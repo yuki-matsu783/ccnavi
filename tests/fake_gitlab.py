@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import json
 import os
 import re
@@ -18,7 +19,20 @@ import urllib.parse
 from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from ccnavi.records import diaglog
+
+def _load_diaglog():
+    """隣の diaglog.py をパスから読む。
+
+    手で使う入口は、このファイルを `tests` パッケージの外で読むため。
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "diaglog.py")
+    spec = importlib.util.spec_from_file_location("ccnavi_test_diaglog", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+diaglog = _load_diaglog()
 
 TOKEN = "fake-gitlab-token-0001"
 DEFAULT_SKEW = timedelta(minutes=3)
@@ -546,7 +560,7 @@ class Server(ThreadingHTTPServer):
         self.stop()
 
 
-def log() -> diaglog.Logger:
+def log():
     return diaglog.get(LOG_NAME)
 
 

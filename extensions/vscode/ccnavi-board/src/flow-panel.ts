@@ -15,7 +15,7 @@
  * 読んだ中身を見比べ、食い違えば場所と両者の値を出して開かない（`core/flow-match.ts`）。保存は次を全部満たすときだけ書く。
  *
  * 1. 実行ファイルの`--lint --flow`が書き出す本文にerrorを言わず、その本文を読んだ中身（`flow.data`）が
- *    画面が書こうとした中身と同じ（`core/flow-match.ts`。PyYAMLで意味が変わる本文を書かない）
+ *    画面が書こうとした中身と同じ（`core/flow-match.ts`。実行ファイルで意味が変わる本文を書かない）
  * 2. 押した時点で実行ファイルに聞き直し、`locked`が偽（着手中でない）
  * 3. 置き場が読んだときと同じ（往復の間にチケットが動いて置き場が替わっていない）
  * 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）
@@ -305,7 +305,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (!value.ok) {
     throw refuse(value.error);
   }
-  // 画面の読み（YAML 1.2）が実行ファイルの読み（PyYAML）と同じときだけ開く。違えば、画面で保存しただけで
+  // 画面の読み（YAML 1.2）が実行ファイルの読み（YAML 1.1）と同じときだけ開く。違えば、画面で保存しただけで
   // 値の意味が変わる（`0755` `yes` `1:30`マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
   const mismatch = flowMismatch(value.value, verdict.data);
   if (mismatch !== undefined) {

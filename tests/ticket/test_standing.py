@@ -15,11 +15,6 @@ import json
 import os
 import unittest
 
-from ccnavi.infra import pathcase, settings
-from ccnavi.tickets.approval import checks as approval_checks
-from ccnavi.tickets.approval import ops as approval_ops
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.model import standing, ticket_model
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text, parent_text
@@ -49,13 +44,6 @@ class AuthorityHarness(PhaseHarness):
         if not result.stdout.strip():
             return ""
         return json.loads(result.stdout).get("hookSpecificOutput", {}).get("permissionDecision", "")
-
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        conf.state = self.state
-        conf.approved = ".ccnavi/approved"
-        conf.tickets = settings.DEFAULT_TICKETS
-        return conf
 
     def board(self):
         return json.loads(self.ccnavi("--explain", "--json").stdout)
@@ -93,12 +81,6 @@ class ParentTreeTest(AuthorityHarness):
         ) as f:
             write(stray, f.read())
         os.remove(os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-02-02.md"))
-        copies, _ = approval.scan(self.conf(), self.root)
-        after = {t.ticket: t.blocked for t in copies}
-        # 理由だけが足される。
-        self.assertIn("i0001-02-02", after)
-        self.assertIn("ワークツリーの外", after["i0001-02-02"])
-        self.assertEqual("", after["i0001-01-01"])
         lint = json.loads(self.ccnavi("--lint", "--json").stdout)
         self.assertTrue(
             any(
@@ -164,15 +146,6 @@ class ParentTreeTest(AuthorityHarness):
         self.assertEqual(1, check.returncode)
         self.assertIn("有効な識別子の形式ではありません", check.stderr)
 
-    def test_the_parent_is_written_to_the_parent_tree(self):
-        # 元ツリーに同じ識別子のチケットがあっても、書く先は親のブランチ。
-        write(os.path.join(self.root, ".ccnavi", "approved", "done", "i0001.md"), "x\n")
-        where = approval.home_dir(self.conf(), self.root, "i0001", "")
-        self.assertEqual(
-            pathcase.fold(os.path.join(self.parent_tree, ".ccnavi", "approved")),
-            pathcase.fold(where),
-        )
-
 
 class NoParentTreeTest(AuthorityHarness):
     """親のワークツリーが無い親子のチケットは決まらず、状態の操作も承認も止める。
@@ -212,28 +185,6 @@ class NoParentTreeTest(AuthorityHarness):
         ready = self.ccnavi("--cwd", parent_tree, "review", "ready", "--result", fixture)
         self.assertNotEqual(0, ready.returncode)
 
-    def test_the_standing_has_no_record_and_no_closed(self):
-        st = standing.standing(self.conf(), self.root, "i0001")
-        self.assertEqual("", st.stop)
-        self.assertEqual("i0001", st.home.name)
-        self.assertEqual("self", st.repo)
-        self.assertFalse(hasattr(st, "closed"))
-        self.assertFalse(hasattr(st, "record"))
-        self.drop_parent()
-        st = standing.standing(self.conf(), self.root, "i0001")
-        self.assertIsNone(st.home)
-        self.assertIn("親のワークツリー", st.stop)
-        self.assertEqual("<ブランチ名>", st.branch_name)
-
-    def test_the_guidance_says_how_to_drop_an_abandoned_family(self):
-        self.drop_parent()
-        st = standing.standing(self.conf(), self.root, "i0001")
-        text = "\n".join(standing.guidance(self.root, st))
-        self.assertIn("ccnavi-git.sh", text)
-        self.assertIn("worktree add .claude/worktrees/i0001", text)
-        self.assertIn("破棄した親子のチケットなら、親のワークツリーを片付ければよい", text)
-        self.assertNotIn("--forget", text)
-
 
 class BusyParentTest(AuthorityHarness):
     def test_a_parent_tree_in_the_middle_of_a_rebase_says_so(self):
@@ -247,49 +198,6 @@ class BusyParentTest(AuthorityHarness):
         finished = self.ccnavi("ticket", "finish", "i0001-01-01")
         self.assertNotEqual(0, finished.returncode)
         self.assertIn("途中の操作（rebase-merge）", finished.stderr)
-
-
-class MarkTest(AuthorityHarness):
-    def test_an_earlier_reason_is_kept(self):
-        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
-        Ticket = ticket_model.Ticket
-        t = Ticket(
-            ticket="i0001-01-01", parent="i0001", tree_root=self.parent_tree, blocked="前の理由"
-        )
-        approval_checks.mark_imported(self.conf(), self.root, [t])
-        self.assertTrue(t.blocked.startswith("前の理由 / "), t.blocked)
-        self.assertIn("合わない", t.blocked)
-
-    def test_a_same_named_tree_in_another_repository_is_not_guessed(self):
-        """同じ名前の親のワークツリーが別のリポジトリにもあれば決めない。
-
-        ワークスペースのユーザの付けた名前 `web-i0012` と、
-        プロジェクト web の issue 12
-        の親子のチケットが並ぶ形。
-        """
-        from ccnavi.infra import tree
-
-        fams = standing.Families(self.conf(), self.root)
-        mine = [w for w in fams.worktrees() if w.name == "i0001"]
-        self.assertEqual(1, len(mine), mine)
-        self.assertEqual("", fams.standing_any("i0001").stop)
-        fams = standing.Families(self.conf(), self.root)
-        fams._worktrees = [
-            *fams.worktrees(),
-            tree.Tree("i0001", os.path.join(self.root, "x"), "web"),
-        ]
-        st = fams.standing_any("i0001")
-        self.assertIn("複数のリポジトリ（self, web）", st.stop)
-        # リポジトリをつければ引ける。
-        self.assertEqual("", fams.standing_any("i0001", "").stop)
-
-    def test_the_repo_key_helpers_live_in_tree(self):
-        from ccnavi.infra import tree
-
-        self.assertEqual("self", tree.repo_key(""))
-        self.assertEqual("web", tree.repo_key("web"))
-        self.assertEqual("", tree.project_of_key("self"))
-        self.assertEqual("web", tree.project_of_key("web"))
 
 
 class PredecessorTest(AuthorityHarness):
@@ -325,26 +233,6 @@ class PredecessorTest(AuthorityHarness):
         text = " ".join(" ".join(r["problems"]) for r in after["rejected"])
         self.assertIn("にもありません", text)
         self.assertIn("predecessors から削除してください", text)
-
-    def test_the_parent_tree_does_not_loosen_a_predecessor(self):
-        # 厳しくする向きだけ: 親のワークツリーで閉じていても、
-        # 前の対応表で満たしていなければ満たさない。
-        Ticket = ticket_model.Ticket
-        done = Ticket(
-            ticket="i0001-01-09", parent="i0001", state="done", tree_root=self.parent_tree
-        )
-        stale = Ticket(ticket="i0001-01-09", parent="i0001", state="doing", tree_root=self.root)
-        pool = {"i0001-01-09": [done, stale]}
-        approval_checks.align_imported(self.conf(), self.root, pool)
-        self.assertEqual([done, stale], pool["i0001-01-09"])
-        # 親のワークツリーで閉じていなければ、それを採る（前の対応表が満たしていても）。
-        doing = Ticket(
-            ticket="i0001-01-08", parent="i0001", state="doing", tree_root=self.parent_tree
-        )
-        closed = Ticket(ticket="i0001-01-08", parent="i0001", state="done", tree_root=self.root)
-        pool = {"i0001-01-08": [doing, closed]}
-        approval_checks.align_imported(self.conf(), self.root, pool)
-        self.assertEqual([doing], pool["i0001-01-08"])
 
 
 class UnreadableChildTest(AuthorityHarness):
@@ -400,18 +288,19 @@ class UnreadableChildTest(AuthorityHarness):
 
 
 class GuidanceByKindTest(AuthorityHarness):
-    """止める理由の種別（`Standing.kind`）で解き方を分ける。文面の部分一致には頼らない。"""
+    """止める理由の種別で解き方を分ける（状態の操作が止まったときの文）。
 
-    def guidance(self, st):
-        return "\n".join(standing.guidance(self.root, st))
+    親のワークツリーが無いときの文は NoParentTreeTest が見る。
+    """
+
+    def refused(self):
+        finished = self.ccnavi("ticket", "finish", "i0001-01-01")
+        self.assertNotEqual(0, finished.returncode)
+        return finished.stderr
 
     def test_a_mismatched_head_names_the_raw_head_not_a_placeholder(self):
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
-        st = standing.standing(self.conf(), self.root, "i0001")
-        self.assertEqual(standing.STOP_MISMATCH, st.kind)
-        self.assertEqual("elsewhere", st.head)
-        self.assertEqual("", st.branch)
-        text = self.guidance(st)
+        text = self.refused()
         self.assertIn("今の HEAD: elsewhere", text)
         self.assertIn("に戻す", text)
         self.assertNotIn("<ブランチ名>", text)
@@ -419,9 +308,7 @@ class GuidanceByKindTest(AuthorityHarness):
 
     def test_a_detached_head_says_it_does_not_point_at_a_branch(self):
         git(self.parent_tree, "checkout", "--quiet", "--detach")
-        st = standing.standing(self.conf(), self.root, "i0001")
-        self.assertEqual(standing.STOP_MISMATCH, st.kind)
-        self.assertIn("HEAD がブランチを指していない", self.guidance(st))
+        self.assertIn("HEAD がブランチを指していない", self.refused())
 
     def test_a_busy_tree_says_to_finish_the_operation(self):
         gitdir = git(self.parent_tree, "rev-parse", "--git-dir").strip()
@@ -431,35 +318,9 @@ class GuidanceByKindTest(AuthorityHarness):
         os.makedirs(os.path.join(gitdir, "rebase-merge"))
         with open(os.path.join(gitdir, "HEAD"), "w", encoding="utf-8") as f:
             f.write(head + "\n")
-        st = standing.standing(self.conf(), self.root, "i0001")
-        self.assertEqual(standing.STOP_BUSY, st.kind)
-        self.assertIn("途中の操作", self.guidance(st))
-        self.assertNotIn("切り直す", self.guidance(st))
-
-    def test_an_absent_tree_says_to_recut_it(self):
-        self.drop_parent()
-        st = standing.standing(self.conf(), self.root, "i0001")
-        self.assertEqual(standing.STOP_ABSENT, st.kind)
-        self.assertIn("切り直す", self.guidance(st))
-
-    def test_a_family_in_two_repositories_does_not_say_to_recut_the_tree(self):
-        from ccnavi.infra import tree
-
-        fams = standing.Families(self.conf(), self.root)
-        fams._worktrees = [
-            *fams.worktrees(),
-            tree.Tree("i0001", os.path.join(self.root, "x"), "web"),
-        ]
-        st = fams.standing_any("i0001")
-        self.assertEqual(standing.STOP_AMBIGUOUS, st.kind)
-        text = self.guidance(st)
-        self.assertIn("複数のリポジトリ", text)
-        self.assertIn("1 つのリポジトリに絞る", text)
+        text = self.refused()
+        self.assertIn("途中の操作", text)
         self.assertNotIn("切り直す", text)
-        self.assertNotIn("worktree add", text)
-
-    def test_a_standing_that_does_not_stop_has_no_kind(self):
-        self.assertEqual("", standing.standing(self.conf(), self.root, "i0001").kind)
 
 
 class ClosedIdentifierReuseTest(AuthorityHarness):
@@ -527,21 +388,6 @@ class LintTest(AuthorityHarness):
             ),
             problems,
         )
-
-
-class HookNoProcessTest(AuthorityHarness):
-    """判定は親のワークツリーのファイルを読むだけで、外部プロセスを起こさない（tree.py の前提）。"""
-
-    def test_the_judge_does_not_spawn(self):
-        import subprocess
-        from unittest import mock
-
-        with mock.patch.object(subprocess, "Popen", side_effect=AssertionError("起こした")):
-            conf = self.conf()
-            copies, _ = approval.scan(conf, self.root)
-            approval_ops.predecessor_pool(conf, self.root)
-            standing.standing(conf, self.root, "i0001")
-        self.assertTrue(copies)
 
 
 if __name__ == "__main__":

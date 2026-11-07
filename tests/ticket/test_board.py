@@ -20,8 +20,6 @@ import os
 import re
 import unittest
 
-from ccnavi.entry import diagnose_board
-from ccnavi.tickets.config import risk
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
 from tests.ticketsample import child_text, parent_text
@@ -390,8 +388,6 @@ class BoardTest(PhaseHarness):
 
     def test_the_merged_head_of_a_child_is_shown(self):
         """finish が書いた `merged_sha`（合流した子の先頭）をボードの JSON に載せる（表示だけ）。"""
-        from ccnavi.tickets.model import ticket_fields
-
         self.scene()
         self.assertEqual(self.close_child("i0001-02-02").returncode, 0)
         found = None
@@ -403,7 +399,9 @@ class BoardTest(PhaseHarness):
             found = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-02-02.md")
         with open(found, encoding="utf-8") as f:
             text = f.read()
-        write(found, ticket_fields.set_fields(text, {"merged_sha": "a" * 40}))
+        head, _, rest = text.partition("\n---\n")
+        head = re.sub(r"\nmerged_sha:[^\n]*", "", head)
+        write(found, f'{head}\nmerged_sha: "{"a" * 40}"\n---\n{rest}')
         by_id = {t["ticket"]: t for t in self.board()["tickets"]}
         self.assertEqual(by_id["i0001-02-02"]["merged_sha"], "a" * 40)
         # finish で閉じた子は、合流した先頭を持つ
@@ -430,152 +428,6 @@ class BoardTest(PhaseHarness):
             sorted(board["parents"][0]["phases"][0]),
         )
         self.assertEqual(sorted(fixture["sums"][0]["phases"]), sorted(board["sums"][0]["phases"]))
-
-
-def _ticket(ticket_id: str, parent: str = "", phase_number: int | None = None, **fields) -> dict:
-    """要対応を決めるのに要る欄だけを持つ、順調なチケット 1 件（作業中でワークツリーがある）。"""
-    record = {
-        "ticket": ticket_id,
-        "parent": parent,
-        "phase": phase_number,
-        "proposal": None,
-        "blocked": "",
-        "copy": {"status": "open"},
-        "worktree": {"exists": True},
-        "risk": None,
-        "scattered": [],
-    }
-    record.update(fields)
-    return record
-
-
-def _phase(number: int, **fields) -> dict:
-    record = {"number": number, "gate_closed": False, "review_waiting": False}
-    record["risk_escalates"] = False
-    record.update(fields)
-    return record
-
-
-class AttentionTest(unittest.TestCase):
-    """`_mark_attention` の条件を 1 つずつ。どれも外れれば偽で、不備は無い。"""
-
-    def mark(self, tickets, phases=(), pending=()):
-        payload = {
-            "tickets": tickets,
-            "parents": [{"ticket": "i0001", "phases": list(phases)}],
-            "pending_approval": list(pending),
-        }
-        diagnose_board._mark_attention(payload)
-        return {t["ticket"]: t for t in payload["tickets"]}
-
-    def calm(self, **child):
-        return self.mark(
-            [_ticket("i0001"), _ticket("i0001-01-01", "i0001", 1, **child)], [_phase(1)]
-        )
-
-    def test_nothing_to_do_is_false_without_issues(self):
-        for t in self.calm().values():
-            self.assertFalse(t["attention"], t["ticket"])
-            self.assertEqual(t["issues"], [], t["ticket"])
-
-    def test_pending_approval(self):
-        got = self.mark([_ticket("i0001")], pending=["i0001"])
-        self.assertTrue(got["i0001"]["attention"])
-
-    def test_own_phase_gate_closed(self):
-        got = self.mark(
-            [
-                _ticket("i0001"),
-                _ticket("i0001-01-01", "i0001", 1),
-                _ticket("i0001-02-01", "i0001", 2),
-            ],
-            [_phase(1, gate_closed=True), _phase(2)],
-        )
-        self.assertTrue(got["i0001-01-01"]["attention"])
-        # 別のフェーズの子は巻き込まない
-        self.assertFalse(got["i0001-02-01"]["attention"])
-
-    def test_own_phase_review_waiting(self):
-        got = self.mark(
-            [_ticket("i0001"), _ticket("i0001-01-01", "i0001", 1)],
-            [_phase(1, review_waiting=True)],
-        )
-        self.assertTrue(got["i0001-01-01"]["attention"])
-
-    def test_no_worktree_in_the_todo_or_doing_column(self):
-        gone = {"exists": False}
-        self.assertTrue(self.calm(worktree=gone)["i0001-01-01"]["attention"])
-        review = {"state": "review"}
-        self.assertTrue(
-            self.calm(worktree=gone, proposal=review, copy={"status": "review"})["i0001-01-01"][
-                "attention"
-            ]
-        )
-        # 閉じた（完了・取り消し）子はワークツリーが無くても要対応ではない
-        closed = self.calm(worktree=gone, copy={"status": "closed"})
-        self.assertFalse(closed["i0001-01-01"]["attention"])
-        # 提案が残っていれば閉じていても未着手・作業中の列
-        todo = {"state": "todo"}
-        reopened = self.calm(worktree=gone, copy={"status": "closed"}, proposal=todo)
-        self.assertTrue(reopened["i0001-01-01"]["attention"])
-
-    def test_own_risk_high_or_above(self):
-        for level, expected in (
-            (risk.LEVEL_HIGH, True),
-            (risk.LEVEL_CRITICAL, True),
-            (risk.LEVEL_MEDIUM, False),
-            (risk.LEVEL_LOW, False),
-        ):
-            got = self.calm(risk={"points": 70, "level": level})
-            self.assertEqual(got["i0001-01-01"]["attention"], expected, level)
-
-    def test_scattered(self):
-        where = [{"tree": "a", "state": "doing", "path": "x"}]
-        self.assertTrue(self.calm(scattered=where)["i0001-01-01"]["attention"])
-
-    def test_blocked_is_an_issue(self):
-        got = self.calm(blocked="親が引けない")["i0001-01-01"]
-        self.assertEqual(got["issues"], ["書き込みが止まっています: 親が引けない"])
-        self.assertTrue(got["attention"])
-
-    def test_no_proposal_and_no_open_or_closed_copy_is_an_issue(self):
-        for status in ("none", "review"):
-            got = self.calm(copy={"status": status})["i0001-01-01"]
-            self.assertEqual(
-                got["issues"], ["提案が見つかりません（承認済みチケットだけがあります）"], status
-            )
-            self.assertTrue(got["attention"], status)
-        # 提案があれば不備ではない
-        todo = self.calm(copy={"status": "none"}, proposal={"state": "todo"})["i0001-01-01"]
-        self.assertEqual(todo["issues"], [])
-
-    def test_missing_parent_is_an_issue(self):
-        got = self.mark([_ticket("i0002-01-01", "i0002", 1)])["i0002-01-01"]
-        self.assertEqual(got["issues"], ["親 i0002 が見つかりません"])
-        self.assertTrue(got["attention"])
-
-    def test_issues_come_in_order(self):
-        stray = _ticket("i0002-01-01", "i0002", 1, blocked="b", copy={"status": "none"})
-        got = self.mark([stray])["i0002-01-01"]
-        self.assertEqual(
-            got["issues"],
-            [
-                "書き込みが止まっています: b",
-                "提案が見つかりません（承認済みチケットだけがあります）",
-                "親 i0002 が見つかりません",
-            ],
-        )
-
-    def test_parent_follows_any_of_its_phases(self):
-        for flag in ("gate_closed", "review_waiting", "risk_escalates"):
-            got = self.mark([_ticket("i0001")], [_phase(1), _phase(2, **{flag: True})])
-            self.assertTrue(got["i0001"]["attention"], flag)
-        # 子はほかのフェーズの状態では要対応にならない（自分のフェーズだけを見る）
-        got = self.mark(
-            [_ticket("i0001"), _ticket("i0001-01-01", "i0001", 1)],
-            [_phase(1), _phase(2, risk_escalates=True)],
-        )
-        self.assertFalse(got["i0001-01-01"]["attention"])
 
 
 def _portable(value, root: str):

@@ -1,0 +1,25 @@
+// Package fsio はファイルの読み書きの入口。記録・マーカー・承認済みチケット・下書きは全部ここを通す。
+//
+// 読めなければ false か error、書けなければ理由の文（Python の str(OSError) と同じ文）を返し、hook の中で
+// 失敗が上へ抜けて判定に達しないまま終わることを防ぐ。理由の文に「書けない」のような言い回しは足さない
+// （呼び手の用件）。書いたパスは Recorder が集め（write-and-push のコミットの対象）、Staging の間は
+// ディスクに書かずに Op として溜める（承認の plan）。時刻は Stamp だけが読み、FixClock で固定できる。
+//
+// Python からの対応: 書き込みの 7 種類は WriteFile（バイト列）・WriteText（本文）の How で選ぶ。
+// write_text → WriteText(…, Plain)、write_text_atomic → Atomic、write_text_durable → Durable、
+// write_bytes → WriteFile(…, Plain)、write_bytes_atomic → Durable（fsync し、`.<名前>.<一意>.part` に書いてから差し替える）、write_new → New、
+// write_new_durable → NewDurable。write_json_atomic → WriteJSON、replace_bytes → ReplaceFile、
+// read_dict → ReadObject、read_json の (値, 例外) → ReadJSON の (値, error)、clock → FixClock、
+// recording → StartRecording と Recorder.Stop、policy → SetPolicy、slashed → ospath.Slashed。
+// open(path, "a") の 1 行の追記 → AppendLine、time.time() の秒との変換 → UnixSeconds・FromUnixSeconds、
+// datetime.isoformat → ISOFormat（秒までの書式は ISOStampLayout）、f"{prefix}{safe_name(id)}.json" の
+// 記録のパス → RecordPath（拡張子は JSONExt）、会話の記録を末尾から広げて読む → ScanTail、
+// shutil.copy2 → CopyFile、safe_name(x) or 既定 → SafeNameOr、fsio を通さない open(path, encoding="utf-8").read() →
+// ReadDiskText、open(path, "rb").read() → ReadDiskBytes（溜める段は見ない）、bytes.decode("utf-8", errors=…) →
+// DecodeBytes（改行は読み替えない）、OSError を Python の文のまま上へ渡す → Wrap、exc.strerror → StrError（番号の
+// 無いエラーは空）、exc.errno == errno.EXDEV → CrossDevice、json.dumps(...) を書く形（indent・ensure_ascii・末尾の改行・改行・書き方）→ WriteJSONAs と
+// JSONFormat、read_line(stdin).strip().lower() → ReadAnswer（y・yes なら → ReadYes）、getattr(os, "O_NOFOLLOW", 0)・
+// O_NONBLOCK → NoFollow・NonBlock（その 2 つで開いて fstat → OpenNoFollow）、名前・識別子に入れる時刻の
+// "%Y%m%d%H%M%S"・"%Y%m%d-%H%M%S" → IDStampLayout・NameStampLayout、時差を除いた StampLayout → LocalStampLayout、
+// ファイルの中身の hashlib の要約（少しずつ読む）→ DiskDigest、hook の時刻の差し込み口 → Now・SetNow。
+package fsio

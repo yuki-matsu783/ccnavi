@@ -16,6 +16,9 @@ fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ�
 4. 調べられないプロジェクト（ミラーがリンク）は error にして、まとめて揃える対象から外す
 5. 工程スキルのコピー（`skills/`）も同じ入口で調べて揃える。書く順と、片方の失敗
 6. 入口: JSON の形、組み合わせの誤り、ターミナルなしの `--yes` の拒否
+
+1〜5 の調べ方と揃え方の細部は Go のテスト（go/internal/tickets/sync/mirror）が確かめる。
+ここでは 6 の入口を外から動かす。
 """
 
 from __future__ import annotations
@@ -23,20 +26,9 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.infra import settings
-from ccnavi.tickets.sync import mirrorsync
-from tests.config.test_config_union import (
-    COMMON_RISK,
-    COMMON_RULES,
-    ConfigUnionHarness,
-    git,
-    read,
-    write,
-)
+from tests.config.test_config_union import ConfigUnionHarness, write
 
 MIRROR = (".ccnavi", "config", "common")
-# 共通レイヤーの中身を変えるための、配点の項目を 1 つ追加する行（読める形）。
-EXTRA_FACTOR = "  - {id: extra, points: 1, lines_over: 99, message: 足した}\n"
 
 
 def mirror_of(project_root, name):
@@ -44,295 +36,18 @@ def mirror_of(project_root, name):
 
 
 class MirrorSyncTest(ConfigUnionHarness):
-    def conf(self):
-        conf, _ = settings.load(self.ws)
-        return conf
-
-    def plan(self, wanted=None):
-        return mirrorsync.prepare(self.conf(), self.ws, wanted)
-
-    def by_name(self, plan):
-        return {p.name: p for p in plan.projects}
+    def view(self, *names):
+        """`user mirror --json` の答え（書かずに調べる）。"""
+        result = self.user_mirror(*names, "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout)
 
     def sync_all(self):
-        """全プロジェクトのミラーを、共通レイヤーに揃える。"""
-        plan = self.plan()
-        done = mirrorsync.apply(self.conf(), plan, plan.expect)
-        self.assertTrue(done.ok, done.error)
-        return done
-
-    # ---- 1. 調べる
-
-    def test_a_project_without_a_mirror_differs_by_creating_the_files(self):
-        plan = self.plan()
-        self.assertEqual(plan.error, "")
-        found = self.by_name(plan)
-        self.assertEqual(sorted(found), ["app", "lib"])
-        for project in found.values():
-            self.assertEqual(project.state, mirrorsync.STATE_DIFFERS, project.name)
-            actions = {c.rel: mirrorsync.action_of(c) for c in project.changes}
-            self.assertEqual(actions[".ccnavi/config/common/rules.yml"], "create")
-            self.assertEqual(actions[".ccnavi/config/common/risks.yml"], "create")
-            self.assertNotEqual(project.expect, "")
-
-    def test_a_synced_project_has_no_changes_and_no_expect(self):
-        self.sync_all()
-        plan = self.plan()
-        for project in plan.projects:
-            self.assertEqual(project.state, mirrorsync.STATE_SYNCED, project.name)
-            self.assertEqual(project.changes, [])
-            self.assertEqual(project.expect, "")
-        self.assertEqual(plan.expect, "")
-
-    def test_a_file_the_common_layer_does_not_have_is_a_delete(self):
-        self.sync_all()
-        write(mirror_of(self.lib, "old.yml"), "version: 1\n")
-        project = self.by_name(self.plan())["lib"]
-        self.assertEqual(project.state, mirrorsync.STATE_DIFFERS)
-        self.assertEqual(
-            [(c.rel, mirrorsync.action_of(c)) for c in project.changes],
-            [(".ccnavi/config/common/old.yml", "delete")],
-        )
-
-    def test_a_changed_file_is_an_update(self):
-        self.sync_all()
-        write(mirror_of(self.lib, "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
-        project = self.by_name(self.plan())["lib"]
-        self.assertEqual(
-            [(c.rel, mirrorsync.action_of(c)) for c in project.changes],
-            [(".ccnavi/config/common/risks.yml", "update")],
-        )
-
-    def test_a_line_ending_difference_is_not_a_difference(self):
-        self.sync_all()
-        raw = read(mirror_of(self.lib, "risks.yml")).replace("\n", "\r\n")
-        with open(mirror_of(self.lib, "risks.yml"), "w", encoding="utf-8", newline="") as f:
-            f.write(raw)
-        self.assertEqual(self.by_name(self.plan())["lib"].state, mirrorsync.STATE_SYNCED)
-
-    def test_names_pick_the_projects_to_show_and_unknown_names_are_an_error(self):
-        plan = self.plan(["lib"])
-        self.assertEqual([p.name for p in plan.projects if p.selected], ["lib"])
-        self.assertEqual(plan.expect, self.by_name(plan)["lib"].expect)
-        bad = self.plan(["nothing"])
-        self.assertIn("nothing", bad.error)
-        self.assertEqual(bad.projects, [])
-
-    def test_names_are_matched_without_regard_to_case(self):
-        plan = self.plan(["LIB"])
-        self.assertEqual([p.name for p in plan.projects if p.selected], ["lib"])
-
-    def test_the_expect_changes_when_the_common_layer_changes(self):
-        before = self.plan().expect
-        write(self.risk, COMMON_RISK + EXTRA_FACTOR)
-        after = self.plan().expect
-        self.assertNotEqual(before, after)
-
-    def test_an_unreadable_common_layer_is_an_error_for_the_whole_plan(self):
-        write(self.rules, "version: 99\n")
-        plan = self.plan()
-        self.assertNotEqual(plan.error, "")
-        self.assertEqual(plan.projects, [])
-
-    # ---- 2. 共通レイヤーが空
-
-    def test_an_empty_common_layer_is_not_a_difference_and_deletes_nothing(self):
-        self.sync_all()
-        for path in (self.rules, self.phases, self.risk):
-            if os.path.exists(path):
-                os.remove(path)
-        plan = self.plan()
-        self.assertTrue(plan.common_empty)
-        for project in plan.projects:
-            self.assertEqual(project.state, mirrorsync.STATE_SYNCED, project.name)
-        done = mirrorsync.apply(self.conf(), plan, plan.expect)
-        self.assertFalse(done.ok)
-        self.assertTrue(os.path.exists(mirror_of(self.lib, "rules.yml")))
-
-    # ---- 3. 揃える
-
-    def test_apply_writes_the_mirror_only_and_does_not_commit(self):
-        config_file = os.path.join(self.lib, ".ccnavi", "config", "project", "rules.yml")
-        config_before = read(config_file) if os.path.exists(config_file) else None
-        head = git(self.lib, "rev-parse", "HEAD")
-
-        plan = self.plan(["lib"])
-        done = mirrorsync.apply(self.conf(), plan, plan.expect)
-
-        self.assertTrue(done.ok, done.error)
-        self.assertEqual([name for name, _ in done.synced], ["lib"])
-        self.assertEqual(json.loads(read(mirror_of(self.lib, "rules.yml"))), COMMON_RULES)
-        self.assertEqual(read(mirror_of(self.lib, "risks.yml")), COMMON_RISK)
-        self.assertFalse(os.path.exists(mirror_of(self.app, "rules.yml")))
-        if config_before is not None:
-            self.assertEqual(read(config_file), config_before)
-        self.assertEqual(git(self.lib, "rev-parse", "HEAD"), head)
-
-    def test_apply_with_a_stale_expect_writes_nothing(self):
-        plan = self.plan()
-        done = mirrorsync.apply(self.conf(), plan, "0" * 64)
-        self.assertFalse(done.ok)
-        self.assertEqual(done.error, mirrorsync.STALE)
-        self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
-
-    def test_apply_with_an_empty_expect_writes_nothing(self):
-        plan = self.plan()
-        done = mirrorsync.apply(self.conf(), plan, "")
-        self.assertFalse(done.ok)
-        self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
-
-    def test_apply_refuses_when_the_common_layer_changed_after_it_was_shown(self):
-        shown = self.plan().expect
-        write(self.risk, COMMON_RISK + EXTRA_FACTOR)
-        done = mirrorsync.apply(self.conf(), self.plan(), shown)
-        self.assertFalse(done.ok)
-        self.assertEqual(done.error, mirrorsync.STALE)
-        self.assertFalse(os.path.exists(mirror_of(self.lib, "risks.yml")))
-
-    def test_apply_with_nothing_to_sync_says_so(self):
-        self.sync_all()
-        plan = self.plan()
-        done = mirrorsync.apply(self.conf(), plan, plan.expect)
-        self.assertFalse(done.ok)
-        self.assertIn("揃えるミラーはありません", done.error)
-
-    def test_apply_by_name_leaves_the_other_projects_alone(self):
-        plan = self.plan(["lib"])
-        self.assertTrue(mirrorsync.apply(self.conf(), plan, plan.expect).ok)
-        again = self.by_name(self.plan())
-        self.assertEqual(again["lib"].state, mirrorsync.STATE_SYNCED)
-        self.assertEqual(again["app"].state, mirrorsync.STATE_DIFFERS)
-
-    # ---- 4. 調べられないプロジェクト
-
-    def test_a_linked_mirror_is_an_error_and_is_left_out_of_the_bulk_sync(self):
-        outside = os.path.join(os.path.dirname(self.ws), "elsewhere")
-        os.makedirs(outside)
-        os.makedirs(os.path.join(self.app, ".ccnavi", "config"), exist_ok=True)
-        os.symlink(outside, os.path.join(self.app, ".ccnavi", "config", "common"))
-
-        plan = self.plan()
-        found = self.by_name(plan)
-        self.assertEqual(found["app"].state, mirrorsync.STATE_ERROR)
-        self.assertNotEqual(found["app"].error, "")
-        self.assertEqual(found["lib"].state, mirrorsync.STATE_DIFFERS)
-        self.assertEqual([p.name for p in plan.chosen], ["lib"])
-        done = mirrorsync.apply(self.conf(), plan, plan.expect)
-        self.assertTrue(done.ok, done.error)
-        self.assertEqual(os.listdir(outside), [])
-
-    # ---- 工程スキル（skills/）
-
-    def skill(self, name="process-test", body="# 本文\n", refs=None):
-        """ワークスペースの共通の工程スキル `.claude/skills/<名前>/` を作る。"""
-        top = os.path.join(self.ws, ".claude", "skills", name)
-        write(os.path.join(top, "SKILL.md"), f"---\nname: {name}\nprocess: true\n---\n{body}")
-        for rel, text in (refs or {}).items():
-            write(os.path.join(top, "references", "common", rel), text)
-
-    def skill_changes(self, name):
-        return sorted(
-            (c.rel, mirrorsync.action_of(c))
-            for c in self.by_name(self.plan())[name].changes
-            if mirrorsync.is_skill(c)
-        )
-
-    def test_a_missing_skills_copy_is_a_create_and_the_expect_covers_its_content(self):
-        self.skill(refs={"a.md": "A\n"})
-        self.sync_all()
-        self.skill(body="# 変えた\n", refs={"a.md": "A\n"})
-        before = self.by_name(self.plan())["lib"].expect
-        self.skill(body="# さらに変えた\n", refs={"a.md": "A\n"})
-        self.assertEqual(
-            self.skill_changes("lib"), [("skills/process-test/SKILL.md", mirrorsync.ACTION_UPDATE)]
-        )
-        self.assertNotEqual(self.by_name(self.plan())["lib"].expect, before)
-
-    def test_without_process_skills_the_expect_is_the_mirror_only_value(self):
-        plan = self.plan()
-        for project in plan.projects:
-            self.assertFalse([c for c in project.changes if mirrorsync.is_skill(c)])
-        self.skill()
-        self.assertNotEqual(self.plan().expect, plan.expect)
-
-    def test_apply_writes_the_skills_and_the_mirror_and_then_nothing_differs(self):
-        self.skill(refs={"a.md": "A\n"})
-        self.assertEqual(
-            self.skill_changes("lib"),
-            [
-                ("skills/process-test/SKILL.md", mirrorsync.ACTION_CREATE),
-                ("skills/process-test/references/common/a.md", mirrorsync.ACTION_CREATE),
-            ],
-        )
-        self.sync_all()
-        self.assertEqual(
-            read(os.path.join(self.lib, "skills", "process-test", "references", "common", "a.md")),
-            "A\n",
-        )
-        self.assertTrue(os.path.exists(mirror_of(self.lib, "rules.yml")))
-        for project in self.plan().projects:
-            self.assertEqual(project.state, mirrorsync.STATE_SYNCED, project.name)
-
-    def test_a_file_removed_from_the_common_side_is_deleted_and_the_empty_dir_is_pruned(self):
-        self.skill(refs={"sub/a.md": "A\n"})
-        self.sync_all()
-        os.remove(
-            os.path.join(
-                self.ws, ".claude", "skills", "process-test", "references", "common", "sub", "a.md"
-            )
-        )
-        self.assertEqual(
-            self.skill_changes("lib"),
-            [("skills/process-test/references/common/sub/a.md", mirrorsync.ACTION_DELETE)],
-        )
-        self.sync_all()
-        common = os.path.join(self.lib, "skills", "process-test", "references", "common")
-        self.assertFalse(os.path.exists(os.path.join(common, "sub")))
-        self.assertTrue(
-            os.path.exists(os.path.join(self.lib, "skills", "process-test", "SKILL.md"))
-        )
-
-    def test_skills_only_differences_are_not_common_empty(self):
-        self.sync_all()
-        for path in (self.rules, self.phases, self.risk):
-            if os.path.exists(path):
-                os.remove(path)
-        self.skill()
-        plan = self.plan()
-        self.assertFalse(plan.common_empty)
-        self.assertEqual(self.by_name(plan)["lib"].state, mirrorsync.STATE_DIFFERS)
-        done = mirrorsync.apply(self.conf(), plan, plan.expect)
-        self.assertTrue(done.ok, done.error)
-        self.assertTrue(
-            os.path.exists(os.path.join(self.lib, "skills", "process-test", "SKILL.md"))
-        )
-        self.assertTrue(os.path.exists(mirror_of(self.lib, "rules.yml")))
-
-    def test_a_linked_skills_dir_is_an_error_for_that_project(self):
-        self.skill()
-        outside = os.path.join(os.path.dirname(self.ws), "elsewhere-skills")
-        os.makedirs(outside)
-        os.symlink(outside, os.path.join(self.app, "skills"))
-        found = self.by_name(self.plan())
-        self.assertEqual(found["app"].state, mirrorsync.STATE_ERROR)
-        self.assertEqual(found["lib"].state, mirrorsync.STATE_DIFFERS)
-        self.assertEqual(os.listdir(outside), [])
-
-    def test_a_skills_failure_leaves_the_mirror_unwritten_and_is_reported(self):
-        self.skill()
-        plan = self.plan()
-        original = mirrorsync.skillsync.apply
-        mirrorsync.skillsync.apply = lambda changes: "書けない"
-        try:
-            done = mirrorsync.apply(self.conf(), plan, plan.expect)
-        finally:
-            mirrorsync.skillsync.apply = original
-        self.assertFalse(done.ok)
-        self.assertIn("書けない", done.error)
-        self.assertEqual(done.synced, [])
-        self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
-        # 次に調べると、残りの差分がそのまま出る
-        self.assertEqual(self.by_name(self.plan())["lib"].state, mirrorsync.STATE_DIFFERS)
+        """全プロジェクトのミラーを、共通レイヤーに揃える（ボードの経路）。"""
+        expect = self.view()["expect"]
+        result = self.user_mirror("--yes", "--expect", expect, "--via", "board", "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(json.loads(result.stdout)["ok"], result.stdout)
 
     # ---- 6. 入口
 
@@ -353,8 +68,8 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertIn(
             {"rel": ".ccnavi/config/common/rules.yml", "action": "create"}, lib["changes"]
         )
-        self.assertEqual(lib["expect"], self.by_name(self.plan())["lib"].expect)
-        self.assertEqual(answer["expect"], self.plan().expect)
+        self.assertTrue(lib["expect"])
+        self.assertEqual(answer["expect"], self.view()["expect"])
 
     def test_the_view_writes_nothing(self):
         self.user_mirror("--json")
@@ -364,7 +79,9 @@ class MirrorSyncTest(ConfigUnionHarness):
         result = self.user_mirror()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("ずれ", result.stdout)
-        self.assertIn(f"ccnavi-user-mirror.sh --yes --expect {self.plan().expect}", result.stdout)
+        self.assertIn(
+            f"ccnavi-user-mirror.sh --yes --expect {self.view()['expect']}", result.stdout
+        )
 
     def test_the_text_view_quotes_names_and_shows_how_to_see_the_diff(self):
         self.project("odd name")
@@ -382,7 +99,7 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertNotIn("上書き・削除します", fresh.stdout)
 
     def test_the_board_route_syncs_with_a_matching_expect(self):
-        expect = self.plan(["lib"]).expect
+        expect = self.view("lib")["expect"]
         result = self.user_mirror("lib", "--yes", "--expect", expect, "--via", "board", "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         answer = json.loads(result.stdout)

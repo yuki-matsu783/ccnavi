@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import re
@@ -21,6 +20,7 @@ import tempfile
 import unittest
 
 from tests import ROOT
+from tests.sh import install_harness
 
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
 
@@ -47,18 +47,10 @@ def _launcher_source():
 LAUNCHER = _launcher_source()
 
 
-def _load_build():
-    """build.py を名前でなく場所で読む。`import build` は PyInstaller の作業場所
-    （build/）や同名のパッケージを読み込みうる。"""
-    spec = importlib.util.spec_from_file_location("ccnavi_build", os.path.join(ROOT, "build.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-# この機械で組み立てたときに build.py が書く目印。導入スクリプトはこれを自分の uname と
-# 比べる。ここを実際の build_target から取るので、2 つの語が食い違えばテストが失敗する。
-THIS_MACHINE = _load_build().build_target()
+# この機械で組み立てたときに scripts/ccnavi-build.sh が書く目印。導入スクリプトはこれを自分の
+# uname と比べる。ここは uname とは別の読み方（install_harness.host_target）で取るので、
+# 2 つの語が食い違えばテストが失敗する。
+THIS_MACHINE = install_harness.THIS_MACHINE
 # どの機械とも一致しない目印。
 ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -163,7 +155,6 @@ TEMPLATES_PARTS = (".ccnavi", "config", "common", "templates")
 # 機械の名前は <M>、配布先は <T> に置き換えて比べる。
 NO_TEMPLATES_FILES = [
     ".ccnavi/CCNAVI.md",
-    ".ccnavi/bin/<M>/_internal/base_library.zip",
     ".ccnavi/bin/<M>/ccnavi",
     ".ccnavi/config/common/phases.yml",
     ".ccnavi/config/common/risks.yml",
@@ -1278,10 +1269,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     ):
         """配布元のふりをするディレクトリを作る。
 
-        実物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
+        実物を組み立てない。ここで見たいのは
         「どこから何を配るか」であって、実行ファイルの中身ではない。
 
-        target は build.py が dist/ccnavi.target に書く目印。None なら書かない
+        target は scripts/ccnavi-build.sh が dist/ccnavi.target に書く目印。None なら書かない
         （目印の無い配布元）。
 
         launcher が偽なら、.ccnavi/scripts/ccnavi-launcher.sh だけを置かない。
@@ -1300,16 +1291,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 with open(os.path.join(src, "dist", "ccnavi.target"), "w", encoding="utf-8") as f:
                     f.write(target + "\n")
             binary = os.path.join(src, "dist", "ccnavi", "ccnavi")
-            os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
+            os.makedirs(os.path.dirname(binary))
             with open(binary, "w", encoding="utf-8") as f:
                 f.write("#!/bin/sh\nexit 0\n")
             os.chmod(binary, 0o755)
-            with open(
-                os.path.join(src, "dist", "ccnavi", "_internal", "base_library.zip"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                f.write("同梱物")
         if parts:
             os.makedirs(os.path.dirname(os.path.join(src, *RULES_PARTS)))
             with open(
@@ -1416,7 +1401,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
-        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
         with (
             open(self.deployed(*LAUNCHER_PARTS), encoding="utf-8") as f,
             open(LAUNCHER, encoding="utf-8") as g,
@@ -1622,19 +1606,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     expected,
                 )
 
-    def test_a_distribute_skill_is_not_copied_into_the_projects_by_the_prompt_sync(self):
-        """配るだけのスキルは工程スキルではない。ユーザの発言のときの同期の対象に入らない。"""
-        from ccnavi.tickets.sync import skillsync
-
-        root = tempfile.mkdtemp(prefix="ccnavi-skills-")
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        for name, text in (("tool", self.DISTRIBUTE), ("process-test", self.PROCESS)):
-            path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
-            os.makedirs(os.path.dirname(path))
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(text)
-        self.assertEqual(skillsync.processes(root), ["process-test"])
-
     def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
         src = self.make_source(skills=self.skill_files())
         path = self.deployed(".claude", "skills", "process-test", "SKILL.md")
@@ -1649,13 +1620,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             self.assertEqual(f.read(), self.PROCESS)
 
     def test_reads_the_process_flag_like_the_ticket_start_does(self):
-        """配る判定は、親チケットの着手がコピーする判定（skillsync）と同じ答えを返す。
+        """配る判定は、親チケットの着手がコピーする判定と同じ答えを返す。
 
         食い違うと、着手がコピーする元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
-        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。
+        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。着手の側の判定は
+        go test（go/internal/tickets/sync/mirror/setup_sh_test.go）が同じ表で見る。
+        配るだけのスキル（distribute）を工程として数えないことも、そちらが見る。
         """
-        from ccnavi.tickets.sync import skillsync
-
         cases = {
             "lf": ("---\nname: x\nprocess: true\n---\n", True),
             "crlf": ("---\r\nname: x\r\nprocess: true\r\n---\r\n", True),
@@ -1670,7 +1641,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         }
         for label, (text, expected) in cases.items():
             with self.subTest(label=label):
-                self.assertIs(skillsync._process_flag(text.encode("utf-8")), expected)
                 src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
                 target = tempfile.mkdtemp(prefix="ccnavi-setup-")
                 self.addCleanup(shutil.rmtree, target, ignore_errors=True)
@@ -1915,7 +1885,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], BIN_PATH)
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
-        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
         self.assertEqual(sorted(os.listdir(self.deployed(*BIN_DIR_PARTS))), [THIS_MACHINE])
         self.assertNotIn("まだ無いもの", result.stdout)
 
@@ -2007,7 +1976,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
         link = os.path.join(home, ".local", "bin", "ccnavi")
         self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi")))
-        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
         self.assertTrue(os.path.islink(link))
         self.assertEqual(os.readlink(link), os.path.join(share, "ccnavi"))
         # 配布先の .ccnavi/bin/ には置かず、無視する行も追加しない。sh と設定は配る。
@@ -2050,8 +2018,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         replaced = self.run_user_bin(home, *args, answer="y")
         self.assertEqual(replaced.returncode, 0, replaced.stdout + replaced.stderr)
         share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
-        with open(os.path.join(share, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "新しい同梱物")
+        with open(os.path.join(share, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい組み立て")
 
     # ---- PATH の案内は、環境に合った追加の仕方を言う
 
@@ -2170,7 +2138,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_on_git_bash_puts_the_folder_on_the_path_and_makes_no_link(self):
-        """Git Bash はリンクを使わず、ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
+        """Git Bash はリンクを使わず、ccnavi.exe が在るフォルダを PATH に通す。"""
         src = self.make_source(target="windows-x86_64")
         with open(os.path.join(src, "dist", "ccnavi", "ccnavi.exe"), "w", encoding="utf-8") as f:
             f.write("exe")
@@ -2183,7 +2151,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         share = os.path.join(home, ".local", "share", "ccnavi", "windows-x86_64")
         self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi.exe")))
-        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
         self.assertFalse(os.path.exists(os.path.join(home, ".local", "bin")))
         # Windows の環境変数 Path に、実体のフォルダを追加する手順を言う。rc には触れない。
         self.assertIn("SetEnvironmentVariable", result.stdout)
@@ -2319,7 +2286,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
         self.assertIn("配っていません", result.stdout)
-        self.assertIn("build.py", result.stdout)
+        self.assertIn("scripts/ccnavi-build.sh", result.stdout)
 
     def test_does_not_refuse_when_the_default_source_is_the_target(self):
         """ccnavi 自身に打っても止まらない。配る先が無いので、配布だけ諦める。"""
@@ -2362,9 +2329,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
 
-    def change_source_build(self, src, text="新しい同梱物"):
+    def change_source_build(self, src, text="新しい組み立て"):
         """配布元の組み立てを変える（組み立て直したことにする）。"""
-        with open(os.path.join(src, "dist", "ccnavi", "_internal", "base_library.zip"), "w") as f:
+        with open(os.path.join(src, "dist", "ccnavi", "ccnavi"), "w", encoding="utf-8") as f:
             f.write(text)
 
     def test_replaces_a_build_that_differs_from_the_source_without_force(self):
@@ -2375,7 +2342,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
-        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
+        stale = self.built(THIS_MACHINE, "前の版の残り")
         with open(stale, "w", encoding="utf-8") as f:
             f.write("前の版")
         self.change_source_build(src)
@@ -2383,8 +2350,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("入れ替えた", result.stdout)
-        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "新しい同梱物")
+        with open(self.built(THIS_MACHINE, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい組み立て")
         self.assertFalse(os.path.exists(stale))
         # 新しい版を隣に作ってから入れ替えるので、途中の置き場を残さない。
         left = [
@@ -2396,12 +2363,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """中身が同じなら置き換えない。何度実行しても同じ結果になる。"""
         src = self.make_source()
         self.run_setup("--deploy", src)
-        before = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+        before = os.stat(self.built(THIS_MACHINE, "ccnavi")).st_mtime_ns
 
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("入れ替えた", result.stdout)
-        after = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+        after = os.stat(self.built(THIS_MACHINE, "ccnavi")).st_mtime_ns
         self.assertEqual(before, after)
 
     def test_a_differing_build_does_not_replace_the_rules_the_project_edited(self):
@@ -2416,8 +2383,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
-        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "新しい同梱物")
+        with open(self.built(THIS_MACHINE, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい組み立て")
 
     def test_check_counts_a_differing_build_as_not_settled(self):
         """`--check` は、配布元と中身が違う実行ファイルを「揃っていない」に数える。書かない。"""
@@ -2427,18 +2394,17 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "同梱物")
+        with open(self.built(THIS_MACHINE, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "#!/bin/sh\nexit 0\n")
 
     def test_force_replaces_and_drops_the_previous_build(self):
         """`--force` なら入れ替える。前の組み立ての残りも持ち越さない。
 
-        PyInstaller の同梱物は名前で引かれるので、前の版の同梱物が残ると
-        新しい実行ファイルがそれを読み込む。
+        前の版にだけあったファイルが残ると、置き場の中身がどの版のものか分からなくなる。
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
-        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
+        stale = self.built(THIS_MACHINE, "前の版の残り")
         with open(stale, "w", encoding="utf-8") as f:
             f.write("前の版")
         with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:
@@ -2460,7 +2426,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         src = self.make_source(built=False)
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("build.py", result.stderr)
+        self.assertIn("scripts/ccnavi-build.sh", result.stderr)
         self.assertFalse(os.path.exists(self.settings_path()))
 
     def test_names_what_the_source_does_not_have(self):
@@ -2549,7 +2515,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
     """実行ファイルを、組み立てた機械の置き場（`<os>-<arch>/`）に入れる。
 
-    PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かない。機械ごとに
+    実行ファイルは組み立てた向きの OS と CPU でしか動かない。機械ごとに
     置き場を分けるので、別の機械向けを配ってもこの機械の実行ファイルは上書きされない。
     ただしこの機械で動くものが無いことは、省かずに言う。
     """
@@ -2626,7 +2592,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
     """配った実行ファイルなどを .gitignore に足す。足す行は目印の行で囲んだ 1 つの領域に入る。
 
     配布先は git で持ち回るのが普通なので、書かないと次のコミットで実行ファイルと
-    _internal がまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
+    実行ファイルがまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
     ない。
     """
 

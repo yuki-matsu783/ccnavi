@@ -1,0 +1,133 @@
+package handoffnames
+
+import (
+	_ "embed"
+	"fmt"
+	"strings"
+
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
+)
+
+// NamesFile は表のファイル名。`.ccnavi/scripts/` に置き、sh と実行ファイルが同じものを読む。
+const NamesFile = "ccnavi-handoff-names.txt"
+
+const (
+	commentMark = "#"
+	msgBadLine  = NamesFile + " の %d 行目を読めない: %s"
+	msgReserved = "%s の `%s` は、下書きの置き場で `%s` を読み替える予約した名前なので、この名前の階層は下書きにできない"
+)
+
+//go:embed ccnavi-handoff-names.txt
+var embedded string
+
+// Pair は表の 1 行（元の階層名 → 下書きでの階層名）。
+type Pair struct {
+	Original string
+	Draft    string
+}
+
+// Table は読み替えの表。行の順に当てる（先に当たった行を使う）。
+type Table struct{ pairs []Pair }
+
+var defaultTable, defaultErr = Parse(embedded)
+
+// Default は埋め込んだ表。中身はテストで確かめているので、エラーは写しを壊したときだけ。
+func Default() (*Table, error) { return defaultTable, defaultErr }
+
+// Parse は表のファイルの中身を読む。`#` で始まる行と空行は読まない。1 行は空白で区切った 2 語だけで、
+// 読めない行はエラーにする（黙って捨てると、読み替えられない名前のまま下書きが置かれる）。
+// 同じ元の名前を 2 度書けば、後の行の名前を最初の行の位置で使う（Python の dict と同じ）。
+func Parse(text string) (*Table, error) {
+	t := &Table{}
+	for i, raw := range ospath.Splitlines(text) {
+		line := ospath.Strip(raw)
+		if line == "" || strings.HasPrefix(line, commentMark) {
+			continue
+		}
+		words := strings.FieldsFunc(line, ospath.IsSpace)
+		if len(words) != 2 || !usable(words[0]) || !usable(words[1]) {
+			return nil, fmt.Errorf(msgBadLine, i+1, pyfmt.Quote(raw))
+		}
+		t.put(Pair{words[0], words[1]})
+	}
+	return t, nil
+}
+
+func usable(word string) bool { return isASCII(word) && !strings.Contains(word, "/") }
+
+// With は p を足した写しを返す（表に 1 行足したときの往復を試すため）。
+func (t *Table) With(p Pair) *Table {
+	out := &Table{pairs: append([]Pair(nil), t.pairs...)}
+	out.put(p)
+	return out
+}
+
+func (t *Table) put(p Pair) {
+	for i := range t.pairs {
+		if t.pairs[i].Original == p.Original {
+			t.pairs[i].Draft = p.Draft
+			return
+		}
+	}
+	t.pairs = append(t.pairs, p)
+}
+
+// ToDraft は元の相対パス（"/" 区切り）を、下書きの置き場の中の相対パスにする。
+func (t *Table) ToDraft(rel string) string {
+	return t.convert(rel, func(p Pair) (string, string) { return p.Original, p.Draft })
+}
+
+// FromDraft は下書きの置き場の中の相対パスを、元の相対パスにする。綴りは表の元の階層名にそろう。
+func (t *Table) FromDraft(rel string) string {
+	return t.convert(rel, func(p Pair) (string, string) { return p.Draft, p.Original })
+}
+
+func (t *Table) convert(rel string, way func(Pair) (from, to string)) string {
+	parts := strings.Split(rel, "/")
+	for i, part := range parts {
+		for _, p := range t.pairs {
+			if from, to := way(p); same(part, from) {
+				parts[i] = to
+				break
+			}
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+// ReservedProblem は、元の相対パスが予約名（下書きでの階層名）の階層を含むなら断る理由。含まなければ空。
+// 読み替えると、ほかの元のパスと区別できなくなる。
+func (t *Table) ReservedProblem(rel string) string {
+	for _, part := range strings.Split(rel, "/") {
+		for _, p := range t.pairs {
+			if same(part, p.Draft) {
+				return fmt.Sprintf(msgReserved, rel, part, t.originalOf(p.Draft))
+			}
+		}
+	}
+	return ""
+}
+
+func (t *Table) originalOf(draft string) string {
+	for _, p := range t.pairs {
+		if p.Draft == draft {
+			return p.Original
+		}
+	}
+	return draft
+}
+
+func same(name, other string) bool {
+	return isASCII(name) && pathcase.Fold(name) == pathcase.Fold(other)
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}

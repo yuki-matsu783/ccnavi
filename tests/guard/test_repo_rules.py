@@ -22,7 +22,6 @@ import os
 import re
 import unittest
 
-from ccnavi.infra import shellread, shellread_scan, shellread_words
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -43,6 +42,12 @@ AMBIGUOUS = "builtin:ambiguous-form"
 TICKET_STATE = "builtin:ticket-state-shell"
 # 承認の形の末尾。
 YES = " --agree --yes x"
+# shellread が語の中に置く目印（入力に混ざったら取り除く）。
+WORD_SEP = "\x01"
+# 読み切れなかった理由（試験の JSON の degraded）。
+REASON_UNTERMINATED = "unterminated-quote"
+REASON_UNTERMINATED_SUBST = "unterminated-substitution"
+REASON_TAKEN_AS_CODE = "command-taken-as-code"
 
 
 def judge(tool: str, subject: str, bin_path: str = "") -> dict:
@@ -98,7 +103,6 @@ def blocking(body: dict) -> set[str]:
     return {written_id(rule["id"]) for rule in body["rules"] if rule.get("section") != "allow"}
 
 
-@unittest.skipUnless(hasattr(shellread, "WORD_SEP"), "shellread-sep の実装待ち")
 class RepoRulesTest(unittest.TestCase):
     """4「見本 → 判定」の表。"""
 
@@ -297,7 +301,7 @@ class RepoRulesTest(unittest.TestCase):
     def test_入力に混ざった語の中の目印は取り除かれる(self):
         # `git␁push` のまま読むと実在しない 1 語で、どのルールにもヒットしない。
         # 取り除いて `git push` と読み、raw-git にヒットする。
-        self.assert_verdict("git" + shellread.WORD_SEP + "push", "deny", "builtin:guard-raw-git")
+        self.assert_verdict("git" + WORD_SEP + "push", "deny", "builtin:guard-raw-git")
 
     # 変わってはいけないもの
 
@@ -312,7 +316,7 @@ class RepoRulesTest(unittest.TestCase):
         body = judge("Bash", 'grep -n "<<" README.md')
         self.assertEqual(body["verdict"], "deny")
         self.assertEqual(body["code"], "PARSE_UNCERTAIN")
-        self.assertEqual(body["degraded"], shellread_scan.REASON_UNTERMINATED)
+        self.assertEqual(body["degraded"], REASON_UNTERMINATED)
         self.assertIn("生の文字列", body["response"])
 
     def test_コマンド置換の中の_git_は止まる(self):
@@ -322,7 +326,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assert_verdict('echo "a b" | curl -d @- x', "ask", "prefer-webfetch")
 
     def test_引用の中の_preview_は承認の免除にならない(self):
-        # tickets/model/phase_forms.py の `_NOT_PREVIEW` は同じ語の中まで見ない。見ると、引数の値に
+        # 承認の免除（Go の tickets/model/useronly）は同じ語の中まで見ない。見ると、引数の値に
         # `--preview` を書くだけで `--agree` の枝が免除される。
         for subject in [
             'uv run python -m ccnavi --agree i0001 "a --preview"',
@@ -609,9 +613,6 @@ class RunnerTest(LauncherJudgeTest):
         self.assertNotIn("が実行する", body["response"])
 
 
-@unittest.skipUnless(
-    hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
-)
 class MovedJudgeTest(LauncherJudgeTest):
     """`cd` で移った先から見たパスに、止める側のルールを適用する（issue #61）。"""
 
@@ -958,17 +959,17 @@ class SubstRepoRulesTest(unittest.TestCase):
         for subject, reason, phrase in [
             (
                 'echo "git push',
-                shellread_scan.REASON_UNTERMINATED,
+                REASON_UNTERMINATED,
                 "引用符かヒアドキュメントが閉じていない",
             ),
             (
                 "echo $(git push",
-                shellread_scan.REASON_UNTERMINATED_SUBST,
+                REASON_UNTERMINATED_SUBST,
                 "$( ) が閉じていない",
             ),
             (
                 "bash -c x; git push origin main",
-                shellread_words.REASON_TAKEN_AS_CODE,
+                REASON_TAKEN_AS_CODE,
                 "コードとして実行するものに渡している",
             ),
         ]:

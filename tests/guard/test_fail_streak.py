@@ -12,8 +12,6 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.records import failstreak
-from ccnavi.tickets.model import ticket_places
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -32,16 +30,6 @@ def _env(**extra: str) -> dict[str, str]:
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
     environment.update(extra)
     return environment
-
-
-class ThresholdTest(unittest.TestCase):
-    def test_default_zero_and_bad_values(self):
-        self.assertEqual(3, failstreak.threshold(""))
-        self.assertEqual(5, failstreak.threshold(" 5 "))
-        self.assertEqual(0, failstreak.threshold("0"))
-        self.assertEqual(3, failstreak.threshold("-1"))
-        self.assertEqual(3, failstreak.threshold("abc"))
-        self.assertEqual(3, failstreak.threshold("2.5"))
 
 
 class FailStreakTest(unittest.TestCase):
@@ -142,7 +130,7 @@ class FailStreakTest(unittest.TestCase):
         }
         said = self._context(self._run(payload))
         self.assertIn("Artifact ツールが失敗しました", said)
-        self.assertIn(ticket_places.scratch_dir(self.ws), said)
+        self.assertIn(os.path.join(self.ws, "scratchpad").replace("\\", "/"), said)
 
     def test_artifact_interrupt_says_nothing_about_scratchpad(self):
         payload = {

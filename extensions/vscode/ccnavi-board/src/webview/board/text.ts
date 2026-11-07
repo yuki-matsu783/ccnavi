@@ -212,7 +212,7 @@ export function isHttpUrl(url: string): boolean {
 
 /**
  * 承認画面の本文で、見出しの次の1行に説明が付く見出し。実行ファイルが置く文面と同じ表記
- * （`src/ccnavi/tickets/proposal/agree_screen.py`の`screen`）。番号が付く「issue」だけ前方一致で見る。
+ * （`go/internal/tickets/proposal/agree`の`Screen`）。番号が付く「issue」だけ前方一致で見る。
  *
  * まとめるのはこのリストに載っている見出しの次の行だけ。 知らない見出しなら何もしない。
  * 向こうの文面が変わったときに、本文の中身が気づかないうちに隠れるより、まとめられないほうが軽いため

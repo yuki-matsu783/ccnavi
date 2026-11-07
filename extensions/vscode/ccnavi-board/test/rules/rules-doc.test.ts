@@ -76,7 +76,7 @@ test("CB-T43 欄を変えても、他のルールのコメントと折り返し�
   assert.equal(again.allow[0].message, "見るだけ。書かない");
 });
 
-test("CB-T194 PyYAMLが別の型に読む語は引用符で囲む（id: onはTrue、id: noは空のidに読まれる）", () => {
+test("CB-T194 実行ファイルが別の型に読む語は引用符で囲む（id: onはTrue、id: noは空のidに読まれる）", () => {
   const doc = readRules(TEXT);
   const s = doc.model.sections;
   const fresh: RuleForm = { ...s.deny[1], origin: null, id: "no", message: "新しい" };

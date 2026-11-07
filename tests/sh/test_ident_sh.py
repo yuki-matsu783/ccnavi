@@ -3,58 +3,35 @@
 日本語の識別子を通し、パスやシェルで意味を持つ表記（`/`・`..`・先頭の `-`・空白・制御文字・
 記号）を止める。ロケール（C・C.UTF-8）とシェル（sh・bash）を変えても答えが同じこと、
 前の形（`i0055-01`）も通ることを見る。字の種類（全角記号・NFD）は実行ファイルが止めるので、
-ここでは ASCII の外のバイトは通す（`ticket_ids.id_problem` と並べて見る）。
+ここでは ASCII の外のバイトは通す。
+
+表は `tests/fixtures/ident-cases.json`。実行ファイルの答えは go test
+（go/internal/tickets/model/ids/ident_sh_test.go）が同じ表で見る。
 """
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
-import unicodedata
 import unittest
 
-from ccnavi.tickets.model import ticket_ids
 from tests import ROOT
 
+TABLE = os.path.join(ROOT, "tests", "fixtures", "ident-cases.json")
 COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
 SHELLS = [s for s in (shutil.which("sh"), shutil.which("bash")) if s]
 
-GOOD = [
-    "feature-64-統合先の解決",
-    "hotfix-7-ログイン画面ー",
-    "i0055",
-    "i0055-01",
-    "a",
-    "fix-1-a.b_c",
-]
-BAD = [
-    "",
-    "-x",
-    ".x",
-    "a/b",
-    "a..b",
-    "a b",
-    "a\tb",
-    "a\nb",
-    "ab\n",
-    "a$b",
-    "a;b",
-    "a`b",
-    "a'b",
-    'a"b',
-    "a\\b",
-    "a*b",
-    "a?b",
-    "a|b",
-    "a&b",
-    "a(b",
-    "a:b",
-    "a~b",
-    "a\x7fb",
-    "a\x01b",
-    "統合",
-]
+with open(TABLE, encoding="utf-8") as _f:
+    _CASES = json.load(_f)
+GOOD = _CASES["ident_good"]
+BAD = _CASES["ident_bad"]
+# sh は通し、実行ファイルが止める（字の種類。2 段目の守り）。
+SH_ONLY = _CASES["sh_only"]
+# 親のブランチ名（`ccnavi_is_branch`）。識別子の字に段の区切りの `/` を足したもの。
+BRANCH_GOOD = _CASES["branch_good"]
+BRANCH_BAD = _CASES["branch_bad"]
 
 
 def is_ident(shell, value, locale):
@@ -81,62 +58,10 @@ class IsIdentTest(unittest.TestCase):
                         self.assertFalse(is_ident(shell, value, locale))
 
     def test_what_sh_lets_through_the_executable_checks(self):
-        """sh は ASCII の外のバイトを通す。字の種類は実行ファイルが止める（2 段目の守り）。"""
-        for value in ("feature-1-ＡＢ", unicodedata.normalize("NFD", "feature-1-が")):
+        """sh は ASCII の外のバイトを通す。字の種類は実行ファイルが止める（go test が見る）。"""
+        for value in SH_ONLY:
             with self.subTest(value=value):
                 self.assertTrue(is_ident(SHELLS[0], value, "C"))
-                self.assertFalse(ticket_ids.is_valid_id(value))
-        for value in GOOD:
-            with self.subTest(value=value):
-                self.assertTrue(ticket_ids.is_valid_id(value))
-
-
-# 親のブランチ名（`ccnavi_is_branch`）。
-# 識別子の字に段の区切りの `/` を足したもの。
-BRANCH_GOOD = ["feature/123-login", "hotfix/45", "user/x_y.z", "feature-1-x", "a/日本語"]
-BRANCH_BAD = [
-    "",
-    "-x",
-    ".x",
-    "/x",
-    "x/",
-    "x.",
-    "a..b",
-    "a//b",
-    "a/.b",
-    "x.lock",
-    "x.lock/y",
-    "a b",
-    "a\nb",
-    "ab\n",
-    "a$b",
-    "a;b",
-    "a\\b",
-    "a:b",
-    "a~b",
-    "a@{1}",
-    "統合/x",
-    "HEAD",
-    "origin/main",
-    "origin/HEAD",
-    "Origin/x",
-    "refs/heads/main",
-    "refs/remotes/origin/main",
-    "heads/main",
-    "remotes/x",
-    "tags/v1",
-    "upstream/x",
-    "FETCH_HEAD",
-    "main",
-    "main/x",
-    "Master/x",
-    "develop/x",
-    "release",
-    "release/1",
-    "Release-2",
-    "x/HEAD",
-    "x/ORIG_HEAD/y",
-]
 
 
 def is_branch(shell, value, locale):
@@ -161,14 +86,6 @@ class IsBranchTest(unittest.TestCase):
                 for value in BRANCH_BAD:
                     with self.subTest(shell=shell, locale=locale, value=value):
                         self.assertFalse(is_branch(shell, value, locale))
-
-    def test_the_executable_agrees(self):
-        for value in BRANCH_GOOD:
-            with self.subTest(value=value):
-                self.assertEqual(ticket_ids.branch_problem(value), "")
-        for value in BRANCH_BAD:
-            with self.subTest(value=value):
-                self.assertNotEqual(ticket_ids.branch_problem(value), "")
 
 
 if __name__ == "__main__":

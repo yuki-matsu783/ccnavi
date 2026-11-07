@@ -1,4 +1,4 @@
-"""保護対象の下書きの取り込み（`ccnavi user handoff`。src/ccnavi/tickets/sync/handoff.py）。
+"""保護対象の下書きの取り込み（`ccnavi user handoff`。go/internal/tickets/sync/handoff）。
 
 見るのは次のとおり。
 
@@ -10,13 +10,15 @@
 3. `--expect`: 定義どおりの値。下書き・取り込み先のどれが変わっても値が変わり、
    違えば何も書かない
 4. 差分の見え方: CRLF・BOM・末尾の改行・ゼロ幅の文字を見える形にする。見えない違いは断る
-5. 書き込み: 一時ファイル → fsync → 差し替え。書く直前の確かめ直し。途中で失敗したら元に戻す。
-   下書きは、取り込んだものと同じときだけ消す
+5. 書き込み: 書いたら下書きを消し、取り込み先の綴りを保つ（一時ファイルと fsync・書く直前の
+   確かめ直し・途中で失敗したときの戻し・書き換わった下書きを残すことは go の handoff のテスト）
 6. 経路: 書くにはターミナルか `--via board`（`--expect` と `--json` が要る）。
 `defense` はボードから断る
 7. 中身の検査: レイヤーの設定は `--lint` と同じ関数で、同じ回の対象を取り込んだあとの状態で見る。
    テンプレートの検査、`defense` の `.sh` と `settings*.json`
-8. `ready` の止め: 取り込んでいない下書きが残っていれば止める
+
+取り込み先の表の行と種類、`ready` の止め（取り込んでいない下書き）は go の handoff・request の
+テストが見る。
 """
 
 from __future__ import annotations
@@ -29,20 +31,19 @@ import tempfile
 import textwrap
 import unicodedata
 import unittest
-from unittest import mock
 
-from ccnavi.infra import fsio, settings
-from ccnavi.tickets.model import handoff_names
-from ccnavi.tickets.review import request as review
-from ccnavi.tickets.sync import handoff
 from tests import ROOT, can_case_sensitive, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi
-from tests.ticket.test_ticket import git, write
+from tests.ticket.test_ticket import write
 from tests.ticketsample import PHASES, RULES
 
 DOCS = ".ccnavi/docs/guide.md"
 SCRIPT = ".ccnavi/scripts/ccnavi-x.sh"
 SETTINGS = ".claude/settings.json"
+# 差分に出す、末尾に改行が無いことの印。
+NO_EOL = "\\ 末尾に改行がありません"
+# 下書きの置き場で読み替える階層名（`.ccnavi/scripts/ccnavi-handoff-names.txt` の表）。
+DRAFT_NAMES = {".claude": "handoff-.claude"}
 
 TEMPLATE = textwrap.dedent(
     """\
@@ -61,6 +62,12 @@ def put(path: str, data: bytes) -> str:
     with open(path, "wb") as f:
         f.write(data)
     return path
+
+
+def to_draft(rel: str) -> str:
+    """取り込み先の相対パスを、下書きの置き場での綴りにする（先頭の階層だけを読み替える）。"""
+    head, _, rest = rel.partition("/")
+    return "/".join(x for x in (DRAFT_NAMES.get(head, head), rest) if x)
 
 
 def slurp(path: str) -> bytes:
@@ -86,7 +93,7 @@ class HandoffCase(unittest.TestCase):
         return os.path.join(self.root, *rel.split("/"))
 
     def draft_path(self, rel: str) -> str:
-        return os.path.join(self.root, "wip", "handoff", *handoff_names.to_draft(rel).split("/"))
+        return os.path.join(self.root, "wip", "handoff", *to_draft(rel).split("/"))
 
     def stage(self, rel: str, data: bytes | None = None) -> str:
         """`ccnavi-stage.sh` と同じく、元を下書きにコピーし、下書きを `data` にする。"""
@@ -103,7 +110,7 @@ class HandoffCase(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         environment.pop("CLAUDE_PROJECT_DIR", None)
-        environment[settings.GUARD_TICKET_APPROVAL_ENV] = guard
+        environment["CCNAVI_GUARD_TICKET_APPROVAL"] = guard
         environment.update(env or {})
         # ボードの経路（`--via board`）は拡張の子プロセスが呼ぶ形なので、印も board にする。
         entry = "board" if "board" in args else "sh"
@@ -128,77 +135,8 @@ class HandoffCase(unittest.TestCase):
             expect = self.view(*paths)["expect"]
         return self.run_handoff(*paths, "--yes", "--expect", expect, *extra, "--json")
 
-    def plan(self, *paths):
-        conf, _ = settings.load(self.root)
-        return handoff.prepare(conf, self.root, list(paths) or None)
-
 
 class AllowListTest(HandoffCase):
-    def test_each_row_of_the_table_is_a_kind(self):
-        for rel, kind in (
-            (".ccnavi/config/common/templates/a.yml", handoff.KIND_TEMPLATE),
-            (".ccnavi/config/project/templates/a.yml", handoff.KIND_TEMPLATE),
-            ("projects/lib/.ccnavi/config/project/templates/a.yml", handoff.KIND_TEMPLATE),
-            (".ccnavi/config/common/rules.yml", handoff.KIND_LAYER_CONFIG),
-            (".ccnavi/config/project/phases.yml", handoff.KIND_LAYER_CONFIG),
-            ("projects/lib/.ccnavi/config/project/risks.yml", handoff.KIND_LAYER_CONFIG),
-            (".ccnavi/docs/a/b.md", handoff.KIND_DOCS),
-            (".ccnavi/CCNAVI.md", handoff.KIND_DOCS),
-            # スキルの frontmatter は権限や hook を持てるので、防御としてターミナルでだけ取り込む。
-            (".claude/skills/x/SKILL.md", handoff.KIND_DEFENSE),
-            (".ccnavi/scripts/ccnavi-git.sh", handoff.KIND_DEFENSE),
-            (".claude/hooks/lint-py.sh", handoff.KIND_DEFENSE),
-            (".claude/settings.json", handoff.KIND_DEFENSE),
-            (".claude/settings.local.json", handoff.KIND_DEFENSE),
-        ):
-            with self.subTest(rel=rel):
-                found = handoff.kind_of(handoff.key_of(rel))
-                self.assertIsNotNone(found)
-                self.assertEqual(found.id, kind)
-
-    def test_paths_off_the_table_are_not_kinds(self):
-        for rel in (
-            "learnings/i0001.md",
-            "inbox/x.json",
-            "repro.sh",
-            ".ccnavi/bin/ccnavi",
-            ".ccnavi/approved/doing/i0001.md",
-            ".ccnavi/config/common/rule-expectations.yml",
-            ".ccnavi/config/project/templates/sub/a.yml",
-            "src/x.py",
-            ".git/config",
-            ".gitmodules",
-        ):
-            with self.subTest(rel=rel):
-                self.assertIsNone(handoff.kind_of(handoff.key_of(rel)))
-
-    def test_case_and_nfd_are_folded_before_matching(self):
-        self.assertEqual(handoff.kind_of(handoff.key_of(".CCNAVI/Docs/Guide.MD")).id, "docs")
-        nfd = unicodedata.normalize("NFD", ".ccnavi/docs/が.md")
-        self.assertEqual(handoff.key_of(nfd), handoff.key_of(".ccnavi/docs/が.md"))
-
-    def test_only_the_board_refuses_defense(self):
-        self.assertEqual(
-            {k.id: k.board for k in handoff.KINDS},
-            {
-                "template": True,
-                "messages": False,
-                "layer-config": True,
-                "docs": True,
-                "defense": False,
-            },
-        )
-        self.assertEqual(
-            {k.id: k.new for k in handoff.KINDS},
-            {
-                "template": True,
-                "messages": True,
-                "layer-config": False,
-                "docs": False,
-                "defense": False,
-            },
-        )
-
     def test_drafts_off_the_table_are_counted_and_not_errors(self):
         write(self.draft_path("learnings/i0001.md"), "学び\n")
         write(self.draft_path("repro.sh"), "echo\n")
@@ -225,17 +163,6 @@ class AllowListTest(HandoffCase):
         answer = self.view()
         self.assertEqual(answer["ignored"], 1)
         self.assertEqual(answer["ignored_paths"], [{"path": "linked", "why": "linked-dir"}])
-
-    def test_the_table_and_the_design_document_agree(self):
-        # 表を直したら、設計の文書の表も直す。文書に無い行を表に足さない。
-        with open(
-            os.path.join(ROOT, "docs", "21_design", "tickets", "handoff.md"), encoding="utf-8"
-        ) as f:
-            text = f.read()
-        for kind in handoff.KINDS:
-            for shown in kind.shown:
-                with self.subTest(shown=shown):
-                    self.assertIn(f"`{shown}`", text)
 
 
 class RefuseTest(HandoffCase):
@@ -390,12 +317,6 @@ class ExpectTest(HandoffCase):
         put(self.draft_path(DOCS), b"newer\n")
         self.assertNotEqual(second, self.view()["expect"])
 
-    def test_a_missing_target_is_a_dash(self):
-        rel = ".ccnavi/config/project/templates/feature.yml"
-        write(self.draft_path(rel), TEMPLATE)
-        entry = self.plan().entries[0]
-        self.assertTrue(entry.record().endswith(b"1:-"))
-
     def test_a_wrong_expect_writes_nothing(self):
         self.stage(DOCS, b"new\n")
         result = self.take(expect="0" * 64)
@@ -453,7 +374,7 @@ class DiffTest(HandoffCase):
 
     def test_the_last_newline_is_shown(self):
         row = self.diff(b"a\n", b"a")
-        self.assertIn(handoff.NO_EOL, row["diff"])
+        self.assertIn(NO_EOL, row["diff"])
 
     def test_zero_width_and_control_characters_are_shown(self):
         row = self.diff(b"ab\n", "a​b\x1b\n".encode())
@@ -517,98 +438,6 @@ class WriteTest(HandoffCase):
         listed = run_ccnavi(["--root", self.root, "--templates", "--json"], cwd=ROOT)
         names = [t["name"] for t in json.loads(listed.stdout)["templates"]]
         self.assertEqual(names, ["feature"])
-
-    def test_the_write_goes_through_a_synced_temp_file(self):
-        self.stage(DOCS, b"new\n")
-        synced = []
-        real = fsio._sync_file
-        with mock.patch.object(
-            fsio, "_sync_file", side_effect=lambda fd: (synced.append(fd), real(fd))
-        ):
-            self.assertEqual(self.take().returncode, 0)
-        self.assertTrue(synced)
-        leftovers = [
-            n for n in os.listdir(os.path.dirname(self.target(DOCS))) if n.endswith(".part")
-        ]
-        self.assertEqual(leftovers, [])
-
-    def test_a_draft_rewritten_after_the_write_is_kept(self):
-        draft = self.stage(DOCS, b"new\n")
-        real = handoff._write_one
-
-        def write_then_edit(root, entry):
-            said = real(root, entry)
-            put(draft, b"agent kept editing\n")
-            return said
-
-        with mock.patch.object(handoff, "_write_one", side_effect=write_then_edit):
-            result = self.take()
-        answer = json.loads(result.stdout)
-        self.assertTrue(answer["ok"])
-        self.assertEqual(answer["removed_drafts"], [])
-        self.assertEqual(answer["kept_drafts"][0]["path"], f"wip/handoff/{DOCS}")
-        self.assertEqual(slurp(draft), b"agent kept editing\n")
-
-    def test_a_failure_in_the_middle_puts_back_what_was_written(self):
-        self.stage(DOCS, b"new\n")
-        self.stage(SCRIPT, b"#!/bin/sh\necho new\n")
-        real = fsio.write_bytes_atomic
-
-        def fail_on_script(path, content):
-            if path.endswith("ccnavi-x.sh") and content == b"#!/bin/sh\necho new\n":
-                return "disk full"
-            return real(path, content)
-
-        with mock.patch.object(fsio, "write_bytes_atomic", side_effect=fail_on_script):
-            result = self.take()
-        self.assertEqual(result.returncode, 1)
-        answer = json.loads(result.stdout)
-        self.assertIn("元に戻しました", answer["error"])
-        self.assertEqual(slurp(self.target(DOCS)), "# 手引き\n\n古い文\n".encode())
-        self.assertEqual(slurp(self.target(SCRIPT)), b"#!/bin/sh\necho old\n")
-        self.assertTrue(os.path.exists(self.draft_path(DOCS)))
-
-    def test_what_could_not_be_put_back_is_named(self):
-        self.stage(DOCS, b"new\n")
-        self.stage(SCRIPT, b"#!/bin/sh\necho new\n")
-        real = fsio.write_bytes_atomic
-
-        def fail(path, content):
-            if path.endswith("ccnavi-x.sh") or content != b"new\n":
-                return "disk full"
-            return real(path, content)
-
-        with mock.patch.object(fsio, "write_bytes_atomic", side_effect=fail):
-            result = self.take()
-        error = json.loads(result.stdout)["error"]
-        self.assertIn("元に戻せなかった", error)
-        self.assertIn(DOCS, error)
-
-    def test_the_target_is_checked_again_just_before_writing(self):
-        self.stage(DOCS, b"new\n")
-        conf, _ = settings.load(self.root)
-        plan = handoff.prepare(conf, self.root)
-        put(self.target(DOCS), b"someone else\n")
-        done = handoff.apply(plan, plan.expect)
-        self.assertFalse(done.ok)
-        self.assertIn("変わった", done.error)
-        self.assertEqual(slurp(self.target(DOCS)), b"someone else\n")
-
-    @requires_symlink
-    def test_a_link_put_on_the_way_before_writing_is_refused(self):
-        rel = ".ccnavi/docs/sub/page.md"
-        write(self.target(rel), "old\n")
-        write(self.draft_path(rel), "new\n")
-        conf, _ = settings.load(self.root)
-        plan = handoff.prepare(conf, self.root)
-        outside = tempfile.mkdtemp(prefix="ccnavi-outside-")
-        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
-        write(os.path.join(outside, "page.md"), "old\n")
-        shutil.rmtree(os.path.dirname(self.target(rel)))
-        os.symlink(outside, os.path.dirname(self.target(rel)))
-        done = handoff.apply(plan, plan.expect)
-        self.assertFalse(done.ok)
-        self.assertEqual(slurp(os.path.join(outside, "page.md")), b"old\n")
 
     def test_the_target_keeps_its_spelling(self):
         write(self.draft_path(".ccnavi/docs/GUIDE.md"), "new\n")
@@ -960,44 +789,6 @@ class DefenseTest(HandoffCase):
         self.assertTrue(self.view()["ok"])
         self.assertEqual(self.take().returncode, 0)
         self.assertEqual(slurp(self.target(SCRIPT)), b"#!/bin/sh\necho new\n")
-
-
-class ReadyTest(HandoffCase):
-    def test_pending_names_drafts_that_differ_from_the_target(self):
-        self.stage(DOCS, b"new\n")
-        self.stage(SCRIPT)
-        write(self.draft_path("learnings/x.md"), "x\n")
-        self.assertEqual(handoff.pending(self.root), [f"wip/handoff/{DOCS}"])
-
-    def test_ready_stops_on_a_tracked_draft_that_was_not_taken(self):
-        git(self.root, "init", "--quiet", "-b", "main")
-        self.stage(DOCS, b"new\n")
-        git(self.root, "add", "-A")
-        git(self.root, "commit", "--quiet", "-m", "x")
-        conf, _ = settings.load(self.root)
-        problems = review._merge_problems(self.root, conf, self.root)
-        said = [p for p in problems if "取り込んでいない保護対象の下書き" in p]
-        self.assertEqual(len(said), 1, problems)
-        self.assertIn("ccnavi-user-handoff.sh", said[0])
-        self.assertIn(f"wip/handoff/{DOCS}", said[0])
-
-    def test_ready_does_not_name_untracked_drafts_twice(self):
-        git(self.root, "init", "--quiet", "-b", "main")
-        self.stage(DOCS, b"new\n")
-        conf, _ = settings.load(self.root)
-        problems = review._merge_problems(self.root, conf, self.root)
-        self.assertTrue(any("未追跡" in p for p in problems), problems)
-        self.assertFalse(any("取り込んでいない保護対象の下書き" in p for p in problems), problems)
-
-    def test_ready_does_not_stop_on_taken_or_unrelated_drafts(self):
-        git(self.root, "init", "--quiet", "-b", "main")
-        self.stage(DOCS)
-        write(self.draft_path("learnings/x.md"), "x\n")
-        git(self.root, "add", "-A")
-        git(self.root, "commit", "--quiet", "-m", "x")
-        conf, _ = settings.load(self.root)
-        problems = review._merge_problems(self.root, conf, self.root)
-        self.assertFalse(any("取り込んでいない保護対象の下書き" in p for p in problems), problems)
 
 
 if __name__ == "__main__":

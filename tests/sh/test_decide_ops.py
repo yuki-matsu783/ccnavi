@@ -9,8 +9,8 @@
 4. 送ったか確定できないときは、ホストの一覧を目印とアカウントで照合する。1 件あれば送り済みとし、
    0 件でも、反映待ち（送ってすぐ）やアカウント違いのときは自動で送り直さない
 
-実行ファイルは代役の sh。`ops …` だけは本物の `ccnavi ops` に渡し、受け入れの計画は本物の
-操作記録（`tickets/model/oplog.py`）で書く。GitLab は同じプロセスの小さな HTTP サーバ。
+実行ファイルは代役の sh。`ops …` だけは本物の `ccnavi ops` に渡し、受け入れの計画は実行ファイルと
+同じ形の操作記録（`tests/oprecord.py`）で書く。GitLab は同じプロセスの小さな HTTP サーバ。
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import shutil
 import subprocess
 import unittest
 
-from ccnavi.tickets.model import oplog
+from tests import oprecord
 from tests.sh import decide_support as support
 from tests.sh import test_review_decide as base
 
@@ -80,21 +80,20 @@ class DecideOpsShTest(unittest.TestCase):
         )
 
     def record(self):
-        ids = oplog.all_ids(self.state)
+        ids = oprecord.ids(self.state)
         self.assertLessEqual(len(ids), 1, ids)
-        return oplog.load(self.state, ids[0]) if ids else None
+        return oprecord.load(self.state, ids[0]) if ids else None
 
     def choose(self, **extra):
         return self.run_decide("1", "--choices", '{"u1":"issue"}', "--digest", "d0", **extra)
 
     def age(self, op_id: str, stage: str) -> None:
         """段階の時刻を古くする（送ってすぐは、反映待ちとして確定しないため）。"""
-        record = oplog.load(self.state, op_id)
+        record = oprecord.load(self.state, op_id)
         for row in record["stages"]:
             if row["id"] == stage:
                 row["at"] = "2020-01-01T00:00:00+0000"
-        with open(oplog.record_path(self.state, op_id), "w", encoding="utf-8") as f:
-            json.dump(record, f)
+        oprecord.save(self.state, record)
 
     # ---- 1. 目印と記録
 
@@ -225,7 +224,11 @@ class DecideOpsShTest(unittest.TestCase):
         self.choose()
         record = self.record()
         # 前に送ったアカウントを記録しておき、今のトークンの持ち主を変える
-        oplog.stage_set(self.state, record["id"], "note", oplog.UNKNOWN, account="someone-else")
+        record = oprecord.load(self.state, record["id"])
+        for row in record["stages"]:
+            if row["id"] == "note":
+                row.update(state="unknown", account="someone-else")
+        oprecord.save(self.state, record)
         self.age(record["id"], "note")
         STORE["reject"].clear()
         done = self.run_decide("--resume", stdin="y\n")

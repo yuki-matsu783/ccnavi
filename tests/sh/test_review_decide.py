@@ -38,7 +38,6 @@ import tempfile
 import threading
 import unittest
 
-from ccnavi.tickets.model import review_host
 from tests import ROOT, common_sh
 from tests.sh import decide_support
 
@@ -47,6 +46,8 @@ GIT = shutil.which("git")
 NEEDS = [tool for tool in ("jq", "curl") if shutil.which(tool) is None]
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 TOKEN = "t0k"
+# 受け入れの返信の頭の印（実行ファイルの host.AcceptReply と同じ）。
+MARKER_ACCEPT = "<!-- ccnavi:accept -->"
 
 WINDOWS = os.name == "nt"
 
@@ -420,15 +421,11 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
 
     def plan_file(self, *ids: str, op: str | None = None) -> str:
-        """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。
+        """実行ファイルが `--accept-plan` に書くのと同じ形の計画（go の host.WriteAcceptPlan）。
 
-        sh と実行ファイルの契約を、両側が同じ書き手と同じ読み方で通ることで確かめる。
+        形の書き手と読み手の往復は go test（host_test.go の TestAcceptPlanRoundTrip）が見る。
         """
         path = os.path.join(self.work, "plan-in.json")
-        items = [
-            (review_host.Thread(id=i, url=f"u/{i}"), review_host.accept_reply("テスト"))
-            for i in ids
-        ]
         if op is None:
             # 実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く
             made = os.path.join(self.work, "plan-op.json")
@@ -439,7 +436,16 @@ class ReviewDecideShTest(unittest.TestCase):
             )
             with open(made, encoding="utf-8") as f:
                 op = json.load(f)["op"]
-        self.assertEqual(review_host.write_accept_plan(path, items, "d0", op), "")
+        body = {
+            "version": 1,
+            "digest": "d0",
+            "op": op,
+            "threads": [
+                {"id": i, "key": f"u/{i}", "reply": MARKER_ACCEPT + "\nテスト\n"} for i in ids
+            ],
+        }
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(json.dumps(body, ensure_ascii=False) + "\n")
         return path
 
     def test_all_replies_come_before_any_resolve_and_a_partial_failure_stops(self):
@@ -480,13 +486,13 @@ class ReviewDecideShTest(unittest.TestCase):
                 self.assertEqual(GitLab.posted, [])
                 self.assertIn("ホストには何も書いていない", stopped.stderr)
 
-    def test_a_plan_written_by_the_real_writer_is_read_by_the_sh(self):
+    def test_a_plan_in_the_executables_shape_is_read_by_the_sh(self):
         done = self.decide(
             "1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_PLAN=self.plan_file("d1")
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         reply = GitLab.posted[0][1]
-        self.assertTrue(reply["body"].startswith(review_host.MARKER_ACCEPT))
+        self.assertTrue(reply["body"].startswith(MARKER_ACCEPT))
         self.assertEqual(GitLab.discussions, {"d1": True})
         # 置けて終わったら計画は消える
         self.assertEqual(self.leftovers(), [])

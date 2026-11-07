@@ -6,8 +6,8 @@
    マーカーにアカウントを書く。`--actor` が無ければ（sh がアカウントを引けなかった）
    マーカーは前と同じ中身
 2. `--actor` の形と、`review confirm` の外で渡されたときは断る
-3. 依頼の後にユーザが見るものが動いたかは、手元と Chrome が同じ関数（`review.moved_since`）
-   で決める。Chrome は compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
+3. 依頼の後にユーザが見るものが動いたかは、手元と Chrome が同じに決める。Chrome は
+   compare API の一覧を渡し、打ち切られた（null）なら動いたと数える
 4. Chrome のレビュー済みのマーカーは、
    手元の `--actor` つきのマーカーと経路（`via`）と時刻のほかは同じ
 """
@@ -17,10 +17,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.entry import lint, version
-from ccnavi.infra import settings
-from ccnavi.tickets.model import review_host
-from ccnavi.tickets.review import request as review
+from tests import exe
 from tests.ticket.test_swap_points import STAMP, CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text
@@ -33,8 +30,8 @@ class ActorHarness(CoreHarness):
         super().setUp()
         # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）
         write(
-            os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
-            f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
+            os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-common.sh"),
+            f"#!/bin/sh\nCCNAVI_COMPAT={exe.compat()}\n",
         )
 
     def mark_path(self, kind="reviewed"):
@@ -115,26 +112,6 @@ class LocalActorTest(ActorHarness):
 
 
 class MovedSinceTest(ActorHarness):
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        conf.state = self.state
-        conf.approved = ".ccnavi/approved"
-        return conf
-
-    def test_the_rule(self):
-        conf = self.conf()
-        mark = {"head": "a" * 40}
-        self.assertEqual(review.moved_since(conf, mark, "a" * 40, None), "")
-        self.assertEqual(review.moved_since(conf, mark, "b" * 40, [".ccnavi/approved/x.md"]), "")
-        self.assertEqual(review.moved_since(conf, mark, "b" * 40, ["wip/proposals/todo/x.md"]), "")
-        for changed in (None, ["src/app.py"], [".ccnavi/approved/x", "README.md"]):
-            self.assertIn(
-                "依頼の後に親の HEAD が動いている",
-                review.moved_since(conf, mark, "b" * 40, changed),
-            )
-        self.assertIn("記録されていない", review.moved_since(conf, {}, "b" * 40, []))
-        self.assertIn("動いている", review.moved_since(conf, {"head": "HEAD"}, "b" * 40, []))
-
     def test_code_moved_after_the_request_is_refused_the_same_by_chrome_and_locally(self):
         fixture = self.ready()
         write(os.path.join(self.parent_tree, "src", "late.py"), "print(1)\n")
@@ -156,31 +133,6 @@ class MovedSinceTest(ActorHarness):
         self.assertEqual([p.replace(f"{root}/", "") for p in same], said)
         self.assertIn("依頼の後に親の HEAD が動いている", chrome["problems"][0])
         self.assertIsNone(chrome["changes"])
-
-    def test_the_explanation_is_one_fixed_sentence(self):
-        """止めたあとの説明だけを足す。判定は変えない。何が変わったかは断定しない。"""
-        conf = self.conf()
-        mark = {"head": "a" * 40}
-        fixed = "依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい"
-        for moved in (
-            review.moved_detail(conf, mark, "b" * 40, ["src/app.py"]),
-            review.moved_detail(conf, mark, "b" * 40, None),
-        ):
-            self.assertEqual(moved.kind, review.KIND_MOVED)
-            text = "\n".join(review.moved_explanation(moved))
-            self.assertIn(fixed, text)
-        # 記録が無いときは判定の文だけ（説明は足さない）
-        self.assertEqual(review.moved_explanation(review.moved_detail(conf, {}, "b" * 40, [])), [])
-        # 動いていなければ説明は無い
-        self.assertEqual(
-            review.moved_explanation(review.moved_detail(conf, mark, "a" * 40, [])), []
-        )
-        self.assertEqual(
-            review.moved_explanation(
-                review.moved_detail(conf, mark, "b" * 40, [".ccnavi/approved/x"])
-            ),
-            [],
-        )
 
     def test_a_truncated_or_mismatched_compare_counts_as_moved(self):
         self.ready()
@@ -246,51 +198,6 @@ class ReviewRuleTest(ActorHarness):
     confirm を重ねない。ccnavi の投稿のスレッドを未解決から除くのは、GitLab で依頼を投稿した
     アカウントが書いたときだけ。マージリクエストは親のブランチから引き、依頼の記録の番号と照合する。
     """
-
-    @staticmethod
-    def review(state, at, author="9001"):
-        return review_host.Review(state, f"r/{state}/{at}", at, author)
-
-    def test_a_comment_or_a_pending_review_does_not_clear_a_change_request(self):
-        cr = self.review("CHANGES_REQUESTED", "2026-09-29T01:00:00Z")
-        for later in ("COMMENTED", "PENDING"):
-            got = review_host.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
-            self.assertEqual([r.state for r in got], ["CHANGES_REQUESTED"], later)
-        pending = review_host.Review("PENDING", "r/p", "", "9001")
-        self.assertEqual(
-            [r.state for r in review_host.effective([cr, pending])], ["CHANGES_REQUESTED"]
-        )
-        for later, left in (("APPROVED", ["APPROVED"]), ("DISMISSED", [])):
-            got = review_host.effective([cr, self.review(later, "2026-09-29T02:00:00Z")])
-            self.assertEqual([r.state for r in got], left, later)
-        self.assertEqual(
-            review_host.effective([self.review("COMMENTED", "2026-09-29T00:00:00Z")]), []
-        )
-
-    def test_a_marker_thread_is_skipped_only_on_gitlab_by_the_poster(self):
-        marker = review_host.Thread(id="t", body="<!-- ccnavi:request i0001:1 -->", author="bot")
-        self.assertEqual(review_host._unresolved([marker], "github", "bot"), [marker])
-        self.assertEqual(review_host._unresolved([marker], "gitlab", ""), [marker])
-        self.assertEqual(review_host._unresolved([marker], "gitlab", "someone"), [marker])
-        self.assertEqual(review_host._unresolved([marker], "gitlab", "bot"), [])
-
-    def test_a_crit_push_thread_is_counted_even_from_the_poster(self):
-        """crit push の行のスレッドは目印で始まらないので、依頼を投稿したアカウントからでも数える。
-
-        ユーザが依頼者と同じアカウントで crit push しても、指摘はレビュー済みを止める。
-        """
-        crit = review_host.Thread(
-            id="d1", body="ここは X ではなく Y では", author="bot", path="wip/design/phase-1.html"
-        )
-        for host in ("github", "gitlab"):
-            self.assertEqual(review_host._unresolved([crit], host, "bot"), [crit], host)
-
-    def test_a_request_record_without_host_or_mr_is_not_matched(self):
-        result = review_host.Result(host="github", mr=review_host.MergeRequest(7, "u"))
-        for mark in ({"mr": 7}, {"host": "github"}, {}):
-            self.assertIn("依頼し直してください", review.matching_problems(result, mark)[0], mark)
-        self.assertEqual(review.matching_problems(result, {"host": "github", "mr": 7}), [])
-        self.assertTrue(review.matching_problems(result, {"host": "github", "mr": 8}))
 
     def test_a_reviewed_phase_is_not_confirmed_again_locally_or_from_chrome(self):
         fixture = self.ready()

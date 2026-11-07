@@ -7,11 +7,11 @@
 #   .ccnavi/bin/linux-x86_64/ccnavi
 #   .ccnavi/bin/windows-x86_64/ccnavi.exe
 #
-# ccnavi のリポジトリでも配布先でも同じパスに置く。ccnavi のリポジトリでは build.py が、
+# ccnavi のリポジトリでも配布先でも同じパスに置く。ccnavi のリポジトリでは scripts/ccnavi-build.sh が、
 # 配布先では scripts/ccnavi-setup.sh が、実行ファイルを .ccnavi/bin/<os>-<arch>/ に置く。
 #
 # hook の command は 1 行しか書けず、settings.json は Windows・WSL・Linux・macOS で
-# 同じものを開く。PyInstaller の実行ファイルは組み立てた機械でしか動かないので、
+# 同じものを開く。実行ファイルは OS と CPU ごとに別物なので、
 # どれを起動するかは起動した時点で、起動した機械が決めるしかない。
 #
 # 代償は、ツール呼び出しのたびに sh の起動と uname 1 回ぶんが加わること。uname は
@@ -20,7 +20,7 @@
 # bin_dir は `..` を含むまま使い、正規化しない。`${here%/*}` で切る形は here が `.` や
 # 1 段の名前のときに正しいパスにならない。シンボリックリンクは解かない。
 #
-# 語は src/ccnavi/infra/platformtag.py と scripts/ccnavi-setup.sh の host_target と揃える。
+# 語は go/internal/infra/platformtag と scripts/ccnavi-setup.sh の host_target と揃える。
 #
 # bin/ に無ければ、ワークツリーなら本体のルートの launcher に渡し（ccnavi_launcher_main）、
 # それでも無ければ PATH の ccnavi を探す（下の ccnavi_launcher_path）。
@@ -81,8 +81,6 @@ ccnavi_launcher_main "$@"
 # 見るのは絶対パスの項目だけ。空の項目と相対の項目（`.` や `~/bin`）は cwd や展開の有無で
 # 結果が変わるので飛ばす。自分自身（ccnavi という名前で張ったリンク）を起動すると
 # 自分に戻って終わらないので、自分と同じファイルも飛ばす。
-# PyInstaller の onedir は実行ファイルの隣に _internal/ が要る。単体のコピーは動かない。
-# 実行ファイルの隣に _internal/ があるフォルダを PATH に通すか、そこへのリンクを置く。
 ccnavi_launcher_path() {
 	ccnavi_ifs=$IFS
 	set -f
@@ -106,5 +104,5 @@ ccnavi_launcher_path() {
 }
 ccnavi_launcher_path "$@"
 
-printf 'ccnavi: この機械（%s-%s）で動く実行ファイルが %s/ にも PATH（絶対パスの項目だけ見ます）にもありません。ccnavi のリポジトリでは build.py を実行すると置かれます。配布先では、この機械で組み立てたものを scripts/ccnavi-setup.sh で配ってください。\n' "$os" "$arch" "$bin_dir" >&2
+printf 'ccnavi: この機械（%s-%s）で動く実行ファイルが %s/ にも PATH（絶対パスの項目だけ見ます）にもありません。ccnavi のリポジトリでは sh scripts/ccnavi-build.sh を実行すると置かれます。配布先では、この機械向けに組み立てたものを scripts/ccnavi-setup.sh で配ってください。\n' "$os" "$arch" "$bin_dir" >&2
 exit 127

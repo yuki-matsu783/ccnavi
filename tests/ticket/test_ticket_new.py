@@ -19,8 +19,6 @@ import os
 
 import yaml
 
-from ccnavi.tickets.lifecycle import commands as ops
-from ccnavi.tickets.model import proposal_form, ticket_model
 from tests import config_path
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness
@@ -28,6 +26,19 @@ from tests.ticket.test_ticket import git, write
 from tests.ticketsample import PHASES
 
 IDENT = "feature-9-scaffold-demo"
+
+
+# 親の提案の本文の見出しと、雛形が置く空欄の目印。
+PARENT_HEADINGS = ("目的", "範囲", "対象外", "完了の確かめ方", "計画の理由")
+RATIONALE_TODO = "（ここにこの作業をする理由を書く）"
+HEADING_TODO = {
+    "目的": "（ここにこの作業の目的を書く）",
+    "範囲": "（ここにこの作業の範囲を書く）",
+    "対象外": "（ここにこの作業の対象外を書く）",
+    "完了の確かめ方": "（ここに完了をどう確かめるかを書く）",
+    "計画の理由": "（ここに計画の理由を書く）",
+}
+PLACEHOLDERS = (RATIONALE_TODO, *HEADING_TODO.values())
 
 
 class TicketNewTestBase(PhaseHarness):
@@ -64,7 +75,7 @@ class TicketNewTestBase(PhaseHarness):
     def fill_placeholders(self):
         """雛形の空欄の目印を、実際の内容に書き換える（目印が残ると承認の検査が止める）。"""
         text = self.written()
-        for mark in proposal_form.PLACEHOLDERS:
+        for mark in PLACEHOLDERS:
             text = text.replace(mark, "書いた内容")
         with open(self.todo, "w", encoding="utf-8") as f:
             f.write(text)
@@ -100,9 +111,9 @@ class TicketNewTest(TicketNewTestBase):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
         body = self.written().split("---\n", 2)[2]
         headings = [x[3:] for x in body.splitlines() if x.startswith("## ")]
-        self.assertEqual(headings, list(proposal_form.PARENT_HEADINGS))
-        for name in proposal_form.PARENT_HEADINGS:
-            self.assertIn(f"## {name}\n\n{proposal_form.HEADING_TODO[name]}\n", body)
+        self.assertEqual(headings, list(PARENT_HEADINGS))
+        for name in PARENT_HEADINGS:
+            self.assertIn(f"## {name}\n\n{HEADING_TODO[name]}\n", body)
 
     def test_a_fresh_scaffold_is_refused_for_the_placeholders_left(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
@@ -249,15 +260,6 @@ class TicketNewTest(TicketNewTestBase):
         self.assertNotIn("sh sh", result.stderr)
         self.assertIn("'sh ", result.stderr)
         self.assertFalse(os.path.exists(self.todo))
-
-    def test_the_start_points_a_parent_without_its_worktree_at_ccnavi_start(self):
-        """`ticket start` の案内も、親には識別子の名前のブランチを作らせない。子は -b <子>。"""
-        parent = ticket_model.Ticket(ticket=IDENT)
-        child = ticket_model.Ticket(ticket=f"{IDENT}-01-01", parent=IDENT, phase=1)
-        said = ops._create_words(self.root, parent, "/w/p")
-        self.assertIn("ccnavi-start.sh --mr <MR の番号>", said)
-        self.assertNotIn("-b ", said)
-        self.assertIn(f"-b {IDENT}-01-01", ops._create_words(self.root, child, "/w/c"))
 
     def test_a_worktree_with_another_name_is_not_accepted(self):
         result = self.new(cwd=self.parent_tree)

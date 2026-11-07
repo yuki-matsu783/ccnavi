@@ -41,11 +41,8 @@ root=$(ccnavi_workspace) || root=$(ccnavi_abs "$(dirname "$0")/../..") || {
 }
 
 # 実行ファイルは、打った人の cwd のまま起こす（取り込み先のツリーと根は、実行ファイルが cwd から決める）。
-# ソースで動かすときだけ、uv にワークスペースルートのプロジェクトを教える。
 if bin=$(ccnavi_bin "$root"); then
 	exec "$bin" --entry sh user prune "$@"
-elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-	exec uv run --quiet --project "$root" python -m ccnavi --entry sh user prune "$@"
 fi
-printf 'ccnavi-user-prune: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+printf 'ccnavi-user-prune: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 exit 2

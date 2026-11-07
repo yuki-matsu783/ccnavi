@@ -1,0 +1,73 @@
+作業・レビュー計画のテンプレートを一覧・検索・参照するには、
+次のコマンドを実行します（計画と子フローを1ファイルにまとめたもので、
+.ccnavi/config/common/templates/ と .ccnavi/config/project/templates/ に置かれます。
+読み取り専用で、何も書き込みません）。
+
+    ccnavi --templates [--layer self|PROJECT] [--keyword K]... [--json]
+    ccnavi --templates --show NAME [--layer self|PROJECT] [--json]
+    ccnavi --templates --check-file PATH [--layer self|PROJECT|common] [--json]
+
+一覧は、共通レイヤーと1つのレイヤー（--layer を指定しない場合は self）を合わせたものです。
+--keyword は名前、説明、または使う場面の一部に一致します（2回指定した場合はどちらかに一致）。
+--show は、1件のテンプレートを計画・フロー・検査結果とともに表示します。
+--check-file は、任意のパスのテンプレートを、そのレイヤーのフェーズ定義で検査します
+（何も書き込みません。保存前の確かめ用で、--show・--draft・--keyword とは併用できません）。
+両方のレイヤーに同じ名前で内容の異なるテンプレートがある場合はエラーとなり、
+そのレイヤー側のテンプレートは使用されません。--json は、ボード画面が描画する完全な応答で、
+docs/21_design/tickets/templates.mdに記載しています。--keyword は --docs
+と共通で、それ以外では拒否されます。--docs のその他のフィルターはここでは拒否されます。--lint
+でも同じ検査を報告します。
+
+テンプレートは2段階で収集します。エージェントは --draft を実行できます。
+完了済みの親チケット（done/ にあるもの）の計画と子フローを、親のツリーの
+wip/handoff/<取り込み先の相対パス> に下書きとしてコピーします（--to の既定は project で、
+取り込み先は .ccnavi/config/project/templates/NAME.yml。--to common なら
+.ccnavi/config/common/templates/NAME.yml、--layer PROJECT なら
+projects/PROJECT/.ccnavi/config/project/templates/NAME.yml）。下書きは効力を持たず、
+上書きもされません。取り込み先に同名のテンプレートが既にある場合も作りません。
+
+    ccnavi --templates --draft PARENT [--name NAME] [--to common|project] [--layer NAME] [--json]
+
+下書きの取り込みは、ほかの保護対象（rules.yml・docs・hook など）と同じく、ユーザが
+ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
+--handoff に読み替えます。--handoff を直接渡すと断ります。sh が付ける入口の印（--entry sh）が
+ない user handoff も断ります）。テンプレートの
+改名・移動・削除は、ユーザがファイルを直接操作します。
+
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] [--json]
+        （見るだけ。PATH はツリーからの相対パスで、省くと下書き全部）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] --yes --expect HASH
+        （取り込みます。ボードは実行ファイルを --entry board --via board で呼びます）
+
+共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
+.ccnavi/config/common/）と工程スキル（各プロジェクトの skills/）がずれていないかの確認と、ずれの同期は、ユーザが
+ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
+--mirror に読み替えます。sh が付ける入口の印（--entry sh）がない user mirror は断ります）。同期は各プロジェクトのワークツリーに書くだけで、コミットはしません。
+
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] [--json]
+        （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] --yes --expect HASH
+        （差分のあるプロジェクトを揃えます。--expect が今の差分と違うときは何も書きません。
+        ボードは実行ファイルを --entry board --via board で呼びます）
+
+収集済みのテンプレートは、親の提案を開始するときに使用されます。
+エージェントも実行できます（フローの下書きも効力を持ちません）。
+
+    ccnavi ticket new ID --title TITLE --template NAME [--layer self|PROJECT]
+                         [--with-feedback] --issue <N|owner/repo#N> --mr <N>
+
+ID という名前のワークツリーに wip/proposals/todo/ID.md を書き込みます。plan:
+はテンプレートから取得し（after は、計画内の位置から提案側の番号へ振り直されます）、続けて
+phases: を補完します。feedback: は --with-feedback
+を指定した場合のみ書き込まれます（フィードバック計画は、メイン計画の番号の続きになります）。
+指定しない場合は、テンプレートにフィードバック計画があることが出力に表示されます。
+フィードバック計画は、メイン計画の最後のレビューの後に、改訂によって1回だけ追加されます。
+最初の提案に書いてしまうと、承認後にメイン計画を改訂できなくなるためです。--with-feedback は、
+ticket new --template 以外で指定すると拒否されます。n番目の計画のステップのフローは
+wip/proposals/flows/ID-NN-01.yml に出力されます。これは下書きで、
+ユーザがフローエディターで取り込むまで効力を持ちません。NAME は、
+共通レイヤーと1つのレイヤー（--layer を指定しない場合は、
+ワークツリー自身のレイヤー）から検索されます。次の場合は、何も書き込まずに停止します。
+テンプレートが存在しない、または使用できない（エラーがある、または重複により除外された）場合、
+phases.yml にないタイプがある場合、--plan も指定された場合、
+提案またはフローの下書きがすでに存在する場合。提案は、通常の承認を経る必要があります。

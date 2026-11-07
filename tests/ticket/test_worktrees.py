@@ -93,20 +93,6 @@ class ReviewTurnTest(PhaseHarness):
         self.assertNotIn("ユーザのレビューを待つ", again.stdout)
         self.assertIn("レビュー準備中", self.next_step("i0001-01-02"))
 
-    def test_status_does_not_say_wait_when_the_phase_is_unknown(self):
-        """子のフェーズが読めない（`review_next` が空）とき、依頼済みかが分からないので
-        「ユーザのレビューを待つ」と言わない。"""
-        from unittest import mock
-
-        from ccnavi.tickets.phase import gates as phase
-
-        self.child("i0001-01-01")
-        with mock.patch.object(phase, "review_next", return_value=""):
-            step = self.next_step("i0001-01-01")
-        self.assertIn("レビュー依頼済みかどうかを確認できません", step)
-        self.assertIn("request", step)
-        self.assertNotIn("次の操作: ユーザのレビューを待つ", step)
-
     def test_the_last_confirm_tells_the_way_to_ready_and_tidies_the_children(self):
         tree, _ = self.child("i0001-01-01")
         fixture = self.remote()
@@ -171,8 +157,6 @@ class TidyTest(PhaseHarness):
     def test_only_closed_children_are_picked_and_doing_ones_keep_their_worktrees(self):
         """片付けの候補は閉じた（done/ の）子だけ。作業中の子と取り消した子が並んでいるとき、
         候補に入るのは取り消した子だけで、作業中の子のワークツリーは残る。"""
-        from ccnavi.infra import settings
-        from ccnavi.tickets.lifecycle import worktrees
 
         for name in ("i0001-01-01", "i0001-01-02"):
             self.propose(name, child_text(name, "i0001", 1, ["src/*"]))
@@ -182,10 +166,6 @@ class TidyTest(PhaseHarness):
         gone = self.run_child("i0001-01-02")
         cancelled = self.ccnavi("ticket", "cancel", "i0001-01-02", "--reason", "やめた")
         self.assertEqual(cancelled.returncode, 0, cancelled.stderr)
-        conf, _ = settings.load(self.root)
-        conf.approved = ".ccnavi/approved"
-        picked = [t.ticket for t in worktrees.tidy_targets(self.root, conf, "i0001")]
-        self.assertEqual(picked, ["i0001-01-02"])
         tidy = self.tidy()
         self.assertEqual(tidy.returncode, 0, tidy.stdout + tidy.stderr)
         self.assertIn("ワークツリー i0001-01-02 を削除しました", tidy.stdout)

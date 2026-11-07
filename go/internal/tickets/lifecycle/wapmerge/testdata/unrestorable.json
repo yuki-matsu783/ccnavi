@@ -1,0 +1,1 @@
+{"reasons":["改行を含むパス src/x\\ny.py","大文字小文字だけが違うパス src/A.py, src/a.py","submodule の追加・削除 sub"],"why":""}

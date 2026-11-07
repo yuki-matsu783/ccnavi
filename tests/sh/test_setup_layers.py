@@ -15,8 +15,8 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.infra import platformtag
 from tests import ROOT
+from tests.sh.install_harness import THIS_MACHINE
 
 SETUP = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
 # 振り分けの sh の原本。コピーする前は CCNAVI_TEST_LAUNCHER で名指しできる
@@ -78,12 +78,11 @@ class SetupTest(unittest.TestCase):
         src = tempfile.mkdtemp(prefix="ccnavi-union-source-")
         self.addCleanup(shutil.rmtree, src, ignore_errors=True)
         binary = os.path.join(src, "dist", "ccnavi", "ccnavi")
-        os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
         write(binary, "#!/bin/sh\nexit 0\n")
         os.chmod(binary, 0o755)
         # 置き場の名前になる目印と、hook が起動する振り分けの sh。sh は `.ccnavi/scripts/` に置き、
         # 実行ファイルは `../bin/<os>-<arch>/` に探す。
-        write(os.path.join(src, "dist", "ccnavi.target"), platformtag.host_target() + "\n")
+        write(os.path.join(src, "dist", "ccnavi.target"), THIS_MACHINE + "\n")
         os.makedirs(os.path.join(src, ".ccnavi", "scripts"))
         shutil.copy(LAUNCHER, os.path.join(src, ".ccnavi", "scripts", "ccnavi-launcher.sh"))
         write(os.path.join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")

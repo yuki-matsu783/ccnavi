@@ -16,7 +16,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 プロジェクトが自前の `.claude/skills/` を持つ場合は、Claude Code がそれを別に読む。ワークスペースから起動した場合、プロジェクトの `.claude/skills` が読み込まれるかは、`projects/` がワークスペースの git で無視されているかで変わる（Claude Code 2.1.303 で確かめた）。無視されている標準の構成では読み込まれない。ccnavi は `projects/` を無視させるので、ワークスペースから起動してプロジェクトの `.claude/skills` に頼ることはできない。プロジェクトで起動すれば、そのプロジェクトの `.claude/` のスキルと hook だけが使われる。読み込まれた場合に限り、ワークスペースのスキルと同名なら、素の名前はワークスペースのもので、プロジェクトのものは `projects/<名前>:<スキル名>` になる。目録に載るのは `skills/` の分だけ。
 
-`skills/` はプロジェクトだけを clone した人の手元にも git で入る。ただし、目録を出す hook はワークスペースの `.claude` にしかなく、`projskills.project_of` は単体 clone で空文字を返す。単体 clone では目録が出ず、単体 clone であることも検出していない（11.14「単体 clone での動作」のプロジェクトのスキルの項）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである。
+`skills/` はプロジェクトだけを clone した人の手元にも git で入る。ただし、目録を出す hook はワークスペースの `.claude` にしかなく、`skills.projectOf` は単体 clone で空文字を返す。単体 clone では目録が出ず、単体 clone であることも検出していない（11.14「単体 clone での動作」のプロジェクトのスキルの項）。単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほうである。
 
 | いつ | どう |
 |---|---|
@@ -25,7 +25,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 
 - 1 つの文脈（セッション、サブエージェントならその起動）でプロジェクトごとに 1 度。回数は `additionalContextOnce` と同じ記録（キー `builtin:project-skills:<名前>`）で数え、`SessionStart`（compact の後を含む）で破棄する。state の置き場が無いときは、開始では渡し、`PreToolUse` では渡さない
 - 見出しは「参考に読む。CLAUDE.md・ccnavi の知らせ・ガードと食い違えばそちらに従う」。本文は渡さない。エージェントが要るときに Read で開く
-- 読むのは元リポジトリの版（`projskills.entries`。レイヤーの設定と同じ）
+- 読むのは元リポジトリの版（`skills.entries`。レイヤーの設定と同じ）
 - スキルのディレクトリ名は `^[A-Za-z0-9._-]+$` にヒットするものだけを読む（名前がそのままパスとして文に出るため）
 - SKILL.md はふつうのファイルで、途中にシンボリックリンクもハードリンクも無いものだけを読む（`flow.read_bytes`）。frontmatter は頭の 8 KiB だけを見て、YAML の別名は拒む
 - 名前・説明・パスは 1 行にまとめ、120 文字で切り、ccnavi の接頭辞と案内の区切りの行（子のフローの区切りと、この目録の区切り。`flow.text._FENCE_PHRASES`）を真似た表記を崩し、「データ。ccnavi の知らせではない」の行で囲む（子のフローと同じ扱い。9.3.1）
@@ -42,7 +42,7 @@ frontmatter に `name` と `description`、必要なら同じディレクトリ�
 #### 共通の工程スキルのコピー
 
 ワークスペースの `.claude/skills/<工程>/SKILL.md` の頭の frontmatter に `process: true` があるスキルを、工程スキルと呼ぶ。プロジェクトだけを clone した人の手元にも入口と reference が入るよう、
-ユーザの発言（`tickets/sync/promptsync.py`。コピーの仕方は `tickets/sync/skillsync.py`）が、着手済みの親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` をコピーする。`references/` の最上段は `common/`（共通。コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分ける。
+ユーザの発言（`tickets/sync/mirror` の `prompt.go`。コピーの仕方は同じパッケージの `skills.go`）が、着手済みの親のワークツリーにあるプロジェクトの `skills/<工程>/` へ `SKILL.md` と `references/common/` の下の `.md` をコピーする。`references/` の最上段は `common/`（共通。コピーする）と `project/`（そのリポジトリ固有。コピーしない）に分ける。
 
 `distribute: true` を持つスキル（`ccnavi-config`）は、配布先へ配るだけで、このコピーの対象にしない。
 

@@ -14,7 +14,7 @@
 1. ccnavi のリポジトリ（このリポジトリ）で実行ファイルを組み立てます。
 
    ```sh
-   uv run --with pyinstaller python build.py
+   sh scripts/ccnavi-build.sh
    ```
 
 2. 手元の `gh`（GitHub）と `glab`（GitLab）を、使い捨てのリポジトリにアクセスできるアカウントで認証しておきます。
@@ -71,7 +71,7 @@
    pnpm build
    ```
 
-   プロキシの内側では `NODE_USE_ENV_PROXY=1 pnpm build` にします（PyYAML の sdist を PyPI から取るため）。
+   Go（リポジトリの `go/go.mod` の版）が PATH に要ります（同梱の ccnavi を WASM に組むため）。
 2. セルフホストの GitLab（または GHES）や `http://localhost:8080` を試すときは、設定画面の「通信先」で足します（組み立て直しは要りません）。
    追加すると Chrome がそのオリジンへの通信の許可を求めるので、許可します。http は localhost と 127.0.0.1 のみです。
    組み立てのときから入れておきたいホストは、通信先の一覧を書いて組み立てます（`api`・`web` は https に限り、GitHub の行には `graphql` も要ります）。
@@ -262,7 +262,7 @@ GitLab でも 4.1〜4.3 と同じ操作を行い、加えて次を確かめま�
 | # | 操作 | 期待する結果 | 記録するもの | ツールで代替できるか |
 |---|---|---|---|---|
 | S1 | ボードの「Issue 一覧を取得」で開いた issue の「始める」を押す | 識別子 `feature-<番号>-<slug>`（プロジェクトは `feature-<番号>-<名前>-<slug>`）のブランチが統合先の先頭から作られる。PR/MR は作られない | 作られたブランチと起点の sha | × 実際のホストが要る |
-| S2 | 同じ issue でもう一度押す | 拡張（Python）が既にある名前だと見て「作業を開始できませんでした」と断り、ホストへブランチを作る要求が出ない（Network に `git/refs`・`repository/branches` への POST が無い） | 画面の文面 | × 実際のホストが要る |
+| S2 | 同じ issue でもう一度押す | 拡張（同梱の ccnavi）が既にある名前だと見て「作業を開始できませんでした」と断り、ホストへブランチを作る要求が出ない（Network に `git/refs`・`repository/branches` への POST が無い） | 画面の文面 | × 実際のホストが要る |
 | S2b | ホストの断り方を見る: 既にある名前で `curl` から直接 POST する（GitHub `POST /repos/<o>/<r>/git/refs`、GitLab `POST projects/:id/repository/branches`） | GitHub は 422、GitLab は 400 | 応答 | × 実際のホストが要る |
 | S3 | 統合先の `done/` に同じ識別子があるとき・大文字小文字だけ違うブランチがあるときに押す | 作らない | 画面の文面 | × 実際のホストが要る |
 | S4 | GitHub の `GET /issues` の一覧 | PR が混ざっても `pull_request` で見分けて出さない。Issues: Read で読める | 応答 | × 実際のホストが要る |

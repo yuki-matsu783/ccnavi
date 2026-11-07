@@ -5,12 +5,10 @@
  *   2. `.claude/settings.json`のenv `CCNAVI_ENTRY_PATH`
  *   3. `dist/ccnavi/ccnavi`
  *   4. `.ccnavi/scripts/ccnavi-launcher.sh`（振り分けのsh。scripts/ccnavi-setup.shが配る）
- *   5. ソースがあれば`uv run python -m ccnavi`
- *   6. PATHの`ccnavi`（`ccnavi.exe`）
+ *   5. PATHの`ccnavi`（`ccnavi.exe`）
  *
- * 振り分けのshは、bin/ に合うものが無いとPATHのccnaviを起動する。拡張も同じ規則で、最後にPATHを見る
- * （ソースが先なのは、保護済みshのccnavi_binと同じ）。見るのは絶対パスの項目だけ。振り分けのshと
- * 同じファイル（`ccnavi`という名前で張ったリンク）は飛ばす。
+ * 振り分けのshは、bin/ に合うものが無いとPATHのccnaviを起動する。拡張も同じ規則で、最後にPATHを見る。
+ * 見るのは絶対パスの項目だけ。振り分けのshと同じファイル（`ccnavi`という名前で張ったリンク）は飛ばす。
  *
  * どれも相対ならワークスペースルートからの相対。Windowsの`.exe`はパスに付いていなくても試す。
  *
@@ -18,7 +16,7 @@
  * `bin/<os>-<arch>/`に並ぶ（`.ccnavi/scripts/`のshなら`.ccnavi/bin/<os>-<arch>/`）。
  * 拡張はshを通さずその実体を探し、shそのものは返さない。Windowsではshを直接起動
  * できないので、shを返すと起動に失敗する。実体が無ければ次の候補へ進む。
- * それ以外のパスは、そのパスそのものを探す。語はsrc/ccnavi/infra/platformtag.pyと揃える。
+ * それ以外のパスは、そのパスそのものを探す。語はgo/internal/infra/platformtagと揃える。
  *
  * ファイルの有無は呼び手が渡す（テストで実際のファイルシステムを要らなくするため）。
  */
@@ -46,9 +44,8 @@ export const DEFAULT_BINS = [
   "dist/ccnavi/ccnavi",
   ".ccnavi/scripts/ccnavi-launcher.sh",
 ] as const;
-/** 振り分けのshの名前。src/ccnavi/infra/platformtag.pyのLAUNCHER_NAMEと揃える */
+/** 振り分けのshの名前。go/internal/infra/platformtagのLauncherNameと揃える */
 export const LAUNCHER_NAME = "ccnavi-launcher.sh";
-export const SOURCE_MARKER = "src/ccnavi/__main__.py";
 const SUFFIXES = ["", ".exe"] as const;
 const EXECUTABLE_NAMES = ["ccnavi", "ccnavi.exe"] as const;
 
@@ -115,9 +112,6 @@ export function locate(input: LocateInput): Launcher | undefined {
         return { kind: "exe", path: filePath };
       }
     }
-  }
-  if (input.exists(input.join(input.root, SOURCE_MARKER))) {
-    return { kind: "uv", root: input.root };
   }
   return onPath(input);
 }

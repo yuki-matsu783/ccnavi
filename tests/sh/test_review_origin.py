@@ -1,11 +1,11 @@
-"""origin の URL の読み方。exe の `remote_kind` と、sh の `origin` の両方を見る。
+"""origin の URL の読み方（sh の `origin`）。
 
-両方の読み手を同じファイルに置くのは、同じ URL を両方が同じに読むことを並べて確かめるため。
-sh を起動するので sh のグループに置く。
+実行ファイルの側の読み方は go test（go/internal/tickets/model/host/review_origin_test.go）が
+確かめる。
 
 URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は普通にある。
 ホストにユーザ情報が入り込むと API の URL が不正になり、`origin` の出力にトークンが漏れる。
-実物の GitLab で実際に起きた穴なので、両方の読み手で固定する。
+実物の GitLab で実際に起きた穴なので、sh と実行ファイルの両方で固定する。
 
 `CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
@@ -20,7 +20,6 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi.tickets.model import review_host
 from tests import ROOT
 
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
@@ -28,33 +27,6 @@ SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 CURL = shutil.which("curl")
-
-
-class RemoteKindTest(unittest.TestCase):
-    def test_reads_host_through_userinfo_and_port(self):
-        cases = {
-            "https://github.com/o/r.git": "github",
-            "git@github.com:o/r.git": "github",
-            "https://oauth2:glpat-secret@github.com/o/r.git": "github",
-            "http://localhost:8929/root/p.git": "gitlab",
-            "http://oauth2:glpat-secret@localhost:8929/root/p.git": "gitlab",
-            "ssh://git@gitlab.example.com:2222/g/p.git": "gitlab",
-            "git@gitlab.example.com:g/p.git": "gitlab",
-            # ユーザ情報に `@` が入る。git は最後の `@` で切るので、こちらもそう読む。
-            "https://user:p@ss@github.com/o/r.git": "github",
-            "https://oauth2:glpat-A@B@localhost:8929/root/p.git": "gitlab",
-            # パスに `@` があっても authority の外なのでホストに入らない。
-            "git@github.com:o/r@x.git": "github",
-            "https://[::1]:9/g/p.git": "gitlab",
-            # scheme の大文字小文字は区別しない。
-            "HTTPS://github.com/o/r.git": "github",
-            # sh が読めない表記は、こちらも読めない扱い。
-            "ssh://user@host.example.com/g/p.git": "",
-            "not a url": "",
-        }
-        for url, kind in cases.items():
-            with self.subTest(url=url):
-                self.assertEqual(review_host.remote_kind(url), kind)
 
 
 @unittest.skipUnless(SHELL and JQ and CURL, "sh / jq / curl のどれかが無い")

@@ -17,8 +17,7 @@ import json
 import os
 import unittest
 
-from ccnavi.hook import subagent
-from ccnavi.infra import settings
+from tests import script_command
 from tests.ticket.test_feedback_plan_approval import FeedbackPlanApprovalTest
 from tests.ticket.test_ticket import write
 
@@ -72,10 +71,10 @@ class FeedbackNudgeTest(FeedbackPlanApprovalTest):
         self.assertIn(todo_dir, reason)
         self.assertIn("feedback: []", reason)
         # 改版の雛形は手で写さず、コマンドが作る（スクリプトだけが書く欄の始末も済ませる）
-        launcher = settings.script_command(self.root, "ccnavi-launcher.sh")
+        launcher = script_command(self.root, "ccnavi-launcher.sh")
         self.assertIn(f"{launcher} ticket revise i0001 --feedback", reason)
         self.assertIn("approval-request i0001 --check", reason)
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"`{ticket_sh} approval-request i0001`", reason)
         # ユーザが止めたときの扱いと、同じ状態では 1 回だけであること
         self.assertIn("止めて", reason)
@@ -94,7 +93,7 @@ class FeedbackNudgeTest(FeedbackPlanApprovalTest):
         self.waiting()
         started = self.hook("SubagentStart", "", self.parent_tree, agent_id="a1")
         self.assertEqual(started.returncode, 0, started.stderr)
-        self.assertTrue(os.path.exists(subagent._running_path(self.state, "s1", "a1")))
+        self.assertTrue(os.path.exists(os.path.join(self.state, "subagent-s1-a1.running")))
         self.quiet(self.stop())
         self.quiet(self.stop())
         self.assertEqual(
@@ -125,7 +124,7 @@ class FeedbackNudgeTest(FeedbackPlanApprovalTest):
         self.propose_feedback(feedback=[])
         reason = self.asked(self.stop())
         self.assertIn(f"フィードバック計画の改版は {self.todo()} にあります", reason)
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"`{ticket_sh} approval-request i0001`", reason)
         self.assertIn(f"`{ticket_sh} status i0001`", reason)
         self.assertNotIn("started_at・completed_at", reason)

@@ -1,6 +1,7 @@
 """Stop で `integrate` を促すための、直接作業の「候補」の記録。
 
-直接作業のワークツリー（`.claude/worktrees/<名前>`）に Write・Edit・NotebookEdit で書き込んだとき、
+直接作業のワークツリー（`.claude/worktrees/<名前>`）に
+Write・Edit・MultiEdit・NotebookEdit で書き込んだとき、
 そのツリーを、セッションごとの記録に加える。
 Stop は cwd のツリーに加えて、ここで加えられた候補も調べる。
 cwd がワークスペースルートのままでも、サブエージェントが書いたツリーでも、促しが届く。

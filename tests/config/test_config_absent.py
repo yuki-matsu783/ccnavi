@@ -5,23 +5,17 @@
 組み込みの deny は、共通レイヤーと config の有無・状態によらず常にヒットする。
 
 fixture は tests/config/test_config_union.py の ConfigUnionHarness を継ぐ。
+配点のレイヤーの和の細部、組み込みの文面、照合の速さは Go のテスト
+（go/internal/tickets/config/risk・go/internal/policy/builtin・go/internal/policy/rules）が確かめる。
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
-import shutil
-import tempfile
-import time
 import unittest
 
-from ccnavi.infra import settings, shellread, yamlread
-from ccnavi.policy import builtin, texts
-from ccnavi.tickets.config import risk
-from ccnavi.tickets.model import ticket_guard
-from tests import ROOT
+from tests import script_command
 from tests.config.test_config_union import (
     BROKEN,
     COMMON_RISK,
@@ -252,94 +246,7 @@ BUILTIN_PASSED = (
 )
 
 # 照合の後戻りが長引く形だった入力。どれもヒットしない。
-SLOW_BEFORE = (
-    "rm " * 8000,
-    "git -c " * 8000,
-    "rm -r a " * 3200,
-    "git -C " * 8000,
-    "rm -f a " * 3200,
-    "git reset " * 2400,
-    "/" * 24000,
-    "a/" * 12000,
-    "git --x/git " * 2000,
-    # `.git` の 1 本の、前置きを読み直す形。
-    "mv " + "a/" * 12000,
-    "echo > " + "a/" * 12000,
-    "cp " + "a/ " * 8000 + ".",
-    # 読み切れなかった生の文字列。`>` ごとに尾を読み直さない（上限に頼らない）。
-    'echo "' + ">a" * 12000,
-    'echo "' + ">a/" * 8000,
-    'echo "> ' + "a/" * 12000,
-)
-# 共通ルールの照合が長引く形だった入力（パスの前置きを読み直す形）。
-COMMON_SLOW_BEFORE = (
-    "/" * 30000,
-    "echo " + "/" * 30000 + "; git push",
-    "\x00a" * 15000,
-    "\x00/" * 15000,
-)
-COMMON_LIMIT = 0.1
-# 照合 1 本にかけてよい時間。手元では 0.01 秒ほどで、負荷で揺れても届かない余裕を持たせてある。
-SLOW_LIMIT = 0.5
 TICKET_CONTROL = "CCNAVI_TICKET_CONTROL"
-
-
-class BuiltinSpeedTest(unittest.TestCase):
-    """組み込みの deny の照合は、入力の長さにほぼ比例する時間で終わる。
-
-    判定の期限はルールの合間でしか確かめないので、1 本の照合が後戻りで長引くと、hook の timeout に
-    達して呼び出しが止められずに通る。
-    """
-
-    def test_common_regexes_return_quickly(self):
-        """共通ルールの regex（組み合わせ条件と except の中も）も、長い入力ですぐ返る。"""
-        with open(
-            os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), encoding="utf-8"
-        ) as f:
-            data = yamlread.safe_load(f.read())
-        found = []
-        by_rule: dict[str, list[str]] = {}
-
-        def walk(node, rule_id=""):
-            if isinstance(node, dict):
-                rule_id = node.get("id", rule_id) if isinstance(node.get("id"), str) else rule_id
-                for key, value in node.items():
-                    if key == "regex" and isinstance(value, str):
-                        expression = value.replace("{root}", "/ws").replace("{!root}", "")
-                        found.append(expression)
-                        by_rule.setdefault(rule_id, []).append(expression)
-                    else:
-                        walk(value, rule_id)
-            elif isinstance(node, list):
-                for item in node:
-                    walk(item, rule_id)
-
-        walk(data)
-        # 残しているルール（ccnavi 自身の保護と認証情報は組み込みにあり、ここには無い）の
-        # regex が、検査の対象に入っていることを確かめる。入っていなければ速さを見たことにならない。
-        for rule_id in ("workspace-root", "session-scratchpad", "find-writes", "heredoc"):
-            self.assertIn(rule_id, by_rule)
-        for text in (*COMMON_SLOW_BEFORE, *SLOW_BEFORE):
-            for expression in found:
-                regex = re.compile(expression, re.IGNORECASE)
-                with self.subTest(text=text[:16], regex=expression[:24]):
-                    start = time.monotonic()
-                    regex.search(text)
-                    self.assertLess(time.monotonic() - start, COMMON_LIMIT)
-
-    def test_long_inputs_return_quickly(self):
-        built, problems = builtin.load_base()
-        self.assertEqual(problems, [])
-        regexes = [rule.compiled for rule in built.deny if rule.match == "Bash"]
-        regexes.append(re.compile(ticket_guard.RAW_GIT_REGEX, re.IGNORECASE))
-        for text in SLOW_BEFORE:
-            subject = shellread.read(text).text or text
-            for regex in regexes:
-                with self.subTest(text=text[:16], regex=regex.pattern[:24]):
-                    start = time.monotonic()
-                    regex.search(subject)
-                    regex.search(text)
-                    self.assertLess(time.monotonic() - start, SLOW_LIMIT)
 
 
 RAW_GIT_BUILTIN = "builtin:guard-raw-git"
@@ -390,7 +297,7 @@ class BuiltinFormsTest(ConfigUnionHarness):
                 self.assertNotIn("ccnavi-git.sh", self.reason(denied))
                 self.assertNotIn("'git ", self.reason(denied))
         write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
-        wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
+        wrapper = script_command(self.ws, "ccnavi-git.sh")
         for command, rule in cases:
             with self.subTest(command=command, wrapper=True):
                 denied = self.hook("Bash", self.ws, command=command)
@@ -477,8 +384,8 @@ class BuiltinRawGitTest(ConfigUnionHarness):
         self.assertIn("ユーザ", self.reason(result))
 
 
-GIT_DIR_BUILTIN = builtin.GIT_DIR_RULE_ID
-GIT_DIR_SHELL_BUILTIN = builtin.GIT_DIR_SHELL_RULE_ID
+GIT_DIR_BUILTIN = "builtin:guard-git-dir"
+GIT_DIR_SHELL_BUILTIN = "builtin:guard-git-dir-via-bash"
 # `.git` の中へシェルから書き込む形と、読むだけの形。
 GIT_DIR_SHELL_DENIED = (
     "echo x > .git/config",
@@ -584,7 +491,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
         denied = self.hook("Write", self.ws, file_path=path)
         self.assertNotIn("git <サブコマンド>", self.reason(denied))
         write(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
-        wrapper = settings.script_command(self.ws, "ccnavi-git.sh")
+        wrapper = script_command(self.ws, "ccnavi-git.sh")
         for tool, field, value in (
             ("Write", "file_path", path),
             ("Bash", "command", "echo x > .git/config"),
@@ -593,128 +500,6 @@ class BuiltinGitDirTest(ConfigUnionHarness):
                 denied = self.hook(tool, self.ws, **{field: value})
                 self.assertIn(wrapper, self.reason(denied))
                 self.assertNotIn("'git ", self.reason(denied))
-
-
-class BuiltinGitWordingTest(unittest.TestCase):
-    """組み込みの文面は、止まる形（生の git）を案内しない。
-
-    ラッパーがあるワークスペースではラッパーの実パスで、無ければ `git` で書く
-    （ラッパーが無ければ、生の git を組み込みで止めることもない）。
-    """
-
-    IDS = (
-        "builtin:recursive-delete",
-        "builtin:git-reset-hard",
-        "builtin:git-push",
-        builtin.CONFIG_VIA_BASH_RULE_ID,
-    )
-
-    def messages(self, root):
-        # 文は拒否に当たった回に文面ファイルから引く。同梱の文面ファイルを写して引く。
-        shutil.copytree(
-            os.path.join(ROOT, ".ccnavi", "messages"),
-            os.path.join(root, ".ccnavi", "messages"),
-        )
-        found = {r.id: texts.spoken(r) for r in builtin.load_base(root)[0].deny}
-        conf = settings.Settings(project_home=settings.DEFAULT_PROJECT_HOME)
-        for rule in builtin.load(root, conf)[0].deny:
-            found.setdefault(rule.id, texts.spoken(rule))
-        return {i: found[i] for i in self.IDS}
-
-    def test_with_the_wrapper(self):
-        root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-builtin:words-"))
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")
-        os.makedirs(os.path.dirname(script))
-        with open(script, "w", encoding="utf-8"):
-            pass
-        git = settings.script_command(root, "ccnavi-git.sh")
-        for rule_id, text in self.messages(root).items():
-            with self.subTest(rule=rule_id):
-                self.assertIn(git, text)
-                self.assertNotRegex(text, r"'git ")
-
-    def test_push_with_the_wrapper_separates_the_parent_the_child_and_the_user(self):
-        root = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-builtin:push-"))
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        script = os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh")
-        os.makedirs(os.path.dirname(script))
-        with open(script, "w", encoding="utf-8"):
-            pass
-        text = self.messages(root)["builtin:git-push"]
-        self.assertIn("親のワークツリーのブランチ", text)
-        self.assertIn("子のワークツリーのブランチは送らず", text)
-        self.assertNotIn("push をユーザに頼む", text)
-
-    def test_without_the_wrapper(self):
-        root = tempfile.mkdtemp(prefix="ccnavi-builtin:words-")
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        said = self.messages(root)
-        self.assertIn("ユーザに削除を頼む", said["builtin:recursive-delete"])
-        self.assertIn("ユーザに確認する", said["builtin:git-reset-hard"])
-        self.assertIn("push をユーザに頼む", said["builtin:git-push"])
-        self.assertIn("ユーザに頼んでください", said[builtin.CONFIG_VIA_BASH_RULE_ID])
-        # 生の git は止まるので、`git` の形は案内しない。ユーザに頼む文になる。
-
-
-class AbsentRiskTest(ConfigUnionHarness):
-    def definition(self, project="lib"):
-        conf, _ = settings.load(self.ws)
-        return risk.layer_definition(conf, self.ws, project)
-
-    def test_without_both_files_the_builtin_items_are_used(self):
-        """共通レイヤーにも config にも risks.yml が無ければ、組み込みの 4 項目。"""
-        os.remove(self.risk)
-        os.remove(layer_path(self.lib, "risk"))
-
-        definition, problems = self.definition()
-
-        self.assertEqual(
-            [f.id for f in definition.factors], ["big-diff", "many-files", "ci", "deletes"]
-        )
-        self.assertEqual(definition.fallback, "")
-        self.assertEqual(problems, [])
-
-    def test_a_missing_common_layer_counts_only_the_config_items(self):
-        """共通レイヤーの risks.yml だけが無ければ、共通レイヤーは空。config の項目だけを数える。"""
-        os.remove(self.risk)
-
-        definition, problems = self.definition()
-
-        self.assertEqual([f.id for f in definition.factors], ["schema"])
-        self.assertEqual(definition.levels, {"critical": 50})
-        self.assertEqual(definition.fallback, "")
-        self.assertEqual(problems, [])
-
-    def test_a_missing_config_counts_only_the_common_items(self):
-        """config の risks.yml だけが無ければ、共通レイヤーの項目だけを数える。"""
-        os.remove(layer_path(self.lib, "risk"))
-
-        definition, _ = self.definition()
-
-        self.assertEqual([f.id for f in definition.factors], ["big-diff"])
-        self.assertEqual(definition.fallback, "")
-
-    def test_a_broken_config_is_empty_and_named(self):
-        """不正な config のレイヤーは空。共通レイヤーの項目だけを数え、`fallback` に名前を残す。"""
-        write(layer_path(self.lib, "risk"), "version: 1\nfactors: [\n")
-
-        definition, _ = self.definition()
-
-        self.assertEqual([f.id for f in definition.factors], ["big-diff"])
-        self.assertEqual(definition.dropped, ["lib"])
-        self.assertTrue(definition.fallback)
-
-    def test_a_broken_common_layer_falls_back_to_the_builtin_items(self):
-        """不正な共通レイヤーは組み込みの配点に戻り、レイヤーは足さない。"""
-        write(self.risk, "version: 1\nfactors: [\n")
-
-        definition, _ = self.definition()
-
-        self.assertEqual(
-            [f.id for f in definition.factors], ["big-diff", "many-files", "ci", "deletes"]
-        )
-        self.assertTrue(definition.fallback)
 
 
 class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
@@ -758,11 +543,10 @@ class MirrorIsNotReadInTheWorkspaceTest(ConfigUnionHarness):
     def test_the_mirror_risk_and_phases_are_not_read_either(self):
         """配点とフェーズ定義も同じ。不正なミラーの phases.yml があっても何も言わない。"""
         self.place_mirror()
-        conf, _ = settings.load(self.ws)
 
-        definition, _ = risk.layer_definition(conf, self.ws, "lib")
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
-        self.assertEqual([f.id for f in definition.factors], ["big-diff", "schema"])
+        self.assertEqual([f["id"] for f in sums["lib"]["risk"]["factors"]], ["big-diff", "schema"])
         paths = [p["detail"] for p in self.problems("error")]
         self.assertFalse(
             [d for d in paths if "mirror" in d or "lib/.ccnavi/config/common" in d], paths
@@ -809,13 +593,12 @@ class StandaloneCloneTest(ConfigUnionHarness):
 
     def test_the_risk_is_the_common_layer_plus_the_own_layer(self):
         """配点も共通 + 自身のレイヤーの和。閾値は小さいほう。"""
-        conf, _ = settings.load(self.lib)
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
-        definition, problems = risk.layer_definition(conf, self.lib, "")
-
-        self.assertEqual([f.id for f in definition.factors], ["big-diff", "schema"])
-        self.assertEqual(risk.effective_levels(definition.levels)["critical"], 50)
-        self.assertEqual([p for p in problems if p.severity != "info"], [])
+        risk = sums["self"]["risk"]
+        self.assertEqual([f["id"] for f in risk["factors"]], ["big-diff", "schema"])
+        self.assertEqual(risk["levels"]["critical"], 50)
+        self.assertEqual(risk["fallback"], "")
         self.assertIn("critical", LIB_RISK)
 
     def test_the_mirror_script_resolves_from_the_clone_root(self):
@@ -826,14 +609,15 @@ class StandaloneCloneTest(ConfigUnionHarness):
             COMMON_RISK
             + "  - {id: counted, points: 5, script: .ccnavi/config/common/scripts/count.sh, message: m}\n",  # noqa: E501
         )
-        write(os.path.join(self.mirror, "scripts", "count.sh"), "printf 1\n")
-        conf, _ = settings.load(self.lib)
+        script = os.path.join(self.mirror, "scripts", "count.sh")
+        write(script, "printf 1\n")
 
-        definition, _ = risk.layer_definition(conf, self.lib, "")
-        counted = definition.factor("counted")
-
-        self.assertEqual(counted.home, self.lib)
-        self.assertEqual(risk.script_problems(definition), [])
+        said = [p["detail"] for p in self.problems("error") + self.problems("warn")]
+        self.assertFalse([d for d in said if "count.sh" in d], said)
+        # 置き場に無ければ `--lint` が名指しする（解いた先を見ている）。
+        os.remove(script)
+        said = [p["detail"] for p in self.problems("error") + self.problems("warn")]
+        self.assertTrue([d for d in said if "count.sh" in d], said)
 
     def test_the_phases_come_from_the_config_only(self):
         """フェーズ定義は config の 1 本（`.ccnavi/config/project/phases.yml`）。"""

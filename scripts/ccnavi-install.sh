@@ -237,7 +237,7 @@ ibuild() {
 			fi
 		fi
 		printf '%s\n' "== ccnavi の組み立て =="
-		if ! (cd "$b_src" && uv run --with pyinstaller python build.py); then
+		if ! sh "$b_src/scripts/ccnavi-build.sh"; then
 			printf '案内: 組み立てに失敗した\n'
 			inext "上の出力の理由を直してから、同じコマンドを打ち直す"
 			return 4
@@ -373,8 +373,8 @@ main() {
 		base=${source:-$(dirname "$0")/..}
 		[ -d "$base" ] || die "$base というディレクトリがありません。"
 		src=$(iabs "$base")
-		if [ ! -f "$src/build.py" ] || [ ! -f "$src/scripts/ccnavi-doctor.sh" ]; then
-			inext "ccnavi のソースのフォルダを指して打ち直す（--source。$src に build.py か scripts/ が無い）"
+		if [ ! -f "$src/scripts/ccnavi-build.sh" ] || [ ! -f "$src/scripts/ccnavi-doctor.sh" ]; then
+			inext "ccnavi のソースのフォルダを指して打ち直す（--source。$src に scripts/ccnavi-build.sh か scripts/ccnavi-doctor.sh が無い）"
 			return 3
 		fi
 	else

@@ -8,6 +8,8 @@ keywords: [テスト, 代役, STUB, 操作記録, 全件, discover, グループ
 
 # ccnaviのPythonのテストを回す
 
+Go のテストの回し方は[実行ファイルをGoに書き直す](go-rewrite.md)の「回す」にある。
+
 ## 全件を1本で回さない
 
 全件を`uv run python -m unittest discover -s tests -t .`の1本で回さない。
@@ -54,8 +56,8 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 sh を回す試験は、実行ファイルの代わりに小さな sh（代役、`STUB`）を `CCNAVI_ENTRY_PATH` に置く。sh は実行ファイルの答えに依存するので、sh に新しい要求が足されたら、代役も追従させる。追従が漏れると、代役が黙って空の答えを返し、sh が「操作記録を作れなかった」などで止まる。
 
-- `ops …` は本物の `ccnavi ops`（`python -m ccnavi`）へ渡す。sh は操作記録（`ops begin`・`show`・`stage-set`・`reconcile`・`applied`）を必須で使う
-- 受け入れ計画（`--accept-plan` の JSON）は `op`（操作ID）を持つ。代役が書く計画には、本物の `oplog.begin` で作った op を入れる
+- `ops …` は本物の `ccnavi ops`（`tests/exe.py` が組んだ実行ファイル。sh には `exe.sh_path()` を書く）へ渡す。sh は操作記録（`ops begin`・`show`・`stage-set`・`reconcile`・`applied`）を必須で使う
+- 受け入れ計画（`--accept-plan` の JSON）は `op`（操作ID）を持つ。代役が書く計画には、本物の `oplog.Begin` で作った op を入れる
 - 事前検査（`--check`）は、取り込みより先に sh が呼ぶ。代役の `--check` が副作用（コミットを積むなど）を持たないようにする
 - 文面ファイルを読む処理を試すための使い捨てのワークスペースには、`tests.put_messages(root)` で文面を置く
 - 子プロセスで `git merge`・`git commit` を呼ぶときは、`-c user.email=… -c user.name=…` を付ける。付けないと、識別子の無い環境で衝突とは別の理由で失敗する

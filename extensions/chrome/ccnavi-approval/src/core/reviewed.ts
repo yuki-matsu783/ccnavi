@@ -1,19 +1,19 @@
 /**
  * レビュー済みの読み取り側。
  *
- * 判定（依頼の記録・依頼の後に動いたか・同じ MR か・変更要求・未解決のスレッド）は Python の
+ * 判定（依頼の記録・依頼の後に動いたか・同じ MR か・変更要求・未解決のスレッド）は ccnavi の
  * `confirm`（手元の `ccnavi review confirm` と同じコア）が出す。ここはホストから材料を取ってきて渡すだけで、材料は次のとおり。
  *
  * - MR のスレッドとレビューを取得した結果（`reviewCopy`。`ccnavi-review.sh fetch` と同じ形）
- * - 依頼の後に親のブランチが動いていれば、Python が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）
+ * - 依頼の後に親のブランチが動いていれば、ccnavi が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）
  *
  * ボードはこれで候補のフェーズごとに「通るか」と理由とスレッドを出し、書く流れ（`write.ts` の
  * `confirmPhase`）は押したときに同じ手順を読み直して 1 コミットにする。GitLab の MR も読む
- * （取得した結果の形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、Python が依頼の投稿者
+ * （取得した結果の形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、ccnavi が依頼の投稿者
  * `poster` と比べて ccnavi の依頼のスレッドを除く。目印は誰でも書けるので書き手で見分ける）。
  */
-import type { Compare, ConfirmResult, DecideResult, PyCall, Reviewable, Snapshot, Actor } from "./py.js";
-import { py } from "./py.js";
+import type { Compare, ConfirmResult, DecideResult, CcnaviCall, Reviewable, Snapshot, Actor } from "./ccnavi.js";
+import { ccnavi } from "./ccnavi.js";
 import type { ReviewCopy } from "./github.js";
 import { localStamp } from "./stamp.js";
 
@@ -31,10 +31,10 @@ export interface ConfirmInput {
 }
 
 /**
- * Python の入口を呼ぶ。依頼のあとに先頭が動いていれば（`need_compare`）、求められた 2 つの変更の一覧を読んで呼び直す。
+ * ccnavi の入口を呼ぶ。依頼のあとに先頭が動いていれば（`need_compare`）、求められた 2 つの変更の一覧を読んで呼び直す。
  * 手で `done/` に動かされた子があれば（`need_manual`）、その移動の時刻を読んで呼び直す。
  * 手で動かした子の時刻は、全部の子の最初のコミットの時刻のうち最も新しいものにする。1 つでも読めなければ 0 にする。
- * 0 のときは Python が確かめられないものとして、確定しない。`readTimes` が偽なら、時刻は読まず 0 で呼び直す。
+ * 0 のときは ccnavi が確かめられないものとして、確定しない。`readTimes` が偽なら、時刻は読まず 0 で呼び直す。
  */
 async function withNeeds<R extends { need_compare?: { base: string; head: string }; need_manual?: { paths: readonly string[] } }>(
   ask: Ask,
@@ -64,8 +64,8 @@ async function withNeeds<R extends { need_compare?: { base: string; head: string
   return res;
 }
 
-/** Python の `confirm` を呼ぶ。依頼の後に先頭が動いていれば、求められた 2 つの変更の一覧を読んで呼び直す */
-export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): Promise<ConfirmResult> {
+/** ccnavi の `confirm` を呼ぶ。依頼の後に先頭が動いていれば、求められた 2 つの変更の一覧を読んで呼び直す */
+export async function askConfirm(call: CcnaviCall, ask: Ask, input: ConfirmInput): Promise<ConfirmResult> {
   const body = {
     snapshot: input.snapshot,
     family: input.family,
@@ -74,7 +74,7 @@ export async function askConfirm(call: PyCall, ask: Ask, input: ConfirmInput): P
     stamp: input.stamp,
     ...(input.actor ? { actor: input.actor } : {}),
   };
-  return await withNeeds(ask, input.family, (extra) => py.confirm(call, { ...body, ...extra }));
+  return await withNeeds(ask, input.family, (extra) => ccnavi.confirm(call, { ...body, ...extra }));
 }
 
 export interface DecideInput extends ConfirmInput {
@@ -88,10 +88,10 @@ export interface DecideInput extends ConfirmInput {
 }
 
 /**
- * Python の `decide` を呼ぶ（書かない）。`need_compare`・`need_manual` の往復は `confirm` と同じにする。
+ * ccnavi の `decide` を呼ぶ（書かない）。`need_compare`・`need_manual` の往復は `confirm` と同じにする。
  * 手で動かした子は decide の判断に使わないので、時刻が読めなくても進める。
  */
-export async function askDecide(call: PyCall, ask: Ask, input: DecideInput): Promise<DecideResult> {
+export async function askDecide(call: CcnaviCall, ask: Ask, input: DecideInput): Promise<DecideResult> {
   const body = {
     snapshot: input.snapshot,
     family: input.family,
@@ -103,7 +103,7 @@ export async function askDecide(call: PyCall, ask: Ask, input: DecideInput): Pro
     ...(input.carry && input.carry.length > 0 ? { carry: input.carry } : {}),
     ...(input.actor ? { actor: input.actor } : {}),
   };
-  return await withNeeds(ask, input.family, (extra) => py.decide(call, { ...body, ...extra }), false);
+  return await withNeeds(ask, input.family, (extra) => ccnavi.decide(call, { ...body, ...extra }), false);
 }
 
 /** ボードに出すフェーズ 1 つ。`problems` が空で `error` も無ければ「レビュー済みにする」を出せる */
@@ -115,7 +115,7 @@ export interface ReviewPanel {
   readonly children: readonly string[];
   /** 読んだ MR のスレッドとレビュー（読めなければ null） */
   readonly copy: ReviewCopy | null;
-  /** Python の confirm が通さない理由（手元の confirm の標準エラーと同じ文面） */
+  /** ccnavi の confirm が通さない理由（手元の confirm の標準エラーと同じ文面） */
   readonly problems: readonly string[];
   /** 読めなかった・扱えない（GitLab など）理由 */
   readonly error: string;
@@ -160,12 +160,12 @@ export interface DecidePreview {
 }
 
 /**
- * 候補のフェーズごとに Python に通るかを聞く（書かない）。MR・スレッド・レビューを取得した結果は親子のチケット（親のブランチ）に
+ * 候補のフェーズごとに ccnavi に通るかを聞く（書かない）。MR・スレッド・レビューを取得した結果は親子のチケット（親のブランチ）に
  * 1 つなので、GitHub の候補があれば 1 度だけ読んで全部のフェーズに使う。
  */
 export async function reviewPanels(
   reviewable: readonly Reviewable[],
-  call: PyCall,
+  call: CcnaviCall,
   ask: Ask,
   base: { snapshot: Snapshot; family: string },
   now: Date,

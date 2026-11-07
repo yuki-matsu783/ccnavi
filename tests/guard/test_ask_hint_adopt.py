@@ -17,12 +17,12 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.hook import ccnavimd
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
 RULES = os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml")
 WT = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
+ATTENDED_ENV = "CLAUDE_CODE_SESSION_ATTENDED"
 
 
 class AskHintAdoptTest(unittest.TestCase):
@@ -42,7 +42,7 @@ class AskHintAdoptTest(unittest.TestCase):
         }
         environment = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
         environment["CCNAVI_LEARNING"] = "disable"
-        environment[ccnavimd.ATTENDED_ENV] = attended
+        environment[ATTENDED_ENV] = attended
         done = run_ccnavi(
             ["--root", self.repo], input=json.dumps(payload), cwd=ROOT, env=environment
         )

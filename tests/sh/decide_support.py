@@ -1,7 +1,7 @@
 """decide の sh の試験が共有する代役。投稿を操作記録の段階に載せた形で動かす。
 
 実行ファイルの代役（`STUB`）は、`ops …` を本物の `ccnavi ops` に渡し、受け入れの計画を本物の
-操作記録（`tickets/model/oplog.py`）で書く。ホストの代役（`tests/sh/test_review_decide.py` の
+操作記録の形（`tests/oprecord.py`）で書く。ホストの代役（`tests/sh/test_review_decide.py` の
 `GitLab`）には、issue・コメントの作成と一覧を足す（`install`。送ったものは `STORE` に積む）。
 """
 
@@ -13,31 +13,25 @@ import stat
 import sys
 import unittest.mock as mock
 
-from ccnavi.entry import version
-from tests import ROOT
+from tests import exe, oprecord, userform
 
 # 実行ファイルの代役。`ops` は本物へ渡す。`--preview` は決まった一覧を返し、`STUB_PLAN` があれば
 # その計画を使う。`--accept-plan` は本物の操作記録に判断を保存して
 # 計画を書き、`--yes` は計画の操作ID に「適用した」を記録する。
-# `--check` は `STUB_FAIL_CHECK` があれば断る。ただし `--entry` の並びは、本物の `take_entry` で
-# 先に検べる（`--entry sh --check user …` のような、本物が断る並びを通さない）。
+# `--check` は `STUB_FAIL_CHECK` があれば断る。ただし `--entry` の並びは、本物と同じ検べ方
+# （`tests/userform.py` の `take_entry`）で先に検べる
+# （`--entry sh --check user …` のような、本物が断る並びを通さない）。
 STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) exec "$STUB_PY" -m ccnavi "$@" ;;
+*" ops "*) exec "$STUB_EXE" "$@" ;;
 esac
 printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"
 case " $* " in
 *" --check "*)
-  "$STUB_PY" -c 'import sys
-from ccnavi.tickets.model import user_only
-try:
-    user_only.take_entry(sys.argv[1:])
-except user_only.UserEntryError as e:
-    print(e, file=sys.stderr)
-    sys.exit(2)' "$@" || exit $?
+  "$STUB_PY" "$STUB_USERFORM" "$@" || exit $?
   [ -z "$STUB_FAIL_CHECK" ] || { echo "断った" >&2; exit 1; }; exit 0 ;;
 *" --preview "*) printf '{"version":1,"threads":[{"key":"u1"}],"digest":"d0"}\\n' ;;
 *" --accept-plan "*)
@@ -51,19 +45,21 @@ except user_only.UserEntryError as e:
   done_plan=""; prev=""
   for a in "$@"; do [ "$prev" = --accept-done ] && done_plan="$a"; prev="$a"; done
   op=$(sed -n 's/.*"op": "\\([0-9a-f]*\\)".*/\\1/p' "$done_plan")
-  [ -z "$op" ] || "$STUB_PY" -m ccnavi --root "$root" ops applied "$op" local true
+  [ -z "$op" ] || "$STUB_EXE" --root "$root" ops applied "$op" local true
   printf '{"version":2,"ok":true,"reviewed":true,"followup":""}\\n' ;;
 esac
 """
 
 # 操作記録を作って受け入れの計画を書く（`--accept-plan` の代役）。
+# 引数は <state> <計画の出力先> <MR の URL>。`{tests}` は書き出すときに埋める。
 BEGIN = """import json
 import sys
 
-from ccnavi.tickets.model import oplog
+sys.path.insert(0, {tests!r})
+import oprecord
 
 state, plan, mr_url = sys.argv[1:4]
-op = oplog.begin(
+op = oprecord.begin(
     state,
     "decide",
     repo={"host": "gitlab", "mr_url": mr_url},
@@ -199,9 +195,9 @@ def install(testcase, gitlab) -> None:
         testcase.addCleanup(patcher.stop)
     testcase.begin = os.path.join(testcase.work, "begin_op.py")
     with open(testcase.begin, "w", encoding="utf-8") as f:
-        f.write(BEGIN)
+        f.write(BEGIN.replace("{tests!r}", repr(os.path.dirname(oprecord.__file__))))
     with open(testcase.stub, "w", encoding="utf-8") as f:
-        f.write(STUB.replace("{compat}", str(version.COMPAT)))
+        f.write(STUB.replace("{compat}", exe.compat()))
     os.chmod(testcase.stub, os.stat(testcase.stub).st_mode | stat.S_IXUSR)
     testcase.mr_url = f"http://127.0.0.1:{gitlab.port}/demo/greeter/-/merge_requests/1"
 
@@ -210,7 +206,8 @@ def stub_env(testcase) -> dict:
     """実行ファイルの代役が使う環境変数。"""
     return dict(
         STUB_PY=sys.executable,
+        STUB_EXE=exe.path(),
         STUB_BEGIN=testcase.begin,
+        STUB_USERFORM=userform.__file__,
         STUB_MRURL=testcase.mr_url,
-        PYTHONPATH=os.path.join(ROOT, "src"),
     )

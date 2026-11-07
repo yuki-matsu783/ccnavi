@@ -72,7 +72,7 @@ type EndNode = Node<ItemData, "planEnd">;
 type PlanNode = ItemNode | EndNode;
 
 /**
- * レビューの要否の言葉。同じオーバーレイの本文（承認画面。`agree_screen.py`）の「レビュー不要」
+ * レビューの要否の言葉。同じオーバーレイの本文（承認画面。`go/internal/tickets/proposal/agree`の`Screen`）の「レビュー不要」
  * 「レビュー必須: MR」を、点の幅に収まる短さにしたもの。
  * 定義が読めない（null）なら「?」
  */

@@ -1,0 +1,1 @@
+[{"code":0,"stdout":"ccnavi: 記録がありません（\u003croot\u003e/logs/decisions.jsonl）。候補を作成できません。\n"},{"code":0,"stdout":"{\n \"version\": 1,\n \"root\": \"\u003croot\u003e\",\n \"rules_path\": \"\u003croot\u003e/.ccnavi/config/common/rules.yml\",\n \"logs\": [],\n \"records\": 0,\n \"candidates\": [],\n \"dropped\": 0\n}\n"}]

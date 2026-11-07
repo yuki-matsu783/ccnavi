@@ -44,8 +44,7 @@
 # 呼び出しを見分ける。実行ファイルとこのスクリプトは呼び手を知らない）。
 #
 # 本体は ccnavi の `ticket` サブコマンド。ここは実行ファイルを探して渡すだけ。
-# 探す順は、環境変数 CCNAVI_ENTRY_PATH が指すもの → ワークスペースルートの dist/ccnavi/ccnavi →
-# ソースツリーの `python -m ccnavi`。
+# 探す順は ccnavi-common.sh の ccnavi_bin。
 #
 # start・finish・approval-request・consolidate は、ロックの前に事前確認（ホストの API と git のリモートが使える状態か）を打つ。
 #   直接作業では確かめない。標準出力には何も足さず、ok でない項目だけを標準エラーに出す（ticket_preflight）。
@@ -222,9 +221,9 @@ if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$p
 	exit "$po_rc"
 fi
 
-# 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+# 実行ファイル。
 if ! ccnavi_wap_use_exe "$root"; then
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 
@@ -412,8 +411,7 @@ start | finish | cancel | approval-request | consolidate)
 esac
 
 rc=0
-# learn は作業ディレクトリのワークツリーで書き先と識別子が決まるので、cwd を実行ファイルへ渡す
-# （ソースで動かす形は cd "$root" してから起こすため、渡さないとワークスペースルートの扱いになる）。
+# learn は作業ディレクトリのワークツリーで書き先と識別子が決まるので、cwd を実行ファイルへ渡す。
 case "$1" in
 learn) ccnavi_wap_exe --cwd "$here" ticket "$@" || rc=$? ;;
 *) ccnavi_wap_exe ticket "$@" || rc=$? ;;

@@ -8,7 +8,7 @@ import { JSDOM } from "jsdom";
 import { ensureDailyAlarm, PERIOD_MINUTES } from "../src/core/alarm.js";
 import { expiryNotice } from "../src/core/expiry.js";
 import * as gh from "../src/core/github.js";
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -17,11 +17,11 @@ import { approveFamily, commitMessage, type WriteDeps } from "../src/core/write.
 import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, HOSTS, memoryCache, newStats } from "./helpers/host.js";
 import { blobSha, MockGitHub, TOKEN } from "./helpers/mock-github.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
@@ -32,7 +32,7 @@ const noWait = async () => undefined;
 function depsFor(mock: MockGitHub, repos?: RepoConfig[]): WriteDeps {
   const stats = newStats();
   const d = { ...deps(mock, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), repos), sleep: noWait };
-  return { call: hostCall(d, stats), py, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9", sleep: noWait };
+  return { call: hostCall(d, stats), ccnavi, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9", sleep: noWait };
 }
 
 function client(mock: MockGitHub) {

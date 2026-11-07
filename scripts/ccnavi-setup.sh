@@ -50,7 +50,7 @@
 # 配置先は動かないので、配置先のパスを指定するオプションは持たない。持つのは置き方の選択（--bin）だけ。
 # project（既定）は上の .ccnavi/bin/<os>-<arch>/。user は、実体を ~/.local/share/ccnavi/<os>-<arch>/ に置き、
 # PATH に通す ~/.local/bin/ccnavi からリンクを張る（振り分けの sh は、bin/ に無ければ PATH の ccnavi を使う）。
-# Windows の Git Bash はリンクを当てにせず、実体のフォルダ（ccnavi.exe と _internal/）を PATH に通す。
+# Windows の Git Bash はリンクを当てにせず、実体のフォルダ（ccnavi.exe が在るフォルダ）を PATH に通す。
 # ホームディレクトリに書き込むので、ターミナルで確認する。エージェントが代わりに答える指定は持たない。
 # PATH への追加は、シェルの設定ファイルも Windows の環境変数も書き換えずに、環境に合った追加の仕方を知らせるだけにする。
 #
@@ -110,10 +110,10 @@ BIN_PATH=".ccnavi/scripts/ccnavi-launcher.sh"
 # 実行ファイルの置き場。<os>-<arch>/ はこの下に並ぶ。振り分けの sh はここを探す。
 BUILD_ROOT=".ccnavi/bin"
 
-# 配るもの。配布元での置き場は、build.py の出力（dist/ccnavi）と、ccnavi の
+# 配るもの。配布元での置き場は、scripts/ccnavi-build.sh の出力（dist/ccnavi）と、ccnavi の
 # リポジトリの .ccnavi/ の構成に合わせて決め打ちにしている。
 DEPLOY_BIN_DIR="dist/ccnavi"
-# どの機械向けに組み立てたかの目印。build.py が `<os>-<arch>` の 1 行で書く。
+# どの機械向けに組み立てたかの目印。scripts/ccnavi-build.sh が `<os>-<arch>` の 1 行で書く。
 # dist/ccnavi/ の外にあるので、copy_tree が配布先へコピーすることはない。
 DEPLOY_TARGET_FILE="dist/ccnavi.target"
 DEPLOY_RULES=".ccnavi/config/common/rules.yml"
@@ -159,7 +159,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-*.sh は、ユーザだけがターミナルで打つ sh（エージェントからは hook が名前で止める）。
 # ccnavi-user-push-approved.sh は、ボードが承認のあとにターミナルへ送る 1 行の中身。
 # 配らないと、配布先のボードは承認済みチケットをコミットして push できない。
-# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（tickets/phase/gates.py）がこのパスを表示するので、
+# ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（go/internal/tickets/phase）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。ccnavi-user-decide.sh・
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
 # 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
@@ -178,7 +178,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-stage.sh は、書き込みを止められている保護対象のファイルを下書きの置き場で直すための支度をする sh。
 # CLAUDE.md の決まり（wip/handoff/ に cp して編集し、ユーザが差し替える）の手順を 1 本にしたもの。
 # ccnavi-handoff-names.txt は、下書きの置き場で読み替える階層名（.claude → handoff-.claude）の表。ccnavi-stage.sh が読み、
-# 実行ファイルにも同じファイルが入る（build.py）。stage と同じ場所に置く。
+# 実行ファイルにも同じ内容が入る。stage と同じ場所に置く。
 # ccnavi-worktree.sh は作業用のワークツリーを統合先から切る sh（fetch・遅れの確認・起点の選択・worktree add を
 # 1 本にしたもの）。.ccnavi/docs/worktree.md の「ワークツリーを切る」の手順を打つ。
 # ccnavi-launcher.sh は hook が起動する振り分けの sh（BIN_PATH）。
@@ -424,16 +424,16 @@ fi
 # やめた理由を出して settings.json は書く。
 if [ -n "$deploy" ] && [ ! -d "$source_root/$DEPLOY_BIN_DIR" ]; then
 	[ "$deploy_given" = no ] ||
-		die "$source_root/$DEPLOY_BIN_DIR がありません。配布元で 'uv run --with pyinstaller python build.py' で組み立ててから、もう一度このスクリプトを実行してください。"
-	deploy_skipped="$source_root/$DEPLOY_BIN_DIR が無いので配っていません（配布元で 'uv run --with pyinstaller python build.py' を実行すると作られます）。"
+		die "$source_root/$DEPLOY_BIN_DIR がありません。配布元で 'sh scripts/ccnavi-build.sh' で組み立ててから、もう一度このスクリプトを実行してください。"
+	deploy_skipped="$source_root/$DEPLOY_BIN_DIR が無いので配っていません（配布元で 'sh scripts/ccnavi-build.sh' を実行すると作られます）。"
 	deploy=""
 	source_root=""
 fi
 
-# 実行ファイルをどの機械向けの置き場へ入れるか。PyInstaller の実行ファイルは組み立てた
-# 機械の OS と CPU でしか動かない。そのため配布先では `<os>-<arch>` のディレクトリに分けて
+# 実行ファイルをどの機械向けの置き場へ入れるか。実行ファイルは組み立てた向きの
+# OS と CPU でしか動かない。そのため配布先では `<os>-<arch>` のディレクトリに分けて
 # 並べ、hook が起動する振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）が起動時に選ぶ。
-# 置き場の名前は、build.py が dist/ccnavi.target に書いた目印から取る。
+# 置き場の名前は、scripts/ccnavi-build.sh が dist/ccnavi.target に書いた目印から取る。
 #
 # 別の機械向けに組み立てたものでも配る。そのディレクトリに入るだけで、この機械の実行ファイルは
 # 上書きしないため。Windows と WSL で同じフォルダを開くなら、両方の組み立てを並べて
@@ -444,7 +444,7 @@ fi
 # 止め方は上の「組み立てていない」場合と揃える。指定された --deploy なら 2、既定の
 # 配布元なら配布をやめて理由を出す。
 host_target() {
-	# 名前の付け方は build.py の build_target と揃える。
+	# 名前の付け方は scripts/ccnavi-build.sh の --target と揃える。
 	case "$(uname -s 2>/dev/null)" in
 	Linux*) host_os=linux ;;
 	Darwin*) host_os=darwin ;;
@@ -462,7 +462,7 @@ host_target() {
 runnable_targets() {
 	# $1 この機械。この機械で動く組み立ての名前を、優先する順に空白区切りで並べる。
 	# arm64 の macOS と Windows は x86_64 の実行ファイルを変換して動かす（Rosetta 2 /
-	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と src/ccnavi/infra/platformtag.py と揃える。
+	# Windows on Arm）。名前と順番は .ccnavi/scripts/ccnavi-launcher.sh と go/internal/infra/platformtag と揃える。
 	case "$1" in
 	darwin-arm64) printf '%s' "$1 darwin-x86_64" ;;
 	windows-arm64) printf '%s' "$1 windows-x86_64" ;;
@@ -494,8 +494,8 @@ if [ -n "$deploy" ]; then
 	esac
 	if [ "$built_ok" = no ]; then
 		[ "$deploy_given" = no ] ||
-			die "$source_root/$DEPLOY_TARGET_FILE が無いか読めないので、実行ファイルをどの機械向けの置き場に入れるかを決められません。配布元で 'uv run --with pyinstaller python build.py' をもう一度実行してください。"
-		deploy_skipped="$source_root/$DEPLOY_TARGET_FILE が無いか読めないので配っていません（配布元で 'uv run --with pyinstaller python build.py' をもう一度実行すると書かれます）。"
+			die "$source_root/$DEPLOY_TARGET_FILE が無いか読めないので、実行ファイルをどの機械向けの置き場に入れるかを決められません。配布元で 'sh scripts/ccnavi-build.sh' をもう一度実行してください。"
+		deploy_skipped="$source_root/$DEPLOY_TARGET_FILE が無いか読めないので配っていません（配布元で 'sh scripts/ccnavi-build.sh' をもう一度実行すると書かれます）。"
 		deploy=""
 		source_root=""
 		built=""
@@ -543,11 +543,11 @@ skills_blocked=""
 
 # 配布元のスキルが、frontmatter に `process: true` か `distribute: true` を持つか。先頭の `---` から閉じの `---` までの
 # 間に、その 1 行（行末の `# コメント`は可）があるものだけを適用する。ユーザの発言のときの同期がコピーする判定
-# （src/ccnavi/tickets/sync/skillsync.py の _process_flag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
+# （go/internal/tickets/sync/mirror の processFlag。`process` の側）に寄せてある。CRLF の改行と、`---` の前後の空白は
 # 許し、閉じの `---` が無いもの、BOM 付き、文字列の "true"、本文だけにあるものは適用しない。
-# SKILL.md 自体がリンクのものは、skillsync と同じく適用しない。
+# SKILL.md 自体がリンクのものは、mirror の同期と同じく適用しない。
 # 書き方は文書どおりの `process: true` と `distribute: true` だけを見る。`process: yes` のような別の綴りは、
-# skillsync は真と読むが、ここでは適用しない（配り漏れは、まだ無いものにも出ない。文書は `true` と書く）。
+# mirror の同期は真と読むが、ここでは適用しない（配り漏れは、まだ無いものにも出ない。文書は `true` と書く）。
 is_deployed_skill() {
 	{ [ -f "$1" ] && [ ! -L "$1" ]; } || return 1
 	awk '
@@ -649,7 +649,7 @@ user_link_dir_note=no
 if [ -n "$deploy" ]; then
 	build_dir_rel="$BUILD_ROOT/$built"
 	if [ "$bin_place" = project ]; then
-		# あるかどうかは 2 つの名前で確かめる。PyInstaller は Windows でだけ .exe を付けるため。
+		# あるかどうかは 2 つの名前で確かめる。Windows の組み立てだけが .exe を付けるため。
 		if [ -f "$root/$build_dir_rel/ccnavi" ] || [ -f "$root/$build_dir_rel/ccnavi.exe" ]; then
 			bin_there=yes
 		else
@@ -663,9 +663,8 @@ if [ -n "$deploy" ]; then
 		fi
 		note_deploy "$bin_verdict" "$build_dir_rel" "$DEPLOY_BIN_DIR"
 	else
-		# ホームディレクトリの下に置く。実体（PyInstaller の同梱物ごと）は ~/.local/share/ccnavi/<os>-<arch>/ に置き、
-		# PATH に通す ~/.local/bin/ccnavi からそこへリンクを張る。PATH に通すのは、隣に _internal/ がある
-		# 実行ファイルでなければならず、単体のコピーは動かないため。
+		# ホームディレクトリの下に置く。実体は ~/.local/share/ccnavi/<os>-<arch>/ に置き、
+		# PATH に通す ~/.local/bin/ccnavi からそこへリンクを張る。
 		# 配布先の .ccnavi/bin/ には何も置かない。振り分けの sh は、bin/ に無ければ PATH の ccnavi を使う。
 		[ -n "${HOME:-}" ] || die "--bin user には HOME が要ります。"
 		runs_here "$built" "$runnable" ||
@@ -674,7 +673,7 @@ if [ -n "$deploy" ]; then
 		case "$host" in
 		windows-*)
 			# Git Bash ではリンクを当てにしない（張れないことがある）。PATH に通すのは、実体のフォルダそのもの
-			# （ccnavi.exe と _internal/ が並ぶフォルダ）。振り分けの sh は、PATH のフォルダの ccnavi.exe を見つける。
+			# （ccnavi.exe が在るフォルダ）。振り分けの sh は、PATH のフォルダの ccnavi.exe を見つける。
 			user_windows=yes
 			user_path_dir="$user_share"
 			user_exe="$user_share/ccnavi.exe"
@@ -1089,7 +1088,7 @@ if [ "$force" = yes ]; then
 fi
 forced_json=$(printf '%s\n' $forced | jq -R -s 'split("\n") | map(select(length > 0))')
 
-# 登録済みかどうかの見方。ccnavi の設定 lint（lint_project.py の _registered）は、command に
+# 登録済みかどうかの見方。ccnavi の設定 lint（go/internal/entry/lint の registered）は、command に
 # "ccnavi" が含まれるかどうかだけを見る。それだけだと、無関係な hook のパスに名前が
 # 入っているプロジェクトでは、そのイベントが「登録済み」に見えたまま、いつまでも登録されない。
 #
@@ -1165,7 +1164,7 @@ if [ "$idle" = yes ]; then
 fi
 
 # 配った実行ファイルを git に入れない。配布先は git で共有するのが普通なので、
-# .gitignore に無いと、次のコミットで実行ファイルと _internal がまるごと履歴に
+# .gitignore に無いと、次のコミットで実行ファイルがまるごと履歴に
 # 入る。入ってしまうと、消すには履歴を書き換えるしかない。
 #
 # 置き場全体（.ccnavi/ や .ccnavi/bin/）は無視しない。同じ .ccnavi/ の下に rules.yml が
@@ -1323,8 +1322,7 @@ copy_tree() {
 		# 配布元が空だと glob が展開されずにそのまま残る。実在するものだけを配る。
 		[ -e "$entry" ] || continue
 		name=$(basename "$entry")
-		# 古い組み立ての残りを持ち越さない。PyInstaller の同梱物は名前で探して
-		# 読み込まれるので、前の版の .so が残っていると新しい実行ファイルがそれを読み込む。
+		# 前の版を消してからコピーする（同じ名前のディレクトリがあると、cp -R はその中へ入れる）。
 		# 名前は配布元にある entry から取るので、空のパスを消すことはない。
 		rm -rf "$2/$name"
 		cp -R "$entry" "$2/$name"
@@ -1333,8 +1331,7 @@ copy_tree() {
 
 # 実行ファイルの置き場を、途中で失敗しても元の版が残る形で置き換える。新しい版を隣に作ってから、
 # フォルダごと名前を入れ替える（名前の変更が失敗すれば、元の版がそのまま残る）。Windows で実行中の
-# ファイルがあるときも同じ。1 つずつ消してからコピーすると、途中で止まったときに、実行ファイルだけが残り、
-# 同梱物が欠けた状態になる。
+# ファイルがあるときも同じ。1 つずつ消してからコピーすると、途中で止まったときに、実行ファイルが欠けた状態になる。
 replace_tree() {
 	# $1 配布元 / $2 配布先（既にある）
 	rt_new="$2.new.$$"
@@ -1590,7 +1587,7 @@ if [ -n "$bin_custom" ]; then
 fi
 # ワークスペースの git の索引に projects/ の下が載っているときの知らせ（設計 §4.1・§4.4）。
 #
-# 条件と文面は `ccnavi --lint` の `(projects)` の warn と同じ（src/ccnavi/entry/lint.py の _in_index）。
+# 条件と文面は `ccnavi --lint` の `(projects)` の warn と同じ（go/internal/entry/lint の inIndex）。
 # 変えるなら 2 か所を直す。tests/sh/test_setup.py が 1 文目の一致を見る。
 #
 # - 通常のファイルが 1 本以上: ぶつかり。ワークスペースの projects/ を改名する案内
@@ -1602,7 +1599,7 @@ fi
 #
 # 案内のコマンドに載せるパスを、sh で 1 語として読める綴りにして標準出力に出す（改行は付けない）。
 # sh が割る・展開する文字を含まなければそのまま、含めば '…' で囲み、中の ' は '\'' に置く。
-# 文字の集合と綴りは src/ccnavi/entry/lint.py の _SH_SPECIAL・_sh_word と同じ。変えるなら 2 か所を直す。
+# 文字の集合と綴りは go/internal/entry/lint の shSpecial・shWord と同じ。変えるなら 2 か所を直す。
 sh_word() {
 	w=$1
 	q="'"
@@ -2096,7 +2093,7 @@ case "$host" in
 unknown-* | *-unknown) ;;
 *)
 	if ! runnable_there; then
-		note_missing "${BUILD_ROOT}/${host}/ccnavi（この機械で動く実行ファイル。PATH にも無い。この機械で build.py を実行して組み立ててから配る）"
+		note_missing "${BUILD_ROOT}/${host}/ccnavi（この機械で動く実行ファイル。PATH にも無い。配布元で sh scripts/ccnavi-build.sh --target ${host} を実行して組み立ててから配る）"
 	fi
 	;;
 esac

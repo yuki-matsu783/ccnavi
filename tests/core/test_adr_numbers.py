@@ -28,7 +28,6 @@ import os
 import re
 import unittest
 
-from ccnavi.infra import pathcase
 from tests import ROOT
 
 ADR_DIR = os.path.join(ROOT, "docs", "30_adr")
@@ -45,6 +44,11 @@ TITLE = re.compile(r"^# ADR-(\d{4}): \S")
 
 # 入口の表の 1 行。`| `30_adr/rules/` | 判定とルール… |`
 TOPIC_ROW = re.compile(r"^\| `30_adr/([\w-]+)/` \|", re.M)
+
+
+def _fold(name: str) -> str:
+    """名前を比べる形。どの機械でも大文字小文字を区別しない（Go の pathcase.Fold と同じ）。"""
+    return os.path.normcase(name).casefold()
 
 
 def sheets() -> list[str]:
@@ -100,7 +104,9 @@ class AdrNumbersTest(unittest.TestCase):
             first = lines[0] if lines else ""
             found = TITLE.match(first)
             if found is None:
-                wrong.append(f"{name}: タイトルが `# ADR-<番号>: <タイトル>` の形でない（{first[:40]}）")
+                wrong.append(
+                    f"{name}: タイトルが `# ADR-<番号>: <タイトル>` の形でない（{first[:40]}）"
+                )
             elif found.group(1) != number(name):
                 wrong.append(f"{name}: タイトルの番号が ADR-{found.group(1)} でファイル名と違う")
         self.assertEqual([], wrong)
@@ -111,17 +117,15 @@ class AdrNumbersTest(unittest.TestCase):
             listed = set(TOPIC_ROW.findall(f.read()))
         self.assertTrue(listed, f"入口の表からディレクトリを読めない（{ADR_INDEX}）")
         # 名前は大文字小文字を区別せずに比べる（表の綴りと置き場の綴りが違っても同じもの）
-        folded = {pathcase.fold(t) for t in listed}
+        folded = {_fold(t) for t in listed}
         unlisted = sorted(
-            {n.split("/")[0] for n in self.sheets if pathcase.fold(n.split("/")[0]) not in folded}
+            {n.split("/")[0] for n in self.sheets if _fold(n.split("/")[0]) not in folded}
         )
         self.assertEqual(
             [], unlisted, "表に載っていないディレクトリがある。docs/30_adr.md の表に 1 行足す"
         )
-        placed = {
-            pathcase.fold(t) for t in os.listdir(ADR_DIR) if os.path.isdir(os.path.join(ADR_DIR, t))
-        }
-        empty = sorted(t for t in listed if pathcase.fold(t) not in placed)
+        placed = {_fold(t) for t in os.listdir(ADR_DIR) if os.path.isdir(os.path.join(ADR_DIR, t))}
+        empty = sorted(t for t in listed if _fold(t) not in placed)
         self.assertEqual([], empty, "表に載っているが、docs/30_adr/ に無いディレクトリがある")
 
     def test_no_sheet_sits_at_the_top(self):

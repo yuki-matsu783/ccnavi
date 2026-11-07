@@ -22,7 +22,7 @@
 # 趣旨（消す対象を名指しする）に合わせてある。
 #
 # 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は実行ファイル
-# （src/ccnavi/tickets/lifecycle/worktrees.py の run_clean）にある。
+# （go/internal/tickets/lifecycle/worktrees の RunClean）にある。
 #
 # ワークツリーに未コミットの変更があれば、何も消さずに止める。別のセッションが
 # そこで作業している見込みが高い。git に登録の残っていない、消しきれなかったディレクトリ（.git が無い、
@@ -100,7 +100,6 @@ root=$(ccnavi_workspace) || {
 
 # 中身は ccnavi の実行ファイル。--worktree は `worktree drop`（cwd の確かめ・未コミットの確かめ・生成物の
 # 掃除・無視ファイルの退避・worktree remove）、ないときは `worktree clean`（未コミットの確かめ・生成物の掃除）。
-# 見つからなければソース（ccnavi のリポジトリ）で動かす。
 if [ -n "$whole" ]; then
 	if [ -n "$dry" ]; then
 		printf 'ccnavi-clean: --worktree と --dry-run は同時に指定できません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
@@ -123,9 +122,6 @@ fi
 here="$(pwd -W 2>/dev/null || pwd)"
 if bin=$(ccnavi_bin "$root"); then
 	exec "$bin" --root "$root" --cwd "$here" worktree "$sub" "$name" ${dry:+--preview}
-elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	cd "$root"
-	exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree "$sub" "$name" ${dry:+--preview}
 fi
-printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 exit 2

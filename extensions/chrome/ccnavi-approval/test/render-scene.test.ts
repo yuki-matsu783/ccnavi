@@ -11,14 +11,14 @@ import { JSDOM } from "jsdom";
 import { summarizeBoard } from "../src/core/dom-summary.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import { collectRepo, type RepoBoard } from "../src/core/snapshot.js";
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { fixture, NOW, reviewFamilyFiles, requestedMark } from "./fixtures/repo.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { COMPAT } from "./helpers/compat.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 import { DEFAULT_WIDTH, failuresOf, foldPath, isInside, logLine, parseArgs, redact } from "./helpers/render-scene-lib.js";
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-scene-test-"));
@@ -73,9 +73,9 @@ test("CX-T380 失敗の条件と記録: ページエラー・コンソールの 
   assert.equal(logLine({ kind: "worker-console", type: "error", text: `a\n${TOKEN}` }, [TOKEN]), "[worker.error] a\\n[PAT]");
 });
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 
@@ -86,7 +86,7 @@ test("CX-T381 DOM の要約: 親子のチケットごとに承認待ち（バッ
   const at = mock.push("i0004", reviewFamilyFiles("i0004"), "作業とレビュー待ちの子");
   mock.push("i0004", { ".ccnavi/approved/phases/i0004/1.requested": requestedMark(at, 7) }, "依頼");
   const stats = newStats();
-  const board: RepoBoard = await collectRepo(REPO, { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), py, cache: memoryCache(), now: () => new Date(NOW), stats });
+  const board: RepoBoard = await collectRepo(REPO, { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), ccnavi, cache: memoryCache(), now: () => new Date(NOW), stats });
   const dom = new JSDOM("<!doctype html><body data-state='done'><p id='status'>完了</p></body>");
   const doc = dom.window.document;
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);

@@ -1,4 +1,4 @@
-"""`ccnavi ops …`（操作記録の読み書きの入口）と、prune の下見の表示、hook の止めを確かめる。"""
+"""`ccnavi ops …`（操作記録の読み書きの入口）と、hook の止めを確かめる。"""
 
 from __future__ import annotations
 
@@ -8,9 +8,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.records import prune
-from ccnavi.tickets.model import oplog
-from tests import ROOT, common_path
+from tests import ROOT, common_path, oprecord
 from tests.inproc import run_ccnavi
 
 REPO = {"host": "github.com", "kind": "github", "path": "o/r"}
@@ -41,18 +39,27 @@ class OpsCliTest(unittest.TestCase):
         )
 
     def begin(self):
-        return oplog.begin(
+        return oprecord.begin(
             self.state,
-            oplog.KIND_DECIDE,
+            "decide",
             repo=REPO,
             parent="i0001",
             phase=1,
-            stages=[("reply", oplog.STAGE_REPLY), ("issue", oplog.STAGE_ISSUE)],
+            stages=[("reply", "reply"), ("issue", "issue")],
         )
+
+    def record(self, op_id):
+        """操作記録の中身。消えていれば None。"""
+        path = os.path.join(self.state, "ops", f"{op_id}.json")
+        if not os.path.exists(path):
+            return None
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
 
     def test_pending_lists_unfinished_records_one_per_line(self):
         op_id = self.begin()
-        oplog.stage_set(self.state, op_id, "reply", oplog.SENT)
+        done = self.ccnavi("ops", "stage-set", op_id, "reply", "sent")
+        self.assertEqual(done.returncode, 0, done.stderr)
         result = self.ccnavi("ops", "pending")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.split(), [op_id, "decide", "issue"])
@@ -65,12 +72,12 @@ class OpsCliTest(unittest.TestCase):
         shown = json.loads(self.ccnavi("ops", "show", op_id).stdout)
         self.assertEqual(shown["stages"][1]["url"], "https://x/1")
         self.assertEqual(self.ccnavi("ops", "done", op_id).stdout.strip(), "done")
-        self.assertIsNone(oplog.load(self.state, op_id))
+        self.assertIsNone(self.record(op_id))
 
     def test_done_keeps_an_unfinished_record(self):
         op_id = self.begin()
         self.assertEqual(self.ccnavi("ops", "done", op_id).stdout.strip(), "open")
-        self.assertIsNotNone(oplog.load(self.state, op_id))
+        self.assertIsNotNone(self.record(op_id))
 
     def test_bad_input_is_refused_without_writing(self):
         op_id = self.begin()
@@ -83,13 +90,7 @@ class OpsCliTest(unittest.TestCase):
         ):
             with self.subTest(words=words):
                 self.assertNotEqual(self.ccnavi(*words).returncode, 0)
-        self.assertEqual(oplog.load(self.state, op_id)["stages"][0]["state"], "pending")
-
-    def test_prune_preview_says_the_records_are_kept(self):
-        self.begin()
-        report = prune.run(self.root, "", self.state, "s", dry_run=True)
-        self.assertEqual(report.kept_ops, 1)
-        self.assertTrue(any("消さない" in line for line in prune.lines(report, True)))
+        self.assertEqual(self.record(op_id)["stages"][0]["state"], "pending")
 
 
 class OpsHookTest(unittest.TestCase):

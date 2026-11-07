@@ -21,9 +21,9 @@ function input(existing: readonly string[], overrides: Partial<LocateInput> = {}
   };
 }
 
-test("CB-T20 設定 → settings.json → 既定 → ソースの順に探す", () => {
+test("CB-T20 設定 → settings.json → 既定の順に探す", () => {
   assert.deepEqual(
-    locate(input(["/ws/dist/ccnavi/ccnavi", "/ws/src/ccnavi/__main__.py"])),
+    locate(input(["/ws/dist/ccnavi/ccnavi"])),
     { kind: "exe", path: "/ws/dist/ccnavi/ccnavi" },
   );
   assert.deepEqual(
@@ -34,7 +34,6 @@ test("CB-T20 設定 → settings.json → 既定 → ソースの順に探す", 
     locate(input(["/opt/ccnavi", "/ws/build/ccnavi"], { setting: "/opt/ccnavi", settingsEnvBin: "build/ccnavi" })),
     { kind: "exe", path: "/opt/ccnavi" },
   );
-  assert.deepEqual(locate(input(["/ws/src/ccnavi/__main__.py"])), { kind: "uv", root: "/ws" });
   assert.equal(locate(input([])), undefined);
 });
 
@@ -109,11 +108,8 @@ test("CB-T161 E2振り分けのshそのものは返さない。実体がなけ�
     locate(input([sh, "/ws/.ccnavi/scripts/linux-x86_64/ccnavi"], { settingsEnvBin: ".ccnavi/scripts/ccnavi-launcher.sh" })),
     undefined,
   );
-  // 別の機械向けしか無ければ、実体としては選ばずソースへ進む。
-  assert.deepEqual(
-    locate(input([sh, "/ws/.ccnavi/bin/darwin-arm64/ccnavi", "/ws/src/ccnavi/__main__.py"])),
-    { kind: "uv", root: "/ws" },
-  );
+  // 別の機械向けしか無ければ、実体としては選ばない。
+  assert.equal(locate(input([sh, "/ws/.ccnavi/bin/darwin-arm64/ccnavi"])), undefined);
 });
 
 test("CB-T119 E3名前がccnavi-launcher.shでないパスはそのパスそのものを探し、隣は見ない", () => {
@@ -129,7 +125,7 @@ test("CB-T119 E3名前がccnavi-launcher.shでないパスはそのパスその�
   );
 });
 
-test("CB-T24 機械の語はsrc/ccnavi/infra/platformtag.pyと揃える", () => {
+test("CB-T24 機械の語はgo/internal/infra/platformtagと揃える", () => {
   assert.equal(hostTarget("win32", "x64"), "windows-x86_64");
   assert.equal(hostTarget("darwin", "arm64"), "darwin-arm64");
   assert.equal(hostTarget("linux", "x64"), "linux-x86_64");
@@ -145,7 +141,7 @@ test("CB-T22 settings.jsonのenv.CCNAVI_ENTRY_PATHを読む", () => {
   assert.equal(binFromSettingsJson("[]"), undefined);
 });
 
-test("CB-T1153 PATHのccnaviは最後に見る。絶対パスの項目だけで、ソースが先", () => {
+test("CB-T1153 PATHのccnaviは最後に見る。絶対パスの項目だけ", () => {
   const pathDirs = ["", "rel", "/usr/local/bin", "/opt/bin"];
   assert.deepEqual(locate(input(["/opt/bin/ccnavi"], { pathDirs })), {
     kind: "exe",
@@ -157,11 +153,7 @@ test("CB-T1153 PATHのccnaviは最後に見る。絶対パスの項目だけで�
   });
   // 相対と空の項目は飛ばす（"rel/ccnavi" は "/ws" の外のcwdで変わる）。
   assert.equal(locate(input(["rel/ccnavi", "/ccnavi"], { pathDirs })), undefined);
-  // ソースが先。bin/ の実体もPATHより先。
-  assert.deepEqual(locate(input(["/opt/bin/ccnavi", "/ws/src/ccnavi/__main__.py"], { pathDirs })), {
-    kind: "uv",
-    root: "/ws",
-  });
+  // bin/ の実体はPATHより先。
   assert.deepEqual(
     locate(input(["/opt/bin/ccnavi", "/ws/.ccnavi/bin/linux-x86_64/ccnavi"], { pathDirs })),
     { kind: "exe", path: "/ws/.ccnavi/bin/linux-x86_64/ccnavi" },

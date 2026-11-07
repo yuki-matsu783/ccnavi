@@ -1,9 +1,7 @@
-"""`python -m ccnavi` の入口のスモークテスト。ここだけは実際のプロセスを起こす。
+"""実行ファイルの入口のスモークテスト。
 
-他のテストは tests/inproc.py で cli.run を同じプロセスの中で呼ぶ。速いが、
-パッケージとして起動できること、標準入出力が UTF-8 に切り替わること、
-終了コードがプロセスの終了コードになることは、プロセスを起こさないと分からない。
-その 3 つをここで 1 回ずつ見る。
+標準入出力が UTF-8 で通ること、終了コードがプロセスの終了コードになることを、
+tests/inproc.py を通さずに素の環境で 1 回ずつ見る。
 """
 
 from __future__ import annotations
@@ -11,10 +9,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import unittest
 
-from tests import ROOT, SRC, fixture_workspace
+from tests import ROOT, exe, fixture_workspace
 
 
 def spawn(*args, payload=""):
@@ -25,13 +22,8 @@ def spawn(*args, payload=""):
     # コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     # 切らないと、ワークツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
-    # コンソールのコードページに関係なく UTF-8 で通ることを見たいので、
-    # 親から Python の入出力の指定は渡さない。
-    environment.pop("PYTHONIOENCODING", None)
-    environment.pop("PYTHONUTF8", None)
-    environment["PYTHONPATH"] = SRC
     return subprocess.run(
-        [sys.executable, "-m", "ccnavi", "--root", fixture_workspace(), *args],
+        [exe.path(), "--root", fixture_workspace(), *args],
         input=payload.encode("utf-8"),
         capture_output=True,
         cwd=ROOT,

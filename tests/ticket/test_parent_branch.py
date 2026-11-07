@@ -4,15 +4,13 @@
 直接チェックアウトする。
 見るのは次のとおり（sh を通す主な経路は tests/sh/test_branch_field_sh.py が見る）。
 
-1. 字と形（`ticket_ids.branch_problem`）。保護されたブランチの名前と git で使えない表記は error
-2. チケットに `branch:` の欄があればエラー（使えない欄）。子に書いても同じ
-3. 承認画面と JSON にブランチの行は出ない。ブランチ名と同じ識別子の既存ブランチが別の所にあれば warn
-4. 識別子が大文字小文字だけ違う親は承認しない
-5. lint: 親のワークツリーの HEAD を変換した識別子がフォルダ名と合わなければ warn。既存のブランチを
+1. 承認画面と JSON にブランチの行は出ない。ブランチ名と同じ識別子の既存ブランチが別の所にあれば warn
+2. 識別子が大文字小文字だけ違う親は承認しない
+3. lint: 親のワークツリーの HEAD を変換した識別子がフォルダ名と合わなければ warn。既存のブランチを
    採用した親（親のワークツリーが在り、HEAD が合う）には名前の形式の warn を出さない
-6. `write-and-push family` の `branch` は親のワークツリーの HEAD から読む。読めない・合わないときは
+4. `write-and-push family` の `branch` は親のワークツリーの HEAD から読む。読めない・合わないときは
    `branch_refused`
-7. Chrome の入口: ブランチ名を変換した識別子の親チケットがそのブランチの上にあれば親子のチケットで、
+5. Chrome の入口: ブランチ名を変換した識別子の親チケットがそのブランチの上にあれば親子のチケットで、
    書くものはそのブランチだけ。同じ識別子になる別のブランチに親チケットがあれば、先行の親子のチケット
    でも決めない
 """
@@ -25,10 +23,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.entry import version
-from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.model import ticket_ids
-from tests import ROOT, common_path, config_path, userform
+from tests import ROOT, common_path, config_path, exe, userform
 from tests.inproc import run_ccnavi
 from tests.ticket.test_swap_points import STAMP
 from tests.ticket.test_ticket import git, write
@@ -45,87 +40,6 @@ def with_branch(text, branch):
     lines = text.split("\n")
     at = next(i for i, line in enumerate(lines) if line.startswith("ticket:"))
     return "\n".join([*lines[: at + 1], f"branch: {branch}", *lines[at + 1 :]])
-
-
-class BranchProblemTest(unittest.TestCase):
-    def test_names_that_can_be_a_parent_branch(self):
-        for name in ("feature/123-login", "hotfix/45", "user/x_y.z", "feature-1-x", "a/日本語"):
-            with self.subTest(name=name):
-                self.assertEqual(ticket_ids.branch_problem(name), "")
-
-    def test_names_that_cannot(self):
-        for name in (
-            "",
-            "a..b",
-            "a b",
-            "a\tb",
-            "a$b",
-            "a;b",
-            "a~1",
-            "a^b",
-            "a:b",
-            "a?b",
-            "a*b",
-            "a[b",
-            "a\\b",
-            "HEAD",
-            "origin/main",
-            "origin/HEAD",
-            "refs/heads/main",
-            "refs/remotes/origin/main",
-            "heads/main",
-            "remotes/x",
-            "tags/v1",
-            "upstream/x",
-            "FETCH_HEAD",
-            "main/x",
-            "Develop/x",
-            "x/HEAD",
-            "x/ORIG_HEAD/y",
-            "-x",
-            "/x",
-            "x/",
-            "x.",
-            "a//b",
-            "a/.b",
-            ".x",
-            "x.lock",
-            "x.lock/y",
-            "@",
-            "a@{1}",
-            "main",
-            "Master",
-            "develop",
-            "release",
-            "release/1.0",
-            "Release-2",
-            "ｆｕｌｌ",
-            "x" * 201,
-        ):
-            with self.subTest(name=name):
-                self.assertNotEqual(ticket_ids.branch_problem(name), "")
-
-
-class BranchFieldParseTest(unittest.TestCase):
-    """`branch:` の欄は使えない（エラー）。"""
-
-    def test_a_parent_with_the_field_is_an_error(self):
-        t, problems = ticket_mod.parse(with_branch(parent_text(PARENT, ["design"]), BRANCH))
-        self.assertIsNone(t)
-        self.assertTrue(
-            any(
-                p.severity == "error" and "`branch` は指定できない欄" in p.detail for p in problems
-            ),
-            problems,
-        )
-
-    def test_a_child_with_the_field_is_an_error_too(self):
-        text = child_text(CHILD, PARENT, 1, ("wip/*",))
-        lines = text.split("\n")
-        lines.insert(3, f"branch: {BRANCH}")
-        t, problems = ticket_mod.parse("\n".join(lines))
-        self.assertIsNone(t)
-        self.assertTrue(any("`branch` は指定できない欄" in p.detail for p in problems), problems)
 
 
 class ParentBranchTest(unittest.TestCase):
@@ -300,7 +214,7 @@ def _workspace_files():
         ".claude/settings.json": json.dumps({"env": {"CCNAVI_TICKET_CONTROL": "enable"}}) + "\n",
         ".ccnavi/config/project/phases.yml": PHASES,
         ".ccnavi/config/common/rules.yml": json.dumps(RULES),
-        compat: f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
+        compat: f"#!/bin/sh\nCCNAVI_COMPAT={exe.compat()}\n",
     }
 
 

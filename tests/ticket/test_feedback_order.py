@@ -1,16 +1,13 @@
 """フィードバック計画の順序の受入テスト。
 
-フィードバック計画も全体計画と同じく、ステップの `after` で先行関係が決まる。見るのは 4 つ。
+フィードバック計画も全体計画と同じく、ステップの `after` で先行関係が決まる。ここではターミナルの
+承認で見る（先行関係の計算・承認の検査の細部・全体計画が終わったときの案内は
+go の phases・phase のテスト）。
 
-1. 先行関係: フィードバック計画のステップには全体計画の番号が全部と、フィードバック計画の中で
-`after` を
-   推移的に辿った番号が先行する。`after` を書かないステップはフィードバック計画の中では先行なし
-2. 承認の検査: 終端は 1 つ（最後のステップにほかの全部が先行する）、最後のステップは延期できない、
-延期の引き受け手は
-   延期したステップが先行する延期していない最小の番号。並行する 2
-   ステップを最後のステップが受ける形は通り、受けない形は落ちる
-3. 並行する 2 ステップの子は一緒に承認でき、合流のステップの子は両方が閉じるまで承認しない
-4. 全体計画が終わったときの案内に、合流の書き方と `phases:` の差し込みを言う
+1. 並行する 2 ステップを最後のステップが受けない形は落ちる
+2. 並行する 2 ステップの子は一緒に承認でき、合流のステップの子は両方が閉じるまで承認しない
+3. 承認したフィードバック計画の after は変えられず、最初のフィードバック計画と一緒に
+   全体計画は変えられない
 """
 
 from __future__ import annotations
@@ -18,60 +15,12 @@ from __future__ import annotations
 import os
 import unittest
 
-from ccnavi.tickets.config import workflow
-from ccnavi.tickets.model import ticket_model
-from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_phases_dag import item, parent_of
 from tests.ticketsample import child_text, parent_text
-
-PLAN = [item("design"), item("docs", after=[1])]
-
-
-class FeedbackWaitsTest(unittest.TestCase):
-    """1・2. 先行関係と承認の検査（計算だけ）。"""
-
-    def problems(self, feedback):
-        return [
-            p.detail for p in workflow.problems(parent_of(PLAN, feedback)) if p.severity == "error"
-        ]
-
-    def test_parallel_feedback_items_join_at_the_last_one(self):
-        parent = parent_of(PLAN, [item("fixup"), item("fixup"), item("fixup", after=[3, 4])])
-        wf = workflow.compute(parent)
-        self.assertEqual(wf.waits[3], [1, 2])
-        self.assertEqual(wf.waits[4], [1, 2])
-        self.assertEqual(wf.waits[5], [1, 2, 3, 4])
-        self.assertEqual(workflow.ready(parent, wf), [1, 3, 4])
-        self.assertEqual(self.problems(parent.feedback), [])
-        found = workflow.lines(parent, wf)
-        self.assertIn("すぐ始まる（フィードバック計画）: 3, 4", found)
-
-    def test_feedback_items_without_after_have_more_than_one_end(self):
-        found = self.problems([item("fixup"), item("fixup")])
-        self.assertTrue(
-            any("`feedback` の最後のステップ" in d and "先行していない" in d for d in found), found
-        )
-        self.assertTrue(any("最後に 1 ステップで受ける" in d for d in found), found)
-
-    def test_a_straight_feedback_plan_still_passes(self):
-        self.assertEqual(self.problems([item("fixup"), item("fixup", after=[3])]), [])
-
-    def test_a_deferred_feedback_item_goes_to_the_join(self):
-        parent = parent_of(
-            PLAN, [item("fixup", "defer"), item("fixup"), item("fixup", after=[3, 4])]
-        )
-        parent.workflow = workflow.compute(parent)
-        self.assertEqual(parent.workflow.review_at, {3: 5})
-        self.assertEqual(parent.covered_by(5), [3])
-
-    def test_a_deferred_feedback_item_without_a_taker_is_refused(self):
-        found = self.problems([item("fixup", "defer"), item("fixup"), item("fixup", after=[4])])
-        self.assertTrue(any("延期を引き受けるステップがありません" in d for d in found), found)
 
 
 class FeedbackFlowTest(PhaseHarness):
-    """2・3. ターミナルの承認で、フィードバック計画の並行と合流を通す。"""
+    """1・2. ターミナルの承認で、フィードバック計画の並行と合流を通す。"""
 
     FB = [
         "implement-feedback",
@@ -181,19 +130,6 @@ class FeedbackRevisionTest(FeedbackFlowTest):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("すぐ始まる（フィードバック計画）: 2, 3", result.stdout)
         self.assertIn("フィードバック計画を改版した", result.stdout)
-
-
-class FeedbackHintTest(unittest.TestCase):
-    """4. 全体計画が終わったときの案内。"""
-
-    def test_the_hint_says_how_to_join_and_to_fill_phases(self):
-        parent = ticket_model.Ticket(ticket="i0001", plan=[item("design")])
-        text = phase._next_hint(os.getcwd(), parent, [], 1)
-        self.assertIn("フィードバック計画", text)
-        self.assertIn("after", text)
-        self.assertIn("最後のステップ", text)
-        self.assertIn("1 ステップで受ける", text)
-        self.assertIn("--plan-order i0001 --fill-phases", text)
 
 
 if __name__ == "__main__":

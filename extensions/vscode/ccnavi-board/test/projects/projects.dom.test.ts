@@ -150,7 +150,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を1か所にだ�
   }
 });
 
-// `projects/`がワークスペースのgitの索引に載っているときの苦情（src/ccnavi/entry/lint.pyの`_in_index`）。
+// `projects/`がワークスペースのgitの索引に載っているときの苦情（go/internal/entry/lintの`inIndex`）。
 // 先頭の句は2つで共通で、載せ忘れは直後に「（入れ子のリポジトリとして」が続く（設計 §4.2）
 const COLLISION =
   "`projects/`はワークスペースのgitが追跡している（例: `projects/foo/main.py`）。ccnaviはワークスペース直下の`projects/`をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの`projects/`を別の名前に移す（例: `git mv projects apps`）";

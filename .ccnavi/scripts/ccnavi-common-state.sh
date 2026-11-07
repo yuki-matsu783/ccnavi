@@ -31,7 +31,7 @@ ccnavi_repo_key() {
 # 親のブランチ名として <名前> を受けてよいなら 0。<名前> <識別子>
 #
 # 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
-# ヒットすることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ticket_ids.id_problem`・
+# ヒットすることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ids.IDProblem`・
 # `branch_problem`）の、ASCII で見分けられる分だけの複製で、受けたものを使う側の 2 段目の確認にあたる。
 ccnavi_branch_ok() {
 	if [ "$1" = "$2" ]; then
@@ -58,16 +58,13 @@ ccnavi_head_branch() {
 
 # 実行ファイルに聞く。答え（標準出力）を、Windows の実行ファイルの CR を除いて出す。<ワークスペースルート> <引数>...
 #
-# 実行ファイルが無ければ 1（ソースで動かしている ccnavi のリポジトリでは uv で起こす）。実行ファイルが
+# 実行ファイルが無ければ 1。実行ファイルが
 # 断った・答えなかったときは空を出して 0。答えの頭の行を確かめるのは呼ぶ側。
 ccnavi_ask() {
 	ccnavi_ak_root="$1"
 	shift
 	if ccnavi_ak_bin=$(ccnavi_bin "$ccnavi_ak_root"); then
 		ccnavi_ak_out=$("$ccnavi_ak_bin" --root "$ccnavi_ak_root" "$@" 2>/dev/null </dev/null) || ccnavi_ak_out=""
-	elif [ -f "$ccnavi_ak_root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-		ccnavi_ak_out=$(cd "$ccnavi_ak_root" && uv run --quiet python -m ccnavi --root "$ccnavi_ak_root" "$@" 2>/dev/null </dev/null) ||
-			ccnavi_ak_out=""
 	else
 		return 1
 	fi

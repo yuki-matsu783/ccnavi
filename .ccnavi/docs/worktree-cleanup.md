@@ -41,7 +41,7 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
     中を走査しない。何を退避したかは出力に出る）。退避したものはccnaviが消さないので、要らなければユーザが消す
     - 動かさずに止まる場合は3つ。退避先がgitに無視されていない（`.env`がコミットされうる。ルートの`.gitignore`に`/scratchpad`を足す）、
       退避先に同じパスがある（上書きしない）、移せない（使用中・別ボリュームなど。理由が出る。退避済みのものは退避先に残る）
-    - 生成物（`ccnavi-clean.sh`が消すもの。一覧は`src/ccnavi/tickets/lifecycle/worktrees.py`の`ALWAYS`・`BESIDE`）は退避せずに消す。一覧は作り直せるキャッシュだけで、`node_modules`・`.venv`・`__pycache__`・
+    - 生成物（`ccnavi-clean.sh`が消すもの。一覧は ccnavi のソースの`go/internal/tickets/lifecycle/worktrees/clean.go`の`always`・`beside`）は退避せずに消す。一覧は作り直せるキャッシュだけで、`node_modules`・`.venv`・`__pycache__`・
       `.mypy_cache`・`.tox`・`.next`などと、隣に印のファイルがあるときだけの`out`・`dist`・`.cache`（`package.json`）、
       `target`（`Cargo.toml`・`pom.xml`）、`build`（`build.gradle`）。追跡されているものは消さない。手で置いたデータは、
       この名前の下に置かない

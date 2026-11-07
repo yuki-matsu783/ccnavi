@@ -20,9 +20,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.infra import pathcase
 from tests.inproc import run_ccnavi
 
 # 承認済みチケット 1 枚。`ccnavi_approved` が無いと承認済みチケットとして読まれない。
@@ -388,43 +386,23 @@ class ProjectsCollisionTest(unittest.TestCase):
             )
         self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
 
-    def test_projects_on_another_drive_does_not_crash_the_lint(self):
-        """`--projects` が別のドライブを指して `relpath` が ValueError でも `--lint` は失敗しない。
-
-        Windows 以外では別のドライブが作れないので、`--projects` に置き場のディレクトリを渡し、
-        `relpath` がそのパスだけ ValueError を投げるように差し替える（Windows の挙動の再現）。
-        """
+    def test_projects_outside_the_workspace_does_not_crash_the_lint(self):
+        """`--projects` がワークスペースの外（Windows では別のドライブもありうる）を指しても
+        `--lint` は失敗しない。"""
         self.no_tracking()
         elsewhere = tempfile.mkdtemp(prefix="ccnavi-drive-")
         self.addCleanup(shutil.rmtree, elsewhere, ignore_errors=True)
-        real = os.path.relpath
-
-        def relpath(path, *args, **kwargs):
-            if pathcase.fold(os.fspath(path)) == pathcase.fold(elsewhere):
-                raise ValueError("path is on mount 'D:', start on mount 'C:'")
-            return real(path, *args, **kwargs)
-
         environment = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
         }
         environment.pop("CLAUDE_PROJECT_DIR", None)
 
-        with mock.patch("os.path.relpath", relpath):
-            result = run_ccnavi(
-                [
-                    "--root",
-                    self.ws,
-                    "--projects",
-                    elsewhere,
-                    "--lint",
-                    "--json",
-                    "--mode",
-                    "enable",
-                ],
-                input="",
-                env=environment,
-            )
+        result = run_ccnavi(
+            ["--root", self.ws, "--projects", elsewhere, "--lint", "--json", "--mode", "enable"],
+            input="",
+            env=environment,
+        )
 
         try:
             problems = json.loads(result.stdout)["problems"]
@@ -609,28 +587,6 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
         self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
         self.assertIn("`projects/my lib`", detail)
         self.assertIn("`git rm -r --cached projects`", detail)
-
-
-class ShWordTest(unittest.TestCase):
-    """案内のコマンドに載せるパスの綴り（`lint_places._sh_word`）。
-
-    導入スクリプトの `sh_word` と同じ綴りにする（`tests/sh/test_setup.py` が両方を比べる）。
-    """
-
-    def test_spelling(self):
-        from ccnavi.entry.lint_places import _sh_word
-
-        cases = {
-            "projects/lib": "projects/lib",
-            "projects/my-lib_2.x": "projects/my-lib_2.x",
-            "projects/日本語": "projects/日本語",
-            "projects/my lib": "'projects/my lib'",
-            "projects/a$b": "'projects/a$b'",
-            "projects/it's": "'projects/it'\\''s'",
-        }
-        for path, want in cases.items():
-            with self.subTest(path=path):
-                self.assertEqual(_sh_word(path), want)
 
 
 if __name__ == "__main__":

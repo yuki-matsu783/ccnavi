@@ -75,9 +75,6 @@ root=$(ccnavi_workspace) || {
 here="$(pwd -W 2>/dev/null || pwd)"
 if bin=$(ccnavi_bin "$root"); then
 	exec "$bin" --root "$root" --cwd "$here" worktree branch "$name" ${confirmed:+confirmed}
-elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	cd "$root"
-	exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree branch "$name" ${confirmed:+confirmed}
 fi
-printf 'ccnavi-user-clean-branch: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+printf 'ccnavi-user-clean-branch: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 exit 2

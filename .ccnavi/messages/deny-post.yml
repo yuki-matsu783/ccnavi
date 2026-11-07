@@ -1,11 +1,10 @@
 # 実行前後のフックが組み立てる拒否・報告の文（シェルからルート直下へ書く形、承認された作業範囲の外、
-# 実行後の報告の案内）。条件（いつ出すか）と状態の行はコード側（hook/rootwrite.py・hook/post_findings.py・
-# hook/post_report.py）にあり、ここは何を言うかだけを持つ。
+# 実行後の報告の案内）。条件（いつ出すか）と状態の行はコード側（hook/shellguard・hook/post）にあり、ここは何を言うかだけを持つ。
 # `RULE_` の文は `what` だけが必須で、書くことがない欄は省く。英語の文は、そのまま写してある。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
-  # ---- hook/rootwrite.py（記録の `code` と同じ識別子）
+  # ---- hook/shellguard の rootwrite.go（記録の `code` と同じ識別子）
   DENY_SHELL_WORKSPACE_ROOT:
     kind: deny
     values: [target, path, origin]
@@ -21,7 +20,7 @@ messages:
     no_bypass: |-
       書き込み先の書き方を変えても、同じ場所なら同じゲートに当たります。
 
-  # ---- hook/post_findings.py（承認されたチケットの作業範囲の外。ルール `builtin:ticket-scope` の文）
+  # ---- hook/post の findings.go（承認されたチケットの作業範囲の外。ルール `builtin:ticket-scope` の文）
   RULE_TICKET_SCOPE__BLOCKED:
     kind: deny
     values: [ticket, worktree, blocked]
@@ -46,7 +45,7 @@ messages:
     what: |-
       This path is outside the work area that ticket {ticket} declares ({area}) for worktree {worktree}. Send the output inside that area, or, if the task genuinely needs this path, tell the parent so it can approval-request a ticket that covers it and ask the user to run 'ccnavi-user-agree.sh'.
 
-  # ---- hook/post_report.py（`note:` の行を `案内:` で出す）
+  # ---- hook/post の report.go（`note:` の行を `案内:` で出す）
   # 承認済みの置き場の報告につける 1 行。判定は変えない。
   NOTE_POST_APPROVED_AREA:
     kind: note

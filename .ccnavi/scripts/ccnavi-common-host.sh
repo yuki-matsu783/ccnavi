@@ -21,7 +21,7 @@
 #            GraphQL はその REST の根の /graphql。GHE.com の API の URL の規則は実物では未検証
 #   GitLab : 上のどれにもヒットしないもの全部（gitlab.com、*.aslead.cloud、セルフホスト、未知のホスト）。
 #            接続先は origin の scheme・ホスト・ポートをそのまま保つ（<scheme>://<ホスト[:ポート]>/api/v4）
-# Python の review_host.classify と、Chrome 拡張の hostclass.ts が同じ規則で、tests/fixtures/host-kinds.json の
+# 実行ファイルの host.Classify と、Chrome 拡張の hostclass.ts が同じ規則で、tests/fixtures/host-kinds.json の
 # 同じ表で突き合わせる。
 #   ccnavi_host_connect         道具を選ぶ。ccnavi_h_jq・ccnavi_h_cli・ccnavi_h_cli_name・ccnavi_h_curl・
 #                               ccnavi_h_token・ccnavi_h_transport（gh / glab / curl）を決める。

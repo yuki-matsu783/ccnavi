@@ -18,12 +18,12 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 |---|---|---|
 | `--test <ツール> <対象> [--json] [--cwd <ディレクトリ>] [--permission-mode <モード>] [--agent-id <id>]` | 判定・根拠コード・判定に渡した payload・ヒットしたルール（タイプ、書いた式、翻訳後の正規表現、`file` か `outside`）・行き着く先・縮退したか既定を使ったか・ヒットした中で実行されるコマンド（`unwrapped`、6.3.1）・返る文面。ヒットしたルールは判定が適用したもの（`Record.hits`）そのもので、ルールファイルを読み直さない。組み込み（保護・退避した既定）は `outside` で、式は頭だけに切る。モードは常に `enable`。payload の 3 つの欄は hook が Claude Code から受け取るもので、既定はルート・権限モード無し・メイン。知らない権限モードと無いディレクトリは断る。切り替えの環境変数（`CCNAVI_GUARD_UNWATCHED` など）は hook と同じ関数で解いてから判定に渡す。`--test Stop "(stop)"` はターンの終わりに使われるルール（6.6）を並べ、あれば `allow`、無ければ `skip`。期待の `tool: Stop` も同じ | 0。payload の欄の誤り・2 語（ツールと対象）にオプションが入った形・余った語は 1 |
 | `--test-expectations <期待> [--json]` | 期待する判定をすべて判定に掛け、期待と食い違ったものを名指し | 文字の出力は食い違いがあれば 1、JSON は常に 0、期待のファイルが読めなければ 1 |
-| `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.undeclared_verdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、「dry-run のときに止めるもの」と「判定に達せなかったとき」（内部の例外・期限切れ・payload が読めない。ツールごとの扱い）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
+| `--explain [--json]` | タイプごとのルール、プロジェクトの一覧とルールの可否、権限モードの扱い（権限モード × 読めたか読み切れないかの結末を、判定と同じ `judge.UndeclaredVerdict` で組む）、チケット制御の値、元のプロジェクトが無いワークツリー（節「■ 元のプロジェクトが無いワークツリー」。該当があるときだけ。11.3）、「dry-run のときに止めるもの」と「判定に達せなかったとき」（内部の例外・期限切れ・payload が読めない。ツールごとの扱い）、承認済みチケットの一覧、親の局面、フェーズごとの状態・マーカー・止まっているか・リスク、上位の設定に却下された要求（節「■ 上位の設定に却下された要求」。全件を 1 件 1 行で、該当があるときだけ。REQ-SES-02） | 0 |
 | `--lint [--json]` | 判定を行わず、防御を無効化しうる記述を error と warn に分けて報告。ルール・フェーズ定義・配点・settings.json の登録・チケット・プロジェクトを見る | error があれば 1 |
 | `--suggest [--json]` | 記録（`decisions.jsonl` と、同じ置き場で回した `decisions.*.jsonl`）から、ルールの候補を `rules.yml` と `rule-expectations.yml` の形の下書きで出す。どのルールも言及せず 5 回以上渡った形は `ask` のルールの候補（形は Bash なら先頭のコマンドとサブコマンド、パスのツールならディレクトリの下、WebFetch ならホストの下）、同じ呼び出しを `CCNAVI_DENY_REPEAT` 回以上止めた `deny` は `message` を見直す候補。出すのは `deny` と `ask` だけ。候補ごとに `rules:` 1 タイプぶんと `expectations:`（記録の呼び出しを 3 件まで、ルートは `/repo`）1 タイプぶんを YAML の文書 1 つで並べる。候補ごとに `--lint` と同じ読みと `--test-expectations` と同じ判定で確かめ、通ったものだけを出す（ルールを足す候補は共通レイヤーのコピーに足した一時ファイルで試す）。通らなかった形（いまのルールでは別の判定になる形、ルールファイルの外から来た根拠の拒否）は数だけを出す。読み切れなかった呼び出し（`degraded`）と、上限で切れた `subject` は数えない | 常に 0 |
-| `--version [--json]` | 版・組み立ての元のコミット（`build.py` が埋める。ソースでは `unknown`）・互換の版・読む書式の版。設定もワークスペースも読まない（docs/11_requirements/json-shapes.md「版の JSON」） | 0 |
+| `--version [--json]` | 版・組み立ての元のコミット（`scripts/ccnavi-build.sh` が埋める。埋めていなければ `unknown`）・互換の版・読む書式の版。設定もワークスペースも読まない（docs/11_requirements/json-shapes.md「版の JSON」） | 0 |
 | `--lint [--json] --flow <パス>` | 上に加えて、子のフロー 1 本（9.3.1）を `SubagentStart` と同じ読み手・同じ検査で読み、読めなければ場所 `(flow)` の error で言う。読めたフローの構造と名前の怪しいところは warn。`--json` なら読めた中身を `flow.data`、渡る手順の行を `flow.rendered` に載せ（読めなければどちらも `null`）、選べる名前を `flow.candidates` に載せる。パスは起動した場所からの相対でよい | error があれば 1 |
-| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`docsearch`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は 10.1「`--docs` の索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
+| `--docs [絞り込み] [--sort …] [-r] [--limit N] [--format table\|path\|detail\|json\|jsonl\|count]` | ワークスペースと、プロジェクトの置き場の直下の各プロジェクト（別の git）の md（それぞれの `git ls-files --cached --others --exclude-standard`、ccnavi ディレクトリの下は除く。ただし `.ccnavi/docs/` は載せる）を、頭の frontmatter の索引で横断して引く（`catalog/docs`）。パスはワークスペースルートから。md が直下にあるディレクトリごとの `ccnavi-index.jsonl` を差分で新しくしてから引く。書くのは git がそこの `ccnavi-index.jsonl` を無視しているときだけで、どのディレクトリでも無視していないツリーは、書く前にそのツリーの `.gitignore` に `**/ccnavi-index.jsonl` を 1 行だけ足して（ワークスペースもプロジェクトも同じ。足したことは標準エラーと SessionStart の案内で名指しする。未コミットの差分が残る）確かめ直す。`!` で否定する行がある（ユーザが追跡している）・足せない・足しても無視されないツリーだけが対象外になり、名指しされる。ccnavi の形でない `ccnavi-index.jsonl` はそのまま残し、実体がツリーの外に出るディレクトリは対象外にする。一時ファイルは `.git/` の中に作る（`.git` が別のファイルシステムなら、そのディレクトリの下の git に無視される `.ccnavi-tmp-*/ccnavi-index.jsonl`）。git への問い合わせの失敗は対象外と分けて言う。形は 10.1「`--docs` の索引」 | 引ければ 0（0 件でも）。使い方の誤りは 1 |
 
 **レイヤーの置き場を動かすフラグは 8 本あり、どれも診断でだけ有効になる**。共通レイヤーの中身は
 `--rules` / `--phases` / `--risk`、レイヤーを探す先は `--projects`（プロジェクトのレイヤーの置き場）と
@@ -33,7 +33,7 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 `--project-risk-file <名前>=<パス>`（同じく配点の代わり。統合結果なので共通レイヤーと合わせて検証する。閾値の逆転、同 `id` の衝突、
 `script:` の存在確認はそのレイヤーの git プロジェクトルートが基準）。
 診断の外（hook からの判定、`ticket` / `review` のサブコマンド）に渡すと外し、外したことを標準エラーに
-出す。守る対象も本来の場所のまま（守る側は差し替えを見ない `layer_real_path` を引く）。
+出す。守る対象も本来の場所のまま（守る側は差し替えを見ない `config.LayerRealPath` を引く）。
 
 **記録・state・承認済みチケット・提案の置き場を動かす `--log` / `--state` / `--approved` / `--tickets` も、診断でだけ有効になる。**
 診断の外に渡すと、レイヤーの置き場のフラグと同じく外し、同じ文面を標準エラーに出す。`.ccnavi/scripts/` の sh
@@ -41,7 +41,7 @@ state を内部で外す。拡張と `scripts/check_rules.py` は念のため `-
 エージェントが記録を止めた形（`--log ""`）や、承認済みチケット・提案の置き場を差し替えた形でサブコマンドを動かせる（P2・P6）。
 write-and-push の書いたパスの一覧（`--record-writes`）も、診断の外では `--state` を見ずに既定の state の置き場だけを一覧から外す。
 
-**互換の版**（`src/ccnavi/entry/version.py` の `COMPAT`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
+**互換の版**（`go/internal/entry/version/version.go` の `Compat`）は、実行ファイルと呼ぶ側（`.ccnavi/scripts/` の sh の `CCNAVI_COMPAT`、拡張の
 `EXTENSION_COMPAT`）の契約の版で、3 か所に同じ値を書く。sh と拡張は実行時に実行ファイルの版を比べず、食い違いを断らない（sh と実行ファイルは
 必ず同時に配る前提）。`--lint` だけが sh の値と比べる（`(version)` の warn）。拡張もフラグや機能の有無を事前に確かめない（版のずれは断らず、実行ファイルの断りの文面に任せる。`--version --json` は `flags`・`features` を返さない）。レイヤーは頭の `version:` が書式の版を示す。
 読めない版は読む側が error にする。
@@ -56,9 +56,9 @@ JSON の形は docs/11_requirements/json-shapes.md「試験の JSON」「lint �
 **`--explain --json` の `settings.mode` と `settings.ticket_control` は、hook がいま受け取るはずの値で答える。**
 拡張が起動した実行ファイルには、Claude Code が hook に渡す `.claude/settings*.json` の `env` が届かない。
 そこで `--explain --json` だけは、プロセスの環境の上に、ワークスペースルートの `.claude/settings.json`、
-`.claude/settings.local.json` の `env` をこの順で重ねる（Claude Code と同じ順。`settings.hook_view`）。ccnavi 自身の
+`.claude/settings.local.json` の `env` をこの順で重ねる（Claude Code と同じ順。`config.ReadHookView`）。ccnavi 自身の
 ソースツリーでは上書き設定ファイル（`ccnavi.settings.local.json`）が環境より強いのも `load` と同じ。重ねた値は、判定と同じ
-`modes.resolve_mode` と `selfguard.resolve` で解く。読めない値は `enable`、設定から来た `disable` のモードは
+`config.ResolveMode` と `selfguard.Resolve` で解く。読めない値は `enable`、設定から来た `disable` のモードは
 「環境からだけ受ける」の規則のまま（`env` は Claude Code が環境として渡すので受ける）。フラグ（`--mode`・`--ticket-control`）が
 あればそれが勝つ。ボードの中身（チケットを出すか）も同じ値で組み、`settings` の値と食い違わせない。
 hook の判定の経路（`load`）はこの重ねを使わず、プロセスに渡った環境だけを読む。
@@ -97,25 +97,25 @@ hook の判定の経路（`load`）はこの重ねを使わず、プロセスに
 `--lint` の登録の検査は `.claude/settings.json` しか見ず、モードがどこから来たかを示す。`rules.yml` に
 error がある間は配点もフェーズ定義も保存できない。
 
-`--lint` は `.claude/settings.json` の env の `CCNAVI_ENTRY_PATH` も見る（`lint_project._bin_path`）。指す先が在るのに
-実行できなければ error（hook が起動しない）。POSIX でだけ見る（`os.access(X_OK)`）。パスは書いたとおりに見て、
+`--lint` は `.claude/settings.json` の env の `CCNAVI_ENTRY_PATH` も見る（`entry/lint` の `binPath`）。指す先が在るのに
+実行できなければ error（hook が起動しない）。POSIX でだけ見る（実行ビットのどれかが立っているか）。パスは書いたとおりに見て、
 `.exe` を補わない。指す先が無いときは言わない（自己防衛が missing と言う）。
 
 **拡張との取り決め**（REQ-EXT）のうち、作りに関わるもの。
 
-- 文字コード: 入口（`__main__` の `hookio.rebind_streams`）が標準入出力を UTF-8・改行 LF に張り直す。診断の JSON
-  （`--explain` / `--test` / `--test-expectations` / `--lint` / `--suggest` / `--version`）は `ensure_ascii=True` で ASCII に変換し、
-  承認の JSON と残った指摘の JSON は `ensure_ascii=False` で書く
-- `parse_args` の `SystemExit` は捕まえて終了コード 1 にする
+- 文字コード: 標準入出力は、どの OS でも UTF-8・改行 LF で読み書きする。診断の JSON
+  （`--explain` / `--test` / `--test-expectations` / `--lint` / `--suggest` / `--version`）は ASCII に変換し（`pyjson.Options` の既定）、
+  承認の JSON と残った指摘の JSON は変換しない（`RawUnicode`）
+- 引数の誤り（`infra/argparse` の `*Error`）は、usage と `ccnavi: error: …` を出して終了コード 1 にする
 - `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
-- 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・Python・拡張の 3 つの logger で揃える。
+- 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・実行ファイル・拡張の 3 つの logger で揃える。
   `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
-- Chrome 拡張は `src/ccnavi/` を Pyodide に同梱し、公開の入口 `entry/ext.py` が再公開するモジュールを通して、判定のコア（`tickets/core/api.py`（実体は `core.base`・`core.approve`・`core.review`）の
-  Snapshot → 判定 → Changes）と `cli.run` を直接呼ぶ。拡張が呼ぶ名前は `entry/ext.py` の再公開に限り、一覧はその再公開（コード）が正で、ここには写さない。
-  本体のモジュールを動かすときは `ext.py` の行だけを直す。拡張は同じ版の本体と一緒に同梱するので、別の版の本体と拡張は組み合わさらない。
+- Chrome 拡張は、実行ファイルと同じ Go のソースを WASM に組んで同梱する（`go/cmd/ccnavi-chrome`）。拡張が呼ぶのは要求の JSON を 1 つ渡して答えの JSON を受ける 1 つの関数だけで、
+  入口の `entry/chrome` が、判定のコア（`tickets/core`。ブランチの中身 → 判定 → 書くもの）と、手元と同じ `--agree --preview --json` を通す。要求と答えの形は `entry/chrome` と拡張の `src/core/ccnavi.ts` が対で持ち、ここには写さない。
+  本体のパッケージを動かすときは `entry/chrome` だけを直す。拡張は同じ版の本体と一緒に組むので、別の版の本体と拡張は組み合わさらない。
   互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
-- 互換の版の書き方: 実行ファイル側は `entry/version.py` の行頭から始まる 1 行 `COMPAT = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
+- 互換の版の書き方: 実行ファイル側は `go/internal/entry/version/version.go` の行頭から始まる 1 行 `const Compat = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
   VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/core/test_version.py` が見る
 
 ### 10.1 `--docs` の索引
@@ -158,7 +158,7 @@ frontmatter の無い md は頭の 4 KiB だけで止める。
 
 `SessionStart` はサブエージェントでなければ、ワークスペースとプロジェクトの索引を同じ手順で新しくし、引き方の 1 行（frontmatter の
 決まりの文書があれば、その引き方の 1 文）を `additionalContext` につける。対象外にしたツリーと書き換えなかった `ccnavi-index.jsonl` があれば短く名指しする。
-md が 1 本も無い・git の外なら何も出さない。新しくするのに使うのは 3 秒（`docsearch.START_SECONDS`）と hook の判定の期限の
+md が 1 本も無い・git の外なら何も出さない。新しくするのに使うのは 3 秒（`catalog/docs` の `startBudget`）と hook の判定の期限の
 残りの小さいほうまで。まず全部のディレクトリで使い回せる行を見て、読み直しの要る md を、待つ本数の少ないディレクトリから
 1 本ずつ期限を見ながら読む。過ぎたら読むのをやめ、どのディレクトリも「読めた md の新しい行と、読めなかった md の既存の行」で
 書く（読めなかった md は次の回に読む）。大きなディレクトリも回を重ねれば埋まり、小さなディレクトリはその後ろで待たない。

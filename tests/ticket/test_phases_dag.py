@@ -1,38 +1,30 @@
 """全体計画の順序を計画のステップの `after` で決めるの受入テスト。
 
-見るのは 9 つ。
+見るのは 5 つ。
 
-1. フェーズ定義は順序を持たない。`phases.yml` に残った `order`・`after`・`overlap`・`requires` は
-   読まずに通し、warn で言う
-2. ステップの `after` の読み方。形の誤りは読み込みで落とさず、例外も出さない
-3. 先行関係はステップの `after` を推移的に辿って計算する。書かないステップは先行なし。
-   フィードバック計画はいまは一直線（前の番号が全部先行する）で読む
-4. 計画の検査（終端・最後のステップの延期・延期の引き受け手とそのレビュー）
-5. 承認と順序。並行の枝が一緒に始まり、合流点には両方が先行する
-6. 先行関係のファイルは無い。承認済みチケットの計画から都度計算し、残ったファイルは読まない
-7. 手で動かした承認も `after` で読む。壊れた計画の親は判定で止まり、子も止まる
-8. 改版の見つけ方（定義・`review`・推移的な先行の並び）と、番号ごとの錠
-9. 受け入れは親全体に該当する（`confirm` が数えるのはホスト上の未解決だけ）。
-   次の案内は並行の枝を挙げる
+1. 承認と順序。並行の枝が一緒に始まり、合流点には両方が先行する
+2. 先行関係のファイルは無い。承認済みチケットの計画から都度計算し、残ったファイルは読まない
+3. 手で動かした承認も `after` で読む。壊れた計画の親は判定で止まり、子も止まる
+4. 改版と番号ごとの錠
+5. ボードは並行の枝を挙げる
+
+フェーズ定義の読み方・`after` の読み方・先行関係の計算（見本の表 tests/fixtures/plan-waits.json）・
+計画の検査・改版の見つけ方と錠・次の案内は go/internal/tickets の config/phases・model/ticket・
+proposal/candidates・phase が見る。
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import unittest
 
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import checks as approval_checks
-from ccnavi.tickets.approval import marks as approval_marks
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.config import phasetypes, workflow
-from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.model import ticket_model
-from ccnavi.tickets.proposal import agree_candidates
+import yaml
+
 from tests import config_path
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_ticket import ROOT, write
+from tests.ticket.test_ticket import write
 from tests.ticketsample import child_text
 from tests.ticketsample import parent_text as _parent_text
 
@@ -63,476 +55,6 @@ PLAN = [
     {"type": "docs", "after": [2, 3]},
 ]
 
-# 計画の先行関係の見本の表。先行関係の決まりが黙って変わらないように、ここで固定する。
-PLAN_WAITS = os.path.join(ROOT, "tests", "fixtures", "plan-waits.json")
-
-
-def item(kind, mode="", after=()):
-    """`mode` は "" / "review"（`review: true`）/ "defer"（`deferred: true`）。"""
-    return ticket_model.PlanItem(
-        type=kind,
-        review=True if mode == "review" else None,
-        deferred=mode == "defer",
-        after=list(after),
-    )
-
-
-def parent_of(plan, feedback=None):
-    return ticket_model.Ticket(ticket="i0001", plan=list(plan), feedback=feedback)
-
-
-def parsed(plan_yaml: str, feedback_yaml: str = ""):
-    """計画の YAML を持つ親を読む。読み込みが落ちないことも見る。"""
-    text = (
-        "---\nversion: 1\nticket: i0001\n"
-        + plan_yaml
-        + feedback_yaml
-        + 'title: 親\nallow:\n  - match: Write|Edit\n    glob: "src/*"\n---\n本文\n'
-    )
-    t, problems = ticket_mod.parse(text)
-    assert t is not None, problems
-    return t
-
-
-class TypesTest(unittest.TestCase):
-    def test_definitions_carry_no_order(self):
-        types, problems = phasetypes.parse(DEFS)
-        self.assertIsNotNone(types, problems)
-        self.assertEqual([p for p in problems if p.severity == "error"], [])
-        self.assertFalse(hasattr(types, "order"))
-        self.assertFalse(hasattr(types["docs"], "after"))
-
-    def test_relation_fields_in_a_definition_are_not_read(self):
-        """定義の順序の欄は読まない（warn も error も出さない）。"""
-        text = (
-            "version: 1\norder: dag\nphases:\n"
-            "  design: {title: 設計, review: false, overlap: [docs]}\n"
-            "  docs: {title: 文書, review: true, after: [design], requires: [design]}\n"
-        )
-        types, problems = phasetypes.parse(text)
-        self.assertIsNotNone(types, problems)
-        self.assertEqual(problems, [])
-
-    def test_old_after_pointing_nowhere_is_not_an_error(self):
-        types, problems = phasetypes.parse(
-            "version: 1\nphases:\n  docs: {title: 文書, after: [nope, docs]}\n"
-        )
-        self.assertIsNotNone(types, problems)
-        self.assertEqual([p for p in problems if p.severity == "error"], [])
-
-
-class AfterReadingTest(unittest.TestCase):
-    def test_after_is_read_as_numbers(self):
-        t = parsed("plan:\n  - design\n  - {type: docs, after: [1]}\n")
-        self.assertEqual(t.plan[1].after, [1])
-        self.assertEqual(t.plan[0].after, [])
-        self.assertEqual(t.plan[1].after_errors, [])
-
-    def test_repeated_numbers_are_folded_and_warned(self):
-        t = parsed("plan:\n  - design\n  - extra\n  - {type: docs, after: [2, 1, 2]}\n")
-        self.assertEqual(t.plan[2].after, [1, 2])
-        warned = [p.detail for p in workflow.problems(t) if p.severity == "warn"]
-        self.assertTrue(any("2 度" in d for d in warned), warned)
-
-    def test_broken_after_does_not_stop_reading_or_raise(self):
-        """どの崩し方でも、読み・計算・検査・一覧が例外を出さず、誤りは error で言う。"""
-        broken = [
-            "2",
-            '"2"',
-            '["2"]',
-            "[1.5]",
-            "[[1]]",
-            "[0]",
-            "[-1]",
-            "[3]",
-            "[4]",
-            "[99999999999999999999999]",
-            "[true]",
-            "{a: 1}",
-            "null",
-        ]
-        for value in broken:
-            with self.subTest(value=value):
-                t = parsed(f"plan:\n  - design\n  - extra\n  - {{type: docs, after: {value}}}\n")
-                if value == "null":
-                    self.assertEqual(t.plan[2].after, [])
-                    continue
-                self.assertEqual(t.plan[2].after, [], value)
-                self.assertTrue(t.plan[2].after_errors, value)
-                wf = workflow.compute(t)
-                self.assertEqual(wf.waits[3], [])
-                self.assertIsNone(t.review_at(9))
-                errors = [p.detail for p in workflow.problems(t) if p.severity == "error"]
-                self.assertTrue(any("`plan[2]` の `after`" in d for d in errors), errors)
-                workflow.lines(t, wf)
-
-    def test_a_bool_is_not_a_number(self):
-        t = parsed("plan:\n  - design\n  - {type: docs, after: [true]}\n")
-        self.assertEqual(t.plan[1].after, [])
-        self.assertTrue(t.plan[1].after_errors)
-
-    def test_feedback_after_points_only_at_feedback_numbers(self):
-        t = parsed(
-            "plan:\n  - design\n  - {type: docs, after: [1]}\n",
-            "feedback:\n  - fixup\n  - {type: fixup, after: [2]}\n",
-        )
-        self.assertEqual(t.feedback[1].after, [])
-        errors = [p.detail for p in workflow.problems(t) if p.severity == "error"]
-        self.assertTrue(any("`feedback[1]` の `after`" in d for d in errors), errors)
-        good = parsed(
-            "plan:\n  - design\n  - {type: docs, after: [1]}\n",
-            "feedback:\n  - fixup\n  - {type: fixup, after: [3]}\n",
-        )
-        self.assertEqual(good.feedback[1].after, [3])
-
-    def test_a_deferred_last_item_is_read_and_refused_by_the_check(self):
-        """最後のステップの延期は読む段では落とさない（落とすと承認済みチケットが索引に入らない）。"""
-        t = parsed("plan:\n  - design\n  - {type: docs, deferred: true, after: [1]}\n")
-        self.assertTrue(t.plan[1].deferred)
-        errors = [p.detail for p in workflow.problems(t) if p.severity == "error"]
-        self.assertTrue(any("最後のステップは延期できない" in d for d in errors), errors)
-
-    def test_after_is_written_back_by_as_raw_and_not_compared_by_eq(self):
-        self.assertEqual(item("docs", after=[1]).as_raw(), {"type": "docs", "after": [1]})
-        self.assertEqual(item("docs").as_raw(), "docs")
-        self.assertEqual(item("docs", after=[1]), item("docs", after=[2]))
-
-
-class ComputeTest(unittest.TestCase):
-    def test_waits_follow_after_transitively(self):
-        wf = workflow.compute(
-            parent_of(
-                [
-                    item("design"),
-                    item("acceptance", after=[1]),
-                    item("implement", after=[1]),
-                    item("docs", after=[2, 3]),
-                ]
-            )
-        )
-        self.assertEqual(wf.order, ticket_model.WORKFLOW_DAG)
-        self.assertEqual(wf.waits, {1: [], 2: [1], 3: [1], 4: [1, 2, 3]})
-
-    def test_an_item_without_after_waits_for_nothing_even_for_the_same_type(self):
-        wf = workflow.compute(parent_of([item("implement"), item("implement")]))
-        self.assertEqual(wf.waits, {1: [], 2: []})
-
-    def test_copying_the_transitive_waits_into_after_means_the_same(self):
-        direct = parent_of([item("a"), item("b", after=[1]), item("c", after=[2])])
-        copied = parent_of([item("a"), item("b", after=[1]), item("c", after=[1, 2])])
-        self.assertEqual(workflow.compute(direct).waits, workflow.compute(copied).waits)
-
-    def test_defer_goes_to_the_smallest_later_item_that_waits(self):
-        parent = parent_of(
-            [
-                item("design"),
-                item("acceptance", "defer", [1]),
-                item("implement", after=[1]),
-                item("docs", after=[2, 3]),
-            ]
-        )
-        # 3（実装）には 2 が先行しないので引き受けない。4（文書）が引き受ける。
-        self.assertEqual(workflow.compute(parent).review_at, {2: 4})
-        self.assertEqual(parent.review_at(2), 2) if parent.workflow else None
-        parent.workflow = workflow.compute(parent)
-        self.assertEqual(parent.review_at(2), 4)
-        self.assertEqual(parent.covered_by(4), [2])
-
-    def test_feedback_waits_for_the_whole_plan_and_its_own_after(self):
-        """フィードバック計画は全体計画の番号が全部と、中の `after` の番号が先行する。"""
-        parent = parent_of(
-            [item("design"), item("docs", after=[1])], [item("fixup"), item("fixup")]
-        )
-        wf = workflow.compute(parent)
-        self.assertEqual(wf.waits[3], [1, 2])
-        self.assertEqual(wf.waits[4], [1, 2])
-        parent.feedback[1].after = [3]
-        wf = workflow.compute(parent)
-        self.assertEqual(wf.waits[4], [1, 2, 3])
-        parent.workflow = wf
-        self.assertEqual(workflow.waits_of(parent, 4), [1, 2, 3])
-
-    def test_a_deferred_feedback_item_goes_to_the_next_one(self):
-        parent = parent_of(
-            [item("design"), item("docs", after=[1])],
-            [item("fixup", "defer"), item("fixup", "defer", [3]), item("fixup", after=[4])],
-        )
-        parent.workflow = workflow.compute(parent)
-        self.assertEqual(parent.workflow.review_at, {3: 5, 4: 5})
-        self.assertEqual(parent.review_at(3), 5)
-        self.assertEqual(parent.covered_by(5), [3, 4])
-
-    def test_the_plan_waits_fixture(self):
-        """計画と先行関係の見本の表。実行ファイルの答えが表と同じ。"""
-        with open(PLAN_WAITS, encoding="utf-8") as f:
-            cases = json.load(f)["cases"]
-        self.assertGreaterEqual(len(cases), 5)
-        for case in cases:
-            with self.subTest(case=case["name"]):
-                fb = case.get("feedback")
-                t = parsed(
-                    "plan: " + json.dumps(case["plan"], ensure_ascii=False) + "\n",
-                    ("feedback: " + json.dumps(fb, ensure_ascii=False) + "\n")
-                    if fb is not None
-                    else "",
-                )
-                wf = workflow.compute(t)
-                self.assertEqual(
-                    {str(n): w for n, w in wf.waits.items()}, case["waits"], case["name"]
-                )
-                self.assertEqual(
-                    {str(n): at for n, at in wf.review_at.items()},
-                    case["review_at"],
-                    case["name"],
-                )
-
-
-class PlanProblemsTest(unittest.TestCase):
-    def problems(self, plan, feedback=None, types=None):
-        return [
-            p.detail
-            for p in workflow.problems(parent_of(plan, feedback), types)
-            if p.severity == "error"
-        ]
-
-    def test_a_good_plan_passes(self):
-        plan = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("implement", after=[1]),
-            item("docs", after=[2, 3]),
-        ]
-        self.assertEqual(self.problems(plan), [])
-
-    def test_a_plan_without_after_has_more_than_one_end(self):
-        found = self.problems([item("design"), item("docs")])
-        self.assertTrue(any("最後のステップ" in d and "先行していない" in d for d in found), found)
-
-    def test_a_branch_cut_short_is_refused(self):
-        found = self.problems(
-            [
-                item("design"),
-                item("acceptance", after=[1]),
-                item("implement", after=[1]),
-                item("docs", after=[3]),
-            ]
-        )
-        self.assertTrue(any("2" in d and "先行していない" in d for d in found), found)
-
-    def test_a_single_item_is_its_own_end(self):
-        self.assertEqual(self.problems([item("design")]), [])
-
-    def test_feedback_needs_one_end_too(self):
-        plan = [item("design"), item("docs", after=[1])]
-        self.assertEqual(self.problems(plan, []), [])
-        self.assertEqual(self.problems(plan, [item("fixup")]), [])
-        # 2 ステップなら、最後のステップに前のステップが `after` で先行する（一直線か合流）。
-        self.assertEqual(self.problems(plan, [item("fixup"), item("fixup", after=[3])]), [])
-        found = self.problems(plan, [item("fixup"), item("fixup")])
-        self.assertTrue(any("`feedback` の最後のステップ" in d for d in found), found)
-
-    def test_the_last_item_of_either_plan_cannot_be_deferred(self):
-        found = self.problems([item("design"), item("docs", "defer", [1])])
-        self.assertTrue(any("最後のステップは延期できない" in d for d in found), found)
-        found = self.problems(
-            [item("design"), item("docs", after=[1])], [item("fixup"), item("fixup", "defer")]
-        )
-        self.assertTrue(any("`feedback` の最後のステップは延期できない" in d for d in found), found)
-
-    def test_defer_without_a_taker_is_refused(self):
-        found = self.problems(
-            [
-                item("design"),
-                item("acceptance", "defer", [1]),
-                item("implement", after=[1]),
-                item("docs", after=[3, 1]),
-            ]
-        )
-        self.assertTrue(any("引き受けるステップがありません" in d for d in found), found)
-
-    def test_the_taker_needs_a_review_when_the_definitions_are_given(self):
-        types, _ = phasetypes.parse(DEFS)
-        plan = [item("design", "defer"), item("extra", after=[1]), item("docs", after=[2])]
-        found = self.problems(plan, types=types)
-        self.assertTrue(any("レビューがありません" in d for d in found), found)
-        # 定義を渡さなければ（判定の側）、定義を読む検査は適用しない。
-        self.assertFalse(any("レビューがありません" in d for d in self.problems(plan)))
-        plan[1] = item("extra", "review", [1])
-        self.assertEqual(self.problems(plan, types=types), [])
-
-    def test_lines_list_every_number_and_what_starts_at_once(self):
-        parent = parent_of(
-            [item("design"), item("extra"), item("docs", after=[1, 2])], [item("fixup")]
-        )
-        out = workflow.lines(parent, workflow.compute(parent))
-        self.assertIn("1: design — 先行なし", out)
-        self.assertIn("3: docs — 先行 1, 2", out)
-        self.assertIn("4: fixup — 先行 1, 2, 3", out)
-        self.assertIn("すぐ始まる: 1, 2", out)
-        broken = parent_of([item("design"), item("extra"), item("docs", after=[1])])
-        self.assertIn(
-            "最後のステップの先行になっていない: 2",
-            workflow.lines(broken, workflow.compute(broken)),
-        )
-
-
-class NextHintTest(unittest.TestCase):
-    def test_an_earlier_branch_without_children_is_offered(self):
-        """3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。"""
-        from ccnavi.tickets.phase import gates as phase_mod
-
-        owner = parent_of(
-            [
-                item("design"),
-                item("acceptance", after=[1]),
-                item("implement", after=[1]),
-                item("docs", after=[2, 3]),
-            ]
-        )
-        owner.workflow = workflow.compute(owner)
-        done = ticket_model.Ticket(ticket="c", parent="i0001", review_required=False)
-        phases = []
-        for n in range(1, 5):
-            ph = phase_mod.Phase("i0001", n, item=owner.plan[n - 1], owner=owner)
-            if n in (1, 3):
-                ph.tickets, ph.states = [done], {"c": ticket_model.DONE}
-                ph.marks = {approval_marks.MARK_SKIPPED: {}}
-            phases.append(ph)
-        hint = phase_mod._next_hint(os.getcwd(), owner, phases, 3)
-        self.assertIn("次に始められるのは 2", hint)
-
-
-class LockTest(unittest.TestCase):
-    """改版の錠は番号ごと。固定した番号（子が承認された番号）のステップだけを変えさせない。"""
-
-    def lock(self, current, revised, fixed):
-        return [
-            p.detail
-            for p in agree_candidates.lock_problems(parent_of(revised), parent_of(current), fixed)
-        ]
-
-    # 承認済み: a(1)・b(2)・c(3)・d(4)。b と c の先行は a、d の先行は b と c。1 と 3 に子がある。
-    CURRENT = [
-        item("design"),
-        item("acceptance", after=[1]),
-        item("implement", after=[1]),
-        item("docs", after=[2, 3]),
-    ]
-
-    def test_adding_an_item_before_the_end_passes(self):
-        revised = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("implement", after=[1]),
-            item("extra", after=[1]),
-            item("docs", after=[2, 3, 4]),
-        ]
-        self.assertEqual(self.lock(self.CURRENT, revised, {1, 3}), [])
-
-    def test_an_unstarted_earlier_number_can_change(self):
-        """前置の錠では落ちた形。2 番は子が無いので変えてよい。"""
-        revised = [
-            item("design"),
-            item("extra", after=[1]),
-            item("implement", after=[1]),
-            item("docs", after=[2, 3]),
-        ]
-        self.assertEqual(self.lock(self.CURRENT, revised, {1, 3}), [])
-
-    def test_a_fixed_number_keeps_its_definition_review_and_number(self):
-        revised = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("extra", after=[1]),
-            item("docs", after=[2, 3]),
-        ]
-        found = self.lock(self.CURRENT, revised, {1, 3})
-        self.assertTrue(any("3" in d and "子が承認されている" in d for d in found), found)
-        found = self.lock(self.CURRENT, self.CURRENT[:2], {1, 3})
-        self.assertTrue(found)
-
-    def test_a_fixed_number_keeps_its_transitive_waits(self):
-        revised = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("implement", after=[2]),
-            item("docs", after=[3]),
-        ]
-        found = self.lock(self.CURRENT, revised, {1, 3})
-        self.assertTrue(any("3" in d and "先行を変えられない" in d for d in found), found)
-
-    def test_copying_the_transitive_waits_into_a_fixed_number_passes(self):
-        """固定した番号の先行は推移的な形で比べる。「先行 1, 2, 3」をコピーしても通す。"""
-        revised = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("implement", after=[1]),
-            item("docs", after=[1, 2, 3]),
-            item("extra", after=[4]),
-        ]
-        self.assertEqual(self.lock(self.CURRENT, revised, {1, 2, 3, 4}), [])
-
-    def test_an_unchanged_direct_after_with_a_changed_transitive_wait_is_refused(self):
-        """直接の `after` が同じでも、推移的な先行が変われば固定した番号は落とす。"""
-        current = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("implement", after=[2]),
-            item("docs", after=[3]),
-        ]
-        revised = [
-            item("design"),
-            item("acceptance"),
-            item("implement", after=[2]),
-            item("docs", after=[1, 3]),
-        ]
-        found = self.lock(current, revised, {1, 3})
-        self.assertTrue(
-            any(
-                "3 番目" in d and "先行を変えられない" in d and "いま先行: 1, 2、改版: 2" in d
-                for d in found
-            ),
-            found,
-        )
-
-    def test_a_fixed_number_waiting_on_an_unfixed_one_compares_the_item(self):
-        """子を手で動かした親では、固定した 3 に子の無い 2 が先行することがある。"""
-        current = [
-            item("design"),
-            item("acceptance", after=[1]),
-            item("implement", after=[2]),
-            item("docs", after=[3]),
-        ]
-        revised = [
-            item("design"),
-            item("extra", after=[1]),
-            item("implement", after=[2]),
-            item("docs", after=[3]),
-        ]
-        found = self.lock(current, revised, {1, 3})
-        self.assertTrue(any("2" in d for d in found), found)
-
-    def test_a_defer_taker_moves_only_between_unfixed_numbers(self):
-        # a(1, 延期, 子あり)・x(2)・b(3, a と x が先行) の引き受け手は 3。
-        current = [item("design", "defer"), item("extra"), item("docs", after=[1, 2])]
-        # 振り直して b が 2 番、x が 3 番。引き受け手は 2 番に変わるが、どちらも固定していない。
-        revised = [item("design", "defer"), item("docs", after=[1]), item("extra", after=[2])]
-        self.assertEqual(self.lock(current, revised, {1}), [])
-        # 引き受け手が固定した番号なら、同じでなければ落とす。
-        current = [item("design", "defer"), item("extra", after=[1]), item("docs", after=[2])]
-        revised = [item("design", "defer"), item("extra"), item("docs", after=[1, 2])]
-        found = self.lock(current, revised, {1, 2})
-        self.assertTrue(any("延期の引き受け手" in d for d in found), found)
-
-    def test_differs_compares_definition_review_and_transitive_waits(self):
-        current = parent_of([item("a"), item("b", after=[1]), item("c", after=[2])])
-        copied = parent_of([item("a"), item("b", after=[1]), item("c", after=[1, 2])])
-        self.assertFalse(approval.plan_differs(copied, current))
-        parallel = parent_of([item("a"), item("b", after=[1]), item("c", after=[1])])
-        self.assertTrue(approval.plan_differs(parallel, current))
-        current.feedback = []
-        self.assertTrue(approval.plan_differs(copied, current))
-
 
 class DagApprovalTest(PhaseHarness):
     phases_text = DEFS
@@ -541,17 +63,30 @@ class DagApprovalTest(PhaseHarness):
         super().setUp()
         write(config_path(self.root, "phases"), DEFS)
 
-    def copy(self, name="i0001"):
-        path = os.path.join(self.approved, "doing", name + ".md")
-        t, why = approval.load_copy(path)
-        self.assertIsNotNone(t, why)
-        return t
+    def front(self, name="i0001"):
+        """承認済みチケットの frontmatter。"""
+        with open(os.path.join(self.approved, "doing", name + ".md"), encoding="utf-8") as f:
+            return yaml.safe_load(f.read().split("---\n", 2)[1])
 
-    def scanned(self, name="i0001"):
-        """判定が読むのと同じ走査（`approval.scan`）で読んだ承認済みチケット。"""
-        conf, _ = settings.load(self.root)
-        kept, _ = approval.scan(conf, self.root)
-        return next(t for t in kept if t.ticket == name)
+    def waits(self, name="i0001"):
+        """`--explain` が言う、フェーズごとの先行（番号 → 先行の番号の並び）。"""
+        out = self.ccnavi("--explain").stdout
+        found = {}
+        for number, rest in re.findall(rf"^  {name} フェーズ (\d+)（[^）]*）: (.*)$", out, re.M):
+            tail = rest.rsplit(" / ", 1)[-1]
+            found[int(number)] = (
+                [] if tail == "先行フェーズなし" else [int(n) for n in tail[3:].split(", ")]
+            )
+        return found
+
+    def lint_says(self, name):
+        """`--lint` の、その識別子を名指す error の文。"""
+        problems = json.loads(self.ccnavi("--lint", "--json").stdout)["problems"]
+        return "\n".join(
+            p["detail"]
+            for p in problems
+            if p["severity"] == "error" and (name in p["detail"] or name in p["where"])
+        )
 
     def close_first_phase(self):
         self.propose(
@@ -584,7 +119,7 @@ class DagApprovalTest(PhaseHarness):
 
     def test_parallel_branches_start_together_and_join_waits(self):
         self.family(plan=PLAN)
-        self.assertEqual(self.copy().workflow.waits, {1: [], 2: [1], 3: [1], 4: [1, 2, 3]})
+        self.assertEqual(self.waits(), {1: [], 2: [1], 3: [1], 4: [1, 2, 3]})
         self.close_first_phase()
         result = self.propose_branches()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -636,14 +171,14 @@ class DagApprovalTest(PhaseHarness):
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "phases", "i0001", "workflow.yml"))
         )
-        self.assertEqual(self.scanned().workflow.waits[4], [1, 2, 3])
+        self.assertEqual(self.waits()[4], [1, 2, 3])
 
     def test_a_leftover_workflow_file_is_not_read(self):
         self.family(plan=PLAN)
         held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
         write(held, "order: sequential\nwaits: {1: [], 2: [1], 3: [1, 2], 4: [1, 2, 3]}\n")
         self.commit_parent("leftover")
-        self.assertEqual(self.scanned().workflow.waits[3], [1])
+        self.assertEqual(self.waits()[3], [1])
 
     def test_a_workflow_written_in_a_proposal_is_refused(self):
         text = parent_text("i0001", PLAN).replace(
@@ -660,9 +195,8 @@ class DagApprovalTest(PhaseHarness):
             "title: 親", "workflow: {order: dag, waits: {1: [], 2: [], 3: [], 4: []}}\ntitle: 親"
         )
         self.move_by_hand(text)
-        held = self.scanned()
-        self.assertEqual(held.workflow.waits[4], [1, 2, 3])
-        self.assertIn("workflow", held.blocked)
+        self.assertEqual(self.waits()[4], [1, 2, 3])
+        self.assertIn("workflow", self.lint_says("i0001"))
 
     def test_changing_phases_yml_later_does_not_change_the_waits(self):
         self.family(plan=PLAN)
@@ -676,7 +210,7 @@ class DagApprovalTest(PhaseHarness):
     def test_a_hand_moved_parent_is_read_by_its_after(self):
         """手で動かした承認も、計画の `after` を信じて並行で読む。"""
         self.move_by_hand(parent_text("i0001", PLAN))
-        self.assertEqual(self.scanned().blocked, "")
+        self.assertEqual("", self.lint_says("i0001"))
         self.close_first_phase()
         result = self.propose_branches()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -685,8 +219,7 @@ class DagApprovalTest(PhaseHarness):
     def test_a_hand_moved_broken_plan_stops_the_parent_and_its_children(self):
         broken = parent_text("i0001", ["design", {"type": "extra", "after": []}, "docs"])
         self.move_by_hand(broken)
-        held = self.scanned()
-        self.assertIn("先行していない", held.blocked)
+        self.assertIn("先行していない", self.lint_says("i0001"))
         # 親の範囲はヒットせず、書き込みは止まる。
         denied = self.hook(
             "PreToolUse",
@@ -708,8 +241,7 @@ class DagApprovalTest(PhaseHarness):
         self.move_by_hand(
             child_text("i0001-01-01", "i0001", 1, ["wip/a/*"], review=False), "i0001-01-01"
         )
-        child = self.scanned("i0001-01-01")
-        self.assertIn("計画が不正", child.blocked)
+        self.assertIn("計画が不正", self.lint_says("i0001-01-01"))
         self.start_parent_quietly()
         started = self.ccnavi("ticket", "start", "i0001-01-01")
         self.assertNotEqual(started.returncode, 0)
@@ -721,8 +253,7 @@ class DagApprovalTest(PhaseHarness):
         """形の誤った `after` でも承認済みチケットは読め、判定は理由付きで止める。"""
         broken = parent_text("i0001", ["design", {"type": "docs", "after": [2]}])
         self.move_by_hand(broken)
-        held = self.scanned()
-        self.assertIn("after", held.blocked)
+        self.assertIn("after", self.lint_says("i0001"))
         linted = self.ccnavi("--lint")
         self.assertIn("after", linted.stdout)
 
@@ -748,8 +279,9 @@ class DagApprovalTest(PhaseHarness):
         self.commit_parent("revise")
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual([i.type for i in self.copy().plan][1], "extra")
-        self.assertEqual(self.copy().plan[4].after, [2, 3, 4])
+        plan = self.front()["plan"]
+        self.assertEqual(plan[1]["type"], "extra")
+        self.assertEqual(plan[4]["after"], [2, 3, 4])
 
     def test_a_revision_cannot_change_a_fixed_number(self):
         self.family(plan=PLAN)
@@ -797,7 +329,7 @@ class DagApprovalTest(PhaseHarness):
 
     def test_the_content_check_does_not_trip_on_after(self):
         self.family(plan=PLAN)
-        self.assertEqual([], approval_checks.content_problems(self.copy()))
+        self.assertEqual("", self.lint_says("i0001"))
 
 
 if __name__ == "__main__":

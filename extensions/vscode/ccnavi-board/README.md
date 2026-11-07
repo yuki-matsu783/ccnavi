@@ -11,7 +11,7 @@ ccnaviのチケットが、どのワークツリーでどこまで進んでい�
 | もの | 版 |
 |---|---|
 | VS Code | 1.90以上 |
-| ccnaviの実行ファイル | 探す順は、設定`ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json`が優先）の`CCNAVI_ENTRY_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → ソースがあれば`uv run python -m ccnavi` → PATHの`ccnavi`（絶対パスの項目だけ）。振り分けのsh（名前が`ccnavi-launcher.sh`）を指していれば、shを通さず`../bin/<os>-<arch>/`にあるこのOSとCPU向けの実行ファイルを使い、無ければ次の候補へ進む（Windowsではshを直接起動できないため、shそのものは使わない）。それ以外のパスは、そのまま実行ファイルとして使う |
+| ccnaviの実行ファイル | 探す順は、設定`ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json`が優先）の`CCNAVI_ENTRY_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → PATHの`ccnavi`（絶対パスの項目だけ）。振り分けのsh（名前が`ccnavi-launcher.sh`）を指していれば、shを通さず`../bin/<os>-<arch>/`にあるこのOSとCPU向けの実行ファイルを使い、無ければ次の候補へ進む（Windowsではshを直接起動できないため、shそのものは使わない）。それ以外のパスは、そのまま実行ファイルとして使う |
 | 実行ファイルの版 | 拡張と実行ファイルは同時に配る前提で、起動のときに互換の版を比べて知らせることはしない。使うフラグや機能の有無も事前に確かめず、版のずれは実行ファイルの断りをそのまま見せる（[版のJSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
 | bash | clone / fetch / pullを送るターミナル。承認と未解決の指摘の対応方針はこのターミナルを通らない（子プロセスで打つ。shはこのシェルで走らせる）。WindowsはGit Bash（`C:\Program Files\Git\bin\bash.exe`、無ければPATHの`bash`） |
 | git | PATHにあること。プロジェクト管理画面がoriginを読み、ターミナルでcloneを打つ |

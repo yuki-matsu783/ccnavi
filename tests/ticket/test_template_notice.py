@@ -4,17 +4,16 @@
 
 1. 計画を持つ親が閉じると、`ready` の前に起動の sh で `--templates --draft <親>` を打つ案内が 1 行出る
 2. 出さない: その親の識別子の下書きが在る、同じ計画の形のテンプレートが取り込み済み、
-   子の `finish`、`ready` 済み（材料が退避されて拾えない。`close_notice` が空を返す）
+   子の `finish`、`ready` 済み（材料が退避されて拾えない。
+   go/internal/tickets/sync/drafts が見る）
 3. 案内は出力に足すだけ。終了コードも、閉じる判定も変えない
-4. 案内のとおりに打てば下書きができ、下書きができたあとは案内を出さない
+4. 案内のとおりに打てば下書きができる
 """
 
 from __future__ import annotations
 
 import os
 
-from ccnavi.infra import settings
-from ccnavi.tickets.sync import template_drafts
 from tests import ROOT
 from tests.inproc import run_ccnavi
 from tests.ticket.test_archive import ReadyHarness
@@ -33,10 +32,6 @@ def notice_lines(result):
 
 
 class CloseNoticeTest(ReadyHarness):
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        return conf
-
     def draft_file(self, name="i0001", to="project"):
         """親のツリーの `wip/handoff/` の、テンプレートの下書き 1 本。"""
         layer = "common" if to == "common" else "project"
@@ -52,7 +47,7 @@ class CloseNoticeTest(ReadyHarness):
         )
 
     def common_template(self, name, text):
-        directory = settings.common_templates_dir(self.conf(), self.root)
+        directory = os.path.join(self.root, ".ccnavi", "config", "common", "templates")
         return write(os.path.join(directory, name + ".yml"), text)
 
     def test_a_closed_parent_with_a_plan_says_how_to_make_a_template_in_one_line(self):
@@ -103,7 +98,7 @@ class CloseNoticeTest(ReadyHarness):
 
     def test_a_template_of_the_project_layer_counts_too(self):
         def adopt():
-            directory = settings.layer_templates_dir(self.conf(), self.root)
+            directory = os.path.join(self.root, ".ccnavi", "config", "project", "templates")
             write(os.path.join(directory, "same.yml"), TEMPLATE_SAME)
 
         self.closable(before_close=adopt)
@@ -132,18 +127,3 @@ class CloseNoticeTest(ReadyHarness):
         )
         self.assertEqual(made.returncode, 0, made.stdout + made.stderr)
         self.assertTrue(os.path.isfile(self.draft_file()))
-        self.assertEqual(template_drafts.close_notice(self.conf(), self.root, "i0001"), "")
-
-    def test_the_notice_text_is_a_single_line_with_the_parent(self):
-        self.closable()
-        text = template_drafts.close_notice(self.conf(), self.root, "i0001")
-        self.assertEqual(text.count("\n"), 1)
-        self.assertTrue(text.endswith("\n"))
-
-    def test_after_ready_the_materials_are_gone_so_it_says_nothing(self):
-        fixture = self.closable()
-        self.assertEqual(self.ready(fixture).returncode, 0)
-        self.assertEqual(template_drafts.close_notice(self.conf(), self.root, "i0001"), "")
-
-    def test_an_unknown_parent_says_nothing(self):
-        self.assertEqual(template_drafts.close_notice(self.conf(), self.root, "nothing"), "")

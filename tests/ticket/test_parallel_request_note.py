@@ -1,7 +1,7 @@
 """レビュー準備中・レビュー待ちの間の、新しい依頼についての案内。
 
 案内だけで、セッション単位で機械的に止める仕組みではない。止める（サブエージェントの起動とシェル
-実行）のは今までどおり、その親の cwd からだけ。案内は、止めたときの文（`phase.hold_reason`）と、
+実行）のは今までどおり、その親の cwd からだけ。案内は、止めたときの文と、
 `request` が成功したときの出力に添える。
 """
 
@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import unittest
 
-from ccnavi.tickets.phase import gates as phase
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticketsample import child_text
 
@@ -32,10 +31,6 @@ class ParallelRequestNoteTest(PhaseHarness):
         self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
         self.commit_parent("close 01")
         self.merge("i0001-01-01")
-
-    def test_the_constant_says_it_is_a_guide_and_names_what_stays_allowed(self):
-        for part in PARTS:
-            self.assertIn(part, phase.PARALLEL_REQUEST_NOTE)
 
     def test_the_hold_text_has_the_note_before_and_after_the_request(self):
         self.closed_phase()

@@ -2,8 +2,8 @@
 
 見るのは次のとおり。
 
-1. 読み込み: 書式、未知の欄の warn、読んで書いても中身が変わらない往復、フローと同じ読み手の保護
-   （リンク・ハードリンク・大きさ・別名・UTF-8）
+1. 読み込み: フローと同じ読み手の保護（リンク・ハードリンク・大きさ）。書式・往復・別名・UTF-8 と
+   新しく作る名前の検査は go/internal/tickets/proposal/templates が見る
 2. 2 層の統合結果: 全欄が同じなら info でレイヤーの側を破棄する、中身が違えば error で
    レイヤーの側だけを使わない、壊れた共通は空にしてレイヤーを使う
 3. 検査: 順序（終端・延期の引き受け手・`after` の範囲）は error、型 id・kind の食い違いは warn、
@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -22,15 +23,14 @@ import shutil
 import tempfile
 import unittest
 
-import yaml
-
-from ccnavi.tickets.proposal import plan_templates
 from tests import ROOT, common_path, config_path, requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import write
 from tests.ticketsample import PHASES
 
 FIXTURE = os.path.join(ROOT, "tests", "fixtures", "templates-json.json")
+# `--templates --json` の答えの形の版。
+JSON_VERSION = 1
 
 FLOW = """\
     id: wf-impl
@@ -82,7 +82,7 @@ class Harness(unittest.TestCase):
         write(common_path(self.root, "phases"), PHASES)
 
     def common(self, name: str, text: str) -> str:
-        return write(self.path(plan_templates.LAYER_COMMON, name), text)
+        return write(self.path("common", name), text)
 
     def own(self, name: str, text: str) -> str:
         return write(self.path("self", name), text)
@@ -113,129 +113,6 @@ class Harness(unittest.TestCase):
 
     def problems(self, row: dict, severity: str) -> list[str]:
         return [p["detail"] for p in row["problems"] if p["severity"] == severity]
-
-
-class ReadTest(unittest.TestCase):
-    def test_a_minimal_template_is_read(self):
-        t, notes = plan_templates.parse_template(RESEARCH.encode(), "research")
-        self.assertEqual(notes, [])
-        self.assertEqual([i.type for i in t.plan], ["research", "design"])
-        self.assertEqual(t.plan[1].after, [1])
-        self.assertEqual(t.feedback, [])
-        self.assertEqual(t.flows, {})
-
-    def test_unknown_fields_are_warned_and_kept(self):
-        text = RESEARCH + "owner: someone\n"
-        t, notes = plan_templates.parse_template(text.encode(), "research")
-        self.assertEqual([(p.severity, "owner" in p.detail) for p in notes], [("warn", True)])
-        self.assertEqual(t.extra, {"owner": "someone"})
-        self.assertIn("owner: someone", plan_templates.dump(t))
-
-    def test_the_name_must_match_the_file(self):
-        t, notes = plan_templates.parse_template(RESEARCH.encode(), "other")
-        self.assertIsNone(t)
-        self.assertIn("ファイル名", notes[0].detail)
-
-    def test_required_fields(self):
-        for text, needle in (
-            ("name: a\nplan: [x]\n", "description"),
-            ("name: a\ndescription: d\n", "`plan` がありません"),
-            ("name: a\ndescription: d\nplan: []\n", "`plan` が空"),
-            ("name: a\ndescription: d\nplan: [x]\nflows: [1]\n", "マッピング"),
-            ("name: a\ndescription: d\nplan: [x]\nflows: {a: {}}\n", "添字"),
-            ("name: a\ndescription: d\nplan: [{type: x, after: 1}]\n", "after"),
-            ("name: a\ndescription: d\nplan: [{type: x, after: [true]}]\n", "after"),
-            ("- a\n", "マッピング"),
-        ):
-            t, notes = plan_templates.parse_template(text.encode(), "a")
-            self.assertIsNone(t, text)
-            self.assertTrue(any(needle in p.detail for p in notes), (text, notes))
-
-    def test_reading_then_writing_keeps_the_content(self):
-        t, notes = plan_templates.parse_template((FEATURE + "owner: x\n").encode(), "feature")
-        self.assertFalse([p for p in notes if p.severity == "error"])
-        text = plan_templates.dump(t)
-        again, _ = plan_templates.parse_template(text.encode(), "feature")
-        self.assertEqual(again, t)
-        self.assertEqual(plan_templates.dump(again), text)
-        # 同じ中身は、書き方が違っても同じ書き戻しになる。
-        loose = FEATURE.replace("  - design\n", "  - {type: design}\n")
-        other, _ = plan_templates.parse_template(loose.encode(), "feature")
-        same, _ = plan_templates.parse_template(FEATURE.encode(), "feature")
-        self.assertEqual(plan_templates.dump(other), plan_templates.dump(same))
-
-    PROMPTS = (
-        "一行目\n二行目\n",
-        "一行目\n二行目",
-        "段落\n\n次の段落\n",
-        "日本語: コロン\n- ハイフン\n# 見出し\n'q' \"d\"\n",
-        # literal にできない: 行末の空白、先頭の空白・改行、末尾の空行、タブ、制御文字、復帰。
-        "行末の空白 \n次\n",
-        "  先頭の空白\n次\n",
-        "\n先頭の改行\n",
-        "末尾の空行\n\n",
-        "tab\there\n次\n",
-        "esc\x1b\n次\n",
-        "a\r\nb\n",
-        "幅ゼロ\u200b\n次\n",
-        "改行なし",
-    )
-
-    def test_multiline_strings_are_written_as_literal_blocks_and_round_trip(self):
-        for prompt in self.PROMPTS:
-            with self.subTest(prompt=prompt):
-                body = {"id": "x", "name": "n", "nodes": [{"id": "p", "data": {"prompt": prompt}}]}
-                t = plan_templates.Template(
-                    name="t",
-                    description="d",
-                    plan=[plan_templates.Item("design")],
-                    flows={1: body},
-                )
-                text = plan_templates.dump(t)
-                again, notes = plan_templates.parse_template(text.encode(), "t")
-                self.assertIsNotNone(again, notes)
-                self.assertEqual(again, t)
-                self.assertEqual(again.flows[1]["nodes"][0]["data"]["prompt"], prompt)
-                self.assertEqual(plan_templates.dump(again), text)
-                literal = "prompt: |" in text
-                self.assertEqual(literal, plan_templates._literal_ok(prompt), text)
-        # 読める形で出る。
-        t = plan_templates.Template(
-            name="t",
-            description="d",
-            plan=[plan_templates.Item("design")],
-            flows={1: {"nodes": [{"data": {"prompt": "一行目\n二行目\n"}}]}},
-        )
-        self.assertIn("prompt: |\n", plan_templates.dump(t))
-        self.assertIn("\n          一行目\n          二行目\n", plan_templates.dump(t))
-
-    def test_the_flow_text_uses_the_same_literal_blocks(self):
-        body = {"id": "x", "nodes": [{"id": "p", "data": {"prompt": "a\nb\n"}}]}
-        text, why = plan_templates.dump_flow(body)
-        self.assertEqual(why, "")
-        self.assertIn("prompt: |", text)
-        self.assertEqual(yaml.safe_load(text), body)
-
-    def test_string_flow_keys_are_read_as_numbers(self):
-        text = FEATURE.replace("\n  2:\n", '\n  "2":\n')
-        t, _ = plan_templates.parse_template(text.encode(), "feature")
-        self.assertEqual(list(t.flows), [2])
-
-    def test_aliases_and_bad_bytes_are_refused(self):
-        alias = "name: a\ndescription: &d x\nplan: [a]\nwhen: *d\n"
-        t, notes = plan_templates.parse_template(alias.encode(), "a")
-        self.assertIsNone(t)
-        self.assertIn("別名", notes[0].detail)
-        t, notes = plan_templates.parse_template(b"name: \xff\xfe\n", "a")
-        self.assertIsNone(t)
-        self.assertIn("UTF-8", notes[0].detail)
-        t, notes = plan_templates.parse_template(b"name: [\n", "a")
-        self.assertIsNone(t)
-        self.assertIn("YAML", notes[0].detail)
-
-    def test_a_bom_is_dropped(self):
-        t, _ = plan_templates.parse_template(b"\xef\xbb\xbf" + RESEARCH.encode(), "research")
-        self.assertIsNotNone(t)
 
 
 class LayerTest(Harness):
@@ -444,58 +321,6 @@ class CheckTest(Harness):
         self.assertEqual(self.problems(row, "error"), [])
         self.assertEqual(len(self.problems(row, "warn")), 1)
 
-    def test_the_limit_counts_the_plan_and_the_feedback_plan_together(self):
-        def chain(count: int, kind: str) -> list:
-            return [
-                plan_templates.Item(kind, after=[i - 1] if i > 1 else [])
-                for i in range(1, count + 1)
-            ]
-
-        def errors(plan: int, feedback: int) -> list[str]:
-            t = plan_templates.Template(
-                name="t",
-                description="d",
-                plan=chain(plan, "design"),
-                feedback=chain(feedback, "implement-feedback"),
-            )
-            return [p.detail for p in plan_templates.check(t, None, None) if p.severity == "error"]
-
-        for plan, feedback in ((99, 0), (60, 39), (59, 40), (1, 98)):
-            with self.subTest(plan=plan, feedback=feedback):
-                self.assertEqual(errors(plan, feedback), [])
-        for plan, feedback in ((100, 0), (98, 2), (60, 40), (1, 99)):
-            with self.subTest(plan=plan, feedback=feedback):
-                found = errors(plan, feedback)
-                self.assertTrue(any("上限 99 ステップ" in d for d in found), found)
-
-    def test_hidden_characters_anywhere_in_the_strings_are_an_error(self):
-        flow_body = {"id": "x", "name": "n", "nodes": [{"id": "p", "data": {"prompt": "a\u200bb"}}]}
-        for where in ("description", "when", "flow"):
-            with self.subTest(where=where):
-                t = plan_templates.Template(
-                    name="t", description="d", when="w", plan=[plan_templates.Item("design")]
-                )
-                if where == "flow":
-                    t.flows = {1: flow_body}
-                else:
-                    setattr(t, where, "x\u202ey")
-                found = plan_templates.check(t, None, None)
-                self.assertTrue(
-                    any(
-                        p.severity == "error" and "制御文字・書式文字が含まれている" in p.detail
-                        for p in found
-                    )
-                )
-                # 苦情の文面に生の文字は出ない。
-                self.assertFalse(any("\u202e" in p.detail or "\u200b" in p.detail for p in found))
-        # 改行とタブは対象外。
-        t = plan_templates.Template(
-            name="t", description="a\tb\nc", plan=[plan_templates.Item("design")]
-        )
-        self.assertEqual(
-            [p for p in plan_templates.check(t, None, None) if p.severity == "error"], []
-        )
-
     def test_a_changed_definition_only_warns(self):
         # 型が phases.yml から消えても、読むのも一覧も止まらない（使うときの承認で error になる）。
         self.own("feature", FEATURE)
@@ -565,7 +390,7 @@ class CliTest(Harness):
         shown = json.loads(self.ccnavi("--templates", "--show", "feature", "--json").stdout)
         self.assertEqual(shown["template"]["name"], "feature")
         self.assertEqual(shown["template"]["text"], FEATURE)
-        self.assertEqual(shown["template"]["sha"], plan_templates.digest(FEATURE.encode()))
+        self.assertEqual(shown["template"]["sha"], hashlib.sha256(FEATURE.encode()).hexdigest())
 
     def test_show_of_an_unknown_name_fails(self):
         out = self.ccnavi("--templates", "--show", "nothing")
@@ -584,7 +409,7 @@ class CliTest(Harness):
                 answer = json.loads(out.stdout)
                 self.assertFalse(answer["ok"])
                 self.assertTrue(answer["error"])
-                self.assertEqual(answer["version"], plan_templates.JSON_VERSION)
+                self.assertEqual(answer["version"], JSON_VERSION)
                 self.assertEqual(out.stderr, "")
 
     def test_sums_use_the_same_dropped_shape_as_the_templates(self):
@@ -737,7 +562,7 @@ class CheckFileTest(Harness):
         self.assertTrue(got["ok"])
         self.assertTrue(got["valid"])
         self.assertEqual(got["name"], "feature")
-        self.assertEqual(got["sha"], plan_templates.digest(FEATURE.encode()))
+        self.assertEqual(got["sha"], hashlib.sha256(FEATURE.encode()).hexdigest())
         self.assertEqual(got["problems"], [])
         self.assertEqual(got["data"]["plan"], ["design", {"type": "implement", "after": [1]}])
         self.assertEqual(list(got["data"]["flows"]), ["2"])
@@ -854,41 +679,6 @@ class ShapeTest(unittest.TestCase):
         if isinstance(value, dict):
             return {k: cls.plain(v) for k, v in value.items()}
         return value
-
-
-class NewNameTest(unittest.TestCase):
-    """新しく作る名前の検査。読み込みの側（`NAME_RE`）は変えない。"""
-
-    def test_usable_names_pass(self):
-        for name in ("feature", "a", "full-phases", "v1.2_x", "console", "com10", "A" * 64):
-            self.assertEqual(plan_templates.new_name_problem(name), "", name)
-
-    def test_windows_reserved_names_and_trailing_period_are_refused(self):
-        bad = (
-            "con",
-            "CON",
-            "prn",
-            "aux",
-            "nul",
-            "com1",
-            "COM9",
-            "lpt1",
-            "lpt9",
-            "con.x",
-            "nul.tar.gz",
-            "a.",
-            "a..",
-        )
-        for name in bad:
-            self.assertNotEqual(plan_templates.new_name_problem(name), "", name)
-
-    def test_the_old_shape_is_still_refused(self):
-        for name in ("", "-x", "a b", "a/b", "A" * 65):
-            self.assertNotEqual(plan_templates.new_name_problem(name), "", name)
-
-    def test_reading_still_accepts_what_it_accepted(self):
-        for name in ("con", "a."):
-            self.assertTrue(plan_templates.NAME_RE.match(name), name)
 
 
 if __name__ == "__main__":

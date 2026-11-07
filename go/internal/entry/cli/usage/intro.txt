@@ -1,0 +1,11 @@
+ccnaviはエージェントのツール呼び出しを制御し、より安全な操作へ誘導します。
+
+通常はフックとして実行します。標準入力からフックのJSONデータを1件読み込み、
+処理結果を標準出力に出力します。
+
+ツールの実行前に呼び出しを判定するには、PreToolUseに登録してください。
+実行後に保護対象ファイルへの変更を確認するには、PostToolUseにも登録してください。
+動作確認は次のように行います。
+
+    echo '{"hook_event_name":"PreToolUse","tool_name":"Bash",
+           "tool_input":{"command":"git push"}}' | ccnavi

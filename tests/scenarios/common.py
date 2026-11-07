@@ -4,9 +4,10 @@
 """
 
 import json
+import os
 from pathlib import Path
 
-from ccnavi.records import diaglog
+from tests import diaglog
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -54,6 +55,14 @@ class Refusal(Exception):
 
     def __str__(self):
         return "\n".join([self.what, *[f"案内: {n}" for n in self.notes], f"次: {self.next_line}"])
+
+
+def fold(path):
+    """パスと名前を比べる形。区切りは機械のもの、大文字小文字はどの機械でも区別しない。
+
+    実行ファイルの pathcase.Fold と同じ比べ方。
+    """
+    return os.path.normcase(str(path)).casefold()
 
 
 def log(root):

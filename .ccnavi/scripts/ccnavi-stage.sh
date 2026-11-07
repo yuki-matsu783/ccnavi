@@ -135,7 +135,7 @@ load_aliases
 
 # 元の相対パス <$1> の各要素（階層名）を表で読み替え、下書きの置き場の中の相対パスを ad_out に入れる。
 # 予約した名前（表の下書きでの名前）の要素があれば、その要素を ad_reserved に入れる（無ければ空）。
-# 比べ方は大文字小文字を区別しない ASCII だけ（Python 側は非 ASCII の要素を表に当てない）。
+# 比べ方は大文字小文字を区別しない ASCII だけ（実行ファイル側は非 ASCII の要素を表に当てない）。
 scan_parts() {
 	ad_out=""
 	ad_reserved=""
@@ -224,8 +224,8 @@ relative_of() {
 }
 
 # 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・messages・layer-config・docs・defense）なら 0。
-# 表は src/ccnavi/tickets/sync/handoff.py の KINDS（表の外は 1）。
-# 比べ方は ASCII の大文字小文字を区別しない（Python 側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
+# 表は go/internal/tickets/sync/handoff/kinds.go の kinds（表の外は 1）。
+# 比べ方は ASCII の大文字小文字を区別しない（実行ファイル側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
 is_importable() {
 	im_k=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
 	im_b=$im_k

@@ -1,5 +1,5 @@
 /**
- * Chrome からの残った指摘の対応方針（decide）の試験。模擬の GitHub・GitLab と、Node 上の Pyodide（拡張と同じ zip）を使う。
+ * Chrome からの残った指摘の対応方針（decide）の試験。模擬の GitHub・GitLab と、Node の上の WASM（拡張と同じ dist/ccnavi.wasm）を使う。
  * 読む（preview）から、ホストへ書く（issue・返信・解決）、親のブランチへの 1 コミット、MR へのコメントまでを通す。
  *
  * - 一気通貫: keep・issue・fix の混在、全 fix（ホストに書かない）、0 件（レビュー済み）。書いた順は issue → 返信 → 解決 → コミット → コメント
@@ -11,7 +11,7 @@ import { before, test } from "node:test";
 import assert from "node:assert/strict";
 
 import { sayDecide, type DecideOutcome } from "../src/board/controller.js";
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import type { DecideChoice, DecidePreview } from "../src/core/reviewed.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { decidePhase, decidePreview, type WriteDeps } from "../src/core/write.js";
@@ -19,11 +19,11 @@ import { fixture, NOW, requestedMark, reviewFamilyFiles } from "./fixtures/repo.
 import { deps, GITLAB_REPO, hostCall, memoryCache, newStats, REPOS } from "./helpers/host.js";
 import { TOKEN } from "./helpers/mock-github.js";
 import { thread, WriteGitHub, WriteGitLab, type MockThread } from "./helpers/mock-write.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 
 const FAMILY = "i0004";
@@ -65,7 +65,7 @@ function world(kind: Kind, threads: MockThread[]): World {
   const base = { ...deps(mock, TOKENS, new Map(), () => new Date(NOW), [GH_REPO, GITLAB_REPO]), sleep: noWait };
   const d: WriteDeps = {
     call: hostCall(base, stats, kind === "github" ? "github.com" : "gitlab.com"),
-    py,
+    ccnavi,
     cache: memoryCache(),
     now: () => new Date(NOW),
     stats,

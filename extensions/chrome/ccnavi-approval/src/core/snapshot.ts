@@ -5,19 +5,19 @@
  * 流れは次のとおり。
  *
  * 1. 統合先を決める（設定か、ホストのデフォルトブランチ）。設定したブランチが無ければ止める
- * 2. 置き場のパスを Python に出させる（既定に固定。統合先の `.claude/settings.json` の `env` は読まない）
- * 3. 統合先の `done/`・共通レイヤー・自身のレイヤー・互換のマーカーを読む。互換の比べは Python
- * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、親子のチケットを Python に見分けさせる
- * 5. 親子のチケットごとに、参照の閉包の足りないブランチを読み足し、Python に承認待ちを出させる。
+ * 2. 置き場のパスを ccnavi に出させる（既定に固定。統合先の `.claude/settings.json` の `env` は読まない）
+ * 3. 統合先の `done/`・共通レイヤー・自身のレイヤー・互換のマーカーを読む。互換の比べは ccnavi
+ * 4. 直近 N 日とユーザの指定のブランチ（表示用）の置き場を読み、親子のチケットを ccnavi に見分けさせる
+ * 5. 親子のチケットごとに、参照の閉包の足りないブランチを読み足し、ccnavi に承認待ちを出させる。
  *    判定の入力は統合先・`P`・閉包の `P_X` だけ。表示用のブランチは入れない
- * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、Python の
+ * 6. 依頼済みでまだレビュー済みでないフェーズがあれば、MR のスレッドとレビューを読んで、ccnavi の
  *    `confirm` に通るかを聞く
  *
  * blob は sha で引き、キャッシュ（IndexedDB）にあれば読まない。判定はここでは出さない。
  */
 import type { PathObject, RecentRef, TreeEntry, BlobText } from "./github.js";
 import { BLOB_BATCH, LINK_MODE } from "./github.js";
-import { py, type BoardResult, type Branch, type Compat, type Family, type Placement, type PyCall, type Snapshot, type Workspace } from "./py.js";
+import { ccnavi, type BoardResult, type Branch, type Compat, type Family, type Placement, type CcnaviCall, type Snapshot, type Workspace } from "./ccnavi.js";
 import { reviewPanels, type ReviewPanel } from "./reviewed.js";
 import type { RepoConfig } from "./settings.js";
 
@@ -38,7 +38,7 @@ export interface Stats {
 
 export interface Deps {
   readonly call: HostCall;
-  readonly py: PyCall;
+  readonly ccnavi: CcnaviCall;
   readonly cache: BlobCache;
   readonly now: () => Date;
   /** 呼んだ回数を数える（service worker が返す数を足す） */
@@ -136,7 +136,7 @@ export class Reader {
       const obj = objects[p];
       if (!obj) continue;
       if (obj.type === "link") {
-        // シンボリックリンク（GitLab が mode で見分けたもの）は読まない。Python が「決まらない」にする
+        // シンボリックリンク（GitLab が mode で見分けたもの）は読まない。ccnavi が「決まらない」にする
         if (!links.includes(p)) links.push(p);
       } else if (obj.type === "blob") {
         wanted.push({ path: p, sha: obj.oid });
@@ -144,7 +144,7 @@ export class Reader {
         // GitLab は tree の sha でなく、コミットとパスで引く
         const entries = await this.call<TreeEntry[]>("tree", obj.oid, head, p);
         for (const e of entries) {
-          // シンボリックリンクは中身（指す先のパス）をファイルとして読まない。Python が「決まらない」にする
+          // シンボリックリンクは中身（指す先のパス）をファイルとして読まない。ccnavi が「決まらない」にする
           if (e.mode === LINK_MODE) {
             if (!links.includes(`${p}/${e.path}`)) links.push(`${p}/${e.path}`);
           } else {
@@ -225,15 +225,15 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
   if (repo.project) return await readProjectIntegration(repo, reader, deps);
   const integration = await integrationOf(repo, reader, "");
   const { name, head } = integration;
-  const place: Placement = await py.placement(deps.py);
+  const place: Placement = await ccnavi.placement(deps.ccnavi);
   await reader.read(name, head, [...place.integration_paths, ...place.integration_files]);
-  const compat = await py.compat(deps.py, reader.snapshot(integration));
+  const compat = await ccnavi.compat(deps.ccnavi, reader.snapshot(integration));
   return { integration, place, compat };
 }
 
 /**
  * プロジェクトのリポジトリ: 置き場のパスは既定に固定。共通レイヤー・設定・互換のマーカーはワークスペースの統合先から、
- * 閉じたもの（`done/`）とプロジェクトのレイヤーはプロジェクトの統合先から読む。プロジェクトのレイヤーの計算は Python
+ * 閉じたもの（`done/`）とプロジェクトのレイヤーはプロジェクトの統合先から読む。プロジェクトのレイヤーの計算は ccnavi
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   const ws = deps.workspace;
@@ -242,13 +242,13 @@ async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: De
   }
   const wsReader = new Reader(ws.repo, { ...deps, call: ws.call, workspace: undefined });
   const wsInteg = await integrationOf(ws.repo, wsReader, "ワークスペースの");
-  const place: Placement = await py.placement(deps.py);
+  const place: Placement = await ccnavi.placement(deps.ccnavi);
   const wsBranch = await wsReader.read(wsInteg.name, wsInteg.head, [...place.workspace_paths, ...place.workspace_files]);
   reader.project = repo.project;
   reader.workspace = { integration: wsInteg, files: wsBranch.files, binary: wsBranch.binary, links: wsBranch.links ?? [] };
   const integration = await integrationOf(repo, reader, "");
   await reader.read(integration.name, integration.head, place.project_paths);
-  const compat = await py.compat(deps.py, reader.snapshot(integration));
+  const compat = await ccnavi.compat(deps.ccnavi, reader.snapshot(integration));
   return { integration, place, compat };
 }
 
@@ -281,7 +281,7 @@ export async function collectRepo(repo: RepoConfig, deps: Deps): Promise<RepoBoa
     for (const c of candidates) {
       await reader.read(c, heads.get(c) as string, place.branch_paths);
     }
-    const families = await py.families(deps.py, reader.snapshot(integration), candidates);
+    const families = await ccnavi.families(deps.ccnavi, reader.snapshot(integration), candidates);
     rememberHints(repo, families);
 
     // 5. 親子のチケットごとの承認待ち
@@ -305,9 +305,9 @@ async function closureInput(
   hints?: Readonly<Record<string, string>>,
 ): Promise<Snapshot> {
   const withHints = (snap: Snapshot): Snapshot => (hints ? { ...snap, hints } : snap);
-  // 閉包の足りない親子のチケットを読み足す。無いブランチは `absent` に入り、Python が決める
+  // 閉包の足りない親子のチケットを読み足す。無いブランチは `absent` に入り、ccnavi が決める
   for (let round = 0; round < 32; round += 1) {
-    const closure = await py.closure(deps.py, withHints(reader.snapshot(integration)), family);
+    const closure = await ccnavi.closure(deps.ccnavi, withHints(reader.snapshot(integration)), family);
     if (closure.over_limit || closure.need.length === 0) break;
     for (const n of closure.need) {
       const sha = await reader.head(n);
@@ -316,8 +316,8 @@ async function closureInput(
   }
   // 判定の入力は統合先・P・閉包だけ。表示用のブランチを混ぜないよう、ここで絞る
   const all = withHints(reader.snapshot(integration));
-  const closure = await py.closure(deps.py, all, family);
-  // 同じ親子のチケットを宣言するブランチの確かめ（rivals）も残す。判定の入力には Python が入れない
+  const closure = await ccnavi.closure(deps.ccnavi, all, family);
+  // 同じ親子のチケットを宣言するブランチの確かめ（rivals）も残す。判定の入力には ccnavi が入れない
   const keep = new Set([integration.name, ...closure.families, ...(closure.rivals ?? [])]);
   const branches: Record<string, Branch> = {};
   for (const [k, v] of Object.entries(all.branches)) if (keep.has(k)) branches[k] = v;
@@ -337,10 +337,10 @@ async function familyBoard(
       return { family, result: null, error: family.conflict };
     }
     const input = await closureInput(family.name, reader, integration, place, deps, familyHints.get(hintKey(reader.repoConfig)));
-    const board = await py.board(deps.py, input, family.name);
+    const board = await ccnavi.board(deps.ccnavi, input, family.name);
     const reviews = await reviewPanels(
       board.reviewable ?? [],
-      deps.py,
+      deps.ccnavi,
       (op, args) => reader.call(op, ...args),
       { snapshot: input, family: family.name },
       deps.now(),

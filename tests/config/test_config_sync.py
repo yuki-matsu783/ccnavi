@@ -23,17 +23,16 @@ app は `.ccnavi/` を持たない。
    実行後チェックとバックアップと復元が戻さず、報告もしない。
    ツール呼び出しの中でミラーが書き換わったら、今までどおり戻す
 5. 差分が無いときは何も読み書きしない（指紋が前と同じ）。元か先が動けば、検証つきで比べ直す
+
+写す一覧の組み方（同じスクリプトは 1 回、読む前に消えたものは止める）と、
+書けなかったときに戻すことは、Go のテスト（go/internal/tickets/sync/mirror）が確かめる。
 """
 
 from __future__ import annotations
 
 import json
 import os
-from unittest import mock
 
-from ccnavi.infra import settings
-from ccnavi.tickets.config import risk
-from ccnavi.tickets.sync import configsync, promptsync, skillsync
 from tests import ROOT, phasecopy
 from tests.config.test_config_union import (
     COMMON_PHASES,
@@ -68,7 +67,13 @@ def mirror_of(tree_root, name):
 
 
 def config_of(tree_root, kind):
-    return os.path.join(tree_root, ".ccnavi", "config", "project", settings.LAYER_FILE_NAMES[kind])
+    return os.path.join(
+        tree_root,
+        ".ccnavi",
+        "config",
+        "project",
+        {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}[kind],
+    )
 
 
 class Started:
@@ -126,10 +131,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         started = self.start_ticket(name)
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         return tree, started
-
-    def settings(self):
-        conf, _ = settings.load(self.ws)
-        return conf
 
     def add_script(self):
         write(self.risk, COMMON_SCRIPT_RISK)
@@ -202,7 +203,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
     def test_a_common_template_is_mirrored_and_kept_by_the_next_plan(self):
         """1: 共通のテンプレートもコピーする。ミラーに置いたものが次の着手で消されない。"""
-        conf = self.settings()
         self.add_template()
         write(
             os.path.join(self.ws, ".ccnavi", "config", "common", "templates", ".hidden.yml"),
@@ -220,9 +220,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         # `.yml` でないものと、`.` で始まるものは、テンプレートとして読まれないのでコピーしない。
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/notes.txt")))
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/.hidden.yml")))
-        # コピー終えたあとの次の計画は、何も変えない（ミラーに在るテンプレートを消さない）。
-        changes, why = configsync.plan(conf, self.ws, tree)
-        self.assertEqual((changes, why), ([], ""))
+        # 次の発言は、ミラーに在るテンプレートを消さない。
+        self.prompt()
+        self.assertEqual(read(mirror_of(tree, "templates/feature.yml")), FEATURE_TEMPLATE)
 
     def test_the_mirrored_template_is_read_as_the_common_one_in_a_single_clone(self):
         """1: 単体 clone では、ミラー（`config/common/`）が共通として `--templates` に読まれる。"""
@@ -306,27 +306,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
         # ほかの設定のミラーはコピーされる。
         self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
-
-    def test_a_script_shared_by_two_factors_is_mirrored_once(self):
-        """1: 2 つの項目が同じスクリプトを指しても、コピーするのは 1 回。"""
-        self.add_script()
-        write(
-            self.risk,
-            COMMON_SCRIPT_RISK
-            + "  - {id: again, points: 2, script: .ccnavi/config/common/scripts/count.sh,"
-            " message: もう一度}\n",
-        )
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-
-        changes, why = configsync.plan(self.settings(), self.ws, tree)
-
-        self.assertEqual(why, "")
-        rels = [c.rel for c in changes]
-        self.assertEqual(rels.count(".ccnavi/config/common/scripts/count.sh"), 1, rels)
 
     def test_files_gone_from_the_common_layer_are_removed_from_the_mirror(self):
         """1: 共通レイヤーから無くなったファイルは、ミラーからも消す。config は消さない。"""
@@ -489,7 +468,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertTrue(os.path.exists(mirror_of(tree, "rules.yml")))
         self.assertFalse(os.path.exists(mirror_of(tree, "phases.yml")))
-        self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
+        self.assertEqual(read(config_of(tree, "phases")), LIB_PHASES)
 
     def test_a_common_phases_file_is_mirrored(self):
         """1: 共通レイヤーの phases.yml もミラーへコピーする。config の phases.yml には触れない。"""
@@ -504,7 +483,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertEqual(read(mirror_of(tree, "phases.yml")), COMMON_PHASES)
-        self.assertEqual(read(config_of(tree, settings.KIND_PHASES)), LIB_PHASES)
+        self.assertEqual(read(config_of(tree, "phases")), LIB_PHASES)
 
     def test_a_common_phases_file_the_mirror_cannot_hold_is_reported_and_the_start_goes_on(self):
         """3: フェーズ定義として読めない共通レイヤーの phases.yml はコピーせず、
@@ -536,28 +515,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertIn("count.sh", started.stdout + started.stderr)
         self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
-
-    def test_a_common_file_that_vanishes_after_listing_stops_the_plan(self):
-        """3: 読む前に消えた共通レイヤーのスクリプトは、空としてコピーせずに止める。"""
-        conf = self.settings()
-        self.add_script()
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-        real = configsync._read_strict
-
-        def vanished(path):
-            if path.endswith("count.sh"):
-                return None, ""
-            return real(path)
-
-        with mock.patch.object(configsync, "_read_strict", vanished):
-            changes, why = configsync.plan(conf, self.ws, tree)
-
-        self.assertEqual(changes, [])
-        self.assertIn("を読めない (無い)", why)
 
     def symlink_or_skip(self, source, link):
         """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。"""
@@ -604,36 +561,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         self.assertEqual(os.listdir(elsewhere), [])
-
-    def test_a_failed_write_puts_everything_back(self):
-        """3: 1 本でも書けなければ、した分を元に戻す（書いた分も、消した分も）。"""
-        conf = self.settings()
-        write(mirror_of(self.lib, "scripts/old.sh"), "old\n")
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "--quiet", "-m", "old mirror")
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-        changes, why = configsync.plan(conf, self.ws, tree)
-        self.assertEqual(why, "")
-        deleted = [c for c in changes if c.deletes]
-        written = [c for c in changes if not c.deletes]
-        self.assertTrue(deleted and len(written) >= 2)
-        # 最後に書く 1 本の行き先をディレクトリにして、置き換えを失敗させる。
-        ordered = [*written, *deleted]
-        last = written[-1]
-        os.makedirs(os.path.join(last.target, "x"))
-        run = [*[c for c in changes if c is not last], last]
-
-        failed = configsync.apply(run)
-
-        self.assertIn("戻した", failed)
-        self.assertEqual(read(mirror_of(tree, "scripts/old.sh")), "old\n")
-        for c in written[:-1]:
-            self.assertFalse(os.path.exists(c.target), c.rel)
-        self.assertEqual(len(ordered), len(changes))
 
     def test_post_monitor_does_not_report_the_mirror(self):
         """4: 発言でコピーした分は受け入れの対象になり、繰り返し報告しない。
@@ -747,28 +674,13 @@ class ConfigMirrorTest(ConfigUnionHarness):
                 os.path.join(self.lib, *rel.split("/")), read(os.path.join(tree, *rel.split("/")))
             )
 
-        definition, problems = risk.layer_definition(self.settings(), self.ws, "lib")
+        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
 
-        ids = [f.id for f in definition.factors]
+        ids = [f["id"] for f in sums["lib"]["risk"]["factors"]]
         self.assertEqual(ids.count("counted"), 1, ids)
-        self.assertFalse([p for p in problems if p.severity == "warn"], problems)
+        self.assertEqual(sums["lib"]["risk"]["problems"], [])
 
     # 発言ごとの同期（差分が無ければ読み書きしない）
-
-    def test_a_prompt_with_nothing_to_sync_neither_reads_nor_writes(self):
-        """5: 元も先も動いていなければ、検証つきの比べ直しも書き込みもしない。"""
-        tree, _ = self.start_parent()
-        target = mirror_of(tree, "rules.yml")
-        before = os.stat(target).st_mtime_ns
-
-        with (
-            mock.patch.object(configsync, "plan", side_effect=AssertionError("比べ直した")),
-            mock.patch.object(skillsync, "plan", side_effect=AssertionError("比べ直した")),
-        ):
-            lines = promptsync.sync(self.settings(), self.ws)
-
-        self.assertEqual(lines, [])
-        self.assertEqual(os.stat(target).st_mtime_ns, before)
 
     def test_a_change_in_the_common_layer_reaches_the_mirror_at_the_next_prompt(self):
         """5: ターンの間にユーザが共通レイヤーを直すと、次の発言でコピーされ、戻されない。"""
@@ -827,36 +739,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertNotEqual(read(mirror_of(tree, "risks.yml")), text)
         self.assertEqual(read(mirror_of(tree, "risks.yml")), read(source))
-
-    def test_a_source_that_moves_while_comparing_is_not_remembered(self):
-        """5: 比べている間に元が動いたら「揃った」と記録せず、次の発言で比べ直す。"""
-        tree, _ = self.start_parent()
-        write(self.risk, COMMON_RISK + "# 一つ目\n")
-        real = configsync.apply
-
-        def apply_and_move(changes, base=""):
-            failed = real(changes, base)
-            write(self.risk, COMMON_RISK + "# 二つ目\n")
-            return failed
-
-        with mock.patch.object(configsync, "apply", apply_and_move):
-            promptsync.sync(self.settings(), self.ws)
-        self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK + "# 一つ目\n")
-
-        self.prompt()
-
-        self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK + "# 二つ目\n")
-
-    def test_an_unexpected_failure_of_the_sync_does_not_stop_the_prompt(self):
-        """3: 同期が想定外の例外を出しても、発言は通り、受け入れまで進む。"""
-        self.start_parent()
-
-        with mock.patch.object(promptsync, "sync", side_effect=RuntimeError("壊れた")):
-            done = self.hook("", self.ws, event="UserPromptSubmit", guard="enable")
-
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("ミラーの同期で想定外の失敗", done.stderr)
-        self.assertNotIn("internal-error", done.stderr)
 
     def test_an_unstarted_parent_is_not_mirrored(self):
         """2: 着手していない親のワークツリーにはコピーしない。"""

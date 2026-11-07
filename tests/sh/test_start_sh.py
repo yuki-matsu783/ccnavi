@@ -34,7 +34,7 @@ import tempfile
 import unittest
 from urllib.parse import quote
 
-from tests import ROOT, SRC, common_sh, put_messages
+from tests import ROOT, common_sh, exe, put_messages
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 REAL_GIT = shutil.which("git")
@@ -42,7 +42,7 @@ NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 
 EXE = """#!/bin/sh
-PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@"
+exec '{exe}' "$@"
 """
 
 # fetch / push のときだけ、origin の URL を bare リポジトリへ向ける git の代役。
@@ -197,9 +197,7 @@ class StartShTest(unittest.TestCase):
         ):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         put_messages(self.ws)
-        self.exe = write(
-            os.path.join(base, "exe", "ccnavi"), EXE.format(src=SRC, python=sys.executable)
-        )
+        self.exe = write(os.path.join(base, "exe", "ccnavi"), EXE.format(exe=exe.sh_path()))
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         self.bin = os.path.join(base, "bin")
         write(os.path.join(self.bin, "fake_curl.py"), CURL)

@@ -2,7 +2,8 @@
 
 見るのは次のとおり。見本は tests/handoff_names_samples.py の表（`SAMPLES`）を使う。
 
-1. 表に仮の 1 行を足した場合も含め、sh と Python が同じ変換結果を返す（同じ見本を両方に通す）
+1. 表に仮の 1 行を足した場合も含め、sh が見本どおりに変換する（実行ファイルの変換は
+   go/internal/tickets/model/handoffnames の go test が同じ見本で見る）
 2. 元のパスに予約名（`handoff-.claude`）の階層があれば、stage が断る
 3. stage → 編集 → `--commands` で、取り込みの手順が、読み替えを戻した元のパスを指す
 4. 表のファイルが無い・読めない行があれば、stage は何も作らずに断る
@@ -15,9 +16,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.tickets.model import handoff_names
 from tests import ROOT, common_sh
 from tests.handoff_names_samples import RESERVED, SAMPLES
 
@@ -89,29 +88,25 @@ class StageNamesTest(unittest.TestCase):
                 result = self.stage(ws, orig)
                 self.assertEqual(0, result.returncode, result.stderr)
                 self.assertEqual(expected, self.draft_of(ws, orig), "sh の変換")
-                self.assertEqual(expected, handoff_names.to_draft(orig), "Python の変換")
 
-    def test_sh_and_python_agree_on_every_sample(self):
+    def test_sh_converts_every_sample(self):
         self.check_samples(SAMPLES)
 
-    def test_a_row_added_to_the_table_works_in_both(self):
-        """sh は写しの表を、Python は同じ文面を `parse` した表を使う。足す行は 1 行だけ。"""
+    def test_a_row_added_to_the_table_works(self):
+        """sh は写しの表を使う。足す行は 1 行だけ。"""
         extra = ".vscode handoff-.vscode\n"
-        table = handoff_names.parse(read(os.path.join(SH_DIR, NAMES)) + extra)
         samples = [
             (".vscode/settings.json", "handoff-.vscode/settings.json"),
             ("a/.VSCode/tasks.json", "a/handoff-.vscode/tasks.json"),
             (".claude/settings.json", "handoff-.claude/settings.json"),
             (".github/x.yml", ".github/x.yml"),
         ]
-        with mock.patch.dict(handoff_names.ALIASES, table, clear=True):
-            self.check_samples(samples, extra)
-            ws = self.workspace(extra)
-            write(os.path.join(ws, "handoff-.vscode", "x.json"), "x\n")
-            result = self.stage(ws, "handoff-.vscode/x.json")
-            self.assertEqual(2, result.returncode)
-            self.assertIn("予約", result.stderr)
-            self.assertIn("予約", handoff_names.reserved_problem("handoff-.vscode/x.json"))
+        self.check_samples(samples, extra)
+        ws = self.workspace(extra)
+        write(os.path.join(ws, "handoff-.vscode", "x.json"), "x\n")
+        result = self.stage(ws, "handoff-.vscode/x.json")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("予約", result.stderr)
 
     def test_an_original_path_with_the_reserved_name_is_refused(self):
         for rel in RESERVED:

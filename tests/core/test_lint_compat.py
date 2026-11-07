@@ -1,7 +1,7 @@
 """`--lint` が `.ccnavi/scripts/` の sh の互換の版の食い違いを言うこと。
 
 sh は `ccnavi-common.sh` の `CCNAVI_COMPAT=<数>` で互換の版を宣言する。実行ファイルの
-`src/ccnavi/entry/version.py` の COMPAT と違えば `(version)` の warn で言い、直し方（ccnavi の
+互換の版（`ccnavi --version` の compat）と違えば `(version)` の warn で言い、直し方（ccnavi の
 リポジトリなら組み立て直し、配布先なら配り直し）を名指しする。sh の無いワークスペースでは言わない。
 """
 
@@ -14,8 +14,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.entry import version
-from tests import ROOT
+from tests import ROOT, exe
 from tests.inproc import run_ccnavi
 
 
@@ -54,7 +53,7 @@ class LintShCompatTest(unittest.TestCase):
 
     def test_v20_a_matching_sh_says_nothing(self):
         """V20"""
-        self.put_sh(f"CCNAVI_COMPAT={version.COMPAT}")
+        self.put_sh(f"CCNAVI_COMPAT={int(exe.compat())}")
         self.assertEqual(self.said(), [])
 
     def test_v21_no_sh_says_nothing(self):
@@ -62,12 +61,12 @@ class LintShCompatTest(unittest.TestCase):
         self.assertEqual(self.said(), [])
 
     def test_v22_a_different_compat_is_a_warn_naming_the_redistribution(self):
-        """V22 配布先（build.py もソースも無い）では配り直しを名指しする。"""
-        self.put_sh(f"CCNAVI_COMPAT={version.COMPAT + 1}")
+        """V22 配布先（組み立ての sh もソースも無い）では配り直しを名指しする。"""
+        self.put_sh(f"CCNAVI_COMPAT={int(exe.compat()) + 1}")
         said = self.said()
         self.assertEqual([p["severity"] for p in said], ["warn"], said)
-        self.assertIn(f"互換 {version.COMPAT + 1}", said[0]["detail"])
-        self.assertIn(f"実行ファイルは互換 {version.COMPAT}", said[0]["detail"])
+        self.assertIn(f"互換 {int(exe.compat()) + 1}", said[0]["detail"])
+        self.assertIn(f"実行ファイルは互換 {int(exe.compat())}", said[0]["detail"])
         self.assertIn("scripts/ccnavi-setup.sh", said[0]["detail"])
 
     def test_v23_an_sh_without_the_line_is_old(self):
@@ -79,12 +78,12 @@ class LintShCompatTest(unittest.TestCase):
 
     def test_v24_in_the_ccnavi_repository_the_fix_is_a_rebuild(self):
         """V24"""
-        self.put_sh(f"CCNAVI_COMPAT={version.COMPAT + 1}")
-        write(os.path.join(self.root, "build.py"), "")
-        write(os.path.join(self.root, "src", "ccnavi", "__main__.py"), "")
+        self.put_sh(f"CCNAVI_COMPAT={int(exe.compat()) + 1}")
+        write(os.path.join(self.root, "scripts", "ccnavi-build.sh"), "")
+        write(os.path.join(self.root, "go", "cmd", "ccnavi", "main.go"), "")
         said = self.said()
         self.assertEqual(len(said), 1, said)
-        self.assertIn("build.py を実行して組み立て直して", said[0]["detail"])
+        self.assertIn("scripts/ccnavi-build.sh を実行して組み立て直して", said[0]["detail"])
         self.assertNotIn("ccnavi-setup.sh", said[0]["detail"])
 
     def test_v25_this_repository_is_in_step(self):
@@ -94,7 +93,7 @@ class LintShCompatTest(unittest.TestCase):
         self.assertEqual([p for p in problems if p["where"] == "(version)"], [])
         common = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
         with open(common, encoding="utf-8") as f:
-            self.assertRegex(f.read(), re.compile(rf"(?m)^CCNAVI_COMPAT={version.COMPAT}$"))
+            self.assertRegex(f.read(), re.compile(rf"(?m)^CCNAVI_COMPAT={int(exe.compat())}$"))
 
 
 if __name__ == "__main__":

@@ -26,10 +26,8 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi.tickets.model import oplog
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe, oprecord
 from tests.sh import github_host
-from tests.sh.test_review_host_fixture import conclusion
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
@@ -44,7 +42,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) PYTHONPATH='@SRC@' exec '@PY@' -m ccnavi "$@" ;;
+*" ops "*) exec '@EXE@' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -163,13 +161,9 @@ class RestFallbackTest(unittest.TestCase):
                 {"review_threads": THREADS, "comments": COMMENTS, "body": "", "draft": True}
             ),
         )
-        from ccnavi.entry import version
-
         self.exe = write(
             os.path.join(tmp, "exe", "ccnavi"),
-            EXE.format(compat=version.COMPAT, copy=self.copy)
-            .replace("@PY@", sys.executable)
-            .replace("@SRC@", os.path.join(ROOT, "src")),
+            EXE.format(compat=exe.compat(), copy=self.copy).replace("@EXE@", exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 
@@ -317,11 +311,18 @@ class RestFallbackTest(unittest.TestCase):
         with open(self.copy, encoding="utf-8") as f:
             return json.load(f)
 
+    def unresolved(self):
+        """実行ファイルに渡した JSON の、解決されていないスレッド。
+
+        数え方（機構自身の投稿を除くなど）は go test（host の Unresolved）が見る。ここの
+        スレッドは全部レビュアーのもの。
+        """
+        return [t["id"] for t in self.result_copy()["threads"] if not t["resolved"]]
+
     def test_confirm_hands_the_threads_and_one_unresolved_thread_stops_it(self):
         done = self.review("confirm", "--phase", "1", graphql="blocked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        got = self.result_copy()
-        self.assertEqual(conclusion(got)["unresolved"], ["101"])
+        self.assertEqual(self.unresolved(), ["101"])
 
     def test_confirm_with_every_thread_resolved_has_nothing_unresolved(self):
         resolved = [{**t, "resolved": True} for t in THREADS]
@@ -331,7 +332,7 @@ class RestFallbackTest(unittest.TestCase):
         )
         done = self.review("confirm", "--phase", "1", graphql="blocked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertEqual(conclusion(self.result_copy())["unresolved"], [])
+        self.assertEqual(self.unresolved(), [])
 
     # ---- 失敗の分け方
 
@@ -417,7 +418,7 @@ class RestFallbackTest(unittest.TestCase):
 
     def accept(self, ids, **kw):
         # 実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く
-        op = oplog.begin(
+        op = oprecord.begin(
             os.path.join(self.ws, "logs", "state"),
             "decide",
             repo={"host": "github", "mr_url": "https://github.com/acme/widgets/pull/42"},

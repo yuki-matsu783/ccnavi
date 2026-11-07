@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stop: ターンの終わりに、このターンで編集したツリーのテストを実行する
+# Stop: ターンの終わりに、このターンで編集したツリーのテストを実行する（Go のモジュールは gofmt・go vet・go test）
 #
 # 編集ごとの PostToolUse に置くと、1 ファイル直すたびに全件が走る。複数ファイルに
 # またがる変更では途中の状態が必ず失敗するため、意味のない失敗の山を毎回読むことに
@@ -77,7 +77,36 @@ fi
 # 1 件ずつなので、読む量だけが増える
 failed=""
 output=""
-while IFS= read -r target; do
+
+# Go は、このターンで Go のファイルを編集したモジュールだけを見る（lint-py.sh が書き残す）。
+# Windows 向けの go vet も回す。OS で分けたファイル（build タグ）は、この機械の vet だけでは読まれない
+go_check() (
+	cd "$1" || exit 1
+	unformatted=$(gofmt -l .)
+	if [ -n "$unformatted" ]; then
+		printf 'gofmt: 整形されていないファイル:\n%s\n' "$unformatted"
+		exit 1
+	fi
+	go vet ./... || exit 1
+	GOOS=windows go vet ./... || exit 1
+	go test ./...
+)
+go_trees="$state/$session.go-trees"
+if [ -s "$go_trees" ] && command -v go >/dev/null 2>&1; then
+	sort -u "$go_trees" >"$go_trees.sorted" || exit 0
+	while IFS= read -r module; do
+		[ -f "$module/go.mod" ] || continue
+		if out=$(go_check "$module" </dev/null 2>&1); then
+			continue
+		fi
+		failed=$module
+		output=$out
+		break
+	done <"$go_trees.sorted"
+	rm -f "$go_trees.sorted"
+fi
+
+[ -n "$failed" ] || while IFS= read -r target; do
 	[ -n "$target" ] || continue
 	# tests/ を持たないツリーは飛ばす。ツリーの有無だけを見ると、`unittest
 	# discover -s tests` が "Start directory is not importable" で失敗し、ターンが
@@ -94,7 +123,7 @@ done <"$trees.sorted"
 rm -f "$trees.sorted"
 
 if [ -z "$failed" ]; then
-	rm -f "$counter" "$trees"
+	rm -f "$counter" "$trees" "$go_trees"
 	exit 0
 fi
 
@@ -106,7 +135,7 @@ esac
 tried=$((tried + 1))
 
 if [ "$tried" -gt "$MAX" ]; then
-	rm -f "$counter" "$trees"
+	rm -f "$counter" "$trees" "$go_trees"
 	# ここは exit 0 なのでモデルには届かない。届けると差し戻しと同じことになる
 	# 上限の意味は「機械の往復をやめてユーザに返す」なので、宛先はユーザでよい
 	printf 'ccnavi: %s のテストが失敗したまま %s 回差し戻したので、これ以上は止めません。\n' \
@@ -117,7 +146,7 @@ fi
 
 mkdir -p "$state"
 printf '%s' "$tried" >"$counter"
-printf 'unittest（%s / 最初に失敗した 1 件 / %s 回目、あと %s 回で打ち切り）:\n%s\n' \
+printf 'テスト（%s / 最初に失敗した 1 件 / %s 回目、あと %s 回で打ち切り）:\n%s\n' \
 	"$failed" "$tried" "$((MAX - tried))" "$(printf '%s' "$output" | tail -40)" >&2
 printf '失敗したテストを直してから終わってください。\n' >&2
 exit 2

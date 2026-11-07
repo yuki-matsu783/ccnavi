@@ -2,7 +2,7 @@
 
 道具を隔離する。偽物を PATH の先頭に置くだけでは、後ろの本物が見つかってしまう。テストごとに一時の
 bin ディレクトリを作り、要る道具だけを本物へのリンクで置き、PATH をそのディレクトリだけにする。
-glab・jq・curl・git・setup・uv は、引数を記録する偽物にできる。
+glab・jq・curl・git・setup・go は、引数を記録する偽物にできる。
 記録は `calls.log` に `<道具> <引数>` で 1 行ずつ。
 """
 
@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import contextlib
 import os
+import platform
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -224,6 +226,21 @@ esac
 
 def script(name: str) -> str:
     return os.path.join(ROOT, "scripts", name)
+
+
+def host_target() -> str:
+    """この機械の `<os>-<arch>`。sh（uname）とは別の読み方で求める（sh の語が食い違えば落ちる）。
+
+    語は scripts/ccnavi-build.sh の --target と go/internal/infra/platformtag と同じ。
+    """
+    system = {"win32": "windows", "darwin": "darwin"}.get(sys.platform, "linux")
+    machine = platform.machine().lower()
+    arch = {"amd64": "x86_64", "x86_64": "x86_64", "aarch64": "arm64", "arm64": "arm64"}
+    return f"{system}-{arch.get(machine, machine)}"
+
+
+# この機械で組み立てたときに scripts/ccnavi-build.sh が dist/ccnavi.target に書く目印。
+THIS_MACHINE = host_target()
 
 
 def count_next(text: str) -> int:

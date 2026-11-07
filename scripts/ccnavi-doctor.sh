@@ -86,7 +86,7 @@ doctor_mask() {
 	# 最後の awk は、環境の GITLAB_TOKEN・GITHUB_TOKEN の値そのものを伏せる。
 	printf '%s' "$1" | sed -E \
 		-e 's#([A-Za-z][A-Za-z0-9+.-]*://)[^/ ]*@#\1<伏せた>@#g' \
-		-e 's#(^|[ (])[^/: @]*:[^/@ ]*@#\1<伏せた>@#g' \
+		-e 's#(^|[ (])[^/: @]*:[^/ ]*@#\1<伏せた>@#g' \
 		-e 's#gl[a-z]{1,6}-[A-Za-z0-9_-]{8,}#<伏せた>#g' \
 		-e 's#gh[pousr]_[A-Za-z0-9]{8,}#<伏せた>#g' \
 		-e 's#github_pat_[A-Za-z0-9_]+#<伏せた>#g' \
@@ -793,15 +793,15 @@ doctor_package() {
 # ---- 配布元（build）
 
 doctor_build_tools() {
-	if command -v uv >/dev/null 2>&1; then
-		res uv ok ok "$(doctor_version_of "$(uv --version 2>/dev/null || :)")"
+	if command -v go >/dev/null 2>&1; then
+		res go ok ok "$(doctor_version_of "$(go version 2>/dev/null || :)")"
 	else
-		res uv ng not-installed
+		res go ng not-installed
 	fi
-	if [ -f "$from/build.py" ]; then
+	if [ -f "$from/scripts/ccnavi-build.sh" ]; then
 		res source ok ok "$from"
 	else
-		res source ng missing "$from/build.py が無い"
+		res source ng missing "$from/scripts/ccnavi-build.sh が無い"
 	fi
 	if [ "$online" = yes ]; then
 		doctor_source_remote
@@ -819,7 +819,7 @@ doctor_build_tools() {
 }
 
 doctor_source_remote() {
-	if [ "$have_git" != yes ] || [ ! -f "$from/build.py" ]; then
+	if [ "$have_git" != yes ] || [ ! -f "$from/scripts/ccnavi-build.sh" ]; then
 		res source-remote warn skipped no-source
 		return 0
 	fi
@@ -846,7 +846,7 @@ doctor_claude() {
 # ---- 出力
 
 doctor_print() {
-	for pr_item in machine shell pkg-manager git jq curl workspace origin glab remote host-api existing package uv source source-remote node claude; do
+	for pr_item in machine shell pkg-manager git jq curl workspace origin glab remote host-api existing package go source source-remote node claude; do
 		[ "$(res_get "$pr_item" set)" = yes ] || continue
 		pr_level=$(res_get "$pr_item" level)
 		pr_code=$(res_get "$pr_item" code)
@@ -864,7 +864,7 @@ doctor_next() {
 	# 数える
 	nx_ng=no
 	nx_todos=""
-	for nx_item in machine shell pkg-manager git jq curl workspace origin glab remote host-api existing package uv source source-remote node claude; do
+	for nx_item in machine shell pkg-manager git jq curl workspace origin glab remote host-api existing package go source source-remote node claude; do
 		[ "$(res_get "$nx_item" set)" = yes ] || continue
 		case "$(res_get "$nx_item" level)" in
 		ng) nx_ng=yes ;;
@@ -1027,7 +1027,7 @@ main() {
 	if [ "$no_next" != yes ]; then
 		doctor_next
 	fi
-	for ng_item in machine shell pkg-manager git jq curl workspace origin glab remote host-api existing package uv source source-remote node claude; do
+	for ng_item in machine shell pkg-manager git jq curl workspace origin glab remote host-api existing package go source source-remote node claude; do
 		if [ "$(res_get "$ng_item" level)" = ng ]; then
 			return 1
 		fi

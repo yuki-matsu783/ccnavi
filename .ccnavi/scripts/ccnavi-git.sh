@@ -1798,7 +1798,7 @@ worktree)
 			# （58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）を実行ファイルに聞く（字数と字の種類は実行ファイルが見分ける）。
 			# 子の識別子の形（<親>-<2 桁>-<2 桁>）は子のワークツリーを出し直す形なので、64 文字と字だけを見る。
 			ccnavi_id_ask "$WS" "$wt_base" ||
-				reject worktree-id-unchecked "worktree add $wt_dest $wt_base で、$wt_base から作る識別子が使えるかを確かめられません（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+				reject worktree-id-unchecked "worktree add $wt_dest $wt_base で、$wt_base から作る識別子が使えるかを確かめられません（ccnavi の実行ファイルが答えない）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
 			if [ "$ccnavi_id_child" = yes ]; then
 				wt_id_problem="$ccnavi_id_direct"
 			else
@@ -1901,7 +1901,7 @@ restore)
 	# エラーになる）ので、マージの最中だけ意味を持つ。ガード自身の設定が
 	# 衝突したときに解く方法はここしかない。ルールファイルに衝突マーカーが
 	# 入っていると YAML として読めず、判定は組み込みの既定を使っているが、
-	# 既定もこの形は止めない（src/ccnavi/policy/builtin.py）。
+	# 既定もこの形は止めない（go/internal/policy/builtin）。
 	#
 	# 別のコミットの中身で戻す形（--source）と、衝突を片側の中身で解く形（--ours / --theirs）は、
 	# 承認済みチケットの置き場にヒットするパスには使わせない。
@@ -2307,7 +2307,7 @@ push)
 			esac
 			for push_tree in "$push_root" "$push_projects"/* "$push_root"/.claude/worktrees/*; do
 				[ -d "$push_tree" ] || continue
-				# hook 側の既定（settings.py の DEFAULT_APPROVED・DEFAULT_TICKETS）と同じ場所を見る。
+				# hook 側の既定（go/internal/infra/config の DefaultApproved・DefaultTickets）と同じ場所を見る。
 				# 食い違うと、この検査が別の場所を見て、気づかないうちに行われなくなる。
 				push_copies="$push_tree/.ccnavi/approved" # 固定
 				push_proposals="$push_tree/wip/proposals" # 固定

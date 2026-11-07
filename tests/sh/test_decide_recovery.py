@@ -20,7 +20,7 @@ import subprocess
 import time
 import unittest
 
-from ccnavi.tickets.model import oplog
+from tests import oprecord
 from tests.sh import decide_support as support
 from tests.sh import test_decide_ops as ops
 from tests.sh import test_review_decide as base
@@ -36,7 +36,7 @@ STUB = support.STUB.replace(
     '    done_plan=""; prev=""\n'
     '    for a in "$@"; do [ "$prev" = --accept-done ] && done_plan="$a"; prev="$a"; done\n'
     '    op=$(sed -n \'s/.*"op": "\\([0-9a-f]*\\)".*/\\1/p\' "$done_plan")\n'
-    '    "$STUB_PY" -m ccnavi --root "$root" ops applied "$op" accepted_on_host u1\n'
+    '    "$STUB_EXE" --root "$root" ops applied "$op" accepted_on_host u1\n'
     '    printf \'{"version":2,"ok":false,"mismatch":true,"changed":["u1"]}\\n\'\n'
     '    echo "ccnavi: 見せた指摘と今の指摘が違う。何も置いていない" >&2\n'
     "    exit 1\n"
@@ -51,7 +51,7 @@ class DecideRecoveryShTest(unittest.TestCase):
     def setUp(self):
         ops.DecideOpsShTest.setUp(self)
         with open(self.stub, "w", encoding="utf-8") as f:
-            f.write(STUB.replace("{compat}", str(support.version.COMPAT)))
+            f.write(STUB.replace("{compat}", support.exe.compat()))
         # 以降の run_decide が使う cwd（AT25 で替える）
         self.cwd = self.tree
 
@@ -64,10 +64,11 @@ class DecideRecoveryShTest(unittest.TestCase):
     def run_decide(self, *args: str, stdin: str = "", **extra: str):
         env = dict(
             STUB_PY=support.sys.executable,
+            STUB_EXE=support.exe.path(),
             STUB_BEGIN=self.begin,
             STUB_MRURL=self.mr_url,
             STUB_MISMATCH="",
-            PYTHONPATH=os.path.join(support.ROOT, "src"),
+            STUB_USERFORM=support.userform.__file__,
         )
         env.update(extra)
         return self.decide_with_input(args, stdin, env)
@@ -148,8 +149,8 @@ class DecideRecoveryShTest(unittest.TestCase):
         record = self.record()
         self.assertTrue(record["applied"]["local"])
         # 自分が作った子と動かした子を記録に足す。ホストは、直す指摘が未解決のまま、指摘も増えた
-        oplog.applied_set(self.state, record["id"], "followup", "i0001-01-03")
-        oplog.applied_set(self.state, record["id"], "moved", ["i0001-01-01", "i0001-01-02"])
+        record["applied"].update(followup="i0001-01-03", moved=["i0001-01-01", "i0001-01-02"])
+        oprecord.save(self.state, record)
         GitLab.discussions = {"d1": True, "d2": False, "d3": False}
         STORE["reject"].clear()
         self.age(record["id"], "note")

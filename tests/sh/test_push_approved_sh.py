@@ -31,8 +31,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.entry import version
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
@@ -132,7 +131,7 @@ class Workspace(unittest.TestCase):
             os.path.join(self._tmp.name, "write-and-push-bin", "ccnavi"),
             "#!/bin/sh\n"
             'case " $* " in\n'
-            f"*\" --version \"*) printf 'compat: {version.COMPAT}\\n'; exit 0 ;;\n"
+            f"*\" --version \"*) printf 'compat: {exe.compat()}\\n'; exit 0 ;;\n"
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
             # 親か・承認済みか（push のゲートが聞く）。STUB_PARENT があるときだけ答える。
@@ -776,7 +775,7 @@ class ApproveCarriesTest(Workspace):
         super().setUp()
         self.stub = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
-            STUB.replace("{compat}", str(version.COMPAT)),
+            STUB.replace("{compat}", exe.compat()),
         )
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
 
@@ -965,26 +964,6 @@ class ApproveCarriesTest(Workspace):
         result = self.approve(STUB_EXIT="1", STUB_REPORT=report)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("提案の内容が更新されました", result.stderr)
-
-    def test_source_mode_starts_uv_at_the_workspace_root(self):
-        """ソースで動かすとき、uv はワークスペースルートで起こす（cwd が中の別の場所でも）。"""
-        write(os.path.join(self.ws, "src", "ccnavi", "__main__.py"), "")
-        where = os.path.join(self._tmp.name, "uv-cwd")
-        uv = write(
-            os.path.join(self._tmp.name, "uvbin", "uv"),
-            "#!/bin/sh\n"
-            f"pwd > '{posix(where)}'\n"
-            'while [ $# -gt 0 ]; do [ "$1" != --record-writes ] || : > "$2"; shift; done\n',
-        )
-        os.chmod(uv, 0o755)
-        inner = os.path.join(self.ws, "docs")
-        os.makedirs(inner)
-        env = self.env(CCNAVI_ENTRY_PATH=posix(os.path.join(self._tmp.name, "none")))
-        env["PATH"] = os.pathsep.join([os.path.dirname(uv), env.get("PATH", "")])
-        result = self.run_sh("ccnavi-user-agree.sh", cwd=inner, env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        with open(where, encoding="utf-8") as f:
-            self.assertEqual(os.path.realpath(f.read().strip()), os.path.realpath(self.ws))
 
     def test_failed_push_does_not_fail_the_approval(self):
         """コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。"""

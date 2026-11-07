@@ -46,4 +46,4 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 
 ## 対象外の表と実行ファイル
 
-`.ccnavi/docs/frontmatter.md`の「対象外」の表の置き場は、実行ファイルにも同じ一覧（`src/ccnavi/catalog/docsearch.py`の`NO_FRONTMATTER_PLACES`）があり、テストが表と比べる。表に行を足したら一覧にも足す。
+`.ccnavi/docs/frontmatter.md`の「対象外」の表の置き場は、実行ファイルにも同じ一覧（`go/internal/catalog/docs/hint.go`の`noFrontmatterPlaces`）があり、テストが表と比べる。表に行を足したら一覧にも足す。

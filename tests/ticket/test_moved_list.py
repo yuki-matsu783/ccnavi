@@ -84,14 +84,6 @@ class MovedListTest(ActorHarness):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertNotIn("依頼の後に親の HEAD が動いている", done.stderr)
 
-    def test_a_push_pending_stop_adds_no_moved_explanation(self):
-        """動いたのではなく push されていないだけのとき（kind が空）は、説明を足さない。"""
-        from ccnavi.tickets.review import request as review
-
-        self.assertEqual(
-            review.moved_explanation(review.Moved("親ブランチの HEAD が push されていない")), []
-        )
-
     def test_decide_says_the_same_when_the_head_moved(self):
         fixture = self.ready()
         self.commit_as("alice", "修正", {"src/a.py": "1\n"})

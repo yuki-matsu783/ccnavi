@@ -1,6 +1,6 @@
 /**
  * 「始める」は `ccnavi-start.sh` と同じ手順にそろえる（既存の MR を探して採用する、無ければブランチと Draft の MR を作る）。
- * 模擬の GitHub・GitLab と Node の上の Pyodide で回す。
+ * 模擬の GitHub・GitLab と Node の上の WASM で回す。
  *
  * - issue を閉じる開いた MR が 1 本あれば、その元ブランチを採用する。ブランチも MR も作らない
  * - 採用の確認: open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える・
@@ -18,7 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { dispatch, type Deps } from "../src/core/protocol.js";
-import { py as pyOps, type PyCall } from "../src/core/py.js";
+import { ccnavi as ccnaviOps, type CcnaviCall } from "../src/core/ccnavi.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, Reader, readIntegration } from "../src/core/snapshot.js";
 import { closesIssue, startIssue, type StartOutcome } from "../src/core/start.js";
@@ -27,11 +27,11 @@ import { fixture, NOW } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
 import { MockGitHub, TOKEN, type MockMr } from "./helpers/mock-github.js";
 import { MockGitLab } from "./helpers/mock-gitlab.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 
 const GH_REPO: RepoConfig = { ...GITLAB_REPO, host: "github.com" };
@@ -49,7 +49,7 @@ function wdeps(mock: MockGitHub, host: string): { d: WriteDeps; repo: RepoConfig
     repo: host === "github.com" ? GH_REPO : GITLAB_REPO,
     d: {
       call: hostCall(base, stats, host),
-      py,
+      ccnavi,
       cache: memoryCache(),
       now: () => new Date(NOW),
       stats,
@@ -247,12 +247,12 @@ test("CX-T257 採用の識別子はブランチ名の / を - に置き換えた
   const snapshot = { ...fresh, branches: { ...(board.seen?.branches ?? {}), ...fresh.branches }, absent: [] };
   assert.ok(cases.convert.length > 0 && cases.adopt.length > 0);
   for (const c of cases.convert) {
-    const res = await pyOps.adopt(d.py, { snapshot, branch: c.branch, names: [] });
+    const res = await ccnaviOps.adopt(d.ccnavi, { snapshot, branch: c.branch, names: [] });
     assert.equal(res.identifier, c.id, c.branch);
   }
   // 採用できるかの表（識別子の字・長さ・末尾）。保護された名前や統合先の done/ などは別の理由なので、表の ok だけを見る
   for (const c of cases.adopt) {
-    const res = await pyOps.adopt(d.py, { snapshot, branch: c.branch, names: [] });
+    const res = await ccnaviOps.adopt(d.ccnavi, { snapshot, branch: c.branch, names: [] });
     assert.equal(res.problems.length === 0, c.ok, `${c.branch}: ${res.problems.join(" / ")}`);
   }
 });

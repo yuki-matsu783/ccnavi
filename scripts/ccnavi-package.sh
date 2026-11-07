@@ -3,7 +3,7 @@
 #
 #   sh scripts/ccnavi-package.sh [--build] [--out <dir>]
 #
-#   --build        先に build.py（uv run --with pyinstaller python build.py）で組み立てる
+#   --build        先に scripts/ccnavi-build.sh で、この機械向けに組み立てる
 #   --out <dir>    zip と .sha256 の置き場。既定は build/package/
 #
 # build/package/ は毎回空にしてから、build/package/ccnavi-<短いコミット>-<target>/ に集める。
@@ -18,13 +18,13 @@
 #
 # 拡張機能の照合
 #   VS Code: package.json の今の版の vsix だけを入れ、拡張の EXTENSION_COMPAT
-#     （extensions/vscode/ccnavi-board/src/core/version.ts）が実行ファイルの COMPAT
-#     （src/ccnavi/entry/version.py）と同じときだけ入れる。vsix の中身が今のソースから作られたか
+#     （extensions/vscode/ccnavi-board/src/core/version.ts）が実行ファイルの互換の版
+#     （組み立てた実行ファイルの `--version` の compat）と同じときだけ入れる。vsix の中身が今のソースから作られたか
 #     （同じ版で古いまま）は見分けられない。拡張を直したら版を上げる決まりに頼る
 #   Chrome: dist/manifest.json の version が package.json の version と同じで、組み立てのときに
-#     埋め込まれる互換の版（dist/background.js の compat:<数>）が COMPAT と同じときだけ入れる
+#     埋め込まれる互換の版（dist/background.js の compat:<数>）が実行ファイルの互換の版と同じときだけ入れる
 #
-# zip: zip コマンドがあれば zip -r -y（リンクを保つ）。無ければ python -m zipfile。python の zipfile は
+# zip: zip コマンドがあれば zip -r -y（リンクを保つ）。無ければ python3 -m zipfile。python の zipfile は
 # リンクを保てないので、集めた中にシンボリックリンクがあれば作らずに 2 で止める。
 # zip の隣に <zip 名>.sha256 を書く。
 #
@@ -36,7 +36,7 @@ usage() {
 	printf '%s\n' \
 		'sh scripts/ccnavi-package.sh [--build] [--out <dir>]' \
 		'' \
-		'  --build      先に build.py で組み立てる' \
+		'  --build      先に scripts/ccnavi-build.sh で組み立てる' \
 		'  --out <dir>  zip と .sha256 の置き場（既定 build/package/）' \
 		'終了コード: 0 成功 / 2 引数の誤り・前提が足りない / 4 途中で失敗'
 }
@@ -149,7 +149,7 @@ main() {
 	done
 
 	root=$(pabs "$(dirname "$0")/..")
-	[ -f "$root/build.py" ] || die "$root は ccnavi のソースに見えません（build.py が無い）。ソースの scripts/ccnavi-package.sh を打ってください。"
+	[ -f "$root/scripts/ccnavi-build.sh" ] || die "$root は ccnavi のソースに見えません（scripts/ccnavi-build.sh が無い）。ソースの scripts/ccnavi-package.sh を打ってください。"
 	command -v jq >/dev/null 2>&1 || die "jq が必要です。"
 	command -v git >/dev/null 2>&1 || die "git が必要です。"
 	if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
@@ -157,13 +157,13 @@ main() {
 	fi
 
 	if [ "$build" = yes ]; then
-		if ! (cd "$root" && uv run --with pyinstaller python build.py); then
-			die "build.py が失敗しました。" 4
+		if ! sh "$root/scripts/ccnavi-build.sh"; then
+			die "scripts/ccnavi-build.sh が失敗しました。" 4
 		fi
 	fi
 
 	target_file="$root/dist/ccnavi.target"
-	[ -f "$target_file" ] || die "$target_file がありません。--build を付けて打ち直してください（build.py が書きます）。"
+	[ -f "$target_file" ] || die "$target_file がありません。--build を付けて打ち直してください（scripts/ccnavi-build.sh が書きます）。"
 	target=$(sed -n 1p "$target_file" | tr -d '\r')
 	case "$target" in
 	'' | *[!a-z0-9_-]*) die "$target_file の中身が読めません。--build を付けて打ち直してください。" ;;
@@ -177,7 +177,8 @@ main() {
 	done
 	[ -n "$exe" ] || die "$root/dist/ccnavi/ に実行ファイル（ccnavi か ccnavi.exe）がありません。--build を付けて打ち直してください。"
 
-	# 版を照合する。組み立てた実行ファイルが今の HEAD から作られたものかを見る。
+	# 版を照合する。組み立てた実行ファイルが今の HEAD から作られたものかを見る。互換の版（拡張機能の照合の基準）も
+	# ここで読む。実行ファイルに聞くので、この機械で動かない向きの組み立ては包めない。
 	exe_info=$("$exe" --version </dev/null 2>/dev/null) || die "$exe --version が失敗しました。--build を付けて組み立て直してください。"
 	exe_commit=$(printf '%s\n' "$exe_info" | sed -n 's/^commit:[[:space:]]*\([^[:space:]]*\)[[:space:]]*$/\1/p' | sed -n 1p)
 	exe_compat=$(printf '%s\n' "$exe_info" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | sed -n 1p)
@@ -227,9 +228,6 @@ main() {
 		copy_into "$item" "$item" || die "$item をコピーできません。" 4
 	done
 
-	# 実行ファイルの互換の版（拡張機能の照合の基準）
-	py_compat=$(sed -n 's/^COMPAT = \([0-9][0-9]*\)$/\1/p' "$root/src/ccnavi/entry/version.py" | sed -n 1p)
-
 	# VS Code 拡張
 	vsc_dir="$root/extensions/vscode/ccnavi-board"
 	vsc_version=""
@@ -239,8 +237,8 @@ main() {
 	vsix="$root/dist/ccnavi-board-$vsc_version.vsix"
 	if [ -z "$vsc_version" ] || [ ! -f "$vsix" ]; then
 		printf '案内: VS Code 拡張（dist/ccnavi-board-%s.vsix）が無いので入れていない。scripts/ccnavi-build-install.sh で作れる\n' "${vsc_version:-<版>}"
-	elif [ -z "$py_compat" ] || [ "$vsc_compat" != "$py_compat" ]; then
-		printf '案内: VS Code 拡張の互換の版（%s）が実行ファイルの互換の版（%s）と違うので入れていない\n' "${vsc_compat:-不明}" "${py_compat:-不明}"
+	elif [ -z "$exe_compat" ] || [ "$vsc_compat" != "$exe_compat" ]; then
+		printf '案内: VS Code 拡張の互換の版（%s）が実行ファイルの互換の版（%s）と違うので入れていない\n' "${vsc_compat:-不明}" "${exe_compat:-不明}"
 	else
 		copy_into "dist/ccnavi-board-$vsc_version.vsix" "dist/ccnavi-board-$vsc_version.vsix" || die "vsix をコピーできません。" 4
 	fi
@@ -257,8 +255,8 @@ main() {
 		printf '案内: Chrome 拡張（extensions/chrome/ccnavi-approval/dist/）が無いので入れていない。scripts/ccnavi-build-install.sh で作れる\n'
 	elif [ "$chr_built" != "$chr_version" ]; then
 		printf '案内: Chrome 拡張の組み立て済みの版（%s）がソースの版（%s）と違うので入れていない。組み立て直すこと\n' "$chr_built" "$chr_version"
-	elif [ -z "$py_compat" ] || ! grep -Eq "compat:${py_compat}([^0-9]|\$)" "$chr_dir/dist/background.js" 2>/dev/null; then
-		printf '案内: Chrome 拡張の組み込みの互換の版が実行ファイルの互換の版（%s）と合わない（または読めない）ので入れていない。組み立て直すこと\n' "${py_compat:-不明}"
+	elif [ -z "$exe_compat" ] || ! grep -Eq "compat:${exe_compat}([^0-9]|\$)" "$chr_dir/dist/background.js" 2>/dev/null; then
+		printf '案内: Chrome 拡張の組み込みの互換の版が実行ファイルの互換の版（%s）と合わない（または読めない）ので入れていない。組み立て直すこと\n' "${exe_compat:-不明}"
 	else
 		copy_into extensions/chrome/ccnavi-approval/dist extensions/chrome/ccnavi-approval/dist || die "Chrome 拡張をコピーできません。" 4
 	fi
@@ -267,7 +265,6 @@ main() {
 	find "$stage" \( -name ccnavi-index.jsonl -o -name .DS_Store \) -exec rm -f {} + || die "不要なファイルを除けません。" 4
 	# ワークツリーをそのままコピーするので、追跡されていない物や無視された物が紛れうる。キー・認証情報の置き場と、
 	# 実行時の記録（logs・wip）、古い vsix は入れない。
-	# dist/ccnavi の中の *.pem（証明書の束）は実行ファイルが使うので、キーの掃除は .ccnavi と .claude だけに掛ける。
 	find "$stage/.ccnavi" "$stage/.claude" -type f \( -name '.env' -o -name '.env.*' -o -name '*.pem' \
 		-o -name '*.key' -o -name 'credentials*.json' -o -name 'secrets.y*ml' -o -name 'id_rsa' \
 		-o -name 'id_ed25519' \) -exec rm -f {} + || die "不要なファイルを除けません。" 4
@@ -290,7 +287,8 @@ main() {
 		if [ -n "$(find "$stage" -type l)" ]; then
 			die "集めた中にシンボリックリンクがあり、zip コマンドが無いので python では作れません（リンクを保てない）。zip を入れてください。"
 		fi
-		if ! (cd "$pkg_root" && uv run --project "$root" python -m zipfile -c "$zip_path" "$name"); then
+		command -v python3 >/dev/null 2>&1 || die "zip コマンドか python3 が必要です（zip を作るため）。"
+		if ! (cd "$pkg_root" && python3 -I -m zipfile -c "$zip_path" "$name"); then
 			die "zip を作れませんでした。" 4
 		fi
 	fi

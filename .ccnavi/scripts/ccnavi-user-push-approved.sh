@@ -164,7 +164,7 @@ tab=$(printf '\t')
 
 # 置き場の変更のパス（承認済み、レビュー待ちの review/、承認で消えた todo/ の提案、取り込んで消えた
 # flows/ の下書き）を ccnavi_wap_tmp/carry に。
-# 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、configsync の
+# 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、設定の同期（tickets/sync/mirror）の
 # `*.ccnavi-sync`）はコミットしない。
 carry_paths() {
 	: >"$ccnavi_wap_tmp/carry"

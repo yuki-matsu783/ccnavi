@@ -1,0 +1,22 @@
+判定ログをローテーションし、古いログや終了したセッションの状態データを削除するには、
+次のコマンドを実行してください（SessionStartでも自動的に同じ処理が行われます）。
+
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-prune.sh
+    ccnavi --prune --preview
+
+ユーザがターミナルから ccnavi-user-prune.sh を打ちます（実行ファイルは内部で --prune に読み替えます。sh が付ける入口の印（--entry sh）がない user prune は断ります。
+--prune を user の外で渡すと断ります）。--preview を指定すると、移動予定の項目のみを表示し、
+実際の変更は行いません（エージェントも実行できます）。
+
+判定ログ（logs/decisions.jsonl と、ローテーション済みの
+decisions.*.jsonl）からルールの候補を作成するには、次のコマンドを実行します。
+
+    ccnavi --suggest [--json]
+
+出力されるのは deny/ask の候補のみです。どのルールにも一致せず、
+繰り返しユーザに判断が委ねられた呼び出しと、同じ呼び出しを繰り返し止めた deny（その message
+を見直してください）が対象です。各候補は --lint および --test-expectations
+と同じ検査を通過しています。通過しなかったものは件数のみ表示され、候補からは除外されます。
+何も書き込みません。
+--json で出力される形式は docs/11_requirements/json-shapes.md（「候補の JSON」）に記載しており、VS
+Code拡張機能がこれを読み込みます。

@@ -3,7 +3,7 @@
  *
  * 読めるか（大きさ・UTF-8として読めるか・YAMLとして読めるか・別名）と形（`nodes`が無い、`id`が無い・重なる など）の答えは
  * 実行ファイルの`--lint --json --flow <パス>`が出す。読み手も検査もSubagentStartと同じもの
- * （`src/ccnavi/tickets/flow/graph.py`の`load`）で、拡張は自分で判定し直さない。ルール管理・リスク管理・フェーズ管理の
+ * （`go/internal/tickets/flow`の`Load`）で、拡張は自分で判定し直さない。ルール管理・リスク管理・フェーズ管理の
  * 画面が`--lint --rules` / `--risk` / `--phases`に一時ファイルで聞くのと同じ形。
  *
  * 一時ファイルは画面ごとの一時ディレクトリ（`os.tmpdir()`の下の`ccnavi-flow-*`）に、呼ぶたびに別の名前
