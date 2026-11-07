@@ -114,7 +114,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 | いつ | 何を |
 |---|---|
-| 上の段を移すとき | 呼び手の無い公開名（`fsio`・`git`・`tree`・`shell` など、pyre の `Match`・`FullMatch`・`FindAll`・`Found`・`Named`・`Group`、`selfguard.Resolve`）を、使う段で絞る。あわせて rules の文面の出どころ（`Message`・`Text`・`DegradedMessage`）の優先の決めを 1 か所にまとめ、`compileExpr` の戻りを結果の種類の型にし、公開の可変グローバル（`rules.ScriptPlaceholder`・`Sections`・`SubjectFields`、`selfguard.Choices`・`GateChoices`）を絞る |
+| 上の段を移すとき | 呼び手の無い公開名（`fsio`・`git`・`tree`・`shell` など、pyre の `Match`・`FullMatch`・`FindAll`・`Found`・`Named`・`Group`、`selfguard.Resolve`）を、使う段で絞る。あわせて rules の文面の出どころ（`Message`・`Text`・`DegradedMessage`）の優先の決めを 1 か所にまとめ、`compileExpr` の戻りを結果の種類の型にし、公開の可変グローバル（`rules.ScriptPlaceholder`・`Sections`・`SubjectFields`、`selfguard.Choices`・`GateChoices`）を絞る。lifecycle/worktrees の `Status` の定数 `Removed` とメソッド `Dropped.Removed()`（`Absent` も真）の名前の紛らわしさを、呼び手が揃ったところで分ける。「未コミットの変更」の判定（`integrate.Dirty` と `worktrees.status`）を 1 つに寄せる（`treegate.Dirty` は未追跡を数えない別の意味なので寄せない）。承認済み・閉じた・レビュー中の 3 回の走査の繰り返し（`retire.parentOf`・`worktrees.FamilyFor`・`remaining`・`branch.SerialNames`）を、1 回の走査の結果を渡す形にする |
 | `entry` を移すとき | `config.LayerPath` の差し替えの表を、名前の大文字小文字を区別せずに引く（`pathcase.Fold`） |
 | `entry` を移すとき | stopreview の呼び方が変わったもの（`log_event` → `LogNoKey`・`LogPlanTimeout`・`LogSuspected`、clear 3 つ → `turn.Clear`、stopeval の 3 つ → `Report`、`wiki.pending` → `PendingImpacts`）に呼び手を合わせる |
 | hook を移すとき | records/prune が持つ上の段のファイル名の残りの写し（subagent-・turngate-・.turn・.accepted・.reported）を、持ち主の定数と突き合わせるテストを置く（Python は tests/core/test_prune.py が見ていた）。ops と direct- は `config` の定数を両方が読み、sent は oplog のテストが prune の数えで、nudged- と mirror- は持ち主（lifecycle/stop・sync/mirror）のテストが古い記録が消えることで確かめる |
@@ -122,6 +122,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 | Python を外すとき | Python の policy・infra のファイルを指す設計書と sh（`docs/21_design/messages.md`・`startup-config.md`・`modules.md`、`.agents/docs/environment.md`・`e2e-exploration.md`、`.ccnavi/scripts/ccnavi-launcher.sh`・`ccnavi-git.sh` のコメント）を Go の置き場に直す |
 | Python を外すとき | Chrome 拡張（`extensions/chrome/ccnavi-approval`）は Pyodide で Python の `entry.ext` → `tickets.core.api` を読む。Go には移せないので、Pyodide 用に Python の判定一式を残して配るか、拡張の判定を TS か WASM に書き直すかを決める（ユーザと合意が要る）。それまでは Go と Python の判定のずれを Chrome の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）で見張る |
 | Python を外すとき | `git.Undo` の案内でパスを `"` で囲むだけの引用を、`config` の引用と同じ規則にする（`$` やバッククォートを含むパスで壊れる。いまは Python と同じ出力を保つため残す） |
+| Python を外すとき | sync/handoff の `Apply` で、書いた後の読み直しに失敗したエントリが戻されない（Python も同じ。直すなら Python と同時に直す） |
 | 余裕のあるとき | `infra/pyre` の照合を速くする（先頭の文字の集合で開始位置を飛ばす、開始位置ごとのクロージャをやめる）。いまは Python の C 実装の約 5 倍遅い。数 KB の通常のコマンドでは問題にならない |
 | 余裕のあるとき | pyre の `(?i)ß` が `ẞ` に当たらない（casefix に 1 組足す）。rules の unsupported が `(?P=name)` の後方参照を通す。`TranslateGlob` が文字クラスの中の `/` を壊す（Python と同じ。Python の globmatch の docstring も誤り）。`\N{名前}` の苦情を名指しの文にする |
 
