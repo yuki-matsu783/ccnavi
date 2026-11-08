@@ -7,9 +7,9 @@
    標準出力にも標準エラーにも何も出さないこと。出さないレベルでは date を起動しないこと。
    リンク（logs・logs/diag・書き込み先）をたどらないこと、使えない字の出どころでは書かないこと、
    新しいファイルが 0600 になること
-2. 同じ入力から、sh・Python（src/ccnavi/records/diaglog.py）・拡張（src/log.ts を node が型を
-   取り除いて読む）が同じ行を出すこと。時刻と pid は除いて比べ、時刻は 3 つとも同じ形である
-   ことだけを見る
+2. 同じ入力から、sh・拡張（src/log.ts を node が型を取り除いて読む）が決めた行（EXPECTED）を
+   出すこと。時刻と pid は除いて比べる。実行ファイル（go/internal/records/diaglog）は go test が
+   同じ入力と答えで見る
 3. ccnavi-git.sh の reject と ccnavi-review.sh の fail が、拒否の文面ではなく識別子だけを
    診断ログに残すこと（文面は標準エラーの契約で、そちらは変わらない）
 
@@ -28,7 +28,6 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.records import diaglog
 from tests import ROOT, SH_SCRIPTS, common_sh
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -57,6 +56,31 @@ CASES: list[tuple[str, str, list[tuple[str, str]]]] = [
             ("plain", "git@github.com:org/r.git"),
             ("said", "push to ssh://git@h:22/p failed"),
         ],
+    ),
+]
+
+# CASES から出る行（時刻と pid を除く）。実行ファイルの側は go test
+# （go/internal/records/diaglog/diaglog_sh_test.go）が同じ入力と答えで見る。
+EXPECTED = [
+    ("INFO ", "probe", "push を拒否した reason=unapproved ticket=T-12"),
+    (
+        "WARN ",
+        "probe",
+        '値の逃がし方 v="a b" q="say \\"hi\\"\\\\x" eq="k=v" tab="a\tb"',
+    ),
+    (
+        "ERROR",
+        "probe",
+        '改行を\\n含む本文 n="l1\\nl2\\nl3\\nl4" empty= bs=a\\b',
+    ),
+    ("INFO ", "probe", "値の無い行"),
+    ("DEBUG", "probe", '判定の材料 sub=push path="/tmp/x y/z"'),
+    (
+        "INFO ",
+        "probe",
+        "clone https://***@h/x を読んだ url=https://***@gitlab.example/x.git"
+        " scp=***@gitlab.example:org/r.git plain=git@github.com:org/r.git"
+        ' said="push to ssh://***@h:22/p failed"',
     ),
 ]
 
@@ -406,30 +430,13 @@ class GuardScriptTest(_Workspace):
 
 @unittest.skipIf(not SHELL, "sh も bash も見つからない")
 class SameLineTest(_Workspace):
-    """同じ入力から、3 つの言語が同じ行を出す（時刻と pid を除く）。"""
+    """同じ入力から、決めた行を出す（時刻と pid を除く）。"""
 
     def sh_lines(self) -> list[str]:
         calls = "\n".join(sh_call(level, msg, fields) for level, msg, fields in CASES)
         result = self.run_sh(calls, CCNAVI_LOG_LEVEL="DEBUG")
         self.assertEqual("", result.stderr)
         return self.lines()
-
-    def python_lines(self) -> list[str]:
-        root = tempfile.mkdtemp(prefix="ccnavi-diaglog-py-")
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        saved = os.environ.get(diaglog.LEVEL_ENV)
-        os.environ[diaglog.LEVEL_ENV] = "DEBUG"
-        try:
-            log = diaglog.get("probe", root)
-            for level, msg, fields in CASES:
-                getattr(log, level.lower())(msg, **dict(fields))
-        finally:
-            if saved is None:
-                os.environ.pop(diaglog.LEVEL_ENV, None)
-            else:
-                os.environ[diaglog.LEVEL_ENV] = saved
-        with open(os.path.join(root, "logs", "diag", "probe.log"), encoding="utf-8") as f:
-            return f.read().splitlines()
 
     def node_lines(self) -> list[str]:
         root = tempfile.mkdtemp(prefix="ccnavi-diaglog-ts-")
@@ -458,46 +465,13 @@ class SameLineTest(_Workspace):
         with open(os.path.join(root, "logs", "diag", "probe.log"), encoding="utf-8") as f:
             return f.read().splitlines()
 
-    def test_sh_and_python_write_the_same_lines(self):
-        sh = [body(x) for x in self.sh_lines()]
-        py = [body(x) for x in self.python_lines()]
-        self.assertEqual(len(CASES), len(sh))
-        self.assertEqual(sh, py)
-
-    @unittest.skipIf(not NODE, "node が見つからない")
-    def test_node_writes_the_same_lines_as_python(self):
-        ts = [body(x) for x in self.node_lines()]
-        py = [body(x) for x in self.python_lines()]
-        self.assertEqual(len(CASES), len(ts))
-        self.assertEqual(py, ts)
-
     def test_the_expected_lines(self):
         """揃っているだけでなく、決めた形そのものであること。"""
-        self.assertEqual(
-            [
-                ("INFO ", "probe", "push を拒否した reason=unapproved ticket=T-12"),
-                (
-                    "WARN ",
-                    "probe",
-                    '値の逃がし方 v="a b" q="say \\"hi\\"\\\\x" eq="k=v" tab="a\tb"',
-                ),
-                (
-                    "ERROR",
-                    "probe",
-                    '改行を\\n含む本文 n="l1\\nl2\\nl3\\nl4" empty= bs=a\\b',
-                ),
-                ("INFO ", "probe", "値の無い行"),
-                ("DEBUG", "probe", '判定の材料 sub=push path="/tmp/x y/z"'),
-                (
-                    "INFO ",
-                    "probe",
-                    "clone https://***@h/x を読んだ url=https://***@gitlab.example/x.git"
-                    " scp=***@gitlab.example:org/r.git plain=git@github.com:org/r.git"
-                    ' said="push to ssh://***@h:22/p failed"',
-                ),
-            ],
-            [body(x) for x in self.sh_lines()],
-        )
+        self.assertEqual(EXPECTED, [body(x) for x in self.sh_lines()])
+
+    @unittest.skipIf(not NODE, "node が見つからない")
+    def test_node_writes_the_same_lines(self):
+        self.assertEqual(EXPECTED, [body(x) for x in self.node_lines()])
 
 
 if __name__ == "__main__":

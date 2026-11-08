@@ -1,11 +1,11 @@
 /**
- * 読み取り専用ボードの組み立て。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * 読み取り専用ボードの組み立て。模擬の GitHub と Node の上の WASM（拡張と同じ dist/ccnavi.wasm）で回す。
  */
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -14,11 +14,11 @@ import { fixture, NOW, type FixtureBranch } from "./fixtures/repo.js";
 import { deps, hostCall, memoryCache, newStats } from "./helpers/host.js";
 import { COMPAT } from "./helpers/compat.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
@@ -31,11 +31,11 @@ async function run(
   const mock = new MockGitHub(branches);
   const stats = newStats();
   const requests: Record<string, unknown>[] = [];
-  const spy: PyCall = (req) => {
+  const spy: CcnaviCall = (req) => {
     requests.push(req);
-    return py(req);
+    return ccnavi(req);
   };
-  const board = await collectRepo({ ...REPO, ...repo }, { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), py: spy, cache, now: () => new Date(NOW), stats });
+  const board = await collectRepo({ ...REPO, ...repo }, { call: hostCall(deps(mock, new Map([["github.com", TOKEN]])), stats), ccnavi: spy, cache, now: () => new Date(NOW), stats });
   return { board, mock, requests };
 }
 

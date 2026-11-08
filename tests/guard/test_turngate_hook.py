@@ -29,7 +29,6 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.hook import turngate
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
@@ -40,6 +39,8 @@ REVIEW = "sh .ccnavi/scripts/ccnavi-review.sh"
 REQUEST = f"{REVIEW} review-request --phase 1 --body-file req.md"
 CONFIRM = f"{REVIEW} confirm --phase 1"
 NOTICE = "<task-notification>\n<status>completed</status>\n</task-notification>"
+# 同じ発言の中で止めたときの拒否コード。
+CODE = "DENY_NEEDS_USER_TURN"
 
 
 class TurnGateHookTest(unittest.TestCase):
@@ -76,7 +77,7 @@ class TurnGateHookTest(unittest.TestCase):
         return self.hook("PreToolUse", tool_input={"command": command}, **kw)
 
     def stopped(self, done):
-        return turngate.CODE in done.stdout
+        return CODE in done.stdout
 
     def entries(self):
         if not os.path.isdir(self.state):

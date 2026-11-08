@@ -15,10 +15,21 @@ from __future__ import annotations
 
 import os
 
-from ccnavi.tickets.model import ticket_model
 from tests.ticket.test_feedback_plan_approval import FeedbackPlanApprovalTest
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git
+
+# スクリプトだけが書く欄。写しでは空にする。
+SCRIPT_FIELDS = (
+    "started_at",
+    "completed_at",
+    "base_sha",
+    "merged_sha",
+    "cancelled_at",
+    "cancel_reason",
+    "finished_to",
+    "settled_by",
+)
 
 
 class ReviseTest(PhaseHarness):
@@ -47,7 +58,7 @@ class ReviseTest(PhaseHarness):
         with open(self.todo_path(), encoding="utf-8") as f:
             text = f.read()
         self.assertIn("feedback: []", text)
-        for name in ticket_model.SCRIPT_FIELDS:
+        for name in SCRIPT_FIELDS:
             self.assertNotRegex(text, rf"(?m)^{name}: \S", name)
         self.assertIn("approval-request i0001 --check", made.stdout)
         self.assertEqual(sum(1 for x in made.stdout.splitlines() if x.startswith("次: ")), 1)
@@ -113,16 +124,6 @@ class ReviseTest(PhaseHarness):
         self.assertIn("子の識別子", self.revise(ident="i0001-01-01").stderr)
         self.assertIn("の中ではない", self.revise(cwd=self.root).stderr)
         self.assertFalse(os.path.exists(self.todo_path()))
-
-    def test_a_missing_closing_fence_is_not_reported_as_done(self):
-        """閉じの `---` が無い写しに、黙って `feedback: []` を足さずに成功と言わない。"""
-        from ccnavi.tickets.proposal import revise
-
-        self.assertIsNone(revise._with_feedback_none("---\nticket: i0001\n"))
-        self.assertEqual(
-            revise._with_feedback_none("---\nticket: i0001\n---\n"),
-            "---\nticket: i0001\nfeedback: []\n---\n",
-        )
 
     def test_a_copy_only_run_splits_the_next_step_from_the_notes(self):
         self.reviewed()

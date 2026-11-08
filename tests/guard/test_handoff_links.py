@@ -1,5 +1,5 @@
 """下書きの置き場（`wip/handoff/`）を足場にして、守る場所へ書く形を止めることの受入テスト
-（src/ccnavi/policy/selfguard_shell.py の `builtin:guard-handoff-links`・
+（Go の policy/selfguard の `builtin:guard-handoff-links`・
 `builtin:guard-handoff-ln`）。
 
 1. 名指しのツール: 利用者がルールファイルに書く保護は、置き場の中を `except` の式で外せる。

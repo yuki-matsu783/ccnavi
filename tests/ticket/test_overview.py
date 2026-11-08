@@ -1,4 +1,4 @@
-"""このPCで作業中の親の一覧（`tickets/notice/overview.py`）。
+"""このPCで作業中の親の一覧。
 
 見るのは次のとおり。
 
@@ -6,16 +6,14 @@
 2. MR の番号は親チケットの `mr:`。取り込みの時刻（最終取り込み）は出さない
 3. 親を渡した `ticket status` は、子のワークツリーの状態を出さない（引数なしのときだけ）
 4. 子のワークツリーの状態（合流済み・未合流・未コミットあり）
-5. セッション開始で渡す一覧（`overview.session_text`）
+5. セッション開始で渡す一覧
 """
 
 from __future__ import annotations
 
+import json
 import os
 
-from ccnavi.infra import settings
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.notice import overview
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
 from tests.ticketsample import child_text
@@ -58,21 +56,6 @@ class OverviewTest(PhaseHarness):
         self.assertIn("MR !1", line)
         self.assertNotIn("リモート未確認", line)
 
-    def test_row_reads_the_mr_from_the_parent_ticket(self):
-        self.family(plan=["research"])
-        rows = self.rows()
-        self.assertEqual(rows[0].mr, "1")
-        self.assertFalse(hasattr(rows[0], "fetched_at"))
-
-    def rows(self):
-        conf, _ = settings.load(self.root)
-        raw = approval.read_raw(conf, self.root)
-        doing, _ = approval.scan(conf, self.root, raw=raw)
-        closed, _ = approval.scan(conf, self.root, closed=True, raw=raw)
-        review, _ = approval.scan_review(conf, self.root, raw=raw)
-        proposals, _ = approval.scan_proposals(conf, self.root, raw.everything)
-        return overview.collect(conf, self.root, doing, review, closed, proposals)
-
     def test_unsent_commits_are_counted_against_the_remote_tracking_ref(self):
         self.family(plan=["research"])
         self.remote()
@@ -108,12 +91,17 @@ class OverviewTest(PhaseHarness):
 
     # ---- 5. セッション開始
 
-    def test_session_text_lists_the_parents_of_this_pc(self):
-        conf, _ = settings.load(self.root)
-        self.assertEqual(overview.session_text(conf, self.root), "")
+    def session_text(self):
+        payload = {"hook_event_name": "SessionStart", "cwd": self.root, "session_id": "s1"}
+        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return self.reason(result)
+
+    def test_session_start_lists_the_parents_of_this_pc(self):
+        self.assertNotIn("このPCで作業中の親", self.session_text())
         self.family(plan=["research"])
-        text = overview.session_text(conf, self.root)
-        self.assertTrue(text.startswith("[ccnavi] このPCで作業中の親:"), text)
+        text = self.session_text()
+        self.assertIn("[ccnavi] このPCで作業中の親:", text)
         self.assertIn("- 親 i0001  ブランチ i0001  MR !1", text)
         self.assertNotIn("最終取り込み", text)
         self.assertNotIn("リモート未確認", text)

@@ -1,10 +1,10 @@
 /**
- * Chrome の「レビュー済み」。模擬の GitHub と Node の上の Pyodide（拡張と同じ zip）で回す。
+ * Chrome の「レビュー済み」。模擬の GitHub と Node の上の WASM（拡張と同じ dist/ccnavi.wasm）で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組む結果が、sh が組んだ期待値と同じ
  * - 依頼の後の変更の一覧（compare API）は、打ち切り・祖先でない・無い、のどれでも null（動いたと数える）
  * - ボードは依頼済みのフェーズにスレッドと通らない理由を出し、通るときだけ「レビュー済みにする」を出す
- * - 押すと読み直して Python の confirm が通したときだけ 1 コミットで書く。マーカーは PAT の持ち主（actor）と
+ * - 押すと読み直して ccnavi の confirm が通したときだけ 1 コミットで書く。マーカーは PAT の持ち主（actor）と
  *   経路（chrome）を持つ。未解決・変更要求・依頼の後のコードの変更があれば書かない
  * - スレッドの本文は承認の画面と同じ規則で描く（実行されない・隠れない）
  * - PAT は画面に渡らない
@@ -16,7 +16,7 @@ import path from "node:path";
 import { JSDOM } from "jsdom";
 
 import * as gh from "../src/core/github.js";
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -27,14 +27,14 @@ import { BOARD, deps, hostCall, HOSTS, memoryCache, newStats } from "./helpers/h
 import { loadScene, SCENES, sceneAnswer, sceneFetch, sceneNames } from "./helpers/host-fixture.js";
 import { dispatch } from "../src/core/protocol.js";
 import { LOGIN, MockGitHub, TOKEN } from "./helpers/mock-github.js";
-import { nativePy, pyodidePy } from "./helpers/python.js";
+import { nativeCcnavi, wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
-const native = nativePy();
-after(() => native?.close());
+const native = nativeCcnavi();
+after(() => native.close());
 
 const REPO: RepoConfig = { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 3, extraBranches: [], project: "", workspace: "" };
 const FAMILY = "i0004";
@@ -56,10 +56,10 @@ function reviewing(scene: string): MockGitHub {
   return mock;
 }
 
-function depsFor(mock: MockGitHub, pyCall: PyCall = py): WriteDeps {
+function depsFor(mock: MockGitHub, ccnaviCall: CcnaviCall = ccnavi): WriteDeps {
   const stats = newStats();
   const d = { ...deps(mock, new Map([["github.com", TOKEN]])), sleep: noWait };
-  return { call: hostCall(d, stats), py: pyCall, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9", sleep: noWait };
+  return { call: hostCall(d, stats), ccnavi: ccnaviCall, cache: memoryCache(), now: () => new Date(NOW), stats, version: "9.9.9", sleep: noWait };
 }
 
 async function panelOf(mock: MockGitHub) {
@@ -226,10 +226,10 @@ test("CX-T136 service worker の読み取り（スレッドを取得した結果
   assert.match((none as { error: string }).error, /オープン状態のプルリクエストがありません/);
 });
 
-test("CX-T137 レビュー済みで Python に投げた要求（board・confirm）すべてに、Pyodide と手元の CPython が同じ答えを返す", { skip: native === null ? "uv が無い" : false }, async () => {
+test("CX-T137 レビュー済みで ccnavi に投げた要求（board・confirm）すべてに、WASM と手元向けの ccnavi が同じ答えを返す", async () => {
   const log: { req: Record<string, unknown>; res: Record<string, unknown> }[] = [];
-  const spy: PyCall = async (req) => {
-    const res = await py(req);
+  const spy: CcnaviCall = async (req) => {
+    const res = await ccnavi(req);
     log.push({ req, res });
     return res;
   };
@@ -240,7 +240,7 @@ test("CX-T137 レビュー済みで Python に投げた要求（board・confirm�
   assert.ok(confirms.some((l) => l.res.need_compare), "compare を求めた回がある");
   assert.ok(confirms.some((l) => l.req.compare && l.res.changes), "compare を渡して書くものを出した回がある");
   for (const { req, res } of log) {
-    assert.deepEqual(await native!.call(req), res, `${String(req.op)} ${String(req.family ?? "")}`);
+    assert.deepEqual(await native.call(req), res, `${String(req.op)} ${String(req.family ?? "")}`);
   }
 });
 

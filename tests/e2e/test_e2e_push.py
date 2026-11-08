@@ -22,9 +22,9 @@ tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で�
 通っていない。ここはそのつなぎ目だけを見る。個々の分岐はあちらが見るので、ここで増やさない。
 
 組み立て済みの実行ファイルが無ければ skip する（tests/e2e/test_e2e_sh.py と同じ前準備を使う）。
-試すのはソースではなくその実行ファイルなので、`src/ccnavi/` を直したら組み立て直してから回す。
+試すのはソースではなくその実行ファイルなので、`go/` を直したら組み立て直してから回す。
 
-    uv run --with pyinstaller python build.py
+    sh scripts/ccnavi-build.sh
     uv run python -m unittest tests.e2e.test_e2e_push -v
 
 承認はターミナルからしか通らない（`--agree` の壁）。テストはターミナルを持たないので、段 3 からは
@@ -41,10 +41,11 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
-from tests import config_path
+from tests import config_path, host_stub
 from tests.e2e.test_e2e_sh import DIST, SH_DIR, SHELL, SKIP, WorkspaceTest, git, write
 from tests.ticketsample import PHASES, parent_text
 
@@ -96,6 +97,10 @@ class ApproveAndPushTest(unittest.TestCase):
         git(self.ws, "push", "-q", "origin", "main")
         git(self.ws, "remote", "set-head", "origin", "main")
         self.tree = os.path.join(self.ws, ".claude", "worktrees", TICKET)
+        # `ccnavi-ticket.sh start` の事前確認は origin がホストのものであることを求める（手元のパスの origin は
+        # 本番では受けない）。ホストの代役は `git remote get-url origin` にだけホストの形の URL を答え、
+        # fetch・push は手元の bare へ通す。トークンを渡さないので、ホストの API は「確かめられなかった」で続く。
+        self.hostbin, self.routes, self.requests_log = host_stub.build(self.tmp, sys.executable)
 
     # ---- 道具
 
@@ -235,7 +240,15 @@ class ApproveAndPushTest(unittest.TestCase):
 
         # 5. 着手の欄は実行ファイルが承認済みチケットに書く。
         # 親の `start` は自分で書いた置き場をコミットして push するので、あとに送るものは残らない。
-        self.ok(self.run_sh("ccnavi-ticket.sh", "start", TICKET, cwd=self.tree))
+        self.ok(
+            self.run_sh(
+                "ccnavi-ticket.sh",
+                "start",
+                TICKET,
+                cwd=self.tree,
+                env=host_stub.env(self.hostbin, self.routes, self.requests_log),
+            )
+        )
         started = self.read(self.approved_copy())
         self.assertNotIn('started_at: ""', started)
         self.assertIn(pushed, started, "基準点が承認のコミットになっていない")

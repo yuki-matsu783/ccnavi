@@ -1,0 +1,36 @@
+/**
+ * ボードから ccnavi（WASM）の Worker を呼ぶ手段。
+ */
+import type { CcnaviCall } from "../core/ccnavi.js";
+
+export interface CcnaviWorker {
+  readonly call: CcnaviCall;
+  init(): Promise<{ boot_ms: number; total_ms: number; version: string; violations: string[] }>;
+}
+
+export function startWorker(): CcnaviWorker {
+  const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+  let next = 1;
+  const waiting = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
+  worker.addEventListener("message", (e: MessageEvent<{ id: number; ok: boolean; value?: unknown; error?: string }>) => {
+    const w = waiting.get(e.data.id);
+    if (!w) return;
+    waiting.delete(e.data.id);
+    if (e.data.ok) w.resolve(e.data.value);
+    else w.reject(new Error(e.data.error ?? "Worker が失敗しました"));
+  });
+  worker.addEventListener("error", (e) => {
+    for (const w of waiting.values()) w.reject(new Error(`Worker が異常終了しました：${e.message}`));
+    waiting.clear();
+  });
+  const send = (body: Record<string, unknown>) =>
+    new Promise<unknown>((resolve, reject) => {
+      const id = next++;
+      waiting.set(id, { resolve, reject });
+      worker.postMessage({ id, ...body });
+    });
+  return {
+    init: () => send({ kind: "init" }) as ReturnType<CcnaviWorker["init"]>,
+    call: async (request) => JSON.parse((await send({ kind: "call", request: JSON.stringify(request) })) as string),
+  };
+}

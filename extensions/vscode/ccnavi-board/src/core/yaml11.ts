@@ -1,13 +1,14 @@
 /**
- * 拡張が書くYAML（`yaml`ライブラリ、YAML 1.2）を、実行ファイル（PyYAML、YAML 1.1）が別の型に
+ * 拡張が書くYAML（`yaml`ライブラリ、YAML 1.2）を、実行ファイル（YAML 1.1）が別の型に
  * 読んでしまう語を見分ける。
  *
  * `yaml`は1.2の規則でしか引用符を足さないので、`yes` `on` `1:30` `0755`のような値を裸で書くと
- * PyYAMLは真偽値・六十進・八進として読み、`message`が`True`になったりidが`True`になったりする。
+ * 実行ファイルは真偽値・六十進・八進として読み、`message`が`True`になったりidが`True`になったりする。
  * `--lint`はそれを止めない（読めた値が正しい型なら苦情が無い）。ここにヒットする文字は
  * 引用符で囲んで書く。ヒットしない文字を囲まないのは、変えていない行の見た目を保つため。
  *
- * 規則はPyYAMLのresolver.pyの実装（bool / null / int / float / timestamp / merge / value）。
+ * 規則は実行ファイルのYAMLの読み手（go/internal/infra/yaml。PyYAMLの写し）の型の見分け
+ * （PyYAMLのresolver.pyのbool / null / int / float / timestamp / merge / value）。
  * 1.2でも型になる語（`true` `null` `123` `1.5` `.inf`）は`yaml`が自分で囲むが、重ねて囲んでも害は無い。
  */
 const PATTERNS: readonly RegExp[] = [
@@ -31,7 +32,7 @@ const PATTERNS: readonly RegExp[] = [
   /^<<$/,
 ];
 
-/** PyYAML（YAML 1.1）が文字列以外に読む表記なら真。空文字は真（`null`に読まれる） */
+/** 実行ファイル（YAML 1.1）が文字列以外に読む表記なら真。空文字は真（`null`に読まれる） */
 export function yaml11Ambiguous(text: string): boolean {
   if (text === "") {
     return true;

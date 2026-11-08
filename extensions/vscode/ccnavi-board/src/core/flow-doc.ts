@@ -1,7 +1,7 @@
 /**
  * 子チケットのフローの読み書き。フロー編集画面と拡張ホストが分け合う。
  *
- * ファイルはYAMLの1文書（既定`.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`src/ccnavi/tickets/flow/graph.py`）が読むもの。
+ * ファイルはYAMLの1文書（既定`.ccnavi/approved/flows/<子>.yml`）。形は実行ファイル（`go/internal/tickets/flow`）が読むもの。
  *
  *     id, name, description?, version
  *     nodes:          [node, ...]
@@ -240,9 +240,9 @@ export function asFlowDoc(raw: unknown): FlowDoc | undefined {
 /**
  * 書き出す本文。字下げ2のブロック形式で、長い行を折らない。複数行の文は`|`の形で書く。
  * 同じ中身が2度出ても別名（`&` / `*`）にしない（実行ファイルは別名を読まない）。
- * 実行ファイル（PyYAML、YAML 1.1）が文字以外に読む表記（`yes` `0755` `2026-01-01`など）と、
- * 裸や`|`ではPyYAMLが読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
- * `y` `n`はPyYAMLが文字として読むので囲まない（`position`の`y`をそのまま書く）。
+ * 実行ファイル（YAML 1.1）が文字以外に読む表記（`yes` `0755` `2026-01-01`など）と、
+ * 裸や`|`では実行ファイルが読めない・別の文字に読む文字列（`needsDoubleQuotes`）は二重引用符で囲む。
+ * `y` `n`は実行ファイルが文字として読むので囲まない（`position`の`y`をそのまま書く）。
  *
  * 書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に実行ファイルに読ませて見比べる
  * （`flow-match.ts`）。ここの囲み方はその見比べで止まらずに書くためのもの。
@@ -264,30 +264,30 @@ export function yamlText(value: unknown): string {
       }
     },
   });
-  // 二重引用符の中はJSONと同じ書き方にする（`yaml`の折り返しや独自のエスケープを使わない。PyYAMLはJSONの
-  // エスケープを全部読む）。そのうえでJSONが裸のまま残す文字を、PyYAMLが読めるエスケープに直す
-  return escapeForPyYaml(out.toString({ lineWidth: 0, doubleQuotedAsJSON: true }));
+  // 二重引用符の中はJSONと同じ書き方にする（`yaml`の折り返しや独自のエスケープを使わない。実行ファイルはJSONの
+  // エスケープを全部読む）。そのうえでJSONが裸のまま残す文字を、実行ファイルが読めるエスケープに直す
+  return escapeForYaml11(out.toString({ lineWidth: 0, doubleQuotedAsJSON: true }));
 }
 
 /**
- * PyYAMLが本文に裸では置けない文字（読み手が断る）。C0の制御文字（タブ・改行・復帰を除く）、DEL、
+ * 実行ファイルが本文に裸では置けない文字（読み手が断る）。C0の制御文字（タブ・改行・復帰を除く）、DEL、
  * C1の制御文字（U+0085を除く）、U+FFFE・U+FFFF、対になっていないサロゲート
  */
-const PYYAML_UNPRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
-/** PyYAML（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に置き換えられる）と、文書の頭で読み飛ばすBOM */
-const PYYAML_BREAKS = /[\u0085\u2028\u2029\uFEFF]/;
+const YAML11_UNPRINTABLE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F\uFFFE\uFFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+/** 実行ファイル（YAML 1.1）が改行として読む文字（二重引用符の中でも空白に置き換えられる）と、文書の頭で読み飛ばすBOM */
+const YAML11_BREAKS = /[\u0085\u2028\u2029\uFEFF]/;
 
 /**
  * 裸でも`|`でも正しく書けない文字列。二重引用符（とエスケープ）で書く。
  *
- * - タブ・復帰・U+0085・U+2028・U+2029・U+FEFF・PyYAMLが裸では読めない文字を含む（`a\tb`を裸で書くとPyYAMLが
- *   読めない。U+0085などはPyYAMLが改行として読む。本文の頭のU+FEFFはBOMとして読み飛ばされる）
- * - 複数行で、1行目の頭が空白（1行目が空白だけの`|+`はPyYAMLが中身を取り違える。字下げの指示に頼らない）か、
+ * - タブ・復帰・U+0085・U+2028・U+2029・U+FEFF・実行ファイルが裸では読めない文字を含む（`a\tb`を裸で書くと実行ファイルが
+ *   読めない。U+0085などは実行ファイルが改行として読む。本文の頭のU+FEFFはBOMとして読み飛ばされる）
+ * - 複数行で、1行目の頭が空白（1行目が空白だけの`|+`は実行ファイルが中身を取り違える。字下げの指示に頼らない）か、
  *   どこかの行の末尾が空白（空白だけの行を含む。行末の空白の扱いを読み手に任せない）。2行目から先の頭の空白は
  *   `|`のままで読める
  */
 export function needsDoubleQuotes(text: string): boolean {
-  if (/[\t\r]/.test(text) || PYYAML_BREAKS.test(text) || PYYAML_UNPRINTABLE.test(text)) {
+  if (/[\t\r]/.test(text) || YAML11_BREAKS.test(text) || YAML11_UNPRINTABLE.test(text)) {
     return true;
   }
   if (!text.includes("\n")) {
@@ -299,10 +299,10 @@ export function needsDoubleQuotes(text: string): boolean {
 const BREAK_ESCAPES: Readonly<Record<string, string>> = { "\u0085": "\\N", "\u2028": "\\L", "\u2029": "\\P" };
 
 /**
- * JSONの書き方が裸のまま残す文字を、PyYAMLの二重引用符のエスケープに直す。こうした文字を含む文字列は
+ * JSONの書き方が裸のまま残す文字を、実行ファイル（YAML 1.1）の二重引用符のエスケープに直す。こうした文字を含む文字列は
  * どれも二重引用符で書いてある（`needsDoubleQuotes`）ので、本文に裸で出るのは二重引用符の中だけ
  */
-function escapeForPyYaml(text: string): string {
+function escapeForYaml11(text: string): string {
   return text.replace(/[\u0085\u2028\u2029\x7F-\x84\x86-\x9F\uFEFF\uFFFE\uFFFF]/g, (ch) => {
     const named = BREAK_ESCAPES[ch];
     if (named !== undefined) {

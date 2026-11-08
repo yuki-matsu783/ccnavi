@@ -15,15 +15,15 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 | 型 | 何で止める | 向く場面 | 非対話（`claude -p`）での挙動 | 現在の例 |
 |---|---|---|---|---|
-| 拒否（deny） | ルールファイルの `deny` と、`hook/judge.py` の組み込みのゲート | 戻せない・代わりの経路がある | 止まる。文面がエージェントに返る | ルール `workspace-root`、組み込みの `DENY_TICKET_PARENT`・`DENY_PHASE_REVIEW`・`DENY_CHILD_PUSH` |
-| 確認（ask） | ユーザの確認ダイアログ（ルールの `ask`） | ユーザが毎回見たい | 確認に答える人が居ないので、実質の拒否。理由文（`reasons.ask_hint`）がエージェントに返る | ルール `direct-worktree-confirm`、`RULE_ASK` |
+| 拒否（deny） | ルールファイルの `deny` と、`go/internal/hook/judge` の組み込みのゲート | 戻せない・代わりの経路がある | 止まる。文面がエージェントに返る | ルール `workspace-root`、組み込みの `DENY_TICKET_PARENT`・`DENY_PHASE_REVIEW`・`DENY_CHILD_PUSH` |
+| 確認（ask） | ユーザの確認ダイアログ（ルールの `ask`） | ユーザが毎回見たい | 確認に答える人が居ないので、実質の拒否。理由文（`reasons.AskHint`）がエージェントに返る | ルール `direct-worktree-confirm`、`RULE_ASK` |
 | 確認コード | スクリプトが今の状態から出す `--accept <コード>` を付けて打ち直す | ユーザが状態の報告を見て了承し、その了承を、その状態に結び付けたい（状態が動くとコードが変わり、古い了承は通らない） | コードはルールの確認に出る行に付くので、確認と同じく実質の拒否 | `ccnavi-worktree.sh` の `--accept` |
 | ユーザ専用の入口 | `ccnavi-user-*.sh`（ユーザの端末で打つ）。エージェントが打つ形は組み込みのゲートが止める | 承認・取り下げなど、人の判断 | 止まる。対話・非対話で同じ | `ccnavi-user-agree.sh`（止めるゲートは `DENY_TICKET_APPROVAL_CLI`） |
-| 発言をまたぐゲート（ターン分離） | 前の段のあとにユーザの発言が 1 回あること（`hook/turngate.py`） | 「見せて返事を待つ」を機械で確かめたい | 1 回の発言では通らない。付き添いのある対話では、宣言に `ask_if_attended` を立てると、発言を待たず確認（ask）に出る | `integrate` → `integrate-done`（`DENY_NEEDS_USER_TURN`。対話では確認）、`review-request` → `confirm`（同じ拒否。対話でも確認に出さず、「レビューを終えた」というユーザの発言を待つ。キーは `--phase`） |
+| 発言をまたぐゲート（ターン分離） | 前の段のあとにユーザの発言が 1 回あること（`go/internal/hook/turngate`） | 「見せて返事を待つ」を機械で確かめたい | 1 回の発言では通らない。付き添いのある対話では、宣言に `ask_if_attended` を立てると、発言を待たず確認（ask）に出る | `integrate` → `integrate-done`（`DENY_NEEDS_USER_TURN`。対話では確認）、`review-request` → `confirm`（同じ拒否。対話でも確認に出さず、「レビューを終えた」というユーザの発言を待つ。キーは `--phase`） |
 | 促し（nudge） | `Stop` で 1 回だけ止めて文を渡す | 次の一手を忘れさせたくない | 同じ | `NUDGE_INTEGRATE`、`NUDGE_TICKET_FINISH` |
 | 案内（context） | `additionalContext` / `additionalContextOnce` | 止めずに言う | 同じ | ルール `prefer-read-grep`、`prefer-webfetch` |
 
-- 拒否は、`dry-run` では一般の `deny` が報告だけになり、ゲートと補助の保護は止める（`infra/modes.py` の分類）。発言をまたぐゲートはゲートに入れる
+- 拒否は、`dry-run` では一般の `deny` が報告だけになり、ゲートと補助の保護は止める（`go/internal/infra/config` の `HoldsInDryRun` の分類）。発言をまたぐゲートはゲートに入れる
 - 促しは判断ではなく文を渡すだけ。促しで続けた同じターンは、ユーザの発言に数えない
 
 ## 選び方
@@ -38,7 +38,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 確認のあとに、スクリプトが状態を見て拒否することがある。確認の理由が「了承されたら打ち直してください」としか言わないと、エージェントは了承を頼み、打ち直し、同じ内容の拒否に着く。
 
-- 確認の理由に、通らない条件を入れる。`ask_hint` のルールごとの文（文面ファイル `deny-reasons.yml` の `RULE_ASK__<ルール>`。`reasons._ASK_ALTERNATIVE` が、ルールと対象の語から識別子を引く）に足す。条件は対象の語で絞れる（`--adopt` のときだけ、など）
+- 確認の理由に、通らない条件を入れる。`ask_hint` のルールごとの文（文面ファイル `deny-reasons.yml` の `RULE_ASK__<ルール>`。`reasons.askAlternative` が、ルールと対象の語から識別子を引く）に足す。条件は対象の語で絞れる（`--adopt` のときだけ、など）
 - hook は git もネットワークも起こさない（[実行ファイルの境界](exe-boundary.md)）ので、スクリプトの拒否を hook で先に出さない。ルールの `except` と `when` は、ワークスペースルートと名前しか見えず、結び付きのような状態を知らない
 - 例: `direct-worktree-confirm` の `--adopt` は、チケットに結び付く名前のワークツリーには、了承されても通らない。理由がそれを先に言う
 
@@ -46,8 +46,8 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 確認（ask）の画面に出るのは、コマンドや質問だけである。なぜその操作が要るのか、許可と拒否で何が起きるのかは出ない。確認の前の発言で、見出しを付けて言わせる。
 
-- 対象は、ccnavi が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離のゲートの確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認（ccnavi が返さないもの）は対象外。`hook/judge.py` の `refuse`（確認を返す前）と、`AskUserQuestion` の入口が、同じ関数（`askcontext.stop_text`）を通る。条件を操作ごとに書き直さない
-- 要る節は「前提・背景」（なぜ今この操作が要るか、ここまでの経緯）と「想定結果」（許可した場合と断った場合に何が起きるか）。別名は `askcontext.SECTIONS` にある。節を足す・名前を変えるときは、`SECTIONS` と文面（`DENY_ASK_NEEDS_CONTEXT`）と設計書の付録を揃える
+- 対象は、ccnavi が返す確認すべて（ルールの `ask`・チケットの `ask`・ターン分離のゲートの確認・どのルールも言及しない呼び出しの確認）と `AskUserQuestion`。`ExitPlanMode` と、Claude Code 自身の権限の確認（ccnavi が返さないもの）は対象外。`go/internal/hook/judge` の `refuse`（確認を返す前）と、`AskUserQuestion` の入口が、同じ関数（`go/internal/hook/askcontext` の `StopText`）を通る。条件を操作ごとに書き直さない
+- 要る節は「前提・背景」（なぜ今この操作が要るか、ここまでの経緯）と「想定結果」（許可した場合と断った場合に何が起きるか）。別名は `askcontext.sections` にある。節を足す・名前を変えるときは、`SECTIONS` と文面（`DENY_ASK_NEEDS_CONTEXT`）と設計書の付録を揃える
 - 戻せない操作では、想定結果に「戻せるか・取り消し方」を含める。未確認のこと・代替案・おすすめは検査せず、書いたほうがよい内容として扱う。節が増えるほど、見出しだけを埋める発言が増えるため
 - 見出しが無いときの拒否は差し戻し。ターンは終わらず、文面の次の一手（見出しを書いて、ユーザの返事を待たずに打ち直す）がエージェントに返る
 - 機械が見るのは見出しの語だけ。中身が適切かは見ない
@@ -68,7 +68,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 - 組み込みルールの文（`RULE_*`。`RULE_ASK` の系統を除く）は `what` だけが必須で、`why` `next` `no_bypass` は省くか空にしてよい。ルールごとに止める対象が違い、言うことが無い段を作り足すと偽の文になるため。緩めるのは `RULE_*` に限る。`DENY_*` と `RULE_ASK` の系統は、行き止まりを作らないよう 4 つを必ず書く。`次:` を省いた `RULE_*` の文は、読むだけなら通ることや、頼む先（ユーザ）を `what` か `note` で言って、エージェントが次に何をするかが分かるようにする
 - 拒否コード（`DENY_*`）は、判定の根拠の種類を指す。1 つの種類に複数の宣言があるときは、コードを分けず、記録の `rules`（`builtin:` で始まる名前）と文面に、宣言の id を出す。コードを足したら、設計書の付録の理由コードの表と組み込みの名前の表に行を足す
-- 組み込みの拒否は `reasons.builtin_refusal(code, rule_id, subject, text)` で組む。先頭の行に、コードと記録の `rules` と同じ名前が並ぶ。`text` は `texts.say` が文面ファイルから組む（まだ移していないものは[文面の移行の一覧](message-migration.md)にある）
+- 組み込みの拒否は `reasons.builtin_refusal(code, rule_id, subject, text)` で組む。先頭の行に、コードと記録の `rules` と同じ名前が並ぶ。`text` は `texts.Say` が文面ファイルから組む（まだ移していないものは[文面の移行の一覧](message-migration.md)にある）
 - 文言に ADR 番号を書かない（[実行環境とADRの扱い](environment.md)）
 - 経緯は書かない。いまの理由だけ書く
 - 点検項目:
@@ -80,7 +80,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 ## ターン分離のゲート
 
-「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める汎用の部品（`hook/turngate.py`）。宣言（`Gate`）の表を渡して判定するので、別の組を止めるには宣言を足す。止めるのは B の側だけで、A と B が同じターンに起きたことを、あとから点検する処理は作らない。
+「A を打ったら、ユーザの発言が 1 回はさまるまで B を打てない」を止める汎用の部品（`go/internal/hook/turngate` の `Check`・`Note`）。宣言（`Gate`）の表を渡して判定するので、別の組を止めるには宣言を足す。止めるのは B の側だけで、A と B が同じターンに起きたことを、あとから点検する処理は作らない。
 
 ### 宣言の書き方
 
@@ -99,17 +99,17 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 別の組を足す手順:
 
-1. `turngate.py` の `BUILTIN` に宣言を 1 件足す。キーの regex は、引数の並びの揺れ（`-m <メッセージ>` を名前の前後どちらにも置ける、など）を実際のスクリプトの引数の読み方に合わせて書く
-2. `tests/core/test_turngate.py` に、宣言の表を直接渡す単体のテストを足す。`integrate` と関係の無い架空の組が先例にある
+1. `go/internal/hook/turngate/turngate.go` の `Builtin` に宣言を 1 件足す。キーの regex は、引数の並びの揺れ（`-m <メッセージ>` を名前の前後どちらにも置ける、など）を実際のスクリプトの引数の読み方に合わせて書く
+2. `go/internal/hook/turngate/turngate_test.go` に、宣言の表を直接渡す単体のテストを足す。`integrate` と関係の無い架空の組が先例にある
 3. hook の入口のテスト（`tests/guard/test_turngate_hook.py`）に、実際の呼び出しの順で止まることと、発言を 1 回はさむと通ることを足す
 4. 文面ファイルに `DENY_NEEDS_USER_TURN__<宣言>` を足し、宣言の `message` に指す。上の文面の型に沿わせる。設計書の付録の組み込みの名前の表に宣言の id を足す
 5. 手順書・出力・促しで、A のあとの一手を「ユーザの了承（対話では確認の許可、非対話では次の発言）のあと」と揃えて書く。`ask_if_attended` を立てるなら、確認の前に見せるものを文面の次の一手で言う（確認の画面に出るのはコマンドだけ）
 
-宣言は組み込みの表に置く。ユーザの了承のゲートを、配布先のルールファイルで外されないようにするため。`rules.yml` に `turn-gates:` の節を足して、ルールファイルから宣言を足せるようにする道は、いまは持たない。最初の利用が 1 件で、2 件目の具体的な需要がなく、書式の版（`rules.VERSION`）と、レイヤーの合成・lint・`--explain` に手が入るため。足す日が来たら、宣言の欄がそのままノードの欄になる。足すだけで、組み込みの宣言を外す・弱めることはできない形にする。
+宣言は組み込みの表に置く。ユーザの了承のゲートを、配布先のルールファイルで外されないようにするため。`rules.yml` に `turn-gates:` の節を足して、ルールファイルから宣言を足せるようにする道は、いまは用意しない。最初の利用が 1 件で、2 件目の具体的な需要がなく、書式の版（`rules.Version`）と、レイヤーの合成・lint・`--explain` に手が入るため。足す日が来たら、宣言の欄がそのままノードの欄になる。足すだけで、組み込みの宣言を外す・弱めることはできない形にする。
 
 ### ユーザの発言の数え方
 
-ユーザの発言の時刻は、`state/userprompt-<セッション>.json` に、`hookio.is_user_prompt` が真の `UserPromptSubmit` だけが書く。ターンの印（`records/turn.py`）は `Stop` で消えるので使えない。迷うものは数えない。
+ユーザの発言の時刻は、`state/userprompt-<セッション>.json` に、`hookio.IsUserPrompt` が真の `UserPromptSubmit` だけが書く。ターンの印（`go/internal/records/turn`）は `Stop` で消えるので使えない。迷うものは数えない。
 
 | 形 | 数えるか | 根拠 |
 |---|---|---|

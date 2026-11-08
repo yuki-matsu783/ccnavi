@@ -49,6 +49,7 @@ export const KNOWN_TOOLS = [
   "Grep",
   "Glob",
   "Edit",
+  "MultiEdit",
   "Write",
   "NotebookEdit",
   "Skill",

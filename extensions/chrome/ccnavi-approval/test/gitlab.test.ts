@@ -1,5 +1,5 @@
 /**
- * GitLab・プロジェクトのリポジトリ・「始める」。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
+ * GitLab・プロジェクトのリポジトリ・「始める」。模擬の GitHub・GitLab と Node の上の WASM で回す。
  *
  * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む結果は、sh が組んだ期待値と同じ
  * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェストを出す（読み取りの一致）
@@ -17,7 +17,7 @@ import { JSDOM } from "jsdom";
 
 import * as gl from "../src/core/gitlab.js";
 import { dispatch, type Deps } from "../src/core/protocol.js";
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -29,14 +29,14 @@ import { gitlabSceneFetch, gitlabSceneNames, GITLAB_SCENES, loadGitLabScene, typ
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { MockGitLab } from "./helpers/mock-gitlab.js";
-import { nativePy, pyodidePy } from "./helpers/python.js";
+import { nativeCcnavi, wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
-const native = nativePy();
-after(() => native?.close());
+const native = nativeCcnavi();
+after(() => native.close());
 
 const GH_REPO: RepoConfig = { ...GITLAB_REPO, host: "github.com" };
 const GL = HOSTS.find((h) => h.id === "gitlab.com")!;
@@ -46,12 +46,12 @@ const TOKENS = new Map([
   ["gitlab.com", TOKEN],
 ]);
 
-function glDeps(mock: MockGitHub, host = "gitlab.com", repos: RepoConfig[] = [GITLAB_REPO, GH_REPO], pyCall: PyCall = py): WriteDeps {
+function glDeps(mock: MockGitHub, host = "gitlab.com", repos: RepoConfig[] = [GITLAB_REPO, GH_REPO], ccnaviCall: CcnaviCall = ccnavi): WriteDeps {
   const stats = newStats();
   const d = { ...deps(mock, TOKENS, new Map(), () => new Date(NOW), repos), sleep: noWait };
   return {
     call: hostCall(d, stats, host),
-    py: pyCall,
+    ccnavi: ccnaviCall,
     cache: memoryCache(),
     now: () => new Date(NOW),
     stats,
@@ -381,12 +381,12 @@ function twoHosts(name = "web") {
   const project: RepoConfig = { ...GITLAB_REPO, project: name, workspace: "github.com/acme/widgets" };
   const repos = [GH_REPO, project];
   const fetch: Deps["fetch"] = (url, init) => (url.startsWith("https://gitlab.com/") ? lab.fetch(url, init) : hub.fetch(url, init));
-  const make = (pyCall: PyCall = py): WriteDeps => {
+  const make = (ccnaviCall: CcnaviCall = ccnavi): WriteDeps => {
     const stats = newStats();
     const d: Deps = { ...deps(hub, TOKENS, new Map(), () => new Date(NOW), repos), fetch, sleep: noWait };
     return {
       call: hostCall(d, stats, "gitlab.com"),
-      py: pyCall,
+      ccnavi: ccnaviCall,
       cache: memoryCache(),
       now: () => new Date(NOW),
       stats,
@@ -416,10 +416,10 @@ test("CX-T154 プロジェクトのリポジトリ: ワークスペースの統�
   assert.match(alone.error, /ワークスペースのリポジトリ/);
 });
 
-test("CX-T155 GitLab・プロジェクト・「始める」で Python に投げた要求（board・plan・confirm・start）すべてに、Pyodide と手元の CPython が同じ答えを返す", { skip: native === null ? "uv が無い" : false }, async () => {
+test("CX-T155 GitLab・プロジェクト・「始める」で ccnavi に投げた要求（board・plan・confirm・start）すべてに、WASM と手元向けの ccnavi が同じ答えを返す", async () => {
   const log: { req: Record<string, unknown>; res: Record<string, unknown> }[] = [];
-  const spy: PyCall = async (req) => {
-    const res = await py(req);
+  const spy: CcnaviCall = async (req) => {
+    const res = await ccnavi(req);
     log.push({ req, res });
     return res;
   };
@@ -435,7 +435,7 @@ test("CX-T155 GitLab・プロジェクト・「始める」で Python に投げ�
   const ops = new Set(log.map((l) => l.req.op));
   for (const op of ["board", "plan", "confirm", "start"]) assert.ok(ops.has(op), op);
   for (const { req, res } of log) {
-    assert.deepEqual(await native!.call(req), res, `${String(req.op)} ${String(req.family ?? "")}`);
+    assert.deepEqual(await native.call(req), res, `${String(req.op)} ${String(req.family ?? "")}`);
   }
 });
 
@@ -491,7 +491,7 @@ test("CX-T158 ボードの「始める」の欄と「要確認」: issue のタ�
   assert.equal((dom.window as unknown as { __pwned?: string }).__pwned, undefined);
 });
 
-test("CX-T181 Pyodide の仮のツリー（/ws）の下でも、文面の途中の ws を畳まない（プロジェクト ws・スレッドの本文の projects/ws/）", async () => {
+test("CX-T181 WASM の仮のツリー（/ws）の下でも、文面の途中の ws を畳まない（プロジェクト ws・スレッドの本文の projects/ws/）", async () => {
   // プロジェクトの名前が ws でも、一覧の行き先と書く先は変わらない
   const { lab, project, make } = twoHosts("ws");
   const b = await collectRepo(project, make());
@@ -501,7 +501,7 @@ test("CX-T181 Pyodide の仮のツリー（/ws）の下でも、文面の途中�
   const out = await approveFamily(project, "ws-i0012", shownOf(b, "ws-i0012"), make());
   assert.equal(out.kind, "written", JSON.stringify(out));
   assert.ok(".ccnavi/approved/doing/ws-i0012.md" in lab.files("ws-i0012"));
-  // スレッドの本文の途中にある /ws/ は、Python が文面を畳むときに消さない
+  // スレッドの本文の途中にある /ws/ は、ccnavi が文面を畳むときに消さない
   const mock = reviewingOnGitLab("impostor", "gitlab", (scene) => {
     for (const d of scene.files["discussions.1.json"] as { notes: { id: number; body: string }[] }[]) {
       for (const n of d.notes) if (n.id === 5203) n.body = "projects/ws/src/app.ts と a/ws/b を見直す";

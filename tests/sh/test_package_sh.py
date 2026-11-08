@@ -73,11 +73,10 @@ class PackageTest(unittest.TestCase):
         os.makedirs(root)
         subprocess.run([REAL_GIT, "init", "-q", root], check=True)
         os.makedirs(os.path.join(root, "scripts"))
-        for name in ("package", "setup", "install", "doctor"):
+        for name in ("package", "build", "setup", "install", "doctor"):
             shutil.copy(script(f"ccnavi-{name}.sh"), os.path.join(root, "scripts"))
-        write(os.path.join(root, "build.py"), "")
         write(os.path.join(root, ".gitignore"), "dist/\nbuild/\n")
-        write(os.path.join(root, "src", "ccnavi", "entry", "version.py"), "COMPAT = 18\n")
+        write(os.path.join(root, "go", "cmd", "ccnavi", "main.go"), "package main\n")
         vsc = os.path.join(root, "extensions", "vscode", "ccnavi-board")
         write(os.path.join(vsc, "package.json"), '{"name":"ccnavi-board","version":"0.1.0"}\n')
         write(os.path.join(vsc, self.VSC_VERSION_TS), "export const EXTENSION_COMPAT = 18;\n")
@@ -103,6 +102,8 @@ class PackageTest(unittest.TestCase):
         ):
             write(os.path.join(root, junk))
         write(os.path.join(root, ".claude", "skills", "s", "SKILL.md"), "skill\n")
+        # zip がリンクを保つかを見る置き場。
+        os.symlink("SKILL.md", os.path.join(root, ".claude", "skills", "s", "link.md"))
         for top in ("logs", "wip", "tests"):
             write(os.path.join(root, top, "keep.txt"))
         git(root, "add", "-A")
@@ -115,8 +116,6 @@ class PackageTest(unittest.TestCase):
         shutil.rmtree(dist, ignore_errors=True)
         write(os.path.join(dist, "ccnavi.target"), THIS_MACHINE + "\n")
         write_exec(os.path.join(dist, "ccnavi", "ccnavi"), FAKE_EXE.replace("COMMIT", head))
-        write(os.path.join(dist, "ccnavi", "_internal", "lib.so.1"), "lib\n")
-        os.symlink("lib.so.1", os.path.join(dist, "ccnavi", "_internal", "lib.so"))
         write(os.path.join(dist, "ccnavi-board-0.1.0.vsix"), "current")
         write(os.path.join(dist, "ccnavi-board-0.0.9.vsix"), "old")
         cdist = os.path.join(root, self.CHROME, "dist")
@@ -173,10 +172,11 @@ class PackageTest(unittest.TestCase):
             ".ccnavi/docs/.DS_Store",
             ".claude/skills/s/ccnavi-index.jsonl",
             "scripts/ccnavi-package.sh",
+            "scripts/ccnavi-build.sh",
             "logs/keep.txt",
             "wip/keep.txt",
             "tests/keep.txt",
-            "src/ccnavi/entry/version.py",
+            "go/cmd/ccnavi/main.go",
         ):
             self.assertNotIn(unwanted, got)
         self.assertEqual(count_next(done.stdout), 1)
@@ -240,14 +240,11 @@ class PackageTest(unittest.TestCase):
         )
         for rel in junk:
             write(os.path.join(self.root, rel), "secret\n")
-        # 実行ファイルが使う証明書の束は残す
-        write(os.path.join(self.root, "dist", "ccnavi", "_internal", "cacert.pem"), "ca\n")
         done = self.package()
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         got = set(self.members())
         for rel in junk:
             self.assertNotIn(rel, got)
-        self.assertIn("dist/ccnavi/_internal/cacert.pem", got)
 
     def test_dash_named_out_is_taken_as_a_path(self):
         done = subprocess.run(
@@ -331,11 +328,7 @@ class PackageTest(unittest.TestCase):
             real = shutil.which(name)
             if real:
                 os.symlink(real, os.path.join(bin_dir, name))
-        write_exec(
-            os.path.join(bin_dir, "uv"),
-            '#!/bin/sh\nwhile [ "$1" != "-m" ]; do shift; done\nshift\n'
-            f'exec "{sys.executable}" -m "$@"\n',
-        )
+        os.symlink(sys.executable, os.path.join(bin_dir, "python3"))
         env = dict(os.environ)
         env["PATH"] = bin_dir
         return env
@@ -346,7 +339,7 @@ class PackageTest(unittest.TestCase):
         self.assertIn("シンボリックリンク", done.stderr)
 
     def test_python_zipfile_without_symlinks(self):
-        os.remove(os.path.join(self.root, "dist", "ccnavi", "_internal", "lib.so"))
+        os.remove(os.path.join(self.root, ".claude", "skills", "s", "link.md"))
         done = self.package(env=self.isolated_path_without_zip())
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("dist/ccnavi/ccnavi", self.members())
@@ -362,9 +355,9 @@ class PackageTest(unittest.TestCase):
         os.makedirs(unpacked)
         subprocess.run(["unzip", "-q", self.zip_path(), "-d", unpacked], check=True)
         folder = os.path.join(unpacked, os.listdir(unpacked)[0])
-        link = os.path.join(folder, "dist", "ccnavi", "_internal", "lib.so")
+        link = os.path.join(folder, ".claude", "skills", "s", "link.md")
         self.assertTrue(os.path.islink(link))
-        self.assertEqual(os.readlink(link), "lib.so.1")
+        self.assertEqual(os.readlink(link), "SKILL.md")
         ws = os.path.join(self.base, "ws")
         os.makedirs(ws)
         subprocess.run([REAL_GIT, "init", "-q", ws], check=True)

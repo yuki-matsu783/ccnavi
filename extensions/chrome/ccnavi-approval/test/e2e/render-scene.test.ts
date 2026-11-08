@@ -14,7 +14,7 @@ import path from "node:path";
 import { fixture, reviewFamilyFiles, requestedMark } from "../fixtures/repo.js";
 import { makeRepo } from "../helpers/git-repo.js";
 import { TOKEN } from "../helpers/mock-github.js";
-import { HERE } from "../helpers/python.js";
+import { HERE } from "../helpers/ccnavi.js";
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-render-e2e-"));
 after(() => fs.rmSync(tmp, { recursive: true, force: true }));

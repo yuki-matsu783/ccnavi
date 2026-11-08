@@ -1,67 +1,36 @@
 """承認済みチケットの置き場を、1 回の起動で 1 度だけ読むことの受入テスト。
 
-`--explain`（ボードの JSON と文の一覧）と `--lint` は、親ごとの局面とフェーズ
-（`phase.stage`・`phase.phases_of`・`phase.order_problems`）まで同じ読み（`approval.read_raw`）を
-使い回す。親ごとに読み直すと、読む回数が親の数とツリーの数の積で増え、置き場が育った
-ワークスペースでは VS Code の拡張の期限を超える。
+`--explain`（ボードの JSON と文の一覧）と `--lint` は、親ごとの局面とフェーズまで同じ読み
+（`approval.ReadRaw`）を使い回す。親ごとに読み直すと、読む回数が親の数とツリーの数の積で増え、
+置き場が育ったワークスペースでは VS Code の拡張の期限を超える。
 
-hook も同じ。実行前チェック（レビュー待ちの止め）、実行後チェック（範囲とフェーズの知らせ）、
-ターンの終わり（範囲と `finish` の促し）は、置き場を 1 度だけ読む。実行後チェックがワークツリーを
-戻した回だけは、置き場も戻っていることがあるので読み直す。
-
-数えるのは置き場を読む 3 つの関数（`read_raw`・`scan_all`・`review_all`）と、1 本ずつ読む
-`load_copy`。1 度だけ読めば `scan_all` は作業中と閉じたで 2 回、`review_all` は 1 回になり、
-`load_copy` は全ツリーの置き場のファイルの数と同じになる。
+実行ファイルの中に数える口は置かない。strace で実行ファイルが開いたファイルを記録し、全ツリーの
+`.ccnavi/approved/{doing,done}/*.md` がそれぞれ 1 度だけ開かれたことを見る。strace の無い機械
+（Linux 以外を含む）では飛ばす。
 """
 
 from __future__ import annotations
 
-import contextlib
+import collections
 import glob
-import json
 import os
-from unittest import mock
+import re
+import shutil
+import subprocess
+import sys
+import unittest
 
-from ccnavi.hook import post
-from ccnavi.records import audit
-from ccnavi.tickets.approval import store as approval
+from tests import exe, userform
+from tests.inproc import GIT_ENV
 from tests.ticket.test_phases import PhaseHarness, git
 from tests.ticketsample import child_text, parent_text
 
-
-class Reads:
-    """置き場を読む関数の呼ばれた回数。"""
-
-    def __init__(self, stack: contextlib.ExitStack):
-        self.read_raw = stack.enter_context(
-            mock.patch.object(approval, "read_raw", wraps=approval.read_raw)
-        )
-        self.scan_all = stack.enter_context(
-            mock.patch.object(approval, "scan_all", wraps=approval.scan_all)
-        )
-        self.review_all = stack.enter_context(
-            mock.patch.object(approval, "review_all", wraps=approval.review_all)
-        )
-        self.load_copy = stack.enter_context(
-            mock.patch.object(approval, "load_copy", wraps=approval.load_copy)
-        )
-
-    def counts(self) -> tuple[int, int, int]:
-        return (self.read_raw.call_count, self.scan_all.call_count, self.review_all.call_count)
+_STRACE = shutil.which("strace") if sys.platform.startswith("linux") else None
+_OPENED = re.compile(r'openat\([^,]+, "([^"]+)"')
 
 
-ONCE = (1, 2, 1)
-
-
+@unittest.skipUnless(_STRACE, "strace が無い（Linux だけで回す）")
 class RawShareTest(PhaseHarness):
-    # ---- 道具
-
-    def counted(self, run):
-        with contextlib.ExitStack() as stack:
-            reads = Reads(stack)
-            result = run()
-        return result, reads
-
     def ended_phase(self):
         """フェーズ 1 を終わらせる（レビュー準備中になる手前）。"""
         self.family(plan=["chores", "design"])
@@ -74,31 +43,53 @@ class RawShareTest(PhaseHarness):
         self.commit_parent("close 01")
         self.merge("i0001-01-01")
 
-    def approved_files(self) -> int:
-        """全ツリーの承認済みチケットの置き場（作業中・閉じた）とレビュー待ちのファイルの数。"""
-        pattern = [
-            os.path.join(self.root, ".ccnavi", "approved", "*", "*.md"),
-            os.path.join(
-                self.root, ".claude", "worktrees", "*", ".ccnavi", "approved", "*", "*.md"
-            ),
-            os.path.join(self.root, "wip", "proposals", "review", "*.md"),
-            os.path.join(
-                self.root, ".claude", "worktrees", "*", "wip", "proposals", "review", "*.md"
-            ),
-        ]
-        return sum(len(glob.glob(p)) for p in pattern)
+    def approved_files(self) -> list[str]:
+        """全ツリーの承認済みチケットの置き場（作業中・閉じた）のファイル。"""
+        found = []
+        for top in [self.root, *glob.glob(os.path.join(self.root, ".claude", "worktrees", "*"))]:
+            for state in ("doing", "done"):
+                found += glob.glob(os.path.join(top, ".ccnavi", "approved", state, "*.md"))
+        return sorted(os.path.realpath(p) for p in found)
 
-    def stop(self, cwd):
-        payload = {"hook_event_name": "Stop", "cwd": cwd, "session_id": "s1"}
-        return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
-
-    # ---- 診断
+    def opened(self, *args) -> collections.Counter:
+        """実行ファイルを strace の下で起こし、開いたファイルの回数を返す。"""
+        log = os.path.join(self.root, "strace.log")
+        argv = userform.place(
+            [
+                "--root",
+                self.root,
+                "--guard-core-files",
+                "disable",
+                "--restore-if-deny",
+                "disable",
+                "--guard-ticket-approval",
+                "disable",
+            ],
+            list(args),
+        )
+        environment = {
+            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            "CCNAVI_LEARNING": "disable",
+            **GIT_ENV,
+        }
+        environment.pop("CLAUDE_PROJECT_DIR", None)
+        done = subprocess.run(
+            [_STRACE, "-f", "-qq", "-e", "trace=openat", "-o", log, exe.path(), *argv],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=environment,
+        )
+        self.assertIn(done.returncode, (0, 1), done.stdout + done.stderr)
+        with open(log, encoding="utf-8", errors="replace") as f:
+            paths = [m.group(1) for m in map(_OPENED.search, f) if m]
+        return collections.Counter(os.path.realpath(p) for p in paths)
 
     def test_explain_and_lint_read_the_approved_copies_once(self):
-        """親とツリーが増えても、`--explain` と `--lint` が置き場を読むのは 1 度。"""
+        """親とツリーが増えても、`--explain` と `--lint` が置き場のファイルを開くのは 1 度ずつ。"""
         self.ended_phase()
         self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")  # レビュー準備中にする
-        # 親をもう 1 つと、ワークツリーを 2 つ足す。読む回数は変わらない。
+        # 親をもう 1 つと、ワークツリーを 2 つ足す。開く回数は変わらない。
         other = self.worktree("i0002", "main")
         self.propose("i0002", parent_text("i0002", ["chores"]), tree=other)
         git(other, "add", "-A")
@@ -107,91 +98,27 @@ class RawShareTest(PhaseHarness):
         self.worktree("x1", "i0001")
         self.worktree("x2", "i0001")
         files = self.approved_files()
+        self.assertGreater(len(files), 4)
         for args in (("--explain", "--json"), ("--explain",), ("--lint", "--json")):
             with self.subTest(args=args):
-                result, reads = self.counted(lambda args=args: self.ccnavi(*args))
-                self.assertIn(result.returncode, (0, 1), result.stdout + result.stderr)
-                self.assertEqual(reads.counts(), ONCE)
-                self.assertEqual(reads.load_copy.call_count, files)
-        board = json.loads(self.ccnavi("--explain", "--json").stdout)
-        parents = {p["ticket"]: p for p in board["parents"]}
-        self.assertEqual(set(parents), {"i0001", "i0002"})
-        self.assertIn("レビュー準備中", parents["i0001"]["stage"])
+                opened = self.opened(*args)
+                want = {p: 1 for p in files}
+                if args[0] == "--lint":
+                    # --lint は、親のワークツリーかを見るために、ワークツリーと同じ名前の
+                    # チケットをもう 1 度だけ開く（ワークツリーごとに 1 本。親の数と掛け合わない）。
+                    for p in files:
+                        if _own_ticket(p):
+                            want[p] += 1
+                self.maxDiff = None
+                self.assertEqual({p: opened[p] for p in files}, want)
 
-    # ---- hook
 
-    def test_post_tool_use_reads_once_and_announces(self):
-        """実行後チェックは、範囲とフェーズの知らせ（`phase.announce`）で同じ読みを使う。"""
-        self.ended_phase()
-        result, reads = self.counted(
-            lambda: self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        )
-        self.assertIn("review-request --phase 1", self.reason(result))
-        self.assertEqual(reads.counts(), ONCE)
-        self.assertTrue(os.path.exists(os.path.join(self.approved, "phases", "i0001", "1.pending")))
+def _own_ticket(path: str) -> bool:
+    """<ツリー>/.ccnavi/approved/<状態>/<ツリーの名前>.md か。"""
+    state_dir = os.path.dirname(path)
+    top = os.path.dirname(os.path.dirname(os.path.dirname(state_dir)))
+    return os.path.basename(path) == os.path.basename(top) + ".md"
 
-    def test_pre_tool_use_hold_reads_once(self):
-        """レビュー待ちの止めは、親を引くのとフェーズを組むので同じ読みを使う。"""
-        self.ended_phase()
-        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        for tool, extra in (("Agent", {"description": "次の子"}), ("Bash", {"command": "make"})):
-            with self.subTest(tool=tool):
-                result, reads = self.counted(
-                    lambda tool=tool, extra=extra: self.hook(
-                        "PreToolUse", tool, self.parent_tree, **extra
-                    )
-                )
-                self.assertIn("DENY_PHASE_REVIEW", self.reason(result))
-                self.assertEqual(reads.counts(), ONCE)
 
-    def test_pre_tool_use_at_the_workspace_root_reads_nothing(self):
-        """ワークスペースルートのシェルは置き場を読まない（承認の知らせは外した）。"""
-        self.ended_phase()
-        result, reads = self.counted(
-            lambda: self.hook("PreToolUse", "Bash", self.root, command="ls")
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(reads.counts(), (0, 0, 0))
-
-    def test_stop_reads_once(self):
-        """ターンの終わりは、範囲と `finish` の促し（閉じられるかの検査）で同じ読みを使う。"""
-        self.ended_phase()
-        self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        result, reads = self.counted(lambda: self.stop(self.parent_tree))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(reads.counts(), ONCE)
-
-    def test_post_tool_use_reads_again_after_it_may_have_restored(self):
-        """実行後チェックがワークツリーを戻そうとした回（`post.check` の 2 つ目が真）は読み直す。
-
-        戻した先が置き場だと、最初の読みはもう古い。読み直さないと、戻す前のチケットで
-        フェーズの知らせを組む。戻そうとしなかった回は、差し戻す変更があっても読み直さない。
-        """
-        self.ended_phase()
-
-        for tried, expected in ((True, 2), (False, 1)):
-
-            def denied(*args, tried=tried, **kwargs):
-                kwargs["record"].decision = audit.DENY
-                return "", tried
-
-            with self.subTest(tried=tried):
-                payload = {
-                    "hook_event_name": "PostToolUse",
-                    "tool_name": "Bash",
-                    "cwd": self.parent_tree,
-                    "session_id": "s1",
-                    "tool_input": {"command": "ls"},
-                }
-                with mock.patch.object(post, "check", side_effect=denied):
-                    result, reads = self.counted(
-                        lambda payload=payload: self.ccnavi(
-                            "--mode",
-                            "enable",
-                            "--restore-if-deny",
-                            "enable",
-                            stdin=json.dumps(payload),
-                        )
-                    )
-                self.assertIn(result.returncode, (0, 2), result.stderr)
-                self.assertEqual(reads.read_raw.call_count, expected)
+if __name__ == "__main__":
+    unittest.main()

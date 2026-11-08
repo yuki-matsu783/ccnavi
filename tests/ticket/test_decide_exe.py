@@ -17,7 +17,7 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets.model import oplog
+from tests import oprecord
 from tests.ticket import test_phases, test_ticket
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import parent_text
@@ -137,13 +137,7 @@ class DecideApplyTest(test_ticket.TicketTest):
             ["i0001-01-03.md"],
             "同じ操作ID の子があるのに、2 つ目（i0001-01-04）を作った",
         )
-
-    test_the_same_operation_replayed_after_the_marker_came_back_makes_no_second_child = (
-        unittest.expectedFailure(
-            # ccnavi_op は書くだけで、同じ操作IDの子を探して使い回さない
-            test_the_same_operation_replayed_after_the_marker_came_back_makes_no_second_child
-        )
-    )
+        self.assertEqual(json.loads(again.stdout)["followup"], "i0001-01-03")
 
     def test_a_plain_replay_is_refused_because_the_request_mark_is_gone(self):
         """AT13（印が消えたままの打ち直しは、子を増やさず断る。設計の「使い回す」とは違い、断る）"""
@@ -170,18 +164,30 @@ class UnfinishedOpsTest(test_phases.PhaseHarness):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         return done.stdout
 
+    def stage_set(self, op: str, stage: str, state: str) -> None:
+        done = self.ccnavi("ops", "stage-set", op, stage, state)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+
+    def has_record(self, op: str) -> bool:
+        return os.path.exists(os.path.join(self.state, "ops", op + ".json"))
+
+    def pending(self) -> list[str]:
+        done = self.ccnavi("ops", "pending")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        return [line.split()[0] for line in done.stdout.splitlines()]
+
     def leave_an_unfinished_decide(self) -> str:
-        op = oplog.begin(
+        op = oprecord.begin(
             self.state,
-            oplog.KIND_DECIDE,
+            "decide",
             repo={"host": "fixture", "mr_url": "u/7"},
             parent="i0001",
             phase=1,
             mr=7,
-            stages=[("reply", oplog.STAGE_REPLY), ("note", oplog.STAGE_COMMENT)],
+            stages=[("reply", "reply"), ("note", "comment")],
         )
-        oplog.stage_set(self.state, op, "reply", oplog.SENT)
-        oplog.stage_set(self.state, op, "note", oplog.UNKNOWN)
+        self.stage_set(op, "reply", "sent")
+        self.stage_set(op, "note", "unknown")
         return op
 
     def test_the_record_survives_the_finish_and_the_ready_and_the_cleanup(self):
@@ -215,20 +221,20 @@ class UnfinishedOpsTest(test_phases.PhaseHarness):
         self.assertEqual(passed.returncode, 0, passed.stderr)
         retired = self.ccnavi("ops", "retire", "i0001")
         self.assertEqual(retired.returncode, 0, retired.stderr)
-        self.assertIsNotNone(oplog.load(self.state, op))
-        self.assertEqual([r["id"] for r in oplog.pending(self.state)], [op])
+        self.assertTrue(self.has_record(op))
+        self.assertEqual(self.pending(), [op])
         self.assertIn("引き継ぎ未完了", self.status())
         self.assertIn(op[:8], self.status())
 
     def test_the_cleanup_removes_only_the_finished_records_of_the_parent(self):
-        done = oplog.begin(
-            self.state, oplog.KIND_COMMENT, repo={}, parent="i0001", stages=[("c", "comment")]
+        done = oprecord.begin(
+            self.state, "comment", repo={}, parent="i0001", stages=[("c", "comment")]
         )
-        oplog.stage_set(self.state, done, "c", oplog.SENT)
+        self.stage_set(done, "c", "sent")
         left = self.leave_an_unfinished_decide()
         self.assertEqual(self.ccnavi("ops", "retire", "i0001").returncode, 0)
-        self.assertIsNone(oplog.load(self.state, done))
-        self.assertIsNotNone(oplog.load(self.state, left))
+        self.assertFalse(self.has_record(done))
+        self.assertTrue(self.has_record(left))
 
 
 if __name__ == "__main__":

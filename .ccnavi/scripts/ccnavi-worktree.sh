@@ -175,7 +175,7 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 # 名前の字の種類・NFC・長さは実行ファイルに聞く（sh の検査は ASCII の外のバイトを通す）
 ccnavi_id_ask "$root" "$name" ||
-	fail id-unchecked "名前（${name}）を指定できるか（字の種類・64 文字以内）を確かめられない（ccnavi の実行ファイルが答えない）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+	fail id-unchecked "名前（${name}）を指定できるか（字の種類・64 文字以内）を確かめられない（ccnavi の実行ファイルが答えない）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
 [ -z "$ccnavi_id_direct" ] || fail bad-name "名前（${name}）は指定できません（${ccnavi_id_direct}）。" 2
 top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
@@ -279,7 +279,7 @@ fi
 
 bound_out=$(ccnavi_ask "$root" tree base-bound "$main_tree" "$target") || bound_out=""
 if [ "$(printf '%s\n' "$bound_out" | head -n 1)" != "tree 1" ]; then
-	fail base-bound-unknown "取り込み先 ${target} がチケットに結び付くかを、実行ファイルに確かめられません。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+	fail base-bound-unknown "取り込み先 ${target} がチケットに結び付くかを、実行ファイルに確かめられません。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
 fi
 case "$(printf '%s\n' "$bound_out" | sed -n 's/^bound //p' | head -n 1)" in
 no) ;;

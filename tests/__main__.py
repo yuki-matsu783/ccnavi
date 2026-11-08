@@ -41,6 +41,8 @@ import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from tests import exe
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTS = os.path.join(ROOT, "tests")
 
@@ -122,6 +124,9 @@ def main() -> int:
         for dotted in planned:
             print(dotted)
         return 0
+
+    # 実行ファイルはここで 1 回組み、`CCNAVI_TEST_EXE` で子のプロセスに渡す（tests/exe.py）。
+    exe.path()
 
     jobs = args.jobs if args.jobs > 0 else (os.cpu_count() or 1)
     jobs = max(1, min(jobs, len(planned)))

@@ -4,7 +4,7 @@
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
-  # ---- hook/reasons.py
+  # ---- hook/reasons
   # ルールファイルを読めず組み込みの既定に戻ったことは、呼び出しを通した回にも知らせる。
   NOTICE_FALLEN_BACK:
     kind: notice
@@ -50,7 +50,7 @@ messages:
     what: |-
       ccnavi は、このコマンドが実際に何を実行するか読めませんでした。このセッションには確認に答える人がおらず、権限モードが自分で答えるか、そもそも答えないので、実行しません。何のためのコマンドかを伝えても通りません。読める形に書き直してください。書き直せないときは、何のために要るかをユーザに伝えてください。
 
-  # ---- hook/post.py・post_report.py（実行後の報告。見出しと `path:` などの状態の行はコードに残る）
+  # ---- hook/post（実行後の報告。見出しと `path:` などの状態の行はコードに残る）
   # 横で作業するチェックアウトで見つかった変更。`side-by-side:` の行の本文。
   NOTICE_POST_SIDE_BY_SIDE:
     kind: notice
@@ -105,7 +105,7 @@ messages:
       plain: |-
         [ccnavi] ccnavi は{turn}ごとに、その間に作られたコミットが保護領域のファイルを変更していないかを確認します。{trees}では、今回のターンでこの確認ができませんでした。ターン開始時の HEAD が記録されていないか、差分を読み取れなかったためです。ターンの途中で作り、一度も触らなかったワークツリーでよく起きます。このツリーでコミットしていなければ対応は不要です。コミットした場合は、保護領域のファイルを変更していないかユーザに確かめてもらってください。
 
-  # ---- catalog/docsearch.py（md の索引の案内。`lead` は案内の頭）
+  # ---- catalog/docs（md の索引の案内。`lead` は案内の頭）
   NOTICE_DOCS_GUIDE:
     kind: notice
     values: [lead, command]
@@ -127,7 +127,7 @@ messages:
     what: |-
       [ccnavi] ツール呼び出しの失敗か拒否が {n} 回続いています。同じ操作を言い換えて再実行したり、止められた操作の迂回を探したりせず、止まった理由と決まった手順を資料で確かめてください。確かめても分からなければ、ユーザに相談してください。資料は
 
-  # ---- hook/events.py（Artifact ツールが失敗したとき。PostToolUseFailure）
+  # ---- hook/events（Artifact ツールが失敗したとき。PostToolUseFailure）
   # セッションのスクラッチパッドは書き込みを止めているので、HTML はワークスペースルートの置き場に出す。
   NOTICE_ARTIFACT_FAILED:
     kind: notice
@@ -135,7 +135,7 @@ messages:
     what: |-
       [ccnavi] Artifact ツールが失敗しました。HTML はワークスペースルート直下の scratchpad/（{scratch}）に出力してください。そのスクラッチパッドは置き場にしません。書き出した HTML のパスもユーザに伝えてください。
 
-  # scratchpad/ の中身が CCNAVI_SCRATCHPAD_WARN_MB を超えたとき（SessionStart。tickets/notice/scratchpad.py）。
+  # scratchpad/ の中身が CCNAVI_SCRATCHPAD_WARN_MB を超えたとき（SessionStart。tickets/notice）。
   NOTICE_SCRATCHPAD_LARGE:
     kind: notice
     values: [size, limit, path]
@@ -170,7 +170,7 @@ messages:
       convention: |-
         [ccnavi] {code} ({shown}) frontmatter に type が無いと、'{command} --docs' の --type・--tag・--keyword で見つかりません。既にあるキーの値と順序は変えず、type: skill を足してください。type の値と決まりは {doc}（'{command} --docs --keyword frontmatter' でも引けます）。
 
-  # ---- hook/turngate.py（付き添いのあるセッションで、B をユーザの確認に出す宣言）
+  # ---- hook/turngate（付き添いのあるセッションで、B をユーザの確認に出す宣言）
   NOTICE_ASK_USER_CONFIRM__INTEGRATE:
     kind: notice
     values: [second_name, where, key]
@@ -181,7 +181,7 @@ messages:
     next: |-
       確認の前に、integrate の出力にある差分と変わるファイルを、文章でユーザに見せておく。許可されたら確定し、断られたら取り込まず、やめるなら {script:ccnavi-git.sh} integrate --abort {key} を打つ
 
-  # ---- hook/commitnote.py（直接作業のコミットのあとの案内。メインのエージェントの commit が成功したとき、またはメインの Agent ツールが返ったとき（サブエージェントのコミットを拾う）、ワークツリーごとに 1 回）
+  # ---- hook/hint の CommitNotice（直接作業のコミットのあとの案内。メインのエージェントの commit が成功したとき、またはメインの Agent ツールが返ったとき（サブエージェントのコミットを拾う）、ワークツリーごとに 1 回）
   NOTICE_DIRECT_COMMIT:
     kind: notice
     values: [name]
@@ -190,7 +190,7 @@ messages:
     next: |-
       コミットがほかにも続くなら全部済んでから、取り込み先が進んでいれば先に取り込み（direct-flow.md の手順 4）、haiku のサブエージェントで差分の敵対的レビュー（単純化・共通化の余地も見る）、続けて別の haiku でフラットな評価（過剰な作り込みも見る）を行う。取り入れる指摘は新しいコミットで直してから integrate を打つ。レビュー済みなら、そのまま integrate を打つ（手順は .ccnavi/docs/direct-flow.md）
 
-  # ---- tickets/notice/direct_worktrees.py（SessionStart の直接作業のワークツリーの一覧。1 本ごとの行はコードが組む）
+  # ---- tickets/notice の DirectWorktrees（SessionStart の直接作業のワークツリーの一覧。1 本ごとの行はコードが組む）
   NOTICE_DIRECT_WORKTREES_HEAD:
     kind: notice
     what: |-
@@ -207,7 +207,7 @@ messages:
     what: |-
       他のセッションの作業の可能性があります。続きとして操作する前にユーザに確かめてください。
 
-  # ---- tickets/phase/gates.py（フェーズが終わったあとの、次のフェーズの案内。`what` の 1 行だけで出る）
+  # ---- tickets/phase（フェーズが終わったあとの、次のフェーズの案内。`what` の 1 行だけで出る）
   # 全体計画のフェーズが全部終わった。フィードバック計画がまだ無い。
   NOTICE_PHASE_NEXT__FEEDBACK:
     kind: notice
@@ -234,7 +234,7 @@ messages:
     what: |-
       次に始められるのは {names} です。子チケットを提案して承認を受けてください。{hints}
 
-  # ---- tickets/phase/gates.py の review_next（レビュー待ちの子について、ユーザに回るまでに誰が何をするか。`finish` の出力と `status` の次の操作）
+  # ---- tickets/phase の ReviewNext（レビュー待ちの子について、ユーザに回るまでに誰が何をするか。`finish` の出力と `status` の次の操作）
   # `lead` は延期したフェーズのときの前置き（無ければ空）、`done` は完了の置き場（例 .ccnavi/approved/done/）。
   NOTICE_REVIEW_NEXT__REVIEWED:
     kind: notice
@@ -270,7 +270,7 @@ messages:
     what: |-
       {lead}まだ{preparing}。親が合流・'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を済ませるまで、ユーザには回らない。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
 
-  # ---- tickets/review/request.py（依頼・確認を断るときの、直し方を含む行。`what` の 1 行だけで出る）
+  # ---- tickets/review/request（依頼・確認を断るときの、直し方を含む行。`what` の 1 行だけで出る）
   # 依頼の前提の一覧の 1 件。延期したフェーズを、レビューを引き受けるフェーズ番号で依頼し直す。
   NOTICE_REVIEW_REQUEST_DEFERRED:
     kind: notice
@@ -292,7 +292,7 @@ messages:
     what: |-
       ユーザに解決してもらって再実行する。または、ユーザがターミナルで '{script:ccnavi-review.sh} decide {phase}'（ボードの「決める」）を使い、指摘ごとに受け入れて進むか、続きの子チケットで直すかを選ぶ
 
-  # ---- tickets/flow/graph.py の briefing（SubagentStart でサブエージェントに渡す、ノードの扱いの注意。行頭の空白はコードが付ける）
+  # ---- tickets/flow の Briefing（SubagentStart でサブエージェントに渡す、ノードの扱いの注意。行頭の空白はコードが付ける）
   # 問いのノード。`node` はノードの種類の名前。
   NOTICE_FLOW_BRIEF__ASK:
     kind: notice
@@ -314,7 +314,7 @@ messages:
     what: |-
       subAgent / subAgentFlow のノード: Agent ツールがあれば入れ子のサブエージェントとして起動してください。その description（作業名の欄）に担当の子の識別子 {ticket} を 1 つだけ書き（ccnavi が範囲とフローの案内をプロンプトに書き足す）、担当以外の子の識別子は書かないでください。isolation は使いません。Agent ツールが無ければ（入れ子の上限）、そのノードで手を止め、起動してほしいエージェントの種類・プロンプト・担当の子チケットの識別子を添えてメインに返してください（メインは識別子を description に書いて起動します）。メインはそのとおりに起動し、結果を持って同じサブエージェントを再開させます。
 
-  # ---- policy/selfguard.py の report（設定ファイルを戻したときの知らせに足す注意。見出しと結果の行はコードが言う）
+  # ---- policy/selfguard の Report（設定ファイルを戻したときの知らせに足す注意。見出しと結果の行はコードが言う）
   # ワークツリー側の設定が混じっている。
   NOTICE_SELFGUARD__COPY:
     kind: notice

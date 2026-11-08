@@ -1,5 +1,5 @@
 {
- "about": "親の phases:（計画が使うフェーズ定義のコピー）を承認（--agree）で確かめる決まりの見本の表。コピーの各定義は承認したときの phases.yml の同じ名前の定義と読んだ形で同じでなければ error、使う定義はコピーに書く（無ければ error）、コピーの名前が phases.yml に無ければ error、phases.yml にあってコピーに無い定義は何も言わない、コピーにあってどのステップも使わない定義は warn。errors と warns は、その重さの苦情の文に含まれる語句（順不同、全部が出る）。空なら、その重さの苦情は 1 つも出ない。tests/ticket/test_parent_phases.py が確かめる。決まりを直すときは、この表も一緒に直す",
+ "about": "親の phases:（計画が使うフェーズ定義のコピー）を承認（--agree）で確かめる決まりの見本の表。コピーの各定義は承認したときの phases.yml の同じ名前の定義と読んだ形で同じでなければ error、使う定義はコピーに書く（無ければ error）、コピーの名前が phases.yml に無ければ error、phases.yml にあってコピーに無い定義は何も言わない、コピーにあってどのステップも使わない定義は warn。errors と warns は、その重さの苦情の文に含まれる語句（順不同、全部が出る）。空なら、その重さの苦情は 1 つも出ない。go/internal/tickets/proposal/candidates/parent_phases_test.go が確かめる。決まりを直すときは、この表も一緒に直す",
  "phases_yml": {
   "research": {"kind": "work", "title": "調査", "review": false, "scope": ["wip/research/*"], "deliverables": ["wip/research/summary.md"]},
   "design": {"kind": "work", "title": "設計", "review": true, "scope": ["wip/design/*"]},

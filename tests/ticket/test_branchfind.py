@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import os
 
-from ccnavi.infra import settings
+from tests import script_command
 from tests.ticket.test_phases import PhaseHarness, git, write
 from tests.ticketsample import parent_text
 
@@ -52,7 +52,7 @@ class PromptHintTest(PhaseHarness):
 
     def test_an_issue_and_an_mr_get_one_instruction_each(self):
         said = self.prompt("#152 と !5 を見て直して")
-        sh = settings.script_command(self.root, "ccnavi-start.sh")
+        sh = script_command(self.root, "ccnavi-start.sh")
         self.assertIn(f"'{sh} --issue 152'", said)
         self.assertIn(f"'{sh} --mr 5'", said)
         self.assertIn(os.path.realpath(self.root).replace("\\", "/"), said)
@@ -83,7 +83,7 @@ class PromptHintTest(PhaseHarness):
         self.assertEqual(self.prompt(notice), "")
         # 通知の外にも指定があるときは、外の分だけ拾う
         said = self.prompt(notice + "\n#10 を直して", session="s2")
-        sh = settings.script_command(self.root, "ccnavi-start.sh")
+        sh = script_command(self.root, "ccnavi-start.sh")
         self.assertIn(f"'{sh} --issue 10'", said)
         self.assertNotIn("296", said)
 

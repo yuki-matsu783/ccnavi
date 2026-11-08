@@ -1,13 +1,16 @@
 # 参照専用の資料。配布物には入らない。
 knowledge
 
-# 組み立ての出力。dist は PyInstaller の出力、build はその作業場所。
-# .ccnavi/bin は build.py が dist から写す、hook が起動する実行ファイルの置き場で、
+# 組み立ての出力。dist は scripts/ccnavi-build.sh が組んだ実行ファイル、build はその作業場所。
+# .ccnavi/bin は scripts/ccnavi-build.sh が dist から写す、hook が起動する実行ファイルの置き場で、
 # 機械ごとに <os>-<arch>/ が並ぶ。振り分けの sh は .ccnavi/scripts/ にあり、
 # そちらは追跡する。
 /dist/
 /build/
 /.ccnavi/bin/
+# Go の組み立ての出力（go/ で go build したもの）。
+/go/ccnavi
+/go/ccnavi.exe
 
 # Python の中間物。
 __pycache__/
@@ -66,3 +69,6 @@ settings.local.json*
 
 # macOS の Finder が作るゴミ。
 .DS_Store
+
+# Go のテストの実行ファイル（go test -c の出力）。
+/go/**/*.test

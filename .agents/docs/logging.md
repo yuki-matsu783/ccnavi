@@ -1,20 +1,20 @@
 ---
 type: guide
 title: 診断ログを書く
-description: sh、Python、TypeScriptで診断ログを書くときの決まり。形式、置き場、レベル
+description: sh、Go、TypeScriptで診断ログを書くときの決まり。形式、置き場、レベル
 tags: [records, state]
-keywords: [診断ログ, ログ, logger, sh, Python, TypeScript, logfmt, ccnavi-common.sh, ccnavi-common-log.sh, diaglog]
+keywords: [診断ログ, ログ, logger, sh, Go, TypeScript, logfmt, ccnavi-common.sh, ccnavi-common-log.sh, diaglog]
 ---
 
 # 診断ログを書く
 
-診断ログは、あとで何が起きたかを調べるために残す。sh・Python・TypeScriptで診断ログを書くときは、次の決まりに従う。
+診断ログは、あとで何が起きたかを調べるために残す。sh・Go・TypeScriptで診断ログを書くときは、次の決まりに従う。
 loggerは言語ごとに1つずつあり、どれも同じ形式の行を同じ置き場に書く。
 
 | 言語 | logger | 呼び方 |
 |---|---|---|
 | sh（`.ccnavi/scripts/`） | `ccnavi-common-log.sh`の`log_debug` `log_info` `log_warn` `log_error`（`ccnavi-common.sh`を読めば一緒に読まれる） | `log_info "本文" -- key=value` |
-| Python（`src/ccnavi/`） | `src/ccnavi/records/diaglog.py` | `diaglog.get("<出どころ>", root).info("本文", key=value)` |
+| Go（`go/`） | `go/internal/records/diaglog` | `diaglog.Get("<出どころ>", root).Info("本文", "key", value)` |
 | TypeScript（拡張） | `extensions/vscode/ccnavi-board/src/log.ts` | `diaglog.get("ccnavi-board", root).error("本文", { key: value })` |
 
 ## 契約として決まっている出力とは分ける
@@ -44,7 +44,7 @@ loggerとは関係なく今のまま出し、loggerに置き換えない。文�
 - レベルは5文字の左寄せで書く（`DEBUG` `INFO ` `WARN ` `ERROR`）
 - 本文の後ろに`key=value`をlogfmt形式で並べる。値に空白・タブ・`"`・`=`・改行が入るときだけ`"…"`で囲み、
   中の`\`と`"`は`\`でエスケープする。本文と値の改行は`\n`の2文字に置き換え、1つの出来事を1行に収める
-- 値は文字列にして並べる。PythonとTSの真偽値は`true`/`false`、`None`/`null`/`undefined`は空文字にする。
+- 値は文字列にして並べる。GoとTSの真偽値は`true`/`false`、`nil`/`null`/`undefined`は空文字にする。
   小数は言語によって表記が違う（`1.0`と`1`）ので、整数か文字列で渡す
 
 ## 置き場とレベル
@@ -55,22 +55,22 @@ loggerとは関係なく今のまま出し、loggerに置き換えない。文�
     `ccnavi_workspace`は`CCNAVI_WORKSPACE`を使い、無ければcwdから上へたどる。最初に該当したのが`<根>/projects/<名前>/`で、`projects/`の親にもワークスペースがあるときは、その親を根にする（プロジェクトが`.ccnavi/scripts/`のコピーを持っていても、ログと状態はワークスペースルートに置く）。ルートを求め終えているスクリプト（`ccnavi-git.sh`の`WS`、
     `ccnavi-review.sh`の`root`）は、求めた直後に`ccnavi_log_root`へ入れ、loggerに探し直させない。出どころは
     `$0`のファイル名から拡張子を除いたもの（`ccnavi-git`）で、`CCNAVI_LOG_NAME`で上書きできる
-  - Python: 呼び出し側が`get(name, root)`にルートを渡す。`root`を省くと`CLAUDE_PROJECT_DIR`を使い、
-    どちらも無ければ書かない。実行ファイルは`cli`の`root`（`--root`か`default_root()`）を渡す
+  - Go: 呼び出し側が`Get(name, root)`にルートを渡す。`root`が空なら`CLAUDE_PROJECT_DIR`を使い、
+    どちらも無ければ書かない。実行ファイルは`entry/cli`が決めたルート（`--root`か既定のルート）を渡す
   - TS: 呼び出し側がワークスペースフォルダのパス（`folder.uri.fsPath`）を渡す。空なら書かない
 - 出どころの名前は固定の短い語にする（`ccnavi`・`ccnavi-git`・`ccnavi-board`）。パスやユーザの入力は入れない。
   名前に`[A-Za-z0-9_-]`以外の文字（`/`・`\`・`.`・空白）が入っていたら、3つのloggerとも**書き込まずに破棄する**。
   別の文字に置き換えると他の出どころの名前と重なり、どこから来た行かを取り違えるので、置き換えはしない
 - **シンボリックリンクはたどらない。** `logs`・`logs/diag`・書き込み先の`<出どころ>.log`のどれかがシンボリックリンクなら、
   3つのloggerとも書き込まずに破棄する。リンク先へ追記すると、置き場の外のファイル（`logs/decisions.jsonl`など）を
-  書き換えてしまうため。確かめ方は言語ごとに違い、shは`[ -L ]`、Pythonはlstatと、使えるOSでは`O_NOFOLLOW`、
+  書き換えてしまうため。確かめ方は言語ごとに違い、shは`[ -L ]`、Goは`ospath.IsLink`と、使えるOSでは`O_NOFOLLOW`（`fsio.NoFollow`）、
   TSは`lstatSync`と、使えるOSでは`O_NOFOLLOW`を使う。`logs`を別の場所へのリンクにしている環境では、
-  診断ログは残らない。片付け（`_prune_diag`）もこの場合はリンクをたどらず、報告に出す
-- 新しいファイルは持ち主だけが読める0600で作る。shはumask 077のサブシェル、Pythonは`os.open`のmode、
+  診断ログは残らない。片付け（`go/internal/records/prune`の`pruneDiag`）もこの場合はリンクをたどらず、報告に出す
+- 新しいファイルは持ち主だけが読める0600で作る。shはumask 077のサブシェル、Goは`os.OpenFile`のmode、
   TSは`openSync`のmodeで指定する。既にあるファイルの権限は変えない
 - 出力するレベルは`CCNAVI_LOG_LEVEL`に`DEBUG`/`INFO`/`WARN`/`ERROR`で指定する。大文字小文字は問わない。
   空のときと解釈できない値のときは`INFO`になる
-- 古いログの片付けは`src/ccnavi/records/prune.py`の`_prune_diag`が行い、セッションの開始時と`ccnavi-user-prune.sh`の実行時に動く。
+- 古いログの片付けは`go/internal/records/prune`の`pruneDiag`が行い、セッションの開始時と`ccnavi-user-prune.sh`の実行時に動く。
   しきい値は判定の記録と同じものを使う。`CCNAVI_LOG_ROTATE_MB`を超えたファイルは`<出どころ>.<日時>.log`に
   名前を変え、`CCNAVI_LOG_KEEP_DAYS`の日数のあいだ更新されていない`*.log`は消す。その回に名前を変えたファイルは、
   その回には消さない。`--prune --preview`も同じ結果を表示する
@@ -110,7 +110,7 @@ log_debug 判定の材料 -- "sub=$sub" "top=$root" "cwd=$PWD"
   契約として決まっている出力なので変えない
 - loggerが伏せるのは最後の安全網にすぎない。まず秘密の値をloggerに渡さないことで守る
 
-伏せ方には、3つのloggerで揃っていない部分もある。Pythonはさらに`src/ccnavi/records/redact.py`の`redact`を通し、
+伏せ方には、3つのloggerで揃っていない部分もある。Goはさらに`go/internal/records/redact`の`Redact`を通し、
 トークンの形（`ghp_…`・`glpat-…`・`sk-…`など）、`名前=値`（`GITHUB_TOKEN=…`）、Authorizationヘッダ、`--password`などを
 `ghp_ab***6789`や`***`に伏せる。shとTSにはこの処理が無く、上の2つの形式だけを伏せる。
 shで`redact`を再現すると、正規表現の解釈が環境ごとに違ううえに処理も重くなる。TSには秘密を扱う場面が無い。
@@ -133,7 +133,7 @@ shで`redact`を再現すると、正規表現の解釈が環境ごとに違う�
   既定の`INFO`のままでhookの呼び出し回数だけ行が増えることを避ける
 - 出力しないレベルの呼び出しでは、loggerは時刻も行も作らない。**`DEBUG`の引数を組み立てるために外部コマンドを
   起動しない**。`$(git …)`や`$(date)`を`log_debug`の引数に書かず、`$PWD`のように手元にある値を使う。
-  重い材料が必要なときは、Pythonなら`log.enabled(diaglog.DEBUG)`、TSなら`log.enabled("DEBUG")`の条件の中で組み立てる
+  重い材料が必要なときは、Goなら`log.Enabled(diaglog.Debug)`、TSなら`log.enabled("DEBUG")`の条件の中で組み立てる
 
 ## 書かないこと
 

@@ -1,39 +1,36 @@
-"""md の frontmatter の索引と `ccnavi --docs`（docsearch）。
+"""md の frontmatter の索引と `ccnavi --docs` の受入テスト。実行ファイルを起こして出力だけを見る。
 
 見るのは次のとおり。
 
-1. 索引: git が挙げる md をディレクトリごとの `ccnavi-index.jsonl` に書く。無視されていなければ
-   書く前に .gitignore へ 1 行足す。
-   実体の無い md と ccnavi ディレクトリの下は載せない。md が全部消えたディレクトリの索引は消す
-2. 差分: `concept_id` と `mtime` が同じ行は読み直さない。中身が同じなら書かない
-3. frontmatter: 不正なもの・別名・リストでないものは null。スカラーの tags は 1 要素。日付は文字列
-4. 引く: 完全一致・部分一致・日時、同じものは OR・違うものは AND、並べ方、出力の形、桁揃え
-5. CLI: `--docs` の外の絞り込みは理由を言って失敗にする。誤った値は 1、0 件は 0
-   どこから打ってもワークスペースを引く
-6. プロジェクト: 置き場の直下の各 git も引く。パスはワークスペースルートから。
+1. CLI: `--docs` の外の絞り込みは理由を言って失敗にする。誤った値は 1、0 件は 0。
+   どこから打ってもワークスペースを引く。不正な索引の行でも、どの出力の形でも異常終了しない
+2. プロジェクト: 置き場の直下の各 git も引く。パスはワークスペースルートから。
    ccnavi-index.jsonl を無視していなければ対象外
-7. SessionStart: 索引を新しくして案内をつける。対象外は名指し。
+3. SessionStart: 索引を新しくして案内をつける。対象外は名指し。
    サブエージェントと git の外では案内を出さない
+4. PostToolUse: frontmatter の無い md を Write で作ったら、判定を変えずに案内を渡す
+
+索引の作り方・差分・frontmatter の読み方・引き方・出力の形・敵対的な入力と git の失敗は
+`go/internal/catalog`（docindex・docs）の go test が見る。
 """
 
 from __future__ import annotations
 
-import errno
-import io
 import json
 import os
-import re
 import subprocess
 import tempfile
 import time
-import unicodedata
 import unittest
-from unittest import mock
 
-from ccnavi.catalog import docsearch, docsearch_index, docsearch_query
-from ccnavi.infra import hookio, pathcase, settings
-from tests import ROOT
 from tests.inproc import run_ccnavi
+
+# 文の部品（ccnavi が出す文の一部）。
+CONVENTION_DOC = ".ccnavi/docs/frontmatter.md"
+WORKSPACE = "ワークスペース"
+UNIGNORED = "は .gitignore に `**/ccnavi-index.jsonl` が無く、足せなかったので索引の対象外"
+IGNORE_ADDED = "に `**/ccnavi-index.jsonl` を追加しました（未コミットの差分が残る）"
+CODE_MISSING_FRONTMATTER = "NOTICE_DOC_FRONTMATTER"
 
 
 def git(cwd: str, *args: str) -> str:
@@ -94,437 +91,18 @@ class Repo(unittest.TestCase):
         with open(self.index_of(rel_dir), encoding="utf-8") as f:
             return [json.loads(line) for line in f]
 
-
-# --- 1. 索引 ---------------------------------------------------------------------------
-
-
-class IndexTest(Repo):
-    def test_writes_one_index_per_directory_with_the_row_shape(self):
-        self.put("README.md", doc(type="guide", title="はじめに"))
-        self.put("docs/adr/0001-a.md", doc(type="adr", tags="[git, worktree]"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual(
-            sorted(built.written), ["ccnavi-index.jsonl", "docs/adr/ccnavi-index.jsonl"]
+    def context(self, root: str, **extra) -> str:
+        payload = {"hook_event_name": "SessionStart", "session_id": "s1", "cwd": root, **extra}
+        done = run_ccnavi(
+            ["--root", root, "--mode", "enable"],
+            input=json.dumps(payload),
+            cwd=root,
+            env=clean_env(CCNAVI_ENTRY_PATH=".ccnavi/scripts/ccnavi-launcher.sh"),
         )
-        (row,) = self.rows_of("docs/adr")
-        self.assertEqual(
-            row,
-            {
-                "concept_id": "docs/adr/0001-a",
-                "directory": "docs/adr",
-                "frontmatter": {"type": "adr", "tags": ["git", "worktree"]},
-                "mtime": "2026-08-05T12:00:00",
-            },
-        )
-        self.assertEqual(self.rows_of("")[0]["directory"], ".")
-        with open(self.index_of("docs/adr"), encoding="utf-8") as f:
-            self.assertEqual(f.read().count("\n"), 1)
-            f.seek(0)
-            self.assertNotIn(", ", f.read())  # 1 行は詰めた JSON
-
-    def test_a_tree_that_ignores_no_index_gets_one_line_in_its_gitignore(self):
-        write(os.path.join(self.root, ".gitignore"), "build/\n")
-        self.put("a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root)
-        self.assertFalse(built.unignored)
-        self.assertEqual(built.ignore_added, ".gitignore")
-        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
-        self.assertEqual(
-            read(os.path.join(self.root, ".gitignore")), "build/\n**/ccnavi-index.jsonl\n"
-        )
-        # 2 回目は足さない。
-        again = docsearch_index.build(self.root)
-        self.assertEqual((again.ignore_added, again.written), ("", []))
-        self.assertEqual(
-            read(os.path.join(self.root, ".gitignore")), "build/\n**/ccnavi-index.jsonl\n"
-        )
-
-    def test_the_line_is_added_after_a_missing_final_newline_without_touching_others(self):
-        write(os.path.join(self.root, ".gitignore"), "build/\r\n*.log")
-        self.put("a.md", doc(type="guide"))
-        docsearch_index.build(self.root)
-        self.assertEqual(
-            read(os.path.join(self.root, ".gitignore")), "build/\r\n*.log\n**/ccnavi-index.jsonl\n"
-        )
-
-    def test_a_line_already_there_is_not_appended_again(self):
-        # 同じ行が既にあれば（末尾の空白は除く）、足さずに PRESENT を返す。
-        write(os.path.join(self.root, ".gitignore"), "build/\n**/ccnavi-index.jsonl  \n")
-        self.assertEqual(docsearch_index._add_ignore(self.root), docsearch_index.PRESENT)
-        self.assertEqual(
-            read(os.path.join(self.root, ".gitignore")), "build/\n**/ccnavi-index.jsonl  \n"
-        )
-
-    def test_a_leading_space_is_not_the_ignore_line(self):
-        # git は先頭の空白を無視しないので、先頭に空白のある行は同じ行ではない。足して直す。
-        write(os.path.join(self.root, ".gitignore"), "build/\n  **/ccnavi-index.jsonl\n")
-        self.put("a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual((built.unignored, built.ignore_added), (False, ".gitignore"))
-        self.assertEqual(
-            read(os.path.join(self.root, ".gitignore")),
-            "build/\n  **/ccnavi-index.jsonl\n**/ccnavi-index.jsonl\n",
-        )
-
-    def test_a_present_line_that_does_not_ignore_the_index_is_not_reported_as_added(self):
-        # 索引が追跡されていて無視されないとき、行は既にあっても書いていない。足したとは報告しない。
-        self.put("docs/a.md", doc(type="guide"))
-        self.put("docs/ccnavi-index.jsonl", "")
-        git(self.root, "add", "-f", "docs/ccnavi-index.jsonl")
-        before = read(os.path.join(self.root, ".gitignore"))
-        built = docsearch_index.build(self.root)
-        self.assertTrue(built.unignored)
-        self.assertEqual(built.ignore_added, "")
-        self.assertEqual(read(os.path.join(self.root, ".gitignore")), before)
-
-    def test_a_missing_gitignore_is_created(self):
-        os.remove(os.path.join(self.root, ".gitignore"))
-        self.put("a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.ignore_added, ".gitignore")
-        self.assertEqual(read(os.path.join(self.root, ".gitignore")), "**/ccnavi-index.jsonl\n")
-        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
-
-    def test_a_negation_of_the_index_is_respected(self):
-        for negation in ("!**/ccnavi-index.jsonl", "!ccnavi-index.jsonl", "!docs/*.jsonl"):
-            with self.subTest(negation=negation):
-                write(os.path.join(self.root, ".gitignore"), negation + "\n")
-                self.put("a.md", doc(type="guide"))
-                built = docsearch_index.build(self.root)
-                self.assertTrue(built.unignored)
-                self.assertEqual((built.rows, built.written, built.ignore_added), ([], [], ""))
-                self.assertEqual(read(os.path.join(self.root, ".gitignore")), negation + "\n")
-                self.assertFalse(os.path.exists(self.index_of("")))
-
-    def test_an_unwritable_gitignore_leaves_the_tree_out(self):
-        os.remove(os.path.join(self.root, ".gitignore"))
-        os.mkdir(os.path.join(self.root, ".gitignore"))  # ふつうのファイルではない
-        self.put("a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root)
-        self.assertTrue(built.unignored)
-        self.assertEqual((built.rows, built.written, built.ignore_added), ([], [], ""))
-
-    def test_nothing_is_added_when_not_refreshing(self):
-        write(os.path.join(self.root, ".gitignore"), "")
-        self.put("a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root, refresh=False)
-        self.assertTrue(built.unignored)
-        self.assertEqual(read(os.path.join(self.root, ".gitignore")), "")
-
-    def test_a_partly_ignored_tree_gets_no_line(self):
-        write(os.path.join(self.root, ".gitignore"), "/docs/ccnavi-index.jsonl\n")
-        self.put("a.md", doc(type="guide"))
-        self.put("docs/b.md", doc(type="guide"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual((built.ignore_added, built.written), ("", ["docs/ccnavi-index.jsonl"]))
-        self.assertEqual(read(os.path.join(self.root, ".gitignore")), "/docs/ccnavi-index.jsonl\n")
-
-    def test_a_tracked_index_is_not_rewritten_but_its_rows_are_built(self):
-        self.put("a.md", doc(type="guide"))
-        self.put("docs/b.md", doc(type="adr"))
-        write(self.index_of(""), "tracked\n")
-        git(self.root, "add", "-f", "ccnavi-index.jsonl")
-        built = docsearch_index.build(self.root)
-        self.assertFalse(built.unignored)
-        self.assertEqual([r["concept_id"] for r in built.rows], ["a", "docs/b"])
-        self.assertEqual(built.written, ["docs/ccnavi-index.jsonl"])
-        with open(self.index_of(""), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "tracked\n")
-
-    def test_lists_untracked_but_not_ignored_files_and_skips_ignored_ones(self):
-        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\nbuild/\n")
-        self.put("new.md", doc(type="guide"))
-        self.put("build/out.md", doc(type="guide"))
-        self.put("notes.txt", "not md")
-        built = docsearch_index.build(self.root)
-        self.assertEqual([r["concept_id"] for r in built.rows], ["new"])
-
-    def test_skips_deleted_files_and_removes_the_index_of_an_emptied_directory(self):
-        self.put("keep/a.md", doc(type="guide"))
-        self.put("gone/b.md", doc(type="guide"))
-        git(self.root, "add", "-A")
-        docsearch_index.build(self.root)
-        self.assertTrue(os.path.exists(self.index_of("gone")))
-        os.remove(os.path.join(self.root, "gone", "b.md"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual([r["concept_id"] for r in built.rows], ["keep/a"])
-        self.assertFalse(os.path.exists(self.index_of("gone")))
-        self.assertEqual(built.removed, ["gone/ccnavi-index.jsonl"])
-
-    def test_leaves_out_the_ccnavi_directory(self):
-        self.put(".ccnavi/approved/done/i0001.md", "---\nversion: 1\nticket: i0001\n---\n")
-        self.put("a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root, (".ccnavi",))
-        self.assertEqual([r["concept_id"] for r in built.rows], ["a"])
-        self.assertFalse(os.path.exists(self.index_of(".ccnavi/approved/done")))
-
-    def test_keeps_the_docs_directory_inside_the_ccnavi_directory(self):
-        self.put(".ccnavi/approved/done/i0001.md", "---\nversion: 1\nticket: i0001\n---\n")
-        self.put(".ccnavi/docs/usage.md", doc(type="guide"))
-        built = docsearch_index.build(
-            self.root, (".ccnavi",), kept_dirs=docsearch.kept_dirs(".ccnavi")
-        )
-        self.assertEqual([r["concept_id"] for r in built.rows], [".ccnavi/docs/usage"])
-        self.assertFalse(os.path.exists(self.index_of(".ccnavi/approved/done")))
-
-    def test_not_a_repository_raises(self):
-        with (
-            tempfile.TemporaryDirectory() as bare,
-            self.assertRaises(docsearch_index.NotARepository),
-        ):
-            docsearch_index.build(bare)
-
-
-# --- 2. 差分 ---------------------------------------------------------------------------
-
-
-class IncrementalTest(Repo):
-    def test_reuses_rows_whose_mtime_did_not_move_and_does_not_rewrite(self):
-        self.put("a.md", doc(type="guide"))
-        self.put("b.md", doc(type="adr"))
-        first = docsearch_index.build(self.root)
-        self.assertEqual((first.parsed, first.reused), (2, 0))
-        second = docsearch_index.build(self.root)
-        self.assertEqual((second.parsed, second.reused), (0, 2))
-        self.assertEqual(second.written, [])
-
-    def test_a_row_is_reused_even_if_the_file_changed_within_the_same_mtime(self):
-        # 使い回すかは concept_id と mtime だけで決める（読み直さない証拠）。
-        self.put("a.md", doc(type="guide"))
-        docsearch_index.build(self.root)
-        self.put("a.md", doc(type="changed"))  # 同じ mtime に戻す
-        self.assertEqual(docsearch_index.build(self.root).rows[0]["frontmatter"]["type"], "guide")
-
-    def test_a_moved_mtime_is_read_again(self):
-        self.put("a.md", doc(type="guide"))
-        docsearch_index.build(self.root)
-        self.put("a.md", doc(type="changed"), mtime=NOON + 60)
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.parsed, 1)
-        self.assertEqual(self.rows_of("")[0]["frontmatter"]["type"], "changed")
-        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
-
-    def test_no_refresh_uses_existing_rows_and_writes_nothing(self):
-        self.put("a.md", doc(type="guide"))
-        docsearch_index.build(self.root)
-        self.put("a.md", doc(type="changed"), mtime=NOON + 60)
-        self.put("b.md", doc(type="adr"))
-        built = docsearch_index.build(self.root, refresh=False)
-        types = {r["concept_id"]: r["frontmatter"]["type"] for r in built.rows}
-        self.assertEqual(types, {"a": "guide", "b": "adr"})
-        self.assertEqual(built.written, [])
-
-    def test_an_index_with_a_broken_line_is_not_ours_and_left_alone(self):
-        self.put("a.md", doc(type="guide"))
-        write(self.index_of(""), "{not json\n")
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.parsed, 1)
-        self.assertEqual([r["concept_id"] for r in built.rows], ["a"])
-        self.assertEqual((built.written, built.foreign), ([], ["ccnavi-index.jsonl"]))
-        with open(self.index_of(""), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "{not json\n")
-
-
-# --- 3. frontmatter --------------------------------------------------------------------
-
-
-class FrontMatterTest(unittest.TestCase):
-    def test_none_when_absent_unclosed_broken_aliased_or_not_a_mapping(self):
-        for raw in (
-            b"# no front\n",
-            b"---\ntype: guide\n",
-            b"---\ntype: [unclosed\n---\n",
-            b"---\na: &x 1\nb: *x\n---\n",
-            b"---\n- a\n- b\n---\n",
-            b"---\n!!python/object:os.system x\n---\n",
-        ):
-            with self.subTest(raw=raw):
-                self.assertIsNone(docsearch_index.front_matter(raw))
-
-    def test_values_that_json_lacks_become_strings(self):
-        front = docsearch_index.front_matter(b"---\ndate: 2026-08-05\nn: .nan\nok: true\n---\n")
-        self.assertEqual(front, {"date": "2026-08-05", "n": "nan", "ok": True})
-
-    def test_bom_and_dots_end(self):
-        self.assertEqual(
-            docsearch_index.front_matter("﻿---\ntype: a\n...\n".encode()), {"type": "a"}
-        )
-
-
-# --- 4. 引く ---------------------------------------------------------------------------
-
-
-def row(cid: str, mtime: str = "2026-08-05T12:00:00", **front) -> dict:
-    return {
-        "concept_id": cid,
-        "directory": cid.rpartition("/")[0],
-        "frontmatter": front or None,
-        "mtime": mtime,
-    }
-
-
-ROWS = [
-    row(
-        "docs/adr/0001-git",
-        "2026-08-01T09:00:00",
-        type="adr",
-        title="B タイトル",
-        tags=["git", "Worktree"],
-    ),
-    row("docs/adr/0002-ticket", "2026-08-05T23:30:00", type="ADR", title="A タイトル", keywords=["承認"]),
-    row("docs/claude/worktree", "2026-08-06T00:00:00", type="guide", tags="worktree"),
-    row("README", "2026-07-01T00:00:00", type="guide", description="使い方 description"),
-    row("notes/plain"),
-]
-
-
-def ids(query: docsearch_query.Query) -> list[str]:
-    hits, _ = docsearch_query.search(ROWS, query)
-    return [h["concept_id"] for h in hits]
-
-
-class SearchTest(unittest.TestCase):
-    def test_type_tag_keyword_are_whole_values_ignoring_case(self):
-        self.assertEqual(
-            ids(docsearch_query.Query(types=["adr"])), ["docs/adr/0001-git", "docs/adr/0002-ticket"]
-        )
-        self.assertEqual(ids(docsearch_query.Query(types=["ad"])), [])
-        # スカラーの tags も 1 要素のリストとしてヒットする。
-        self.assertEqual(
-            ids(docsearch_query.Query(tags=["WORKTREE"])),
-            ["docs/adr/0001-git", "docs/claude/worktree"],
-        )
-        self.assertEqual(ids(docsearch_query.Query(keywords=["承認"])), ["docs/adr/0002-ticket"])
-
-    def test_same_option_is_or_and_different_options_are_and(self):
-        self.assertEqual(
-            ids(docsearch_query.Query(types=["guide", "adr"])),
-            ["README", "docs/adr/0001-git", "docs/adr/0002-ticket", "docs/claude/worktree"],
-        )
-        self.assertEqual(
-            ids(docsearch_query.Query(types=["guide"], tags=["worktree"])), ["docs/claude/worktree"]
-        )
-
-    def test_learning_wiki_only_when_typed(self):
-        row = {
-            "concept_id": "docs/wiki/inbox/a.md",
-            "mtime": "2026-01-01T00:00:00",
-            "frontmatter": {"type": "learning-wiki", "tags": [], "keywords": []},
-        }
-        guide = {**row, "frontmatter": {"type": "guide", "tags": [], "keywords": []}}
-        self.assertFalse(docsearch_query.matches(row, docsearch_query.Query()))
-        self.assertTrue(
-            docsearch_query.matches(row, docsearch_query.Query(types=["learning-wiki"]))
-        )
-        self.assertTrue(docsearch_query.matches(guide, docsearch_query.Query()))
-
-    def test_path_is_part_of_the_concept_id(self):
-        self.assertEqual(ids(docsearch_query.Query(paths=["CLAUDE/"])), ["docs/claude/worktree"])
-
-    def test_text_looks_at_values_not_keys(self):
-        # キー名（title・tags・description）にはヒットしない。ヒットすると全件になる。
-        self.assertEqual(ids(docsearch_query.Query(texts=["title"])), [])
-        self.assertEqual(ids(docsearch_query.Query(texts=["tags"])), [])
-        self.assertEqual(ids(docsearch_query.Query(texts=["description"])), ["README"])
-        self.assertEqual(ids(docsearch_query.Query(texts=["使い方"])), ["README"])
-        self.assertEqual(ids(docsearch_query.Query(texts=["2026-07"])), ["README"])
-        self.assertEqual(ids(docsearch_query.Query(texts=["plain"])), ["notes/plain"])
-
-    def test_since_and_date_only_until(self):
-        self.assertEqual(
-            ids(docsearch_query.Query(since="2026-08-05", until="2026-08-05")),
-            ["docs/adr/0002-ticket", "notes/plain"],
-        )
-        self.assertEqual(
-            ids(docsearch_query.Query(until="2026-08-05T12:00")),
-            ["README", "docs/adr/0001-git", "notes/plain"],
-        )
-
-    def test_sort_reverse_and_limit(self):
-        self.assertEqual(
-            ids(docsearch_query.Query(sort="mtime", reverse=True, limit=2)),
-            ["docs/claude/worktree", "docs/adr/0002-ticket"],
-        )
-        # 大文字小文字を区別せず、同じ値は concept_id で並ぶ（`adr` と `ADR` は同じ値）。
-        # frontmatter が無いものは空として先頭に来る。
-        self.assertEqual(
-            ids(docsearch_query.Query(sort="type")),
-            [
-                "notes/plain",
-                "docs/adr/0001-git",
-                "docs/adr/0002-ticket",
-                "README",
-                "docs/claude/worktree",
-            ],
-        )
-        self.assertEqual(
-            ids(docsearch_query.Query(sort="title"))[-2:],
-            ["docs/adr/0002-ticket", "docs/adr/0001-git"],
-        )
-        hits, matched = docsearch_query.search(ROWS, docsearch_query.Query(limit=2))
-        self.assertEqual((len(hits), matched), (2, 5))
-
-    def test_problems_name_bad_values(self):
-        said = docsearch_query.problems_of(
-            docsearch_query.Query(sort="size", format="xml", since="yesterday", until="2026-8-5")
-        )
-        self.assertEqual(len(said), 4)
-
-
-def render(query: docsearch_query.Query, rows=ROWS) -> str:
-    out = io.StringIO()
-    hits, matched = docsearch_query.search(rows, query)
-    docsearch_query.render(out, hits, matched, len(rows), query.format)
-    return out.getvalue()
-
-
-class RenderTest(unittest.TestCase):
-    def test_count_says_shown_only_when_cut(self):
-        self.assertEqual(render(docsearch_query.Query(format="count")), "matched=5 total=5\n")
-        self.assertEqual(
-            render(docsearch_query.Query(format="count", limit=1)), "matched=5 shown=1 total=5\n"
-        )
-
-    def test_path_jsonl_json(self):
-        self.assertEqual(
-            render(docsearch_query.Query(format="path", types=["guide"])),
-            "README\ndocs/claude/worktree\n",
-        )
-        lines = render(docsearch_query.Query(format="jsonl", types=["guide"])).splitlines()
-        self.assertEqual(
-            [json.loads(line)["concept_id"] for line in lines], ["README", "docs/claude/worktree"]
-        )
-        self.assertEqual(len(json.loads(render(docsearch_query.Query(format="json")))), 5)
-
-    def test_detail_folds_lines(self):
-        rows = [row("a", type="guide", description="1 行目\n2 行目", tags=["x", "y"])]
-        text = render(docsearch_query.Query(format="detail"), rows)
-        self.assertIn("  description: 1 行目 2 行目\n", text)
-        self.assertIn("  tags       : x, y\n", text)
-
-    def test_table_aligns_wide_characters_as_two_columns(self):
-        rows = [
-            row("日本語/文書", type="ガイド", title="タイトル"),
-            row("ab", type="adr", title="t"),
-        ]
-        lines = render(docsearch_query.Query(format="table"), rows).splitlines()
-        # タイトルの列が始まる見た目の位置が揃う。
-        starts = [docsearch_query.dwidth(line[: line.rindex(" ") + 1]) for line in lines]
-        self.assertEqual(starts[0], starts[1])
-        self.assertEqual(lines[0], "adr     ab           t")
-
-    def test_broken_rows_do_not_break_any_format(self):
-        rows = [
-            {"concept_id": "x", "frontmatter": {"tags": {"a": 1}, "type": ["odd"]}, "mtime": None},
-            {"concept_id": "y", "frontmatter": "not a mapping"},
-        ]
-        for fmt in docsearch_query.FORMATS:
-            with self.subTest(fmt=fmt):
-                render(docsearch_query.Query(format=fmt, texts=[""], tags=["q"]), rows)
-                render(docsearch_query.Query(format=fmt, sort="title"), rows)
-
-
-# --- 5. CLI ----------------------------------------------------------------------------
+        self.assertEqual(done.returncode, 0, done.stderr)
+        if not done.stdout.strip():
+            return ""
+        return json.loads(done.stdout)["hookSpecificOutput"].get("additionalContext", "")
 
 
 def clean_env(**extra: str) -> dict[str, str]:
@@ -677,9 +255,6 @@ class CliTest(Repo):
         self.assertEqual(self.ccnavi("--docs", "--until", "2026-08-05T10:59").returncode, 0)
 
 
-# --- 6. プロジェクト -------------------------------------------------------------------
-
-
 class ProjectsTest(Repo):
     """プロジェクトの置き場（`projects/`）の直下の各 git も索引に入れる。"""
 
@@ -687,17 +262,21 @@ class ProjectsTest(Repo):
         super().setUp()
         write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
         self.lib = self.project("lib", "**/ccnavi-index.jsonl\n")
-        # ユーザが索引を追跡している（否定の行がある）プロジェクトは、足さず対象外のまま。
-        self.bare = self.project("bare", "!**/ccnavi-index.jsonl\n")
+        # .gitignore に足せない（ふつうのファイルでない）プロジェクトは、対象外のまま。
+        self.bare = self.project("bare", None)
         self.put("docs/w.md", doc(type="guide", title="ワークスペース"))
         self.put("projects/lib/docs/x.md", doc(type="adr", title="lib の決定"))
         self.put("projects/bare/y.md", doc(type="guide"))
 
-    def project(self, name: str, ignore: str) -> str:
+    def project(self, name: str, ignore: str | None) -> str:
+        """ignore が None なら .gitignore をディレクトリにして、無視の行を足せなくする。"""
         home = os.path.join(self.root, "projects", name)
         os.makedirs(home)
         git(home, "init", "-q")
-        write(os.path.join(home, ".gitignore"), ignore)
+        if ignore is None:
+            os.makedirs(os.path.join(home, ".gitignore"))
+        else:
+            write(os.path.join(home, ".gitignore"), ignore)
         return home
 
     def ccnavi(self, *args: str):
@@ -726,10 +305,21 @@ class ProjectsTest(Repo):
     def test_a_project_that_ignores_no_index_is_left_out_and_named(self):
         done = self.ccnavi("--format", "count")
         self.assertEqual(done.stdout, "matched=2 total=2\n")
-        self.assertIn(f"bare {docsearch.UNIGNORED}", done.stderr)
+        self.assertIn(f"bare {UNIGNORED}", done.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.bare, "ccnavi-index.jsonl")))
-        with open(os.path.join(self.bare, ".gitignore"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "!**/ccnavi-index.jsonl\n")  # 否定があれば書き換えない
+        self.assertTrue(os.path.isdir(os.path.join(self.bare, ".gitignore")))
+
+    def test_a_negating_line_does_not_stop_the_line(self):
+        # 許可リスト型の .gitignore でも、足す行が後ろで勝つので足して索引に入れる。
+        allow = self.project("allow", "/*\n!/docs/\n!/docs/**\n")
+        self.put("projects/allow/docs/z.md", doc(type="guide"))
+        done = self.ccnavi("--format", "path")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertIn("projects/allow/docs/z", done.stdout.splitlines())
+        self.assertEqual(
+            read(os.path.join(allow, ".gitignore")), "/*\n!/docs/\n!/docs/**\n**/ccnavi-index.jsonl\n"
+        )
+        self.assertTrue(os.path.exists(os.path.join(allow, "docs", "ccnavi-index.jsonl")))
 
     def test_a_project_without_ignore_gets_the_line_and_is_indexed(self):
         plain = self.project("plain", "node_modules/\n")
@@ -754,30 +344,8 @@ class ProjectsTest(Repo):
         done = self.ccnavi("--path", ".ccnavi", "--format", "count")
         self.assertEqual(done.stdout, "matched=0 total=2\n")
 
-    def test_a_past_deadline_stops_before_any_tree(self):
-        conf = settings.load(self.root)[0]
-        found = docsearch.collect(conf, self.root, deadline=time.monotonic() - 1)
-        self.assertTrue(found.timed_out)
-        self.assertEqual(found.rows, [])
-
-
-# --- 7. SessionStart -------------------------------------------------------------------
-
 
 class SessionStartTest(Repo):
-    def context(self, root: str, **extra) -> str:
-        payload = {"hook_event_name": "SessionStart", "session_id": "s1", "cwd": root, **extra}
-        done = run_ccnavi(
-            ["--root", root, "--mode", "enable"],
-            input=json.dumps(payload),
-            cwd=root,
-            env=clean_env(CCNAVI_ENTRY_PATH=".ccnavi/scripts/ccnavi-launcher.sh"),
-        )
-        self.assertEqual(done.returncode, 0, done.stderr)
-        if not done.stdout.strip():
-            return ""
-        return json.loads(done.stdout)["hookSpecificOutput"].get("additionalContext", "")
-
     def test_refreshes_the_index_and_tells_how_to_search(self):
         self.put("docs/a.md", doc(type="guide"))
         said = self.context(self.root)
@@ -786,22 +354,11 @@ class SessionStartTest(Repo):
         self.assertIn(launcher, said)
         self.assertIn("grep・Glob より先に", said)
         self.assertNotIn("--keyword frontmatter", said)
-        self.assertNotIn(docsearch.UNIGNORED, said)
-
-    def test_the_guide_is_one_line_without_the_option_list_or_writing_rules(self):
-        """常駐の文脈には引き方の要点だけ。オプションの一覧と frontmatter の書き方は渡さない。"""
-        self.put("docs/a.md", doc(type="guide"))
-        conf = settings.load(self.root)[0]
-        said = docsearch.at_start(conf, self.root)
-        self.assertEqual(len(said.splitlines()), 1, said)
-        self.assertIn("--docs --keyword <語>", said)
-        for listed in ("--format", "--sort", "--since", "type は必須", "kebab-case"):
-            self.assertNotIn(listed, said)
-        self.assertIn("--help", said)
+        self.assertNotIn(UNIGNORED, said)
 
     def test_points_to_the_convention_document_through_docs_when_present(self):
         self.put("docs/a.md", doc(type="guide"))
-        self.put(docsearch.CONVENTION_DOC, doc(type="guide"))
+        self.put(CONVENTION_DOC, doc(type="guide"))
         said = self.context(self.root)
         self.assertIn("--docs --keyword frontmatter", said)
 
@@ -811,11 +368,11 @@ class SessionStartTest(Repo):
         home = os.path.join(self.root, "projects", "bare")
         os.makedirs(home)
         git(home, "init", "-q")
-        write(os.path.join(home, ".gitignore"), "!**/ccnavi-index.jsonl\n")
+        os.makedirs(os.path.join(home, ".gitignore"))  # 足せない
         self.put("projects/bare/y.md", doc(type="guide"))
         said = self.context(self.root)
         self.assertIn("--docs", said)
-        self.assertIn(f"bare {docsearch.UNIGNORED}", said)
+        self.assertIn(f"bare {UNIGNORED}", said)
 
     def test_names_a_project_that_got_the_line(self):
         write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
@@ -825,22 +382,23 @@ class SessionStartTest(Repo):
         git(home, "init", "-q")
         self.put("projects/plain/y.md", doc(type="guide"))
         said = self.context(self.root)
-        self.assertIn(f"projects/plain/.gitignore {docsearch.IGNORE_ADDED}", said)
-        self.assertNotIn(docsearch.UNIGNORED, said)
+        self.assertIn(f"projects/plain/.gitignore {IGNORE_ADDED}", said)
+        self.assertNotIn(UNIGNORED, said)
         self.assertEqual(read(os.path.join(home, ".gitignore")), "**/ccnavi-index.jsonl\n")
 
     def test_names_the_workspace_that_got_the_line(self):
         write(os.path.join(self.root, ".gitignore"), "")
         self.put("docs/a.md", doc(type="guide"))
         said = self.context(self.root)
-        self.assertIn(f".gitignore {docsearch.IGNORE_ADDED}", said)
+        self.assertIn(f".gitignore {IGNORE_ADDED}", said)
         self.assertIn("grep・Glob より先に", said)
 
     def test_only_the_left_out_line_when_nothing_is_indexed(self):
-        write(os.path.join(self.root, ".gitignore"), "!**/ccnavi-index.jsonl\n")
+        os.remove(os.path.join(self.root, ".gitignore"))
+        os.makedirs(os.path.join(self.root, ".gitignore"))  # 足せない
         self.put("docs/a.md", doc(type="guide"))
         said = self.context(self.root)
-        self.assertIn(f"{docsearch.WORKSPACE} {docsearch.UNIGNORED}", said)
+        self.assertIn(f"{WORKSPACE} {UNIGNORED}", said)
         self.assertNotIn("grep・Glob より先に", said)
 
     def test_silent_for_a_subagent_without_md_and_outside_git(self):
@@ -863,102 +421,6 @@ class FrontmatterHintTest(Repo):
     置き場・チケットの置き場）を除いたもの。
     """
 
-    def hint(self, rel: str, text: str | None = None, tool="Write", kind="create", root=None):
-        base = root or self.root
-        path = os.path.join(base, *rel.split("/"))
-        if text is not None:
-            write(path, text)
-        payload = hookio.Input(
-            event=hookio.POST_TOOL_USE,
-            tool_name=tool,
-            tool_input={"file_path": path},
-            cwd=base,
-            tool_response={"type": kind, "filePath": path},
-        )
-        return docsearch.missing_frontmatter(settings.load(self.root)[0], self.root, payload)
-
-    def test_a_new_md_without_front_matter_is_told_once(self):
-        said = self.hint("docs/new.md", "# 見出し\n")
-        self.assertTrue(said.startswith(f"[ccnavi] {docsearch.CODE_MISSING_FRONTMATTER} "), said)
-        self.assertIn("(docs/new.md)", said)
-        self.assertIn("type（必須）", said)
-        self.assertNotIn("--help", said)
-
-    def test_a_missing_type_is_told_too(self):
-        said = self.hint("docs/new.md", doc(title="t"))
-        self.assertIn("frontmatter に type が無い", said)
-        self.assertEqual(self.hint("docs/ok.md", doc(type="guide")), "")
-
-    def test_edits_and_overwrites_are_not_told(self):
-        self.put("docs/old.md", "# 見出し\n")
-        self.assertEqual(self.hint("docs/old.md", tool="Edit", kind=""), "")
-        self.assertEqual(self.hint("docs/old.md", "# 上書き\n", kind="update"), "")
-
-    def test_files_meant_to_have_no_front_matter_are_not_told(self):
-        for rel in (
-            "README.md",
-            "extensions/x/README.md",
-            "CLAUDE.md",
-            "AGENTS.md",
-            "CHANGELOG.md",
-            "wip/handoff/draft.md",
-            "wip/proposals/todo/i0001.md",
-            ".ccnavi/notes.md",
-            "wip/design/scripts/i12.md",
-            ".claude/skills/yomiyasu/a.md",
-            ".claude/skills/yomiyasu/references/b.md",
-        ):
-            with self.subTest(rel=rel):
-                self.assertEqual(self.hint(rel, "# 見出し\n"), "")
-        # 表に無い置き場には出す。
-        self.assertNotEqual(self.hint("wip/design/notes.md", "# 見出し\n"), "")
-        self.assertNotEqual(self.hint(".claude/skills/x/references/a.md", "# 見出し\n"), "")
-
-    def test_a_skill_without_type_is_told_to_add_type_skill(self):
-        said = self.hint(".claude/skills/x/SKILL.md", "---\nname: x\ndescription: y\n---\n# x\n")
-        self.assertIn("type: skill を足してください", said)
-        self.assertNotIn("ありません。ので", said)
-
-    def test_exempt_places_match_the_convention_table(self):
-        """案内を出さない置き場は、決まりの文書の「対象外」の表で付けない・付けなくてよいとするもの。"""
-        with open(os.path.join(ROOT, *docsearch.CONVENTION_DOC.split("/")), encoding="utf-8") as f:
-            text = f.read()
-        table = text.split("## 対象外", 1)[1].split("\n\n", 2)[1]
-        places = set()
-        for row in table.splitlines()[2:]:
-            cells = [c.strip() for c in row.strip("|").split("|")]
-            if cells[1] not in ("付けない", "付けなくてよい"):
-                continue
-            for code in re.findall(r"`([^`]+)`", cells[0]):
-                if "/" in code:
-                    places.add(code if not code.endswith("/") else code + "**")
-        self.assertEqual(places, set(docsearch.NO_FRONTMATTER_PLACES))
-
-    def test_ignored_and_non_md_files_are_not_told(self):
-        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/out/\n")
-        self.assertEqual(self.hint("out/a.md", "# 見出し\n"), "")
-        self.assertEqual(self.hint("docs/a.txt", "x\n"), "")
-
-    def test_the_convention_document_is_named_when_present(self):
-        self.put(docsearch.CONVENTION_DOC, doc(type="guide"))
-        said = self.hint("docs/new.md", "# 見出し\n")
-        self.assertIn(docsearch.CONVENTION_DOC, said)
-        self.assertIn("--docs --keyword frontmatter", said)
-
-    def test_a_worktree_ignored_by_the_workspace_is_judged_by_its_own_git(self):
-        """ワークスペースは `.claude/worktrees/` を無視する。
-
-        ワークツリーの md も統合後は索引に入るので、ワークツリー自身の git で決める。
-        """
-        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/.claude/worktrees/\n")
-        git(self.root, "add", ".gitignore")
-        git(self.root, "commit", "-q", "-m", "seed")
-        tree_root = os.path.join(self.root, ".claude", "worktrees", "w")
-        git(self.root, "worktree", "add", "-q", tree_root, "-b", "w")
-        said = self.hint("docs/new.md", "# 見出し\n", root=tree_root)
-        self.assertIn("(.claude/worktrees/w/docs/new.md)", said)
-        self.assertEqual(self.hint("wip/handoff/a.md", "# 見出し\n", root=tree_root), "")
-
     def test_post_tool_use_delivers_it_without_changing_the_decision(self):
         path = self.put("docs/new.md", "# 見出し\n")
         payload = {
@@ -977,125 +439,23 @@ class FrontmatterHintTest(Repo):
         )
         self.assertEqual(done.returncode, 0, done.stderr)
         said = json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
-        self.assertIn(docsearch.CODE_MISSING_FRONTMATTER, said)
+        self.assertIn(CODE_MISSING_FRONTMATTER, said)
         self.assertNotIn("permissionDecision", done.stdout)
-
-
-# --- 8. 敵対的な入力と失敗 --------------------------------------------------------------
-
-
-def can_symlink_dirs() -> bool:
-    with tempfile.TemporaryDirectory() as d:
-        try:
-            os.symlink(d, os.path.join(d, "link"), target_is_directory=True)
-        except (OSError, NotImplementedError):
-            return False
-    return True
 
 
 class ForeignIndexTest(Repo):
     """A: ccnavi の形でない ccnavi-index.jsonl は上書きも削除もしない。"""
-
-    def test_a_foreign_index_is_not_overwritten(self):
-        self.put("a.md", doc(type="guide"))
-        foreign = '{"name": "other tool"}\n'
-        write(self.index_of(""), foreign)
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.foreign, ["ccnavi-index.jsonl"])
-        self.assertIn("ccnavi の索引ではない", built.problems[0])
-        with open(self.index_of(""), encoding="utf-8") as f:
-            self.assertEqual(f.read(), foreign)
-
-    def test_a_foreign_index_of_an_emptied_directory_is_not_removed(self):
-        self.put("gone/b.md", doc(type="guide"))
-        self.put("keep.md", doc(type="guide"))
-        git(self.root, "add", "gone/b.md")
-        write(self.index_of("gone"), "not ours\n")
-        os.remove(os.path.join(self.root, "gone", "b.md"))
-        built = docsearch_index.build(self.root)
-        self.assertTrue(os.path.exists(self.index_of("gone")))
-        self.assertEqual(built.removed, [])
-
-    def test_an_empty_index_is_ours(self):
-        self.put("a.md", doc(type="guide"))
-        write(self.index_of(""), "\n")
-        self.assertEqual(docsearch_index.build(self.root).written, ["ccnavi-index.jsonl"])
 
     def test_cli_and_session_start_name_it(self):
         self.put("a.md", doc(type="guide"))
         write(self.index_of(""), "x\n")
         done = run_ccnavi(["--root", self.root, "--docs", "--format", "count"], env=clean_env())
         self.assertIn("ccnavi-index.jsonl は ccnavi の索引ではないので書き換えない", done.stderr)
-        conf = settings.load(self.root)[0]
-        self.assertIn("書き換えなかった: ccnavi-index.jsonl", docsearch.at_start(conf, self.root))
-
-
-class OutsideTest(Repo):
-    """B: リンク越しにツリーの外を読まない・書かない。"""
-
-    def outside(self) -> str:
-        other = tempfile.TemporaryDirectory()
-        self.addCleanup(other.cleanup)
-        path = os.path.realpath(other.name)
-        write(os.path.join(path, "x.md"), doc(type="guide"))
-        return path
-
-    def assert_nothing_outside(self, outside: str, built: docsearch_index.Built) -> None:
-        self.assertFalse(os.path.exists(os.path.join(outside, "ccnavi-index.jsonl")))
-        self.assertEqual([r for r in built.rows if r["concept_id"].startswith("linked")], [])
-
-    def test_under_refuses_a_path_outside(self):
-        base = pathcase.fold(os.path.realpath(self.root))
-        self.assertTrue(docsearch_index._under(os.path.join(self.root, "docs"), base))
-        self.assertFalse(docsearch_index._under(self.outside(), base))
-
-    @unittest.skipUnless(os.name == "nt", "ジャンクションは Windows にしか無い")
-    def test_a_junction_is_neither_read_nor_written(self):
-        import _winapi
-
-        outside = self.outside()
-        link = os.path.join(self.root, "linked")
-        _winapi.CreateJunction(outside, link)
-        self.addCleanup(os.rmdir, link)
-        self.assertFalse(docsearch_index._under(link, pathcase.fold(os.path.realpath(self.root))))
-        self.put("a.md", doc(type="guide"))
-        self.assert_nothing_outside(outside, docsearch_index.build(self.root))
-
-    @unittest.skipUnless(can_symlink_dirs(), "ディレクトリのシンボリックリンクを作れない")
-    def test_a_symlinked_directory_is_neither_read_nor_written(self):
-        outside = self.outside()
-        os.symlink(outside, os.path.join(self.root, "linked"), target_is_directory=True)
-        self.put("a.md", doc(type="guide"))
-        self.assert_nothing_outside(outside, docsearch_index.build(self.root))
+        self.assertIn("書き換えなかった: ccnavi-index.jsonl", self.context(self.root))
 
 
 class RobustTest(Repo):
     """C: 不正な入力で異常終了しない。"""
-
-    def test_front_matter_that_json_cannot_write_is_none(self):
-        huge = b"---\nn: 1" + b"9" * 5000 + b"\n---\n"
-        self.assertIsNone(docsearch_index.front_matter(huge))
-
-    def test_a_deeply_nested_index_is_foreign_not_a_crash(self):
-        self.put("a.md", doc(type="guide"))
-        write(self.index_of(""), "[" * 100000 + "\n")
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.foreign, ["ccnavi-index.jsonl"])
-
-    def test_one_broken_directory_does_not_stop_the_others(self):
-        self.put("bad/a.md", doc(type="guide"))
-        self.put("good/b.md", doc(type="adr"))
-        real = docsearch_index._scan
-
-        def broken(base, base_real, directory, *args):
-            if directory == "bad":
-                raise RuntimeError("boom")
-            return real(base, base_real, directory, *args)
-
-        with mock.patch.object(docsearch_index, "_scan", broken):
-            built = docsearch_index.build(self.root)
-        self.assertEqual([r["concept_id"] for r in built.rows], ["good/b"])
-        self.assertIn("bad/ を読めない", built.problems[0])
 
     def test_no_refresh_and_text_survive_odd_rows(self):
         self.put("a.md", doc(type="guide"))
@@ -1116,352 +476,15 @@ class RobustTest(Repo):
                 self.assertIn('"a"' if fmt == "json" else "guide", done.stdout)
 
 
-class DeadlineTest(Repo):
-    """D: 期限は md 1 本ごとに見る。打ち切ったディレクトリも読めた分は書き、回を重ねれば埋まる。"""
-
-    def test_parse_stops_between_files_and_keeps_the_rest_waiting(self):
-        self.put("a.md", doc(type="guide"))
-        one = docsearch_index._Dir(
-            "", "ccnavi-index.jsonl", self.index_of(""), True, docsearch_index.ABSENT, {}, None
-        )
-        one.order = ["a"]
-        one.pending = [("a.md", "a", "2026-01-01T00:00:00")]
-        built = docsearch_index.Built()
-        docsearch_index._parse_pending(self.root, [one], time.monotonic() - 1, built)
-        self.assertTrue(built.timed_out)
-        self.assertEqual(built.parsed, 0)
-        self.assertEqual(len(one.pending), 1)
-
-    def test_a_directory_cut_short_is_written_up_to_where_it_got(self):
-        """読めた md の新しい行と、読めなかった md の既存の行で書く。"""
-        self.put("a.md", doc(type="guide"))
-        self.put("b.md", doc(type="guide"))
-        old_b = {"concept_id": "b", "directory": ".", "frontmatter": None, "mtime": "x"}
-        write(self.index_of(""), json.dumps(old_b) + "\n")
-        real = docsearch_index._read_head
-        reads = []
-
-        def once(path):
-            # 1 本読んだら期限が切れたことにする。
-            reads.append(path)
-            return real(path)
-
-        with (
-            mock.patch.object(docsearch_index, "_read_head", once),
-            mock.patch.object(docsearch_index, "_past", lambda deadline: bool(reads)),
-        ):
-            built = docsearch_index.build(self.root, deadline=time.monotonic() + 600)
-        self.assertTrue(built.timed_out)
-        self.assertEqual(built.written, ["ccnavi-index.jsonl"])
-        rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
-        self.assertEqual(rows["a"]["frontmatter"], {"type": "guide"})
-        self.assertEqual(rows["b"], old_b)
-
-        # 次の回に残りを読む。
-        built = docsearch_index.build(self.root)
-        self.assertFalse(built.timed_out)
-        rows = {r["concept_id"]: r for r in map(json.loads, read(self.index_of("")).splitlines())}
-        self.assertEqual(rows["b"]["frontmatter"], {"type": "guide"})
-
-    def test_a_big_directory_fills_up_over_runs_and_does_not_starve_the_rest(self):
-        """大きなディレクトリが毎回打ち切られても、回を重ねれば埋まり、後ろのディレクトリも読む。"""
-        for i in range(30):
-            self.put(f"docs/d{i:03}.md", doc(type="guide"))
-        self.put("zz/late.md", doc(type="adr"))
-        budget = {"left": 0}
-        real = docsearch_index._read_head
-
-        def counted(path):
-            budget["left"] -= 1
-            return real(path)
-
-        def past(deadline):
-            return deadline is not None and budget["left"] <= 0
-
-        seen = []
-        with (
-            mock.patch.object(docsearch_index, "_read_head", counted),
-            mock.patch.object(docsearch_index, "_past", past),
-        ):
-            for _ in range(3):
-                budget["left"] = 12  # 1 回に読めるのは 12 本まで
-                built = docsearch_index.build(self.root, deadline=time.monotonic() + 600)
-                seen.append(len(built.rows))
-                self.assertIn("zz/late", [r["concept_id"] for r in built.rows])
-        # 1 回目は zz/late と docs の 11 本、2 回目は docs の続き 12 本、3 回目で残りの 7 本。
-        self.assertEqual(seen, [12, 24, 31])
-        built = docsearch_index.build(self.root)
-        self.assertFalse(built.timed_out)
-        self.assertEqual(built.parsed, 0)
-
-    def test_session_start_without_time_does_not_refresh_but_still_guides(self):
-        """期限が切れていれば新しくしないが、既存の索引と md があれば案内は出す。"""
-        self.put("a.md", doc(type="guide"))
-        conf = settings.load(self.root)[0]
-        said = docsearch.at_start(conf, self.root, time.monotonic() - 1)
-        self.assertIn("--docs", said)
-        self.assertFalse(os.path.exists(self.index_of("")))
-
-        docsearch_index.build(self.root)
-        before = read(self.index_of(""))
-        self.put("a.md", doc(type="adr"))
-        os.utime(self.root + "/a.md", (time.time() + 5, time.time() + 5))
-        said = docsearch.at_start(conf, self.root, time.monotonic() - 1)
-        self.assertIn("--docs", said)
-        self.assertEqual(read(self.index_of("")), before)
-
-    def test_session_start_without_time_and_without_md_says_nothing(self):
-        self.put("docs/x.txt", "x")
-        conf = settings.load(self.root)[0]
-        self.assertEqual(docsearch.at_start(conf, self.root, time.monotonic() - 1), "")
-
-    def test_read_head_stops_early_without_front_matter(self):
-        path = self.put("big.md", "x" * 20000)
-        self.assertEqual(len(docsearch_index._read_head(path)), docsearch_index.FIRST_READ)
-        path = self.put("closed.md", "---\ntype: a\n---\n" + "y" * 20000)
-        self.assertEqual(len(docsearch_index._read_head(path)), docsearch_index.FIRST_READ)
-        path = self.put("long.md", "---\nd: " + "z" * 10000 + "\n---\nbody")
-        self.assertEqual(
-            docsearch_index.front_matter(docsearch_index._read_head(path))["d"], "z" * 10000
-        )
-
-
-class GitFailureTest(Repo):
-    """E: git に聞けなかったことを、git の外・無視されていないと取り違えない。"""
-
-    def failing(self, verb: str):
-        real = docsearch_index.gitcmd.run
-
-        def run(cwd, args, *rest, **kwargs):
-            if args[0] == verb:
-                return docsearch_index.gitcmd.Done(failure="timed out", timed_out=True)
-            return real(cwd, args, *rest, **kwargs)
-
-        return mock.patch.object(docsearch_index.gitcmd, "run", run)
-
-    def test_ls_files_failure_is_failed_not_outside_git(self):
-        self.put("a.md", doc(type="guide"))
-        conf = settings.load(self.root)[0]
-        with self.failing("ls-files"):
-            found = docsearch.collect(conf, self.root)
-        self.assertEqual(found.failed, [f"{docsearch.WORKSPACE}: git が期限までに終わらなかった"])
-        self.assertEqual(found.unignored, [])
-
-    def test_check_ignore_failure_is_not_unignored(self):
-        self.put("a.md", doc(type="guide"))
-        conf = settings.load(self.root)[0]
-        with self.failing("check-ignore"):
-            found = docsearch.collect(conf, self.root)
-            said = docsearch.at_start(conf, self.root)
-        self.assertEqual(found.unignored, [])
-        self.assertEqual(len(found.failed), 1)
-        self.assertNotIn(docsearch.UNIGNORED, said)
-
-    def test_cli_says_the_query_failed(self):
-        self.put("a.md", doc(type="guide"))
-        with self.failing("ls-files"):
-            done = run_ccnavi(["--root", self.root, "--docs"], env=clean_env())
-        self.assertEqual(done.returncode, 0)
-        self.assertIn("git への問い合わせに失敗したので引かない", done.stderr)
-
-
-class NormalizationTest(unittest.TestCase):
-    """F: NFC に揃えて比べ、結合文字は幅 0。"""
-
-    NFD = unicodedata.normalize("NFD", "が")
-
-    def test_nfd_rows_match_nfc_queries(self):
-        rows = [row(f"docs/{self.NFD}", tags=[self.NFD], title=self.NFD)]
-        for query in (
-            docsearch_query.Query(paths=["が"]),
-            docsearch_query.Query(tags=["が"]),
-            docsearch_query.Query(texts=["が"]),
-        ):
-            with self.subTest(query=query):
-                self.assertEqual(len(docsearch_query.search(rows, query)[0]), 1)
-
-    def test_combining_marks_have_no_width(self):
-        self.assertEqual(docsearch_query.dwidth(self.NFD), 2)
-        self.assertEqual(docsearch_query.dwidth("é"), 1)
-
-
-class TempFileTest(Repo):
-    """G: 一時ファイルは .git の中に排他で作り、残骸は次の回に消す。"""
-
-    def test_nothing_new_shows_in_git_status(self):
-        git(self.root, "add", ".gitignore")
-        git(self.root, "commit", "-q", "-m", "i")
-        self.put("a.md", doc(type="guide"))
-        git(self.root, "add", "a.md")
-        git(self.root, "commit", "-q", "-m", "a")
-        docsearch_index.build(self.root)
-        self.assertTrue(os.path.exists(self.index_of("")))
-        self.assertEqual(git(self.root, "status", "--porcelain", "-uall"), "")
-
-    def test_stale_leftovers_are_swept(self):
-        self.put("a.md", doc(type="guide"))
-        git_dir = os.path.join(self.root, ".git")
-        stale = write(os.path.join(git_dir, "ccnavi-index-1-0.tmp"), "x", mtime=NOON)
-        fresh = write(os.path.join(git_dir, "ccnavi-index-1-1.tmp"), "x")
-        docsearch_index.build(self.root)
-        self.assertFalse(os.path.exists(stale))
-        self.assertTrue(os.path.exists(fresh))
-        leftovers = [n for n in os.listdir(git_dir) if n.startswith("ccnavi-index-")]
-        self.assertEqual(leftovers, ["ccnavi-index-1-1.tmp"])
-
-
 class DedupeAndProjectsTest(Repo):
     """H: 同じ concept_id は 1 本に。`.git` の無いプロジェクトは CLI で名指し。"""
-
-    def test_nfc_duplicates_are_folded(self):
-        nfc, nfd = "が", unicodedata.normalize("NFD", "が")
-        self.put(f"{nfc}.md", doc(type="a"))
-        try:
-            self.put(f"{nfd}.md", doc(type="b"))
-        except OSError:
-            self.skipTest("NFD の名前を作れない")
-        names = os.listdir(self.root)
-        if not (nfc + ".md" in names and nfd + ".md" in names):
-            self.skipTest("このファイルシステムは名前を正規化する")
-        conf = settings.load(self.root)[0]
-        self.assertEqual(len(docsearch.collect(conf, self.root).rows), 1)
 
     def test_a_project_without_git_is_named_by_the_cli(self):
         self.put("a.md", doc(type="guide"))
         self.put("projects/plain/x.md", doc(type="guide"))
         done = run_ccnavi(["--root", self.root, "--docs"], env=clean_env())
         self.assertIn("プロジェクト plain は .git を持たないので引かない", done.stderr)
-        conf = settings.load(self.root)[0]
-        self.assertNotIn("plain", docsearch.at_start(conf, self.root))
-
-
-# --- 敵対的レビューの指摘 -------------------------------------------------------------------
-
-
-class LineSeparatorTest(Repo):
-    """自分の ccnavi-index.jsonl を、値の中の U+2028・U+2029・U+0085 で割って foreign にしない。"""
-
-    def test_a_line_separator_in_a_value_keeps_the_index_ours(self):
-        for escape, char in (("\\L", " "), ("\\P", " "), ("\\N", "\u0085")):
-            with self.subTest(char=hex(ord(char))):
-                self.put("a.md", f'---\ntype: guide\ntitle: "x{escape}y"\n---\n')
-                docsearch_index.build(self.root)
-                self.assertIn(char, read(self.index_of("")))
-                built = docsearch_index.build(self.root)
-                self.assertEqual(built.foreign, [])
-                self.assertEqual(built.reused, 1)
-                self.assertEqual(built.rows[0]["frontmatter"]["title"], f"x{char}y")
-                os.remove(self.index_of(""))
-
-    def test_crlf_lines_are_still_read(self):
-        self.put("a.md", doc(type="guide"))
-        docsearch_index.build(self.root)
-        text = read(self.index_of(""))
-        with open(self.index_of(""), "w", encoding="utf-8", newline="") as f:
-            f.write(text.replace("\n", "\r\n"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.foreign, [])
-        self.assertEqual(built.reused, 1)
-
-
-class CrossDeviceTest(Repo):
-    """`.git` が別のファイルシステムでも、ワークツリーの側の一時ファイルで書く。"""
-
-    def exdev(self):
-        real = os.replace
-        git_dir = os.path.join(self.root, ".git") + os.sep
-
-        def replace(src, dst):
-            if str(src).startswith(git_dir):
-                raise OSError(errno.EXDEV, "Invalid cross-device link")
-            return real(src, dst)
-
-        return mock.patch.object(docsearch_index.os, "replace", replace)
-
-    def leftovers(self, rel_dir: str) -> list[str]:
-        where = os.path.join(self.root, *[p for p in rel_dir.split("/") if p])
-        return [n for n in os.listdir(where) if n.startswith(docsearch_index.LOCAL_TMP_PREFIX)]
-
-    def test_writes_through_a_temporary_beside_the_index(self):
-        self.put("docs/a.md", doc(type="guide"))
-        self.put("b.md", doc(type="adr"))
-        with self.exdev():
-            built = docsearch_index.build(self.root)
-        self.assertEqual(built.problems, [])
-        self.assertEqual(sorted(built.written), ["ccnavi-index.jsonl", "docs/ccnavi-index.jsonl"])
-        self.assertEqual(self.rows_of("docs")[0]["frontmatter"], {"type": "guide"})
-        self.assertEqual(self.leftovers("docs"), [])
-        self.assertEqual(self.leftovers(""), [])
-        status = git(self.root, "status", "--porcelain", "--untracked-files=all")
-        self.assertNotIn("ccnavi-index.jsonl", status)
-        self.assertNotIn(docsearch_index.LOCAL_TMP_PREFIX, status)
-
-    def test_does_not_write_when_the_temporary_would_not_be_ignored(self):
-        write(os.path.join(self.root, ".gitignore"), "/docs/ccnavi-index.jsonl\n")
-        self.put("docs/a.md", doc(type="guide"))
-        with self.exdev():
-            built = docsearch_index.build(self.root)
-        self.assertEqual(built.written, [])
-        self.assertIn("git に無視されない", " ".join(built.problems))
-        self.assertFalse(os.path.exists(self.index_of("docs")))
-        self.assertEqual(self.leftovers("docs"), [])
-        self.assertEqual([r["concept_id"] for r in built.rows], ["docs/a"])
-
-    def test_sweeps_only_its_own_stale_leftovers(self):
-        self.put("docs/a.md", doc(type="guide"))
-        old = time.time() - docsearch_index.TMP_STALE_SECONDS - 60
-        mine = write(os.path.join(self.root, "docs", ".ccnavi-tmp-1-1", "ccnavi-index.jsonl"), "x")
-        theirs = write(os.path.join(self.root, "docs", ".ccnavi-tmp-2-2", "notes.txt"), "keep")
-        fresh = write(os.path.join(self.root, "docs", ".ccnavi-tmp-3-3", "ccnavi-index.jsonl"), "x")
-        for path in (mine, theirs):
-            os.utime(os.path.dirname(path), (old, old))
-        with self.exdev():
-            docsearch_index.build(self.root)
-        self.assertFalse(os.path.exists(os.path.dirname(mine)))
-        self.assertTrue(os.path.exists(theirs))
-        self.assertTrue(os.path.exists(fresh))
-
-    def test_a_different_device_goes_beside_from_the_start(self):
-        self.put("a.md", doc(type="guide"))
-        real = os.stat
-        git_dir = os.path.join(self.root, ".git")
-
-        class Other:
-            def __init__(self, info):
-                self.info = info
-
-            def __getattr__(self, name):
-                return self.info.st_dev + 1 if name == "st_dev" else getattr(self.info, name)
-
-        def stat(path, *args, **kwargs):
-            info = real(path, *args, **kwargs)
-            return Other(info) if os.fspath(path) == git_dir else info
-
-        writer = None
-        with mock.patch.object(docsearch_index.os, "stat", stat):
-            writer = docsearch_index._Writer(self.root, git_dir, None)
-        self.assertTrue(writer.beside)
-
-
-class PathspecMagicTest(Repo):
-    """パスやユーザの環境を pathspec の magic として読ませない。"""
-
-    def test_check_ignore_takes_a_path_that_looks_like_magic(self):
-        paths = [":(exclude)x/ccnavi-index.jsonl", ":!y/ccnavi-index.jsonl", "*/ccnavi-index.jsonl"]
-        self.assertEqual(docsearch_index._ignored(self.root, paths), set(paths))
-
-    @unittest.skipIf(os.name == "nt", "Windows では `:` を名前に使えない")
-    def test_a_directory_named_like_magic_is_indexed(self):
-        self.put(":(exclude)x/a.md", doc(type="guide"))
-        built = docsearch_index.build(self.root)
-        self.assertEqual(built.written, [":(exclude)x/ccnavi-index.jsonl"])
-
-    def test_pathspec_environment_of_the_user_does_not_break_the_index(self):
-        self.put("docs/a.md", doc(type="guide"))
-        for name in ("GIT_LITERAL_PATHSPECS", "GIT_ICASE_PATHSPECS", "GIT_GLOB_PATHSPECS"):
-            with self.subTest(name=name), mock.patch.dict(os.environ, {name: "1"}):
-                built = docsearch_index.build(self.root)
-                self.assertEqual([r["concept_id"] for r in built.rows], ["docs/a"])
+        self.assertNotIn("plain", self.context(self.root))
 
 
 class JsonOutputTest(Repo):
@@ -1487,9 +510,6 @@ class JsonOutputTest(Repo):
 
                 def refuse(constant):
                     raise ValueError(constant)
-
-                rows = json.loads(done.stdout, parse_constant=refuse)
-                self.assertEqual(rows[0]["frontmatter"], {"type": "guide"})
 
 
 if __name__ == "__main__":

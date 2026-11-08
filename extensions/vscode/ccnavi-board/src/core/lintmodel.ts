@@ -17,7 +17,17 @@ export interface LintProblem {
   /** ユーザ向けの文面で`error:`の後ろに出る場所。`(projects/lib) rule-id`など。ファイル全体への苦情なら空 */
   readonly where: string;
   readonly detail: string;
+  /**
+   * 苦情の種類。実行ファイルが画面で見分けるものにだけ付ける（`projects-tracked`・`projects-unignored`）。
+   * 画面は文面の照合でなく、これで見分ける
+   */
+  readonly kind?: string;
 }
+
+/** 置き場がワークスペースのgitの索引に載っている（go/internal/entry/lintの`KindProjectsTracked`） */
+export const KIND_PROJECTS_TRACKED = "projects-tracked";
+/** 置き場がワークスペースのgitで無視されていない（go/internal/entry/lintの`KindProjectsUnignored`） */
+export const KIND_PROJECTS_UNIGNORED = "projects-unignored";
 
 export interface LintJson {
   readonly version: number;
@@ -111,10 +121,12 @@ export function parseLintJson(text: string): ParsedLint {
 }
 
 function problem(raw: Record<string, unknown>): LintProblem {
+  const kind = str(raw.kind);
   return {
     severity: raw.severity === "error" ? "error" : "warn",
     where: str(raw.where),
     detail: str(raw.detail),
+    ...(kind === "" ? {} : { kind }),
   };
 }
 

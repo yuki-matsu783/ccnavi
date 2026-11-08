@@ -200,12 +200,7 @@ function run(
   args: readonly string[],
   timeout?: number,
 ): Promise<Ran> {
-  const common = ["--root", root, ...args];
-  const [file, argv] =
-    launcher.kind === "exe"
-      ? [launcher.path, common]
-      : ["uv", ["run", "python", "-m", "ccnavi", ...common]];
-  return spawn(file, argv, root, timeout);
+  return spawn(launcher.path, ["--root", root, ...args], root, timeout);
 }
 
 /** 子プロセスを1本走らせ、終了コード・出力・打ち切られたかを返す */
@@ -219,8 +214,6 @@ function spawn(file: string, argv: readonly string[], cwd: string, timeout?: num
         maxBuffer: MAX_OUTPUT,
         windowsHide: true,
         ...(timeout === undefined ? {} : { timeout }),
-        // 標準出力はASCIIだけにしてあるが、標準エラーの日本語が化けないように。
-        env: { ...process.env, PYTHONUTF8: "1", PYTHONIOENCODING: "utf-8" },
       },
       (error, stdout, stderr) => {
         const code =
@@ -307,7 +300,7 @@ export async function runApproveYes(
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, approveArgs(tickets, digest, only), APPROVE_TIMEOUT_MS);
-  // 打ち切りは読む前に見る。承認済みチケットは1件ずつ置かれる（tickets/proposal/agree.pyのfor cand in batch）ので、
+  // 打ち切りは読む前に見る。承認済みチケットは1件ずつ置かれる（go/internal/tickets/proposal/agree）ので、
   // 途中で強制終了されると一部だけ置かれた状態が残る。stdoutも途中で切れていて「読み取れない」になるため、
   // ここで拾わないと何が起きたのか伝わらない。
   if (ran.killed) {

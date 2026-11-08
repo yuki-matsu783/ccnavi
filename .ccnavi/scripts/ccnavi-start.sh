@@ -23,7 +23,7 @@
 #      引っかかったら止める。続けるときは毎回 origin から取って早送りし、最後に ccnavi-sync.sh <識別子> を打つ。
 #      複数なら一覧を出して終わる（ユーザが選ぶ）。0 件で --issue なら新しく作る
 #   3. 新規作成: <先頭の語>-<番号>-<slug> のブランチを統合先から切り、ワークツリー・空の初期コミット・push・Draft MR。
-#      slug は Chrome 拡張の「始める」と同じ作り方（実行ファイルの `worktree issue-id`。`ticket_ids.issue_identifier`）で、
+#      slug は Chrome 拡張の「始める」と同じ作り方（実行ファイルの `worktree issue-id`。`ids.IssueIdentifier`）で、
 #      作る前に既存の MR を採用するときと同じ識別子の確認（使える・同じ識別子の別ブランチが無い・同名のマージ済み MR が
 #      無い）をする。作ってから後段で詰まると、打ち直しても採用の確認で止まり、手で消すまで戻れないため
 #   途中で失敗しても、打ち直せば完了済みの処理をスキップし、未完了の処理から再開する（ブランチ・push・MR の有無を確かめる）。
@@ -610,7 +610,7 @@ issue_state_gate() {
 }
 
 # issue の番号とタイトルから、新しい親のブランチ名（= 識別子）を実行ファイルに作らせる（`worktree issue-id`）。
-# Chrome 拡張の「始める」と同じ関数（`ticket_ids.issue_identifier`）なので、タイトルが短ければ同じ名前になる。
+# Chrome 拡張の「始める」と同じ関数（`ids.IssueIdentifier`）なので、タイトルが短ければ同じ名前になる。
 # タイトルが長くて slug が途中で切れるときは、実行ファイルが `long yes` を返す（issue_branch_long）。拡張は切った名前で
 # 進めるが、ここでは短い --slug を付けさせて止める（エージェントがタイトルから短い語を考える）。
 # プロジェクト（projects/<名前>）のリポジトリなら、その名前を渡す（slug の頭に付く）。
@@ -626,9 +626,6 @@ issue_branch_make() {
 	if ib_bin=$(ccnavi_bin "$root"); then
 		ib_rc=0
 		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
-	elif [ -f "$root/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-		ib_rc=0
-		ib_out=$(cd "$root" && uv run --quiet python -m ccnavi --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
 	else
 		return 1
 	fi
@@ -1367,7 +1364,7 @@ id_check() {
 	ic_branch="$1"
 	ic_hint="${2:-ブランチ名を直すか、ユーザに相談してください。}"
 	ccnavi_id_ask "$root" "$ic_branch" ||
-		fail id-unchecked "ブランチ ${ic_branch} から作る識別子が親に使えるか（58 文字以内・末尾が -2 桁でない・使える字）を確かめられない（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
+		fail id-unchecked "ブランチ ${ic_branch} から作る識別子が親に使えるか（58 文字以内・末尾が -2 桁でない・使える字）を確かめられない（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"
 	[ -z "$ccnavi_id_problem" ] ||
 		fail adopt-id "ブランチ ${ic_branch} から作る識別子 ${ccnavi_id_ident} は使えない（${ccnavi_id_problem}）。何も作成せずに処理を中断しました。${ic_hint}" "${3:-1}"
 }
@@ -1661,7 +1658,7 @@ if [ "$total" -eq 0 ]; then
 		case "$ib_rc" in
 		0) ;;
 		2) fail no-slug "issue #${number} からブランチ名を作れませんでした（${issue_branch_why}）。--slug <語> を付けて再実行してください。" 2 ;;
-		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
+		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
 		esac
 		if [ "$issue_branch_long" = yes ]; then
 			# タイトルが長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる

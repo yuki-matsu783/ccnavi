@@ -1,0 +1,6 @@
+// Package ops は、チケットの状態を動かす操作の本体である。操作は `ccnavi ticket start|finish|cancel|record-risk <識別子>`
+// と、その `--check` にあたる。置き場を動かして欄を書くだけで、状態は置き場が表す。start は doing/ の欄を書く。
+// finish は doing/ から review/（レビューが要る）か done/（要らない）へ動かす。cancel は doing/ から done/ へ動かす。
+// 子を閉じるときは実績のリスクを数え、定性の判定がそろうまでは閉じない。副作用の前に分かる検査は、操作ごとに 1 つの
+// 関数（gate）に置く。本体と `--check` が同じ gate を通る。
+package ops

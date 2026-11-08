@@ -1,4 +1,9 @@
-"""`scratchpad/` の容量の知らせ（tickets/notice/scratchpad）のテスト。"""
+"""`scratchpad/` の容量の知らせが、hook を通した SessionStart の文脈に出ること。
+
+サブエージェントには出ない。
+
+容量の数え方としきい値の読み方は `go/internal/tickets/notice` の go test が見る。
+"""
 
 from __future__ import annotations
 
@@ -7,12 +12,11 @@ import os
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.tickets.notice import scratchpad
 from tests.inproc import run_ccnavi
 
 MB = 1024 * 1024
+WARN_MB_ENV = "CCNAVI_SCRATCHPAD_WARN_MB"
 
 
 def _put(root: str, rel: str, size: int) -> str:
@@ -21,81 +25,6 @@ def _put(root: str, rel: str, size: int) -> str:
     with open(path, "wb") as f:
         f.write(b"x" * size)
     return path
-
-
-class SizeTest(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.root = self._tmp.name
-
-    def test_sum_includes_nested_files(self):
-        _put(self.root, "a.bin", 100)
-        _put(self.root, "sub/b.bin", 200)
-        self.assertEqual(scratchpad.scratch_bytes(self.root), 300)
-
-    def test_missing_dir_is_zero(self):
-        self.assertEqual(scratchpad.scratch_bytes(self.root), 0)
-
-    def test_symlinks_not_followed(self):
-        target = _put(self.root, "real.bin", 100)
-        try:
-            os.symlink(target, os.path.join(self.root, "scratchpad", "link.bin"))
-            os.symlink(self.root, os.path.join(self.root, "scratchpad", "dirlink"))
-        except (OSError, NotImplementedError):
-            self.skipTest("symlink 不可")
-        self.assertEqual(scratchpad.scratch_bytes(self.root), 100)
-
-
-    def test_scan_stops_at_the_limit(self):
-        _put(self.root, "a.bin", 100)
-        self.assertEqual(scratchpad.scratch_bytes(self.root, 0.0), 0)
-
-
-class WarnMbTest(unittest.TestCase):
-    def _with(self, value):
-        env = {} if value is None else {scratchpad.WARN_MB_ENV: value}
-        with mock.patch.dict(os.environ, env, clear=False):
-            if value is None:
-                os.environ.pop(scratchpad.WARN_MB_ENV, None)
-            return scratchpad.warn_mb()
-
-    def test_default_cases(self):
-        for value in (None, "", "abc", "-1", "inf", "nan"):
-            self.assertEqual(self._with(value), scratchpad.DEFAULT_WARN_MB, value)
-
-    def test_values(self):
-        self.assertEqual(self._with("0"), 0)
-        self.assertEqual(self._with("2.5"), 2.5)
-
-
-class NoticeTest(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.root = self._tmp.name
-
-    def _text(self, limit: str) -> str:
-        with mock.patch.dict(os.environ, {scratchpad.WARN_MB_ENV: limit}):
-            return scratchpad.session_text(self.root)
-
-    def test_over_limit_notifies(self):
-        _put(self.root, "big.bin", 2 * MB)
-        text = self._text("1")
-        self.assertIn("scratchpad", text)
-        self.assertIn("2 MB", text)
-
-    def test_at_or_below_limit_silent(self):
-        _put(self.root, "big.bin", 1 * MB)
-        self.assertEqual(self._text("1"), "")
-
-    def test_zero_disables(self):
-        _put(self.root, "big.bin", 2 * MB)
-        self.assertEqual(self._text("0"), "")
-
-    def test_failure_is_swallowed(self):
-        with mock.patch.object(scratchpad, "scratch_bytes", side_effect=RuntimeError):
-            self.assertEqual(scratchpad.session_text(self.root), "")
 
 
 class SessionStartWiringTest(unittest.TestCase):
@@ -120,7 +49,7 @@ class SessionStartWiringTest(unittest.TestCase):
         env.update(
             CCNAVI_LEARNING="disable",
             CCNAVI_ENTRY_PATH=".ccnavi/scripts/ccnavi-launcher.sh",
-            **{scratchpad.WARN_MB_ENV: limit},
+            **{WARN_MB_ENV: limit},
         )
         done = run_ccnavi(
             ["--root", self.root, "--mode", "enable"],

@@ -176,7 +176,7 @@
         "ccnaviBoard.binPath": {
           "type": "string",
           "default": "",
-          "description": "ccnaviの実行ファイルのパスです。空のときは.claude/settings.jsonのCCNAVI_ENTRY_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.shの順に探し、どれも無く、src/ccnavi/__main__.pyがあればuv run python -m ccnaviを使います。起動スクリプト（ccnavi-launcher.sh）を指定した場合は、スクリプトを実行せず、shのあるフォルダの親のbin/<os>-<arch>/にある、このOSとCPU向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
+          "description": "ccnaviの実行ファイルのパスです。空のときは.claude/settings.jsonのCCNAVI_ENTRY_PATH、dist/ccnavi/ccnavi、.ccnavi/scripts/ccnavi-launcher.shの順に探し、どれも無ければPATHのccnaviを使います。起動スクリプト（ccnavi-launcher.sh）を指定した場合は、スクリプトを実行せず、shのあるフォルダの親のbin/<os>-<arch>/にある、このOSとCPU向けの実行ファイルを使います。それが無ければ次の候補へ進みます。ほかのパスは、そのまま実行ファイルとして使います。ワークスペースルートからの相対パスでも絶対パスでも指定できます。"
         },
         "ccnaviBoard.bashPath": {
           "type": "string",

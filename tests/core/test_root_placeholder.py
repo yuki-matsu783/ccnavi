@@ -12,7 +12,8 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.policy import rules
+import yaml
+
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -34,14 +35,12 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
 
     通すのは wip/handoff/・scratchpad/・.claude/worktrees/。
 
-    判定と同じ読み方（rules.parse）で組み立てて適用する。ルールは 1 本の regex でも、
-    `except:` で置き場を除く形でも書けるので、式を取り出して適用すると書き方に縛られる。
-    大文字小文字は判定と同じく区別しない。
+    ルールだけを置いたワークスペースで `--test Write` を当て、workspace-root がヒットしたかを見る。
+    ルールは 1 本の regex でも、`except:` で置き場を除く形でも書けるので、式を取り出して適用すると
+    書き方に縛られる。大文字小文字は判定と同じく区別しない。
     """
 
     def setUp(self):
-        import yaml
-
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
         self.root = os.path.realpath(self.dir.name)
@@ -49,22 +48,24 @@ class WorkspaceRootRealRuleTest(unittest.TestCase):
             os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml"), encoding="utf-8"
         ) as f:
             raw = next(r for r in yaml.safe_load(f)["deny"] if r["id"] == "workspace-root")
-        rule_set, problems = rules.parse({"version": 1, "deny": [raw]}, self.root)
-        self.assertEqual([p for p in problems if p.severity == rules.SEVERITY_ERROR], [])
-        self.rule = rule_set.deny[0]
+        write(common_path(self.root, "rules"), json.dumps({"version": 1, "deny": [raw]}))
 
     def hits(self, tail: str) -> bool:
-        return self.rule.matches("Write", self.root + tail)
+        done = run_ccnavi(
+            ["--root", self.root, "--mode", "enable", "--guard-core-files", "disable"]
+            + ["--test", "Write", self.root + tail],
+            cwd=ROOT,
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        return ":workspace-root " in done.stdout
 
     def test_置き場だけが通る(self):
         for tail in [
             "/wip/handoff/a.md",
             "/wip/handoff/x/y.sh",
-            r"\wip\handoff\a",
             "/wip/Handoff/a.md",
             "/scratchpad/a.md",
             "/.claude/worktrees/x/a.md",
-            r"\.claude\worktrees\x\a.md",
         ]:
             with self.subTest(tail=tail):
                 self.assertFalse(self.hits(tail))
@@ -208,24 +209,6 @@ class RootPlaceholderTest(unittest.TestCase):
         spelled = self.root.replace("\\", "/")
         self.assertIn(f"'sh {spelled}/.ccnavi/scripts/ccnavi-git.sh rm -r wip'", reason)
         self.assertNotIn("{root}", reason)
-
-    def test_written_message_is_kept(self):
-        """書いた文面は残る。置き換えるのはモデルへ渡すときだけ（glob / regex と同じ）。"""
-        rule_set, _ = rules.load(self.rules, self.root)
-        wip = rule_set.deny[1]
-        self.assertIn("{root}", wip.message)
-        self.assertNotIn("{root}", wip.spoken_message())
-        # ルートが渡らない読み方では置き換えない。
-        self.assertEqual(rules.fill_root(wip.message, ""), wip.message)
-
-    def test_placeholder_needs_a_root(self):
-        _, problems = rules.load(self.rules)
-        self.assertTrue(any("{root}" in str(p) for p in problems), problems)
-        rule_set, problems = rules.load(self.rules, self.root)
-        self.assertEqual(problems, [])
-        # 書いた表記は残り、置き換わるのは翻訳後の式だけ。
-        self.assertEqual(rule_set.deny[0].regex, WORKSPACE_ROOT_RULE)
-        self.assertNotIn("{root}", rule_set.deny[0].compiled.pattern)
 
 
 if __name__ == "__main__":

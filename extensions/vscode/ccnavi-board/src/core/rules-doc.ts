@@ -137,7 +137,7 @@ export function condOfYaml(value: unknown, depth = 1): CondNode {
       if (!isScalar(inner) || typeof inner.value !== "string") {
         return invalid(value, `${key}の値は文字列で指定します`);
       }
-      // 引用符の無い`yes` `on` `0755`などは、実行ファイル（PyYAML、YAML 1.1）が文字列以外に読み、
+      // 引用符の無い`yes` `on` `0755`などは、実行ファイル（YAML 1.1）が文字列以外に読み、
       // 読み込みがerrorにする。ここ（YAML 1.2）では文字列に見えるので、誤りとして揃えて挙げる
       if (inner.type === Scalar.PLAIN && yaml11Ambiguous(inner.value)) {
         return invalid(value, `${key}の値${inner.value}は引用符で囲んでください（実行ファイルは文字列として読みません）`);
@@ -498,7 +498,7 @@ function patchCond(doc: Document, existing: unknown, tree: CondNode): Node {
         if (scalar.value !== tree.pattern) {
           scalar.value = tree.pattern;
         }
-        // 書き方は元のまま。ただし引用符の無い`on` `yes`などは実行ファイル（PyYAML）が真偽値に
+        // 書き方は元のまま。ただし引用符の無い`on` `yes`などは実行ファイル（YAML 1.1）が真偽値に
         // 読むので囲む（setTextと同じ。読み込みはこれを誤りに挙げている）
         if ((scalar.type === Scalar.PLAIN || scalar.type === undefined) && yaml11Ambiguous(tree.pattern)) {
           scalar.type = Scalar.QUOTE_SINGLE;
@@ -775,7 +775,7 @@ function setText(
   const current = node.get(key, true);
   if (current instanceof Scalar) {
     // 書き方（引用符・折り返し）は元のまま。値が変わっても書き方まで変えない。
-    // ただし実行ファイル（PyYAML）が別の型に読む語を裸で書くことになるなら囲む。
+    // ただし実行ファイル（YAML 1.1）が別の型に読む語を裸で書くことになるなら囲む。
     // `id: on`は "True" に、`id: no`は空のidに読まれる。
     if (current.value !== value) {
       current.value = value;

@@ -1,13 +1,15 @@
-"""ターン中の印（`records/turn.py`）の受入テスト。
+"""ターン中の印の受入テスト。
 
 印はセッションごとのファイルで、ユーザの発言で置き、ツール呼び出しで更新時刻を新しくし、
 Stop と中断で消す。VS Code 拡張は `--explain --json` の `turns` でこれを読む。
 
-見るのは次の 3 つ。
+見るのは次の 2 つ。
 
 - 発言から Stop までの間だけ、印がある
-- 中断や、プロセスが落ちたことでターンが閉じなくても、古い印は数えない
 - 並行するセッションは互いの印を書き換えも消しもしない
+
+印の読み書きそのもの（古い印・壊れた印・置き場が無いとき）は Go のテスト
+（go/internal/records/turn）が確かめる。
 """
 
 from __future__ import annotations
@@ -18,110 +20,11 @@ import shutil
 import tempfile
 import time
 import unittest
-from unittest import mock
 
-from ccnavi.hook import events
-from ccnavi.records import turn
 from tests import ROOT
 from tests.inproc import run_ccnavi
 
-
-class TurnRecordTest(unittest.TestCase):
-    """`records/turn.py` そのもの。"""
-
-    def setUp(self):
-        self.state = tempfile.mkdtemp(prefix="ccnavi-turn-")
-        self.addCleanup(shutil.rmtree, self.state, ignore_errors=True)
-
-    def sessions(self, now=None):
-        return [a.session for a in turn.active(self.state, now)]
-
-    def test_始めたセッションがターン中に出る(self):
-        turn.begin(self.state, "s1", now=1000.0)
-
-        found = turn.active(self.state, now=1010.0)
-
-        self.assertEqual([a.session for a in found], ["s1"])
-        self.assertEqual(found[0].since, 1000.0)
-
-    def test_終わったセッションは出ない(self):
-        turn.begin(self.state, "s1")
-
-        turn.end(self.state, "s1")
-
-        self.assertEqual(self.sessions(), [])
-
-    def test_終えていない印が無いセッションを終えても何も起きない(self):
-        turn.end(self.state, "nobody")
-        turn.clear(self.state, "nobody")
-
-        self.assertEqual(self.sessions(), [])
-
-    def test_更新が無いまま古くなった印は数えない(self):
-        # 中断や、ターンの途中でプロセスが落ちたとき、Stop は来ない。
-        turn.begin(self.state, "s1", now=1000.0)
-        os.utime(os.path.join(self.state, "turn-s1.json"), (1000.0, 1000.0))
-
-        self.assertEqual(self.sessions(now=1000.0 + turn.STALE_SECONDS - 1), ["s1"])
-        self.assertEqual(self.sessions(now=1000.0 + turn.STALE_SECONDS), [])
-
-    def test_ツール呼び出しの更新で古くならない(self):
-        turn.begin(self.state, "s1", now=1000.0)
-        os.utime(os.path.join(self.state, "turn-s1.json"), (1000.0, 1000.0))
-
-        turn.touch(self.state, "s1", now=1000.0 + turn.STALE_SECONDS - 5)
-
-        later = 1000.0 + turn.STALE_SECONDS + 60
-        self.assertEqual(self.sessions(now=later), ["s1"])
-
-    def test_更新は無い印を作らない(self):
-        # Stop の直後に走ったサブエージェントの呼び出しが、消した印を作り直さない。
-        turn.begin(self.state, "s1")
-        turn.end(self.state, "s1")
-
-        turn.touch(self.state, "s1")
-
-        self.assertEqual(self.sessions(), [])
-        self.assertFalse(os.path.exists(os.path.join(self.state, "turn-s1.json")))
-
-    def test_並行するセッションは互いの印に触れない(self):
-        turn.begin(self.state, "s1")
-        turn.begin(self.state, "s2")
-
-        turn.end(self.state, "s1")
-
-        self.assertEqual(self.sessions(), ["s2"])
-
-    def test_壊れた印と形の違う印は数えず読むだけで消さない(self):
-        turn.begin(self.state, "ok")
-        for name, text in (
-            ("turn-broken.json", "{not json"),
-            ("turn-list.json", "[]"),
-            ("turn-nosince.json", json.dumps({"session": "x"})),
-            ("turn-badsince.json", json.dumps({"since": "yesterday"})),
-            ("turn-bool.json", json.dumps({"since": True})),
-        ):
-            with open(os.path.join(self.state, name), "w", encoding="utf-8") as f:
-                f.write(text)
-
-        self.assertEqual(self.sessions(), ["ok"])
-        self.assertTrue(os.path.exists(os.path.join(self.state, "turn-broken.json")))
-
-    def test_置き場が無い_書けない_空でも例外にしない(self):
-        missing = os.path.join(self.state, "nowhere", "state")
-        blocker = os.path.join(self.state, "file")
-        with open(blocker, "w", encoding="utf-8") as f:
-            f.write("x")
-
-        for state in ("", missing, blocker):
-            with self.subTest(state=state):
-                turn.begin(state, "s1")
-                turn.touch(state, "s1")
-                turn.end(state, "s1")
-                turn.clear(state, "s1")
-                self.assertEqual(turn.active(state), [])
-        turn.begin(self.state, "")
-        self.assertEqual(self.sessions(), [])
+RULES = os.path.join(".ccnavi", "config", "common", "rules.yml")
 
 
 class TurnWiringTest(unittest.TestCase):
@@ -152,7 +55,9 @@ class TurnWiringTest(unittest.TestCase):
         return os.path.join(self.state, f"turn-{session}.json")
 
     def active(self):
-        return sorted(a.session for a in turn.active(self.state))
+        """ターン中のセッション。ボードの JSON（`--explain --json` の turns）から読む。"""
+        done = run_ccnavi(["--explain", "--json", "--root", self.repo], cwd=ROOT)
+        return sorted(t["session"] for t in json.loads(done.stdout)["turns"])
 
     def test_発言から_Stop_までの間だけ印がある(self):
         self.run_hook("SessionStart", source="startup")
@@ -179,14 +84,25 @@ class TurnWiringTest(unittest.TestCase):
 
     def test_止めた_Stop_ではターンが続くので印を残す(self):
         # 促しで Stop を止めると、モデルは同じターンの続きを動かす。続きの間も印が要る。
+        # 2 回に 1 度止める Stop のルールで、2 回目の Stop を止めさせる。
+        rule = {
+            "id": "nudge",
+            "match": "Stop",
+            "glob": "*",
+            "additionalContext": "続ける",
+            "every": 2,
+        }
+        with open(os.path.join(self.repo, RULES), "w", encoding="utf-8") as f:
+            json.dump({"version": 1, "allow": [rule]}, f)
         self.run_hook("UserPromptSubmit", prompt="お願いします")
+        self.assertNotIn("block", self.run_hook("Stop").stdout)
+        self.run_hook("UserPromptSubmit", prompt="続きを")
 
-        with mock.patch.object(events, "_finish_nudge", return_value="続けてください"):
-            stopped = self.run_hook("Stop")
+        stopped = self.run_hook("Stop")
 
         self.assertIn("block", stopped.stdout)
         self.assertEqual(self.active(), ["s1"])
-        self.run_hook("Stop")
+        self.run_hook("Stop", stop_hook_active=True)
         self.assertEqual(self.active(), [])
 
     def test_ユーザの中断で印を消す(self):

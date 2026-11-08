@@ -18,9 +18,9 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 欄 | 意味 |
 |---|---|
 | `id` | 識別子。必須。文面と記録に出す。記録では `<ワークスペースのルートからの相対パス>:<id>`（組み込みは `builtin:<名前>`）。id の無いルールは読み込まず error で名指しする |
-| `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
+| `match` | ツール名を `\|` でつないだもの。`Bash` `PowerShell` `Read` `Edit` `MultiEdit` `Write` `NotebookEdit` `Grep` `Glob` `Skill` `Agent` `WebFetch`。ツールでない名前として `Stop`（メインエージェントのターンの終わり）。`Stop` を書けるのは `allow` だけ（6.6） |
 | `glob` | `fnmatch` の記法。文字列全体にヒットする |
-| `regex` | Python の正規表現。`re.search`。先読み・後読み・後方参照は受け付けない |
+| `regex` | Python の正規表現の書き方で、`re.search` と同じ答えを返す（実行ファイルは `infra/pyre` で読む）。先読み・後読み・後方参照は受け付けない |
 | `when` | 組み合わせ条件。`glob` / `regex` の個別条件を `all` / `any` / `not` で組む（5.3） |
 | `except` | 省略できる。`glob` か `regex` の片方だけを持つマッピングのリスト。本体にヒットしても、どれかにヒットすればヒットしない扱い（5.3） |
 | `message` | `deny` だけ。必須。止められたモデルに届く「なぜ止めたか、代わりに何をするか」 |
@@ -54,10 +54,10 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 `{root}` は、読み込み時にワークスペースルートの実パスへ置き換わる。regex では区切りが `[\\/]` になる。
 ルートは hook なら `CLAUDE_PROJECT_DIR`、ターミナルなら `--root` の実パス。区切りは `/` と `\` のどちらにもヒットし、大文字小文字は区別しない。ルートを渡さずに読むと error。文面（`message` / `additionalContext` / `additionalContextOnce`）の `{root}` は、
-モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.fill_text`）。`{script:<名前>}` は `settings.script_command` の値に置き換える。ルートが渡されない読み方では、置き換えない。`<名前>` は `[A-Za-z0-9._-]+` だけで、形が違うものは置き換えず、スクリプトが無いものは置き換える。どちらも `--lint` が warn する。`--explain` と `--test` は書いた表記のまま `{root}` を出す。
+モデルへ渡すときに、実パス（区切りは `/`）へ置き換える（`rules.FillText`）。`{script:<名前>}` は `config.ScriptCommand` の値に置き換える。ルートが渡されない読み方では、置き換えない。`<名前>` は `[A-Za-z0-9._-]+` だけで、形が違うものは置き換えず、スクリプトが無いものは置き換える。どちらも `--lint` が warn する。`--explain` と `--test` は書いた表記のまま `{root}` を出す。
 
 先読み・後読み・後方参照を弾くのは、ルールがエンジンをまたいでも同じ意味になり、組み合わせ爆発を起こしうる書き方を受け付けないため
-（Python の `re` に時間制限は無く、判定の途中で止まったままの hook は期限に達し、呼び出しは止められずに通る）。
+（正規表現の照合（`infra/pyre`）に時間制限は無く、判定の途中で止まったままの hook は期限に達し、呼び出しは止められずに通る）。
 
 `{!root}` は、読み込み時に「ワークスペースルートで始まらない」へ展開される。`(?!...)` を使わずに否定を書くための
 記法である。ルートを 1 文字ずつ分解した入れ子の式になり、繰り返しを含まない。展開先はどのレイヤーのルールでもワークスペースルート。
@@ -133,7 +133,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | `match` に書く名前 | 適用する対象 |
 |---|---|
 | `Bash` `PowerShell` | コマンド。`Bash` はシェルとして読んでから適用する（6.3）。`PowerShell` は生の文字列 |
-| `Read` `Edit` `Write` `NotebookEdit` | ファイルのパス（行き着く先まで解いてから、6.2） |
+| `Read` `Edit` `MultiEdit` `Write` `NotebookEdit` | ファイルのパス（行き着く先まで解いてから、6.2） |
 | `Grep` `Glob` | 探す場所のパス（`path`。省略されていれば呼び出し側の cwd） |
 | `Skill` | スキル名 |
 | `Agent` | 起動の見出し（`description`、無ければ `prompt`） |
@@ -146,8 +146,8 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 呼び出し | ルール集合 |
 |---|---|
-| パスを持つツール（`Read` `Grep` `Glob` `Write` `Edit` `NotebookEdit`） | 共通レイヤーに、行き先のツリーが属する 1 レイヤーを足したもの。プロジェクトに属すればそのレイヤー、属さなければワークスペース自身のレイヤー。`Grep` と `Glob` の行き先は探し始める場所で、省略されていれば `cwd`（11.4） |
-| パスを持たないツール（`Bash` `PowerShell` `Skill` `Agent` `WebFetch`） | 共通レイヤー・自身のレイヤー・全プロジェクトのレイヤーのルールをタイプごとに連結したもの |
+| パスを取るツール（`Read` `Grep` `Glob` `Write` `Edit` `MultiEdit` `NotebookEdit`） | 共通レイヤーに、行き先のツリーが属する 1 レイヤーを足したもの。プロジェクトに属すればそのレイヤー、属さなければワークスペース自身のレイヤー。`Grep` と `Glob` の行き先は探し始める場所で、省略されていれば `cwd`（11.4） |
+| パスを取らないツール（`Bash` `PowerShell` `Skill` `Agent` `WebFetch`） | 共通レイヤー・自身のレイヤー・全プロジェクトのレイヤーのルールをタイプごとに連結したもの |
 
 共通レイヤーはワークスペースルートの `.ccnavi/config/common/` の 1 本。プロジェクトの `.ccnavi/config/common/`（ミラー。11.12）は、そのプロジェクトだけを clone したときにだけ共通レイヤーとして読まれる。
 共通と config のどちらのファイルも無くてよく、無いのは「設定が無い」正常で空として扱う。両方に無ければ組み込みの既定を使う（11.2、11.4）。
@@ -163,11 +163,11 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 |---|---|
 | `rm -rf`、`git push`、`git reset --hard` | 止める。表記違いも止める（下） |
 | 生の git（いつも） | 止める（`builtin:guard-raw-git`。9.1） |
-| 認証情報の置き場（`.env*`、`.dev.vars`、`.netrc`、`.npmrc`、`.pypirc`、`.aws/`、`.ssh/`、`*.pem` / `*.key`、`secrets/`、`credentials/`、`credentials.json`、`id_rsa`、`id_ed25519`）への `Bash` `Read` `Write` `Edit` `NotebookEdit` | 止める（`builtin:credentials`。下） |
+| 認証情報の置き場（`.env*`、`.dev.vars`、`.netrc`、`.npmrc`、`.pypirc`、`.aws/`、`.ssh/`、`*.pem` / `*.key`、`secrets/`、`credentials/`、`credentials.json`、`id_rsa`、`id_ed25519`）への `Bash` `Read` `Write` `Edit` `MultiEdit` `NotebookEdit` | 止める（`builtin:credentials`。下） |
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
-| `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
+| `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `MultiEdit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先にヒットする） | 通す |
-| `hook`・`settings`・`scripts`・共通の設定 3 本への `Write` `Edit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
+| `hook`・`settings`・`scripts`・共通の設定 3 本への `Write` `Edit` `MultiEdit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
 | ワークスペースルート直下への `Write` `Edit` と、`Bash` の書き込み先（`workspace-root`） | 既定には入らない（ルールファイルの決まり）。ルールファイルを読めないときは、どちらも権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
 
@@ -175,7 +175,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 常にヒットする土台の deny で、glob の文字列一致ではなく regex で書く。glob（`*rm -rf *`・`*git push*`）は表記違いに外れるため。
 
 - git は、サブコマンドの前に挟むグローバルオプション（`-C <path>`・`-c <k=v>`・`--git-dir[=]<dir>`・`--work-tree[=]<dir>`・`--no-pager` など）を
-  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読む）、`git -c push.default=current status` の値の `push` も値として読む。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
+  読み飛ばしてから `push` / `reset` を見る。値を取るオプションは値を最後まで読むので（`git -C gitx push` の `gitx` も 1 つの値。読みで空白が 2 字続く空の値 `git -C '' push` は空の値として読み、読めなかったコマンドの `git -C  x push` のように空白が何字も続く形は、その先の語を値として読む。どちらの読みでも当たれば止める）、`git -c push.default=current status` の値の `push` も値として読む。`push` の後ろは空白・区切り・末尾だけを見る。`reset` は後ろのどこかに `--hard`（略した `--har` も）があれば止める。`--` の後ろはパスなので見ない（`git reset -- --hard`）。
   サブコマンドを直接起こす `git-push` / `git-reset`（パス付きの `/usr/lib/git-core/git-push`、`.exe` 付き）も同じ 1 本で止める。
 - rm は、再帰（`-r` `-R` `--recursive`）と強制（`-f` `--force`）の組を、まとめた形（`-rf` `-fr` `-Rfv`）・分けた形（`-r -f`）・順序・
   長い形（略した形も）を問わずに止める。共通のルールファイルには書かず、この土台だけが持つ
@@ -185,8 +185,8 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
   git のオプションは、中に git の始まりを持たない語だけを読む
 
 認証情報の 1 本（`builtin:credentials`）も、既定のときに限らず常にヒットする土台の deny。設定で切れず、誤検知が出ても外せない。
-見本の `.env.example` も、対象の 5 つのツール（`Bash` `Read` `Write` `Edit` `NotebookEdit`）で止まる。`Grep` `Glob` `PowerShell` は対象に入れない。
-キーのファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）で適用する。判定に達せなかったときの許可リスト（`hook/failsafe.py`）は、
+見本の `.env.example` も、対象の 6 つのツール（`Bash` `Read` `Write` `Edit` `MultiEdit` `NotebookEdit`）で止まる。`Grep` `Glob` `PowerShell` は対象に入れない。
+キーのファイルは拡張子として書かれた形（`x.pem`、`x.pem.bak`、`x.key.json`）で適用する。判定に達せなかったときの許可リスト（`hook/failsafe`）は、
 この式に揃え、独自に `.gnupg`、`id_ecdsa`、`.p12` / `.pfx`、`.git`、操作記録の置き場を足している。
 
 `.git` の中への書き込みの 2 本（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`）も、既定のときに限らず常にヒットする土台の deny。
@@ -212,12 +212,12 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 - git のラッパーの中で行う `.git` への書き込み（統合の片付けなど）は、外側のコマンド文字列に `.git` が出ないのでヒットしない
 - リダイレクトの行き先は `>` をまたがずに読むので、読み切れなかった生の文字列でも照合が長さに比例して終わる
 - `cd .git` のあとの相対パスへの書き込みは、同じコマンドの中なら止める（`cd .git && echo x > config`・`cd .git && find . -delete`）。
-  `cd` で移った先から見たパス（`shellread` の moved）にも適用するため
+  `cd` で移った先から見たパス（`shell.Reading` の `Moved`）にも適用するため
 - 止めないもの。守る場所の検出と同じく、形の分かる書き込みだけを見る
   - `git` 自身のサブコマンド（`git config` など）
   - `cd` が別の Bash の呼び出しにまたがる形（`cd .git/hooks` のあと、別の呼び出しで `echo x > pre-commit`）。判定はセッションの cwd を見ない
   - インタプリタ（`python -c` など）の中の書き込み
-  - 変数・コマンド置換・グロブで書いたパス（`$h/pre-commit`、`$(… --git-path hooks)/x`、`.gi?/config`）。`shellread` は変数の値も展開の結果も知らない
+  - 変数・コマンド置換・グロブで書いたパス（`$h/pre-commit`、`$(… --git-path hooks)/x`、`.gi?/config`）。`infra/shell` は変数の値も展開の結果も知らない
   - 上に無い書き込みの動詞（`touch` `chmod` `mkdir` `perl -pi` `rsync` `tar` `curl -o` `awk -i inplace`）は未実装。足すと読むだけの形の誤検知が増えるため
   - 親から始める `find`（`find . -name index.lock -delete`）。開始点が `.git` の形だけを見る
   - Windows の別名（8.3 形式の `GIT~1`、`.git::$INDEX_ALLOCATION`）。解決済みのパスでも別名のまま残る

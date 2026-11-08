@@ -257,7 +257,7 @@ function Body({
 
 /**
  * 本文に出る開発者向けの語の凡例。本文は実行ファイルの出力のまま変えないので、本文に出る順に本文の外へ置く。
- * 実行ファイルの意味と合わせる（`agree_screen.py`、`docs/21_design/tickets/proposal-format.md`）
+ * 実行ファイルの意味と合わせる（`go/internal/tickets/proposal/agree`の`Screen`、`docs/21_design/tickets/proposal-format.md`）
  */
 const LEGEND: readonly (readonly [string, string])[] = [
   ["allow", "確認なしで編集できる場所"],

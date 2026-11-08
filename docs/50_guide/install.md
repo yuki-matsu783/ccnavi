@@ -155,7 +155,7 @@ sh scripts/ccnavi-setup.sh <ワークスペースルート>
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）は `CCNAVI_MODE` と同じ値で書く。`dry-run` で入れたままだとこの 2 つも `dry-run` のまま残るので、`enable` へ切り替えるときは `--mode enable` で打ち直す。切り替える前に、記録の `would-restore` で何が戻るはずだったかを確かめられる。
 `CCNAVI_GUARD_TICKET_APPROVAL` はモードに合わせず、いつも `enable` で書く。`dry-run` と書かれていたら `--lint` が error にする。
 
-入れ終わったところで、ワークスペースの git の索引に `projects/` の下が載っていないかも見る。問題があれば直し方を案内するだけで、止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。
+入れ終わったところで、配った実行ファイルで `--lint` を 1 回実行し、結果をそのまま見せる（ワークスペースの git の索引に `projects/` の下が載っていないかなども、ここで分かる）。止めず、終了コードも変えない。索引も `.gitignore` も変えない（直すのはユーザ）。`--check` では実行せず、導入したあとに `sh .ccnavi/scripts/ccnavi-launcher.sh --lint` で確かめるよう 1 行で案内する。
 
 置き場は固定で env には書かない（[設定](settings.md)の「置き場」）。
 
@@ -164,8 +164,8 @@ sh scripts/ccnavi-setup.sh <ワークスペースルート>
 hook が起動する実行ファイル、`rules.yml`、拒否の文面が案内する sh が、対象プロジェクトの中に要る。設定を書く 1 回で、配布物も置く。
 
 ```sh
-# ソースから使うときだけ。ccnavi のリポジトリで、先に実行ファイルを組み立てる
-uv run --with pyinstaller python build.py
+# ソースから使うときだけ。ccnavi のリポジトリで、先に実行ファイルを組み立てる（Go が要る）
+sh scripts/ccnavi-build.sh
 
 # 対象プロジェクトへ、設定を書いて実行ファイルを配る
 sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
@@ -173,7 +173,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --mode dry-run
 
 配布元は既定で、ccnavi の根である。よそから配るときは `--deploy <ccnavi の根>` で名指しする。
 
-実行ファイルは、配布先の `.ccnavi/bin/<os>-<arch>/` に入る。`<os>-<arch>` は組み立てた機械で決まる。hook は `.ccnavi/scripts/ccnavi-launcher.sh` を起動し、この sh がその機械に合う実行ファイルを選ぶので、`settings.json` を Windows・WSL・Linux・macOS で共有できる。実行ファイルは組み立てた機械の OS と CPU でしか動かない。別の機械向けの組み立ても、その機械の置き場に入るだけなので配る。Windows と WSL で同じフォルダを開くなら、それぞれの機械で打てば両方が並ぶ。
+実行ファイルは、配布先の `.ccnavi/bin/<os>-<arch>/` に入る。`<os>-<arch>` は組み立てた向きで決まる。hook は `.ccnavi/scripts/ccnavi-launcher.sh` を起動し、この sh がその機械に合う実行ファイルを選ぶので、`settings.json` を Windows・WSL・Linux・macOS で共有できる。実行ファイルは組み立てた向きの OS と CPU でしか動かない。別の機械向けの組み立ても、その機械の置き場に入るだけなので配る。別の機械向けには `sh scripts/ccnavi-build.sh --target windows-x86_64` のように組める（`linux`・`darwin`・`windows` と `x86_64`・`arm64` の組）。Windows と WSL で同じフォルダを開くなら、それぞれの向きに組み立てて配れば両方が並ぶ。
 
 この機械で動く実行ファイルが無ければ、導入スクリプトは出力の「まだ無いもの」で知らせる。実行時に見つからないときは終了コード 127、実行できないときは 126 で終わる（[つまずきやすい点](troubleshooting.md)）。
 目印が無いか読めない配布元からは配らない。名指しの `--deploy` なら終了コード 2 で断り、既定の配布元なら理由を出して設定だけ書く。
@@ -195,7 +195,7 @@ sh scripts/ccnavi-setup.sh /path/to/project --bin user
 中身が配布元と同じなら、確認なしで終わる。違えば、また確認して置き換える。`~/.local/bin/ccnavi` に別のファイルが既にあれば触らない（置き換えるなら `--force`）。配布先の `.ccnavi/bin/` に実行ファイルが残っていると、そちらが先に使われるので、残っていることを案内に出す。`--check` は書かず、確認も求めない。
 `--bin` は `ccnavi-install.sh` に渡せない。`ccnavi-setup.sh` を直接打つ。
 
-実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して置き換えると、ほかのプロジェクトにも効く。PATH に通すのは、隣に `_internal/` がある実体のフォルダで、実行ファイル単体のコピーは動かない。この機械で動く実行ファイルだけを置ける。
+実体は同じ機械の全プロジェクトが使うので、1 つのプロジェクトで再実行して置き換えると、ほかのプロジェクトにも効く。この機械で動く実行ファイルだけを置ける。
 
 PATH に通すフォルダが PATH に入っていなければ、環境に合った足し方を知らせる。シェルの設定ファイルも Windows の環境変数も、書き換えない。
 

@@ -279,7 +279,12 @@ function waitingWithMr(url: string): BoardJson {
         : p,
     ),
   };
-  return { ...base, parents: [parent] };
+  // 判定が出す形に揃える。フェーズがレビュー待ちなら、そのフェーズの作業中の子はレビュー待ちの置き場（review/）にある。
+  // 作業中（open）のままだと子のバッジは「要確認」になり、レビュー完了が付かない
+  const tickets = base.tickets.map((t): TicketJson =>
+    t.ticket === "i0001-02-02" ? { ...t, copy: { ...t.copy, status: "review" }, in_progress: false } : t,
+  );
+  return { ...base, parents: [parent], tickets };
 }
 
 test("CB-T131 レビュー待ちのフェーズの子にレビュー完了が付き、依頼のマーカーのMRがフェーズ行・親カード・そのフェーズの子に載る", () => {

@@ -15,6 +15,10 @@ function text(element: { textContent: string | null } | null | undefined): strin
   return (element?.textContent ?? "").trim();
 }
 
+
+/** `projects/`が無視されていないときの苦情（go/internal/entry/lintの`projectPlaces`） */
+const UNIGNORED = "projects/ がワークスペースの git で無視されていない。プロジェクトは自分の git を持つので、ワークスペースの `.gitignore` に入れてください";
+
 test("CB-D31 .gitignoreの帯のボタンとcloneは、それぞれの型で送る。cloneは欄のURLと名前を送り、名前はURLから埋まる", async () => {
   const dom = await openProjects([row()], { ignored: false });
   try {
@@ -122,7 +126,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を1か所にだ�
     {
       ignored: false,
       dirProblems: [
-        problem("warn", "projects/ がワークスペースのgitで無視されていない", "(projects)"),
+        problem("warn", UNIGNORED, "(projects)", "projects-unignored"),
         problem("warn", "別の指摘", "(projects)"),
       ],
     },
@@ -142,24 +146,31 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を1か所にだ�
   }
 
   // .gitignoreが済んでいればlintの指摘はそのまま出る
-  const fine = await openProjects([row()], { dirProblems: [problem("warn", "projects/ がワークスペースのgitで無視されていない", "(projects)")] });
+  const fine = await openProjects([row()], { dirProblems: [problem("warn", UNIGNORED, "(projects)", "projects-unignored")] });
   try {
-    assert.ok(fine.all(".banner").some((b) => text(b) === "warn: projects/ がワークスペースのgitで無視されていない"));
+    assert.ok(fine.all(".banner").some((b) => text(b) === `warn: ${UNIGNORED}`));
   } finally {
     await fine.close();
   }
 });
 
-// `projects/`がワークスペースのgitの索引に載っているときの苦情（src/ccnavi/entry/lint.pyの`_in_index`）。
-// 先頭の句は2つで共通で、載せ忘れは直後に「（入れ子のリポジトリとして」が続く（設計 §4.2）
+// `projects/`がワークスペースのgitの索引に載っているときの苦情（go/internal/entry/lintの`inIndex`）。
+// 2つは同じ種類（`projects-tracked`）で届き、画面は文面を照合しない（設計 §4.2）
 const COLLISION =
-  "`projects/`はワークスペースのgitが追跡している（例: `projects/foo/main.py`）。ccnaviはワークスペース直下の`projects/`をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの`projects/`を別の名前に移す（例: `git mv projects apps`）";
+  "`projects/` はワークスペースの git が追跡している（例: `projects/foo/main.py`）。ccnavi はワークスペース直下の `projects/` をプロジェクトの置き場として使い、名前は変えられない。直すには、ワークスペースの `projects/` を別の名前に移す（例: `git mv projects apps`）";
 const ADDED_BY_MISTAKE =
-  "`projects/`はワークスペースのgitが追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで`git rm -r --cached projects`を打ち、`.gitignore`に`/projects/`を追加して、コミットする";
+  "`projects/` はワークスペースの git が追跡している（入れ子のリポジトリとして: `projects/lib`）。直すには、ワークスペースで `git rm -r --cached projects` を打ち、`.gitignore` に `/projects/` を追加して、コミットする";
 
 /** 置き場の苦情の帯・`.gitignore`の帯とボタンを見る */
 async function trackedBanners(detail: string, ignored: boolean): Promise<{ banners: string[]; fixButtons: number }> {
-  const dom = await openProjects([row()], { ignored, dirProblems: [problem("warn", detail, "(projects)"), problem("warn", "別の指摘", "(projects)")] });
+  const dom = await openProjects([row()], {
+    ignored,
+    dirProblems: [
+      problem("warn", detail, "(projects)", "projects-tracked"),
+      problem("warn", UNIGNORED, "(projects)", "projects-unignored"),
+      problem("warn", "別の指摘", "(projects)"),
+    ],
+  });
   try {
     return { banners: dom.all(".banner").map((b) => text(b)), fixButtons: dom.all('button[data-action="fix-ignore"]').length };
   } finally {

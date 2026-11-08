@@ -7,14 +7,16 @@
    （`extensions/chrome/ccnavi-approval/test/fixtures/host/github/<場面>/`）から sh が組む JSON
    （`fetch`。`fetched_at` を除く）が、見本の期待値（`expected.json`）と同じ。拡張の試験
    （CX-T129）も同じ見本から TS で組んで同じ期待値と比べるので、sh と TS が同じ JSON を組む
-2. JSON から出る結論（変更要求と未解決のスレッド。判定のコアの
-   `review_host.effective`・`_unresolved`）が見本の `conclusion.json` と同じ
+2. 見本の結論（`conclusion.json`。変更要求と未解決のスレッド）が、場面の狙いどおり。
+   `expected.json` から実行ファイルが出す結論が `conclusion.json` と同じことは go test
+   （go/internal/tickets/model/host/review_host_fixture_test.go）が見る
 3. `confirm` はトークンの持ち主を引いて `--actor` で渡す。
    引けなければ渡さない（マーカーは前と同じ）。
    呼び手が `--actor` を渡しても受けない
 
-ホストの API が変わって見本を録り直したら、`CCNAVI_HOST_FIXTURE=1` を付けてこのテストを回し、
-期待値を書き直す（手順は extensions/chrome/ccnavi-approval/README.md の「ホストの応答の見本」）。
+ホストの API が変わって見本を録り直したら、`CCNAVI_HOST_FIXTURE=1` を付けてこのテストを回して
+`expected.json` を、同じ環境変数で上の go test を回して `conclusion.json` を書き直す
+（手順は extensions/chrome/ccnavi-approval/README.md の「ホストの応答の見本」）。
 """
 
 from __future__ import annotations
@@ -27,9 +29,7 @@ import sys
 import tempfile
 import unittest
 
-from ccnavi.entry import version
-from ccnavi.tickets.model import oplog, review_host
-from tests import ROOT, can_pass_argument, common_sh
+from tests import ROOT, can_pass_argument, common_sh, exe, oprecord
 from tests.sh import github_host, gitlab_host
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -71,7 +71,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) PYTHONPATH='@SRC@' exec '@PY@' -m ccnavi "$@" ;;
+*" ops "*) exec '{exe}' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -86,7 +86,6 @@ done
 for a in "$@"; do printf '%s\\n' "$a"; done >>'{log}'
 exit 0
 """
-STUB = STUB.replace("@PY@", sys.executable).replace("@SRC@", os.path.join(ROOT, "src"))
 
 
 # マージリクエストを作ったときのホストの返事（GitLab の形）。
@@ -100,37 +99,14 @@ def write(path, text):
     return path
 
 
-def conclusion(copy: dict, poster: str = "") -> dict:
-    """JSON から出る結論。confirm が止める理由のうち、ホストから取ってきた JSON で決まるもの。
-
-    GitLab は依頼を投稿したアカウント（`poster`）の ccnavi の依頼のスレッドを数えない。
-    目印は誰でも書けるので、書いたアカウントでも確かめる。
-    """
-    result = review_host.Result.from_data(copy)
-    changes = [
-        r for r in review_host.effective(result.reviews) if r.state.upper() == "CHANGES_REQUESTED"
-    ]
-    unresolved = review_host._unresolved(result.threads, result.host, poster)
-    return {
-        "changes_requested": sorted(r.url for r in changes),
-        "unresolved": sorted(t.id for t in unresolved),
-    }
-
-
 def accept_plan_file(tmp, ws, mr_url, nodes):
-    """実物の書き手（実行ファイルが使う `review_host.write_accept_plan`）で書いた計画。
+    """実行ファイルが `--accept-plan` に書くのと同じ形の計画（go の host.WriteAcceptPlan）。
 
-    実行ファイルと同じく、本物の操作記録を作って、その操作ID を計画に書く。
+    実行ファイルと同じく、操作記録を作って、その操作ID を計画に書く。
     """
     path = os.path.join(tmp, "plan.json")
-    items = [
-        (
-            review_host.Thread(id=node, url=f"u/{node}"),
-            review_host.accept_reply("テスト", issue=False),
-        )
-        for node in nodes
-    ]
-    op = oplog.begin(
+    keys = [f"u/{node}" for node in nodes]
+    op = oprecord.begin(
         os.path.join(ws, "logs", "state"),
         "decide",
         repo={"host": "test", "mr_url": mr_url},
@@ -138,15 +114,24 @@ def accept_plan_file(tmp, ws, mr_url, nodes):
         phase=1,
         mr=1,
         shown=[
-            {"key": t.url, "id": t.id, "url": t.url, "path": "a.py", "line": 3, "version": "v1",
+            {"key": key, "id": node, "url": key, "path": "a.py", "line": 3, "version": "v1",
              "body": "指摘の本文"}
-            for t, _ in items
+            for node, key in zip(nodes, keys)
         ],
-        choices={t.url: "keep" for t, _ in items},
+        choices={key: "keep" for key in keys},
         plan={"digest": "d"},
         stages=[("reply", "reply")],
-    )
-    assert review_host.write_accept_plan(path, items, "d", op) == ""
+    )  # fmt: skip
+    body = {
+        "version": 1,
+        "digest": "d",
+        "op": op,
+        "threads": [
+            {"id": node, "key": key, "reply": "<!-- ccnavi:accept -->\nテスト\n"}
+            for node, key in zip(nodes, keys)
+        ],
+    }
+    write(path, json.dumps(body, ensure_ascii=False) + "\n")
     return path
 
 
@@ -171,7 +156,7 @@ class HostFixtureTest(unittest.TestCase):
         self.args = os.path.join(self._tmp.name, "args.txt")
         self.exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            STUB.format(compat=version.COMPAT, log=self.args),
+            STUB.format(compat=exe.compat(), log=self.args, exe=exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 
@@ -231,12 +216,8 @@ class HostFixtureTest(unittest.TestCase):
                 if os.environ.get("CCNAVI_HOST_FIXTURE"):
                     body = json.dumps(copy, ensure_ascii=False, indent=2) + "\n"
                     write(os.path.join(where, "expected.json"), body)
-                    body = json.dumps(conclusion(copy), ensure_ascii=False, indent=2) + "\n"
-                    write(os.path.join(where, "conclusion.json"), body)
                 with open(os.path.join(where, "expected.json"), encoding="utf-8") as f:
                     self.assertEqual(copy, json.load(f), f"{scene} の expected.json が古い")
-                with open(os.path.join(where, "conclusion.json"), encoding="utf-8") as f:
-                    self.assertEqual(conclusion(copy), json.load(f))
 
     def test_the_scenes_say_what_they_are_for(self):
         def said(scene):
@@ -531,7 +512,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.args = os.path.join(self._tmp.name, "args.txt")
         self.exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            STUB.format(compat=version.COMPAT, log=self.args),
+            STUB.format(compat=exe.compat(), log=self.args, exe=exe.sh_path()),
         )
         os.chmod(self.exe, 0o755)
 
@@ -599,17 +580,11 @@ class GitLabHostFixtureTest(unittest.TestCase):
                 copy = json.loads(done.stdout)
                 self.assertRegex(copy.pop("fetched_at"), r"^\d{4}-\d\d-\d\dT")
                 where = os.path.join(gitlab_host.SCENES, scene)
-                with open(os.path.join(where, "scene.json"), encoding="utf-8") as f:
-                    poster = json.load(f)["poster"]
                 if os.environ.get("CCNAVI_HOST_FIXTURE"):
                     body = json.dumps(copy, ensure_ascii=False, indent=2) + "\n"
                     write(os.path.join(where, "expected.json"), body)
-                    body = json.dumps(conclusion(copy, poster), ensure_ascii=False, indent=2)
-                    write(os.path.join(where, "conclusion.json"), body + "\n")
                 with open(os.path.join(where, "expected.json"), encoding="utf-8") as f:
                     self.assertEqual(copy, json.load(f), f"{scene} の expected.json が古い")
-                with open(os.path.join(where, "conclusion.json"), encoding="utf-8") as f:
-                    self.assertEqual(conclusion(copy, poster), json.load(f))
 
     def test_the_scenes_say_what_they_are_for(self):
         def said(scene):
@@ -657,12 +632,12 @@ class GitLabHostFixtureTest(unittest.TestCase):
             os.path.join(self._tmp.name, "exe2", "ccnavi"),
             "#!/bin/sh\n"
             'case " $* " in *" --version "*) printf \'compat: %s\\n\' '
-            + str(version.COMPAT)
+            + exe.compat()
             + "; exit 0 ;; esac\n"
             + 'case " $* " in *" write-and-push family "*)'
             + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
             + 'case " $* " in *" ops "*)'
-            + f" PYTHONPATH='{os.path.join(ROOT, 'src')}' exec '{sys.executable}' -m ccnavi \"$@\" ;; esac\n"
+            + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'
             f"  printf '<!-- ccnavi:request i0001:1 key=k -->\\n依頼\\n' >'{out}/body.md'\n"

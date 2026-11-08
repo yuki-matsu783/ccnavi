@@ -1,6 +1,6 @@
 """親に固定するフェーズ定義（親の `phases:`）の受入テスト。
 
-計画を持つ親は、計画が使う定義だけのコピーを `phases:` に持つ。見るのは 6 つ。
+計画を持つ親は、計画が使う定義だけのコピーを `phases:` に持つ。見るのは 5 つ。
 
 1. 承認（`--agree`）の検査。コピーは承認したときの `phases.yml` の同じ名前の定義と読んだ形で
    同じでなければ落ちる。使う定義はコピーに書く。`phases.yml` にあってコピーに無い定義は何も
@@ -9,7 +9,6 @@
 3. コピーの無い計画付きの親と、コピーを書いた子は、手で動かしても判定で止まる
 4. 改版の規則。コピーだけの違いも改版になり、子が承認された番号の定義は変えられない
 5. 補助のフラグ `--plan-order <親> --fill-phases`
-6. 定義の `scope` と `deliverables` は 20 件まで
 """
 
 from __future__ import annotations
@@ -20,10 +19,6 @@ import unittest
 
 import yaml
 
-from ccnavi.tickets.config import phasetypes
-from ccnavi.tickets.model import phase_forms
-from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.proposal import agree_digest
 from tests import phasecopy
 from tests.ticket.test_phases import (
     PHASES,
@@ -129,21 +124,6 @@ class CopyAgreeTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("`phases:` がありません。", result.stderr)
         self.assertIn("--fill-phases", result.stderr)
-
-    def test_a_parent_without_a_plan_gets_a_warning_before_the_request(self):
-        from ccnavi.tickets.proposal import agree_candidates
-
-        text = "\n".join(
-            ["---", "version: 1", "ticket: i0001", "title: t", "mr: 1", "issue: 1", "allow:"]
-            + ["- {glob: 'src/*', match: 'Write|Edit'}", "---", ""]
-        )
-        t, _ = ticket_mod.parse(text)
-        found = agree_candidates.plan_problems(t, None)
-        self.assertEqual(["warn"], [p.severity for p in found], found)
-        self.assertIn("計画（`plan:`）がありません", found[0].detail)
-        # 承認済みの親と、着手済みの親の改版（held あり）には言わない
-        self.assertEqual([], agree_candidates.plan_problems(t, None, approved=True))
-        self.assertEqual([], agree_candidates.plan_problems(t, None, held={}))
 
     def test_an_unused_definition_is_a_warning_and_shown_on_the_screen(self):
         acceptance = phasecopy.definitions(PHASES)["acceptance"]
@@ -388,16 +368,6 @@ class CopyRevisionTest(PhaseHarness):
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("子が承認された番号が使う定義", result.stderr)
 
-    def test_revised_front_replaces_the_copy_with_the_proposal(self):
-        """改版の書き込みは計画と一緒に `phases:` も提案の値に差し替える。"""
-        current, _ = ticket_mod.parse(parent_text("i0001", ["design"]))
-        revised, _ = ticket_mod.parse(
-            parent_text("i0001", ["design"], feedback=["implement-feedback"])
-        )
-        front = agree_digest.revised_front(current, revised)
-        self.assertEqual(set(front["phases"]), {"design", "implement-feedback"})
-        self.assertEqual(front["phases"], revised.raw["phases"])
-
 
 class FillPhasesTest(PhaseHarness):
     """5. `--plan-order <親> --fill-phases`。"""
@@ -563,76 +533,6 @@ class FillPhasesTest(PhaseHarness):
         self.assertNotEqual(with_agree.returncode, 0)
         self.assertIn("--agree", with_agree.stderr)
         self.assertNotIn("phases:", self.read())
-
-    def test_the_agent_may_type_fill_phases(self):
-        """`--agree` の外の独立したフラグなので、組み込みの止めにヒットしない。"""
-        rule = phase_forms.ticket_approval_rule("", self.root)
-        for command in (
-            "ccnavi --plan-order i0001 --fill-phases",
-            ".ccnavi/bin/ccnavi --plan-order i0001 --fill-phases",
-        ):
-            with self.subTest(command=command):
-                self.assertIsNone(rule.compiled.search(command))
-                self.assertEqual(phase_forms.human_path_form(command), ("", ""))
-
-
-class LimitTest(unittest.TestCase):
-    """6. 定義の `scope` と `deliverables` は 20 件まで。`phases.yml` もコピーも同じ。"""
-
-    def test_scope_and_deliverables_are_capped(self):
-        many = [f"d{i}/*" for i in range(21)]
-        for key in ("scope", "deliverables"):
-            with self.subTest(key=key):
-                body = {"kind": "work", "title": "多い", key: many}
-                text = yaml.safe_dump({"version": 1, "phases": {"big": body}})
-                types, problems = phasetypes.parse(text)
-                self.assertIsNone(types)
-                self.assertTrue(any("上限 20 件" in p.detail for p in problems), problems)
-                copied, problems = phasetypes.read_copy({"big": body})
-                self.assertNotIn("big", copied)
-                self.assertTrue(any("上限 20 件" in p.detail for p in problems), problems)
-        body = {"kind": "work", "title": "ちょうど", "scope": many[:20], "deliverables": many[:20]}
-        types, problems = phasetypes.parse(yaml.safe_dump({"version": 1, "phases": {"ok": body}}))
-        self.assertEqual(problems, [])
-        self.assertIn("ok", types)
-
-
-FIXTURE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "fixtures", "parent-phases.json")
-
-
-class CopyRuleTableTest(unittest.TestCase):
-    """承認でコピーを確かめる決まりを、見本の表（tests/fixtures/parent-phases.json）で固定する。"""
-
-    def test_the_rules_match_the_table(self):
-        from ccnavi.policy import rules
-        from ccnavi.tickets.proposal import agree_candidates
-
-        with open(FIXTURE, encoding="utf-8") as f:
-            table = json.load(f)
-        config, problems = phasetypes.parse(
-            yaml.safe_dump({"version": 1, "phases": table["phases_yml"]}, allow_unicode=True)
-        )
-        self.assertEqual(problems, [])
-        for case in table["cases"]:
-            with self.subTest(case["name"]):
-                front = {"version": 1, "ticket": "i0001"}
-                if case["phases"] is not None:
-                    front["phases"] = case["phases"]
-                front["plan"] = case["plan"]
-                front.update({"title": "親", "allow": [{"match": "Write|Edit", "glob": "src/*"}]})
-                text = "---\n" + yaml.safe_dump(front, allow_unicode=True) + "---\n本文\n"
-                t, problems = ticket_mod.parse(text)
-                self.assertIsNotNone(t, problems)
-                found = agree_candidates.plan_problems(t, config)
-                for severity, key in (
-                    (rules.SEVERITY_ERROR, "errors"),
-                    (rules.SEVERITY_WARN, "warns"),
-                ):
-                    said = [p.detail for p in found if p.severity == severity]
-                    if not case[key]:
-                        self.assertEqual(said, [], key)
-                    for phrase in case[key]:
-                        self.assertTrue(any(phrase in d for d in said), (phrase, said))
 
 
 if __name__ == "__main__":

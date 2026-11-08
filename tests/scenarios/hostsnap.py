@@ -17,7 +17,7 @@
 import json
 from datetime import datetime
 
-from ccnavi.records import diaglog
+from tests import diaglog
 from tests.scenarios import hostenv
 
 LOG_NAME = hostenv.LOG_NAME

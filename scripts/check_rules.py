@@ -4,9 +4,11 @@
 
     uv run python scripts/check_rules.py [ルールファイル]
 
-中身は `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。期待する判定の読み方も
-突き合わせも実行ファイルの側にあり、ここは引数を足して渡すだけ。VS Code 拡張の
-ルール管理画面も同じコマンドを `--json` 付きで使う。判定を 2 か所で作らないのが肝で、
+中身は `ccnavi --test-expectations` を呼ぶだけの薄いラッパースクリプト。ccnavi は振り分けの
+sh（`.ccnavi/scripts/ccnavi-launcher.sh`）から起こすので、先に `sh scripts/ccnavi-build.sh` で
+組んでおく。
+期待する判定の読み方も突き合わせも実行ファイルの側にあり、ここは引数を足して渡すだけ。
+VS Code 拡張のルール管理画面も同じコマンドを `--json` 付きで使う。判定を 2 か所で作らないのが肝で、
 別の道で確かめると、期待する判定が通ったのに実運用で失敗する、という一番まずい形になる。
 
 終了コードは実行ファイルのものをそのまま返す。食い違いが 1 件でもあれば 1。無ければ 0。
@@ -22,10 +24,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # 共通レイヤーのルールと期待する判定の置き場。
 RULES = os.path.join(ROOT, ".ccnavi", "config", "common", "rules.yml")
 EXPECTATIONS = os.path.join(ROOT, ".ccnavi", "config", "common", "rule-expectations.yml")
+# この機械の .ccnavi/bin/ の実行ファイルを選んで起こす sh。
+LAUNCHER = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-launcher.sh")
 
 
 def arguments(rules_path: str = RULES) -> list[str]:
-    """`python -m ccnavi` に渡す引数。
+    """ccnavi に渡す引数。
 
     全件テスト（tests/core/test_check_rules.py）も同じものを使う。
 
@@ -53,16 +57,13 @@ def arguments(rules_path: str = RULES) -> list[str]:
 
 def environment() -> dict[str, str]:
     """`CCNAVI_*` を外した環境。走らせたユーザの dry-run や設定の差し替えを判定に入れない。"""
-    env = {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
-    # パッケージは src レイアウト。入れていない Python でもこのツリーのソースを読む。
-    env["PYTHONPATH"] = os.path.join(ROOT, "src")
-    return env
+    return {k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")}
 
 
 def main() -> int:
     rules_path = sys.argv[1] if len(sys.argv) > 1 else RULES
     done = subprocess.run(
-        [sys.executable, "-m", "ccnavi", *arguments(rules_path)],
+        ["sh", LAUNCHER, *arguments(rules_path)],
         cwd=ROOT,
         env=environment(),
     )

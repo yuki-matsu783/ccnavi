@@ -4,7 +4,7 @@
 # `pnpm install --frozen-lockfile`（vscode の scripts/package.sh、scripts/ccnavi-build-install.sh）を
 # workspace にする前と同じ置き場・同じ形のまま使うため。
 # 拡張のディレクトリで打った pnpm install は、その拡張の依存だけを入れる（recursiveInstall: false）。
-# 片方の組み立てに、もう片方の依存（Pyodide など）を取りに行かせないため。
+# 片方の組み立てに、もう片方の依存を取りに行かせないため。
 packages:
   - chrome/ccnavi-approval
   - vscode/ccnavi-board

@@ -43,7 +43,6 @@ export function App({ controller, md, frame }: AppProps): JSX.Element {
   useLayoutEffect(() => {
     setText(frame.status, s.status.text);
     if (s.status.bootMs !== undefined) frame.status.dataset.bootMs = String(s.status.bootMs);
-    if (s.status.importMs !== undefined) frame.status.dataset.importMs = String(s.status.importMs);
     if (s.status.violations !== undefined) frame.status.dataset.violations = String(s.status.violations);
   }, [frame, s.status]);
 

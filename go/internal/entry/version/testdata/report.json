@@ -1,0 +1,1 @@
+{"json":"{\n \"schema\": 1,\n \"version\": \"0.1.0\",\n \"commit\": \"unknown\",\n \"built\": false,\n \"compat\": 20,\n \"formats\": {\n  \"phases\": 1,\n  \"risks\": 1,\n  \"rules\": 1,\n  \"ticket\": 1\n }\n}\n","text":"ccnavi 0.1.0\ncommit: unknown\nbuilt: no (scripts/ccnavi-build.sh で組んでいない)\ncompat: 20\nschema: 1\nformats: phases=1 risks=1 rules=1 ticket=1\n"}

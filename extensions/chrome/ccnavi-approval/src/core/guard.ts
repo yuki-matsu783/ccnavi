@@ -1,7 +1,7 @@
 /**
  * 書き込みの保護。判定ではなく、書く先の形だけを見る。
  *
- * 判定は Python が出し、書く先（親のブランチ・置き場の下）も Python が決める。ここは service worker と
+ * 判定は ccnavi が出し、書く先（親のブランチ・置き場の下）も ccnavi が決める。ここは service worker と
  * 書く流れ（`write.ts`）が、送る直前にもう一度見る二重の確認。画面で XSS が起きて service worker に
  * 書く頼みを直に送られても、保護されたブランチ・統合先・置き場の外・登録していないリポジトリには書かない。
  */
@@ -9,7 +9,7 @@
 /** 書く先にしない名前（`ccnavi-user-push-approved.sh` の一覧と同じ）。大文字小文字をそろえて比べる */
 export const PROTECTED = /^(?:main|master|develop|release|release[-/].*)$/i;
 
-/** 置き場のパスの既定（`src/ccnavi/infra/settings.py` の DEFAULT_TICKETS・DEFAULT_APPROVED と同じ） */
+/** 置き場のパスの既定（`go/internal/infra/config` の DefaultTickets・DefaultApproved と同じ） */
 export const DEFAULT_TICKETS = "wip/proposals";
 export const DEFAULT_APPROVED = ".ccnavi/approved";
 
@@ -19,16 +19,16 @@ export interface Places {
 }
 
 /**
- * 置き場のパス。既定に固定する（`ccnavi_chrome._placement` と同じ）。統合先の `.claude/settings.json` の
+ * 置き場のパス。既定に固定する（ccnavi の `chrome.opPlacement` と同じ）。統合先の `.claude/settings.json` の
  * `env` は読まない。`env` で置き場を動かしたワークスペースでも断らず、既定の置き場を読み書きする
  */
 export const DEFAULT_PLACES: Places = Object.freeze({ tickets: DEFAULT_TICKETS, approved: DEFAULT_APPROVED });
 
-/** ルートから始まる形（`/`・`\`・`~`・ドライブ名）。`ccnavi_chrome._ROOTED` と同じ */
+/** ルートから始まる形（`/`・`\`・`~`・ドライブ名）。ccnavi の `chrome.checkRel` と同じ */
 const ROOTED = /^(?:[/\\~]|[A-Za-z]:)/;
 
 /**
- * ツリーの中に留まる相対パスか（`ccnavi_chrome._check_rel` と同じ形の検査）。ルートから始まるもの・バックスラッシュを
+ * ツリーの中に留まる相対パスか（ccnavi の `chrome.checkRel` と同じ形の検査）。ルートから始まるもの・バックスラッシュを
  * 含むもの・空や `.` や `..` の要素を持つものは断る。先頭の文字列だけを比べると `wip/proposals/../../x` が置き場の下に見えるため
  */
 export function isPlainRel(path: string): boolean {

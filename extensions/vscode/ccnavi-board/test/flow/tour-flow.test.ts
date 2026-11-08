@@ -78,10 +78,10 @@ test("CB-T481 見本のフローは、YAML の本文に書き出して実際の�
 
 const exe = exeRunner();
 
-test("CB-T482 見本のフローは、実行ファイル（PyYAML）が読んでも同じ中身で、error がありません", { skip: exe.ok ? false : exe.reason }, () => {
+test("CB-T482 見本のフローは、実行ファイルが読んでも同じ中身で、error がありません", { skip: exe.ok ? false : exe.reason }, () => {
   assert.ok(exe.ok);
   for (const name of names) {
-    const read = exe.read(sample.flows[name].doc, sample.page.flowPath);
+    const read = exe.read(serializeFlow(sample.flows[name].doc), sample.page.flowPath);
     assert.equal(flowMismatch(sample.flows[name].doc, read.data), undefined, `${name}: 画面の読みと実行ファイルの読みが食い違う`);
     assert.deepEqual(read.problems.filter((problem) => problem.severity === "error"), [], name);
   }
@@ -91,7 +91,7 @@ test("CB-T483 見本の checks（warns・rendered）は、実行ファイルが�
   assert.ok(exe.ok);
   for (const name of names) {
     const { doc, checks } = sample.flows[name];
-    const read = exe.read(doc, sample.page.flowPath);
+    const read = exe.read(serializeFlow(doc), sample.page.flowPath);
     assert.deepEqual(checks.warns, read.problems.map((problem) => problem.detail), `${name}: warns`);
     assert.deepEqual(checks.rendered, read.rendered, `${name}: rendered`);
   }

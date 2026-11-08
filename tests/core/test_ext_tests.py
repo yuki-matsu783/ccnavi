@@ -311,12 +311,12 @@ class MarkExtHookTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as ws:
             path = "/repo/extensions/chrome/ccnavi-approval/src/board.ts"
             self.assertEqual([path], self.mark(ws, path))
-            relative = "extensions/chrome/ccnavi-approval/py/ccnavi_chrome.py"
+            relative = "extensions/chrome/ccnavi-approval/src/core/ccnavi.ts"
             self.assertEqual([path, relative], self.mark(ws, relative))
 
     def test_files_outside_the_extension_are_not_written_down(self):
         with tempfile.TemporaryDirectory() as ws:
-            self.assertEqual([], self.mark(ws, "/repo/src/ccnavi/main.py"))
+            self.assertEqual([], self.mark(ws, "/repo/go/cmd/ccnavi/main.go"))
             self.assertEqual([], self.mark(ws, "/repo/docs/adr/0036-tests-at-stop.md"))
 
     def test_the_same_file_twice_is_harmless(self):

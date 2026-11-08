@@ -99,7 +99,7 @@ allow:
 - 大文字小文字は `glob` も `regex` も区別せずにヒットする（コマンド名も）。区別が要る部分だけ `(?-i:...)` で囲む。
   パスの文字を除外する否定（`\.[^c\\/]` など）は囲む。囲まないと大文字の側まで除外され、ヒットする範囲が変わる
 - `match` に書けるのは、判定が対象を取り出せるツールだけ。`Bash` `PowerShell`（コマンド）、
-  `Read` `Edit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
+  `Read` `Edit` `MultiEdit` `Write` `NotebookEdit`（パス）、`Grep` `Glob`（探す場所）、`Skill`（スキル名）、
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
   及ぼすなら `Bash|PowerShell`。ツールでない名前は `Stop`（メインエージェントのターンの終わり）だけで、
   `allow` に `glob: "*"` と `every: N` を添えて置く。渡す回にターンの終わりを止めて文を渡す。
@@ -123,7 +123,7 @@ Bash は実行される部分にヒットする。`$( )` の中や `&&` の先�
 素朴に `deny: ^{!root}` と置かない。セッションのスクラッチパッド（.ccnavi/docs/scratchpad.md）、
 `projects/` の外の参照用ツリー、他ツールの一時出力先まで一度に塞がる。
 
-- `match` を絞る。「外への書き込みを止める」なら `Write|Edit|NotebookEdit` にして `Read` は残す
+- `match` を絞る。「外への書き込みを止める」なら `Write|Edit|MultiEdit|NotebookEdit` にして `Read` は残す
 - 例外が要るなら `except:` で除く（`except: [{regex: '^{!root}.*[\\/]tmp[\\/]'}]` のように、除く側にも `{!root}` が書ける）。
   除く場所が多いなら、場所を名指しするルールにする
 

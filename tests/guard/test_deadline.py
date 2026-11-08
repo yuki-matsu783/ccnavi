@@ -1,15 +1,16 @@
 """判定の期限（REQ-CMN-08）の受入テスト。
 
-期限は `judge.decide_before` がルールを 1 つ照合するたびに見る。ここでは時計を差し替えて、
-実時間を待たずに期限切れの経路を確かめる。
+期限は判定がルールを 1 つ照合するたびに見る。ここでは期限を環境変数
+（CCNAVI_HOOK_DEADLINE_SECONDS）でごく短くして、実時間を待たずに期限切れの経路を確かめる。
 
-- enable は終了コード 2、dry-run は 0
+- enable は終了コード 2、dry-run は安全な読み取りだけ 0
 - 標準エラーに期限の文面、記録の `reason` に `deadline-exceeded`
 - 期限に達した回は、標準出力に allow（や deny の応答）を出さない
+- 期限切れの結論はツールの種類で決まる（書き込みは止め、安全な読み取りは通す）
 
-時計は 2 か所で差し替える。期限を決める `cli.time`（呼び出しの頭で 1 回）と、確認する
-`judge.time`（ルールごと）。実時間の代表入力は、期限の 1/3 に収まることを緩い上限で確かめる。
-測定は tests/core/bench_deadline.py。
+どの照合の回で期限に達しても応答を出さないこと、期限ちょうどは超えていないことは、時計を差し替えられる
+Go のテスト（go/internal/hook/judge の TestDeadline）が確かめる。
+実時間の代表入力は、期限の 1/3 に収まることを緩い上限で見る。測定は tests/core/bench_deadline.py。
 """
 
 from __future__ import annotations
@@ -20,43 +21,23 @@ import shutil
 import tempfile
 import time
 import unittest
-from unittest import mock
 
-from ccnavi.entry import cli
-from ccnavi.hook import judge
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-START = 100.0
-EXPIRED = START + judge.DEADLINE_SECONDS + 1
+# 判定の期限の既定（秒）。
+DEADLINE_SECONDS = 3.0
+# 最初の照合で超える期限（秒）。
+LATE = "0.000001"
 
 
-class Clock:
-    """`time.monotonic` だけを持つ差し替え用の時計。
-
-    最初の `checks` 回は期限に届く前の時刻を返し、それ以降は期限を過ぎた時刻を返す。
-    呼ばれた回数は `calls` に残る。
-    """
-
-    def __init__(self, checks: int, before: float = START, after: float = EXPIRED) -> None:
-        self.checks, self.before, self.after, self.calls = checks, before, after, 0
-
-    def monotonic(self) -> float:
-        self.calls += 1
-        return self.before if self.calls <= self.checks else self.after
-
-
-class Start:
-    """期限を決める側（cli）の時計。いつも START を返す。"""
-
-    @staticmethod
-    def monotonic() -> float:
-        return START
-
-
-def payload(command: str) -> str:
+def payload(command: str, tool: str = "Bash", tool_input: dict | None = None) -> str:
     return json.dumps(
-        {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": command}}
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": tool,
+            "tool_input": tool_input if tool_input is not None else {"command": command},
+        }
     )
 
 
@@ -69,74 +50,75 @@ class DeadlineTest(unittest.TestCase):
         os.makedirs(os.path.dirname(target))
         shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", "rules.yml"), target)
 
-    def run_with(self, command, clock, mode="enable"):
+    def run_late(self, command, mode="enable", tool="Bash", tool_input=None):
         environment = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
+            "CCNAVI_GUARD_CORE_FILES": "disable",
+            "CCNAVI_HOOK_DEADLINE_SECONDS": LATE,
         }
-        environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
         environment.pop("CLAUDE_PROJECT_DIR", None)
-        with (
-            mock.patch.object(cli, "time", Start),
-            mock.patch.object(judge, "time", clock),
-        ):
-            return run_ccnavi(
-                ["--root", self.root, "--mode", mode],
-                input=payload(command),
-                cwd=ROOT,
-                env=environment,
-            )
+        return run_ccnavi(
+            ["--root", self.root, "--mode", mode],
+            input=payload(command, tool, tool_input),
+            cwd=ROOT,
+            env=environment,
+        )
 
     def last_record(self):
         with open(os.path.join(self.root, "logs", "decisions.jsonl"), encoding="utf-8") as f:
             return [json.loads(line) for line in f if line.strip()][-1]
 
     def test_enable_stops_with_exit_code_2(self):
-        result = self.run_with("echo hi", Clock(0))
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertEqual(result.stdout, "")
+        for command in ("echo hi", "git push origin main", "cat .env"):
+            with self.subTest(command=command):
+                result = self.run_late(command)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertEqual(result.stdout, "")
 
-    def test_dry_run_lets_it_through(self):
-        result = self.run_with("ls", Clock(0), mode="dry-run")
+    def test_enable_says_it_stopped(self):
+        result = self.run_late("echo hi")
+        self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
+        self.assertIn("期限（", result.stderr)
+        self.assertIn("止めました", result.stderr)
+        self.assertIn("短く分けて", result.stderr)
+
+    def test_dry_run_lets_a_safe_read_through_and_does_not_say_stopped(self):
+        result = self.run_late("ls", mode="dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
-        self.assertIn("deadline-exceeded", result.stderr)
-
-    def test_stderr_names_the_deadline(self):
-        result = self.run_with("echo hi", Clock(0))
         self.assertIn("[ccnavi] deadline-exceeded", result.stderr)
-        self.assertIn(f"期限（{judge.DEADLINE_SECONDS:g} 秒）", result.stderr)
+        self.assertIn("通しました", result.stderr)
+        self.assertNotIn("止めました", result.stderr)
 
     def test_record_says_deadline_exceeded(self):
-        self.run_with("echo hi", Clock(0))
+        self.run_late("echo hi")
         row = self.last_record()
         self.assertEqual(row["decision"], "skip")
         self.assertEqual(row["reason"], "deadline-exceeded")
 
-    def test_reaching_exactly_the_deadline_is_not_exceeded(self):
-        # 比べるのは `>`。期限ちょうどは超えていない。
-        clock = Clock(0, after=START + judge.DEADLINE_SECONDS)
-        result = self.run_with("echo hi", clock)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotIn("deadline-exceeded", result.stderr)
-
-    def test_a_call_that_hits_the_deadline_never_gets_a_verdict(self):
-        # 照合の回数を数え、どの回で期限に達しても、応答を出さずに止めることを確かめる。
-        # 止めるコマンド（deny）も、通すコマンド（allow）も同じ。
-        for command in ("echo hi", "git push origin main", "cat .env"):
-            with self.subTest(command=command):
-                counting = Clock(10**9)
-                done = self.run_with(command, counting)
-                checks = counting.calls
-                self.assertGreater(checks, 0)
-                self.assertNotIn("deadline-exceeded", done.stderr)
-                for hit in range(checks):
-                    with self.subTest(command=command, hit=hit):
-                        result = self.run_with(command, Clock(hit))
-                        self.assertEqual(result.returncode, 2, result.stderr)
-                        self.assertEqual(result.stdout, "")
-                        self.assertIn("deadline-exceeded", result.stderr)
-                        self.assertEqual(self.last_record()["reason"], "deadline-exceeded")
+    def test_the_deadline_follows_the_tool_kind(self):
+        """AT4：期限切れの結論もツールで決まる。Write は止め、安全な読み取りは通す。"""
+        cases = (
+            ("Write", {"file_path": "/tmp/x"}, 2),
+            ("Edit", {"file_path": "/tmp/x"}, 2),
+            ("Agent", {"description": "d"}, 2),
+            ("Read", {"file_path": "/tmp/notes.md"}, 0),
+            ("Read", {"file_path": "/home/u/.env"}, 2),
+            ("Grep", {"pattern": "x", "path": "/tmp/notes"}, 0),
+            ("Grep", {"pattern": "x", "path": "/home/u/.env"}, 2),
+            ("Glob", {"pattern": "/tmp/notes/*.md"}, 0),
+            ("PowerShell", {"command": "echo hi"}, 2),
+            ("Bash", {"command": "ls"}, 0),
+            ("Bash", {"command": "echo hi"}, 2),
+            ("Bash", {"command": "cat .env"}, 2),
+        )
+        for tool, tool_input, expected in cases:
+            for mode in ("enable", "dry-run"):
+                with self.subTest(tool=tool, tool_input=tool_input, mode=mode):
+                    result = self.run_late("", mode, tool, tool_input)
+                    self.assertEqual(result.returncode, expected, result.stderr)
+                    self.assertEqual(self.last_record()["reason"], "deadline-exceeded")
 
 
 class RealTimeTest(unittest.TestCase):
@@ -172,12 +154,12 @@ class RealTimeTest(unittest.TestCase):
     def test_long_command_finishes_well_within_the_deadline(self):
         seconds, result = self.timed("echo " + "a" * 3_000)
         self.assertNotIn("deadline-exceeded", result.stderr)
-        self.assertLess(seconds, judge.DEADLINE_SECONDS)
+        self.assertLess(seconds, DEADLINE_SECONDS)
 
     def test_many_substitutions_finish_well_within_the_deadline(self):
         seconds, result = self.timed("echo " + "$(:) " * 500)
         self.assertNotIn("deadline-exceeded", result.stderr)
-        self.assertLess(seconds, judge.DEADLINE_SECONDS)
+        self.assertLess(seconds, DEADLINE_SECONDS)
 
 
 if __name__ == "__main__":

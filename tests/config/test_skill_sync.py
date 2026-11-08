@@ -13,6 +13,9 @@ fixture は tests/config/test_config_sync.py と同じ ConfigUnionHarness を使
    (空になったディレクトリも片付ける)。`references/` の common 以外(プロジェクト固有)は
    上書きも削除もしない
 3. 中身が同じなら何も書かず、知らせない
+
+工程スキルの数え方と、シンボリックリンクがあるときに写さないことは、Go のテスト
+（go/internal/tickets/sync/mirror）が確かめる。
 """
 
 from __future__ import annotations
@@ -154,27 +157,6 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
         self.assertNotIn("skills/process-test", second.stdout)
 
-    def test_symlinked_process_dir_is_not_a_process(self):
-        """2: 工程スキルのディレクトリ自体がシンボリックリンクなら、工程スキルに数えない"""
-        from ccnavi.tickets.sync import skillsync
-
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        os.symlink(self.source("process-test"), self.source("evil"))
-        self.assertEqual(skillsync.processes(self.ws), ["process-test"])
-
-    def test_symlink_under_a_process_stops_the_copy(self):
-        """2: 工程スキルの下にシンボリックリンクがあれば、何もコピーせず理由を返す"""
-        from ccnavi.tickets.sync import skillsync
-
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        outside = os.path.join(self.ws, "outside.md")
-        write(outside, "外\n")
-        os.makedirs(self.source("process-test", "references", "common"), exist_ok=True)
-        os.symlink(outside, self.source("process-test", "references", "common", "leak.md"))
-        sources, why = skillsync.sources(self.ws)
-        self.assertEqual(sources, {})
-        self.assertIn("シンボリックリンク", why)
-
     def test_the_start_does_not_copy_the_skills(self):
         """1: `ticket start` 自身は工程スキルをコピーしない。コピーするのは次のユーザの発言"""
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
@@ -213,19 +195,6 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(read(os.path.join(base, "common", "shared.md")), "共通\n")
         self.assertFalse(os.path.exists(os.path.join(base, "project")))
         self.assertFalse(os.path.exists(os.path.join(base, "loose.md")))
-
-    def test_symlinked_common_dir_stops_the_copy(self):
-        """2: common/ そのものがシンボリックリンクなら、何もコピーせず理由を返す"""
-        from ccnavi.tickets.sync import skillsync
-
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        outside = os.path.join(self.ws, "outside")
-        write(os.path.join(outside, "leak.md"), "外\n")
-        os.makedirs(self.source("process-test", "references"), exist_ok=True)
-        os.symlink(outside, self.source("process-test", "references", "common"))
-        sources, why = skillsync.sources(self.ws)
-        self.assertEqual(sources, {})
-        self.assertIn("シンボリックリンク", why)
 
     def test_start_deletes_common_files_gone_from_the_source(self):
         """2: 共通側から無くなった common/ の .md は消し、空になったディレクトリも片付ける"""

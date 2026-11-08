@@ -75,7 +75,7 @@ ccnavi --lint --json
 | `version` | 形の版。整数（いま 1）。欄を足すだけなら上げない |
 | `root` / `rules` / `mode` / `ticket_control` | 何を見て検証したか。ユーザ向けの文面が先頭に出すものと同じ |
 | `projects[]` | 検証の対象になったプロジェクトの名前 |
-| `problems[]` | 指摘 1 件ずつの `{severity, where, detail}`。`severity` は `error` / `warn` / `info` |
+| `problems[]` | 指摘 1 件ずつの `{severity, where, detail, kind?}`。`severity` は `error` / `warn` / `info` |
 | `errors` / `warns` / `infos` | 件数 |
 | `flow` | `--flow` を渡したときだけ在る。`{path, data, rendered, candidates}` |
 | `flow.path` / `flow.data` | 確かめたファイルの絶対パス / 実行ファイルが読んだ中身（下）。`data` は読めなければ `null` |
@@ -84,6 +84,9 @@ ccnavi --lint --json
 
 `problems[].where` は、ユーザ向けの文面で `error:` の後ろに出る場所。`(projects/lib) rule-id` や `(self) (phases) design` のような形で、
 `--flow` で渡したフローへの指摘なら `(flow)` になる。ファイル全体への指摘なら空。
+
+`problems[].kind` は、画面が文面を照合せずに見分ける指摘にだけ付く。いまは置き場（`(projects)`）の 2 つで、
+`projects-tracked` は `projects/` がワークスペースの git の索引に載っている、`projects-unignored` は無視されていない。
 
 `flow.rendered` は文字列の配列で、`SubagentStart` で渡す手順の行そのまま。子のパスやロックの案内は入らない。
 
@@ -371,7 +374,7 @@ ccnavi --version --json
 | `schema` | この JSON の形の版（いま 1）。欄を足すだけなら上げない |
 | `version` | ccnavi の版 |
 | `commit` | 組み立ての元のコミット。組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
-| `built` | 組み立てた実行ファイルなら真、ソースで動いていれば偽 |
+| `built` | `scripts/ccnavi-build.sh` で組んだ実行ファイル（コミットを埋めたもの）なら真、そうでなければ偽 |
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
 | `formats` | 読む書式の版。レイヤーのファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
 

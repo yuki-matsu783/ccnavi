@@ -1,10 +1,9 @@
-"""振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）と、
-機械の語（src/ccnavi/infra/platformtag.py）。
+"""振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）。
 
 sh は `.ccnavi/scripts/` に、実体は `.ccnavi/bin/<os>-<arch>/` に並ぶ。sh は `../bin/` を探す。
-語を読む場所は 3 つ（sh、platformtag、ccnavi-setup.sh）あり、
+語を読む場所は 3 つ（sh、go/internal/infra/platformtag、ccnavi-setup.sh）あり、
 どれかだけ変わると配った場所と探す場所が食い違う。ここでは sh を外から動かし、
-選んだ置き場を見る。
+選んだ置き場を見る。platformtag の探す順は go test（platformtag_test.go）が確かめる。
 
 sh の原本は環境変数 `CCNAVI_TEST_LAUNCHER` で差し替えられる。ユーザがコピーする前に
 `wip/design/scripts/ccnavi-launcher.sh` を名指しで確かめるため（相対ならリポジトリの
@@ -21,8 +20,8 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.infra import platformtag
 from tests import ROOT
+from tests.exe import host_target
 
 LAUNCHER = os.path.join(
     ROOT,
@@ -37,157 +36,6 @@ def write(path, text, mode=0o755):
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     os.chmod(path, mode)
-
-
-class HostTargetTest(unittest.TestCase):
-    def test_names_the_three_systems_in_the_same_words(self):
-        self.assertEqual(platformtag.host_target("win32", "AMD64"), "windows-x86_64")
-        self.assertEqual(platformtag.host_target("darwin", "arm64"), "darwin-arm64")
-        self.assertEqual(platformtag.host_target("linux", "aarch64"), "linux-arm64")
-        self.assertEqual(platformtag.host_target("linux", "x86_64"), "linux-x86_64")
-
-    def test_arm64_falls_back_to_x86_64_only_where_it_is_translated(self):
-        self.assertEqual(
-            platformtag.runnable_targets("darwin-arm64"), ("darwin-arm64", "darwin-x86_64")
-        )
-        self.assertEqual(
-            platformtag.runnable_targets("windows-arm64"), ("windows-arm64", "windows-x86_64")
-        )
-        self.assertEqual(platformtag.runnable_targets("linux-arm64"), ("linux-arm64",))
-
-
-class PathExecutableTest(unittest.TestCase):
-    """PATH の ccnavi。sh（ccnavi_launcher_path）と同じ規則。
-
-    絶対パスの項目だけを順に見て、実行できるものを返す。
-    """
-
-    def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="ccnavi-pathexe-")
-        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
-
-    def place(self, name, *, mode=0o755):
-        path = os.path.join(self.dir, name, "ccnavi")
-        write(path, "x\n", mode)
-        return os.path.dirname(path)
-
-    def test_first_entry_in_path_order_wins(self):
-        first, second = self.place("a"), self.place("b")
-        found = platformtag.path_executable(first + os.pathsep + second)
-        self.assertEqual(found, os.path.join(first, "ccnavi"))
-
-    def test_skips_relative_and_empty_entries(self):
-        self.place("a")
-        raw = os.pathsep.join(["a", "", ".", os.path.join("..", "a")])
-        self.assertEqual(platformtag.path_executable(raw), "")
-
-    @unittest.skipIf(os.name == "nt", "実行ビットは POSIX の話")
-    def test_skips_a_file_that_is_not_executable(self):
-        plain = self.place("a", mode=0o644)
-        self.assertEqual(platformtag.path_executable(plain), "")
-
-    def test_is_empty_when_path_is_empty(self):
-        self.assertEqual(platformtag.path_executable(""), "")
-
-    def test_skips_a_link_to_the_launcher_and_takes_the_next_entry(self):
-        """sh（ccnavi_launcher_path）と同じ規則。自分に戻るファイルは飛ばして次の項目へ進む。"""
-        launcher = os.path.join(self.dir, "scripts", platformtag.LAUNCHER_NAME)
-        write(launcher, "#!/bin/sh\n")
-        linked = os.path.join(self.dir, "linked")
-        os.makedirs(linked)
-        try:
-            os.symlink(launcher, os.path.join(linked, "ccnavi"))
-        except (OSError, NotImplementedError):
-            self.skipTest("シンボリックリンクを作れない")
-        real = self.place("real")
-        raw = linked + os.pathsep + real
-        self.assertEqual(
-            platformtag.path_executable(raw, skip=launcher), os.path.join(real, "ccnavi")
-        )
-        self.assertEqual(platformtag.path_executable(raw), os.path.join(linked, "ccnavi"))
-
-
-class LaunchedExecutableTest(unittest.TestCase):
-    """探す順。`scripts/ccnavi-launcher.sh` から `../bin/<os>-<arch>/` を、sh と同じ順で探す。"""
-
-    def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="ccnavi-launched-")
-        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
-        self.launcher = os.path.join(self.dir, "scripts", platformtag.LAUNCHER_NAME)
-        write(self.launcher, "#!/bin/sh\n")
-
-    def test_prefers_its_own_build_over_a_translated_one(self):
-        write(os.path.join(self.dir, "bin", "darwin-x86_64", "ccnavi"), "x86\n")
-        write(os.path.join(self.dir, "bin", "darwin-arm64", "ccnavi"), "arm\n")
-        found = platformtag.launched_executable(self.launcher, "darwin-arm64")
-        self.assertEqual(found, os.path.join(self.dir, "bin", "darwin-arm64", "ccnavi"))
-
-    def test_finds_the_exe_spelling(self):
-        write(os.path.join(self.dir, "bin", "windows-x86_64", "ccnavi.exe"), "MZ\n")
-        found = platformtag.launched_executable(self.launcher, "windows-arm64")
-        self.assertEqual(found, os.path.join(self.dir, "bin", "windows-x86_64", "ccnavi.exe"))
-
-    def test_is_empty_when_no_build_runs_here(self):
-        write(os.path.join(self.dir, "bin", "linux-x86_64", "ccnavi"), "elf\n")
-        self.assertEqual(platformtag.launched_executable(self.launcher, "darwin-arm64"), "")
-
-
-class LaunchedFromScriptsTest(unittest.TestCase):
-    """L5: 名前が `ccnavi-launcher.sh` なら `../bin/` を探す。それ以外は探さない。
-
-    切り替えの条件は名前だけ（3.3 節）。`binary_clause` と同じ条件で、どちらかだけ
-    条件を足すと、守る場所とバックアップする場所が食い違う。
-    """
-
-    def setUp(self):
-        self.dir = tempfile.mkdtemp(prefix="ccnavi-launched-scripts-")
-        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
-        self.scripts = os.path.join(self.dir, ".ccnavi", "scripts")
-        self.bin = os.path.join(self.dir, ".ccnavi", "bin")
-
-    def launcher_name(self):
-        """`platformtag.LAUNCHER_NAME`。無ければこのテストを失敗させる。"""
-        name = getattr(platformtag, "LAUNCHER_NAME", None)
-        if name is None:
-            self.fail("platformtag.LAUNCHER_NAME が無い")
-        return name
-
-    def test_the_launcher_name_is_the_one_placed_in_scripts(self):
-        self.assertEqual(self.launcher_name(), "ccnavi-launcher.sh")
-
-    def test_launcher_named_as_such_looks_in_the_bin_next_to_its_directory(self):
-        launcher = os.path.join(self.scripts, self.launcher_name())
-        write(launcher, "#!/bin/sh\n")
-        write(os.path.join(self.bin, "linux-x86_64", "ccnavi"), "elf\n")
-        found = platformtag.launched_executable(launcher, "linux-x86_64")
-        self.assertEqual(
-            os.path.normpath(found), os.path.join(self.bin, "linux-x86_64", "ccnavi"), found
-        )
-
-    def test_launcher_named_as_such_falls_back_in_the_same_order_as_the_sh(self):
-        launcher = os.path.join(self.scripts, self.launcher_name())
-        write(launcher, "#!/bin/sh\n")
-        write(os.path.join(self.bin, "windows-x86_64", "ccnavi.exe"), "MZ\n")
-        found = platformtag.launched_executable(launcher, "windows-arm64")
-        self.assertEqual(
-            os.path.normpath(found), os.path.join(self.bin, "windows-x86_64", "ccnavi.exe"), found
-        )
-
-    def test_launcher_named_as_such_does_not_look_next_to_itself(self):
-        """L3 と揃える。sh が起動しない置き場を、バックアップする場所として返さない。"""
-        launcher = os.path.join(self.scripts, self.launcher_name())
-        write(launcher, "#!/bin/sh\n")
-        write(os.path.join(self.scripts, "linux-x86_64", "ccnavi"), "elf\n")
-        self.assertEqual(platformtag.launched_executable(launcher, "linux-x86_64"), "")
-
-    def test_other_names_are_the_executable_itself(self):
-        """名前が違えば実行ファイルそのもの。`../bin/` も隣も探さない。"""
-        self.launcher_name()
-        launcher = os.path.join(self.scripts, "ccnavi")
-        write(launcher, "#!/bin/sh\n")
-        write(os.path.join(self.bin, "linux-x86_64", "ccnavi"), "bin\n")
-        write(os.path.join(self.scripts, "linux-x86_64", "ccnavi"), "next\n")
-        self.assertEqual(platformtag.launched_executable(launcher, "linux-x86_64"), "")
 
 
 @unittest.skipIf(os.name == "nt", "偽の uname と sh の実行ファイルを PATH で差し替える")
@@ -243,14 +91,14 @@ class LauncherTest(unittest.TestCase):
 
     # L1
 
-    def test_starts_the_build_for_this_machine_in_the_same_words_as_platformtag(self):
-        """偽の uname を使わない。sh の語と platformtag の語が揃っていることを見る。"""
-        self.build(platformtag.host_target())
+    def test_starts_the_build_for_this_machine_in_the_same_words_as_the_executable(self):
+        """偽の uname を使わない。sh の語と実行ファイル（platformtag）の語が揃っていることを見る。"""
+        self.build(host_target())
         self.build("haiku-riscv64")
         result = self.run_launcher(fake=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(
-            result.stdout.startswith("bin/" + platformtag.host_target() + "/"), result.stdout
+            result.stdout.startswith("bin/" + host_target() + "/"), result.stdout
         )
 
     def test_passes_arguments_and_the_payload_through(self):

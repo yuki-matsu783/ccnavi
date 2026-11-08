@@ -1,8 +1,8 @@
 /**
- * 実機の試験。Pyodide が MV3 の CSP で動くかと、PAT の期限の応答ヘッダを拡張の fetch で読めるかも見る。試験用の通信先（127.0.0.1）で組んだ拡張（dist-e2e/）を
+ * 実機の試験。同梱の ccnavi（WASM）が MV3 の CSP で動くかと、PAT の期限の応答ヘッダを拡張の fetch で読めるかも見る。試験用の通信先（127.0.0.1）で組んだ拡張（dist-e2e/）を
  * Chromium（headless=new）に読み込み、模擬の GitHub を相手に次を確かめる。
  *
- * - 拡張のページの Web Worker で Pyodide が MV3 の CSP（'wasm-unsafe-eval' だけ）の下で起動し、ccnavi を import できる
+ * - 拡張のページの Web Worker で ccnavi の WASM が MV3 の CSP（'wasm-unsafe-eval' だけ）の下で起動する
  * - 設定画面で PAT とリポジトリを登録し、ボードが描ける
  * - 悪意のある Markdown を描いても、承認しても何も動かない
  * - ボードから承認を書く（`createCommitOnBranch` の 1 コミット）
@@ -28,7 +28,7 @@ import { loadScene } from "../helpers/host-fixture.js";
 import { loadGitLabScene } from "../helpers/gitlab-fixture.js";
 import { LOGIN, MockGitHub, TOKEN } from "../helpers/mock-github.js";
 import { MockGitLab } from "../helpers/mock-gitlab.js";
-import { HERE } from "../helpers/python.js";
+import { HERE } from "../helpers/ccnavi.js";
 
 const DIST = path.join(HERE, "dist-e2e");
 const PORT = 18787;
@@ -102,7 +102,7 @@ test("CX-T071 設定画面で PAT とリポジトリを登録する。PAT は画
   await page.close();
 });
 
-test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待ちを描く。開いただけでは何も書かない", async () => {
+test("CX-T072 ボード: Worker の ccnavi（WASM）が CSP の下で起き、承認待ちを描く。開いただけでは何も書かない", async () => {
   const page = await ctx.newPage();
   watch(page);
   const t0 = Date.now();
@@ -112,15 +112,14 @@ test("CX-T072 ボード: Worker の Pyodide が CSP の下で起き、承認待�
   assert.equal(await page.getAttribute("body", "data-state"), "done", (await page.textContent("#status")) ?? "");
   const status = page.locator("#status");
   const boot = Number(await status.getAttribute("data-boot-ms"));
-  const imp = Number(await status.getAttribute("data-import-ms"));
   assert.equal(await status.getAttribute("data-violations"), "0");
-  console.log(`# Pyodide 起動 ${boot} ms・ccnavi の読み込み ${imp} ms・ボードが描けるまで ${took} ms`);
+  console.log(`# ccnavi（WASM）起動 ${boot} ms・ボードが描けるまで ${took} ms`);
 
   assert.match((await page.textContent("[data-testid=integration]")) ?? "", /^統合先: main（ホストのデフォルトブランチ）/);
   const families = await page.locator("[data-family]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.family));
   assert.deepEqual(families, ["i0001", "i0002"]);
   assert.equal(await page.locator('[data-family="i0001"] [data-ticket="i0001"].entry').count(), 1);
-  assert.match((await page.textContent('[data-family="i0001"] .rejected')) ?? "", /先行 i0003-01-01 が閉じていない/);
+  assert.match((await page.textContent('[data-family="i0001"] .rejected')) ?? "", /先行 i0003-01-01 が完了していない/);
   assert.match((await page.textContent('[data-family="i0001"] .closure')) ?? "", /i0003/);
   // 見た目を目で確かめるとき: CCNAVI_E2E_SHOT=<png のパス>
   if (process.env.CCNAVI_E2E_SHOT) await page.screenshot({ path: process.env.CCNAVI_E2E_SHOT, fullPage: true });
@@ -214,7 +213,7 @@ test("CX-T078 PAT の期限: service worker が応答ヘッダ（CORS に公開�
   const page = await openBoard();
   const banner = page.locator('#banner [data-level="soon"]');
   assert.equal(await banner.count(), 1);
-  assert.match((await banner.textContent()) ?? "", /あと 3 日で切れる/);
+  assert.match((await banner.textContent()) ?? "", /あと 3 日で切れます/);
   const [sw] = ctx.serviceWorkers();
   const badge = await sw.evaluate(() => (globalThis as unknown as { chrome: { action: { getBadgeText(d: object): Promise<string> } } }).chrome.action.getBadgeText({}));
   assert.equal(badge, "3d");
@@ -256,7 +255,10 @@ test("CX-T138 レビュー済み: スレッドの悪意のある本文を描い�
   await page.waitForTimeout(300);
   assert.equal(await page.evaluate(() => (window as unknown as { __pwned?: string }).__pwned ?? null), null);
   assert.match((await box.locator(".problems").textContent()) ?? "", /未解決のスレッドが 8 件残っている/);
-  assert.equal(await box.locator("button").count(), 0);
+  // 未解決が残るので「レビュー済みにする」は出さず、残った指摘の対応方針を決める画面への入口だけを出す
+  assert.equal(await box.locator("button[data-action=review]").count(), 0);
+  assert.equal(await box.locator("button").count(), 1);
+  assert.equal(await box.locator("button[data-action=decide-open]").count(), 1);
   await page.close();
 
   mock.attachScene("i0004", loadScene("resolved"));
@@ -332,7 +334,7 @@ test("CX-T160 「始める」: ボードで issue を読み、押すと issue �
   await page.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await page.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="12"]`);
   const said = await press(page, `${GL_REPO} [data-testid=start] li[data-issue="12"] button[data-action=start]`);
-  assert.match(said, /^written: 親のブランチ feature-12-新しい機能 を作った/);
+  assert.match(said, /^written: 親ブランチ feature-12-新しい機能 と Draft のマージリクエスト !\d+ を作成しました/);
   assert.deepEqual(lab.createdBranches, [{ name: "feature-12-新しい機能", sha: lab.head("main") }]);
   await page.close();
   const again = await openBoard();

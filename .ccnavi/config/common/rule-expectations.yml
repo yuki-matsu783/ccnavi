@@ -11,7 +11,7 @@
 # 試験では ask として出る。deny にヒットしてほしくないが allow にも無いものは、
 # ask に置いて「ヒットしないこと」を期待にする。
 #
-# subject は Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / Write /
+# subject は Bash / PowerShell ならコマンド、Read / Grep / Glob / Edit / MultiEdit / Write /
 # NotebookEdit ならパス、Skill ならスキル名、Agent なら見出し、WebFetch なら URL。
 # パスは絶対で書く。
 # 判定は行き着く先まで解いてから適用するので、相対で書くと走らせた場所で
@@ -27,11 +27,14 @@ deny:
   - tool: NotebookEdit
     subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/c.ipynb"
     why: ノートブックの編集も同じ（session-scratchpad）
+  - tool: MultiEdit
+    subject: "/tmp/claude-0/-repo/0a1b2c/scratchpad/d.md"
+    why: 何か所もまとめて直す MultiEdit も同じ（session-scratchpad）
   - tool: Write
     subject: "/repo/README.md"
     why: ユーザのチェックアウトでは編集しない。作業はワークツリーの中で
   - tool: Edit
-    subject: "/repo/src/ccnavi/cli.py"
+    subject: "/repo/go/cmd/ccnavi/main.go"
     why: 同上。ソースもユーザのチェックアウトでは触らない
   - tool: Write
     subject: "/repo/.gitignore"
@@ -161,7 +164,7 @@ deny:
     why: >-
       値を持たない見本の .env も止める。認証情報は組み込みの builtin:credentials（常に効く土台。
       設定で切れないので、見本の誤検知が出ても外せない）が、.env の後ろに続く名前ごと止める。
-      match は Bash|Read|Write|Edit|NotebookEdit
+      match は Bash|Read と書き込むツール（Write|Edit|MultiEdit|NotebookEdit）
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/.env.example"
     why: >-
@@ -172,6 +175,9 @@ deny:
   - tool: NotebookEdit
     subject: "/repo/.claude/worktrees/x/.env.local"
     why: NotebookEdit でも .env は止める（builtin:credentials）
+  - tool: MultiEdit
+    subject: "/repo/.claude/worktrees/x/.env.local"
+    why: MultiEdit でも .env は止める（builtin:credentials）
   - tool: Bash
     subject: "cat /repo/.env; cat /repo/.env.example"
     why: >-
@@ -420,7 +426,7 @@ ask:
     subject: "uv run python -m unittest discover -s tests -t ."
     why: 検査コマンド。どのルールも言及しない
   - tool: Bash
-    subject: "uv run python -m ccnavi --rules /repo/.ccnavi/config/common/rules.yml --test Bash ls"
+    subject: "sh /repo/.ccnavi/scripts/ccnavi-launcher.sh --rules /repo/.ccnavi/config/common/rules.yml --test Bash ls"
     why: ルールを確かめる手そのもの。ルールファイルの名前が引数に出ても deny にはヒットしない
   - tool: Bash
     subject: "cp /repo/.ccnavi/config/common/rules.yml /tmp/backup.yml"
@@ -436,7 +442,7 @@ ask:
     why: 設定の Read も止めない。止めると何が効いているか分からなくなる
   - tool: Read
     subject: "/repo/.ccnavi/config/common/phases.yml"
-    why: builtin:guard-ccnavi-config は Write / Edit / NotebookEdit だけ。読むのは止めない
+    why: builtin:guard-ccnavi-config は Write / Edit / MultiEdit / NotebookEdit だけ。読むのは止めない
   - tool: Bash
     subject: 'echo "$HOME" "$L"'
     why: 変数が引数にあるだけで、コマンド名の位置ではない。どのルールにもヒットせず権限モードへ渡る
@@ -451,6 +457,9 @@ allow:
   - tool: Write
     subject: "/repo/.claude/worktrees/x/src/a.py"
     why: ワークツリーの中のコード。worktrees と process-skill-first-edit がヒットし、工程スキルを Skill で呼ぶ一言が最初の 1 度だけ添えられる
+  - tool: MultiEdit
+    subject: "/repo/.claude/worktrees/x/src/b.py"
+    why: MultiEdit でもワークツリーの中のコードは通す（worktrees）
   - tool: Write
     subject: "/repo/.claude/worktrees/x/wip/proposals/todo/p.md"
     why: 提案は process-skill-first-edit の except。Once を先に消費しない
@@ -478,7 +487,7 @@ allow:
     subject: "sh /repo/.ccnavi/scripts/ccnavi-git.sh integrate --abort foo"
     why: 通す。取りやめには報告の指示を添えない
   - tool: Bash
-    subject: "grep -n TODO src/ccnavi/cli.py"
+    subject: "grep -n TODO go/cmd/ccnavi/main.go"
     why: 読むだけ。prefer-read-grep が適用して通す
   - tool: Bash
     subject: "CAT /etc/hosts"
@@ -513,7 +522,7 @@ allow:
     subject: "# git push origin main"
     why: コメントだけの行は何も走らない
   - tool: Write
-    subject: "/repo/.claude/worktrees/x/src/ccnavi/cli.py"
+    subject: "/repo/.claude/worktrees/x/go/cmd/ccnavi/main.go"
     why: ワークツリーの中のソース。ユーザのチェックアウトの側は deny
   - tool: Write
     subject: "/repo/.claude/worktrees/x/tests/test_glob.py"

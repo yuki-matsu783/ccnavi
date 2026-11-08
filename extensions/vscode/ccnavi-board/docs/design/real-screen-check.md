@@ -28,7 +28,8 @@ VS Code本体の配布元、GitHubのリリース、Open VSXは403で、`code`�
 |---|---|---|
 | Node.js 22.13.1以上とnpm | 拡張の組み立て、code-server | `node -v` |
 | pnpm 10 | 拡張の組み立て | `pnpm -v`（壊れていたら詰まりどころの表） |
-| uvとPython 3.12以上 | ccnaviの組み立て、チケットの見本を作る | `uv --version` |
+| Go（`go/go.mod`の版以上） | ccnaviの組み立て | `go version` |
+| uvとPython 3.12以上 | チケットの見本を作る | `uv --version` |
 | PlaywrightのChromium | 撮影 | Playwrightのブラウザの置き場（環境変数`PLAYWRIGHT_BROWSERS_PATH`。無ければLinuxは`~/.cache/ms-playwright`、macOSは`~/Library/Caches/ms-playwright`、Windowsは`%LOCALAPPDATA%\ms-playwright`）の`chromium*`。クラウドのコンテナでは`/opt/pw-browsers/`のこともある |
 | git | 検証用コピーのワークツリー | `git --version` |
 
@@ -73,7 +74,7 @@ mkdir -p "$W/shots"
 ### 1.1 ccnaviを組み立てる
 
 ```sh
-cd "$CCNAVI" && uv run --with pyinstaller python build.py
+cd "$CCNAVI" && sh scripts/ccnavi-build.sh
 ```
 
 約10秒で終わる。`dist/ccnavi/`ができ、ccnavi自身の`.ccnavi/bin/<os>-<arch>/`にもコピーされる（どちらもgit管理外）。`ccnavi-setup.sh`は、`dist/`を配布元にする。
@@ -81,7 +82,7 @@ cd "$CCNAVI" && uv run --with pyinstaller python build.py
 最新のmainを、検証用の別クローンで組み立てることもできる。ccnaviのワークツリーや`.ccnavi/bin/`、`dist/`を変えずに済む。
 
 - mainのtrackedファイルを、別のディレクトリ（`ccnavi-src`など）へコピーする（コピーの方法は未確認）
-- そのコピーで、`extensions/vscode/ccnavi-board`の`sh scripts/package.sh`（vsix）と、コピーのルートの`uv run --with pyinstaller python build.py`（実行ファイル）を打つ。成果物はコピーの`dist/`に出る。検証用リポジトリへは、そのコピーの`scripts/ccnavi-setup.sh`で入れる
+- そのコピーで、`extensions/vscode/ccnavi-board`の`sh scripts/package.sh`（vsix）と、コピーのルートの`sh scripts/ccnavi-build.sh`（実行ファイル）を打つ。成果物はコピーの`dist/`に出る。検証用リポジトリへは、そのコピーの`scripts/ccnavi-setup.sh`で入れる
 - 以降の`$CCNAVI`・`$BOARD`は、そのコピーを指す
 
 ### 1.2検証用コピーを作ってsetupで反映する
@@ -430,7 +431,7 @@ cd "$BOARD" && grep -rn "<画面の文言の一部>" src docs | head
 ```
 
 文言は`src/core/*.ts`（拡張ホストが組む文）、`src/webview/**/text.ts`・`*.tsx`（画面）、`src/webview/tours/*.yml`（案内）にある。
-ccnavi本体が返す文言（エラーの文、判定の結果）は`$CCNAVI/src/ccnavi/`にある。文言の出どころが拡張か実行ファイルかで、直す場所が変わる。
+ccnavi本体が返す文言（エラーの文、判定の結果）は`$CCNAVI/.ccnavi/messages/`と`$CCNAVI/go/`にある。文言の出どころが拡張か実行ファイルかで、直す場所が変わる。
 指摘には、画像の名前、画面と操作、ソースの場所（`ファイル:行`）、日本語の読み手がどこで迷うかを書く。
 
 ## 5. 今回確認できなかったこと（次回の宿題）

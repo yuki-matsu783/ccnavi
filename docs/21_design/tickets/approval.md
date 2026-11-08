@@ -37,7 +37,7 @@ keywords: [承認, user agree, ターミナル, todo, 親, 子]
 
 承認画面に出るのは、件数、各提案の識別子とタイトル（親 / 親 X、フェーズ N: フェーズ定義名）、親なら
 「このチケットで編集可能な範囲」、子なら「この子チケットで編集可能な範囲」とフェーズ定義の範囲の上限
-（範囲は `allow:` などの見出しの下に 1 行 1 項目の箇条書きで出る。実装は `agree_screen._bullets`）、新規の子なら親の
+（範囲は `allow:` などの見出しの下に 1 行 1 項目の箇条書きで出る。実装は `agree.bullets`）、新規の子なら親の
 `issue:`、子の人間レビュー
 要否と先行、親の全体計画とフィードバック計画、理由、ワークツリーと提案のパス、判定に効かない記述の
 warn、チケットで編集対象としているが書き込めない場所（下）。計画を持つ親なら、親に固定するフェーズ定義を 3 つに分けて出す
@@ -111,7 +111,7 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 承認の可否は、承認の直前に最新の状態から計算し直す（外れた提案があれば承認しない）。
 
 - ダイジェストは、識別子の順に「識別子と提案ファイルの SHA-256」を並べ、件数を頭に付けて、その全体の SHA-256 を取る
-  （`agree_digest.proposals_digest`）。`--agree --preview --json` が `digest` として出す
+  （`agree.ProposalsDigest`）。`--agree --preview --json` が `digest` として出す
 - ボードは `--yes` に `--digest <値>` を付け、実行ファイルが承認の直前に取り直したものと比べる。違えば何も置かず
   `mismatch` と `digest: {expected, current}` を返して 1 で終わる。`--digest` が無いときも 1。値の大文字小文字の違いは無視する
 - ターミナルの `user agree` は、y の入力のあとに最新の状態から取り直して比べる。Chrome 拡張は、親のブランチの先頭が動いたら
@@ -247,16 +247,16 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 
 **承認を頼む前の確認は `--preview` に相乗りする。** `--agree --preview --verify [<識別子>...]` は、
 置かずに「いま `user agree` を打てば、その提案が承認の対象に入るか」を終了コードで返す（REQ-APV-13）。
-0 が「はい」、`modes.EXIT_ANSWER_NO`（3）が「いいえ」、1 は使い方か設定の誤り。判定は承認と同じ
+0 が「はい」、`config.ExitAnswerNo`（3）が「いいえ」、1 は使い方か設定の誤り。判定は承認と同じ
 `gather`・`candidates` が持ち、`user agree` が外さないもの（範囲の超過と、読めない提案）では外さない。
 走査は絞る前の全ツリーを見るので、他のセッションの書きかけ 1 本で「いいえ」になることがある。承認で外れる
 ものは `--lint` も名指しする。新規の提案に雛形の空欄の目印が残っているのも、外れる条件の 1 つ
 （改版は warn で外さない。親の必須の見出しの欠けも warn。提案の書式 9.3）。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
-`rules.KIND_NOT_YET`）は `--lint` では warn。
+`rules.KindNotYet`）は `--lint` では warn。
 
-エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親の状態（`lifecycle.treegate` の `APPROVAL_REQUEST`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.approve.readiness` の 1 か所にあり、本番の `approval-request` の gate（`approval_request_gate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。`approval-request` の本体も、sh がロック・取り込みをする前に、同じ検査（`--check`）を先に通して断る。
+エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `gather` に加えて、親の状態（`lifecycle/treegate` の `APPROVAL_REQUEST`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.approve.readiness` の 1 か所にあり、本番の `approval-request` の gate（`approval_request_gate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。`approval-request` の本体も、sh がロック・取り込みをする前に、同じ検査（`--check`）を先に通して断る。
 
-提案を `todo/` に書いた回に、この確認（`approval-request --check`）を勧める文を 1 度だけ渡す（REQ-APV-14、`ticket_guard.propose_notice`）。
+提案を `todo/` に書いた回に、この確認（`approval-request --check`）を勧める文を 1 度だけ渡す（REQ-APV-14、`guard.ProposeNotice`）。
 判定には足さず、ルールの文と同じ `PreToolUse` の `additionalContext` の経路で渡す。
 
 `CCNAVI_MODE=dry-run` の間も、承認の経路はゲートなので止まり、エージェントは `--yes` を打てない。承認の経路だけを
@@ -264,7 +264,7 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 
 **承認したことは、拡張が渡す文と `status` で伝わる。** hook は承認を伝えない。
 
-- ボードの承認は、`user agree --yes` の `prompt`（`agree_screen.approved_text`）を拡張が通知からユーザに渡し、ユーザが進行中の
+- ボードの承認は、`user agree --yes` の `prompt`（`agree.ApprovedText`）を拡張が通知からユーザに渡し、ユーザが進行中の
   セッションに貼るか、新しいセッションを開く
 - ターミナル・GitLab や GitHub の画面・Chrome 拡張の承認では、ユーザがそのあとセッションに一言送る。エージェントは、承認済みチケットの状態を
   確かめるとき（着手の前、引き継ぎを読んだあと、承認の有無に迷ったとき）に、ファイルを読んで推測せず

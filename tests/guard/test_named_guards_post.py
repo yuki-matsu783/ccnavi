@@ -22,8 +22,7 @@ import shutil
 import tempfile
 import unittest
 
-from ccnavi.infra import settings
-from tests import ROOT
+from tests import ROOT, script_command
 from tests.guard.test_post import DOING, STARTED, TICKET, git, write
 from tests.inproc import run_ccnavi
 
@@ -155,7 +154,7 @@ class Fixture(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         environment.pop("CLAUDE_PROJECT_DIR", None)
-        environment[settings.TICKET_CONTROL_ENV] = tickets
+        environment["CCNAVI_TICKET_CONTROL"] = tickets
         return run_ccnavi(
             [
                 "--root",
@@ -409,25 +408,6 @@ class UnreadableRulesPostTest(Fixture):
             self.assertEqual(read(self.path("ws", rel)), initial(rel), "復元される")
 
 
-class SessionRejectsTest(Fixture):
-    """ticket の範囲の退けは、組み込みの保護（ルールファイルに無い）も数える。"""
-
-    def denied(self, rel):
-        from ccnavi.tickets.notice import session_rejects
-
-        conf, _ = settings.load(self.root)
-        target = session_rejects.tree.Tree("w", self.trees["worktree"], "", "worktree")
-        rule_set = session_rejects._rule_set(conf, self.root, target)
-        rule = session_rejects._denied_by(rule_set, self.path("worktree", rel))
-        return rule.id if rule else None
-
-    def test_builtin_protections_are_counted(self):
-        self.assertEqual(self.denied(".claude/hooks/guard.sh"), HOOKS)
-        self.assertEqual(self.denied(".ccnavi/config/common/rules.yml"), CONFIG)
-        self.assertEqual(self.denied(DOING), APPROVED)
-        self.assertIsNone(self.denied("src/app.py"))
-
-
 class ApprovedPostTest(Fixture):
     """承認済みの置き場は、チケット制御の保護。自己防衛の値には依らない。"""
 
@@ -529,7 +509,7 @@ class ApprovedPostTest(Fixture):
         self.baseline()
         self.widen("ws")
         result = self.run_hook(command="python build.py")
-        ticket = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket = script_command(self.root, "ccnavi-ticket.sh")
         for text in (
             f"{ticket} status",
             f"{ticket} finish",

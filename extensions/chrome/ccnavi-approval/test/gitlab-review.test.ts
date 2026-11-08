@@ -1,5 +1,5 @@
 /**
- * GitLab 対応のレビューで直したもの。模擬の GitHub・GitLab と Node の上の Pyodide で回す。
+ * GitLab 対応のレビューで直したもの。模擬の GitHub・GitLab と Node の上の WASM で回す。
  *
  * - 応答が返らなかった書き込みの受け直し（PROBE-2・3）: 自分のコミットを「書いた中身と親の組」で見分けたときだけ受け直す。
  *   見分けられなければユーザの対応に切り替える
@@ -21,7 +21,7 @@ import { JSDOM } from "jsdom";
 import * as gh from "../src/core/github.js";
 import * as gl from "../src/core/gitlab.js";
 import { dispatch, type Deps } from "../src/core/protocol.js";
-import type { PyCall } from "../src/core/py.js";
+import type { CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -32,11 +32,11 @@ import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats } from
 import { MockGitHub, TOKEN } from "./helpers/mock-github.js";
 import { COMPAT } from "./helpers/compat.js";
 import { MockGitLab } from "./helpers/mock-gitlab.js";
-import { pyodidePy } from "./helpers/python.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
 
-let py: PyCall;
+let ccnavi: CcnaviCall;
 before(async () => {
-  py = (await pyodidePy()).call;
+  ccnavi = (await wasmCcnavi()).call;
 });
 
 const GH_REPO: RepoConfig = { ...GITLAB_REPO, host: "github.com" };
@@ -55,7 +55,7 @@ function glDeps(mock: MockGitHub, host = "gitlab.com", now: () => Date = () => n
   const d = { ...deps(mock, TOKENS, new Map(), () => new Date(NOW), [GITLAB_REPO, GH_REPO]), sleep: noWait };
   return {
     call: hostCall(d, stats, host),
-    py,
+    ccnavi,
     cache: memoryCache(),
     now,
     stats,

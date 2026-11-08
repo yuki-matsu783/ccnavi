@@ -12,9 +12,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.tickets.phase import manual_settle
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -302,45 +300,6 @@ class GitRolesInChildTreeTest(HookCase):
             with self.subTest(sub=sub):
                 decision, text = self.bash(f"sh .ccnavi/scripts/ccnavi-git.sh {sub}", agent="a1")
                 self.assertEqual(decision, "deny", text)
-
-
-class PreToolUseReadsNoHistoryTest(HookCase):
-    """PreToolUse は git の履歴を読まない。手動移動の判定を例外にしても判定は返る。"""
-
-    def test_pre_tool_use_never_calls_the_manual_settle_assessment(self):
-        calls = []
-
-        def boom(*args, **kwargs):
-            calls.append(args)
-            raise RuntimeError("履歴を読んではいけない")
-
-        with (
-            mock.patch.object(manual_settle, "assess", side_effect=boom),
-            mock.patch.object(manual_settle, "_shared", side_effect=boom),
-        ):
-            decision, _ = self.bash("rm -rf /tmp/some-dir")
-            self.assertEqual(decision, "deny")
-            decision, _ = self.bash("git status")
-            self.assertEqual(decision, "deny")
-            decision, text = self.hook(
-                "Write",
-                {"file_path": os.path.join(self.root, ".ccnavi/approved/done/i0001-01-01.md")},
-            )
-            self.assertEqual(decision, "deny", text)
-            decision, text = self.hook("Write", {"file_path": os.path.join(self.root, "notes.md")})
-            self.assertNotEqual(decision, "deny", text)
-            decision, text = self.bash("ls")
-            self.assertNotEqual(decision, "deny", text)
-        self.assertEqual(calls, [])
-
-    def test_the_pre_tool_use_modules_do_not_reach_the_history_readers(self):
-        """上の mock は親の依頼済みフェーズが無いと空振りしうる。参照そのものも固定する。"""
-        for name in ("judge.py", "failsafe.py"):
-            with open(os.path.join(ROOT, "src", "ccnavi", "hook", name), encoding="utf-8") as f:
-                text = f.read()
-            for reader in ("manual_settle", "ops_stop_request"):
-                with self.subTest(module=name, reader=reader):
-                    self.assertNotIn(reader, text)
 
 
 class DryRunGeneralConfigTest(HookCase):

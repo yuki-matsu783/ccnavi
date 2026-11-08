@@ -1,9 +1,7 @@
-"""`python -m ccnavi` の入口のスモークテスト。ここだけは実際のプロセスを起こす。
+"""実行ファイルの入口のスモークテスト。
 
-他のテストは tests/inproc.py で cli.run を同じプロセスの中で呼ぶ。速いが、
-パッケージとして起動できること、標準入出力が UTF-8 に切り替わること、
-終了コードがプロセスの終了コードになることは、プロセスを起こさないと分からない。
-その 3 つをここで 1 回ずつ見る。
+標準入出力が UTF-8 で通ること、終了コードがプロセスの終了コードになることを、
+tests/inproc.py を通さずに素の環境で 1 回ずつ見る。
 """
 
 from __future__ import annotations
@@ -11,10 +9,9 @@ from __future__ import annotations
 import json
 import os
 import subprocess
-import sys
 import unittest
 
-from tests import ROOT, SRC, fixture_workspace
+from tests import ROOT, exe, fixture_workspace
 
 
 def spawn(*args, payload=""):
@@ -25,13 +22,8 @@ def spawn(*args, payload=""):
     # コアファイルのバックアップと復元は切る。リポジトリ自身をワークスペースルートにして動くので、
     # 切らないと、ワークツリーで消した設定ファイルが `logs/state` のバックアップから書き戻される。
     environment["CCNAVI_GUARD_CORE_FILES"] = "disable"
-    # コンソールのコードページに関係なく UTF-8 で通ることを見たいので、
-    # 親から Python の入出力の指定は渡さない。
-    environment.pop("PYTHONIOENCODING", None)
-    environment.pop("PYTHONUTF8", None)
-    environment["PYTHONPATH"] = SRC
     return subprocess.run(
-        [sys.executable, "-m", "ccnavi", "--root", fixture_workspace(), *args],
+        [exe.path(), "--root", fixture_workspace(), *args],
         input=payload.encode("utf-8"),
         capture_output=True,
         cwd=ROOT,
@@ -79,6 +71,33 @@ class EntryTest(unittest.TestCase):
 
         self.assertNotEqual(done.returncode, 0)
         self.assertIn("hook", done.stderr.decode("utf-8", "replace"))
+
+    @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
+    def test_a_terminal_gets_the_usage_without_waiting_for_a_payload(self):
+        """引数なしでターミナルから打つと、payload を待たずに使い方を出して 1 で終える。"""
+        import pty
+
+        master, slave = pty.openpty()
+        try:
+            proc = subprocess.Popen(
+                [exe.path(), "--root", fixture_workspace()],
+                stdin=slave,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=ROOT,
+                env={k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            )
+            os.close(slave)
+            try:
+                _, err = proc.communicate(timeout=20)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.communicate()
+                self.fail("ターミナルの入力を待ち続けた")
+        finally:
+            os.close(master)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("hook", err.decode("utf-8", "replace"))
 
 
 if __name__ == "__main__":

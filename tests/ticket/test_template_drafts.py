@@ -14,14 +14,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import textwrap
+import types
 import unittest
 
-from ccnavi.infra import settings
-from ccnavi.policy.rules import SEVERITY_ERROR, SEVERITY_WARN
-from ccnavi.tickets.proposal import plan_templates
 from tests import ROOT, common_path, requires_symlink
 from tests.inproc import run_ccnavi
 from tests.ticket.test_phases import PhaseHarness
@@ -44,6 +43,30 @@ FLOW_IMPL = textwrap.dedent(
 )
 
 DENY = "DENY_TICKET_APPROVAL_CLI"
+# 一般化を待つ欄に下書きが付ける印。
+TODO_MARK = "TODO"
+GUARD_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
+
+
+def digest(raw: bytes) -> str:
+    """テンプレートのファイルの中身のハッシュ（保存の `--expect` と同じ）。"""
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _items(raw_items):
+    """テンプレートの計画のステップ（`--check-file` の `data` の形）を type・after・deferred に。"""
+    out = []
+    for item in raw_items or []:
+        if isinstance(item, str):
+            item = {"type": item}
+        out.append(
+            types.SimpleNamespace(
+                type=item["type"],
+                after=list(item.get("after", [])),
+                deferred=bool(item.get("deferred", False)),
+            )
+        )
+    return out
 
 
 class Drafts(PhaseHarness):
@@ -56,7 +79,6 @@ class Drafts(PhaseHarness):
         super().setUp()
         # 共通のフェーズ定義。取り込み先が共通のとき、この定義で検査される。
         write(common_path(self.root, "phases"), PHASES)
-        self.conf, _ = settings.load(self.root)
 
     def tpl(self, *args, guard=None):
         """`--templates` と `--lint` を動かす。
@@ -72,7 +94,7 @@ class Drafts(PhaseHarness):
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
         if guard is not None:
-            env[settings.GUARD_TICKET_APPROVAL_ENV] = guard
+            env[GUARD_ENV] = guard
         return run_ccnavi(["--root", self.root, *args], env=env, cwd=ROOT)
 
     # ---- 完了した親
@@ -118,21 +140,36 @@ class Drafts(PhaseHarness):
         with open(self.draft_path(name), "rb") as f:
             return f.read()
 
-    def drafted(self, name="i0001") -> plan_templates.Template:
-        template, notes = plan_templates.parse_template(self.read_draft(name), name)
-        self.assertIsNotNone(template, notes)
-        return template
+    def checked(self, name="i0001"):
+        """下書きを `--templates --check-file` で読んだ答え。"""
+        result = self.tpl("--templates", "--check-file", self.draft_path(name), "--json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        answer = json.loads(result.stdout)
+        self.assertTrue(answer["valid"], answer)
+        return answer
+
+    def drafted(self, name="i0001"):
+        """下書きの中身（名前・説明・計画・フロー）。"""
+        data = self.checked(name)["data"]
+        return types.SimpleNamespace(
+            name=data["name"],
+            description=data.get("description", ""),
+            when=data.get("when", ""),
+            plan=_items(data.get("plan")),
+            feedback=_items(data.get("feedback")),
+            flows={int(k): v for k, v in (data.get("flows") or {}).items()},
+        )
 
     def generalize(self, name="i0001", description="機能を設計から実装まで進める"):
         """下書きの TODO を直す（エージェントが一般化したあとの形）。"""
         text = self.read_draft(name).decode("utf-8")
-        fixed = text.replace(f"{plan_templates.TODO_MARK} 一般化する: 親", description).replace(
-            f"{plan_templates.TODO_MARK} 一般化する: 「親」と同じ形の作業をするとき",
+        fixed = text.replace(f"{TODO_MARK} 一般化する: 親", description).replace(
+            f"{TODO_MARK} 一般化する: 「親」と同じ形の作業をするとき",
             "新しい機能を足すとき",
         )
-        self.assertNotIn(plan_templates.TODO_MARK, fixed)
+        self.assertNotIn(TODO_MARK, fixed)
         write(self.draft_path(name), fixed)
-        return plan_templates.digest(fixed.encode("utf-8"))
+        return digest(fixed.encode("utf-8"))
 
     # ---- 取り込み（ほかの保護対象と同じ `user handoff`）
 
@@ -144,7 +181,7 @@ class Drafts(PhaseHarness):
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
-        env[settings.GUARD_TICKET_APPROVAL_ENV] = guard
+        env[GUARD_ENV] = guard
         shown = run_ccnavi(["--root", tree, "user", "handoff", rel, "--json"], env=env, cwd=ROOT)
         self.assertEqual(shown.returncode, 0, shown.stdout + shown.stderr)
         expect = json.loads(shown.stdout)["expect"]
@@ -167,10 +204,6 @@ def target_rel(name="i0001", to="project", layer=""):
     if layer:
         return f"projects/{layer}/.ccnavi/config/project/templates/{name}.yml"
     return f".ccnavi/config/project/templates/{name}.yml"
-
-
-def plan_templates_dir(conf, root):
-    return settings.common_templates_dir(conf, root)
 
 
 def slurp(path: str) -> bytes:
@@ -198,8 +231,6 @@ class MakeTest(Drafts):
         self.assertEqual(template.name, "i0001")
         self.assertEqual([i.type for i in template.plan], ["research", "design", "implement"])
         self.assertEqual([i.after for i in template.plan], [[], [1], [2]])
-        # 書いたものを読み直しても、書き戻しても変わらない。
-        self.assertEqual(plan_templates.dump(template).encode(), self.read_draft())
         self.assertEqual(list(template.flows), [3])
         self.assertEqual(template.flows[3]["name"], "実装の手順")
 
@@ -219,13 +250,12 @@ class MakeTest(Drafts):
         template = self.drafted()
         self.assertEqual([i.after for i in template.plan], [[], [], [1, 2]])
         self.assertEqual([i.after for i in template.feedback], [[], [1]])
-        # 親の絶対番号に付け直すと元に戻る（検査が合成する提案の形）。
-        parent = plan_templates._composed(template, {})
-        self.assertIn("- 4", parent)
-        # 順序の検査（終端・範囲）に error が無い。
-        types, _ = plan_templates.phasetypes.common_types(self.conf)
-        found = plan_templates.check(template, types, None)
-        self.assertEqual([p for p in found if p.severity == SEVERITY_ERROR], [])
+        # 親の絶対番号に付け直すと元に戻る（検査が合成する提案の形）。順序の検査に error が無い。
+        checked = self.checked()
+        feedback = next(p for p in checked["plans"] if p["part"] == "feedback")
+        self.assertEqual([i["number"] for i in feedback["items"]], [4, 5])
+        self.assertEqual(feedback["after"], {"5": [4]})
+        self.assertEqual([p for p in checked["problems"] if p["severity"] == "error"], [])
 
     def test_review_is_kept(self):
         plan = [{"type": "design", "deferred": True}, "implement"]
@@ -269,13 +299,13 @@ class MakeTest(Drafts):
         self.done_parent(["design"])
         result = self.draft()
         template = self.drafted()
-        self.assertTrue(template.description.startswith(plan_templates.TODO_MARK))
+        self.assertTrue(template.description.startswith(TODO_MARK))
         self.assertIn("親", template.description)
-        self.assertTrue(template.when.startswith(plan_templates.TODO_MARK))
+        self.assertTrue(template.when.startswith(TODO_MARK))
         self.assertIn("親", template.when)
         self.assertIn("warn", result.stdout)
-        self.assertIn(f"`description` に {plan_templates.TODO_MARK} が残っている", result.stdout)
-        self.assertIn(f"`when` に {plan_templates.TODO_MARK} が残っている", result.stdout)
+        self.assertIn(f"`description` に {TODO_MARK} が残っている", result.stdout)
+        self.assertIn(f"`when` に {TODO_MARK} が残っている", result.stdout)
         # 次の手に、未追跡の下書きが ready を止めることを言う。
         self.assertIn("未追跡", result.stdout)
         self.assertIn("ready が止まる", result.stdout)
@@ -372,7 +402,7 @@ class MakeTest(Drafts):
         self.assertEqual(answer["path"], "wip/handoff/.ccnavi/config/project/templates/i0001.yml")
         self.assertEqual(answer["target"], ".ccnavi/config/project/templates/i0001.yml")
         self.assertEqual(answer["layer"], "self")
-        self.assertEqual(answer["sha"], plan_templates.digest(self.read_draft()))
+        self.assertEqual(answer["sha"], digest(self.read_draft()))
         self.assertEqual(answer["tree"], "i0001")
 
     def test_to_common_puts_the_draft_at_the_common_place(self):
@@ -436,7 +466,7 @@ class MakeTest(Drafts):
         self.assertEqual(taken.returncode, 0, taken.stdout + taken.stderr)
         placed = os.path.join(self.parent_tree, *target_rel().split("/"))
         with open(placed, "rb") as f:
-            self.assertEqual(plan_templates.digest(f.read()), sha)
+            self.assertEqual(digest(f.read()), sha)
         self.assertFalse(os.path.exists(self.draft_path()))
 
 
@@ -491,7 +521,7 @@ class EffectTest(Drafts):
         (row,) = self.answer()["drafts"]
         self.assertFalse(row["valid"])
         self.assertFalse(row["importable"])
-        self.assertEqual(row["problems"][0]["severity"], SEVERITY_ERROR)
+        self.assertEqual(row["problems"][0]["severity"], "error")
 
     def test_lint_never_makes_a_draft_an_error(self):
         write(self.draft_path("broken"), "name: [\n")
@@ -504,10 +534,10 @@ class EffectTest(Drafts):
         ]
         self.assertTrue(found)
         self.assertEqual({p["severity"] for p in found} - {"warn", "info"}, set())
-        self.assertIn(SEVERITY_WARN, {p["severity"] for p in found})
+        self.assertIn("warn", {p["severity"] for p in found})
         details = " ".join(p["detail"] for p in found)
         self.assertIn("wip/handoff/.ccnavi/config/project/templates/broken.yml", details)
-        self.assertIn(plan_templates.TODO_MARK, details)
+        self.assertIn(TODO_MARK, details)
         # ほかの苦情（効力のある側）には混ざらない。
         others = [p for p in json.loads(result.stdout)["problems"] if "templates" in p["where"]]
         self.assertEqual([p for p in others if p["where"] != "(template-drafts)"], [])
@@ -547,25 +577,6 @@ class EffectTest(Drafts):
 
 def plan_template(name, plan, description="試し"):
     return f"name: {name}\ndescription: {description}\nplan:\n{plan}"
-
-
-class CheckTest(Drafts):
-    def test_the_check_reports_each_kind_of_hidden_character_as_an_error(self):
-        self.done_parent(["design"])
-        self.assertEqual(self.draft().returncode, 0)
-        for char in ("\u202e", "\u200b", "\u200d", "\u2060", "\ufeff", "\u2028", "\u2029", "\x1b"):
-            with self.subTest(char=repr(char)):
-                text = self.read_draft().decode()
-                template, _ = plan_templates.parse_template(text.encode(), "i0001")
-                template.description += char
-                found = plan_templates.check(template, None, None)
-                self.assertTrue(
-                    any(
-                        p.severity == SEVERITY_ERROR
-                        and "制御文字・書式文字が含まれている" in p.detail
-                        for p in found
-                    )
-                )
 
 
 class UserOnlyTest(Drafts):

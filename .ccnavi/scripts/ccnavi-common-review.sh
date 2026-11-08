@@ -61,7 +61,7 @@ review_place() {
 	exe_cwd="$here"
 }
 
-# ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+# ---- 実行ファイル。
 
 # 見つからなければ 1（止めるかどうかは呼ぶ側が決める。merged は実行ファイルを起こさないので、無くても進める）。
 review_exe() {
@@ -72,15 +72,11 @@ review_exe() {
 		return 0
 	fi
 	bin=""
-	if [ -f "$root/src/ccnavi/__main__.py" ]; then
-		ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$exe_cwd" "$@"); }
-		return 0
-	fi
 	return 1
 }
 
 review_no_bin() {
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 }
 
 # 居るブランチ・親の識別子・親のワークツリーの中か（branch・family・review_in_tree）を決める。

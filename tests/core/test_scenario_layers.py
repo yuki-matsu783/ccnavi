@@ -1,8 +1,8 @@
 """tests/scenarios/ の import の向きを、テストで守る。
 
 段の表は `runner.py` の docstring に 1 か所だけある。ここはその表を読んで、
-各モジュールの import が同じ段か下の段だけを向くことを確かめる（`tests/core/test_module_layers.py`
-の、`src/ccnavi/` に対する検査と同じ考え）。表を直すのは runner.py の docstring。
+各モジュールの import が同じ段か下の段だけを向くことを確かめる（`go/internal/layers_test.go`
+の、Go のパッケージに対する検査と同じ考え）。表を直すのは runner.py の docstring。
 
 見るのは 4 つ。
 
@@ -23,7 +23,8 @@ from pathlib import Path
 
 DIR = Path(__file__).parents[1] / "scenarios"
 PREFIX = "tests.scenarios"
-# runner を import すると、グループをまたぐ import になる（tests/core/test_layout.py）。ファイルから読む。
+# runner を import すると、グループをまたぐ import になる（tests/core/test_layout.py）。
+# ファイルから読む。
 RUNNER = DIR / "runner.py"
 
 

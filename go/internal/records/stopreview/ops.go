@@ -1,0 +1,553 @@
+package stopreview
+
+import (
+	"slices"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/pyjson"
+)
+
+// approval-request の操作実績。実行前（PreToolUse）に呼び出しを登録する（Register）。
+// ccnavi-ticket.sh が出口でどの経路を通っても書く結果ファイルを、実行後に tool_use_id・識別子・時刻の範囲で結び付ける（Bind）。
+// 標準出力の識別行は、出力が切られると消えるので頼らない。
+// バックグラウンドの実行などで結べなかったものは、Stop で結び直し（Rebind）、それでも結べなければ未連携にする。
+
+// Route は approval-request の経路。
+type Route string
+
+const (
+	RouteSent         Route = "sent"          // 送った
+	routeUnchanged    Route = "unchanged"     // 変更なし
+	routeWriteOnly    Route = "write_only"    // 書くだけ（origin なし）
+	routeStopped      Route = "stopped"       // 止めた
+	routeFailedBefore Route = "failed_before" // 送る前に失敗（親の状態で拒否した回を含む）
+	routeFailedAfter  Route = "failed_after"  // push 後の後処理で失敗
+	// RouteUnsent は todo/ へ書いたまま送っていない提案（操作実績ではなく、書いた記録から決める）。
+	RouteUnsent Route = "unsent"
+)
+
+var routes = []Route{RouteSent, routeUnchanged, routeWriteOnly, routeStopped, routeFailedBefore, routeFailedAfter}
+
+// effective は提案の最終の有効版になる経路。変更なしは、前に送った版がそのまま有効のままになる。
+func (r Route) effective() bool { return r == RouteSent || r == routeUnchanged }
+
+const (
+	unlinked = "unlinked"
+	// slack は時計の粗さ（sh は秒単位）と実行の前後の隙間。
+	slack = 2 * time.Second
+	// unlinkAfter は結び直しても見つからないまま、未連携にするまでの長さ。
+	unlinkAfter = 30 * time.Second
+	// turnFloorSlack はターンの操作実績を、ターンの開始より前から数える幅（sh の時刻は秒単位）。
+	turnFloorSlack = time.Second
+	// refsKept は issue・MR の指定を、新しく足す前に残す数。
+	refsKept = 19
+
+	approvalVerb   = "approval-request"
+	checkFlag      = "--check"
+	reasonFlag     = "--reason"
+	proposalPrefix = "proposal:"
+	versionLength  = 12
+)
+
+var shells = []string{"sh", "bash", "zsh", "dash", "ksh"}
+
+var wrappers = []string{"env", "nohup", "time", "timeout", "sudo", "uv", "run", "nice", "command", "exec", "stdbuf"}
+
+// File は送った版に含まれたファイル。SHA は書いた記録から作った未送信の版では空。
+type File struct {
+	sha  string
+	Path string
+}
+
+// Op は approval-request の 1 回の操作実績。
+type Op struct {
+	Ident     string
+	Route     Route
+	Commit    string
+	Files     []File
+	ToolUseID string
+	started   time.Time
+	ended     time.Time
+}
+
+// fold はパスを比べるキー。区切りは "/" にそろえ、大文字小文字は区別しない。
+func fold(path string) string {
+	return ospath.Slashed(pathcase.Fold(path))
+}
+
+// runs はスクリプトの前に並ぶ語が、実行の前置き（シェル・VAR=値・env・timeout・オプション・数）だけか。
+func runs(before []string) bool {
+	for _, word := range before {
+		name := ospath.Basename(fold(word))
+		// 前置きとして許すのは、シェル・実行の包み役・オプション・数（`timeout 30` の 30 など）・`VAR=値`。
+		// これ以外の語が先にあれば、スクリプトは引数の中に出ているだけで実行されない。
+		switch {
+		case slices.Contains(shells, name), slices.Contains(wrappers, name), strings.HasPrefix(word, "-"),
+			pyfmt.IsDigit(strings.TrimLeft(word, "-")):
+			continue
+		}
+		if head, _, ok := strings.Cut(word, "="); ok && !strings.Contains(head, "/") {
+			continue
+		}
+		if pyfmt.IsDigit(strings.Replace(word, ".", "", 1)) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// ProposeIdent はコマンドの語から、実行される `ccnavi-ticket.sh approval-request <識別子>` の識別子を取る。
+// 無ければ空。識別子は `--` と `--reason <値>` を読み飛ばした最初の語（sh の ticket_id と同じ読み方）。
+// `--check` は確かめるだけで提案を送らないので、操作実績に載せない。
+func ProposeIdent(words []string) string {
+	for at, word := range words {
+		if ospath.Basename(fold(word)) != config.TicketWrapper || !runs(words[:at]) {
+			continue // `echo …` や `grep …` の引数の中は数えない
+		}
+		rest := words[at+1:]
+		if len(rest) == 0 || rest[0] != approvalVerb {
+			continue
+		}
+		if slices.Contains(rest[1:], checkFlag) {
+			return ""
+		}
+		// 識別子は、オプションと `--reason` の値を読み飛ばした最初の語。
+		skip := false
+		for _, arg := range rest[1:] {
+			switch {
+			case skip:
+				skip = false
+			case arg == reasonFlag:
+				skip = true
+			case strings.HasPrefix(arg, "-") && len(arg) > 1:
+			default:
+				return arg
+			}
+		}
+		return ""
+	}
+	return ""
+}
+
+// call は 1 つの Bash に approval-request が複数あっても、それぞれ別の呼び出しとして扱うためのキー。
+func call(toolUseID, ident string) string { return toolUseID + "~" + pathcase.Fold(ident) }
+
+func prePath(state, toolUseID, ident string) string {
+	return fsio.RecordPath(state, PrePrefix, call(toolUseID, ident), fsio.JSONExt)
+}
+
+func opPath(state, toolUseID, ident string) string {
+	return fsio.RecordPath(state, OpPrefix, call(toolUseID, ident), fsio.JSONExt)
+}
+
+// StartTurn は通知でない発言のとき、ターンの開始時刻を書く。
+func StartTurn(state, session string, now time.Time) {
+	if state != "" && session != "" {
+		fsio.WriteJSON(sessionFile(state, TurnStartPrefix, session), pyjson.NewObject("t", fsio.UnixSeconds(now)))
+	}
+}
+
+// TurnStart はターンの開始時刻。無ければ UNIX 秒の 0（セッションの最初から数える）。
+func TurnStart(state, session string) time.Time {
+	if state == "" || session == "" {
+		return time.Unix(0, 0)
+	}
+	return moment(readObject(sessionFile(state, TurnStartPrefix, session)).Value("t"), time.Unix(0, 0))
+}
+
+// Register は実行前に、approval-request の呼び出しを登録する。
+func Register(state, session, toolUseID, ident string, now time.Time) {
+	if state == "" || session == "" || toolUseID == "" || ident == "" {
+		return
+	}
+	fsio.WriteJSON(prePath(state, toolUseID, ident), pyjson.NewObject(
+		"tool_use_id", toolUseID, "session", session, "ident", ident, "t0", fsio.UnixSeconds(now), "bound", ""))
+}
+
+// readResult は結果ファイル（key=value の行）を読む。読めない・経路が分からない・識別子が無ければ nil。
+func readResult(path string) *pyjson.Object {
+	text, ok := fsio.ReadText(path, fsio.Replace)
+	if !ok {
+		return nil
+	}
+	// 行は `key=値`。`file=<sha> <パス>` は何行あってもよく、files に並べる。ほかのキーは後勝ち。
+	result := pyjson.NewObject("files", nil)
+	files := []any{}
+	for _, line := range ospath.Splitlines(text) {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		if key == "file" {
+			if sha, name, _ := strings.Cut(value, " "); sha != "" && name != "" {
+				files = append(files, pyjson.NewObject("sha", sha, "path", name))
+			}
+			continue
+		}
+		result.Set(key, value)
+	}
+	result.Set("files", files)
+	if !slices.Contains(routes, Route(result.String("route"))) || result.String("id") == "" {
+		return nil
+	}
+	// 時刻と終了コードは文字列で書かれているので、数に直す（読めなければ 0）。
+	for _, key := range []string{"started", "ended", "rc"} {
+		value := 0.0
+		if text, ok := result.Value(key).(string); ok {
+			if parsed, err := pyfmt.ParseFloat(text); err == nil {
+				value = parsed
+			}
+		}
+		result.Set(key, value)
+	}
+	result.Set("file", path)
+	return result
+}
+
+func results(state string) []*pyjson.Object {
+	dir := ospath.Join(state, ResultDir)
+	var out []*pyjson.Object
+	for _, name := range names(dir) {
+		if strings.HasSuffix(name, resultSuffix) {
+			if r := readResult(ospath.Join(dir, name)); r != nil {
+				out = append(out, r)
+			}
+		}
+	}
+	return out
+}
+
+func boundFiles(state string) map[string]bool {
+	bound := map[string]bool{}
+	for _, op := range records(state, OpPrefix) {
+		if f := op.String("file"); f != "" {
+			bound[f] = true
+		}
+	}
+	return bound
+}
+
+// Bind は実行後に、結果ファイルを tool_use_id の呼び出しへ結び付ける。最後に結べた操作を返す。
+// 1 つの Bash に approval-request が複数あれば、登録は識別子ごとにあり、それぞれ結ぶ。
+func Bind(state, toolUseID string, now time.Time) (Op, bool) {
+	var last Op
+	found := false
+	if state == "" || toolUseID == "" {
+		return last, false
+	}
+	for _, pre := range records(state, PrePrefix) {
+		if pre.Value("tool_use_id") != toolUseID {
+			continue
+		}
+		if op, ok := bindOne(state, pre, now); ok {
+			last, found = op, true
+		}
+	}
+	return last, found
+}
+
+// bindOne は 1 件の登録に結果ファイルを結ぶ。識別子が合い、開始が登録の時刻より後で、終了が今より前
+// （どちらも slack を許す）、まだどの呼び出しにも結ばれていないもののうち、終了の最も新しいもの。
+func bindOne(state string, pre *pyjson.Object, now time.Time) (Op, bool) {
+	if pyfmt.Truthy(pre.Value("bound")) {
+		return Op{}, false
+	}
+	// 範囲 [登録の時刻 - slack, 今 + slack] に収まる結果だけを候補にする。
+	// 同じ識別子の結果が複数あっても、別の呼び出しに結んだものは使わない。
+	taken := boundFiles(state)
+	lower, upper := moment(pre.Value("t0"), epoch).Add(-slack), now.Add(slack)
+	var best *pyjson.Object
+	for _, r := range results(state) {
+		if r.Value("id") != pre.Value("ident") || taken[r.String("file")] ||
+			moment(r.Value("started"), epoch).Before(lower) || moment(r.Value("ended"), epoch).After(upper) {
+			continue
+		}
+		if best == nil || moment(r.Value("ended"), epoch).After(moment(best.Value("ended"), epoch)) {
+			best = r
+		}
+	}
+	if best == nil {
+		return Op{}, false
+	}
+	toolUseID, ident := pre.String("tool_use_id"), pre.String("ident")
+	op := best.With("tool_use_id", toolUseID, "session", pre.Value("session"), "ident", ident)
+	if fsio.WriteJSON(opPath(state, toolUseID, ident), op) != "" {
+		return Op{}, false // pre を bound にすると、結べなかった op を結び直せなくなる
+	}
+	pre.Set("bound", best.String("file"))
+	fsio.WriteJSON(prePath(state, toolUseID, ident), pre)
+	return parseOp(op), true
+}
+
+// Rebind は結び付いていない登録を、時刻の範囲で結び直す。見つからないまま古くなったものは未連携にする。
+func Rebind(state, session string, now time.Time) {
+	for _, name := range names(state) {
+		if !strings.HasPrefix(name, PrePrefix) || !strings.HasSuffix(name, fsio.JSONExt) {
+			continue
+		}
+		path := ospath.Join(state, name)
+		pre := readObject(path)
+		if pre.Len() == 0 || pre.Value("session") != session || pyfmt.Truthy(pre.Value("bound")) {
+			continue
+		}
+		if _, ok := bindOne(state, pre, now); ok {
+			continue
+		}
+		if now.Sub(moment(pre.Value("t0"), epoch)) > unlinkAfter {
+			pre.Set("bound", unlinked)
+			fsio.WriteJSON(path, pre)
+		}
+	}
+}
+
+func parseOp(obj *pyjson.Object) Op {
+	return Op{
+		Ident:     obj.String("ident"),
+		Route:     Route(obj.String("route")),
+		Commit:    obj.String("commit"),
+		Files:     parseFiles(obj.Value("files")),
+		ToolUseID: obj.String("tool_use_id"),
+		started:   moment(obj.Value("started"), epoch),
+		ended:     moment(obj.Value("ended"), epoch),
+	}
+}
+
+func parseFiles(v any) []File {
+	items, _ := v.([]any)
+	var out []File
+	for _, item := range items {
+		if x, ok := item.(*pyjson.Object); ok {
+			out = append(out, File{sha: x.String("sha"), Path: pyfmt.Str(orEmpty(x.Value("path")))})
+		}
+	}
+	return out
+}
+
+func orEmpty(v any) any {
+	if v == nil {
+		return ""
+	}
+	return v
+}
+
+func filesList(files []File) []any {
+	out := make([]any, 0, len(files))
+	for _, f := range files {
+		if f.sha != "" {
+			out = append(out, pyjson.NewObject("sha", f.sha, "path", f.Path))
+		} else {
+			out = append(out, pyjson.NewObject("path", f.Path))
+		}
+	}
+	return out
+}
+
+// TurnOps はこのターン（since 以降に始まった呼び出し）の操作実績。終了の古い順。
+func TurnOps(state, session string, since time.Time) []Op {
+	floor := since.Add(-turnFloorSlack)
+	var ops []Op
+	for _, obj := range records(state, OpPrefix) {
+		if obj.Value("session") == session && !moment(obj.Value("started"), epoch).Before(floor) {
+			ops = append(ops, parseOp(obj))
+		}
+	}
+	slices.SortStableFunc(ops, func(a, b Op) int {
+		if c := a.ended.Compare(b.ended); c != 0 {
+			return c
+		}
+		return strings.Compare(a.ToolUseID, b.ToolUseID)
+	})
+	return ops
+}
+
+// FinalVersions は提案ごとの最終の有効版を、識別子が最初に出た順に返す。有効なのは送った版で、変更なしは
+// 直前の有効版のままなので版を動かさない。有効な版が 1 つも無い提案は、最後の操作（送れなかった理由）を返す。
+func FinalVersions(ops []Op) []Op {
+	var order []string
+	latest := map[string]Op{}
+	for _, op := range ops {
+		prev, seen := latest[op.Ident]
+		// 変更なしは、前に送った版がそのまま有効なので版を動かさない。
+		if op.Route == routeUnchanged && seen && prev.Route.effective() {
+			continue
+		}
+		if op.Route.effective() || !seen || !prev.Route.effective() {
+			if !seen {
+				order = append(order, op.Ident)
+			}
+			latest[op.Ident] = op
+		}
+	}
+	out := make([]Op, 0, len(order))
+	for _, ident := range order {
+		out = append(out, latest[ident])
+	}
+	return out
+}
+
+// TargetKey は判定の対象キー。識別子と版（送った先頭、無ければ経路）から決める。
+func TargetKey(op Op) string {
+	version := op.Commit
+	if version == "" {
+		version = string(op.Route)
+	}
+	version, _ = clip(version, versionLength)
+	return proposalPrefix + op.Ident + ":" + version
+}
+
+// ---- 未送信の提案
+
+// Write は提案を todo/ へ書いた（Write・Edit）記録。
+type Write struct {
+	Ident string
+	Path  string
+	at    time.Time
+}
+
+// todoMarker は提案の置き場の下の todo/ を、"/" で区切ったパスの中で探す印。
+const todoMarker = "/" + config.TodoDir + "/"
+
+// WrittenIdent は書き込んだパスが `<提案の置き場>/todo/<識別子>.md` なら識別子、違えば空。
+// 大文字小文字は区別しない。置き場は設定の相対パス（既定 wip/proposals）。
+func WrittenIdent(filePath, ticketsDir string) string {
+	// 比べるときは大文字小文字をそろえた形を使うが、返す識別子は元の綴りで切り出す。
+	// そろえると文字数が変わる字（İ など）があれば、元の位置とずれるので空を返す。
+	path := fold(filePath)
+	marker := "/" + strings.Trim(fold(ticketsDir), "/") + todoMarker
+	at := strings.LastIndex(path, marker)
+	original := []rune(strings.ReplaceAll(filePath, `\`, "/"))
+	if at < 0 || utf8.RuneCountInString(path) != len(original) {
+		return ""
+	}
+	start := utf8.RuneCountInString(path[:at]) + utf8.RuneCountInString(marker)
+	name := path[at+len(marker):]
+	if strings.Contains(name, "/") || !strings.HasSuffix(name, config.MdExt) || utf8.RuneCountInString(name) <= 3 {
+		return ""
+	}
+	return string(original[start : len(original)-3])
+}
+
+func writePath(state, session, ident string) string {
+	return fsio.RecordPath(state, WritePrefix, session, "-"+safe(pathcase.Fold(ident))+fsio.JSONExt)
+}
+
+// NoteWritten は提案を todo/ へ書いたことを、書いた時刻つきで残す。
+func NoteWritten(state, session, ident, path string, now time.Time) {
+	if state != "" && session != "" && ident != "" {
+		fsio.WriteJSON(writePath(state, session, ident), pyjson.NewObject(
+			"session", session, "ident", ident, "path", path, "t", fsio.UnixSeconds(now)))
+	}
+}
+
+// TurnWrites はこのターンに書いた提案。書いた時刻の古い順。
+func TurnWrites(state, session string, since time.Time) []Write {
+	var found []Write
+	for _, obj := range records(state, WritePrefix+safe(session)+"-") {
+		if at := moment(obj.Value("t"), epoch); !at.Before(since) {
+			found = append(found, Write{Ident: obj.String("ident"), Path: obj.String("path"), at: at})
+		}
+	}
+	slices.SortStableFunc(found, func(a, b Write) int {
+		if c := a.at.Compare(b.at); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Ident, b.Ident)
+	})
+	return found
+}
+
+// UnsentWrites は書いたのに、書いた後に送った操作が無い提案。送ったかは、送った操作の files に
+// `todo/<識別子>.md` があり、その終了が書いた時刻より後（slack を許す）かで決める。親の approval-request は
+// 子の提案も一緒に送るので、識別子では決めない。
+func UnsentWrites(writes []Write, ops []Op) []Write {
+	// 送った操作の files から、`todo/` 以降のパスごとに最後に送った時刻を集める。
+	sent := map[string]time.Time{}
+	for _, op := range ops {
+		if op.Route != RouteSent {
+			continue
+		}
+		for _, f := range op.Files {
+			tail := fold(f.Path)
+			if i := strings.LastIndex(tail, todoMarker); i >= 0 {
+				tail = tail[i+len(todoMarker):]
+			}
+			if prev, ok := sent[tail]; !ok || op.ended.After(prev) {
+				sent[tail] = later(op.ended, epoch)
+			}
+		}
+	}
+	var unsent []Write
+	for _, w := range writes {
+		at, ok := sent[fold(w.Ident+config.MdExt)]
+		if !ok {
+			at = epoch.Add(-time.Second) // 送った版が無いものは、必ず未送信になる古い時刻に置く
+		}
+		if at.Before(w.at.Add(-slack)) {
+			unsent = append(unsent, w)
+		}
+	}
+	return unsent
+}
+
+// epoch は記録に時刻が無いときの UNIX 秒の 0。
+var epoch = time.Unix(0, 0)
+
+func later(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
+}
+
+// UnsentKey は未送信の提案の対象キー。
+func UnsentKey(ident string) string { return proposalPrefix + ident + ":" + string(RouteUnsent) }
+
+// ---- issue・MR の指定
+
+// NoteRefs は依頼に issue・MR の指定があれば、ラベルを時刻つきで足す（セッションの間は残す）。
+func NoteRefs(state, session string, labels []string, now time.Time) {
+	if state == "" || session == "" || len(labels) == 0 {
+		return
+	}
+	path := sessionFile(state, RefsPrefix, session)
+	// 同じラベルは古い行を除いて末尾に付け直す。件数は refsKept までに絞る（セッションの間に増え続けない）。
+	row := readObject(path)
+	prior, _ := row.Value("refs").([]any)
+	var kept []any
+	for _, r := range prior {
+		obj, _ := r.(*pyjson.Object)
+		if label, ok := obj.Value("label").(string); ok && slices.Contains(labels, label) {
+			continue
+		}
+		kept = append(kept, r)
+	}
+	kept = kept[max(len(kept)-refsKept, 0):]
+	for _, label := range labels {
+		kept = append(kept, pyjson.NewObject("label", label, "t", fsio.UnixSeconds(now)))
+	}
+	fsio.WriteJSON(path, pyjson.NewObject("refs", kept))
+}
+
+// SessionRefs はこのセッションで指定された issue・MR のラベル（古い順）。
+func SessionRefs(state, session string) []string {
+	if state == "" || session == "" {
+		return nil
+	}
+	refs, _ := readObject(sessionFile(state, RefsPrefix, session)).Value("refs").([]any)
+	var out []string
+	for _, r := range refs {
+		obj, _ := r.(*pyjson.Object)
+		if label := obj.Value("label"); pyfmt.Truthy(label) {
+			out = append(out, pyfmt.Str(label))
+		}
+	}
+	return out
+}

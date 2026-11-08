@@ -1,7 +1,7 @@
 """受入テスト。すべて外から道具を動かす。
 
 標準入力に payload を 1 件渡し、読み返すのは標準出力・標準エラー・終了コードだけ。
-入口（`python -m ccnavi` と同じ引数と標準入力）より内側の関数を呼ばないので、
+入口（実行ファイルの引数と標準入力）より内側の関数を呼ばないので、
 中身が動いてもテストは真であり続ける。起動の仕方は tests/inproc.py を見る。
 """
 
@@ -11,7 +11,6 @@ import json
 import os
 import unittest
 
-from ccnavi.infra import shellread_scan
 from tests import ROOT, common_path, fixture_workspace
 from tests.inproc import run_ccnavi
 
@@ -437,9 +436,6 @@ class RecordTest(unittest.TestCase):
         # 出た判定なのかを記録が答えられない。
         self.assertIn("degraded", got[1], "生の文字列で下した判定に degraded が無い")
 
-    @unittest.skipUnless(
-        hasattr(shellread_scan, "REASON_AMBIGUOUS_SUBST"), "shellread-subst の実装待ち"
-    )
     def test_引用の中から切り出したコマンドにヒットしたことを記録する(self):
         # 書いた側が文字のつもりでいた場所にヒットした判定を、あとから数えられるように
         # （wip/design/shellread-subst.md 1.4）。

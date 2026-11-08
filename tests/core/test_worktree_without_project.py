@@ -1,10 +1,7 @@
 """元のプロジェクトが無いワークツリーを --lint と --explain が名指しすることの受入テスト。
 
-親チケット feature-207 のフェーズ 1（#210）。実装より先に書いてある。実装が入るまで失敗するのが
-正しい。失敗の仕方が「名指しが出ない」であって、組み立てやテストの誤りではないことだけを見ること。
-
 元のプロジェクトが無いワークツリーとは、`.claude/worktrees/<名前>/.git` が `gitdir:` の行を持つ
-ファイルで、`tree.owner_of` が元のプロジェクトを見つけられないもの。次の 2 つの形を試す。
+ファイルで、元のプロジェクトを見つけられないもの。次の 2 つの形を試す。
 
 - gitdir が指す先が無い（プロジェクトのディレクトリごと消した）
 - 先は在るが、そこの `gitdir` ファイルが戻ってこない（相互参照が成り立たない）
@@ -13,7 +10,8 @@
 
 - `--lint --json` の苦情（深刻度と文面）
 - `--explain` の節
-- `tree.tree_of` の結果（判定が変わらないこと）
+
+中のパスの判定と一覧の作り方は `go/internal/infra/tree` の go test が見る。
 """
 
 from __future__ import annotations
@@ -24,9 +22,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.infra import tree
 from tests import GIT_ENV, ROOT
 from tests.inproc import run_ccnavi
 
@@ -131,17 +127,6 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
             if name in p["where"] + p["detail"] and not p["where"].startswith("(direct/")
         ]
 
-    # ---- 前提（いまの判定。実装前から通る）
-
-    def test_前提_この2つは元のプロジェクトを見つけられない(self):
-        owners = [tree.main_tree(self.root), *tree.projects(self.projects)]
-
-        self.assertIsNone(tree.owner_of(self.gone_path, owners))
-        self.assertIsNone(tree.owner_of(self.broken_path, owners))
-        self.assertIsNotNone(
-            tree.owner_of(os.path.join(self.root, ".claude", "worktrees", NORMAL), owners)
-        )
-
     # ---- --lint
 
     def test_lint_先が無いワークツリーを名指しして_warnを1件出す(self):
@@ -214,40 +199,6 @@ class WorktreeWithoutProjectTest(unittest.TestCase):
         said = [p for p in problems["problems"] if "元のプロジェクトがありません" in p["detail"]]
         self.assertEqual(said, [])
         self.assertNotIn(HEADING, explained)
-
-    # ---- 判定は変わらない
-
-    def test_中のパスは従来どおりワークスペースルートとして判定される(self):
-        for path in (self.gone_path, self.broken_path):
-            with self.subTest(path=path):
-                inside = os.path.join(path, "src", "a.py")
-                found = tree.tree_of(self.root, inside, self.projects)
-
-                self.assertIsNotNone(found)
-                self.assertEqual(found.name, tree.MAIN)
-                self.assertEqual(found.kind, tree.KIND_MAIN)
-                self.assertNotIn(
-                    os.path.basename(path),
-                    [t.name for t in tree.worktrees(self.root, self.projects)],
-                )
-
-    def test_列挙と判定は_gitを起動しない(self):
-        # tree.worktrees の約束。名指しのために git を起こす実装にしない。
-        with (
-            mock.patch("subprocess.Popen", side_effect=AssertionError("git を起動した")),
-            mock.patch("subprocess.run", side_effect=AssertionError("git を起動した")),
-        ):
-            tree.worktrees(self.root, self.projects)
-            tree.tree_of(self.root, os.path.join(self.gone_path, "a"), self.projects)
-            tree.worktrees_without_project(self.root, self.projects)
-
-    def test_名指しの一覧は先の有無を区別し_ふつうのディレクトリを数えない(self):
-        found = {w.name: w for w in tree.worktrees_without_project(self.root, self.projects)}
-
-        self.assertEqual(set(found), {GONE, BROKEN})
-        self.assertFalse(found[GONE].gitdir_exists)
-        self.assertTrue(found[BROKEN].gitdir_exists)
-        self.assertEqual(found[GONE].gitdir, self.gone_gitdir)
 
 
 if __name__ == "__main__":

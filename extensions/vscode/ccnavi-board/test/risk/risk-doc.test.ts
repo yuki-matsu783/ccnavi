@@ -192,7 +192,7 @@ test("CB-T99 同じ元ノードを2回送れば書き戻さない。glob以外�
   assert.match(readRisk("- a\n").blocking[0], /最上位がマップ（キーと値の組の集まり）ではありません/);
 });
 
-test("CB-T100 PyYAMLが別の型に読む語は引用符で囲み、それ以外は裸のまま", () => {
+test("CB-T100 実行ファイルが別の型に読む語は引用符で囲み、それ以外は裸のまま", () => {
   const doc = readRisk(TEXT);
   const f = doc.model.form;
   const out = doc.apply({

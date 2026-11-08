@@ -27,9 +27,8 @@ import time
 import urllib.parse
 from datetime import datetime
 
-from ccnavi.infra import pathcase
-from ccnavi.records import diaglog
-from tests import fake_gitlab, host_stub
+from tests import diaglog, fake_gitlab, host_stub
+from tests.scenarios.common import fold
 
 HOSTS = ("bare", "fake-gitlab", "docker-gitlab", "real")
 DOCKER = "docker-gitlab"
@@ -184,7 +183,7 @@ def project_name(scenario_id, now=None, rand=None):
     接頭辞 `sc-<ID>-` で、残ったものを一覧して消せる。"""
     now = now or datetime.now()
     rand = rand or os.urandom(2).hex()
-    ident = re.sub(r"[^a-z0-9]+", "-", pathcase.fold(str(scenario_id))).strip("-")
+    ident = re.sub(r"[^a-z0-9]+", "-", fold(str(scenario_id))).strip("-")
     return f"sc-{ident}-{now:%Y%m%d%H%M%S}-{rand}"
 
 

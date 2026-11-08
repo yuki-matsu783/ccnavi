@@ -27,7 +27,7 @@ const HERE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = path.join(HERE, "dist-e2e");
 const PORTS = { github: 18787, gitlab: 18788 };
 const HOST_ID = { github: "github.com", gitlab: "gitlab.e2e" };
-/** 完了の待ち（Pyodide の起動を含む。e2e の待ちに合わせる） */
+/** 完了の待ち（ccnavi の WASM の起動を含む。e2e の待ちに合わせる） */
 const RENDER_TIMEOUT_MS = 120_000;
 const VIEWPORT_HEIGHT = 900;
 const OUTPUT_NAMES = ["board.png", "board.txt", "board.dom.json", "board.log"];

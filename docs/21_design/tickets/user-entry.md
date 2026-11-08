@@ -16,7 +16,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 
 #### 表が正本
 
-何がユーザ専用かは `src/ccnavi/tickets/model/user_only.py` の表だけが持つ。ほかの場所に手書きの一覧や正規表現を持たない。
+何がユーザ専用かは `go/internal/tickets/model/useronly` の表だけが持つ。ほかの場所に手書きの一覧や正規表現は置かない。
 
 | 表 | 持つもの |
 |---|---|
@@ -28,7 +28,7 @@ keywords: [ユーザ専用, user, 入口, 表, user_only, ccnavi-user, hook, 読
 | `VERBS` | `ccnavi user <操作>` の読み替え。操作の語、読み替えた先の内部のオプション、値を取るか |
 | `WRAPPER_OPTIONS` | sh と拡張が先に付ける値つきのオプション（`--root`・`--cwd`・`--record-writes`・`--record-tree`） |
 
-表から作られるもの: hook の正規表現とオプションの一覧（`phase_forms`）、実行ファイルの読み替えと断り（`rewrite`・`refused`）、
+表から作られるもの: hook の正規表現とオプションの一覧（`useronly`）、実行ファイルの読み替えと断り（`rewrite`・`refused`）、
 ターミナル要求のときの表示名（`terminal`）。操作を足すときは、この表の行を直す。
 
 実行ファイルを通さず sh が呼ぶだけの操作（`ticket start/finish/cancel/approval-request/consolidate/record-risk/prepare/requested/confirm/ready`、`review confirm`、
@@ -90,9 +90,9 @@ hook が止める。
 
 #### 実行ファイルの読み替えと断り
 
-`_run`（`entry/cli.py`）は argparse の前に `user_only.rewrite(argv)` を呼ぶ。`user <操作> …` なら、`VERBS` の行に従って内部の形に書き換える。
-値を取る操作（`reviewed`）で値が無い、または知らない操作のときは `UserEntryError` で、使い方を標準エラーに出して終了コード 2 で終わる。
-`user` で始まらない argv はそのまま通る。
+`entry/cli` の `run` は引数を読む前に `useronly.Rewrite` を呼ぶ。`user <操作> …` なら、表の行に従って内部の形に書き換える。
+値を取る操作（`reviewed`）で値が無い、または知らない操作のときは `useronly.EntryError` で、使い方を標準エラーに出して終了コード 2 で終わる。
+`user` で始まらない引数はそのまま通る。
 
 「`user` の入口から来た」という事実は argparse の結果（`args`）に入れず、`rewrite` が返す操作を別の変数（`entry`）で持つ。
 オプションで偽装できないようにするため、`args` には何も足さない。
@@ -110,14 +110,14 @@ hook の止めは表から作る。ユーザ専用の入口の止めは `DENY_TI
 
 | 種類 | 止める形 |
 |---|---|
-| `user` の入口 | 実行ファイルの呼び出しで、`WRAPPER_OPTIONS` を読み飛ばした後の最初の語が `user`（`user_entry_forms`）。`--` を挟んだ形も止める。変数・glob・コマンド置換で `user` になりうる語も止める（`hidden_user_entry`）。`prune` は別の deny（`prune_form`）が止める。実行ファイルの呼び出しとして読む表記は、名前（`ccnavi`・`ccnavi.exe`・実行ファイルのパス・`ccnavi-launcher.sh`）と、Python から走らせる形（`python[版]`・`py` に、`-u`・`-I`・`-OO`・`-3`・`-W x`・`-X utf8` などの選択肢を挟み、`-m ccnavi`・`-mccnavi`・`-m ccnavi.__main__`・`main.py` で入る。前に `uv run`・`poetry run`・`pipenv run` を置いてもよい） |
+| `user` の入口 | 実行ファイルの呼び出しで、`WRAPPER_OPTIONS` を読み飛ばした後の最初の語が `user`（`useronly` の `userEntryForms`）。`--` を挟んだ形も止める。変数・glob・コマンド置換で `user` になりうる語も止める（`hidden_user_entry`）。`prune` は別の deny（`prune_form`）が止める。実行ファイルの呼び出しとして読む表記は、名前（`ccnavi`・`ccnavi.exe`・実行ファイルのパス・`ccnavi-launcher.sh`）と、Python から走らせる形（`python[版]`・`py` に、`-u`・`-I`・`-OO`・`-3`・`-W x`・`-X utf8` などの選択肢を挟み、`-m ccnavi`・`-mccnavi`・`-m ccnavi.__main__`・`main.py` で入る。前に `uv run`・`poetry run`・`pipenv run` を置いてもよい） |
 | `ccnavi-user-*.sh` | コマンド行のどこに名前が出ても止める（`user_script_pattern`。`human_path_form`）。引数に依らない。表示・検索・閲覧の道具だけが並ぶ行は通す |
 | 直接打つ形 | 実行ファイルのオプション（`--agree`・`--reviewed`・`--close-early` など）を `user` の外で直に打つ形 |
 | 名前に依らない文字列検査 | ターミナルを求めない操作（`user agree`・`user reviewed`・`user handoff`・`user mirror` と `--yes` の組、`--choices` と `--digest` の組、`user` を伴わない単独の `--via board` / `--via=board`）と、ターミナル要求を切る形（`CCNAVI_GUARD_TICKET_APPROVAL`、`CCNAVI_` で始まる名前の途中に展開が混じる形（`env CCNAVI_GUARD_TICKET_${X}APPROVAL=disable`）、`--guard-ticket-approval`）。名前を変えたコピー・`python -c`・`awk` の `system()` でも止まる。暫定の止めとして、単独の語の `user` があるコマンド行で、`--` で始まる語に展開（`$`・バッククォート）が混じれば止める（`--y${X}es`・`--y$(echo es)`。入口の表記を読めない形のため。無関係の語の展開まで止める側に広がる） |
 | sh から呼ぶだけの操作 | `SUBS` の `ticket start/finish/…`・`review confirm/…`・`sync tidy`・`worktree retire/branch` を実行ファイルで直に打つ形 |
 
 エージェントが sh で打てるのは `ccnavi-ticket.sh`・`ccnavi-review.sh`・`ccnavi-git.sh`（`AGENT_SCRIPTS`）で、サブエージェントは
-さらに役割の表（`user_only.SUBAGENT_ROLES`）で決めた操作を打てない。実行ファイルを直に呼ぶ `SUBS` の状態操作も、`CCNAVI_GUARD_TICKET_APPROVAL` の値によらず打てない（REQ-TKT-10）。状態を持つ `ccnavi-ticket.sh` と `ccnavi-review.sh` は、読み取りの副命令だけ打てる。`ccnavi-git.sh` は push・worktree・integrate 系だけを止め、`ccnavi-start.sh`・`ccnavi-sync.sh`・`ccnavi-worktree.sh`・`ccnavi-clean.sh` は副命令に関わらず止める。`ccnavi user --help` も `user` の入口なので止まる。
+さらに役割の表（`useronly.subagentRoles`）で決めた操作を打てない。実行ファイルを直に呼ぶ `SUBS` の状態操作も、`CCNAVI_GUARD_TICKET_APPROVAL` の値によらず打てない（REQ-TKT-10）。状態を持つ `ccnavi-ticket.sh` と `ccnavi-review.sh` は、読み取りの副命令だけ打てる。`ccnavi-git.sh` は push・worktree・integrate 系だけを止め、`ccnavi-start.sh`・`ccnavi-sync.sh`・`ccnavi-worktree.sh`・`ccnavi-clean.sh` は副命令に関わらず止める。`ccnavi user --help` も `user` の入口なので止まる。
 
 hook は擬似ターミナルを作る実行役（`script`・`tmux`・`screen`・`expect`）越しの呼び出しを読めない。
 `--` で始まらない語（`$X` だけ）で `--yes` を組み立て、入口の名前も読めない形（名前を変えたコピー）は、文字列検査にヒットしない。
@@ -125,7 +125,7 @@ hook は擬似ターミナルを作る実行役（`script`・`tmux`・`screen`�
 #### ターミナル要求の位置づけ
 
 実行ファイルは、`ccnavi-user-agree.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`・`ccnavi-user-prune.sh` と、書くとき（`--yes`）の `ccnavi-user-handoff.sh` と `ccnavi-user-mirror.sh` で、標準入力がターミナルのときだけ動く。
-ターミナルを求めるときに標準エラーへ出す名前は、ユーザが打つ sh の名前で、`OPS` の `terminal`（`user_only.terminal`）が持つ。
+ターミナルを求めるときに標準エラーへ出す名前は、ユーザが打つ sh の名前で、`OPS` の `terminal`（`useronly.Terminal`）が持つ。
 
 ターミナルを求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、ターミナル要求は 2 段目ではない。
 擬似ターミナルを使えばターミナル要求は満たせる。

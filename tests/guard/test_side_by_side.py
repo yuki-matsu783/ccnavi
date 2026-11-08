@@ -18,7 +18,6 @@ import subprocess
 import tempfile
 import unittest
 
-from ccnavi.infra import directrec, tree
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
@@ -102,7 +101,7 @@ class SideBySideTest(unittest.TestCase):
     def record(self, side="yes", common=None, name=NAME, main=None):
         common = common or os.path.join(self.p, ".git")
         write(
-            os.path.join(self.p, ".git", directrec.DIRECT_DIR, name),
+            os.path.join(self.p, ".git", "ccnavi-direct", name),
             "\n".join(
                 [
                     "version 4",
@@ -154,32 +153,6 @@ class SideBySideTest(unittest.TestCase):
     def text(self, path):
         with open(path, encoding="utf-8") as f:
             return f.read()
-
-    # 記録の読み取り
-
-    def test_有効な記録を読む(self):
-        self.record()
-        main = tree.Tree("p", self.p, project="p", kind=tree.KIND_PROJECT)
-        found = directrec.records_of(self.ws, main)
-        self.assertEqual([r.name for r in found], [NAME])
-
-    def test_無効な記録は読まない(self):
-        main = tree.Tree("p", self.p, project="p", kind=tree.KIND_PROJECT)
-        self.record(side="no")
-        self.assertEqual(directrec.records_of(self.ws, main), [])
-        self.record(common=os.path.join(self.q, ".git"))
-        self.assertEqual(directrec.records_of(self.ws, main), [])
-        self.record(main=self.q)
-        self.assertEqual(directrec.records_of(self.ws, main), [])
-        self.record()
-        git(self.p, "worktree", "remove", "--force", self.wt)
-        self.assertEqual(directrec.records_of(self.ws, main), [])
-
-    def test_別のブランチを開いたワークツリーは無効(self):
-        self.record()
-        git(self.wt, "checkout", "--quiet", "-b", "other")
-        main = tree.Tree("p", self.p, project="p", kind=tree.KIND_PROJECT)
-        self.assertEqual(directrec.records_of(self.ws, main), [])
 
     # 実行後チェック
 

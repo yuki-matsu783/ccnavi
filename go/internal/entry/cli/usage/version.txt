@@ -1,0 +1,8 @@
+バージョンとビルド情報を確認するには、次のコマンドを実行してください。
+
+    ccnavi --version [--json]
+
+バージョン、ビルド元のコミット（ソースから実行した場合は "unknown"）、.ccnavi/scripts/
+のスクリプトとVS Code拡張機能との互換性確認に使用するバージョン情報を
+出力します。ペイロードも設定も読み込みません。--json の形式は
+docs/11_requirements/json-shapes.md（「版の JSON」）に記載しています。

@@ -7,11 +7,11 @@
    `after` は計画の中の添字から提案の絶対番号に付け直す
    （フィードバック計画は全体のステップ数を足す）。`phases:` のコピーが入り、
    `--lint` と承認の確認（`--agree --preview --verify`）、
-   承認の検査（`agree_candidates.plan_problems`）が error にならない
+   承認の検査が error にならない
 2. 往復: 完了した親から `--templates --draft` で作った下書きを `user handoff` で取り込み、
    `--template` で使うと、元の計画と同じ形・同じフローになる
 3. 子のフローの下書き: 全体計画の n 番目のステップの最初の子 `<親>-<NN>-01` の
-   `wip/proposals/flows/<子>.yml` に書く。`flow.load` で読める。効力が無いことを出力で言う
+   `wip/proposals/flows/<子>.yml` に書く。フローとして読める。効力が無いことを出力で言う
 4. 断る: 無い名前、使えない名前（error・読めない）、定義が phases.yml に無い、kind が
    置き場と合わない、`--plan` との併用、既にある提案・フロー下書き。断ったときは何も書かない
 5. 統合結果: 共通とレイヤーで衝突した名前は共通が引かれ、そのことを言う。`--layer` で選ぶ
@@ -20,14 +20,11 @@
 from __future__ import annotations
 
 import os
+import re
 import textwrap
 
-from ccnavi.infra import settings
-from ccnavi.tickets.config import phasetypes, workflow
-from ccnavi.tickets.flow import graph as flow
-from ccnavi.tickets.model import proposal_form
-from ccnavi.tickets.model import ticket as ticket_mod
-from ccnavi.tickets.proposal import agree_candidates, plan_templates
+import yaml
+
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_template_drafts import FLOW_IMPL, Drafts, target_rel
 from tests.ticket.test_ticket import git, write
@@ -61,6 +58,32 @@ plan:
 """
 
 
+# 雛形の空欄の目印（`（ここに…を書く）`）。
+PLACEHOLDER = re.compile(r"（ここに[^）\n]*を書く）")
+
+
+def raw_step(item):
+    """計画のステップを、書き方に依らない形（type・review・deferred・after）にする。"""
+    if isinstance(item, str):
+        item = {"type": item}
+    return {
+        "type": item["type"],
+        "review": item.get("review"),
+        "deferred": bool(item.get("deferred", False)),
+        "after": list(item.get("after", [])),
+    }
+
+
+def steps(front, key):
+    return [raw_step(i) for i in front.get(key) or []]
+
+
+def read_flow(path):
+    """フローの下書きの中身。"""
+    with open(path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
 def variant(name: str, *pairs: tuple[str, str]) -> str:
     """SMALL の名前を変え、文字列の置き換えを重ねた本文。"""
     text = SMALL.replace("name: small", f"name: {name}")
@@ -78,10 +101,8 @@ class Use(Drafts):
         self.todo = os.path.join(self.tree, "wip", "proposals", "todo", IDENT + ".md")
 
     def put(self, name, text, layer="common"):
-        if layer == "common":
-            directory = settings.common_templates_dir(self.conf, self.root)
-        else:
-            directory = settings.layer_templates_dir(self.conf, self.root)
+        where = "common" if layer == "common" else "project"
+        directory = os.path.join(self.root, ".ccnavi", "config", where, "templates")
         return write(os.path.join(directory, name + ".yml"), text)
 
     def new(self, *extra, ident=IDENT, title="試す", cwd=None, template="feature"):
@@ -107,6 +128,19 @@ class Use(Drafts):
 
     def draft_of(self, n):
         return os.path.join(self.flows_dir(), self.child(n) + ".yml")
+
+    def assert_approvable(self):
+        """空欄の目印を埋めてコミットすれば、`--lint` に error が無く、承認の確認が通る。"""
+        text = PLACEHOLDER.sub("書いた内容", self.written())
+        with open(self.todo, "w", encoding="utf-8") as f:
+            f.write(text)
+        git(self.tree, "add", "-A")
+        git(self.tree, "commit", "--quiet", "-m", "scaffold")
+        lint = self.ccnavi("--lint", "--mode", "enable")
+        self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
+        self.assertIn("error 0 件", lint.stdout)
+        verify = self.ccnavi("--agree", "--preview", "--verify")
+        self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
     def nothing_written(self):
         self.assertFalse(os.path.exists(self.todo))
@@ -150,24 +184,9 @@ class ProposalTest(Use):
 
     def test_the_proposal_passes_the_approval_checks(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
-        parsed, notes = ticket_mod.parse(self.written())
-        self.assertIsNotNone(parsed, notes)
-        config = phasetypes.load_types(self.conf, self.root, "")
-        found = agree_candidates.plan_problems(parsed, config)
-        self.assertEqual([p.detail for p in found if p.severity == "error"], [])
         # 雛形の空欄の目印は、書き換えるまで承認の検査が止める
-        text = self.written()
-        for mark in proposal_form.PLACEHOLDERS:
-            text = text.replace(mark, "書いた内容")
-        with open(self.todo, "w", encoding="utf-8") as f:
-            f.write(text)
-        git(self.tree, "add", "-A")
-        git(self.tree, "commit", "--quiet", "-m", "scaffold")
-        lint = self.ccnavi("--lint", "--mode", "enable")
-        self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
-        self.assertIn("error 0 件", lint.stdout)
-        verify = self.ccnavi("--agree", "--preview", "--verify")
-        self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
+        self.assertTrue(PLACEHOLDER.search(self.written()))
+        self.assert_approvable()
 
     def test_the_output_says_what_was_written_and_what_the_flow_draft_is(self):
         result = self.new("--with-feedback")
@@ -194,11 +213,7 @@ class ProposalTest(Use):
         self.assertIn("--with-feedback", result.stdout)
         self.assertNotIn("feedback（", result.stdout)
         # 全体計画だけの提案は、承認のあとで全体計画を改版できる形のまま（検査を通る）。
-        parsed, notes = ticket_mod.parse(self.written())
-        self.assertIsNotNone(parsed, notes)
-        config = phasetypes.load_types(self.conf, self.root, "")
-        found = agree_candidates.plan_problems(parsed, config)
-        self.assertEqual([p.detail for p in found if p.severity == "error"], [])
+        self.assert_approvable()
 
     def test_a_template_without_a_feedback_plan_says_nothing_about_it(self):
         self.put("small", SMALL)
@@ -242,8 +257,7 @@ class FlowDraftTest(Use):
         self.assertEqual(self.new().returncode, 0)
         place = self.draft_of(3)
         self.assertEqual(os.listdir(self.flows_dir()), [self.child(3) + ".yml"])
-        data, why = flow.load(place, self.tree)
-        self.assertEqual(why, "")
+        data = read_flow(place)
         self.assertEqual(data["name"], "実装の手順")
         self.assertEqual([n["id"] for n in data["nodes"]], ["s", "p", "e"])
         # フローの本文と同じ中身（先にテスト）が文の前後まで残る。
@@ -251,7 +265,7 @@ class FlowDraftTest(Use):
 
     def test_the_draft_has_no_effect_it_is_not_the_approved_flow(self):
         self.assertEqual(self.new().returncode, 0)
-        approved = flow.flow_file(self.conf, self.tree, self.child(3))
+        approved = os.path.join(self.tree, ".ccnavi", "approved", "flows", self.child(3) + ".yml")
         self.assertFalse(os.path.exists(approved))
 
     def test_an_existing_flow_draft_is_not_overwritten_and_nothing_is_written(self):
@@ -478,37 +492,23 @@ class RoundTripTest(Use):
         result = self.new("--with-feedback", template="i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-        original, _ = ticket_mod.parse(parent_text("i0001", plan, feedback))
-        made, notes = ticket_mod.parse(self.written())
-        self.assertIsNotNone(made, notes)
-        return original, made
+        original = front_of(parent_text("i0001", plan, feedback))
+        return original, front_of(self.written())
 
     def assert_same_plan(self, original, made):
-        self.assertEqual([i.as_raw() for i in made.plan], [i.as_raw() for i in original.plan])
-        self.assertEqual(
-            [i.as_raw() for i in made.feedback], [i.as_raw() for i in original.feedback]
-        )
-        wanted = workflow.compute(original)
-        got = workflow.compute(made)
-        self.assertEqual(got.waits, wanted.waits)
-        self.assertEqual(got.review_at, wanted.review_at)
+        self.assertEqual(steps(made, "plan"), steps(original, "plan"))
+        self.assertEqual(steps(made, "feedback"), steps(original, "feedback"))
 
     def test_a_template_drafted_from_a_done_parent_gives_the_same_plan_and_flow(self):
         original, made = self.roundtrip(self.PLAN, self.FEEDBACK, "i0001-03-01")
         self.assert_same_plan(original, made)
-        wanted, why = flow.parse(FLOW_IMPL.encode("utf-8"))
-        self.assertEqual(why, "")
-        data, why = flow.load(self.draft_of(3), self.tree)
-        self.assertEqual(why, "")
-        self.assertEqual(data, wanted)
+        self.assertEqual(read_flow(self.draft_of(3)), yaml.safe_load(FLOW_IMPL))
 
     def test_defer_multiple_after_repeated_types_and_feedback_after_round_trip(self):
         original, made = self.roundtrip(self.RICH_PLAN, self.RICH_FEEDBACK, "i0001-04-01")
-        self.assertTrue(workflow.compute(original).review_at)
         self.assert_same_plan(original, made)
-        self.assertEqual([i.after for i in made.feedback], [[], [5], [5, 6], [5, 7]])
-        data, why = flow.load(self.draft_of(4), self.tree)
-        self.assertEqual(why, "")
+        self.assertEqual([i["after"] for i in steps(made, "feedback")], [[], [5], [5, 6], [5, 7]])
+        self.assertEqual(read_flow(self.draft_of(4))["name"], "実装の手順")
 
     def test_without_with_feedback_the_main_plan_alone_round_trips(self):
         self.done_parent(self.PLAN, feedback=self.FEEDBACK, flows={"i0001-03-01": FLOW_IMPL})
@@ -518,28 +518,8 @@ class RoundTripTest(Use):
         self.assertEqual(taken.returncode, 0, taken.stdout + taken.stderr)
         result = self.new(template="i0001")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        original, _ = ticket_mod.parse(parent_text("i0001", self.PLAN, self.FEEDBACK))
-        made, notes = ticket_mod.parse(self.written())
-        self.assertIsNotNone(made, notes)
-        self.assertEqual([i.as_raw() for i in made.plan], [i.as_raw() for i in original.plan])
-        self.assertFalse(made.feedback)
+        original = front_of(parent_text("i0001", self.PLAN, self.FEEDBACK))
+        made = front_of(self.written())
+        self.assertEqual(steps(made, "plan"), steps(original, "plan"))
+        self.assertFalse(made.get("feedback"))
         self.assertIn("フィードバック計画（2 ステップ）がある", result.stdout)
-
-    def test_absolute_is_the_inverse_of_the_draft_normalization(self):
-        from ccnavi.tickets.proposal import template_use
-
-        template = plan_templates.Template(
-            name="t",
-            description="d",
-            plan=[plan_templates.Item("research"), plan_templates.Item("design", after=[1])],
-            feedback=[
-                plan_templates.Item("implement-feedback"),
-                plan_templates.Item("implement-feedback", after=[1]),
-            ],
-        )
-        plan, feedback = template_use.absolute(template)
-        self.assertEqual([i.after for i in plan], [[], [1]])
-        # 全体計画は 2 ステップなので、フィードバック計画の 1 は 3 になる。
-        self.assertEqual([i.after for i in feedback], [[], [3]])
-        # 元の Template は変えない。
-        self.assertEqual([i.after for i in template.feedback], [[], [1]])

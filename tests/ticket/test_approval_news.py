@@ -161,18 +161,6 @@ class ApprovalToldTest(PhaseHarness):
         self.assertEqual(body["dirty_parent"], [{"ticket": "i0001", "paths": ["src/keep.py"]}])
         self.assertEqual(len(body["placed"]), 1)
 
-    def test_a_missing_parent_worktree_does_not_stop_the_approval(self):
-        """親のワークツリーが無いときは黙って空にする。承認は止めない。"""
-        from types import SimpleNamespace
-
-        from ccnavi.infra import settings
-        from ccnavi.tickets.core import approve as core_approve
-
-        self.parent_only()
-        conf, _ = settings.load(self.root)
-        ticket = SimpleNamespace(ticket="i9999", parent="", is_child=False, project="")
-        self.assertEqual(core_approve.dirty_parents(conf, self.root, [ticket]), [])
-
     def test_the_parent_denial_tells_how_to_put_a_change_back(self):
         """承認の後、親のワークツリーの変更を Edit で戻そうとして断られたとき、戻し方を案内する。"""
         self.parent_only()
@@ -208,25 +196,6 @@ class ApprovalToldTest(PhaseHarness):
         # セッション開始の一覧（このPCで作業中の親）は次の子を名指しする。承認の知らせは言わない
         self.assertNotIn("承認され", self.context(self.event("SessionStart")))
         self.assertNotIn("承認され", self.prompt(session="s2"))
-
-    def test_one_hook_reads_the_approved_copies_once(self):
-        """UserPromptSubmit と PreToolUse（ワークツリーへの書き込み）は、置き場を 1 度だけ読む。
-
-        承認の知らせは外したが、範囲（実行後の側・実行前の判定）は同じ読みを使い回す。
-        """
-        from unittest import mock
-
-        from ccnavi.tickets.approval import store as approval
-
-        self.parent_only()
-        self.next_child()
-        self.approve_yes(["i0001", "i0001-01-01"])
-        with mock.patch.object(approval, "read_raw", wraps=approval.read_raw) as read_raw:
-            self.assertNotIn("承認され", self.prompt())
-        self.assertEqual(read_raw.call_count, 1)
-        with mock.patch.object(approval, "read_raw", wraps=approval.read_raw) as read_raw:
-            self.assertNotIn("承認され", self.before())
-        self.assertEqual(read_raw.call_count, 1)
 
     def test_the_verdict_still_comes_back_after_an_approval(self):
         self.parent_only()

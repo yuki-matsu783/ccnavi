@@ -14,12 +14,8 @@ import shutil
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 
-from ccnavi.hook import events, post, post_findings
-from ccnavi.infra import gitstate, settings
-from ccnavi.records import audit
-from tests import ROOT, common_path
+from tests import ROOT, common_path, script_command
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -39,7 +35,7 @@ RULES = {
         },
         {
             # 承認済みチケットの置き場。ユーザが承認してコミットする場所でもあるので、
-            # コミット済みのぶんは報告から外れる（post._committed_findings）。
+            # コミット済みのぶんは報告から外れる（Go の post の committedFindings）。
             "id": "approved",
             "match": "Write|Edit",
             "glob": "*/.ccnavi/approved/*",
@@ -54,8 +50,8 @@ RULES = {
             "message": "proposals are moved by the scripts.",
         },
     ],
-    # `ask` も保護領域（post_findings._guarding）。報告はされるが、戻す対象ではない
-    # （post._restorable）。文面は書かない。ask に message を書くと lint が error。
+    # `ask` も保護領域。報告はされるが、戻す対象ではない。文面は書かない。
+    # ask に message を書くと lint が error。
     "ask": [
         {
             "id": "watched",
@@ -239,7 +235,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- "protected/keep.txt"', result.stderr
+            'ccnavi-git.sh restore --staged --worktree -- protected/keep.txt', result.stderr
         )
         # ルールが持つ文面。止めるだけでは足りないという道具の目的そのもの。
         self.assertIn("Ask the user", result.stderr)
@@ -266,7 +262,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/generated.env", result.stderr)
         # 現れたファイルは restore では戻せない。git のラッパーは clean を通さないので、
         # シェルの rm で消す。
-        self.assertIn('rm -- "protected/generated.env"', result.stderr)
+        self.assertIn('rm -- protected/generated.env', result.stderr)
         self.assertNotIn("git clean", result.stderr)
 
     def test_同じ変更を毎回は言わない(self):
@@ -484,26 +480,6 @@ class PostToolUseTest(Harness, unittest.TestCase):
             self.assertEqual(f.read(), "committed\n")
         self.assertIn("restored:", result.stderr)
 
-    def test_戻そうとしたかを呼び手に返す(self):
-        """`post.check` の 2 つ目は、戻しを試みた回だけ真。呼び手はこれで置き場を読み直す。"""
-        seen = []
-
-        def spy(*args, **kwargs):
-            out = real(*args, **kwargs)
-            seen.append(out[1])
-            return out
-
-        real = post.check
-        with mock.patch.object(post, "check", side_effect=spy):
-            self.run_hook(command="ls")
-            self.dirty()
-            self.run_hook(restore="enable", command="python build.py")
-            # 戻しが無効なら、差し戻す変更があっても戻そうとしない
-            self.run_hook(session="s2", command="ls")
-            self.dirty()
-            self.run_hook(session="s2", restore="disable", command="python build.py")
-        self.assertEqual(seen, [False, True, False, False])
-
     def test_自動復元は現れたファイルを消さずに退避する(self):
         self.run_hook(command="ls")
         write(os.path.join(self.repo, "protected", "generated.env"), "SECRET=1\n")
@@ -530,7 +506,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("put it back to its committed content", result.stderr)
         # 誰も戻していないので、戻す手順は省かない。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- "protected/keep.txt"', result.stderr
+            'ccnavi-git.sh restore --staged --worktree -- protected/keep.txt', result.stderr
         )
         self.assertIn("would-restore 1", self.records()[-1]["detail"])
 
@@ -728,7 +704,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- "watched/deps.txt"', result.stderr
+            'ccnavi-git.sh restore --staged --worktree -- watched/deps.txt', result.stderr
         )
         # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
@@ -840,7 +816,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         tree = git(self.repo, "write-tree").strip()
         git(self.repo, "commit", "--quiet", "-m", "取り込み")
         git(self.repo, "branch", "--quiet", "-D", "feat")
-        ddir = os.path.join(self.repo, ".git", post_findings.INTEGRATE_DONE_DIR)
+        ddir = os.path.join(self.repo, ".git", "ccnavi-integrate-done")
         write(
             os.path.join(ddir, "feat"),
             f"state staged\nbranch feat\nbranch_sha {tip}\nbase {base}\ntree {tree}\n",
@@ -874,7 +850,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         # 記録が無ければ squash と確かめられないので、今までどおり報告する。
         self.run_hook(event="UserPromptSubmit")
         self.integrate_and_finish()
-        os.remove(os.path.join(self.repo, ".git", post_findings.INTEGRATE_DONE_DIR, "feat"))
+        os.remove(os.path.join(self.repo, ".git", "ccnavi-integrate-done", "feat"))
 
         result = self.run_hook(event="Stop")
 
@@ -1011,53 +987,6 @@ def ticket_repo(committed=True, text=TICKET):
     return repo
 
 
-class RecordCodeTest(unittest.TestCase):
-    """記録の code は 1 つ。件の code が混ざった回は強いほうを載せ、内訳を detail に書く。"""
-
-    @staticmethod
-    def found(*codes):
-        return [
-            post_findings.Finding(gitstate.Change(path=f"f{i}"), [], "", code)
-            for i, code in enumerate(codes)
-        ]
-
-    def test_ルールの違反はチケットの範囲外より強い(self):
-        found = self.found("POST_TICKET_SCOPE", "POST_VIOLATION", "POST_TICKET_SCOPE")
-        self.assertEqual(post_findings.record_code(found), "POST_VIOLATION")
-        self.assertEqual(
-            post_findings.codes_note(found), "codes POST_VIOLATION 1, POST_TICKET_SCOPE 2"
-        )
-
-    def test_1種類だけなら内訳を書かない(self):
-        found = self.found("POST_TICKET_SCOPE", "POST_TICKET_SCOPE")
-        self.assertEqual(post_findings.record_code(found), "POST_TICKET_SCOPE")
-        self.assertEqual(post_findings.codes_note(found), "")
-
-    def test_件が無ければ空(self):
-        self.assertEqual(post_findings.record_code([]), "")
-        self.assertEqual(post_findings.codes_note([]), "")
-
-
-class StopNudgeRecordTest(unittest.TestCase):
-    """同じ Stop で報告と促しが重なった回の記録。止めた促しが勝ち、報告は detail に残る。"""
-
-    def test_報告のcodeとrulesをdetailへ移す(self):
-        record = audit.Record(
-            decision=audit.DENY,
-            code="POST_VIOLATION",
-            rules=["guard-a", "guard-b"],
-            detail="uncounted 1",
-        )
-        events._over_report(record)
-        self.assertEqual(record.detail, "uncounted 1; report POST_VIOLATION guard-a,guard-b")
-        self.assertEqual(record.rules, [])
-
-    def test_報告が無ければ何もしない(self):
-        record = audit.Record(decision=audit.ALLOW, detail="uncounted 1")
-        events._over_report(record)
-        self.assertEqual(record.detail, "uncounted 1")
-
-
 class TicketPlaceTest(Harness, unittest.TestCase):
     """チケットの置き場の変更を、誰が書いたかではなく何が変わったかで見分ける。
 
@@ -1149,14 +1078,6 @@ class TicketPlaceTest(Harness, unittest.TestCase):
         self.assertIn("undo: は打たないでください", result.stderr)
         # 判定は変えない。報告も undo も出る。
         self.assertIn("undo:", result.stderr)
-
-    def test_承認済みの置き場の外の報告には添えない(self):
-        from ccnavi.hook import post_report
-
-        self.assertTrue(post_report._in_approved_area(".ccnavi/approved/doing/a.md"))
-        self.assertTrue(post_report._in_approved_area("projects/x/.ccnavi/approved/done/a.md"))
-        self.assertFalse(post_report._in_approved_area("wip/proposals/todo/a.md"))
-        self.assertFalse(post_report._in_approved_area("src/.ccnavi/approvedX/a.md"))
 
     def test_承認済みチケットを消すだけなら言う(self):
         # 承認済みチケットの無いワークツリーは範囲を持たない。消すことは範囲を外すこと。
@@ -1386,31 +1307,11 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
 
 class UndoTextTest(unittest.TestCase):
-    """戻す手順の文（`gitstate.undo`）は、git のラッパーで打てる形だけを書く。"""
+    """戻す手順の文は、git のラッパーで打てる形だけを書く。
 
-    def change(self, kind, staged=False):
-        return gitstate.Change(kind=kind, path="p/x.txt", full="", status="", staged=staged)
-
-    def test_wrapper_forms(self):
-        git = "sh /w/.ccnavi/scripts/ccnavi-git.sh"
-        self.assertEqual(
-            gitstate.undo(self.change(gitstate.KIND_CHANGED), git),
-            f'{git} restore --staged --worktree -- "p/x.txt"',
-        )
-        # ラッパーは rm -f と clean を通さない。索引から外してシェルの rm で消す。
-        self.assertEqual(
-            gitstate.undo(self.change(gitstate.KIND_NEW, staged=True), git),
-            f'{git} restore --staged -- "p/x.txt" && rm -- "p/x.txt"',
-        )
-        self.assertEqual(gitstate.undo(self.change(gitstate.KIND_NEW), git), 'rm -- "p/x.txt"')
-
-    def test_git_command_follows_the_wrapper(self):
-        root = tempfile.mkdtemp(prefix="ccnavi-gitcmd-")
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        # ラッパーが無ければ、生の git は組み込みで止まらないので git を案内する。
-        self.assertEqual(settings.git_command(root), "git")
-        write(os.path.join(root, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
-        self.assertEqual(settings.git_command(root), settings.script_command(root, "ccnavi-git.sh"))
+    文の組み立て（ラッパーの有無・新しいファイルの消し方）は Go のテスト
+    （go/internal/infra/git の TestUndoWritesOnlyWrapperForms）が確かめる。
+    """
 
     def test_report_uses_the_wrapper(self):
         # 実行後チェックの報告は、ワークスペースのラッパーで打てる形を案内する。
@@ -1421,9 +1322,9 @@ class UndoTextTest(unittest.TestCase):
         harness.run_hook(command="ls")
         harness.dirty()
         result = harness.run_hook(command="python build.py")
-        git = settings.script_command(harness.repo, "ccnavi-git.sh")
+        git = script_command(harness.repo, "ccnavi-git.sh")
         self.assertIn(
-            f'undo: {git} restore --staged --worktree -- "protected/keep.txt"', result.stderr
+            f'undo: {git} restore --staged --worktree -- protected/keep.txt', result.stderr
         )
 
 

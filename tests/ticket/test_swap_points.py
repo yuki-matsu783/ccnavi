@@ -1,31 +1,24 @@
-"""判定のコアと差し替え点の受入テスト。
+"""判定のコアを Chrome の入口と手元の CLI が同じに使うことの受入テスト。
 
-判定のコアは入出力を持たない関数にし、ファイルシステム・git・API は差し替え点に分ける。
-Chrome（Pyodide）と手元が同じコアで判定するため。
+見るのは 5 つ。
 
-見るのは 7 つ。
-
-1. 時計（Clock の差し替え点）: `fsio.clock` で固定した時刻を、承認の記録と履歴が同じに書く
-2. 承認の記録の `source_path` はリポジトリからの相対、`source_tree` はブランチ名。
-   前の形（絶対パス・ツリーの名前）の承認済みチケットも同じに読み、判定の答えは変わらない
-3. plan と Writer(FS): 書くもの（Changes）を並べるだけではディスクは変わらず、並べたものを
-   書いた結果が Changes のとおりになる（改版・マーカーの消去・フローの移動・フィードバック計画）
-4. Chrome の入口（`ccnavi_chrome.py`）が同じ入力から、手元が実際に書いたのと同じバイト列を出す
-   （新規・マーカーの消去・改版・フィードバック計画・多段の先行と外れる提案・レビュー済み）。
+1. 承認は提案の中身を変えない（承認済みチケットは提案のバイト列のまま。CRLF も）
+2. 親のワークツリーの HEAD がブランチを指していなければ承認しない
+3. Chrome の入口（`go/cmd/ccnavi-chrome`。拡張の WASM と同じ要求を受ける）が同じ入力から、
+   手元の CLI が実際に書いたのと同じバイト列を出す（新規・マーカーの消去・改版・フィードバック計画・
+   多段の先行と外れる提案・レビュー済み）。時刻は、Chrome は要求の時刻、CLI は手元の時計で書くので、
+   時刻の欄だけを除いて比べる。
    同じ要求と答えを拡張の試験の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）
-   に置き、拡張の試験が Pyodide でも同じ答えになることを見る
-5. fsio の記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
-6. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
-   置き場の env を入れても既定の置き場を使い、`settings` の env 名の定数を参照しない
+   に置き、拡張の試験が WASM でも同じ答えになることを見る
+4. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
+   置き場の env を入れても既定の置き場を使う
+5. 記録層（`--record-writes`）: 各コマンドで書いたパスの一覧が `git status` の変化と一致する
 
 見本の形を変えたら `CCNAVI_CHROME_FIXTURE=1` を付けてこのテストを走らせ、見本を書き直す。
 """
 
 from __future__ import annotations
 
-import ast
-import contextlib
-import io
 import json
 import os
 import re
@@ -34,15 +27,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from ccnavi.entry import lint, version
-from ccnavi.infra import fsio, pathcase, settings
-from ccnavi.infra import tree as tree_mod
-from ccnavi.tickets.approval import ops as approval_ops
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.core import api as core
-from ccnavi.tickets.core import base as core_base
-from ccnavi.tickets.model import ticket_model, via
-from tests import requires_symlink
+from tests import exe, requires_symlink
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import CHROME, child_text, load_chrome, parent_text
@@ -84,11 +69,6 @@ def _files(tree_root, prefixes=PLACES):
 class CoreHarness(PhaseHarness):
     """親のワークツリー（i0001）を持つリポジトリで、コアを直に呼ぶ道具。"""
 
-    def conf(self):
-        conf, _ = settings.load(self.root)
-        conf.state = self.state
-        return conf
-
     def trees(self):
         """ブランチの名前 → ツリーのルート。ワークスペースルートは main。"""
         found = {"main": self.root}
@@ -116,26 +96,6 @@ class CoreHarness(PhaseHarness):
             if rows:
                 out[name] = rows
         return out
-
-    def snapshot(self):
-        return core.read_fs(self.conf(), self.root, STAMP, core.Actor("", via.VIA_CHROME))
-
-    def write_changes(self, changes):
-        out, err = io.StringIO(), io.StringIO()
-        with via.session(via.VIA_CHROME):
-            applied = core.write_fs(out, err, changes.planned)
-        return applied, out.getvalue(), err.getvalue()
-
-    def plan_local(self, only=None):
-        """手元でコアを通して承認する。答えは (Changes, 書いた前後の差分)。"""
-        snapshot = self.snapshot()
-        with via.session(via.VIA_CHROME):
-            verdict = core.judge_approval(snapshot, only)
-            changes = core.plan(snapshot, verdict)
-        before = self.disk()
-        applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        return changes, self.diff(before, self.disk())
 
     def reviewed_phase_one(self):
         """フェーズ 1（MR で見る設計）の子を閉じて合流し、レビューを依頼したところまで進める。"""
@@ -201,19 +161,8 @@ class CoreHarness(PhaseHarness):
         return answer
 
     def keep_scenario(self, name, request, answer):
-        """拡張の試験の見本に置く（要求と、手元の CPython の答え）。"""
+        """拡張の試験の見本に置く（要求と、Chrome の入口の答え）。"""
         CoreChromeTest.collected[name] = {"request": request, "answer": answer}
-
-
-class ClockTest(unittest.TestCase):
-    def test_a_fixed_clock_gives_the_stamp(self):
-        with fsio.clock("2026-09-29T09:30:05+0900"):
-            self.assertEqual(fsio.stamp(), "2026-09-29T09:30:05+0900")
-        self.assertNotEqual(fsio.stamp(), "2026-09-29T09:30:05+0900")
-
-    def test_an_unreadable_stamp_is_refused(self):
-        with self.assertRaises(ValueError), fsio.clock("2026-09-29 09:30"):
-            pass
 
 
 class SourcePathTest(CoreHarness):
@@ -246,41 +195,6 @@ class SourcePathTest(CoreHarness):
             self.assertEqual(text.encode("utf-8"), f.read())
 
 
-class BranchOfTest(unittest.TestCase):
-    """`tree.branch_of`: ブランチを指す HEAD だけを名前として読む。ほかは None。"""
-
-    def setUp(self):
-        import tempfile
-
-        self.base = tempfile.mkdtemp(prefix="ccnavi-branch-")
-        self.addCleanup(__import__("shutil").rmtree, self.base, ignore_errors=True)
-
-    def repo(self, head, gitfile=None):
-        tree_root = os.path.join(self.base, "t")
-        if gitfile is None:
-            write(os.path.join(tree_root, ".git", "HEAD"), head)
-        else:
-            write(os.path.join(tree_root, ".git"), gitfile)
-            write(os.path.join(tree_root, "meta", "HEAD"), head)
-        return tree_root
-
-    def test_forms(self):
-        from ccnavi.infra import tree
-
-        self.assertEqual(tree.branch_of(self.repo("ref: refs/heads/main\n")), "main")
-        self.assertIsNone(tree.branch_of(self.repo("0123456789abcdef0123456789abcdef01234567\n")))
-        self.assertIsNone(tree.branch_of(self.repo("")))
-        self.assertIsNone(tree.branch_of(self.repo("ref: refs/heads/\n")))
-        self.assertIsNone(tree.branch_of(self.repo("garbage")))
-        self.assertIsNone(tree.branch_of(os.path.join(self.base, "none")))
-
-    def test_a_relative_gitdir_is_read_from_the_tree(self):
-        from ccnavi.infra import tree
-
-        root = self.repo("ref: refs/heads/i0001\n", gitfile="gitdir: meta\n")
-        self.assertEqual(tree.branch_of(root), "i0001")
-
-
 class DetachedHeadTest(CoreHarness):
     """親のワークツリーの HEAD がブランチを指していなければ承認しない。"""
 
@@ -293,330 +207,15 @@ class DetachedHeadTest(CoreHarness):
         self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
 
 
-class PlanWriterTest(CoreHarness):
-    """plan は書かない。Writer(FS) が書いた結果は plan の Changes のとおり。"""
-
-    def plan_and_write(self, only=None):
-        snapshot = self.snapshot()
-        before = self.disk()
-        with via.session(via.VIA_CHROME):
-            verdict = core.judge_approval(snapshot, only)
-            changes = core.plan(snapshot, verdict)
-        self.assertEqual(self.disk(), before, "plan がディスクを書いた")
-        planned = {
-            name: [
-                {k: (v.decode() if isinstance(v, bytes) else v) for k, v in row.items()}
-                for row in rows
-            ]
-            for name, rows in changes.per_branch().items()
-        }
-        applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertEqual(planned, self.diff(before, self.disk()))
-        return changes, out
-
-    def test_new_parent_and_child(self):
-        self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose(
-            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        )
-        self.commit_parent()
-        changes, out = self.plan_and_write()
-        self.assertIn("承認した。", out)
-        rows = changes.per_branch()["i0001"]
-        self.assertEqual(
-            [(r["op"], r["path"]) for r in rows],
-            [
-                ("create", ".ccnavi/approved/doing/i0001-01-01.md"),
-                ("create", ".ccnavi/approved/doing/i0001.md"),
-                # 先行関係は書かない（承認済みチケットの計画から都度計算する）
-                ("delete", "wip/proposals/todo/i0001-01-01.md"),
-                ("delete", "wip/proposals/todo/i0001.md"),
-            ],
-        )
-        # 承認済みチケットは提案のバイト列のまま（承認の記録を書き足さない）
-        self.assertEqual(rows[1]["content"], parent_text("i0001", ["research", "design"]).encode())
-
-    def test_revision_and_feedback_plan(self):
-        self.family(plan=["design"])
-        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
-        self.commit_parent("close 01")
-        self.merge("i0001-01-01")
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture, 1).returncode, 0)
-        self.assertEqual(self.confirm(fixture, 1).returncode, 0)
-        self.commit_parent("reviewed")
-        self.propose("i0001", parent_text("i0001", ["design"], feedback=[]))
-        self.commit_parent()
-        _, out = self.plan_and_write()
-        self.assertIn("i0001 のフィードバック計画を改版した", out)
-
-    def test_adding_a_child_clears_the_marks(self):
-        self.family(plan=["design"])
-        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        marks = os.path.join(self.approved, "phases", "i0001")
-        write(os.path.join(marks, "1.requested"), '{"at": "x"}')
-        write(os.path.join(marks, "1.reviewed"), '{"at": "x"}')
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        _, out = self.plan_and_write()
-        self.assertIn("マーカー（requested, reviewed）を削除しました。", out)
-        self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
-
-
-@contextlib.contextmanager
-def durable_writes():
-    """一時ファイル→fsync→os.replace の書き方（`fsio._replace_durably`）を通ったパスを集める。
-
-    呼び出し側が素の書き方（`write_bytes`・`write_new`）に戻されると、ここに載らない。
-    """
-    seen: list[str] = []
-    real = fsio._replace_durably
-
-    def record(path, content):
-        seen.append(pathcase.fold(os.path.abspath(path)))
-        return real(path, content)
-
-    with mock.patch.object(fsio, "_replace_durably", record):
-        yield seen
-
-
-def _norm(path: str) -> str:
-    return pathcase.fold(os.path.abspath(path))
-
-
-class DurableWiringTest(CoreHarness):
-    """承認の書き込みが、途中を見せず fsync する書き方を通ること（呼び出し側の配線）。"""
-
-    def planned(self):
-        snapshot = self.snapshot()
-        with via.session(via.VIA_CHROME):
-            return core.plan(snapshot, core.judge_approval(snapshot))
-
-    def test_approval_writes_the_ticket_durably_and_no_workflow(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        changes = self.planned()
-        with durable_writes() as seen:
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn(_norm(os.path.join(self.approved, "doing", "i0001.md")), seen)
-        held = os.path.join(self.approved, "phases", "i0001", "workflow.yml")
-        self.assertNotIn(_norm(held), seen)
-        self.assertFalse(os.path.exists(held))
-
-    def approved_parent_copy(self):
-        self.family(plan=["design"])
-        found, _ = approval.scan(self.conf(), self.root)
-        (parent,) = [t for t in found if t.ticket == "i0001"]
-        return parent
-
-    def test_start_and_finish_fields_are_rewritten_durably(self):
-        """着手・終わりの欄の書き直し（`update_fields`）も、承認済みチケットを途中を見せずに書く。"""
-        parent = self.approved_parent_copy()
-        with durable_writes() as seen:
-            self.assertEqual(approval_ops.update_fields(parent.path, {"started_at": "x"}), "")
-        self.assertEqual(seen, [_norm(parent.path)])
-        with open(parent.path, encoding="utf-8") as f:
-            self.assertIn('started_at: "x"', f.read())
-
-    def test_a_followup_child_is_written_durably(self):
-        """続きの子（`followup`）は `doing/` に直に起こすので、同じ書き方で置く。"""
-        parent = self.approved_parent_copy()
-        with durable_writes() as seen:
-            ident, failed = approval_ops.followup(
-                self.conf(), self.root, parent, 1, [parent], ["指摘"]
-            )
-        self.assertEqual(failed, "")
-        written = [
-            p for p in seen if p.endswith(pathcase.fold(os.path.join("doing", ident + ".md")))
-        ]
-        self.assertEqual(len(written), 1, seen)
-        self.assertTrue(os.path.exists(written[0]))
-
-    def test_the_new_durable_op_does_not_overwrite_and_goes_durably(self):
-        target = os.path.join(self.root, "flows-test", "a.yml")
-        op = fsio.Op(fsio.OP_NEW_DURABLE, target, b"new")
-        with durable_writes() as seen:
-            self.assertEqual(core_base._write_op(op), "")
-        self.assertEqual(seen, [_norm(target)])
-        with durable_writes() as seen:
-            self.assertNotEqual(core_base._write_op(fsio.Op(fsio.OP_NEW_DURABLE, target, b"x")), "")
-        self.assertEqual(seen, [])
-        with open(target, "rb") as f:
-            self.assertEqual(f.read(), b"new")
-
-
-class WriterFailureTest(CoreHarness):
-    """Writer(FS) の失敗の仕方。並べる段では書き込みが失敗しないので、書くときの枝を試す。"""
-
-    def planned(self):
-        snapshot = self.snapshot()
-        with via.session(via.VIA_CHROME):
-            return core.plan(snapshot, core.judge_approval(snapshot))
-
-    def failing(self, name, when):
-        """`fsio.<name>` を、`when(引数)` が真の呼び出しだけ失敗させる。"""
-        real = getattr(fsio, name)
-
-        def fake(*args):
-            return "わざと失敗させた" if when(*args) else real(*args)
-
-        return mock.patch.object(fsio, name, fake)
-
-    def test_a_proposal_that_cannot_be_removed_undoes_the_copy_and_stops(self):
-        self.propose("i0001", parent_text("i0001", ["research"]))
-        self.commit_parent()
-        changes = self.planned()
-        with self.failing("unlink", lambda path: path.endswith(os.path.join("todo", "i0001.md"))):
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 1)
-        self.assertEqual(applied.placed, [])
-        self.assertIn("ccnavi: i0001: 提案を todo/ から動かせない (わざと失敗させた)", err)
-        self.assertFalse(os.path.exists(os.path.join(self.approved, "doing", "i0001.md")))
-        self.assertNotIn("承認した。", out)
-
-    def held(self):
-        return os.path.join(self.approved, "phases", "i0001", "workflow.yml")
-
-    def test_a_failed_move_leaves_no_copy_and_no_workflow_file(self):
-        """承認は先行関係を書かない。動かす段で落ちても、承認済みチケットも先行関係のファイルも残らない。"""
-        doing = os.path.join("doing", "i0001.md")
-        todo = os.path.join("todo", "i0001.md")
-        for name, when in (
-            ("unlink", lambda path: path.endswith(todo)),
-            ("write_bytes_atomic", lambda path, data: path.endswith(doing)),
-        ):
-            with self.subTest(name=name):
-                self.propose("i0001", parent_text("i0001", ["research"]))
-                self.commit_parent()
-                changes = self.planned()
-                with self.failing(name, when):
-                    applied, out, err = self.write_changes(changes)
-                self.assertEqual(applied.code, 1, out + err)
-                self.assertFalse(os.path.exists(os.path.join(self.approved, doing)))
-                self.assertFalse(os.path.exists(self.held()), err)
-
-    def test_a_failed_revision_leaves_the_copy_as_it_was(self):
-        """改版でチケットを書く段で落ちたら、承認済みチケットは前のまま。先行関係のファイルは書かない。"""
-        self.family(plan=["research", "design"])
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        with open(copy, "rb") as f:
-            before = f.read()
-        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
-        self.commit_parent()
-        changes = self.planned()
-        doing = os.path.join("doing", "i0001.md")
-        with self.failing("write_text_durable", lambda path, *rest: path.endswith(doing)):
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 1, out + err)
-        with open(copy, "rb") as f:
-            self.assertEqual(f.read(), before)
-        self.assertFalse(os.path.exists(self.held()))
-
-    def test_a_revised_proposal_that_cannot_be_removed_is_said_and_goes_on(self):
-        self.family(plan=["research", "design"])
-        self.propose("i0001", parent_text("i0001", ["research", "design", "acceptance"]))
-        self.commit_parent()
-        changes = self.planned()
-        with self.failing("unlink", lambda path: path.endswith(os.path.join("todo", "i0001.md"))):
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn("ccnavi: i0001: 改版の提案を todo/ から削除できない (わざと失敗させた)", err)
-        self.assertIn("i0001 の全体計画を改版した", out)
-
-    def reopened(self):
-        self.family(plan=["design"])
-        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        marks = os.path.join(self.approved, "phases", "i0001")
-        write(os.path.join(marks, "1.requested"), '{"at": "x"}')
-        write(os.path.join(marks, "1.reviewed"), '{"at": "x"}')
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        return marks
-
-    def test_a_reviewed_mark_that_cannot_be_removed_stops(self):
-        """reviewed を消せなければ止める。ほかの種類には手を付けない。"""
-        marks = self.reopened()
-        changes = self.planned()
-        with self.failing("unlink", lambda path: path.endswith("1.reviewed")):
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 1)
-        self.assertEqual(applied.placed, ["i0001-01-02"])
-        self.assertIn("レビュー済みのマーカー", err)
-        self.assertIn("ここで止める", err)
-        self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
-        self.assertTrue(os.path.exists(os.path.join(marks, "1.reviewed")))
-        self.assertNotIn("を削除した", out)
-
-    def test_another_mark_that_cannot_be_removed_is_said_and_left(self):
-        """reviewed 以外は言って続ける。行は実際に消せた種類だけ。"""
-        marks = self.reopened()
-        changes = self.planned()
-        # 見え方（Chrome の 1 コミット）では両方消える。
-        self.assertIn(
-            "  i0001 のフェーズ 1 のマーカー（requested, reviewed）を削除しました。"
-            "全部閉じたらレビューをもう一度頼むことになる",
-            changes.lines,
-        )
-        with self.failing("unlink", lambda path: path.endswith("1.requested")):
-            applied, out, err = self.write_changes(changes)
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertIn(
-            "削除できませんでした（わざと失敗させた）。requested は残っていて有効なまま", err
-        )
-        self.assertIn("マーカー（reviewed）を削除しました", out)
-        self.assertTrue(os.path.exists(os.path.join(marks, "1.requested")))
-        self.assertFalse(os.path.exists(os.path.join(marks, "1.reviewed")))
-
-    @requires_symlink
-    def test_a_mark_that_is_a_link_is_removed_as_a_link(self):
-        """溜める段の消去はリンクを辿らない（行き先を消さない）。"""
-        marks = self.reopened()
-        outside = write(os.path.join(self.root, "outside.json"), "{}")
-        os.remove(os.path.join(marks, "1.requested"))
-        os.symlink(outside, os.path.join(marks, "1.requested"))
-        applied, out, err = self.write_changes(self.planned())
-        self.assertEqual(applied.code, 0, out + err)
-        self.assertFalse(os.path.lexists(os.path.join(marks, "1.requested")))
-        self.assertTrue(os.path.exists(outside))
-
-    def test_a_move_whose_target_appeared_stops(self):
-        """並べた後に行き先が置かれていたら、動かさずに止める。"""
-        self.family(plan=["design"])
-        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
-        self.commit_parent()
-        self.assertEqual(self.approve().returncode, 0)
-        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
-        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
-        self.commit_parent("close 01")
-        self.merge("i0001-01-01")
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture, 1).returncode, 0)
-        from ccnavi.tickets.model import review_host
-
-        result = review_host.Result.from_data({"host": "fixture", "mr": {"number": 7, "url": "u"}})
-        checked = core.confirm(self.snapshot(), "i0001", 1, result, "")
-        done = write(os.path.join(self.approved, "done", "i0001-01-01.md"), "other\n")
-        applied, out, err = self.write_changes(checked.changes)
-        self.assertEqual(applied.code, 1)
-        self.assertIn("移動先に既にある", err)
-        with open(done, encoding="utf-8") as f:
-            self.assertEqual(f.read(), "other\n")
+# 書いた時刻（`2026-09-29T12:00:00+0900` の形）。
+_STAMP_PATTERN = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:[+-]\d{4}|Z)")
 
 
 def _normalized(changes):
-    """経路（`via`・`settled_by`）の欄を除いた Changes。
+    """経路（`via`・`settled_by`）の欄を除き、書いた時刻を伏せた Changes。
 
-    手元の CLI（board・cli）と Chrome（chrome）で違う所。
+    手元の CLI（board・cli）と Chrome（chrome）で違う所。時刻は、Chrome は要求の `stamp`、CLI は
+    手元の時計で書く。
     """
     out = {}
     for name, rows in (changes or {}).items():
@@ -630,6 +229,8 @@ def _normalized(changes):
                 content = row["content"] = re.sub(
                     r'^settled_by: "[a-z-]+"\n', "", content, flags=re.M
                 )
+            if isinstance(content, str):
+                content = row["content"] = _STAMP_PATTERN.sub("<stamp>", content)
             if content is not None and row["path"].endswith(".reviewed"):
                 mark = json.loads(content)
                 mark.pop("via", None)
@@ -672,22 +273,19 @@ class CoreChromeTest(CoreHarness):
     collected: dict = {}
 
     def setUp(self):
-        # 見本は走らせるたびに同じ中身にする。時刻（承認の記録・履歴・マーカー）は fsio の時計で、
-        # コミットの sha（依頼のマーカーの `head`）は git の日時で固定する。
+        # コミットの sha は git の日時で固定する。CLI が書く時刻は手元の時計なので、見本の要求は
+        # 書き直すたびに変わる（Chrome が書く時刻は要求の `stamp`）。
         for key in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
             if key in os.environ:
                 self.addCleanup(os.environ.__setitem__, key, os.environ[key])
             else:
                 self.addCleanup(os.environ.pop, key, None)
             os.environ[key] = "2026-09-29T12:00:00+0900"
-        clock = fsio.clock(STAMP)
-        clock.__enter__()
-        self.addCleanup(clock.__exit__, None, None, None)
         super().setUp()
         # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）。
         write(
-            os.path.join(self.root, *lint.SH_COMPAT_FILE.split(os.sep)),
-            f"#!/bin/sh\nCCNAVI_COMPAT={version.COMPAT}\n",
+            os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-common.sh"),
+            f"#!/bin/sh\nCCNAVI_COMPAT={exe.compat()}\n",
         )
 
     @classmethod
@@ -703,23 +301,39 @@ class CoreChromeTest(CoreHarness):
         write(SCENARIOS, body + "\n")
 
     def keep_scenario(self, name, request, answer):
-        """拡張の試験の見本と突き合わせる（書き直すときは記録しておく）。場面ごとにその場で比べる。"""
+        """拡張の試験の見本に置く場面。書き直すときだけ記録する。
+
+        見本の答えが今の入口と合うことは `test_the_fixture_answers_are_what_the_entry_says` が見る。
+        """
         CoreChromeTest.collected[name] = {"request": request, "answer": answer}
-        if os.environ.get("CCNAVI_CHROME_FIXTURE"):
+        if not os.environ.get("CCNAVI_CHROME_FIXTURE"):
             return
         if not MACHINE_NEWLINE_IS_LF:
-            self.skipTest("機械の改行が CRLF で、見本（LF で作ってある）とダイジェストが合わない")
+            self.skipTest("機械の改行が CRLF で、見本（LF で作る）を書き直せない")
+
+    def test_the_fixture_answers_are_what_the_entry_says(self):
+        """見本の要求を Chrome の入口に渡すと、見本の答えが返る。
+
+        拡張の試験は WASM で同じことを見る。
+
+        手元の CLI は時刻を手元の時計で書くので、見本の要求は書き直すたびに時刻とコミットが変わる。
+        見本が今の入口と合っていることは、要求を渡し直して確かめる。
+        """
         with open(SCENARIOS, encoding="utf-8") as f:
             held = json.load(f)
-        self.assertIn(
-            name, held, f"{SCENARIOS} に {name} が無い。CCNAVI_CHROME_FIXTURE=1 で書き直す"
-        )
-        self.assertEqual(
-            held[name],
-            json.loads(json.dumps({"request": request, "answer": answer})),
-            f"{SCENARIOS} の {name} が古い。"
-            "CCNAVI_CHROME_FIXTURE=1 を付けて tests.ticket.test_swap_points を回す",
-        )
+        for name, scene in sorted(held.items()):
+            with self.subTest(name=name):
+                answer = json.loads(
+                    load_chrome().handle(
+                        json.dumps(scene["request"]), os.path.join(self.root, "replay", name)
+                    )
+                )
+                self.assertEqual(
+                    scene["answer"],
+                    answer,
+                    f"{SCENARIOS} の {name} が古い。"
+                    "CCNAVI_CHROME_FIXTURE=1 を付けて tests.ticket.test_swap_points を回す",
+                )
 
     def test_the_fixture_has_every_scenario(self):
         with open(SCENARIOS, encoding="utf-8") as f:
@@ -802,7 +416,7 @@ class CoreChromeTest(CoreHarness):
             "worktree",
             "remove",
             "--force",
-            tree_mod.worktree_path(self.root, "i0001-01-01"),
+            os.path.join(self.root, ".claude", "worktrees", "i0001-01-01"),
         )
         answer = self.same_as_cli("feedback-plan", "i0001")
         self.assertIn("  i0001 のフィードバック計画を改版した", answer["lines"])
@@ -878,6 +492,29 @@ class CoreChromeTest(CoreHarness):
             "confirm", "i0001", heads=heads, phase=1, result=result, compare=compare
         )
 
+    def refused_by_changes_requested(self, fixture, result, compare):
+        """変更要求のある結果を、Chrome の入口と手元の CLI の両方に渡す。
+
+        答えは（Chrome の答え, CLI の結果）。
+        """
+        changes_requested = {**result, "reviews": [{"state": "CHANGES_REQUESTED", "url": "r/1"}]}
+        refused = self.ask_chrome(self.confirm_request(changes_requested, compare))
+        write(fixture, json.dumps(changes_requested))
+        return refused, self.confirm(fixture, 1)
+
+    def test_a_refusal_has_the_same_text_as_the_cli(self):
+        fixture = self.reviewed_phase_one()
+        self.commit_parent("requested")
+        result = {
+            "host": "fixture",
+            "mr": {"number": 7, "url": "u/7"},
+            "threads": [],
+            "reviews": [],
+        }
+        refused, local = self.refused_by_changes_requested(fixture, result, self.host_compare())
+        self.assertEqual(refused["problems"], local.stderr.splitlines())
+        self.assertTrue(refused["problems"][0].startswith("ccnavi: [CORE_CONFIRM_REVIEW_OPEN] "))
+
     def test_confirm(self):
         """レビュー済み: レビュー待ちの子を done/ へ動かし（settle_review）、マーカーを置く。"""
         fixture = self.reviewed_phase_one()
@@ -889,8 +526,8 @@ class CoreChromeTest(CoreHarness):
             "reviews": [],
         }
         compare = self.host_compare()
-        # 依頼の後に親の先頭が動いていれば、Python が compare の一覧を求める
-        # （比べる相手は Python が出す）
+        # 依頼の後に親の先頭が動いていれば、入口が compare の一覧を求める
+        # （比べる相手は入口が出す）
         need = self.ask_chrome(
             self.chrome_request(
                 "confirm", "i0001", heads={"i0001": compare["head"]}, phase=1, result=result
@@ -898,17 +535,14 @@ class CoreChromeTest(CoreHarness):
         )
         self.assertEqual(need["need_compare"], {"base": compare["base"], "head": compare["head"]})
         self.assertIsNone(need["changes"])
-        # 変更要求があれば通さない。問題点の文面は手元の CLI の標準エラーと同じ。
-        changes_requested = {**result, "reviews": [{"state": "CHANGES_REQUESTED", "url": "r/1"}]}
-        refused = self.ask_chrome(self.confirm_request(changes_requested, compare))
-        write(fixture, json.dumps(changes_requested))
-        local = self.confirm(fixture, 1)
+        # 変更要求があれば通さない。名指しする相手は手元の CLI の標準エラーと同じ。
+        refused, local = self.refused_by_changes_requested(fixture, result, compare)
         self.assertEqual(local.returncode, 1)
-        self.assertEqual(refused["problems"], local.stderr.splitlines())
+        self.assertEqual(refused["problems"][1:], local.stderr.splitlines()[1:])
         self.assertIsNone(refused["changes"])
-        # 分岐の材料は文面ではなくキー（文面の頭にも同じコードが載る）
+        # 分岐の材料は文面ではなくキー（文面にも同じコードが載る）
         self.assertEqual(refused["code"], "CORE_CONFIRM_REVIEW_OPEN")
-        self.assertTrue(refused["problems"][0].startswith("ccnavi: [CORE_CONFIRM_REVIEW_OPEN] "))
+        self.assertIn("[CORE_CONFIRM_REVIEW_OPEN] ", refused["problems"][0])
         write(fixture, json.dumps(result))
 
         request = self.confirm_request(result, compare)
@@ -993,11 +627,7 @@ SCENARIO_NAMES = (
 
 
 # 置き場を既定から外す env の名前（統合先の `.claude/settings.json` に書かれうるもの）。
-# `settings` の定数ではなく綴りで持つ。定数が消えても（i0064）この試験は読み込める。
 MOVED_ENV_NAMES = ("CCNAVI_TICKETS_PROPOSAL", "CCNAVI_TICKETS_APPROVED", "CCNAVI_PROJECT_HOME")
-
-# env 名の定数（i0064 で消える）。ccnavi_chrome.py はこれを引かない。
-ENV_CONSTANTS = ("TICKETS_ENV", "APPROVED_ENV", "PROJECT_HOME_ENV")
 
 # 置き場の答えのうち、既定の置き場から組まれるはずの欄。
 PLACEMENT_KEYS = (
@@ -1014,20 +644,21 @@ PLACEMENT_KEYS = (
 
 
 def _default_placement(chrome):
-    """既定の置き場（`settings.DEFAULT_*`）から組んだ、置き場の答えの欄。"""
-    tickets = settings.DEFAULT_TICKETS.replace(os.sep, "/").strip("/")
-    approved = settings.DEFAULT_APPROVED.replace(os.sep, "/").strip("/")
-    home = settings.DEFAULT_PROJECT_HOME.replace(os.sep, "/").strip("/")
-    layer = f"{home}/{settings.LAYER_CONFIG_DIR}"
-    done = f"{approved}/{ticket_model.DONE}"
+    """既定の置き場から組んだ、置き場の答えの欄。"""
+    tickets = "wip/proposals"
+    approved = ".ccnavi/approved"
+    layer = ".ccnavi/config/project"
+    done = f"{approved}/done"
+    # 文面ファイルは拒否の文を手元の CLI と同じにするため、統合先とワークスペースから読む。
+    messages = ".ccnavi/messages"
     return {
         "tickets": tickets,
         "approved": approved,
         "layer_dir": layer,
-        "integration_paths": sorted({done, chrome.COMMON_LAYER, layer}),
+        "integration_paths": sorted({done, chrome.COMMON_LAYER, layer, messages}),
         "integration_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
         "branch_paths": [approved, tickets],
-        "workspace_paths": sorted({chrome.COMMON_LAYER, layer}),
+        "workspace_paths": sorted({chrome.COMMON_LAYER, layer, messages}),
         "workspace_files": [chrome.SETTINGS_FILE, chrome.COMPAT_FILE],
         "project_paths": sorted({done, layer}),
     }
@@ -1041,7 +672,7 @@ def _settings_text(env):
 class ChromePlacementTest(CoreHarness):
     """Chrome の入口は置き場を既定に固定し、置き場を動かす env を読まない。
 
-    置き場は入口（`handle`）を通して確かめ、`_placement` の引数の形には縛られない。
+    置き場は入口（`handle`）を通して確かめる。
     `CoreChromeTest` の見本には載せない（見本は拡張の側に置くもの）。
     """
 
@@ -1104,51 +735,8 @@ class ChromePlacementTest(CoreHarness):
         )
         self.assertEqual(answer, plain)
 
-    def test_the_module_does_not_refer_to_the_env_names(self):
-        # B4 （1 段目）ソースが env 名の定数を引かない。土台の名前（`settings.`・別名）を問わず
-        # 属性参照を拾い、`from ... import TICKETS_ENV` と、`getattr` に渡す同じ綴りの文字列も拾う。
-        path = os.path.join(CHROME, "py", "ccnavi_chrome.py")
-        with open(path, encoding="utf-8") as f:
-            tree = ast.parse(f.read(), path)
-        found = []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and node.attr in ENV_CONSTANTS:
-                found.append(f"{node.lineno}: 属性 {ast.unparse(node)}")
-            elif isinstance(node, ast.ImportFrom):
-                found += [
-                    f"{node.lineno}: import {a.name}" for a in node.names if a.name in ENV_CONSTANTS
-                ]
-            elif isinstance(node, ast.Constant) and node.value in ENV_CONSTANTS:
-                found.append(f"{node.lineno}: 文字列 {node.value!r}")
-        self.assertEqual(
-            sorted(found), [], "ccnavi_chrome.py が settings の env 名の定数を参照している"
-        )
-
-    def test_the_module_loads_without_the_env_name_constants(self):
-        # B4 （2 段目）定数を外しても読み込める。外している間は読み込みだけを見る。
-        # `settings.load` は i0064 まで定数を引くので、外したまま置き場を聞くと
-        # 正しい実装でも失敗する。置き場は戻してから聞く。
-        saved = {name: getattr(settings, name) for name in ENV_CONSTANTS if hasattr(settings, name)}
-        for name, value in saved.items():
-            self.addCleanup(setattr, settings, name, value)
-        for name in saved:
-            delattr(settings, name)
-        try:
-            chrome = load_chrome()
-        except (AttributeError, ImportError) as exc:
-            loaded = exc
-        else:
-            loaded = None
-        finally:
-            for name, value in saved.items():
-                setattr(settings, name, value)
-        if loaded is not None:
-            self.fail(f"settings の env 名の定数が無いと ccnavi_chrome.py を読み込めない: {loaded}")
-        _, place = self.ask_placement(chrome)
-        self.assert_default(chrome, place)
-
     def test_the_local_process_env_is_not_read(self):
-        # B5 手元のプロセスの env は `_environ` が外す（回帰の見張り）
+        # B5 手元のプロセスの env は読まない（回帰の見張り）
         moved = {name: f"local/{i}" for i, name in enumerate(MOVED_ENV_NAMES)}
         with mock.patch.dict(os.environ, moved):
             chrome, place = self.ask_placement()
@@ -1312,77 +900,6 @@ class RecordWritesTest(CoreHarness):
         with open(target, encoding="utf-8") as f:
             listed = sorted(line for line in f.read().splitlines() if line)
         self.assertEqual(listed, self.changed(self.parent_tree))
-
-    def test_the_layer_writes_bypass_nothing(self):
-        """fsio を通らない書き込みが残っていない（置き場を書くモジュールに素の書き込みが無い）。"""
-        import re
-
-        pattern = re.compile(
-            r"os\.remove\(|os\.rename\(|os\.replace\(|shutil\.copy2?\(|shutil\.move\(|"
-            r"os\.open\(|open\([^)]*[\"'][wax]b?[\"']"
-        )
-        # 素の書き込みを許す所と理由。
-        allowed = {
-            # 実行後チェックが範囲の外の変更を脇へ退ける（`gitstate.restore`）。状態の操作では
-            # なく、write-and-push の書いたパスの一覧に載せるものでもない。
-            ("gitstate", "shutil.move(source, target)"),
-        }
-        names = (
-            "tickets.approval.store",
-            "tickets.proposal.agree",
-            "tickets.model.via",
-            "tickets.sync.configsync",
-        )
-        names += (
-            "tickets.lifecycle.commands",
-            "tickets.flow.graph",
-            "tickets.config.risk",
-            "tickets.core.api",
-            "tickets.review.request",
-        )
-        names += ("tickets.phase.gates", "tickets.model.ticket", "infra.gitstate")
-        names += ("tickets.approval.marks", "tickets.approval.checks", "tickets.approval.times")
-        names += ("tickets.model.review_host", "tickets.review.decide", "tickets.review.close")
-        names += (
-            "tickets.model.ticket_model",
-            "tickets.model.ticket_ids",
-            "tickets.model.ticket_places",
-        )
-        names += (
-            "tickets.model.ticket_fold",
-            "tickets.model.ticket_guard",
-            "tickets.model.ticket_fields",
-        )
-        names += (
-            "tickets.proposal.agree_candidates",
-            "tickets.proposal.agree_digest",
-            "tickets.proposal.agree_screen",
-        )
-        names += ("tickets.model.phase_forms", "tickets.phase.scope")
-        names += ("tickets.flow.text", "tickets.flow.shape", "tickets.flow.render")
-        names += ("tickets.approval.ops", "tickets.lifecycle.close", "tickets.lifecycle.stop")
-        names += (
-            "tickets.core.base",
-            "tickets.core.approve",
-            "tickets.core.review",
-        )
-        for dotted in names:
-            name = dotted.rpartition(".")[2]
-            path = os.path.join(ROOT, "src", "ccnavi", *dotted.split(".")) + ".py"
-            with open(path, encoding="utf-8") as f:
-                lines = f.read().splitlines()
-            hits = [
-                f"{name}.py:{n}: {line.strip()}"
-                for n, line in enumerate(lines, 1)
-                if pattern.search(line)
-            ]
-            # flow/graph.py の read_bytes は読むだけ（`os.open` の flags は O_RDONLY）。
-            reads = ["graph.py:" + str(n) for n, line in enumerate(lines, 1) if "O_RDONLY" in line]
-            if name == "graph":
-                self.assertEqual(len(reads), 1)
-                hits = [h for h in hits if "os.open(path, flags)" not in h]
-            hits = [h for h in hits if not any(n == name and w in h for n, w in allowed)]
-            self.assertEqual(hits, [], name)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi (Python)、ccnavi-board (VS Code 拡張機能)、ccnavi-approval (Chrome 拡張機能) をビルドし、
+# ccnavi (Go)、ccnavi-board (VS Code 拡張機能)、ccnavi-approval (Chrome 拡張機能) をビルドし、
 # ccnavi と ccnavi-board はこのマシンにインストールする。
 #
 #   sh scripts/ccnavi-build-install.sh
@@ -9,8 +9,7 @@
 # 追跡するリモートブランチが無いとき（detached HEAD や未設定のとき）は飛ばす。fast-forward できなければ止まる。
 # ワークツリーの中で実行したときは、そのブランチのソースをそのままビルドするので取り込まない。
 #
-# ccnavi は、build.py がビルドと .ccnavi/bin/<os>-<arch>/ への配置を両方行う
-# （scripts/../build.py 参照）。
+# ccnavi は、scripts/ccnavi-build.sh がビルドと .ccnavi/bin/<os>-<arch>/ への配置を両方行う。
 #
 # 拡張機能は、code にインストール済みのバージョンが extensions/vscode/ccnavi-board/package.json の
 # バージョン以上なら、インストール済みのバージョンのパッチを 1 つ上げてからビルドする。
@@ -25,7 +24,7 @@
 # 拡張機能のディレクトリの dist/ に組む。Chrome へはコマンドで入れられないため、ビルドのあとに、chrome://extensions の
 # 「パッケージ化されていない拡張機能を読み込む」で選ぶ dist/ の場所を表示する。
 # プロキシの内側（HTTPS_PROXY か https_proxy がある）で NODE_USE_ENV_PROXY が未設定のときは、
-# このビルドのコマンドにだけ NODE_USE_ENV_PROXY=1 を付ける。Node がプロキシを使って Pyodide などを取れるようにするため。
+# このビルドのコマンドにだけ NODE_USE_ENV_PROXY=1 を付ける。Node がプロキシを使って依存を取れるようにするため。
 #
 # バージョンを上げるときは package.json を書き換える。チェックアウトした
 # ブランチ直下でこのスクリプトを実行すると、その書き換えが未コミットの変更として残る。
@@ -89,9 +88,8 @@ main() {
     echo ""
   fi
 
-  echo "== ccnavi (Python) のビルド =="
-  # PyInstaller は uv で一時的に追加して使う。
-  (cd "$ROOT" && uv run --with pyinstaller python build.py)
+  echo "== ccnavi (Go) のビルド =="
+  sh "$ROOT/scripts/ccnavi-build.sh"
 
   echo ""
   echo "== ccnavi-board (VS Code 拡張機能) のビルド =="

@@ -7,7 +7,7 @@
 #   log_info <本文の語>... [-- <キー>=<値>...]
 #
 # 本文の語はスペースでつなぐ。`--` の後ろは 1 つずつ `キー=値` として logfmt で並べる。
-# 出る行の形は次のとおり（Python の src/ccnavi/records/diaglog.py、拡張の src/log.ts と同じ）。
+# 出る行の形は次のとおり（実行ファイルの go/internal/records/diaglog、拡張の src/log.ts と同じ）。
 #
 #   2026-09-27T10:15:03+09:00 INFO  ccnavi-git[4242] 拒否した sub=push reason=unapproved
 #
@@ -220,7 +220,7 @@ ccnavi_log_value() {
 	ccnavi_log_out="\"$ccnavi_log_out\""
 }
 
-# 埋まった資格情報を `***` に伏せる。Python の diaglog.mask_userinfo と拡張の maskUserinfo と
+# 埋まった資格情報を `***` に伏せる。実行ファイルの diaglog.MaskUserinfo と拡張の maskUserinfo と
 # 同じ規則で伏せ、3 つの結果は 1 文字も違わない（tests/sh/test_diaglog_sh.py）。結果は ccnavi_log_out。
 #
 # 空白・タブ・LF・CR で切った語ごとに見る。

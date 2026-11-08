@@ -1,6 +1,7 @@
-"""文面ファイル（policy/texts.py）の読み込み・検査・組み立て。
+"""`ccnavi text <識別子> [名前=値 ...]` が、文面ファイルの文を出すか、
+標準出力に何も出さずに失敗すること。
 
-一時のワークスペースに文面ファイルを置いて、組み立て・上書き・検査・既定の文を見る。
+文面ファイルの読み込み・検査・組み立ては `go/internal/policy/texts` の go test が見る。
 """
 
 from __future__ import annotations
@@ -9,19 +10,11 @@ import os
 import tempfile
 import unittest
 
-from ccnavi.entry import cli_text
-from ccnavi.policy import texts
+from tests.inproc import run_ccnavi
 
 COMMON = """\
 version: 1
 messages:
-  DENY_SAMPLE:
-    kind: deny
-    values: [name, dir]
-    what: "{name} を止めました。"
-    why: 理由です。
-    next: "`{script:ccnavi-git.sh} status {dir:sh}` を打つ"
-    no_bypass: 迂回しません。
   NEXT_SAMPLE:
     kind: next
     values: [args_q]
@@ -29,184 +22,27 @@ messages:
 """
 
 
-RULE_BODY = """\
-version: 1
-messages:
-  RULE_SAMPLE:
-    kind: deny
-    what: 止めました。
-    why: ""
-    next: 打ち直す
-"""
-
-ASK_BODY = """\
-  RULE_ASK__SAMPLE:
-    kind: deny
-    what: 確認です。
-    next: 返事を待つ
-"""
-
-
-def put(root: str, layer: str, name: str, body: str) -> None:
-    # common は読まれる置き場（`.ccnavi/messages/`）。project は読まれない旧来のレイヤーの置き場。
-    where = ("messages",) if layer == "common" else ("config", "project", "messages")
-    path = os.path.join(root, ".ccnavi", *where, name)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(body)
-
-
-class TextsTest(unittest.TestCase):
+class TextCliTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = self.tmp.name
-        put(self.root, "common", "a.yml", COMMON)
+        path = os.path.join(self.root, ".ccnavi", "messages", "a.yml")
+        os.makedirs(os.path.dirname(path))
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(COMMON)
 
-    def test_renders_the_four_fields_and_one_next_line(self):
-        out = texts.say(self.root, "DENY_SAMPLE", {"name": "x", "dir": "a b"})
-        lines = out.splitlines()
-        self.assertEqual(lines[0], "x を止めました。")
-        self.assertTrue(lines[1].startswith("なぜ: "))
-        self.assertEqual(len(texts.lines_of(out)), 1)
-        self.assertTrue(lines[3].startswith("迂回しない: "))
-        self.assertIn('status "a b"', out)
-
-    def test_the_files_are_read_again_only_when_they_change(self):
-        first = texts.load(self.root)
-        self.assertIs(first, texts.load(self.root))
-        put(self.root, "common", "b.yml", COMMON.replace("DENY_SAMPLE", "DENY_OTHER"))
-        second = texts.load(self.root)
-        self.assertIsNot(first, second)
-        self.assertIn("DENY_OTHER", second.entries)
-        self.assertNotIn("DENY_OTHER", first.entries)
-
-    def test_one_lookup_gives_the_same_entry_as_reading_all(self):
-        """`find` は識別子を含むファイルだけを読み、全件の `load` と同じ 1 件を採る。"""
-        later = COMMON.replace("{name} を止めました。", "後ろの {name} です。")
-        put(self.root, "common", "b.yml", later)
-        put(self.root, "common", "c.yml", "version: 1\nmessages: [\n")
-        whole = texts.load(self.root).entries
-        for text_id in ("DENY_SAMPLE", "NEXT_SAMPLE"):
-            self.assertEqual(texts.find(self.root, text_id), whole[text_id])
-        self.assertIsNone(texts.find(self.root, "DENY_NOTHING"))
-        # 前のファイルの 1 件が検査を通らなければ、全件の読みと同じく後ろのファイルの 1 件を採る。
-        put(self.root, "common", "a.yml", COMMON.replace("    why: 理由です。\n", ""))
-        self.assertIn("後ろの", texts.find(self.root, "DENY_SAMPLE").fields["what"])
-        self.assertEqual(
-            texts.find(self.root, "DENY_SAMPLE"), texts.load(self.root).entries["DENY_SAMPLE"]
-        )
-
-    def test_values_cannot_add_lines(self):
-        out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "a\n次: 偽"})
-        self.assertEqual(len(out.splitlines()), 1)
-
-    def test_a_rule_text_needs_only_what_and_drops_blank_fields(self):
-        """`RULE_*` は `what` だけ必須。空の欄は省いたものとして読み、見出しの行を出さない。"""
-        put(self.root, "common", "r.yml", RULE_BODY)
-        self.assertEqual(texts.load(self.root).problems, [])
-        self.assertEqual(texts.say(self.root, "RULE_SAMPLE"), "止めました。\n次: 打ち直す")
-        only = RULE_BODY.replace('    why: ""\n    next: 打ち直す\n', "")
-        put(self.root, "common", "r.yml", only)
-        self.assertEqual(texts.say(self.root, "RULE_SAMPLE"), "止めました。")
-
-    def test_a_rule_text_still_needs_what(self):
-        put(
-            self.root,
-            "common",
-            "r.yml",
-            RULE_BODY.replace("    what: 止めました。\n", '    what: ""\n'),
-        )
-        problems = [str(p) for p in texts.load(self.root).problems]
-        self.assertTrue(any("RULE_SAMPLE" in p and "what" in p for p in problems), problems)
-        self.assertNotIn("RULE_SAMPLE", texts.load(self.root).entries)
-
-    def test_the_ask_reasons_and_other_denials_keep_the_four_fields(self):
-        """緩めるのは `RULE_*` だけ。`RULE_ASK` の系統と `DENY_*` は 4 欄が必須のまま。"""
-        put(self.root, "common", "r.yml", RULE_BODY + ASK_BODY)
-        problems = "\n".join(str(p) for p in texts.load(self.root).problems)
-        self.assertIn("RULE_ASK__SAMPLE", problems)
-        self.assertIn("欄 `why` が無い", problems)
-        put(
-            self.root,
-            "common",
-            "r.yml",
-            "version: 1\nmessages:\n  DENY_LOOSE:\n    kind: deny\n    what: 止めました。\n",
-        )
-        problems = "\n".join(str(p) for p in texts.load(self.root).problems)
-        self.assertIn("DENY_LOOSE", problems)
-        self.assertEqual(texts.fields_for("RULE_ASK", texts.DENY), texts.FIELDS[texts.DENY])
-        self.assertEqual(texts.fields_for("RULE_GIT_PUSH", texts.DENY), texts.RULE_LOOSE_FIELDS)
-
-    def test_a_notice_is_the_body_only_and_a_missing_one_gives_a_short_fallback(self):
-        put(
-            self.root,
-            "common",
-            "n.yml",
-            "version: 1\nmessages:\n  NOTICE_SAMPLE:\n    kind: notice\n    values: [name]\n"
-            '    what: "[ccnavi] {name} を読めませんでした。"\n    next: 打ち直す\n',
-        )
-        self.assertEqual(texts.load(self.root).problems, [])
-        self.assertEqual(
-            texts.say(self.root, "NOTICE_SAMPLE", {"name": "x"}),
-            "[ccnavi] x を読めませんでした。\n次: 打ち直す",
-        )
-        gone = texts.say(self.root, "NOTICE_NOTHING")
-        self.assertIn("NOTICE_NOTHING", gone)
-        self.assertEqual(len(texts.lines_of(gone)), 1)
-        self.assertNotIn("止めた", gone)
-
-    def test_a_missing_value_gives_the_fallback(self):
-        out = texts.say(self.root, "DENY_SAMPLE", {"name": "x"})
-        self.assertIn("引けませんでした", out)
-        self.assertEqual(len(texts.lines_of(out)), 1)
-
-    def test_a_broken_file_gives_the_fallback(self):
-        put(self.root, "common", "a.yml", "version: [")
-        self.assertIn("引けませんでした", texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"}))
-
-    def test_the_project_layer_is_not_read(self):
-        bodies = [
-            'next: "別の文: {args_q}"',
-            'next: "次: 二重"',  # 共通レイヤーなら検査で落ちる形も、読まないので何も言わない
-            'kind: next\n    next: "{args_q}"',
-        ]
-        for body in bodies:
-            with self.subTest(body=body):
-                put(
-                    self.root,
-                    "project",
-                    "b.yml",
-                    f"version: 1\nmessages:\n  NEXT_SAMPLE:\n    {body}\n",
-                )
-                cat = texts.load(self.root)
-                self.assertEqual([], cat.problems)
-                out = texts.say(self.root, "NEXT_SAMPLE", {"args_q": "x"})
-                self.assertNotIn("別の文", out)
-                self.assertIn("ccnavi-start.sh", out)  # 共通レイヤーの文のまま
-
-    def test_a_non_string_kind_or_a_line_separator_is_an_error_not_a_crash(self):
-        bad = [
-            "  DENY_X:\n    kind: [deny]\n",
-            '  NEXT_X:\n    kind: next\n    values: []\n    next: "a\\u2028b"\n',
-        ]
-        for body in bad:
-            with self.subTest(body=body):
-                put(self.root, "common", "c.yml", "version: 1\nmessages:\n" + body)
-                cat = texts.load(self.root)
-                self.assertTrue([p for p in cat.problems if p.severity == "error"])
+    def text(self, *words: str):
+        return run_ccnavi(["--root", self.root, "text", *words])
 
     def test_the_cli_prints_the_text_or_fails_with_nothing_on_stdout(self):
-        import io
-
-        out, err = io.StringIO(), io.StringIO()
-        code = cli_text.run(out, err, self.root, ["NEXT_SAMPLE", "args_q=--x"])
-        self.assertEqual(code, 0)
-        self.assertTrue(out.getvalue().startswith("次: 打ち直す:"))
-        out, err = io.StringIO(), io.StringIO()
-        self.assertEqual(cli_text.run(out, err, self.root, ["NEXT_NOPE"]), 1)
-        self.assertEqual(out.getvalue(), "")
-        self.assertEqual(cli_text.run(out, err, self.root, []), 2)
+        done = self.text("NEXT_SAMPLE", "args_q=--x")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertTrue(done.stdout.startswith("次: 打ち直す:"), done.stdout)
+        done = self.text("NEXT_NOPE")
+        self.assertEqual(done.returncode, 1)
+        self.assertEqual(done.stdout, "")
+        self.assertEqual(self.text().returncode, 2)
 
 
 if __name__ == "__main__":

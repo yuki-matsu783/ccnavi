@@ -21,18 +21,16 @@
 道具は外から動かす（`tests/inproc.py` の `run_ccnavi`）。fixture は
 tests/config/test_config_union.py の ConfigUnionHarness と
 tests/config/test_config_union_guard.py の GuardHarness を継ぐ。
+組み込みの保護の照合が長い入力ですぐ返ることは、Go のテスト（go/internal/policy/selfguard の
+TestShellRuleDoesNotBlowUp）が確かめる。
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
-import time
 import unittest
 
-from ccnavi.infra import settings, shellread
-from ccnavi.policy import selfguard_shell
 from tests.config.test_config_union import (
     COMMON_RISK,
     HOME,
@@ -46,6 +44,12 @@ from tests.config.test_config_union import (
     write_layer,
 )
 from tests.config.test_config_union_guard import GuardHarness
+
+# レイヤーの名前と、予約してある名前（プロジェクトはこの名前を使えない）。
+LAYER_COMMON = "common"
+LAYER_SELF = "self"
+RESERVED_LAYER_NAMES = (LAYER_COMMON, LAYER_SELF, "builtin")
+LAYER_KINDS = ("rules", "phases", "risk")
 
 # 大文字小文字の的。`glob` と `regex` と、区別を取り戻した `regex` を 1 本ずつ持つ。
 # `glob` も `regex` も組み込みの保護も、どの機械でも大文字小文字を区別せずにヒットする。
@@ -208,7 +212,7 @@ class GlobCaseTest(ConfigUnionHarness):
         """`regex` の deny も、どの機械でも大文字小文字を区別せずにヒットする。
 
         区別すると、`Write` の経路だけが表記違いで外れる。同じ場所へシェルから書く形は
-        組み込みの保護（selfguard_shell._folded）が表記の違いを無視して止めるので、経路で答えが分かれる。
+        組み込みの保護が表記の違いを無視して止めるので、経路で答えが分かれる。
         """
         self.assertFalse(os.path.exists(os.path.join(self.ws, "token")))
         exact = self.hook("Write", self.ws, file_path=os.path.join(self.ws, "token", "x.txt"))
@@ -507,21 +511,9 @@ class CopyDestinationTest(GuardHarness):
             with self.subTest(command=command):
                 self.assert_guarded(command)
 
-    def test_skipping_options_does_not_blow_up(self):
-        """後ろの選択肢の割り方は 1 通り。ヒットしない長い並びでもすぐ返る。"""
-        regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
-        for tail in (" -S" * 60, " -S -" * 60, " --suffix" * 60, " -m x" * 60):
-            text = shellread.read(
-                "cp /tmp/x .ccnavi/config/common/rules.yml" + tail + " /tmp/y"
-            ).text
-            with self.subTest(tail=tail[:12]):
-                start = time.monotonic()
-                regex.search(text)
-                self.assertLess(time.monotonic() - start, 1.0)
-
 
 class HolderDestinationTest(GuardHarness):
-    """守るものが入っているディレクトリを行き先にした形（`selfguard_shell.holder_regex`）。
+    """守るものが入っているディレクトリを行き先にした形（Go の selfguard の HolderRegex）。
 
     行き先の表記に守るファイルの名前が出ないので、場所の表記ではヒットしない。元の側に
     守る名前の語か、名前の決まらない語があるときだけ止め、別の名前を置くだけの形は止めない。
@@ -643,24 +635,6 @@ class HolderDestinationTest(GuardHarness):
         ):
             with self.subTest(command=command):
                 self.assert_not_guarded(command)
-
-    def test_scanning_many_sources_does_not_blow_up(self):
-        """元の語は最初に見つかったもので決め打ちする。ヒットしない長い並びでもすぐ返る。"""
-        regex = re.compile(selfguard_shell.guard_shell_regex(self.ws), re.IGNORECASE)
-        for tail in (
-            " /tmp/decisions.jsonl" * 300,
-            " $x" * 300,
-            " -T" * 300,
-            " -t logs" * 300,
-            " -- /tmp/decisions.jsonl" * 200,
-            " -S -t" * 300,
-        ):
-            for verb in ("cp", "mv"):
-                text = shellread.read(f"{verb} /tmp/x{tail} /tmp/y").text
-                with self.subTest(verb=verb, tail=tail[:12]):
-                    start = time.monotonic()
-                    regex.search(text)
-                    self.assertLess(time.monotonic() - start, 1.0)
 
 
 class ColonIdTest(ConfigUnionHarness):
@@ -790,7 +764,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     def test_a_write_into_projects_self_is_not_judged_by_the_workspace_layer(self):
         """`projects/self/` はレイヤー無し。ワークスペースのレイヤーの allow では通らない。"""
-        self.check_no_layer_is_borrowed(settings.LAYER_SELF)
+        self.check_no_layer_is_borrowed(LAYER_SELF)
 
     def test_the_spelling_does_not_change_it(self):
         """`projects/Self/` も同じ（表記の大文字小文字は問わない）。"""
@@ -798,11 +772,11 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     def test_a_write_into_projects_common_is_not_judged_by_the_workspace_layer(self):
         """`common` も予約。`projects/common/` もレイヤー無し。"""
-        self.check_no_layer_is_borrowed(settings.LAYER_COMMON)
+        self.check_no_layer_is_borrowed(LAYER_COMMON)
 
     def test_the_workspace_layer_deny_does_not_reach_projects_self(self):
         """レイヤーを借りないので、ワークスペースのレイヤーの deny もヒットしない。"""
-        self.check_the_workspace_deny_does_not_reach(settings.LAYER_SELF)
+        self.check_the_workspace_deny_does_not_reach(LAYER_SELF)
 
     def test_a_project_whose_name_is_not_reserved_still_works(self):
         """対照: 予約名でない `lib` は今までどおり自分のレイヤーで判定される。"""
@@ -816,25 +790,22 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     def test_builtin_is_a_reserved_layer_name(self):
         """`builtin` は予約名。組み込みの id（`builtin:<名前>`）と取り違えないよう拒否する。"""
-        self.assertTrue(settings.is_reserved_layer_name("builtin"))
-        self.assertTrue(settings.is_reserved_layer_name("Builtin"))
         self.project("builtin", rules=RESERVED_PROJECT_RULES)
         errors = self.problems("error", where=self.project_where("builtin"))
         self.assertTrue(any("予約" in p["detail"] for p in errors), errors)
 
     def test_lint_names_every_reserved_name(self):
         """`projects/common/`・`projects/self/`・`projects/builtin/` を error で名指しする。"""
-        for name in settings.RESERVED_LAYER_NAMES:
+        for name in RESERVED_LAYER_NAMES:
             self.project(name, rules=RESERVED_PROJECT_RULES)
-        for name in settings.RESERVED_LAYER_NAMES:
+        for name in RESERVED_LAYER_NAMES:
             with self.subTest(name=name):
                 errors = self.problems("error", where=self.project_where(name))
                 self.assertTrue(any("予約" in p["detail"] for p in errors), errors)
                 # 文面から「どちらの表記が予約か」が読めること。
                 self.assertTrue(
                     any(
-                        f"`{settings.LAYER_COMMON}`" in p["detail"]
-                        and f"`{settings.LAYER_SELF}`" in p["detail"]
+                        f"`{LAYER_COMMON}`" in p["detail"] and f"`{LAYER_SELF}`" in p["detail"]
                         for p in errors
                     ),
                     errors,
@@ -842,7 +813,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
 
     def test_a_ticket_cannot_name_a_reserved_layer_name(self):
         """`project: self` / `project: common` のチケットは `--agree` で通らない。"""
-        for name in settings.RESERVED_LAYER_NAMES:
+        for name in RESERVED_LAYER_NAMES:
             self.project(name, rules=RESERVED_PROJECT_RULES)
         # 前提。同じ本文で `project: lib` なら通る。止まる理由が予約名であることを固定する。
         self.propose(
@@ -851,7 +822,7 @@ class ReservedLayerNameTest(ConfigUnionHarness):
         approved = self.approve()
         self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
 
-        numbered = zip(("i0002", "i0003", "i0004"), settings.RESERVED_LAYER_NAMES, strict=True)
+        numbered = zip(("i0002", "i0003", "i0004"), RESERVED_LAYER_NAMES, strict=True)
         for number, name in numbered:
             with self.subTest(project=name):
                 proposal = self.propose(
@@ -881,7 +852,7 @@ class ReservedLayerRestoreTest(GuardHarness):
     def setUp(self):
         super().setUp()
         self.reserved = self.project(
-            settings.LAYER_COMMON,
+            LAYER_COMMON,
             rules=RESERVED_PROJECT_RULES,
             phases=RESERVED_PROJECT_PHASES,
             risk=RESERVED_PROJECT_RISK,
@@ -889,7 +860,7 @@ class ReservedLayerRestoreTest(GuardHarness):
 
     def test_the_layer_of_a_project_named_common_is_restored(self):
         """レイヤーの名前と同じ名前のプロジェクトでも、レイヤーの 3 本がバックアップと復元の対象。"""
-        for kind in settings.LAYER_KINDS:
+        for kind in LAYER_KINDS:
             with self.subTest(kind=kind):
                 path = layer_path(self.reserved, kind)
                 broken = "version: 1\ndeny: []\n" if kind == "rules" else "version: 1\n"
@@ -920,7 +891,7 @@ class ReservedLayerRestoreTest(GuardHarness):
     def test_the_layer_of_a_project_named_self_is_restored_too(self):
         """`projects/self/` の 3 本も、ワークスペース自身のレイヤーとは別に守る。"""
         project = self.project(
-            settings.LAYER_SELF, rules=RESERVED_PROJECT_RULES, phases=RESERVED_PROJECT_PHASES
+            LAYER_SELF, rules=RESERVED_PROJECT_RULES, phases=RESERVED_PROJECT_PHASES
         )
         write(layer_path(self.ws, "risk"), COMMON_RISK)
         for home, kind in ((project, "rules"), (project, "phases"), (self.ws, "risk")):
@@ -979,7 +950,7 @@ class ScriptTamperTest(GuardHarness):
                     self.guarded_hook("Bash", self.ws, command=command),
                     "builtin:guard-setting-files",
                 )
-        # シェルの側も、場所のパスはどの機械でも区別せずに適用する（selfguard_shell._folded）。
+        # シェルの側も、場所のパスはどの機械でも区別せずに適用する。
         swapped = "rm -rf projects/lib/.Ccnavi/scripts/count.sh"
         result = self.guarded_hook("Bash", self.ws, command=swapped)
         self.assert_denied(result, "builtin:guard-setting-files")

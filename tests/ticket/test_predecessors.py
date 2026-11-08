@@ -23,8 +23,11 @@ import os
 import shutil
 import unittest
 
-from ccnavi.infra import modes, settings
+from tests import script_command
 from tests.ticket.test_ticket import TicketTest, git, read_json, write
+
+# 答えが「いいえ」のときの終了コード（`--verify` が通らない）。
+EXIT_ANSWER_NO = 3
 
 
 def load_tests(loader, tests, pattern):
@@ -181,7 +184,7 @@ class PredecessorTest(TicketTest):
             any("先行 i0001-01-01 が完了していない" in p for p in rejected["i0001-01-03"])
         )
         verified = self.ccnavi("--agree", "--preview", "--verify")
-        self.assertEqual(verified.returncode, modes.EXIT_ANSWER_NO, verified.stdout)
+        self.assertEqual(verified.returncode, EXIT_ANSWER_NO, verified.stdout)
         self.assertIn("外れる", verified.stdout)
         self.assertIn("先行 i0001-01-01", verified.stdout)
 
@@ -219,7 +222,7 @@ class PredecessorTest(TicketTest):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("i0001-01-03 の先行が満たされていないので開始しない", refused.stderr)
         self.assertIn("- 先行 i0001-01-01: 作業中（doing/）", refused.stderr)
-        ticket_sh = settings.script_command(self.root, "ccnavi-ticket.sh")
+        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         self.assertIn(f"'{ticket_sh} finish <先行>'", refused.stderr)
         self.assertIn(f"'{ticket_sh} cancel i0001-01-03 --reason <理由>'", refused.stderr)
         with open(os.path.join(self.approved, "doing", "i0001-01-03.md"), encoding="utf-8") as f:
@@ -367,7 +370,7 @@ class PredecessorTest(TicketTest):
         self.assertEqual(bash("echo x > .ccnavi/approved/doing/i0001-01-03.md"), "deny")
         # 書き込み先を読めないコマンド（sed -i）は何も言われずに通ることはない。
         # 聞ける者が居る権限モードでは Claude Code がユーザに聞き（ccnavi は判定を出さない）、
-        # 居なければ ccnavi が断る（judge.undeclared_verdict）。
+        # 居なければ ccnavi が断る（judge.UndeclaredVerdict）。
         # 書かれても実行後チェックが書き換えとして言う。サブコマンドが書く欄のほかが変わった内容に
         # なるため。
         sed = "sed -i 's/predecessors.*//' .ccnavi/approved/doing/i0001-01-03.md"

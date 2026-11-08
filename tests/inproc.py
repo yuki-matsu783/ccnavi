@@ -1,39 +1,33 @@
-"""テストから ccnavi を 1 回動かす。プロセスを起こさず、同じプロセスの中で cli.run を呼ぶ。
-
-`python -m ccnavi` は標準入出力を整えて cli.run を呼ぶだけ（src/ccnavi/__main__.py）。
-テストが見るのは引数・標準入力・標準出力・標準エラー・終了コードで、それは
-cli.run の入口と出口そのものなので、プロセスを起こさなくても同じものが読める。
-
-1 回の起動が 0.5 秒ほどかかるのは Python の立ち上げと PyYAML の読み込みで、
-判定そのものは 0.05 秒に満たない。全件で 700 回起動するので、プロセスを
-起こすとそこがテスト時間の半分以上を占める。
+"""テストから ccnavi を 1 回動かす。実行ファイル（tests/exe.py が用意する Go のもの）を起こす。
 
 subprocess.run と同じ形（引数のリスト、input、env、cwd）を受け、CompletedProcess を
-返す。呼び手の assert は subprocess のときと同じ書き方で通る。
+返す。返す args は ccnavi に渡した引数だけ（実行ファイルのパスは入れない）。
 
 - env は「その起動に見える環境そのもの」として扱う。subprocess.run(env=...) と同じで、
   渡したマップに無い変数は見えない。例外は走った機械の git の設定を締め出す分
   （tests.GIT_ENV）で、これは空にしても残す。判定の中で起こす git がホストの
-  `~/.gitconfig` を読み直さないようにするため
-- cwd は起動中だけ移る。テストは並行して走らないので、戻し忘れが無ければ他に影響しない
-- hook の判定の中で出た例外は、本番と同じく cli が受けて内部エラーとして終える
-  （標準エラーに `[ccnavi] internal-error`）。それ以外の経路の例外は、そのまま伝える
-
-`python -m ccnavi` の入口（標準入出力の切り替え、パッケージとしての起動）は
-test_entry.py が実際のプロセスで確かめる。
+  `~/.gitconfig` を読み直さないようにするため。呼び手が同じ名前を渡したときは呼び手を
+  優先する（締め出し方そのものを試すテストのため）
+- 起こす前に、実行ファイルが使うワークスペースルートに文面ファイル（`.ccnavi/messages/`）が
+  無ければ、このリポジトリの文面をコピーする（`put_messages`）。文を見るテストの大半は、文面を
+  気にしない使い捨ての木を組むので、木ごとにコピーさせない。文面ファイルを置いた木（壊れた文面を
+  試す木を含む）と、このリポジトリの中の木（`tests/fixtures` など）には触らない。木が git の
+  リポジトリなら、コピーした文面を `.git/info/exclude` に書いて git から見えなくする（未追跡の
+  保護対象として、判定や報告に混ざらないように）。
+  `.ccnavi/` の無い木そのものを試すテストは `messages=False` を渡す
 """
 
 from __future__ import annotations
 
-import contextlib
-import io
 import os
 import subprocess
 from collections.abc import Mapping, Sequence
-from unittest import mock
 
-from ccnavi.entry import cli
-from tests import GIT_ENV
+from tests import GIT_ENV, ROOT, exe, put_messages
+
+ROOT_OPTION = "--root"
+CLAUDE_DIR = ".claude"
+WORKTREES = os.path.join(CLAUDE_DIR, "worktrees")
 
 
 def run_ccnavi(
@@ -42,53 +36,77 @@ def run_ccnavi(
     input: str = "",
     env: Mapping[str, str] | None = None,
     cwd: str | None = None,
+    messages: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    """`python -m ccnavi *args` を同じプロセスの中で動かし、CompletedProcess の形で返す。"""
+    """`ccnavi *args` を起こし、CompletedProcess の形で返す。"""
     argv = list(args)
     # 学びの蓄積の既定は enable。学びを扱わないテストの子の finish が記録で止まらないよう、呼び手が
-    # 指定しなければ切る（扱うテストは env で CCNAVI_LEARNING を渡す。既定そのものは settings を
-    # 直に読んで見る）。
-    if env is not None and "CCNAVI_LEARNING" not in env:
-        env = {**env, "CCNAVI_LEARNING": "disable"}
-    built = os.environ.get("CCNAVI_TEST_EXE", "")
-    if built:
-        # 組み立て済みの実行ファイルで動かす（`CCNAVI_TEST_EXE=<パス>`）。配る物を測る。
-        merged = (
-            {"CCNAVI_LEARNING": "disable", **os.environ, **GIT_ENV}
-            if env is None
-            else {**GIT_ENV, **env}
-        )
-        done = subprocess.run(
-            [built, *argv],
-            input=input or "",
-            env=merged,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=120,
-        )
-        return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
-    stdin = io.StringIO(input or "")
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    with contextlib.ExitStack() as stack:
-        if env is None:
-            stack.enter_context(
-                mock.patch.dict(
-                    os.environ, {"CCNAVI_LEARNING": os.environ.get("CCNAVI_LEARNING", "disable")}
-                )
-            )
-        if env is not None:
-            # 走った機械の git の設定を締め出す分（tests.GIT_ENV）は、環境を空にしても
-            # 残す。ccnavi は判定の中で git を起こす（src/ccnavi/infra/gitcmd.py）ので、ここで
-            # 消すと、この経路だけがホストの `~/.gitconfig` を読み直す。
-            # 呼び手が同じ名前を渡したときは呼び手を優先する。締め出し方そのものを
-            # 試すテストが、ここでの締め出しに上書きされないようにするため。
-            stack.enter_context(mock.patch.dict(os.environ, {**GIT_ENV, **env}, clear=True))
-        if cwd:
-            previous = os.getcwd()
-            os.chdir(cwd)
-            stack.callback(os.chdir, previous)
-        returncode = cli.run(stdin, stdout, stderr, argv)
-    return subprocess.CompletedProcess(argv, returncode, stdout.getvalue(), stderr.getvalue())
+    # 指定しなければ切る（扱うテストは env で CCNAVI_LEARNING を渡す）。
+    if env is None:
+        merged = {"CCNAVI_LEARNING": "disable", **os.environ, **GIT_ENV}
+    else:
+        merged = {"CCNAVI_LEARNING": "disable", **GIT_ENV, **env}
+    if messages:
+        _put_messages_when_absent(_root_of(argv, merged, cwd))
+    done = subprocess.run(
+        [exe.path(), *argv],
+        input=input or "",
+        env=merged,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=120,
+    )
+    return subprocess.CompletedProcess(argv, done.returncode, done.stdout, done.stderr)
+
+
+def _root_of(argv: list[str], env: Mapping[str, str], cwd: str | None) -> str:
+    """実行ファイルが使うワークスペースルート。`--root`、CLAUDE_PROJECT_DIR、作業ディレクトリから上って
+    `.claude` を持つ所（ワークツリーは飛ばす）の順。実行ファイルの既定のルートと同じ決め方。"""
+    for at, word in enumerate(argv):
+        if word == ROOT_OPTION and at + 1 < len(argv):
+            return argv[at + 1]
+        if word.startswith(ROOT_OPTION + "="):
+            return word.partition("=")[2]
+    if env.get("CLAUDE_PROJECT_DIR"):
+        return env["CLAUDE_PROJECT_DIR"]
+    directory = os.path.abspath(cwd or os.getcwd())
+    while True:
+        holder = os.path.dirname(directory)
+        if os.path.isdir(os.path.join(directory, CLAUDE_DIR)) and not same_path(
+            holder, os.path.join(os.path.dirname(holder), WORKTREES)
+        ):
+            return directory
+        if holder == directory:
+            return ""
+        directory = holder
+
+
+def _fold(path: str) -> str:
+    """パスを比べる形。どの機械でも大文字小文字を区別しない（Go の pathcase と同じ）。"""
+    return os.path.normcase(os.path.abspath(path)).casefold()
+
+
+def same_path(a: str, b: str) -> bool:
+    return _fold(a) == _fold(b)
+
+
+def _inside_repo(path: str) -> bool:
+    """このリポジトリ（ROOT）か、その下か。"""
+    folded, repo = _fold(path), _fold(ROOT)
+    return folded == repo or folded.startswith(repo.rstrip(os.sep) + os.sep)
+
+
+def _put_messages_when_absent(root: str) -> None:
+    # リポジトリの中（tests/fixtures など）に写すと、作業ツリーに追跡されないファイルが残る。
+    if not root or not os.path.isdir(root) or _inside_repo(root):
+        return
+    if os.path.lexists(os.path.join(root, ".ccnavi", "messages")):
+        return
+    put_messages(root)
+    info = os.path.join(root, ".git", "info")
+    if os.path.isdir(os.path.join(root, ".git")):
+        os.makedirs(info, exist_ok=True)
+        with open(os.path.join(info, "exclude"), "a", encoding="utf-8", newline="\n") as f:
+            f.write("\n/.ccnavi/messages/\n")

@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { csp, manifest, parseHosts } from "../src/core/hosts.js";
-import { HERE } from "./helpers/python.js";
+import { HERE } from "./helpers/ccnavi.js";
 
 const defaults = () => parseHosts(fs.readFileSync(path.join(HERE, "hosts.json"), "utf8"));
 

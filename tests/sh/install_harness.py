@@ -2,7 +2,7 @@
 
 道具を隔離する。偽物を PATH の先頭に置くだけでは、後ろの本物が見つかってしまう。テストごとに一時の
 bin ディレクトリを作り、要る道具だけを本物へのリンクで置き、PATH をそのディレクトリだけにする。
-glab・jq・curl・git・setup・uv は、引数を記録する偽物にできる。
+glab・jq・curl・git・setup・go は、引数を記録する偽物にできる。
 記録は `calls.log` に `<道具> <引数>` で 1 行ずつ。
 """
 
@@ -18,6 +18,7 @@ import time
 import unittest
 
 from tests import ROOT
+from tests.exe import host_target
 
 SHELL = shutil.which("sh")
 REAL_GIT = shutil.which("git")
@@ -224,6 +225,10 @@ esac
 
 def script(name: str) -> str:
     return os.path.join(ROOT, "scripts", name)
+
+
+# この機械で組み立てたときに scripts/ccnavi-build.sh が dist/ccnavi.target に書く目印。
+THIS_MACHINE = host_target()
 
 
 def count_next(text: str) -> int:

@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-approval",
   "displayName": "ccnavi 承認ボード",
-  "description": "リモートのブランチの承認待ちを、ブラウザと PAT だけで見せ、承認・レビュー済みを親のブランチへ書き、issue から親のブランチを始める Chrome 拡張（GitHub と GitLab）。判定は同梱の ccnavi を Pyodide で動かして出す",
+  "description": "リモートのブランチの承認待ちを、ブラウザと PAT だけで見せ、承認・レビュー済みを親のブランチへ書き、issue から親のブランチを始める Chrome 拡張（GitHub と GitLab）。判定は同梱の ccnavi（Go の WASM）を動かして出す",
   "version": "0.4.0",
   "private": true,
   "license": "MIT",
@@ -18,7 +18,6 @@
   "dependencies": {
     "dompurify": "3.4.16",
     "marked": "18.0.14",
-    "pyodide": "314.0.7",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

@@ -1,7 +1,7 @@
 /**
  * 見本のリポジトリ。模擬の GitHub（test/helpers/mock-github.ts）がこれを API で返す。
  *
- * - `main`（統合先）: 共通レイヤー、互換のマーカー、クローズ済みの親子のチケット i0005 の `done/`
+ * - `main`（統合先）: 共通レイヤー、互換のマーカー、文面ファイル、クローズ済みの親子のチケット i0005 の `done/`
  * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01-01（開いた親子のチケット。直近の外なので閉包で読む）と
  *   i0005-01-01（統合先で閉じている。そこで止まる）
  * - `i0002`（直近）: 悪意のある Markdown を本文に持つ親の提案と、範囲が親の外に出る子（承認の対象にしない）。
@@ -11,6 +11,7 @@
  */
 
 import { COMPAT } from "../helpers/compat.js";
+import { MESSAGES } from "../helpers/messages.js";
 
 export const NOW = "2026-09-29T00:00:00Z";
 
@@ -175,6 +176,7 @@ const MAIN_FILES: Record<string, string> = {
   // フェーズ定義は共通レイヤーと config の和。この見本は自身の config にだけ置き、ワークスペースの親はその定義を使う
   ".ccnavi/config/project/phases.yml": PHASES,
   ".ccnavi/config/common/rules.yml": RULES,
+  ...MESSAGES,
   ".ccnavi/approved/done/i0005.md": done("i0005", null, null),
   ".ccnavi/approved/done/i0005-01-01.md": done("i0005-01-01", "i0005", 1),
   "README.md": "見本\n",

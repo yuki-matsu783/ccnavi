@@ -89,10 +89,8 @@ ccnavi_wap_number() {
 
 # ccnavi_wap_exe を決める。<ワークスペースルート>
 #
-# 実行ファイル（ccnavi_bin）があればそれを、無ければソース（ccnavi のリポジトリの src/ と uv）を
-# `--root <ルート>` つきで起こす。どちらも無ければ、ccnavi_wap_exe は 1 を返すだけの関数にして 1 を返す
-# （止めるかどうかと文面は呼ぶ側が決める）。見つけた実行ファイルのパスは ccnavi_wap_bin に入れる
-# （ソースで動かすときは空）。
+# 実行ファイル（ccnavi_bin）を `--root <ルート>` つきで起こす。無ければ、ccnavi_wap_exe は 1 を返すだけの
+# 関数にして 1 を返す（止めるかどうかと文面は呼ぶ側が決める）。見つけた実行ファイルのパスは ccnavi_wap_bin に入れる。
 # 各 sh が同じ定義をコピーして持たないように、ここに 1 つだけ置く。
 ccnavi_wap_bin=""
 ccnavi_wap_exe_root=""
@@ -103,12 +101,6 @@ ccnavi_wap_use_exe() {
 		return 0
 	fi
 	ccnavi_wap_bin=""
-	if [ -f "$1/src/ccnavi/__main__.py" ] && command -v uv >/dev/null 2>&1; then
-		# ソースで動かすときは、ワークスペースルートで uv を起こす（uv はプロジェクトを cwd から探す）。
-		# サブシェルで cd するので、呼ぶ側の cwd は動かない。
-		ccnavi_wap_exe() { (cd "$ccnavi_wap_exe_root" && uv run --quiet python -m ccnavi --root "$ccnavi_wap_exe_root" "$@"); }
-		return 0
-	fi
 	ccnavi_wap_exe() { return 1; }
 	return 1
 }

@@ -12,8 +12,8 @@ Windows のパスの表記が実物でしか出ない。
 
 git init と worktree add を何度も行い、実行ファイルをコピーするが、実際に測ると 20 件が 8 秒ほどで
 終わるので、他のテストと同じく既定で走る。組み立て済みの実行ファイル（`dist/ccnavi`）が
-無ければ skip する。試すのはソースではなくその実行ファイルなので、`src/ccnavi/` を直したら
-`build.py` で組み立て直してから回す。
+無ければ skip する。試すのはソースではなくその実行ファイルなので、`go/` を直したら
+`sh scripts/ccnavi-build.sh` で組み立て直してから回す。
 
     uv run python -m unittest tests.e2e.test_e2e_sh -v
 
@@ -147,7 +147,7 @@ def reason_to_skip():
     if not os.path.isdir(SH_DIR):
         return f"sh の出どころが無い ({SH_DIR})"
     if not os.path.isdir(DIST):
-        return f"実行ファイルが組み立てられていない ({DIST})。build.py で作る"
+        return f"実行ファイルが組み立てられていない ({DIST})。sh scripts/ccnavi-build.sh で作る"
     return ""
 
 

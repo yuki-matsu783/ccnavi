@@ -16,7 +16,6 @@ import os
 import shutil
 import unittest
 
-from ccnavi.tickets.model import review_host
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text
@@ -27,19 +26,6 @@ GITHUB = (
     "変更要求（Changes requested）が出ています。"
     "解除はレビュアーの Approve か、レビューの dismiss で行います"
 )
-
-
-class NoteTest(unittest.TestCase):
-    def test_the_note_by_host(self):
-        self.assertIn(GITLAB, review_host.changes_requested_note("gitlab"))
-        self.assertIn(GITLAB_UNVERIFIED, review_host.changes_requested_note("gitlab"))
-        self.assertIn(
-            "ccnavi で状態を取り直して確かめます", review_host.changes_requested_note("gitlab")
-        )
-        for host in ("github", "fixture", ""):
-            self.assertEqual(review_host.changes_requested_note(host), GITHUB)
-        self.assertNotIn("Approve か", review_host.changes_requested_note("gitlab"))
-        self.assertNotIn("dismiss", review_host.changes_requested_note("gitlab"))
 
 
 class HostsTest(PhaseHarness):

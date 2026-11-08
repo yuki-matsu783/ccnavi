@@ -3,8 +3,8 @@
 HEAD から読む。
 
 使い捨てのワークスペースと bare のリモートを組み、sh（ccnavi-git.sh・ccnavi-sync.sh・
-ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルはこのツリーのソースを
-`python -m ccnavi` で起動する（tests/sh/write_and_push_harness.py と同じ形）。
+ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは tests/exe.py が
+組み立てたものを起動する（tests/sh/write_and_push_harness.py と同じ形）。
 ユーザが既に作ったブランチ
 `feature/123-login` を、`.claude/worktrees/feature-123-login` が直接チェックアウトする。
 
@@ -35,7 +35,7 @@ import sys
 import tempfile
 import unittest
 
-from tests import ROOT, SRC, common_path, config_path, host_stub
+from tests import ROOT, common_path, config_path, exe, host_stub
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -52,7 +52,7 @@ CHILD = f"{PARENT}-01-01"
 APPROVED = ".ccnavi/approved"
 TODO = "wip/proposals/todo"
 
-# 実行ファイルの代わり。このツリーのソースを起こす。`user` の入口は、ラッパーのオプション
+# 実行ファイルの代わり。tests/exe.py が組み立てたものを起こす。`user` の入口は、ラッパーのオプション
 # （--root など）の後の最初の語なので、ターミナル要求を切るオプションは `user` の呼び出しでは
 # 後ろに付ける。
 EXE = """#!/bin/sh
@@ -66,9 +66,9 @@ for a in "$@"; do
   esac
 done
 if [ "$first" = user ]; then
-  PYTHONPATH='{src}' exec '{python}' -m ccnavi "$@" --guard-ticket-approval disable
+  exec '{exe}' "$@" --guard-ticket-approval disable
 fi
-PYTHONPATH='{src}' exec '{python}' -m ccnavi --guard-ticket-approval disable "$@"
+exec '{exe}' --guard-ticket-approval disable "$@"
 """
 
 
@@ -126,7 +126,7 @@ class ParentBranchShTest(unittest.TestCase):
         git(self.ws, "push", "-q", "-u", "origin", "main")
         git(self.ws, "remote", "set-head", "origin", "main")
         self.bin = os.path.join(base, "bin", "ccnavi")
-        write(self.bin, EXE.format(src=SRC, python=sys.executable))
+        write(self.bin, EXE.format(exe=exe.sh_path()))
         os.chmod(self.bin, os.stat(self.bin).st_mode | stat.S_IXUSR | stat.S_IXGRP)
         self.state = os.path.join(self.ws, "logs", "state")
         # ホストの代役（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）

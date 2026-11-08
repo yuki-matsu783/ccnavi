@@ -1,6 +1,7 @@
 """人間役の端末操作（human_run。段 4）。"""
 
 import contextlib
+import json
 import os
 import select
 import signal
@@ -8,11 +9,9 @@ import subprocess
 import time
 from pathlib import Path
 
-from ccnavi.infra import pathcase, settings
-from ccnavi.tickets.approval import store as approval_store
-from ccnavi.tickets.model import ticket, ticket_model
+from tests.inproc import run_ccnavi
 from tests.scenarios import prepare, schema
-from tests.scenarios.common import DISPOSABLE_REL, write_state
+from tests.scenarios.common import DISPOSABLE_REL, fold, write_state
 
 HUMAN_RUN_TIMEOUT_SEC = 300
 
@@ -26,21 +25,29 @@ def run_text(step):
     return f"`{Path(script).name}`（{what}）"
 
 
+def _board(root):
+    """ボードの JSON（`ccnavi --explain --json`）。チケットの一覧と承認待ちの識別子を読む。"""
+    done = run_ccnavi(["--explain", "--json", "--root", str(root)], cwd=str(root), messages=False)
+    if done.returncode != 0:
+        raise RuntimeError(f"--explain が終了コード {done.returncode}: {done.stderr.strip()}")
+    return json.loads(done.stdout)
+
+
 def pending_proposals(root):
     """承認待ちの提案の [識別子, プロジェクト] の並び。複数のツリーに同じ識別子が出るので畳む。"""
-    conf, _ = settings.load(str(root))
-    found, _ = ticket.scan_all(str(root), conf.tickets, conf.projects)
+    board = _board(root)
+    waiting = set(board["pending_approval"])
     return [
         list(p)
-        for p in sorted({(t.ticket, t.project) for t in found if t.state == ticket_model.TODO})
+        for p in sorted(
+            {(t["ticket"], t["project"]) for t in board["tickets"] if t["ticket"] in waiting}
+        )
     ]
 
 
 def approved_ids(root):
-    """承認済みチケットの識別子（全ツリー）。"""
-    conf, _ = settings.load(str(root))
-    found, _ = approval_store.scan_all(conf, str(root))
-    return {t.ticket for t in found}
+    """承認済みで閉じていないチケットの識別子（全ツリー）。"""
+    return {t["ticket"] for t in _board(root)["tickets"] if t["copy"]["status"] == "open"}
 
 
 def _human_run_env(st, root):
@@ -154,7 +161,7 @@ def run(out, st, idx, step, root):
     if not added:
         return _halt_human_run(out, st, num, "承認する提案が増えていない")
     project = Path(DISPOSABLE_REL).name
-    other = [p for p in added if pathcase.fold(p[1]) != pathcase.fold(project)]
+    other = [p for p in added if fold(p[1]) != fold(project)]
     if other:
         return _halt_human_run(
             out,

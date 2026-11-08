@@ -1,7 +1,7 @@
 """正とするツリーの外に残った古い提案（承認済みの識別子）の受入テスト。
 
 承認済みの識別子の提案は、承認済みチケットと合わせて正とするツリー（親のツリー →
-元ツリー → 決まらない）を決め、そのツリーに在るものだけを読む（`approval.scan_proposals`）。
+元ツリー → 決まらない）を決め、そのツリーに在るものだけを読む。
 見るのは次のとおり。
 
 1. 改版の前に切ったワークツリーに残った古い版（場面 C）を、改版として承認の対象にしない
@@ -15,8 +15,6 @@ import json
 import os
 import unittest
 
-from ccnavi.tickets.approval import store as approval
-from ccnavi.tickets.model import ticket_fold, ticket_model
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_standing import AuthorityHarness
 from tests.ticket.test_ticket import git, write
@@ -241,7 +239,7 @@ class ImportedFamilyTest(AuthorityHarness):
 
     def test_a_stopped_family_carries_the_reason_family_problems_gives(self):
         """親子のチケットが止まっている（親のツリーの HEAD がブランチを指していない）なら、
-        承認の手前で言っていた止まった理由と手順（`approval_checks.family_stop_text`）を同じ文面で添える。"""
+        承認の手前で言っていた止まった理由と手順を同じ文面で添える。"""
         git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
         verify = self.revision_in_root()
         self.assertIn("親子のチケットが止まっている", verify.stdout)
@@ -250,50 +248,6 @@ class ImportedFamilyTest(AuthorityHarness):
         )
         self.assertIn("承認しない", verify.stdout)
         self.assertNotIn("で親のブランチへ送ってから", verify.stdout)
-
-
-def _t(tree, state, project="", parent="", ticket="i0001"):
-    return ticket_model.Ticket(
-        ticket=ticket, tree=tree, state=state, project=project, parent=parent, path=f"/{tree}"
-    )
-
-
-class AuthorityTest(unittest.TestCase):
-    """正とするツリーの決め方（`ticket_fold.authority`）。承認済みチケットと提案が同じ関数を通る。"""
-
-    def test_approved_copies_alone_decide(self):
-        approved = [_t("", "doing")]
-        stale = [_t("i0001", ticket_model.TODO)]
-        # 親のツリーのコピーが無ければ決めない
-        self.assertIsNone(ticket_fold.authority(approved))
-        self.assertEqual(ticket_fold.fold(stale, approved), stale)
-        self.assertEqual([t.tree for t in approval._authoritative(approved, approved)], [""])
-
-    def test_home_tree_wins_over_the_origin(self):
-        approved = [_t("", "doing"), _t("i0001", "doing")]
-        props = [_t("i0001", ticket_model.TODO), _t("x", ticket_model.TODO)]
-        self.assertEqual(ticket_fold.authority(approved), "i0001")
-        self.assertEqual([t.tree for t in ticket_fold.fold(props, approved)], ["i0001"])
-
-    def test_a_cross_repository_collision_keeps_everything_as_before(self):
-        """リポジトリをまたぐ衝突はまとめない（修正前と同じ答え）。"""
-        approved = [_t("", "doing")]
-        props = [
-            _t("p1", ticket_model.TODO, project="p1"),
-            _t("p1-wt", ticket_model.TODO, project="p1"),
-        ]
-        self.assertEqual(ticket_fold.fold(props, approved), props)
-        self.assertEqual(ticket_fold.dedupe(props, approved), props)
-        mixed = [_t("", "doing"), _t("p1", "doing", project="p1")]
-        self.assertIsNone(ticket_fold.authority(mixed))
-        self.assertEqual(approval._authoritative(mixed, mixed), mixed)
-
-    def test_undecided_keeps_every_proposal(self):
-        """親のツリーにも元ツリーにも承認済みチケットが無ければ、提案は全部残す（今までどおり）。"""
-        approved = [_t("a", "doing"), _t("b", "done")]
-        props = [_t("a", ticket_model.TODO), _t("c", ticket_model.TODO)]
-        self.assertIsNone(ticket_fold.authority(approved))
-        self.assertEqual(ticket_fold.fold(props, approved), props)
 
 
 if __name__ == "__main__":

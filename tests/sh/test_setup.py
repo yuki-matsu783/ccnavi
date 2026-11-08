@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import re
@@ -21,6 +20,7 @@ import tempfile
 import unittest
 
 from tests import ROOT
+from tests.sh import install_harness
 
 SCRIPT = os.path.join(ROOT, "scripts", "ccnavi-setup.sh")
 
@@ -47,18 +47,10 @@ def _launcher_source():
 LAUNCHER = _launcher_source()
 
 
-def _load_build():
-    """build.py を名前でなく場所で読む。`import build` は PyInstaller の作業場所
-    （build/）や同名のパッケージを読み込みうる。"""
-    spec = importlib.util.spec_from_file_location("ccnavi_build", os.path.join(ROOT, "build.py"))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-# この機械で組み立てたときに build.py が書く目印。導入スクリプトはこれを自分の uname と
-# 比べる。ここを実際の build_target から取るので、2 つの語が食い違えばテストが失敗する。
-THIS_MACHINE = _load_build().build_target()
+# この機械で組み立てたときに scripts/ccnavi-build.sh が書く目印。導入スクリプトはこれを自分の
+# uname と比べる。ここは uname とは別の読み方（tests.exe.host_target）で取るので、
+# 2 つの語が食い違えばテストが失敗する。
+THIS_MACHINE = install_harness.THIS_MACHINE
 # どの機械とも一致しない目印。
 ANOTHER_MACHINE = "haiku-riscv64"
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -78,8 +70,8 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_ENTRY_PATH")
-# `projects/` がワークスペースの git に追跡されているときの知らせの先頭の句。`--lint` の
-# `(projects)` の warn と同じ句で始まる（VS Code 拡張が見分けに使う）。
+# `projects/` がワークスペースの git に追跡されているときの `--lint` の `(projects)` の warn の先頭の句。
+# 導入スクリプトは入れ終わりに `--lint` を起こし、この warn をそのまま見せる。
 TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
 # 書かなければ enable で動くので、dry-run で導入したときにここだけ実際に動くと、
@@ -163,7 +155,6 @@ TEMPLATES_PARTS = (".ccnavi", "config", "common", "templates")
 # 機械の名前は <M>、配布先は <T> に置き換えて比べる。
 NO_TEMPLATES_FILES = [
     ".ccnavi/CCNAVI.md",
-    ".ccnavi/bin/<M>/_internal/base_library.zip",
     ".ccnavi/bin/<M>/ccnavi",
     ".ccnavi/config/common/phases.yml",
     ".ccnavi/config/common/risks.yml",
@@ -277,6 +268,7 @@ ccnavi を登録した hook:
   .ccnavi/scripts/ccnavi-idle.sh
   .ccnavi/scripts/ccnavi-launcher.sh
 env の値は、セッションを開き直すまで反映されません。
+sh .ccnavi/scripts/ccnavi-launcher.sh --lint の結果:
 """
 LAUNCHER_PARTS = (".ccnavi", "scripts", LAUNCHER_NAME)
 # CCNAVI_ENTRY_PATH に書くパス。固定。
@@ -670,261 +662,6 @@ class WritesTheExpectedShape(SetupTest):
         self.assertTrue(names(missing, f".ccnavi/bin/{THIS_MACHINE}/ccnavi"), result.stdout)
 
 
-@unittest.skipUnless(shutil.which("git"), "git が見つからない")
-class TellsAboutAProjectsCollision(SetupTest):
-    """ワークスペースの git が `projects/` の下を追跡しているとき、入れ終わりに知らせる（A8）。
-
-    条件と文面は `--lint` と同じ（設計 §4.4）。止めず、終了コードも変えない。`--check` でも出す
-    （導入の不足ではないので「揃っていない」には数えない）。
-
-    sh と `--lint` が同じ文面を持つので、`--lint` の先頭の句がこちらの出力にも入っていることを
-    ここで確かめて、ずれを捕まえる。
-    """
-
-    def git(self, *args):
-        subprocess.run(
-            ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *args],
-            cwd=self.dir,
-            check=True,
-            capture_output=True,
-        )
-
-    def track_projects(self):
-        """ワークスペース自身のソースとして `projects/foo.txt` を追跡させる。"""
-        self.git("init", "--quiet", "-b", "main")
-        path = os.path.join(self.dir, "projects", "foo.txt")
-        os.makedirs(os.path.dirname(path))
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        self.git("add", "--", "projects/foo.txt")
-        self.git("commit", "--quiet", "-m", "init")
-
-    def test_names_the_collision_after_it_finished(self):
-        self.track_projects()
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(TRACKED_LEAD, result.stdout)
-        self.assertIn("projects/foo.txt", result.stdout)
-        self.assertTrue(os.path.isfile(self.settings_path()), "止めて設定を書かなかった")
-
-    def test_the_exit_code_is_the_same_with_and_without_the_collision(self):
-        plain = self.run_setup("--mode", "enable")
-        self.assertEqual(plain.returncode, 0, plain.stderr)
-        self.assertNotIn(TRACKED_LEAD, plain.stdout)
-
-        self.track_projects()
-        again = self.run_setup("--mode", "enable")
-
-        self.assertEqual(again.returncode, plain.returncode, again.stdout + again.stderr)
-        self.assertIn(TRACKED_LEAD, again.stdout)
-
-    def test_check_names_it_but_does_not_count_it_as_not_settled(self):
-        self.run_setup("--mode", "enable")
-        self.track_projects()
-
-        checked = self.run_setup("--mode", "enable", "--check")
-
-        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-        self.assertIn(TRACKED_LEAD, checked.stdout)
-
-    def test_says_nothing_without_a_tracked_file_under_projects(self):
-        self.git("init", "--quiet", "-b", "main")
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn(TRACKED_LEAD, result.stdout)
-
-    def test_the_lead_phrase_is_the_one_lint_uses(self):
-        """`--lint` の `(projects)` の warn の先頭の句が、こちらの出力にも入っている。"""
-        from tests.inproc import run_ccnavi
-
-        self.track_projects()
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        lead = details[0].split("（", 1)[0]
-        self.assertTrue(lead.startswith(TRACKED_LEAD), lead)
-        self.assertIn(lead, setup.stdout)
-
-
-@unittest.skipUnless(shutil.which("git"), "git が見つからない")
-class TellsAboutProjectsAddedByMistake(SetupTest):
-    """索引の `projects/` の下が gitlink だけのとき（載せ忘れ）の知らせ（A8b）。
-
-    `.gitignore` に `/projects/` を入れ忘れて `git add -A` しただけなので、改名ではなく
-    「索引から外して無視に入れる」を案内する。条件と文面は `--lint` と同じ（設計 §4.4）。
-    止めず、終了コードも変えず、`--check` でも出し、「揃っていない」には数えない。
-    導入スクリプトは索引を変えない。
-
-    gitlink は人が踏むのと同じ手で作る: `projects/lib` で `git init` して 1 回コミットし、
-    ワークスペースで `-f` を付けずに `git add -A`（設計 §6）。
-    """
-
-    def git(self, *args, cwd=None):
-        done = subprocess.run(
-            ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t", *args],
-            cwd=cwd or self.dir,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        return done.stdout
-
-    def forget_projects(self):
-        self.git("init", "--quiet", "-b", "main")
-        lib = os.path.join(self.dir, "projects", "lib")
-        os.makedirs(lib)
-        with open(os.path.join(lib, "main.py"), "w", encoding="utf-8") as f:
-            f.write("print(1)\n")
-        self.git("init", "--quiet", "-b", "main", cwd=lib)
-        self.git("add", "-A", cwd=lib)
-        self.git("commit", "--quiet", "-m", "init", cwd=lib)
-        self.git("add", "-A")
-        self.git("commit", "--quiet", "-m", "init")
-        self.assertIn("160000", self.index())
-
-    def index(self):
-        return self.git("ls-files", "-s")
-
-    def test_names_it_with_the_way_to_untrack_and_not_the_rename(self):
-        self.forget_projects()
-        before = self.index()
-
-        result = self.run_setup("--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(TRACKED_LEAD + "（入れ子のリポジトリとして", result.stdout)
-        self.assertIn("git rm -r --cached projects", result.stdout)
-        self.assertNotIn("git mv", result.stdout)
-        self.assertTrue(os.path.isfile(self.settings_path()), "止めて設定を書かなかった")
-        self.assertEqual(self.index(), before, "導入スクリプトが索引を変えた")
-
-    def test_the_exit_code_is_the_same_as_without_it(self):
-        plain = self.run_setup("--mode", "enable")
-        shutil.rmtree(os.path.join(self.dir, ".claude"), ignore_errors=True)
-        shutil.rmtree(os.path.join(self.dir, ".vscode"), ignore_errors=True)
-        self.forget_projects()
-
-        again = self.run_setup("--mode", "enable")
-
-        self.assertEqual(again.returncode, plain.returncode, again.stdout + again.stderr)
-        self.assertIn(TRACKED_LEAD, again.stdout)
-
-    def test_check_names_it_but_does_not_count_it_as_not_settled(self):
-        self.forget_projects()
-        self.run_setup("--mode", "enable")
-        before = self.index()
-
-        checked = self.run_setup("--mode", "enable", "--check")
-
-        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-        self.assertIn("git rm -r --cached projects", checked.stdout)
-        self.assertNotIn("git mv", checked.stdout)
-        self.assertEqual(self.index(), before, "--check が索引を変えた")
-
-    def test_the_first_sentence_is_the_one_lint_uses(self):
-        """`--lint` の `(projects)` の warn の 1 文目が、こちらの出力にもそのまま入っている。"""
-        from tests.inproc import run_ccnavi
-
-        self.forget_projects()
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        first = details[0].split("。", 1)[0] + "。"
-        self.assertTrue(first.startswith(TRACKED_LEAD + "（入れ子のリポジトリとして"), first)
-        self.assertIn(first, setup.stdout)
-        # 文面全体も揃っている（2 か所に書いた文面のずれを捕まえる）。
-        self.assertIn(details[0], setup.stdout)
-
-    def test_a_file_beside_the_gitlink_is_worded_as_lint_words_the_collision(self):
-        """通常のファイルもあればぶつかり（改名）で、gitlink を名指しする。
-
-        文面は `--lint` と同じ。
-        """
-        from tests.inproc import run_ccnavi
-
-        self.forget_projects()
-        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        self.git("add", "--", "projects/foo.txt")
-        self.git("commit", "--quiet", "-m", "source")
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        self.assertIn("git mv projects apps", details[0])
-        self.assertIn("git rm --cached projects/lib", details[0])
-        self.assertIn(details[0], setup.stdout)
-
-    def test_gitlinks_with_a_space_or_a_quote_are_quoted_as_lint_quotes_them(self):
-        """`git rm --cached` に載せるパスは、sh で割れる文字を含むときだけ `'…'` で囲む。
-
-        `'` を含むなら `'\\''` に置く。綴りは `--lint` と 1 字違わず同じ。
-        """
-        from tests.inproc import run_ccnavi
-
-        self.git("init", "--quiet", "-b", "main")
-        for name in ("it's", "lib", "my lib"):
-            nested = os.path.join(self.dir, "projects", name)
-            os.makedirs(nested)
-            with open(os.path.join(nested, "main.py"), "w", encoding="utf-8") as f:
-                f.write("print(1)\n")
-            self.git("init", "--quiet", "-b", "main", cwd=nested)
-            self.git("add", "-A", cwd=nested)
-            self.git("commit", "--quiet", "-m", "init", cwd=nested)
-        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        self.git("add", "-A")
-        self.git("commit", "--quiet", "-m", "init")
-        setup = self.run_setup("--mode", "enable")
-        linted = run_ccnavi(
-            ["--root", self.dir, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=clean_env(),
-        )
-
-        details = [
-            p["detail"] for p in json.loads(linted.stdout)["problems"] if p["where"] == "(projects)"
-        ]
-
-        self.assertEqual(len(details), 1, linted.stdout)
-        self.assertIn(
-            "`git rm --cached 'projects/it'\\''s' projects/lib 'projects/my lib'`", details[0]
-        )
-        self.assertIn(details[0], setup.stdout)
-
-
 class KeepsWhatItFinds(SetupTest):
     def test_running_twice_changes_nothing(self):
         """2 回目は同じ形に落ち着き、hook が二重にならない。"""
@@ -1278,10 +1015,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
     ):
         """配布元のふりをするディレクトリを作る。
 
-        実物を組み立てない。PyInstaller に 11 秒かかるし、ここで見たいのは
+        実物を組み立てない。ここで見たいのは
         「どこから何を配るか」であって、実行ファイルの中身ではない。
 
-        target は build.py が dist/ccnavi.target に書く目印。None なら書かない
+        target は scripts/ccnavi-build.sh が dist/ccnavi.target に書く目印。None なら書かない
         （目印の無い配布元）。
 
         launcher が偽なら、.ccnavi/scripts/ccnavi-launcher.sh だけを置かない。
@@ -1300,16 +1037,10 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                 with open(os.path.join(src, "dist", "ccnavi.target"), "w", encoding="utf-8") as f:
                     f.write(target + "\n")
             binary = os.path.join(src, "dist", "ccnavi", "ccnavi")
-            os.makedirs(os.path.join(src, "dist", "ccnavi", "_internal"))
+            os.makedirs(os.path.dirname(binary))
             with open(binary, "w", encoding="utf-8") as f:
                 f.write("#!/bin/sh\nexit 0\n")
             os.chmod(binary, 0o755)
-            with open(
-                os.path.join(src, "dist", "ccnavi", "_internal", "base_library.zip"),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                f.write("同梱物")
         if parts:
             os.makedirs(os.path.dirname(os.path.join(src, *RULES_PARTS)))
             with open(
@@ -1416,7 +1147,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
-        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
         with (
             open(self.deployed(*LAUNCHER_PARTS), encoding="utf-8") as f,
             open(LAUNCHER, encoding="utf-8") as g,
@@ -1605,7 +1335,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "crlf": ("---\r\nname: x\r\ndistribute: true\r\n---\r\n", True),
             "trailing comment": ("---\ndistribute: true # 配る\n---\n", True),
             "no closing fence": ("---\ndistribute: true\n", False),
-            "bom": ("\ufeff---\ndistribute: true\n---\n", False),
+            "bom": ("\ufeff---\ndistribute: true\n---\n", True),
             "string": ('---\ndistribute: "true"\n---\n', False),
             "false": ("---\ndistribute: false\n---\n", False),
             "in the body": ("---\nname: x\n---\ndistribute: true\n", False),
@@ -1622,19 +1352,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
                     expected,
                 )
 
-    def test_a_distribute_skill_is_not_copied_into_the_projects_by_the_prompt_sync(self):
-        """配るだけのスキルは工程スキルではない。ユーザの発言のときの同期の対象に入らない。"""
-        from ccnavi.tickets.sync import skillsync
-
-        root = tempfile.mkdtemp(prefix="ccnavi-skills-")
-        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
-        for name, text in (("tool", self.DISTRIBUTE), ("process-test", self.PROCESS)):
-            path = os.path.join(root, ".claude", "skills", name, "SKILL.md")
-            os.makedirs(os.path.dirname(path))
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(text)
-        self.assertEqual(skillsync.processes(root), ["process-test"])
-
     def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
         src = self.make_source(skills=self.skill_files())
         path = self.deployed(".claude", "skills", "process-test", "SKILL.md")
@@ -1649,13 +1366,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             self.assertEqual(f.read(), self.PROCESS)
 
     def test_reads_the_process_flag_like_the_ticket_start_does(self):
-        """配る判定は、親チケットの着手がコピーする判定（skillsync）と同じ答えを返す。
+        """配る判定は、親チケットの着手がコピーする判定と同じ答えを返す。
 
         食い違うと、着手がコピーする元の SKILL.md が配布先に届かないまま、何の知らせも出ない。
-        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。
+        特に Windows の Git Bash は、SKILL.md を CRLF で取り出すことがある。着手の側の判定は
+        go test（go/internal/tickets/sync/mirror/setup_sh_test.go）が同じ表で見る。
+        配るだけのスキル（distribute）を工程として数えないことも、そちらが見る。
         """
-        from ccnavi.tickets.sync import skillsync
-
         cases = {
             "lf": ("---\nname: x\nprocess: true\n---\n", True),
             "crlf": ("---\r\nname: x\r\nprocess: true\r\n---\r\n", True),
@@ -1663,14 +1380,13 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "trailing comment": ("---\nprocess: true # 工程\n---\n", True),
             "no closing fence": ("---\nprocess: true\n", False),
             "flag before the fence": ("process: true\n---\nname: x\n---\n", False),
-            "bom": ("﻿---\nprocess: true\n---\n", False),
+            "bom": ("\ufeff---\nprocess: true\n---\n", True),
             "string": ('---\nprocess: "true"\n---\n', False),
             "commented out": ("---\n# process: true\n---\n", False),
             "in the body": ("---\nname: x\n---\nprocess: true\n", False),
         }
         for label, (text, expected) in cases.items():
             with self.subTest(label=label):
-                self.assertIs(skillsync._process_flag(text.encode("utf-8")), expected)
                 src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
                 target = tempfile.mkdtemp(prefix="ccnavi-setup-")
                 self.addCleanup(shutil.rmtree, target, ignore_errors=True)
@@ -1740,7 +1456,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "uv run": r"\buv run\b",
             "scripts/check_rules.py": r"scripts/check_rules\.py",
             "配布元の docs/": r"(?<![\w])(?:docs/\d\d_|\.agents/docs)",
-            "配布元の src/ccnavi": r"src/ccnavi/",
+            "配布元の go/": r"(?<![\w/])go/(?:internal|cmd)/",
             "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
         }
         problems = []
@@ -1915,7 +1631,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], BIN_PATH)
         self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "ccnavi")))
-        self.assertTrue(os.path.isfile(self.built(THIS_MACHINE, "_internal", "base_library.zip")))
         self.assertEqual(sorted(os.listdir(self.deployed(*BIN_DIR_PARTS))), [THIS_MACHINE])
         self.assertNotIn("まだ無いもの", result.stdout)
 
@@ -2007,7 +1722,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
         link = os.path.join(home, ".local", "bin", "ccnavi")
         self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi")))
-        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
         self.assertTrue(os.path.islink(link))
         self.assertEqual(os.readlink(link), os.path.join(share, "ccnavi"))
         # 配布先の .ccnavi/bin/ には置かず、無視する行も追加しない。sh と設定は配る。
@@ -2050,8 +1764,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         replaced = self.run_user_bin(home, *args, answer="y")
         self.assertEqual(replaced.returncode, 0, replaced.stdout + replaced.stderr)
         share = os.path.join(home, ".local", "share", "ccnavi", THIS_MACHINE)
-        with open(os.path.join(share, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "新しい同梱物")
+        with open(os.path.join(share, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい組み立て")
 
     # ---- PATH の案内は、環境に合った追加の仕方を言う
 
@@ -2170,7 +1884,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     @unittest.skipIf(os.name == "nt", "疑似ターミナルは POSIX の話")
     def test_bin_user_on_git_bash_puts_the_folder_on_the_path_and_makes_no_link(self):
-        """Git Bash はリンクを使わず、ccnavi.exe と _internal/ が並ぶフォルダを PATH に通す。"""
+        """Git Bash はリンクを使わず、ccnavi.exe が在るフォルダを PATH に通す。"""
         src = self.make_source(target="windows-x86_64")
         with open(os.path.join(src, "dist", "ccnavi", "ccnavi.exe"), "w", encoding="utf-8") as f:
             f.write("exe")
@@ -2183,7 +1897,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         share = os.path.join(home, ".local", "share", "ccnavi", "windows-x86_64")
         self.assertTrue(os.path.isfile(os.path.join(share, "ccnavi.exe")))
-        self.assertTrue(os.path.isfile(os.path.join(share, "_internal", "base_library.zip")))
         self.assertFalse(os.path.exists(os.path.join(home, ".local", "bin")))
         # Windows の環境変数 Path に、実体のフォルダを追加する手順を言う。rc には触れない。
         self.assertIn("SetEnvironmentVariable", result.stdout)
@@ -2319,7 +2032,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.read_settings()["env"]["CCNAVI_MODE"], "enable")
         self.assertIn("配っていません", result.stdout)
-        self.assertIn("build.py", result.stdout)
+        self.assertIn("scripts/ccnavi-build.sh", result.stdout)
 
     def test_does_not_refuse_when_the_default_source_is_the_target(self):
         """ccnavi 自身に打っても止まらない。配る先が無いので、配布だけ諦める。"""
@@ -2362,9 +2075,9 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
 
-    def change_source_build(self, src, text="新しい同梱物"):
+    def change_source_build(self, src, text="新しい組み立て"):
         """配布元の組み立てを変える（組み立て直したことにする）。"""
-        with open(os.path.join(src, "dist", "ccnavi", "_internal", "base_library.zip"), "w") as f:
+        with open(os.path.join(src, "dist", "ccnavi", "ccnavi"), "w", encoding="utf-8") as f:
             f.write(text)
 
     def test_replaces_a_build_that_differs_from_the_source_without_force(self):
@@ -2375,7 +2088,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
-        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
+        stale = self.built(THIS_MACHINE, "前の版の残り")
         with open(stale, "w", encoding="utf-8") as f:
             f.write("前の版")
         self.change_source_build(src)
@@ -2383,8 +2096,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("入れ替えた", result.stdout)
-        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "新しい同梱物")
+        with open(self.built(THIS_MACHINE, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい組み立て")
         self.assertFalse(os.path.exists(stale))
         # 新しい版を隣に作ってから入れ替えるので、途中の置き場を残さない。
         left = [
@@ -2396,12 +2109,12 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         """中身が同じなら置き換えない。何度実行しても同じ結果になる。"""
         src = self.make_source()
         self.run_setup("--deploy", src)
-        before = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+        before = os.stat(self.built(THIS_MACHINE, "ccnavi")).st_mtime_ns
 
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("入れ替えた", result.stdout)
-        after = os.stat(self.built(THIS_MACHINE, "_internal", "base_library.zip")).st_mtime_ns
+        after = os.stat(self.built(THIS_MACHINE, "ccnavi")).st_mtime_ns
         self.assertEqual(before, after)
 
     def test_a_differing_build_does_not_replace_the_rules_the_project_edited(self):
@@ -2416,8 +2129,8 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(self.deployed(*RULES_PARTS), encoding="utf-8") as f:
             self.assertIn("このプロジェクトで直した", f.read())
-        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "新しい同梱物")
+        with open(self.built(THIS_MACHINE, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "新しい組み立て")
 
     def test_check_counts_a_differing_build_as_not_settled(self):
         """`--check` は、配布元と中身が違う実行ファイルを「揃っていない」に数える。書かない。"""
@@ -2427,18 +2140,17 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
         result = self.run_setup("--deploy", src, "--check")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        with open(self.built(THIS_MACHINE, "_internal", "base_library.zip"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "同梱物")
+        with open(self.built(THIS_MACHINE, "ccnavi"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "#!/bin/sh\nexit 0\n")
 
     def test_force_replaces_and_drops_the_previous_build(self):
         """`--force` なら入れ替える。前の組み立ての残りも持ち越さない。
 
-        PyInstaller の同梱物は名前で引かれるので、前の版の同梱物が残ると
-        新しい実行ファイルがそれを読み込む。
+        前の版にだけあったファイルが残ると、置き場の中身がどの版のものか分からなくなる。
         """
         src = self.make_source()
         self.run_setup("--deploy", src)
-        stale = self.built(THIS_MACHINE, "_internal", "古い同梱物.so")
+        stale = self.built(THIS_MACHINE, "前の版の残り")
         with open(stale, "w", encoding="utf-8") as f:
             f.write("前の版")
         with open(self.deployed(*RULES_PARTS), "w", encoding="utf-8") as f:
@@ -2460,7 +2172,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         src = self.make_source(built=False)
         result = self.run_setup("--deploy", src)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("build.py", result.stderr)
+        self.assertIn("scripts/ccnavi-build.sh", result.stderr)
         self.assertFalse(os.path.exists(self.settings_path()))
 
     def test_names_what_the_source_does_not_have(self):
@@ -2549,7 +2261,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
     """実行ファイルを、組み立てた機械の置き場（`<os>-<arch>/`）に入れる。
 
-    PyInstaller の実行ファイルは組み立てた機械の OS と CPU でしか動かない。機械ごとに
+    実行ファイルは組み立てた向きの OS と CPU でしか動かない。機械ごとに
     置き場を分けるので、別の機械向けを配ってもこの機械の実行ファイルは上書きされない。
     ただしこの機械で動くものが無いことは、省かずに言う。
     """
@@ -2626,7 +2338,7 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
     """配った実行ファイルなどを .gitignore に足す。足す行は目印の行で囲んだ 1 つの領域に入る。
 
     配布先は git で持ち回るのが普通なので、書かないと次のコミットで実行ファイルと
-    _internal がまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
+    実行ファイルがまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
     ない。
     """
 
@@ -2996,8 +2708,8 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
         self.assertEqual(written.count("ccnavi begin"), 1)
         self.assertIn(WORKTREES_LINE, written)
 
-    def test_index_negation_keeps_the_user_tracking_the_index(self):
-        """ユーザが ccnavi-index.jsonl を否定していれば足さず、そう言う（--check でも）。"""
+    def test_index_negation_does_not_stop_the_index_line(self):
+        """ccnavi-index.jsonl を否定する行があっても、実行ファイルと同じく末尾に足す（--check でも足すと言う）。"""
         for negation in (
             "!**/ccnavi-index.jsonl",
             "!ccnavi-index.jsonl",
@@ -3011,14 +2723,16 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
                 )
                 src = self.settle(before)
                 checked = self.run_setup("--deploy", src, "--check")
-                self.assertIn("ユーザが索引を追跡しているので", checked.stdout)
-                self.assertIn(negation, checked.stdout)
-                self.assertNotIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
+                self.assertNotIn("ユーザが索引を追跡しているので", checked.stdout)
+                self.assertIn(INDEX_LINE, section(checked.stdout, ".gitignore に足す"))
                 self.assertEqual(self.read_raw(), before)
 
                 result = self.run_setup("--deploy", src)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(self.read_raw(), before)
+                written = self.read_raw()
+                self.assertTrue(written.startswith(before), written)
+                self.assertEqual(written.splitlines().count(INDEX_LINE), 1, written)
+                self.assertNotIn("まだ無視していません", result.stdout)
 
     def test_scratchpad_and_logs_equivalents_and_negations(self):
         for existing in (SCRATCH_LINE, "/scratchpad/", "scratchpad/", "scratchpad"):
@@ -3218,6 +2932,93 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertEqual(check.returncode, 1, check.stdout)
         self.assertIn("git.detectWorktrees", check.stdout)
         self.assertFalse(os.path.exists(self.vscode_path()), "--check は書かない")
+
+
+
+# 入れ終わりに見せる `--lint` の見出しと、起こさないときの 1 行。
+LINT_HEADING = f"sh {BIN_PATH} --lint の結果:"
+LINT_LATER = f"案内: 導入したあとに、ワークスペースルートで sh {BIN_PATH} --lint を実行して"
+
+
+class ShowsTheLintAtTheEnd(SetupTest):
+    """入れ終わりに、配った振り分けの sh を通して `--lint` を 1 回起こし、結果をそのまま見せる。
+
+    `projects/` の索引の知らせなどの判定と文面は実行ファイルだけが持ち、導入スクリプトは自分で判定しない。
+    止めず、終了コードも変えない。`--check` と、振り分けの sh がまだ無いときは起こさず、確かめ方の 1 行だけを出す。
+    """
+
+    # 配布元の作り方だけを借りる（継ぐと配布のテストがもう一度走る）。
+    make_source = DeploysWhatTheProjectNeeds.make_source
+
+    def source_with_exe(self, body):
+        """配る実行ファイルを、body の sh にした配布元。"""
+        src = self.make_source()
+        with open(os.path.join(src, "dist", "ccnavi", "ccnavi"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(body)
+        return src
+
+    def lint_calls(self, log):
+        if not os.path.exists(log):
+            return []
+        with open(log, encoding="utf-8") as f:
+            return f.read().splitlines()
+
+    @unittest.skipIf(os.name == "nt", "代役の実行ファイルは sh で書く")
+    def test_runs_lint_once_at_the_end_and_shows_it_as_is(self):
+        log = os.path.join(self.dir, "lint-calls.txt")
+        # 終了コードを 3 にして、導入スクリプトの終了コードが変わらないことも見る。
+        src = self.source_with_exe(
+            f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\nprintf 'LINT-OUT\\n'\nexit 3\n"
+        )
+
+        result = self.run_setup("--deploy", src, "--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(result.stdout.endswith(LINT_HEADING + "\nLINT-OUT\n"), result.stdout)
+        self.assertEqual(self.lint_calls(log), [f"--root {self.dir} --lint"])
+
+    @unittest.skipIf(os.name == "nt", "代役の実行ファイルは sh で書く")
+    def test_check_does_not_run_lint(self):
+        log = os.path.join(self.dir, "lint-calls.txt")
+        src = self.source_with_exe(f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\n")
+        self.run_setup("--deploy", src, "--mode", "enable")
+        before = self.lint_calls(log)
+
+        checked = self.run_setup("--deploy", src, "--mode", "enable", "--check")
+
+        self.assertIn(LINT_LATER, checked.stdout)
+        self.assertNotIn(LINT_HEADING, checked.stdout)
+        self.assertEqual(self.lint_calls(log), before)
+
+    def test_without_the_launcher_it_only_says_how_to_check(self):
+        result = self.run_setup("--no-deploy", "--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(LINT_LATER, result.stdout)
+        self.assertNotIn(LINT_HEADING, result.stdout)
+
+    @unittest.skipUnless(shutil.which("git"), "git が見つからない")
+    def test_the_real_lint_names_a_tracked_projects_place(self):
+        """本物の実行ファイルを配ると、`projects/` の索引の知らせは `--lint` の文面のまま出る。"""
+        from tests import exe
+
+        src = self.make_source()
+        os.remove(os.path.join(src, "dist", "ccnavi", "ccnavi"))
+        shutil.copy(exe.path(), os.path.join(src, "dist", "ccnavi", exe.NAME))
+        git = ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+        subprocess.run([*git, "init", "--quiet", "-b", "main"], cwd=self.dir, check=True)
+        os.makedirs(os.path.join(self.dir, "projects"))
+        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
+            f.write("ワークスペースのソース\n")
+        subprocess.run([*git, "add", "--", "projects/foo.txt"], cwd=self.dir, check=True)
+        subprocess.run([*git, "commit", "--quiet", "-m", "init"], cwd=self.dir, check=True)
+
+        result = self.run_setup("--deploy", src, "--mode", "enable")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        after = result.stdout.split(LINT_HEADING, 1)
+        self.assertEqual(len(after), 2, result.stdout)
+        self.assertIn(TRACKED_LEAD + "（例: `projects/foo.txt`）", after[1])
 
 
 if __name__ == "__main__":

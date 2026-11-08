@@ -1,11 +1,31 @@
 """setup.issue の issue を gh / glab で作って閉じる（段 1）。"""
 
+import re
 import subprocess
 from pathlib import Path
 
-from ccnavi.tickets.model import review_host
-
 ISSUE_PLACEHOLDER = "{issue}"
+
+# origin の URL（https・ssh・scp 形式）からホストを取り出す。実行ファイルの分け方と同じ表記を読む。
+_REMOTE = re.compile(
+    r"^(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?"
+    r"(?P<host>\[[^\]/]+\]|[^/:@]+)(?::[0-9]+)?[/:]+.+?(?:\.git)?/?$"
+)
+_GHE_DOMAIN = "ghe.com"
+
+
+def host_kind(url):
+    """origin の URL から、ホストの種類（github / gitlab。読めない表記なら空）を返す。
+
+    github.com と GHE.com（`ghe.com` とそのサブドメイン）は GitHub、ほかは GitLab として扱う。
+    """
+    m = _REMOTE.match(url)
+    if m is None:
+        return ""
+    host = m.group("host").lower()
+    if host == "github.com" or host == _GHE_DOMAIN or host.endswith("." + _GHE_DOMAIN):
+        return "github"
+    return "gitlab"
 
 
 def issue_number(url):
@@ -22,7 +42,7 @@ def issue_number(url):
 
 
 def host_cli(kind):
-    """ホストの種類（classify の kind）から CLI の名前を返す。GitLab は glab、GitHub は gh。"""
+    """ホストの種類（host_kind）から CLI の名前を返す。GitLab は glab、GitHub は gh。"""
     if kind == "github":
         return "gh"
     if kind == "gitlab":
@@ -53,7 +73,7 @@ def repo_host_kind(repo_dir):
     )
     if r.returncode != 0:
         return ""
-    return review_host.classify(r.stdout.strip()).kind
+    return host_kind(r.stdout.strip())
 
 
 def make_issue(issue, root):

@@ -1,0 +1,28 @@
+ツールの実行可否を判定せずに、ルールファイルと設定を検証するには、次のコマンドを実行します。
+
+    ccnavi --lint [--json]
+
+ペイロードは読み込みません。ガードを無効にしうる事項をエラーまたは警告として報告し、
+エラーを報告した場合は0以外の終了コードで終了します。
+--json で出力される形式は docs/11_requirements/json-shapes.md（「lint
+の JSON」）に記載しており、VS Code拡張機能がこれを読み込みます。
+
+1つのレイヤーのフェーズ定義も同じ方法で渡します（self はワークスペース自身のレイヤーです。
+共通レイヤーには --phases を使います）。
+
+    ccnavi --lint --project-phases-file self=/tmp/phases.yml
+
+1つのレイヤーのリスクの配点も同じ方法で渡します（--project-risk-file。共通レイヤーには --risk
+を使います）。共通レイヤーと組み合わせて、統合後のレベルの境界、重複するid、各 script:
+がそのレイヤー自身のgitプロジェクトルート配下に存在するかを検証します。
+
+    ccnavi --lint --project-risk-file lib=/tmp/risks.yml
+
+子チケット1件のフローも同様に検証します。
+SubagentStartが使用するものと同じ読み込み処理・同じ検証を行います（--lint 専用です。VS
+Code拡張機能は、フローを開く前や保存する前に、編集中の内容をこの方法で渡します）。
+
+    ccnavi --lint --json --flow /tmp/flow.yml
+
+共通レイヤーのオプション（--rules・--phases・--risk・--projects など）は
+ccnavi --help scripts に書いてあります。

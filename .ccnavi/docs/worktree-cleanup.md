@@ -36,14 +36,16 @@ keywords: [片付け, ワークツリー, worktree remove, ccnavi-clean.sh, 分�
     （`sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-clean.sh --worktree <名前>`）が出る。`worktree drop`を親のワークツリーの中から
     直接打ったときはこの形になる（`worktree retire`は子に触る前に最初に断る。上）。`ready`は外から`--parent`を付けて打つので、この形にはならない。ExitWorktreeか`cd`でワークスペースルートに出てから、出た1本をそのまま打つ
   - 未コミットの変更があるワークツリーは、何も消さずに止まる（中身は`git -C <パス> status`で見る）。別のセッションの作業かもしれないので、ユーザに確かめる
+  - HEADがブランチを指していない（detached）ワークツリーは、どのブランチ・タグにも無いコミットがあると、何も消さずに止まる
+    （消すとそのコミットがどこからも辿れず、gitのgcで失われる）。残すなら`git -C <パス> branch <ブランチ名>`でブランチを付けてから打ち直す
   - gitが無視しているファイル（`.env`など）は、`worktree remove`が黙って消して履歴から戻せないので、消さずに
     ワークスペースルートの`scratchpad/worktrees/<名前>/`へ退避してから消す（元の相対パスを保つ。最上位の項目ごとのrenameで、
     中を走査しない。何を退避したかは出力に出る）。退避したものはccnaviが消さないので、要らなければユーザが消す
     - 動かさずに止まる場合は3つ。退避先がgitに無視されていない（`.env`がコミットされうる。ルートの`.gitignore`に`/scratchpad`を足す）、
       退避先に同じパスがある（上書きしない）、移せない（使用中・別ボリュームなど。理由が出る。退避済みのものは退避先に残る）
-    - 生成物（`ccnavi-clean.sh`が消すもの。一覧は`src/ccnavi/tickets/lifecycle/worktrees.py`の`ALWAYS`・`BESIDE`）は退避せずに消す。一覧は作り直せるキャッシュだけで、`node_modules`・`.venv`・`__pycache__`・
+    - 生成物（`ccnavi-clean.sh`が消すもの。一覧は ccnavi のソースの`go/internal/tickets/lifecycle/worktrees/clean.go`の`always`・`beside`）は退避せずに消す。一覧は作り直せるキャッシュだけで、`node_modules`・`.venv`・`__pycache__`・
       `.mypy_cache`・`.tox`・`.next`などと、隣に印のファイルがあるときだけの`out`・`dist`・`.cache`（`package.json`）、
-      `target`（`Cargo.toml`・`pom.xml`）、`build`（`build.gradle`）。追跡されているものは消さない。手で置いたデータは、
+      `target`（`Cargo.toml`・`pom.xml`）、`build`（`build.gradle`）。印のファイルがリンクなら生成物と見ず、退避する。追跡されているものは消さない。手で置いたデータは、
       この名前の下に置かない
     - 下書きの置き場は`wip/handoff/`（追跡される。[scratchpad.md](scratchpad.md)）で、gitが無視するファイルではない。
       未コミットの下書きは「未コミットの変更」として止まる

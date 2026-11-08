@@ -3,7 +3,7 @@ type: guide
 title: 開発の入口
 description: ccnavi 自身を開発する人向けの入口。読み手ごとの最初の文書の地図、文書の案内表、開発環境のコマンド、手で 1 回動かす方法、トップレベルのディレクトリ構成
 tags: [development, docs]
-keywords: [開発, 入口, 開発環境, テスト, unittest, ruff, build.py, uv, 手で動かす, ディレクトリ構成, 文書の案内, 読み手]
+keywords: [開発, 入口, 開発環境, テスト, unittest, ruff, ccnavi-build.sh, go, uv, 手で動かす, ディレクトリ構成, 文書の案内, 読み手]
 ---
 
 # 開発の入口
@@ -36,6 +36,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 | 実行ファイルの組み立てと配布物、配布する sh の確かめ方 | [組み立てと配布物](../.agents/docs/build-and-dist.md) |
 | 作業の決まり（`.ccnavi/CCNAVI.md`）に条件を足す | [作業の決まりに条件を足す](../.agents/docs/ccnavimd-conditions.md) |
 | 環境の版、環境固有の落とし穴 | [実行環境とADRの扱い](../.agents/docs/environment.md) |
+| 実行ファイルを Go に書き直す作業の決まりと進み具合 | [実行ファイルをGoに書き直す](../.agents/docs/go-rewrite.md) |
 
 ## 開発環境
 
@@ -47,7 +48,8 @@ uv run python -m tests tests/core                  # 1 グループ
 uv run --with ruff ruff check .                    # 静的検査
 uv run --with ruff ruff format .                   # 整形
 uv run --with ruff ruff format --check .           # 整形の確認だけ
-uv run --with pyinstaller python build.py          # 実行ファイルの組み立て
+sh scripts/ccnavi-build.sh                         # 実行ファイルの組み立て（--target <os>-<arch> で別の機械向け）
+cd go && gofmt -l . && go vet ./... && go test ./...  # 実行ファイルの整形・検査・テスト
 ```
 
 - テストは `python -m tests` か `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに失敗する。全件の回し方と、回すグループの決め方は[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)にある
@@ -59,29 +61,31 @@ uv run --with pyinstaller python build.py          # 実行ファイルの組み
 hook の入力を標準入力に渡して、判定を見る。
 
 ```sh
+cd go
 echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push"}}' \
-  | uv run python -m ccnavi --mode enable
+  | go run ./cmd/ccnavi --mode enable
 ```
+
+組み立てた実行ファイル（`sh scripts/ccnavi-build.sh` が `.ccnavi/bin/<os>-<arch>/` に置く）に渡すなら、`sh .ccnavi/scripts/ccnavi-launcher.sh --mode enable` に渡す。
 
 ## ディレクトリ構成（トップレベル）
 
-役割のまとまりで並べる。ファイル 1 本ごとの役割は、そのファイル先頭の説明にある。サブパッケージごとの構成は[モジュール構成](21_design/modules.md)にある。
+役割のまとまりで並べる。ファイル 1 本ごとの役割は、そのファイル先頭の説明にある。パッケージごとの構成は[モジュール構成](21_design/modules.md)にある。
 
 | 場所 | 中身 |
 |---|---|
-| `src/ccnavi/` | 実行ファイルのソース。サブパッケージは役割ごとに 7 つ |
-| `main.py`・`build.py` | 配布物の入口（PyInstaller に渡すスクリプト）と、配布物の組み立て |
-| `pyproject.toml`・`uv.lock` | Python のプロジェクト設定と、依存の固定 |
+| `go/` | 実行ファイルのソース（`internal/` に段ごとのパッケージ、`cmd/ccnavi/` に入口、`cmd/ccnavi-chrome/` に Chrome 拡張の WASM の入口）。組み立ては `scripts/ccnavi-build.sh`（[組み立てと配布物](../.agents/docs/build-and-dist.md)） |
+| `pyproject.toml`・`uv.lock` | テスト（Python）を回すための設定と、依存の固定 |
 | `tests/` | テスト。グループごとのディレクトリに分ける（グループは[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)で決める）。入口の標準入出力・終了コード・ファイルだけを見る受入テスト（`guard`・`sh`・`e2e` が中心）と、`ccnavi` の部品を直接呼ぶ単体テスト（`core`・`ticket` に多い）が混在する。GitLab の模擬と契約テスト（`contract/`）、受入シナリオ（`scenarios/`）、手動の道具（`manual/`）、テスト用の見本（`fixtures/`）もここにある |
 | `docs/` | 設計・要件・ADR・手引き。番号の付け方は[文書の置き場・読み手・リンクの向き](../.agents/docs/docs-structure.md)の「番号」にある。`CONTEXT.md` は用語集、`wiki/` は学びの蓄積 |
 | `.agents/docs/` | ccnavi の開発で常に守る決まり。配布しない |
-| `.ccnavi/` | ccnavi 自身の設定と、配布先へ配るものの元。作業の決まり（`CCNAVI.md`）、使い方の文書（`docs/`）、設定 3 本（`config/`）、文面ファイル（`messages/`）、配布する sh（`scripts/`。一覧と役割は[配布するスクリプト](50_guide/scripts.md)）。`bin/` は `build.py` が作る実行ファイルの置き場で追跡しない。`scripts/ccnavimd.sh` は配布先が作るファイルで、このリポジトリには無い |
+| `.ccnavi/` | ccnavi 自身の設定と、配布先へ配るものの元。作業の決まり（`CCNAVI.md`）、使い方の文書（`docs/`）、設定 3 本（`config/`）、文面ファイル（`messages/`）、配布する sh（`scripts/`。一覧と役割は[配布するスクリプト](50_guide/scripts.md)）。`bin/` は `scripts/ccnavi-build.sh` が作る実行ファイルの置き場で追跡しない。`scripts/ccnavimd.sh` は配布先が作るファイルで、このリポジトリには無い |
 | `.claude/` | このリポジトリの Claude Code の設定。`settings.json`（hook の登録）、`hooks/`（開発用の hook）、`skills/`（このリポジトリのスキル）。`settings.local.json` は利用者ごとのファイルで追跡しない |
-| `scripts/` | ccnavi を入れる・配る・点検する側の道具。導入（`ccnavi-install.sh`・`ccnavi-setup.sh`・`ccnavi-doctor.sh`）、配布の zip（`ccnavi-package.sh`）、開発機への導入（`ccnavi-build-install.sh`）、Stop の AI 判定の登録（`ccnavi-stop-review.sh`）、PR の検査（`ccnavi-check-no-wip.sh`）、ルールの期待の点検（`check_rules.py`）。配布先には `ccnavi-setup.sh` が必要なものだけを配る |
+| `scripts/` | ccnavi を入れる・配る・点検する側の道具。導入（`ccnavi-install.sh`・`ccnavi-setup.sh`・`ccnavi-doctor.sh`）、配布の zip（`ccnavi-package.sh`）、実行ファイルの組み立て（`ccnavi-build.sh`）、開発機への導入（`ccnavi-build-install.sh`）、Stop の AI 判定の登録（`ccnavi-stop-review.sh`）、PR の検査（`ccnavi-check-no-wip.sh`）、ルールの期待の点検（`check_rules.py`）。配布先には `ccnavi-setup.sh` が必要なものだけを配る |
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）、Chrome 拡張（`chrome/ccnavi-approval`）、共有の部品（`shared/`）。拡張ごとの開発の手引きは各拡張の `docs/` と `VERIFY.md` にある |
 | `.github/` | Issue のテンプレートと CI の定義 |
 | `.vscode/` | VS Code の設定 |
 | `README.md`・`AGENTS.md`・`CLAUDE.md` | 利用者向けの入口、開発者のエージェント向けの決まり、`AGENTS.md` を読み込ませる 1 行 |
 | `wip/` | 作業ブランチで使う下書きの置き場。main には入れない（`.github` の CI と `scripts/ccnavi-check-no-wip.sh` が、main へ入れる PR の差分を見る） |
 
-git 管理外のもの: `dist/`・`build/`（組み立ての出力）、`logs/`（記録。絶対パスとコマンド全文が入るのでコミットしない）、`knowledge/`（参照専用の資料。Claude Code の hook にまつわる実測）、`.venv/`、`projects/`、`scratchpad/`。
+git 管理外のもの: `dist/`・`build/`・`go/ccnavi`（組み立ての出力）、`logs/`（記録。絶対パスとコマンド全文が入るのでコミットしない）、`knowledge/`（参照専用の資料。Claude Code の hook にまつわる実測）、`.venv/`、`projects/`、`scratchpad/`。

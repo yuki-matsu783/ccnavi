@@ -3,7 +3,8 @@
 見るのは次のとおり（どれも同じミスを検知して、正しい方法を案内する形）。
 
 1. 親の提案が識別子と違う名前のワークツリーに在る、子の提案が親と同名でない所に在る（warn）
-2. 子の親が承認済みの一覧に無く、別のツリーに在る（error のまま、文面に置き場所を添える）
+2. 子の親が承認済みの一覧に無く、別のツリーに在る（error のまま、文面に置き場所を添える。
+   go の candidates のテスト）
 3. 計画の無い親（warn。`ticket start` も止まる）
 4. `.claude/worktrees/` の下で git に登録が無いディレクトリ（warn）
 5. 直接作業のワークツリーの名前が `<先頭の語>-<番号>-<slug>` の形でない（warn。
@@ -14,8 +15,6 @@ from __future__ import annotations
 
 import os
 
-from ccnavi.tickets.model import ticket_model
-from ccnavi.tickets.proposal import agree_candidates
 from tests.ticket.test_phases import PhaseHarness, child_text, parent_text
 from tests.ticket.test_ticket import git, write
 
@@ -70,32 +69,6 @@ class LintOpsTest(PhaseHarness):
         )
         lines = self.lint_lines("i0001-01-01", "子の提案を rename-x に書いている")
         self.assertTrue(any("親 i0001 のワークツリー" in line for line in lines), lines)
-
-    # ---- 2. 親が別のツリーに在る
-
-    def test_a_missing_parent_names_the_tree_that_holds_it(self):
-        fake = ticket_model.Ticket(ticket="i0003", state=ticket_model.DOING, tree="rename-x")
-        child = ticket_model.Ticket(ticket="i0003-01-01", parent="i0003", phase=1, tree="other")
-        text = agree_candidates.parent_elsewhere_text(
-            self.root, self.conf(), child, everything=[fake]
-        )
-        self.assertIn("親 i0003 が承認されていない", text)
-        self.assertIn("親 i0003 は rename-x の doing/ に在る", text)
-        self.assertIn("親のワークツリーは i0003 と同名にして、その中に承認済みチケットを置く", text)
-        problems, _ = agree_candidates.validate(child, {}, missing=text)
-        self.assertEqual([p.detail for p in problems], [text])
-        self.assertEqual(problems[0].severity, "error")
-        # 同じツリーに在るだけなら添えない。
-        same = ticket_model.Ticket(ticket="i0003-01-01", parent="i0003", phase=1, tree="rename-x")
-        self.assertEqual(
-            agree_candidates.parent_elsewhere_text(self.root, self.conf(), same, everything=[fake]),
-            "",
-        )
-
-    def conf(self):
-        from ccnavi.infra import settings
-
-        return settings.Settings(tickets="wip/proposals")
 
     # ---- 3. 計画の無い親
 

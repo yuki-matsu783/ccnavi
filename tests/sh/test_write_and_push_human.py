@@ -198,7 +198,7 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
         from tests.ticketsample import load_chrome
 
         chrome = load_chrome()
-        place = chrome._placement()
+        place = chrome.placement()
         keep = tuple(p + "/" for p in place["integration_paths"])
         main = {
             rel: text

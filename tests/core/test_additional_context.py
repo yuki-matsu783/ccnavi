@@ -22,6 +22,9 @@ import unittest
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
+# additionalContextFile の本文を渡す上限の文字数（go/internal/policy/ctxfile の MaxChars）。
+MAX_CHARS = 4000
+
 NOTE = "ワークツリーの中だけで直すこと。main には触らない。"
 
 
@@ -277,10 +280,8 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertIn(NOTE, allowed.stdout)
 
     def test_file_body_follows_the_text_and_is_cut_at_the_limit(self):
-        from ccnavi.policy import ctxfile
-
         write(os.path.join(self.root, "docs", "guide.md"), "# 決まり\n\nテストは tests/ に置く。\n")
-        write(os.path.join(self.root, "docs", "long.md"), "あ" * (ctxfile.MAX_CHARS + 50))
+        write(os.path.join(self.root, "docs", "long.md"), "あ" * (MAX_CHARS + 50))
         self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[
@@ -301,8 +302,8 @@ class AdditionalContextTest(unittest.TestCase):
             got.get("additionalContext"), f"{NOTE}\n\n# 決まり\n\nテストは tests/ に置く。"
         )
         cut = self.judge("Write", os.path.join(self.root, "docs", "x.md"))["additionalContext"]
-        self.assertTrue(cut.startswith("あ" * ctxfile.MAX_CHARS + "\n\n(ccnavi: docs/long.md は"))
-        self.assertNotIn("あ" * (ctxfile.MAX_CHARS + 1), cut)
+        self.assertTrue(cut.startswith("あ" * MAX_CHARS + "\n\n(ccnavi: docs/long.md は"))
+        self.assertNotIn("あ" * (MAX_CHARS + 1), cut)
         self.assertIn("続きはこのファイルを読んで", cut)
         # 無いファイルは何も足さない。
         self.assertEqual(self.judge("Write", os.path.join(self.root, "etc", "a")), {})
@@ -328,10 +329,8 @@ class AdditionalContextTest(unittest.TestCase):
         self.assertEqual(outside.get("additionalContext"), "ルートの案内")
 
     def test_once_file_is_delivered_once_and_lint_checks_the_path(self):
-        from ccnavi.policy import ctxfile
-
         write(os.path.join(self.root, "docs", "once.md"), "最初に 1 度だけ")
-        write(os.path.join(self.root, "docs", "long.md"), "い" * (ctxfile.MAX_CHARS + 1))
+        write(os.path.join(self.root, "docs", "long.md"), "い" * (MAX_CHARS + 1))
         self.rules(
             deny=[rule("push", "Bash", glob="*git push*")],
             allow=[
@@ -362,7 +361,7 @@ class AdditionalContextTest(unittest.TestCase):
             "warn: gone: additionalContextFile の docs/gone.md がありません。", lint.stdout
         )
         self.assertIn(
-            f"warn: long: additionalContextFile の docs/long.md は {ctxfile.MAX_CHARS} 文字",
+            f"warn: long: additionalContextFile の docs/long.md は {MAX_CHARS} 文字",
             lint.stdout,
         )
         self.assertIn("error: up: additionalContextFile の ../secret.md: `..`", lint.stdout)

@@ -18,7 +18,7 @@ import { createRenderer } from "../core/sanitize.js";
 import { App } from "./App.js";
 import { blobCache } from "./cache.js";
 import { createBoardController } from "./controller.js";
-import { startWorker } from "./py-client.js";
+import { startWorker } from "./worker-client.js";
 
 // 設定画面で足したホストを読んでから組む（開いたあとに足したホストは、開き直すまで出ない）
 const hosts = await loadHosts(chrome.storage.local, __CCNAVI_HOSTS__);

@@ -1,18 +1,13 @@
-"""学びの蓄積の CLI（`ticket learn`）と、子を閉じる検査（record_blocked）を確かめる。"""
+"""学びの蓄積の CLI（`ticket learn`）を確かめる。子を閉じる検査は go の learning のテストが見る。"""
 
 from __future__ import annotations
 
-import dataclasses
-import io
 import os
 import shutil
 import subprocess
 import tempfile
-import types
 import unittest
 
-from ccnavi.infra import settings
-from ccnavi.tickets.learning import notes as learning
 from tests.inproc import run_ccnavi
 
 
@@ -115,91 +110,6 @@ class LearningCliTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--target", result.stderr)
         self.assertFalse(os.path.exists(os.path.join(wt, "docs")))
-
-    def test_record_blocked_needs_tracked_record(self) -> None:
-        child = "feat-1-01-01"
-        wt = os.path.join(self.ws, ".claude", "worktrees", child)
-        os.makedirs(wt)
-        subprocess.run(
-            ["git", "init", "--quiet", "-b", "main"], cwd=wt, check=True, capture_output=True
-        )
-        conf, _ = settings.load(self.ws)
-        conf = dataclasses.replace(conf, learning="enable")
-        found = types.SimpleNamespace(is_child=True, is_consolidate=False, ticket=child, phase=None)
-
-        err = io.StringIO()
-        self.assertTrue(learning.record_blocked(err, self.ws, conf, found))
-        self.assertIn("learn", err.getvalue())
-
-        rec = os.path.join(wt, learning.record_rel(child))
-        os.makedirs(os.path.dirname(rec))
-        with open(rec, "w", encoding="utf-8") as f:
-            f.write(learning.scaffold_text(child, "feat-1"))
-        # 追跡前なので、まだ閉じさせない。
-        self.assertTrue(learning.record_blocked(io.StringIO(), self.ws, conf, found))
-
-        subprocess.run(
-            ["git", "add", "-f", learning.record_rel(child)],
-            cwd=wt,
-            check=True,
-            capture_output=True,
-        )
-        # 追加しただけで、コミット前なので、まだ閉じさせない。
-        self.assertTrue(learning.record_blocked(io.StringIO(), self.ws, conf, found))
-        subprocess.run(
-            ["git", "-c", "user.email=a@b.c", "-c", "user.name=n", "commit", "-q", "-m", "x"],
-            cwd=wt,
-            check=True,
-            capture_output=True,
-        )
-        self.assertFalse(learning.record_blocked(io.StringIO(), self.ws, conf, found))
-
-        disabled = dataclasses.replace(conf, learning="disable")
-        found2 = types.SimpleNamespace(is_child=True, is_consolidate=False, ticket="feat-1-01-02")
-        self.assertFalse(learning.record_blocked(io.StringIO(), self.ws, disabled, found2))
-
-    def test_record_blocked_refuses_a_malformed_record_in_the_child(self) -> None:
-        """子の finish でも、親の finish と同じ形式の検査をする（`learnings` に配列を書いた形など）。"""
-        child = "feat-1-01-03"
-        wt = os.path.join(self.ws, ".claude", "worktrees", child)
-        os.makedirs(wt)
-        subprocess.run(
-            ["git", "init", "--quiet", "-b", "main"], cwd=wt, check=True, capture_output=True
-        )
-        conf, _ = settings.load(self.ws)
-        conf = dataclasses.replace(conf, learning="enable")
-        found = types.SimpleNamespace(is_child=True, is_consolidate=False, ticket=child, phase=None)
-        rel = learning.record_rel(child)
-        bodies = {
-            "配列": "---\nticket: x\nlearnings:\n  - 気づき\n---\n",
-            "節の数": "---\nticket: x\nlearnings: 2\n---\n\n## 一つだけ\n",
-        }
-        for label, body in bodies.items():
-            with self.subTest(label):
-                rec = os.path.join(wt, rel)
-                os.makedirs(os.path.dirname(rec), exist_ok=True)
-                with open(rec, "w", encoding="utf-8") as f:
-                    f.write(body)
-                subprocess.run(["git", "add", "-f", rel], cwd=wt, check=True, capture_output=True)
-                subprocess.run(
-                    [
-                        "git",
-                        "-c",
-                        "user.email=a@b.c",
-                        "-c",
-                        "user.name=n",
-                        "commit",
-                        "-q",
-                        "-m",
-                        "x",
-                    ],
-                    cwd=wt,
-                    check=True,
-                    capture_output=True,
-                )
-                err = io.StringIO()
-                self.assertTrue(learning.record_blocked(err, self.ws, conf, found))
-                self.assertIn(rel, err.getvalue())
 
 
 if __name__ == "__main__":

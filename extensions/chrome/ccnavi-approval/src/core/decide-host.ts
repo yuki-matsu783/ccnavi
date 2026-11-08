@@ -19,7 +19,7 @@ import type { HostCall } from "./snapshot.js";
 import type { FindResult, ThreadAbility, WriteInfo } from "./github.js";
 import type { IssueRef } from "./github.js";
 
-/** Python の `decide` が返す、ホストへ書く計画（`host_plan`） */
+/** ccnavi の `decide` が返す、ホストへ書く計画（`host_plan`） */
 export interface HostPlan {
   readonly issues: readonly PlanIssue[];
   readonly replies: readonly PlanReply[];

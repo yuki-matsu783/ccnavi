@@ -6,7 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { REPO } from "./python.js";
+import { REPO } from "./ccnavi.js";
 
 export const DATA = path.join(REPO, "tests", "contract", "gitlab");
 

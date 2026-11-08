@@ -1,4 +1,4 @@
-# サブエージェントの起動（Agent・Task）を止める拒否の文。条件（いつ止めるか）は hook/agentlaunch.py にある。
+# サブエージェントの起動（Agent・Task）を止める拒否の文。条件（いつ止めるか）は hook/launch にある。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
