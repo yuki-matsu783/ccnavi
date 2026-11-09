@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"testing"
 )
 
@@ -282,5 +283,13 @@ func TestIdentity(t *testing.T) {
 	}
 	if _, _, ok := Identity(filepath.Join(dir, "missing")); ok {
 		t.Error("無いものは読めない")
+	}
+}
+
+func TestWithoutEnv(t *testing.T) {
+	got := WithoutEnv([]string{"GIT_DIR=/a", "PATH=/bin", "GIT_WORK_TREE=/b", "X=1=2"}, []string{"GIT_DIR", "GIT_WORK_TREE"})
+	want := []string{"PATH=/bin", "X=1=2"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }

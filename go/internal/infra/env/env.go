@@ -91,6 +91,11 @@ const (
 	GitCommonDir = "GIT_COMMON_DIR"
 )
 
+// Repository は git が見るリポジトリ・ワークツリー・索引を決める変数の並び（呼ぶたびに新しい写し）。
+// git の hook の中（ccnavi-git.sh が打つ commit の pre-commit など）から ccnavi が起こされると設定されている。
+// 残したまま git や sh を起こすと、渡したツリーでなくその hook のリポジトリを見るので、起こす側が外す。
+func Repository() []string { return []string{GitDir, GitWorkTree, GitIndexFile, GitCommonDir} }
+
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所・端末の幅。
 const (
 	GitHubToken = "GITHUB_TOKEN"

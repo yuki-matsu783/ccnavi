@@ -8,6 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"time"
+
+	envnames "ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 )
 
 // Program は外部のスクリプトを走らせるシェル（PATH から探す）。
@@ -39,7 +42,8 @@ type Ran struct {
 }
 
 // Script は sh に args を渡して走らせ、終わるまで待つ。dir が空なら親の作業ディレクトリ、env は親の環境に足す
-// "名前=値"。起こせなかったときは error で、sh が見つからなければ ErrNoShell（と exec.ErrNotFound）を包む。
+// "名前=値"。親の環境からは git の見るリポジトリを決める変数（env.Repository）を外す。git の hook の中から ccnavi が
+// 起こされたとき、sh の中の git が dir のツリーでなくその hook のリポジトリを見ないようにするため。起こせなかったときは error で、sh が見つからなければ ErrNoShell（と exec.ErrNotFound）を包む。
 func Script(args []string, dir string, env []string, timeout time.Duration) (Ran, error) {
 	path, err := exec.LookPath(Program)
 	if err != nil {
@@ -49,9 +53,7 @@ func Script(args []string, dir string, env []string, timeout time.Duration) (Ran
 	defer cancel()
 	cmd := exec.CommandContext(ctx, path, args...)
 	cmd.Dir = dir
-	if env != nil {
-		cmd.Env = append(os.Environ(), env...)
-	}
+	cmd.Env = append(ospath.WithoutEnv(os.Environ(), envnames.Repository()), env...)
 	cmd.WaitDelay = killedPipeWait
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr

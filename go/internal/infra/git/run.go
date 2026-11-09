@@ -67,11 +67,6 @@ const killedPipeWait = 100 * time.Millisecond
 // pathspecEnv はユーザの環境で pathspec の読み方を変える環境変数。check-ignore はこれらを受けず 128 で止まる。
 var pathspecEnv = []string{env.GitLiteralPathspecs, env.GitGlobPathspecs, env.GitNoglobPathspecs, env.GitIcasePathspecs}
 
-// repositoryEnv は git が見るリポジトリ・ワークツリー・索引を決める環境変数。git の hook の中（ccnavi-git.sh が打つ
-// commit の pre-commit など）から起こされると設定されていて、残すと Dir に渡したツリーでなく、その hook のリポジトリを
-// 見る。ccnavi は見るツリーを必ず Dir で渡すので、いつも外す。
-var repositoryEnv = []string{env.GitDir, env.GitWorkTree, env.GitIndexFile, env.GitCommonDir}
-
 // rawPathsArgs は非 ASCII を含むパスを 8 進の表記に引用させない設定。パスをそのまま突き合わせる側が使う。
 var rawPathsArgs = []string{"-c", "core.quotePath=false"}
 
@@ -325,32 +320,15 @@ func startFailure(err error) error {
 	return f
 }
 
-// environ は親の環境から repositoryEnv を外し、GIT_OPTIONAL_LOCKS=0 と GIT_NO_LAZY_FETCH=1 を足したもの。
+// environ は親の環境から env.Repository の変数を外し、GIT_OPTIONAL_LOCKS=0 と GIT_NO_LAZY_FETCH=1 を足したもの。
 // GIT_OPTIONAL_LOCKS=0 は、期限で殺したときに status が取った index.lock を残さないため（diff や restore のように
 // index を書き換える操作の lock は止まらない）。GIT_NO_LAZY_FETCH=1 は、partial clone の無い blob を取りに
 // ネットワークへ出ず、読めないにするため。
 func environ(plainPathspecs bool) []string {
-	drop := append([]string{env.GitOptionalLocks, env.GitNoLazyFetch}, repositoryEnv...)
+	drop := append([]string{env.GitOptionalLocks, env.GitNoLazyFetch}, env.Repository()...)
 	if plainPathspecs {
 		drop = append(drop, pathspecEnv...)
 	}
-	var out []string
-	for _, kv := range os.Environ() {
-		name, _, _ := strings.Cut(kv, "=")
-		if !hasName(drop, name) {
-			out = append(out, kv)
-		}
-	}
+	out := ospath.WithoutEnv(os.Environ(), drop)
 	return append(out, env.GitOptionalLocks+"=0", env.GitNoLazyFetch+"=1")
-}
-
-// hasName は環境変数の名前が names にあるか。Windows の名前は大文字小文字を区別しない。
-func hasName(names []string, name string) bool {
-	for _, n := range names {
-		// 環境変数の名前は OS の決まりで比べる（どの機械でも区別しない pathcase.Fold ではない）。
-		if n == name || (ospath.Windows && strings.EqualFold(n, name)) {
-			return true
-		}
-	}
-	return false
 }
