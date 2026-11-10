@@ -288,20 +288,20 @@ func diagnosis(stdout, stderr io.Writer, conf *config.Settings, root string, a o
 	case test != nil:
 		call := diagnose.Call{Cwd: a.Str("cwd"), PermissionMode: a.Str("permission_mode"), AgentID: a.Str("agent_id")}
 		code, err := diagnose.Test(stdout, stderr, conf, root, test[0], test[1], call, asJSON)
-		return finish(stderr, code, err)
+		return finish(stderr, root, code, err)
 	case a.Str("test_expectations") != "":
 		code, err := diagnose.TestExpectations(stdout, stderr, conf, root, a.Str("test_expectations"), asJSON)
-		return finish(stderr, code, err)
+		return finish(stderr, root, code, err)
 	case a.Truthy("suggest"):
 		code, err := suggest.Report(stdout, conf, root, asJSON)
-		return finish(stderr, code, err)
+		return finish(stderr, root, code, err)
 	case asJSON:
 		code, err := diagnose.ExplainJSON(stdout, stderr, conf, root, a.Str("mode"), a.Str("ticket_control"))
-		return finish(stderr, code, err)
+		return finish(stderr, root, code, err)
 	}
 	// 残るのは --explain（routeOf が診断の経路と決めたとき）。
 	code, err := diagnose.Explain(stdout, stderr, conf, root)
-	return finish(stderr, code, err)
+	return finish(stderr, root, code, err)
 }
 
 // planOrder は親の提案の計画を書き換える補助の経路。`--agree` のターミナルの確かめより手前で分ける。書くのは
@@ -394,7 +394,7 @@ func agree(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		code, err := core.ApproveYes(stdout, stderr, conf, root, strings.Split(yes, ","), a.Truthy("json"), only,
 			a.Str("digest"))
 		if err != nil {
-			return finish(stderr, code, err)
+			return finish(stderr, root, code, err)
 		}
 		return okIf(code == 0)
 	}
@@ -404,7 +404,7 @@ func agree(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	via.SetRoute(via.Terminal)
 	code, err := core.Approve(in.buf, stdout, stderr, conf, root, only, a.Str("placed_out"))
 	if err != nil {
-		return finish(stderr, code, err)
+		return finish(stderr, root, code, err)
 	}
 	if code == config.ExitPartial {
 		return config.ExitPartial

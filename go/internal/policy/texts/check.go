@@ -28,6 +28,8 @@ const (
 	kindNote    kind = "note"
 	// kindNotice は止めない通知。見出しと状態の行はコードに残し、文面ファイルには本文だけを書く。
 	kindNotice kind = "notice"
+	// kindError は読み手に届くエラーの文。拒否から no_bypass を除いた形で、境界が SayFault で引く。
+	kindError kind = "error"
 )
 
 // 欄の名前。
@@ -55,10 +57,11 @@ var kindFields = map[kind]fields{
 	kindChoices: {[]string{fieldItems}, nil},
 	kindNote:    {[]string{fieldNote}, nil},
 	kindNotice:  {[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNote}},
+	kindError:   {[]string{fieldWhat, fieldWhy, fieldNext}, []string{fieldNote}},
 }
 
 // kindOrder は種類を苦情の文に並べる順。
-var kindOrder = []kind{kindDeny, kindNudge, kindNext, kindChoices, kindNote, kindNotice}
+var kindOrder = []kind{kindDeny, kindNudge, kindNext, kindChoices, kindNote, kindNotice, kindError}
 
 // ruleLooseFields は `RULE_` の文（組み込みルールの文）の欄。what だけが必須で、言うことが無い欄は作り足さない。
 // ruleAsk とその場合は、記録の code と同じ識別子を持ち、ほかの拒否と同じ 4 欄を必ず持つ。
@@ -77,7 +80,7 @@ var prefixes = []struct {
 	kind kind
 }{
 	{"DENY_", kindDeny}, {rulePrefix, kindDeny}, {"NUDGE_", kindNudge}, {"NEXT_", kindNext},
-	{"CHOICES_", kindChoices}, {"NOTE_", kindNote}, {"NOTICE_", kindNotice},
+	{"CHOICES_", kindChoices}, {"NOTE_", kindNote}, {"NOTICE_", kindNotice}, {"ERROR_", kindError},
 }
 
 // 出力で欄の前に付ける語。what と items には付けない（items は番号を付ける）。

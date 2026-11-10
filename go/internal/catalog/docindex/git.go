@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -18,24 +19,22 @@ var ErrNotRepository = errors.New("git のルートではない")
 
 // gitError は git への問い合わせに失敗したことを表す（git が無い・期限切れ・リポジトリが壊れている）。
 // git の外とも、無視されていないとも別に扱う。Error() は理由の文を返す。
-type gitError struct{ reason string }
-
-func (e *gitError) Error() string { return e.reason }
+type gitError struct{ fault.Detail }
 
 func gitFailure(done git.Done) error {
 	switch {
 	case done.Missing():
-		return &gitError{"git が見つからない"}
+		return &gitError{fault.Plain("git が見つからない")}
 	case done.TimedOut():
-		return &gitError{"git が期限までに終わらなかった"}
+		return &gitError{fault.Plain("git が期限までに終わらなかった")}
 	case done.Failure != nil:
-		return &gitError{done.Failure.Error()}
+		return &gitError{fault.Plain(done.Failure.Error())}
 	}
 	lines := ospath.Splitlines(ospath.Strip(done.Stderr))
 	if len(lines) == 0 {
-		return &gitError{"git が " + strconv.Itoa(done.Code) + " で終わった"}
+		return &gitError{fault.Plain("git が " + strconv.Itoa(done.Code) + " で終わった")}
 	}
-	return &gitError{lines[len(lines)-1]}
+	return &gitError{fault.Plain(lines[len(lines)-1])}
 }
 
 // listed は、base の下で git が挙げる md（base からの相対、"/" 区切り）を返す。追跡しているものと、

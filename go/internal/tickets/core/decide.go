@@ -226,7 +226,7 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 		if !errors.As(err, &noParent) {
 			return Decided{}, err
 		}
-		failed = "親のワークツリーが決まらない（" + noParent.Reason + "）"
+		failed = "親のワークツリーが決まらない（" + noParent.What + "）"
 	}
 	if failed != "" {
 		return refusedDecided(codeDecideStopped, []string{"ccnavi: " + failed}, nil), nil
@@ -337,7 +337,7 @@ func stageDecision(stage *fsio.Stage, conf *config.Settings, root string, actor 
 	if err != nil {
 		var noParent *approval.NoParentError
 		if errors.As(err, &noParent) {
-			return "", "マーカーを置く親のワークツリーが決まらない（" + noParent.Reason + "）", nil
+			return "", "マーカーを置く親のワークツリーが決まらない（" + noParent.What + "）", nil
 		}
 		return "", "", err
 	}

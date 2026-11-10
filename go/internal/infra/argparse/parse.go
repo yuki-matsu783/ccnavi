@@ -7,20 +7,19 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/pyfmt"
 )
 
 // Error は読めなかった引数。Message は誤りの文（`argument --x: expected one argument`）。
-type Error struct{ Message string }
-
-func (e *Error) Error() string { return e.Message }
+type Error struct{ fault.Detail }
 
 func argError(a *Action, format string, args ...any) *Error {
 	msg := fmt.Sprintf(format, args...)
 	if a == nil {
-		return &Error{Message: msg}
+		return &Error{fault.Plain(msg)}
 	}
-	return &Error{Message: "argument " + a.name() + ": " + msg}
+	return &Error{fault.Plain("argument " + a.name() + ": " + msg)}
 }
 
 // Int は整数を読む type。
@@ -55,7 +54,7 @@ func (p *Parser) Parse(args []string) (Namespace, error) {
 		return nil, err
 	}
 	if len(extras) > 0 {
-		return nil, &Error{Message: "unrecognized arguments: " + strings.Join(extras, " ")}
+		return nil, &Error{fault.Plain("unrecognized arguments: " + strings.Join(extras, " "))}
 	}
 	return ns, nil
 }

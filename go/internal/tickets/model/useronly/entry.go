@@ -4,15 +4,16 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/pyfmt"
 )
 
 // EntryError は `user` の入口の使い方の誤り（操作が無い・知らない操作・印の誤り）。文はそのまま利用者に見せる。
-type EntryError struct{ msg string }
+type EntryError struct{ fault.Detail }
 
-func (e *EntryError) Error() string { return e.msg }
-
-func entryError(msg string) error { return &EntryError{msg} }
+func entryError(msg string) error {
+	return &EntryError{fault.New("ERROR_USER_ENTRY", fault.Values{"detail": msg}, msg)}
+}
 
 func isWrapperOption(word string) bool {
 	if slices.Contains(wrapperOptions, word) {

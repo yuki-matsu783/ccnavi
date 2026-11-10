@@ -38,6 +38,7 @@ var subTiers = map[string]map[string]int{
 		"pyfmt":   0,
 		"ospath":  0,
 		"digest":  0, // 16 進の要約と乱数（記録・バックアップの名前）
+		"fault":   0, // 読み手に届くエラーの共通の形（識別子・値・What）。文面は境界が引く
 		"difflib": 0, // 見せる差分（difflib の写し）
 		"golden":  0, // テストの見本（testdata の JSON）を読む。テストからだけ読む
 		// 1: 土台だけを読む

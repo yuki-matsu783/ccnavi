@@ -68,17 +68,27 @@ func goCalls(t *testing.T, repo string) []call {
 		local := filepath.ToSlash(filepath.Dir(path)) == filepath.ToSlash(filepath.Join(repo, "go", "internal", "policy", "texts"))
 		ast.Inspect(f, func(n ast.Node) bool {
 			c, ok := n.(*ast.CallExpr)
-			if !ok || len(c.Args) < 2 || !isSay(c.Fun, local) {
+			if !ok {
 				return true
 			}
-			lit, ok := c.Args[1].(*ast.BasicLit)
+			// texts.Say(root, "ID", Values, …) は識別子が 2 番目。fault.New("ID", Values, what) は 1 番目。
+			idAt := 1
+			if isFaultNew(c.Fun) {
+				idAt = 0
+			} else if !isSay(c.Fun, local) {
+				return true
+			}
+			if len(c.Args) < idAt+1 {
+				return true
+			}
+			lit, ok := c.Args[idAt].(*ast.BasicLit)
 			if !ok || lit.Kind != token.STRING {
 				return true
 			}
 			id, _ := strconv.Unquote(lit.Value)
 			names := []string{}
-			if len(c.Args) > 2 {
-				names = literalKeys(c.Args[2])
+			if len(c.Args) > idAt+1 {
+				names = literalKeys(c.Args[idAt+1])
 			}
 			found = append(found, call{id: id, names: names, where: fset.Position(c.Pos()).String()})
 			return true
@@ -89,6 +99,16 @@ func goCalls(t *testing.T, repo string) []call {
 		t.Fatal(err)
 	}
 	return found
+}
+
+// isFaultNew は fault.New(識別子, 値, what) の呼び出し。エラーが運ぶ識別子も、文面ファイルにあることを見る。
+func isFaultNew(fun ast.Expr) bool {
+	sel, ok := fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	x, ok := sel.X.(*ast.Ident)
+	return ok && x.Name == "fault" && sel.Sel.Name == "New"
 }
 
 func isSay(fun ast.Expr, local bool) bool {
@@ -395,5 +415,32 @@ func TestNoADRNumberInSharedRuleWording(t *testing.T) {
 				t.Errorf("%s: %q", r.ID, text)
 			}
 		}
+	}
+}
+
+// kind: error の文は、組み立てると what・なぜ・次: の順で、次: の行がちょうど 1 行になる。
+func TestErrorTextsRenderWhatWhyNext(t *testing.T) {
+	repo := repoRoot(t)
+	c := Load(repo)
+	n := 0
+	for id, e := range c.Entries {
+		if e.kind != kindError {
+			continue
+		}
+		n++
+		said := Say(repo, id, dummyValues(e), firstCases(e))
+		if strings.Contains(said, "引けませんでした") || strings.Contains(said, "{") {
+			t.Errorf("%s: %q", id, said)
+		}
+		lines := strings.Split(said, "\n")
+		if len(lines) < 3 || !strings.HasPrefix(lines[1], whyLabel) || !strings.HasPrefix(lines[2], NextLabel) {
+			t.Errorf("%s: what・なぜ・次: の順になっていない: %q", id, said)
+		}
+		if got := strings.Count(said, "\n"+NextLabel); got != 1 {
+			t.Errorf("%s: 次: が %d 行", id, got)
+		}
+	}
+	if n < 1 {
+		t.Error("error の文が無い")
 	}
 }

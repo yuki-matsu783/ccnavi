@@ -1,12 +1,14 @@
 package texts
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/policy/rules"
 )
 
@@ -233,6 +235,47 @@ func TestSpokenPrefersTheTextFile(t *testing.T) {
 	}
 	r.Text, r.DegradedMessage = rules.TextRef{}, ""
 	if got := Spoken(r); got != "書いた文 "+rules.RootGlob(root) {
+		t.Errorf("%q", got)
+	}
+}
+
+type faultErr struct{ fault.Detail }
+
+func TestSayFaultFallsBackToWhat(t *testing.T) {
+	root := t.TempDir() // 文面ファイルの無いワークスペース
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"nil", nil, ""},
+		{"Detail が無い", errors.New("素のエラー"), "素のエラー"},
+		{"識別子が空", &faultErr{fault.Plain("読み込めない")}, "読み込めない"},
+		{"文面ファイルが無い", &faultErr{fault.New("ERROR_NO_SUCH", nil, "What の 1 行")}, "What の 1 行"},
+	}
+	for _, c := range cases {
+		if got := SayFault(root, c.err); got != c.want {
+			t.Errorf("%s: %q、want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestSayFaultUsesTheMessageFile(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, ".ccnavi", "messages")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	file := "version: 1\nmessages:\n  ERROR_T:\n    kind: error\n    values: [x]\n    what: |-\n      止めました: {x}\n    why: |-\n      理由です\n    next: |-\n      直して打ち直す\n"
+	if err := os.WriteFile(filepath.Join(dir, "e.yml"), []byte(file), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := "止めました: 1\nなぜ: 理由です\n次: 直して打ち直す"
+	if got := SayFault(root, &faultErr{fault.New("ERROR_T", fault.Values{"x": "1"}, "what")}); got != want {
+		t.Errorf("%q", got)
+	}
+	// 値が足りなければ What に落ちる。
+	if got := SayFault(root, &faultErr{fault.New("ERROR_T", nil, "what")}); got != "what" {
 		t.Errorf("%q", got)
 	}
 }

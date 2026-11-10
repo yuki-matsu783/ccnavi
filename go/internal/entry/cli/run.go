@@ -12,8 +12,9 @@ import (
 
 	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/tickets/approval"
+	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
 )
@@ -62,17 +63,15 @@ func runCrashed(stdout, stderr io.Writer, argv []string, r any, f failure) int {
 	return config.ExitError
 }
 
-// finish は error を返す操作の終わり方。書く側の置き場（親のワークツリー）が決まらないときは、ほかのコピーへは
-// 書かないので止める。
-func finish(stderr io.Writer, code int, err error) int {
-	var noParent *approval.NoParentError
-	switch {
-	case err == nil:
+// finish は error を返す操作の終わり方。読み手に届く理由を運ぶ error（fault.Detail）は、文面ファイルの文で言う。
+// 書く側の置き場（親のワークツリー）が決まらないときも、ほかのコピーへは書かないので止める。
+func finish(stderr io.Writer, root string, code int, err error) int {
+	if err == nil {
 		return code
-	case errors.As(err, &noParent):
-		fmt.Fprintf(stderr, "ccnavi: 親のワークツリーが決まらないので止めた: %s。"+
-			"親のワークツリーを準備してから（%s）打ち直してください\n", noParent.Reason, config.StartWrapper)
-	default:
+	}
+	if d, ok := fault.Of(err); ok && d.ID != "" {
+		fmt.Fprintf(stderr, "ccnavi: %s\n", texts.SayFault(root, err))
+	} else {
 		fmt.Fprintf(stderr, "ccnavi: 想定外の失敗で止まった: %v\n", err)
 	}
 	return config.ExitError
@@ -99,7 +98,8 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		argv, entry, err = useronly.Rewrite(argv)
 	}
 	if err != nil {
-		fmt.Fprintf(stderr, "ccnavi: %s\n", err)
+		// 入口の使い方の誤り（useronly.EntryError）。設定は読む前なので、文面は既定のルートから引く。
+		fmt.Fprintf(stderr, "ccnavi: %s\n", texts.SayFault(defaultRoot(), err))
 		return config.ExitBlock
 	}
 	// 引数を読む。`--test` の語と `--help`・`--json` の位置は、argparse に渡す前に整える（どの順に書いても同じに読むため）。
@@ -109,7 +109,7 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 	if err != nil {
 		var bad *argparse.Error
 		if errors.As(err, &bad) {
-			io.WriteString(stderr, parser.ErrorText(bad.Message))
+			io.WriteString(stderr, parser.ErrorText(bad.What))
 		}
 		return config.ExitError
 	}
