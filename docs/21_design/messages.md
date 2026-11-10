@@ -62,6 +62,7 @@ messages:
 | `choices` | 次の一手が 1 つに決まらないとき | `items`（2 件以上） | | `次の手:` と `  1. …` の番号つき |
 | `note` | 条件つきで足す 1 件の補足 | `note` | | `案内: note` |
 | `notice` | 止めない通知（見出しと状態の行はコードに残し、本文だけ） | `what` | `why` `next` `note` | `what` / `なぜ: why` / `次: next` / `案内: note`（`what` だけなら本文がそのまま 1 行で出る） |
+| `error` | 読み手に届くエラー（13.9） | `what` `why` `next` | `note` | `what` / `なぜ: why` / `次: next` / `案内: note` |
 
 - どの種類も `values` を持つ（空でもよい）。文面に書いた差し込みの名前の全部と一致する
 - `what` `why` `next` `no_bypass` は 1 行。`note` は複数行でよく、1 行ごとに `案内: ` を付けて出す。`items` の 1 件は 1 行
@@ -79,6 +80,7 @@ messages:
 | `deny`（組み込みルール） | `RULE_<ルールの id>`。記録の `code` とは別（記録の `code` は `DENY_COMMAND` など、根拠の種類）。識別子と値と場合はルール側にあり、拒否に当たった回に `texts.Spoken` が引く | `RULE_GIT_PUSH`、`RULE_GUARD_HOOKS` |
 | `nudge` | 記録の `code` と同じ（`NUDGE_*`） | `NUDGE_INTEGRATE__RUN` |
 | `next`・`choices`・`note` | `NEXT_*`・`CHOICES_*`・`NOTE_*`。出力元の名前を 2 語目に置く | `NEXT_START_DRY_RUN` |
+| `error` | `ERROR_*`。エラーが運ぶ識別子（13.9）。出力元の名前を 2 語目に置く | `ERROR_NO_PARENT_WORKTREE` |
 | `notice` | `NOTICE_*`。記録の `code` とは別（記録の `code` や見出しの理由コードに `NOTICE_` で始まるものがあっても、文面の識別子ではない）。sh からは引かない。出力元の名前を 2 語目に置く。場合を結末や状態で分けるときは `__` | `NOTICE_UNDECLARED__ASK` |
 
 同じコードで文が分かれる場合（ホストの種類、段、操作）だけ `__` で分ける。コードを分けない（判定の根拠の種類は 1 つ）。
@@ -167,3 +169,19 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 | 配布先に文面ファイルが無い | 文面ファイルが無いのと同じ。`ccnavi-setup.sh` が文面ファイルを `.ccnavi/messages/` へ配る |
 
 既定の文は 1 つの関数（`texts.Fallback`）が組む。種類ごとに数行で、個々の文は置かない（文が 2 か所に残らない）。
+
+### 13.9 エラー
+
+読み手に届くエラーも、拒否と同じく what・why・next を文面ファイルに置く。エラーを作る側は文を組まず、識別子と値を運び、出力の境界が引く。
+
+| 担当 | 持つもの | 持たないもの |
+|---|---|---|
+| `infra/fault` | 共通の形 `Detail`（識別子 `ID`・差し込む値 `Values`・文面が引けないときの 1 行 `What`）、`Error()`、取り出し口 `Of` | 文面ファイルの読み、文の組み立て |
+| エラー型 | `Detail` を埋め込む。型ごとの判定用の欄（`errors.Is` の相手など）は別に持ってよい | 利用者に見せる文 |
+| `policy/texts` の `SayFault` | エラーから `Detail` を取り、識別子の文を組む。識別子が空・引けない・値が合わないときは `What` を返す | 判定 |
+| 出力の境界（`entry`・`hook`） | `SayFault` を呼んで出す | エラーごとの文 |
+
+- 種類は `error`。識別子の頭は `ERROR_`。`what`・`why`・`next` が必須、`note` が任意。`次:` の行は 1 行（13.7 の点検がそのまま掛かる）。`no_bypass` は持たない
+- 文面ファイルから引くのは読み手に届くエラーだけ。届かないもの（`infra` の読み込み失敗など）は識別子を空にし、`What` を出す
+- ccnavi のリポジトリのテストは、`fault.New` が受ける識別子を、`texts.Say` の識別子と同じに点検する（13.7）
+
