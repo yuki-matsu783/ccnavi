@@ -284,7 +284,7 @@ func Say(root, id string, values Values, variants Variants) string {
 }
 
 // SayFault はエラーの文を組み立てる。err が Detail を運び、識別子の文を引けて値が合えばその文、そうでなければ
-// Detail の What（Detail が無ければ err の文）。失敗せず、止める・止めないの判定には関わらない。
+// Detail の What（Detail が無ければ err の文）。引けなくても失敗はせず、止める・止めないの判定には関わらない。
 func SayFault(root string, err error) string {
 	if err == nil {
 		return ""

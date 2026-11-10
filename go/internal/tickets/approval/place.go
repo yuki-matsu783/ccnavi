@@ -95,7 +95,7 @@ func Trees(conf *config.Settings, root string) []tree.Tree {
 // ほかのツリーのコピーで代用しないので、書く先が決まらない。理由の文は NoParentError に置く。
 var ErrNoParentWorktree = errors.New("親のワークツリーが決まらない")
 
-// NoParentError は書く先が決まらない理由（Error() は理由の文だけ。What が理由）。errors.Is で ErrNoParentWorktree に
+// NoParentError は書く先が決まらない理由を運ぶ（Error() と What は、どちらも理由の文）。errors.Is で ErrNoParentWorktree に
 // 当たる。読み手に見せる文は、境界が文面ファイルの ERROR_NO_PARENT_WORKTREE から引く。
 type NoParentError struct{ fault.Detail }
 

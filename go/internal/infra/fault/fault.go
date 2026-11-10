@@ -14,7 +14,7 @@ type Detail struct {
 	What   string
 }
 
-// New は Detail を作る。識別子の字が文面ファイルにあるかは、リポジトリのテストが点検する。
+// New は Detail を作る。識別子が文面ファイルにあるかは、リポジトリのテストで確かめる。
 func New(id string, values Values, what string) Detail {
 	return Detail{ID: id, Values: values, What: what}
 }
