@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -94,11 +95,16 @@ func Trees(conf *config.Settings, root string) []tree.Tree {
 // ほかのツリーのコピーで代用しないので、書く先が決まらない。理由の文は NoParentError に置く。
 var ErrNoParentWorktree = errors.New("親のワークツリーが決まらない")
 
-// NoParentError は書く先が決まらない理由（Error() は理由の文だけ）。errors.Is で ErrNoParentWorktree に当たる。
-type NoParentError struct{ Reason string }
+// NoParentError は書く先が決まらない理由を運ぶ（Error() と What は、どちらも理由の文）。errors.Is で ErrNoParentWorktree に
+// 当たる。読み手に見せる文は、境界が文面ファイルの ERROR_NO_PARENT_WORKTREE から引く。
+type NoParentError struct{ fault.Detail }
 
-func (e *NoParentError) Error() string        { return e.Reason }
 func (e *NoParentError) Is(target error) bool { return target == ErrNoParentWorktree }
+
+// NewNoParentError は理由（reason）を運ぶ NoParentError を作る。
+func NewNoParentError(reason string) *NoParentError {
+	return &NoParentError{fault.New("ERROR_NO_PARENT_WORKTREE", fault.Values{"reason": reason}, reason)}
+}
 
 // HomeDir は、この識別子の承認済みチケットを置く置き場を返す。返すのは親のワークツリーの置き場だけ。
 // 書く先も読む先も 1 つに決めるため。子のワークツリーにも checkout されるが、そこへ書くと同じ識別子が 2 通りになる。
@@ -146,7 +152,7 @@ func homeDir(conf *config.Settings, root, home string, pick func(*standing.Famil
 		if reason == "" {
 			reason = "親のワークツリー（.claude/worktrees/" + home + "）がありません"
 		}
-		return "", &NoParentError{reason}
+		return "", NewNoParentError(reason)
 	}
 	return conf.ApprovedDir(st.Home.Root), nil
 }

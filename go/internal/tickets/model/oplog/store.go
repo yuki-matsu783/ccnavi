@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -139,7 +140,7 @@ func lock(state, id string) (unlock func(), err error) {
 		return nil, err
 	}
 	if err := fsio.MakeDirs(dir(state)); err != nil {
-		return nil, &Error{fsio.ErrorText(err)}
+		return nil, &Error{fault.Plain(fsio.ErrorText(err))}
 	}
 	// ロックは「排他的に作ったファイル」で表す。作れたら取得、既にあれば他の更新が使用中。
 	path := ospath.Join(dir(state), id+lockExt)
@@ -153,12 +154,12 @@ func lock(state, id string) (unlock func(), err error) {
 			}, nil
 		}
 		if !errors.Is(err, fs.ErrExist) {
-			return nil, &Error{fsio.ErrorText(err)}
+			return nil, &Error{fault.Plain(fsio.ErrorText(err))}
 		}
 		// 待つ上限は先に見る（消せない・読めないときに、上限を飛ばして回り続けない）
 		// 待つ上限は先に見る（消せない・読めないときに、上限を飛ばして回り続けない）
 		if time.Now().After(deadline) {
-			return nil, &Error{msgBusy}
+			return nil, &Error{fault.Plain(msgBusy)}
 		}
 		// 古すぎるロックは、前の更新が途中で死んだ残りと見て消し、取り直す。
 		if mtime, _, ok := ospath.Stat(path); ok && time.Since(mtime) > lockStale {

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -26,11 +27,11 @@ type (
 )
 
 // Error は文を組み立てられなかった理由（値が足りない・場合を選べない・文面が無い）。
-type Error struct{ msg string }
+type Error struct{ fault.Detail }
 
-func (e *Error) Error() string { return e.msg }
-
-func failf(format string, args ...any) error { return &Error{msg: fmt.Sprintf(format, args...)} }
+func failf(format string, args ...any) error {
+	return &Error{fault.Plain(fmt.Sprintf(format, args...))}
+}
 
 // Catalog は置き場の全件。
 type Catalog struct {
@@ -278,6 +279,31 @@ func Say(root, id string, values Values, variants Variants) string {
 	text, err := Render(entry, values, variants, root)
 	if err != nil {
 		return Fallback(id)
+	}
+	return text
+}
+
+// SayFault はエラーの文を組み立てる。err が Detail を運び、識別子の文を引けて値が合えばその文。引けなければ
+// Detail の What に、文面を引けなかったことと次の一手（Fallback）を足す。識別子が空なら What だけ（Detail が無ければ
+// err の文）。引けなくても失敗はせず、止める・止めないの判定には関わらない。
+func SayFault(root string, err error) string {
+	if err == nil {
+		return ""
+	}
+	d, ok := fault.Of(err)
+	if !ok {
+		return err.Error()
+	}
+	if d.ID == "" {
+		return d.What
+	}
+	entry := Find(root, d.ID)
+	if entry == nil {
+		return d.What + "\n" + Fallback(d.ID)
+	}
+	text, rerr := Render(entry, Values(d.Values), nil, root)
+	if rerr != nil {
+		return d.What + "\n" + Fallback(d.ID)
 	}
 	return text
 }

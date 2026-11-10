@@ -82,16 +82,16 @@ func operate(in *input, stdout, stderr io.Writer, conf *config.Settings, root st
 		via.SetRoute(via.Terminal)
 		decideActor(a)
 		code, err := decide.Reviewed(in.buf, stdout, stderr, conf, root, cwd, reviewed, acceptUnresolved, a.Str("result"))
-		return finishOK(stderr, code, err)
+		return finishOK(stderr, root, code, err)
 	}
 	code, err := ticketOrReview(stdout, stderr, conf, root, a, words, cwd)
-	return finishOK(stderr, code, err)
+	return finishOK(stderr, root, code, err)
 }
 
 // finishOK は error を返す操作の終わり方（0 を ExitOK、ほかを ExitError に寄せる）。
-func finishOK(stderr io.Writer, code int, err error) int {
+func finishOK(stderr io.Writer, root string, code int, err error) int {
 	if err != nil {
-		return finish(stderr, code, err)
+		return finish(stderr, root, code, err)
 	}
 	return okIf(code == 0)
 }
@@ -113,7 +113,7 @@ func closeEarly(in *input, stdout, stderr io.Writer, conf *config.Settings, root
 	code, err := closeout.CloseEarly(in.buf, stdout, stderr, conf, root, cwd, a.Str("reason"), a.Str("result"),
 		closeout.EarlyOptions{PlanOut: a.Str("accept_plan"), PlanDone: a.Str("accept_done"),
 			PlanCheck: a.Str("accept_check"), NoIssue: a.Truthy("no_issue")})
-	return finishOK(stderr, code, err)
+	return finishOK(stderr, root, code, err)
 }
 
 // decideBoard はボードから打つ decide（見るだけの `--preview` と、押した選択の `--yes`）。
@@ -138,7 +138,7 @@ func decideBoard(stdout, stderr io.Writer, conf *config.Settings, root string, a
 	}
 	code, err := decide.Yes(stdout, stderr, conf, root, cwd, reviewed, a.Str("result"), yes, a.Str("digest"),
 		decide.YesOptions{PlanOut: a.Str("accept_plan"), PlanDone: a.Str("accept_done")})
-	return finishOK(stderr, code, err)
+	return finishOK(stderr, root, code, err)
 }
 
 // outsideState は、渡されたパスが state の置き場の外にあるフラグ（最初の 1 つ）。
@@ -313,7 +313,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 		}
 		return config.ExitOK
 	case verb == "issue-id" && (len(words) == 4 || len(words) == 5):
-		return issueID(stdout, stderr, a, words)
+		return issueID(stdout, stderr, root, a, words)
 	case verb == "branch" && (len(words) == 3 || len(words) == 4 && words[3] == "confirmed"):
 		// 親を閉じたときに片付ける子として記録したブランチを、条件を確かめ直して消す。
 		if !ids.IsValidID(words[2]) {
@@ -357,7 +357,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 
 // issueID は `worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>`。issue から新しい親のブランチ名
 // （= 識別子）を作る（Chrome の「始める」と同じ関数）。
-func issueID(stdout, stderr io.Writer, a opts, words []string) int {
+func issueID(stdout, stderr io.Writer, root string, a opts, words []string) int {
 	number := 0
 	if pyfmt.IsDigit(words[2]) {
 		n, err := pyfmt.ParseInt(words[2])
@@ -373,8 +373,7 @@ func issueID(stdout, stderr io.Writer, a opts, words []string) int {
 	}
 	ident, shortened, err := ids.IssueIdentifier(number, a.Str("title"), project, words[3])
 	if err != nil {
-		fmt.Fprintf(stderr, "ccnavi: %s\n", err)
-		return config.ExitError
+		return finish(stderr, root, config.ExitError, err)
 	}
 	fmt.Fprintf(stdout, "id %s\n", ident)
 	if shortened {

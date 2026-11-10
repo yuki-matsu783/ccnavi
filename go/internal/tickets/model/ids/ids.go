@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/pyfmt"
 )
 
@@ -205,9 +206,7 @@ func issueSlug(title string, room int) string {
 }
 
 // IssueError は issue から識別子を作れない（番号・プロジェクト名・先頭の語が形に合わない）理由。
-type IssueError struct{ detail string }
-
-func (e *IssueError) Error() string { return e.detail }
+type IssueError struct{ fault.Detail }
 
 // IssueIdentifier は issue から親の識別子 `<prefix>-<番号>-<slug>` を決め、タイトルが長くて slug を短くしたかを
 // 添える。プロジェクトの issue なら slug の頭に `<プロジェクト名>-` を付ける（issue の番号はリポジトリごと）。
@@ -215,7 +214,7 @@ func (e *IssueError) Error() string { return e.detail }
 // 「issue → 識別子」はこの 1 つだけ。作れなければ *IssueError。
 func IssueIdentifier(number int, title, project, prefix string) (string, bool, error) {
 	fail := func(detail string) (string, bool, error) {
-		return "", false, &IssueError{detail: detail}
+		return "", false, &IssueError{fault.New("ERROR_ISSUE_IDENTIFIER", fault.Values{"detail": detail}, detail)}
 	}
 	if number <= 0 {
 		return fail(fmt.Sprintf("issue の番号は正の整数: %d", number))

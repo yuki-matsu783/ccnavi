@@ -8,6 +8,7 @@ import (
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/digest"
+	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -66,11 +67,9 @@ const (
 )
 
 // Error は記録を読み書きできない、または形が合わない。このパッケージが返すエラーはすべてこの型。
-type Error struct{ msg string }
+type Error struct{ fault.Detail }
 
-func (e *Error) Error() string { return e.msg }
-
-func fail(format string, args ...any) error { return &Error{fmt.Sprintf(format, args...)} }
+func fail(format string, args ...any) error { return &Error{fault.Plain(fmt.Sprintf(format, args...))} }
 
 const (
 	msgBadID        = "操作IDの形が不正: %s"

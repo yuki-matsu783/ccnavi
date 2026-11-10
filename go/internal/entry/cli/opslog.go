@@ -44,7 +44,8 @@ func opsCommand(stdout, stderr io.Writer, conf *config.Settings, words []string)
 		fmt.Fprintf(stderr, "ccnavi: %s\n", opErr)
 		return config.ExitError
 	case err != nil:
-		return finish(stderr, 0, err)
+		// 操作記録の経路には、文面ファイルの識別子を運ぶ error が来ない（root は要らない）。
+		return finish(stderr, "", 0, err)
 	case !handled:
 		io.WriteString(stderr, opsUsage)
 		return config.ExitError
