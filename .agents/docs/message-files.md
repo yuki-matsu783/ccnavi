@@ -24,7 +24,7 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 ## エラーの文を足す
 
-読み手に届くエラー（`fault.Detail` を埋め込んだ型）の文は `ERROR_*`（種類 `error`）で、`what` `why` `next` を必ず書く。エラーを作る側は `fault.New("ERROR_…", fault.Values{…}, what)` で識別子と値を運び、出力の境界が `texts.SayFault(root, err)` で引く。`what` 引数は文面を引けないときの 1 行で、文面ファイルの `what` と同じ内容にする。読み手に届かないエラー（`infra` の読み込み失敗など）は `fault.Plain(what)` で、文面ファイルには置かない。境界が `root` を取れない経路は、既定のルートか空のルートで呼ぶ（引けなければ `what` が出る）。設計は設計書の文面ファイルの設計（`messages.md`）の「エラー」の節。
+読み手に届くエラー（`fault.Detail` を埋め込んだ型）の文は `ERROR_*`（種類 `error`）で、`what` `why` `next` を必ず書く。エラーを作る側は `fault.New("ERROR_…", fault.Values{…}, what)` で識別子と値を運び、出力の境界が `texts.SayFault(root, err)` で引く。`what` 引数は文面を引けないときの 1 行で、何が起きたかが分かる短い文にする（文面ファイルの `what` と同じでなくてよい）。読み手に届かないエラー（`infra` の読み込み失敗など）は `fault.Plain(what)` で、文面ファイルには置かない。境界が `root` を取れない経路は、既定のルートか空のルートで呼ぶ（引けなければ `what` が出る）。設計は設計書の文面ファイルの設計（`messages.md`）の「エラー」の節。
 
 テスト（`catalog_test.go`）は `fault.New` の識別子も、文面ファイルにあること・値の名前が `values` と一致することを見る。
 
