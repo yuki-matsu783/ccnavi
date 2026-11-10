@@ -49,6 +49,8 @@ keywords: [文面, 移行, 一覧, 進捗, 文面ファイル, DENY, NUDGE, 次:
 | `NOTICE_FLOW_BRIEF__*` | `go/internal/tickets/flow` の `Briefing`（サブエージェントに渡す、問い・繰り返し・サブエージェントのノードの扱い。`notice.yml`） | 行頭の空白はコードが付ける |
 | `NOTICE_SELFGUARD__*` | `go/internal/policy/selfguard/report.go` の `Report`（設定ファイルを戻したときの知らせに足す注意。`notice.yml`） | 見出しと結果の行はコードに残る。`Report` は `root` を取る |
 
+| `ERROR_NO_PARENT_WORKTREE`・`ERROR_ISSUE_IDENTIFIER`・`ERROR_USER_ENTRY` | `go/internal/tickets/approval` の `NoParentError`、`go/internal/tickets/model/ids` の `IssueError`、`go/internal/tickets/model/useronly` の `EntryError`（`error.yml`） | 新しい種類 `error`。エラーが識別子と値を運び（`go/internal/infra/fault`）、`go/internal/entry/cli` の `finish` と入口が `texts.SayFault` で引く。`ERROR_USER_ENTRY`・`ERROR_ISSUE_IDENTIFIER` の `what` は、どこを直すかを言う `detail` を差し込む。ボードの `go/internal/entry/chrome` は `IssueError` を 1 行の `What` で出す |
+
 ## 残り
 
 | 種類 | 出力元 | 状態 |

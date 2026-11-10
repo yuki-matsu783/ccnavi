@@ -14,13 +14,19 @@ keywords: [文面, 文面ファイル, messages, ccnavi text, ccnavi_text, texts
 
 ## 文を足す手順
 
-1. 文面ファイルに 1 件足す。種類は識別子の頭で決まる（`DENY_*`・`RULE_*` は `deny`、`NUDGE_*` は `nudge`、`NEXT_*` は `next`、`CHOICES_*` は `choices`、`NOTE_*` は `note`、`NOTICE_*` は `notice`）。拒否と促しの識別子は、記録の `code` と同じ（組み込みルールの文 `RULE_<ルールの id>` は別。記録の `code` ではなく、ルールの id から決める）。同じコードで文が分かれるときだけ `__<区別>` を足す
+1. 文面ファイルに 1 件足す。種類は識別子の頭で決まる（`DENY_*`・`RULE_*` は `deny`、`NUDGE_*` は `nudge`、`NEXT_*` は `next`、`CHOICES_*` は `choices`、`NOTE_*` は `note`、`NOTICE_*` は `notice`、`ERROR_*` は `error`）。拒否と促しの識別子は、記録の `code` と同じ（組み込みルールの文 `RULE_<ルールの id>` は別。記録の `code` ではなく、ルールの id から決める）。同じコードで文が分かれるときだけ `__<区別>` を足す
 2. 種類ごとの欄を書く。必須の欄と任意の欄は、設計書の文面ファイルの設計（`messages.md`）の「形式」の節の、種類ごとの欄の表に従う。文は `|-` のブロックで書くと、`{` や backtick を含んでも引用符で囲まずに済む
 3. 差し込む値の名前を `values` に全部書く。文面に書いた `{名前}` と過不足なく一致させる
 4. 呼ぶ側に識別子と値を渡す。Go は `texts.Say(root, "ID", texts.Values{"名前": 値}, nil)`（値の表は呼び出しに直接書く。テストが名前を数えるため）。sh は `ccnavi_text "$root" ID "名前=値"`。出力の `次:` と `案内:` の見出しは文面ファイルの側が付けるので、コードや sh に書かない
 5. `go/internal/policy/texts/catalog_test.go` が、引く識別子が文面ファイルにあること、値の名前が一致すること、どこからも引かれない識別子が無いことを見る。通るまで直す
 6. 移した出力は、文面ファイルを引いた結果に対して、`次:` の行が 1 行で値が埋まっていることを確かめる
 7. [文面の移行の一覧](message-migration.md)の行を「残り」から「移した」の表へ動かす
+
+## エラーの文を足す
+
+読み手に届くエラー（`fault.Detail` を埋め込んだ型）の文は `ERROR_*`（種類 `error`）で、`what` `why` `next` を必ず書く。エラーを作る側は `fault.New("ERROR_…", fault.Values{…}, what)` で識別子と値を運び、出力の境界が `texts.SayFault(root, err)` で引く。`what` 引数は文面を引けないときの 1 行で、文面ファイルの `what` と同じ内容にする。読み手に届かないエラー（`infra` の読み込み失敗など）は `fault.Plain(what)` で、文面ファイルには置かない。境界が `root` を取れない経路は、既定のルートか空のルートで呼ぶ（引けなければ `what` が出る）。設計は設計書の文面ファイルの設計（`messages.md`）の「エラー」の節。
+
+テスト（`catalog_test.go`）は `fault.New` の識別子も、文面ファイルにあること・値の名前が `values` と一致することを見る。
 
 ## 組み込みルールの文を足す
 
