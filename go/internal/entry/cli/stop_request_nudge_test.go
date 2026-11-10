@@ -21,7 +21,7 @@ func TestFinishSaysTheParentWorktreeIsNotSettled(t *testing.T) {
 	}
 	// what・why・next の 3 行が、文面ファイルの文で出る。
 	for _, want := range []string{
-		"ccnavi: 親のワークツリーが決まらないので止めました: 決まらない。\n",
+		"ccnavi: 親のワークツリーが決まらないため止めました: 決まらない。\n",
 		"なぜ: ",
 		"次: 親のワークツリーを準備してから（sh ",
 		config.StartWrapper + "）打ち直す",

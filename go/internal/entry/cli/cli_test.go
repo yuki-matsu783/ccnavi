@@ -136,6 +136,19 @@ func TestProposalBodyValidatesCommitAndPaths(t *testing.T) {
 }
 
 // 引数の組み合わせの誤りは、設定を読む前に断る。ユーザ専用のオプションは 2、ほかは 1。
+// ユーザ専用の入口の誤り（EntryError）は、文面ファイルの what・なぜ・次: で言う。
+func TestEntryErrorIsSaidFromTheMessageFile(t *testing.T) {
+	var out, errOut bytes.Buffer
+	if code := Run(strings.NewReader(""), &out, &errOut, []string{"--entry", "sh", "ticket"}); code != 2 {
+		t.Fatalf("code %d", code)
+	}
+	for _, want := range []string{"ccnavi: ユーザ専用の入口を使えません: ", "\nなぜ: ", "\n次: "} {
+		if !strings.Contains(errOut.String(), want) {
+			t.Errorf("%q が無い: %q", want, errOut.String())
+		}
+	}
+}
+
 func TestUsageRefusals(t *testing.T) {
 	for _, c := range []struct {
 		args []string

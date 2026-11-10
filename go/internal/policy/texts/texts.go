@@ -283,8 +283,9 @@ func Say(root, id string, values Values, variants Variants) string {
 	return text
 }
 
-// SayFault はエラーの文を組み立てる。err が Detail を運び、識別子の文を引けて値が合えばその文、そうでなければ
-// Detail の What（Detail が無ければ err の文）。引けなくても失敗はせず、止める・止めないの判定には関わらない。
+// SayFault はエラーの文を組み立てる。err が Detail を運び、識別子の文を引けて値が合えばその文。引けなければ
+// Detail の What に、文面を引けなかったことと次の一手（Fallback）を足す。識別子が空なら What だけ（Detail が無ければ
+// err の文）。引けなくても失敗はせず、止める・止めないの判定には関わらない。
 func SayFault(root string, err error) string {
 	if err == nil {
 		return ""
@@ -298,11 +299,11 @@ func SayFault(root string, err error) string {
 	}
 	entry := Find(root, d.ID)
 	if entry == nil {
-		return d.What
+		return d.What + "\n" + Fallback(d.ID)
 	}
 	text, rerr := Render(entry, Values(d.Values), nil, root)
 	if rerr != nil {
-		return d.What
+		return d.What + "\n" + Fallback(d.ID)
 	}
 	return text
 }

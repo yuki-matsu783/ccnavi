@@ -251,12 +251,16 @@ func TestSayFaultFallsBackToWhat(t *testing.T) {
 		{"nil", nil, ""},
 		{"Detail が無い", errors.New("素のエラー"), "素のエラー"},
 		{"識別子が空", &faultErr{fault.Plain("読み込めない")}, "読み込めない"},
-		{"文面ファイルが無い", &faultErr{fault.New("ERROR_NO_SUCH", nil, "What の 1 行")}, "What の 1 行"},
 	}
 	for _, c := range cases {
 		if got := SayFault(root, c.err); got != c.want {
 			t.Errorf("%s: %q、want %q", c.name, got, c.want)
 		}
+	}
+	// 引けないときは What に、引けなかったことと次の一手を足す。
+	got := SayFault(root, &faultErr{fault.New("ERROR_NO_SUCH", nil, "What の 1 行")})
+	if !strings.HasPrefix(got, "What の 1 行\n") || !strings.Contains(got, "ERROR_NO_SUCH") || !strings.Contains(got, "\n"+NextLabel) {
+		t.Errorf("%q", got)
 	}
 }
 
@@ -274,8 +278,8 @@ func TestSayFaultUsesTheMessageFile(t *testing.T) {
 	if got := SayFault(root, &faultErr{fault.New("ERROR_T", fault.Values{"x": "1"}, "what")}); got != want {
 		t.Errorf("%q", got)
 	}
-	// 値が足りなければ What に落ちる。
-	if got := SayFault(root, &faultErr{fault.New("ERROR_T", nil, "what")}); got != "what" {
+	// 値が足りなければ What に落ちる（次の一手つき）。
+	if got := SayFault(root, &faultErr{fault.New("ERROR_T", nil, "what")}); !strings.HasPrefix(got, "what\n") {
 		t.Errorf("%q", got)
 	}
 }
