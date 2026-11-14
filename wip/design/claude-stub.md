@@ -72,7 +72,8 @@ steps:
 - 読むのは `<ワークスペースルート>/.claude/settings.json` の `hooks` だけ。ユーザ設定・`settings.local.json`・プラグインの hook は読まない
 - イベントごとに、`matcher` が無いか空なら全部、あれば `tool_name` に正規表現で当てる（Claude Code の決まりに合わせる）
 - 命令は `sh -c` で起こし、環境に `CLAUDE_PROJECT_DIR` を足し、payload を標準入力に渡す。`timeout` を守る
-- 同じイベントに当たった hook は、書いた順に 1 本ずつ起こす。本物は並行に起こすので、順番に頼る hook があっても代役では気づけない（限界に書く）
+- 同じイベントに当たった hook は、本物と同じく並行に起こす
+- hook の環境には `CLAUDE_PROJECT_DIR`・`CLAUDE_ENV_FILE` を入れ、`CLAUDE_CODE_ENTRYPOINT` が無ければ `sdk-cli` を入れる（ccnavi は `sdk` で始まるかで非対話を見分ける）
 - `asyncRewake` の hook は起こさず、起こさなかったことを stream-json の hook の行に残す
 
 ### payload に入れる欄
@@ -154,7 +155,7 @@ stream-json は、`tests/scenarios/stream.py` が読む行を本物と同じ形�
 ## 確かめられないこと
 
 - モデルが案内を読んで正しく動くか、拒否を迂回しないか（`judge`）。本物の受入シナリオと探索に残す
-- hook を並行に起こしたときの順番の違い
+- 並行に起こした hook が終わる順番（本物とは揃わない）
 - Claude Code 自身の権限の仕組みと、確認の表示
 - 契約で録っていない手の形（録った手に限って本物と合う）
 
@@ -170,7 +171,7 @@ stream-json は、`tests/scenarios/stream.py` が読む行を本物と同じ形�
 | 段 | 中身 | これで回せるシナリオ |
 |---|---|---|
 | 1 | 本物で録る。`tests/manual/claude/record_hooks.py` で、本物の `claude -p`（Haiku）に決まった手を打たせ、hook の payload と stream-json の形を `tests/contract/claude/recorded.json` に録る。`permissionDecision: ask` の `-p` での扱いもここで確かめる | — |
-| 2 | 録った形を元に、代役の芯（SessionStart・UserPromptSubmit・PreToolUse・PostToolUse・Stop、Bash・Read・Write・Edit、stream-json）と、比べる側の契約テスト、実行器の `agent: script` を作る | UC-01・02・03・04・05・07（層 1・2 の拒否） |
+| 2 | 録った形を元に、代役の芯（SessionStart・UserPromptSubmit・PreToolUse・PostToolUse・Stop、Bash・Read・Write・Edit、stream-json）と、比べる側の契約テスト、実行器の `agent: script` を作る | UC-01（済み。台本を書いた）。UC-02・03・04・05・07 は台本を足せば回せる |
 | 3 | Stop の差し戻し、`--resume`、セッションの記録、PostToolUseFailure、サブエージェント。足りない手があれば段 1 に戻って録り足す | UC-08・09・18・19、fake-gitlab を相手にした UC-20 |
 | 4 | 使い捨てのワークスペースで回し、全量テストに入れる | 上の全部を毎回回す |
 
@@ -178,10 +179,21 @@ stream-json は、`tests/scenarios/stream.py` が読む行を本物と同じ形�
 
 `tests/manual/claude/record_hooks.py` で Claude Code 2.1.325 を録った。形は `tests/contract/claude/recorded.json`、振る舞いはその `observations`。上の設計と違っていた点と、代役を作るときに合わせる点を挙げる。
 
-- **hook は並行に起きる**: 同じイベントに当たった 2 本の hook の実行時間が重なった。代役は書いた順に 1 本ずつ起こすので、限界のとおり順番の違いには気づけない
+- **hook は並行に起きる**: 同じイベントに当たった 2 本の hook の実行時間が重なった。代役も並行に起こす
 - **サブエージェントの道具の名前は `Agent`**: `Task` ではない。サブエージェントの中では、終わるときに `SubagentHandback` というツールの PreToolUse・PostToolUse も出る。中の hook の payload には `agent_id` が入る
 - **サブエージェントはバックグラウンドで動いた**: 終わると `system/task_notification` が出て、親の側で UserPromptSubmit がもう一度起きた。代役は、`agent` の手のあとに UserPromptSubmit を 1 回足す
 - **`ask` と PostToolUse の `block`**: 上の「応答の解釈」の表に書いた
 - **`--resume`**: SessionStart の `source` は `resume`
 - **hook の環境**: `CLAUDE_PROJECT_DIR` は payload の `cwd` と同じで、hook の作業ディレクトリもそこ。ほかに `CLAUDE_CODE_ENTRYPOINT`・`CLAUDE_ENV_FILE` が入る
 - stream-json には、`stream.py` が読む行のほかに `system/hook_started`・`system/task_*`・`rate_limit_event` などの行も出る。代役は、`stream.py` と ccnavi が読む行だけを出す
+
+## 段 2 で作ったもの
+
+| 置き場 | 中身 |
+|---|---|
+| `tests/fake_claude.py` | 代役の本体 |
+| `tests/contract/claudeside.py` | 本物と代役で共有する場面（木・hook・打つ手）と、形・振る舞いへのまとめ |
+| `tests/contract/test_claude_contract.py` | 代役の形と振る舞いを `recorded.json` と比べる（約 4 秒） |
+| `tests/scenarios/schema.py`・`drive.py` | `agent: script` と step の `script`・`after_stop_block`。`agent: script` では `judge` を評価しない |
+
+`agent: script` のシナリオも、今は本物と同じく `runner run … --confirmed` で回す（普段のワークスペースルートで、人間の確認を取ってから）。確認なしで回せるのは段 4 で使い捨てのワークスペースを作ってから。
