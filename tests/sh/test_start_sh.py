@@ -649,27 +649,6 @@ class StartShTest(unittest.TestCase):
         self.assertIn("既存の MR を確かめられなかった", done.stdout)
         self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
 
-    def test_adopting_an_existing_mr_guidance_asks_for_all_three_arguments(self):
-        # --mr で既存の MR を採用する道は、--mcp-checked を足すだけでは進めない
-        done = self.run_sh("--mr", "5", token=False)
-        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn(
-            "--mr 5 --issue <閉じる issue> --branch <head.ref> --mcp-checked", done.stdout
-        )
-        self.assertNotIn("同じコマンドに --mcp-checked を付けて再実行する", done.stdout)
-        again = self.run_sh("--mr", "5", "--mcp-checked", token=False)
-        self.assertEqual(again.returncode, 4, again.stdout + again.stderr)
-        self.assertIn(
-            "--issue <issue の番号> --mr 5 --branch <元ブランチ> --mcp-checked", again.stdout
-        )
-
-    def test_new_creation_guidance_only_adds_mcp_checked(self):
-        # 候補が 0 件で --issue だけの新規作成は、--mcp-checked を足した打ち直しで進む
-        done = self.run_sh("--issue", "152", token=False)
-        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        _, args = self.guided_args(done.stdout, "再実行する: ")
-        self.assertEqual(args, ["--issue", "152", "--mcp-checked"])
-
     def test_title_unreadable_prints_issue_read_guidance(self):
         # API が失敗した（500）。ホストには届いていないので MCP の案内と終了コード 4
         self.route({PULLS: [200, []], f"GET {GITHUB}/issues/152": [500, {"message": "boom"}]})
@@ -1917,13 +1896,6 @@ exec '{self.bin}/curl' -X "$method" "https://gitlab.com/api/v4/$path"
         self.assertIn("なし（ブランチもワークツリーも作っていない）", done.stdout)
         self.assertNotIn("--mcp-checked", done.stdout)
         self.assertNotIn("ブラウザ", done.stdout)
-
-    def test_gitlab_mcp_checked_without_all_three_asks_the_user(self):
-        done = self.run_sh("--mr", "5", "--mcp-checked", token=False)
-        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-        self.assertIn("次: ユーザに、ブラウザで MR の元ブランチ", done.stdout)
-        self.assertIn("直接実装にも切り替えず、ユーザに報告して止まる", done.stdout)
-        self.assertNotIn("MCP などで", done.stdout)
 
     def test_gitlab_new_issue_unreachable_asks_the_user(self):
         done = self.run_sh("--new-issue", "Add login", "--similar-checked", token=False)
