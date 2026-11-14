@@ -96,8 +96,8 @@ ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧）を
 |---|---|
 | 終了コード 2 | 止める。標準エラーを理由にする（PreToolUse ならツールを実行せず、エラーの `tool_result` に理由を入れる。Stop なら差し戻し） |
 | 終了コード 0 で `hookSpecificOutput.permissionDecision: deny` | PreToolUse を止める。`permissionDecisionReason` を `tool_result` に入れる |
-| `permissionDecision: ask` | 段 1 で本物の扱いを録ってから決める（未決の点） |
-| `decision: block` | Stop は差し戻し、PostToolUse は理由を `tool_result` に足す |
+| `permissionDecision: ask` | `-p` では deny と同じく止める（本物で録った。理由が `tool_result` に入り、`system/permission_denied` の行も出る） |
+| `decision: block` | Stop は差し戻し（理由は `Stop hook feedback:` で始まる合成の `user` の行で渡る）。PostToolUse は `tool_result` を変えず、理由は hook の行にだけ出る |
 | `additionalContext` | モデルに渡す文脈として stream-json に残すだけ（台本は読まない） |
 | それ以外の終了コード | 止めない。hook の失敗として stream-json に残す |
 
@@ -174,6 +174,14 @@ stream-json は、`tests/scenarios/stream.py` が読む行を本物と同じ形�
 | 3 | Stop の差し戻し、`--resume`、セッションの記録、PostToolUseFailure、サブエージェント。足りない手があれば段 1 に戻って録り足す | UC-08・09・18・19、fake-gitlab を相手にした UC-20 |
 | 4 | 使い捨てのワークスペースで回し、全量テストに入れる | 上の全部を毎回回す |
 
-## 未決の点
+## 本物で録った結果（段 1）
 
-1. **`permissionDecision: ask` の扱い**: 段 1 で、`-p` で本物がどう振る舞うかを録ってから決める
+`tests/manual/claude/record_hooks.py` で Claude Code 2.1.325 を録った。形は `tests/contract/claude/recorded.json`、振る舞いはその `observations`。上の設計と違っていた点と、代役を作るときに合わせる点を挙げる。
+
+- **hook は並行に起きる**: 同じイベントに当たった 2 本の hook の実行時間が重なった。代役は書いた順に 1 本ずつ起こすので、限界のとおり順番の違いには気づけない
+- **サブエージェントの道具の名前は `Agent`**: `Task` ではない。サブエージェントの中では、終わるときに `SubagentHandback` というツールの PreToolUse・PostToolUse も出る。中の hook の payload には `agent_id` が入る
+- **サブエージェントはバックグラウンドで動いた**: 終わると `system/task_notification` が出て、親の側で UserPromptSubmit がもう一度起きた。代役は、`agent` の手のあとに UserPromptSubmit を 1 回足す
+- **`ask` と PostToolUse の `block`**: 上の「応答の解釈」の表に書いた
+- **`--resume`**: SessionStart の `source` は `resume`
+- **hook の環境**: `CLAUDE_PROJECT_DIR` は payload の `cwd` と同じで、hook の作業ディレクトリもそこ。ほかに `CLAUDE_CODE_ENTRYPOINT`・`CLAUDE_ENV_FILE` が入る
+- stream-json には、`stream.py` が読む行のほかに `system/hook_started`・`system/task_*`・`rate_limit_event` などの行も出る。代役は、`stream.py` と ccnavi が読む行だけを出す
