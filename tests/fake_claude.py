@@ -1,8 +1,8 @@
 """`claude -p` の代役。台本どおりにツールを呼び、Claude Code と同じ形で hook を呼び、
 stream-json を出す。
 
-受入シナリオの `agent: script` で、実行器（`tests/scenarios/drive.py`）が `claude` の代わりに
-起こす。設計は `wip/design/claude-stub.md`。形が本物と合っていることは
+受入シナリオを `--agent script` で回すとき、実行器（`tests/scenarios/drive.py`）が
+`claude` の代わりに起こす。仕様は `.agents/docs/claude-contract.md`。形が本物と合っていることは
 `tests/contract/test_claude_contract.py` が、本物から録った
 `tests/contract/claude/recorded.json` と比べて確かめる。
 

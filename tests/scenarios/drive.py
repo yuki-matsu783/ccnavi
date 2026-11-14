@@ -287,6 +287,7 @@ def start_scenario(scn, scenario_path, root, top, out):
     base = (setup.get("reset") or {}).get("base")
     st = {
         "scenario": str(Path(scenario_path).resolve()),
+        "agent": scn.get("agent", schema.AGENT_CLAUDE),
         "root": str(root),
         "out": str(out),
         "next_step": 0,

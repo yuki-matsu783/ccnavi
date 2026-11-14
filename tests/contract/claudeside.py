@@ -1,4 +1,4 @@
-"""claude -p の契約の場面（本物と代役で同じもの）。仕様は `wip/design/claude-stub.md`。
+"""claude -p の契約の場面（本物と代役で同じもの）。仕様は `.agents/docs/claude-contract.md`。
 
 GitLab の `fakeside.py` と同じ役回り。使い捨ての木、hook の入力を書き出すだけの hook、
 打たせる手を持つ。hook が受けた JSON と stream-json を、形（`shape.py`）と

@@ -5,6 +5,7 @@
     uv run python -m tests.scenarios.runner preflight <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
+    uv run python -m tests.scenarios.runner run <シナリオ> --agent script --confirmed   代役で回す
     uv run python -m tests.scenarios.runner run-all <ディレクトリ or glob> --max-total-usd <USD>
     uv run python -m tests.scenarios.runner run-all <...> --max-total-usd <USD> --confirmed <目印>
     uv run python -m tests.scenarios.runner next <出力の置き場>
@@ -50,7 +51,7 @@ import は同じ段か下へだけ向ける。
 import argparse
 import sys
 
-from tests.scenarios import commands
+from tests.scenarios import commands, schema
 from tests.scenarios.common import ROOT, enable_entry
 
 
@@ -64,6 +65,12 @@ def main(argv=None):
     r.add_argument("--confirmed", action="store_true")
     r.add_argument("--root", default=str(ROOT))
     r.add_argument("--out")
+    r.add_argument(
+        "--agent",
+        choices=[schema.AGENT_CLAUDE, schema.AGENT_SCRIPT],
+        default=schema.AGENT_CLAUDE,
+        help="script なら step の script を代役（tests/fake_claude.py）で回す。claude は呼ばない",
+    )
     r.set_defaults(fn=commands.cmd_run)
     ra = sub.add_parser("run-all")
     ra.add_argument("scenarios", nargs="+", help="ディレクトリ・glob・シナリオのファイル")

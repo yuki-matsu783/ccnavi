@@ -4558,10 +4558,6 @@ for _name in [n for n in dir(DockerLifecycleTest) if n.startswith("test_")]:
     setattr(HumanApiTest, _name, None)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class ScriptedAgentTest(unittest.TestCase):
     """agent: script の step を、claude の代わりに代役（tests/fake_claude.py）で回す。"""
 
@@ -4611,6 +4607,10 @@ class ScriptedAgentTest(unittest.TestCase):
     def test_script_step_requires_script(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "scn.yml"
-            path.write_text("id: T\nagent: script\nsteps:\n  - prompt: a\n", encoding="utf-8")
+            path.write_text("id: T\nsteps:\n  - prompt: a\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "script が要ります"):
-                schema.load_scenario(path)
+                schema.load_scenario(path, schema.AGENT_SCRIPT)
+
+
+if __name__ == "__main__":
+    unittest.main()

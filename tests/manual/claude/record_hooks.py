@@ -1,6 +1,7 @@
 """本物の `claude -p` に決まった手を打たせ、hook に渡る JSON と stream-json の形を録る。
 
-claude -p の代役の契約の録る側（設計は `wip/design/claude-stub.md`）。手動で回す。費用がかかる。
+claude -p の代役の契約の録る側（仕様は `.agents/docs/claude-contract.md`）。
+手動で回す。費用がかかる。
 自動テストは呼ばない。
 
     uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2
