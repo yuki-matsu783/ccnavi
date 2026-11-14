@@ -71,6 +71,14 @@ reject() {
 	exit 2
 }
 
+# exe_reject <識別子> <文面>。実行ファイル（`ccnavi git check`）が拒否したとき。識別子は実行ファイルが決めるので、
+# reject と違って文字のまま書けない。出し方と記録の仕方は reject と同じ。
+exe_reject() {
+	printf 'ccnavi-git: %s\n' "$2" >&2
+	log_info 拒否した -- "sub=${sub:-}" "reason=$1"
+	exit 2
+}
+
 # 共通部分。ワークスペースルートの探し方と、プロジェクト名の導出はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
@@ -176,6 +184,11 @@ esac
 # 引数だけで決まるサブコマンドの判定（読むだけの一覧・cat-file・grep・branch・tag・remote・stash・add・commit・
 # 通さないサブコマンド）。答えは allow（通す）・pass（続きはこのあとの case が見る）・deny <識別子> と拒否の文。
 # git の引数は標準入力に NUL 区切りで渡す（ccnavi の引数として渡すと、`-m` などを ccnavi のオプションとして読むため）。
+# 診断ログの sub。サブコマンドより前のオプションで止めるときは空のまま。
+case "$1" in
+-*) ;;
+*) sub="$1" ;;
+esac
 gc_bin=$(ccnavi_bin "$WS") ||
 	reject no-exe "ccnavi の実行ファイルが見つからないため、git の引数の形を確かめられません。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、無ければユーザに伝えてください。"
 gc_out=$(printf '%s\0' "$@" | "$gc_bin" --root "$WS" git check "$SELF" "$SYNC" 2>/dev/null) || gc_out=""
@@ -184,7 +197,7 @@ case "$gc_out" in
 allow | pass) ;;
 deny\ *)
 	gc_id=$(printf '%s\n' "$gc_out" | sed -n '1s/^deny //p')
-	reject "$gc_id" "$(printf '%s\n' "$gc_out" | sed -n '2p')"
+	exe_reject "$gc_id" "$(printf '%s\n' "$gc_out" | sed -n '2p')"
 	;;
 *) reject no-exe "ccnavi の実行ファイルが git の引数の形に答えませんでした。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、直せなければユーザに伝えてください。" ;;
 esac
