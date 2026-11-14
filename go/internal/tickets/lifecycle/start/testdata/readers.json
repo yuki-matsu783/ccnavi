@@ -680,5 +680,42 @@
   ],
   "out": "",
   "code": 1
+ },
+ {
+  "name": "sh の試験の本文: コード・引用・注釈・語の一部",
+  "op": "linked-body",
+  "args": [
+   "acme/widgets"
+  ],
+  "inputs": [
+   "{\"body\": \"Closes #12\\n```\\nFixes #9\\n```\\n> Closes #7\\n<!-- Closes #100 -->\\n\\u4f8b: `Closes #50`\\nDoes not close #8 bug-fix #13 Closes #14abc\"}"
+  ],
+  "out": "issue acme/widgets#12\n",
+  "code": 0
+ },
+ {
+  "name": "sh の試験の本文: コロンと大文字と別のリポジトリ",
+  "op": "linked-body",
+  "args": [
+   "acme/widgets"
+  ],
+  "inputs": [
+   "{\"body\": \"fixes: other/repo#3\\nRESOLVES #12\\nrefs #99\\nrefix #98\"}"
+  ],
+  "out": "issue other/repo#3\nissue acme/widgets#12\n",
+  "code": 0
+ },
+ {
+  "name": "外から来た制御文字を消す",
+  "op": "list-open",
+  "args": [
+   "github"
+  ],
+  "inputs": [
+   "[{\"number\": 1, \"title\": \"first\\u2028\\u001b[31m injected\", \"body\": \"x\\u001b[0m\"}]",
+   "[]"
+  ],
+  "out": "open の issue（全 1 件。先頭 50 件を出す）:\nissue #1  first [31m injected\n  本文: x [0m\nopen の MR（全 0 件。先頭 50 件を出す）:\n",
+  "code": 0
  }
 ]

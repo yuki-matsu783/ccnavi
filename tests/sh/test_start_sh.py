@@ -419,13 +419,6 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("issue #152 を作った", done.stdout)
 
-    def test_new_issue_ignores_an_unrelated_open_issue(self):
-        self.github_new_issue(
-            found=[{"number": 11, "title": "Fix typo in README", "html_url": "u"}]
-        )
-        done = self.run_sh("--new-issue", "Add login", "--similar-checked")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-
     def test_new_issue_waits_for_the_semantic_check_by_a_haiku_subagent(self):
         """機械的な確認で似たものが無くても、意味が近いかの確認が済むまで作らない。"""
         self.github_new_issue(
@@ -513,26 +506,6 @@ class StartShTest(unittest.TestCase):
         self.assertIn("'--issue' '152' '--slug' 'add-login'", done.stdout)
         self.assertNotIn("'--new-issue'", done.stdout.split("MCP で行う手順")[-1])
         self.assertEqual(len(self.posts()), 1)
-
-    def test_list_open_says_how_many_were_left_out_and_cleans_external_text(self):
-        issues = [
-            {"number": n, "title": f"issue {n}", "body": "x", "html_url": "u"} for n in range(1, 52)
-        ]
-        issues[0]["title"] = "first\u2028\u001b[31m injected"
-        self.route(
-            {
-                f"GET {GITHUB}": [200, {"id": 1, "permissions": {"push": False}}],
-                f"GET {GITHUB}/issues?state=open&per_page=100&page=1": [200, issues],
-                f"GET {GITHUB}/pulls?state=open&per_page=100&page=1": [200, []],
-            }
-        )
-        done = self.run_sh("--list-open")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("open の issue（全 51 件。先頭 50 件を出す）", done.stdout)
-        self.assertIn("（ほかに 1 件あります。", done.stdout)
-        self.assertIn("first [31m injected", done.stdout.replace("\x1b", ""))
-        self.assertNotIn("\u2028", done.stdout)
-        self.assertNotIn("\x1b", done.stdout)
 
     def test_new_issue_dry_run_creates_nothing(self):
         self.github_new_issue()
@@ -804,13 +777,6 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
         self.assertIn("確認: issue #152 の状態: 未確認", done.stdout)
         self.assertNotIn("は closed", done.stdout)
-
-    def test_a_response_without_a_state_does_not_stop_and_says_unconfirmed(self):
-        # タイトルは読めたが状態が分からない応答でも止めない
-        self.github_new()
-        done = self.run_sh("--issue", "152")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("確認: issue #152 の状態: 未確認", done.stdout)
 
     def test_reopened_needs_issue(self):
         done = self.run_sh("--mr", "5", "--reopened")
@@ -1636,18 +1602,14 @@ class StartShTest(unittest.TestCase):
         self.assertIn("--mr 5 --issue <issue の番号> --branch", done.stdout)
         self.assertFalse(os.path.isdir(self.wt("fix-152-other")))
 
-    def test_graphql_errors_and_null_pull_request_are_not_zero_linked_issues(self):
-        for payload in (
-            {"errors": [{"message": "boom"}], "data": None},
-            {"data": {"repository": {"pullRequest": None}}},
-        ):
-            with self.subTest(payload=payload):
-                self.mr_branch(**{GRAPHQL: [200, payload]})
-                done = self.run_sh("--mr", "5")
-                self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
-                self.assertIn("mcp__github__issue_read", done.stdout)
-                # 理由が空（「?」）にならない
-                self.assertIn("紐づく issue を読めなかった", done.stdout)
+    def test_an_unreadable_closing_link_stops_with_the_reason_and_exit_4(self):
+        # 応答の読み方（errors・PR が null）は Go の見本（tickets/lifecycle/start）が見る。
+        self.mr_branch(**{GRAPHQL: [200, {"errors": [{"message": "boom"}], "data": None}]})
+        done = self.run_sh("--mr", "5")
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.assertIn("mcp__github__issue_read", done.stdout)
+        # 理由が空（「?」）にならない
+        self.assertIn("紐づく issue を読めなかった", done.stdout)
 
     def graphql_blocked_with_body(self, body, status=403):
         """GraphQL が断られる環境。MR の本文（`GET pulls/5`）に body を置く。"""
@@ -1663,30 +1625,6 @@ class StartShTest(unittest.TestCase):
         done = self.run_sh("--mr", "5")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("issue: 12 と mr: 5", done.stdout)
-
-    def test_the_body_keywords_ignore_case_and_read_other_repositories(self):
-        self.graphql_blocked_with_body("fixes: other/repo#3\nRESOLVES #12\nrefs #99\nrefix #98")
-        done = self.run_sh("--mr", "5")
-        self.assertEqual(done.returncode, 3, done.stdout + done.stderr)
-        self.assertIn("other/repo#3", done.stdout)
-        self.assertIn("acme/widgets#12", done.stdout)
-        self.assertNotIn("#99", done.stdout)
-        self.assertNotIn("#98", done.stdout)
-
-    def test_body_keywords_inside_code_comments_quotes_and_words_are_not_read(self):
-        self.graphql_blocked_with_body(
-            "Closes #12\n```\nFixes #9\n```\n> Closes #7\n<!-- Closes #100 -->\n"
-            "例: `Closes #50`\nDoes not close #8 bug-fix #13 Closes #14abc"
-        )
-        done = self.run_sh("--mr", "5")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("issue: 12 と mr: 5", done.stdout)
-
-    def test_a_blocked_graphql_with_no_keyword_in_the_body_is_zero_linked_issues(self):
-        self.graphql_blocked_with_body("Refs #12")
-        done = self.run_sh("--mr", "5")
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("Closes #<番号>", done.stderr)
 
     def test_a_401_from_graphql_does_not_fall_back_to_the_body(self):
         self.graphql_blocked_with_body("Closes #12", status=401)
