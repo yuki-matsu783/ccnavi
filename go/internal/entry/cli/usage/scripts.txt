@@ -169,6 +169,9 @@
     ccnavi start route <candidates.json> what=issue|mr number=<n> [issue=…] [mr=…] [branch=…] [mcp=…] integration=<branch>
         （ccnavi-start.sh 用。ccnavi-branches.sh の候補と引数とこのリポジトリの git から、
          進む道（route の行）と、採用できない理由（problem の行）を出力します。読み取り専用）
+    ccnavi start guidance stage=<段階> kind=github|gitlab <名前>=<値>...
+        （ccnavi-start.sh 用。ホストに届かないときの案内（GitHub は MCP で代行する手順、GitLab は
+         認証を頼んで打ち直す次の一手）を出力します。読み取り専用）
 
 ccnavi自身は、リモートに接続しません。スクリプトがマージリクエストとそのスレッド、
 レビューを取得し、--result <json> として渡します。
