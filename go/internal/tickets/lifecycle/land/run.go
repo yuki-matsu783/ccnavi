@@ -113,13 +113,13 @@ func (r *run) list(lines []string) {
 
 // git は dir で git を起こし、標準出力（末尾の改行を落とす）と、0 で終わったかを返す。
 func (r *run) git(dir string, args ...string) (string, bool) {
-	done := git.Run(dir, args, git.Options{Timeout: gitTimeout})
+	done := git.Run(dir, args, git.Options{Timeout: gitTimeout, LazyFetch: true})
 	return strings.TrimRight(done.Out, "\n"), done.OK()
 }
 
 // gitDone は dir で git を起こし、終わり方をそのまま返す（索引のファイルを指定できる）。
 func (r *run) gitDone(dir, index string, args ...string) git.Done {
-	return git.Run(dir, args, git.Options{Timeout: gitTimeout, IndexFile: index, RawPaths: true})
+	return git.Run(dir, args, git.Options{Timeout: gitTimeout, IndexFile: index, RawPaths: true, LazyFetch: true})
 }
 
 // out は cwd で git を起こした標準出力（失敗なら空）。

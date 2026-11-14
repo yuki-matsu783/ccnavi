@@ -52,7 +52,7 @@ type preparer struct {
 
 // run は dir で git を起こす。失敗したら git の出力を標準エラーに出す行として残して偽。
 func (p *preparer) run(dir string, args ...string) bool {
-	done := git.Run(dir, args, git.Options{Timeout: prepareTimeout})
+	done := git.Run(dir, args, git.Options{Timeout: prepareTimeout, LazyFetch: true})
 	if !done.OK() {
 		p.o.err(strings.TrimRight(done.Stderr+done.Out, "\n"))
 	}
@@ -145,7 +145,7 @@ func (p *preparer) cleanup() {
 	if !p.created {
 		return
 	}
-	if !git.Run(p.cwd, []string{"worktree", "remove", p.wt}, git.Options{Timeout: prepareTimeout}).OK() {
+	if !git.Run(p.cwd, []string{"worktree", "remove", p.wt}, git.Options{Timeout: prepareTimeout, LazyFetch: true}).OK() {
 		p.o.out(texts.Say(p.root, "NOTE_START_WORKTREE_KEPT", texts.Values{"wt": p.wt, "branch": p.a.Branch}, nil))
 		return
 	}
