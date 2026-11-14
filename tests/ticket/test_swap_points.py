@@ -6,8 +6,8 @@
 2. 親のワークツリーの HEAD がブランチを指していなければ承認しない
 3. Chrome の入口（`go/cmd/ccnavi-chrome`。拡張の WASM と同じ要求を受ける）が同じ入力から、
    手元の CLI が実際に書いたのと同じバイト列を出す（新規・マーカーの消去・改版・フィードバック計画・
-   多階層の先行と外れる提案・レビュー済み）。時刻は、Chrome は要求の時刻、CLI は手元の時計で書くので、
-   時刻の欄だけを除いて比べる。
+   多階層の先行と外れる提案・レビュー済み）。時刻は、Chrome は要求の時刻、CLI は手元の時計で書く
+   ので、時刻の欄だけを除いて比べる。
    同じ要求と答えを拡張の試験の見本（`extensions/chrome/ccnavi-approval/test/fixtures/core-scenarios.json`）
    に置き、拡張の試験が WASM でも同じ答えになることを見る
 4. Chrome の入口は置き場を既定に固定する。統合先の `.claude/settings.json` の `env` や手元の env に
