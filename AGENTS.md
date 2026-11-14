@@ -39,7 +39,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | 文書（`docs/`・`.ccnavi/docs/`・`.agents/docs/`・`README.md`）を足す・動かす・改名する、どの読み手向けの文書か・どこに置くかを決める、文書から別の文書へリンクを張る（上位から下位へ張ってよいか） | `.agents/docs/docs-structure.md` |
 | 要件書・設計書・ADR（`docs/11_requirements`・`docs/21_design`・`docs/30_adr`）を書く・直す、これらの文書から別の文書を指す | `.agents/docs/docs-writing.md` |
 | sh やスクリプトを書く、パス・名前を比べる、コードのコメントを書く、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `.agents/docs/environment.md` |
-| ccnavi の実行ファイル（`go/`）か `.ccnavi/scripts/` の sh を直す | `.agents/docs/exe-boundary.md` |
+| ccnavi の実行ファイル（`go/`）か `.ccnavi/scripts/` の sh を直す、sh の処理を実行ファイルへ移す | `.agents/docs/exe-boundary.md`（移行の進み具合は `.agents/docs/sh-migration.md`） |
 | エージェントを止める・返事を求める仕組みを足す・直す、拒否の文を書く | `.agents/docs/stop-patterns.md` |
 | 異常状態（壊れた記録・書きかけ・手で動かされた状態・一時的な失敗）を扱う処理を足す・直す・削る | `.agents/docs/irregular-states.md` |
 | 操作を止める条件（ゲート）を足す・直す、承認・レビューを頼む操作の拒否条件を決める、名前・オプション・形式を変える（後方互換を残さない） | `.agents/docs/gate-conditions.md` |
