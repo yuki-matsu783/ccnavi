@@ -18,6 +18,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | `ccnavi-start.sh` | 候補の振り分け（候補が複数・ホストを見られない・新しく作る・採用・作りかけ・古いブランチ・MR の無い候補などの道）と、採用の確認のうちローカルで決まるもの（MR の状態・フォーク・マージ先・保護されたブランチ） | `ccnavi start route`（`go/internal/tickets/lifecycle/start`） | 識別子・同じ識別子の別ブランチ・マージ済み MR の確認と、止めるときの文は sh |
 | `ccnavi-start.sh` | ホストに届かないときの案内（`stop_host` の文。GitHub の MCP の手順、GitLab の認証を頼む次の一手） | `ccnavi start guidance`（`go/internal/tickets/lifecycle/start`） | 案内のログを書くことと、ホストの種類が読めないときに止めることは sh |
 | `ccnavi-git.sh` | 引数だけで決まる判定（サブコマンドより前のオプション、全引数で止める形とその略、読むだけのサブコマンド、`cat-file`・`grep`・`branch`・`tag`・`remote`・`stash`・`add`・`commit`、通さないサブコマンド）と、そのオプションの許可リストの読み | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | 実行ファイルが無いとラッパーは止まる |
+| `ccnavi-git.sh` | 状態を見るサブコマンド（`rm`・`restore`・`checkout`・`switch`・`merge`・`merge-file`・`fetch`・`pull`・`push`・`worktree`）の判定、守る場所の判定（承認済みチケットの置き場と ccnavi 自身を守る場所）、`worktree add` の起点の新しさ、push のゲートを掛けるか | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | ゲートの ls-remote と、fetch が失敗した印の書き込みは sh |
 
 ## 残り
 
@@ -26,7 +27,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | sh | Go で実装するもの（いま sh にある） | sh で実装するもの | 備考 |
 |---|---|---|---|
 | `ccnavi-start.sh` | 引数の検査（`--new-issue` のタイトルの整えと長さ）、`--repo` と origin の照合、実行ファイルの答え（`--templates --json`）の jq での読み、`id_check`・`clash_check`・`merged_check` の判定、`resolve_issue`、`ensure_worktree`・`fast_forward`・`ensure_initial_commit`・`cleanup_created_worktree`、`report` と dry-run の出力 | `host_open`、API の取得と POST、`remote_heads`、fetch・push、`ccnavi-branches.sh` と `ccnavi-sync.sh` の呼び出し、`--check` | `--check`（`ccnavi_preflight`）は `ccnavi-common-host.sh` と一緒に直す |
-| `ccnavi-git.sh` | 状態を見るサブコマンド（`rm`・`restore`・`checkout`・`switch`・`merge`・`merge-file`・`fetch`・`pull`・`push`・`worktree`）のオプションの許可リストと拒否、守る場所の判定（`store_hit`・`core_hit`）、`integrate` / `integrate-done` の判定と状態操作（一時ワークツリー・コミット・ff-only・`update-ref -d`）、ログの書き出しと要約 | 環境の消去、実行ファイルへの受け渡し、fetch・pull・push とゲートの ls-remote、子のワークツリーからの push の独立した検査 | 直したら、設計書（チケット制御の「置き場」の文書の、ラッパーの中の判定と push のゲートの節）と、設計原則 P13 の例外の書き方を書き直す |
+| `ccnavi-git.sh` | `integrate` / `integrate-done` の判定と状態操作（一時ワークツリー・コミット・ff-only・`update-ref -d`）、ログの書き出しと要約 | 環境の消去、実行ファイルへの受け渡し、fetch・pull・push とゲートの ls-remote、子のワークツリーからの push の独立した検査 | 直したら、設計書（チケット制御の「置き場」の文書の、ラッパーの中の判定と push のゲートの節）と、設計原則 P13 の例外の書き方を書き直す |
 | `ccnavi-common-state.sh` | `ccnavi_push_gate` の判定、`ccnavi_parent_trace`、`ccnavi_id_clash`、`ccnavi_git_refusal`、`ccnavi_record_*`、`ccnavi_integration` | `ccnavi_git_timed`、ゲートの ls-remote、実行ファイルに聞く口（`ccnavi_ask` など） | ゲートは素の push を打つ 3 経路が共有する |
 | `ccnavi-sync.sh` | 親子の選び方、`sync_family`・`merged_present`・`sync_absent`・`sync_retired` の分岐、ff・merge・abort、origin/HEAD の向け直し、出力の文 | ls-remote、`fetch_one`、`ccnavi-review.sh merged` の呼び出し、ロック、trap | merge の abort は実行ファイルの 1 回の起動の中で持つ |
 | `ccnavi-worktree.sh` | 引数と C1〜C7 の検査、`same_id_guard`、`make_candidate`、記録の書き出し、`worktree add`、報告の文 | ccnavi-git.sh 経由の fetch と ls-remote | 記録 `ccnavi-direct/<名前>` は integrate が読む |
