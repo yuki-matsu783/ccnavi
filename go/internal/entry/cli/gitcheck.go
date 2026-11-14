@@ -60,15 +60,20 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 }
 
 // gitIntegrateUsage は `ccnavi git integrate` の使い方。
-const gitIntegrateUsage = "ccnavi: git integrate <自分の呼び方> <自分の呼び方（引用済み）> <ccnavi-worktree.sh の呼び方（引用済み）> <ccnavi-ticket.sh の呼び方（引用済み）> <terminal|pipe> <一覧の行数>（integrate または integrate-done で始まる git の引数は標準入力に NUL 区切りで渡す）"
+const gitIntegrateUsage = "ccnavi: git integrate <自分の呼び方> <自分の呼び方（引用済み）> <ccnavi-worktree.sh の呼び方（引用済み）> <ccnavi-ticket.sh の呼び方（引用済み）> <一覧の行数> -- integrate|integrate-done <引数>..."
 
-// runGitIntegrate は `ccnavi git integrate <呼び方>...`（ccnavi-git.sh 用）。直接作業の取り込み（integrate・integrate --abort・
-// integrate-done）を行い、出力をそのまま標準出力・標準エラーに書く。終了コードは 0（済んだ）・1（止めた）・2（拒否）。
-// ロックはラッパーが取ってから呼ぶ。
+// runGitIntegrate は `ccnavi git integrate <呼び方>... -- <git の引数>...`（ccnavi-git.sh 用）。直接作業の取り込み
+// （integrate・integrate --abort・integrate-done）を行い、出力をそのまま標準出力・標準エラーに書く。終了コードは 0（済んだ）・
+// 1（止めた）・2（拒否）。ロックはラッパーが取ってから呼ぶ。標準入力が端末かは、ここで自分で見る（ラッパーの言葉を
+// 信じると、実行ファイルを直に打って「ターミナルから打つ」決まりを迂回できるため）。
 func runGitIntegrate(in *input, stdout, stderr io.Writer, root string, conf *config.Settings, words []string) int {
-	args, ok := nulArgs(in, stderr)
-	lines, err := strconv.Atoi(wordAt(words, 5))
-	if len(words) != 6 || !ok || err != nil || len(args) == 0 || args[0] != "integrate" && args[0] != "integrate-done" {
+	const names = 5
+	if len(words) <= names || words[names] != "integrate" && words[names] != "integrate-done" {
+		fmt.Fprintln(stderr, gitIntegrateUsage)
+		return config.ExitError
+	}
+	lines, err := strconv.Atoi(words[4])
+	if err != nil {
 		fmt.Fprintln(stderr, gitIntegrateUsage)
 		return config.ExitError
 	}
@@ -79,16 +84,8 @@ func runGitIntegrate(in *input, stdout, stderr io.Writer, root string, conf *con
 	}
 	return land.Run(land.Input{
 		Names: land.Names{Self: words[0], SelfQ: words[1], WorktreeQ: words[2], TicketQ: words[3]},
-		Root:  root, Cwd: cwd, Conf: conf, Terminal: words[4] == "terminal", MaxLines: lines,
-	}, stdout, stderr, args)
-}
-
-// wordAt は words[i]（無ければ空）。
-func wordAt(words []string, i int) string {
-	if i < len(words) {
-		return words[i]
-	}
-	return ""
+		Root:  root, Cwd: cwd, Conf: conf, Terminal: in.terminal(), MaxLines: lines,
+	}, stdout, stderr, words[names:])
 }
 
 // nulArgs は標準入力から NUL 区切りの git の引数を読む。読めなければ理由を書いて偽。

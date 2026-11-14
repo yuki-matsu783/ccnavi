@@ -225,8 +225,8 @@ wt_fresh_dir() {
 #
 # 判定と操作（記録・一時ワークツリー・コミット・取り込み先への fast-forward・片付け）は実行ファイルの
 # `ccnavi git integrate`（go/internal/tickets/lifecycle/land）が行う。ここはロック（キーは
-# logs/state/locks/<repo>/.integrate。持ち主はこの sh）を取ってから呼ぶ。標準入力が端末かは、git の引数を
-# 渡す前にここで確かめる（自己防衛の対象を含む取り込みはターミナルから打たせる）。
+# logs/state/locks/<repo>/.integrate。持ち主はこの sh）を取ってから呼ぶ。標準入力はそのまま渡す（自己防衛の対象を含む取り込みは
+# ターミナルから打たせるので、端末かを実行ファイルが見る）。
 ig_run() {
 	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	ig_repo=""
@@ -238,10 +238,8 @@ ig_run() {
 	trap 'exit 130' INT
 	trap 'exit 143' TERM
 	trap 'exit 129' HUP
-	ig_tty=pipe
-	[ ! -t 0 ] || ig_tty=terminal
 	ig_rc=0
-	printf '%s\0' "$sub" "$@" | "$gc_bin" --root "$WS" git integrate "$SELF" "$SELF_Q" "$WT_SH_Q" "$TICKET_SH_Q" "$ig_tty" "$MAX_LINES" || ig_rc=$?
+	"$gc_bin" --root "$WS" git integrate "$SELF" "$SELF_Q" "$WT_SH_Q" "$TICKET_SH_Q" "$MAX_LINES" -- "$sub" ${1+"$@"} || ig_rc=$?
 	exit "$ig_rc"
 }
 

@@ -154,9 +154,9 @@
     ccnavi git check <self> <sync> <start> <self_q> <worktree_q>
         （ccnavi-git.sh 用。標準入力に NUL 区切りで受けた git の引数を、git の状態とあわせて通すかを、
          allow・pass か "deny <識別子>" と拒否の文で出力します。読み取り専用）
-    ccnavi git integrate <self> <self_q> <worktree_q> <ticket_q> terminal|pipe <lines>
-        （ccnavi-git.sh 用。標準入力に NUL 区切りで受けた integrate・integrate --abort・integrate-done を
-         行い、結果をそのまま出力します。0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）
+    ccnavi git integrate <self> <self_q> <worktree_q> <ticket_q> <lines> -- integrate|integrate-done <args>...
+        （ccnavi-git.sh 用。integrate・integrate --abort・integrate-done を行い、結果をそのまま出力します。
+         0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）
     ccnavi start issue|linked-page|linked-body|linked-gitlab|similar|list-open|pick <args> <file>...
         （ccnavi-start.sh 用。スクリプトが取得したホストの応答のファイルを読み、1行1項目で
          出力します。読めない応答は終了コード 1。読み取り専用）
