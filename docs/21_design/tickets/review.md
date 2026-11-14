@@ -43,7 +43,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
    （`request.handoffNote`）。レビュアーは `wip/handoff/` の下の変更を読まなくてよい。
 3. sh が依頼を投稿する。親のブランチに open のマージリクエストが無ければ、作らずに止める（マージリクエストは `ccnavi-start.sh` が作る）。
 4. `review requested` が HEAD が動いていないことを確かめ、`{head, mr, url, host, since}` をマーカーに置く。続けて、親の
-   承認済みチケットの `mr:` が空なら、この MR の番号を書き足す（`approval.ops.note_mr`。書いたパスは write-and-push のコミットに入る）。
+   承認済みチケットの `mr:` が空なら、この MR の番号を書き足す（`approval.NoteMR`。書いたパスは write-and-push のコミットに入る）。
    同じ番号が既にあれば何もせず、違う値があれば上書きせず「`mr:` に別の値が既にある」と警告する（依頼は通る）。
    実行後チェックはこの書き足しだけを ccnavi の書き込みと見なす（post-check.md の `mr:` の例外）。
 
@@ -164,8 +164,8 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 一致しなければ拒む。依頼時の HEAD と今の HEAD が同じで push 済みであることを求める。ただし
 ccnavi 自身の置き場（`.ccnavi/approved/` と `wip/proposals/`）だけを変えたコミットは、
 動いたとも未 push とも数えない（マーカーやチケットの移動で依頼が止まらないように）。出し直し（`review-request`）の
-「依頼済み」の判定と、`review-request` の push の前提（`_unmet`）も同じ基準で見る。Chrome のレビュー済みも同じ `moved_since` を通る。`ready` の前提
-（`_merge_problems`）だけは、置き場も含めて完全に push させる。
+「依頼済み」の判定と、`review-request` の push の前提（`request.unmetIn`）も同じ基準で見る（`request.MovedInTree`）。Chrome のレビュー済みも同じ `request.MovedDetail` を通る。`ready` の前提
+（`request.MergeProblems`）だけは、置き場も含めて完全に push させる。
 マーカーの `head` は、`^[0-9a-f]{7,64}$` でなければ差分の相手にせず、記録が無いマーカーと同じく
 「動いた」として扱い、出し直させる。数えるのは
 いま解決されていない指摘の全部で、付いた時刻では絞らない。除くのは機構自身の投稿
@@ -185,11 +185,11 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 
 **手で動かした子の確定（受け入れ台帳）。** ユーザが子を `review/` から `done/` へ手で動かして commit・push した（共有済み）とき、`confirm` は移動の前に付いた未解決の指摘をホストで解決せずに、版つき（キー・指摘の版・最後のコメントの id）で `phases/<親>/accepted.json` に足して `reviewed` を置く（マーカーに `via: manual` と `moved`）。`accepted.json` は、この確定にだけ使う台帳である。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は、`confirm`・`decide`・`close-early` のどれでも未解決として数えない（`host.Unresolved` の `ledger` 引数）。本文が変わる・受け入れの後にコメントが付く指摘は数える。移動の後に付いた指摘が残れば確定せず、`decide` へ案内する。判定は指摘の最初と最後のコメントの両方で見る。変更要求は保留する。Stop は共有済みの手動移動を見つけたら `confirm` を 1 回促し（`STEP_CONFIRM`）、`status` は「レビュー完了確認待ち」「移動が未共有」を出す。Chrome 拡張の確定も同じ。git が無いので、移動の時刻は拡張がホストの履歴（そのパスを最初に加えたコミット）から読んで渡す。
 
-**依頼のあとに HEAD が動いたときの説明。** 判定は変えない（`request.MovedDetail` / `_moved_since_request` の結果をそのまま使う）。判定で止めたあと、理由の説明を足す（`request.MovedExplanation`。`confirm`・`decide`・Chrome 拡張が同じ文）。説明は何が変わったかを断定しない固定の 1 文で、「依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す」。依頼時のコミットが祖先でない・読めない場合もあるので、コミットの一覧や `git log` の範囲は出さない。プロジェクトの親で、レビューの対象を動かしたのがミラー側（共通レイヤーのコピーか `skills/`）だけのときは、直し方が違うので「動かしたのはミラーのずれのコミット」の 1 文を足す。依頼時の HEAD の記録が無い・HEAD を読めない・push されていないだけのときは、判定の文だけで説明は足さない。依頼を打ち直す手順は変わらない。依頼のあとに変えたものを元へ戻した（revert で差分が空になった）場合は、判定は通る。
+**依頼のあとに HEAD が動いたときの説明。** 判定には手を加えない（`request.MovedDetail` / `request.MovedInTree` の結果をそのまま使う）。判定で止めたあと、理由の説明を足す（`request.MovedExplanation`。`confirm`・`decide`・Chrome 拡張が同じ文）。説明は何が変わったかを断定しない固定の 1 文で、「依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す」。依頼時のコミットが祖先でない・読めない場合もあるので、コミットの一覧や `git log` の範囲は出さない。プロジェクトの親で、レビューの対象を動かしたのがミラー側（共通レイヤーのコピーか `skills/`）だけのときは、直し方が違うので「動かしたのはミラーのずれのコミット」の 1 文を足す。依頼時の HEAD の記録が無い・HEAD を読めない・push されていないだけのときは、判定の文だけで説明は足さない。どの場合も、依頼を打ち直す手順は同じ。依頼のあとに変えたものを元へ戻した（revert で差分が空になった）場合は、判定は通る。
 
-**fix で直した指摘は、ユーザが resolve する。** `decide` の「このフェーズで直す」を選んだスレッドは、ホスト上で未解決のまま残るのが仕様で、続きの子で直したあと、ユーザが確かめて resolve する。案内の文は、ホストを問わず同じで、「修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない」。入れる場所は、`decide` の結果の文（`review.decide._decided_prompt`。fix があるとき）、VS Code ボードの `decided` の note、依頼の本文の末尾の固定の 1 文（`request.ResolveNote`。`HANDOFF_NOTE` のあとに足す）。依頼の目印のキーは、この 1 文を足す前の本文と親のブランチの先頭から作るので、1 文を足す前に投稿した依頼を打ち直しても二重に投稿されない。keep・issue を選んだスレッドに sh が返信して resolve する仕組み（受け入れの返信と解決）は、この案内の対象外。
+**fix で直した指摘は、ユーザが resolve する。** `decide` の「このフェーズで直す」を選んだスレッドは、ホスト上で未解決のまま残るのが仕様で、続きの子で直したあと、ユーザが確かめて resolve する。案内の文は、ホストを問わず同じで、「修正を確認したら、ユーザがホスト上で該当スレッドを resolve する。エージェントは fix を理由に resolve しない」。入れる場所は、`decide` の結果の文（`decide.decidedPrompt`。fix があるとき）、VS Code ボードの `decided` の note、依頼の本文の末尾の固定の 1 文（`request.ResolveNote`。`request.handoffNote` のあとに足す）。依頼の目印のキーは、この 1 文を足す前の本文と親のブランチの先頭から作る（この 1 文はキーに入らない）。keep・issue を選んだスレッドに sh が返信して resolve する仕組み（受け入れの返信と解決）は、この案内の対象外。
 
-**依頼の目印。** 依頼文の 1 行目は目印 `<!-- ccnavi:request <親>:<フェーズ番号> key=<キー> -->` で、キーは依頼文の本文と親のブランチの先頭（HEAD）から作る（`review prepare`）。`review-request` はマージリクエストのコメントに同じ目印で始まるものがあれば投稿し直さず、その投稿を記録に使う。打ち直しや write-and-push のやり直しで依頼が二重にならない。子を足してやり直した依頼は先頭が違うので、キーが変わり別に投稿する。**限界:** 1 回目と 2 回目の間に親のブランチが動くとキーが変わり、同じ依頼がもう 1 度投稿される（見つけたらユーザが古いほうのコメントを消す）。コメントの一覧を取れなければ、投稿せずに止まる（`request-posted-unknown`）。
+**依頼の目印。** 依頼文の 1 行目は目印 `<!-- ccnavi:request <親>:<フェーズ番号> key=<キー> -->` で、キーは依頼文の本文と親のブランチの先頭（HEAD）から作る（`review prepare`）。`review-request` はマージリクエストのコメントに同じ目印で始まるものがあれば投稿し直さず、その投稿を記録に使う。打ち直しや write-and-push のやり直しで依頼が二重にならない。子を足してやり直した依頼は先頭が違うので、キーが変わり別に投稿する。**限界:** 1 回目と 2 回目の間に親のブランチが動くとキーが変わり、同じ依頼がもう 1 度投稿される（見つけたらユーザが先に投稿したほうのコメントを消す）。コメントの一覧を取れなければ、投稿せずに止まる（`request-posted-unknown`）。
 
 **ホストの分類。** ホストの分類は、origin から取り出したホストを小文字にしてポートを除いたもの（分類に使うホスト）を、`.` の区切りで照合して決める（`evilgithub.com`・`github.com.evil`・`evilghe.com`・`ghe.com.evil` は GitHub にならない）。scheme の大文字小文字は区別しない（`HTTPS://` も読む）。
 
@@ -199,16 +199,16 @@ GitLab に GitHub の dismiss にヒットする操作は適用していない�
 | `ghe.com`・`*.ghe.com`（GHE.com） | GitHub | `https://api.<分類に使うホスト>` | `https://api.<分類に使うホスト>/graphql` |
 | 上のどれにもヒットしないもの全部（`gitlab.com`・`*.aslead.cloud`・セルフホスト・未知のホスト） | GitLab | origin の scheme・ホスト・ポートを保った `<scheme>://<ホスト[:ポート]>/api/v4` | 使わない（REST だけ） |
 
-ポートを除くのは分類のときだけで、GitLab の接続先はポートを保つ。GHE.com の origin にポートが付いていると API の URL を組めないので、理由を言って止まる。GHE.com の API と GraphQL の URL の規則は、この表を前提として固定している。判定は sh（`ccnavi_host_parse`）・実行ファイル（`host.classify`・`transport_problem`）・Chrome 拡張（`hostclass.ts`）の 3 か所に同じ規則で置き、`tests/fixtures/host-kinds.json` の同じ表で突き合わせる。Chrome 拡張では、この表は自動判定に使い、設定画面でユーザが明示した種類（GitHub / GitLab）は、これより優先する（未知のホストを GitHub として登録すれば Enterprise Server の `/api/v3`・`/api/graphql`。GHE.com を GitHub として登録した場合だけ上の表の接続先）。登録していないホストへ自動で通信したり PAT を送ったりはしない。権限は画面の origin だけでなく API と GraphQL の origin に対しても取る（GHE.com は画面と API の origin が違う）。
+ポートを除くのは分類のときだけで、GitLab の接続先はポートを保つ。GHE.com の origin にポートが付いていると API の URL を組めないので、理由を言って止まる。GHE.com の API と GraphQL の URL の規則は、この表を前提として固定している。判定は sh（`ccnavi_host_parse`）・実行ファイル（`host.classify`・`host.TransportProblem`）・Chrome 拡張（`hostclass.ts`）の 3 か所に同じ規則で置き、`tests/fixtures/host-kinds.json` の同じ表で突き合わせる。Chrome 拡張では、この表は自動判定に使い、設定画面でユーザが明示した種類（GitHub / GitLab）は、これより優先する（未知のホストを GitHub として登録すれば Enterprise Server の `/api/v3`・`/api/graphql`。GHE.com を GitHub として登録した場合だけ上の表の接続先）。登録していないホストへ自動で通信したり PAT を送ったりはしない。権限は画面の origin だけでなく API と GraphQL の origin に対しても取る（GHE.com は画面と API の origin が違う）。
 
-**GraphQL が使えない環境。** Claude Code のクラウドでは、GitHub の GraphQL が 403 で拒否される（REST は通る）。GitHub の次の 4 か所は、GraphQL を先に試し、使えない 403 のときだけ REST（`ccr` の道）に替える。GraphQL が通る環境の動きは変わらない。GitLab は変えない。「使えない 403」とは、gh なら本文が `GraphQL is not available` を含むもの、curl なら番号だけの 403 を指す。curl は本文を捨てるので、認証の失敗と見分けが付かない。curl の 403 は替えて、それも失敗したら元の文面を言う。401 と別の理由の 403 は替えない。判定は `ccnavi_host_graphql_blocked`、GraphQL を打つ入口は `gql`（戻り値 3 が「使えない」）。
+**GraphQL が使えない環境。** Claude Code のクラウドでは、GitHub の GraphQL が 403 で拒否される（REST は通る）。GitHub の次の 4 か所は、GraphQL を先に試し、使えない 403 のときだけ REST（`ccr` の道）に替える。GraphQL が通る環境では GraphQL を使う。GitLab はこの替え方をしない。「使えない 403」とは、gh なら本文が `GraphQL is not available` を含むもの、curl なら番号だけの 403 を指す。curl は本文を捨てるので、認証の失敗と見分けが付かない。curl の 403 は替えて、それも失敗したら元の文面を言う。401 と別の理由の 403 は替えない。判定は `ccnavi_host_graphql_blocked`、GraphQL を打つ入口は `gql`（戻り値 3 が「使えない」）。
 
 | 場所 | REST での代わり |
 |---|---|
 | スレッドの取得（`threads`） | `GET pulls/<N>/ccr/review_threads`（`resolved`・`path`・`line`・`comment_ids`）と `GET pulls/<N>/comments`（全ページ）から、GraphQL と同じ形の JSON を組む。スレッドの id は先頭コメントの id（数字の文字列）。url・本文・作成の時刻は先頭コメントから、`last_*` は `comment_ids` の最後のコメントから取る |
 | Draft 外し（`undraft`） | タイトルの `Draft:` 除去の PATCH のあとで `POST pulls/<N>/ccr/ready_for_review` を打つ。戻り値は `GET pulls/<N>` の `draft`（戻り値の形は GraphQL と同じ） |
 | 受け入れの返信と解決（`accept_reply`・`accept_resolve`） | `POST pulls/<N>/comments/<id>/replies` と `POST pulls/<N>/ccr/comments/<id>/resolve`。計画の id が数字だけなら REST、そうでなければ GraphQL の node id を使う。id は取り直した結果にあるものだけを通すので、取った道と書く道は同じになる |
-| MR が閉じる issue（`ccnavi-start.sh` の `mr_linked_issues`） | `GET pulls/<N>` の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n`（大文字小文字不問）。コードブロック・インラインコード・HTML コメント・引用行の中の文字は対象外とする。`not close #n` や、語の途中の `fix`（`bug-fix #n`）も拾わない。MCP で確かめた値を渡す回避路（`--mcp-checked`）は残す |
+| MR が閉じる issue（`ccnavi-start.sh` の `mr_linked_issues`） | `GET pulls/<N>` の本文の `close(s/d)`・`fix(es/ed)`・`resolve(s/d)` に続く `#n`・`owner/repo#n`（大文字小文字不問）。コードブロック・インラインコード・HTML コメント・引用行の中の文字は対象外とする。`not close #n` や、語の途中の `fix`（`bug-fix #n`）も拾わない。MCP で確かめた値を渡す回避路（`--mcp-checked`）もある |
 
 REST の代わりの道も失敗したときは、ユーザに接続（認証と権限）の確認を頼んで止まる案内を出す（`rest_fallback_failed`）。スレッドとレビューの JSON を作って実行ファイルに直接渡す手順は案内しない（write-and-push の検査で止まるため）。`ccr` の道は通常の GitHub では 404 になる。
 
