@@ -75,7 +75,7 @@ func Check(t testing.TB, name string, got any) {
 	}
 }
 
-// encode は got を JSON にする。最上段が列か表なら 1 件を 1 行に、それ以外は字下げして書く。
+// encode は got を JSON にする。最上位が列か表なら 1 件を 1 行に、それ以外は字下げして書く。
 func encode(t testing.TB, got any) []byte {
 	t.Helper()
 	compact := func(v any) []byte {
@@ -131,7 +131,7 @@ func encode(t testing.TB, got any) []byte {
 }
 
 var (
-	// tempDir は t.TempDir が作る置き場の頭（一時置き場の直下の 1 段）。名前の数字は回すたびに変わり、桁数も変わる。
+	// tempDir は t.TempDir が作る置き場の頭（一時置き場の直下の 1 階層）。名前の数字は回すたびに変わり、桁数も変わる。
 	// macOS の一時置き場はリンクなので、リンクを解いた綴りも見る。
 	tempDir = regexp.MustCompile(`(?i)(?:` + tempPrefix(os.TempDir()) + `|` + tempPrefix(realpath(os.TempDir())) + `)[^\\/\s"'）]*`)
 	// cut は文が長い引数を切った形（頭の数十字と「...」）。頭がルートで始まると、置き場の名前の桁数で切る位置がずれる。

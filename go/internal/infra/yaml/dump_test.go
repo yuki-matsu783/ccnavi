@@ -108,7 +108,7 @@ func TestDumpUnrepresentable(t *testing.T) {
 	}
 }
 
-// 上の段が組む値（Put で並べたマップと []string）も、読んだ値と同じ形で書く。
+// 上の層が組む値（Put で並べたマップと []string）も、読んだ値と同じ形で書く。
 func TestDumpBuiltMap(t *testing.T) {
 	m := &Map{}
 	m.Put("ticket", "x")

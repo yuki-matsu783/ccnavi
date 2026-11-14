@@ -290,7 +290,7 @@ func ChildProblems(t, parent *ticket.Ticket, missing string) []rules.Problem {
 		return []rules.Problem{problem(t, missing)}
 	}
 	if parent.IsChild() {
-		return []rules.Problem{problem(t, "親 "+t.Parent+" 自身が子。深さは 2 段まで")}
+		return []rules.Problem{problem(t, "親 "+t.Parent+" 自身が子。深さは 2 階層まで")}
 	}
 	if parent.HasPlan() && !t.IsConsolidate() && parent.ItemAt(t.Phase) == nil {
 		return []rules.Problem{problem(t, strconv.Itoa(t.Phase)+" 番目のフェーズは親 "+parent.ID+" の計画にありません"+

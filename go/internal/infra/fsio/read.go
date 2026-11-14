@@ -59,7 +59,7 @@ func LoadSource(path string) ([]byte, string, error) {
 	return content, text, nil
 }
 
-// ReadDiskBytes は open(path, "rb").read()。溜める段は見ない。読めた中身は空のファイルでも nil にしない（「無い」と
+// ReadDiskBytes は open(path, "rb").read()。溜める段階は見ない。読めた中身は空のファイルでも nil にしない（「無い」と
 // 分けるため）。読めなければ Wrap したエラーで、errors.Is(err, fs.ErrNotExist) なら無い（FileNotFoundError）。
 func ReadDiskBytes(path string) ([]byte, error) {
 	content, err := readFile(path)
@@ -72,7 +72,7 @@ func ReadDiskBytes(path string) ([]byte, error) {
 	return content, nil
 }
 
-// ReadDiskText はディスクの本文を UTF-8 として読む。溜める段は見ない。読めなければ Wrap したエラー
+// ReadDiskText はディスクの本文を UTF-8 として読む。溜める段階は見ない。読めなければ Wrap したエラー
 // （errors.Is(err, fs.ErrNotExist) で「無い」を分けられる）、Strict で UTF-8 でなければ *DecodeError。改行は "\n" にそろう。
 func ReadDiskText(path string, bad Undecodable) (string, error) {
 	content, err := readFile(path)
@@ -176,7 +176,7 @@ func ReadYes(r *bufio.Reader) bool {
 	return slices.Contains(yesAnswers, ReadAnswer(r))
 }
 
-// Exists は在るか（リンクは辿る）。溜める段があれば、そこで書いた・消した分を先に見る。
+// Exists は在るか（リンクは辿る）。溜める段階があれば、そこで書いた・消した分を先に見る。
 func Exists(path string) bool {
 	if _, staged, ok := stagedContent(path); staged {
 		return ok
@@ -184,7 +184,7 @@ func Exists(path string) bool {
 	return ospath.DiskExists(path)
 }
 
-// Lexists は在るか（リンクそのものも数える）。溜める段は Exists と同じに見る。
+// Lexists は在るか（リンクそのものも数える）。溜める段階は Exists と同じに見る。
 func Lexists(path string) bool {
 	if _, staged, ok := stagedContent(path); staged {
 		return ok
@@ -192,8 +192,8 @@ func Lexists(path string) bool {
 	return ospath.DiskLexists(path)
 }
 
-// Listdir はディレクトリの名前の一覧（順序は決めない）。溜める段があれば、そこで足した名前を足し、
-// 消した名前を除く。ディレクトリが無く、溜める段も何も足していなければエラー。
+// Listdir はディレクトリの名前の一覧（順序は決めない）。溜める段階があれば、そこで足した名前を足し、
+// 消した名前を除く。ディレクトリが無く、溜める段階も何も足していなければエラー。
 func Listdir(directory string) ([]string, error) {
 	names, err := listNames(directory)
 	if current == nil {
@@ -246,7 +246,7 @@ func OpenNoFollow(path string) (*os.File, fs.FileInfo, error) {
 	return f, info, nil
 }
 
-// DiskDigest はディスクの中身の要約（16 進）。溜める段は見ず、少しずつ読む（大きなビルドの出力でも中身を全部は
+// DiskDigest はディスクの中身の要約（16 進）。溜める段階は見ず、少しずつ読む（大きなビルドの出力でも中身を全部は
 // 持たない）。消えているか読めなければ偽。
 func DiskDigest(path string, a digest.Algo) (string, bool) {
 	f, err := os.Open(path)

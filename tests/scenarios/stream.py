@@ -1,4 +1,4 @@
-"""claude -p の出力（stream-json）を読む（段 0）。外を呼ばない。"""
+"""claude -p の出力（stream-json）を読む（層 0）。外を呼ばない。"""
 
 import json
 

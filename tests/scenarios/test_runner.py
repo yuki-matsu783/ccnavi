@@ -3410,6 +3410,8 @@ class BareHostTest(unittest.TestCase):
             if name.startswith("ccnavi-") and name.endswith(".sh"):
                 shutil.copy(os.path.join(SH_DIR, name), scripts)
         git(self.ws.target, "switch", "-q", "-c", "feat")
+        # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+        env = {**env, "CCNAVI_ENTRY_PATH": built.sh_path()}
         done = subprocess.run(
             ["sh", str(scripts / "ccnavi-git.sh"), "fetch", "origin"],
             cwd=self.top,

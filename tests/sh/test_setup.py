@@ -576,7 +576,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_the_unwatched_gate_is_written_as_enable(self):
         """確認できる者が居ないモードの切り替えの環境変数も、モードに合わせず enable で書く。
 
-        この環境変数も enable か disable しか取らない。止めずに報告する段は
+        この環境変数も enable か disable しか取らない。止めずに報告する段階は
         CCNAVI_MODE=dry-run が持つので、dry-run で導入したプロジェクトでも
         ここは enable のまま書く。切るプロジェクトは自分で 1 行書き換える。
         """

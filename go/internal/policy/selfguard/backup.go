@@ -407,7 +407,7 @@ func (b backup) write(content []byte) string {
 func (b backup) absentNoted() bool { return ospath.DiskExists(b.absent()) }
 func (b backup) noteAbsent()       { fsio.WriteFile(b.absent(), nil, fsio.Plain) }
 
-// clearAbsent は os で直に消す（fsio を通さない。印は溜める段にも記録にも載せない）。
+// clearAbsent は os で直に消す（fsio を通さない。印は溜める段階にも記録にも載せない）。
 func (b backup) clearAbsent() { os.Remove(b.absent()) }
 
 func (b backup) readRef() (heavyRef, bool) { return parseRef(fsio.ReadBytes(b.ref())) }
@@ -575,7 +575,7 @@ func fileDigest(path string) string {
 }
 
 // replaceWith は別の名前へコピーしてから置き換える（中断したコピーを揃ったものとして拾わせない）。
-// os で直に差し替える（実行ファイルは溜める段にも記録にも載せない）。
+// os で直に差し替える（実行ファイルは溜める段階にも記録にも載せない）。
 func replaceWith(source, destination string) string {
 	part := destination + partSuffix
 	if failed := copyFile(source, part); failed != "" {

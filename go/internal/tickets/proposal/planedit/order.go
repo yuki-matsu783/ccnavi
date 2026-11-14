@@ -79,7 +79,7 @@ var digits = regexp.MustCompile(`\A[0-9]+\z`)
 // ParseOrder は `--order` の JSON を読む。形は {"plan": {"1": [], "2": [3]}, "feedback": {...}}。番号は元の番号で、
 // 渡した計画は全部の番号の先行をそこから取る（書いていない番号は先行なし）。読めなければ (nil, 理由)。
 func ParseOrder(text string, parent *ticket.Ticket) (Order, string) {
-	// JSON の形を 1 段ずつ確かめる。計画（plan・feedback）→ 番号 → 先行のリストの順で、範囲外・自分自身・非整数の先行は断る。
+	// JSON の形を 1 階層ずつ確かめる。計画（plan・feedback）→ 番号 → 先行のリストの順で、範囲外・自分自身・非整数の先行は断る。
 	data, err := pyjson.Loads(text)
 	if err != nil {
 		return nil, "JSON として読めない（" + errorClass(err) + "）"

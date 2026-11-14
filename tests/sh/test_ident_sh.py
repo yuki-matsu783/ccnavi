@@ -27,9 +27,9 @@ with open(TABLE, encoding="utf-8") as _f:
     _CASES = json.load(_f)
 GOOD = _CASES["ident_good"]
 BAD = _CASES["ident_bad"]
-# sh は通し、実行ファイルが止める（字の種類。2 段目の守り）。
+# sh は通し、実行ファイルが止める（字の種類。2 つ目の守り）。
 SH_ONLY = _CASES["sh_only"]
-# 親のブランチ名（`ccnavi_is_branch`）。識別子の字に段の区切りの `/` を足したもの。
+# 親のブランチ名（`ccnavi_is_branch`）。識別子の字に階層の区切りの `/` を足したもの。
 BRANCH_GOOD = _CASES["branch_good"]
 BRANCH_BAD = _CASES["branch_bad"]
 

@@ -13,6 +13,4 @@
 //   - `tree leftover <ツリー> <名前>`: 親のワークツリーに、承認待ちの提案・作業中の子・MR が残っているかを返す。
 //   - `tree base-bound <チェックアウト> <ブランチ>`: 直接作業の取り込み先のブランチが結び付くかを返す
 //     （branch.BaseBound）。
-//   - `tree guarded <チェックアウト> <パス>…`: パスが自己防衛の守る対象に当たるかを返す。
-//   - `tree handoff-pending <ツリー> [<起点>]`: 取り込んでいない下書き（wip/handoff/）を返す。
 package shask

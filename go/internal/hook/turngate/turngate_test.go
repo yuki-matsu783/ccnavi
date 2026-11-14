@@ -384,7 +384,7 @@ func TestMessage(t *testing.T) {
 		!strings.Contains(lines[0], "キー foo") || !strings.HasPrefix(lines[1], "なぜ: ") ||
 		!strings.HasPrefix(lines[2], "次: ") || !strings.Contains(lines[2], "copy-out foo を打ち直す") ||
 		!strings.HasPrefix(lines[3], "迂回しない: ") {
-		t.Fatalf("段が違う: %q", lines)
+		t.Fatalf("段階が違う: %q", lines)
 	}
 	if got := Message(f.b("copy-out $name"), root); !strings.Contains(got, "copy-out <名前> を打ち直す") {
 		t.Errorf("解けないキーの仮の値: %s", got)

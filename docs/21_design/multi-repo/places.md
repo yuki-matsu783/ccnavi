@@ -21,7 +21,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | プロジェクト |
 | 自身・プロジェクトのレイヤーのテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |
 | 固有スクリプト（配点の `script:` が指す先） | 共通レイヤーとそのミラーは `.ccnavi/config/common/scripts/`。自身のレイヤーとプロジェクトのレイヤーは、それぞれの `.ccnavi/scripts/` | レイヤーと同じ |
-| プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 段に固定 | ワークスペースでは無視。プロジェクト自身の git |
+| プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 階層に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | ワークツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
 | 提案 | そのツリーの `wip/proposals/<状態>/<識別子>.md`。プロジェクト向けはそのプロジェクトの git が持つ | そのツリーのリポジトリ |
 | テンプレートの下書き | そのツリーの `wip/handoff/` の下の、取り込み先と同じ相対パス（ユーザが `ccnavi user handoff` で取り込む。9.15、9.19） | そのツリーのリポジトリ |
@@ -58,7 +58,7 @@ ccnavi ディレクトリは git プロジェクトルートの直下の `.ccnav
 **ファイルが無いのは「設定が無い」正常。** common だけ、config だけ、両方無し、のどれでも動く。ルール・リスクの配点・フェーズ定義のすべてで
 「無い = 空」に揃える。不正なとき（読めない・error）だけ、そのファイルは空として扱い、記録の `fallback` にレイヤーの名前を残し、`--lint` が error で言う。
 土台の deny（取り返しの付かない操作の止め。`rm -rf`・`git push`・`git reset --hard`・認証情報の置き場。5.6）は、共通レイヤーと config の有無・状態によらず常に有効で、common と config のルールは、その上に足す。
-土台の deny と、`.ccnavi/` などを守る `builtin:guard-*`（Write / Edit・シェルの設定保護。8.2）は別で、`add_rules` の分は組み込みの既定を使っている間（共通レイヤーのルールが不正な間）は外す。名前で書くツールの 4 本（`builtin:guard-hooks`・`-settings`・`-scripts`・`-ccnavi-config`）は、読めない間も外さない。
+土台の deny と、`.ccnavi/` などを守る `builtin:guard-*`（Write / Edit・シェルの設定保護。8.2）は別で、`selfguard.AddRules` の分は組み込みの既定を使っている間（共通レイヤーのルールが不正な間）は外す。名前で書くツールの 4 本（`builtin:guard-hooks`・`-settings`・`-scripts`・`-ccnavi-config`）は、読めない間も外さない。
 common と config の両方が無ければ、ルールは組み込みの既定だけで判定する。
 
 共通レイヤーのルール（`.ccnavi/config/common/rules.yml`）自身が破損して読めないときは、組み込みの既定を使い（REQ-PRE-06）、自身のレイヤーとプロジェクトのレイヤーは足さない。

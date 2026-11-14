@@ -37,7 +37,7 @@ const (
 // 依頼文の式。番号は 0 で始まらない（`#000`・`#012345` のような色や連番を読まない）。本文の形（語のあとの番号・
 // `#N`・`!N`）は、番号の直後に行末・空白・句読点・閉じ括弧・助詞だけを許す（`手順#2を`・`issue 2つ目` を読まない）。
 // `#N`・`!N` の直前は行頭・空白・開き括弧・引用符・読点・助詞だけ。URL は GitHub と GitLab の issues・pull・
-// merge_requests で、前の 2 段（owner/repo）をリポジトリの手がかりに残す。
+// merge_requests で、前の 2 要素（owner/repo）をリポジトリの手がかりに残す。
 const (
 	numPattern     = `(?P<num>[1-9][0-9]{0,8})(?![0-9A-Za-z_])`
 	afterPattern   = `(?=\Z|\s|[.,;:!?)\]}"'` + "`" + `]|[)」』）、。！？：，．…]|[をのがにはでともへや]|から|まで|だけ|より|って|です)`
@@ -267,7 +267,7 @@ func boundLine(r Ref, b *boundTo) string {
 }
 
 // projectOfRepo は `owner/repo` を origin に持つ場所。自身なら空と真、プロジェクトならその名前と真、無ければ偽。
-// origin のパスの最後の 2 段を、大文字小文字を区別せずに比べる。
+// origin のパスの最後の 2 要素を、大文字小文字を区別せずに比べる。
 func projectOfRepo(conf *config.Settings, root, repo string) (string, bool) {
 	want := pathcase.Fold(repo)
 	if pathcase.Fold(tree.OriginRepo(tree.MainTree(root).Root)) == want {

@@ -32,7 +32,7 @@ ccnavi_repo_key() {
 #
 # 識別子と同じ名前は識別子の検査（ccnavi_is_ident）で見る（前からの識別子は ccnavi_is_branch の予約に
 # ヒットすることがある）。違う名前は ccnavi_is_branch で見る。どちらも実行ファイルの検査（`ids.IDProblem`・
-# `branch_problem`）の、ASCII で見分けられる分だけの複製で、受けたものを使う側の 2 段目の確認にあたる。
+# `branch_problem`）の、ASCII で見分けられる分だけの複製で、受けたものを使う側の 2 つ目の確認にあたる。
 ccnavi_branch_ok() {
 	if [ "$1" = "$2" ]; then
 		ccnavi_is_ident "$1"
@@ -99,8 +99,8 @@ ccnavi_text() {
 # 名前のワークツリーがチケットに結び付くかを実行ファイル（`tree bound`）に聞く。<ワークスペースルート> <ワークツリーのパス> <名前>
 #
 # 答えは ccnavi_tb_state（yes・no・unavailable（実行ファイルに確かめられない）・undecided（決められない））と、
-# 結び付くときの理由 ccnavi_tb_why に入れる。結び付かない（no）ときだけ 0。`ccnavi-git.sh integrate` と
-# `ccnavi-worktree.sh --adopt` が同じ判定で断るための入口で、sh はチケットの置き場を自分で読まない。
+# 結び付くときの理由 ccnavi_tb_why に入れる。結び付かない（no）ときだけ 0。`ccnavi-worktree.sh --adopt` が
+# 断るための入口（`ccnavi-git.sh integrate` は実行ファイルの中で同じ判定を使う）で、sh はチケットの置き場を自分で読まない。
 # 止める側の呼び出し元は、no 以外を「引き取らない・取り込まない」に倒す。
 ccnavi_tree_bound() {
 	ccnavi_tb_out=$(ccnavi_ask "$1" tree bound "$2" "$3") || ccnavi_tb_out=""

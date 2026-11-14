@@ -143,7 +143,7 @@ func readSnapshot(req *pyjson.Object) (*snapshot, error) {
 	return s, nil
 }
 
-// checkRel はホストから来た相対パスを、仮のツリーの外へ出ない形に限る（根から始まるもの・`\`・空や `.`・`..` の段を断る）。
+// checkRel はホストから来た相対パスを、仮のツリーの外へ出ない形に限る（根から始まるもの・`\`・空や `.`・`..` の要素を断る）。
 func checkRel(path string) error {
 	bad := path == "" || strings.Contains(path, `\`) || rooted(path)
 	for _, part := range strings.Split(path, "/") {

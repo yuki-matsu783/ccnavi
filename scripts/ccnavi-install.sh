@@ -126,7 +126,7 @@ istored_mode() {
 }
 
 # 配布元を決める。<起点> → 標準出力に配布元。戻り値: 0 / 3 決められない（標準出力に理由）
-# scripts/ccnavi-setup.sh が直下にあればそこ。直下に無く、1 段下にちょうど 1 つあればそこ。2 つ以上は決められない。
+# scripts/ccnavi-setup.sh が直下にあればそこ。直下に無く、1 つ下にちょうど 1 つあればそこ。2 つ以上は決められない。
 iresolve_base() {
 	if [ -f "$1/scripts/ccnavi-setup.sh" ]; then
 		iabs "$1"
@@ -144,8 +144,8 @@ iresolve_base() {
 		iabs "$rb_hit"
 		return 0
 		;;
-	0) printf '%s に scripts/ccnavi-setup.sh が見つからない（直下にも 1 段下にも無い）' "$1" ;;
-	*) printf '%s の 1 段下に scripts/ccnavi-setup.sh を持つフォルダが %s つあり、どれを使うか決められない' "$1" "$rb_count" ;;
+	0) printf '%s に scripts/ccnavi-setup.sh が見つからない（直下にも 1 つ下にも無い）' "$1" ;;
+	*) printf '%s の 1 つ下に scripts/ccnavi-setup.sh を持つフォルダが %s つあり、どれを使うか決められない' "$1" "$rb_count" ;;
 	esac
 	return 3
 }

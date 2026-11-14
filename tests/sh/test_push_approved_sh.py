@@ -644,7 +644,7 @@ class PushApprovedTest(Workspace):
     def test_projects_itself_as_a_symlink_is_not_followed(self):
         """`projects/` そのものがシンボリックリンクなら、その下のリポジトリにコミットしない。
 
-        リンク先の中の 1 件ずつはリンクではないので、置き場の段で確かめないと辿ってしまう。
+        リンク先の中の 1 件ずつはリンクではないので、置き場の段階で確かめないと辿ってしまう。
         飛ばしたことは標準エラーに言う。実際のワークツリーはコミットして push する。
         """
         app, remote = self.outside_repository("elsewhere-projects")
@@ -864,7 +864,7 @@ class ApproveCarriesTest(Workspace):
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     def test_approve_says_when_there_is_nothing_to_carry(self):
-        """コミットと push の段は ccnavi-user-push-approved.sh に任せる。
+        """コミットと push の段階は ccnavi-user-push-approved.sh に任せる。
         コミットするものが無ければその 1 行が出る。
         """
         self.worktree("i0001")

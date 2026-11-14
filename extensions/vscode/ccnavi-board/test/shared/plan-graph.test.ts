@@ -88,7 +88,7 @@ test("CB-T358 点は定義のタイトル・レビューの要否・延期の引
   assert.equal(node("n2")?.type, "design");
 });
 
-test("CB-T359 置き場所はstartからの最長の段数で列に分け、列の中は番号順。startは先頭の列、endは最後の列", () => {
+test("CB-T359 置き場所はstartからの最長の階層数で列に分け、列の中は番号順。startは先頭の列、endは最後の列", () => {
   const graph = planGraphOf(plan(DIAMOND));
   const at = new Map(graph.nodes.map((node) => [node.id, node]));
   assert.deepEqual(

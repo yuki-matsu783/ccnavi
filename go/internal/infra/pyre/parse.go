@@ -32,7 +32,7 @@ const maxRepeat = 4294967295
 // maxGroups は Python の MAXGROUPS。
 const maxGroups = 1073741823
 
-// maxNesting は Python が RecursionError で読めなくなる入れ子の段数（3.13・再帰の上限 1000 で 496 段）。
+// maxNesting は Python が RecursionError で読めなくなる入れ子の階層数（3.13・再帰の上限 1000 で 496 階層）。
 const maxNesting = 495
 
 // maxCode は Python の MAXCODE。後読みの幅の上限。

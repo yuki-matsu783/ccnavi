@@ -434,6 +434,15 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return okIf(syncCheck(stdout, stderr, root, conf, cmd[2], repo) == 0), true
 	case cmd[0] == "text":
 		return runText(stdout, stderr, root, cmd[1:]), true
+	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "integrate":
+		// ccnavi-git.sh の integrate・integrate-done（直接作業の取り込み）。チケット制御の有無に依らない。
+		return runGitIntegrate(in, stdout, stderr, root, conf, cmd[2:]), true
+	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "check":
+		// ccnavi-git.sh が受けた git の引数を通すかを決める。チケット制御の有無に依らない。
+		return runGitCheck(in, stdout, stderr, root, conf, cmd[2:]), true
+	case cmd[0] == "start":
+		// ccnavi-start.sh が取ってきたホストの応答を読む。チケット制御の有無に依らない。
+		return runStart(stdout, stderr, root, conf, cmd[1:]), true
 	}
 	if code, matched := shask.Answer(stdout, stderr, root, conf, cmd); matched {
 		return code, true

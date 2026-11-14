@@ -17,7 +17,7 @@ const (
 	// headLimit は frontmatter を探す頭の長さ。本文は読まない。
 	headLimit = 64 * 1024
 	// maxDepth は frontmatter と索引の行の入れ子の上限。`--format json` の字下げは再帰で書くので、
-	// これより深いものは書けないものとして扱う。行は frontmatter より 1 段深いので、frontmatter は 31 段までとなる。
+	// これより深いものは書けないものとして扱う。行は frontmatter より 1 階層深いので、frontmatter は 31 階層までとなる。
 	maxDepth = 32
 )
 

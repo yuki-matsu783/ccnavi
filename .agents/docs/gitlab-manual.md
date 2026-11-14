@@ -73,12 +73,12 @@ uv run python tests/manual/gitlab/probe_gitlab.py
 - ready のあとは、MR の Draft が外れて squash が立つこと、ready の note があること、GitLab の親のブランチに `wip/` が無いこと、閉じた親子がワークスペースの `logs/archive/` へ移ったことを見る（`logs/archive/` は git の外にあり、GitLab には無い）。`wip/` に未追跡ファイルがあると ready が止まり、MR は Draft のままであることも、先に確かめる。
 - 取り消した子は、置き場でなく欄（`cancelled_at`）で表す。早めに閉じた親では、未着手の子が `.ccnavi/approved/done/` に移って `cancelled_at` が入ることを見る（`cancelled/` という置き場は無い）。
 - 終わりに、この実行が作ったプロジェクトだけを `DELETE` で消す（他の作業のものは触らない）。GitLab の削除は非同期で、応答は 202、直後の `GET` は 200 で `marked_for_deletion_on` が入る（本当に消えるまで待たない）。調べるために残したいときは `CCNAVI_PROBE_KEEP=1`。
-- まとめは `PASS n / SKIP m / FAIL k`。SKIP は確かめられなかった段（CE の変更要求）で、PASS に数えない。FAIL があれば終了コードは 1。
+- まとめは `PASS n / SKIP m / FAIL k`。SKIP は確かめられなかったステップ（CE の変更要求）で、PASS に数えない。FAIL があれば終了コードは 1。
 - `--help` は、トークンも exe も無くても終わる。
 
 ## CE の限界
 
-- 変更要求（`request_changes`）は GitLab EE の機能。CE では 404 になる。probe は 404 のとき、その段を SKIP とする（PASS に数えない）。EE では出して、続く「変更要求が立っていると confirm は止まる」段も通す。
+- 変更要求（`request_changes`）は GitLab EE の機能。CE では 404 になる。probe は 404 のとき、そのステップを SKIP とする（PASS に数えない）。EE では出して、続く「変更要求が立っていると confirm は止まる」ステップも通す。
   この 404 は、実機の CE（版は `GITLAB_IMAGE`）で probe を回して確かめた（`request_changes` が `status=404`）。ほかの版では未確認。
 
 ## 手動の通し確認

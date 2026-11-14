@@ -740,7 +740,7 @@ test("CB-D193 使い方ごとの案内は、全部の手順で指す先が画面
       await dom.settle();
       for (const [index, step] of course.steps.entries()) {
         await dom.settle();
-        const at = `${course.id}の${index + 1}段目（${step.title}）`;
+        const at = `${course.id}の${index + 1}つ目（${step.title}）`;
         assert.equal(dom.one("#tour-title").textContent, step.title, at);
         if (step.target !== "") {
           assert.ok(dom.all(`[data-tour="${step.target}"]`).length >= 1, `${at}: 指す先${step.target}が画面にありません`);
@@ -1347,7 +1347,7 @@ test("CB-D302 絞り込みと畳みの案内は、sceneのfindで件数を「一
     assert.ok(dom.one('[data-section="allow"]').classList.contains("folded"));
     assert.equal(dom.one('[data-section="deny"]').classList.contains("folded"), false);
     assert.equal(dom.one('[data-section="ask"]').classList.contains("folded"), false);
-    // 次の段は畳まない（段ごとに全部を書き直す）
+    // 次のステップは畳まない（ステップごとに全部を書き直す）
     await toStep(dom, "find-fold-move", 3);
     assert.equal(dom.all(".rule-section.folded").length, 0);
     dom.click(dom.one('[data-action="tour-skip"]'));
@@ -1369,9 +1369,9 @@ test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
     assert.ok(dom.one("footer").classList.contains("error"));
     await toStep(dom, "save-error", 2);
-    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読む段の続きで消えた");
+    assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読むステップの続きで消えた");
     await toStep(dom, "save-error", 4);
-    assert.equal(dom.one("#status").textContent, "", "エラーの段を過ぎても残っている");
+    assert.equal(dom.one("#status").textContent, "", "エラーのステップを過ぎても残っている");
     assert.equal(dom.one("footer").classList.contains("error"), false);
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();

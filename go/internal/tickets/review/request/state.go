@@ -332,7 +332,7 @@ func settledByConfirm() string {
 	return byConfirm
 }
 
-// SettleAndMark は、レビュー済みで書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。順番は SettleChildren、マーカーである。
+// SettleAndMark は、レビュー済みで書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段階に並べる。順番は SettleChildren、マーカーである。
 // 子を先に動かし、台帳はマーカーより先に書く。マーカーだけが置かれて、受け入れた指摘が数えられる形を作らないため。止まったら、その理由を返す。書き手は `ccnavi: <理由>` を言って止まる。
 func SettleAndMark(stage *fsio.Stage, conf *config.Settings, root string, parent *ticket.Ticket, p *phase.Phase, mark *pyjson.Object, ledger []*pyjson.Object) (string, error) {
 	restore := fsio.SetPolicy(func(po *fsio.Policy) {

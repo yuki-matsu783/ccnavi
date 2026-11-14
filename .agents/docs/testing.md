@@ -54,6 +54,10 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 `tests/fake_claude.py`（claude -p のスタブ）、`tests/contract/claudeside.py`、`tests/contract/claude/recorded.json` を変えたら、同じく `contract` を回す。本物の `claude -p` から録った形と比べる。仕様と録り直しは [claude-contract.md](claude-contract.md)。
 
+## sh のテストは通しの確認だけにする
+
+sh のテスト 1 本の時間は、sh を 1 回走らせる時間でほぼ決まる。観点ごとに 1 本ずつ書くと、同じ実行を観点の数だけ繰り返すことになる。判断と解釈は Go で実装して表駆動のテストで確かめ、sh のテストは経路ごとに数本にする。1 回の実行で、終了コード・出力・作られた物・ホストへの要求をまとめて確かめる。sh と Go のどちらで実装するかは[実行ファイルの境界](exe-boundary.md)の「sh で実装するものと、Go で実装するもの」にある。
+
 ## sh の試験の実行ファイルのスタブ
 
 sh を回す試験は、実行ファイルの代わりに小さな sh のスタブ（`STUB`）を `CCNAVI_ENTRY_PATH` に置く。sh は実行ファイルの答えに依存するので、sh に新しい要求が足されたら、スタブも追従させる。追従が漏れると、スタブが黙って空の答えを返し、sh が「操作記録を作れなかった」などで止まる。

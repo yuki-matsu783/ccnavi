@@ -346,7 +346,7 @@ func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool, error)
 // 長い文字列に当てると深さが文字数に比例して伸び、Go のスタックの上限（越えると回復できずにプロセスが落ちる）に届く。
 // Python の sre はヒープに積むので落ちない。上限を越えた照合は打ち切り、errDepthLimit で知らせる。
 // 値は数 KB の通常のコマンドでは届かず、最も深く積む形でもスタックが 128 MB ほどに収まる大きさ
-// （1 段に数百バイト積む。32 ビットの機械のスタックの上限 250 MB にも収まる）。
+// （1 階層に数百バイト積む。32 ビットの機械のスタックの上限 250 MB にも収まる）。
 const depthLimit = 1 << 18
 
 // errDepthLimit は照合が depthLimit を越えて打ち切られたこと。当たったかどうかは分からない。

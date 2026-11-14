@@ -101,7 +101,7 @@ type AcceptPlan struct {
 	Op     string
 }
 
-// ReadAcceptPlan は書いた計画。読めなければ nil（計画の段を通っていない）。
+// ReadAcceptPlan は書いた計画。読めなければ nil（計画の段階を通っていない）。
 func ReadAcceptPlan(path string) *AcceptPlan {
 	data, ok := fsio.ReadObject(path)
 	if !ok || data.Len() == 0 || !pyfmt.EqualsInt(data.Value("version"), acceptPlanVersion) {

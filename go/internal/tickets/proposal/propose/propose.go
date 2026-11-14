@@ -115,7 +115,7 @@ func childlessProblems(conf *config.Settings, root string, paths []string, paren
 
 // Run は `ticket approval-request <識別子>`。送る提案を一覧に載せ、載せたものを標準出力に 1 行ずつ出す。gate は
 // 送る提案の識別子（todo/ の .md）を受け取り、承認の画面と同じ検査を通す（通らなければ 0 以外。検査そのものは
-// 上の段が持つ）。check は検査だけをして、何も一覧に載せない。
+// 上の層が持つ）。check は検査だけをして、何も一覧に載せない。
 func Run(stdout, stderr io.Writer, conf *config.Settings, root, ident string, check bool, gate func([]string) int) int {
 	// 1. 送る先（親のワークツリー）を決める。決まらなければ止める。送る先が無い設計（verdict No）のときは、止めず案内だけ出す。
 	parent := wap.FamilyOf(ident)

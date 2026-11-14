@@ -18,7 +18,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 保護対象の変更は 1 本の手順で行う。
 
-| 段 | 誰が | 何をする |
+| ステップ | 誰が | 何をする |
 |---|---|---|
 | コピーする | エージェント | `ccnavi-stage.sh <パス>` が元のファイルを `wip/handoff/<ツリーからの相対パス>`（`.claude` の階層は `handoff-.claude` に読み替える。下の「階層名の読み替え」）にコピーする。新規のテンプレートはコピーする元が無いので、`ccnavi --templates --draft` が `wip/handoff/` に作る |
 | 編集 | エージェント | `wip/handoff/` の下書きを編集する |
@@ -29,7 +29,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 - `--yes` が無い形は見るだけで、何も書かない。パスを省くと、種類の表に該当する下書き全部が対象になる
 - 見るだけの形を含めて、すべてユーザ専用（`user` の入口の中。外では断る）。エージェントは `ccnavi-stage.sh --commands` で状態を見る
-- `ccnavi-stage.sh --commands` は、編集済みの下書きに、`defense` を含む全種類で、このコマンドの手順（見るだけと `--yes --expect`）を出す。`mv` は出さない（`mv` は検査・差分・`--expect` を通らず、下書きを作ったあとに直された元を黙って上書きする）。表の外のパスには手順を出さず、取り込めないと標準エラーに言う（sh の `is_importable` が `KINDS` と同じ表を持ち、ずれはテストで見つかる）。`defense` は取り込み先の無いファイルを作れないが、`ccnavi-stage.sh` が元の無いパスを断るので、元の無い `defense` の下書きは `--commands` に届かない（手で `wip/handoff/` に置いた下書きは届くが、取り込み先が無いので取り込みが断る。`defense` は新規作成できない）
+- `ccnavi-stage.sh --commands` は、編集済みの下書きに、`defense` を含む全種類で、このコマンドの手順（見るだけと `--yes --expect`）を出す。`mv` は出さない（`mv` は検査・差分・`--expect` を通らず、下書きを作ったあとに直された元を黙って上書きする）。表の外のパスには手順を出さず、取り込めないと標準エラーに言う（sh の `is_importable` が `handoff` の `kinds` と同じ表を持ち、ずれはテストで見つかる）。`defense` は取り込み先の無いファイルを作れないが、`ccnavi-stage.sh` が元の無いパスを断るので、元の無い `defense` の下書きは `--commands` に届かない（手で `wip/handoff/` に置いた下書きは届くが、取り込み先が無いので取り込みが断る。`defense` は新規作成できない）
 
 **ツリー。** `--root` で指した 1 本のツリーだけを見る。ほかのツリーの `wip/handoff/` は読まない。`ccnavi-stage.sh` と `user handoff` は
 同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使う。取り込み先は、下書きがあるツリーの、階層名の読み替えを戻した相対パス。
@@ -54,12 +54,12 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 #### 種類の表（許可リスト）
 
 取り込み先は、種類の表に載せたものだけ。下書きの読み替えを戻した取り込み先のパスは、リンクを解いた実パスの全要素を `pathcase.Fold` と NFC に正規化してから表に適用する。
-表に該当しないパスと、リンクのディレクトリ（中は読まない）は「対象外」とし、JSON に件数（`ignored`）と、置き場からの相対パスと理由の並び（`ignored_paths: [{path, why}]`。`why` は `not-allowed`（表に無い）か `linked-dir`（リンクのディレクトリ）。`ignored` と件数が一致し、順序は走査順で、各ディレクトリのファイル（名前順）、リンクのディレクトリ、下のディレクトリの順）を出す。形の版は上げない（足すだけ）。拡張はこの欄を必ず出るものとして読む。テキスト版は件数だけ。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/` や、
+表に該当しないパスと、リンクのディレクトリ（中は読まない）は「対象外」とし、JSON に件数（`ignored`）と、置き場からの相対パスと理由の並び（`ignored_paths: [{path, why}]`。`why` は `not-allowed`（表に無い）か `linked-dir`（リンクのディレクトリ）。`ignored` と件数が一致し、順序は走査順で、各ディレクトリのファイル（名前順）、リンクのディレクトリ、下のディレクトリの順）を出す。拡張はこの欄を必ず出るものとして読む。テキスト版は件数だけ。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/` や、
 再現用のスクリプトも置かれる）。バイナリ（NUL を含む）と、実行ファイル（`.ccnavi/bin/`）は対象外。
 
 | 種類 | パス（ツリーからの相対） | 新規作成 | ボード | 検査 |
 |---|---|---|---|---|
-| `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`NAME_RE`・`NAME_LIMIT`） |
+| `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`ids.IsValidName` と、`proposal/templates` の `nameLimit`） |
 | `messages` | `.ccnavi/messages/<名前>.yml`（ワークスペースルート直下だけ。`projects/<名前>/` の下の `messages/` は読まれないので対象外） | できる | 不可 | 文面ファイルの検査（`policy/texts`。欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script 呼び出し。[文面ファイル](../messages.md)）。error のある下書きは取り込めない |
 | `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | できない | 可（`rules.yml` で防御の記述を動かすものは不可。下記） | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（下の「検査の共有」） |
 | `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | UTF-8 であること |
@@ -106,7 +106,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 
 #### 直接作業の `integrate` の検査
 
-`ccnavi-git.sh integrate`（と片付け・`integrate-done`）は、作業ワークツリーの `wip/handoff/` を、`ccnavi tree handoff-pending <ツリー> <起点>` で起点（S）の木の元のパスと突き合わせる。
+`ccnavi-git.sh integrate`（と片付け・`integrate-done`）では、実行ファイル（`ccnavi git integrate`）が作業ワークツリーの `wip/handoff/` を、起点（S）の木の元のパスと突き合わせる。
 元のパスは、置き場を除いた相対パスの `.claude` の階層名を `handoff-.claude` と読み替えた分を戻したもので、大文字小文字と NFC/NFD の違いは同じものとして探す。
 応答は `foreign <パス>`（元があり中身が違う写し。止める）と `note <パス>`（元が無い下書き。通して「取り込まない下書き」として出す）。
 元と中身が同じ写し、S の同じ下書きと同じものは、どちらの一覧にも入れない。元の無い下書きでも、コミットしていないものは止める。

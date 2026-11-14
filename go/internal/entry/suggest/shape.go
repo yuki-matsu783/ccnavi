@@ -112,7 +112,7 @@ func pathShape(tool, subject, root string) (shaped, bool) {
 	case where == "/":
 		return shaped{}, false
 	}
-	// 候補の id の元は、ディレクトリ名の最後の 2 段。
+	// 候補の id の元は、ディレクトリ名の最後の 2 要素。
 	spelled := where + "/*"
 	parts := strings.Split(strings.Trim(strings.ReplaceAll(where, rules.RootPlaceholder, ""), "/"), "/")
 	name := strings.Join(parts[max(0, len(parts)-2):], "-")

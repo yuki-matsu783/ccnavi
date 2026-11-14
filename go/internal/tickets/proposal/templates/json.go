@@ -109,15 +109,8 @@ func layerJSON(l *LayerRead) *pyjson.Object {
 // AsJSON は ccnavi --templates --json の答え。templates は共通 + layer の統合結果（共通の側は統合結果のフェーズ
 // 定義で検査し直す。keywords で絞る）、layers は各レイヤーの生の中身、sums はレイヤーごとの統合結果の索引。
 func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords []string) *pyjson.Object {
-	var types *phases.Types
-	if s.layer(layer) != nil {
-		types = TypesFor(conf, root, layer)
-	}
 	chosen := []any{}
-	for _, e := range s.adopted(layer) {
-		if e.Layer == config.LayerCommon {
-			e = Recheck(e, types, &s.Catalog)
-		}
+	for _, e := range s.checked(conf, root, layer) {
 		if Matches(e, keywords) {
 			chosen = append(chosen, EntryJSON(e))
 		}
@@ -147,6 +140,33 @@ func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords 
 	return pyjson.NewObject("version", JSONVersion, "root", root, "layer", layer, "keywords", words,
 		"templates", chosen, "layers", layers, "sums", sums,
 		"errors", counts[rules.Error], "warns", counts[rules.Warn], "infos", counts[rules.Info])
+}
+
+// checked は、レイヤー layer で採るテンプレート（共通の側は、統合結果のフェーズ定義で検査し直したもの）。
+func (s *Scan) checked(conf *config.Settings, root, layer string) []*Entry {
+	var types *phases.Types
+	if s.layer(layer) != nil {
+		types = TypesFor(conf, root, layer)
+	}
+	var out []*Entry
+	for _, e := range s.adopted(layer) {
+		if e.Layer == config.LayerCommon {
+			e = Recheck(e, types, &s.Catalog)
+		}
+		out = append(out, e)
+	}
+	return out
+}
+
+// UsableCount は、レイヤー layer で使えるテンプレートの数（ccnavi --templates --json の usable が真のもの）。
+func UsableCount(conf *config.Settings, root string, s *Scan, layer string) int {
+	n := 0
+	for _, e := range s.checked(conf, root, layer) {
+		if e.usable() {
+			n++
+		}
+	}
+	return n
 }
 
 // CheckFile は任意のパスのテンプレートを検査した答え（--templates --check-file）。書かない。名前の期待値は

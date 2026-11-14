@@ -1,103 +1,9 @@
-# sh（ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-start.sh・ccnavi-stage.sh・ccnavi-sync.sh・ccnavi-ticket.sh）が
+# sh（ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-sync.sh・ccnavi-ticket.sh）が
 # 標準出力・標準エラーに出す `案内:`。いつ出すかの条件と状態の報告は sh 側にある。
 # `案内: ` の見出しは、文を組み立てる側が付ける。sh が引用を済ませた値（`$SELF_Q` など）は、名前の末尾を `_q` にする。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
 version: 1
 messages:
-  # ---- ccnavi-git.sh（integrate）
-  # 一時ワークツリーを消せなかったとき。
-  NOTE_GIT_TMP_LEFT:
-    kind: note
-    values: [tmp, why]
-    note: |-
-      一時ワークツリー {tmp} を残した（{why}）。中身はユーザのものかもしれないので、黙って消さない。ユーザに確かめてください。
-
-  # 取り込みが衝突したとき。
-  NOTE_GIT_INTEGRATE_CONFLICT:
-    kind: note
-    values: [wt, base, name, self_q]
-    note: |-
-      ワークツリー（{wt}）の中で {self_q} merge {base:sh} を実行して衝突を解いてコミットしてから、{self_q} integrate {name:sh} を再実行します。
-
-  # 取り込み結果を一時ワークツリーに用意した後（常に出る 2 本と、条件つきの 4 本）。
-  NOTE_GIT_INTEGRATE_SAVE_EDITS:
-    kind: note
-    note: |-
-      このファイルをエディタで開いて保存していない編集があれば、integrate-done の前に保存してもらう
-
-  NOTE_GIT_INTEGRATE_VERIFY:
-    kind: note
-    values: [tmp]
-    note: |-
-      取り込み結果は一時ワークツリーで検証できる: cd {tmp:path} && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない
-
-  NOTE_GIT_INTEGRATE_IGNORED_OVERLAP:
-    kind: note
-    values: [paths]
-    note: |-
-      取り込みで増えるパスが、ユーザのチェックアウトの ignored のファイルと重なっている（{paths}）。integrate-done の fast-forward は上書きせずに止まる。ユーザに退避を頼む
-
-  NOTE_GIT_INTEGRATE_DRAFTS:
-    kind: note
-    values: [notes]
-    note: |-
-      取り込まない下書き: {notes}（取り込み結果には含まれず、作業ブランチにだけ残る。作業ブランチを片付けると消える。内容をユーザに伝え、必要なら先に別の場所へ写してもらう）
-
-  NOTE_GIT_INTEGRATE_GUARDED:
-    kind: note
-    values: [paths]
-    note: |-
-      自己防衛の対象（{paths}）を含む。integrate-done はユーザがターミナルで、エージェントのターンが終わってから打つ
-
-  NOTE_GIT_INTEGRATE_ORIGIN_BEHIND:
-    kind: note
-    values: [base, top]
-    note: |-
-      origin/{base} が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd {top:path} && git pull --ff-only origin {base:sh}）
-
-  # 取り込みをやめたあと（integrate --abort）。
-  NOTE_GIT_INTEGRATE_ABORTED:
-    kind: note
-    values: [self_q, name]
-    note: |-
-      直接作業の記録は残した。作業を続けて、もう一度 {self_q} integrate {name:sh} を打てる
-
-  # integrate-done（片付け）
-  NOTE_GIT_DONE_STOPPED:
-    kind: note
-    values: [self_q, name]
-    note: |-
-      取り込み自体は成功している。原因を片付けてから、ユーザのチェックアウトで {self_q} integrate-done {name:sh} を再実行すると、済んだところを飛ばして続きから進む
-
-  NOTE_GIT_DONE_COMMIT_FAILED:
-    kind: note
-    values: [self_q, name]
-    note: |-
-      原因を直してから {self_q} integrate-done {name:sh} -m '<メッセージ>' を再実行します。
-
-  NOTE_GIT_DONE_HOOK_CHANGED:
-    kind: note
-    values: [self_q, name]
-    note: |-
-      フックが何を変えたかをユーザに確かめてもらう。{self_q} integrate --abort {name:sh} で戻せる。
-
-  NOTE_GIT_DONE_FF_FAILED:
-    kind: note
-    values: [self_q, name, short]
-    note: |-
-      原因を直してから、同じコマンド（{self_q} integrate-done {name:sh}）を再実行すると、K（{short}）から再開する。
-
-  # 統合先のユーザのチェックアウトでの merge・pull を断った理由に続ける案内（`次:` の行のあと）。
-  NOTE_GIT_MERGE_ON_TARGET_ALLOWED:
-    kind: note
-    note: |-
-      途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。
-
-  NOTE_GIT_PULL_ON_TARGET_ALLOWED:
-    kind: note
-    values: [integ]
-    note: |-
-      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
 
   # 統合先のユーザのチェックアウトで pull が衝突して失敗したとき（出力の後ろに足す）。
   NOTE_GIT_PULL_CONFLICT_ON_TARGET:
@@ -160,30 +66,6 @@ messages:
     kind: note
     note: |-
       projects/ の下のプロジェクトの変更を頼まれたなら、このワークツリーはワークスペース自身のリポジトリから作られている。このワークツリーを片付け、projects/<名前> へ cd してから実行し直す
-
-  # ---- ccnavi-start.sh
-  NOTE_START_REMOTE_UNCHECKED:
-    kind: note
-    note: |-
-      リモート未確認。origin から取れなかったので、手元のブランチのまま続けた。つながったら {script:ccnavi-sync.sh} を打つ
-
-  NOTE_START_WORKTREE_KEPT:
-    kind: note
-    values: [wt, branch]
-    note: |-
-      この回で作ったワークツリー {wt:path} が、片付けられずに残っている。作業の跡ではない。{script:ccnavi-git.sh} worktree remove {wt:path} と {script:ccnavi-git.sh} branch -d {branch:sh} で消してから打ち直す（消せなければユーザに伝える）
-
-  NOTE_START_BRANCH_KEPT:
-    kind: note
-    values: [branch]
-    note: |-
-      ワークツリーは消したが、この回で作ったブランチ {branch:sh} が残っている（手元の統合先が origin より遅れていると、branch -d が通らない）。残したまま打ち直すと「古いブランチらしい」で止まる。ユーザに伝え、手元の統合先を origin に揃えてもらってから {script:ccnavi-git.sh} branch -d {branch:sh} で消し、打ち直す
-
-  NOTE_START_TEMPLATES:
-    kind: note
-    values: [count]
-    note: |-
-      使えるテンプレートがある（{count} 本）。合うものがあれば --plan の代わりに --template <名前> を使う。一覧は {script:ccnavi-launcher.sh} --templates（名前・説明・使う場面が出る）
 
   # ---- ccnavi-stage.sh
   NOTE_STAGE_NONINTERACTIVE:

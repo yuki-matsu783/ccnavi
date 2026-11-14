@@ -149,7 +149,7 @@ deny:
   for (let i = 0; i < 8; i += 1) {
     deep = not(deep);
   }
-  assert.deepEqual(condProblems(deep).map((p) => p.message), ["深さが9段あります（上限8段）"]);
+  assert.deepEqual(condProblems(deep).map((p) => p.message), ["深さが9階層あります（上限8階層）"]);
   assert.deepEqual(condProblems((deep as { child: CondNode }).child), []);
   const wide = group("any", Array.from({ length: 64 }, (_, i) => leaf("glob", String(i))));
   assert.deepEqual(condProblems(wide).map((p) => p.message), ["条件が65個あります（上限64）"]);
@@ -221,7 +221,7 @@ test("CB-T338 組み合わせ条件の操作（子の追加・削除・種別の
   assert.deepEqual(removeAt(EXPECTED, []), EXPECTED);
   assert.deepEqual(addChild(leaf("glob", "a"), [], leaf("glob", "b")), leaf("glob", "a"));
   assert.deepEqual(changeOp(leaf("glob", "a"), [], "all"), leaf("glob", "a"));
-  // 置き方: 最上位のノードが左、段ごとに右へ。演算子は子の真ん中の高さ。中が空のnotには穴の点
+  // 置き方: 最上位のノードが左、階層ごとに右へ。演算子は子の真ん中の高さ。中が空のnotには穴の点
   const layout = layoutCond(EXPECTED);
   const at = new Map(layout.places.map((p) => [p.key, p]));
   assert.deepEqual(

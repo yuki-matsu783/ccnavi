@@ -134,6 +134,11 @@ type Options struct {
 	input *string
 	// PlainPathspecs はユーザの環境の pathspec の読み方（pathspecEnv）を外し、git の既定に戻す。
 	PlainPathspecs bool
+	// LazyFetch は、partial clone の無い blob をネットワークから取ってよいか（GIT_NO_LAZY_FETCH=1 を付けない）。
+	// ワークツリーを作る・取り込むなど、中身を書き出す操作だけに付ける（読むだけの git は付けない）。
+	LazyFetch bool
+	// IndexFile は索引のファイル（GIT_INDEX_FILE）。空ならリポジトリの索引。一時の索引で木を組むときに使う。
+	IndexFile string
 }
 
 func (o Options) timeout() time.Duration {
@@ -236,7 +241,10 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 		return 1, nil, nil, startFailure(cmd.Err)
 	}
 	cmd.Dir = cwd
-	cmd.Env = environ(o.PlainPathspecs)
+	cmd.Env = environ(o.PlainPathspecs, o.LazyFetch)
+	if o.IndexFile != "" {
+		cmd.Env = append(cmd.Env, env.GitIndexFile+"="+o.IndexFile)
+	}
 	// 子プロセスが孫に出力の口を渡したまま残ると Run が返らないので、終わったあとの待ちに上限を付ける。
 	cmd.WaitDelay = killedPipeWait
 	if o.input != nil {
@@ -328,8 +336,8 @@ func startFailure(err error) error {
 // environ は親の環境から repositoryEnv を外し、GIT_OPTIONAL_LOCKS=0 と GIT_NO_LAZY_FETCH=1 を足したもの。
 // GIT_OPTIONAL_LOCKS=0 は、期限で殺したときに status が取った index.lock を残さないため（diff や restore のように
 // index を書き換える操作の lock は止まらない）。GIT_NO_LAZY_FETCH=1 は、partial clone の無い blob を取りに
-// ネットワークへ出ず、読めないにするため。
-func environ(plainPathspecs bool) []string {
+// ネットワークへ出ず、読めないにするため（lazyFetch なら付けない）。
+func environ(plainPathspecs, lazyFetch bool) []string {
 	drop := append([]string{env.GitOptionalLocks, env.GitNoLazyFetch}, repositoryEnv...)
 	if plainPathspecs {
 		drop = append(drop, pathspecEnv...)
@@ -341,7 +349,11 @@ func environ(plainPathspecs bool) []string {
 			out = append(out, kv)
 		}
 	}
-	return append(out, env.GitOptionalLocks+"=0", env.GitNoLazyFetch+"=1")
+	out = append(out, env.GitOptionalLocks+"=0")
+	if !lazyFetch {
+		out = append(out, env.GitNoLazyFetch+"=1")
+	}
+	return out
 }
 
 // hasName は環境変数の名前が names にあるか。Windows の名前は大文字小文字を区別しない。

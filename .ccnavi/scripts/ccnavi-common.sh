@@ -335,7 +335,7 @@ ccnavi_project() {
 		"$ccnavi_pj_places"/*)
 			ccnavi_pj_name="${ccnavi_pj_orel#"$ccnavi_pj_places"/}"
 			case "$ccnavi_pj_name" in
-			*/*) return 0 ;; # 2 段以上は数えない
+			*/*) return 0 ;; # 2 階層以上は数えない
 			esac
 			printf '%s\n' "$ccnavi_pj_name"
 			;;
@@ -387,7 +387,7 @@ ccnavi_is_ident() {
 # ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
 #
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
-# （`ids.BranchProblem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
+# （`ids.BranchProblem`）が字と形を確かめたものを受け取る側の 2 つ目の確認で、パスや ref で意味を持つ
 # 書き方を止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる階層）、`.lock` で終わる
 # 階層、`\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の名前
 # （refs/・origin/ など）や保護されたブランチの名前を先頭の階層に持つもの、HEAD の階層を持つもの。

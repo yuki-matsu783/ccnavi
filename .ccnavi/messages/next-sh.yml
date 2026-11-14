@@ -1,35 +1,7 @@
-# ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh が出す次の一手。
+# ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh・ccnavi-review.sh が出す次の一手。
 # 条件の分岐は sh 側にある。引数の並び（args_q など）は sh が引用を済ませて渡す。
 version: 1
 messages:
-  NEXT_GIT_MERGE_ON_TARGET:
-    kind: next
-    values: [integ]
-    next: |-
-      {script:ccnavi-worktree.sh} <名前> でワークツリーを切る
-    note: |-
-      切ったワークツリーの中で {script:ccnavi-git.sh} merge {integ:sh} を打って衝突を解いてコミットし、{script:ccnavi-git.sh} integrate <名前> で取り込む
-
-  NEXT_GIT_INTEGRATE_EMPTY:
-    kind: next
-    values: [name]
-    next: |-
-      ユーザに伝えたあと、{script:ccnavi-git.sh} integrate-done {name:sh} で確定する（報告と進め方は、integrate を打ったときの追加の文脈に従う）
-
-  NEXT_GIT_INTEGRATE_REVIEW:
-    kind: next
-    values: [head, result, name]
-    next: |-
-      差分を {script:ccnavi-git.sh} diff {head:sh} {result:sh} で確かめる
-    note: |-
-      報告のあと、{script:ccnavi-git.sh} integrate-done {name:sh} -m '<メッセージ>' で確定する（報告と進め方は、integrate を打ったときの追加の文脈に従う）
-      やめるなら {script:ccnavi-git.sh} integrate --abort {name:sh}
-
-  NEXT_GIT_PUSH_USER:
-    kind: next
-    values: [base, top]
-    next: |-
-      ユーザにターミナルで {base} をリモートへ送るよう頼む（cd {top:path} && git push origin {base:sh}）。ccnavi-git.sh push は取り込み先へ送らない
 
   NEXT_WORKTREE_EDIT:
     kind: next

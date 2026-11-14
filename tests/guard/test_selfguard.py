@@ -1289,7 +1289,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_浅いパスの振り分けでも守る場所とバックアップする場所が揃う(self):
-        # G6。`scripts/ccnavi-launcher.sh` は段が 2 つしかない。段の数で切り替えると、
+        # G6。`scripts/ccnavi-launcher.sh` は階層が 2 つしかない。階層の数で切り替えると、
         # 名前だけで切り替えるバックアップの側と食い違う。
         spelled, _, exe = self.scripts_layout(())
 

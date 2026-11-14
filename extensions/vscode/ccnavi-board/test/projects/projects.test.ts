@@ -64,7 +64,7 @@ test("CB-T63 cloneはターミナル向けの1行になる", () => {
   );
 });
 
-test("CB-T64 プロジェクトになっていない .gitを深さ2まで探し、置き場の中は1段深く見る", () => {
+test("CB-T64 プロジェクトになっていない .gitを深さ2まで探し、置き場の中は1階層深く見る", () => {
   const tree: Record<string, readonly DirEntry[]> = {
     "": [
       dir("projects"), dir("参考"), dir("tools"), dir("node_modules"), dir(".claude"), dir("src"), file("README.md"),

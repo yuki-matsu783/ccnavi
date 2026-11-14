@@ -77,25 +77,23 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 `ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
 （理由を直して打ち直せば通る）。MR がマージ済みと分かったら、手元の片付け（`ccnavi sync tidy`。9.11）を行う。
 
-**`ccnavi-git.sh` の中の判定は P13 の例外。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
-`git` は組み込みでいつも止まる）、その中で次の可否を sh が一次に判定する。チケットに結び付くブランチの `integrate` を断る
-（`integrate-ticket`）、統合先への push を断る、親のワークツリーのブランチが
-リモートから消えていれば push を断る（push のゲート。下）、親のワークツリーでの
+**`ccnavi-git.sh` の判定は実行ファイルが持つ。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
+`git` は組み込みでいつも止まる）、その可否は実行ファイルの `ccnavi git check` が判定する。統合先への push を断る、親のワークツリーの push に、ブランチが
+リモートから消えていないかを確かめるゲートを掛ける（push のゲート。下。ls-remote は sh が打つ）、親のワークツリーでの
 `checkout`・`switch` の行き先を、今のブランチと、変換した名前がフォルダ名になるブランチに限る（`worktree add` も変換した名前の
-形だけ）。`integrate` / `integrate-done` の状態操作（取り込みの記録・一時ワークツリー・取り込み先への `merge --ff-only --no-overwrite-ignore`・取り込んだブランチの
-`update-ref -d`）も sh が持つ。例外に入るのは、生の操作が組み込みで止まり、ラッパーが許可リストで読み、判定の材料のうち
-チケットの中身を実行ファイルに聞くものだけ。sh はチケットの YAML を読まず、親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・
-親チケットの `mr:` は `ccnavi tree parent`、`integrate` が断る「チケットに結び付く名前」かどうかは `ccnavi tree bound`（Stop の促しと同じ判定）、直接作業の取り込み先のブランチがチケットに結び付くかは `ccnavi tree base-bound`、親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは `ccnavi tree leftover`、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める。答えが得られないときは、
-止める側の検査は止める向きに（`integrate` は断り、checkout は親のワークツリーとして狭める。ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
+形だけ）。直接作業の取り込み（`integrate` / `integrate-done`）は、判定（チケットに結び付くブランチを断る `integrate-ticket`）と状態操作（取り込みの記録・一時ワークツリー・取り込み先への `merge --ff-only --no-overwrite-ignore`・取り込んだブランチの
+`update-ref -d`）を実行ファイルの `ccnavi git integrate` が 1 回の起動で行い、sh はロックを取ってから呼ぶだけ。
+親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・親チケットの `mr:` は `ccnavi tree parent`、親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは `ccnavi tree leftover`、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める（sh はチケットの YAML を読まない）。答えが得られないときは、
+止める側の検査は止める向きに（ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 
-push のゲート（`ccnavi_push_gate`、`ccnavi-common-state.sh`）も同じ例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
+push のゲート（`ccnavi_push_gate`、`ccnavi-common-state.sh`）は P13 の例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
 write-and-push（`ccnavi_wap_prepare`）と `ccnavi-user-push-approved.sh` の push の前も含める。この 3 経路はどれも素の push を打つので、
 ここを通さないと、消えた親のブランチを作り直してしまう。対象は親のワークツリーのブランチだけ（通常のブランチと子の push には掛けない）。
 形跡（`refs/remotes/origin/<B>`、または着手済み（承認済みの親チケットの `started_at`）・`.requested`・退避）があれば `ls-remote`（60 秒。`CCNAVI_WRITE_AND_PUSH_TIMEOUT` で変えられる）でリモートにあるかを聞き、
-無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。
+無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。ただし承認済みチケットを読めない（`tree parent` の `approved` が `unreadable`）ときは、着手済みかを確かめられないので拒否側にする。
 承認済みというだけでは形跡にしない（承認して最初に打つ push を通す。着手は write-and-push で push してから完了するので、着手済みなら一度は push している）。
-実行ファイルが無い、または古くて `started` の行を返さないときは、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）はゲートでは呼ばない。
+実行ファイルが無い・`tree parent` が読めないとき、答えに `started` などの行が無いときは、その行を形跡に数えず、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）はゲートでは呼ばない。
 迂回は、ユーザがターミナルで `git push origin <B>` を一度打つこと。破棄した親は、親のワークツリーを片付ければ対象から外れる。
 `branch.<B>.remote` は形跡に使わない（`origin/main` から切っただけの未 push の親でも設定されるため）。`ccnavi-git.sh push` は、引数のリモートが origin と同じ URL なら origin とみなす。
 write-and-push は、取り込みがマージ済みの親のワークツリーを片付けた後にツリーが無ければ、何も書かずに止める。診断は `sh .ccnavi/scripts/ccnavi-sync.sh <P>`。
@@ -106,8 +104,9 @@ write-and-push は、取り込みがマージ済みの親のワークツリー�
 | 親のワークツリーでない | 通す |
 | 実行ファイルが無い、または `tree parent` が読めない | `origin/<B>` の参照の形跡だけで続ける |
 | 形跡がある | `ls-remote` でリモートにあるかを聞く。あれば通す。無ければ拒否。失敗・時間切れは確かめられない（拒否側。エージェントは直せなければユーザに伝えて止まる） |
+| 形跡が無く、承認済みチケットを読めない（`approved` が `unreadable`） | 確かめられない（拒否側） |
 | 形跡が無く、着手も依頼も退避も無い（承認済みでも未着手・未 push の親を含む） | 通す（初回の push） |
-| 形跡が無く、実行ファイルが古い（`started` の行を返さない） | 通す |
+| 形跡が無く、答えに `started` の行が無い | 通す（着手済みを形跡に数えない） |
 
 **正とする側。** 全部の親子のチケットで同じく、親のブランチに固定する。手元では `.claude/worktrees/<P>`（HEAD のブランチ名の
 `/` を `-` に置き換えたものが `P` になるツリー）。判定に使うのは、親のワークツリーの有無・
@@ -121,7 +120,7 @@ HEAD とフォルダ名の一致・途中の操作を示すファイルだけで
   オフラインの hook では消失が分からない
 - 閉じた親子のチケット: 閉じたかの根拠は MR がマージ済みかだけで、`ccnavi-sync.sh` がホストに聞いて、親の片付けまで行う（9.11）。
   閉じた別の親子の子を先行に持つチケットは、`predecessors` を満たす置き場が
-  どこにも無いので `PRED_MISSING` になる。文面は「どの置き場にもありません。閉じて片付いた親子のチケットなら、取り込み済みなので
+  どこにも無いので `missing`（`approval` の `predMissing`）になる。文面は「どの置き場にもありません。閉じて片付いた親子のチケットなら、取り込み済みなので
   predecessors から削除してください」で、置き換えの手段は無い
 - 親のワークツリーを片付けた後（`ready` の後）の片付けの列挙元は、`ready` が書いた `retire/<P>.json`（`mr`・`branch`・子の一覧）。
   放棄した親（MR をマージせずに閉じた親）の記録は、ユーザが `ccnavi worktree retire --abandon <P>` で消す（エージェントの Bash は
@@ -147,4 +146,4 @@ HEAD とフォルダ名の一致・途中の操作を示すファイルだけで
 **正とするのは親のツリーの版 1 つ。** 子のワークツリーにも同じ承認済みチケットが checkout されるが、読むのは
 親のツリー（親のワークツリー）の側だけ（子のワークツリー上の古いチケットから、閉じたチケットを復活させない）。親のワークツリーが
 無い、そこにチケットが無い、複数のリポジトリにまたがるときは、正とするツリーが決まらない
-（`ticket.Authority` が `None` を返す）。状態の操作は止まる。
+（`ticket.Authority` が偽を返す）。状態の操作は止まる。

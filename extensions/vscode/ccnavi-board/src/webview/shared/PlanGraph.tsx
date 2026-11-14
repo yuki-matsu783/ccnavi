@@ -223,12 +223,12 @@ const START_PAD = 16;
  * 開いたときの見え方。点の大きさが測れたら、全体を枠に収める（`PLAN_FIT_MIN_ZOOM`より縮めず、
  * `PLAN_FIT_MAX_ZOOM`より拡げない）。下限で止まって収まらないときは、開始（左端の列）が見えるように
  * 左へ寄せる（真ん中に合わせると、開始も終了も枠の外になる）。計画が替わったら合わせ直す。
- * React Flowの`fitView`の属性は使わない（下限で止めたあとに寄せる段を挟めないため）
+ * React Flowの`fitView`の属性は使わない（下限で止めたあとに寄せる段階を挟めないため）
  */
 /**
  * 点がすべて測れたか。React Flowの`useNodesInitialized`は使わない。あれは呼び手が渡した点（`nodes`）に
  * 測った大きさが書き戻されて初めて真になり、点を読むだけで返さない（`onNodesChange`を持たない）この図では、
- * 実際のChromiumでいつまでも偽のまま（全体を枠に収める段が走らない）。React Flowが測って持つ内側の点を見る
+ * 実際のChromiumでいつまでも偽のまま（全体を枠に収める段階が走らない）。React Flowが測って持つ内側の点を見る
  */
 function useMeasured(): boolean {
   return useStore((s) => s.nodeLookup.size > 0 && [...s.nodeLookup.values()].every((node) => (node.measured?.width ?? 0) > 0 && (node.measured?.height ?? 0) > 0));

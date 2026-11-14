@@ -24,8 +24,8 @@ type node struct {
 
 type nodePair struct{ key, value *node }
 
-// maxDepth は組み立てるコレクションの入れ子の上限。PyYAML は再帰の上限（1000 段）で
-// およそ 490 段の入れ子から読めなくなる。それに合わせて、深い文書を同じく「入れ子が深すぎる」で断る。
+// maxDepth は組み立てるコレクションの入れ子の上限。PyYAML は再帰の上限（1000 階層）で
+// およそ 490 階層の入れ子から読めなくなる。それに合わせて、深い文書を同じく「入れ子が深すぎる」で断る。
 const maxDepth = 480
 
 type composer struct {

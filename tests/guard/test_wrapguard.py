@@ -1,12 +1,12 @@
 """保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（Go の hook/shellguard）。
 
-止める・通すの判定は hook が持ち、sh の検査は 2 重目の確認にする。
+止める・通すの判定は hook が持ち、sh の検査は 2 つ目の確認にする。
 
 1. sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形
 2. 子チケットのワークツリーからの `ccnavi-git.sh push`。親エージェントが打っても止める
 
 見本の表（CHILD_CASES）は、コピーする版の `ccnavi-git.sh` にも同じものを渡して、sh の検査が
-2 重目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
+2 つ目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
 別の実装で持つので、食い違いはこの表で見つける。
 """
 
@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
+from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh, exe
 from tests.inproc import run_ccnavi
 
 GIT = ["sh", "../../../.ccnavi/scripts/ccnavi-git.sh"]
@@ -79,6 +79,8 @@ class EnvHookTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -192,6 +194,8 @@ class ChildPushTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -305,6 +309,8 @@ class SubagentParentTreeTest(unittest.TestCase):
             payload["agent_id"] = agent
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -521,7 +527,7 @@ class SubagentParentTreeTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class ShAgreesTest(unittest.TestCase):
-    """同じ見本をコピーする版の sh にも渡し、2 重目として同じく止めることを確かめる。
+    """同じ見本をコピーする版の sh にも渡し、2 つ目として同じく止めることを確かめる。
 
     `CCNAVI_SH_DIR` で sh の置き場を差し替えられる（コピーする版は wip/design/scripts/）。
     """
@@ -567,6 +573,8 @@ class ShAgreesTest(unittest.TestCase):
     def run_sh(self, cwd, sub):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -626,6 +634,8 @@ class ShAgreesTest(unittest.TestCase):
         write(os.path.join(parent, "only-in-parent.txt"), "x\n")
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -736,6 +746,8 @@ class CorePathTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -970,7 +982,7 @@ class CorePathTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class CorePathShAgreesTest(unittest.TestCase):
-    """同じ見本を sh にも渡し、2 重目として同じく止めることを確かめる。"""
+    """同じ見本を sh にも渡し、2 つ目として同じく止めることを確かめる。"""
 
     SH_DIR = ShAgreesTest.SH_DIR
 
@@ -1000,6 +1012,8 @@ class CorePathShAgreesTest(unittest.TestCase):
     def run_sh(self, args):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -1041,7 +1055,7 @@ class CorePathShAgreesTest(unittest.TestCase):
     def test_review_place_is_left_to_the_user(self):
         """レビュー待ちの置き場の `rm` は sh では止めない
         （ユーザがターミナルで打つ手順を塞がない）。
-        過去の中身に戻す形は、前からの置き場の検査（store_hit）が止める。"""
+        過去の中身に戻す形は、置き場の検査（ccnavi git check の StoreHit）が止める。"""
         for args in ("rm wip/proposals/review/i0002.md", "rm -r wip"):
             with self.subTest(args=args):
                 result = self.run_sh(args)

@@ -1,14 +1,14 @@
 """tests/scenarios/ の import の向きを、テストで守る。
 
-段の表は `runner.py` の docstring に 1 か所だけある。ここはその表を読んで、
-各モジュールの import が同じ段か下の段だけを向くことを確かめる（`go/internal/layers_test.go`
+層の表は `runner.py` の docstring に 1 か所だけある。ここはその表を読んで、
+各モジュールの import が同じ層か下の層だけを向くことを確かめる（`go/internal/layers_test.go`
 の、Go のパッケージに対する検査と同じ考え）。表を直すのは runner.py の docstring。
 
 見るのは 4 つ。
 
-1. 置いてある全モジュール（`actors/` を含む）が、表のどの段かをちょうど 1 つ持つ。表にあって
-   置いていないモジュールも止める。モジュールを足したら、どの段かを決めさせる
-2. import の行き先（`tests.scenarios` の中）は、同じ段か下の段
+1. 置いてある全モジュール（`actors/` を含む）が、表のどの層かをちょうど 1 つ持つ。表にあって
+   置いていないモジュールも止める。モジュールを足したら、どの層かを決めさせる
+2. import の行き先（`tests.scenarios` の中）は、同じ層か下の層
 3. 循環を許さない
 4. `tests.scenarios` の中への相対 import、`import tests.scenarios`、パッケージや `*` を
    名前で取り込む書き方（`from tests.scenarios import actors` など）は使わない
@@ -29,7 +29,7 @@ RUNNER = DIR / "runner.py"
 
 
 def tiers():
-    """runner.py の docstring の段の表 → {モジュール名（ドット区切り）: 段の番号}。
+    """runner.py の docstring の層の表 → {モジュール名（ドット区切り）: 層の番号}。
     `actors/` は actors の中の全モジュール、「この入口」は runner。"""
     text = " ".join(ast.get_docstring(ast.parse(RUNNER.read_text(encoding="utf-8"))).split())
     start = text.index("0 common")
@@ -40,7 +40,7 @@ def tiers():
         for name in names.split("・"):
             name = "runner" if name == "この入口" else name
             if name in found:
-                raise AssertionError(f"段の表に {name} が 2 回ある")
+                raise AssertionError(f"層の表に {name} が 2 回ある")
             found[name] = int(num)
     return found
 
@@ -103,10 +103,10 @@ class ScenarioLayersTest(unittest.TestCase):
         table = tiers()
         have = modules()
         missing = sorted(m for m in have if tier_of(m, table) is None)
-        self.assertEqual(missing, [], f"runner.py の docstring の段の表に無いモジュール: {missing}")
+        self.assertEqual(missing, [], f"runner.py の docstring の層の表に無いモジュール: {missing}")
         names = {m.split(".")[0] + "/" if m.startswith("actors.") else m for m in have}
         ghost = sorted(n for n in table if n not in names)
-        self.assertEqual(ghost, [], f"段の表にあって置いていないモジュール: {ghost}")
+        self.assertEqual(ghost, [], f"層の表にあって置いていないモジュール: {ghost}")
 
     def test_imports_go_same_tier_or_down(self):
         table = tiers()
@@ -118,7 +118,7 @@ class ScenarioLayersTest(unittest.TestCase):
             for t in sorted(targets - {mod}):
                 if tier_of(t, table) > tier_of(mod, table):
                     a, b = tier_of(mod, table), tier_of(t, table)
-                    errors.append(f"{mod}（段 {a}）が上の {t}（段 {b}）を読んでいる")
+                    errors.append(f"{mod}（層 {a}）が上の {t}（層 {b}）を読んでいる")
         self.assertEqual(errors, [], "\n".join(errors))
 
     def test_no_cycles(self):

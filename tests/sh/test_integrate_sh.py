@@ -8,8 +8,8 @@ git とファイルシステムに残ったものだけ。
 
 記録（`ccnavi-direct/<名前>`）は `ccnavi-worktree.sh` が書く形を、このテストが同じ形で書く。
 
-実行ファイル（`tree base-bound`・`tree guarded`・`tree handoff-pending`・`worktree drop`）の
-代わりに、tests/exe.py が組み立てたものを起こす（CCNAVI_ENTRY_PATH）。
+判定と操作は実行ファイル（`ccnavi git integrate`）が行う。tests/exe.py が組み立てたものを起こす
+（CCNAVI_ENTRY_PATH）。
 """
 
 from __future__ import annotations
@@ -400,14 +400,6 @@ class IntegrateTest(Fixture):
         self.assertOk(r, 2)
         self.assertIn("チケット", r.stderr)
 
-    def test_the_exe_that_cannot_answer_refuses(self):
-        self.work_in_branch()
-        r = self.run_git_sh(
-            "integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": "/nonexistent/ccnavi"}
-        )
-        self.assertOk(r, 2)
-        self.assertIn("確かめられない", r.stderr)
-
     def test_without_a_record_it_points_at_adopt(self):
         self.work_in_branch()
         os.remove(self.record())
@@ -437,17 +429,6 @@ class IntegrateTest(Fixture):
         self.assertIn("ccnavi-ticket.sh", r.stderr)
         self.assertIn("status", r.stderr)
         self.assertFalse(os.path.exists(self.tmp_wt()))
-
-    def test_without_a_record_an_unanswerable_exe_still_points_at_adopt(self):
-        # 結び付くか確かめられないときは、従来どおり（--adopt 側が確かめて断る）。
-        self.work_in_branch()
-        os.remove(self.record())
-        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
-        r = self.run_git_sh(
-            "integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": "/nonexistent/ccnavi"}
-        )
-        self.assertOk(r, 2)
-        self.assertIn("--adopt", r.stderr)
 
     def test_a_record_of_another_repository_is_refused(self):
         self.work_in_branch()
@@ -1142,7 +1123,7 @@ class UnknownMarkerTest(Fixture):
 class IntegrateGapsTest(Fixture):
     """ほかのクラスが一部しか見ていなかった条件を扱う。
 
-    グローバルの excludes、片付けの各段での停止と再開、プロジェクトの自己防衛、
+    グローバルの excludes、片付けの各段階での停止と再開、プロジェクトの自己防衛、
     一時ワークツリーに残った ignored のファイル、リポジトリ間の境界。
     """
 
@@ -1227,7 +1208,7 @@ class IntegrateGapsTest(Fixture):
     def stage_stops_then_resumes(
         self, match, wt=True, tmp=True, branch=True, stopped_before_refs=True
     ):
-        """止めた段までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
+        """止めた段階までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
         self.install_failing_git()
@@ -1270,7 +1251,7 @@ class IntegrateGapsTest(Fixture):
         )
         self.assertTrue(os.path.isfile(self.marker()))
 
-    # ---- 3: 片付けの各段で止まっても、打ち直せば完了する
+    # ---- 3: 片付けの各段階で止まっても、打ち直せば完了する
 
     def test_a_stop_at_the_work_worktree_resumes(self):
         self.stage_stops_then_resumes("worktree remove /")

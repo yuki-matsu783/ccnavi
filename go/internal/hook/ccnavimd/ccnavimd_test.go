@@ -212,8 +212,8 @@ func sessionWorkspace(t *testing.T, md string) string {
 	return root
 }
 
-// 決めた本文（条件の段・置き換え・長い本文・空）の組み立ては、Go の答えの見本（答えが確かめ済みだった Go の
-// 答えから取った）と比べる。リポジトリの CCNAVI.md は書き換わるので、段と置き換えが残らないことだけを見る。
+// 決めた本文（条件の段階・置き換え・長い本文・空）の組み立ては、Go の答えの見本（答えが確かめ済みだった Go の
+// 答えから取った）と比べる。リポジトリの CCNAVI.md は書き換わるので、段階と置き換えが残らないことだけを見る。
 func TestSessionTextMatchesGolden(t *testing.T) {
 	repo := testkit.RepoRoot(t)
 	data, err := os.ReadFile(filepath.Join(repo, ".ccnavi", file))
@@ -240,7 +240,7 @@ func TestSessionTextMatchesGolden(t *testing.T) {
 	}
 	for i, text := range say(string(data) + extra) {
 		if strings.Contains(text, "{{") || strings.Contains(text, "ccnavi:if") || strings.Contains(text, "ccnavi:endif") {
-			t.Errorf("case %d: 置き換えか条件の段が残った:\n%s", i, text)
+			t.Errorf("case %d: 置き換えか条件の段階が残った:\n%s", i, text)
 		}
 	}
 	golden.Check(t, "session", map[string][]string{"fixed": say(fixed), "long": say(long), "empty": say("")})

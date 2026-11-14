@@ -618,7 +618,7 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 	return moved, ""
 }
 
-// safeDir は行き先のディレクトリを、ルートから 1 段ずつ確かめながら作る。リンクがあれば理由を返す。
+// safeDir は行き先のディレクトリを、ルートから 1 階層ずつ確かめながら作る。リンクがあれば理由を返す。
 func safeDir(root, project, rel string) string {
 	relParts := strings.Split(rel, "/")
 	path := root

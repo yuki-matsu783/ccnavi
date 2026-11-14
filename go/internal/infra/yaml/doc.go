@@ -4,7 +4,7 @@
 // PyYAML の純 Python の読み手（YAML 1.1）に沿って実装する。gopkg.in/yaml.v3 は YAML 1.2 寄りで、
 // yes/no/on/off の真偽、0 始まりの 8 進、時刻、タブや "?" の受け入れ方が違うため使わない。
 // 値は nil・bool・int（範囲を超えれば *big.Int）・float64・string・[]byte・[]any・*Map・Date・
-// DateTime・Set・Tuple で返す。上の段は *Map の取り出し（Text・Map など）で型付きの値へ移す。
+// DateTime・Set・Tuple で返す。上の層は *Map の取り出し（Text・Map など）で型付きの値へ移す。
 //
 // 読みの入口は Load と、別名を拒む LoadRefusingAliases。読めない文書は errors.Is(err, errUnreadable) で見分け、
 // 別名で断ったものは ErrAlias になる。問題と位置は errors.As で *Error の Problem・ProblemMark から読み、

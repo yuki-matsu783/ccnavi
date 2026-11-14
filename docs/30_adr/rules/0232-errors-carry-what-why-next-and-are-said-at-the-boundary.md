@@ -1,9 +1,9 @@
 ---
 type: adr
 title: エラーは識別子と値を運び、what・why・next の文は出力の境界で文面ファイルから引く
-description: エラー型を共通の形（infra/fault の Detail）に揃え、読み手に届くエラーだけ文面ファイルの新しい種類 error（what・why・next）から境界で引く決定。範囲、置き場の段、採らなかった案
+description: エラー型を共通の形（infra/fault の Detail）に揃え、読み手に届くエラーだけ文面ファイルの新しい種類 error（what・why・next）から境界で引く決定。範囲、置き場の層、採らなかった案
 tags: [exe-boundary, hook, config]
-keywords: [エラー, error, fault, Detail, what, why, next, 文面ファイル, texts.SayFault, ERROR_, 境界, infra, 段, NoParentError, IssueError, EntryError]
+keywords: [エラー, error, fault, Detail, what, why, next, 文面ファイル, texts.SayFault, ERROR_, 境界, infra, 層, NoParentError, IssueError, EntryError]
 ---
 
 # ADR-0232: エラーは識別子と値を運び、what・why・next の文は出力の境界で文面ファイルから引く

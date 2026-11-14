@@ -3,7 +3,7 @@ type: guide
 title: 操作を止める条件（ゲート）の置き方と、シンプルな実装・後方互換を考えない決まり
 description: 操作を止める条件は 1 か所に置き、承認・レビューを頼む操作はその条件で先に拒否する。実装は一番シンプルな方法を選び、責務と依存の向きを守り、旧名や旧形式は残さず置き換える
 tags: [exe-boundary, ticket]
-keywords: [責務, 依存関係, 段, import の向き, シンプル, 共通化, 修正範囲, ゲート, 条件, 1 か所, 複製, 検査, --check, approval-request, review-request, 先に拒否, 後方互換, 互換, 別名, 移行, 旧名, 置き換え, finish, start, ready, dirty, 未 push]
+keywords: [責務, 依存関係, 層, import の向き, シンプル, 共通化, 修正範囲, ゲート, 条件, 1 か所, 複製, 検査, --check, approval-request, review-request, 先に拒否, 後方互換, 互換, 別名, 移行, 旧名, 置き換え, finish, start, ready, dirty, 未 push]
 ---
 
 # 操作を止める条件（ゲート）の置き方と、シンプルな実装・後方互換を考えない決まり
@@ -22,7 +22,7 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 `review-request` の前提は `go/internal/tickets/review/request` の `gate`、`decide` の依頼の記録・動きの検査は `go/internal/tickets/review/decide` の `gate` に置く。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh user reviewed N --check --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`go/internal/tickets/core` の `confirmGate`、`review/closeout` の `readyGate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
 
-親のワークツリーの未コミットの変更と親ブランチの未 push は、`go/internal/tickets/lifecycle/treegate` の `Check` に寄せた。操作が見る条件は `watches` に宣言する（confirm・decide の未 push の確かめ直しも `Reviewed` として宣言する）。git の呼び出しが重複していないことは `tests/core/test_gate_single_source.py`、操作ごとの拒否は `tests/core/test_treegate.py` が守る。置き場の判定は `place.IsTicketPlace`（`go/internal/tickets/model/place`）に一本化した。
+親のワークツリーの未コミットの変更と親ブランチの未 push は、`go/internal/tickets/lifecycle/treegate` の `Check` に寄せた。操作が見る条件は `watches` に宣言する（confirm・decide の未 push の確かめ直しも `Reviewed` として宣言する）。git の呼び出しが重複していないことは `treegate` の `single_source_test.go`、操作ごとの拒否は `treegate_test.go` が守る。置き場の判定は `place.IsTicketPlace`（`go/internal/tickets/model/place`）に一本化した。
 
 ## ユーザに頼む操作は、後のゲートで止まる条件を先に拒否する
 
@@ -61,9 +61,9 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 共通化や関数の移動で、置き場と import の向きを崩さない。
 
 - 1 つのパッケージは 1 つの責務を持つ。条件の関数は「何を調べるか」だけを扱い、表示（文・JSON）、操作の流れ、書き込みは扱わない
-- import は、同じ段か下の段へだけ向ける（`go/internal/layers_test.go`。パッケージの層は `docs/21_design/modules.md`）。共通の条件の関数は、それを呼ぶ操作の全部より下の段に置く。操作の側から共通の条件へ向け、逆は作らない
-- 共通化のために上の段のパッケージを呼ぶ必要が出たら、呼び方を直さず、置き場を下へ動かす。引数での注入は、循環を隠すだけなので避ける
-- 新しいパッケージを足したら、段と役割（`doc.go`）を決めて `layers_test.go` の表に足す
+- import は、同じ層か下の層へだけ向ける（`go/internal/layers_test.go`。パッケージの層は `docs/21_design/modules.md`）。共通の条件の関数は、それを呼ぶ操作の全部より下の層に置く。操作の側から共通の条件へ向け、逆は作らない
+- 共通化のために上の層のパッケージを呼ぶ必要が出たら、呼び方を直さず、置き場を下へ動かす。引数での注入は、循環を隠すだけなので避ける
+- 新しいパッケージを足したら、層と役割（`doc.go`）を決めて `layers_test.go` の表に足す
 - 環境を読む処理（git・ホスト）と、状態（チケット・マーカー）を読む処理は分ける。環境だけで決まる条件は、状態を知らない関数にして、承認の前後どちらの操作からも呼べるようにする
 
 ## 後方互換を考えない

@@ -275,8 +275,7 @@ func TestInsertDropsBrokenRule(t *testing.T) {
 	}
 }
 
-// 組み込みのルールが持つ文の識別子・値・場合が、文面ファイルと合っている（tests/core/test_texts_catalog.py の
-// BuiltinRuleTextsTest の自己防衛のぶん）。
+// 組み込みのルールが持つ文の識別子・値・場合が、文面ファイルと合っている（自己防衛のぶん）。
 func TestBuiltinRuleTexts(t *testing.T) {
 	repo := repoRoot(t)
 	catalog := texts.Load(repo)

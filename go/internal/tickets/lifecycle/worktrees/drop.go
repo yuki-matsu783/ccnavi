@@ -158,7 +158,7 @@ func Drop(root, name, cwd string) Dropped {
 	}
 	path := worktreePath(root, name)
 	refused := func(why string) Dropped { return Dropped{name: name, Status: refused, Path: path, Detail: why} }
-	if failed := cleanGenerated(path); failed != "" {
+	if failed := CleanGenerated(path); failed != "" {
 		return refused(failed)
 	}
 	note, stuck := stashIgnored(root, name, path)
@@ -217,7 +217,7 @@ func RunDrop(stdout io.Writer, root, name, cwd string) int {
 	return 1
 }
 
-// ignored は git が無視しているものと、読めなかった理由。生成物は先に cleanGenerated が消してあるので、
+// ignored は git が無視しているものと、読めなかった理由。生成物は先に CleanGenerated が消してあるので、
 // ここで生成物かどうかを判定し直さない（判定が 2 つあると食い違い、退避も削除もされないものが消える）。
 // --directory で全体が無視されたディレクトリは 1 行（末尾の "/"）にまとまる。下書きの置き場は追跡されるので
 // ここには現れない。
@@ -294,7 +294,7 @@ func moveAside(source, target string) string {
 	return ""
 }
 
-// relParts は git が出した相対パス（区切りは "/"、ディレクトリは末尾に "/"）の各段。
+// relParts は git が出した相対パス（区切りは "/"、ディレクトリは末尾に "/"）の各要素。
 func relParts(rel string) []string {
 	var parts []string
 	for _, p := range strings.Split(strings.TrimRight(rel, "/"), "/") {

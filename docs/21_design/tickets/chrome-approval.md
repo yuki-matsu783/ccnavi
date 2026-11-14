@@ -29,7 +29,7 @@ keywords: [Chrome拡張, PAT, WASM, MV3, CSP, createCommitOnBranch, expectedHead
 - 読むのは置き場のサブツリーだけ。GitHub はパスで置き場の tree の sha を引き `?recursive=1` で取る。`truncated: true` なら error で止める。GitLab は `repository/tree`（`path`・`recursive`）をページングで取り切り、取り切れなければ error
 - blob は sha で引き、IndexedDB に保存する（sha が同じなら中身は同じなので失効が要らない）。ボードを開くたびに読むのは tree だけになる
 - まとめて取る: GitHub は GraphQL の別名（`f1: object(expression: "P:path") { ... on Blob { text } }`）で、IndexedDB に無い blob を 1 回に最大 50 件ほど取る。GitLab は REST の `repository/blobs/:sha` を 1 件ずつ引く
-- 統合先の `done/` は、判定が要るもの（閉包の先行、同じ識別子の検査でヒットしたもの）だけを取る。取らなかったものは `NOT_FETCHED` として判定に渡す
+- 統合先の `done/` は丸ごと読む（閉包の先行と、前の統合先から切った `P` でも閉じた識別子の使い直しを見つけるため。`entry/chrome` の `families.go`、拡張の `snapshot.ts`）
 
 初回の blob の数は、判定に入る親子のチケットの置き場のファイル数の和に統合先の `done/` の件数を足した数。GraphQL の呼び出しは ⌈blob の数 / 50⌉ + 1。2 回目以降は変わった blob の分だけ。GitHub の上限（REST・GraphQL とも 5,000 回（点）/時）に対して十分小さい。
 
@@ -38,7 +38,7 @@ keywords: [Chrome拡張, PAT, WASM, MV3, CSP, createCommitOnBranch, expectedHead
 1. preview: Snapshot を組み、`judge` → 画面とダイジェスト。書く先の `P` の先頭 `H` を記録する
 2. yes: Snapshot を組み直し、ダイジェストが同じか確かめる。違えば preview からやり直す
 3. `plan` の変更を、`P` へ 1 コミットで書く。条件は「`P` の先頭が `H` のまま」
-4. 先頭が動いていたら、新しい先頭で Snapshot を組み直し、`judge` と `plan` を必ずやり直す。ダイジェストが同じなら新しい plan を新しい先頭に書く（ユーザに見せ直さない）。違えば preview からやり直す。古い plan をそのまま書かない。3 回やり直しても書けなければユーザの対応に切り替える
+4. 先頭が動いていたら、新しい先頭で Snapshot を組み直し、`judge` と `plan` を必ずやり直す。ダイジェストが同じなら新しい plan を新しい先頭に書く（ユーザに見せ直さない）。違えば preview からやり直す。前の plan をそのまま書かない。3 回やり直しても書けなければユーザの対応に切り替える
 
 1 回の承認は 1 つの `P` に限る。レビュー済みも同じ流れで書く。
 
@@ -49,7 +49,6 @@ keywords: [Chrome拡張, PAT, WASM, MV3, CSP, createCommitOnBranch, expectedHead
   - 書き換える・消すファイルに `last_commit_id`（そのファイルを最後に変えたコミット）を付ける。同じファイルを他人が変えていれば GitLab が断るので書かない
   - 書いた後にコミットの `parent_ids[0]` が `H` と同じか確かめる。違えば（別のファイルへの書き込みが間に入った）自分の書き込みの直前の状態で同じ時刻で判定し直し、書くものが違えば元に戻すコミット（revert）を積んで知らせる。元に戻すコミットの各ファイルにも「最後に変えたのは自分のコミット」を付け、他人の変更の上には書かない。2 回で収まらなければ止めてユーザの対応に切り替える（ボードに「要確認」で出す）
   - 別のファイルどうしの競合は `last_commit_id` では検出できないので、取り下げ以外の同時の書き込みで判定の変わるものが一時的に `P` に残りうる（受け入れた危険）
-  - `seq` ファイルによる比較つきの書き込みは入れていない。GitLab の実機で前提（`last_commit_id` の比較の相手）を確かめてから足す
 - 提案が `P` の上にあれば同じコミットで消す。`P` 以外のブランチにある提案は承認しない
 - コミットメッセージはユーザが読む説明（「ccnavi: <識別子> を承認」など）と拡張の版だけ。どの処理も読まない。`[skip ci]` は付けない
 
@@ -73,7 +72,7 @@ issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェク
 | 操作 | Chrome 拡張との関係 |
 |---|---|
 | `review-request` | 変わらない。依頼のマーカーは write-and-push で送る |
-| `confirm` | 中身はコアの `confirm` / `reviewed_mark`。sh がトークンの持ち主を引いて `--actor` で渡す。write-and-push で送る |
+| `confirm` | 中身はコアの `Confirm` / `request.ReviewedMark`。sh がトークンの持ち主を引いて `--actor` で渡す。write-and-push で送る |
 | `decide` | Chrome に載せる。ホストへの書き込み（issue・返信・解決）は拡張が行い、親のブランチへは write-and-push の代わりに 1 コミットで送る（下の「残った指摘の対応方針を決める」） |
 | `ready` | 前提に「親が `done/` にある」を足す。マーカーは write-and-push。`[skip ci]` を付けない |
 | 子の push | 子のブランチはリモートに出さない |
@@ -91,7 +90,7 @@ issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェク
 
 #### レビュー済みのマーカーを Chrome から付ける
 
-開発者と承認者が別の人のとき、マージリクエストを見てスレッドを片付けるのは承認者側なので、Chrome に「レビュー済み」を置く。`ccnavi-review.sh confirm` は手元用で、どちらも同じコアの `confirm` と `reviewed_mark` を使う。
+開発者と承認者が別の人のとき、マージリクエストを見てスレッドを片付けるのは承認者側なので、Chrome に「レビュー済み」を置く。`ccnavi-review.sh confirm` は手元用で、どちらも同じコアの `Confirm` と `request.ReviewedMark` を使う。
 
 マーカー `phases/<親>/<N>.reviewed` の中身は次のとおり。
 
@@ -99,8 +98,8 @@ issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェク
 {"mr": 42, "accepted": [], "actor": "<ホストのアカウント名>", "via": "chrome", "at": "<時刻>"}
 ```
 
-- 既存のキー `by` は経路名なので、アカウントは新しいキー `actor` に入れる。`actor` は押したユーザではなく、トークン（手元は `gh`・`glab` の認証か `GITHUB_TOKEN`/`GITLAB_TOKEN`、Chrome は PAT）の持ち主。記録であり、判定にも表示にも使わない
-- 読む側（止める判定）はマーカーが在るかと `mr`・`accepted` しか見ないので、キーを足しても判定は変わらない
+- 経路名はキー `via`、アカウントはキー `actor` に入れる（どちらも分かるときだけ書く）。`actor` は押したユーザではなく、トークン（手元は `gh`・`glab` の認証か `GITHUB_TOKEN`/`GITLAB_TOKEN`、Chrome は PAT）の持ち主。記録であり、判定にも表示にも使わない
+- 読む側（止める判定）はマーカーが在るかと `mr`・`accepted` しか見ない。`actor`・`via`・`at` は判定に使わない
 
 `confirm` の検査は Chrome でも同じにする。
 
@@ -113,7 +112,7 @@ issue の一覧に「始める」を出し、`P`（`i<番号>`、プロジェク
 | 未解決スレッドが無い | GitHub GraphQL の `reviewThreads.isResolved`、GitLab `discussions` の `resolved` |
 | レビュー待ちの子を `done/` へ | 同じ移動を `Changes` にして同じコミットに入れる |
 
-push 済みかの検査は手元だけに残す。ホストから取得した内容は、`ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `Result.load` に渡す。未解決が残るときは Chrome では通さず、「解決するか、`decide`（ターミナル・VS Code のボード）で受け入れる」と出す。
+push 済みかの検査は手元だけに残す。ホストから取得した内容は、`ccnavi-review.sh` が組む JSON（`{host, mr, threads, reviews, fetched_at}`）と同じ形にして `host.ResultOf` に渡す。未解決が残るときは Chrome では通さず、「解決するか、`decide`（ターミナル・VS Code のボード）で受け入れる」と出す。
 
 sh と TS の二重実装は、本物のホストの応答の形に合わせて手で組んだ見本（拡張の `test/fixtures/host/<github|gitlab>/<場面>/`）と、「その見本から sh が組んだ JSON」の期待値 1 つで揃える。sh の試験と TS の試験の両方が期待値と突き合わせる。ホストの応答の形が変わったら、見本のうち形の変わったキーを直し、sh の試験を `CCNAVI_HOST_FIXTURE=1` で回して期待値を作り直し、TS の試験を回す。見本・期待値・sh・TS の変更は同じコミットに入れる（手順の詳細は拡張の README の「ホストの応答の見本」）。
 

@@ -315,7 +315,7 @@ func Move(source, target string) string {
 }
 
 // CopyFile は shutil.copy2（中身・権限・更新時刻を写す。リンクは辿る）。親のディレクトリは作らない。
-// 溜める段は通さない（実行ファイルのバックアップと退避に使う）。
+// 溜める段階は通さない（実行ファイルのバックアップと退避に使う）。
 func CopyFile(source, target string) error {
 	in, err := os.Open(source)
 	if err != nil {
@@ -345,7 +345,7 @@ func CopyFile(source, target string) error {
 
 // AppendLine は line に機械の改行を付けて、追記モードの 1 回の書き込みで足す（Windows でも
 // テキストモードの改行になる）。並行するプロセスの行と混ざらない。
-// perm は新しく作るファイルの権限。親のディレクトリは作らない。溜める段は通さない（記録のログ用）。
+// perm は新しく作るファイルの権限。親のディレクトリは作らない。溜める段階は通さない（記録のログ用）。
 func AppendLine(path, line string, perm os.FileMode) error {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, perm)
 	if err != nil {

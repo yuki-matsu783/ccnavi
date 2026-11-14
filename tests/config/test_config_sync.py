@@ -663,7 +663,7 @@ class ConfigMirrorTest(ConfigUnionHarness):
             self.assertEqual(f.read(), raw)
 
     def test_a_mirrored_script_factor_is_not_counted_twice(self):
-        """ミラーが統合先に入っても、共通レイヤーの同じ項目と 2 重に数えない。
+        """ミラーが統合先に入っても、共通レイヤーの同じ項目と 2 回数えない。
 
         ワークスペースの中ではミラーを読まない（共通レイヤーは 1 本）ので、そもそも数が増えない。
         """

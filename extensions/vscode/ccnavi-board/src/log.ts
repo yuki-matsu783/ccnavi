@@ -17,7 +17,7 @@
  * 出どころの名前が`[A-Za-z0-9_-]`以外を含むときも書かない。
  *
  * nodeの型を取り除くだけで動く書き方にしてある（enumも引数のプロパティも使わない）。
- * Pythonのテスト（tests/core/test_diaglog.py）が`node`で直に読み、3つの言語の行を比べる。
+ * Pythonのテスト（tests/sh/test_diaglog_sh.py）が`node`で直に読み、3つの言語の行を比べる。
  */
 import * as fs from "node:fs";
 import * as path from "node:path";

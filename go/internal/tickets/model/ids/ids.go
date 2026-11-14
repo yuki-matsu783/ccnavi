@@ -92,7 +92,7 @@ type Child struct {
 }
 
 // ParseChild は子の識別子の形なら、その親・フェーズ番号・連番と真。識別子だけから親を割り出すときは
-// 右から 2 段を剥がすので、親が "-" や数字を含んでも 1 通りに決まる。
+// 右から 2 階層を剥がすので、親が "-" や数字を含んでも 1 通りに決まる。
 func ParseChild(id string) (Child, bool) {
 	m := childPattern.FindStringSubmatch(id)
 	if m == nil {

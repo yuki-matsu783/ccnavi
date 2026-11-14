@@ -23,7 +23,7 @@ const (
 // sourceDir は工程スキルの置き場の、ワークスペースルートからの相対。
 var sourceDir = []string{config.ClaudeDir, config.SkillsDir}
 
-// commonRefs は references/ の最上段で、共通として写すディレクトリ。
+// commonRefs は references/ の最上位で、共通として写すディレクトリ。
 var commonRefs = []string{"references", "common"}
 
 func skillSource(root string) string { return ospath.Join(root, sourceDir...) }

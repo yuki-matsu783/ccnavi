@@ -20,7 +20,7 @@ const needsMessage = Deny
 // 読めない（ファイルが無い、UTF-8 でない、YAML として読めない、マッピングでない）ときは error を返す。
 // 組み立てられないルールは外して Problem で名指しし、組み立てられたものは返す。1 件の不備でガード全体を止めないため。
 func Load(path, root string) (*RuleSet, []Problem, error) {
-	// UTF-8 として厳密に読む。fsio を通さずディスクだけを読むので、溜める段も見ない。
+	// UTF-8 として厳密に読む。fsio を通さずディスクだけを読むので、溜める段階も見ない。
 	text, err := fsio.ReadDiskText(path, fsio.Strict)
 	if err != nil {
 		return nil, nil, err
@@ -395,7 +395,7 @@ func readWhen(written any, name string) (*Condition, *Problem) {
 	var node func(raw any, where string, depth int) (*Condition, whenError)
 	node = func(raw any, where string, depth int) (*Condition, whenError) {
 		if depth > maxWhenDepth {
-			return nil, whenError(fmt.Sprintf("%s で入れ子が %d 段を超える。判定が重くならないように、段を浅くするか、ルールを分けてください", where, maxWhenDepth))
+			return nil, whenError(fmt.Sprintf("%s で入れ子が %d 階層を超える。判定が重くならないように、入れ子を浅くするか、ルールを分けてください", where, maxWhenDepth))
 		}
 		count++
 		if count > maxWhenNodes {

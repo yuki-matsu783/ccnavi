@@ -23,7 +23,7 @@
  *
  * 読めるか・形が正しいかは実行ファイルが`--lint --flow`で言い（`flow-lint.ts`）、
  * 着手中に書けるかは実行ファイルが`flow.locked`で言う。
- * 入れ子の段の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限にヒットした
+ * 入れ子の階層の数（`nesting`）は案内で、止めるのは実行ファイルでも画面でもなく、上限にヒットした
  * サブエージェントにAgentツールが渡らないこと（そのノードで止まってメインへ戻る）。
  *
  * ここにはVS CodeのAPIもnodeもDOMも入れない。画面（React）がバンドルして読むため。
@@ -106,11 +106,11 @@ export function branchPort(index: number): string {
 
 // ---- 入れ子の上限（付録C）
 
-/** 入れ子の起動の既定の上限（`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`）。メインの下の段の数 */
+/** 入れ子の起動の既定の上限（`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`）。メインの下の階層の数 */
 export const SPAWN_LIMIT = 3;
-/** 子チケットの担当のサブエージェントの段（メインの下1段目） */
+/** 子チケットの担当のサブエージェントの階層（メインの下1階層目） */
 export const CHILD_LAYER = 1;
-/** 子のフローの中で重ねてよい段の数。子の下2段まで */
+/** 子のフローの中で重ねてよい階層の数。子の下2階層まで */
 export const NEST_ALLOWED = SPAWN_LIMIT - CHILD_LAYER;
 
 // ---- 読む関数（欠けた欄は既定で読む。書き足さない）
@@ -1084,10 +1084,10 @@ export function connectionLabel(doc: FlowDoc, c: FlowConnection): string {
   return item === undefined ? "" : labelText(item.label);
 }
 
-// ---- 入れ子の段と注意
+// ---- 入れ子の階層と注意
 
 export interface Nesting {
-  /** 子の下に重なる段の数の最大。subAgent / subAgentFlowが1段 */
+  /** 子の下に重なる階層の数の最大。subAgent / subAgentFlowが1階層 */
   readonly depth: number;
   /** サブフローが自分を（間接にでも）呼んでいる */
   readonly cyclic: boolean;
@@ -1108,8 +1108,8 @@ function subFlows(doc: FlowDoc): ReadonlyMap<string, readonly FlowNode[]> {
 }
 
 /**
- * 子の下に何段の入れ子が重なるか。`subAgent`は1段。`subAgentFlow`は1段で、そのサブフローの中の
- * ノードがさらに重なる。子は メインの下1段目なので、既定の上限（メインの下3段）なら子の下は2段まで。
+ * 子の下に何階層の入れ子が重なるか。`subAgent`は1階層。`subAgentFlow`は1階層で、そのサブフローの中の
+ * ノードがさらに重なる。子は メインの下1階層目なので、既定の上限（メインの下3階層）なら子の下は2階層まで。
  */
 export function nesting(doc: FlowDoc): Nesting {
   const flows = subFlows(doc);
@@ -1148,12 +1148,12 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   const { depth, cyclic } = nesting(doc);
   if (depth > NEST_ALLOWED) {
     out.push(
-      `入れ子のサブエージェントが、子の下に${depth}段重なっています。既定の上限はメインの下${SPAWN_LIMIT}段で、子（1段目）の下は${NEST_ALLOWED}段までです。` +
-        "上限に達した段ではAgentツールを利用できず、そのノードで止まってメインへ戻ります",
+      `入れ子のサブエージェントが、子の下に${depth}階層重なっています。既定の上限はメインの下${SPAWN_LIMIT}階層で、子（1階層目）の下は${NEST_ALLOWED}階層までです。` +
+        "上限に達した階層ではAgentツールを利用できず、そのノードで止まってメインへ戻ります",
     );
   }
   if (cyclic) {
-    out.push("サブフローの呼び出しが循環しています（subAgentFlowIdが輪になっています）。段の数を数えられません");
+    out.push("サブフローの呼び出しが循環しています（subAgentFlowIdが輪になっています）。階層の数を数えられません");
   }
   const starts = doc.nodes.filter((node) => nodeType(node) === "start").length;
   if (starts === 0) {

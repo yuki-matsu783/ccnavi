@@ -117,7 +117,7 @@ export function runBasicTours(): void {
   openNext();
 }
 
-/** 1つの画面の基本の案内だけを動かす（ウォークスルーの各段のボタン） */
+/** 1つの画面の基本の案内だけを動かす（ウォークスルーの各ステップのボタン） */
 export function runScreenTour(screen: string): void {
   resetChain([screen]);
   openNext();

@@ -30,7 +30,7 @@ const (
 	blockedShell = "このシェル実行"
 )
 
-// HoldReason は止めたときに返す文。段の名前（レビュー準備中・レビュー待ち）を見出しに置き、段ごとに次に何を
+// HoldReason は止めたときに返す文。段階の名前（レビュー準備中・レビュー待ち）を見出しに置き、段階ごとに次に何を
 // すればよいかを言う（依頼済みならユーザを待つ、未依頼なら子の合流を確かめて依頼する）。
 func HoldReason(p *Phase, tool, root string) string {
 	agent := slices.Contains(config.AgentTools(), tool)

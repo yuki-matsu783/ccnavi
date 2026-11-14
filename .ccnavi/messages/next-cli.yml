@@ -1,4 +1,4 @@
-# チケットの CLI（ccnavi-ticket.sh・--agree・ccnavi-review.sh など）が標準出力・標準エラーに出す次の一手。
+# チケットの CLI（ccnavi-ticket.sh・--agree・ccnavi-review.sh など）と `ccnavi git check`・`ccnavi git integrate`（ccnavi-git.sh の判定と直接作業の取り込み）が標準出力・標準エラーに出す次の一手。
 # 状態の報告（何をしたか・何が起きたか）はコード側にあり、ここは次の一手だけを持つ。
 # `次:` の行は組み立てる側が付ける。`note` は 1 行ごとに `案内: ` を付けて出す。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
@@ -328,3 +328,129 @@ messages:
     note: |-
       取り込みは、ユーザがこのツリー（{tree_root}）で `ccnavi-user-handoff.sh {target}` を打って行う
       下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、ready の前に下書きを削除します（またはコミットする）
+
+  # ccnavi git check（ccnavi-git.sh の判定）が、統合先のユーザのチェックアウトでの merge・pull を断る文に続ける次の一手と案内。
+  NEXT_GIT_MERGE_ON_TARGET:
+    kind: next
+    values: [integ]
+    next: |-
+      {script:ccnavi-worktree.sh} <名前> でワークツリーを切る
+    note: |-
+      切ったワークツリーの中で {script:ccnavi-git.sh} merge {integ:sh} を打って衝突を解いてコミットし、{script:ccnavi-git.sh} integrate <名前> で取り込む
+
+  # 統合先のユーザのチェックアウトでの merge・pull を断った理由に続ける案内（`次:` の行のあと）。
+  NOTE_GIT_MERGE_ON_TARGET_ALLOWED:
+    kind: note
+    note: |-
+      途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。
+
+  NOTE_GIT_PULL_ON_TARGET_ALLOWED:
+    kind: note
+    values: [integ]
+    note: |-
+      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
+
+  # ccnavi git integrate（ccnavi-git.sh の integrate・integrate-done。直接作業の取り込み）が出す次の一手と案内。
+  NEXT_GIT_INTEGRATE_EMPTY:
+    kind: next
+    values: [name]
+    next: |-
+      ユーザに伝えたあと、{script:ccnavi-git.sh} integrate-done {name:sh} で確定する（報告と進め方は、integrate を打ったときの追加の文脈に従う）
+
+  NEXT_GIT_INTEGRATE_REVIEW:
+    kind: next
+    values: [head, result, name]
+    next: |-
+      差分を {script:ccnavi-git.sh} diff {head:sh} {result:sh} で確かめる
+    note: |-
+      報告のあと、{script:ccnavi-git.sh} integrate-done {name:sh} -m '<メッセージ>' で確定する（報告と進め方は、integrate を打ったときの追加の文脈に従う）
+      やめるなら {script:ccnavi-git.sh} integrate --abort {name:sh}
+
+  NEXT_GIT_PUSH_USER:
+    kind: next
+    values: [base, top]
+    next: |-
+      ユーザにターミナルで {base} をリモートへ送るよう頼む（cd {top:path} && git push origin {base:sh}）。ccnavi-git.sh push は取り込み先へ送らない
+
+  # ---- ccnavi-git.sh（integrate）
+  # 一時ワークツリーを消せなかったとき。
+  NOTE_GIT_TMP_LEFT:
+    kind: note
+    values: [tmp, why]
+    note: |-
+      一時ワークツリー {tmp} を残した（{why}）。中身はユーザのものかもしれないので、黙って消さない。ユーザに確かめてください。
+
+  # 取り込みが衝突したとき。
+  NOTE_GIT_INTEGRATE_CONFLICT:
+    kind: note
+    values: [wt, base, name, self_q]
+    note: |-
+      ワークツリー（{wt}）の中で {self_q} merge {base:sh} を実行して衝突を解いてコミットしてから、{self_q} integrate {name:sh} を再実行します。
+
+  # 取り込み結果を一時ワークツリーに用意した後（常に出る 2 本と、条件つきの 4 本）。
+  NOTE_GIT_INTEGRATE_SAVE_EDITS:
+    kind: note
+    note: |-
+      このファイルをエディタで開いて保存していない編集があれば、integrate-done の前に保存してもらう
+
+  NOTE_GIT_INTEGRATE_VERIFY:
+    kind: note
+    values: [tmp]
+    note: |-
+      取り込み結果は一時ワークツリーで検証できる: cd {tmp:path} && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない
+
+  NOTE_GIT_INTEGRATE_IGNORED_OVERLAP:
+    kind: note
+    values: [paths]
+    note: |-
+      取り込みで増えるパスが、ユーザのチェックアウトの ignored のファイルと重なっている（{paths}）。integrate-done の fast-forward は上書きせずに止まる。ユーザに退避を頼む
+
+  NOTE_GIT_INTEGRATE_DRAFTS:
+    kind: note
+    values: [notes]
+    note: |-
+      取り込まない下書き: {notes}（取り込み結果には含まれず、作業ブランチにだけ残る。作業ブランチを片付けると消える。内容をユーザに伝え、必要なら先に別の場所へ写してもらう）
+
+  NOTE_GIT_INTEGRATE_GUARDED:
+    kind: note
+    values: [paths]
+    note: |-
+      自己防衛の対象（{paths}）を含む。integrate-done はユーザがターミナルで、エージェントのターンが終わってから打つ
+
+  NOTE_GIT_INTEGRATE_ORIGIN_BEHIND:
+    kind: note
+    values: [base, top]
+    note: |-
+      origin/{base} が手元より進んでいる。先に合わせると、古い上に載せずに済む（cd {top:path} && git pull --ff-only origin {base:sh}）
+
+  # 取り込みをやめたあと（integrate --abort）。
+  NOTE_GIT_INTEGRATE_ABORTED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      直接作業の記録は残した。作業を続けて、もう一度 {self_q} integrate {name:sh} を打てる
+
+  # integrate-done（片付け）
+  NOTE_GIT_DONE_STOPPED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      取り込み自体は成功している。原因を片付けてから、ユーザのチェックアウトで {self_q} integrate-done {name:sh} を再実行すると、済んだところを飛ばして続きから進む
+
+  NOTE_GIT_DONE_COMMIT_FAILED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      原因を直してから {self_q} integrate-done {name:sh} -m '<メッセージ>' を再実行します。
+
+  NOTE_GIT_DONE_HOOK_CHANGED:
+    kind: note
+    values: [self_q, name]
+    note: |-
+      フックが何を変えたかをユーザに確かめてもらう。{self_q} integrate --abort {name:sh} で戻せる。
+
+  NOTE_GIT_DONE_FF_FAILED:
+    kind: note
+    values: [self_q, name, short]
+    note: |-
+      原因を直してから、同じコマンド（{self_q} integrate-done {name:sh}）を再実行すると、K（{short}）から再開する。

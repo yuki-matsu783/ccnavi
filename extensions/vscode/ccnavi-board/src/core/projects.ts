@@ -138,7 +138,7 @@ export interface DirEntry {
 /** 歩かないディレクトリ。ワークツリーはtreesに既にあり、依存の置き場は深くて遅い */
 export const SKIP_DIRS: ReadonlySet<string> = new Set([".git", "node_modules", ".venv", ".claude"]);
 
-/** 置き場の中は1段深く歩き、2段目に置かれたcloneを「置き場の2段目以下」として拾う */
+/** 置き場の中は1階層深く歩き、2階層目に置かれたcloneを「置き場の2階層目以下」として拾う */
 const DEPTH = 2;
 const DEPTH_IN_PROJECTS = 3;
 

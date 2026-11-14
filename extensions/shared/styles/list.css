@@ -65,8 +65,8 @@ details.more > .sub { display: grid; grid-template-columns: 150px minmax(0, 1fr)
 .find input { width: var(--w-field); max-width: 100%; }
 .find .hint { margin: 0; }
 /*
- * 狭い幅（パネルを細くしたとき）。欄名を欄の上に置いて 1 列にし、左の余白も詰める。行の見出しは 2 段にして、
- * パターンや条件の列が 0 幅に潰れないようにする（2 段目へ回す列は画面ごとの CSS が決める）
+ * 狭い幅（パネルを細くしたとき）。欄名を欄の上に置いて 1 列にし、左の余白も詰める。行の見出しは 2 行にして、
+ * パターンや条件の列が 0 幅に潰れないようにする（2 行目へ回す列は画面ごとの CSS が決める）
  */
 @media (max-width: 520px) {
   .row-body { padding-left: 14px; grid-template-columns: minmax(0, 1fr); gap: var(--gap-1) var(--gap-5); }

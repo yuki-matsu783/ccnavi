@@ -28,7 +28,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, SH_SCRIPTS, common_sh
+from tests import ROOT, SH_SCRIPTS, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NODE = shutil.which("node")
@@ -190,7 +190,7 @@ class ShLoggerTest(_Workspace):
         subprocess.run(
             [SHELL, script],
             cwd=sub,
-            env=base_env(CCNAVI_WORKSPACE=self.ws),
+            env=base_env(CCNAVI_WORKSPACE=self.ws, CCNAVI_ENTRY_PATH=exe.sh_path()),
             check=True,
             capture_output=True,
         )
@@ -364,7 +364,7 @@ class GuardScriptTest(_Workspace):
             capture_output=True,
             text=True,
             encoding="utf-8",
-            env=base_env(CCNAVI_WORKSPACE=self.ws),
+            env=base_env(CCNAVI_WORKSPACE=self.ws, CCNAVI_ENTRY_PATH=exe.sh_path()),
             check=False,
         )
 

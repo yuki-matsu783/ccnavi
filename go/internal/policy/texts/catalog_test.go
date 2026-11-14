@@ -20,7 +20,7 @@ import (
 	"ccnavi/internal/policy/rules"
 )
 
-// リポジトリの文面ファイルと、それを引くコード・sh の食い違いを見る（tests/core/test_texts_catalog.py の Go 版）。
+// リポジトリの文面ファイルと、それを引くコード・sh の食い違いを見る。
 // - 共通の文面ファイルは検査を通る
 // - Go の texts.Say と sh の ccnavi_text が引く識別子は文面ファイルにあり、渡す値の名前が values と一致する
 // - 文面ファイルの識別子は、どこかから引かれている
@@ -363,7 +363,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	ids := regexp.MustCompile(`(?m)^  (NOTE_[A-Z0-9_]+):$`).FindAllStringSubmatch(string(data), -1)
-	if len(ids) < 25 {
+	if len(ids) < 10 {
 		t.Fatalf("%d 件しかない", len(ids))
 	}
 	c := Load(repo)
@@ -382,8 +382,8 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 	for _, k := range shCalls(t, repo) {
 		called[k.id] = true
 	}
-	for _, id := range []string{"NOTE_GIT_INTEGRATE_CONFLICT", "NOTE_GIT_MERGE_ON_TARGET_ALLOWED", "NOTE_WORKTREE_RECORD_MISSING",
-		"NOTE_START_TEMPLATES", "NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
+	for _, id := range []string{"NOTE_GIT_WORKTREE_REMOVE_CWD", "NOTE_GIT_PULL_CONFLICT_ON_TARGET", "NOTE_WORKTREE_RECORD_MISSING",
+		"NOTE_START_SLUG_SHORT", "NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
 			t.Errorf("sh が %s を引かない", id)
 		}

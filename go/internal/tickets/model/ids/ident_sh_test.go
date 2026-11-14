@@ -10,7 +10,7 @@ import (
 )
 
 // sh（ccnavi_is_ident・ccnavi_is_branch）と同じ表（tests/fixtures/ident-cases.json）で、実行ファイルの
-// 答えを確かめる。sh が通す識別子は実行ファイルも通し、sh_only は実行ファイルだけが止める（2 段目の守り）。
+// 答えを確かめる。sh が通す識別子は実行ファイルも通し、sh_only は実行ファイルだけが止める（2 つ目の守り）。
 // ident_bad は sh だけの答え（`..` のように実行ファイルは識別子として通すものがある）。
 func TestIdentCasesTable(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "ident-cases.json"))

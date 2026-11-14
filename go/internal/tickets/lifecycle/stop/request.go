@@ -29,7 +29,7 @@ const (
 	stepMerge   Step = "merge"
 	stepLateFix Step = "late-fix"
 	stepRequest Step = "request"
-	// StepConfirm はユーザが子を手で done/ に動かした段。親が confirm を打てば確定する。
+	// StepConfirm はユーザが子を手で done/ に動かした段階。親が confirm を打てば確定する。
 	StepConfirm Step = "confirm"
 )
 
@@ -162,7 +162,7 @@ func nextStep(root, worktree string, ph *phase.Phase) (Step, []string) {
 	return stepRequest, nil
 }
 
-// RequestNudge は Stop を止めて渡す文。段ごとの文は文面ファイルが持ち、子の finish だけは子ごとのコマンドを並べて渡す。
+// RequestNudge は Stop を止めて渡す文。段階ごとの文は文面ファイルが持ち、子の finish だけは子ごとのコマンドを並べて渡す。
 func RequestNudge(root string, p *Pending) string {
 	n := strconv.Itoa(p.Number)
 	ticketSh := config.ScriptCommand(root, config.TicketWrapper)

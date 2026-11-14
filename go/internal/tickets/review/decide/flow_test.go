@@ -247,8 +247,8 @@ func requestedWorkspace(t *testing.T) (root, tree string, conf *config.Settings)
 	return root, tree, conf
 }
 
-// 受け入れる指摘には置く前に sh が返信して解決する。計画の段（PlanOut）は判断を操作記録に保存して計画を書くだけで、
-// 解決したあとの段（PlanDone）で置く。解決済みになった指摘も見せた指摘として数え直し、操作記録に適用を残す。
+// 受け入れる指摘には置く前に sh が返信して解決する。計画の段階（PlanOut）は判断を操作記録に保存して計画を書くだけで、
+// 解決したあとの段階（PlanDone）で置く。解決済みになった指摘も見せた指摘として数え直し、操作記録に適用を残す。
 func TestYesInThreeSteps(t *testing.T) {
 	root, tree, conf := requestedWorkspace(t)
 	threads := filepath.Join(root, "logs", "threads.json")
@@ -262,14 +262,14 @@ func TestYesInThreeSteps(t *testing.T) {
 	choices := `{"u1": "keep", "u2": "fix"}`
 	o.Reset()
 	if code, _ := Yes(&o, &e, conf, root, tree, 1, threads, choices, digest, YesOptions{PlanOut: plan}); code != 0 || o.Len() != 0 {
-		t.Fatalf("計画の段: %d %q %q", code, o.String(), e.String())
+		t.Fatalf("計画の段階: %d %q %q", code, o.String(), e.String())
 	}
 	planned := host.ReadAcceptPlan(plan)
 	if planned == nil || !reflect.DeepEqual(planned.Keys, []string{"u1"}) || planned.Op == "" {
 		t.Fatalf("計画: %+v", planned)
 	}
 	if _, err := os.Stat(filepath.Join(tree, ".ccnavi", "approved", "phases", "i0001", "1.reviewed")); err == nil {
-		t.Fatal("計画の段で置いた")
+		t.Fatal("計画の段階で置いた")
 	}
 	// 解決する前の結果では、受け入れが済んでいないと言って置かない。
 	if code, _ := Yes(&o, &e, conf, root, tree, 1, threads, choices, digest, YesOptions{PlanDone: plan}); code == 0 ||
@@ -282,7 +282,7 @@ func TestYesInThreeSteps(t *testing.T) {
 	o.Reset()
 	e.Reset()
 	if code, err := Yes(&o, &e, conf, root, tree, 1, resolved, choices, digest, YesOptions{PlanDone: plan}); code != 0 || err != nil {
-		t.Fatalf("置く段: %q", e.String())
+		t.Fatalf("置く段階: %q", e.String())
 	}
 	answer, _ := pyjson.Loads(o.String())
 	if got := answer.(*pyjson.Object); got.String("op") != planned.Op || got.String("followup") != "i0001-01-02" {
