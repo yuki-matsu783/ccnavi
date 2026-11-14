@@ -9,7 +9,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 # GitLab の応答の形の契約テスト
 
 本物の GitLab（Docker）の応答の**形**を録り、模擬（`tests/fake_gitlab.py`）の応答の形と比べる。値（ID・時刻・SHA）は比べない。
-置き場は `tests/contract/`（テストのグループ `contract`）と、データの `tests/contract/gitlab/`。同じグループにある claude -p の代役の契約（`tests/contract/claude/`）は [claude-contract.md](claude-contract.md)。
+置き場は `tests/contract/`（テストのグループ `contract`）と、データの `tests/contract/gitlab/`。同じグループにある claude -p のスタブの契約（`tests/contract/claude/`）は [claude-contract.md](claude-contract.md)。
 
 ## 何が証明されるか
 
@@ -184,7 +184,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 | `notes_post` `notes_get` | 状態ファイル（`FAKE_GITLAB_STATE`） | 場面によらないので 1 場面で 1 回。先に `notes_post` を打ち、`notes_get` が空にならないようにする |
 | `mrs_merged` | 全場面で `[]` | 除く。`state=merged` の枝が無く、比べても配列が空で何も比べない |
 | `project` | 固定値 `{"id":42,"default_branch":"main"}` | 除く。`reads` は 5 キーで、見本が持つのは `id` と `default_branch` だけ（比べられるのは `id` のみ） |
-| 上以外 | 404 | 見本が答えない（見本は読み取りだけの代役） |
+| 上以外 | 404 | 見本が答えない（見本は読み取りだけのスタブ） |
 
 ### 比べ方と許可
 

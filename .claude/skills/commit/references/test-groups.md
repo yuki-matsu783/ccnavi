@@ -19,7 +19,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 140 秒 |
 | `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 6 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
-| `contract` | 本物の GitLab から録った応答の形（`recorded.json`）と、Python の模擬（`tests/fake_gitlab.py`）・sh の見本（`tests/sh/gitlab_host.py` とフィクスチャ）の応答の形を、`reads` のキーで比べる。比較器・変異・機密・置く分岐の試験を含む。TS 側（Chrome 拡張の `MockGitLab` との比較）は `extensions/chrome/ccnavi-approval` の `pnpm test`（下の表）。録り直しは手動（Docker。`.agents/docs/gitlab-contract.md`）。claude -p の代役（`tests/fake_claude.py`）と、本物から録った形（`tests/contract/claude/recorded.json`）の比較も含む（`.agents/docs/claude-contract.md`）。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 15 秒 |
+| `contract` | 本物の GitLab から録った応答の形（`recorded.json`）と、Python の模擬（`tests/fake_gitlab.py`）・sh の見本（`tests/sh/gitlab_host.py` とフィクスチャ）の応答の形を、`reads` のキーで比べる。比較器・変異・機密・置く分岐の試験を含む。TS 側（Chrome 拡張の `MockGitLab` との比較）は `extensions/chrome/ccnavi-approval` の `pnpm test`（下の表）。録り直しは手動（Docker。`.agents/docs/gitlab-contract.md`）。claude -p のスタブ（`tests/fake_claude.py`）と、本物から録った形（`tests/contract/claude/recorded.json`）の比較も含む（`.agents/docs/claude-contract.md`）。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 15 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
 ```sh
@@ -56,9 +56,9 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
-| `tests/fake_claude.py`・`tests/contract/claudeside.py`・`tests/contract/claude/recorded.json` | `contract` `scenarios`（`scenarios` の `test_runner` は代役を起こす） |
+| `tests/fake_claude.py`・`tests/contract/claudeside.py`・`tests/contract/claude/recorded.json` | `contract` `scenarios`（`scenarios` の `test_runner` はスタブを起こす） |
 | `tests/manual/claude/record_hooks.py` | `contract`（`claudeside` を使う。本物を呼ぶので自動テストは回さない） |
-| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つの代役と模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
+| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つのスタブと模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
 | `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |

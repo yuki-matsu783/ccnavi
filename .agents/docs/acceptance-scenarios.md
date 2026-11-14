@@ -55,7 +55,7 @@ setup:
 steps:
   - prompt: "ワークツリーは切らずに README.md を Edit ツールで直接編集して。拒否されたら迂回しないで"
     resume: false                # true なら直前のセッションを --resume でつなぐ
-    script:                      # 任意。代役（--agent script）で回すときの台本。書き方は claude-contract.md
+    script:                      # 任意。スタブ（--agent script）で回すときの台本。書き方は claude-contract.md
       - tool: Edit
         input: {file_path: README.md, old_string: "a", new_string: "b"}
     expect_after:                # 任意。この step を回したあとに評価する（下の箇条書き）
@@ -128,7 +128,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```
 
-   `--agent script` を付けると、`claude -p` の代わりに代役（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、代役が真似る範囲は [claude-contract.md](claude-contract.md)。
+   `--agent script` を付けると、`claude -p` の代わりにスタブ（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、スタブが真似る範囲は [claude-contract.md](claude-contract.md)。
 
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
@@ -137,7 +137,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。`human_api` か `human_run` のある step は止まらずに進む（擬似端末を作れない環境の `human_run` は 10 で止まる）。
    `docker-gitlab` のシナリオで 10 で止まる step は、操作者が `tests/manual/gitlab/scenario_tools.py` で代行する（`<出力の置き場>` は止まった回の `logs/scenarios/<ID>-<日時>/`）。素の shell で承認の sh を打たない。
    - issue を作る（人間役のトークンで 1 件）: `uv run python tests/manual/gitlab/scenario_tools.py issue <出力の置き場> [--title 題]`
-   - 承認を代行する（代役の git の環境で擬似端末から y を送る）: `uv run python tests/manual/gitlab/scenario_tools.py agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
+   - 承認を代行する（スタブの git の環境で擬似端末から y を送る）: `uv run python tests/manual/gitlab/scenario_tools.py agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
    - 記録にトークンの値が出ていないかを確かめる: `uv run python tests/manual/gitlab/scenario_tools.py leak <出力の置き場>`
    人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
@@ -290,18 +290,18 @@ setup:
 | `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
 
 - `bare` / `fake-gitlab` / `docker-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
-- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` は代役を通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
-- 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare（`docker-gitlab` は作らず、GitLab のプロジェクトを使う）、PATH の先頭の代役（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
-- `git` の代役は、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`、`docker-gitlab` は `http://127.0.0.1:8929/root/<プロジェクト>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、代役が効く
+- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` はスタブを通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
+- 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare（`docker-gitlab` は作らず、GitLab のプロジェクトを使う）、PATH の先頭のスタブ（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
+- `git` のスタブは、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`、`docker-gitlab` は `http://127.0.0.1:8929/root/<プロジェクト>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、スタブが効く
 - `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを、`docker-gitlab` はエージェント役のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
 - ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
-- 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH の代役と `FAKE_*` が届くところまで
+- 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH のスタブと `FAKE_*` が届くところまで
 
 **`docker-gitlab`。** 動いている Docker の GitLab（`tests/manual/gitlab/docker_gitlab.py`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
 
 - 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（共用の注意は [gitlab-manual.md](gitlab-manual.md) の「ほかの作業が使っているとき」）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
 - 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push し、続けて `git fetch --prune --no-tags origin` を 1 回打つ（対象に残る本物の origin の古い `refs/remotes/origin/*` が、新規プロジェクトの issue #1 などに番号で当たってブランチ候補になるのを防ぐ。戻すのは後片付けの `refs/remotes/origin/*` の巻き戻し）。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
-- origin: `bare` と同じ git の代役で、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（代役を置かない）、`gh`・`glab` は失敗する代役
+- origin: `bare` と同じ git のスタブで、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（スタブを置かない）、`gh`・`glab` は失敗するスタブ
 - 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
 - 残ったプロジェクトは、接頭辞 `sc-` で一覧して手で消す。掃除の道具は無いので、GitLab の「プロジェクト」画面で `sc-` を検索する
 - 資格情報: `claude` にはエージェント役 `GITLAB_TOKEN`（root の PAT）を渡し、人間役のトークンは渡さない。トークンは回すたびに `tokens.env` から読み、`state.json` には識別子と URL だけを残す。ccnavi が書く記録（`state.json`・`evidence.md`・`messages.md`・`report.*`・`host-N.json`・診断ログ）には出さない。`step-N.jsonl` は `claude` の出力そのもので、エージェントが `tokens.env` を読めば混ざる
@@ -328,7 +328,7 @@ setup:
 - トークンは記録に出さない。認証の情報を含む応答は全文を残さず、取る項目を選ぶ。そのうえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
 - `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`。ここの `errors` は件数）を残し、`report.md` の「相手（setup.host）」の行のあとに件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない
 
-**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`drive.finish` の `finally`・`drive.continue_scenario` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・代役・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
+**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`drive.finish` の `finally`・`drive.continue_scenario` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・スタブ・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
 
 ### 中断・失敗・停止のあと
 

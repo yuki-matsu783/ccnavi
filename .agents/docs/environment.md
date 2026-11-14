@@ -44,7 +44,7 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
 - **macOSの`/etc`・`/tmp`・`/var`は`/private`へのリンク。** `ospath.Realpath`で実体化すると先頭に`private`が付く。
   実体化する関数（`tree.PartsUnder`など）のテストに実在のリンクを渡さない。存在しないパスか、`realpath`を通した一時ディレクトリで組む
 - **macOSのbashは`~/.bash_profile`、Linuxのbashは`~/.bashrc`を読む。** 導入スクリプトの案内は、bashだけ`uname -s`で分ける（zshは`~/.zshrc`）。
-  テストは`uname`の代役をPATHの先頭に置き、どのOSで回しても両方の分岐を通す（`tests/sh/test_setup.py`の`fake_uname`）
+  テストは`uname`のスタブをPATHの先頭に置き、どのOSで回しても両方の分岐を通す（`tests/sh/test_setup.py`の`fake_uname`）
 - **gitのグローバルの無視ファイル（`~/.config/git/ignore`）は`GIT_CONFIG_GLOBAL`で塞がらない。** Claude Codeを使う機械には
   `**/.claude/settings.local.json`が入っており、テストが`git add -A`で作るリポジトリにその設定ファイルが入らなくなる。
   OSの差ではなく機械の差で、Linuxの開発機でも起きる。`tests/__init__.py`の`_block_host_git_config`が`core.excludesFile`を空のファイルへ向けて塞ぐ。
