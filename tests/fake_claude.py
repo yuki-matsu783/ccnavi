@@ -44,7 +44,7 @@ SUBAGENT_DONE_PROMPT = "<task-notification>サブエージェントが終わっ�
 
 
 class Blocked(Exception):
-    """hook が止めた。`text` はモデルに渡る文。"""
+    """hook に止められたことを表す例外。`text` はモデルに渡る文。"""
 
     def __init__(self, text: str):
         super().__init__(text)
@@ -147,7 +147,8 @@ class Session:
             "CLAUDE_PROJECT_DIR": self.root,
             "CLAUDE_ENV_FILE": os.path.join(self.home, f"{self.id}.env"),
         }
-        # 本物の -p は、外から渡されていなければ sdk-cli を入れる（ccnavi は非対話の見分けに読む）
+        # 本物の -p は、外から渡されていなければ sdk-cli を入れる。
+        # ccnavi は、この値で非対話かどうかを見分ける
         env.setdefault("CLAUDE_CODE_ENTRYPOINT", "sdk-cli")
         env.pop(SCRIPT_ENV, None)
         try:

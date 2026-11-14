@@ -103,7 +103,7 @@ PROMPT = """これはツールの動きを録るテストです。
 
 PROMPT_RESUME = "Read ツールで a.txt を読み、「おわり」とだけ答えてください。"
 
-# 機械・人・モデルに結び付く文字列。記録に入っていたら置かない
+# 機械・人・モデルに結び付く文字列。記録に現れたら置かない
 FORBIDDEN = [
     {"name": "メールの形", "regex": r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+\.[A-Za-z0-9.-]+"},
     {
@@ -225,7 +225,7 @@ def tool_key(payload: dict) -> str:
 
 
 def text_in(events: list[dict], needle: str) -> list[str]:
-    """needle が出た stream-json の行の type/subtype の一覧。"""
+    """needle を含む stream-json の行の type/subtype の一覧。"""
     return sorted(
         {
             f"{e.get('type')}/{e.get('subtype', '')}"
@@ -359,7 +359,7 @@ def observe(tree: str, logs: list[dict], streams: list[list[dict]]) -> dict:
 
 
 def collect(tree: str, run) -> dict:
-    """run(回の番号, prompt) で 2 回回し、hook と stream-json を形と振る舞いにまとめる。
+    """run(回の番号, prompt) を 2 回呼び、hook と stream-json を形と振る舞いにまとめる。
     run は stream-json の文字列を返す。"""
     log_path = os.path.join(tree, ".rec", "log.jsonl")
     streams_text = [run(0, PROMPT)]
