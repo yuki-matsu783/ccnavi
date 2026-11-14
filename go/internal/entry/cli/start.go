@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/tickets/lifecycle/start"
 )
@@ -42,6 +44,13 @@ func runStart(stdout, stderr io.Writer, args []string) int {
 			pid = rest[2]
 		}
 		files, answer = rest[len(rest)-1:], func(in [][]byte) (string, int) { return start.Pick(rest[0], rest[1], pid, in[0]) }
+	case op == "route" && len(rest) >= 1:
+		ra, valid := routeArgs(rest[1:])
+		if !valid {
+			return usage()
+		}
+		wd, _ := ospath.Getwd()
+		files, answer = rest[:1], func(in [][]byte) (string, int) { return start.Route(wd, in[0], ra) }
 	default:
 		return usage()
 	}
@@ -57,4 +66,34 @@ func runStart(stdout, stderr io.Writer, args []string) int {
 	out, code := answer(in)
 	fmt.Fprint(stdout, out)
 	return code
+}
+
+// routeArgs は `ccnavi start route` の <名前>=<値> を読む。知らない名前があれば偽。
+func routeArgs(pairs []string) (start.RouteArgs, bool) {
+	var a start.RouteArgs
+	for _, p := range pairs {
+		k, v, found := strings.Cut(p, "=")
+		if !found {
+			return a, false
+		}
+		switch k {
+		case "what":
+			a.What = v
+		case "number":
+			a.Number = v
+		case "issue":
+			a.HasIssue = v != ""
+		case "mr":
+			a.HasMR = v != ""
+		case "branch":
+			a.Branch = v
+		case "mcp":
+			a.MCPChecked = v != ""
+		case "integration":
+			a.Integration = v
+		default:
+			return a, false
+		}
+	}
+	return a, a.What == "issue" || a.What == "mr"
 }

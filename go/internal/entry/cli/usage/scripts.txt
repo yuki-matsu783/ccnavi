@@ -166,6 +166,9 @@
     ccnavi start issue|linked-page|linked-body|linked-gitlab|similar|list-open|pick <args> <file>...
         （ccnavi-start.sh 用。スクリプトが取得したホストの応答のファイルを読み、1行1項目で
          出力します。読めない応答は終了コード 1。読み取り専用）
+    ccnavi start route <candidates.json> what=issue|mr number=<n> [issue=…] [mr=…] [branch=…] [mcp=…] integration=<branch>
+        （ccnavi-start.sh 用。ccnavi-branches.sh の候補と引数とこのリポジトリの git から、
+         進む道（route の行）と、採用できない理由（problem の行）を出力します。読み取り専用）
 
 ccnavi自身は、リモートに接続しません。スクリプトがマージリクエストとそのスレッド、
 レビューを取得し、--result <json> として渡します。

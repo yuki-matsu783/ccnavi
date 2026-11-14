@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// ゲートの条件を調べる git の呼び出しは treegate の 1 か所にある（tests/core/test_gate_single_source.py の Go 版）。
+// ゲートの条件を調べる git の呼び出しは treegate の 1 か所にある。
 // 親のワークツリーの未コミットの変更（未追跡を挙げない status）と、親のブランチの未 push
 // （rev-list origin/<ブランチ>..HEAD）を数える実装を、操作ごとに書き直さない（.agents/docs/gate-conditions.md）。
 // 見るのは _test.go でない Go のソースの行で、dirty は git.UntrackedNo、unpushed は "rev-list" と "origin/" で始まる
@@ -20,7 +20,10 @@ func TestOnlyTreegateReadsDirtyAndUnpushed(t *testing.T) {
 	internal := filepath.Join(testkit.RepoRoot(t), "go", "internal")
 	own := filepath.ToSlash(filepath.Join("tickets", "lifecycle", "treegate", "treegate.go"))
 	// (ファイル, 種類) -> ゲートの条件でない理由。
-	exceptions := map[[2]string]string{}
+	exceptions := map[[2]string]string{
+		{"tickets/lifecycle/start/route.go", "unpushed"}: "開始の候補のブランチが統合先より何コミット進んでいるか（取り込み済みの古いブランチか、" +
+			"初期コミットだけの作りかけか）を数える。親のブランチの未 push ではない",
+	}
 	hits := map[[2]string]bool{}
 	err := filepath.WalkDir(internal, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
