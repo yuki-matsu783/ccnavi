@@ -37,6 +37,8 @@ def load_scenario(path, agent=AGENT_CLAUDE):
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
     data["agent"] = agent
+    # 本物で回すとき、step ごとの費用の上限は budget_usd を人間の操作でない step 数で割る
+    data["_prompt_steps"] = sum(1 for s in data["steps"] if not s.get("human"))
     _check_agent(path, data)
     _check_setup(path, data.get("setup"))
     _check_human_api(path, data)
@@ -67,6 +69,22 @@ def is_scripted(scn):
     return scn.get("agent") == AGENT_SCRIPT
 
 
+def stub_unready(scn):
+    """使い捨てのワークスペースでスタブで回せないなら、その理由。回せるなら空。
+    回せるのは、人間の操作が無く、step がすべて script を持ち、setup が作るファイルだけのもの。"""
+    if any(s.get("human") for s in scn["steps"]):
+        return "人間の操作の step がある"
+    n = unscripted_step(scn)
+    if n:
+        return f"step {n} に script が無い"
+    setup = scn.get("setup") or {}
+    if set(setup) - {"files"}:
+        return "setup が作るファイル以外を使う: " + ", ".join(sorted(set(setup) - {"files"}))
+    if any(file_spec(v)[1] for v in (setup.get("files") or {}).values()):
+        return "setup.files に追記がある"
+    return ""
+
+
 def load_from_state(st):
     """回の状態（state.json）から、その回と同じ相手でシナリオを読み直す。"""
     return load_scenario(st["scenario"], st.get("agent", AGENT_CLAUDE))
@@ -80,8 +98,17 @@ def _check_agent(path, data):
         for key in ("script", "after_stop_block"):
             if key in step and not isinstance(step[key], list):
                 raise ValueError(f"{path}: step {n} の {key} は手の list です")
-        if is_scripted(data) and not step.get("human") and not step.get("script"):
-            raise ValueError(f"{path}: step {n} --agent script で回すには script が要ります")
+    n = unscripted_step(data)
+    if is_scripted(data) and n:
+        raise ValueError(f"{path}: step {n} --agent script で回すには script が要ります")
+
+
+def unscripted_step(scn):
+    """script を持たない、人間の操作でない最初の step の番号（1 始まり）。無ければ 0。"""
+    for n, step in enumerate(scn["steps"], 1):
+        if not step.get("human") and not step.get("script"):
+            return n
+    return 0
 
 
 def _check_human_api(path, data):

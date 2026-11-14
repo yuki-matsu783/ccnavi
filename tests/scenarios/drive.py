@@ -41,7 +41,8 @@ STEP_TIMEOUT_SEC = 900
 
 def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no=None, env=None):
     """env が None なら親の環境を継承する（setup.host が real のとき）。"""
-    require_entry()
+    if not schema.is_scripted(scn):
+        require_entry()  # 本物の claude を呼ぶのは、入口から起動したときだけ
     cmd = [
         "claude",
         "-p",
