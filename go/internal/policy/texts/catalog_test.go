@@ -20,7 +20,7 @@ import (
 	"ccnavi/internal/policy/rules"
 )
 
-// リポジトリの文面ファイルと、それを引くコード・sh の食い違いを見る（tests/core/test_texts_catalog.py の Go 版）。
+// リポジトリの文面ファイルと、それを引くコード・sh の食い違いを見る。
 // - 共通の文面ファイルは検査を通る
 // - Go の texts.Say と sh の ccnavi_text が引く識別子は文面ファイルにあり、渡す値の名前が values と一致する
 // - 文面ファイルの識別子は、どこかから引かれている

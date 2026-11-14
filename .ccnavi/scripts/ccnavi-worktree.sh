@@ -196,7 +196,7 @@ cgit() {
 	return 0
 }
 
-# 非対話（CLAUDE_CODE_SESSION_ATTENDED が 0。実行ファイルの ccnavimd.unattended と同じ見方）のときだけ、
+# 非対話（CLAUDE_CODE_SESSION_ATTENDED が 0。実行ファイルの hookio.Unattended と同じ見方）のときだけ、
 # 確認に答えられないことと次の行動を足します。対話のときは何も出しません。
 unattended_line() {
 	[ "${CLAUDE_CODE_SESSION_ATTENDED:-}" = 0 ] || return 0

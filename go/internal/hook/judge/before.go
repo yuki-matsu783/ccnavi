@@ -342,7 +342,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 }
 
 // turnGate はユーザの発言をまたぐゲート。ルールが allow でも、ユーザの返事を待つ手順は外さない。B は止め、通した A は
-// 記録する。付き添いのあるセッションでは、ask_if_attended の宣言があると B を確認に出す（同じコマンドに A と B を並べたら止める）。
+// 記録する。付き添いのあるセッションでは、askIfAttended の宣言があると B を確認に出す（同じコマンドに A と B を並べたら止める）。
 // サブエージェントは対話でも発言を待つ。確認で先に返すと、後のサブエージェントの禁止に届かないため。
 func (j *judgement) turnGate(notices []string, subject string, inner []layer) (int, bool, error) {
 	conf, in, record := j.conf, j.in, j.record
