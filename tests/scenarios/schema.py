@@ -37,7 +37,7 @@ def load_scenario(path, agent=AGENT_CLAUDE):
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
     data["agent"] = agent
-    # 本物で回すときの step ごとの費用の上限は、budget_usd を人間の操作でない step の数で割る
+    # 本物で回すとき、step ごとの費用の上限は budget_usd を人間の操作でない step 数で割る
     data["_prompt_steps"] = sum(1 for s in data["steps"] if not s.get("human"))
     _check_agent(path, data)
     _check_setup(path, data.get("setup"))

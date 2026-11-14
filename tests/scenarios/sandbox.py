@@ -6,7 +6,7 @@
   `.claude/settings.json`・`.claude/hooks/`、`.gitignore`、`docs/wiki/` をコピーし、
   git のリポジトリにする
 - テストが組む ccnavi の実行ファイル（`tests/exe.py`）を `.ccnavi/bin/<os>-<arch>/` に置く
-- `settings.json` の `CCNAVI_MODE` を `enable` にする（この使い捨ての木の中だけ）
+- `settings.json` の `CCNAVI_MODE` を `enable` にする（この使い捨てのワークスペースの中だけ）
 - `projects/test-repo` に、README を 1 本持つ小さなリポジトリを置く
 
 ユーザのワークスペースには触れないので、回す前の人間の確認は要らない。
@@ -23,10 +23,10 @@ from pathlib import Path
 from tests import exe
 from tests.scenarios.common import ROOT
 
-# docs/wiki は、ccnavi がセッションの開始で学びの案内を作るときに読む
+# docs/wiki は、ccnavi がセッションの開始時に学びの案内を作るときに読む
 COPIED = (".ccnavi", ".claude/settings.json", ".claude/hooks", ".gitignore", "docs/wiki")
 TEST_REPO = "projects/test-repo"
-# 受入シナリオが当てにする test-repo の README の見出し（UC-01 の台本が書き換える行）
+# 受入シナリオが前提とする test-repo の README の見出し（UC-01 の台本が書き換える行）
 TEST_REPO_README = "# 演習: テキスト整形CLI\n\n受入シナリオの使い捨てのワークスペースの見本。\n"
 OS_NAMES = {"Linux": "linux", "Darwin": "darwin", "Windows": "windows"}
 ARCH_NAMES = {"x86_64": "x86_64", "amd64": "x86_64", "arm64": "arm64", "aarch64": "arm64"}

@@ -357,7 +357,7 @@ def _run_all_loop(eligible, root, cap, batch, rows):
 def run_stub(paths):
     """シナリオごとに使い捨てのワークスペースを組み、スタブで回して消す。人間の確認は取らない
     （ユーザのワークスペースに触れず、claude も呼ばない）。[(ID か パス, 終了コード, 理由)] を返す。
-    回せないシナリオは終了コード None で、理由を持つ。"""
+    回せないシナリオは、終了コードが None で理由を持つ。"""
     results = []
     for path in paths:
         scn = schema.load_scenario(path)
