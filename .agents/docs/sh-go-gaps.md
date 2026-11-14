@@ -14,6 +14,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 
 | sh | Go で実装したもの | 実行ファイルの入口 | 備考 |
 |---|---|---|---|
+| `ccnavi-start.sh` | ホストの応答の読み取り（issue の 1 件、MR が閉じる issue（GraphQL のページ・本文の Closes・GitLab の closes_issues）、似た issue・MR、open の一覧、MR・issue の番号と URL） | `ccnavi start issue`・`linked-page`・`linked-body`・`linked-gitlab`・`similar`・`list-open`・`pick`（`go/internal/tickets/lifecycle/start`） | API に送る本文の組み立て（`jq -n`）は外との出入りなので sh |
 
 ## 残り
 
@@ -21,7 +22,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 
 | sh | Go で実装するもの（いま sh にある） | sh で実装するもの | 備考 |
 |---|---|---|---|
-| `ccnavi-start.sh` | 引数の検査、`--repo` と origin の照合、`issue_title_get`・`mr_linked_issues`・`find_similar`・`list_open_items` の応答の解釈、候補の振り分け、`adopt_check`・`id_check`・`clash_check`・`merged_check` の判定、`resolve_issue`、`ensure_worktree`・`fast_forward`・`ensure_initial_commit`・`cleanup_created_worktree`、`stop_host` の案内、`report` と dry-run の出力 | `host_open`、API の取得と POST、`remote_heads`、fetch・push、`ccnavi-branches.sh` と `ccnavi-sync.sh` の呼び出し、`--check` | `--check`（`ccnavi_preflight`）は `ccnavi-common-host.sh` と一緒に直す |
+| `ccnavi-start.sh` | 引数の検査（`--new-issue` のタイトルの整えと長さ）、`--repo` と origin の照合、実行ファイルの答え（候補の JSON・`--templates --json`）の jq での読み、候補の振り分け、`adopt_check`・`id_check`・`clash_check`・`merged_check` の判定、`resolve_issue`、`ensure_worktree`・`fast_forward`・`ensure_initial_commit`・`cleanup_created_worktree`、`stop_host` の案内、`report` と dry-run の出力 | `host_open`、API の取得と POST、`remote_heads`、fetch・push、`ccnavi-branches.sh` と `ccnavi-sync.sh` の呼び出し、`--check` | `--check`（`ccnavi_preflight`）は `ccnavi-common-host.sh` と一緒に直す |
 | `ccnavi-git.sh` | オプションの許可リスト、サブコマンドごとの拒否、`integrate` / `integrate-done` の判定と状態操作（一時ワークツリー・コミット・ff-only・`update-ref -d`）、ログの書き出しと要約 | 環境の消去、実行ファイルへの受け渡し、fetch・pull・push とゲートの ls-remote、子のワークツリーからの push の独立した検査 | 直したら、設計書（チケット制御の「置き場」の文書の、ラッパーの中の判定と push のゲートの節）と、設計原則 P13 の例外の書き方を書き直す |
 | `ccnavi-common-state.sh` | `ccnavi_push_gate` の判定、`ccnavi_parent_trace`、`ccnavi_id_clash`、`ccnavi_git_refusal`、`ccnavi_record_*`、`ccnavi_integration` | `ccnavi_git_timed`、ゲートの ls-remote、実行ファイルに聞く口（`ccnavi_ask` など） | ゲートは素の push を打つ 3 経路が共有する |
 | `ccnavi-sync.sh` | 親子の選び方、`sync_family`・`merged_present`・`sync_absent`・`sync_retired` の分岐、ff・merge・abort、origin/HEAD の向け直し、出力の文 | ls-remote、`fetch_one`、`ccnavi-review.sh merged` の呼び出し、ロック、trap | merge の abort は実行ファイルの 1 回の起動の中で持つ |
