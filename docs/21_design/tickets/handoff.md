@@ -18,7 +18,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 保護対象の変更は 1 本の手順で行う。
 
-| 段 | 誰が | 何をする |
+| ステップ | 誰が | 何をする |
 |---|---|---|
 | コピーする | エージェント | `ccnavi-stage.sh <パス>` が元のファイルを `wip/handoff/<ツリーからの相対パス>`（`.claude` の階層は `handoff-.claude` に読み替える。下の「階層名の読み替え」）にコピーする。新規のテンプレートはコピーする元が無いので、`ccnavi --templates --draft` が `wip/handoff/` に作る |
 | 編集 | エージェント | `wip/handoff/` の下書きを編集する |

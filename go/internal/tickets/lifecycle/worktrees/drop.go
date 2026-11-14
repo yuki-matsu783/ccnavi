@@ -294,7 +294,7 @@ func moveAside(source, target string) string {
 	return ""
 }
 
-// relParts は git が出した相対パス（区切りは "/"、ディレクトリは末尾に "/"）の各段。
+// relParts は git が出した相対パス（区切りは "/"、ディレクトリは末尾に "/"）の各要素。
 func relParts(rel string) []string {
 	var parts []string
 	for _, p := range strings.Split(strings.TrimRight(rel, "/"), "/") {

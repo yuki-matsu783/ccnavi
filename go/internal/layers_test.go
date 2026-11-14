@@ -1,10 +1,10 @@
 package internal
 
-// internal/ の下の import の向きを守る。段の小さいパッケージは、段の大きいパッケージを読まない。
+// internal/ の下の import の向きを守る。層の小さいパッケージは、層の大きいパッケージを読まない。
 // 循環は Go のコンパイラが止めるので、ここでは向きだけを見る。
 //
-// 段は 2 つの表で決める。topTiers は internal/ 直下の並び。subTiers は親（"tickets" や "tickets/config"）の下を
-// さらに分けるときの並びで、同じ親の下の兄弟（とその下）は、段が小さい兄弟だけを読める（段が同じ兄弟は互いに
+// 層は 2 つの表で決める。topTiers は internal/ 直下の並び。subTiers は親（"tickets" や "tickets/config"）の下を
+// さらに分けるときの並びで、同じ親の下の兄弟（とその下）は、層が小さい兄弟だけを読める（層が同じ兄弟は互いに
 // 読めない）。subTiers に親が無ければ、その中の兄弟どうしの向きは見ない。親がその下を読むのは見ない。
 // 新しいパッケージを足すときは、先にこの表を直す。
 
@@ -161,7 +161,7 @@ func importsOf(t *testing.T) map[string][]string {
 		if err != nil {
 			return err
 		}
-		// テストの import は数えない。テストは本体より上の段のパッケージ（testkit など）を読んでよい。
+		// テストの import は数えない。テストは本体より上の層のパッケージ（testkit など）を読んでよい。
 		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
@@ -193,7 +193,7 @@ func violation(from, to string) string {
 	fs, ts := strings.Split(from, "/"), strings.Split(to, "/")
 	if fs[0] != ts[0] {
 		if topTiers[ts[0]] >= topTiers[fs[0]] {
-			return "上か同じ段の " + ts[0] + " を読んでいる"
+			return "上か同じ層の " + ts[0] + " を読んでいる"
 		}
 		return ""
 	}
@@ -210,23 +210,23 @@ func violation(from, to string) string {
 		return ""
 	}
 	if tiers[ts[d]] >= tiers[fs[d]] {
-		return "兄弟で上か同じ段の " + strings.Join(ts[:d+1], "/") + " を読んでいる"
+		return "兄弟で上か同じ層の " + strings.Join(ts[:d+1], "/") + " を読んでいる"
 	}
 	return ""
 }
 
-// TestLayers は、全パッケージの import が段の表に沿うこと、表に載らないパッケージが無いことを確かめる。
-// 表に無いパッケージを黙って通すと、足した段が検査されないままになる。
+// TestLayers は、全パッケージの import が層の表に沿うこと、表に載らないパッケージが無いことを確かめる。
+// 表に無いパッケージを黙って通すと、足した層が検査されないままになる。
 func TestLayers(t *testing.T) {
 	// テストはこのディレクトリ（go/internal）で走る。ここに infra が無ければ、相対パスの前提が崩れている。
 	if _, err := os.Stat("infra"); err != nil {
 		t.Fatal(err)
 	}
 	for pkg, deps := range importsOf(t) {
-		// 最上位の段の表に載っているか。
+		// 最上位の層の表に載っているか。
 		top := strings.Split(pkg, "/")[0]
 		if _, ok := topTiers[top]; !ok {
-			t.Errorf("%s: 段の表（topTiers）に無い", pkg)
+			t.Errorf("%s: 層の表（topTiers）に無い", pkg)
 			continue
 		}
 		// 兄弟の表（subTiers）を持つ親の下にあるなら、その表にも載っているか。
@@ -235,11 +235,11 @@ func TestLayers(t *testing.T) {
 			parent := strings.Join(parts[:d], "/")
 			if tiers, ok := subTiers[parent]; ok {
 				if _, ok := tiers[parts[d]]; !ok {
-					t.Errorf("%s: 段の表（subTiers[%s]）に無い", pkg, parent)
+					t.Errorf("%s: 層の表（subTiers[%s]）に無い", pkg, parent)
 				}
 			}
 		}
-		// 読んでいる先が、同じ段か上でないか。
+		// 読んでいる先が、同じ層か上でないか。
 		for _, dep := range deps {
 			if why := violation(pkg, dep); why != "" {
 				t.Errorf("%s → %s: %s", pkg, dep, why)

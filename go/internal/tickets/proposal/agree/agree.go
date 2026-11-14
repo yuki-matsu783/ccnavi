@@ -347,7 +347,7 @@ func VerifyVerdict(root string, g *Gathered, ticketsRel string, held *Held) Verd
 	return Verdict{reason == verifyOK, reason, strings.Join(lines, "")}
 }
 
-// elsewhereSection は正とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする段。
+// elsewhereSection は正とするツリーの外に在る計画の違う版（承認待ちに入らない）を名指しする節。
 func elsewhereSection(g *Gathered) string {
 	if len(g.Elsewhere) == 0 {
 		return ""
@@ -359,7 +359,7 @@ func elsewhereSection(g *Gathered) string {
 	return out
 }
 
-// unreadableSection は読めなかったものを名指しする段。終了コードは動かさないが、省くと「確かめは『いいえ』なのに
+// unreadableSection は読めなかったものを名指しする節。終了コードは動かさないが、省くと「確かめは『いいえ』なのに
 // 承認は通る」になり、自分が書いた 1 本かもしれないので、件数と文を出す。
 func unreadableSection(g *Gathered) string {
 	if len(g.Problems) == 0 {

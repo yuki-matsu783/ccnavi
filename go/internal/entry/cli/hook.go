@@ -123,7 +123,7 @@ func resolveSwitches(stderr io.Writer, conf *config.Settings, a opts) {
 		env.RestoreIfDeny, selfguard.Choices()))
 	conf.GuardCoreFiles = string(selfguard.Resolve(stderr, a.Str("guard_core_files"), conf.GuardCoreFiles,
 		env.GuardCoreFiles, selfguard.Choices()))
-	// この切り替えは enable / disable の 2 値。止めずに報告する段は CCNAVI_MODE=dry-run が持つ。
+	// この切り替えは enable / disable の 2 値。止めずに報告する段階は CCNAVI_MODE=dry-run が持つ。
 	conf.GuardUnwatched = resolveGate(stderr, "", conf.GuardUnwatched, env.GuardUnwatched)
 }
 

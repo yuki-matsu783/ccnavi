@@ -15,15 +15,15 @@ keywords: [レビュー, 依頼, 確認, mr, ccnavi-review.sh, GraphQL, 403, RES
 リモート（GitHub / GitLab）を読み書きするのは `.ccnavi/scripts/ccnavi-review.sh` で、実行ファイルは
 ネットワークに出ない（P11）。実行ファイルが持つのはワークツリーの中で分かる前提検査と、
 sh が取得して JSON ファイルに書き、そのパスを `--result` で渡す。実行ファイルはその JSON の判定とマーカーの操作だけを持つ。sh と実行ファイルの間の契約は、この JSON の形で決まる。
-実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/model/host`、`review-request` と `confirm` の段は `tickets/review/request`、
-`decide` の段は `tickets/review/decide`、`ready` と `close-early` の段は `tickets/review/closeout` が持つ。
+実行ファイルの側では、JSON を読む形と投稿の目印は `tickets/model/host`、`review-request` と `confirm` の処理は `tickets/review/request`、
+`decide` の処理は `tickets/review/decide`、`ready` と `close-early` の処理は `tickets/review/closeout` が持つ。
 
 | `--result` の JSON | 形 |
 |---|---|
 | `confirm` / `decide` が受け取るもの | `{host: github\|gitlab, mr: {number, url}, threads: [{id, resolved, url, path, line, body, created_at, author}], reviews: [{state, url, submitted_at, author}], fetched_at}` |
 | `review-request` の投稿の結果 | `{host, mr, url, created_at}` |
 
-| sh の呼び方 | 実行ファイルの段 |
+| sh の呼び方 | 実行ファイルの処理 |
 |---|---|
 | `review-request --phase <N> --body-file <文>`（成功後、`--body-file` が workspace 直下の `scratchpad/` の中なら sh が消す。外のファイルは消さない。消せなければ警告のみで終了コードは変えない） | `review prepare --check`（ロック・取り込みの前に断る）→ ロックと取り込み → `review prepare` → sh が親ブランチの open のマージリクエストを探し（無ければ作らずに止める。元ブランチが HEAD と一致し、マージ先が統合先であることも確かめる）、依頼を投稿 → `review requested` |
 | `review-request --phase <N> --body-file <文> --check` | 読むだけ。ロックも取り込みもせず、`review-request` の前提（`review prepare`・MR の確認）を確かめ、投稿とマーカーの前に `確認: ok` を出して終わる |
@@ -31,11 +31,11 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 | `decide <N> --preview` | 一覧とダイジェストを見るだけ（`--reviewed N --accept-unresolved --preview`）。書く側は `ccnavi-user-decide.sh <N>`（下の行） |
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`--entry sh user reviewed N --check --accept-unresolved`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
-| `ready` | `review ready --check`（ロック・取り込みの前に断る。前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）→ `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree retire <親>` で子と親のワークツリーを消す。`ready` は `--parent <親>` を付けて親のワークツリーの外から打つ形だけ（sh が親のワークツリーへ移って同じ段を回し、消す前に打った場所へ戻る） |
+| `ready` | `review ready --check`（ロック・取り込みの前に断る。前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）→ `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree retire <親>` で子と親のワークツリーを消す。`ready` は `--parent <親>` を付けて親のワークツリーの外から打つ形だけ（sh が親のワークツリーへ移って同じ処理を回し、消す前に打った場所へ戻る） |
 | `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
 | `fetch` / `origin` | 取得した JSON を標準出力へ / origin をどう読んだか |
 
-**`review-request` の段**。次の順に進む。
+**`review-request` の処理**。次の順に進む。
 
 1. `ccnavi --check review prepare` が前提（フェーズの終了・合流・未コミット・push・依頼済み・依頼文）を、ロックも取り込みもせずに確かめる。通らなければここで断る。通れば sh がロックを取り、取り込む。
 2. `review prepare` が、取り込みのあとの状態で前提をもう一度確かめ、依頼の本文を state の置き場に書き出す。
@@ -47,7 +47,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
    同じ番号が既にあれば何もせず、違う値があれば上書きせず「`mr:` に別の値が既にある」と警告する（依頼は通る）。
    実行後チェックはこの書き足しだけを ccnavi の書き込みと見なす（post-check.md の `mr:` の例外）。
 
-`confirm` の段（依頼のあとにユーザの発言をはさむまでの拒否は[事前判定の 6.7](../pre-check.md)）。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
+`confirm` の処理（依頼のあとにユーザの発言をはさむまでの拒否は[事前判定の 6.7](../pre-check.md)）。sh は、ロック・取り込みの前に `review confirm --check` で断れる条件を通してから、スレッドとレビューを取ってきて、`review confirm` に渡す。`review confirm` は判定し、
 通れば `reviewed` のマーカーを置いて、そのフェーズと引き受けた延期の分の `review/` の子を `done/` へ動かす。
 sh がトークンの持ち主を引けたら `--actor` で渡し、マーカーに `actor` と `via: cli` を残す。引けないときは渡さないので、
 マーカーに `actor` が無い。
@@ -60,7 +60,7 @@ Chrome 拡張も `decide` を行える。拡張が issue・返信・解決をホ
 `done/` へ動いた子のワークツリーを消す（未コミットがあるもの・cwd が中のものは消さずに言う）。
 Chrome 拡張のレビュー済みと `decide` のワークツリーは、親の `finish` の片付けが消す。
 
-`decide` の段（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh user reviewed N --check --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
+`decide` の処理（`ccnavi-user-decide.sh`）。ユーザがボードの［レビュー完了］かターミナルで打つ。sh は、アカウントの問い合わせ・ロック・取り込みの前に、`ccnavi --entry sh user reviewed N --check --accept-unresolved`（親とフェーズ・依頼の記録・依頼のあとに動いていないこと。選択とダイジェストを渡すときは `--yes` と `--digest` も）で断れる条件を通す。そのあと、スレッドとレビューを取ってきて、実行ファイルを
 `user reviewed N --accept-unresolved` で呼ぶ。実行ファイルは残っているスレッドを 1 件ずつ見せ、ユーザに対応方針を
 選ばせる。方針は次の 3 つ。
 
@@ -113,9 +113,9 @@ sh はスレッドごとに最後のコメントの id・時刻・作成者も�
 sh がトークンの持ち主を引けたら `--actor=<名前> --via=<terminal|board>` で渡し、`reviewed` のマーカーに
 `actor` と `via` を残す。引けないときは `--actor` を渡さず、マーカーに `actor` を残さない。`--via` は無条件に渡す。実行ファイルは、`--yes` の無い呼び方では `--via board` を受け付けない。
 
-**`comment` の段**。ユーザの指摘は、マージリクエストの差分に付くスレッドで、ccnavi は関わらない。
+**`comment` の処理**。ユーザの指摘は、マージリクエストの差分に付くスレッドで、ccnavi は関わらない。
 
-**`ready` の段**。親が閉じたあとに打つ。`review ready` は次の 3 つを確かめる。親を閉じられる条件を満たしていること。
+**`ready` の処理**。親が閉じたあとに打つ。`review ready` は次の 3 つを確かめる。親を閉じられる条件を満たしていること。
 親の承認済みチケットが `done/` にあること（閉じる前に Draft を外してマージされると、親が `done/` に無いまま親のブランチが消えるため）。`wip/` に未追跡のファイルが無く、未コミットの変更が無く、
 push 済みであること。満たしていれば `ready.json` とコメントの下書きを置き、閉じた親子のチケット（今回の親と、統合先に
 たまっていた過去の親）を親のワークツリーの承認済みの領域から `logs/archive/<リポジトリ>/` へ退避し（9.11）、`wip/` の追跡済みのファイルを
@@ -134,7 +134,7 @@ write-and-push の書いたパスの一覧の検査は、`review ready` が消�
 有効にする。同じ親に 2 度打っても通る。退避を始めた後の打ち直しは、ready のマーカーが今のツリーのもので、`ready.json` のマージリクエストの
 番号が今回と同じときだけ、ワークツリーの側の条件だけを見て残りを移す。マージするのはユーザ。
 
-**`close-early` の段**（`ccnavi-user-close-early.sh`）。ユーザがターミナルで打つ。sh は実行ファイルを `user close-early` で呼び、そのあと残りを issue に書き出して、
+**`close-early` の処理**（`ccnavi-user-close-early.sh`）。ユーザがターミナルで打つ。sh は実行ファイルを `user close-early` で呼び、そのあと残りを issue に書き出して、
 コメントを投稿する。`user close-early` は、変更要求のレビューがあれば拒む。無ければ残りを見せて y/N を聞く。
 未解決のスレッドの返信と解決を置く前に済ませるため、3 回に分けて呼ぶ（間で sh が結果を取り直す）。
 1 回目（`--accept-plan`）は y/N を聞いて計画だけを書く。2 回目（`--accept-check`）は、y/N を答えている間に

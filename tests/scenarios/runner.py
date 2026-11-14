@@ -40,9 +40,9 @@ ccnavi 本体にブランチ・コミット・ワークツリーが残らない�
 inconclusive（未成立。fail にしない）。意味で読むもの（judge）は、evidence.md に証拠を
 抜き出し、別のエージェントが基準に照らして読む。
 
-中身は責務ごとのモジュールに分けてある（段の低い方から。この表は
+中身は責務ごとのモジュールに分けてある（層の低い方から。この表は
 tests/core/test_scenario_layers.py が読んで import の向きを確かめる。表の持ち場はここだけ）。
-import は同じ段か下へだけ向ける。
+import は同じ層か下へだけ向ける。
 0 common・schema・stream・hostenv・hostsnap / 1 expect・evidence・workspace・issues /
 2 repo / 3 prepare / 4 actors/ / 5 report / 6 drive / 7 commands / 8 この入口。
 """

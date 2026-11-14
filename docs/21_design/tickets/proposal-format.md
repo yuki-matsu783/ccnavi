@@ -32,7 +32,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 - 識別子は、親が 1 語、子が `<親>-<2 桁のフェーズ番号>-<2 桁のフェーズ内の連番>`
   （親 feature-50-settings-split のフェーズ 2 の 1 枚目は `feature-50-settings-split-02-01`）。フェーズ番号は `phase:` と
   同じ値で、食い違えば error。親の識別子が名前空間になり、別の親の子と衝突しない。識別子だけから親を割り出すときは、
-  右から 2 段（`-<2 桁>-<2 桁>`）を剥がす。深さは 2 段まで。字は ASCII の英数字と `.` `_` `-`、ひらがな・カタカナ・
+  右から 2 要素（`-<2 桁>-<2 桁>`）を剥がす。深さは 2 階層まで。字は ASCII の英数字と `.` `_` `-`、ひらがな・カタカナ・
   長音記号・CJK 統合漢字・々（先頭は ASCII の英数字）。NFC に限り、64 文字まで
 - 新しい親の識別子は `<先頭の語>-<番号>-<slug>`（`feature-63-integration-branch`、`feature-64-統合先の解決`）。
   先頭の語は `CCNAVI_BRANCH_PREFIXES` のリスト（既定は `feature` `hotfix` `fix` `bugfix` `chore` `refactor` `docs`）の

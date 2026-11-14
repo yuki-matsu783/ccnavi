@@ -887,7 +887,7 @@ class SyncTest(SyncHarness):
         self.assertIn(PARENT, self.branches())
 
     def test_a_retired_family_keeps_the_lock_held_by_the_caller(self):
-        """入れ子（外側が持つロック）は、片付けの段で消さない。外すのは持ち主だけ。"""
+        """入れ子（外側が持つロック）は、片付けの段階で消さない。外すのは持ち主だけ。"""
         record = self.retire_record()
         self.retire_tree()
         self.review_says("none")

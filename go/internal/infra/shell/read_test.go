@@ -217,7 +217,7 @@ func nested(depth int) string {
 
 func TestNestingLimit(t *testing.T) {
 	if r := Read(nested(maxDepth)); r.Degraded {
-		t.Fatalf("16 段は読める: %s", r.Reason)
+		t.Fatalf("16 階層は読める: %s", r.Reason)
 	}
 	for _, depth := range []int{maxDepth + 1, 400} {
 		r := Read(nested(depth))

@@ -1,5 +1,5 @@
 {
-  "note": "識別子（ccnavi_is_ident）と親のブランチ名（ccnavi_is_branch）。sh（tests/sh/test_ident_sh.py）は全部を、実行ファイル（go/internal/tickets/model/ids/ident_sh_test.go）は ident_good・sh_only・branch_good・branch_bad を確かめる。sh_only は sh が通し、実行ファイルが止める字（2 段目の守り）。",
+  "note": "識別子（ccnavi_is_ident）と親のブランチ名（ccnavi_is_branch）。sh（tests/sh/test_ident_sh.py）は全部を、実行ファイル（go/internal/tickets/model/ids/ident_sh_test.go）は ident_good・sh_only・branch_good・branch_bad を確かめる。sh_only は sh が通し、実行ファイルが止める字（2 重目の守り）。",
   "ident_good": [
     "feature-64-統合先の解決",
     "hotfix-7-ログイン画面ー",

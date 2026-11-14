@@ -26,7 +26,7 @@ func TestHandleRefusesWithoutRunning(t *testing.T) {
 	}
 }
 
-// ホストから来たパスは、根から始まるもの・区切りが `\` のもの・`.`・`..`・空の段を含むものを断る。
+// ホストから来たパスは、根から始まるもの・区切りが `\` のもの・`.`・`..`・空の要素を含むものを断る。
 func TestHostPathsThatLeaveTheTreeAreRefused(t *testing.T) {
 	if err := checkRel("wip/proposals/todo/i0001.md"); err != nil {
 		t.Fatal(err)

@@ -12,7 +12,7 @@ import (
 )
 
 // 書く形（キーの順・indent・時刻の足し方）は、見本と突き合わせる approval のテストが見る。
-// ここは消す順と溜める段、台帳の読めない形を見る。
+// ここは消す順と溜める段階、台帳の読めない形を見る。
 
 func TestClearTakesEveryKindInOrder(t *testing.T) {
 	dir := t.TempDir()
@@ -53,7 +53,7 @@ func TestClearInTheStageAnnouncesWhatWasRemoved(t *testing.T) {
 		t.Errorf("%+v", got)
 	}
 	if len(Marks(dir, "p", 2)) != 2 {
-		t.Error("溜める段の中でディスクから消した")
+		t.Error("溜める段階の中でディスクから消した")
 	}
 	var call *fsio.Call
 	var ops []*fsio.Op

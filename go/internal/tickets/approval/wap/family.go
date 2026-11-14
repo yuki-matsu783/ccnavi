@@ -26,7 +26,7 @@ const (
 	Stop Target = "stop"
 )
 
-// FamilyOf は識別子が属する親子のチケットの親。子の形なら右から 2 段を剥がした親、そうでなければ自身。
+// FamilyOf は識別子が属する親子のチケットの親。子の形なら右から 2 階層を剥がした親、そうでなければ自身。
 func FamilyOf(id string) string {
 	if c, ok := ids.ParseChild(id); ok {
 		return c.Parent

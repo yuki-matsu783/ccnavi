@@ -926,7 +926,7 @@ class StartShTest(unittest.TestCase):
         self.fail(f"{marker} の行が無い: {out}")
 
     def test_rerun_after_mcp_made_the_mr_follows_the_guided_commands(self):
-        # チケットが無く、API に届かない状態から: 新規作成 → create 段で 4 → MCP で MR を作った想定
+        # チケットが無く、API に届かない状態から: 新規作成 → create の段階で 4 → MCP で MR を作った想定
         # → 案内のコマンド（--issue M --mr N --branch <ブランチ> --mcp-checked）を打ち直して 0
         create = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked", token=False)
         self.assertEqual(create.returncode, 4, create.stdout + create.stderr)

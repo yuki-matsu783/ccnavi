@@ -1,4 +1,4 @@
-"""setup.issue の issue を gh / glab で作って閉じる（段 1）。"""
+"""setup.issue の issue を gh / glab で作って閉じる（層 1）。"""
 
 import re
 import subprocess

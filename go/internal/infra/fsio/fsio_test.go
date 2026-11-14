@@ -338,7 +338,7 @@ func TestNewFiles(t *testing.T) {
 	}
 }
 
-// 溜める段では書かずに Op を溜め、読みは溜めた中身を先に見る。テキストの中身は機械に依らず LF。
+// 溜める段階では書かずに Op を溜め、読みは溜めた中身を先に見る。テキストの中身は機械に依らず LF。
 func TestStagingQueuesInsteadOfWriting(t *testing.T) {
 	dir := t.TempDir()
 	held := filepath.Join(dir, "held.yml")
@@ -363,7 +363,7 @@ func TestStagingQueuesInsteadOfWriting(t *testing.T) {
 	done()
 
 	if !ok || text != "x\ny\n" || exists || ospathExists(a) || !ospathExists(held) {
-		t.Fatalf("溜める段の見え方が違う: %q %v %v", text, ok, exists)
+		t.Fatalf("溜める段階の見え方が違う: %q %v %v", text, ok, exists)
 	}
 	slices.Sort(listed)
 	if !slices.Equal(listed, []string{"b.md", "sub"}) && !slices.Equal(listed, []string{"b.md"}) {

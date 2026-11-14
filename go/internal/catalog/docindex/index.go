@@ -116,7 +116,7 @@ type dirState struct {
 // 確かめ直す。それでも無視されなければ、索引の対象外（Unignored）として行を返さない。一部だけ無視されていない
 // ディレクトリと、ccnavi のものでない索引のディレクトリは、行を組むが書かない。
 //
-// 処理は 3 段。まず全部のディレクトリで既存の索引を読み、使い回せる行を分ける。次に、読み直しの要る md を待つ数が
+// 処理は 3 段階。まず全部のディレクトリで既存の索引を読み、使い回せる行を分ける。次に、読み直しの要る md を待つ数が
 // 少ないディレクトリから読む。最後にディレクトリごとに書く。読めなかった md は既存の行を残し、次の回に読み直す。
 // `.git` が無ければ ErrNotRepository を、git に聞けなければ理由のエラーを返す。エラーのときの結果は nil だが、
 // .gitignore に足したあとの確かめ直しに失敗したときだけ、IgnoreAdded を載せた結果も返す。
@@ -181,7 +181,7 @@ func Build(base string, o Options) (*Built, error) {
 	}
 	baseReal := ospath.Realpath(base)
 
-	// 1 段目: 既存の索引を読んで、使い回す行と読み直す md に分ける。
+	// 1 段階目: 既存の索引を読んで、使い回す行と読み直す md に分ける。
 	var states []*dirState
 	for _, d := range dirs {
 		if past(o.Deadline) {
@@ -192,7 +192,7 @@ func Build(base string, o Options) (*Built, error) {
 			states = append(states, one)
 		}
 	}
-	// 2 段目: 読み直しの要る md を読む。3 段目: ディレクトリごとに行を決めて書く。
+	// 2 段階目: 読み直しの要る md を読む。3 段階目: ディレクトリごとに行を決めて書く。
 	if o.Parse && !result.TimedOut {
 		parsePending(base, states, o.Deadline, result)
 	}

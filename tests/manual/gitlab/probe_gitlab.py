@@ -34,7 +34,7 @@ push は URL にトークンを埋めない（埋めると origin の URL に混
 sh の HTTP 経路（curl・jq・ページング・投稿・認証）と、GitLab が返す JSON の形が sh の読み方と
 合っているか。結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
 変更要求（request_changes）は GitLab EE の機能で、CE では 404 になる。
-CE ではその段を SKIP とする（確かめていないものを PASS に数えない）。まとめは
+CE ではその段階を SKIP とする（確かめていないものを PASS に数えない）。まとめは
 `PASS n / SKIP m / FAIL k`。FAIL があれば終了コードは 1。
 """
 
@@ -82,7 +82,7 @@ ROOT = ""
 ENV: dict[str, str] = {}
 STAMP = ""
 LOG = None
-# (段名, "PASS" | "SKIP" | "FAIL", 詳細)
+# (段階名, "PASS" | "SKIP" | "FAIL", 詳細)
 RESULTS: list[tuple[str, str, str]] = []
 API_SEQ = 0
 # この実行が作ったプロジェクトの id。終わりに、これだけを消す
@@ -151,7 +151,7 @@ def say(text: str) -> None:
 
 
 def record(name: str, ok: bool, detail: str = "", *, skip: bool = False) -> None:
-    """段の結果を残す。skip は「確かめられなかった」（CE の変更要求など）。PASS には数えない。"""
+    """段階の結果を残す。skip は「確かめられなかった」（CE の変更要求など）。PASS には数えない。"""
     state = "SKIP" if skip else ("PASS" if ok else "FAIL")
     RESULTS.append((name, state, detail))
     say(f"{state}  {name}  {detail}")
@@ -378,7 +378,7 @@ def propose(tree: str, name: str, **kw) -> str:
 
 def commit_all(tree: str, msg: str) -> None:
     git(tree, "add", "-A")
-    # 変更が無い段（start など）でも止まらない
+    # 変更が無い段階（start など）でも止まらない
     git(tree, "commit", "--quiet", "--allow-empty", "-m", msg)
 
 

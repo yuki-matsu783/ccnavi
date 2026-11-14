@@ -1142,7 +1142,7 @@ class UnknownMarkerTest(Fixture):
 class IntegrateGapsTest(Fixture):
     """ほかのクラスが一部しか見ていなかった条件を扱う。
 
-    グローバルの excludes、片付けの各段での停止と再開、プロジェクトの自己防衛、
+    グローバルの excludes、片付けの各段階での停止と再開、プロジェクトの自己防衛、
     一時ワークツリーに残った ignored のファイル、リポジトリ間の境界。
     """
 
@@ -1227,7 +1227,7 @@ class IntegrateGapsTest(Fixture):
     def stage_stops_then_resumes(
         self, match, wt=True, tmp=True, branch=True, stopped_before_refs=True
     ):
-        """止めた段までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
+        """止めた段階までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
         self.install_failing_git()
@@ -1270,7 +1270,7 @@ class IntegrateGapsTest(Fixture):
         )
         self.assertTrue(os.path.isfile(self.marker()))
 
-    # ---- 3: 片付けの各段で止まっても、打ち直せば完了する
+    # ---- 3: 片付けの各段階で止まっても、打ち直せば完了する
 
     def test_a_stop_at_the_work_worktree_resumes(self):
         self.stage_stops_then_resumes("worktree remove /")

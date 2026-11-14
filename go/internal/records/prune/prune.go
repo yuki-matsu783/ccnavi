@@ -21,7 +21,7 @@ import (
 	"ccnavi/internal/records/turn"
 )
 
-// records より上の段（policy・tickets・hook）が書く置き場の名前は、records から import できない（段が逆向きになる）。
+// records より上の層（policy・tickets・hook）が書く置き場の名前は、records から import できない（層が逆向きになる）。
 // そのため名前をここに写す（持ち主は括弧の中）。records の中の名前は、持ち主のパッケージの定数を読む。
 // policy が書く名前（自己防衛のバックアップ・ctxfile の数え）は config の定数を読む。
 const (
@@ -121,7 +121,7 @@ func Run(root, logPath, stateDir, session string, o Options) *Report {
 	if r.now.IsZero() {
 		r.now = time.Now()
 	}
-	// 0 はその段を止める。読めない値は limit が既定に直して Problems に積む。
+	// 0 はその段階を止める。読めない値は limit が既定に直して Problems に積む。
 	rotate, logDays, stateDays := r.limit(rotateMB), r.limit(logKeepDays), r.limit(stateKeepDays)
 	if logPath != "" {
 		if rotate > 0 {
@@ -313,7 +313,7 @@ func countOps(stateDir string) int {
 	return n
 }
 
-// allSent は段階がすべて送り終えたか（終わった記録はその操作が自分で消す）。段が無い・形が違う記録は未完了として数える。
+// allSent は段階がすべて送り終えたか（終わった記録はその操作が自分で消す）。段階が無い・形が違う記録は未完了として数える。
 func allSent(data *pyjson.Object) bool {
 	stages, ok := data.Value("stages").([]any)
 	if !ok {

@@ -25,10 +25,10 @@ func (e *DecodeError) Error() string {
 // ErrIntDigits は 4300 桁を超える整数（Python の int の上限。json.loads は ValueError で止まる）。
 var ErrIntDigits = errors.New("Exceeds the limit (4300 digits) for integer string conversion")
 
-// ErrTooDeep は入れ子が maxDepth 段を超えた（Python の json.loads の RecursionError）。
+// ErrTooDeep は入れ子が maxDepth 階層を超えた（Python の json.loads の RecursionError）。
 var ErrTooDeep = errors.New("maximum recursion depth exceeded while decoding a JSON value")
 
-// maxDepth は読める入れ子の段数。Python 3.13 の json.loads が RecursionError を出さずに読める最大の段数。
+// maxDepth は読める入れ子の階層数。Python 3.13 の json.loads が RecursionError を出さずに読める最大の階層数。
 const maxDepth = 9998
 
 // maxIntDigits は Python が 10 進の文字列から作る整数の桁の上限（sys.get_int_max_str_digits の既定）。

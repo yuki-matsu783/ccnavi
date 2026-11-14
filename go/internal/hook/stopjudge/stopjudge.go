@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	// ReasonJudge は判定役の呼び出しの記録の reason。上の段もほかのイベントで同じ値を残す。
+	// ReasonJudge は判定役の呼び出しの記録の reason。上の層もほかのイベントで同じ値を残す。
 	ReasonJudge  audit.Reason = "stop-review-judge"
 	reasonWorker audit.Reason = "stop-review-worker"
 

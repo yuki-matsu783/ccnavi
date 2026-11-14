@@ -92,11 +92,11 @@ func TestErrorsReadExpected(t *testing.T) {
 func TestTooDeepAndOverflow(t *testing.T) {
 	ok := strings.Repeat("(", maxNesting) + "x" + strings.Repeat(")", maxNesting)
 	if _, err := Compile(ok, 0); err != nil {
-		t.Errorf("%d 段: %v", maxNesting, err)
+		t.Errorf("%d 階層: %v", maxNesting, err)
 	}
 	deep := "(" + ok + ")"
 	if _, err := Compile(deep, 0); !errors.Is(err, ErrTooDeep) {
-		t.Errorf("%d 段: %v", maxNesting+1, err)
+		t.Errorf("%d 階層: %v", maxNesting+1, err)
 	}
 	if _, err := Compile("a{4294967295}", 0); !errors.Is(err, errOverflow) {
 		t.Errorf("%v", err)

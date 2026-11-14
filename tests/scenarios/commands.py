@@ -1,4 +1,4 @@
-"""サブコマンド run / run-all / next / restore / judge / preflight の中身（段 7）。"""
+"""サブコマンド run / run-all / next / restore / judge / preflight の中身（層 7）。"""
 
 import glob
 import hashlib

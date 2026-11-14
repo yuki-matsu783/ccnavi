@@ -1297,7 +1297,7 @@ class TicketTest(unittest.TestCase):
         return fixture
 
     def request(self, fixture, phase="1"):
-        """sh の request と同じ 3 段。prepare → 投稿（承認済みチケットに書く）→ requested。"""
+        """sh の request と同じ 3 段階。prepare → 投稿（承認済みチケットに書く）→ requested。"""
         body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
         prepared = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "--body-file", body, "review", "prepare"
@@ -1759,7 +1759,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(plan))
 
     def test_accept_plan_runs_the_placing_prechecks_before_the_host_is_touched(self):
-        """置く側の事前検査（続きの子を起こせるか）を計画の段で適用する。通らなければ計画を書かない。
+        """置く側の事前検査（続きの子を起こせるか）を計画の段階で適用する。通らなければ計画を書かない。
 
         計画を書けば sh がホストに返信と解決を書く。そのあとで「置けない」と分かると、
         解決済みのスレッドだけが残る。
@@ -2353,7 +2353,7 @@ class TicketTest(unittest.TestCase):
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
 
     def test_user_entries_with_unreadable_arguments_are_denied(self):
-        """2 段目の無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
+        """2 重目の守りの無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
 
         `ccnavi-review.sh decide`（`--choices`）・実行ファイルの`--yes` と
         `worktree retire --abandon` はターミナルを求めない。

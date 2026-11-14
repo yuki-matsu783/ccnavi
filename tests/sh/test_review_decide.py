@@ -336,7 +336,7 @@ class ReviewDecideShTest(unittest.TestCase):
             return f.read().splitlines()
 
     def calls(self) -> list[str]:
-        """置く・計画の段の呼び出し。事前の検査（`--check`）は `all_calls` にだけ入る。"""
+        """置く・計画の段階の呼び出し。事前の検査（`--check`）は `all_calls` にだけ入る。"""
         return [c for c in self.all_calls() if " --check " not in f" {c} "]
 
     def test_preview_passes_the_answer_through_and_posts_nothing(self):

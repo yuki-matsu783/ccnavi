@@ -37,7 +37,7 @@ func refusedCheck(c code, problems []string) checked {
 	return checked{problems: refused(c, problems), code: c}
 }
 
-// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段に並べる。result はホストから取得した結果である。
+// confirm は、レビュー済みにしてよいかを見る。通れば、書くもの（子を done/ へ、受け入れ台帳、レビュー済みのマーカー）を溜める段階に並べる。result はホストから取得した結果である。
 // changed は、依頼の後にユーザが見るものが動いたことの説明で、空なら動いていない。moved は、止めたあとの説明にだけ使う。
 // manual が確定してよい形（SettleReady）なら、未解決の指摘は解決せず、版つきで受け入れ台帳に足す。
 // actor の Account と Via はマーカーに書く（空なら書かない）。
@@ -74,7 +74,7 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 	} else if problems := request.ReviewProblems(conf, root, parent, number, result); len(problems) > 0 {
 		return refusedCheck(codeConfirmReviewOpen, problems), nil
 	}
-	// 3. 書き込みを溜める段に並べる。ここでは書かない（書くのは Writer）。時刻は 1 つに固定し、並べた全部で同じ値を使う。
+	// 3. 書き込みを溜める段階に並べる。ここでは書かない（書くのは Writer）。時刻は 1 つに固定し、並べた全部で同じ値を使う。
 	stage, done, err := fsio.Staging()
 	if err != nil {
 		return checked{}, err

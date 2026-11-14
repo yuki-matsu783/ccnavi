@@ -111,7 +111,7 @@ func TestScriptKeyComparesContentNotPlace(t *testing.T) {
 	other, _ := Parse(factors("  - {id: c, points: 1, script: .ccnavi/scripts/d.sh}"), where, homes)
 	other.markLayer("self", root)
 	if merged, _ := merge(common, same, "self"); len(merged.Factors) != 1 {
-		t.Errorf("同じ中身を 2 重に数える: %v", factorIDs(merged))
+		t.Errorf("同じ中身を 2 回数える: %v", factorIDs(merged))
 	}
 	if merged, _ := merge(common, other, "self"); len(merged.Factors) != 2 || merged.Factors[1].ID != "self:c" {
 		t.Errorf("違う中身を捨てる: %v", factorIDs(merged))

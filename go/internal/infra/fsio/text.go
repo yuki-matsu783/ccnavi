@@ -126,7 +126,7 @@ func (nl Newline) onDisk(text string) []byte {
 	return nl.staged(text)
 }
 
-// staged は溜める段に置く中身。NativeNewline は LF のまま残し、機械に依らず同じバイト列にする
+// staged は溜める段階に置く中身。NativeNewline は LF のまま残し、機械に依らず同じバイト列にする
 // （Chrome のコミットと手元の plan が同じ答えになるように）。
 func (nl Newline) staged(text string) []byte {
 	if nl == crlf || nl == cr {

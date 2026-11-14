@@ -1,4 +1,4 @@
-"""人間役の API 操作（human_api。段 4）。"""
+"""人間役の API 操作（human_api。層 4）。"""
 
 from tests.scenarios import hostenv
 from tests.scenarios.common import write_state

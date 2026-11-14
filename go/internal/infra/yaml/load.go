@@ -16,7 +16,7 @@ func Load(text string) (any, error) { return load(text, false) }
 func LoadRefusingAliases(text string) (any, error) { return load(text, true) }
 
 // aliasScanDepth は、2 つ目の文書の別名を探してイベントを流すときに見る入れ子の深さ。これより深ければ
-// 探すのをやめ、組み立てる段に任せる。
+// 探すのをやめ、組み立てる段階に任せる。
 const aliasScanDepth = 100
 
 func load(text string, refuseAliases bool) (any, error) {

@@ -42,8 +42,8 @@ issue から決めるときは `i` + 4 桁の 0 埋め（`i0131`）、issue が�
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| 新しい親の形は `<先頭の語>-<番号>-<slug>`。先頭の語は英小文字で始まる英小文字と数字、番号は 0 で始まらない正の整数、slug の先頭は英数字か日本語の字 | 一覧で中身が読め、番号で issue と結べる。`-` 区切りなので識別子に `/` を入れずに済む（ファイル名とワークツリーの直下 1 段の置き場がそのまま使える） | `feature/123-x` を識別子にする（ファイル名とワークツリーの置き場が 2 段になる。5 章で別のキーとして扱う） |
-| 形は `--lint` の warn（新規の提案だけ）。承認は止めない | 前の段（ADR-0093 の 3.1 の 2・5・6）と同じ深刻度。承認済み・閉じたチケット（`i0055` など）は読めるまま残す | 承認で止める（既存の運用で書いた提案が一斉に止まる） |
+| 新しい親の形は `<先頭の語>-<番号>-<slug>`。先頭の語は英小文字で始まる英小文字と数字、番号は 0 で始まらない正の整数、slug の先頭は英数字か日本語の字 | 一覧で中身が読め、番号で issue と結べる。`-` 区切りなので識別子に `/` を入れずに済む（ファイル名とワークツリーの直下 1 階層の置き場がそのまま使える） | `feature/123-x` を識別子にする（ファイル名とワークツリーの置き場が 2 階層になる。5 章で別のキーとして扱う） |
+| 形は `--lint` の warn（新規の提案だけ）。承認は止めない | 前の段階（ADR-0093 の 3.1 の 2・5・6）と同じ深刻度。承認済み・閉じたチケット（`i0055` など）は読めるまま残す | 承認で止める（既存の運用で書いた提案が一斉に止まる） |
 | 先頭の語のリストは `CCNAVI_BRANCH_PREFIXES`（カンマか空白区切り）。環境変数を先に見て、無ければ `.claude/settings.local.json`、`.claude/settings.json` の `env` を読む。無ければ既定のリスト | Claude Code が `env` を hook と Bash に渡すので、ほかの `CCNAVI_*` と同じ置き場で足りる。ターミナルで打つ `ccnavi --lint` にも同じ値が効くよう、ファイルの `env` も読む（`CCNAVI_INTEGRATION_BRANCH` の `integration_local` と同じ考え） | 新しい設定ファイルを置く（ユーザの決定 5） |
 | リストに `release` と `main`・`master`・`develop` は入れられない（読まずに warn で名指しする） | 統合先や保護されたブランチの名前（`release-*`）にヒットする | 黙って破棄する |
 | 番号は issue の番号か通し番号。通し番号は、番号を持つ親の識別子（新しい形と、前の形 `i<番号>`・`<名前>-i<番号>`）の最大 + 1。先頭の語が違っても同じ通し番号を使う。`--lint` の形の warn と番号の重なりの warn が次の通し番号を添える | 新しいコマンドを足さずに、提案を書くエージェントが番号を知れる | 通し番号を出すコマンドを足す（ユーザとの IF が増える。要るなら後で足す） |
@@ -97,7 +97,7 @@ issue のタイトルは誰でも書けるので、Chrome 拡張の service work
 先頭が ASCII の英数字でない、ASCII の英数字と `.` `_` `-` 以外の ASCII の字（空白・制御文字・記号）。残りは
 `LC_ALL=C tr -d 'A-Za-z0-9._\200-\377-'` で消し、何も残らなければ通す（`ccnavi-review.sh` の eli5 の検査と同じ方法。
 末尾の改行が `$( )` で落ちないよう番兵の `/` を足して比べる）。ASCII の外のバイトは通し、字の種類（全角記号・NFD）は
-実行ファイルが確かめる（2 段目の確認。ADR-0093 の判定は実行ファイルが持つ）。`ccnavi-push-approved.sh`・`ccnavi-sync.sh`・
+実行ファイルが確かめる（2 重目の確認。ADR-0093 の判定は実行ファイルが持つ）。`ccnavi-push-approved.sh`・`ccnavi-sync.sh`・
 `ccnavi-review.sh config-synced`・`ccnavi-ticket.sh` の write-and-push の識別子の検査をこれに置き換えた。
 
 ### 3.2 git の非 ASCII の扱い（確かめたこと）
@@ -207,12 +207,12 @@ ADR-0093 の 3.1 は、案 N3（`branch:` キー）を「キーを書き換え�
 
 ### 5.3 キーの読み方と字
 
-- `ticket_ids.branch_problem`: 字は識別子の字（`ID_CHARS`）に段の区切りの `/` を足したものだけで、先頭は ASCII の英数字。
+- `ticket_ids.branch_problem`: 字は識別子の字（`ID_CHARS`）に階層の区切りの `/` を足したものだけで、先頭は ASCII の英数字。
   git が許すほかの字（`$`・`;`・引用符・全角の字）は sh と拡張が名前を扱う箇所で意味を持つか、見た目の同じ別の名前を作るので
-  使わない（厳しくする向き）。そのうえで `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる段・`.lock` で終わる段・
+  使わない（厳しくする向き）。そのうえで `git check-ref-format --branch` の形の規則（`..`・`//`・`.` で始まる階層・`.lock` で終わる階層・
   先頭や末尾の `/`・末尾の `.`）、NFC でない表記、200 字を超える長さを error にする
-- git の表記と紛れる名前も error（レビューの指摘 2）: 先頭の段が `refs`・`heads`・`remotes`・`tags`・`origin`・`upstream`・
-  `HEAD`、どこかの段が `HEAD` か `*_HEAD`、保護されたブランチの名前（main・master・develop・release）を先頭の段に持つもの
+- git の表記と紛れる名前も error（レビューの指摘 2）: 先頭の階層が `refs`・`heads`・`remotes`・`tags`・`origin`・`upstream`・
+  `HEAD`、どこかの階層が `HEAD` か `*_HEAD`、保護されたブランチの名前（main・master・develop・release）を先頭の階層に持つもの
   （`main/x`・`release/1`）と `release-*`。`branch: origin/main` で `-b origin/main` を作ると `rev-parse --abbrev-ref` が
   `heads/origin/main` を返して push の節と食い違い、`symbolic-ref --short refs/remotes/origin/HEAD` まで変わって
   `ccnavi_default_branch` が外れるため
@@ -220,7 +220,7 @@ ADR-0093 の 3.1 は、案 N3（`branch:` キー）を「キーを書き換え�
   リスト（環境変数、`.claude/settings.local.json` の `env`、統合先の取り込み結果の `head`、`origin/HEAD` が指すもの、
   `origin/main`・`origin/master`。`Families.integration_names`）の全部
 - 子に書いた `branch:` は warn で、読まない（`issue:` と同じ）
-- sh の 2 段目の確認は `ccnavi_is_branch`（`ccnavi_is_ident` に `/` と段の形の検査、git の表記と保護されたブランチの名前の
+- sh の 2 重目の確認は `ccnavi_is_branch`（`ccnavi_is_ident` に `/` と階層の形の検査、git の表記と保護されたブランチの名前の
   検査を足したもの）。識別子と同じ名前は `ccnavi_is_ident` で見る（`ccnavi_branch_ok`）
 
 ### 5.4 sh が親のブランチ名を知る手段

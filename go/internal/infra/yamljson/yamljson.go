@@ -58,7 +58,7 @@ func jsonKey(k any) string {
 	return pyfmt.Str(k)
 }
 
-// FromJSON は上の段が JSON の形（*pyjson.Object と []any）で組んだ値を、yaml.Dump に渡せる形（*yaml.Map）にする。
+// FromJSON は上の層が JSON の形（*pyjson.Object と []any）で組んだ値を、yaml.Dump に渡せる形（*yaml.Map）にする。
 // キーと値の順は保つ。
 func FromJSON(v any) any {
 	switch x := v.(type) {

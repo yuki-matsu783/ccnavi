@@ -68,7 +68,7 @@ func HasLink(root, path string) bool {
 		if IsLink(current) {
 			return true
 		}
-		// root の下の綴りなら root まで 1 段ずつ調べる（途中のリンクが root の中へ戻っても見逃さない）。
+		// root の下の綴りなら root まで 1 階層ずつ調べる（途中のリンクが root の中へ戻っても見逃さない）。
 		outside := !strings.HasPrefix(pathcase.Fold(current), inside)
 		if outside && pathcase.Real(current) == base {
 			return false

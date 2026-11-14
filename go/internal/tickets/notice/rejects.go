@@ -299,7 +299,7 @@ func countLine(found *Found) string {
 		"そのワークツリーで始めたセッションに詳細を出す。%s --explain でも範囲を見られる。", len(names), cut, config.Launcher)
 }
 
-// renderRejects は却下の段落。件数と先頭の数件。常駐の文脈を短く保つため、空行を挟まない 1 段落にする。
+// renderRejects は却下の層落。件数と先頭の数件。常駐の文脈を短く保つため、空行を挟まない 1 段落にする。
 func renderRejects(ident string, found *Found) string {
 	if len(found.Rejects) == 0 {
 		return ""

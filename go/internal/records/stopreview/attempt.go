@@ -207,7 +207,7 @@ func (s Store) create(attempt *pyjson.Object) (bool, error) {
 	if reason == "" {
 		return true, nil
 	}
-	// 有無はディスクだけで決め、溜める段は見ない。
+	// 有無はディスクだけで決め、溜める段階は見ない。
 	if ospath.DiskLexists(path) {
 		return false, nil // 別のプロセスが先に作った
 	}

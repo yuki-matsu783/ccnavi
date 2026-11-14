@@ -1,7 +1,7 @@
 ---
 type: design
 title: 9.16 学びの蓄積（learning-wiki）
-description: 子チケットの気づきを learning-wiki に溜め、ルール・配点・フェーズ・テンプレート・スキル・文書への提案として育てる流れの設計。集める・溜める・提案する・人が決める・採否を残すの各段と、置き場・形・検査・診断
+description: 子チケットの気づきを learning-wiki に溜め、ルール・配点・フェーズ・テンプレート・スキル・文書への提案として育てる流れの設計。集める・溜める・提案する・人が決める・採否を残すの各段階と、置き場・形・検査・診断
 tags: [design-doc, ticket, learning-wiki]
 keywords: [学び, 気づき, learning-wiki, wiki, パターン, 提案, 採否, 再発, 反映先, learn, 揮発, 子, 親, フィードバック計画, impact]
 ---

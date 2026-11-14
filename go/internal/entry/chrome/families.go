@@ -99,7 +99,7 @@ func opFamilies(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	return pyjson.NewObject("families", out), nil
 }
 
-// closure は親子のチケット family の判定に要る、親子のチケットの閉包。先行を多段で辿る（1 段だけでは手元と答えが
+// closure は親子のチケット family の判定に要る、親子のチケットの閉包。先行を何階層も辿る（1 階層だけでは手元と答えが
 // 変わる）。提案と承認済みのチケットの predecessors を辿り、統合先の done/ にあるもので止める。まだ読んでいない
 // 親子のチケットは need で返し、拡張が読んでから呼び直す。
 type closure struct {

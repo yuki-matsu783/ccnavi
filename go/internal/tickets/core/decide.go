@@ -205,7 +205,7 @@ func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID str
 			return refusedDecided(codeDecideFollowup, []string{"ccnavi: 続きの子チケットを起こせない: " + problem}, nil), nil
 		}
 	}
-	// 5. 書き込みを溜める段に並べる。ここでは書かない（書くのは Writer）。時刻は 1 つに固定し、並べた全部で同じ値を使う。
+	// 5. 書き込みを溜める段階に並べる。ここでは書かない（書くのは Writer）。時刻は 1 つに固定し、並べた全部で同じ値を使う。
 	stage, done, err := fsio.Staging()
 	if err != nil {
 		return Decided{}, err

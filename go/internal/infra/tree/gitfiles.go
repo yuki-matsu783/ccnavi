@@ -66,8 +66,8 @@ func headText(treeRoot string) (string, bool) {
 	return ospath.Strip(text), true
 }
 
-// OriginRepo は `origin` の URL が指す `owner/repo`（パスの最後の 2 段。GitLab の入れ子のグループも
-// 最後の 2 段に縮める）。読めなければ空。
+// OriginRepo は `origin` の URL が指す `owner/repo`（パスの最後の 2 要素。GitLab の入れ子のグループも
+// 最後の 2 要素に縮める）。読めなければ空。
 func OriginRepo(repoRoot string) string {
 	gitdir, ok := GitDir(repoRoot)
 	if !ok {

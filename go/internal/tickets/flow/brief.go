@@ -44,7 +44,7 @@ func fingerprint(file, treeRoot string) string {
 }
 
 // digestRecordPath は着手のときに保存したハッシュの記録の置き場。フローと同じツリーの
-// `phases/<親>/<子>.flow.json`（承認の子の記録と同じ形。承認は flow より上の段なので形だけを揃える）。
+// `phases/<親>/<子>.flow.json`（承認の子の記録と同じ形。承認は flow より上の層なので形だけを揃える）。
 func digestRecordPath(conf *config.Settings, root string, child *ticket.Ticket) string {
 	approved := conf.ApprovedDir(orDefault(child.TreeRoot, root))
 	return ospath.Join(approved, place.PhasesDir, child.Parent, child.ID+"."+digestRecord+fsio.JSONExt)

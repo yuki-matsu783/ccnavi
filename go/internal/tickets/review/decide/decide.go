@@ -321,8 +321,8 @@ func ask(stdin *bufio.Reader, stdout, stderr io.Writer, d *Decision) (*pyjson.Ob
 	return choices, true
 }
 
-// YesOptions は Yes の計画の段。PlanOut（`--accept-plan`）はホストにも票にも置かず判断と計画を書く段、PlanDone
-// （`--accept-done`）は sh が計画のスレッドに返信して解決したあとに置く段。どちらも空なら一度に置く。
+// YesOptions は Yes の計画の段階。PlanOut（`--accept-plan`）はホストにも票にも置かず判断と計画を書く段階、PlanDone
+// （`--accept-done`）は sh が計画のスレッドに返信して解決したあとに置く段階。どちらも空なら一度に置く。
 type YesOptions struct {
 	PlanOut  string
 	PlanDone string
@@ -578,7 +578,7 @@ func SettledChildren(p *phase.Phase) []*ticket.Ticket {
 	return out
 }
 
-// precheck は置く前に、ローカルで失敗しうることを確かめる。ホストに触る前（PlanOut の段）にも呼ぶ（受け入れの
+// precheck は置く前に、ローカルで失敗しうることを確かめる。ホストに触る前（PlanOut の段階）にも呼ぶ（受け入れの
 // 返信と解決を済ませてから置けないと分かると、解決済みのスレッドだけが残る）。
 func precheck(stderr io.Writer, conf *config.Settings, root string, d *Decision, picked map[Choice][]host.Thread) bool {
 	// issue に回す分は state の置き場に下書きを書いて sh に渡す。置き場が無ければ、何も置く前に断る。

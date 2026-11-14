@@ -52,7 +52,7 @@ func LoadCopy(path string, requireRecord bool) (*ticket.Ticket, string) {
 }
 
 // loadDir は置き場のチケットを名前の順に読む。読めなかったものは (パス, 説明)。
-// fsio を通すので、承認の plan（書き込みを溜める段）の中では同じ承認で動かした後の置き場を読む。
+// fsio を通すので、承認の plan（書き込みを溜める段階）の中では同じ承認で動かした後の置き場を読む。
 func loadDir(directory string, requireRecord bool) ([]*ticket.Ticket, []Unread) {
 	names, err := fsio.Listdir(directory)
 	if errors.Is(err, fs.ErrNotExist) {

@@ -294,7 +294,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 		if kind, found := useronly.HumanPathForm(record.Subject); found != "" {
 			return stop(useronly.CodeTicketApproval, useronly.TicketApprovalRuleID, useronly.HumanMessage(root, kind, found), config.Gate)
 		}
-		// 2 段目の無いユーザの入口は、引数を変数・置換・glob で組むと表記の検査から外れるので、読めなければ止める。
+		// 2 つ目の無いユーザの入口は、引数を変数・置換・glob で組むと表記の検査から外れるので、読めなければ止める。
 		layers := make([]useronly.Layer, len(inner))
 		for i, l := range inner {
 			layers[i] = useronly.Layer{Runner: l.runner, Text: l.text}
@@ -303,7 +303,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 			return stop(useronly.CodeTicketApproval, useronly.TicketApprovalRuleID, useronly.HiddenEntryMessage(root, entry, found), config.Gate)
 		}
 	}
-	// 子チケットのワークツリーからの push は誰が打っても止める（sh の検査は 2 重目）。
+	// 子チケットのワークツリーからの push は誰が打っても止める（sh の検査は 2 つ目）。
 	if conf.TicketsEnabled() && in.ToolName == config.ToolBash {
 		if name, parent := shellguard.CheckChildPush(conf, root, in.Cwd, record.Subject, degraded); name != "" {
 			return stop(shellguard.CodeChildPush, shellguard.ChildPushRuleID, shellguard.ChildPushMessage(root, name, parent), config.Gate)

@@ -1,9 +1,9 @@
 ---
 type: design
 title: モジュール構成
-description: 実行ファイル（go/）のパッケージを役割ごとにまとめた表と、読む向きの段。パッケージごとの役割は各パッケージのdoc.goが持つ
+description: 実行ファイル（go/）のパッケージを役割ごとにまとめた表と、読む向きの層。パッケージごとの役割は各パッケージのdoc.goが持つ
 tags: [design-doc, modules]
-keywords: [モジュール, パッケージ, 構成, infra, records, policy, tickets, catalog, hook, entry, 段, 目録, doc.go]
+keywords: [モジュール, パッケージ, 構成, infra, records, policy, tickets, catalog, hook, entry, 層, 目録, doc.go]
 ---
 
 [設計書の入口に戻る](../20_design.md)
@@ -29,7 +29,7 @@ keywords: [モジュール, パッケージ, 構成, infra, records, policy, tic
 | `go/internal/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント | `infra`、`records`、`policy`、`tickets`、`catalog` |
 | `go/internal/entry/` | 入口。CLI・診断・lint・提案・版・Chrome 拡張の入口 | 下の全部。どこからも読まれない |
 
-同じまとまりの中の読む順（段）は、`layers_test.go` の `subTiers` が持つ。パッケージを足したら、その表に段を足す。
+同じまとまりの中の読む順（層）は、`layers_test.go` の `subTiers` が持つ。パッケージを足したら、その表に層を足す。
 
 ## infra
 
@@ -72,9 +72,9 @@ keywords: [モジュール, パッケージ, 構成, infra, records, policy, tic
 
 ## tickets
 
-下の段から順に並べた。段の大きいものは、段の小さいものだけを読む。同じ段どうしは読まない（順は `layers_test.go` の `subTiers` の `tickets` が持ち、検査する）。テストだけが読む道具（`testkit`）は一番上の段に置き、本体からは読めない。
+下の層から順に並べた。層の大きいものは、層の小さいものだけを読む。同じ層どうしは読まない（順は `layers_test.go` の `subTiers` の `tickets` が持ち、検査する）。テストだけが読む道具（`testkit`）は一番上の層に置き、本体からは読めない。
 
-| 段 | パッケージ | 役割 |
+| 層 | パッケージ | 役割 |
 |---|---|---|
 | 0 | `model/` | 型と名前。書式の定数・状態の名前・範囲の項・計画のステップ、識別子とブランチ名の規則、状態の置き場を守る組み込みのルール、親子の立ち位置、誰がどの経路で動かしたか、ユーザだけが打つ操作の表（hook の止めとターミナル要求が引く正本）、ホストへの送信の段階の記録、閉じた親子の退避 |
 | 1 | `config/` | フェーズ定義（`phases.yml`）の読み込み、ワークフロー、実績で測るリスク、設定の検査 |

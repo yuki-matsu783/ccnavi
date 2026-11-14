@@ -71,7 +71,7 @@ Bash のコマンドに現れるパスはコマンド文字列として見る。
 `Bash` のルールは、コマンド文字列そのものではなく、シェルが実際に実行する部分に適用する。禁止された語を書いただけの操作は
 止めず、二重引用の中の `$( )` のようにシェルが実行する部分は読み落とさない。
 
-読みは 2 段で行う。先に原文を 1 回走査して、`shlex` が見ないもの（コマンド置換、プロセス置換、ヒアドキュメントの本文、
+読みは 2 段階で行う。先に原文を 1 回走査して、`shlex` が見ないもの（コマンド置換、プロセス置換、ヒアドキュメントの本文、
 コメント、改行）と引用の状態を処理し、語の分割は Python の `shlex` と同じ規則で行う（`infra/shell` の `Split`）。食い違いは
 `go/internal/infra/shell` の試験で確かめる（`read_test.go` の `TestShellRunsOnlyWhatShellRuns` は bash 3.2 と zsh で実測した 65 形、`split_test.go`・`words_test.go` は `shlex` と同じ答えか）。
 
@@ -110,7 +110,7 @@ Bash のコマンドに現れるパスはコマンド文字列として見る。
    パスは除かない（`*git push*` は `/usr/bin/git push` にヒットしない）。
    `.ccnavi/config/common/rules.yml` では、引用付きの `grep -n "git push" README.md` や `find . -name "a b"` は、後ろにコマンドが続かなければ
    `prefer-read-grep` / `prefer-glob`（allow）にヒットする。`cat README.md | head -20` は `\x00` をまたぐのでヒットしない
-9. 切り出した中身を同じ手順で読み（入れ子は 16 段まで。越えたら `ambiguous-substitution`）、外側の読みの
+9. 切り出した中身を同じ手順で読み（入れ子は 16 階層まで。越えたら `ambiguous-substitution`）、外側の読みの
    後ろに、出てきた順に `\x00` でつなぐ。中身は `\x00` の直後に来るので、`(^|\x00)` で書いたルールは引用の外と
    同じようにヒットし、`[^\x00]*$` の allow は中身が 1 本でもあれば外れる。中身が縮退すれば全体が縮退し、理由は中身のもの
 
@@ -144,7 +144,7 @@ Bash のコマンドに現れるパスはコマンド文字列として見る。
 | `brace-expansion` | `DENY_BRACE_EXPANSION` | 上のブレース展開 |
 | `command-name-expansion` | `DENY_COMMAND_NAME_EXPANSION` | コマンドの位置の語に、変数か置換の `$`、`*` `?`、閉じた `[…]` がある。コマンドの位置の語は、前に置いた代入（`a[1]=x`・`x+=1` を含む）とリダイレクト（`>/dev/null`・`2>&1`、名前付き fd `{fd}>`）を飛ばした最初の語で、`case` `for` `select` の直後の 1 本は見ない。読んだコマンドと、実行役のコマンドを外した層（6.3.1）の両方で見るので、`env $c`・`sh $SCRIPT` も並ぶ。`eval` と `sh -c` の文字列を読み直した層は、外側が縮退していないときに見る。たとえば `FOO=1 eval "$c"` は見る |
 | `backquote` | `DENY_BACKQUOTE` | 単一引用・`$'…'`・`` \` ``・引用付きヒアドキュメントの本文・コメントの外のバッククォート。見つけたところで読むのをやめ、`backquote` で縮退する |
-| `ambiguous-form` | `DENY_AMBIGUOUS_FORM` | `ambiguous-substitution` で縮退した形（`$( )` の中の `case`、`$((cmd) \| x)`、16 段を超える入れ子）と、コマンドの位置の `coproc`・`select` |
+| `ambiguous-form` | `DENY_AMBIGUOUS_FORM` | `ambiguous-substitution` で縮退した形（`$( )` の中の `case`、`$((cmd) \| x)`、16 階層を超える入れ子）と、コマンドの位置の `coproc`・`select` |
 
 `sh -c`・`eval`・後ろが読むだけの許可リストにない `xargs`・`find -exec` は、書き直すと中身がファイルになって見えなくなるので、ここでは止めず、縮退と層の読み
 （6.3.1）のままにする。
@@ -484,7 +484,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 - 起動と再開（`SessionStart` の `startup`・`resume`）で、そのセッションの記録とユーザの発言の記録を消す。compact と clear では消さない
 - 記録は、ほかの `state` の記録と同じく、後始末（prune）が消す
 
-**サブエージェント。** サブエージェントの呼び出しも、同じセッションの記録で見る。サブエージェントが A を打っても B を打っても、同じに止まる。付き添いのあるセッションでも、サブエージェントの呼び出しは確認に出さず、この発言を待つゲートで見る。確認で先に返すと、後段のサブエージェントの禁止（`useronly.Forbidden`）に届かなくなるため。
+**サブエージェント。** サブエージェントの呼び出しも、同じセッションの記録で見る。サブエージェントが A を打っても B を打っても、同じに止まる。付き添いのあるセッションでも、サブエージェントの呼び出しは確認に出さず、この発言を待つゲートで見る。確認で先に返すと、後の段階のサブエージェントの禁止（`useronly.Forbidden`）に届かなくなるため。
 
 **dry-run。** ゲート（`GATE`）の分類なので、`CCNAVI_MODE` が `dry-run` でも止める。
 

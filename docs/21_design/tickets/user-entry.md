@@ -126,5 +126,5 @@ hook は擬似ターミナルを作る実行役（`script`・`tmux`・`screen`�
 実行ファイルは、`ccnavi-user-agree.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`・`ccnavi-user-prune.sh` と、書くとき（`--yes`）の `ccnavi-user-handoff.sh` と `ccnavi-user-mirror.sh` で、標準入力がターミナルのときだけ動く。
 ターミナルを求めるときに標準エラーへ出す名前は、ユーザが打つ sh の名前で、`verbs` の `terminal`（`useronly.Terminal`）が持つ。
 
-ターミナルを求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、ターミナル要求は 2 段目ではない。
+ターミナルを求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、ターミナル要求は 2 重目ではない。
 擬似ターミナルを使えばターミナル要求は満たせる。

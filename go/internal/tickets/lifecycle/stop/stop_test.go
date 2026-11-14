@@ -7,7 +7,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// 共通の 1 文は全部の段の促しと finish の促しに 1 回ずつ入り、段ごとの次の一手は残る。
+// 共通の 1 文は全部の段階の促しと finish の促しに 1 回ずつ入り、段階ごとの次の一手は残る。
 func TestEveryStepKeepsItsGuidanceAndGetsTheCommonNote(t *testing.T) {
 	root := clock.Workspace(t)
 	guide := map[Step][]string{

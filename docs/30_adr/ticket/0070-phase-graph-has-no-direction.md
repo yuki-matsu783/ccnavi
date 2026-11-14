@@ -31,7 +31,7 @@ keywords: [フェーズ, グラフ, DAG, requires, overlap, 置き場所, id]
 矢印を描くと、**無い制約を描く**ことになる。
 
 このリポジトリ自身の `.ccnavi/config/project/phases.yml` で既に成り立たない。`acceptance.overlap: [implement]`
-（並行してよい＝同じ段に置きたい）と `implement.requires: [acceptance]`（レイヤに分けると 1 段後ろ）が
+（並行してよい＝同じ階層に置きたい）と `implement.requires: [acceptance]`（レイヤに分けると 1 階層後ろ）が
 衝突する。`phases-doc.ts` の雛形も同じ組なので、**最初に開いた時点の絵で、もう食い違う**。
 
 ### 判定
