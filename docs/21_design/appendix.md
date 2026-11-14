@@ -164,7 +164,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | 期限の数値（残り − 0.5 秒・0.2 秒以下は起動しない・SessionStart の 2 秒）で足りるか | Linux では足りる（ワークツリー 8 本・記録 1 件で、Stop も SessionStart も 1 回 0.3 秒未満）。Windows の Git Bash は未測定で、測ってから見直す |
 | `/clear` の後の `SessionStart` の `session_id` と `source` | 未実測（ユーザの操作が要る）。`compact` は上の行のとおり |
 | `${CLAUDE_PROJECT_DIR}` は `env` で展開されるか | hook の `command` では展開されるが `env` では展開されない |
-| `env` は再読み込みされるか | されない。セッションを開き直すまで古い値が残る。hook の `command` は即座に反映される |
+| `env` は再読み込みされるか | されない。セッションを開き直すまで前の値が残る。hook の `command` は即座に反映される |
 | Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来るか | 来ない。hook の環境にだけ来る |
 | `.claude/settings.json` に独自のトップレベルキーを足せるか | スキーマ検証に弾かれる |
 | Windows は実行中の実行ファイルを上書きできるか | できない。名前の変更はできる |
