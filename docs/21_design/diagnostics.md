@@ -110,7 +110,7 @@ error がある間は配点もフェーズ定義も保存できない。
 - `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・実行ファイル・拡張の 3 つの logger で揃える。
-  `tests/core/test_diaglog.py` が 3 つの行を突き合わせる
+  `tests/sh/test_diaglog_sh.py` が sh と拡張の行を、`go/internal/records/diaglog` の go test が同じ入力と答えで実行ファイルの行を見る
 - Chrome 拡張は、実行ファイルと同じ Go のソースを WASM に組んで同梱する（`go/cmd/ccnavi-chrome`）。拡張が呼ぶのは要求の JSON を 1 つ渡して答えの JSON を受ける 1 つの関数だけで、
   入口の `entry/chrome` が、判定のコア（`tickets/core`。ブランチの中身 → 判定 → 書くもの）と、手元と同じ `--agree --preview --json` を通す。要求と答えの形は `entry/chrome` と拡張の `src/core/ccnavi.ts` が対で定義しており、ここには写さない。
   本体のパッケージを動かすときは `entry/chrome` だけを直す。拡張は同じ版の本体と一緒に組むので、別の版の本体と拡張は組み合わさらない。
@@ -163,12 +163,11 @@ md が 1 本も無い・git の外なら何も出さない。新しくするの�
 残りの小さいほうまで。まず全部のディレクトリで使い回せる行を見て、読み直しの要る md を、待つ本数の少ないディレクトリから
 1 本ずつ期限を見ながら読む。過ぎたら読むのをやめ、どのディレクトリも「読めた md の新しい行と、読めなかった md の既存の行」で
 書く（読めなかった md は次の回に読む）。大きなディレクトリも回を重ねれば埋まり、小さなディレクトリはその後ろで待たない。
-残りが 0.5 秒（`MIN_REFRESH_SECONDS`）に満たない（期限が既に切れている）ときは新しくせず、md を読まず書かずに既存の
+残りが 0.5 秒（`catalog/docs` の `minRefresh`）に満たない（期限が既に切れている）ときは新しくせず、md を読まず書かずに既存の
 `ccnavi-index.jsonl` の行だけで案内する（git には 1 秒だけ与える。それも間に合わなければ、ワークスペースルートに md があれば
 引き方だけを出す）。`--docs` は引く前に期限なしで新しくする。何が起きてもセッションの開始は最後まで進む。
 
-絞り込みのフラグ（`--type` から `--no-refresh` まで）を `--docs` の外で渡すと、その旨を出して 1 で終わる（このフラグが無かったころに
-argparse が止めていた打ち間違いを、知らせずに通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
+絞り込みのフラグ（`--type` から `--no-refresh` まで）を `--docs` の外で渡すと、その旨を出して 1 で終わる（打ち間違いを、知らせずに通さないため）。`--docs` にほかの経路のフラグ（`--lint` `--yes` `--preview` `--result`
 `--tickets` `--flow` など）と、判定やチケットの経路の設定・sh が渡すフラグ（`--cwd` `--mode` `--approved` `--rules` `--phases`
 `--risk` `--projects` `--project-home` `--ticket-control` `--guard-core-files` `--guard-ticket-approval` `--restore-if-deny`
 `--record-writes` `--choose-out` `--actor` `--via` など）を付けたときも、無視せずに 1 で終わる。
@@ -184,11 +183,11 @@ argparse が止めていた打ち間違いを、知らせずに通さないた�
 |---|---|
 | `concept_id` | 引いた結果ではワークスペースルートからの相対パス（`/` 区切り）から `.md` を除いたもの。`ccnavi-index.jsonl` に書く行は、そのリポジトリのルートから（プロジェクトの頭の `projects/<名前>/` が無い） |
 | `directory` | そのファイルがあるディレクトリ（`concept_id` と同じ基準。リポジトリのルート直下は `.`、プロジェクトのルート直下は `projects/<名前>`） |
-| `frontmatter` | 頭の `---` から `---`（か `...`）までを YAML（SafeLoader、別名は拒む）で読んだもの。無い・読めない・マッピングでない・JSON に書けない（桁の多すぎる整数など）なら `null`。日付などの JSON に無い値は文字列 |
+| `frontmatter` | 頭の `---` から `---`（か `...`）までを YAML（`yaml.LoadRefusingAliases`。別名は拒む）で読んだもの。無い・読めない・マッピングでない・JSON に書けない（桁の多すぎる整数など）なら `null`。日付などの JSON に無い値は文字列 |
 | `mtime` | ファイルの更新日時。ローカル時刻の `YYYY-MM-DDTHH:MM:SS` |
 
-**古い `ccnavi-index.jsonl` が残る条件。** md が全部消えたディレクトリの `ccnavi-index.jsonl` を消すのは、そこに追跡されている md が
+**使われない `ccnavi-index.jsonl` が残る条件。** md が全部消えたディレクトリの `ccnavi-index.jsonl` を消すのは、そこに追跡されている md が
 あった（`git ls-files --cached` に出るが実体が無い）ときだけで、しかも ccnavi の形で、git に無視されているものに限る。
 追跡されていない md だけを持っていたディレクトリ、ディレクトリごと消えたもの、`.gitignore` に入ったディレクトリ、索引の対象外に
 なったツリーの `ccnavi-index.jsonl` は残る。残ったものは読まない（引くのは、いま md を持つディレクトリの分だけ）ので結果は変わらない。
-`mtime` は秒で比べるので、同じ秒の中で 2 度書き換えた md は次に `mtime` が変わるまで古い行のままになる。
+`mtime` は秒で比べるので、同じ秒の中で 2 度書き換えた md は次に `mtime` が変わるまで前の行のままになる。
