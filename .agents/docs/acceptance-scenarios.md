@@ -128,7 +128,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```
 
-   `--agent script` を付けると、`claude -p` の代わりに代役（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、代役が真似ることは [claude-contract.md](claude-contract.md)。
+   `--agent script` を付けると、`claude -p` の代わりに代役（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、代役が真似る範囲は [claude-contract.md](claude-contract.md)。
 
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。

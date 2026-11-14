@@ -10,7 +10,7 @@ keywords: [代役, fake_claude, 台本, script, after_stop_block, --agent, claud
 
 受入シナリオ（[acceptance-scenarios.md](acceptance-scenarios.md)）は本物の `claude -p` を呼ぶので、費用がかかり、結果が毎回揺れる。
 代役（`tests/fake_claude.py`）は、モデルが打つ手を台本に固定し、Claude Code が hook を呼んでツールを実行する部分だけを真似る。
-これで、hook の登録（`.claude/settings.json` のイベント・matcher）、何手も続く流れ（拒否・Stop の差し戻し・`--resume`・サブエージェント）、実行器の通しを、費用なしで毎回同じ結果で確かめられる。
+これで、hook の登録（`.claude/settings.json` のイベント・matcher）、何手も続く流れ（拒否・Stop の差し戻し・`--resume`・サブエージェント）、実行器の動きを、費用なしで毎回同じ結果で確かめられる。
 モデルが案内に従うか（`judge`）は確かめられない。それは本物で回す。
 
 ## ファイル
@@ -45,8 +45,8 @@ uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-de
 
 - 1 手は `tool`（`Read`・`Write`・`Edit`・`Bash`）と `input`、`say`（最後の文。`result` に入る）、`agent`（サブエージェント。`type`・`description`・`script`）のどれか
 - `file_path` は cwd（ワークスペースルート）からの相対で書く。代役が絶対パスに直して hook に渡す
-- 台本は分岐しない。止められても次の手へ進む。案内に従う手は、台本を書く人が並べる。ccnavi の案内が変わると台本も直すことになり、それが案内の変更に気づく合図になる
-- `--agent script` のときは、人間の操作でない step はすべて `script` が要る（読み込みで止める）。`judge` は評価しない
+- 台本は分岐しない。止められても次の手へ進む。案内に従う手は、台本を書く人が並べる。ccnavi の案内が変わったら台本も直す。台本を直すことが、案内の変更に気づく合図になる
+- `--agent script` のときは、人が操作しない step には、すべて `script` が要る（足りなければ読み込みで止まる）。`judge` は評価しない
 - 台本は出力の置き場に `step-N.script.json` として残る
 - 代役でも、今は本物と同じく、普段のワークスペースルートで人間の確認を取ってから回す（[acceptance-scenarios.md](acceptance-scenarios.md) の「回し方」）。使い捨てのワークスペースで確認なしに回す仕組みは、まだ無い
 
@@ -103,4 +103,4 @@ uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2
 - モデルが案内を読んで正しく動くか、拒否を迂回しないか（`judge`）
 - 並行に起こした hook が終わる順番
 - Claude Code 自身の権限の仕組みと確認の表示
-- 場面で録っていない手（Glob・Grep・WebFetch などのツール、PostToolUse の `additionalContext` 以外の出力の形）。台本に書けるツールは Read・Write・Edit・Bash と `agent` だけ
+- 場面に出てこない手（Glob・Grep・WebFetch などのツール、PostToolUse の `additionalContext` 以外の出力の形）。台本に書けるツールは Read・Write・Edit・Bash と `agent` だけ
