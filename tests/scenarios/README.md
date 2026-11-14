@@ -91,9 +91,9 @@ UC の番号と中身の正は、要件書の流れの文書（[flows.md](../../
 - `judge` は、意味で読む基準（自然文）。実行器が `evidence.md` に証拠を抜き出し、別のエージェントが読んで判定する
 - 出力ディレクトリ（`logs/scenarios/<ID>-<日時>/`）のファイル: `step-N.jsonl`（stream-json）・`report.md`（判定と、拒否の傾向の目印）・`report.json`・`evidence.md`（`judge` 用の証拠。渡った文脈の先頭を含む）・`context-N.md`（step N に渡った文脈の全文）・`messages.md`（hook の応答の文面の一覧）・`state.json`（実行の状態）。`--agent script` で回したときは、step ごとの台本 `step-N.script.json` も置く（[スタブ](../../.agents/docs/claude-contract.md)）。`setup.host` が `fake-gitlab` / `docker-gitlab` なら、step ごとの相手側の状態 `host-N.json` も置く（[相手側の状態の記録](../../.agents/docs/acceptance-scenarios.md)）。
   読み方は [証拠の読み方](../../.agents/docs/acceptance-scenarios.md)
-- 回すのは [runner.py](runner.py)（入口。中身は責務ごとのモジュールで、段の一覧は `runner.py` の docstring。`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../.agents/docs/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
+- 回すのは [runner.py](runner.py)（入口。中身は責務ごとのモジュールで、段の一覧は `runner.py` の docstring。`uv run python -m tests.scenarios.runner run <シナリオ>`。ほかに `preflight`・`run-all`・`run-stub`（使い捨てのワークスペースでスタブで回す。[スタブ](../../.agents/docs/claude-contract.md)）・`next`・`restore`・`judge`。使い方と終了コード（10 を含む）は [回し方](../../.agents/docs/acceptance-scenarios.md)）。判定は pass / fail / inconclusive（未成立）/ needs-review。
   `run-all <ディレクトリ or glob> --max-total-usd <USD>` は、使い捨てのリポジトリのシナリオ（人間の操作が無く、`setup.reset` を持つもの）を、1 回の確認で直列に回す。最後に全体の表（ID・判定・実費・ツール呼び出し数・拒否数・ask 数・出力の置き場）を出し、`summary.md` / `summary.json` に書く。確認が有効なのは ID の集合・`base`・費用の上限・概要に限る（[続けて回す](../../.agents/docs/acceptance-scenarios.md)）。
-  全量テスト（`python -m tests`）には入らない。拾われるのは [test_runner.py](test_runner.py)（実行器の単体テスト）だけ。モジュールの import の向きは `tests/core/test_scenario_layers.py` が見る（段の表は `runner.py` の docstring を読む）
+  本物の claude で回すシナリオは、全量テスト（`python -m tests`）には入らない。拾われるのは [test_runner.py](test_runner.py)（実行器の単体テスト）と [test_stub_scenarios.py](test_stub_scenarios.py)（台本のあるシナリオをスタブで回す）だけ。モジュールの import の向きは `tests/core/test_scenario_layers.py` が見る（段の表は `runner.py` の docstring を読む）
 
 ## 期待の確かめ方の約束
 

@@ -416,11 +416,11 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 「全量テストを回して」（`uv run python -m tests`）で、シナリオが回らないようにしてある。
 
 - **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と実行器のモジュール（`runner.py`・`drive.py`・`commands.py` など）は拾われない。
-  `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）だけで、`claude` を呼ばない
-- **実行器がゲートを持つ。** `claude` を呼ぶ道（`drive.run_step`・`commands.cmd_run`。ゲートは `common.require_entry`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。
+  `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）と `test_stub_scenarios.py`（台本のあるシナリオを、使い捨てのワークスペースでスタブで回す。[claude-contract.md](claude-contract.md)）だけで、どちらも `claude` を呼ばない
+- **実行器がゲートを持つ。** `claude` を呼ぶ道（`drive.run_step`・`commands.cmd_run`。ゲートは `common.require_entry`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。スタブで回す step はゲートを通らない（claude を呼ばない）。
   ほかのモジュールが import して呼ぶと `RuntimeError` で止まる。後で誰かが、実行器を呼ぶテストを足しても動かない
-- **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が `tests.scenarios.test_runner` しか拾わないこと、
-  `tests/scenarios/` に `test_runner.py` 以外の `test_*.py` が無いことを確かめる。シナリオを回す道を `test_` のモジュールに置かない
+- **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が上の 2 つのモジュールしか拾わないこと、
+  `tests/scenarios/` にほかの `test_*.py` が無いことを確かめる。本物の `claude` でシナリオを回す道を `test_` のモジュールに置かない
 
 ## 人間の操作
 

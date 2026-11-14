@@ -48,7 +48,19 @@ uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-de
 - 台本は分岐しない。止められても次の手へ進む。案内に従う手は、台本を書く人が並べる。ccnavi の案内が変わったら台本も直す。台本を直すことが、案内の変更に気づく合図になる
 - `--agent script` のときは、人が操作しない step には、すべて `script` が要る（足りなければ読み込みで止まる）。`judge` は評価しない
 - 台本は出力の置き場に `step-N.script.json` として残る
-- スタブでも、今は本物と同じく、普段のワークスペースルートで人間の確認を取ってから回す（[acceptance-scenarios.md](acceptance-scenarios.md) の「回し方」）。使い捨てのワークスペースで確認なしに回す仕組みは、まだ無い
+- `run --agent script` は、本物と同じく普段のワークスペースルートで、人間の確認を取ってから回す（[acceptance-scenarios.md](acceptance-scenarios.md) の「回し方」）
+- `run-stub` は、シナリオごとに使い捨てのワークスペースを組んで回し、終わったら消す。ユーザのワークスペースに触れないので、確認を取らない（下の「使い捨てのワークスペースで回す」）
+
+## 使い捨てのワークスペースで回す
+
+```sh
+uv run python -m tests.scenarios.runner run-stub tests/scenarios
+```
+
+- 回すのは、人間の操作が無く、step がすべて `script` を持ち、`setup` が作るファイル（追記でないもの）だけのシナリオ（`schema.stub_unready`）。ほかは理由を出して回さない
+- ワークスペースは `tests/scenarios/sandbox.py` が一時ディレクトリに組む。このリポジトリの作業ツリーから、追跡している `.ccnavi/`・`.claude/settings.json`・`.claude/hooks/`・`.gitignore` をコピーし、テスト用に組んだ実行ファイル（`tests/exe.py`）を `.ccnavi/bin/` に置き、`settings.json` の `CCNAVI_MODE` を `enable` にする。`projects/test-repo` は README を 1 本持つ小さなリポジトリにする（UC-01 の台本が書き換える見出しを持つ）
+- 出力は `logs/scenarios/<ID>-stub-<日時>/`。終了コードは 0 全部 pass / 1 fail がある・回せるものが無い / 2 未成立がある
+- 全量テストでも回る（`tests/scenarios/test_stub_scenarios.py`）。シナリオに台本を足すと、そこで回る
 
 ## スタブが真似ること
 
