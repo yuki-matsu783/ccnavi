@@ -231,18 +231,19 @@ def tool_key(payload: dict) -> str:
     return f"{ev}:{tool}" if tool else ev
 
 
-# モデルが書く行。この行に文が出るかはモデルの答え方で変わるので、数えない
-MODEL_LINES = ("assistant/", "result/success")
+# モデルが書く行の type。ここに文が出るかはモデルの答え方で変わるので、出た場所に数えない
+MODEL_TYPES = ("assistant", "result")
 
 
 def text_in(events: list[dict], needle: str) -> list[str]:
     """needle を含む stream-json の行の type/subtype の一覧（モデルが書く行を除く）。"""
-    kinds = {
-        f"{e.get('type')}/{e.get('subtype', '')}"
-        for e in events
-        if needle in json.dumps(e, ensure_ascii=False)
-    }
-    return sorted(kinds - set(MODEL_LINES))
+    return sorted(
+        {
+            f"{e.get('type')}/{e.get('subtype', '')}"
+            for e in events
+            if e.get("type") not in MODEL_TYPES and needle in json.dumps(e, ensure_ascii=False)
+        }
+    )
 
 
 def tool_result_text(events: list[dict], tool_use_id: str) -> tuple[bool, str] | None:
