@@ -873,10 +873,11 @@ resolve_issue() {
 
 # ---- ホストに届かないときの案内。標準出力に出して終了コード 4 で止まる。
 #
-# 段階は search（既存の MR を確かめる）・title（issue のタイトルを読む）・create（MR を作る）。
-# GitHub は MCP（mcp__github__のツール）で代行する手順を出す。GitLab には MCP の案内が無いので、理由の 1 語と、
-# ユーザに認証を頼んで打ち直す次の一手だけを出す。
-# 使う変数: stop_branch・stop_target・stop_title・stop_wt（段階より前に出来たこと）
+# 段階は mcp-args（--mcp-checked に 3 つがそろわない）・search（既存の MR を確かめる）・title（issue のタイトルを読む）・
+# merged（同じ名前のマージ済み MR を確かめる）・issue-link（MR が閉じる issue を確かめる）・create（MR を作る）。
+# GitHub は MCP（mcp__github__のツール）で代行する手順を、GitLab は理由の 1 語と、ユーザに認証を頼んで打ち直す
+# 次の一手を出す。文は実行ファイルが組み立てる（`ccnavi start guidance`）。
+# 使う変数: stop_branch・stop_target・stop_title・stop_wt・stop_mr（段階より前に出来たこと）
 stop_branch=""
 stop_target=""
 stop_title=""
@@ -889,114 +890,12 @@ stop_host() {
 	if [ -z "${ccnavi_h_kind:-}" ]; then
 		fail host-unknown "ホストを読めない（${sh_why}）。origin を確かめてください。"
 	fi
-	sh_owner="${ccnavi_h_path%%/*}"
-	sh_repo="${ccnavi_h_path#*/}"
-	# MR を作る段階と issue を確かめる段階は、MCP で確かめたあとの打ち直しを issue・MR・元ブランチの 3 つそろえた形で案内する
-	sh_issue_v="<issue の番号>"
-	[ -z "$issue_arg" ] || sh_issue_v="$issue_arg"
-	sh_branch_v="<元ブランチ>"
-	[ -z "$stop_branch" ] || sh_branch_v=$(sh_quote "$stop_branch")
-	case "$sh_stage" in
-	create) sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh --issue $(issue_show "" "$number") --mr <作った番号> --branch $sh_branch_v --mcp-checked" ;;
-	issue-link) sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh --mr $stop_mr --issue $sh_issue_v --branch $sh_branch_v --mcp-checked" ;;
-	mcp-args) sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh --issue ${issue_arg:-<issue の番号>} --mr ${mr_arg:-<MR の番号>} --branch ${branch_arg:-<元ブランチ>} --mcp-checked" ;;
-	*) sh_cmd="sh .ccnavi/scripts/ccnavi-start.sh $orig_args" ;;
-	esac
-	# search・merged は、新規作成なら元の引数に --mcp-checked を足すだけで進む。既存の候補や MR を採用する道
-	# （手元の候補がある・--mr が指定されている）は、issue・MR・元ブランチの 3 つがそろわないと進めない。
-	sh_adopt=""
-	{ [ "${total:-0}" -ge 1 ] || [ "$what" = mr ] || [ -n "$mr_arg" ]; } && sh_adopt=1
-	sh_adopt_cmd="sh .ccnavi/scripts/ccnavi-start.sh --issue ${issue_arg:-<issue の番号>} --mr ${mr_arg:-<MR の番号>} --branch ${branch_arg:-$sh_branch_v} --mcp-checked"
-	if [ "$sh_stage" = mcp-args ]; then
-		sh_missing=""
-		[ -n "$issue_arg" ] || sh_missing="$sh_missing --issue"
-		[ -n "$mr_arg" ] || sh_missing="$sh_missing --mr"
-		[ -n "$branch_arg" ] || sh_missing="$sh_missing --branch"
-		printf 'ccnavi-start: ホストを見られない間は、--mcp-checked は --issue・--mr・--branch の 3 つがそろうときだけ指定できます（足りない:%s）。何も作成せずに処理を中断しました。\n' "$sh_missing"
-		if [ "$ccnavi_h_kind" = github ]; then
-			ccnavi_text "$root" NEXT_START_MCP_ARGS__GITHUB "cmd_q=$sh_cmd"
-		else
-			ccnavi_text "$root" NEXT_START_MCP_ARGS__GITLAB "cmd_q=$sh_cmd"
-		fi
-		exit "$EXIT_HOST"
-	fi
-	if [ "$ccnavi_h_kind" = github ]; then
-		case "$sh_stage" in
-		search) printf 'ccnavi-start: GitHub APIに接続できず、%s #%s に紐づく既存の MR を確かめられなかった（%s）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$what" "$number" "$sh_why" ;;
-		title) printf 'ccnavi-start: GitHub APIに接続できず、issue #%s を読めなかった（%s）。実在を確かめられないので、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$number" "$sh_why" ;;
-		merged) printf 'ccnavi-start: GitHub APIに接続できず、ブランチ %s と同じ名前のマージ済みの MR があるかを確かめられなかった（%s）。マージ済みのブランチを再利用しないため、何も作成せずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_branch" "$sh_why" ;;
-	issue-link) printf 'ccnavi-start: MR !%s が閉じる issue を確かめられなかった（%s）。issue と MR のセットが確定しないため、続けずに処理を中断しました。MCP（mcp__github__のツール）で代行してください。\n' "$stop_mr" "$sh_why" ;;
-		*) printf 'ccnavi-start: GitHub APIに接続できず、プルリクエストを作れなかった（%s）。MCP（mcp__github__のツール）で代行してください。\n' "$sh_why" ;;
-		esac
-		printf '完了済みの処理:\n'
-		if [ "$sh_stage" = create ]; then
-			printf '  ブランチ: %s（push 済み）\n  ワークツリー: %s\n' "$stop_branch" "$stop_wt"
-		else
-			printf '  なし（ブランチもワークツリーも作っていない）\n'
-		fi
-		printf 'MCP で行う手順:\n'
-		case "$sh_stage" in
-		issue-link)
-			printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と本文を読む。本文の Closes / Fixes / Resolves #<番号> が、この MR が閉じる issue\n' "$sh_owner" "$sh_repo" "$stop_mr"
-			printf '  2. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=<その番号> で呼び、issue が実在することを確かめる（Closes が無い・複数あるときは、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo"
-			printf '  3. 元ブランチと issue が決まったら、打ち直す: %s\n' "$sh_cmd"
-			;;
-		search)
-			if [ "$what" = issue ]; then
-				printf '  1. mcp__github__search_pull_requests を query=「repo:%s/%s is:pr is:open %s」で呼ぶ。タイトル・本文に #%s を含むか、元ブランチの名前に %s を含む（前後が - / _ . か端。区切り以外の文字が隣なら含まない）PR が、この issue に紐づく MR\n' "$sh_owner" "$sh_repo" "$number" "$number" "$number"
-				printf '  2. 見つかったら、一覧をユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞く（続けるなら、その PR の元ブランチ（head.ref）と本文の Closes を確かめ、--mr <その PR の番号> --issue <閉じる issue> --branch <head.ref> --mcp-checked を付けて打ち直す）\n'
-				printf '  3. 紐づく PR が無いと確かめたら、mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することも確かめる（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
-				if [ -n "$sh_adopt" ]; then
-					printf '  4. 手元に候補があるので、--mcp-checked を足すだけでは進めない。紐づく PR が見つからないときは、ユーザに相談して止まる\n'
-				else
-					printf '  4. 実在を確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
-				fi
-			else
-				printf '  1. mcp__github__pull_request_read を method=get owner=%s repo=%s pullNumber=%s で呼び、head.ref（元ブランチ）と head.repo.full_name を読む\n' "$sh_owner" "$sh_repo" "$number"
-				printf '  2. head.repo.full_name が %s/%s と違えばフォークの MR。元ブランチがこのリポジトリに無いので作業を始められない。ユーザに伝えて止める\n' "$sh_owner" "$sh_repo"
-				printf '  3. 同じなら head.ref を元ブランチとし、本文の Closes で閉じる issue を確かめ（mcp__github__issue_read で実在も確かめる）、--mr %s --issue <閉じる issue> --branch <head.ref> --mcp-checked を付けて打ち直す\n' "$number"
-			fi
-			;;
-		merged)
-			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=closed で呼び、マージ済み（merged_at がある）の PR が無いことを確かめる\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
-			printf '     mcp__github__* がセッションに無いときは gh で代行する: gh api -X GET repos/%s/%s/pulls -f state=closed -f per_page=100 -f head=%s:%s（-X GET を付ける。-f だけだと POST になる。-f なら gh が値をエンコードする）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
-			printf '  2. あれば、マージ済みのブランチは再利用できない。ユーザに伝えて止める\n'
-			if [ -n "$sh_adopt" ]; then
-				printf '  3. 無いと確かめたら、既存の MR を採用する形で、issue・MR・元ブランチの 3 つをそろえて打ち直す（値が確かめられないときは、ユーザに相談して止まる）: %s\n' "$sh_adopt_cmd"
-			else
-				printf '  3. 無いと確かめたら、同じコマンドに --mcp-checked を付けて再実行する: %s --mcp-checked\n' "$sh_cmd"
-			fi
-			;;
-		title)
-				printf '  1. mcp__github__issue_read を method=get owner=%s repo=%s issue_number=%s で呼び、issue が実在することを確かめてタイトルを読む（無ければ番号を作らず、ユーザに伝えて止める）\n' "$sh_owner" "$sh_repo" "$number"
-			printf '  2. タイトルから ASCII の小文字・数字・ハイフンの語を決め、再実行する: %s --slug <語> --title '"'"'<タイトル>'"'"' --mcp-checked\n' "$sh_cmd"
-			;;
-		*)
-			printf '  1. mcp__github__list_pull_requests を owner=%s repo=%s head=%s:%s state=open で呼び、このブランチの開いた PR が無いことを確かめる（あればその番号を <作った番号> にして 3 へ）\n' "$sh_owner" "$sh_repo" "$sh_owner" "$stop_branch"
-			printf '  2. mcp__github__create_pull_request を次の値で呼ぶ\n'
-			printf '       owner: %s\n       repo: %s\n       head: %s\n       base: %s\n       title: %s\n       body: Closes #%s\n       draft: true\n' "$sh_owner" "$sh_repo" "$stop_branch" "$stop_target" "$stop_title" "$number"
-			printf '  3. 作れた PR の番号を <作った番号> に入れて、打ち直す: %s（ブランチとワークツリーがあるので、続きから進んでワークツリーのパスを出す）\n' "$sh_cmd"
-			;;
-		esac
-	else
-		# GitLab には MCP の代行が無い。段階ごとの手順は出さず、認証を頼んで同じ引数で打ち直す（出来た段階は飛ばして続きから進む）
-		case "$sh_why" in
-		*"HTTP "[0-9][0-9][0-9]*)
-			sh_word="${sh_why#*HTTP }"
-			sh_word="HTTP ${sh_word%%:*}"
-			;;
-		*利用できず*) sh_word="${sh_why%。}" ;;
-		*) sh_word="応答なし" ;;
-		esac
-		printf 'ccnavi-start: GitLab の API に届かない（%s）。処理を中断しました。\n' "$sh_word"
-		printf '完了済みの処理:\n'
-		if [ "$sh_stage" = create ]; then
-			printf '  ブランチ: %s（push 済み）\n  ワークツリー: %s\n' "$stop_branch" "$stop_wt"
-		else
-			printf '  なし（ブランチもワークツリーも作っていない）\n'
-		fi
-		ccnavi_text "$root" NEXT_START_HOST__GITLAB "host=${ccnavi_h_host:-?}" "args_q=$orig_args"
-	fi
+	# 案内の文は実行ファイルが組み立てる（`ccnavi start guidance`）。引けなければ短い 1 行で止める。
+	start_read guidance "stage=$sh_stage" "why=$sh_why" "kind=$ccnavi_h_kind" "path=$ccnavi_h_path" \
+		"host=${ccnavi_h_host:-}" "what=$what" "number=$number" "issue=$issue_arg" "mr=$mr_arg" "branch=$branch_arg" \
+		"stop-branch=$stop_branch" "stop-mr=$stop_mr" "stop-target=$stop_target" "stop-title=$stop_title" \
+		"stop-wt=$stop_wt" "orig=$orig_args" "total=${total:-0}" ||
+		printf 'ccnavi-start: ホストに届かず止めた（%s）。案内を組み立てられなかったので、ユーザに伝えて止まってください。\n' "$sh_why"
 	exit "$EXIT_HOST"
 }
 
