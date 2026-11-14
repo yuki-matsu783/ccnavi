@@ -157,6 +157,23 @@
     ccnavi git integrate <self> <self_q> <worktree_q> <ticket_q> <lines> -- integrate|integrate-done <args>...
         （ccnavi-git.sh 用。integrate・integrate --abort・integrate-done を行い、結果をそのまま出力します。
          0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）
+    ccnavi start args -- <ccnavi-start.sh の引数>...
+        （ccnavi-start.sh 用。引数を確かめ、依頼のリポジトリ（--repo）と origin を照らし、値を 1 行 1 項目で
+         出力します。誤りは "fail <識別子> <終了コード>" と "msg <文>"。読み取り専用）
+    ccnavi start branch-ok <branch> strict|lenient [heads=<file>] [err=…] [hint=…] [exit=<n>]
+        （ccnavi-start.sh 用。識別子が親に使えるかと、同じ識別子になる別のブランチが無いかを確かめます）
+    ccnavi start merged github|gitlab <branch> <file>
+        （ccnavi-start.sh 用。同じブランチ名のマージ済み MR があれば止めます）
+    ccnavi start resolve <file>|- [issue=…] [issue-n=…] [issue-r=…] own=<owner/repo> [mr=…] [orig=…]
+        （ccnavi-start.sh 用。MR が閉じる issue の一覧から、frontmatter に書く issue を決めます）
+    ccnavi start issue-state state=open|closed|… number=<n> [real=…] [reopened=…]
+        （ccnavi-start.sh 用。closed の issue なら止めて、どうするかの次の手を出力します）
+    ccnavi start prepare <branch> [from=<起点>] [ff=yes] [initial=yes] integration=<branch> number=<n> [real=…]
+        （ccnavi-start.sh 用。ワークツリーを出し、早送りと空の初期コミットを済ませます。初期コミットを積めなければ、
+         この回で作ったワークツリーとブランチを片付けて止めます）
+    ccnavi start report <名前>=<値>...
+    ccnavi start dry new-issue|mcp|create|existing <名前>=<値>...
+        （ccnavi-start.sh 用。開始の結果と、--dry-run の作る予定を出力します）
     ccnavi start issue|linked-page|linked-body|linked-gitlab|similar|list-open|pick <args> <file>...
         （ccnavi-start.sh 用。スクリプトが取得したホストの応答のファイルを読み、1行1項目で
          出力します。読めない応答は終了コード 1。読み取り専用）

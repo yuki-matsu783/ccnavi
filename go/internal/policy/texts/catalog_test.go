@@ -363,7 +363,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	ids := regexp.MustCompile(`(?m)^  (NOTE_[A-Z0-9_]+):$`).FindAllStringSubmatch(string(data), -1)
-	if len(ids) < 15 {
+	if len(ids) < 10 {
 		t.Fatalf("%d 件しかない", len(ids))
 	}
 	c := Load(repo)
@@ -383,7 +383,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 		called[k.id] = true
 	}
 	for _, id := range []string{"NOTE_GIT_WORKTREE_REMOVE_CWD", "NOTE_GIT_PULL_CONFLICT_ON_TARGET", "NOTE_WORKTREE_RECORD_MISSING",
-		"NOTE_START_TEMPLATES", "NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
+		"NOTE_START_SLUG_SHORT", "NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
 			t.Errorf("sh が %s を引かない", id)
 		}

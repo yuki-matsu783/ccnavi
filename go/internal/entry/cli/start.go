@@ -4,17 +4,22 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
+	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/lifecycle/start"
+	"ccnavi/internal/tickets/proposal/templates"
 )
 
 // runStart は `ccnavi start <読み方> <引数>… <応答のファイル>…`（ccnavi-start.sh 用）。sh が取ってきたホストの応答を読み、
 // 1 行 1 項目で答える。応答を読めないときは何も出さずに 1。
-func runStart(stdout, stderr io.Writer, root string, args []string) int {
+func runStart(stdout, stderr io.Writer, root string, conf *config.Settings, args []string) int {
 	usage := func() int {
 		fmt.Fprintf(stderr, "ccnavi: start の引数が読めない（%s）\n", pyfmt.Repr(args))
 		return config.ExitError
@@ -50,6 +55,74 @@ func runStart(stdout, stderr io.Writer, root string, args []string) int {
 			return usage()
 		}
 		files, answer = nil, func([][]byte) (string, int) { return start.Guidance(root, ga) }
+	case op == "args":
+		wd, _ := os.Getwd()
+		files, answer = nil, func([][]byte) (string, int) { return start.Args(wd, root, rest) }
+	case op == "branch-ok" && len(rest) >= 2 && (rest[1] == "strict" || rest[1] == "lenient"):
+		kv, valid := pairs(rest[2:], "heads", "err", "hint", "exit")
+		if !valid {
+			return usage()
+		}
+		code, _ := strconv.Atoi(kv["exit"])
+		wd, _ := ospath.Getwd()
+		files, answer = nil, func([][]byte) (string, int) {
+			return start.BranchOK(wd, start.BranchArgs{Branch: rest[0], Strict: rest[1] == "strict", Heads: kv["heads"],
+				HeadsErr: kv["err"], Hint: kv["hint"], IDExit: code})
+		}
+	case op == "merged" && len(rest) == 3 && host(rest[0]):
+		files, answer = rest[2:], func(in [][]byte) (string, int) { return start.Merged(rest[0], rest[1], in[0]) }
+	case op == "resolve" && len(rest) >= 1:
+		kv, valid := pairs(rest[1:], "issue", "issue-n", "issue-r", "own", "mr", "orig")
+		if !valid {
+			return usage()
+		}
+		ra := start.ResolveArgs{Trust: rest[0] == "-", IssueArg: kv["issue"], IssueN: kv["issue-n"], IssueR: kv["issue-r"],
+			Own: kv["own"], MR: kv["mr"], Orig: kv["orig"]}
+		if !ra.Trust {
+			files = rest[:1]
+		}
+		answer = func(in [][]byte) (string, int) {
+			if len(in) > 0 {
+				ra.Linked = string(in[0])
+			}
+			return start.Resolve(root, ra)
+		}
+	case op == "issue-state":
+		kv, valid := pairs(rest, "state", "number", "real", "reopened")
+		if !valid {
+			return usage()
+		}
+		files, answer = nil, func([][]byte) (string, int) {
+			return start.IssueState(root, kv["state"], kv["number"], kv["real"], kv["reopened"] != "")
+		}
+	case op == "prepare" && len(rest) >= 1:
+		kv, valid := pairs(rest[1:], "from", "ff", "initial", "integration", "number", "real")
+		if !valid {
+			return usage()
+		}
+		wd, _ := ospath.Getwd()
+		files, answer = nil, func([][]byte) (string, int) {
+			return start.Prepare(root, wd, start.PrepareArgs{Branch: rest[0], From: kv["from"], FastForward: kv["ff"] != "",
+				Initial: kv["initial"] != "", Integration: kv["integration"], Number: kv["number"], Real: kv["real"]})
+		}
+	case op == "report":
+		kv, valid := pairs(rest, "top", "repo", "wt", "branch", "mr-url", "mr", "ff", "remote", "sync-note", "issue", "title",
+			"sync-next", "host-unseen", "sync-no-ticket", "sync-ok")
+		if !valid {
+			return usage()
+		}
+		files, answer = nil, func([][]byte) (string, int) { return start.Report(root, reportArgs(root, conf, kv)) }
+	case op == "dry" && len(rest) >= 1:
+		kv, valid := pairs(rest[1:], "title", "branch", "integration", "mr-title", "number", "issue", "host-why", "mr-url", "real", "resume")
+		if !valid {
+			return usage()
+		}
+		wd, _ := ospath.Getwd()
+		files, answer = nil, func([][]byte) (string, int) {
+			return start.DryRun(root, wd, start.DryArgs{Kind: rest[0], Title: kv["title"], Branch: kv["branch"],
+				Integration: kv["integration"], MRTitle: kv["mr-title"], Number: kv["number"], Issue: kv["issue"],
+				HostWhy: kv["host-why"], MRURL: kv["mr-url"], Real: kv["real"], Resume: kv["resume"] != ""})
+		}
 	case op == "route" && len(rest) >= 1:
 		ra, valid := routeArgs(rest[1:])
 		if !valid {
@@ -120,4 +193,34 @@ func guidanceArgs(pairs []string) (start.GuidanceArgs, bool) {
 		*field = v
 	}
 	return a, a.Stage != ""
+}
+
+// pairs は <名前>=<値> の並びを読む。known に無い名前があれば偽。
+func pairs(words []string, known ...string) (map[string]string, bool) {
+	kv := map[string]string{}
+	for _, w := range words {
+		k, v, found := strings.Cut(w, "=")
+		if !found || !slices.Contains(known, k) {
+			return nil, false
+		}
+		kv[k] = v
+	}
+	return kv, true
+}
+
+// reportArgs は `ccnavi start report` の値に、プロジェクトの名前と、提案に使えるテンプレートの数を足す。
+func reportArgs(root string, conf *config.Settings, kv map[string]string) start.ReportArgs {
+	here, _ := tree.TreeOf(root, ospath.Abspath(kv["top"]), integrate.ProjectsDir(conf, root))
+	layer := config.LayerSelf
+	if here.Project != "" {
+		layer = here.Project
+	}
+	count := -1
+	if slices.Contains(layerNames(conf, root), layer) {
+		count = templates.UsableCount(conf, root, templates.Load(conf, root), layer)
+	}
+	return start.ReportArgs{Repo: kv["repo"], Project: here.Project, WT: kv["wt"], Branch: kv["branch"], MRURL: kv["mr-url"],
+		MRNumber: kv["mr"], FF: kv["ff"], Remote: kv["remote"], SyncNote: kv["sync-note"], Issue: kv["issue"], Title: kv["title"],
+		SyncNext: kv["sync-next"], HostUnseen: kv["host-unseen"] != "", SyncNoTicket: kv["sync-no-ticket"] != "",
+		SyncOK: kv["sync-ok"] != "", Templates: count}
 }

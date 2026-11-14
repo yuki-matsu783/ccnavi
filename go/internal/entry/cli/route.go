@@ -442,7 +442,7 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return runGitCheck(in, stdout, stderr, root, conf, cmd[2:]), true
 	case cmd[0] == "start":
 		// ccnavi-start.sh が取ってきたホストの応答を読む。チケット制御の有無に依らない。
-		return runStart(stdout, stderr, root, cmd[1:]), true
+		return runStart(stdout, stderr, root, conf, cmd[1:]), true
 	}
 	if code, matched := shask.Answer(stdout, stderr, root, conf, cmd); matched {
 		return code, true

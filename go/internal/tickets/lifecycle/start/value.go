@@ -104,7 +104,7 @@ func number(v any) (float64, bool) {
 	return f, err == nil && !math.IsInf(f, 0)
 }
 
-// clean は sh の CLEAN_JQ と同じ。制御文字・C1 制御文字・行区切り・段落区切り・全角空白の並びを空白 1 つにする。
+// clean は、外から来る文字列を出力に流す前に整える。制御文字・C1 制御文字・行区切り・段落区切り・全角空白の並びを空白 1 つにする。
 func clean(s string) string {
 	var b strings.Builder
 	inRun := false

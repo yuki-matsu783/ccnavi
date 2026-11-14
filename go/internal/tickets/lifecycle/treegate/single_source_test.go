@@ -23,6 +23,8 @@ func TestOnlyTreegateReadsDirtyAndUnpushed(t *testing.T) {
 	exceptions := map[[2]string]string{
 		{"tickets/lifecycle/start/route.go", "unpushed"}: "開始の候補のブランチが統合先より何コミット進んでいるか（取り込み済みの古いブランチか、" +
 			"初期コミットだけの作りかけか）を数える。親のブランチの未 push ではない",
+		{"tickets/lifecycle/start/prepare.go", "unpushed"}: "新しく切ったブランチが統合先より進んでいるか（空の初期コミットを積むか）を数える。" +
+			"親のブランチの未 push ではない",
 	}
 	hits := map[[2]string]bool{}
 	err := filepath.WalkDir(internal, func(path string, d fs.DirEntry, err error) error {
