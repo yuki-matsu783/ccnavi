@@ -1326,24 +1326,18 @@ template_note() {
 # 変換した識別子が使える（58 文字以内、末尾が -2 桁でない。実行ファイルに聞く）・同じ識別子になる別のブランチが無い
 # （origin の全ブランチ。ls-remote。英字の大文字小文字は区別しない）・同じブランチ名のマージ済み MR が無い
 # （ホストに聞く。手元の退避には頼らない）。後ろの 3 つは新しく作るとき（id_check・clash_check・merged_check）も同じ。
+# 前の 4 つは実行ファイルの `ccnavi start route` が判定し、`problem` の行で返す。<ブランチ>
 adopt_check() {
 	ad_branch="$1"
-	ad_mr="$2"
-	ad_num=$(printf '%s' "$ad_mr" | jq -r '.number // ""')
-	ad_state=$(printf '%s' "$ad_mr" | jq -r '.state // ""')
-	ad_base=$(printf '%s' "$ad_mr" | jq -r '.base // ""')
-	ad_fork=$(printf '%s' "$ad_mr" | jq -r '.fork // false')
-	case "$ad_state" in
-	open | opened) ;;
-	*) fail adopt-not-open "MR !${ad_num} は ${ad_state:-状態が不明}。open の MR だけ採用できます（閉じた・マージ済みの MR のブランチでは続けません）。ユーザに確かめてください。" ;;
+	ad_num="$c_mrnum"
+	ad_state=$(route_get mr-state)
+	ad_base=$(route_get mr-base)
+	case "$(route_get problem)" in
+	not-open*) fail adopt-not-open "MR !${ad_num} は ${ad_state:-状態が不明}。open の MR だけ採用できます（閉じた・マージ済みの MR のブランチでは続けません）。ユーザに確かめてください。" ;;
+	fork) fail fork-mr "MR !${ad_num} はフォークから出ている。元ブランチ ${ad_branch} はこのリポジトリに無いので、ここでは作業を始められません。フォーク側のブランチで続けるか、ユーザに相談してください。" ;;
+	target*) fail adopt-target "MR !${ad_num} のマージ先は ${ad_base:-不明} で、統合先 ${integration} ではありません。マージ先を直すか、別の作業としてユーザに相談してください。" ;;
+	protected) fail adopt-protected "ブランチ ${ad_branch} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。" ;;
 	esac
-	[ "$ad_fork" != true ] ||
-		fail fork-mr "MR !${ad_num} はフォークから出ている。元ブランチ ${ad_branch} はこのリポジトリに無いので、ここでは作業を始められません。フォーク側のブランチで続けるか、ユーザに相談してください。"
-	[ "$ad_base" = "$integration" ] ||
-		fail adopt-target "MR !${ad_num} のマージ先は ${ad_base:-不明} で、統合先 ${integration} ではありません。マージ先を直すか、別の作業としてユーザに相談してください。"
-	if ! ccnavi_is_branch "$ad_branch" || [ "$ad_branch" = "$integration" ]; then
-		fail adopt-protected "ブランチ ${ad_branch} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。"
-	fi
 	id_check "$ad_branch"
 	clash_check "$ad_branch" strict
 	merged_check "$ad_branch"
@@ -1524,10 +1518,18 @@ fi
 if ! sh "$scripts/ccnavi-branches.sh" "--$what" "$number" --json >"$cand_json"; then
 	fail branches-failed "ccnavi-branches.sh が候補を出せなかった（上の文面を見てください）。"
 fi
-jq -e . "$cand_json" >/dev/null 2>&1 || fail branches-bad-json "ccnavi-branches.sh の出力を読めなかった。"
-checked=$(jq -r '.host.checked' "$cand_json")
-host_reason=$(jq -r '.host.reason // ""' "$cand_json")
-total=$(jq '.candidates | length' "$cand_json")
+# 候補と引数とこのリポジトリの git から、進む道を実行ファイルに決めさせる（`ccnavi start route`）。答えは 1 行 1 項目。
+route_out=$(start_read route "$cand_json" "what=$what" "number=$number" "issue=$issue_arg" "mr=$mr_arg" \
+	"branch=$branch_arg" "mcp=$mcp_checked" "integration=$integration") ||
+	fail branches-bad-json "ccnavi-branches.sh の出力を読めなかった。"
+# route の答えの <項目> の値。<項目>
+route_get() {
+	printf '%s\n' "$route_out" | sed -n "s/^$1 //p" | head -n 1
+}
+checked=$(route_get checked)
+host_reason=$(route_get reason)
+total=$(route_get total)
+route=$(route_get route)
 log_debug 候補を読んだ -- "checked=$checked" "total=$total"
 
 # 一覧を出す（ccnavi-branches.sh の人が読む形）
@@ -1541,12 +1543,12 @@ unchecked=""
 
 # ホストに届かず、MCP またはユーザがブラウザで確かめたうえで issue・MR・元ブランチがそろっているとき:
 # 候補の探索の代わりに --branch のブランチで、ホストを見ずに続ける。ホストにしか無い情報は補わない
-if [ -n "$unchecked" ] && [ -n "$mcp_checked" ] && [ -n "$issue_arg" ] && [ -n "$mr_arg" ] && [ -n "$branch_arg" ]; then
+if [ "$route" = mcp ]; then
 	cb="$branch_arg"
-	{ ccnavi_is_branch "$cb" && [ "$cb" != "$integration" ]; } ||
-		fail adopt-protected "ブランチ ${cb} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。"
-	[ -n "$(branch_ref "$cb")" ] ||
-		fail branch-missing "ブランチ $cb が手元にも origin にもありません。--branch の綴りを確かめてください。"
+	case "$(route_get problem)" in
+	protected) fail adopt-protected "ブランチ ${cb} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。" ;;
+	branch-missing) fail branch-missing "ブランチ $cb が手元にも origin にもありません。--branch の綴りを確かめてください。" ;;
+	esac
 	id_check "$cb"
 	mode=strict
 	remote_heads || mode=lenient
@@ -1571,7 +1573,7 @@ if [ -n "$unchecked" ] && [ -n "$mcp_checked" ] && [ -n "$issue_arg" ] && [ -n "
 	exit 0
 fi
 
-if [ "$total" -gt 1 ]; then
+if [ "$route" = multi ]; then
 	show_list
 	printf 'ccnavi-start: 候補が %s 件見つかったため、何も作成せずに処理を中断しました。ユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$total"
 	log_info 候補が複数 -- "total=$total"
@@ -1580,13 +1582,13 @@ fi
 
 # ホストを見られないまま続けない（手元の候補だけでは、既存の MR も閉じる issue も確かめられない）。
 # --mcp-checked でも、新しく作る道（候補が 0 件で --issue だけ）以外は、3 つの引数がそろわなければ止める
-if [ -n "$unchecked" ] && { [ "$total" -ge 1 ] || [ "$what" = mr ]; }; then
+if [ "$route" = unchecked ]; then
 	host_rc=0
 	host_open || host_rc=$?
 	if [ "$host_rc" -eq 1 ]; then
 		fail host-unreadable "ホストを見られず（${host_reason}）、origin も読めない（${host_why}）。何も作成せずに処理を中断しました。"
 	fi
-	stop_branch=$(jq -r '.candidates[0].branch // ""' "$cand_json")
+	stop_branch=$(route_get branch)
 	if [ -n "$mcp_checked" ]; then
 		stop_host mcp-args "${host_reason:-$host_why}"
 	fi
@@ -1594,10 +1596,10 @@ if [ -n "$unchecked" ] && { [ "$total" -ge 1 ] || [ "$what" = mr ]; }; then
 fi
 
 if [ "$total" -eq 0 ]; then
-	if [ "$what" = mr ]; then
+	if [ "$route" = mr-not-found ]; then
 		fail mr-not-found "MR #${number} の元ブランチを読めなかった。番号を確かめてください。"
 	fi
-	if [ -n "$unchecked" ] && [ -z "$mcp_checked" ]; then
+	if [ "$route" = none-unchecked ]; then
 		# 既存の MR を見落として重複を作らないため、新規作成に進まず止める
 		host_rc=0
 		host_open || host_rc=$?
@@ -1606,7 +1608,7 @@ if [ "$total" -eq 0 ]; then
 		fi
 		stop_host search "${host_reason:-$host_why}"
 	fi
-	if [ -n "$branch_arg" ]; then
+	if [ "$route" = none-branch ]; then
 		# --branch は既存の MR の元ブランチを指す。ホストを見られないなら 3 つそろえる案内、見られたのに MR が無ければ止める
 		[ -z "$unchecked" ] || stop_host mcp-args "${host_reason:-ホストを見られない}"
 		fail branch-no-mr "--branch ${branch_arg} を元ブランチに持つ開いた MR は見つかりません（issue #${number} に紐づく候補が 0 件）。ブランチ名を確かめるか、--branch を外して新しく始めてください。" 1
@@ -1703,28 +1705,26 @@ if [ "$total" -eq 0 ]; then
 fi
 
 # ---- 3. 候補がちょうど 1 件（ホストを見られている）
-cb=$(jq -r '.candidates[0].branch' "$cand_json")
-ccnavi_is_branch "$cb" || fail bad-candidate "候補のブランチ名（${cb}）が使えない書き方か、保護されたブランチ（統合先・main・master・develop・release など）です。ユーザに確かめてください。"
-c_local=$(jq -r '.candidates[0].local' "$cand_json")
-c_origin=$(jq -r '.candidates[0].origin' "$cand_json")
-c_mrs=$(jq '.candidates[0].mrs | length' "$cand_json")
-c_url=$(jq -r '[.candidates[0].mrs[]?.url][0] // ""' "$cand_json")
-c_mrnum=$(jq -r '[.candidates[0].mrs[]?.number][0] // ""' "$cand_json")
+cb=$(route_get branch)
+c_mrs=$(route_get mrs)
+c_url=$(route_get url)
+c_mrnum=$(route_get mr)
+[ "$route" != bad-candidate ] || fail bad-candidate "候補のブランチ名（${cb}）が使えない書き方か、保護されたブランチ（統合先・main・master・develop・release など）です。ユーザに確かめてください。"
 
-if [ "$c_local" != true ] && [ "$c_origin" != true ] && [ "$c_mrs" -eq 0 ]; then
+if [ "$route" = proposal-only ]; then
 	# どこにも実体が無い（チケットの提案だけ）。ユーザが決める
 	show_list
 	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体がありません（チケットの提案だけ）。何も作成せずに処理を中断しました。ユーザに確かめてください。\n' "$cb"
 	exit "$EXIT_MULTI"
 fi
 # --branch はホストに届くとき、普通に確かめる側の指定（MR の元ブランチと違えば止める）
-if [ -n "$branch_arg" ] && [ "$cb" != "$branch_arg" ]; then
+if [ "$route" = branch-mismatch ]; then
 	fail branch-mismatch "--branch ${branch_arg} は、ホストで見つかった元ブランチ ${cb} と違います。ブランチ名を確かめて打ち直してください。" 1
 fi
 # 紐づく MR がすでにある。--issue だけで来て、ローカルにそのブランチの親のワークツリーが無ければ、他の PC・他の
 # セッションの作業かもしれない。黙って引き継がず、ユーザに聞く（--mr を渡されたら、選んだものとして続ける）。
 # ワークツリーがあれば自分の作業の再開なので、聞かずに続ける
-if [ "$c_mrs" -gt 0 ] && [ "$what" = issue ] && [ -z "$(worktree_of "$cb")" ]; then
+if [ "$route" = mr-exists ]; then
 	show_list
 	printf 'ccnavi-start: issue #%s に紐づく MR !%s（%s）がすでにあります。この PC にそのブランチ %s のワークツリーが無いので、他の PC や他のセッションの作業かもしれません。何も作成せずに処理を中断しました。\n' "$number" "$c_mrnum" "$c_url" "$cb"
 	ccnavi_text "$root" NEXT_START_MR_EXISTS "issue=$number" "mr=$c_mrnum"
@@ -1732,9 +1732,8 @@ if [ "$c_mrs" -gt 0 ] && [ "$what" = issue ] && [ -z "$(worktree_of "$cb")" ]; t
 	exit "$EXIT_MULTI"
 fi
 # 既存の MR を採用するときの確認。引っかかったら止める
-if [ "$c_mrs" -gt 0 ]; then
-	c_mr=$(jq -c '.candidates[0].mrs[0]' "$cand_json")
-	adopt_check "$cb" "$c_mr"
+if [ "$route" = adopt ]; then
+	adopt_check "$cb"
 	# adopt_check の後で、その MR が閉じる issue を確かめる
 	stop_branch="$cb"
 	resolve_issue "$c_mrnum"
@@ -1751,25 +1750,15 @@ fi
 # 統合先より進んでいない（c_ahead=0）ブランチは作りかけと見なさない。取り込み済みで消し忘れた古いブランチと区別できず、
 # 続けると空コミット・push・新しい Draft MR を作ってしまう。一覧を出してユーザに聞く
 resume=""
-if [ "$c_mrs" -eq 0 ]; then
-	case "$cb" in
-	*/*) ;;
-	*)
-		cref=$(branch_ref "$cb")
-		if [ -n "$cref" ] && ref_exists "refs/remotes/origin/$integration"; then
-			c_ahead=$(git rev-list --count "origin/$integration..$cref" 2>/dev/null || echo 9)
-			c_subject=$(git log -1 --format=%s "$cref" 2>/dev/null || :)
-			if [ "$c_ahead" -eq 0 ]; then
-				show_list
-				printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR もありません（取り込み済みで消し忘れた古いブランチかもしれない）。何も作成せずに処理を中断しました。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
-				log_info 古いブランチらしい -- "branch=$cb"
-				exit "$EXIT_MULTI"
-			fi
-			if [ "$c_ahead" -eq 1 ] && [ "$c_subject" = "$init_subject" ] && [ "$what" = issue ]; then
-				resume=1
-			fi
-		fi
+if [ "$route" = nomr ]; then
+	case "$(route_get after)" in
+	stale)
+		show_list
+		printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR もありません（取り込み済みで消し忘れた古いブランチかもしれない）。何も作成せずに処理を中断しました。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
+		log_info 古いブランチらしい -- "branch=$cb"
+		exit "$EXIT_MULTI"
 		;;
+	resume) resume=1 ;;
 	esac
 	if [ -z "$resume" ]; then
 		# MR の無い候補は成功させない（issue と MR のセットが確定しない）
@@ -1838,7 +1827,7 @@ stop_branch="$cb"
 fetch_branch "$cb"
 ensure_worktree "$cb"
 fast_forward "$cb"
-next_title=$(jq -r '.candidates[0].mrs[0].title // ""' "$cand_json")
+next_title=$(route_get title)
 finish_up "$cb" "$c_mrnum"
 report "$cb" "$c_url" "$c_mrnum"
 log_info 続ける -- "branch=$cb"
