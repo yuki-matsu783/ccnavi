@@ -52,6 +52,7 @@ if ev == "UserPromptSubmit":
 env = {k: v for k, v in os.environ.items() if k.startswith("CLAUDE")}
 line = {"tag": tag, "payload": p, "t0": t0, "t1": time.time(),
         "env_names": sorted(env), "project_dir": env.get("CLAUDE_PROJECT_DIR"),
+        "hook_path_env": os.environ.get("CONTRACT_HOOK_PATH"),
         "hook_cwd": os.getcwd()}
 with open(os.path.join(rec, "log.jsonl"), "a", encoding="utf-8") as f:
     f.write(json.dumps(line, ensure_ascii=False) + "\n")
@@ -97,6 +98,7 @@ PROMPT = """これはツールの動きを録るテストです。
 7. Bash ツールで `echo block-post` を打つ
 8. Read ツールで ctx-me.txt を読む
 9. サブエージェント（general-purpose）を 1 つ起動し、次のとおり頼む。
+   run_in_background は false にして、終わるまで待つ。
    「Read ツールで a.txt を読み、Write ツールで sub.txt に ok と書いて終わる」
 10. 最後に「おわり」とだけ答える
 """
@@ -120,16 +122,21 @@ MODEL_KEY = re.compile(r"claude|haiku|sonnet|opus|fable", re.IGNORECASE)
 ID_KEY = re.compile(r"^toolu_|^[0-9a-f]{8}-[0-9a-f]{4}-|^[0-9a-f]{16,}$")
 
 
-def settings(rec_dir: str) -> dict:
-    hook = os.path.join(rec_dir, "hook.py")
+# settings.json の env に入れ、hook の命令で使う変数。ccnavi の hook が CCNAVI_ENTRY_PATH を
+# 使うのと同じ形にする（env が hook に届かなければ hook が起きず、観察が空になる）
+HOOK_PATH_ENV = "CONTRACT_HOOK_PATH"
+HOOK_PATH = ".rec/hook.py"
+
+
+def settings() -> dict:
     hooks = {}
     for ev in EVENTS:
-        py = sys.executable
-        entries = [{"type": "command", "command": f'"{py}" "{hook}" A', "timeout": 30}]
+        cmd = f'"{sys.executable}" "${{CLAUDE_PROJECT_DIR}}/${{{HOOK_PATH_ENV}}}"'
+        entries = [{"type": "command", "command": f"{cmd} A", "timeout": 30}]
         if ev == "UserPromptSubmit":
-            entries.append({"type": "command", "command": f'"{py}" "{hook}" B', "timeout": 30})
+            entries.append({"type": "command", "command": f"{cmd} B", "timeout": 30})
         hooks[ev] = [{"hooks": entries}]
-    return {"hooks": hooks}
+    return {"env": {HOOK_PATH_ENV: HOOK_PATH}, "hooks": hooks}
 
 
 def build_tree(base: str) -> str:
@@ -140,7 +147,7 @@ def build_tree(base: str) -> str:
     with open(os.path.join(rec, "hook.py"), "w", encoding="utf-8") as f:
         f.write(HOOK)
     with open(os.path.join(tree, ".claude", "settings.json"), "w", encoding="utf-8") as f:
-        json.dump(settings(rec), f, ensure_ascii=False, indent=2)
+        json.dump(settings(), f, ensure_ascii=False, indent=2)
     for name, body in (("a.txt", "hello\n"), ("ctx-me.txt", "ctx\n")):
         with open(os.path.join(tree, name), "w", encoding="utf-8") as f:
             f.write(body)
@@ -224,15 +231,18 @@ def tool_key(payload: dict) -> str:
     return f"{ev}:{tool}" if tool else ev
 
 
+# モデルが書く行。ここに文が出るかはモデルの答え方で変わるので、出た場所に数えない
+MODEL_LINES = ("assistant/", "result/success")
+
+
 def text_in(events: list[dict], needle: str) -> list[str]:
-    """needle を含む stream-json の行の type/subtype の一覧。"""
-    return sorted(
-        {
-            f"{e.get('type')}/{e.get('subtype', '')}"
-            for e in events
-            if needle in json.dumps(e, ensure_ascii=False)
-        }
-    )
+    """needle を含む stream-json の行の type/subtype の一覧（モデルが書く行を除く）。"""
+    kinds = {
+        f"{e.get('type')}/{e.get('subtype', '')}"
+        for e in events
+        if needle in json.dumps(e, ensure_ascii=False)
+    }
+    return sorted(kinds - set(MODEL_LINES))
 
 
 def tool_result_text(events: list[dict], tool_use_id: str) -> tuple[bool, str] | None:
@@ -325,7 +335,7 @@ def observe(tree: str, logs: list[dict], streams: list[list[dict]]) -> dict:
             "started": len(sub_start),
             "agent_types": sorted({str(p.get("agent_type")) for p in sub_start}),
             "nested_tool_events": sorted({tool_key(p) for p in agent_payloads}),
-            "stream_nested_assistant_lines": len(nested),
+            "stream_has_nested_assistant_lines": bool(nested),
             "launcher_tools": sorted(
                 {
                     p.get("tool_name")
@@ -345,6 +355,7 @@ def observe(tree: str, logs: list[dict], streams: list[list[dict]]) -> dict:
             }
         ),
         "hook_cwd_is_project_dir": sorted({e["hook_cwd"] == e["project_dir"] for e in a_hooks}),
+        "settings_env_in_hook": sorted({str(e.get("hook_path_env")) for e in a_hooks}),
         "env_names": sorted(
             {
                 n

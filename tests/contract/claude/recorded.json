@@ -2620,6 +2620,11 @@
         "string"
        ]
       },
+      "surpassedThreshold": {
+       "t": [
+        "number"
+       ]
+      },
       "unifiedWindows": {
        "t": [
         "object"
@@ -2638,6 +2643,11 @@
           "status": {
            "t": [
             "string"
+           ]
+          },
+          "surpassedThreshold": {
+           "t": [
+            "number"
            ]
           },
           "utilization": {
@@ -2670,6 +2680,11 @@
          }
         }
        }
+      },
+      "utilization": {
+       "t": [
+        "number"
+       ]
       }
      }
     },
@@ -4413,11 +4428,6 @@
           "integer"
          ]
         },
-        "policy_limits_await_ms": {
-         "t": [
-          "integer"
-         ]
-        },
         "pre_action_client_data_url_ms": {
          "t": [
           "integer"
@@ -4550,7 +4560,6 @@
         }
        },
        "opt": [
-        "policy_limits_await_ms",
         "resume_deserialize_ms",
         "resume_live_check_ms"
        ]
@@ -4710,11 +4719,6 @@
           "integer"
          ]
         },
-        "policy_limits_await_ms": {
-         "t": [
-          "integer"
-         ]
-        },
         "pre_action_client_data_url_ms": {
          "t": [
           "integer"
@@ -4852,7 +4856,6 @@
         }
        },
        "opt": [
-        "policy_limits_await_ms",
         "resume_deserialize_ms",
         "resume_live_check_ms",
         "resume_load_cpu_ms"
@@ -6430,7 +6433,7 @@
     "SubagentStart",
     "SubagentStop"
    ],
-   "stream_nested_assistant_lines": 3,
+   "stream_has_nested_assistant_lines": true,
    "launcher_tools": [
     "Agent"
    ]
@@ -6443,6 +6446,9 @@
   ],
   "hook_cwd_is_project_dir": [
    true
+  ],
+  "settings_env_in_hook": [
+   ".rec/hook.py"
   ],
   "env_names": [
    "CLAUDE_CODE_ENTRYPOINT",
