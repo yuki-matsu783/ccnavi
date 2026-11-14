@@ -208,7 +208,7 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 
 #### 案内と配布
 
-**`ccnavi-start.sh` の案内。** 親チケットも提案も無いワークツリーでは、提案を作る `次:` の案内の末尾に、使えるテンプレートがあるときだけ `案内:` を 1 行足す（`--plan` の代わりに `--template <名前>`、一覧は `ccnavi-launcher.sh --templates`）。層は `ticket new --template` が引く層（`projects/<名前>/` ならそのプロジェクト）に合わせる。件数は `ccnavi --templates --json` の `usable` が true のものの数で、結果を出す実行ファイル（`ccnavi start report`）が同じ数え方で数える。0 本か、層が無いときは何も出さない。言及が無いと、エージェントは手書きの `--plan` に進み、テンプレートを見つけないため。`ccnavi ticket new` が `--plan` も `--template` も無く断る文は、この `次:` を読まずに `ticket new` を打った場合にだけ出るので、足さない。
+**`ccnavi-start.sh` の案内。** 親チケットも提案も無いワークツリーでは、提案を作る `次:` の案内の末尾に、使えるテンプレートがあるときだけ `案内:` を 1 行足す（`--plan` の代わりに `--template <名前>`、一覧は `ccnavi-launcher.sh --templates`）。層は `ticket new --template` が引く層（`projects/<名前>/` ならそのプロジェクト）に合わせる。件数は `ccnavi --templates --json` の `usable` が true のものの数で、結果を出す実行ファイル（`ccnavi start report`）が同じ数え方で数える。0 本か、層が無いときは何も出さない。言及が無いと、エージェントは手書きの `--plan` に進んでテンプレートを見つけないので、この `案内:` を足す。`ccnavi ticket new` が `--plan` も `--template` も無く断る文は、この `次:` を読まずに `ticket new` を打った場合にだけ出るので、足さない。
 
 **親の `finish` の案内。** 親が閉じる出力（`ops.closeParent`。子の `finish` には出さない）の最後に、テンプレート化の案内を 1 行足す。
 `ready` は閉じた親の `done/`・`flows/` を手元の `logs/archive/` へ退避し、退避した親から下書きは作れないので、材料が残っている `ready` の前に出す。
