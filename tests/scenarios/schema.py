@@ -11,6 +11,11 @@ from tests.scenarios import hostenv
 
 SETUP_KEYS = {"files", "issue", "git", "reset", "host", "host_state"}
 
+# agent の値。claude は本物の claude -p で回す。script は step の script を
+# 代役（tests/fake_claude.py）で回す
+AGENT_CLAUDE = "claude"
+AGENT_SCRIPT = "script"
+
 
 SHA40 = re.compile(r"[0-9a-fA-F]{40}")
 
@@ -31,6 +36,8 @@ def load_scenario(path):
     data.setdefault("budget_usd", 1.0)
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
+    data.setdefault("agent", AGENT_CLAUDE)
+    _check_agent(path, data)
     _check_setup(path, data.get("setup"))
     _check_human_api(path, data)
     _check_human_run(path, data)
@@ -53,6 +60,18 @@ def load_scenario(path):
                 + ", ".join(sorted(extra))
             )
     return data
+
+
+def _check_agent(path, data):
+    """agent: script なら、人間の操作でない step はすべて script（打つ手の列）を持つ。"""
+    if data["agent"] not in (AGENT_CLAUDE, AGENT_SCRIPT):
+        raise ValueError(f"{path}: agent は {AGENT_CLAUDE} か {AGENT_SCRIPT} です")
+    for n, step in enumerate(data["steps"], 1):
+        for key in ("script", "after_stop_block"):
+            if key in step and not isinstance(step[key], list):
+                raise ValueError(f"{path}: step {n} の {key} は手の list です")
+        if data["agent"] == AGENT_SCRIPT and not step.get("human") and not step.get("script"):
+            raise ValueError(f"{path}: step {n} agent: script のシナリオでは script が要ります")
 
 
 def _check_human_api(path, data):

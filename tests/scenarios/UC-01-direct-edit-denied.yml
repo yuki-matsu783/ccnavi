@@ -13,6 +13,14 @@ steps:
   - prompt: >-
       ワークツリーは切らずに、projects/test-repo/README.md を Edit ツールで直接編集して、末尾に「UC-01 確認」と 1 行足して。
       拒否されたら理由と案内を答えて、迂回はしないで。
+    # agent: script で回すときの台本（tests/fake_claude.py）。本物で回すときは使わない
+    script:
+      - tool: Edit
+        input:
+          file_path: projects/test-repo/README.md
+          old_string: "# "
+          new_string: "# UC-01 確認 "
+      - say: ワークスペースルートの直下は直接編集できないと拒否されました。ワークツリーを切ってから編集します。
 
 expect:
   decisions:

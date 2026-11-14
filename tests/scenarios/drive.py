@@ -4,7 +4,9 @@ step の種類を actors/ に振り分け、状態を書き、判定と後片付
 """
 
 import json
+import os
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -26,6 +28,7 @@ from tests.scenarios.common import (
     INCONCLUSIVE,
     PASS,
     REVIEW,
+    ROOT,
     RUNNER,
     Refusal,
     refuse,
@@ -60,6 +63,8 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no
         cmd += ["--session-id", session_id]
     if not persist:
         cmd += ["--no-session-persistence"]
+    if scn.get("agent") == schema.AGENT_SCRIPT:
+        cmd, env = _scripted(cmd, step, out / f"step-{idx}.script.json", env)
     r = subprocess.run(
         cmd, cwd=root, capture_output=True, text=True, timeout=STEP_TIMEOUT_SEC, env=env
     )
@@ -70,6 +75,16 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no
         # 失敗した step の出力は、ここでは判定に使わない（drive が止める）
         raise RuntimeError(f"claude が終了コード {r.returncode} で終わった")
     return stream.parse_stream(r.stdout)
+
+
+def _scripted(cmd, step, plan_path, env):
+    """claude の代わりに代役（tests/fake_claude.py）を同じ引数で起こす形にする。"""
+    plan = {"script": step["script"], "after_stop_block": step.get("after_stop_block") or []}
+    plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+    env = dict(os.environ if env is None else env)
+    env["CCNAVI_FAKE_CLAUDE_SCRIPT"] = str(plan_path)
+    env["PYTHONPATH"] = str(ROOT)
+    return [sys.executable, "-m", "tests.fake_claude", *cmd[1:]], env
 
 
 def _persist_needed(steps, idx):
@@ -189,7 +204,11 @@ def finish(scn, out, st, root):
         # state の run は setup のファイルが残っているうちに回す。消すのは判定のあと
         raw = "".join(p.read_text(encoding="utf-8") for p in sorted(out.glob("step-*.jsonl")))
         rows = expect.read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
-        results = expect.evaluate(scn["expect"], rows, raw, root, st["pre_digests"])
+        spec = scn["expect"]
+        if scn.get("agent") == schema.AGENT_SCRIPT:
+            # 代役は台本どおりに打つので、モデルの振る舞いを読む judge は評価しない
+            spec = {k: v for k, v in spec.items() if k != "judge"}
+        results = expect.evaluate(spec, rows, raw, root, st["pre_digests"])
         halt = st.get("halt")
         if halt:
             # 止まった回は後続の step が回っていないので、decisions・state は必ず落ちる。外す

@@ -4560,3 +4560,57 @@ for _name in [n for n in dir(DockerLifecycleTest) if n.startswith("test_")]:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScriptedAgentTest(unittest.TestCase):
+    """agent: script の step を、claude の代わりに代役（tests/fake_claude.py）で回す。"""
+
+    def test_step_runs_the_fake_and_hook_denies(self):
+        with tempfile.TemporaryDirectory() as d:
+            root, out = Path(d) / "root", Path(d) / "out"
+            (root / ".claude").mkdir(parents=True)
+            out.mkdir()
+            (root / "a.txt").write_text("hello\n", encoding="utf-8")
+            deny = json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": "止めた",
+                    }
+                },
+                ensure_ascii=False,
+            )
+            hook = {"type": "command", "command": f"printf '%s' '{deny}'"}
+            (root / ".claude/settings.json").write_text(
+                json.dumps({"hooks": {"PreToolUse": [{"hooks": [hook]}]}}), encoding="utf-8"
+            )
+            scn = {
+                "agent": schema.AGENT_SCRIPT,
+                "model": "haiku",
+                "budget_usd": 1.0,
+                "_prompt_steps": 1,
+                "permission_mode": "auto",
+            }
+            step = {
+                "prompt": "直して",
+                "script": [
+                    {
+                        "tool": "Edit",
+                        "input": {"file_path": "a.txt", "old_string": "hello", "new_string": "hi"},
+                    }
+                ],
+            }
+            env = {**os.environ, "CCNAVI_FAKE_CLAUDE_HOME": str(Path(d) / "home")}
+            with mock.patch.object(drive, "require_entry"):
+                ev = drive.run_step(scn, step, out, 1, "s-1", None, False, root, env=env)
+            self.assertTrue(ev["tool_results"][0]["is_error"])
+            self.assertIn("止めた", stream.text_of(ev["tool_results"][0]["content"]))
+            self.assertEqual((root / "a.txt").read_text(encoding="utf-8"), "hello\n")
+
+    def test_script_step_requires_script(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "scn.yml"
+            path.write_text("id: T\nagent: script\nsteps:\n  - prompt: a\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "script が要ります"):
+                schema.load_scenario(path)
