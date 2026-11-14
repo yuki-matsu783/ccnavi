@@ -110,8 +110,8 @@
          "mr <番号>|-"（親チケットの mr:）を出力します。スクリプト自身は
          チケットのYAMLを読み込みません）
     ccnavi tree bound <tree> <name>
-        （ccnavi-git.sh integrate 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
-         ワークツリーがチケットに結び付くか。結び付くと integrate は断ります）、結び付くなら
+        （ccnavi-worktree.sh --adopt 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
+         ワークツリーがチケットに結び付くか。結び付くと --adopt は断ります）、結び付くなら
          "why <理由>" を出力します。Stop の促しと同じ判定です）
     ccnavi tree leftover <tree> <name>
         （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"leftover yes|no"（そのツリーが親の

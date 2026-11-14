@@ -133,8 +133,9 @@ type Options struct {
 	// input は標準入力に渡す文字列（check-ignore --stdin など）。nil なら親の標準入力のまま。
 	input *string
 	// PlainPathspecs はユーザの環境の pathspec の読み方（pathspecEnv）を外し、git の既定に戻す。
-	PlainPathspecs bool // IndexFile は索引のファイル（GIT_INDEX_FILE）。空ならリポジトリの索引。一時の索引で木を組むときに使う。
-	IndexFile      string
+	PlainPathspecs bool
+	// IndexFile は索引のファイル（GIT_INDEX_FILE）。空ならリポジトリの索引。一時の索引で木を組むときに使う。
+	IndexFile string
 }
 
 func (o Options) timeout() time.Duration {
