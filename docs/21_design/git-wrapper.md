@@ -13,6 +13,12 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
 `.ccnavi/scripts/ccnavi-git.sh` は安全な git だけを通し、出力を抑えて結果だけを返す。生の `git` はルールで拒否し、拒否の文面からここへ誘導する。
 ここは何を通し、何を止めるかを書く。ラッパースクリプトで守る場所を消す・戻す形は [8. 自己防衛](self-guard.md) にある。
 
+## 判定の置き場
+
+引数だけで決まる判定は、実行ファイルの `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`）が行う。サブコマンドより前のオプション、どのサブコマンドでも許さない形（設定の一時上書き・ファイル書き込みや外部コマンド実行に変えるオプション・判定の起点を動かすオプションと、その略）、読むだけのサブコマンド、`cat-file`・`grep`・`branch`・`tag`・`remote`・`stash`・`add`・`commit` の形、通さないサブコマンドがこれに当たる。ラッパースクリプトは git の引数を標準入力に NUL 区切りで渡し、`allow`・`pass`・`deny <識別子>` と拒否の文の答えを見る。実行ファイルが見つからない・答えないときは、形を確かめられないので拒否する。
+
+ワークツリーと状態を見る判定（守る場所に向く `rm`・`restore`・`checkout <ref> <パス>`、`worktree add`、`checkout`・`switch` のブランチの移動、`merge`、`fetch`・`pull`、`push` とそのゲート、`integrate`）は、`pass` の答えのあとにラッパースクリプトが行う。
+
 ## 何を通し、何を止めるか
 
 - 通す形の一覧に無いものは拒否する。`git branch -D`、`git worktree remove --force`、`git tag -d`、`git checkout -- <パス>` のように
