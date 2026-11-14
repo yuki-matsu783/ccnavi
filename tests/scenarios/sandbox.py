@@ -2,9 +2,9 @@
 
 一時ディレクトリに、ccnavi の hook が動くのに要るものだけを置いたワークスペースを組む。
 
-- このリポジトリの作業ツリーから、追跡している `.ccnavi/`（`bin/` は管理外なので入らない）、
-  `.claude/settings.json`・`.claude/hooks/`、`.gitignore`、`docs/wiki/` をコピーし、
-  git のリポジトリにする
+- このリポジトリの作業ツリーから、`.ccnavi/`・`.claude/settings.json`・`.claude/hooks/`・
+  `.gitignore`・`docs/wiki/` をコピーし、git のリポジトリにする。コピーするのは、追跡している
+  ファイルと、まだ add していないファイル（`.gitignore` で外した `bin/` などは入らない）
 - テストが組む ccnavi の実行ファイル（`tests/exe.py`）を `.ccnavi/bin/<os>-<arch>/` に置く
 - `settings.json` の `CCNAVI_MODE` を `enable` にする（この使い捨てのワークスペースの中だけ）
 - `projects/test-repo` に、README を 1 本持つ小さなリポジトリを置く
@@ -55,7 +55,18 @@ def make_base():
 
 def _tracked(paths):
     r = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "-z", "--", *paths],
+        [
+            "git",
+            "-C",
+            str(ROOT),
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            *paths,
+        ],
         capture_output=True,
         text=True,
         check=True,
@@ -81,6 +92,7 @@ def _put_exe(ws):
 
 def _commit(path):
     git = ["git", "-C", str(path), "-c", "user.name=ccnavi-test", "-c", "user.email=test@invalid"]
+    git += ["-c", "commit.gpgsign=false"]  # 署名を求める設定の機械でも組めるように
     subprocess.run([*git, "init", "-q", "-b", "main"], check=True)
     subprocess.run([*git, "add", "-A"], check=True)
     subprocess.run([*git, "commit", "-q", "-m", "使い捨てのワークスペース"], check=True)

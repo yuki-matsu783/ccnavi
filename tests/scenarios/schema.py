@@ -74,8 +74,9 @@ def stub_unready(scn):
     回せるのは、人間の操作が無く、step がすべて script を持ち、setup が作るファイルだけのもの。"""
     if any(s.get("human") for s in scn["steps"]):
         return "人間の操作の step がある"
-    if unscripted_step(scn):
-        return f"step {unscripted_step(scn)} に script が無い"
+    n = unscripted_step(scn)
+    if n:
+        return f"step {n} に script が無い"
     setup = scn.get("setup") or {}
     if set(setup) - {"files"}:
         return "setup が作るファイル以外を使う: " + ", ".join(sorted(set(setup) - {"files"}))
