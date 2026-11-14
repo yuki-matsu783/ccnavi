@@ -57,9 +57,10 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
-| `tests/fake_claude.py`・`tests/contract/claudeside.py`・`tests/contract/claude/recorded.json` | `contract` `scenarios`（`scenarios` の `test_runner` はスタブを起こす） |
+| `tests/fake_claude.py`・`tests/contract/claudeside.py`・`tests/contract/claude/recorded.json` | `contract` `scenarios`（`scenarios` の `test_runner`・`test_stub_scenarios` はスタブを使う） |
 | `tests/manual/claude/record_hooks.py` | `contract`（`claudeside` を使う。本物を呼ぶので自動テストは回さない） |
 | `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つのスタブと模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
+| `tests/scenarios/*.yml`・`tests/scenarios/sandbox.py` | `scenarios`（`test_stub_scenarios` が、台本のあるシナリオを使い捨てのワークスペースでスタブで回す。ccnavi の判定を変えても結果が変わる） |
 | `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
 | `tests/fixtures/` | `guard` `ticket` |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
