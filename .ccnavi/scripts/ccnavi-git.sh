@@ -170,49 +170,27 @@ case "$1" in
 	;;
 esac
 
-# サブコマンドより前のグローバルオプションは 1 つも受け取らない。
-#
-# `-c diff.external=<コマンド>` は分類上ただの `git diff` のまま任意コマンドを
-# 実行する。危ない設定名 (diff.external / core.pager / core.sshCommand ...) を
-# 列挙して拒否するやり方は、列挙から抜けた名前が読み取り専用のまま通るので採らない。値を見ずに
-# 形を拒否する。`-C <パス>` と `--git-dir` も、判定の起点が動くので同じ扱い。
-case "$1" in
--*) reject global-option "サブコマンドより前のオプション ($1) は受け取りません。$SELF <サブコマンド> ... の形で書き直してください。設定の一時上書きが必要なら、その理由をユーザに伝えてください。" ;;
+# 引数の形を通すかは実行ファイルが決める（`ccnavi git check`）。決めるのは、サブコマンドより前のオプション
+# （`-c diff.external=<コマンド>`・`-C <パス>`・`--git-dir` など。値を見ずに形で断る）、どのサブコマンドでも許さない形
+# （設定の一時上書き・ファイル書き込みや外部コマンド実行に変えるオプション・判定の起点を動かすオプションと、その略）、
+# 引数だけで決まるサブコマンドの判定（読むだけの一覧・cat-file・grep・branch・tag・remote・stash・add・commit・
+# 通さないサブコマンド）。答えは allow（通す）・pass（続きはこのあとの case が見る）・deny <識別子> と拒否の文。
+# git の引数は標準入力に NUL 区切りで渡す（ccnavi の引数として渡すと、`-m` などを ccnavi のオプションとして読むため）。
+gc_bin=$(ccnavi_bin "$WS") ||
+	reject no-exe "ccnavi の実行ファイルが見つからないため、git の引数の形を確かめられません。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、無ければユーザに伝えてください。"
+gc_out=$(printf '%s\0' "$@" | "$gc_bin" --root "$WS" git check "$SELF" "$SYNC" 2>/dev/null) || gc_out=""
+gc_out=$(printf '%s\n' "$gc_out" | tr -d '\r')
+case "$gc_out" in
+allow | pass) ;;
+deny\ *)
+	gc_id=$(printf '%s\n' "$gc_out" | sed -n '1s/^deny //p')
+	reject "$gc_id" "$(printf '%s\n' "$gc_out" | sed -n '2p')"
+	;;
+*) reject no-exe "ccnavi の実行ファイルが git の引数の形に答えませんでした。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、直せなければユーザに伝えてください。" ;;
 esac
 
 sub="$1"
 shift
-
-# 全引数を走査して、どのサブコマンドでも許さない形を拒否する。前方一致で拾えば
-# 等号形 (--output=out.diff) も一緒に拒否されるので、getopt 相当の解析は要らない。
-for arg in ${1+"$@"}; do
-	case "$arg" in
-	-c | --config-env | --config-env=*)
-		reject config-override "設定の一時上書き ($arg) は受け取りません。設定の上書きを付けない形で書き直してください。"
-		;;
-	--output | --output=* | --upload-pack* | --receive-pack* | --exec-path* | --exec=* | --ext-diff | --textconv)
-		reject output-or-exec "$arg は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
-		;;
-	--git-dir | --git-dir=* | --work-tree | --work-tree=* | --namespace | --namespace=* | -C)
-		reject moved-root "$arg は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
-		;;
-	--?*)
-		# 略した表記（`--outp=x`・`--upload-p=...`）。parse-options を使うサブコマンドは長いオプションの
-		# 略を受けるので、止める名前の頭にヒットする表記も止める。
-		# `--text`（diff の正式な名前）だけは textconv の頭でも通す。
-		gl_name="${arg#--}"
-		gl_name="${gl_name%%=*}"
-		for gl_bad in output upload-pack receive-pack exec-path exec ext-diff textconv git-dir work-tree namespace; do
-			case "$gl_bad" in
-			"$gl_name"*)
-				[ "$gl_name" = text ] && continue
-				reject output-or-exec "$arg は、止めているオプション（--${gl_bad}）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
-				;;
-			esac
-		done
-		;;
-	esac
-done
 
 # サブコマンドごとのホワイトリスト。ここに無いものは既定で拒否。
 #
@@ -1570,112 +1548,6 @@ ig_done() {
 }
 
 case "$sub" in
-status | log | show | diff | blame | shortlog | describe | rev-parse | rev-list | ls-files | ls-tree | merge-base | diff-tree | whatchanged | show-ref)
-	: # 読むだけ。上のグローバル判定で穴は塞いである
-	;;
-
-cat-file)
-	# `--textconv`・`--filters` は設定の外部コマンドを走らせ、parse-options なので略も有効。
-	# 通すのは中身と型を読む形だけ（許可リスト）。
-	ow_spec "batch batch-check batch-all-objects buffer unordered allow-unknown-type" "" "" "etsp" ""
-	catfile_cb() { :; }
-	opt_walk catfile_cb ${1+"$@"}
-	;;
-
-grep)
-	# `-O` / `--open-files-in-pager` はヒットしたファイルを外部コマンドで開く。まとめた短いオプション（`-iO`）と略も見る。
-	# 値を取る短いオプション（-e -f -A -B -C -m）より後ろの字は値なので数えない。
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		--) break ;;
-		--?*)
-			gr_name="${arg#--}"
-			gr_name="${gr_name%%=*}"
-			case "open-files-in-pager" in
-			"$gr_name"*)
-				[ "${#gr_name}" -ge 2 ] &&
-					reject grep-pager "$arg は一致したファイルを外部コマンドで開きます。使用できません。一致したファイルを見るなら、$SELF grep -l <型> で一覧を出し、Read で開いてください。"
-				;;
-			esac
-			;;
-		-?*)
-			gr_rest="${arg#-}"
-			while [ -n "$gr_rest" ]; do
-				gr_ch="${gr_rest%"${gr_rest#?}"}"
-				gr_rest="${gr_rest#?}"
-				case "$gr_ch" in
-				O) reject grep-pager "$arg には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので使用できません。一致したファイルを見るなら、$SELF grep -l <型> で一覧を出し、Read で開いてください。" ;;
-				e | f | A | B | C | m) gr_rest="" ;;
-				esac
-			done
-			;;
-		esac
-	done
-	;;
-
-branch)
-	# 許可リストで読む（略した長いオプションと、まとめた短いオプションを 1 字ずつ見る）。
-	# 消す・改名する・複製する・追跡先を書き換える形は、一覧に入れた上で名前を見て止める。
-	ow_spec "list all remotes verbose quiet show-current no-column no-color ignore-case omit-empty no-track delete create-reflog no-create-reflog force move copy unset-upstream edit-description" \
-		"sort format points-at set-upstream-to" \
-		"contains no-contains merged no-merged color column abbrev track" \
-		"arvqdlitDMCfmuc" ""
-	branch_cb() {
-		[ "$1" = opt ] || return 0
-		case "$2" in
-		-D)
-			reject branch-delete-unmerged "branch -D は未マージのブランチを削除します。安全側の削除 ($SELF branch -d <名前>) を試し、それでも削除したいならユーザに依頼してください。"
-			;;
-		-M | -C | -c | --move | --copy)
-			reject branch-force-move "branch $2 はブランチを改名するか複製し、同じ名前の既存のブランチを上書きすることがあります。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューのときに名前からチケットを引けなくなります。必要な理由をユーザに伝えてください。"
-			;;
-		--force | --set-upstream-to | --unset-upstream | --edit-description)
-			reject branch-force "branch $2 はブランチを強制的に削除するか、設定を書き換えます。安全側の削除 ($SELF branch -d <名前>) を試し、それでも必要ならユーザに依頼してください。"
-			;;
-		-f | -m | -u)
-			reject branch-move "branch $2 はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由をユーザに伝えてください。"
-			;;
-		esac
-	}
-	opt_walk branch_cb ${1+"$@"}
-	;;
-
-tag)
-	# 一覧だけ通す。位置の引数（`tag <名前>` はタグを作る）は -l / --list のときの絞り込みだけ。
-	# --contains などの値を次の語で取る形は、値ごと読み飛ばす。
-	tg_list=no
-	tg_words=""
-	tg_skip=no
-	for arg in ${1+"$@"}; do
-		if [ "$tg_skip" = yes ]; then
-			tg_skip=no # 直前のオプションの値
-			continue
-		fi
-		case "$arg" in
-		-l | --list) tg_list=yes ;;
-		--contains | --no-contains | --points-at | --merged | --no-merged) tg_skip=yes ;;
-		--contains=* | --no-contains=* | --points-at=* | --merged=* | --no-merged=* | --sort=* | --format=* | -n | -n[0-9]*) ;;
-		-*) reject tag-write "tag は一覧のみ使用できます ($arg は不可)。タグを作る・削除するのはユーザに依頼してください。" ;;
-		*) tg_words="$arg" ;;
-		esac
-	done
-	if [ -n "$tg_words" ] && [ "$tg_list" = no ]; then
-		reject tag-write "tag $tg_words はタグを作ります。tag は一覧のみ使用できます（絞り込むなら $SELF tag -l <型>）。タグを作るのはユーザに依頼してください。"
-	fi
-	;;
-
-remote)
-	for arg in ${1+"$@"}; do
-		case "$arg" in
-		-v | --verbose | show | get-url) ;;
-		-*) reject remote-option "remote は一覧のみ使用できます ($arg は不可)。一覧は $SELF remote -v、1 つの取得先は $SELF remote get-url <名前> で見られます。ほかの操作が必要ならユーザに依頼してください。" ;;
-		add | set-url | set-head | set-branches | remove | rm | rename | prune | update)
-			reject remote-write "remote $arg は取得先・送信先を書き換えます。ユーザに依頼してください。"
-			;;
-		esac
-	done
-	;;
-
 worktree)
 	action="${1:-list}"
 	case "$action" in
@@ -1833,21 +1705,6 @@ worktree)
 		;;
 	*) reject worktree-action "worktree $action は指定できません。指定できるのは list / add / prune / remove です。" ;;
 	esac
-	;;
-
-stash)
-	action="${1:-push}"
-	case "$action" in
-	list | show | push | save | pop | apply | -*) ;;
-	drop | clear)
-		reject stash-drop "stash $action は退避した変更を破棄します。中身を $SELF stash show -p で確かめ、不要と判断した理由をユーザに伝えてください。"
-		;;
-	*) reject stash-action "stash $action は指定できません。指定できるのは list / show / push / pop / apply です。" ;;
-	esac
-	;;
-
-add)
-	: # 索引を変えるだけ。ワークツリーは損なわれない
 	;;
 
 rm)
@@ -2050,27 +1907,6 @@ merge-file)
 	if [ "$mf_stdout" = no ]; then
 		reject merge-file-no-stdout "merge-file は -p (--stdout) を付けた形のみ使用できます。付けないと1つめのファイルを直に書き換えます。衝突の最中なら $SELF merge-file -p --union --object-id :2:<パス> :1:<パス> :3:<パス> で出力し、その結果を Edit で書いてください。"
 	fi
-	;;
-
-commit)
-	# 通す。中身の点検は /commit スキルと ask ルールの側でやる。
-	# ここで見るのは、点検そのものを行わない形（--no-verify・-n）と、直前のコミットを書き換える
-	# --amend。オプションは許可リストで読む（略した --no-verif・まとめた -an も同じに読む）。
-	ow_spec "all quiet verbose signoff no-signoff only include allow-empty allow-empty-message dry-run short porcelain long branch null status no-status reset-author edit no-edit verify no-verify pathspec-file-nul amend" \
-		"message file author date cleanup trailer pathspec-from-file template fixup squash" "untracked-files" \
-		"aqvsoiezn" "mFt" "u"
-	commit_cb() {
-		[ "$1" = opt ] || return 0
-		case "$2" in
-		--no-verify | -n)
-			reject commit-no-verify "commit の $2 (--no-verify) はコミット前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
-			;;
-		--amend)
-			reject commit-amend "commit --amend は直前のコミットを書き換えます。直すなら新しいコミットを積んでください。"
-			;;
-		esac
-	}
-	opt_walk commit_cb ${1+"$@"}
 	;;
 
 checkout | switch)
@@ -2418,23 +2254,8 @@ integrate)
 integrate-done)
 	ig_done ${1+"$@"}
 	;;
-reset)
-	reject reset "reset は作業中の変更やコミットを削除します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。リモートに合わせたいなら、親のブランチは $SYNC <P> を実行してください（早送りか merge で取り込み、衝突したら取りやめます）。ほかのブランチは $SELF fetch <リモート> <ブランチ> のあと$SELF merge <リモート>/<ブランチ> です。分かれていて進めない（squash マージの後で fast-forward できない、など）なら、ブランチを移さずにユーザに伝えてください。"
-	;;
-clean)
-	reject clean "$sub は作業中の変更を削除します。退避は $SELF stash push -u、戻すのは $SELF restore <パス> です。"
-	;;
-rebase | cherry-pick | revert | am | apply | bisect | filter-branch | replace | update-ref | symbolic-ref | reflog | gc | notes)
-	reject history-rewrite "$sub は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
-	;;
-config)
-	reject config "config は設定を読み書きします。値には資格情報が混ざるので使用できません。必要な値はユーザに尋ねてください。"
-	;;
-clone | submodule | lfs)
-	reject import "$sub は外から中身を持ち込みます。使用できません。ユーザに依頼してください。"
-	;;
 *)
-	reject not-allowed "$sub は許可リストにありません。指定できる形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
+	: # 引数だけで決まるサブコマンドは、上の `ccnavi git check` が通した
 	;;
 esac
 
