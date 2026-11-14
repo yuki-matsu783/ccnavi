@@ -119,6 +119,8 @@ var subTiers = map[string]map[string]int{
 		"gitwrap": 3,
 		// 4: 直接作業の取り込み（integrate・integrate-done）。取り込み先がチケットに結び付くかを branch から読む
 		"land": 4,
+		// 3: チケット作業の入口の事前確認。統合先の決め方を integrate から読む
+		"preflight": 3,
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,
