@@ -4606,7 +4606,7 @@ class ScriptedAgentTest(unittest.TestCase):
 
     def test_settings_env_reaches_hook(self):
         """本物と同じく、settings.json の env が hook の環境に入る（ccnavi の hook は
-        CCNAVI_ENTRY_PATH をここから受ける）。"""
+        CCNAVI_ENTRY_PATH をここから受け取る）。"""
         with tempfile.TemporaryDirectory() as d:
             root, out = Path(d) / "root", Path(d) / "out"
             (root / ".claude").mkdir(parents=True)

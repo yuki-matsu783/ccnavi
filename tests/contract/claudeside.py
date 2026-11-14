@@ -231,7 +231,7 @@ def tool_key(payload: dict) -> str:
     return f"{ev}:{tool}" if tool else ev
 
 
-# モデルが書く行。ここに文が出るかはモデルの答え方で変わるので、出た場所に数えない
+# モデルが書く行。この行に文が出るかはモデルの答え方で変わるので、数えない
 MODEL_LINES = ("assistant/", "result/success")
 
 
