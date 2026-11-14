@@ -19,7 +19,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 | 確認（ask） | ユーザの確認ダイアログ（ルールの `ask`） | ユーザが毎回見たい | 確認に答える人が居ないので、実質の拒否。理由文（`reasons.AskHint`）がエージェントに返る | ルール `direct-worktree-confirm`、`RULE_ASK` |
 | 確認コード | スクリプトが今の状態から出す `--accept <コード>` を付けて打ち直す | ユーザが状態の報告を見て了承し、その了承を、その状態に結び付けたい（状態が動くとコードが変わり、古い了承は通らない） | コードはルールの確認に出る行に付くので、確認と同じく実質の拒否 | `ccnavi-worktree.sh` の `--accept` |
 | ユーザ専用の入口 | `ccnavi-user-*.sh`（ユーザの端末で打つ）。エージェントが打つ形は組み込みのゲートが止める | 承認・取り下げなど、人の判断 | 止まる。対話・非対話で同じ | `ccnavi-user-agree.sh`（止めるゲートは `DENY_TICKET_APPROVAL_CLI`） |
-| 発言をまたぐゲート（ターン分離） | 前の段のあとにユーザの発言が 1 回あること（`go/internal/hook/turngate`） | 「見せて返事を待つ」を機械で確かめたい | 1 回の発言では通らない。付き添いのある対話では、宣言に `ask_if_attended` を立てると、発言を待たず確認（ask）に出る | `integrate` → `integrate-done`（`DENY_NEEDS_USER_TURN`。対話では確認）、`review-request` → `confirm`（同じ拒否。対話でも確認に出さず、「レビューを終えた」というユーザの発言を待つ。キーは `--phase`） |
+| 発言をまたぐゲート（ターン分離） | 前の段のあとにユーザの発言が 1 回あること（`go/internal/hook/turngate`） | 「見せて返事を待つ」を機械で確かめたい | 1 回の発言では通らない。付き添いのある対話では、宣言に `askIfAttended` を立てると、発言を待たず確認（ask）に出る | `integrate` → `integrate-done`（`DENY_NEEDS_USER_TURN`。対話では確認）、`review-request` → `confirm`（同じ拒否。対話でも確認に出さず、「レビューを終えた」というユーザの発言を待つ。キーは `--phase`） |
 | 促し（nudge） | `Stop` で 1 回だけ止めて文を渡す | 次の一手を忘れさせたくない | 同じ | `NUDGE_INTEGRATE`、`NUDGE_TICKET_FINISH` |
 | 案内（context） | `additionalContext` / `additionalContextOnce` | 止めずに言う | 同じ | ルール `prefer-read-grep`、`prefer-webfetch` |
 
@@ -90,10 +90,10 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 | `first` / `second` | A と B の条件（`Cond`）。`regex` か `glob` のどちらか 1 つ。読み方はルールと同じ（大文字小文字を区別しない、先読みと後方参照は使えない）。コマンドを `;` や `&&` で分けた 1 つずつに適用し、実行役が中で実行するコマンドも含む |
 | `but` | 同じコマンドにこの regex があれば、その条件にヒットしない |
 | キー | `regex` の名前つきグループ `key`。A と B の両方に書くと、同じキーの組だけを対象にする。書かなければ宣言ごとに 1 組 |
-| `first_name` / `second_name` | 文面で A と B を呼ぶ名前 |
+| `firstName` / `secondName` | 文面で A と B を呼ぶ名前 |
 | `message` | 文面ファイルの識別子（`DENY_NEEDS_USER_TURN__<宣言>`）。「なぜ」と「次の一手」と、`what` の場合分け（`same_command`・`no_user_turn`）をそこに書く。`{key}` と `{script:<sh の名前>}` を埋める |
-| `key_name` | キーが解けなかったときに `{key}` に入れる仮の値 |
-| `ask_if_attended` / `ask_message` | 立てると、付き添いのあるセッションで B を発言を待たずに確認（ask）に出す。同じコマンドに A と B が並ぶ形だけは、どちらでも止める。`ask_message` は確認の文を持つ通知（`NOTICE_ASK_USER_CONFIRM__<宣言>`）の識別子 |
+| `keyName` | キーが解けなかったときに `{key}` に入れる仮の値 |
+| `askIfAttended` / `askMessage` | 立てると、付き添いのあるセッションで B を発言を待たずに確認（ask）に出す。同じコマンドに A と B が並ぶ形だけは、どちらでも止める。`ask_message` は確認の文を持つ通知（`NOTICE_ASK_USER_CONFIRM__<宣言>`）の識別子 |
 
 記録を読み書きできない場合と、ゲートの記録が壊れている場合の文は、宣言によらず `DENY_NEEDS_USER_TURN__STATE`。`what` を `unreadable`・`unwritable`・`broken` で、`next` を `place`・`broken` で分ける。
 
@@ -103,7 +103,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 2. `go/internal/hook/turngate/turngate_test.go` に、宣言の表を直接渡す単体のテストを足す。`integrate` と関係の無い架空の組が先例にある
 3. hook の入口のテスト（`tests/guard/test_turngate_hook.py`）に、実際の呼び出しの順で止まることと、発言を 1 回はさむと通ることを足す
 4. 文面ファイルに `DENY_NEEDS_USER_TURN__<宣言>` を足し、宣言の `message` に指す。上の文面の型に沿わせる。設計書の付録の組み込みの名前の表に宣言の id を足す
-5. 手順書・出力・促しで、A のあとの一手を「ユーザの了承（対話では確認の許可、非対話では次の発言）のあと」と揃えて書く。`ask_if_attended` を立てるなら、確認の前に見せるものを文面の次の一手で言う（確認の画面に出るのはコマンドだけ）
+5. 手順書・出力・促しで、A のあとの一手を「ユーザの了承（対話では確認の許可、非対話では次の発言）のあと」と揃えて書く。`askIfAttended` を立てるなら、確認の前に見せるものを文面の次の一手で言う（確認の画面に出るのはコマンドだけ）
 
 宣言は組み込みの表に置く。ユーザの了承のゲートを、配布先のルールファイルで外されないようにするため。`rules.yml` に `turn-gates:` の節を足して、ルールファイルから宣言を足せるようにする道は、いまは用意しない。最初の利用が 1 件で、2 件目の具体的な需要がなく、書式の版（`rules.Version`）と、レイヤーの合成・lint・`--explain` に手が入るため。足す日が来たら、宣言の欄がそのままノードの欄になる。足すだけで、組み込みの宣言を外す・弱めることはできない形にする。
 
@@ -121,7 +121,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 | 空の発言、サブエージェントの中、`UserPromptSubmit` 以外のイベント | 数えない | |
 | 予約した実行（`session_crons`・`ScheduleWakeup`・`send_later`）の `prompt` | 数える側に残る。見分けられない | 保存した文そのままで来る。payload にユーザの発言と言い切れる欄（来歴）が無い |
 
-- `from_background_task`（ターンの印と、ユーザの手による変更の受け入れに使う）は変えない。`is_user_prompt` はゲートだけが使う
+- `hookio` の `FromBackgroundTask`（ターンの印と、ユーザの手による変更の受け入れに使う）は変えない。`hookio.IsUserPrompt` はゲートだけが使う
 - `Stop` の促しで続けたターンは、新しい `UserPromptSubmit` を起こさないので、数えない
 - 動かしている作業が残っていること（`busy`）は、発言を数えない理由にしない。ユーザの手による変更かを決める材料であって、発言かどうかではない。数えないと、予約が残る限り、ユーザの返事でもゲートが開かなくなる
 - `<task-notification>` を含む判定は、先頭に限らない。ユーザがその文字列を自分で打ってもゲートは開かない。開かないのは安全側で、普通に打ち直せば通る

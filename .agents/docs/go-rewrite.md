@@ -135,7 +135,7 @@ Go の版は `go/go.mod` の `go 1.26.0` に合わせる。
 
 ```sh
 cd go && go vet ./... && go test ./...
-cd go && go test ./internal/hook/reasons -run TestTextsMatchPython -update   # golden.Check の見本を書き直す
+cd go && go test ./internal/hook/reasons -run TestTextsMatchGolden -update   # golden.Check の見本を書き直す
 ```
 
 `go/cmd/ccnavi/main.go` は標準入出力と引数を `entry/cli` の `Run` に渡して終わるだけ。配る実行ファイルは `scripts/ccnavi-build.sh` が組む（[組み立てと配布物](build-and-dist.md)）。Python の CLI のテストは、次のように Go の実行ファイルに当てる（版のコミットは `-ldflags "-X ccnavi/internal/entry/version.commit=<sha>"` で入れる）。

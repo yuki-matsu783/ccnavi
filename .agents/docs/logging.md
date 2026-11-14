@@ -147,7 +147,7 @@ shで`redact`を再現すると、正規表現の解釈が環境ごとに違う�
 ## テスト
 
 - 各スクリプトやモジュールのテストでは、診断ログの中身を検査しない。行の形式と動作は、logger自体のテスト
-  （`tests/core/test_diaglog.py`、`tests/sh/test_diaglog_sh.py`、拡張の`test/shared/log.test.ts`）で固定している
+  （`go/internal/records/diaglog`のgo test、`tests/sh/test_diaglog_sh.py`、拡張の`test/shared/log.test.ts`）で固定している
 - `tests/sh/test_diaglog_sh.py`は同じ入力を3つの言語のloggerに渡し、時刻とpidを除いて同じ行になることを確かめる。
   行の形式を変えるときは3つのloggerを揃えて直し、このテストを通す
 - ワークスペースの`logs/`の中身を数えるテストは、`logs/diag/`ディレクトリが増えることを前提にする
