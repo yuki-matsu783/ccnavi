@@ -1775,7 +1775,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         )
 
     def fake_uname(self, system):
-        """`uname -s` だけを system と答える代役のフォルダ。PATH の先頭に置く。
+        """`uname -s` だけを system と答えるスタブのフォルダ。PATH の先頭に置く。
 
         ほかの引数（`-m` など）は本物の uname に任せる。
         """
@@ -1872,7 +1872,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertNotIn("PATH に入っていません", result.stdout)
 
     def fake_git_bash(self):
-        """uname が Git Bash（MINGW）の値を答える代役のフォルダ。PATH の先頭に置く。"""
+        """uname が Git Bash（MINGW）の値を答えるスタブのフォルダ。PATH の先頭に置く。"""
         shim = tempfile.mkdtemp(prefix="ccnavi-uname-")
         self.addCleanup(shutil.rmtree, shim, ignore_errors=True)
         uname = os.path.join(shim, "uname")
@@ -2962,7 +2962,7 @@ class ShowsTheLintAtTheEnd(SetupTest):
         with open(log, encoding="utf-8") as f:
             return f.read().splitlines()
 
-    @unittest.skipIf(os.name == "nt", "代役の実行ファイルは sh で書く")
+    @unittest.skipIf(os.name == "nt", "スタブの実行ファイルは sh で書く")
     def test_runs_lint_once_at_the_end_and_shows_it_as_is(self):
         log = os.path.join(self.dir, "lint-calls.txt")
         # 終了コードを 3 にして、導入スクリプトの終了コードが変わらないことも見る。
@@ -2976,7 +2976,7 @@ class ShowsTheLintAtTheEnd(SetupTest):
         self.assertTrue(result.stdout.endswith(LINT_HEADING + "\nLINT-OUT\n"), result.stdout)
         self.assertEqual(self.lint_calls(log), [f"--root {self.dir} --lint"])
 
-    @unittest.skipIf(os.name == "nt", "代役の実行ファイルは sh で書く")
+    @unittest.skipIf(os.name == "nt", "スタブの実行ファイルは sh で書く")
     def test_check_does_not_run_lint(self):
         log = os.path.join(self.dir, "lint-calls.txt")
         src = self.source_with_exe(f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\n")

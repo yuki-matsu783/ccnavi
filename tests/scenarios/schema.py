@@ -11,6 +11,11 @@ from tests.scenarios import hostenv
 
 SETUP_KEYS = {"files", "issue", "git", "reset", "host", "host_state"}
 
+# 回す相手（実行器の --agent）。claude は本物の claude -p で回す。script は step の script を
+# スタブ（tests/fake_claude.py）で回す。シナリオのファイルには書かない（1 本を両方で回す）
+AGENT_CLAUDE = "claude"
+AGENT_SCRIPT = "script"
+
 
 SHA40 = re.compile(r"[0-9a-fA-F]{40}")
 
@@ -21,7 +26,7 @@ GIT_ESCAPES = ("-C", "--git-dir", "--work-tree")
 GIT_GLOBAL_ESCAPES = ("-c", "--config-env", "--exec-path")
 
 
-def load_scenario(path):
+def load_scenario(path, agent=AGENT_CLAUDE):
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     for key in ("id", "steps"):
@@ -31,6 +36,8 @@ def load_scenario(path):
     data.setdefault("budget_usd", 1.0)
     data.setdefault("permission_mode", "auto")
     data.setdefault("expect", {})
+    data["agent"] = agent
+    _check_agent(path, data)
     _check_setup(path, data.get("setup"))
     _check_human_api(path, data)
     _check_human_run(path, data)
@@ -53,6 +60,28 @@ def load_scenario(path):
                 + ", ".join(sorted(extra))
             )
     return data
+
+
+def is_scripted(scn):
+    """スタブ（--agent script）で回すシナリオか。"""
+    return scn.get("agent") == AGENT_SCRIPT
+
+
+def load_from_state(st):
+    """回の状態（state.json）から、その回と同じ相手でシナリオを読み直す。"""
+    return load_scenario(st["scenario"], st.get("agent", AGENT_CLAUDE))
+
+
+def _check_agent(path, data):
+    """スタブで回すなら、人間の操作でない step はすべて script（打つ手の列）を持つ。"""
+    if data["agent"] not in (AGENT_CLAUDE, AGENT_SCRIPT):
+        raise ValueError(f"--agent は {AGENT_CLAUDE} か {AGENT_SCRIPT} です")
+    for n, step in enumerate(data["steps"], 1):
+        for key in ("script", "after_stop_block"):
+            if key in step and not isinstance(step[key], list):
+                raise ValueError(f"{path}: step {n} の {key} は手の list です")
+        if is_scripted(data) and not step.get("human") and not step.get("script"):
+            raise ValueError(f"{path}: step {n} --agent script で回すには script が要ります")
 
 
 def _check_human_api(path, data):
@@ -207,7 +236,7 @@ def scenario_host(scn):
 
 
 def uses_target(scn):
-    """使い捨てのリポジトリを触る setup（git・reset・追記・代役を使う相手）があるか。"""
+    """使い捨てのリポジトリを触る setup（git・reset・追記・スタブを使う相手）があるか。"""
     setup = scn.get("setup") or {}
     appends = any(file_spec(v)[1] for v in (setup.get("files") or {}).values())
     return bool(

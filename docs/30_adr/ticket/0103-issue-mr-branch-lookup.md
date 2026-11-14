@@ -117,7 +117,7 @@ sh が書いて `--result` で渡す（設計書の「issue・MR に紐づくブ
 `tests/core/test_branchfind_refs.py`（拾う・拾わないの表、URL の数え方、まとめ方、番号の前後）、
 `tests/ticket/test_branchfind.py`（UserPromptSubmit の指示と表記、チケット制御 disable・dry-run、サブコマンドの手元の候補・
 ワークツリー・承認前の `branch:` を使わない・承認済みの `branch:`・ホストの結果・MR・引数の誤り）、
-`tests/sh/test_branches_sh.py`（curl の代役で GitHub と GitLab の MR の元ブランチ・issue を参照する MR、トークン無し・
+`tests/sh/test_branches_sh.py`（curl のスタブで GitHub と GitLab の MR の元ブランチ・issue を参照する MR、トークン無し・
 origin 無し・API の失敗で「ホストは見ていない」、origin の資格情報を出さない、プロジェクトの中から打つ、引数の誤り）。
 共有にしたホストへの接続は、既存の `tests/sh/test_review_*.py`・`tests/core/test_review_origin.py`・
 `tests/core/test_review_403_hint.py` が ccnavi-review.sh の側から確かめる。

@@ -14,7 +14,7 @@ REST（`/ccr/` の道）に替える（`test_review_rest_fallback.py`）。
 - GraphQL 以外の失敗では案内を出さない: 閉じたポートへ実際に打つ
 
 実際の GitHub の GraphQL を失敗させる環境は作れない。`remote_kind` はホスト名で github と読むため、
-127.0.0.1 に立てた偽物は gitlab として読まれる。GraphQL の 403 は `github_host.py` の代役で作る。
+127.0.0.1 に立てた偽物は gitlab として読まれる。GraphQL の 403 は `github_host.py` のスタブで作る。
 """
 
 from __future__ import annotations

@@ -78,7 +78,7 @@ def cmd_judge(args):
         return 1
     judged = expect.parse_judgment(Path(args.file).read_text(encoding="utf-8"))
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
-    scn = schema.load_scenario(st["scenario"])
+    scn = schema.load_from_state(st)
     expected = len(scn["expect"].get("judge", []))
     if not judged or len(judged) != expected:
         print(f"判定の表の行数が違う: 期待 {expected} 行、読めた {len(judged)} 行")
@@ -98,7 +98,7 @@ def cmd_judge(args):
 def cmd_run(args):
     require_entry()
     root = Path(args.root).resolve()
-    scn = schema.load_scenario(args.scenario)
+    scn = schema.load_scenario(args.scenario, args.agent)
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     mode_ok, mode_text = workspace.mode_check(root)
     if not mode_ok:
@@ -160,7 +160,7 @@ def cmd_next(args):
         for note in hostenv.resume(st["root"], st["host"]):
             print(f"案内: {note}")
         write_state(out, st)
-    scn = schema.load_scenario(st["scenario"])
+    scn = schema.load_from_state(st)
     scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return drive.continue_scenario(scn, out, st, st["root"])
 
@@ -170,7 +170,7 @@ def cmd_restore(args):
     戻せなかった回の戻し直しにも使う。"""
     out = Path(args.out)
     st = json.loads((out / "state.json").read_text(encoding="utf-8"))
-    scn = schema.load_scenario(st["scenario"])
+    scn = schema.load_from_state(st)
     tgt = st.get("target")
     if tgt and not st.get("released"):
         try:

@@ -1,9 +1,9 @@
-"""ホストの応答の見本を返す GitLab の代役。
+"""ホストの応答の見本を返す GitLab のスタブ。
 
 Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
 見本は `extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/<場面>/` にある。拡張の試験
-（`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
+（`test/helpers/gitlab-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つのスタブで揃える。
 
 - `GET /api/v4/user` → `user.json`（無ければ 403）
 - `GET /api/v4/projects/<namespace と project を符号化>` → `{"id": 42}`
@@ -22,7 +22,7 @@ Chrome と手元の sh が同じ見本から同じ JSON を組むことを見る
 - ほかは 404
 - `FAKE_GITLAB_NO_PROJECT` を立てると、プロジェクトそのもの（`GET /projects/<パス>`）を 404 にする
 
-sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを
+sh の試験は PATH の先頭に `curl` のスタブを置き、このファイルを
 `python gitlab_host.py curl ...` で起こす。
 """
 
@@ -113,7 +113,10 @@ def answer(
 
 
 def curl(argv: list[str]) -> int:
-    """curl の代役。`ccnavi-review.sh` が打つ形（`-fsS -X <M> -H ... [--data-binary @-] <URL>`）"""
+    """curl のスタブ。
+
+    `ccnavi-review.sh` が打つ形（`-fsS -X <M> -H ... [--data-binary @-] <URL>`）を受ける。
+    """
     method, url, body = "GET", "", ""
     i = 0
     while i < len(argv):
@@ -159,7 +162,7 @@ def curl(argv: list[str]) -> int:
 
 
 def install(bin_dir: str, python: str) -> None:
-    """PATH の先頭に置く代役（`curl` と、使えない `glab`）を bin_dir に書く。"""
+    """PATH の先頭に置くスタブ（`curl` と、使えない `glab`）を bin_dir に書く。"""
     os.makedirs(bin_dir, exist_ok=True)
     for name, text in (
         ("curl", f"#!/bin/sh\nexec '{python}' '{os.path.abspath(__file__)}' curl \"$@\"\n"),

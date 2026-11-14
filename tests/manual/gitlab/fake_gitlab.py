@@ -1,4 +1,4 @@
-"""GitLab API v4 の代役。`.ccnavi/scripts/ccnavi-review.sh` を実物なしで通すための的。
+"""GitLab API v4 のスタブ。`.ccnavi/scripts/ccnavi-review.sh` を実物なしで通すための的。
 
 ユーザが手で 1 周させるための道具。本体は `tests/fake_gitlab.py` にあり、
 ここは起動するだけの入口。

@@ -15,7 +15,7 @@ import (
 // PATH の先頭に、指定の引数を含む呼び出しだけ失敗させる git を置いて再現する。
 func TestMeasureRefusesWhenAStepCannotBeRead(t *testing.T) {
 	if ospath.Windows {
-		t.Skip("sh の git の代役を PATH から起こせない")
+		t.Skip("sh の git のスタブを PATH から起こせない")
 	}
 	real, err := exec.LookPath("git")
 	if err != nil {

@@ -1,7 +1,7 @@
-"""decide の sh の試験が共有する代役。投稿を操作記録の段階に載せた形で動かす。
+"""decide の sh の試験が共有するスタブ。投稿を操作記録の段階に載せた形で動かす。
 
-実行ファイルの代役（`STUB`）は、`ops …` を本物の `ccnavi ops` に渡し、受け入れの計画を本物の
-操作記録の形（`tests/oprecord.py`）で書く。ホストの代役（`tests/sh/test_review_decide.py` の
+実行ファイルのスタブ（`STUB`）は、`ops …` を本物の `ccnavi ops` に渡し、受け入れの計画を本物の
+操作記録の形（`tests/oprecord.py`）で書く。ホストのスタブ（`tests/sh/test_review_decide.py` の
 `GitLab`）には、issue・コメントの作成と一覧を足す（`install`。送ったものは `STORE` に積む）。
 """
 
@@ -15,7 +15,7 @@ import unittest.mock as mock
 
 from tests import exe, oprecord, userform
 
-# 実行ファイルの代役。`ops` は本物へ渡す。`--preview` は決まった一覧を返し、`STUB_PLAN` があれば
+# 実行ファイルのスタブ。`ops` は本物へ渡す。`--preview` は決まった一覧を返し、`STUB_PLAN` があれば
 # その計画を使う。`--accept-plan` は本物の操作記録に判断を保存して
 # 計画を書き、`--yes` は計画の操作ID に「適用した」を記録する。
 # `--check` は `STUB_FAIL_CHECK` があれば断る。ただし `--entry` の並びは、本物と同じ検べ方
@@ -50,7 +50,7 @@ case " $* " in
 esac
 """
 
-# 操作記録を作って受け入れの計画を書く（`--accept-plan` の代役）。
+# 操作記録を作って受け入れの計画を書く（`--accept-plan` のスタブ）。
 # 引数は <state> <計画の出力先> <MR の URL>。`{tests}` は書き出すときに埋める。
 BEGIN = """import json
 import sys
@@ -84,7 +84,7 @@ with open(plan, "w", encoding="utf-8") as f:
     json.dump(body, f)
 """
 
-# 代役のホストが覚えている投稿。
+# スタブのホストが覚えている投稿。
 STORE: dict = {}
 
 
@@ -135,7 +135,7 @@ def do_get(self):
 def do_post(self):
     path = self.path
     if "/discussions/" in path:
-        # 返信は元の代役に任せる
+        # 返信は元のスタブに任せる
         GITLAB.original_post(self)
         return
     length = int(self.headers.get("Content-Length", "0") or 0)
@@ -183,7 +183,7 @@ GITLAB = _Holder
 
 
 def install(testcase, gitlab) -> None:
-    """ホストの代役を投稿の形に差し替え、実行ファイルの代役を書き換える（テストの終わりに戻す）。"""
+    """ホストのスタブを投稿の形に差し替え、実行ファイルのスタブを書き換える（テストの終わりに戻す）。"""
     reset_store()
     GITLAB.original_get = gitlab.do_GET
     GITLAB.original_post = gitlab.do_POST
@@ -203,7 +203,7 @@ def install(testcase, gitlab) -> None:
 
 
 def stub_env(testcase) -> dict:
-    """実行ファイルの代役が使う環境変数。"""
+    """実行ファイルのスタブが使う環境変数。"""
     return dict(
         STUB_PY=sys.executable,
         STUB_EXE=exe.path(),

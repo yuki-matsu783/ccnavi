@@ -334,6 +334,11 @@ def scenario_summary(scn):
         f"状態 {scn.get('status', '-')}・モデル {scn.get('model', '-')}・"
         f"費用の上限 {scn.get('budget_usd', '-')} USD"
     )
+    if schema.is_scripted(scn):
+        lines.append(
+            "相手: スタブ（tests/fake_claude.py）が step の script どおりに打つ。claude は呼ばず、"
+            "費用はかからない。judge は評価しない"
+        )
     if scn.get("test_repo"):
         lines.append("作るもの: projects/test-repo にブランチ・コミット・MR が残る（後で片付ける）")
     else:

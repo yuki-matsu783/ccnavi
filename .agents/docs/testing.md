@@ -3,7 +3,7 @@ type: guide
 title: ccnaviのPythonのテストを回す
 description: ccnaviのPythonのテストを回すときの決まり。全件を1本で回さず、変えたモジュールから絞って広げる。時間の実測と、出力が出ないときの扱い
 tags: [process-test]
-keywords: [テスト, 代役, STUB, 操作記録, 全件, discover, グループ, モジュール, python -m tests, 時間切れ, 同時実行, 実測, 重い]
+keywords: [テスト, スタブ, STUB, 操作記録, 全件, discover, グループ, モジュール, python -m tests, 時間切れ, 同時実行, 実測, 重い]
 ---
 
 # ccnaviのPythonのテストを回す
@@ -52,13 +52,15 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 `tests/contract/shape.py` と、`tests/contract/gitlab/` の `normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。
 
-## sh の試験の実行ファイルの代役
+`tests/fake_claude.py`（claude -p のスタブ）、`tests/contract/claudeside.py`、`tests/contract/claude/recorded.json` を変えたら、同じく `contract` を回す。本物の `claude -p` から録った形と比べる。仕様と録り直しは [claude-contract.md](claude-contract.md)。
 
-sh を回す試験は、実行ファイルの代わりに小さな sh（代役、`STUB`）を `CCNAVI_ENTRY_PATH` に置く。sh は実行ファイルの答えに依存するので、sh に新しい要求が足されたら、代役も追従させる。追従が漏れると、代役が黙って空の答えを返し、sh が「操作記録を作れなかった」などで止まる。
+## sh の試験の実行ファイルのスタブ
+
+sh を回す試験は、実行ファイルの代わりに小さな sh のスタブ（`STUB`）を `CCNAVI_ENTRY_PATH` に置く。sh は実行ファイルの答えに依存するので、sh に新しい要求が足されたら、スタブも追従させる。追従が漏れると、スタブが黙って空の答えを返し、sh が「操作記録を作れなかった」などで止まる。
 
 - `ops …` は本物の `ccnavi ops`（`tests/exe.py` が組んだ実行ファイル。sh には `exe.sh_path()` を書く）へ渡す。sh は操作記録（`ops begin`・`show`・`stage-set`・`reconcile`・`applied`）を必須で使う
-- 受け入れ計画（`--accept-plan` の JSON）は `op`（操作ID）を含む。代役が書く計画には、本物の `oplog.Begin` で作った op を入れる
-- 事前検査（`--check`）は、取り込みより先に sh が呼ぶ。代役の `--check` が副作用（コミットを積むなど）を持たないようにする
+- 受け入れ計画（`--accept-plan` の JSON）は `op`（操作ID）を含む。スタブが書く計画には、本物の `oplog.Begin` で作った op を入れる
+- 事前検査（`--check`）は、取り込みより先に sh が呼ぶ。スタブの `--check` が副作用（コミットを積むなど）を持たないようにする
 - 文面ファイルを読む処理を試すための使い捨てのワークスペースには、`tests.put_messages(root)` で文面を置く
 - 子プロセスで `git merge`・`git commit` を呼ぶときは、`-c user.email=… -c user.name=…` を付ける。付けないと、識別子の無い環境で衝突とは別の理由で失敗する
 

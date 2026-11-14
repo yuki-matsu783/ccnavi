@@ -1,4 +1,4 @@
-"""GitLab の代役（`tests/fake_gitlab.py`）を関数で起こして止める。
+"""GitLab のスタブ（`tests/fake_gitlab.py`）を関数で起こして止める。
 
 見るのは次の観点。
 
@@ -6,8 +6,8 @@
 2. keep-alive の接続を開いたままでも `stop()` が返る
 3. 2 つ同時に立てても、状態ファイルは干渉しない
 4. `skew` を変えると、返す時刻が変わる
-5. 実物の `ccnavi-review.sh fetch` が、`GITLAB_TOKEN` と代役の origin から、
-   curl 経路で模擬の MR とスレッドを読める（`glab` は失敗する代役を前に置く）
+5. 実物の `ccnavi-review.sh fetch` が、`GITLAB_TOKEN` とスタブの origin から、
+   curl 経路で模擬の MR とスレッドを読める（`glab` は失敗するスタブを前に置く）
 6. 401・404 を返したあとも、同じ keep-alive 接続の次の要求が通る（要求の本文を読み捨てている）
 7. 存在しない MR への要求は、MR を引く全ルートで 404 になり、接続が切れない
 8. 手で使う入口 `python tests/manual/gitlab/fake_gitlab.py <state.json> <port>` が、
@@ -440,7 +440,7 @@ def seeded() -> dict:
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq・curl のどれかが無い")
 class ReviewShReadsTheFakeTest(unittest.TestCase):
-    """実コードの ccnavi-review.sh が、glab を通らず curl で代役の MR とスレッドを読む。"""
+    """実コードの ccnavi-review.sh が、glab を通らず curl でスタブの MR とスレッドを読む。"""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -501,7 +501,7 @@ class ReviewShReadsTheFakeTest(unittest.TestCase):
         thread = got["threads"][0]
         self.assertFalse(thread["resolved"])
         self.assertIn("ここを直してください", thread["body"])
-        # curl の経路に入ったことは、代役が受けた要求で分かる
+        # curl の経路に入ったことは、スタブが受けた要求で分かる
         log = self.server.requests
         self.assertIn(f"GET /api/v4/projects/{PROJECT.replace('/', '%2F')}", log)
         self.assertTrue(any("/merge_requests/1/discussions" in line for line in log), log)

@@ -1,6 +1,6 @@
 """decide の復旧と照合の穴を確かめる sh の受入テスト（ccnavi-user-decide.sh）。
 
-道具は `test_decide_ops`（実行ファイルの代役・GitLab の代役・本物の操作記録）を借りる。
+道具は `test_decide_ops`（実行ファイルのスタブ・GitLab のスタブ・本物の操作記録）を借りる。
 
 1. AT43: ホストに書いたあとの照合が外れたとき、続きの子もマーカーも置かず（置く呼び出しが断る）、
    ホストの解決は残り、操作記録に解決した分が残る
@@ -28,7 +28,7 @@ from tests.sh import test_review_decide as base
 GitLab = ops.GitLab
 STORE = ops.STORE
 
-# `--yes` の代役に「置く段階で失敗する」「ホストに書いたあとの照合が外れた」形を足す。
+# `--yes` のスタブに「置く段階で失敗する」「ホストに書いたあとの照合が外れた」形を足す。
 STUB = support.STUB.replace(
     '  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }\n',
     '  [ -z "$STUB_FAIL_YES" ] || { echo "置けない" >&2; exit 1; }\n'

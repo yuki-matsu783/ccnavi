@@ -63,7 +63,7 @@ def script_and_args(ws: str, args) -> list[str]:
     return [os.path.join(scripts, "ccnavi-review.sh"), *args]
 
 
-# 実行ファイルの代役。受けた引数を 1 行ずつ書き残し、何も書かずに 0 で終わる。
+# 実行ファイルのスタブ。受けた引数を 1 行ずつ書き残し、何も書かずに 0 で終わる。
 STUB = """#!/bin/sh
 case " $* " in
 *" --version --json "*)
@@ -622,7 +622,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
         self.assertEqual(done.stdout, "")
 
     def request_stub(self, out):
-        """実行ファイルの代役。`review prepare` で本文と下書きを書き、
+        """実行ファイルのスタブ。`review prepare` で本文と下書きを書き、
         `--result` の JSON を残しておく。
 
         受け取った引数は 1 行 1 つで `out/args.txt` に溜める。

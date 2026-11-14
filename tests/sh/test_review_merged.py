@@ -5,7 +5,7 @@ ccnavi-sync.sh は答えが `none` のときだけ「マージされていない
 `merged <番号> <先頭の sha> <元ブランチ>` を返し、sync はその sha を基準に、その元ブランチの
 手元の片付けをする。MR の番号を渡せば、その MR だけを聞く。
 API が失敗した・答えを読めなかったときは `unknown`（終了コード 3）、道具やトークンが無ければ
-`none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いた代役に差し替える。
+`none` を出さずに止まる。ホストへの道具（curl）は PATH の先頭に置いたスタブに差し替える。
 """
 
 from __future__ import annotations
@@ -171,7 +171,7 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         )
 
     def gitlab_says(self, mrs, project='{"id": 42}', project_code=0, pages=None, one=None):
-        """URL ごとに答える curl の代役。`pages` を渡すと MR の一覧をページの番号で引く。"""
+        """URL ごとに答える curl のスタブ。`pages` を渡すと MR の一覧をページの番号で引く。"""
         mr_cases = (
             "".join(
                 f"*merge_requests*page={n}) printf '%s' '{body}' ;;\n" for n, body in pages.items()

@@ -1,6 +1,6 @@
 """投稿 API の失敗と不正な応答、操作記録を失った後の打ち直し（AT21・AT41）。
 
-GitLab の代役（`Host`）の POST を、テストごとに差し替えて失敗させる。代役は同じプロセスの
+GitLab のスタブ（`Host`）の POST を、テストごとに差し替えて失敗させる。スタブは同じプロセスの
 スレッドで動くので、`Host.do_POST` を差し替えれば効く。共通の道具は
 `tests/sh/write_and_push_harness.py` にある。
 """
@@ -76,7 +76,8 @@ class PostFailureTest(WriteAndPushHostHarness):
         return ("review-request", "--phase", "1", "--body-file", body)
 
     def ready_exe(self):
-        """ready の補助コメントの下書きを返す実行ファイルの代役（実際の ready は下書きを置く）。"""
+        """ready の補助コメントの下書きを返す実行ファイルのスタブ。
+        実際の ready は下書きを置く。"""
         note = write(os.path.join(self._base, "ready-note.md"), "Draft を外した\n")
         return executable(
             os.path.join(self._base, "bin", "readyhalf"),
