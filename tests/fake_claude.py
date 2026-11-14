@@ -61,7 +61,11 @@ class Session:
         self.home = home
         self.transcript = os.path.join(home, f"{self.id}.jsonl")
         self.prompt_id = str(uuid.uuid4())
-        self.hooks = _load_hooks(root)
+        settings = _load_settings(root)
+        self.hooks = settings.get("hooks") or {}
+        # 本物と同じく、settings.json の env を自分の環境に入れる（hook と Bash が受け継ぐ）。
+        # ccnavi の hook の命令は、ここで入る CCNAVI_ENTRY_PATH を使う
+        os.environ.update({k: str(v) for k, v in (settings.get("env") or {}).items()})
         self.out = sys.stdout
         self.last_text = ""
         self.ran_agent = False
@@ -400,10 +404,10 @@ def _result(call: str, text: str, is_error: bool, agent: dict | None) -> dict:
     }
 
 
-def _load_hooks(root: str) -> dict:
+def _load_settings(root: str) -> dict:
     try:
         with open(os.path.join(root, ".claude", "settings.json"), encoding="utf-8") as f:
-            return json.load(f).get("hooks") or {}
+            return json.load(f)
     except FileNotFoundError:
         return {}
 

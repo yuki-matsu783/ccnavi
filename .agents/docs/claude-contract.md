@@ -54,10 +54,11 @@ uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-de
 
 ### hook の呼び方
 
-- 読むのは `<cwd>/.claude/settings.json` の `hooks` だけ。ユーザ設定・`settings.local.json`・プラグインの hook は読まない
+- 読むのは `<cwd>/.claude/settings.json` の `hooks` と `env` だけ。ユーザ設定・`settings.local.json`・プラグインの設定は読まない
 - `matcher` が無いか空なら全部、あれば `tool_name` に正規表現で当てる。ツールの無いイベント（SessionStart・Subagent* など）で `matcher` を持つ hook は起こさない
 - 同じイベントに当たった hook は並行に起こす。`asyncRewake` の hook と `command` 以外の hook は起こさない
 - 命令は `sh -c` で起こし、payload を標準入力に渡す。環境に `CLAUDE_PROJECT_DIR`（= cwd）と `CLAUDE_ENV_FILE` を入れ、`CLAUDE_CODE_ENTRYPOINT` が無ければ `sdk-cli` を入れる（ccnavi はこれが `sdk` で始まるかで非対話を見分ける）
+- 本物と同じく、`settings.json` の `env` を自分の環境に入れ、hook と Bash に受け継がせる。ccnavi の hook の命令は、ここで入る `CCNAVI_ENTRY_PATH` を使う。hook が終了コード 2 以外で失敗すると止めずにツールを実行するので（本物と同じ）、hook が起こされないまま保護されたファイルが書き換わることがある。期待には `files_unchanged` などの最終状態も書く
 - 呼ぶ順は本物と同じ: SessionStart（`--resume` なら `source: resume`）→ UserPromptSubmit → 手ごとに PreToolUse → PostToolUse か PostToolUseFailure → 終わりに Stop。サブエージェントは `Agent` の PreToolUse → SubagentStart → 中の手（`agent_id`・`agent_type` 付き）→ `SubagentHandback` → SubagentStop → `Agent` の PostToolUse。サブエージェントを使った回は、Stop の前に UserPromptSubmit をもう一度起こす（本物はサブエージェントの終わりを知らせで受ける）
 
 ### 応答の扱い
@@ -82,11 +83,12 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 
 - **形**: スタブが出す欄は本物にもあり、型は本物の型に含まれる（hook の payload はイベントとツールごと、stream-json は `type/subtype` ごと）。本物にだけある欄は比べない。スタブは ccnavi と実行器が読む欄だけを出す
 - **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `READS`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
-- **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境）が本物と同じ
+- **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境と `settings.json` の `env` が hook に届くか）が本物と同じ。場面の hook の命令は ccnavi と同じく `settings.json` の `env` の変数で組むので、`env` が届かなければ hook が起きず、観察が空になって落ちる
+- 観察には、モデルの答え方で変わるものを入れない。理由の文が現れる行は、モデルが書く行（`assistant`・`result`）を除いた、行の種類の集合で見る。サブエージェントの中の行は数ではなく有無で見る。本物には `run_in_background` を `false` と指示して、サブエージェントを同期に固定する
 
 ### 録り直す
 
-Claude Code の版を上げたとき、スタブに手を足すとき（`claudeside.py` の `PROMPT` と `SCRIPT` に同じ手を足す）に録り直す。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
+Claude Code の版を上げたとき、スタブに手を足すとき（`claudeside.py` の `PROMPT` と `SCRIPT` に同じ手を足す）に録り直す。`PROMPT` にだけある「サブエージェントを同期で起動する」指示は、本物を同期に固定するためのもので、`SCRIPT` には対応する欄が無い（スタブは同期の形だけを出す）。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
 
 ```sh
 uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2 --dry-run   # 置かずに標準出力へ
@@ -103,4 +105,5 @@ uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2
 - モデルが案内を読んで正しく動くか、拒否を迂回しないか（`judge`）
 - 並行に起こした hook が終わる順番
 - Claude Code 自身の権限の仕組みと確認の表示
+- 非同期（`run_in_background`）のサブエージェント。本物は既定で非同期に起動することがあり、そのときは Stop がサブエージェントの終わりより先に起きる。スタブは同期の形だけを出す
 - 場面に出てこない手（Glob・Grep・WebFetch などのツール、PostToolUse の `additionalContext` 以外の出力の形）。台本に書けるツールは Read・Write・Edit・Bash と `agent` だけ

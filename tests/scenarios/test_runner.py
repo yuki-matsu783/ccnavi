@@ -4604,6 +4604,32 @@ class ScriptedAgentTest(unittest.TestCase):
             self.assertIn("止めた", stream.text_of(ev["tool_results"][0]["content"]))
             self.assertEqual((root / "a.txt").read_text(encoding="utf-8"), "hello\n")
 
+    def test_settings_env_reaches_hook(self):
+        """本物と同じく、settings.json の env が hook の環境に入る（ccnavi の hook は
+        CCNAVI_ENTRY_PATH をここから受け取る）。"""
+        with tempfile.TemporaryDirectory() as d:
+            root, out = Path(d) / "root", Path(d) / "out"
+            (root / ".claude").mkdir(parents=True)
+            out.mkdir()
+            hook = {"type": "command", "command": 'echo "$PROBE" > "$CLAUDE_PROJECT_DIR/got"'}
+            settings = {
+                "env": {"PROBE": "from-settings"},
+                "hooks": {"PreToolUse": [{"hooks": [hook]}]},
+            }
+            (root / ".claude/settings.json").write_text(json.dumps(settings), encoding="utf-8")
+            scn = {
+                "agent": schema.AGENT_SCRIPT,
+                "model": "haiku",
+                "budget_usd": 1.0,
+                "_prompt_steps": 1,
+                "permission_mode": "auto",
+            }
+            step = {"prompt": "x", "script": [{"tool": "Bash", "input": {"command": "true"}}]}
+            env = {**os.environ, "CCNAVI_FAKE_CLAUDE_HOME": str(Path(d) / "home")}
+            with mock.patch.object(drive, "require_entry"):
+                drive.run_step(scn, step, out, 1, "s-1", None, False, root, env=env)
+            self.assertEqual((root / "got").read_text(encoding="utf-8"), "from-settings\n")
+
     def test_script_step_requires_script(self):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "scn.yml"
