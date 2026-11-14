@@ -509,7 +509,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0001-01-01-01-01", parent="i0001-01-01", phase=1, allow=("src/a/*",))
         result = self.approve()
-        self.assertIn("2 段", result.stderr)
+        self.assertIn("2 階層", result.stderr)
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01-01-01.md"))
         )
