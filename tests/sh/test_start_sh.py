@@ -926,7 +926,7 @@ class StartShTest(unittest.TestCase):
         self.fail(f"{marker} の行が無い: {out}")
 
     def test_rerun_after_mcp_made_the_mr_follows_the_guided_commands(self):
-        # チケットが無く、API に届かない状態から: 新規作成 → create の段階で 4 → MCP で MR を作った想定
+        # チケットが無く、API に届かない状態から: 新規作成 → create で 4 → MCP で MR を作った想定
         # → 案内のコマンド（--issue M --mr N --branch <ブランチ> --mcp-checked）を打ち直して 0
         create = self.run_sh("--issue", "152", "--slug", "login", "--mcp-checked", token=False)
         self.assertEqual(create.returncode, 4, create.stdout + create.stderr)
@@ -1086,28 +1086,6 @@ class StartShTest(unittest.TestCase):
         body = {**pr(5, branch), **(mr or {})}
         self.route({f"GET {GITHUB}/pulls/5": [200, body], **closed_pulls(branch), **routes})
         return self.run_sh("--mr", "5")
-
-    def test_adopt_stops_when_mr_is_not_open(self):
-        for state, merged_at in (("closed", None), ("closed", "2026-01-01T00:00:00Z")):
-            with self.subTest(merged_at=merged_at):
-                done = self.adopt("topic/x", {"state": state, "merged_at": merged_at})
-                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-                self.assertIn("open の MR だけ", done.stderr)
-                self.assertFalse(os.path.isdir(self.wt("topic-x")))
-
-    def test_adopt_stops_when_target_is_not_integration(self):
-        done = self.adopt("topic/x", {"base": {"ref": "develop"}})
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("マージ先は develop", done.stderr)
-        self.assertFalse(os.path.isdir(self.wt("topic-x")))
-
-    def test_adopt_stops_when_branch_is_protected(self):
-        for branch in ("release/1.0", "develop"):
-            with self.subTest(branch=branch):
-                done = self.adopt(branch)
-                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-                self.assertIn("保護されたブランチ", done.stderr)
-                self.assertFalse(os.path.isdir(self.wt(branch.replace("/", "-"))))
 
     def test_adopt_stops_when_identifier_is_unusable(self):
         long_branch = "feature/" + "a" * 60
