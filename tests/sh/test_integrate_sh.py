@@ -119,6 +119,18 @@ class Fixture(unittest.TestCase):
         git(repo, "worktree", "add", "-q", wt, "-b", name, "--no-track", head)
         return wt
 
+    def silent_exe(self):
+        """ラッパーの引数の形（`git check`）にだけ答え、ほかの問いには答えない実行ファイル。"""
+        path = os.path.join(self._tmp.name, "silent", "ccnavi")
+        write(
+            path,
+            "#!/bin/sh\n"
+            f'case " $* " in *" git check "*) exec \'{exe.sh_path()}\' "$@" ;; esac\n'
+            "exit 1\n",
+        )
+        os.chmod(path, 0o755)
+        return path
+
     def run_git_sh(self, *args, cwd=None, env_extra=None):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
@@ -402,9 +414,7 @@ class IntegrateTest(Fixture):
 
     def test_the_exe_that_cannot_answer_refuses(self):
         self.work_in_branch()
-        r = self.run_git_sh(
-            "integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": "/nonexistent/ccnavi"}
-        )
+        r = self.run_git_sh("integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": self.silent_exe()})
         self.assertOk(r, 2)
         self.assertIn("確かめられない", r.stderr)
 
@@ -443,9 +453,7 @@ class IntegrateTest(Fixture):
         self.work_in_branch()
         os.remove(self.record())
         write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
-        r = self.run_git_sh(
-            "integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": "/nonexistent/ccnavi"}
-        )
+        r = self.run_git_sh("integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": self.silent_exe()})
         self.assertOk(r, 2)
         self.assertIn("--adopt", r.stderr)
 

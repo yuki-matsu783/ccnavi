@@ -527,7 +527,11 @@ class WorktreeShTest(unittest.TestCase):
         # 案内の git は、書いたとおりに新しいシェルで打てる。
         command = re.search(r"`(cd .+? <サブコマンド>)`", last).group(1)
         command = command.replace("<サブコマンド>", "rev-parse --abbrev-ref HEAD")
-        done = subprocess.run([SHELL, "-c", command], cwd="/", capture_output=True, text=True)
+        # ラッパーは引数の形を実行ファイルに確かめさせる（利用先では settings.json の env が渡す）。
+        shell_env = {**os.environ, "CCNAVI_ENTRY_PATH": self.exe}
+        done = subprocess.run(
+            [SHELL, "-c", command], cwd="/", env=shell_env, capture_output=True, text=True
+        )
         self.assertEqual("topic", done.stdout.strip().splitlines()[-1], done.stderr)
         # 既にあるときも、最後の行は同じ。
         again = self.run_sh("topic")

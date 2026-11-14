@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
+from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh, exe
 from tests.inproc import run_ccnavi
 
 GIT = ["sh", "../../../.ccnavi/scripts/ccnavi-git.sh"]
@@ -79,6 +79,8 @@ class EnvHookTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -192,6 +194,8 @@ class ChildPushTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -305,6 +309,8 @@ class SubagentParentTreeTest(unittest.TestCase):
             payload["agent_id"] = agent
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -567,6 +573,8 @@ class ShAgreesTest(unittest.TestCase):
     def run_sh(self, cwd, sub):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -626,6 +634,8 @@ class ShAgreesTest(unittest.TestCase):
         write(os.path.join(parent, "only-in-parent.txt"), "x\n")
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -736,6 +746,8 @@ class CorePathTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -1000,6 +1012,8 @@ class CorePathShAgreesTest(unittest.TestCase):
     def run_sh(self, args):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
