@@ -52,6 +52,7 @@ sh scripts/ccnavi-build.sh                         # 実行ファイルの組み
 cd go && gofmt -l . && go vet ./... && go test ./...  # 実行ファイルの整形・検査・テスト
 ```
 
+- git の入口（`.ccnavi/scripts/ccnavi-git.sh`）は、実行ファイルに引数の形を確かめさせる。組み立てる前は使えないので、新しい環境（Claude Code on the web など）では最初に `sh scripts/ccnavi-build.sh` を打つ。`go/` を変えたら組み立て直す（`.ccnavi/bin/` の実行ファイルは、組み立てたときの判定のまま）
 - テストは `python -m tests` か `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに失敗する。全件の回し方と、回すグループの決め方は[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)にある
 - 拡張（`extensions/`）のテストは、各拡張のディレクトリで `pnpm test` を回す。触ったファイルから回すグループを決める仕組みは[開発用の hook](../.agents/docs/dev-hooks.md)にある
 - ログの置き場と書き方は[ログの書き方](../.agents/docs/logging.md)にある
