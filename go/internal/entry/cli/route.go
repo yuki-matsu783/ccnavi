@@ -434,6 +434,9 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return okIf(syncCheck(stdout, stderr, root, conf, cmd[2], repo) == 0), true
 	case cmd[0] == "text":
 		return runText(stdout, stderr, root, cmd[1:]), true
+	case cmd[0] == "start":
+		// ccnavi-start.sh が取ってきたホストの応答を読む。チケット制御の有無に依らない。
+		return runStart(stdout, stderr, cmd[1:]), true
 	}
 	if code, matched := shask.Answer(stdout, stderr, root, conf, cmd); matched {
 		return code, true

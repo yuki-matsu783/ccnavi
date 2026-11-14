@@ -111,7 +111,7 @@ var subTiers = map[string]map[string]int{
 	"tickets/approval": {"marks": 0, "wap": 1},
 	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
 	"tickets/lifecycle": {
-		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0,
+		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0, "start": 0,
 		"stop": 1, "consolidate": 1, "retire": 1, "wapmerge": 1, "ops": 1,
 		"integrate": 2,
 		"branch":    3,
