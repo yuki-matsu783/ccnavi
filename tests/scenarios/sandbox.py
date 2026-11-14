@@ -3,7 +3,8 @@
 一時ディレクトリに、ccnavi の hook が動くのに要るものだけを置いたワークスペースを組む。
 
 - このリポジトリの作業ツリーから、追跡している `.ccnavi/`（`bin/` は管理外なので入らない）、
-  `.claude/settings.json`・`.claude/hooks/`、`.gitignore` をコピーし、git のリポジトリにする
+  `.claude/settings.json`・`.claude/hooks/`、`.gitignore`、`docs/wiki/` をコピーし、
+  git のリポジトリにする
 - テストが組む ccnavi の実行ファイル（`tests/exe.py`）を `.ccnavi/bin/<os>-<arch>/` に置く
 - `settings.json` の `CCNAVI_MODE` を `enable` にする（この使い捨ての木の中だけ）
 - `projects/test-repo` に、README を 1 本持つ小さなリポジトリを置く
@@ -22,7 +23,8 @@ from pathlib import Path
 from tests import exe
 from tests.scenarios.common import ROOT
 
-COPIED = (".ccnavi", ".claude/settings.json", ".claude/hooks", ".gitignore")
+# docs/wiki は、ccnavi がセッションの開始で学びの案内を作るときに読む
+COPIED = (".ccnavi", ".claude/settings.json", ".claude/hooks", ".gitignore", "docs/wiki")
 TEST_REPO = "projects/test-repo"
 # 受入シナリオが当てにする test-repo の README の見出し（UC-01 の台本が書き換える行）
 TEST_REPO_README = "# 演習: テキスト整形CLI\n\n受入シナリオの使い捨てのワークスペースの見本。\n"

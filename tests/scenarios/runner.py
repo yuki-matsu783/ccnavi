@@ -6,7 +6,7 @@
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
     uv run python -m tests.scenarios.runner run <シナリオ> --agent script --confirmed   スタブで回す
-    uv run python -m tests.scenarios.runner run-stub <ディレクトリ or glob>   使い捨ての木で回す
+    uv run python -m tests.scenarios.runner run-stub <ディレクトリ or glob>
     uv run python -m tests.scenarios.runner run-all <ディレクトリ or glob> --max-total-usd <USD>
     uv run python -m tests.scenarios.runner run-all <...> --max-total-usd <USD> --confirmed <目印>
     uv run python -m tests.scenarios.runner next <出力の置き場>
@@ -19,6 +19,11 @@ run-all は、使い捨てのリポジトリのシナリオ（人間の操作が
 実行の直前に作り直し、合わなければ止まる。実費の累計が --max-total-usd を超えそうなら、
 次のシナリオは回さずに止まる。終了コードは 0 全部 pass / 1 fail がある・回せるシナリオが無い /
 2 未成立か意味の判定待ちがある・上限が不正 / 3 確認が要る・止まった。
+
+run-stub は、台本のあるシナリオを、シナリオごとに組んだ使い捨てのワークスペースで
+スタブで回して消す。ユーザのワークスペースに触れず claude も呼ばないので、確認を取らない。
+終了コードは 0 全部 pass / 1 fail がある・回せるものが無い / 2 未成立がある /
+3 後片付けができなかった回がある。
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 restore は、人間の操作で止まった回を続けずにやめるとき、setup のファイルを消し、

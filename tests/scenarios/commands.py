@@ -101,7 +101,6 @@ def cmd_run(args):
     require_entry()
     root = Path(args.root).resolve()
     scn = schema.load_scenario(args.scenario, args.agent)
-    scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     mode_ok, mode_text = workspace.mode_check(root)
     if not mode_ok:
         # 確認の前に止める。--confirmed を付けても、enable でなければ回さない
@@ -163,7 +162,6 @@ def cmd_next(args):
             print(f"案内: {note}")
         write_state(out, st)
     scn = schema.load_from_state(st)
-    scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
     return drive.continue_scenario(scn, out, st, st["root"])
 
 
@@ -261,7 +259,6 @@ def run_all_plan(paths, root):
             skipped.append((sid, f"ID が重複している（{ids[sid]} と同じ）"))
             continue
         ids[sid] = str(path)
-        scn["_prompt_steps"] = sum(1 for s in scn["steps"] if not s.get("human"))
         why = run_all_reason(scn, root, top, top_why)
         if why:
             skipped.append((sid, why))
@@ -369,7 +366,6 @@ def run_stub(paths):
             results.append((str(scn["id"]), None, why))
             continue
         scn = schema.load_scenario(path, schema.AGENT_SCRIPT)
-        scn["_prompt_steps"] = len(scn["steps"])
         out = ROOT / "logs" / "scenarios" / f"{scn['id']}-stub-{datetime.now():%Y%m%d-%H%M%S-%f}"
         base = sandbox.make_base()
         try:
@@ -382,7 +378,7 @@ def run_stub(paths):
 
 def cmd_run_stub(args):
     """run-stub: 使い捨てのワークスペースでスタブで回す。0 全部 pass / 1 fail がある・回せるものが
-    無い / 2 未成立か意味の判定待ちがある。"""
+    無い / 2 未成立がある / 3 後片付けができなかった回がある（run と同じ意味）。"""
     results = run_stub(expand_scenario_paths(args.scenarios))
     ran = [r for r in results if r[1] is not None]
     for sid, rc, note in results:
@@ -391,9 +387,11 @@ def cmd_run_stub(args):
     if not ran:
         print("使い捨てのワークスペースでスタブで回せるシナリオが無い")
         return 1
-    if any(rc == 1 for _, rc, _ in ran):
-        return 1
-    return 0 if all(rc == 0 for _, rc, _ in ran) else 2
+    codes = {rc for _, rc, _ in ran}
+    for rc in (1, 3, 2):  # fail を先に、後片付けができなかった回（3）を未成立（2）より先に知らせる
+        if rc in codes:
+            return rc
+    return 0 if codes == {0} else 2
 
 
 def cmd_run_all(args):
