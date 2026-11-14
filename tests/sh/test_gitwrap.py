@@ -161,36 +161,10 @@ class RejectTest(GitWrapperTest):
             with self.subTest(args=args):
                 self.assertRejected(*args)
 
-    def test_global_config_option_is_rejected_without_reading_its_value(self):
-        # `git -c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを
-        # 実行する。危ない設定名の列挙は網羅できないので、値を見ずに形で弾く。
-        self.assertRejected("-c", "diff.external=echo", "diff")
-        self.assertRejected("--config-env=diff.external=X", "diff")
-
-    def test_options_that_turn_reads_into_writes_are_rejected(self):
-        self.assertRejected("diff", "--output=stolen.txt")
-        self.assertRejected("log", "--exec-path=/tmp")
-        self.assertRejected("status", "--git-dir=/elsewhere/.git")
-        self.assertFalse(os.path.exists(os.path.join(self.dir, "stolen.txt")))
-
-    def test_destructive_subcommands_are_rejected(self):
-        for args in (
-            ("reset", "--hard"),
-            ("clean", "-fd"),
-            ("rebase", "main"),
-            ("cherry-pick", "HEAD"),
-            ("config", "--get", "user.email"),
-            ("clone", "https://example.invalid/x.git"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-    def test_commit_checkout_and_pull_pass_but_their_escape_hatches_do_not(self):
+    def test_the_escape_hatches_of_checkout_switch_and_pull_are_rejected(self):
         # commit / checkout / pull は通す。止めるのは、点検を飛ばす形と
         # ワークツリーの書きかけを破棄する形だけ。
         for args in (
-            ("commit", "--no-verify", "-m", "x"),
-            ("commit", "-an", "-m", "x"),
             ("checkout", "--", "tracked.txt"),
             ("checkout", "-f", "main"),
             ("switch", "--discard-changes", "main"),
@@ -201,14 +175,7 @@ class RejectTest(GitWrapperTest):
 
     def test_dangerous_forms_of_allowed_subcommands_are_rejected(self):
         for args in (
-            ("branch", "-D", "x"),
-            ("branch", "--force", "x"),
-            ("branch", "-u", "origin/main"),
-            ("tag", "-d", "v1"),
-            ("remote", "add", "o", "u"),
             ("worktree", "remove", "--force", "p"),
-            ("stash", "drop"),
-            ("stash", "clear"),
             ("restore", "."),
             ("merge", "-X", "ours", "other"),
             ("merge", "-Xtheirs", "other"),
@@ -217,9 +184,6 @@ class RejectTest(GitWrapperTest):
         ):
             with self.subTest(args=args):
                 self.assertRejected(*args)
-
-    def test_unknown_subcommand_is_rejected_by_default(self):
-        self.assertRejected("frobnicate")
 
     def test_rm_passes_but_forcing_it_does_not(self):
         # git rm は索引や HEAD と食い違うファイルを既定で拒む。-f はその線を
@@ -240,12 +204,8 @@ class RejectTest(GitWrapperTest):
         # 案内された先でもう 1 度拒否される。代わりの手段が拒否される案内は、
         # 案内が無いのとほとんど同じ。示すならラッパースクリプトの形で示す。
         for args in (
-            ("reset", "--hard"),
-            ("clean", "-fd"),
             ("checkout", "-f", "main"),
             ("checkout", "--", "tracked.txt"),
-            ("stash", "drop"),
-            ("branch", "-D", "other"),
             ("restore",),
             ("pull", "--force"),
         ):
@@ -257,12 +217,6 @@ class RejectTest(GitWrapperTest):
                     self.assertNotIn(
                         form, stderr.replace("ccnavi-git.sh", ""), f"生の git を勧めた: {stderr}"
                     )
-
-    def test_long_option_values_do_not_trip_the_short_option_scan(self):
-        # `--contains=feature/dev` の f と d を -f -d と読み違えないこと。
-        # 短いオプションをまとめた形 (-rd) を 1 文字ずつ見る判定の巻き添え。
-        result = self.run_wrapper("branch", "--contains=feature/dev")
-        self.assertNotEqual(2, result.returncode, result.stderr)
 
 
 # 拒否の文に代わりの手段を書くと決めた理由の名前。次に何をすればよいかを必ず書く。
@@ -302,21 +256,6 @@ class RejectAlternativeTest(GitWrapperTest):
                         any(mark in text for mark in ALTERNATIVE_MARKS),
                         f"代わりの手段が無い: {text}",
                     )
-
-    def test_the_pager_rejection_names_a_wrapper_form_that_passes(self):
-        for args in (("grep", "-O", "line"), ("grep", "-iO", "line"), ("grep", "--open", "line")):
-            with self.subTest(args=args):
-                result = self.assertRejected(*args)
-                self.assertIn("ccnavi-git.sh grep -l", result.stderr)
-        listed = self.run_wrapper("grep", "-l", "line")
-        self.assertEqual(0, listed.returncode, listed.stderr)
-        self.assertIn("tracked.txt", listed.stdout)
-
-    def test_the_remote_option_rejection_names_the_listing_forms(self):
-        result = self.assertRejected("remote", "--frob")
-        self.assertIn("ccnavi-git.sh remote -v", result.stderr)
-        self.assertIn("ccnavi-git.sh remote get-url", result.stderr)
-        self.assertNotEqual(2, self.run_wrapper("remote", "-v").returncode)
 
     def test_the_missing_destination_rejection_names_the_worktree_form(self):
         result = self.assertRejected("worktree", "add")
@@ -753,29 +692,10 @@ class ResetGuidanceTest(GitWrapperTest):
         git(self.dir, "commit", "-q", "-m", "local")
         return branch
 
-    def test_reset_names_ccnavi_sync_and_merge_not_checkout_B(self):
-        stderr = self.assertRejected("reset", "--hard", "origin/main").stderr
-        for form in (
-            "ccnavi-sync.sh <P>",
-            "fetch <リモート> <ブランチ>",
-            "merge <リモート>/<ブランチ>",
-            "ユーザ",
-        ):
-            self.assertIn(form, stderr)
-        self.assertNotIn("checkout -B", stderr)
-        # 勧める形はラッパースクリプトの形で示す。生の git を勧めると、勧めた先でもう 1 度止まる。
-        rest = stderr.replace("ccnavi-git.sh", "").replace("ccnavi-sync.sh", "")
-        for raw in ("git checkout", "git merge", "git fetch", "git stash"):
-            self.assertNotIn(raw, rest)
-
     def test_usage_names_ccnavi_sync_not_checkout_B(self):
         usage = self.run_wrapper("--help").stdout
         self.assertIn("ccnavi-sync.sh <P>", usage)
         self.assertNotIn("checkout -B <ブランチ>", usage)
-
-    def test_clean_does_not_mention_checkout_B(self):
-        stderr = self.assertRejected("clean", "-fd").stderr
-        self.assertNotIn("checkout -B", stderr)
 
     def test_forced_branch_moves_are_rejected(self):
         branch = self.diverge()
@@ -802,46 +722,12 @@ class ResetGuidanceTest(GitWrapperTest):
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
-class BranchForceMoveTest(GitWrapperTest):
-    """`branch -M`（強制の改名）と `-C`（強制の複製）を止める。
+class BranchUsageTest(GitWrapperTest):
+    """使い方の文が、branch で通さない形（-D・-m・-M・-C・-f・-u）を挙げる。
 
-    短いオプションの検査は小文字の f・m・u だけを見ていたので、大文字の -M は通っていた。
-    ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、改名すると引けなくなる。
+    判定そのものは実行ファイル（`ccnavi git check`）が行い、
+    go/internal/tickets/lifecycle/gitwrap の見本が見る。
     """
-
-    def test_force_rename_and_force_copy_are_rejected(self):
-        git(self.dir, "branch", "topic")
-        before = git_out(self.dir, "branch", "--list")
-        for args in (
-            ("branch", "-M", "topic", "renamed"),
-            ("branch", "-M", "renamed"),
-            ("branch", "-rM", "origin/x", "y"),
-            ("branch", "--move", "topic", "renamed"),
-            ("branch", "--move=topic"),
-            ("branch", "-C", "topic", "copied"),
-            ("branch", "-rC", "topic", "copied"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual(before, git_out(self.dir, "branch", "--list"))
-
-    def test_force_rename_names_why_and_the_wrapper(self):
-        stderr = self.assertRejected("branch", "-M", "renamed").stderr
-        self.assertIn("識別子", stderr)
-        self.assertIn("ユーザ", stderr)
-
-    def test_lower_case_move_stays_rejected(self):
-        # -m は以前から止めている。-M を足しても変わらない。
-        for args in (("branch", "-m", "renamed"), ("branch", "-rm", "x")):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-    def test_safe_delete_and_listing_still_pass(self):
-        git(self.dir, "branch", "topic")
-        for args in (("branch", "--list"), ("branch", "-v"), ("branch", "-d", "topic")):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_usage_lists_what_it_rejects(self):
         usage = self.run_wrapper("--help").stdout
@@ -1423,9 +1309,6 @@ class AllowListTest(GitWrapperTest):
             ("checkout", "--for", "topic"),
             ("checkout", "-qB", "topic", "HEAD"),
             ("checkout", "-fq", "topic"),
-            ("branch", "--mov", "topic", "renamed"),
-            ("branch", "--forc", "-d", "topic"),
-            ("branch", "-rM", "a", "b"),
             ("pull", "--rebas", "origin", "main"),
             ("pull", "-r", "origin", "main"),
             ("pull", "-Xours", "origin", "main"),
@@ -1436,10 +1319,6 @@ class AllowListTest(GitWrapperTest):
             ("merge", "-Xours", "topic"),
             ("merge", "-sours", "topic"),
             ("merge", "--no-verif", "topic"),
-            ("commit", "--no-verif", "-m", "x"),
-            ("commit", "-anm", "x"),
-            ("commit", "--amend", "-m", "x"),
-            ("commit", "--amen", "-m", "x"),
             ("rm", "--forc", "tracked.txt"),
             ("rm", "-rf", "tracked.txt"),
             ("worktree", "remove", "--forc", "x"),
@@ -1447,15 +1326,6 @@ class AllowListTest(GitWrapperTest):
             ("restore", "--sour=HEAD~1", store),
             ("restore", "-sHEAD~1", store),
             ("restore", "-Ss", "HEAD~1", store),
-            ("cat-file", "--textc", "HEAD:tracked.txt"),
-            ("cat-file", "--filters", "HEAD:tracked.txt"),
-            ("grep", "-O", "line"),
-            ("grep", "-iOvim", "line"),
-            ("grep", "--open-f", "line"),
-            ("log", "--outp=out.txt"),
-            ("diff", "--ext"),
-            ("show", "--textc"),
-            ("fetch", "--upload-p=touch x", "origin"),
             ("checkout", "--unknown-option"),
         ):
             with self.subTest(args=args):
@@ -1469,14 +1339,6 @@ class AllowListTest(GitWrapperTest):
             ("switch", "-cnew3"),
             ("switch", "--create", "new4", self.base),
             ("checkout", self.base),
-            ("branch", "--list"),
-            ("branch", "-vv"),
-            ("branch", "-d", "new1"),
-            ("commit", "--allow-empty", "-qm", "x"),
-            ("cat-file", "-p", "HEAD:tracked.txt"),
-            ("grep", "-e", "line 1", "--", "tracked.txt"),
-            ("grep", "-C3", "line 5", "--", "tracked.txt"),
-            ("diff", "--text", "HEAD"),
             ("restore", "--staged", "tracked.txt"),
         ):
             with self.subTest(args=args):
@@ -1886,13 +1748,14 @@ class IntegrationPushTest(GitWrapperTest):
 
 
 class SafeAdditionsTest(GitWrapperTest):
-    """許可リストに足した、履歴を書き換えない形。
+    """許可リストにある、履歴を書き換えない形（fetch・pull・merge）。
 
-    足したもの: commit --fixup・--squash、fetch と pull の --depth・--deepen・--shallow-since・
-    --unshallow、merge と pull の --autostash・--no-autostash、fetch の --show-forced-updates・
-    --no-show-forced-updates・--write-fetch-head・--no-write-fetch-head。
-    拒否されない（終了コード 2 にならない）ことを見る。git 自身が断る形（完全な clone への
-    --unshallow など）は 1 で終わってよい。
+    fetch と pull の --depth・--deepen・--shallow-since・--unshallow、merge と pull の --autostash・
+    --no-autostash、fetch の --show-forced-updates・--no-show-forced-updates・--write-fetch-head・
+    --no-write-fetch-head。拒否されない（終了コード 2 にならない）ことを見る。
+    git 自身が断る形（完全な clone への --unshallow など）は 1 で終わってよい。
+    commit の --fixup・--squash は実行ファイルの判定で、
+    go/internal/tickets/lifecycle/gitwrap の見本が見る。
     """
 
     def setUp(self):
@@ -1903,12 +1766,8 @@ class SafeAdditionsTest(GitWrapperTest):
         git(self.dir, "push", "-q", "origin", self.branch)
 
     def test_added_forms_are_not_rejected(self):
-        head = git_out(self.dir, "rev-parse", "HEAD")
         b = self.branch
         for args in (
-            ("commit", "--allow-empty", f"--fixup={head}"),
-            ("commit", "--allow-empty", "--fixup", head),
-            ("commit", "--allow-empty", f"--squash={head}", "-m", "x"),
             ("fetch", "--depth=1", "origin", b),
             ("fetch", "--depth", "1", "origin", b),
             ("fetch", "--deepen=1", "origin", b),
@@ -1945,46 +1804,21 @@ class SafeAdditionsTest(GitWrapperTest):
             ("fetch", "--depth=1", "origin", "+main:main"),
             ("pull", "--rebase", "origin", self.branch),
             ("pull", "--rebase=merges", "origin", self.branch),
-            ("commit", "--amend", "-m", "x"),
-            ("commit", "--fixu=x"),
         ):
             with self.subTest(args=args):
                 self.assertRejected(*args)
 
 
 class TagListOnlyTest(GitWrapperTest):
-    """tag は一覧だけ。位置の引数は -l / --list のときの絞り込みだけ。タグは作らせない。"""
+    """使い方の文が、tag は一覧だけでタグの作成はユーザに頼むと言う。
 
-    def test_creating_a_tag_is_rejected(self):
-        for args in (
-            ("tag", "v1"),
-            ("tag", "v1", "HEAD"),
-            ("tag", "--contains", "HEAD", "v1"),
-            ("tag", "-n", "v1"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual("", git_out(self.dir, "tag", "--list"))
+    判定そのものは実行ファイル（`ccnavi git check`）が行い、
+    go/internal/tickets/lifecycle/gitwrap の見本が見る。
+    """
 
     def test_help_says_creation_is_the_users(self):
         result = self.run_wrapper("--help")
         self.assertIn("作成はユーザに依頼", result.stdout + result.stderr)
-
-    def test_listing_still_passes(self):
-        git(self.dir, "tag", "v0")
-        for args in (
-            ("tag",),
-            ("tag", "-l"),
-            ("tag", "-l", "v*"),
-            ("tag", "--list", "v*"),
-            ("tag", "--contains", "HEAD"),
-            ("tag", "--points-at", "HEAD"),
-            ("tag", "--merged=HEAD"),
-            ("tag", "-n", "-l", "v*"),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
