@@ -106,7 +106,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 
 #### 直接作業の `integrate` の検査
 
-`ccnavi-git.sh integrate`（と片付け・`integrate-done`）は、作業ワークツリーの `wip/handoff/` を、実行ファイル（`ccnavi git integrate`）の中で起点（S）の木の元のパスと突き合わせる。
+`ccnavi-git.sh integrate`（と片付け・`integrate-done`）では、実行ファイル（`ccnavi git integrate`）が作業ワークツリーの `wip/handoff/` を、起点（S）の木の元のパスと突き合わせる。
 元のパスは、置き場を除いた相対パスの `.claude` の階層名を `handoff-.claude` と読み替えた分を戻したもので、大文字小文字と NFC/NFD の違いは同じものとして探す。
 応答は `foreign <パス>`（元があり中身が違う写し。止める）と `note <パス>`（元が無い下書き。通して「取り込まない下書き」として出す）。
 元と中身が同じ写し、S の同じ下書きと同じものは、どちらの一覧にも入れない。元の無い下書きでも、コミットしていないものは止める。
