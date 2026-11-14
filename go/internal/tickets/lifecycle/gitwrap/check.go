@@ -20,9 +20,26 @@ var readOnly = map[string]bool{"status": true, "log": true, "show": true, "diff"
 	"describe": true, "rev-parse": true, "rev-list": true, "ls-files": true, "ls-tree": true, "merge-base": true,
 	"diff-tree": true, "whatchanged": true, "show-ref": true}
 
-// byState は、続きの判定に git の状態やワークスペースを読むサブコマンド（Judge が決める）。
-var byState = map[string]bool{"worktree": true, "rm": true, "restore": true, "merge": true, "merge-file": true,
-	"checkout": true, "switch": true, "fetch": true, "pull": true, "push": true, "integrate": true, "integrate-done": true}
+// byState は、続きの判定に git の状態やワークスペースを読むサブコマンドと、その判定（Judge が引く）。nil は、判定を
+// ラッパー（sh）が持つサブコマンド。サブコマンドを足すときは、この表だけを直す。
+var byState = map[string]func(e *Env, sub string, args []string, a *Answer){
+	"worktree":   func(e *Env, _ string, args []string, a *Answer) { a.Deny, a.Warn = e.worktree(args) },
+	"rm":         func(e *Env, _ string, args []string, a *Answer) { a.Deny = e.rm(args) },
+	"restore":    func(e *Env, _ string, args []string, a *Answer) { a.Deny = e.restore(args) },
+	"merge":      func(e *Env, _ string, args []string, a *Answer) { a.Deny, a.Prepend = e.merge(args) },
+	"merge-file": func(e *Env, _ string, args []string, a *Answer) { a.Deny = e.mergeFile(args) },
+	"checkout":   func(e *Env, sub string, args []string, a *Answer) { a.Deny = e.checkout(sub, args) },
+	"switch":     func(e *Env, sub string, args []string, a *Answer) { a.Deny = e.checkout(sub, args) },
+	"fetch":      func(e *Env, sub string, args []string, a *Answer) { a.Deny = e.fetch(sub, args) },
+	"pull": func(e *Env, sub string, args []string, a *Answer) {
+		if a.Deny = e.fetch(sub, args); a.Deny == nil {
+			a.Target = e.targetHere()
+		}
+	},
+	"push":           func(e *Env, _ string, args []string, a *Answer) { a.Deny = e.push(args, a) },
+	"integrate":      nil,
+	"integrate-done": nil,
+}
 
 // Check は、ラッパーが受けた引数 args（先頭がサブコマンド）を通すかを決める。答えは Allow・Pass、または拒否。
 func Check(n Names, args []string) (string, *Deny) {
@@ -39,7 +56,7 @@ func Check(n Names, args []string) (string, *Deny) {
 	switch {
 	case readOnly[sub] || sub == "add":
 		return Allow, nil
-	case byState[sub]:
+	case hasState(sub):
 		return Pass, nil
 	}
 	if d := bySubcommand(n, sub, rest); d != nil {
@@ -48,37 +65,24 @@ func Check(n Names, args []string) (string, *Deny) {
 	return Allow, nil
 }
 
+// hasState は、sub が byState にあるか。
+func hasState(sub string) bool {
+	_, ok := byState[sub]
+	return ok
+}
+
 // Judge は、ラッパーが受けた引数 args（先頭がサブコマンド）を、引数（Check）と git の状態から通すかを決める。
 func Judge(e *Env, args []string) Answer {
 	verdict, d := Check(e.Names, args)
 	if d != nil || verdict != Pass {
 		return Answer{Verdict: verdict, Deny: d}
 	}
-	a := Answer{Verdict: Allow}
-	sub, rest := args[0], args[1:]
-	switch sub {
-	case "worktree":
-		a.Deny, a.Warn = e.worktree(rest)
-	case "rm":
-		a.Deny = e.rm(rest)
-	case "restore":
-		a.Deny = e.restore(rest)
-	case "merge":
-		a.Deny, a.Prepend = e.merge(rest)
-	case "merge-file":
-		a.Deny = e.mergeFile(rest)
-	case "checkout", "switch":
-		a.Deny = e.checkout(sub, rest)
-	case "fetch", "pull":
-		a.Deny = e.fetch(sub, rest)
-		if sub == "pull" && a.Deny == nil {
-			a.Target = e.targetHere()
-		}
-	case "push":
-		a.Deny = e.push(rest, &a)
-	default:
-		a.Verdict = Pass
+	judge := byState[args[0]]
+	if judge == nil {
+		return Answer{Verdict: Pass}
 	}
+	a := Answer{Verdict: Allow}
+	judge(e, args[0], args[1:], &a)
 	return a
 }
 

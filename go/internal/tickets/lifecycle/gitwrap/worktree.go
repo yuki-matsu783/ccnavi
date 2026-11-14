@@ -6,14 +6,16 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/tickets/model/ids"
 )
 
 // worktree は `worktree list | add | prune | remove` の判定。add の起点が古いかもしれないときの警告も返す。
 func (e *Env) worktree(args []string) (*Deny, string) {
+	if len(args) == 0 {
+		args = []string{"list"}
+	}
 	action := "list"
-	if len(args) > 0 && args[0] != "" {
+	if args[0] != "" {
 		action = args[0]
 	}
 	switch action {
@@ -96,11 +98,14 @@ func (e *Env) worktreeAdd(args []string) (*Deny, string) {
 	return e.fresh(f)
 }
 
-// abs は cwd から解いた絶対パス（`/` 区切り、`.` と `..` を取り除く）。
+// abs は cwd から解いた絶対パス（`/` 区切り、`.` と `..` を取り除く）。`\` を区切りとして読むのは Windows だけ
+// （ほかの機械では名前の字で、`.claude\worktrees\x` は cwd の直下の 1 つの名前になる）。
 func (e *Env) abs(p string) string {
-	p = ospath.Slashed(p)
+	if ospath.Windows {
+		p = ospath.Slashed(p)
+	}
 	if !isAbsSlashed(p) {
-		p = ospath.Slashed(e.Cwd) + "/" + p
+		p = slashedOnWindows(e.Cwd) + "/" + p
 	}
 	parts, _ := clean(p)
 	out := strings.Join(parts, "/")
@@ -110,6 +115,14 @@ func (e *Env) abs(p string) string {
 	return "/" + out
 }
 
+// slashedOnWindows は、Windows でだけ区切りを `/` に揃える。
+func slashedOnWindows(p string) string {
+	if ospath.Windows {
+		return ospath.Slashed(p)
+	}
+	return p
+}
+
 // root はワークスペースルート（`/` 区切り）。
 func (e *Env) root() string {
 	return e.abs(e.Root)
@@ -117,7 +130,7 @@ func (e *Env) root() string {
 
 // inWorktrees は、abs がワークスペースの `.claude/worktrees/` の下 1 階層か。
 func (e *Env) inWorktrees(abs string) bool {
-	rest, ok := strings.CutPrefix(pathcase.Fold(abs), pathcase.Fold(e.root()+"/.claude/worktrees/"))
+	rest, ok := strings.CutPrefix(fold(abs), fold(e.root()+"/.claude/worktrees/"))
 	return ok && rest != "" && !strings.Contains(rest, "/")
 }
 
@@ -125,7 +138,7 @@ func (e *Env) inWorktrees(abs string) bool {
 // 打つときに使い回せないので、ワークスペースの中なら `../` を並べる。
 func (e *Env) spell(name string) string {
 	here, ws := e.abs("."), e.root()
-	if pathcase.Fold(here) == pathcase.Fold(ws) {
+	if fold(here) == fold(ws) {
 		return ".claude/worktrees/" + name
 	}
 	if rel, ok := strings.CutPrefix(here, ws+"/"); ok {

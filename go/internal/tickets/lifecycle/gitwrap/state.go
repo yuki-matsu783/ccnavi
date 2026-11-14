@@ -6,6 +6,7 @@ import (
 
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 )
 
@@ -37,7 +38,7 @@ type Answer struct {
 
 // git は cwd で git を実行し、標準出力の末尾の改行を落として返す。
 func (e *Env) git(args ...string) (string, bool) {
-	done := git.Run(e.Cwd, args, git.Options{})
+	done := git.Run(e.Cwd, args, git.Options{Timeout: git.MergeTimeout})
 	return strings.TrimRight(done.Out, "\r\n"), done.OK()
 }
 
@@ -94,11 +95,11 @@ func (e *Env) worktreeName(top string) (string, bool) {
 	if top == "" {
 		return "", false
 	}
-	rest, ok := strings.CutPrefix(phys(top), phys(e.Root)+"/.claude/worktrees/")
-	if !ok || rest == "" {
+	rest, ok := pathcase.Under(phys(top), ospath.Join(phys(e.Root), ".claude", "worktrees"))
+	if !ok || rest == "." {
 		return "", false
 	}
-	name, _, _ := strings.Cut(rest, "/")
+	name, _, _ := strings.Cut(rest, ospath.Sep)
 	return name, true
 }
 
@@ -107,7 +108,7 @@ func (e *Env) userCheckout(top string) (string, bool) {
 	out, _ := e.git("worktree", "list", "--porcelain")
 	first, _, _ := strings.Cut(out, "\n")
 	main, ok := strings.CutPrefix(first, "worktree ")
-	return main, ok && main != "" && phys(top) == phys(main)
+	return main, ok && main != "" && pathcase.SameReal(top, main)
 }
 
 // integration は top が属するリポジトリの統合先の名前。決まらなければ空。

@@ -9,6 +9,12 @@ import (
 	"ccnavi/internal/infra/pathcase"
 )
 
+// fold は、大文字小文字を区別せずに比べるキー。区切りは `/` に揃える（pathcase.Fold は Windows で `\` にするので、
+// `/` を含む型と比べる前に戻す）。
+func fold(p string) string {
+	return slashedOnWindows(pathcase.Fold(p))
+}
+
 // isAbsSlashed は `/` 区切りのパスが絶対パス（`/x` か `C:/x`）か。
 func isAbsSlashed(p string) bool {
 	return strings.HasPrefix(p, "/") || ospath.HasDrive(p, true) && strings.HasPrefix(p[2:], "/")
@@ -58,9 +64,9 @@ func (e *Env) StoreHit(arg string) bool {
 	if above {
 		return false
 	}
-	norm := pathcase.Fold(strings.Join(parts, "/"))
+	norm := fold(strings.Join(parts, "/"))
 	for _, store := range stores {
-		store = pathcase.Fold(store)
+		store = fold(store)
 		if abs {
 			if strings.Contains("/"+norm+"/", "/"+store+"/") {
 				return true
@@ -123,8 +129,8 @@ func (e *Env) CoreHit(arg string) bool {
 	for _, part := range parts {
 		norm += "/" + part
 	}
-	low := pathcase.Fold(norm + "/")
-	ws := pathcase.Fold("/" + strings.TrimPrefix(phys(e.Root), "/"))
+	low := fold(norm + "/")
+	ws := fold("/" + strings.TrimPrefix(phys(e.Root), "/"))
 	if strings.Contains(low, "/.ccnavi/approved/") {
 		return false
 	}
@@ -138,7 +144,7 @@ func (e *Env) CoreHit(arg string) bool {
 		return true
 	}
 	// ツリーの頂上か、その上。
-	if t := pathcase.Fold("/" + strings.TrimPrefix(top, "/")); t == pathcase.Fold(norm) || strings.HasPrefix(t, pathcase.Fold(norm)+"/") {
+	if t := fold("/" + strings.TrimPrefix(top, "/")); t == fold(norm) || strings.HasPrefix(t, fold(norm)+"/") {
 		return true
 	}
 	// Windows の `C:/x` は上で `/C:/x` になる。ファイルシステムに聞くときは頭の / を外す。
