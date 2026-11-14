@@ -216,7 +216,7 @@ allow:
     additionalContextOnce: >-
       直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ります。取り込み先の確認・リモートとのずれの確認・
       書きかけの扱いをまとめて行うので、新しく切るときに手で worktree add を打つ必要はありません。
-      ブランチが既にあるときの worktree add（ccnavi-worktree.sh が案内する 1 段目）のあとは、
+      ブランチが既にあるときの worktree add（ccnavi-worktree.sh が案内する 1 つ目）のあとは、
       {script:ccnavi-worktree.sh} <名前> --adopt --base <統合先> で引き取ります。引き取りにはユーザの確認が要ります。
       引き取らないと integrate できません。
       worktree add が断られたら、出力の案内どおりに打ち直してください。手元の取り込み先は進めません。

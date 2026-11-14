@@ -662,21 +662,21 @@ review-request)
 		*) set -- "$@" "$rr_a" ;;
 		esac
 	done
-	# 段 0: ワークツリーの中で分かる前提（フェーズの終了・合流・未コミット・push・依頼済みなど）は、
-	# ロック・取り込みより前に、何も変えずに断る。検査は段 1 の prepare と同じ関数（読むだけ）。
+	# ステップ 0: ワークツリーの中で分かる前提（フェーズの終了・合流・未コミット・push・依頼済みなど）は、
+	# ロック・取り込みより前に、何も変えずに断る。検査はステップ 1 の prepare と同じ関数（読むだけ）。
 	# `--check` は位置引数の前に置く。
 	ccnavi --check review prepare "$@" >/dev/null || exit $?
 	# 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
 	# --check は読むだけなので、ロックも取り込みもしない。
 	[ -n "$rr_check" ] || wap_start "$family"
-	# 段 1: 前提。exe が依頼の本文を書き出す（取り込みのあとの状態で、段 0 と同じ前提をもう一度通す）。
-	# --check は本文を書かず、段 0 で済んでいる。
+	# ステップ 1: 前提。exe が依頼の本文を書き出す（取り込みのあとの状態で、ステップ 0 と同じ前提をもう一度通す）。
+	# --check は本文を書かず、ステップ 0 で済んでいる。
 	file=""
 	if [ -z "$rr_check" ]; then
 		prepared=$(ccnavi review prepare "$@") || exit $?
 		file=$(printf '%s\n' "$prepared" | sed -n 1p)
 	fi
-	# 段 1.5: マージリクエストの確認。無ければ作らずに止める（作るのは ccnavi-start.sh）。
+	# ステップ 1.5: マージリクエストの確認。無ければ作らずに止める（作るのは ccnavi-start.sh）。
 	# 元ブランチがこのツリーの HEAD のブランチと同じで、マージ先が統合先であること。
 	mr=$(find_mr)
 	[ -n "$mr" ] ||
@@ -696,7 +696,7 @@ review-request)
 		printf '確認: ok（前提は通った。取り込みとロックは確かめていない。MR #%s）\n' "$number"
 		exit 0
 	fi
-	# 段 2: 投稿。同じ目印（親・フェーズ・キー）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
+	# ステップ 2: 投稿。同じ目印（親・フェーズ・キー）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
 	# やり直しで依頼を重複させない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
@@ -712,9 +712,9 @@ review-request)
 	fi
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
-	# 段 3: マーカー。
+	# ステップ 3: マーカー。
 	wap_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 3.5: 依頼文の後始末。依頼文は review-request の入力で、依頼した後は要らない。ここからはレビュー待ちで、
+	# ステップ 3.5: 依頼文の後始末。依頼文は review-request の入力で、依頼した後は要らない。ここからはレビュー待ちで、
 	# ccnavi-*.sh（前の cd、後ろの | head・| tail は付けてよい）を打つ以外のシェルは止まり、エージェントは rm で消せない。だから review-request 自身が消す。
 	# 消すのは、--body-file がワークスペースルート直下の scratchpad/ の中のファイルのときだけ（利用者のファイルは消さない）。
 	# 消せなくても依頼は済んでいるので、警告だけで終了コードは変えない。

@@ -25,7 +25,7 @@
 #   3. 新規作成: <先頭の語>-<番号>-<slug> のブランチを統合先から切り、ワークツリー・空の初期コミット・push・Draft MR。
 #      slug は Chrome 拡張の「始める」と同じ作り方（実行ファイルの `worktree issue-id`。`ids.IssueIdentifier`）で、
 #      作る前に既存の MR を採用するときと同じ識別子の確認（使える・同じ識別子の別ブランチが無い・同名のマージ済み MR が
-#      無い）をする。作ってから後段で詰まると、打ち直しても採用の確認で止まり、手で消すまで戻れないため
+#      無い）をする。作ってから後のステップで詰まると、打ち直しても採用の確認で止まり、手で消すまで戻れないため
 #   途中で失敗しても、打ち直せば完了済みの処理をスキップし、未完了の処理から再開する（ブランチ・push・MR の有無を確かめる）。
 #
 # git は ccnavi-git.sh を通す（読むだけの確認は git を直接呼ぶ。他のスクリプトと同じ）。ホストへの繋ぎ方は
@@ -38,7 +38,7 @@
 #
 # 終了コード: 0 完了 / 1 前提の未充足 / 2 引数か環境の誤り / 3 候補が複数か、MR の無い候補か、closed の issue か、MR が閉じる issue が複数か、
 #             ワークツリーの無い既存の MR か、似た issue・MR か、意味が近いかの確認待ち（何も作らず、ユーザに聞く・選ぶ） /
-#             4 ホストに届かず、その段を代行してほしい（GitHub は MCP、GitLab はユーザに認証を頼む。案内を標準出力に出した。
+#             4 ホストに届かず、その段階を代行してほしい（GitHub は MCP、GitLab はユーザに認証を頼む。案内を標準出力に出した。
 #             済んだら打ち直す）。
 #             --check では「確かめられなかった項目がある」
 
@@ -115,7 +115,7 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
                 closed のまま続ける・別の issue にする・やめる、を「次の手:」に並べる。ユーザが closed と承知のうえで
                 続けると言ったときだけ付ける。ホストから issue の状態を読めないときは止めず、「確認:」の行で未確認と出す
   --dry-run     何も作らず、作る予定の内容だけ出す（リモートは読むだけ）
-  --mcp-checked ホストの API に届かず、MCP（GitLab の引数の段はユーザがブラウザ）で確かめたあとに付ける（エージェントが確かめずに付けない）
+  --mcp-checked ホストの API に届かず、MCP（GitLab の引数の段階はユーザがブラウザ）で確かめたあとに付ける（エージェントが確かめずに付けない）
   --branch <元ブランチ>
                 --mcp-checked と一緒のときだけ指定できる。ホストに届かないとき、候補の探索の代わりにこのブランチを使う
                 （--issue・--mr・--branch の 3 つがそろえば、ホストを見ずに続ける）。ホストに届くときは普通に確かめ、
@@ -321,7 +321,7 @@ top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 [ -n "$top" ] ||
 	fail not-git "cwd（${here}）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。"
 # ---- 依頼のリポジトリと、実行した場所のリポジトリが違えば、ホストに問い合わせる前に止める。
-# origin のパスの最後の 2 段を、大文字小文字を区別せずに比べる（ccnavi_host_parse は使わない。ホストには接続しない）。
+# origin のパスの最後の 2 要素を、大文字小文字を区別せずに比べる（ccnavi_host_parse は使わない。ホストには接続しない）。
 repo_of_url() {
 	printf '%s' "$1" | sed -E -e 's#^[A-Za-z][A-Za-z0-9+.-]*://##' -e 's#^[^/@]*@##' -e 's#^[^/:]*[:/]##' -e 's#/+$##' -e 's#\.git$##' | tr -d '\r' | awk -F/ 'NF>=2{print $(NF-1) "/" $NF}'
 }
@@ -599,7 +599,7 @@ issue_title_get() {
 }
 
 # issue が closed のときは止める。閉じた issue は完了済み・却下・重複のことが多く、理由が分からないまま実装を始めると
-# 不要な作業になる。承認の前（提案の段）に、ユーザが気づける形にする。--reopened（closed と分かって続ける）で通す。
+# 不要な作業になる。承認の前（提案の段階）に、ユーザが気づける形にする。--reopened（closed と分かって続ける）で通す。
 # 状態を読めなかった（ホストに届かない・応答に state が無い）ときは止めず、確認: の行で未確認と出す。
 # issue_title_get を呼んだ後に使う。呼べなかったときは issue_state_read が空のままなので、未確認になる。
 issue_state_gate() {
@@ -873,10 +873,10 @@ resolve_issue() {
 
 # ---- ホストに届かないときの案内。標準出力に出して終了コード 4 で止まる。
 #
-# 段は search（既存の MR を確かめる）・title（issue のタイトルを読む）・create（MR を作る）。
+# 段階は search（既存の MR を確かめる）・title（issue のタイトルを読む）・create（MR を作る）。
 # GitHub は MCP（mcp__github__のツール）で代行する手順を出す。GitLab には MCP の案内が無いので、理由の 1 語と、
 # ユーザに認証を頼んで打ち直す次の一手だけを出す。
-# 使う変数: stop_branch・stop_target・stop_title・stop_wt（段より前に出来たこと）
+# 使う変数: stop_branch・stop_target・stop_title・stop_wt（段階より前に出来たこと）
 stop_branch=""
 stop_target=""
 stop_title=""
@@ -891,7 +891,7 @@ stop_host() {
 	fi
 	sh_owner="${ccnavi_h_path%%/*}"
 	sh_repo="${ccnavi_h_path#*/}"
-	# MR を作る段と issue を確かめる段は、MCP で確かめたあとの打ち直しを issue・MR・元ブランチの 3 つそろえた形で案内する
+	# MR を作る段階と issue を確かめる段階は、MCP で確かめたあとの打ち直しを issue・MR・元ブランチの 3 つそろえた形で案内する
 	sh_issue_v="<issue の番号>"
 	[ -z "$issue_arg" ] || sh_issue_v="$issue_arg"
 	sh_branch_v="<元ブランチ>"
@@ -979,7 +979,7 @@ stop_host() {
 			;;
 		esac
 	else
-		# GitLab には MCP の代行が無い。段ごとの手順は出さず、認証を頼んで同じ引数で打ち直す（出来た段は飛ばして続きから進む）
+		# GitLab には MCP の代行が無い。段階ごとの手順は出さず、認証を頼んで同じ引数で打ち直す（出来た段階は飛ばして続きから進む）
 		case "$sh_why" in
 		*"HTTP "[0-9][0-9][0-9]*)
 			sh_word="${sh_why#*HTTP }"
@@ -1028,7 +1028,7 @@ branch_ref() {
 
 init_subject="chore: #${number} の作業を開始する"
 
-# ---- 作る・続ける段（どれも、出来ていれば飛ばす）
+# ---- 作る・続ける段階（どれも、出来ていれば飛ばす）
 
 # ensure_worktree <ブランチ> [<起点> 新規のとき]。出来たワークツリーのパスを wt に入れる。
 #
@@ -1667,7 +1667,7 @@ if [ "$total" -eq 0 ]; then
 		slug="${new_branch#"${opt_prefix}-${number}-"}"
 	fi
 	ccnavi_is_branch "$new_branch" || fail bad-branch "ブランチ名 ${new_branch} は使えない書き方です（--prefix・--slug を見直してください）。" 2
-	# 作る前に、既存の MR を採用するときと同じ識別子の確認をする。作ってから後段で詰まると、打ち直しても
+	# 作る前に、既存の MR を採用するときと同じ識別子の確認をする。作ってから後のステップで詰まると、打ち直しても
 	# 採用の確認で止まり、手で消すまで戻れない
 	id_check "$new_branch" "--prefix・--slug を見直して再実行してください。" 2
 	clash_check "$new_branch" strict
@@ -1747,7 +1747,7 @@ else
 fi
 
 # 作りかけ（ccnavi-start.sh が途中で失敗した跡）か。MR が無く、初期コミット（init_subject）だけ
-# 積んであり、名前に / を含まないなら、残りの段（push・MR）を続ける。
+# 積んであり、名前に / を含まないなら、残りの段階（push・MR）を続ける。
 # 統合先より進んでいない（c_ahead=0）ブランチは作りかけと見なさない。取り込み済みで消し忘れた古いブランチと区別できず、
 # 続けると空コミット・push・新しい Draft MR を作ってしまう。一覧を出してユーザに聞く
 resume=""
@@ -1801,7 +1801,7 @@ if [ -n "$dry" ]; then
 	fi
 	printf 'ブランチ: %s\n' "$cb"
 	if [ -n "$resume" ]; then
-		printf '作りかけなので、残りの段（初期コミット・push・Draft MR）も続ける予定。MR のタイトル: %s\n' "$(make_title "$cb")"
+		printf '作りかけなので、残りの段階（初期コミット・push・Draft MR）も続ける予定。MR のタイトル: %s\n' "$(make_title "$cb")"
 	else
 		printf 'MR: %s\n' "${c_url:--}"
 	fi

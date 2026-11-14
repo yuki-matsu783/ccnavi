@@ -1744,7 +1744,7 @@ worktree)
 		"$WS"/.claude/worktrees/*)
 			wt_rest="${wt_abs#"$WS"/.claude/worktrees/}"
 			case "$wt_rest" in
-			*/*) ;; # 2 段以上は置かない
+			*/*) ;; # 2 階層以上は置かない
 			'') ;;
 			*) wt_ok=yes ;;
 			esac
@@ -1761,7 +1761,7 @@ worktree)
 				wt_spell=".claude/worktrees/$wt_name"
 				;;
 			"$WS"/*)
-				# ワークスペースまで何段上がるかを数えて `../` を並べる。
+				# ワークスペースまで何階層上がるかを数えて `../` を並べる。
 				wt_rel="${wt_here#"$WS"/}"
 				wt_up=""
 				while [ -n "$wt_rel" ]; do
@@ -1774,7 +1774,7 @@ worktree)
 				wt_spell="$wt_up.claude/worktrees/$wt_name"
 				;;
 			esac
-			reject worktree-outside "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 段で置きます（ワークツリーは git 管理外の固定の置き場）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
+			reject worktree-outside "ワークツリーはワークスペースの .claude/worktrees/ の下に 1 階層で置きます（ワークツリーは git 管理外の固定の置き場）。$wt_dest は cwd から解くと $wt_abs になり、ワークスペースの外に出ます。$wt_spell と書いてください。"
 		fi
 		# 行き先の名前 = ブランチ名。-b が無く 2 つ目の語も無ければ、
 		# git は行き先の名前でブランチを切るので揃う。

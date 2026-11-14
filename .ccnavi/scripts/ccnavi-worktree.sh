@@ -166,7 +166,7 @@ if [ -z "$name" ]; then
 	fail no-name "ワークツリーの名前を渡してください。" 2
 fi
 case "$name" in
-*/*) fail bad-name "名前（${name}）に / は書けません。ワークツリーは .claude/worktrees/ の下に 1 段で置きます。" 2 ;;
+*/*) fail bad-name "名前（${name}）に / は書けません。ワークツリーは .claude/worktrees/ の下に 1 階層で置きます。" 2 ;;
 esac
 ccnavi_is_branch "$name" || fail bad-name "名前（${name}）はブランチ名に使えない書き方です。" 2
 
@@ -254,7 +254,7 @@ if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
 	exit 0
 fi
 if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
-	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すには、2 段の手順が要ります。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
+	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すには、2 段階の手順が要ります。1 つ目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 つ目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
 fi
 
 # ---- C1〜C3。先に断るもの。

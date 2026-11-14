@@ -326,8 +326,8 @@ if [ "$#" -gt 0 ]; then
 	exit "$named_rc"
 fi
 
-# ワークスペースルートから rel を 1 段ずつ下り、シンボリックリンクの段があれば 0。
-# その段（ルートからのパス）を linked に残す。`.claude` だけがリンクでも見逃さない。
+# ワークスペースルートから rel を 1 階層ずつ下り、シンボリックリンクの階層があれば 0。
+# その階層（ルートからのパス）を linked に残す。`.claude` だけがリンクでも見逃さない。
 linked=""
 linked_segment() {
 	linked=""
@@ -350,7 +350,7 @@ linked_segment() {
 	return 1
 }
 
-# 数えるのは 置き場 → その下の 1 件ずつ、の二段。どちらの段でもリンクは辿らない。
+# 数えるのは 置き場 → その下の 1 件ずつ、の 2 階層。どちらの階層でもリンクは辿らない。
 trees="$root"
 for place in "$projects" ".claude/worktrees"; do
 	if linked_segment "$place"; then

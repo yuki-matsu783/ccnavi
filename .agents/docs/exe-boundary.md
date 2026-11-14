@@ -15,7 +15,7 @@ sh で実装するのは、外との出入りと段取りだけ。プロジェ�
 | sh で実装するもの | 当たるもの |
 |---|---|
 | 外との出入り | ホストの API、origin への fetch・push・ls-remote、認証、その時間の上限（`ccnavi_run_timed`・`ccnavi_git_timed`）。API のパスとページの送り方 |
-| 段取り | ネットワークと実行ファイルの呼び出しを並べる順序。次に何を取るかを決める最小の読み（ページの件数・cursor・GitLab の権限の 2 段目に要る id） |
+| 段取り | ネットワークと実行ファイルの呼び出しを並べる順序。次に何を取るかを決める最小の読み（ページの件数・cursor・GitLab の権限の 2 つ目に要る id） |
 | sh のプロセスの寿命に結び付くもの | ロック（`ccnavi-common-lock.sh`。持ち主は sh の pid）、信号を受けたときの trap、idle の待機 |
 | 起動役 | `ccnavi-launcher.sh`、ワークスペースと実行ファイルの探し方、診断ログ |
 | 実行ファイルを起こさずに動くもの | `ccnavi-fetch.sh`・`ccnavi-user-push-approved.sh`（実行ファイルの入れ替え中も fetch・push できるように）。`ccnavi-git.sh` の子のワークツリーからの push の検査（実行ファイルが壊れていても効く2 つ目の検査） |
@@ -69,7 +69,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
   sh（`ccnavi-start.sh`・`ccnavi-branches.sh`）が受け持ち、hookは記録（承認済みチケット・マーカーなど）を読むだけ。
   hookのtimeoutは10秒で、ネットワークを待てないため
 - 操作を止めるか通すかは、hookと実行ファイルが判定する（P13）。shがccnaviの状態を読んで操作を止める処理は、
-  hookと実行ファイルの判定に重ねた2段目の確認にあたる。新しい判定はshに足さない。まずhook側に置けないかを考え、置けなければ実行ファイル（Go）に置く
+  hookと実行ファイルの判定に重ねた2つ目の確認にあたる。新しい判定はshに足さない。まずhook側に置けないかを考え、置けなければ実行ファイル（Go）に置く
   - gitの状態だけを見て止める処理（`ccnavi-ticket.sh`の`ensure_child_worktree`が、手元だけのコミットがある子のブランチを
     消さずに止めるなど）は、ccnaviの状態を読まないので、この決まりの対象ではない
   - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の

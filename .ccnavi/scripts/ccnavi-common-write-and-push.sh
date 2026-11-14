@@ -116,7 +116,7 @@ ccnavi_wap_family() {
 	ccnavi_wap_branch=""
 	ccnavi_wap_repo=""
 	ccnavi_wap_tree=""
-	# 子の識別子（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）なら、右から 2 段を剥がして親にする。
+	# 子の識別子（`<親>-<2 桁のフェーズ番号>-<2 桁の連番>`）なら、右から 2 要素を剥がして親にする。
 	ccnavi_cf_p="$1"
 	case "$ccnavi_cf_p" in
 	?*-[0-9][0-9]-[0-9][0-9]) ccnavi_cf_p="${ccnavi_cf_p%-[0-9][0-9]-[0-9][0-9]}" ;;
