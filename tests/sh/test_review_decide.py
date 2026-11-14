@@ -4,7 +4,7 @@
 ccnavi-review.sh decide <N> --preview。ccnavi-review.sh の decide の置く形は、何も動かさずに
 終了コード 2 で新しい sh を案内する。
 
-sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周させる。
+sh を外から呼び、GitLab のスタブと実行ファイルのスタブで 1 周させる。
 
 見るのは sh の仕事だけ。
 
@@ -18,7 +18,7 @@ sh を外から呼び、GitLab の代役と実行ファイルの代役で 1 周�
    ccnavi-user-decide.sh の --preview も断る
 6. 抜けるときの片付け（EXIT の trap）で rm が失敗しても、元の終了コードで抜ける（dash と bash）
 
-実行ファイルは代役（`decide_support.py`。`ops` は本物に渡し、ほかは引数を記録して答える）。
+実行ファイルはスタブ（`decide_support.py`。`ops` は本物に渡し、ほかは引数を記録して答える）。
 判定そのものは `tests/ticket` が見る。
 GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
 
@@ -131,7 +131,7 @@ def quote_arg(arg: str) -> str:
 
 
 class GitLab(http.server.BaseHTTPRequestHandler):
-    """sh が呼ぶ経路だけを返す代役。
+    """sh が呼ぶ経路だけを返すスタブ。
 
     投稿は `posted` に積む。`fail_notes` なら投稿のコメントを 500 にする。
     """
@@ -555,7 +555,7 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertIn("ccnavi-review.sh decide <N> --preview", refused.stderr)
         self.assertEqual(self.calls(), [])
 
-    @unittest.skipIf(WINDOWS, "rm の代役を PATH の頭に置く形は POSIX で見る")
+    @unittest.skipIf(WINDOWS, "rm のスタブを PATH の頭に置く形は POSIX で見る")
     def test_a_failing_rm_in_the_exit_trap_keeps_the_exit_code(self):
         shells = [found for found in (shutil.which("dash"), shutil.which("bash")) if found]
         if not shells:

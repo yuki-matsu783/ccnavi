@@ -2,8 +2,8 @@
 
 使い捨てのワークスペースを組み、sh を外から呼ぶ。実行ファイルは tests/exe.py が
 組み立てたものを起こす（tests/sh/test_branch_field_sh.py と同じ形）。ホストは PATH の
-先頭に置いた `curl` の代役が答える（tests/sh/test_review_host_fixture.py と同じ作り方。
-gh / glab は使えない代役にして、curl とトークンの経路に切り替える）。代役は、要求の表記
+先頭に置いた `curl` のスタブが答える（tests/sh/test_review_host_fixture.py と同じ作り方。
+gh / glab は使えないスタブにして、curl とトークンの経路に切り替える）。スタブは、要求の表記
 （`<METHOD> <URL>`）ごとに決めた答えを返し、決めていない要求は 404 にする。
 
 見るのは次のとおり。
@@ -37,7 +37,8 @@ EXE = """#!/bin/sh
 exec '{exe}' "$@"
 """
 
-# curl の代役。`-X <M>` と URL を読み、FAKE_ROUTES の JSON（"<M> <URL>" → [状態, 本文]）から答える。
+# curl のスタブ。`-X <M>` と URL を読み、FAKE_ROUTES の JSON（"<M> <URL>" → [状態, 本文]）から
+# 答える。
 CURL = r"""
 import json, os, sys
 argv = sys.argv[1:]

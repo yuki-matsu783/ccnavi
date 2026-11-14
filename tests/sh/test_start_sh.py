@@ -1,11 +1,12 @@
 """ccnavi-start.sh の受入テスト。
 
 使い捨てのワークスペースと、origin の代わりの bare リポジトリを組み、sh を外から呼ぶ。
-origin の URL は GitHub / GitLab の形のままにする。PATH の先頭に置いた git の代役が、
+origin の URL は GitHub / GitLab の形のままにする。PATH の先頭に置いた git のスタブが、
 fetch / push のときだけ bare リポジトリへ向ける
 （`git remote get-url` が書き換えた URL を返すと、ホストを見分けられないため）。
-ホストは PATH の先頭の `curl` の代役が答える（tests/sh/test_branches_sh.py と同じ作り）。
-gh / glab は使えない代役にして、curl とトークンの経路に切り替える。代役は POST の本文も記録する。
+ホストは PATH の先頭の `curl` のスタブが答える（tests/sh/test_branches_sh.py と同じ作り）。
+gh / glab は使えないスタブにして、curl とトークンの経路に切り替える。
+スタブは POST の本文も記録する。
 
 見るのは次のとおり。
 
@@ -45,7 +46,7 @@ EXE = """#!/bin/sh
 exec '{exe}' "$@"
 """
 
-# fetch / push のときだけ、origin の URL を bare リポジトリへ向ける git の代役。
+# fetch / push のときだけ、origin の URL を bare リポジトリへ向ける git のスタブ。
 GIT = """#!/bin/sh
 for a in "$@"; do
   case "$a" in
@@ -213,7 +214,7 @@ class StartShTest(unittest.TestCase):
         self.route({})
 
     def default_routes(self):
-        """ホストの代役の既定の答え。probe と、書き込みの権限と、紐づく issue。"""
+        """ホストのスタブの既定の答え。probe と、書き込みの権限と、紐づく issue。"""
         if self.origin_url == GL_URL:
             return {
                 f"GET {GITLAB}": [
@@ -301,7 +302,7 @@ class StartShTest(unittest.TestCase):
                     out[key] = line[len(key) + 2 :]
         return out
 
-    # GitHub で新規作成が通る代役
+    # GitHub で新規作成が通るスタブ
     def github_new(self, title="Add login", created=True, branch=BRANCH):
         routes = {
             PULLS: [200, []],
@@ -689,7 +690,7 @@ class StartShTest(unittest.TestCase):
     # ---- closed の issue
 
     def closed_issue(self, state="closed"):
-        """issue #152 の状態が state になっている GitHub の代役（MR は無い）。新規作成は通る。"""
+        """issue #152 の状態が state になっている GitHub のスタブ（MR は無い）。新規作成は通る。"""
         self.github_new()
         with open(self.routes, encoding="utf-8") as f:
             routes = json.load(f)
@@ -864,7 +865,7 @@ class StartShTest(unittest.TestCase):
         self.assertEqual(self.remote_branches(), ["main"])
 
     def test_github_unreachable_at_create_prints_mcp_guidance_then_rerun_continues(self):
-        # MR の作成だけ届かない（POST の代役が無い）。ブランチ・ワークツリー・push は済む
+        # MR の作成だけ届かない（POST のスタブが無い）。ブランチ・ワークツリー・push は済む
         self.github_new(created=False)
         done = self.run_sh("--issue", "152")
         self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
@@ -1825,8 +1826,8 @@ class StartShGitLabTest(StartShTest):
         self.assertNotIn("未確認", again.stdout)
 
     def install_glab(self):
-        """認証済みのglabの代役。本文付きでContent-Typeが無いと、GitLabと同じくHTTP 415を返す。
-        それ以外はcurlの代役（ルート表）へ回す"""
+        """認証済みのglabのスタブ。本文付きでContent-Typeが無いと、GitLabと同じくHTTP 415を返す。
+        それ以外はcurlのスタブ（ルート表）へ回す"""
         text = f"""#!/bin/sh
 method=GET; ct=""; input=""; path=""
 while [ $# -gt 0 ]; do

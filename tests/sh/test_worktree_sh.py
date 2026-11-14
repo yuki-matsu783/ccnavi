@@ -1,7 +1,7 @@
 """ccnavi-worktree.sh の受入テスト。
 
 使い捨てのワークスペースと、origin の代わりの bare リポジトリを組み、sh を外から呼ぶ。
-fetch のときだけ origin の URL を bare リポジトリへ向ける git の代役を PATH の先頭に置く
+fetch のときだけ origin の URL を bare リポジトリへ向ける git のスタブを PATH の先頭に置く
 （tests/sh/test_start_sh.py と同じ作り）。
 
 見るのは次のとおり。
@@ -45,7 +45,7 @@ EXE = """#!/bin/sh
 exec '{exe}' "$@"
 """
 
-# fetch のときだけ、origin の URL を bare リポジトリへ向ける git の代役。
+# fetch のときだけ、origin の URL を bare リポジトリへ向ける git のスタブ。
 # FAKE_FETCH_FAIL があれば失敗させる。FAKE_LS_REMOTE_FAIL があれば ls-remote だけ失敗させる。
 # FAKE_GIT_VERSION があれば `git version` をその版で答える。
 # FAKE_READ_TREE_FAIL があれば read-tree だけ失敗させる。

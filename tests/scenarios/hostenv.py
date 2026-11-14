@@ -2,9 +2,9 @@
 決まりは .agents/docs/acceptance-scenarios.md。
 
 - `bare`: 対象の origin への通信を、一時ディレクトリの bare に向ける。
-  git の代役が URL をホストの形で答える。
+  git のスタブが URL をホストの形で答える。
   ホストの API は gh / glab が失敗し、curl は空の routes で 404（「確かめられなかった」）
-- `fake-gitlab`: `bare` に加え、`tests/fake_gitlab.py` を起こす（curl の代役は置かない）
+- `fake-gitlab`: `bare` に加え、`tests/fake_gitlab.py` を起こす（curl のスタブは置かない）
 - `docker-gitlab`: Docker の本物の GitLab（tests/manual/gitlab/docker_gitlab.py の `up`）に
   使い捨てのプロジェクトを作り、`main` を push する。
   origin への通信はそのプロジェクトへ向く。回したあとに消す
@@ -53,7 +53,7 @@ def is_fake(host):
 
 
 def uses_stub_git(host):
-    """origin への通信を git の代役で向け直す相手。is_fake に Docker の GitLab を足したもの。"""
+    """origin への通信を git のスタブで向け直す相手。is_fake に Docker の GitLab を足したもの。"""
     return is_fake(host) or host == DOCKER
 
 
@@ -199,7 +199,7 @@ def validate(path, setup):
     if uses_stub_git(host) and setup.get("issue"):
         raise ValueError(
             f"{path}: setup.issue と setup.host: {host} は併用できません"
-            "（issue は runner が gh / glab で作るので、代役の PATH では作れない）。"
+            "（issue は runner が gh / glab で作るので、スタブの PATH では作れない）。"
             "fake-gitlab で issue が要るときは setup.host_state に書く。"
             "docker-gitlab で issue が要るときは、操作者が API で作る"
         )
@@ -293,7 +293,7 @@ def _make_docker_project(root, host, top, scenario_id, git):
         raise RuntimeError(f"プロジェクト {name} を作れない（HTTP {status}）")
     host.update(project_id=body["id"], project=body["path_with_namespace"], base=base)
     host["url"] = f"{base}/{host['project']}"
-    host["bare"] = host["url"] + ".git"  # origin の通信先（git の代役が向け直す先）
+    host["bare"] = host["url"] + ".git"  # origin の通信先（git のスタブが向け直す先）
     _log(root).info("プロジェクトを作った", project_id=host["project_id"], url=host["url"])
     status, _ = client.add_member(token, host["project_id"], int(reviewer), DEVELOPER)
     if status not in (200, 201):
@@ -324,7 +324,7 @@ def git_env(host):
 
 
 def prepare(root, top, setup, git, scenario_id=""):
-    """代役の置き場を作り、fake-gitlab のときは模擬を、docker-gitlab のときはプロジェクトを作る。
+    """スタブの置き場を作り、fake-gitlab のときは模擬を、docker-gitlab のときはプロジェクトを作る。
     state.json に残せる辞書を返す。失敗したら、作ったものを消してから例外を投げる。
     `git(args, cwd=, input=, env=)` は、本物の git を実行する関数。"""
     kind = setup.get("host", DEFAULT_HOST)
@@ -350,7 +350,7 @@ def prepare(root, top, setup, git, scenario_id=""):
             _SERVERS[place] = server
             host["port"], host["token"] = server.port, server.token
         _log(root).info(
-            "ホストの代役を置いた",
+            "ホストのスタブを置いた",
             host=kind,
             dir=place,
             port=host.get("port"),
@@ -374,7 +374,7 @@ def git_via(host):
     """setup.git（runner が実行する git）にも、origin への通信を bare へ向ける -c を付ける。
     docker-gitlab は、利用者の credential helper に PAT が渡らないよう、同じ key を
     空で打ち消してから、環境変数 GITLAB_TOKEN を返す helper を足す
-    （host_stub の git の代役と同じ）。"""
+    （host_stub の git のスタブと同じ）。"""
     via = ["-c", f"url.{host['bare']}.insteadOf={host['real_origin']}"]
     if host["kind"] == DOCKER:
         key = f"credential.{host['base']}.helper"
@@ -383,7 +383,7 @@ def git_via(host):
 
 
 def step_env(host, base=None):
-    """claude に渡す環境。親の環境を継承し、本物のトークン系だけ除いて、代役を足す。"""
+    """claude に渡す環境。親の環境を継承し、本物のトークン系だけ除いて、スタブを足す。"""
     out = {k: v for k, v in (base or os.environ).items() if not TOKEN_VAR.match(k)}
     out.update(
         host_stub.env(
@@ -403,7 +403,7 @@ def step_env(host, base=None):
 
 
 def hold(root, host):
-    """人間の操作で止めるとき。模擬は止め、置き場（bare・代役・模擬の状態）は残す。"""
+    """人間の操作で止めるとき。模擬は止め、置き場（bare・スタブ・模擬の状態）は残す。"""
     server = _SERVERS.pop(host["dir"], None)
     if server is not None:
         server.stop()
@@ -490,5 +490,5 @@ def teardown(root, host, git):
             print(f"案内: {host['top']} の refs/remotes/origin/* を戻せなかった: {exc}")
     shutil.rmtree(host["dir"], ignore_errors=True)
     host["down"] = True
-    _log(root).info("ホストの代役を片付けた", host=host["kind"], dir=host["dir"])
+    _log(root).info("ホストのスタブを片付けた", host=host["kind"], dir=host["dir"])
     return failed

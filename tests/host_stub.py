@@ -1,12 +1,12 @@
-"""ホスト（GitHub / GitLab）の代役。write-and-push と `ccnavi-ticket.sh` のテストと、
+"""ホスト（GitHub / GitLab）のスタブ。write-and-push と `ccnavi-ticket.sh` のテストと、
 受入シナリオの `setup.host`（tests/scenarios/hostenv.py）が使う。
 
 `git remote get-url origin` だけがホストの形の URL（`https://gitlab.com/acme/widgets.git`）を答える。
 origin が手元の bare ならそのまま fetch・push・ls-remote が動く。origin が本物のホストのときは、
 `env` に bare と本物の URL を渡すと、`-c url.<bare>.insteadOf=<本物の URL>` で bare へ向く
 （対象のリポジトリだけに効かせるのは `target_common`）。
-PATH の先頭に置いた gh / glab は失敗する代役、curl は routes.json で答える代役。
-本物のネットワークには出ない。`build(curl=False)` は curl の代役を置かない
+PATH の先頭に置いた gh / glab は失敗するスタブ、curl は routes.json で答えるスタブ。
+本物のネットワークには出ない。`build(curl=False)` は curl のスタブを置かない
 （fake-gitlab の模擬に届くように）。
 トークンを渡さなければ、ホストの API は「確かめられなかった」になり、git のリモートの確認は通る。
 """
@@ -125,9 +125,9 @@ def _write(path, text):
 
 
 def build(base, python, curl=True):
-    """代役を base/hostbin に置く。routes.json（空）とログの場所を返す。
+    """スタブを base/hostbin に置く。routes.json（空）とログの場所を返す。
 
-    curl=False は curl の代役を置かない（fake-gitlab の模擬に届かなくなるため）。"""
+    curl=False は curl のスタブを置かない（fake-gitlab の模擬に届かなくなるため）。"""
     bin_dir = os.path.join(base, "hostbin")
     _write(os.path.join(bin_dir, "git"), GIT)
     _write(os.path.join(bin_dir, "gh"), "#!/bin/sh\nexit 1\n")
@@ -160,10 +160,10 @@ def env(
     real_origin=None,
     cred_url=None,
 ):
-    """ホストの代役を効かせる環境変数。渡された PATH の先頭に代役の置き場を足す。
+    """ホストのスタブを効かせる環境変数。渡された PATH の先頭にスタブの置き場を足す。
 
-    target_common・bare・real_origin は、git の代役を対象のリポジトリだけに効かせ、
-    本物の origin への通信を bare へ向ける（上の git の代役の説明を参照）。
+    target_common・bare・real_origin は、git のスタブを対象のリポジトリだけに効かせ、
+    本物の origin への通信を bare へ向ける（上の git のスタブの説明を参照）。
     cred_url（`http://127.0.0.1:8929`）は、その URL だけに環境変数 GITLAB_TOKEN を返す
     credential helper を足す（Docker の GitLab 用）。"""
     out = {

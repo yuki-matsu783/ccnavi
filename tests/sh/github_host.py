@@ -1,9 +1,9 @@
-"""ホストの応答の見本を返す GitHub の代役。
+"""ホストの応答の見本を返す GitHub のスタブ。
 
 Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。
 
 見本は `extensions/chrome/ccnavi-approval/test/fixtures/host/github/<場面>/` にある。拡張の試験
-（`test/helpers/host-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つの代役で揃える。
+（`test/helpers/host-fixture.ts`）も同じ見本を同じ規則で返す。規則は 2 つのスタブで揃える。
 
 - `GET /user` → `user.json`（無ければ 403）
 - `GET /repos/<o>/<r>/pulls?head=<o>:<branch>` → `branch` が `scene.json` のものなら
@@ -28,7 +28,7 @@ Chrome と手元の sh が同じ見本から同じ JSON を組むことを見る
   `{"rest": "<M> <path>", "body": ...}` で残す
 - ほかは 404
 
-sh の試験は PATH の先頭に `curl` の代役を置き、このファイルを
+sh の試験は PATH の先頭に `curl` のスタブを置き、このファイルを
 `python github_host.py curl ...` で起こす。
 """
 
@@ -49,8 +49,8 @@ API = "https://api.github.com"
 
 
 # 見本の応答が持つ欄。問い合わせからどれかを外せば、実際のホストは答えにその欄を入れないので、
-# 代役も答えない（欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。
-# 拡張の代役と同じ
+# スタブも答えない（欄の名前を見ずに見本を返すと、問い合わせの欄を削っても試験が通ってしまう）。
+# 拡張のスタブと同じ
 THREAD_FIELDS = (
     "reviewThreads",
     "pageInfo",
@@ -280,7 +280,10 @@ def answer(scene: str, method: str, url: str, body: str, state: str = "") -> tup
 
 
 def curl(argv: list[str]) -> int:
-    """curl の代役。`ccnavi-review.sh` が打つ形（`-fsS -X <M> -H ... [--data-binary @-] <URL>`）"""
+    """curl のスタブ。
+
+    `ccnavi-review.sh` が打つ形（`-fsS -X <M> -H ... [--data-binary @-] <URL>`）を受ける。
+    """
     method, url, body = "GET", "", ""
     i = 0
     while i < len(argv):
@@ -322,7 +325,7 @@ def curl(argv: list[str]) -> int:
 
 
 def gh(argv: list[str]) -> int:
-    """gh の代役（`gh api --hostname <h> [--method <M>] [--input -] <rel>`）。
+    """gh のスタブ（`gh api --hostname <h> [--method <M>] [--input -] <rel>`）。
 
     見本を返し、標準エラーに雑音を出す。
 
@@ -367,7 +370,7 @@ def gh(argv: list[str]) -> int:
 
 
 def install(bin_dir: str, python: str) -> None:
-    """PATH の先頭に置く代役（`curl` と、使えない `gh`）を bin_dir に書く。"""
+    """PATH の先頭に置くスタブ（`curl` と、使えない `gh`）を bin_dir に書く。"""
     os.makedirs(bin_dir, exist_ok=True)
     for name, text in (
         ("curl", f"#!/bin/sh\nexec '{python}' '{os.path.abspath(__file__)}' curl \"$@\"\n"),

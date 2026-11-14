@@ -1,0 +1,6459 @@
+{
+ "source": "claude",
+ "claude_version": "2.1.325",
+ "hooks": {
+  "PostToolUse:Agent": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "prompt": {
+       "t": [
+        "string"
+       ]
+      },
+      "run_in_background": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "subagent_type": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_response": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "agentId": {
+       "t": [
+        "string"
+       ]
+      },
+      "agentType": {
+       "t": [
+        "string"
+       ]
+      },
+      "canContinueAgent": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "content": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "text": {
+          "t": [
+           "string"
+          ]
+         },
+         "type": {
+          "t": [
+           "string"
+          ]
+         }
+        }
+       }
+      },
+      "handback": {
+       "t": [
+        "string"
+       ]
+      },
+      "handbackReport": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "text": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "harnessNoteCount": {
+       "t": [
+        "integer"
+       ]
+      },
+      "harnessSectionHash": {
+       "t": [
+        "string"
+       ]
+      },
+      "harnessTailCount": {
+       "t": [
+        "integer"
+       ]
+      },
+      "prompt": {
+       "t": [
+        "string"
+       ]
+      },
+      "resolvedModel": {
+       "t": [
+        "string"
+       ]
+      },
+      "status": {
+       "t": [
+        "string"
+       ]
+      },
+      "toolStats": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "bashCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "editFileCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "linesAdded": {
+         "t": [
+          "integer"
+         ]
+        },
+        "linesRemoved": {
+         "t": [
+          "integer"
+         ]
+        },
+        "otherToolCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "readCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "searchCount": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "toolsUsed": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "string"
+        ]
+       }
+      },
+      "totalDurationMs": {
+       "t": [
+        "integer"
+       ]
+      },
+      "totalTokens": {
+       "t": [
+        "integer"
+       ]
+      },
+      "totalToolUseCount": {
+       "t": [
+        "integer"
+       ]
+      },
+      "usage": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cache_creation": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "ephemeral_1h_input_tokens": {
+           "t": [
+            "integer"
+           ]
+          },
+          "ephemeral_5m_input_tokens": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "cache_creation_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cache_read_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "fallback_credit": {
+         "t": [
+          "null"
+         ]
+        },
+        "inference_geo": {
+         "t": [
+          "string"
+         ]
+        },
+        "input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "iterations": {
+         "t": [
+          "array"
+         ],
+         "items": {
+          "t": [
+           "object"
+          ],
+          "keys": {
+           "cache_creation": {
+            "t": [
+             "object"
+            ]
+           },
+           "cache_creation_input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "cache_read_input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "output_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "type": {
+            "t": [
+             "string"
+            ]
+           }
+          }
+         }
+        },
+        "output_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "output_tokens_details": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "thinking_tokens": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "server_tool_use": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "web_fetch_requests": {
+           "t": [
+            "integer"
+           ]
+          },
+          "web_search_requests": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "service_tier": {
+         "t": [
+          "string"
+         ]
+        },
+        "speed": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      }
+     }
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PostToolUse:Bash": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "command": {
+       "t": [
+        "string"
+       ]
+      },
+      "description": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_response": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "interrupted": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "isImage": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "noOutputExpected": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "stderr": {
+       "t": [
+        "string"
+       ]
+      },
+      "stdout": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PostToolUse:Edit": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "file_path": {
+       "t": [
+        "string"
+       ]
+      },
+      "new_string": {
+       "t": [
+        "string"
+       ]
+      },
+      "old_string": {
+       "t": [
+        "string"
+       ]
+      },
+      "replace_all": {
+       "t": [
+        "boolean"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_response": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "filePath": {
+       "t": [
+        "string"
+       ]
+      },
+      "gitDiff": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "additions": {
+         "t": [
+          "integer"
+         ]
+        },
+        "changes": {
+         "t": [
+          "integer"
+         ]
+        },
+        "deletions": {
+         "t": [
+          "integer"
+         ]
+        },
+        "filename": {
+         "t": [
+          "string"
+         ]
+        },
+        "patch": {
+         "t": [
+          "string"
+         ]
+        },
+        "repository": {
+         "t": [
+          "null"
+         ]
+        },
+        "status": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "newString": {
+       "t": [
+        "string"
+       ]
+      },
+      "oldString": {
+       "t": [
+        "string"
+       ]
+      },
+      "originalFile": {
+       "t": [
+        "string"
+       ]
+      },
+      "replaceAll": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "structuredPatch": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "lines": {
+          "t": [
+           "array"
+          ],
+          "items": {
+           "t": [
+            "string"
+           ]
+          }
+         },
+         "newLines": {
+          "t": [
+           "integer"
+          ]
+         },
+         "newStart": {
+          "t": [
+           "integer"
+          ]
+         },
+         "oldLines": {
+          "t": [
+           "integer"
+          ]
+         },
+         "oldStart": {
+          "t": [
+           "integer"
+          ]
+         }
+        }
+       }
+      },
+      "userModified": {
+       "t": [
+        "boolean"
+       ]
+      }
+     }
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PostToolUse:Read": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "file_path": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_response": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "file": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "content": {
+         "t": [
+          "string"
+         ]
+        },
+        "filePath": {
+         "t": [
+          "string"
+         ]
+        },
+        "numLines": {
+         "t": [
+          "integer"
+         ]
+        },
+        "startLine": {
+         "t": [
+          "integer"
+         ]
+        },
+        "totalLines": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "type": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   },
+   "opt": [
+    "agent_id",
+    "agent_type"
+   ]
+  },
+  "PostToolUse:SubagentHandback": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "message": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_response": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "message": {
+       "t": [
+        "string"
+       ]
+      },
+      "success": {
+       "t": [
+        "boolean"
+       ]
+      }
+     }
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PostToolUse:Write": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "content": {
+       "t": [
+        "string"
+       ]
+      },
+      "file_path": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_response": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "content": {
+       "t": [
+        "string"
+       ]
+      },
+      "filePath": {
+       "t": [
+        "string"
+       ]
+      },
+      "gitDiff": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "additions": {
+         "t": [
+          "integer"
+         ]
+        },
+        "changes": {
+         "t": [
+          "integer"
+         ]
+        },
+        "deletions": {
+         "t": [
+          "integer"
+         ]
+        },
+        "filename": {
+         "t": [
+          "string"
+         ]
+        },
+        "patch": {
+         "t": [
+          "string"
+         ]
+        },
+        "repository": {
+         "t": [
+          "null"
+         ]
+        },
+        "status": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "originalFile": {
+       "t": [
+        "null"
+       ]
+      },
+      "structuredPatch": {
+       "t": [
+        "array"
+       ]
+      },
+      "type": {
+       "t": [
+        "string"
+       ]
+      },
+      "userModified": {
+       "t": [
+        "boolean"
+       ]
+      }
+     }
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   },
+   "opt": [
+    "agent_id",
+    "agent_type"
+   ]
+  },
+  "PostToolUseFailure:Bash": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "error": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "is_interrupt": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "command": {
+       "t": [
+        "string"
+       ]
+      },
+      "description": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PreToolUse:Agent": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "description": {
+       "t": [
+        "string"
+       ]
+      },
+      "prompt": {
+       "t": [
+        "string"
+       ]
+      },
+      "run_in_background": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "subagent_type": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PreToolUse:Bash": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "command": {
+       "t": [
+        "string"
+       ]
+      },
+      "description": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PreToolUse:Edit": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "file_path": {
+       "t": [
+        "string"
+       ]
+      },
+      "new_string": {
+       "t": [
+        "string"
+       ]
+      },
+      "old_string": {
+       "t": [
+        "string"
+       ]
+      },
+      "replace_all": {
+       "t": [
+        "boolean"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PreToolUse:Read": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "file_path": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   },
+   "opt": [
+    "agent_id",
+    "agent_type"
+   ]
+  },
+  "PreToolUse:SubagentHandback": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "message": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "PreToolUse:Write": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_input": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "content": {
+       "t": [
+        "string"
+       ]
+      },
+      "file_path": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   },
+   "opt": [
+    "agent_id",
+    "agent_type"
+   ]
+  },
+  "SessionStart": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "context_tokens": {
+     "t": [
+      "integer"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "estimated_cache_write_usd": {
+     "t": [
+      "number"
+     ]
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_cache_likely_expired": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "seconds_since_last_response": {
+     "t": [
+      "integer"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "source": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   },
+   "opt": [
+    "context_tokens",
+    "estimated_cache_write_usd",
+    "prompt_cache_likely_expired",
+    "seconds_since_last_response"
+   ]
+  },
+  "Stop": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "background_tasks": {
+     "t": [
+      "array"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "last_assistant_message": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_crons": {
+     "t": [
+      "array"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "stop_hook_active": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "SubagentStart": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "SubagentStop": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_transcript_path": {
+     "t": [
+      "string"
+     ]
+    },
+    "agent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "background_tasks": {
+     "t": [
+      "array"
+     ]
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "effort": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "level": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_crons": {
+     "t": [
+      "array"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "stop_hook_active": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "UserPromptSubmit": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_event_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "permission_mode": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt": {
+     "t": [
+      "string"
+     ]
+    },
+    "prompt_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "scratchpad_dir": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "transcript_path": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  }
+ },
+ "stream": {
+  "active_goal/": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    },
+    "value": {
+     "t": [
+      "null"
+     ]
+    }
+   }
+  },
+  "assistant/": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "message": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "container": {
+       "t": [
+        "null"
+       ]
+      },
+      "content": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "caller": {
+          "t": [
+           "object"
+          ],
+          "keys": {
+           "type": {
+            "t": [
+             "string"
+            ]
+           }
+          }
+         },
+         "id": {
+          "t": [
+           "string"
+          ]
+         },
+         "input": {
+          "t": [
+           "object"
+          ],
+          "keys": {
+           "command": {
+            "t": [
+             "string"
+            ]
+           },
+           "content": {
+            "t": [
+             "string"
+            ]
+           },
+           "description": {
+            "t": [
+             "string"
+            ]
+           },
+           "file_path": {
+            "t": [
+             "string"
+            ]
+           },
+           "message": {
+            "t": [
+             "string"
+            ]
+           },
+           "new_string": {
+            "t": [
+             "string"
+            ]
+           },
+           "old_string": {
+            "t": [
+             "string"
+            ]
+           },
+           "prompt": {
+            "t": [
+             "string"
+            ]
+           },
+           "replace_all": {
+            "t": [
+             "boolean"
+            ]
+           },
+           "run_in_background": {
+            "t": [
+             "boolean"
+            ]
+           },
+           "subagent_type": {
+            "t": [
+             "string"
+            ]
+           }
+          },
+          "opt": [
+           "command",
+           "content",
+           "description",
+           "file_path",
+           "message",
+           "new_string",
+           "old_string",
+           "prompt",
+           "replace_all",
+           "run_in_background",
+           "subagent_type"
+          ]
+         },
+         "name": {
+          "t": [
+           "string"
+          ]
+         },
+         "signature": {
+          "t": [
+           "string"
+          ]
+         },
+         "text": {
+          "t": [
+           "string"
+          ]
+         },
+         "thinking": {
+          "t": [
+           "string"
+          ]
+         },
+         "type": {
+          "t": [
+           "string"
+          ]
+         }
+        },
+        "opt": [
+         "caller",
+         "id",
+         "input",
+         "name",
+         "signature",
+         "text",
+         "thinking"
+        ]
+       }
+      },
+      "context_management": {
+       "t": [
+        "null"
+       ]
+      },
+      "diagnostics": {
+       "t": [
+        "null"
+       ]
+      },
+      "id": {
+       "t": [
+        "string"
+       ]
+      },
+      "input_transformations": {
+       "t": [
+        "array"
+       ]
+      },
+      "model": {
+       "t": [
+        "string"
+       ]
+      },
+      "role": {
+       "t": [
+        "string"
+       ]
+      },
+      "stop_details": {
+       "t": [
+        "null"
+       ]
+      },
+      "stop_reason": {
+       "t": [
+        "null"
+       ]
+      },
+      "stop_sequence": {
+       "t": [
+        "null"
+       ]
+      },
+      "type": {
+       "t": [
+        "string"
+       ]
+      },
+      "usage": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cache_creation": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "ephemeral_1h_input_tokens": {
+           "t": [
+            "integer"
+           ]
+          },
+          "ephemeral_5m_input_tokens": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "cache_creation_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cache_read_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "inference_geo": {
+         "t": [
+          "string"
+         ]
+        },
+        "input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "output_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "service_tier": {
+         "t": [
+          "string"
+         ]
+        },
+        "speed": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      }
+     }
+    },
+    "parent_tool_use_id": {
+     "t": [
+      "null",
+      "string"
+     ]
+    },
+    "request_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subagent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_description": {
+     "t": [
+      "string"
+     ]
+    },
+    "thinking_display": {
+     "t": [
+      "string"
+     ]
+    },
+    "thinking_duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "timestamp": {
+     "t": [
+      "datetime"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    },
+    "wire_tool_inputs": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "<id>": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "command": {
+         "t": [
+          "string"
+         ]
+        },
+        "content": {
+         "t": [
+          "string"
+         ]
+        },
+        "description": {
+         "t": [
+          "string"
+         ]
+        },
+        "file_path": {
+         "t": [
+          "string"
+         ]
+        },
+        "new_string": {
+         "t": [
+          "string"
+         ]
+        },
+        "old_string": {
+         "t": [
+          "string"
+         ]
+        },
+        "prompt": {
+         "t": [
+          "string"
+         ]
+        },
+        "run_in_background": {
+         "t": [
+          "boolean"
+         ]
+        },
+        "subagent_type": {
+         "t": [
+          "string"
+         ]
+        }
+       },
+       "opt": [
+        "command",
+        "content",
+        "description",
+        "file_path",
+        "new_string",
+        "old_string",
+        "prompt",
+        "run_in_background",
+        "subagent_type"
+       ]
+      }
+     }
+    }
+   },
+   "opt": [
+    "agent_id",
+    "subagent_type",
+    "task_description",
+    "thinking_display",
+    "thinking_duration_ms",
+    "wire_tool_inputs"
+   ]
+  },
+  "autocompact_state/": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    },
+    "value": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "effective_window": {
+       "t": [
+        "integer"
+       ]
+      },
+      "enabled": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "enforced": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "source": {
+       "t": [
+        "string"
+       ]
+      },
+      "threshold": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    }
+   }
+  },
+  "rate_limit_event/": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "rate_limit_info": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "isUsingOverage": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "overageDisabledReason": {
+       "t": [
+        "string"
+       ]
+      },
+      "overageStatus": {
+       "t": [
+        "string"
+       ]
+      },
+      "rateLimitType": {
+       "t": [
+        "string"
+       ]
+      },
+      "resetsAt": {
+       "t": [
+        "integer"
+       ]
+      },
+      "status": {
+       "t": [
+        "string"
+       ]
+      },
+      "surpassedThreshold": {
+       "t": [
+        "number"
+       ]
+      },
+      "unifiedWindows": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "five_hour": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "resetsAt": {
+           "t": [
+            "integer"
+           ]
+          },
+          "status": {
+           "t": [
+            "string"
+           ]
+          },
+          "surpassedThreshold": {
+           "t": [
+            "number"
+           ]
+          },
+          "utilization": {
+           "t": [
+            "number"
+           ]
+          }
+         }
+        },
+        "seven_day": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "resetsAt": {
+           "t": [
+            "integer"
+           ]
+          },
+          "status": {
+           "t": [
+            "string"
+           ]
+          },
+          "utilization": {
+           "t": [
+            "number"
+           ]
+          }
+         }
+        }
+       }
+      },
+      "utilization": {
+       "t": [
+        "number"
+       ]
+      }
+     }
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "result/success": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "api_error_status": {
+     "t": [
+      "null"
+     ]
+    },
+    "duration_api_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "duration_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "fast_mode_disabled_reason": {
+     "t": [
+      "string"
+     ]
+    },
+    "fast_mode_state": {
+     "t": [
+      "string"
+     ]
+    },
+    "first_content_frame_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "flag_fetch_kick": {
+     "t": [
+      "string"
+     ]
+    },
+    "input_attachments_detail": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "ambient_start_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "ambient_wait_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "changed_files_reread": {
+       "t": [
+        "integer"
+       ]
+      },
+      "cpu_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "major_faults": {
+       "t": [
+        "integer"
+       ]
+      },
+      "producers": {
+       "t": [
+        "integer"
+       ]
+      },
+      "prompt_producers_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "render_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "setup_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "slowest_producer": {
+       "t": [
+        "string"
+       ]
+      },
+      "slowest_producer_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "token_counts": {
+       "t": [
+        "integer"
+       ]
+      }
+     },
+     "opt": [
+      "changed_files_reread"
+     ]
+    },
+    "is_error": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "main_stream_chunk_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "main_stream_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "main_stream_event_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "message_normalization_detail": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "after_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "before_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "images_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "messages": {
+       "t": [
+        "integer"
+       ]
+      },
+      "normalize_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "other_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "post_process_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "wire_messages": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "modelUsage": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "<model>": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cacheCreationEphemeral1hInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cacheCreationEphemeral5mInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cacheCreationInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cacheReadInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "canonicalModel": {
+         "t": [
+          "string"
+         ]
+        },
+        "contextWindow": {
+         "t": [
+          "integer"
+         ]
+        },
+        "costBasis": {
+         "t": [
+          "string"
+         ]
+        },
+        "costUSD": {
+         "t": [
+          "number"
+         ]
+        },
+        "inputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "maxOutputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "outputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "provider": {
+         "t": [
+          "string"
+         ]
+        },
+        "thinkingTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "webSearchRequests": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      }
+     }
+    },
+    "model_usage_since_last_result": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "<model>": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cacheCreationEphemeral1hInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cacheCreationEphemeral5mInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cacheCreationInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cacheReadInputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "canonicalModel": {
+         "t": [
+          "string"
+         ]
+        },
+        "contextWindow": {
+         "t": [
+          "integer"
+         ]
+        },
+        "costBasis": {
+         "t": [
+          "string"
+         ]
+        },
+        "costUSD": {
+         "t": [
+          "number"
+         ]
+        },
+        "inputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "maxOutputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "outputTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "provider": {
+         "t": [
+          "string"
+         ]
+        },
+        "thinkingTokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "webSearchRequests": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      }
+     }
+    },
+    "num_turns": {
+     "t": [
+      "integer"
+     ]
+    },
+    "permission_denials": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "tool_input": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "command": {
+          "t": [
+           "string"
+          ]
+         },
+         "content": {
+          "t": [
+           "string"
+          ]
+         },
+         "description": {
+          "t": [
+           "string"
+          ]
+         },
+         "file_path": {
+          "t": [
+           "string"
+          ]
+         }
+        },
+        "opt": [
+         "command",
+         "content",
+         "description",
+         "file_path"
+        ]
+       },
+       "tool_name": {
+        "t": [
+         "string"
+        ]
+       },
+       "tool_use_id": {
+        "t": [
+         "string"
+        ]
+       }
+      }
+     }
+    },
+    "process_anon_mib_result": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_anon_mib_turn_start": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_cpu_ms_streaming": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_cpu_ms_turn": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_peak_rss_mib": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_rss_mib_result": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_rss_mib_turn_start": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_start_tuning": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_turn_index": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_turn_states": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "after_last_request": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "agent_tool": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "before_first_request": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "between_requests": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "first_event_wait": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "main_stream": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "side_stream": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "tool": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "entries": {
+         "t": [
+          "integer"
+         ]
+        },
+        "wall_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      }
+     },
+     "opt": [
+      "agent_tool",
+      "side_stream"
+     ]
+    },
+    "process_wall_ms_streaming": {
+     "t": [
+      "integer"
+     ]
+    },
+    "process_wall_ms_turn": {
+     "t": [
+      "integer"
+     ]
+    },
+    "queued_turn_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "request_build_detail": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "cache_break_record_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "headers_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "other_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "plans_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "record_attempt_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "records_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "retry_setup_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "sent_build_cache_breakpoints_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "sent_build_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "sent_build_safety_context_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "sent_build_surrogate_scan_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "system_ms": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "result": {
+     "t": [
+      "string"
+     ]
+    },
+    "result_index": {
+     "t": [
+      "integer"
+     ]
+    },
+    "safety_stops": {
+     "t": [
+      "integer"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "stop_reason": {
+     "t": [
+      "string"
+     ]
+    },
+    "subagent_stats": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "by_type": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "general-purpose": {
+         "t": [
+          "integer"
+         ]
+        }
+       },
+       "opt": [
+        "general-purpose"
+       ]
+      },
+      "completed": {
+       "t": [
+        "integer"
+       ]
+      },
+      "failed": {
+       "t": [
+        "integer"
+       ]
+      },
+      "killed": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "parent": {
+         "t": [
+          "integer"
+         ]
+        },
+        "system": {
+         "t": [
+          "integer"
+         ]
+        },
+        "user": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "max_depth": {
+       "t": [
+        "integer"
+       ]
+      },
+      "refused": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "budget": {
+         "t": [
+          "integer"
+         ]
+        },
+        "concurrency_limit": {
+         "t": [
+          "integer"
+         ]
+        },
+        "depth_limit": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "requested": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "background": {
+         "t": [
+          "integer"
+         ]
+        },
+        "foreground": {
+         "t": [
+          "integer"
+         ]
+        },
+        "unset": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "spawned": {
+       "t": [
+        "integer"
+       ]
+      },
+      "spawned_by_subagents": {
+       "t": [
+        "integer"
+       ]
+      },
+      "started_in_background": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "terminal_reason": {
+     "t": [
+      "string"
+     ]
+    },
+    "time_origin_ms": {
+     "t": [
+      "number"
+     ]
+    },
+    "time_to_request_cpu_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "time_to_request_from_spawn_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "time_to_request_loop_lag_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "time_to_request_major_faults": {
+     "t": [
+      "integer"
+     ]
+    },
+    "time_to_request_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "time_to_request_phases_ms": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "auto_mode_context_wait": {
+       "t": [
+        "integer"
+       ]
+      },
+      "autocompact": {
+       "t": [
+        "integer"
+       ]
+      },
+      "client_creation": {
+       "t": [
+        "integer"
+       ]
+      },
+      "conversation_append": {
+       "t": [
+        "integer"
+       ]
+      },
+      "engine_pickup": {
+       "t": [
+        "integer"
+       ]
+      },
+      "init_frame_send": {
+       "t": [
+        "integer"
+       ]
+      },
+      "init_message": {
+       "t": [
+        "integer"
+       ]
+      },
+      "input_attachments": {
+       "t": [
+        "integer"
+       ]
+      },
+      "input_hooks": {
+       "t": [
+        "integer"
+       ]
+      },
+      "loop_entry": {
+       "t": [
+        "integer"
+       ]
+      },
+      "message_normalization": {
+       "t": [
+        "integer"
+       ]
+      },
+      "message_prep": {
+       "t": [
+        "integer"
+       ]
+      },
+      "model_config_wait": {
+       "t": [
+        "integer"
+       ]
+      },
+      "model_gates": {
+       "t": [
+        "integer"
+       ]
+      },
+      "other": {
+       "t": [
+        "integer"
+       ]
+      },
+      "process_user_input": {
+       "t": [
+        "integer"
+       ]
+      },
+      "query_setup": {
+       "t": [
+        "integer"
+       ]
+      },
+      "request_announcements": {
+       "t": [
+        "integer"
+       ]
+      },
+      "request_build": {
+       "t": [
+        "integer"
+       ]
+      },
+      "resume_other": {
+       "t": [
+        "integer"
+       ]
+      },
+      "system_prompt": {
+       "t": [
+        "integer"
+       ]
+      },
+      "tool_pool_refresh": {
+       "t": [
+        "integer"
+       ]
+      },
+      "tool_schema_build": {
+       "t": [
+        "integer"
+       ]
+      },
+      "transcript_persist": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "tool_pool_build_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "tool_pool_build_lapsed_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "tool_pool_limit_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "tool_pool_moved_at_lapse_count": {
+     "t": [
+      "integer"
+     ]
+    },
+    "tool_schema_build_detail": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "after_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "betas_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "new_schemas": {
+       "t": [
+        "integer"
+       ]
+      },
+      "other_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "placement_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "render_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "tools": {
+       "t": [
+        "integer"
+       ]
+      },
+      "waits_ms": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "total_cost_usd": {
+     "t": [
+      "number"
+     ]
+    },
+    "ttft_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "ttft_stream_ms": {
+     "t": [
+      "integer"
+     ]
+    },
+    "turn_start_resume_kind": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "usage": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "cache_creation": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "ephemeral_1h_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "ephemeral_5m_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "cache_creation_input_tokens": {
+       "t": [
+        "integer"
+       ]
+      },
+      "cache_read_input_tokens": {
+       "t": [
+        "integer"
+       ]
+      },
+      "fallback_credit": {
+       "t": [
+        "null"
+       ]
+      },
+      "inference_geo": {
+       "t": [
+        "string"
+       ]
+      },
+      "input_tokens": {
+       "t": [
+        "integer"
+       ]
+      },
+      "iterations": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "cache_creation": {
+          "t": [
+           "object"
+          ],
+          "keys": {
+           "ephemeral_1h_input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "ephemeral_5m_input_tokens": {
+            "t": [
+             "integer"
+            ]
+           }
+          }
+         },
+         "cache_creation_input_tokens": {
+          "t": [
+           "integer"
+          ]
+         },
+         "cache_read_input_tokens": {
+          "t": [
+           "integer"
+          ]
+         },
+         "input_tokens": {
+          "t": [
+           "integer"
+          ]
+         },
+         "output_tokens": {
+          "t": [
+           "integer"
+          ]
+         },
+         "type": {
+          "t": [
+           "string"
+          ]
+         }
+        }
+       }
+      },
+      "output_tokens": {
+       "t": [
+        "integer"
+       ]
+      },
+      "output_tokens_details": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "thinking_tokens": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "server_tool_use": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "web_fetch_requests": {
+         "t": [
+          "integer"
+         ]
+        },
+        "web_search_requests": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "service_tier": {
+       "t": [
+        "string"
+       ]
+      },
+      "speed": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    },
+    "warm_spare_claimed": {
+     "t": [
+      "boolean"
+     ]
+    }
+   }
+  },
+  "system/hook_response": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "exit_code": {
+     "t": [
+      "integer"
+     ]
+    },
+    "hook_event": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "outcome": {
+     "t": [
+      "string"
+     ]
+    },
+    "output": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "stderr": {
+     "t": [
+      "string"
+     ]
+    },
+    "stdout": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/hook_started": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "hook_event": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "hook_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/init": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "<model>": {
+     "t": [
+      "string"
+     ]
+    },
+    "additional_directories": {
+     "t": [
+      "array"
+     ]
+    },
+    "agents": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "analytics_disabled": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "apiKeySource": {
+     "t": [
+      "string"
+     ]
+    },
+    "capabilities": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "fast_mode_disabled_reason": {
+     "t": [
+      "string"
+     ]
+    },
+    "fast_mode_state": {
+     "t": [
+      "string"
+     ]
+    },
+    "mcp_servers": {
+     "t": [
+      "array"
+     ]
+    },
+    "messaging_socket_path": {
+     "t": [
+      "string"
+     ]
+    },
+    "model": {
+     "t": [
+      "string"
+     ]
+    },
+    "original_cwd": {
+     "t": [
+      "string"
+     ]
+    },
+    "output_style": {
+     "t": [
+      "string"
+     ]
+    },
+    "per_turn_effort_active": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "permissionMode": {
+     "t": [
+      "string"
+     ]
+    },
+    "plugins": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "name": {
+        "t": [
+         "string"
+        ]
+       },
+       "path": {
+        "t": [
+         "string"
+        ]
+       },
+       "source": {
+        "t": [
+         "string"
+        ]
+       }
+      }
+     }
+    },
+    "product_feedback_disabled": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "scratchpad_path": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "skills": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "slash_commands": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "startup_timing": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "cli_trial_keys": {
+       "t": [
+        "integer"
+       ]
+      },
+      "entrypoint": {
+       "t": [
+        "string"
+       ]
+      },
+      "flag_fetch_kick": {
+       "t": [
+        "string"
+       ]
+      },
+      "flag_fetch_kick_judged_at_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "hooks_init_origin_ms": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "project_settings": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "hooks_init_source": {
+       "t": [
+        "string"
+       ]
+      },
+      "kick_on_warm_cache": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "phase_start_ms": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "agent_proxy_ca_fetch_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_inputs_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_relay_up_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_trust_write_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_handle_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_read_from_spawn_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_read_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "grove_check_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "growthbook_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "headless_post_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "headless_prologue_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "hooks_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "init_emit_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "initial_messages_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "input_ready_from_spawn_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "input_ready_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_config_wait_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_connect_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_policy_settings_wait_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_prewait_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "model_catalog_decision_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "node_boot_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "permission_context_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "plugin_state_refresh_inline_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_client_data_url_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_managed_settings_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_mdm_keychain_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_migrations_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "print_import_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "prompt_submit_hooks_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "qe_plugin_skills_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "qe_system_prompt_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "resume_deserialize_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "resume_live_check_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "sdk_mcp_update_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "settings_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_file_watcher_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_hooks_snapshot_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_import_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_release_notes_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_dir_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_listen_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_messaging_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_publish_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "skills_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "spawn_to_exec_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "tools_commands_load_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       },
+       "opt": [
+        "resume_deserialize_ms",
+        "resume_live_check_ms"
+       ]
+      },
+      "phases": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "agent_proxy_ca_fetch_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_inputs_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_relay_up_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "agent_proxy_trust_write_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_handle_cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_handle_loop_lag_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_handle_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_read_from_spawn_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "first_message_read_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "grove_check_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "growthbook_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "headless_post_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "headless_prologue_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "hooks_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "init_emit_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "initial_messages_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "input_ready_from_spawn_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "input_ready_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_config_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_config_wait_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_connect_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_policy_settings_wait_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "mcp_prewait_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "model_catalog_decision_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "node_boot_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "permission_context_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "plugin_state_refresh_inline_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "plugins_sync_install_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "plugins_sync_mcp_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_client_data_url_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_init_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_managed_settings_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_mdm_keychain_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_migrations_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "pre_action_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "print_import_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "prompt_submit_hooks_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "qe_plugin_skills_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "qe_system_prompt_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "resume_deserialize_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "resume_live_check_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "resume_load_cpu_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "sdk_mcp_update_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "settings_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_file_watcher_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_hooks_snapshot_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_import_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_release_notes_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_dir_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_listen_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_messaging_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "setup_uds_publish_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "skills_load_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "spawn_to_exec_ms": {
+         "t": [
+          "integer"
+         ]
+        },
+        "tools_commands_load_ms": {
+         "t": [
+          "integer"
+         ]
+        }
+       },
+       "opt": [
+        "resume_deserialize_ms",
+        "resume_live_check_ms",
+        "resume_load_cpu_ms"
+       ]
+      },
+      "plugin_full_loads": {
+       "t": [
+        "integer"
+       ]
+      },
+      "plugins_sync_round": {
+       "t": [
+        "string"
+       ]
+      },
+      "policy_answer": {
+       "t": [
+        "string"
+       ]
+      },
+      "process_start_tuning": {
+       "t": [
+        "integer"
+       ]
+      },
+      "process_stretches": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "to_first_message": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "children_cpu_ms": {
+           "t": [
+            "integer"
+           ]
+          },
+          "children_minor_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "cpu_ms": {
+           "t": [
+            "integer"
+           ]
+          },
+          "major_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "minor_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "storage_read_kib": {
+           "t": [
+            "integer"
+           ]
+          },
+          "wall_ms": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "to_first_turn": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "children_cpu_ms": {
+           "t": [
+            "integer"
+           ]
+          },
+          "children_minor_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "cpu_ms": {
+           "t": [
+            "integer"
+           ]
+          },
+          "major_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "minor_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "storage_read_kib": {
+           "t": [
+            "integer"
+           ]
+          },
+          "wall_ms": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "to_input_ready": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "children_cpu_ms": {
+           "t": [
+            "integer"
+           ]
+          },
+          "children_minor_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "cpu_ms": {
+           "t": [
+            "integer"
+           ]
+          },
+          "major_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "minor_faults": {
+           "t": [
+            "integer"
+           ]
+          },
+          "storage_read_kib": {
+           "t": [
+            "integer"
+           ]
+          },
+          "wall_ms": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        }
+       }
+      },
+      "sdk_mcp_dial_runs": {
+       "t": [
+        "integer"
+       ]
+      },
+      "sdk_mcp_servers_dialed": {
+       "t": [
+        "integer"
+       ]
+      },
+      "time_origin_ms": {
+       "t": [
+        "number"
+       ]
+      },
+      "user_context_builds": {
+       "t": [
+        "integer"
+       ]
+      },
+      "warm_spare_claimed": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "warm_wake_early_fetch": {
+       "t": [
+        "boolean"
+       ]
+      }
+     }
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "terminal_slash_commands": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "tools": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "string"
+      ]
+     }
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "ultrathink_available": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "ultrathink_typed_raises": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    },
+    "view_mode": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/notification": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "key": {
+     "t": [
+      "string"
+     ]
+    },
+    "priority": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "text": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/permission_denied": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "decision_reason": {
+     "t": [
+      "string"
+     ]
+    },
+    "decision_reason_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "message": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/post_turn_summary": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "needs_action": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "status_category": {
+     "t": [
+      "string"
+     ]
+    },
+    "status_detail": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "summarizes_uuid": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/task_notification": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "handback": {
+     "t": [
+      "string"
+     ]
+    },
+    "handback_report": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "text": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "output_file": {
+     "t": [
+      "string"
+     ]
+    },
+    "run_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "status": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "summary": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "usage": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "duration_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "tool_uses": {
+       "t": [
+        "integer"
+       ]
+      },
+      "total_tokens": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/task_progress": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "description": {
+     "t": [
+      "string"
+     ]
+    },
+    "last_tool_name": {
+     "t": [
+      "string"
+     ]
+    },
+    "run_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subagent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "usage": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "duration_ms": {
+       "t": [
+        "integer"
+       ]
+      },
+      "tool_uses": {
+       "t": [
+        "integer"
+       ]
+      },
+      "total_tokens": {
+       "t": [
+        "integer"
+       ]
+      }
+     }
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/task_started": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "description": {
+     "t": [
+      "string"
+     ]
+    },
+    "is_backgrounded": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "prompt": {
+     "t": [
+      "string"
+     ]
+    },
+    "run_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "spawn_depth": {
+     "t": [
+      "integer"
+     ]
+    },
+    "subagent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "tool_use_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/task_summary": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "detail": {
+     "t": [
+      "null",
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/task_updated": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "patch": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "end_time": {
+       "t": [
+        "integer"
+       ]
+      },
+      "status": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "run_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "system/thinking_tokens": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "estimated_tokens": {
+     "t": [
+      "integer"
+     ]
+    },
+    "estimated_tokens_delta": {
+     "t": [
+      "integer"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subtype": {
+     "t": [
+      "string"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   }
+  },
+  "user/": {
+   "t": [
+    "object"
+   ],
+   "keys": {
+    "agent_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "isSynthetic": {
+     "t": [
+      "boolean"
+     ]
+    },
+    "message": {
+     "t": [
+      "object"
+     ],
+     "keys": {
+      "content": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "content": {
+          "t": [
+           "array",
+           "string"
+          ],
+          "items": {
+           "t": [
+            "object"
+           ]
+          }
+         },
+         "is_error": {
+          "t": [
+           "boolean"
+          ]
+         },
+         "text": {
+          "t": [
+           "string"
+          ]
+         },
+         "tool_use_id": {
+          "t": [
+           "string"
+          ]
+         },
+         "type": {
+          "t": [
+           "string"
+          ]
+         }
+        },
+        "opt": [
+         "content",
+         "is_error",
+         "text",
+         "tool_use_id"
+        ]
+       }
+      },
+      "role": {
+       "t": [
+        "string"
+       ]
+      }
+     }
+    },
+    "parent_tool_use_id": {
+     "t": [
+      "null",
+      "string"
+     ]
+    },
+    "session_id": {
+     "t": [
+      "string"
+     ]
+    },
+    "subagent_type": {
+     "t": [
+      "string"
+     ]
+    },
+    "task_description": {
+     "t": [
+      "string"
+     ]
+    },
+    "timestamp": {
+     "t": [
+      "datetime"
+     ]
+    },
+    "tool_result_meta": {
+     "t": [
+      "array"
+     ],
+     "items": {
+      "t": [
+       "object"
+      ],
+      "keys": {
+       "id": {
+        "t": [
+         "string"
+        ]
+       },
+       "non_execution_kind": {
+        "t": [
+         "string"
+        ]
+       },
+       "permission_decision": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "decision": {
+          "t": [
+           "string"
+          ]
+         },
+         "reason_type": {
+          "t": [
+           "string"
+          ]
+         },
+         "source": {
+          "t": [
+           "string"
+          ]
+         }
+        },
+        "opt": [
+         "reason_type"
+        ]
+       }
+      },
+      "opt": [
+       "non_execution_kind"
+      ]
+     }
+    },
+    "tool_use_result": {
+     "t": [
+      "object",
+      "string"
+     ],
+     "keys": {
+      "agentId": {
+       "t": [
+        "string"
+       ]
+      },
+      "agentType": {
+       "t": [
+        "string"
+       ]
+      },
+      "canContinueAgent": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "content": {
+       "t": [
+        "array",
+        "string"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "text": {
+          "t": [
+           "string"
+          ]
+         },
+         "type": {
+          "t": [
+           "string"
+          ]
+         }
+        }
+       }
+      },
+      "file": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "content": {
+         "t": [
+          "string"
+         ]
+        },
+        "filePath": {
+         "t": [
+          "string"
+         ]
+        },
+        "numLines": {
+         "t": [
+          "integer"
+         ]
+        },
+        "startLine": {
+         "t": [
+          "integer"
+         ]
+        },
+        "totalLines": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "filePath": {
+       "t": [
+        "string"
+       ]
+      },
+      "gitDiff": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "additions": {
+         "t": [
+          "integer"
+         ]
+        },
+        "changes": {
+         "t": [
+          "integer"
+         ]
+        },
+        "deletions": {
+         "t": [
+          "integer"
+         ]
+        },
+        "filename": {
+         "t": [
+          "string"
+         ]
+        },
+        "patch": {
+         "t": [
+          "string"
+         ]
+        },
+        "repository": {
+         "t": [
+          "null"
+         ]
+        },
+        "status": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "handback": {
+       "t": [
+        "string"
+       ]
+      },
+      "handbackReport": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "text": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "harnessNoteCount": {
+       "t": [
+        "integer"
+       ]
+      },
+      "harnessSectionHash": {
+       "t": [
+        "string"
+       ]
+      },
+      "harnessTailCount": {
+       "t": [
+        "integer"
+       ]
+      },
+      "interrupted": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "isImage": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "newString": {
+       "t": [
+        "string"
+       ]
+      },
+      "noOutputExpected": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "oldString": {
+       "t": [
+        "string"
+       ]
+      },
+      "originalFile": {
+       "t": [
+        "null",
+        "string"
+       ]
+      },
+      "prompt": {
+       "t": [
+        "string"
+       ]
+      },
+      "replaceAll": {
+       "t": [
+        "boolean"
+       ]
+      },
+      "resolvedModel": {
+       "t": [
+        "string"
+       ]
+      },
+      "status": {
+       "t": [
+        "string"
+       ]
+      },
+      "stderr": {
+       "t": [
+        "string"
+       ]
+      },
+      "stdout": {
+       "t": [
+        "string"
+       ]
+      },
+      "structuredPatch": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "object"
+        ],
+        "keys": {
+         "lines": {
+          "t": [
+           "array"
+          ],
+          "items": {
+           "t": [
+            "string"
+           ]
+          }
+         },
+         "newLines": {
+          "t": [
+           "integer"
+          ]
+         },
+         "newStart": {
+          "t": [
+           "integer"
+          ]
+         },
+         "oldLines": {
+          "t": [
+           "integer"
+          ]
+         },
+         "oldStart": {
+          "t": [
+           "integer"
+          ]
+         }
+        }
+       }
+      },
+      "toolStats": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "bashCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "editFileCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "linesAdded": {
+         "t": [
+          "integer"
+         ]
+        },
+        "linesRemoved": {
+         "t": [
+          "integer"
+         ]
+        },
+        "otherToolCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "readCount": {
+         "t": [
+          "integer"
+         ]
+        },
+        "searchCount": {
+         "t": [
+          "integer"
+         ]
+        }
+       }
+      },
+      "toolsUsed": {
+       "t": [
+        "array"
+       ],
+       "items": {
+        "t": [
+         "string"
+        ]
+       }
+      },
+      "totalDurationMs": {
+       "t": [
+        "integer"
+       ]
+      },
+      "totalTokens": {
+       "t": [
+        "integer"
+       ]
+      },
+      "totalToolUseCount": {
+       "t": [
+        "integer"
+       ]
+      },
+      "type": {
+       "t": [
+        "string"
+       ]
+      },
+      "usage": {
+       "t": [
+        "object"
+       ],
+       "keys": {
+        "cache_creation": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "ephemeral_1h_input_tokens": {
+           "t": [
+            "integer"
+           ]
+          },
+          "ephemeral_5m_input_tokens": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "cache_creation_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "cache_read_input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "fallback_credit": {
+         "t": [
+          "null"
+         ]
+        },
+        "inference_geo": {
+         "t": [
+          "string"
+         ]
+        },
+        "input_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "iterations": {
+         "t": [
+          "array"
+         ],
+         "items": {
+          "t": [
+           "object"
+          ],
+          "keys": {
+           "cache_creation": {
+            "t": [
+             "object"
+            ]
+           },
+           "cache_creation_input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "cache_read_input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "input_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "output_tokens": {
+            "t": [
+             "integer"
+            ]
+           },
+           "type": {
+            "t": [
+             "string"
+            ]
+           }
+          }
+         }
+        },
+        "output_tokens": {
+         "t": [
+          "integer"
+         ]
+        },
+        "output_tokens_details": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "thinking_tokens": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "server_tool_use": {
+         "t": [
+          "object"
+         ],
+         "keys": {
+          "web_fetch_requests": {
+           "t": [
+            "integer"
+           ]
+          },
+          "web_search_requests": {
+           "t": [
+            "integer"
+           ]
+          }
+         }
+        },
+        "service_tier": {
+         "t": [
+          "string"
+         ]
+        },
+        "speed": {
+         "t": [
+          "string"
+         ]
+        }
+       }
+      },
+      "userModified": {
+       "t": [
+        "boolean"
+       ]
+      }
+     },
+     "opt": [
+      "agentId",
+      "agentType",
+      "canContinueAgent",
+      "content",
+      "file",
+      "filePath",
+      "gitDiff",
+      "handback",
+      "handbackReport",
+      "harnessNoteCount",
+      "harnessSectionHash",
+      "harnessTailCount",
+      "interrupted",
+      "isImage",
+      "newString",
+      "noOutputExpected",
+      "oldString",
+      "originalFile",
+      "prompt",
+      "replaceAll",
+      "resolvedModel",
+      "status",
+      "stderr",
+      "stdout",
+      "structuredPatch",
+      "toolStats",
+      "toolsUsed",
+      "totalDurationMs",
+      "totalTokens",
+      "totalToolUseCount",
+      "type",
+      "usage",
+      "userModified"
+     ]
+    },
+    "type": {
+     "t": [
+      "string"
+     ]
+    },
+    "uuid": {
+     "t": [
+      "string"
+     ]
+    }
+   },
+   "opt": [
+    "agent_id",
+    "isSynthetic",
+    "subagent_type",
+    "task_description",
+    "tool_result_meta",
+    "tool_use_result"
+   ]
+  }
+ },
+ "observations": {
+  "sequence_run1": [
+   "SessionStart",
+   "UserPromptSubmit",
+   "PreToolUse:Read",
+   "PostToolUse:Read",
+   "PreToolUse:Write",
+   "PreToolUse:Edit",
+   "PostToolUse:Edit",
+   "PreToolUse:Bash",
+   "PreToolUse:Write",
+   "PreToolUse:Bash",
+   "PostToolUseFailure:Bash",
+   "PreToolUse:Bash",
+   "PostToolUse:Bash",
+   "PreToolUse:Read",
+   "PostToolUse:Read",
+   "PreToolUse:Agent",
+   "SubagentStart",
+   "PreToolUse:Read",
+   "PostToolUse:Read",
+   "PreToolUse:Write",
+   "PostToolUse:Write",
+   "PreToolUse:SubagentHandback",
+   "PostToolUse:SubagentHandback",
+   "SubagentStop",
+   "PostToolUse:Agent",
+   "UserPromptSubmit",
+   "Stop",
+   "PreToolUse:Write",
+   "PostToolUse:Write",
+   "Stop"
+  ],
+  "sequence_run2": [
+   "SessionStart",
+   "UserPromptSubmit",
+   "PreToolUse:Read",
+   "PostToolUse:Read",
+   "Stop"
+  ],
+  "deny": {
+   "called": true,
+   "tool": "Write",
+   "later_events": [],
+   "is_error": true,
+   "reason_in_result": {
+    "REC-DENY": true,
+    "REC-ASK": false,
+    "REC-EXIT2": false,
+    "REC-POSTBLOCK": false
+   },
+   "file_written": false
+  },
+  "ask": {
+   "called": true,
+   "tool": "Write",
+   "later_events": [],
+   "is_error": true,
+   "reason_in_result": {
+    "REC-DENY": false,
+    "REC-ASK": true,
+    "REC-EXIT2": false,
+    "REC-POSTBLOCK": false
+   },
+   "file_written": false
+  },
+  "exit2": {
+   "called": true,
+   "tool": "Bash",
+   "later_events": [],
+   "is_error": true,
+   "reason_in_result": {
+    "REC-DENY": false,
+    "REC-ASK": false,
+    "REC-EXIT2": true,
+    "REC-POSTBLOCK": false
+   }
+  },
+  "bash_exit3": {
+   "called": true,
+   "tool": "Bash",
+   "later_events": [
+    "PostToolUseFailure"
+   ],
+   "is_error": true,
+   "reason_in_result": {
+    "REC-DENY": false,
+    "REC-ASK": false,
+    "REC-EXIT2": false,
+    "REC-POSTBLOCK": false
+   }
+  },
+  "post_block": {
+   "called": true,
+   "tool": "Bash",
+   "later_events": [
+    "PostToolUse"
+   ],
+   "is_error": false,
+   "reason_in_result": {
+    "REC-DENY": false,
+    "REC-ASK": false,
+    "REC-EXIT2": false,
+    "REC-POSTBLOCK": false
+   },
+   "seen_in": [
+    "system/hook_response"
+   ]
+  },
+  "post_context_seen_in": [
+   "system/hook_response"
+  ],
+  "session_context_seen_in": [
+   "system/hook_response"
+  ],
+  "user_prompt_hooks_parallel": true,
+  "stop": {
+   "count": 2,
+   "stop_hook_active": [
+    false,
+    true
+   ],
+   "continued_after_block": true,
+   "reason_seen_in": [
+    "system/hook_response",
+    "user/"
+   ]
+  },
+  "subagent": {
+   "started": 1,
+   "agent_types": [
+    "general-purpose"
+   ],
+   "nested_tool_events": [
+    "PostToolUse:Read",
+    "PostToolUse:SubagentHandback",
+    "PostToolUse:Write",
+    "PreToolUse:Read",
+    "PreToolUse:SubagentHandback",
+    "PreToolUse:Write",
+    "SubagentStart",
+    "SubagentStop"
+   ],
+   "stream_has_nested_assistant_lines": true,
+   "launcher_tools": [
+    "Agent"
+   ]
+  },
+  "resume_session_start_source": [
+   "resume"
+  ],
+  "project_dir_is_cwd": [
+   true
+  ],
+  "hook_cwd_is_project_dir": [
+   true
+  ],
+  "settings_env_in_hook": [
+   ".rec/hook.py"
+  ],
+  "env_names": [
+   "CLAUDE_CODE_ENTRYPOINT",
+   "CLAUDE_ENV_FILE",
+   "CLAUDE_PROJECT_DIR"
+  ]
+ }
+}

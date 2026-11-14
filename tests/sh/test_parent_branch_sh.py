@@ -129,7 +129,8 @@ class ParentBranchShTest(unittest.TestCase):
         write(self.bin, EXE.format(exe=exe.sh_path()))
         os.chmod(self.bin, os.stat(self.bin).st_mode | stat.S_IXUSR | stat.S_IXGRP)
         self.state = os.path.join(self.ws, "logs", "state")
-        # ホストの代役（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
+        # ホストのスタブ（git remote get-url だけがホストの形を答える。
+        # 本物のネットワークには出ない）
         self.hostbin, self.routes, self.requests_log = host_stub.build(base, sys.executable)
         self.tree = os.path.join(self.ws, ".claude", "worktrees", PARENT)
         # ユーザが既に作って送ってあるブランチ（`/` を含む）。
@@ -444,7 +445,7 @@ class ParentBranchShTest(unittest.TestCase):
         self.assertIn(f"親のブランチ {BRANCH} がリモートに無い", refused.stderr)
         self.assertIn(f"ccnavi-sync.sh {PARENT}", refused.stderr)
         self.assertEqual(self.remote_sha(), "")
-        # 診断は ccnavi-sync.sh が出す（MR の答えは代役。マージされていない）。
+        # 診断は ccnavi-sync.sh が出す（MR の答えはスタブ。マージされていない）。
         write(
             os.path.join(self.scripts, "ccnavi-review.sh"),
             '#!/bin/sh\n[ "$1" = merged ] && echo none\nexit 0\n',

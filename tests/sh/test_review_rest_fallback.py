@@ -13,7 +13,7 @@ GraphQL が通る環境の動きは変えない。認証の失敗（401）と別
 - decide の返信と解決: 数字の id は REST、node id は GraphQL
 - 401・別の理由の 403 は REST に落とさず失敗する。REST も失敗したら、拒否される手順を案内に書かない
 
-ホストは `github_host.py` の代役。`FAKE_GITHUB_GRAPHQL` で GraphQL の断り方を選ぶ。
+ホストは `github_host.py` のスタブ。`FAKE_GITHUB_GRAPHQL` で GraphQL の断り方を選ぶ。
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
 
-# 実行ファイルの代役。`--result` で渡された JSON を、そのまま残す。
+# 実行ファイルのスタブ。`--result` で渡された JSON を、そのまま残す。
 EXE = """#!/bin/sh
 case " $* " in
 *" --version --json "*)

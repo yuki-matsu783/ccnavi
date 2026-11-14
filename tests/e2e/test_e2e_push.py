@@ -98,7 +98,7 @@ class ApproveAndPushTest(unittest.TestCase):
         git(self.ws, "remote", "set-head", "origin", "main")
         self.tree = os.path.join(self.ws, ".claude", "worktrees", TICKET)
         # `ccnavi-ticket.sh start` の事前確認は origin がホストのものであることを求める（手元のパスの origin は
-        # 本番では受けない）。ホストの代役は `git remote get-url origin` にだけホストの形の URL を答え、
+        # 本番では受けない）。ホストのスタブは `git remote get-url origin` にだけホストの形の URL を答え、
         # fetch・push は手元の bare へ通す。トークンを渡さないので、ホストの API は「確かめられなかった」で続く。
         self.hostbin, self.routes, self.requests_log = host_stub.build(self.tmp, sys.executable)
 

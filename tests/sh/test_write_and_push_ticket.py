@@ -540,7 +540,7 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertEqual(self.remote_sha(), "")
 
     def test_a_parent_gone_from_the_remote_is_refused_by_the_push_gate(self):
-        """取り込みが通っても（代役が 0 で終わる）、リモートに無い親のブランチは作り直さない。
+        """取り込みが通っても（スタブが 0 で終わる）、リモートに無い親のブランチは作り直さない。
         write-and-push の push の前のゲートが止める。"""
         write(os.path.join(self.scripts, "ccnavi-sync.sh"), "#!/bin/sh\nexit 0\n")
         git(self.ws, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{PARENT}")

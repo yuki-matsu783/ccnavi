@@ -125,7 +125,7 @@ class Workspace(unittest.TestCase):
         self.remote = os.path.join(self._tmp.name, "origin.git")
         git(self._tmp.name, "init", "-q", "--bare", self.remote)
         git(self.ws, "remote", "add", "origin", self.remote)
-        # write-and-push の対象かを答えるだけの実行ファイルの代役（いつも対象外。
+        # write-and-push の対象かを答えるだけの実行ファイルのスタブ（いつも対象外。
         # ここで見るのは対象外の道）
         self.write_and_push_stub = write(
             os.path.join(self._tmp.name, "write-and-push-bin", "ccnavi"),
@@ -435,7 +435,7 @@ class PushApprovedTest(Workspace):
         self.assertIn("i0001", result.stderr)
 
     # ---- 親のブランチの push のゲート（ccnavi_push_gate）。
-    # 実行ファイルの代役が `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
+    # 実行ファイルのスタブが `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
 
     def sent_parent(self, name="i0001", started="yes", **extra):
         """送ったことのある親のワークツリー。ホストがブランチを消した（参照だけが残る）形にする。

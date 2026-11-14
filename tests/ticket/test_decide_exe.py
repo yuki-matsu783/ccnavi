@@ -1,6 +1,6 @@
 """decide の適用（実行ファイル側）の取りこぼしを確かめる受入テスト。
 
-sh の代役ではなく、本物の `ccnavi user reviewed --accept-unresolved` と操作記録で見る。
+sh のスタブではなく、本物の `ccnavi user reviewed --accept-unresolved` と操作記録で見る。
 
 1. AT43: ホストに返信・解決を書いたあとの取り直しで、選んだ指摘の本文が変わっていたら、続きの子も
    マーカーも置かず、解決した分を操作記録の applied に残して止まる（ボードは `mismatch` で見せ直す）

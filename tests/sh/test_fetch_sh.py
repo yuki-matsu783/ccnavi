@@ -158,7 +158,7 @@ class FetchTest(unittest.TestCase):
         return done.stdout.strip()
 
     def spy_on_ls_remote(self, fail=False, answer=None, hang=False, fail_fetch=False):
-        """`git ls-remote` が打たれた回数を残す git の代役。fail なら ls-remote だけ失敗させる。
+        """`git ls-remote` が打たれた回数を残す git のスタブ。fail なら ls-remote だけ失敗させる。
         answer があれば、ls-remote の出力をその 1 行（`ref: refs/heads/<名前>\tHEAD`）に差し替える。
         hang なら ls-remote が返事をしない。fail_fetch なら fetch だけ失敗させる（fetch の回数は
         返す記録の隣の `.fetch` に残る）。PATH に足す値と、ls-remote の記録のパスを返す。"""
@@ -185,7 +185,7 @@ class FetchTest(unittest.TestCase):
         return os.pathsep.join([bindir, os.environ.get("PATH", "")]), log
 
     def fetch_calls(self, log):
-        """spy_on_ls_remote の代役が受けた fetch の行。"""
+        """spy_on_ls_remote のスタブが受けた fetch の行。"""
         try:
             with open(log + ".fetch", encoding="utf-8") as f:
                 return f.read().splitlines()
@@ -710,7 +710,7 @@ class FetchTest(unittest.TestCase):
 
     def test_a_failed_fetch_of_the_new_default_does_not_move_origin_head(self):
         # ホストは trunk と答えたが、trunk を取れない（fetch が失敗する）。向け直さない。
-        # ls-remote の答えは代役が返し、fetch は代役が失敗させる。向け直す手前の経路を通すため。
+        # ls-remote の答えはスタブが返し、fetch はスタブが失敗させる。向け直す手前の経路を通すため。
         self.leave_main()
         before = self.origin_head()
         path, log = self.spy_on_ls_remote(answer="trunk", fail_fetch=True)
