@@ -17,7 +17,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 
 ## 残り
 
-直す順は、上から。処理は、そこに入る主な関数で書く。
+直す順は上から。処理は、そこに入る主な関数の名前で書く。
 
 | sh | Go で実装するもの（いま sh にある） | sh で実装するもの | 備考 |
 |---|---|---|---|
@@ -26,13 +26,13 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | `ccnavi-common-state.sh` | `ccnavi_push_gate` の判定、`ccnavi_parent_trace`、`ccnavi_id_clash`、`ccnavi_git_refusal`、`ccnavi_record_*`、`ccnavi_integration` | `ccnavi_git_timed`、ゲートの ls-remote、実行ファイルに聞く口（`ccnavi_ask` など） | ゲートは素の push を打つ 3 経路が共有する |
 | `ccnavi-sync.sh` | 親子の選び方、`sync_family`・`merged_present`・`sync_absent`・`sync_retired` の分岐、ff・merge・abort、origin/HEAD の向け直し、出力の文 | ls-remote、`fetch_one`、`ccnavi-review.sh merged` の呼び出し、ロック、trap | merge の abort は実行ファイルの 1 回の起動の中で持つ |
 | `ccnavi-worktree.sh` | 引数と C1〜C7 の検査、`same_id_guard`、`make_candidate`、記録の書き出し、`worktree add`、報告の文 | ccnavi-git.sh 経由の fetch と ls-remote | 記録 `ccnavi-direct/<名前>` は integrate が読む |
-| `ccnavi-fetch.sh` | ff merge・update-ref・symbolic-ref・ワークツリーの一覧の解析、`family`・`seen` の選び方、出力の文 | `ccnavi_fetch_git`、`ccnavi_fetch_retarget` の ls-remote と fetch、時間の枠、ロック | 実行ファイルを起こさずに動く。Go で実装するなら、無いときは親の早送りを省く |
+| `ccnavi-fetch.sh` | ff merge・update-ref・symbolic-ref・ワークツリーの一覧の解析、`family`・`seen` の選び方、出力の文 | `ccnavi_fetch_git`、`ccnavi_fetch_retarget` の ls-remote と fetch、時間の枠、ロック | 実行ファイルを起こさずに動く作り。Go で実装する場合は、実行ファイルが無いときに親の早送りを省く |
 | `ccnavi-branches.sh` | GitHub と GitLab の MR・issue の応答の整形（jq の 4 通り） | 一覧の取得 | 生の一覧を `branches --result` に渡す形にする |
-| `ccnavi-common-host.sh` | `ccnavi_host_fail_status`・`ccnavi_host_graphql_blocked`・`ccnavi_host_fail_body` の解析、`ccnavi_host_access` の判定、preflight の集計と `fix` の順、`ccnavi_pf_line`・`ccnavi_pf_next` | `ccnavi_host_connect`・`ccnavi_host_api`・`ccnavi_host_pages`・`ccnavi_git_auth`・probe の取得、`find_tool` | `ccnavi_host_parse` は接続の前に要る。実行ファイルの `host.classify` と規則が重なる |
-| `ccnavi-review.sh`・`ccnavi-common-review.sh` | `mr_state_classify`、`merged`・`undraft` の読み、`threads`・`reviews`・`find_marked` の解釈、`ready` の出力の読み取り | `api`・`gql`・`pages`、GraphQL が断られたときの REST への切り替え、ページの cursor の読み | `threads` の GitLab の枝は Chrome 拡張の `gitlab.ts` と同じ読み方。Go で実装して WASM と共有する。`mr-state` の 2 行の形と終了コードはボードとの約束 |
-| `ccnavi-common-write-and-push.sh` | `ccnavi_wap_commit`・`ccnavi_wap_unstage`・`ccnavi_wap_restore_written`・`ccnavi_wap_merge_begin` / `ccnavi_wap_unmerge` / `ccnavi_wap_commit_merge`・`ccnavi_wap_undo`・`ccnavi_wap_busy` | push と ls-remote、ロック、ゲートの呼び出し、`ccnavi-sync.sh` の入れ子の起動 | 書く→コミット→push→確かめ→戻してやり直しの一続き。ローカルの書き込みと戻しは 1 回の起動にまとめる |
+| `ccnavi-common-host.sh` | `ccnavi_host_fail_status`・`ccnavi_host_graphql_blocked`・`ccnavi_host_fail_body` の解析、`ccnavi_host_access` の判定、preflight の集計と `fix` の順、`ccnavi_pf_line`・`ccnavi_pf_next` | `ccnavi_host_connect`・`ccnavi_host_api`・`ccnavi_host_pages`・`ccnavi_git_auth`・probe の取得、`find_tool` | `ccnavi_host_parse` は接続の前に必要。実行ファイルの `host.classify` と規則が重なる |
+| `ccnavi-review.sh`・`ccnavi-common-review.sh` | `mr_state_classify`、`merged`・`undraft` の読み、`threads`・`reviews`・`find_marked` の解釈、`ready` の出力の読み取り | `api`・`gql`・`pages`、GraphQL が断られたときの REST への切り替え、ページの cursor の読み | `threads` の GitLab の枝は Chrome 拡張の `gitlab.ts` と同じ読み方。Go で実装し、WASM と共有する。`mr-state` の 2 行の形と終了コードは、ボードとの約束 |
+| `ccnavi-common-write-and-push.sh` | `ccnavi_wap_commit`・`ccnavi_wap_unstage`・`ccnavi_wap_restore_written`・`ccnavi_wap_merge_begin` / `ccnavi_wap_unmerge` / `ccnavi_wap_commit_merge`・`ccnavi_wap_undo`・`ccnavi_wap_busy` | push と ls-remote、ロック、ゲートの呼び出し、`ccnavi-sync.sh` の入れ子の起動 | 書く、コミット、push、確かめ、戻してやり直す、の一続き。ローカルの書き込みと戻しは 1 回の起動にまとめる |
 | `ccnavi-user-push-approved.sh` | `carry_paths`・`given_in`・`unsent_paths`、ツリーの列挙とリンクの検査、保護ブランチの判定 | push、ロック、ユーザだけが打つ入口 | 実行ファイルを起こさない作り（承認の直後、入れ替え中でも push できるように） |
-| `ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh` | `accept_threads` の検査、`reply_already_sent`、`resume_prepare` の読み | 返信・解決・issue・コメントの送信、y/N の確認、ロック | Chrome 拡張とホストへ書く順が違う。共有するなら順を揃えてから |
+| `ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh` | `accept_threads` の検査、`reply_already_sent`、`resume_prepare` の読み | 返信・解決・issue・コメントの送信、y/N の確認、ロック | Chrome 拡張とホストで書く順が違う。共有するなら、先に順を揃える |
 | `ccnavi-ticket.sh` | `ticket_id` の検査、approval-request の結果ファイルの読み、`ensure_child_worktree`、`ticket_unsent_parent_next` の文 | preflight、write-and-push の組み立て | |
 | `ccnavi-stage.sh`・`ccnavi-dirs.sh` | パスとリンクの検査、読み替えの表、コピー、手順の文。`projects/` ごとの最新の並べ方 | — | ほぼ全部が Go で実装するもの |
 
@@ -46,5 +46,5 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 |---|---|---|
 | 保護するブランチの一覧が 4 か所にあり、形が揃っていない（`release-*` と `release/*`） | `ccnavi-git.sh`（2 か所）・`ccnavi-user-push-approved.sh`・`ccnavi-common.sh` | 実行ファイルの 1 つの関数で判定し、sh はそれに聞く。実行ファイルを起こさない `ccnavi-user-push-approved.sh` の写しは、一致をテストで確かめる |
 | 実行ファイルの答え（`ops show` の JSON）を jq で読む | `ccnavi-user-lib-review.sh` の `op_field`・`reply_already_sent` | 1 行 1 項目で答えるサブコマンドを足す |
-| パスを自分で小文字にして比べる | `ccnavi-review.sh` の依頼文の置き場の照合 | 実行ファイルの `pathcase` で比べる |
+| パスを自分で小文字にして比べている | `ccnavi-review.sh` の依頼文の置き場の照合 | 実行ファイルの `pathcase` で比べる |
 | 実行ファイルの規則の写し | `ccnavi-stage.sh` の `is_importable`、`ccnavi-branches.sh` の `names_number` | 実行ファイルに聞く |
