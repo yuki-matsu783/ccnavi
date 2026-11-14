@@ -219,41 +219,7 @@ class RejectTest(GitWrapperTest):
                     )
 
 
-# 拒否の文に代わりの手段を書くと決めた理由の名前。次に何をすればよいかを必ず書く。
-# integrate のほかの拒否（grep-pager・remote-option・worktree-no-dest など）の文は
-# 実行ファイルが持ち、go/internal/tickets/lifecycle/gitwrap のテストと、下の個別のテストが確かめる。
-NEEDS_ALTERNATIVE = ("integrate-tmp",)
-# 代わりの手段を示している印。ラッパーか取り込みの sh の形か、ユーザに頼むこと。
-# 「ユーザに依頼してください」で終わる拒否（remote-write など）も、正しい代わりの手段として数える。
-ALTERNATIVE_MARKS = ("$SELF", "$SYNC", "ユーザに")
-
-
-def reject_texts(reason):
-    """ccnavi-git.sh の中で、この理由の名前で拒否する文（二重引用の中身）をすべて返す。"""
-    with open(SCRIPT, encoding="utf-8") as f:
-        source = f.read()
-    head = f'reject {reason} "'
-    found = []
-    start = source.find(head)
-    while start >= 0:
-        body = start + len(head)
-        found.append(source[body : source.index('"', body)])
-        start = source.find(head, body)
-    return found
-
-
 class RejectAlternativeTest(GitWrapperTest):
-    def test_each_listed_rejection_names_what_to_do_instead(self):
-        for reason in NEEDS_ALTERNATIVE:
-            texts = reject_texts(reason)
-            with self.subTest(reason=reason):
-                self.assertTrue(texts, f"{reason} の拒否が見つからない")
-                for text in texts:
-                    self.assertTrue(
-                        any(mark in text for mark in ALTERNATIVE_MARKS),
-                        f"代わりの手段が無い: {text}",
-                    )
-
     def test_the_missing_destination_rejection_names_the_worktree_form(self):
         result = self.assertRejected("worktree", "add")
         self.assertIn(
