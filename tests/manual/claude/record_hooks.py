@@ -13,7 +13,8 @@ claude -p のスタブの契約のうち、本物から録る側（仕様は `.a
 
 1. 使い捨ての木（一時ディレクトリ、`git init` 済み）に、hook の標準入力を書き出すだけの hook
    （`tests/contract/claudeside.py` の `HOOK`）を全イベントに登録した `.claude/settings.json` を
-   置く。ccnavi は使わない
+   置く。hook の命令は ccnavi と同じく `settings.json` の `env` の変数（`CONTRACT_HOOK_PATH`）で
+   組む。ccnavi は使わない
 2. `claude -p --model haiku --setting-sources project` で 2 回回す。
    1 回目は決まった手の列（`claudeside.PROMPT`）。2 回目は `--resume` でつなぎ、
    SessionStart の `source` を見る
