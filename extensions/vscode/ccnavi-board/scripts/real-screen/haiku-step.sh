@@ -6,7 +6,7 @@
 #
 # 1 回目は依頼文（例: 「issue #1 を進めてください」）、2 回目以降は --continue と、ユーザ役の一言
 # （「承認しました。続きを進めてください。」など）を渡す。承認は、ユーザ役が実画面（approve.js）で行う。
-# 出力: <出力ディレクトリ>/step-<連番>.jsonl（生の記録）と、標準出力の要約（summarize-run.py）。
+# 出力: <出力ディレクトリ>/step-<連番>.jsonl（生の記録）と、標準出力の要約（summarize-run.js）。
 # 起動に要る環境（fake-host.sh の PATH と GITLAB_TOKEN）は、呼ぶ側で設定しておく。
 # 許可は acceptEdits に、使うツールだけを --allowedTools で足す（bypassPermissions は使わない）。
 # 上限は CCNAVI_STEP_TIMEOUT 秒（既定 1500）。
@@ -28,4 +28,4 @@ cd "$repo"
 timeout "${CCNAVI_STEP_TIMEOUT:-1500}" claude -p $flag --model haiku --permission-mode acceptEdits \
 	--allowedTools "Bash,Read,Write,Edit,Glob,Grep,Agent" --output-format stream-json --verbose \
 	<"$prompt" >"$log" 2>"$out/step-$n.err" || echo "claude の終了コード: $?" >&2
-python3 "$here/summarize-run.py" "$log" "${CCNAVI_SUMMARY_WIDTH:-350}"
+node "$here/summarize-run.js" "$log" "${CCNAVI_SUMMARY_WIDTH:-350}"

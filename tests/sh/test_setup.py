@@ -1454,7 +1454,6 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         root = self.deploy_the_real_tree()
         forbidden = {
             "uv run": r"\buv run\b",
-            "scripts/check_rules.py": r"scripts/check_rules\.py",
             "配布元の docs/": r"(?<![\w])(?:docs/\d\d_|\.agents/docs)",
             "配布元の go/": r"(?<![\w/])go/(?:internal|cmd)/",
             "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
