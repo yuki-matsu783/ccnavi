@@ -158,7 +158,7 @@
         （ccnavi-git.sh 用。integrate・integrate --abort・integrate-done を行い、結果をそのまま出力します。
          0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）
     ccnavi start args -- <ccnavi-start.sh の引数>...
-        （ccnavi-start.sh 用。引数を確かめ、依頼のリポジトリ（--repo）と origin を照らし、値を 1 行 1 項目で
+        （ccnavi-start.sh 用。引数を確かめ、依頼のリポジトリ（--repo）と origin を比べ、値を 1 行 1 項目で
          出力します。誤りは "fail <識別子> <終了コード>" と "msg <文>"。読み取り専用）
     ccnavi start branch-ok <branch> strict|lenient [heads=<file>] [err=…] [hint=…] [exit=<n>]
         （ccnavi-start.sh 用。識別子が親に使えるかと、同じ識別子になる別のブランチが無いかを確かめます）

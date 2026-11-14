@@ -25,7 +25,7 @@ type BranchArgs struct {
 
 // BranchOK は、ブランチから作る識別子が親に使えるか（58 文字以内・末尾が -<2 桁> でない・字の種類・NFC）と、同じ識別子に
 // なる別のブランチ（origin の全ブランチと手元のブランチ。英字の大文字小文字は区別しない）が無いかを確かめる。
-// 引っかかれば fail。origin の一覧を取れず手元で代わりに確かめたときは `note <案内>`。
+// 見つかれば fail。origin の一覧を取れず手元で代わりに確かめたときは `note <案内>`。
 func BranchOK(cwd string, a BranchArgs) (string, int) {
 	var o outcome
 	answer := map[string]string{}
