@@ -48,7 +48,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 | id | 適用するもの | 書き込みを許す例外 |
 |---|---|---|
-| `builtin:guard-hooks` | glob `*/.claude/hooks/*` | `handoff_write_exempt`（直下の `wip/handoff/` の普通のコピー） |
+| `builtin:guard-hooks` | glob `*/.claude/hooks/*` | `handoffWriteExempt`（直下の `wip/handoff/` の普通のコピー） |
 | `builtin:guard-settings` | regex `[\\/]\.claude[\\/]settings(\.local)?\.json$` | 同上 |
 | `builtin:guard-scripts` | glob `*/<ccnavi ディレクトリ>/scripts/*` | 同上 |
 | `builtin:guard-ccnavi-config` | regex `[\\/]<ccnavi ディレクトリ>[\\/]config[\\/]common[\\/](rules\|phases\|risks)\.yml$` | 同上 |
@@ -56,7 +56,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 - 共通のルールファイルには書かない
 - ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない
 - `builtin:guard-ccnavi-config` はルートを固定せず、パスの末尾で適用する。`builtin:guard-common-layer` と同じ範囲だとは仮定しない
-- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `add_rules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`add_rules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`add_rules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watchedFor` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
+- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `selfguard.AddRules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`AddRules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`AddRules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watchedFor` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
 - 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`config.EffectiveSetting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
 - `disable` のときは、実行前にも実行後にも足さない。ワークスペースルートの `.claude/hooks/` と `.claude/settings*.json` は、ルールの `workspace-root` が実行前に止める
 
@@ -131,9 +131,9 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 通すのは、索引の中身に戻す `restore`（`--staged`、衝突を解く `--ours` / `--theirs`）と、何も消さない `rm -n` / `--dry-run`（後ろに `--no-dry-run` があれば、git と同じく消す形として見る）。
 衝突したルールファイルを直す道がここしか無く、索引の中身はエージェントが書けない場所から来る。拒否の文面は、変更をユーザに依頼することと、通る形を案内する。
 `--source` の長いオプションは、git が受ける省略形（`--sou=`・`--so`）も同じに読む。
-ラッパーも同じ場所の検査（`core_hit`）を 2 重目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
+ラッパーも同じ場所の検査（`ccnavi-git.sh` の sh の関数 `core_hit`）を 2 重目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
 記録の置き場（`logs/`）はワークスペースルートの下だけに適用する。承認済みチケットの置き場は `core_hit` では見ず、過去の中身に戻す形を
-前からの置き場の検査（`restore-store-source`・`checkout-store`）が止める。`rm -n` / `--dry-run` は通す。
+sh の置き場の検査（`restore-store-source`・`checkout-store`）が止める。`rm -n` / `--dry-run` は通す。
 見るサブコマンドは `rm`・`restore`・`checkout` だけ。
 
 保護済みの sh の前に置く環境変数（`DENY_SCRIPT_ENV_OVERRIDE`）: 保護済みの sh（`ccnavi-*.sh`）は、
@@ -189,7 +189,7 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.LaunchedExecutable` が sh と同じ順で探し、
 名前が `ccnavi-launcher.sh` なら `../bin/`、それ以外は隣を見る（8.2 と同じ条件）。見つからなければ足さない。
 実体は中身のハッシュで名前を付けて `state/selfguard/store/` へ 1 本だけ置き、セッションの側は参照（ハッシュ・大きさ・更新時刻）だけ
-持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.PathExecutable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`_rebase_if_changed`）。キーは `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、古い実体の参照を新しい実体に適用しない。止める正規表現は実体のパスの末尾 3 要素で適用し（要素が 3 以下の浅い実体は、区切りで始まる形だけに適用する）、置き場のディレクトリ全体は守らない。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
+持つ。比べるのは大きさと更新時刻。`CCNAVI_ENTRY_PATH` が振り分けの sh のときは、PATH にある `ccnavi`（`platformtag.PathExecutable`。絶対パスの項目だけを、sh と同じ順で見る）の実体も、`bin/` の有無に関わらず守る。自分と同じファイル（`ccnavi` という名前で張った launcher へのリンク）は sh と同じく飛ばす。PATH の実体はセッション開始のあとに現れることもあるので、参照が無いまま現れたら、実行前に最初に見た版を基準に取る（`rebaseIfChanged`）。キーは `bin-path-<実パスの印>` で、PATH が変わって指す先が替わっても、前に指していた実体の参照を新しい実体に適用しない。止める正規表現は実体のパスの末尾 3 要素で適用し（要素が 3 以下の浅い実体は、区切りで始まる形だけに適用する）、置き場のディレクトリ全体は守らない。3 日より長く触られていないセッションのバックアップは、次のセッション開始で消す。
 
 実行前にも照合する。`PreToolUse` の登録ごと消された場合は ccnavi が一切動かない（12.1）。
 
@@ -206,4 +206,4 @@ sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は
 セッションごとに別のファイルで、並行するセッションは互いの印を書き換えも消しもしない。印の読み書きの失敗は、発言とツールの結果を変えない。書けないときは印が無い（ターン中ではない）側に倒れ、警告が出ないだけで、保護の動きは変わらない。
 読み手は `--explain --json` の `turns` で、拡張が設定ファイルを保存する前の確認に使う。
 
-ターンの印は `Stop` で消えるので、ターンをまたぐ事実は持てない。ユーザが最後に発言した時刻は、別の記録 `state/userprompt-<セッション>.json` に、ユーザの発言と言い切れる `UserPromptSubmit`（`hookio.IsUserPrompt`）だけが書く。ターン分離のゲート（6.7）が読む。起動と再開で消し、compact と clear では消さない。ユーザの手による変更の受け入れ（8.3）の判定（`from_background_task`）とは別に決める。
+ターンの印は `Stop` で消えるので、ターンをまたぐ事実は持てない。ユーザが最後に発言した時刻は、別の記録 `state/userprompt-<セッション>.json` に、ユーザの発言と言い切れる `UserPromptSubmit`（`hookio.IsUserPrompt`）だけが書く。ターン分離のゲート（6.7）が読む。起動と再開で消し、compact と clear では消さない。ユーザの手による変更の受け入れ（8.3）の判定（`hookio.Input` の `FromBackgroundTask`）とは別に決める。
