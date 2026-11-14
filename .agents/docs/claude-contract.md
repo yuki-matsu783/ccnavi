@@ -58,6 +58,7 @@ uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-de
 - `matcher` が無いか空なら全部、あれば `tool_name` に正規表現で当てる。ツールの無いイベント（SessionStart・Subagent* など）で `matcher` を持つ hook は起こさない
 - 同じイベントに当たった hook は並行に起こす。`asyncRewake` の hook と `command` 以外の hook は起こさない
 - 命令は `sh -c` で起こし、payload を標準入力に渡す。環境に `CLAUDE_PROJECT_DIR`（= cwd）と `CLAUDE_ENV_FILE` を入れ、`CLAUDE_CODE_ENTRYPOINT` が無ければ `sdk-cli` を入れる（ccnavi はこれが `sdk` で始まるかで非対話を見分ける）
+- 本物と同じく、`settings.json` の `env` を自分の環境に入れ、hook と Bash に受け継がせる。ccnavi の hook の命令は、ここで入る `CCNAVI_ENTRY_PATH` を使う。hook が終了コード 2 以外で失敗すると止めずにツールを実行するので（本物と同じ）、hook が起きないまま保護されたファイルが書き換わることがある。期待には `files_unchanged` などの最終状態も書く
 - 呼ぶ順は本物と同じ: SessionStart（`--resume` なら `source: resume`）→ UserPromptSubmit → 手ごとに PreToolUse → PostToolUse か PostToolUseFailure → 終わりに Stop。サブエージェントは `Agent` の PreToolUse → SubagentStart → 中の手（`agent_id`・`agent_type` 付き）→ `SubagentHandback` → SubagentStop → `Agent` の PostToolUse。サブエージェントを使った回は、Stop の前に UserPromptSubmit をもう一度起こす（本物はサブエージェントの終わりを知らせで受ける）
 
 ### 応答の扱い
