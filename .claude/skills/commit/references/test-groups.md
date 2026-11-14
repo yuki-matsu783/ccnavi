@@ -53,6 +53,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh`・`ccnavi-user-handoff.sh`・`ccnavi-user-mirror.sh`・`ccnavi-user-prune.sh`・`ccnavi-clean.sh` | `sh` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh` | `sh` |
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`） |
+| `.ccnavi/scripts/ccnavi-common-host.sh`・`go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_write_and_push_ticket`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
