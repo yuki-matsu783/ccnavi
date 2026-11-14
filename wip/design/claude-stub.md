@@ -96,7 +96,7 @@ ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧）を
 |---|---|
 | 終了コード 2 | 止める。標準エラーを理由にする（PreToolUse ならツールを実行せず、エラーの `tool_result` に理由を入れる。Stop なら差し戻し） |
 | 終了コード 0 で `hookSpecificOutput.permissionDecision: deny` | PreToolUse を止める。`permissionDecisionReason` を `tool_result` に入れる |
-| `permissionDecision: ask` | `-p` での本物の扱いを契約で確かめるまで決めない（未決の点） |
+| `permissionDecision: ask` | 段 1 で本物の扱いを録ってから決める（未決の点） |
 | `decision: block` | Stop は差し戻し、PostToolUse は理由を `tool_result` に足す |
 | `additionalContext` | モデルに渡す文脈として stream-json に残すだけ（台本は読まない） |
 | それ以外の終了コード | 止めない。hook の失敗として stream-json に残す |
@@ -158,19 +158,22 @@ stream-json は、`tests/scenarios/stream.py` が読む行を本物と同じ形�
 - Claude Code 自身の権限の仕組みと、確認の表示
 - 契約で録っていない手の形（録った手に限って本物と合う）
 
+## 回す場所と台本の置き場
+
+- 代役のシナリオは、使い捨てのワークスペース（`tests/e2e/` のように一時ディレクトリに組み立てる）で回す。普段のワークスペースルートに触れないので、人間の確認を取らず、全量テストに入れる。本物の `claude -p` で回すときの決まり（普段のワークスペースルートで、確認を取ってから）は変えない
+- 台本は、本物用の `prompt` と同じシナリオのファイルに `script` として並べる。1 本のシナリオを、本物でも代役でも回せる
+
 ## 進め方
+
+本物で先に録り、録った形を正として代役を作る。代役を仕様の読みだけで先に作らない。
 
 | 段 | 中身 | これで回せるシナリオ |
 |---|---|---|
-| 1 | 代役の芯（SessionStart・UserPromptSubmit・PreToolUse・PostToolUse・Stop、Bash・Read・Write・Edit、stream-json）と、実行器の `agent: script` | UC-01・02・03・04・05・07（層 1・2 の拒否） |
-| 2 | 本物との契約（録る側と比べる側） | 段 1 の結果を信じてよくなる |
-| 3 | Stop の差し戻し、`--resume`、セッションの記録、PostToolUseFailure、サブエージェント | UC-08・09・18・19、fake-gitlab を相手にした UC-20 |
+| 1 | 本物で録る。`tests/manual/claude/record_hooks.py` で、本物の `claude -p`（Haiku）に決まった手を打たせ、hook の payload と stream-json の形を `tests/contract/claude/recorded.json` に録る。`permissionDecision: ask` の `-p` での扱いもここで確かめる | — |
+| 2 | 録った形を元に、代役の芯（SessionStart・UserPromptSubmit・PreToolUse・PostToolUse・Stop、Bash・Read・Write・Edit、stream-json）と、比べる側の契約テスト、実行器の `agent: script` を作る | UC-01・02・03・04・05・07（層 1・2 の拒否） |
+| 3 | Stop の差し戻し、`--resume`、セッションの記録、PostToolUseFailure、サブエージェント。足りない手があれば段 1 に戻って録り足す | UC-08・09・18・19、fake-gitlab を相手にした UC-20 |
 | 4 | 使い捨てのワークスペースで回し、全量テストに入れる | 上の全部を毎回回す |
 
 ## 未決の点
 
-ユーザと合意してから決める。
-
-1. **回す場所**: 今の受入シナリオは「普段のワークスペースルートで回す。コピーは作らない」決まりで、回す前に人間の確認を取る。代役のシナリオを全量テストに入れるなら、使い捨てのワークスペース（`tests/e2e/` のように組み立てる）で回す必要がある。決まりを代役だけ例外にするか、段 4 をやめて代役も確認を取って回すか
-2. **台本の置き場**: 本物用の `prompt` と同じシナリオに `script` を同居させる（上の案）か、代役専用のシナリオを別に書くか。同居なら 1 本で両方回せるが、`judge` と `script` が同じファイルに並ぶ
-3. **`permissionDecision: ask` の扱い**: `-p` で本物がどう振る舞うかを契約で録ってから決める
+1. **`permissionDecision: ask` の扱い**: 段 1 で、`-p` で本物がどう振る舞うかを録ってから決める
