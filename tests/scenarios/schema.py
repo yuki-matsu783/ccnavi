@@ -62,6 +62,16 @@ def load_scenario(path, agent=AGENT_CLAUDE):
     return data
 
 
+def is_scripted(scn):
+    """代役（--agent script）で回すシナリオか。"""
+    return scn.get("agent") == AGENT_SCRIPT
+
+
+def load_from_state(st):
+    """回の状態（state.json）から、その回と同じ相手でシナリオを読み直す。"""
+    return load_scenario(st["scenario"], st.get("agent", AGENT_CLAUDE))
+
+
 def _check_agent(path, data):
     """代役で回すなら、人間の操作でない step はすべて script（打つ手の列）を持つ。"""
     if data["agent"] not in (AGENT_CLAUDE, AGENT_SCRIPT):
@@ -70,7 +80,7 @@ def _check_agent(path, data):
         for key in ("script", "after_stop_block"):
             if key in step and not isinstance(step[key], list):
                 raise ValueError(f"{path}: step {n} の {key} は手の list です")
-        if data["agent"] == AGENT_SCRIPT and not step.get("human") and not step.get("script"):
+        if is_scripted(data) and not step.get("human") and not step.get("script"):
             raise ValueError(f"{path}: step {n} 代役（--agent script）で回すには script が要ります")
 
 

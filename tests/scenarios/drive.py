@@ -63,7 +63,7 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no
         cmd += ["--session-id", session_id]
     if not persist:
         cmd += ["--no-session-persistence"]
-    if scn.get("agent") == schema.AGENT_SCRIPT:
+    if schema.is_scripted(scn):
         cmd, env = _scripted(cmd, step, out / f"step-{idx}.script.json", env)
     r = subprocess.run(
         cmd, cwd=root, capture_output=True, text=True, timeout=STEP_TIMEOUT_SEC, env=env
@@ -205,7 +205,7 @@ def finish(scn, out, st, root):
         raw = "".join(p.read_text(encoding="utf-8") for p in sorted(out.glob("step-*.jsonl")))
         rows = expect.read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
         spec = scn["expect"]
-        if scn.get("agent") == schema.AGENT_SCRIPT:
+        if schema.is_scripted(scn):
             # 代役は台本どおりに打つので、モデルの振る舞いを読む judge は評価しない
             spec = {k: v for k, v in spec.items() if k != "judge"}
         results = expect.evaluate(spec, rows, raw, root, st["pre_digests"])

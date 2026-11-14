@@ -334,7 +334,7 @@ def scenario_summary(scn):
         f"状態 {scn.get('status', '-')}・モデル {scn.get('model', '-')}・"
         f"費用の上限 {scn.get('budget_usd', '-')} USD"
     )
-    if scn.get("agent") == schema.AGENT_SCRIPT:
+    if schema.is_scripted(scn):
         lines.append(
             "相手: 代役（tests/fake_claude.py）が step の script どおりに打つ。claude は呼ばず、"
             "費用はかからない。judge は評価しない"
