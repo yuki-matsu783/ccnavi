@@ -74,7 +74,7 @@ keywords: [issue, MR, ccnavi-start.sh, ccnavi-branches.sh, 既存のブランチ
   チケットが既にあるワークツリーでは、「次:」の行が`ccnavi-ticket.sh status <識別子>`を勧める。行頭の語は[terms.md](terms.md)
 - ホストに届かないか、断られたとき（Claude remoteのコンテナでは、GitHubのAPIに届かないことがある）、`ccnavi-start.sh`は終了コード4で止まり、
   どの段階で届かなかったか・その段階までに出来たこと・MCPで行う手順を標準出力に出す。エージェントはその手順どおりに`mcp__github__`のツールで代行し、
-  同じコマンドを打ち直す。段階は3つある
+  同じコマンドを打ち直す。主な段階は次の4つ
   - 既存のMRを確かめる段階: `mcp__github__search_pull_requests`で探す。見つかれば候補としてユーザに聞く。無いと確かめた新規作成（`--issue`だけで、手元の候補も無い）は、`--mcp-checked`を付けて打ち直す。既存のMRや手元の候補を採用するときは、`--mcp-checked`だけでは進めない。`--issue`・`--mr`・`--branch`の3つの値を確かめてそろえる。値を確かめられなければ、ユーザに相談して止まる
   - issueのタイトルを読む段階（slugが決められないとき）: `mcp__github__issue_read`でタイトルを読み、`--slug <語> --title '<タイトル>'`を付けて打ち直す
   - MRを作る段階（ブランチ・ワークツリー・pushは済んでいる）: `mcp__github__create_pull_request`を、案内の値（`head`はブランチ名、`base`は統合先、
