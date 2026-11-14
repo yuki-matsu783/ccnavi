@@ -17,7 +17,7 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
 
 通すか止めるかの判定は、実行ファイルの `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`）が行う。引数だけで決まる判定（サブコマンドより前のオプション、どのサブコマンドでも許さない形（設定の一時上書き・ファイル書き込みや外部コマンド実行に変えるオプション・判定の起点を動かすオプションと、その略形）、読むだけのサブコマンド、`cat-file`・`grep`・`branch`・`tag`・`remote`・`stash`・`add`・`commit` の形、通さないサブコマンド）と、ワークツリーと状態を見る判定（守る場所に向く `rm`・`restore`・`checkout <ref> <パス>`、`worktree add` の行き先・名前・起点の新しさ、`checkout`・`switch` のブランチの移動、`merge`・`merge-file`、`fetch`・`pull`、`push`）がこれに当たる。実行ファイルはラッパースクリプトの cwd で git の状態を読む（ネットワークには出ない）。
 
-ラッパースクリプトは git の引数を標準入力に NUL 区切りで渡し、答えの行を見る。1 行目は `allow`・`pass`・`deny <識別子>`（次の行から拒否の文）のどれか。`allow` には、git の引数の前に足す語（`prepend`。ワークツリーの中の `merge` に補う `--no-ff`）・出力の後ろに出す警告（`warn`）・push の前に確かめる親のブランチ（`gate-top`・`gate-branch`）・ユーザのチェックアウトで統合先をチェックアウトしているときの、その統合先（`target`。`pull` が衝突したときの案内に使う）が続くことがある。`pass` は `integrate`・`integrate-done` で、その判定と状態の操作はラッパースクリプトが行う。push のゲートの ls-remote もラッパースクリプトが打つ。実行ファイルが見つからない・答えないときは、形を確かめられないので拒否する。
+ラッパースクリプトは git の引数を標準入力に NUL 区切りで渡し、答えの行を見る。1 行目は `allow`・`pass`・`deny <識別子>`（次の行から拒否の文）のどれか。`allow` には、git の引数の前に足す語（`prepend`。ワークツリーの中の `merge` に補う `--no-ff`）・出力の後ろに出す警告（`warn`）・push の前に確かめる親のブランチ（`gate-top`・`gate-branch`）・ユーザのチェックアウトで統合先をチェックアウトしているときの、その統合先（`target`。`pull` が衝突したときの案内に使う）が続くことがある。`pass` は `integrate`・`integrate-done` で、ラッパースクリプトはロック（`logs/state/locks/<repo>/.integrate`）を取ってから `ccnavi git integrate` を起こし、その判定と状態の操作（`go/internal/tickets/lifecycle/land`）を任せる。push のゲートの ls-remote もラッパースクリプトが打つ。実行ファイルが見つからない・答えないときは、形を確かめられないので拒否する。
 
 ## 何を通し、何を止めるか
 
