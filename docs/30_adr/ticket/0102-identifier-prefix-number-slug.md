@@ -97,7 +97,7 @@ issue のタイトルは誰でも書けるので、Chrome 拡張の service work
 先頭が ASCII の英数字でない、ASCII の英数字と `.` `_` `-` 以外の ASCII の字（空白・制御文字・記号）。残りは
 `LC_ALL=C tr -d 'A-Za-z0-9._\200-\377-'` で消し、何も残らなければ通す（`ccnavi-review.sh` の eli5 の検査と同じ方法。
 末尾の改行が `$( )` で落ちないよう番兵の `/` を足して比べる）。ASCII の外のバイトは通し、字の種類（全角記号・NFD）は
-実行ファイルが確かめる（2 重目の確認。ADR-0093 の判定は実行ファイルが持つ）。`ccnavi-push-approved.sh`・`ccnavi-sync.sh`・
+実行ファイルが確かめる（2 つ目の確認。ADR-0093 の判定は実行ファイルが持つ）。`ccnavi-push-approved.sh`・`ccnavi-sync.sh`・
 `ccnavi-review.sh config-synced`・`ccnavi-ticket.sh` の write-and-push の識別子の検査をこれに置き換えた。
 
 ### 3.2 git の非 ASCII の扱い（確かめたこと）
@@ -220,7 +220,7 @@ ADR-0093 の 3.1 は、案 N3（`branch:` キー）を「キーを書き換え�
   リスト（環境変数、`.claude/settings.local.json` の `env`、統合先の取り込み結果の `head`、`origin/HEAD` が指すもの、
   `origin/main`・`origin/master`。`Families.integration_names`）の全部
 - 子に書いた `branch:` は warn で、読まない（`issue:` と同じ）
-- sh の 2 重目の確認は `ccnavi_is_branch`（`ccnavi_is_ident` に `/` と階層の形の検査、git の表記と保護されたブランチの名前の
+- sh の 2 つ目の確認は `ccnavi_is_branch`（`ccnavi_is_ident` に `/` と階層の形の検査、git の表記と保護されたブランチの名前の
   検査を足したもの）。識別子と同じ名前は `ccnavi_is_ident` で見る（`ccnavi_branch_ok`）
 
 ### 5.4 sh が親のブランチ名を知る手段

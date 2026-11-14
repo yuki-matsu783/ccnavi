@@ -50,11 +50,11 @@ import {
 
 export type { Client };
 
-/** 名前空間（グループ。入れ子の `group/sub` も）とプロジェクトの名前の 1 段 */
+/** 名前空間（グループ。入れ子の `group/sub` も）とプロジェクトの名前の 1 階層 */
 const SEGMENT = /^[A-Za-z0-9_.-]{1,100}$/;
 const USERNAME = /^[A-Za-z0-9_.-]{1,100}$/;
 
-/** GitLab の owner（名前空間）。`group` か入れ子の `group/sub`。どの段も `.`・`..` でない */
+/** GitLab の owner（名前空間）。`group` か入れ子の `group/sub`。どの階層も `.`・`..` でない */
 export function checkNamespace(value: unknown, what = "owner"): string {
   if (typeof value !== "string" || value.length > 255 || value.split("/").some((p) => !SEGMENT.test(p) || p === "." || p === "..")) {
     throw new HostError(`${what} の形が正しくありません：${String(value)}`);
@@ -236,7 +236,7 @@ async function listTree(client: Client, owner: string, repo: string, commit: str
   }
 }
 
-/** コミットの上のパスが指す tree / blob。無ければ null（親のディレクトリを 1 段読んで名前で引く） */
+/** コミットの上のパスが指す tree / blob。無ければ null（親のディレクトリを 1 階層読んで名前で引く） */
 export async function pathObjects(client: Client, owner: string, repo: string, commit: string, paths: readonly string[]): Promise<Record<string, PathObject | null>> {
   checkOid(commit);
   const dirs = new Map<string, TreeItem[]>();

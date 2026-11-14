@@ -2353,7 +2353,7 @@ class TicketTest(unittest.TestCase):
             self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
 
     def test_user_entries_with_unreadable_arguments_are_denied(self):
-        """2 重目の守りの無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
+        """2 つ目の守りの無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
 
         `ccnavi-review.sh decide`（`--choices`）・実行ファイルの`--yes` と
         `worktree retire --abandon` はターミナルを求めない。

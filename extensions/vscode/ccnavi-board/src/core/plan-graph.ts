@@ -10,8 +10,8 @@
  * - **startとendの仮の点。** 先行の無いステップへstartから、後続の無いステップからendへ線を引く。どちらも図だけの
  *   もので保存しない（実行ファイルは知らない）。この2種類の線は引き直せない（先行を全部消せばstartからの
  *   線が出る）。フィードバック計画ではstartを「全体計画のレビュー後」、endを「親をクローズする」と名付ける
- * - **置き場所。** startからの最長の段数で列に分け、列の中は番号順。線が循環していても（計画編集タブで
- *   引いている途中など）止まらず、循環に戻った線は段数に数えない（循環を言うのは引けない線の検査と実行ファイル）
+ * - **置き場所。** startからの最長の階層数で列に分け、列の中は番号順。線が循環していても（計画編集タブで
+ *   引いている途中など）止まらず、循環に戻った線は階層数に数えない（循環を言うのは引けない線の検査と実行ファイル）
  * - **引けない線（`canConnect`）。** ステップからステップへだけ引ける。自分へ・startとendに触れる線・固定した番号
  *   （子が承認された番号）へ入る線・循環になる線を断る。線と点だけで決まる形の検査で、計画の良し悪しの判定ではない
  *
@@ -53,7 +53,7 @@ export interface PlanGraphNode {
   readonly locked: boolean;
   /** 終端に届かないステップ（実行ファイルの`loose`に入っている） */
   readonly loose: boolean;
-  /** startからの最長の段数。startが0 */
+  /** startからの最長の階層数。startが0 */
   readonly column: number;
   readonly x: number;
   readonly y: number;
@@ -194,7 +194,7 @@ export function planGraphOf(plan: ApprovePlan): PlanGraph {
   return { part: plan.part, nodes, edges };
 }
 
-/** startからの最長の段数（先行の無いステップが1）。循環に戻った線は数えない */
+/** startからの最長の階層数（先行の無いステップが1）。循環に戻った線は数えない */
 function depthsOf(numbers: readonly number[], before: ReadonlyMap<number, readonly number[]>): Map<number, number> {
   const depth = new Map<number, number>();
   const visiting = new Set<number>();
@@ -274,7 +274,7 @@ export function layoutOf(graph: PlanGraph): PlanLayout {
 
 /**
  * 覚えた置き場所にステップを置き直す。覚えていないステップは組んだ場所のまま。startは先頭の列、endは右端のステップの次の列に置く
- * （線を変えて段数が変わっても、endがステップに重ならないように）。覚えた場所が1つもヒットしなければ組んだ図のまま
+ * （線を変えて階層数が変わっても、endがステップに重ならないように）。覚えた場所が1つもヒットしなければ組んだ図のまま
  */
 export function withLayout(graph: PlanGraph, layout: PlanLayout): PlanGraph {
   const placed = (node: PlanGraphNode): PlanGraphNode => {

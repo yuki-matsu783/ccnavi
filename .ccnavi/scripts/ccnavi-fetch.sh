@@ -99,7 +99,7 @@ fetch_cleanup() {
 trap 'fetch_cleanup' EXIT
 trap 'fetch_cleanup; exit 130' INT TERM HUP
 : >"$scratch/failed"
-# 向け直しのための ls-remote が失敗・時間切れだった origin。第 2 周で同じ origin を二重に待たないために
+# 向け直しのための ls-remote が失敗・時間切れだった origin。第 2 周で同じ origin を2 回待たないために
 # 覚える（failed とは別。ここは第 1 周の取得の失敗ではない）。
 : >"$scratch/rt-failed"
 
@@ -152,7 +152,7 @@ ccnavi_fetch_git() {
 
 # 認証に失敗したときに添える案内を、origin のホストに合わせて 1 行出す。<ツリー>
 #
-# ホストの見分けは ccnavi_host_parse に任せる（規則を二重に持たない）。呼び手の ccnavi_h_* を壊さないよう
+# ホストの見分けは ccnavi_host_parse に任せる（規則を重複して持たない）。呼び手の ccnavi_h_* を壊さないよう
 # サブシェルで読み、ホストへは新たに通信しない。origin が読めなければ glab を先に書く。
 ccnavi_fetch_auth_note() {
 	ccnavi_an_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
@@ -213,8 +213,8 @@ ccnavi_fetch_integration() {
 #
 # 何も出さないのは、ホストに聞けない・fetch できない・時間切れ・ホストに聞いた名前が手元と同じ、のとき。
 # 失敗は $scratch/failed に書かない（ここは「向け直せなかった」だけで、第 1 周の取得の失敗とは別）。
-# ただし ls-remote が時間切れになった origin は $scratch/rt-failed に覚え、第 2 周の取得で二重に待たない。
-# 第 1 周でその origin への接続に失敗していたら、同じ origin で二重に待たないよう聞かない。
+# ただし ls-remote が時間切れになった origin は $scratch/rt-failed に覚え、第 2 周の取得で2 回待たない。
+# 第 1 周でその origin への接続に失敗していたら、同じ origin で2 回待たないよう聞かない。
 # 向け直すのは fetch が成功した後にする（存在しない ref を指す状態を残さないため）。
 ccnavi_fetch_retarget() {
 	ccnavi_rt_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)

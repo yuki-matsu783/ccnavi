@@ -450,7 +450,7 @@ store_hit() {
 # `rm`・`restore --source`・`checkout <ref> <パス>` で、hook の登録・設定・保護済みのスクリプト・
 # 実行ファイル・記録を消す・別のコミットの中身に戻す形を止めるために使う。シェルの rm と Write / Edit は
 # hook の自己防衛が止める場所で、このスクリプト自身を消すと生の git の止めも外れる。止めるのは hook が先
-# （DENY_WRAPPER_CORE_PATH）で、ここは 2 重目。見るのは既定の置き場の名前だけ（動かした置き場は hook が見る）。
+# （DENY_WRAPPER_CORE_PATH）で、ここは 2 つ目。見るのは既定の置き場の名前だけ（動かした置き場は hook が見る）。
 #
 # ヒットするとみなすのは、`.ccnavi/` の下・`.claude/settings*.json`・`.claude/hooks/`・ワークスペースルートの
 # `logs/` の記録と state と退避・`ccnavi-git.sh`、それらを中に含むディレクトリ（ツリーの頂上と、`.ccnavi`・

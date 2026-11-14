@@ -56,7 +56,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 - 共通のルールファイルには書かない
 - ccnavi ディレクトリの名前が空なら、それを使う 2 本（scripts と共通の設定）は足さない
 - `builtin:guard-ccnavi-config` はルートを固定せず、パスの末尾で適用する。`builtin:guard-common-layer` と同じ範囲だとは仮定しない
-- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `selfguard.AddRules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`AddRules` の中身は変えず、二重に足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`AddRules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watchedFor` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
+- 足す場所は 3 つで、同じ関数から足す。実行前の通常時は `selfguard.AddRules` の後に呼ぶ（`deny` の先頭に挿すので、専用の文面が `builtin:guard-project-home` / `builtin:guard-common-layer` より先に並ぶ。`AddRules` の中身は変えず、2 回足さない）。実行前で、共通のルールファイルが読めず組み込みの既定で動いている間は、`AddRules` は呼ばずこの関数だけ呼ぶ。実行後は `events.watchedFor` が、各ツリーのルールの組にこの関数だけを足す（読めない間も同じ。`builtin:guard-project-home` 全体は足さない）
 - 一般の保護と同じ扱いで、`dry-run` では報告だけにする。実行後は、`CCNAVI_RESTORE_IF_DENY` を全体モードと掛け合わせた実効値（`config.EffectiveSetting`）が `enable` なら未コミットの変更を復元し、全体モードが `dry-run` なら報告だけにする。`Stop` は報告だけで復元しない。`UserPromptSubmit` と `SessionStart` は同じ保護範囲で基準を取り、前からある変更とユーザが受け入れた変更を戻さない
 - `disable` のときは、実行前にも実行後にも足さない。ワークスペースルートの `.claude/hooks/` と `.claude/settings*.json` は、ルールの `workspace-root` が実行前に止める
 
@@ -83,7 +83,7 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 - sh かどうかは名前だけで決め、`platformtag.LaunchedExecutable`（8.3）と条件を揃える。ファイルは読まない。
   別の名前で置いた sh は実行ファイルそのものとして読まれ、その `../bin/` は `builtin:guard-binary` から外れる
-- 既定の配置では、`builtin:guard-setting-files` の `.ccnavi` のパスと `builtin:guard-project-home` でも二重に止まる
+- 既定の配置では、`builtin:guard-setting-files` の `.ccnavi` のパスと `builtin:guard-project-home` でも2 回止まる
 
 判定に渡るパスはワークスペースルートを継ぎ足した絶対パス（`config.resolveBin`）なので、名指しのツールは浅いパスでも止まる。
 相対で書いたシェルのコマンドは守らない（`CCNAVI_ENTRY_PATH=scripts/ccnavi-launcher.sh` での `rm -rf bin/linux-x86_64`、
@@ -131,7 +131,7 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 通すのは、索引の中身に戻す `restore`（`--staged`、衝突を解く `--ours` / `--theirs`）と、何も消さない `rm -n` / `--dry-run`（後ろに `--no-dry-run` があれば、git と同じく消す形として見る）。
 衝突したルールファイルを直す道がここしか無く、索引の中身はエージェントが書けない場所から来る。拒否の文面は、変更をユーザに依頼することと、通る形を案内する。
 `--source` の長いオプションは、git が受ける省略形（`--sou=`・`--so`）も同じに読む。
-ラッパーも同じ場所の検査（`ccnavi-git.sh` の sh の関数 `core_hit`）を 2 重目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
+ラッパーも同じ場所の検査（`ccnavi-git.sh` の sh の関数 `core_hit`）を 2 つ目に持つ。見るのは既定の置き場の名前だけで、動かした置き場は hook が見る。
 記録の置き場（`logs/`）はワークスペースルートの下だけに適用する。承認済みチケットの置き場は `core_hit` では見ず、過去の中身に戻す形を
 sh の置き場の検査（`restore-store-source`・`checkout-store`）が止める。`rm -n` / `--dry-run` は通す。
 見るサブコマンドは `rm`・`restore`・`checkout` だけ。

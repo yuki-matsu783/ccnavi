@@ -11,7 +11,7 @@
 .project-head .name { font-weight: 600; font-size: var(--font-title); overflow-wrap: anywhere; }
 .project-head .rel { overflow-wrap: anywhere; }
 .project-head .flags { display: flex; flex-wrap: wrap; gap: var(--gap-2); margin-left: auto; }
-/* 項目は1つ240pxを目安に、幅に合わせて段数が変わる。検証は長くなるので常に1段まるごと使う */
+/* 項目は1つ240pxを目安に、幅に合わせて行数が変わる。検証は長くなるので常に1行まるごと使う */
 .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--gap-3) var(--gap-6); margin: 0; }
 .field { min-width: 0; }
 .field.wide { grid-column: 1 / -1; }

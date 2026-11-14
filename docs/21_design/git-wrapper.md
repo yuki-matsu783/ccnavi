@@ -26,7 +26,7 @@ keywords: [ccnavi-git.sh, git, ラッパースクリプト, push, fetch, pull, r
 - 承認済みチケットの置き場（`.ccnavi/approved/`）とレビュー待ち（`wip/proposals/review/`）にヒットするパスには、
   `checkout <ref> <パス>`・`restore --source <ref>`・`restore --ours / --theirs` を通さない
 - ccnavi 自身を守る場所（`.ccnavi/`・`.claude/settings*.json`・`.claude/hooks/`・記録と state・`ccnavi-git.sh`）には、
-  `rm`・`restore --source <ref>`・`checkout <ref> <パス>` を通さない。hook が先に止め、ラッパースクリプトも 2 重目に止める。
+  `rm`・`restore --source <ref>`・`checkout <ref> <パス>` を通さない。hook が先に止め、ラッパースクリプトも 2 つ目に止める。
   生の git の止めは組み込みでいつも働き、ラッパースクリプト自身を消しても外れない。衝突の解決（`restore --ours / --theirs`）は通る
 - 親のワークツリーでは、今のブランチと、ブランチ名の `/` を `-` に置き換えたものがフォルダ名（識別子）になるブランチのほかへ
   `checkout`・`switch` で移れない。`worktree add` は行き先の名前がブランチ名の `/` を `-` に置き換えたものになる形だけ

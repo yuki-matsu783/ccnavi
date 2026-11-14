@@ -50,7 +50,7 @@ reply_already_sent() {
 	ra_last=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].last_author // empty' "$2" 2>/dev/null)
 	# 最後のコメントがスレッドの最初のコメントと別のもの（作成の時刻が違う）のときだけ、返信とみなす。
 	# 自分が立てたスレッドの最初のコメントを、自分の返信と取り違えないため（取り違えると返信が欠ける。
-	# 時刻が同じ秒に収まる返信は送り直す側に倒れ、二重の返信は出うるが欠落は出さない）。
+	# 時刻が同じ秒に収まる返信は送り直す側に倒れ、重複した返信は出うるが欠落は出さない）。
 	ra_later=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0] | if (.last_at // "") != "" and (.last_at // "") != (.created_at // "") then "yes" else "" end' "$2" 2>/dev/null)
 	op_account
 	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ] && [ -n "$ra_later" ]; then
@@ -146,7 +146,7 @@ accept_threads() {
 		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
 		accept_key=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].key' "$accept_file")
 		accept_text=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].reply' "$accept_file")
-		# 操作記録があれば、返信を送り済みのスレッドには重ねない（打ち直し・--resume で二重に返信しない）。
+		# 操作記録があれば、返信を送り済みのスレッドには重ねない（打ち直し・--resume で2 回返信しない）。
 		# 試して結果が分からないスレッド（記録に試した印だけある）は、ホストのスレッドの最後のコメントが
 		# 自分のものなら送り済みとみなし、そうでなければ送り直す。
 		if reply_already_sent "$accept_id" "$accept_rfile"; then
@@ -155,7 +155,7 @@ accept_threads() {
 			accept_i=$((accept_i + 1))
 			continue
 		fi
-		# 送る前の印を書けなければ送らない（書けないまま送って落ちると、二重に返信しうる）
+		# 送る前の印を書けなければ送らない（書けないまま送って落ちると、2 回返信しうる）
 		if [ -n "${op_id:-}" ] && ! ccnavi ops applied "$op_id" "reply_try_$accept_id" true 2>/dev/null; then
 			printf '%s: 操作記録に返信の印を書けなかった。何も送らずに止めた。\n' "$review_label" >&2
 			return 1
@@ -350,7 +350,7 @@ post_staged() {
 # 置いたあとの投稿なので、失敗しても決めたことは戻さない。post_warning に言い、記録を残す。
 #
 # 操作 ID のロック（`locks/ops/<操作ID>`。staged_send と同じ置き場・待ち方）を、段階の進行全体で持つ。
-# 2 つの --resume・打ち直しが同じ段階を同時に「未送信」と見て、二重に送るのを防ぐ。
+# 2 つの --resume・打ち直しが同じ段階を同時に「未送信」と見て、2 回送るのを防ぐ。
 # --resume は返信・解決の前から持つ（decide.sh が op_lock_take を打つ）。すでに同じロックを持っていれば（入れ子）何もしない。
 # ロックの取得はグローバル変数 1 組を使うので、write-and-push などほかのロックの状態は退避して戻す。
 op_lk_dir=""

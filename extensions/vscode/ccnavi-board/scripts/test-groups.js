@@ -137,7 +137,7 @@ function importsOf(file) {
   return found;
 }
 
-/** ディレクトリの下の、条件に合うファイル全部（下の段も見る）。 */
+/** ディレクトリの下の、条件に合うファイル全部（下の階層も見る）。 */
 function filesUnder(dir, accept) {
   const found = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort(byName)) {
@@ -193,8 +193,8 @@ function readByScreen(absolute) {
 
 /** グループのテストが辿り着くファイル全部（テスト自身も含む）。 */
 function closureOf(group) {
-  // 下の段（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
-  // コンパイルするので、ここで 1 段しか見ないと、下の段のテストが気づかないうちに回らなくなる。
+  // 下の階層（`test/<グループ>/<何か>/x.test.ts`）も見る。tsc は `test/**/*.ts` を
+  // コンパイルするので、ここで 1 階層しか見ないと、下の階層のテストが気づかないうちに回らなくなる。
   return closureFrom(filesUnder(path.join(TEST_DIR, group), (name) => name.endsWith(".ts") || name.endsWith(".tsx")));
 }
 
@@ -397,7 +397,7 @@ function testFiles(groups, domOnly) {
   for (const group of groups) {
     const dir = path.join(ROOT, "out", "test", group);
     if (!fs.existsSync(dir)) continue;
-    // 下の段も見る。closureOf と同じ理由で、1 段しか見ないと気づかないうちに回らなくなる。
+    // 下の階層も見る。closureOf と同じ理由で、1 階層しか見ないと気づかないうちに回らなくなる。
     for (const full of filesUnder(dir, (name) => name.endsWith(".test.js"))) {
       if (domOnly && !full.endsWith(".dom.test.js")) continue;
       files.push(path.relative(ROOT, full));

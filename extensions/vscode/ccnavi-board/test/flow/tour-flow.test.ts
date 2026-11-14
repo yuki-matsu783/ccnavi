@@ -127,7 +127,7 @@ test("CB-T485 実際の編集の関数（addNode・groupNodes・pasteNodes）の
 test("CB-T486 画面の注意（flowNotices）は、入れ子の見本（deep）で上限を言い、完成した見本（main）では何も言わない", () => {
   assert.deepEqual(flowNotices(sample.flows.main.doc, { exe: true }), []);
   const deep = flowNotices(sample.flows.deep.doc, { exe: true });
-  assert.ok(deep.some((notice) => notice.includes("子の下に3段重なっています")), deep.join("\n"));
+  assert.ok(deep.some((notice) => notice.includes("子の下に3階層重なっています")), deep.join("\n"));
   // 開始が無い見本（broken）の注意は、実行ファイルの warn（start が無い）に任せ、画面は言わない
   assert.deepEqual(flowNotices(sample.flows.broken.doc, { exe: true }), []);
   assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("start がありません")));

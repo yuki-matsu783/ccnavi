@@ -697,10 +697,10 @@ review-request)
 		exit 0
 	fi
 	# 段 2: 投稿。同じ目印（親・フェーズ・キー）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
-	# やり直しで依頼を二重にしない）。
+	# やり直しで依頼を重複させない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
-		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
+		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。2 回投稿しないよう止めた。"
 	if [ -n "$posted" ]; then
 		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 		# 前の試みが結果を確定できないまま残っていても、ここで送り済みに直す（「引き継ぎ未完了」を残さない）

@@ -415,7 +415,7 @@ function TourSettle(): null {
 /**
  * `readableFit`のときの開いた直後の見え方（`webview/shared/PlanGraph.tsx`の`FitOnOpen`と同じ方式）。
  * 点がすべて測れたら1回だけ、下限の倍率までで全体を収める。下限で止まって収まらないときは、種類がstartの点を
- * 左端に寄せる。`fitView`の属性は使わない（下限で止めたあとに寄せる段を挟めないため）。
+ * 左端に寄せる。`fitView`の属性は使わない（下限で止めたあとに寄せる段階を挟めないため）。
  * `useNodesInitialized`は使わない（点の読み込みが終わったことを返さない図では、実際のChromiumで偽のままになる）
  */
 function ReadableFit(): null {

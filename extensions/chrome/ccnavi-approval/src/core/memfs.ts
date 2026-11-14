@@ -106,7 +106,7 @@ export function createMemFs(log: (text: string) => void = (t) => console.log(t))
   const isDir = (n: Node) => (n.mode & S_IFMT) === S_IFDIR;
   const isLink = (n: Node) => (n.mode & S_IFMT) === S_IFLNK;
 
-  /** パスを辿る。follow が偽なら最後の段のリンクは辿らない。答えは親と名前と、在ればその節 */
+  /** パスを辿る。follow が偽なら最後の階層のリンクは辿らない。答えは親と名前と、在ればその節 */
   function walk(path: string, follow: boolean, op: string, depth = 0): { parent: Node; name: string; node: Node | undefined } {
     if (depth > MAX_LINKS) throw new FsError("ELOOP", op, path);
     const parts = split(path);

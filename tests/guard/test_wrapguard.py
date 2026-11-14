@@ -1,12 +1,12 @@
 """保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（Go の hook/shellguard）。
 
-止める・通すの判定は hook が持ち、sh の検査は 2 重目の確認にする。
+止める・通すの判定は hook が持ち、sh の検査は 2 つ目の確認にする。
 
 1. sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形
 2. 子チケットのワークツリーからの `ccnavi-git.sh push`。親エージェントが打っても止める
 
 見本の表（CHILD_CASES）は、コピーする版の `ccnavi-git.sh` にも同じものを渡して、sh の検査が
-2 重目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
+2 つ目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
 別の実装で持つので、食い違いはこの表で見つける。
 """
 
@@ -521,7 +521,7 @@ class SubagentParentTreeTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class ShAgreesTest(unittest.TestCase):
-    """同じ見本をコピーする版の sh にも渡し、2 重目として同じく止めることを確かめる。
+    """同じ見本をコピーする版の sh にも渡し、2 つ目として同じく止めることを確かめる。
 
     `CCNAVI_SH_DIR` で sh の置き場を差し替えられる（コピーする版は wip/design/scripts/）。
     """
@@ -970,7 +970,7 @@ class CorePathTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class CorePathShAgreesTest(unittest.TestCase):
-    """同じ見本を sh にも渡し、2 重目として同じく止めることを確かめる。"""
+    """同じ見本を sh にも渡し、2 つ目として同じく止めることを確かめる。"""
 
     SH_DIR = ShAgreesTest.SH_DIR
 

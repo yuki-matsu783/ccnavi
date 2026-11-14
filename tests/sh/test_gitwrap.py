@@ -1556,7 +1556,7 @@ class WorktreeDetachTest(GitWrapperTest):
 class WorktreeFreshBaseTest(GitWrapperTest):
     """統合先から切る worktree add は、fetch が新しく、手元の統合先が遅れていないときだけ通す。
 
-    hook は git もネットワークも起こさないので、この 2 重目の確認は sh の中にある。
+    hook は git もネットワークも起こさないので、この 2 つ目の確認は sh の中にある。
     fetch は打たない。拒否のあと案内どおりに fetch すれば（FETCH_HEAD が新しくなって）通る。
     """
 

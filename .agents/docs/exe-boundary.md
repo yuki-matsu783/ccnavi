@@ -18,7 +18,7 @@ sh で実装するのは、外との出入りと段取りだけ。プロジェ�
 | 段取り | ネットワークと実行ファイルの呼び出しを並べる順序。次に何を取るかを決める最小の読み（ページの件数・cursor・GitLab の権限の 2 段目に要る id） |
 | sh のプロセスの寿命に結び付くもの | ロック（`ccnavi-common-lock.sh`。持ち主は sh の pid）、信号を受けたときの trap、idle の待機 |
 | 起動役 | `ccnavi-launcher.sh`、ワークスペースと実行ファイルの探し方、診断ログ |
-| 実行ファイルを起こさずに動くもの | `ccnavi-fetch.sh`・`ccnavi-user-push-approved.sh`（実行ファイルの入れ替え中も fetch・push できるように）。`ccnavi-git.sh` の子のワークツリーからの push の検査（実行ファイルが壊れていても効く2 重目の検査） |
+| 実行ファイルを起こさずに動くもの | `ccnavi-fetch.sh`・`ccnavi-user-push-approved.sh`（実行ファイルの入れ替え中も fetch・push できるように）。`ccnavi-git.sh` の子のワークツリーからの push の検査（実行ファイルが壊れていても効く2 つ目の検査） |
 | ユーザだけが打つ入口 | `ccnavi-user-*` の名前、y/N の確認、引数の許可リスト |
 | ラッパーの受け口 | `ccnavi-git.sh` が受けた引数を、環境を整えてから実行ファイルへ渡すこと |
 

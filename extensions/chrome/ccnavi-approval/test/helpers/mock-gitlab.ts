@@ -65,7 +65,7 @@ export class MockGitLab extends MockGitHub {
     return { name, commit: { id: sha, committed_date: (this.commits.get(sha) as Commit).date } };
   }
 
-  /** GitLab の repository/tree の答え（`path` の下。再帰なら全部の段、でなければ直下だけ） */
+  /** GitLab の repository/tree の答え（`path` の下。再帰なら全部の階層、でなければ直下だけ） */
   private treeItems(ref: string, path: string, recursive: boolean): unknown[] | null {
     const files = this.commits.get(ref)?.files;
     if (!files) return null;

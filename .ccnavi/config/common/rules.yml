@@ -209,7 +209,7 @@ allow:
 
   # 直接作業のワークツリーは {script:ccnavi-worktree.sh} だけで切る。手の worktree add に誘わない。
   # ccnavi-git.sh の worktree add を直接打ったときの止めない案内（既存のブランチを出すときなど、親や子のワークツリー用）。
-  # 止める 2 重目の確認は ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
+  # 止める 2 つ目の確認は ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
   - id: ccnavi-git-worktree-add
     match: Bash
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
