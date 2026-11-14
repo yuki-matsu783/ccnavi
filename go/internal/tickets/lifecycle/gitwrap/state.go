@@ -9,12 +9,12 @@ import (
 	"ccnavi/internal/tickets/lifecycle/integrate"
 )
 
-// Env は、git の状態とワークスペースを読む判定の材料。git はラッパーの cwd（Cwd）で起こす。
+// Env は、git の状態とワークスペースを読む判定の材料。git はラッパーの cwd（Cwd）で起動する。
 type Env struct {
 	Names
 	// Root はワークスペースルート、Cwd はラッパーが打たれた場所。
 	Root, Cwd string
-	// ParentTree は、ツリー top（名前 name）が親子のチケットの親のワークツリーか。0 は親、1 は親でない、2 は決められない。
+	// ParentTree は、ツリー top（名前 name）が親チケットのワークツリーか。0 は親、1 は親でない、2 は決められない。
 	ParentTree func(top, name string) int
 
 	top, prefix *string
@@ -35,13 +35,13 @@ type Answer struct {
 	Target string
 }
 
-// git は cwd で git を起こし、標準出力の末尾の改行を落として返す。
+// git は cwd で git を実行し、標準出力の末尾の改行を落として返す。
 func (e *Env) git(args ...string) (string, bool) {
 	done := git.Run(e.Cwd, args, git.Options{})
 	return strings.TrimRight(done.Out, "\r\n"), done.OK()
 }
 
-// gitOK は git が 0 で終わったか。
+// gitOK は git の終了コードが 0 だったか。
 func (e *Env) gitOK(args ...string) bool {
 	_, ok := e.git(args...)
 	return ok

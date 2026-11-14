@@ -93,12 +93,12 @@ func protected(branch string) bool {
 	return strings.HasPrefix(branch, "release/")
 }
 
-// push は、自分が居るブランチを同じ名前でそのまま送る形だけを通す。通さないのは「戻せなくなる形」（force・delete・
+// push は、今のブランチを同じ名前でそのまま送る形だけを通す。通さないのは「戻せなくなる形」（force・delete・
 // all/mirror/tags）と「ユーザの判断を経ない形」（別の名前へ送る refspec、統合先への直接の push、子チケットのワークツリーからの
 // push）。統合はユーザがマージリクエストで行う。
 //
 // 送り先が origin で、ワークツリー（`.claude/worktrees/` の下）から送るときは、リモートから消えた親のブランチへ送らないか
-// をラッパーが ls-remote で確かめる（gate の行で頼む）。
+// をラッパーが ls-remote で確かめる（答えの gate の行で受け取る）。
 func (e *Env) push(args []string, a *Answer) *Deny {
 	branch, _ := e.git("rev-parse", "--abbrev-ref", "HEAD")
 	if branch == "" || branch == "HEAD" {
@@ -111,7 +111,7 @@ func (e *Env) push(args []string, a *Answer) *Deny {
 			return &Deny{"push-child-worktree", name + " は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（" + parent + "）が子の成果を取り込んでから、親のワークツリー (.claude/worktrees/" + parent + ") で送ります。子は作業を終えたら結果を報告して終わってください。"}
 		}
 	}
-	// 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。名前はこのツリーが属するリポジトリについて決める。
+	// 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。統合先の名前は、このツリーが属するリポジトリごとに決める。
 	if protected(branch) || branch == integration(cmpOr(top, e.Cwd)) {
 		return &Deny{"push-integration-branch", branch + " は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"}
 	}
@@ -150,9 +150,9 @@ func cmpOr(a, b string) string {
 	return b
 }
 
-// pushesToOrigin は、送り先が origin か。送り先は git と同じ順で解く: 引数のリモート → branch.<b>.pushRemote →
+// pushesToOrigin は、送り先が origin か。送り先は git と同じ順で決める: 引数のリモート → branch.<b>.pushRemote →
 // remote.pushDefault → branch.<b>.remote → origin。設定済みのリモート名でない引数（`:` を含まない URL やローカルの
-// パス）は、origin と同じ URL なら origin とみなす（origin の URL がローカルのパスのとき、ゲートを飛ばせないように）。
+// パス）は、origin と同じ URL なら origin とみなす（origin の URL がローカルのパスのときでも、ゲートを飛ばされないように）。
 func (e *Env) pushesToOrigin(remote, branch string) bool {
 	dest := remote
 	for _, key := range []string{"branch." + branch + ".pushRemote", "remote.pushDefault", "branch." + branch + ".remote"} {

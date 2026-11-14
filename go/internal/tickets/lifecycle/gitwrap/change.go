@@ -117,7 +117,7 @@ func (e *Env) onTarget(integ, first, allowed string) *Deny {
 		"\n" + texts.Say(e.Root, allowed, texts.Values{"integ": integ}, nil)}
 }
 
-// merge は早送り以外も通す（main が先に進んだ状態からブランチへ main を取り込む手順を必ず通るため）。止めるのは、衝突を
+// merge は早送り以外も通す（main が先に進んだあと、ブランチへ main を取り込む手順で必ず使うため）。止めるのは、衝突を
 // ユーザが見ないまま片側を破棄する形（`-X ours`・`-s ours`）と、検査を飛ばす --no-verify。
 //
 // ユーザの手元で統合先をチェックアウトしている場合は、途中の merge を終わらせる --abort / --continue / --quit 以外を
@@ -265,7 +265,7 @@ func (e *Env) checkout(sub string, args []string) *Deny {
 	}
 	top := e.Top()
 	name, ok := e.worktreeName(top)
-	// 親チケットか提案があるかを決められない（2）ときも、親のワークツリーとして狭める。
+	// 親チケットか提案があるかを決められない（2）ときも、親のワークツリーとして扱って制限する。
 	if !ok || e.ParentTree(phys(top), name) == 1 {
 		return nil
 	}

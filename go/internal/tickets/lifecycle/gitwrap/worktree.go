@@ -43,7 +43,7 @@ type addForm struct {
 // worktreeAdd は worktree add の行き先・名前・起点を確かめる。
 //
 // 行き先はワークスペースの `.claude/worktrees/` の下に 1 階層で置き、名前をブランチ名（の / を - に置き換えたもの）に
-// 揃える。ccnavi は親チケットのワークツリーを、名前が識別子で、そのブランチをチェックアウトしているものとして探す。
+// 揃える。ccnavi は、名前が識別子で、そのブランチをチェックアウトしているものを親チケットのワークツリーとして探す。
 // 書き換えずに止める（打ったパスと起きたことが食い違うと、記録を読んだユーザが追えなくなる）。
 // 行き先は「オプションでない最初の語」で、知らないオプションは通さない（通すと行き先を取り違える）。
 func (e *Env) worktreeAdd(args []string) (*Deny, string) {
@@ -122,7 +122,7 @@ func (e *Env) inWorktrees(abs string) bool {
 }
 
 // spell は、cwd からワークスペースの `.claude/worktrees/<名前>` を指す書き方。絶対パスだけを出すと、次に別の場所から
-// 打つときに応用が効かないので、ワークスペースの中なら `../` を並べる。
+// 打つときに使い回せないので、ワークスペースの中なら `../` を並べる。
 func (e *Env) spell(name string) string {
 	here, ws := e.abs("."), e.root()
 	if pathcase.Fold(here) == pathcase.Fold(ws) {
@@ -171,17 +171,17 @@ func (e *Env) addName(f addForm) *Deny {
 	return nil
 }
 
-// freshWindow は、最後の fetch がこれより前なら起点が古いかもしれないとみなす間。
+// freshWindow は、最後の fetch がこの時間より前なら、起点が古いかもしれないとみなす時間。
 const freshWindow = 10 * time.Minute
 
-// fresh は、統合先から切る worktree add の起点が古くないかを確かめる。hook は git もネットワークも起こさない決まりなので、
+// fresh は、統合先から切る worktree add の起点が古くないかを確かめる。hook は git を実行せず、ネットワークにも出ない決まりなので、
 // 判定は `ccnavi git check` が行い、fetch が失敗した印はラッパーが書く。ここで fetch は打たない（副作用が増えるため）。
 //
 //   - 最後の fetch が 10 分より前、または FETCH_HEAD が無い（共通の git ディレクトリの FETCH_HEAD の更新時刻）
 //   - 起点が手元の統合先で、origin/<統合先> より遅れている（origin/<統合先> が起点なら対象外）
 //
 // fetch を試して失敗した印（ラッパーの fetch が失敗したときに共通の git ディレクトリへ置く）が 10 分以内にあるときは、
-// 1 つ目は止めずに警告だけにする（オフラインで詰まないため）。起点を省いたときは今のブランチが起点になる。
+// 1 つ目の条件では止めず、警告だけにする（オフラインで詰まないため）。起点を省いたときは今のブランチが起点になる。
 // 既にあるブランチを出す形は新しく切らないので対象外。
 func (e *Env) fresh(f addForm) (*Deny, string) {
 	if f.newBranch == "" && (f.base != "" || e.hasRef("refs/heads/"+f.leaf)) {

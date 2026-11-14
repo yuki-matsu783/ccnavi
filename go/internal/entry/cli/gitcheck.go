@@ -14,11 +14,11 @@ import (
 // gitCheckUsage は `ccnavi git check` の使い方。
 const gitCheckUsage = "ccnavi: git check <自分の呼び方> <ccnavi-sync.sh の呼び方> <ccnavi-start.sh の呼び方> <自分の呼び方（引用済み）> <ccnavi-worktree.sh の呼び方（引用済み）>（git の引数は標準入力に NUL 区切りで渡す）"
 
-// runGitCheck は `ccnavi git check <呼び方>...`（ccnavi-git.sh 用）。git の引数を標準入力から NUL 区切りで読み、git の状態と
-// あわせて通すかを答える。1 行目は `allow`・`pass`（続きの判定はラッパーが持つ）、または `deny <識別子>` と次の行の拒否の文。
+// runGitCheck は `ccnavi git check <呼び方>...`（ccnavi-git.sh 用）。git の引数を標準入力から NUL 区切りで読み、git の状態を見て
+// 通すかを答える。1 行目は `allow`・`pass`（続きの判定はラッパーが持つ）、または `deny <識別子>` と次の行の拒否の文。
 // allow に続けて、`prepend <語>`（git の引数の前に足す）・`warn <文>`（出力の後ろに出す）・`gate-top <パス>` と
-// `gate-branch <ブランチ>`（push の前に、リモートに親のブランチが在るかを確かめる）・`target <統合先>`（統合先の
-// ユーザのチェックアウト）の行が付くことがある。
+// `gate-branch <ブランチ>`（push の前に、リモートに親のブランチが在るかを確かめる）・`target <統合先>`（統合先を
+// チェックアウトしているユーザのチェックアウト）の行が付くことがある。
 // 引数を ccnavi の引数として受けないのは、`-m` のような語を ccnavi 自身のオプションとして読まないため。
 func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.Settings, words []string) int {
 	if len(words) != 5 {
