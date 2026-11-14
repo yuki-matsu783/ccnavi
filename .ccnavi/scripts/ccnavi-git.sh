@@ -226,7 +226,7 @@ wt_fresh_dir() {
 # 判定と操作（記録・一時ワークツリー・コミット・取り込み先への fast-forward・片付け）は実行ファイルの
 # `ccnavi git integrate`（go/internal/tickets/lifecycle/land）が行う。ここはロック（キーは
 # logs/state/locks/<repo>/.integrate。持ち主はこの sh）を取ってから呼ぶ。標準入力が端末かは、git の引数を
-# 標準入力で渡す前にここで見る（自己防衛の対象を含む取り込みはターミナルから打たせる）。
+# 渡す前にここで確かめる（自己防衛の対象を含む取り込みはターミナルから打たせる）。
 ig_run() {
 	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
 	ig_repo=""

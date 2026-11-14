@@ -76,7 +76,7 @@ func (r *run) userCheckout() string {
 	return strings.TrimPrefix(first, "worktree ")
 }
 
-// begin は、名前・場所・記録の置き場を決める。ユーザのチェックアウト（git worktree list の先頭）で打たれていることを求める。
+// begin は、名前・場所・記録の置き場を決める。ユーザのチェックアウト（git worktree list の先頭）から打たれたことを求める。
 func (r *run) begin() {
 	r.top = r.out("rev-parse", "--show-toplevel")
 	if r.top == "" {

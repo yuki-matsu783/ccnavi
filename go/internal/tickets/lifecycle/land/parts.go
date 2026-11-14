@@ -15,7 +15,7 @@ import (
 	"ccnavi/internal/tickets/sync/handoff"
 )
 
-// removeQuiet・removeDirQuiet は、消せなくても止めない削除（空のディレクトリだけを消す）。
+// removeQuiet・removeDirQuiet は、消せなくても処理を止めない削除（removeDirQuiet は空のディレクトリだけを消す）。
 func removeQuiet(path string)    { _ = os.Remove(path) }
 func removeDirQuiet(path string) { _ = os.Remove(path) }
 
@@ -24,8 +24,8 @@ func (r *run) tmpUnder() string {
 	return ospath.Join(r.Root, "logs", "direct-tmp")
 }
 
-// removeTmp は一時ワークツリーを片付ける。生成物を消し、索引の木が許す木（allow）のどれかと同じで、追跡ファイルに
-// それ以上の変更が無く、未追跡のファイル（無視されたものを含む）が残っていないときに限り `worktree remove --force` を打つ。
+// removeTmp は一時ワークツリーを片付ける。生成物を消したあと、索引の木が許す木（allow）のどれかと同じで、追跡ファイルに
+// それ以上の変更が無く、未追跡のファイル（無視されたものを含む）も残っていないときに限り `worktree remove --force` を打つ。
 // 満たさなければ削除せずに残し、理由を tmpWhy に入れて偽。
 func (r *run) removeTmp(allow ...string) bool {
 	r.tmpWhy = ""
@@ -90,7 +90,7 @@ func (r *run) tmpNote() {
 	r.print(texts.Say(r.Root, "NOTE_GIT_TMP_LEFT", texts.Values{"tmp": r.tmp, "why": r.tmpWhy}, nil))
 }
 
-// dropRefs は専用の ref を消す。全部に当たってから、消せなかったものがあれば偽を返し、その種類を refsFailed に入れる。
+// dropRefs は専用の ref を消す。全部を消そうとしてから、消せなかったものがあれば偽を返し、その種類を refsFailed に入れる。
 // すでに無い ref は消せたものと同じ。
 func (r *run) dropRefs(kinds ...string) bool {
 	var failed []string
@@ -158,7 +158,7 @@ func (r *run) treeEntry(rev, path string) string {
 	return ""
 }
 
-// makeT は、作業ブランチの先頭 tip の木から wip/handoff/ の差分を base に戻した木 T を作る。snap と snap0 を渡すと
+// makeT は、作業ブランチの先頭（tip）の木から wip/handoff/ の差分を base に戻した木 T を作る。snap と snap0 を渡すと
 // （作業ブランチが取り込み先を取り込んでいて、base が S ではなく共通祖先のとき）、コピーした書きかけ（snap0..snap の差分）
 // のうち、エージェントが snap から変えていないパスも base の版に戻す（コピーした書きかけそのものは成果に含めない）。
 func (r *run) makeT(base, tip, snap, snap0 string) string {

@@ -33,7 +33,7 @@ type Input struct {
 // gitTimeout は 1 回の git の期限。コミットのフックや大きな木の計算を待つので長くとる。
 const gitTimeout = 10 * time.Minute
 
-// exit は、途中で終える終了コード。panic で運び、Run が受ける。
+// exit は、処理を途中で終えるための終了コード。panic で運び、Run が受ける。
 type exit int
 
 // run は 1 回の取り込みの状態。
@@ -101,7 +101,7 @@ func (r *run) print(text string) {
 	fmt.Fprintln(r.stdout, text)
 }
 
-// list は行を、上限まで頭に 2 つの空白を付けて出す。
+// list は上限まで、行の頭に 2 つの空白を付けて出す。
 func (r *run) list(lines []string) {
 	for i, line := range lines {
 		if i >= r.MaxLines {

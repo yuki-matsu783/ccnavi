@@ -53,8 +53,8 @@ func TreeRoots(conf *config.Settings, root string) []string {
 	return out
 }
 
-// TreeAt は、パス path のツリーを名前 name のワークツリーとして読む。登録されていないディレクトリでも、そのパスの
-// 置き場を見る。プロジェクトは、ワークスペースかプロジェクトのワークツリーなら元リポジトリから決める。
+// TreeAt は、パス path のツリーを名前 name のワークツリーとして読む。登録されていないディレクトリでも読める。プロジェクトは、
+// パスを含む木を探し、ワークスペースかプロジェクトのワークツリーならその元リポジトリから決める。
 func TreeAt(conf *config.Settings, root, path, name string) tree.Tree {
 	full := ospath.Abspath(path)
 	owners := append([]tree.Tree{tree.MainTree(root)}, tree.Projects(ProjectsDir(conf, root))...)

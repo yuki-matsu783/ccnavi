@@ -172,7 +172,7 @@ func (r *run) makeK(m marker, cur, message string, hasMessage bool) string {
 	if hits := r.guarded(r.names("HEAD^{tree}", m.ctree)); len(hits) > 0 && !r.Terminal {
 		r.reject("integrate-done-terminal", "自己防衛の対象（"+strings.Join(hits, " ")+" ）を含む取り込みは、ユーザがターミナルで、エージェントのターンが終わってから打ちます（fast-forward で設定ファイルが書き換わると、ターンの終わりの照合が元に戻してしまうため）。ユーザに "+r.SelfQ+" integrate-done "+r.name+" -m '<メッセージ>' を頼んでください。")
 	}
-	// K を commit したあと、記録する前に落ちた打ち直しは、一時ワークツリーの HEAD が既に K になっている。
+	// K をコミットしたあと、記録する前に中断された打ち直しでは、一時ワークツリーの HEAD が既に K になっている。
 	// 親が head、木が c_tree ならそれを採用して記録する（commit し直さない）。
 	k, _ := r.git(r.tmp, "rev-parse", "--verify", "HEAD")
 	if k == "" || k == m.head || !r.isK(k, m) {

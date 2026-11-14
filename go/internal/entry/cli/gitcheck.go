@@ -60,7 +60,7 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 }
 
 // gitIntegrateUsage は `ccnavi git integrate` の使い方。
-const gitIntegrateUsage = "ccnavi: git integrate <自分の呼び方> <自分の呼び方（引用済み）> <ccnavi-worktree.sh の呼び方（引用済み）> <ccnavi-ticket.sh の呼び方（引用済み）> <terminal|pipe> <一覧の行数>（integrate か integrate-done から始まる git の引数は標準入力に NUL 区切りで渡す）"
+const gitIntegrateUsage = "ccnavi: git integrate <自分の呼び方> <自分の呼び方（引用済み）> <ccnavi-worktree.sh の呼び方（引用済み）> <ccnavi-ticket.sh の呼び方（引用済み）> <terminal|pipe> <一覧の行数>（integrate または integrate-done で始まる git の引数は標準入力に NUL 区切りで渡す）"
 
 // runGitIntegrate は `ccnavi git integrate <呼び方>...`（ccnavi-git.sh 用）。直接作業の取り込み（integrate・integrate --abort・
 // integrate-done）を行い、出力をそのまま標準出力・標準エラーに書く。終了コードは 0（済んだ）・1（止めた）・2（拒否）。

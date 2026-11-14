@@ -21,7 +21,7 @@ func (r *run) integrate(args []string) {
 		r.reject("integrate-has-k", r.name+" は確定の途中です（K="+r.short(k)+"）。"+r.SelfQ+" integrate-done "+r.name+" -m '<メッセージ>' で続けるか、"+r.SelfQ+" integrate --abort "+r.name+" でやめてください。")
 	}
 	if !ospath.IsFile(r.rec) {
-		// チケットに結び付く名前は --adopt が断る。案内が行き止まりに向かわないよう、先に同じ判定で聞く。
+		// チケットに結び付く名前は --adopt が断る。案内が行き止まりにならないよう、先に同じ判定で確かめる。
 		if state, why := r.bound(); state == "yes" {
 			r.reject("integrate-no-record", r.name+" の直接作業の記録がありません（ccnavi-direct/"+r.name+"）。"+r.name+" はチケットに結び付く名前です（"+why+"）。チケットの作業は直接作業に引き取らず、マージリクエストで出します（"+r.TicketQ+" status の次の操作に従う。.ccnavi/docs/worktree-merge.md）。")
 		}
@@ -112,8 +112,8 @@ func (r *run) baseBound(base string) {
 // compute は T と C を計算し、C（取り込み結果の木）を返す。衝突したら衝突したパスを出して止める。
 //
 // 基準は、ふつう起点 S。作業ブランチが取り込み先を取り込んでいる（先頭と HEAD の共通祖先 M が、記録した確認時点の
-// HEAD（base_sha）より新しい）ときは M にする。S のままだと、取り込み先側と同じ箇所を直した解決結果が「両側が変更」と
-// 読まれ、衝突を解いても integrate が収束しない。
+// HEAD（base_sha）より新しい）ときは M にする。S のままだと、取り込み先と同じ箇所を直した解決結果が「両側が変更された」差分として
+// 扱われ、衝突を解いても integrate が収束しない。
 func (r *run) compute(tip, s, s0, base string) string {
 	bs, snap, snap0 := s, "", ""
 	if mb := r.out("merge-base", "HEAD", tip); mb != "" && s0 != "" && mb != s0 && r.isAncestor(s0, mb) {
