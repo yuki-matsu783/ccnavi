@@ -1055,7 +1055,7 @@ class CorePathShAgreesTest(unittest.TestCase):
     def test_review_place_is_left_to_the_user(self):
         """レビュー待ちの置き場の `rm` は sh では止めない
         （ユーザがターミナルで打つ手順を塞がない）。
-        過去の中身に戻す形は、前からの置き場の検査（store_hit）が止める。"""
+        過去の中身に戻す形は、置き場の検査（ccnavi git check の StoreHit）が止める。"""
         for args in ("rm wip/proposals/review/i0002.md", "rm -r wip"):
             with self.subTest(args=args):
                 result = self.run_sh(args)

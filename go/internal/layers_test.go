@@ -111,10 +111,12 @@ var subTiers = map[string]map[string]int{
 	"tickets/approval": {"marks": 0, "wap": 1},
 	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
 	"tickets/lifecycle": {
-		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0, "start": 0, "gitwrap": 0,
+		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0, "start": 0,
 		"stop": 1, "consolidate": 1, "retire": 1, "wapmerge": 1, "ops": 1,
 		"integrate": 2,
 		"branch":    3,
+		// 3: ラッパー（ccnavi-git.sh）の判定。統合先の決め方を integrate から読む
+		"gitwrap": 3,
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,

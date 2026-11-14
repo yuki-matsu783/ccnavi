@@ -436,7 +436,7 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return runText(stdout, stderr, root, cmd[1:]), true
 	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "check":
 		// ccnavi-git.sh が受けた git の引数を通すかを決める。チケット制御の有無に依らない。
-		return runGitCheck(in, stdout, stderr, cmd[2:]), true
+		return runGitCheck(in, stdout, stderr, root, conf, cmd[2:]), true
 	case cmd[0] == "start":
 		// ccnavi-start.sh が取ってきたホストの応答を読む。チケット制御の有無に依らない。
 		return runStart(stdout, stderr, root, cmd[1:]), true

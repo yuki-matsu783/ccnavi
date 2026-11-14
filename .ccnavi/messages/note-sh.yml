@@ -87,18 +87,6 @@ messages:
     note: |-
       原因を直してから、同じコマンド（{self_q} integrate-done {name:sh}）を再実行すると、K（{short}）から再開する。
 
-  # 統合先のユーザのチェックアウトでの merge・pull を断った理由に続ける案内（`次:` の行のあと）。
-  NOTE_GIT_MERGE_ON_TARGET_ALLOWED:
-    kind: note
-    note: |-
-      途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。
-
-  NOTE_GIT_PULL_ON_TARGET_ALLOWED:
-    kind: note
-    values: [integ]
-    note: |-
-      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
-
   # 統合先のユーザのチェックアウトで pull が衝突して失敗したとき（出力の後ろに足す）。
   NOTE_GIT_PULL_CONFLICT_ON_TARGET:
     kind: note

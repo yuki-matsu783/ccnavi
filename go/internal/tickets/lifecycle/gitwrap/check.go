@@ -2,15 +2,17 @@ package gitwrap
 
 import "strings"
 
-// 答え。Pass はサブコマンドより前の判定を通ったが、続きの判定はラッパー（sh）が持つサブコマンド。
+// 答え。Check の Pass は、引数だけの判定を通り、続きを状態から決めるサブコマンド。Judge の Pass は、続きの判定を
+// ラッパー（sh）が持つサブコマンド（integrate・integrate-done）。
 const (
 	Allow = "allow"
 	Pass  = "pass"
 )
 
-// Names はラッパーの文に入れる呼び方。Self は `sh <ccnavi-git.sh>`、Sync は `sh <ccnavi-sync.sh>`。
+// Names はラッパーの文に入れる呼び方。Self は `sh <ccnavi-git.sh>`、Sync は `sh <ccnavi-sync.sh>`、Start は
+// `sh <ccnavi-start.sh>`。SelfQ と WorktreeQ は、パスを単引用符で囲んだ `sh '<ccnavi-git.sh>'` と `sh '<ccnavi-worktree.sh>'`。
 type Names struct {
-	Self, Sync string
+	Self, Sync, Start, SelfQ, WorktreeQ string
 }
 
 // readOnly は読むだけのサブコマンド。全引数の判定で穴は塞いである。
@@ -18,8 +20,8 @@ var readOnly = map[string]bool{"status": true, "log": true, "show": true, "diff"
 	"describe": true, "rev-parse": true, "rev-list": true, "ls-files": true, "ls-tree": true, "merge-base": true,
 	"diff-tree": true, "whatchanged": true, "show-ref": true}
 
-// judgedByWrapper は、続きの判定をまだラッパー（sh）が持つサブコマンド。
-var judgedByWrapper = map[string]bool{"worktree": true, "rm": true, "restore": true, "merge": true, "merge-file": true,
+// byState は、続きの判定に git の状態やワークスペースを読むサブコマンド（Judge が決める）。
+var byState = map[string]bool{"worktree": true, "rm": true, "restore": true, "merge": true, "merge-file": true,
 	"checkout": true, "switch": true, "fetch": true, "pull": true, "push": true, "integrate": true, "integrate-done": true}
 
 // Check は、ラッパーが受けた引数 args（先頭がサブコマンド）を通すかを決める。答えは Allow・Pass、または拒否。
@@ -37,13 +39,47 @@ func Check(n Names, args []string) (string, *Deny) {
 	switch {
 	case readOnly[sub] || sub == "add":
 		return Allow, nil
-	case judgedByWrapper[sub]:
+	case byState[sub]:
 		return Pass, nil
 	}
 	if d := bySubcommand(n, sub, rest); d != nil {
 		return "", d
 	}
 	return Allow, nil
+}
+
+// Judge は、ラッパーが受けた引数 args（先頭がサブコマンド）を、引数（Check）と git の状態から通すかを決める。
+func Judge(e *Env, args []string) Answer {
+	verdict, d := Check(e.Names, args)
+	if d != nil || verdict != Pass {
+		return Answer{Verdict: verdict, Deny: d}
+	}
+	a := Answer{Verdict: Allow}
+	sub, rest := args[0], args[1:]
+	switch sub {
+	case "worktree":
+		a.Deny, a.Warn = e.worktree(rest)
+	case "rm":
+		a.Deny = e.rm(rest)
+	case "restore":
+		a.Deny = e.restore(rest)
+	case "merge":
+		a.Deny, a.Prepend = e.merge(rest)
+	case "merge-file":
+		a.Deny = e.mergeFile(rest)
+	case "checkout", "switch":
+		a.Deny = e.checkout(sub, rest)
+	case "fetch", "pull":
+		a.Deny = e.fetch(sub, rest)
+		if sub == "pull" && a.Deny == nil {
+			a.Target = e.targetHere()
+		}
+	case "push":
+		a.Deny = e.push(rest, &a)
+	default:
+		a.Verdict = Pass
+	}
+	return a
 }
 
 // blocked は、どのサブコマンドでも止める長いオプションの名前。略した表記（`--outp=x`）も止める。

@@ -220,12 +220,9 @@ class RejectTest(GitWrapperTest):
 
 
 # 拒否の文に代わりの手段を書くと決めた理由の名前。次に何をすればよいかを必ず書く。
-# 引数だけで決まる拒否（grep-pager・remote-option・remote-write など）の文は実行ファイルが持ち、
-# go/internal/tickets/lifecycle/gitwrap のテストが同じことを確かめる。
-NEEDS_ALTERNATIVE = (
-    "integrate-tmp",
-    "worktree-no-dest",
-)
+# integrate のほかの拒否（grep-pager・remote-option・worktree-no-dest など）の文は
+# 実行ファイルが持ち、go/internal/tickets/lifecycle/gitwrap のテストと、下の個別のテストが確かめる。
+NEEDS_ALTERNATIVE = ("integrate-tmp",)
 # 代わりの手段を示している印。ラッパーか取り込みの sh の形か、ユーザに頼むこと。
 # 「ユーザに依頼してください」で終わる拒否（remote-write など）も、正しい代わりの手段として数える。
 ALTERNATIVE_MARKS = ("$SELF", "$SYNC", "ユーザに")
@@ -884,7 +881,7 @@ class StoreRewindTest(GitWrapperTest):
 
         env で保護を外せないことを見る。
         `.ccnavi/scripts/` がコピーする版（i0064-10）になる前は失敗する。
-        コピーする前の sh（`ccnavi-git.sh` の `store_hit`）は `CCNAVI_TICKETS_APPROVED` と
+        コピーする前の判定（`ccnavi git check` の `StoreHit`）は `CCNAVI_TICKETS_APPROVED` と
         `CCNAVI_TICKETS_PROPOSAL` のパスを置き場と読み、既定の置き場の restore を止めないため。
         承認済みとレビュー待ちは別々に打つ（一緒に打つと、片方の保護だけで止まって
         もう片方が env で動くのを見逃すため）。

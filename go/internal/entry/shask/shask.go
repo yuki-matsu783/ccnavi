@@ -145,18 +145,10 @@ func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, pa
 	}
 	// 置き場（提案と承認済み）から、親か・承認済みか・着手済みか・MR の番号を読む。
 	work := treeOf(root, conf, path, name)
-	held := holdsParent(conf, work)
 	approved, mr, started := approvedParent(conf, work)
-	// 手元の退避を見るのは `.claude/worktrees/<名前>` の形のときだけ（退避のリポジトリはワークツリーの元リポジトリで
-	// 決まる）。
-	archived := no
-	if underWorktrees(root, path) {
-		if copy, ok := archive.ArchivedFields(root, work.Project, name); ok && copy.Ticket == name && copy.Parent == "" {
-			archived, held = yes, yes
-			if mr == "" {
-				mr = archivedMR(root, work.Project, name)
-			}
-		}
+	held, archived := parentHeld(root, conf, work, path, name)
+	if archived == yes && mr == "" {
+		mr = archivedMR(root, work.Project, name)
 	}
 	writeLines(stdout, head,
 		"parent "+string(held),
@@ -166,6 +158,34 @@ func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, pa
 		"started "+string(started),
 		"mr "+cmp.Or(mr, none))
 	return true
+}
+
+// parentHeld は、ツリーが親のワークツリーか（held）と、手元の退避に親があるか（archived）。手元の退避を見るのは
+// `.claude/worktrees/<名前>` の形のときだけ（退避のリポジトリはワークツリーの元リポジトリで決まる）。
+func parentHeld(root string, conf *config.Settings, work tree.Tree, path, name string) (held, archived answer) {
+	held, archived = holdsParent(conf, work), no
+	if underWorktrees(root, path) {
+		if copy, ok := archive.ArchivedFields(root, work.Project, name); ok && copy.Ticket == name && copy.Parent == "" {
+			held, archived = yes, yes
+		}
+	}
+	return held, archived
+}
+
+// IsParentTree は、ツリー path（名前 name）が親子のチケットの親のワークツリーか（`tree parent` の parent の行と同じ判定）。
+// 0 は親、1 は親でない、2 は決められない（名前が識別子でない・ツリーが無い・置き場のファイルを読めない）。
+func IsParentTree(root string, conf *config.Settings, path, name string) int {
+	if !ids.IsValidFamily(name) || path == "" || !ospath.IsDir(path) {
+		return 2
+	}
+	held, _ := parentHeld(root, conf, treeOf(root, conf, path, name), path, name)
+	switch held {
+	case yes:
+		return 0
+	case no:
+		return 1
+	}
+	return 2
 }
 
 // boundTree は `tree bound`。頭に続けて bound yes|no、結び付くなら why <理由>。

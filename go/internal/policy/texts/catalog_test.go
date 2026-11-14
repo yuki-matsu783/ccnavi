@@ -382,7 +382,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 	for _, k := range shCalls(t, repo) {
 		called[k.id] = true
 	}
-	for _, id := range []string{"NOTE_GIT_INTEGRATE_CONFLICT", "NOTE_GIT_MERGE_ON_TARGET_ALLOWED", "NOTE_WORKTREE_RECORD_MISSING",
+	for _, id := range []string{"NOTE_GIT_INTEGRATE_CONFLICT", "NOTE_GIT_PULL_CONFLICT_ON_TARGET", "NOTE_WORKTREE_RECORD_MISSING",
 		"NOTE_START_TEMPLATES", "NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
 			t.Errorf("sh が %s を引かない", id)

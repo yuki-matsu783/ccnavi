@@ -328,3 +328,24 @@ messages:
     note: |-
       取り込みは、ユーザがこのツリー（{tree_root}）で `ccnavi-user-handoff.sh {target}` を打って行う
       下書きは未追跡のファイルで、残っていると親の ready が止まる。取り込むか、ready の前に下書きを削除します（またはコミットする）
+
+  # ccnavi git check（ccnavi-git.sh の判定）が、統合先のユーザのチェックアウトでの merge・pull を断る文に続ける次の一手と案内。
+  NEXT_GIT_MERGE_ON_TARGET:
+    kind: next
+    values: [integ]
+    next: |-
+      {script:ccnavi-worktree.sh} <名前> でワークツリーを切る
+    note: |-
+      切ったワークツリーの中で {script:ccnavi-git.sh} merge {integ:sh} を打って衝突を解いてコミットし、{script:ccnavi-git.sh} integrate <名前> で取り込む
+
+  # 統合先のユーザのチェックアウトでの merge・pull を断った理由に続ける案内（`次:` の行のあと）。
+  NOTE_GIT_MERGE_ON_TARGET_ALLOWED:
+    kind: note
+    note: |-
+      途中の merge を終わらせる --abort / --continue / --quit と、統合先でないブランチでの merge は、ここでも打てます。
+
+  NOTE_GIT_PULL_ON_TARGET_ALLOWED:
+    kind: note
+    values: [integ]
+    note: |-
+      統合先の更新（引数なしの pull と pull [--ff-only] <リモート> {integ:sh}）と、統合先でないブランチ・ワークツリーでの pull は、ここでも実行できます。
