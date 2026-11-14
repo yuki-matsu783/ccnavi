@@ -175,7 +175,7 @@ func (e *Env) addName(f addForm) *Deny {
 const freshWindow = 10 * time.Minute
 
 // fresh は、統合先から切る worktree add の起点が古くないかを確かめる。hook は git もネットワークも起こさない決まりなので、
-// 判定はラッパーの中で行う。ここで fetch は打たない（副作用が増えるため）。
+// 判定は `ccnavi git check` が行い、fetch が失敗した印はラッパーが書く。ここで fetch は打たない（副作用が増えるため）。
 //
 //   - 最後の fetch が 10 分より前、または FETCH_HEAD が無い（共通の git ディレクトリの FETCH_HEAD の更新時刻）
 //   - 起点が手元の統合先で、origin/<統合先> より遅れている（origin/<統合先> が起点なら対象外）
