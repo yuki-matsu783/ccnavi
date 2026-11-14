@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"fmt"
 	"io"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -17,8 +16,6 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/infra/yaml"
-	"ccnavi/internal/policy/ruleload"
-	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/lifecycle/branch"
 	"ccnavi/internal/tickets/lifecycle/integrate"
@@ -26,7 +23,6 @@ import (
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
-	"ccnavi/internal/tickets/sync/handoff"
 )
 
 // head は答えの頭の行。
@@ -78,10 +74,6 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 		ok = leftoverTree(stdout, stderr, root, conf, args[0], args[1])
 	case verb == "base-bound" && len(args) == 2:
 		ok = baseBoundTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "guarded" && len(args) >= 2:
-		ok = guardedTree(stdout, stderr, root, conf, args[0], args[1:])
-	case verb == "handoff-pending" && len(args) <= 2:
-		ok = handoffPendingTree(stdout, stderr, args[0], args[1:])
 	default:
 		return 0, false
 	}
@@ -109,21 +101,9 @@ func treeOK(stderr io.Writer, verb, path string) bool {
 	return false
 }
 
-// treeOf は sh が渡したツリーのパスを、名前を付けたワークツリーとして読む。登録されていないディレクトリでも、そのパスの
-// 置き場を見る。プロジェクトは、ワークスペースかプロジェクトのワークツリーなら元リポジトリから決める。
+// treeOf は sh が渡したツリーのパスを、名前を付けたワークツリーとして読む（integrate.TreeAt）。
 func treeOf(root string, conf *config.Settings, path, name string) tree.Tree {
-	full := ospath.Abspath(path)
-	owners := append([]tree.Tree{tree.MainTree(root)}, tree.Projects(projectsDir(root, conf))...)
-	owner, _ := tree.OwnerOf(full, owners)
-	return tree.Tree{Name: name, Root: full, Project: owner.Project, Kind: tree.KindWorktree}
-}
-
-// projectsDir はプロジェクトの置き場の絶対パス。
-func projectsDir(root string, conf *config.Settings) string {
-	if conf.Projects == "" || ospath.IsAbs(conf.Projects) {
-		return conf.Projects
-	}
-	return ospath.Join(root, conf.Projects)
+	return integrate.TreeAt(conf, root, path, name)
 }
 
 // underWorktrees は path が `.claude/worktrees/` の下か（大文字小文字を畳んで比べる）。
@@ -293,59 +273,6 @@ func baseBoundTree(stdout, stderr io.Writer, root string, conf *config.Settings,
 	lines := []string{head, "bound " + string(bound)}
 	if why != "" {
 		lines = append(lines, "why "+why)
-	}
-	writeLines(stdout, lines...)
-	return true
-}
-
-// guardedTree は `tree guarded`。頭に続けて guarded yes|no、守る対象に当たるパスごとに path <パス>。パスはチェックアウト
-// からの相対で、自己防衛が守る対象と、行き着く先まで解いたパスを大文字小文字を畳んで比べる。
-func guardedTree(stdout, stderr io.Writer, root string, conf *config.Settings, path string, rels []string) bool {
-	if !treeOK(stderr, "tree guarded", path) {
-		return false
-	}
-	guarded := map[string]bool{}
-	for _, t := range selfguard.Targets(root, conf.Rules, conf.Bin, ruleload.LayerFiles(conf, root), conf.Projects) {
-		guarded[pathcase.Fold(ospath.Realpath(t.Path))] = true
-	}
-	var hits []string
-	for _, rel := range rels {
-		if rel != "" && guarded[pathcase.Fold(ospath.Realpath(ospath.Join(path, filepath.FromSlash(rel))))] {
-			hits = append(hits, rel)
-		}
-	}
-	lines := []string{head, "guarded " + string(yesNo(len(hits) > 0))}
-	for _, rel := range hits {
-		lines = append(lines, "path "+rel)
-	}
-	writeLines(stdout, lines...)
-	return true
-}
-
-// handoffPendingTree は `tree handoff-pending`。頭に続けて pending <件数> と、取り込んでいない下書きごとに path <パス>。
-// 起点（start の 1 つめ）があれば、元があり中身が違う写しごとに foreign <パス>、元の無い下書きごとに note <パス>。
-func handoffPendingTree(stdout, stderr io.Writer, path string, start []string) bool {
-	if !treeOK(stderr, "tree handoff-pending", path) {
-		return false
-	}
-	root := ospath.Abspath(path)
-	left := handoff.Pending(root)
-	var foreign, notes []string
-	if len(start) > 0 {
-		var ok bool
-		if foreign, notes, ok = handoff.Survey(root, start[0]); !ok {
-			fmt.Fprintf(stderr, "ccnavi: tree handoff-pending の起点 %s の木を読めません。\n", pyfmt.Repr(start[0]))
-			return false
-		}
-	}
-	lines := []string{head, "pending " + strconv.Itoa(len(left))}
-	for _, group := range []struct {
-		key   string
-		paths []string
-	}{{"path", left}, {"foreign", foreign}, {"note", notes}} {
-		for _, rel := range group.paths {
-			lines = append(lines, group.key+" "+rel)
-		}
 	}
 	writeLines(stdout, lines...)
 	return true

@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"ccnavi/internal/entry/shask"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/tickets/lifecycle/gitwrap"
+	"ccnavi/internal/tickets/lifecycle/land"
 )
 
 // gitCheckUsage は `ccnavi git check` の使い方。
@@ -30,14 +32,9 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 		fmt.Fprintf(stderr, "ccnavi: 作業場所を読めない（%s）\n", err)
 		return config.ExitError
 	}
-	data, err := io.ReadAll(in.buf)
-	if err != nil {
-		fmt.Fprintf(stderr, "ccnavi: git の引数を読めない（%s）\n", err)
+	args, ok := nulArgs(in, stderr)
+	if !ok {
 		return config.ExitError
-	}
-	args := strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00")
-	if len(data) == 0 {
-		args = nil
 	}
 	env := &gitwrap.Env{
 		Names: gitwrap.Names{Self: words[0], Sync: words[1], Start: words[2], SelfQ: words[3], WorktreeQ: words[4]},
@@ -60,4 +57,49 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 	}
 	fmt.Fprintln(stdout, strings.Join(lines, "\n"))
 	return config.ExitOK
+}
+
+// gitIntegrateUsage は `ccnavi git integrate` の使い方。
+const gitIntegrateUsage = "ccnavi: git integrate <自分の呼び方> <自分の呼び方（引用済み）> <ccnavi-worktree.sh の呼び方（引用済み）> <ccnavi-ticket.sh の呼び方（引用済み）> <terminal|pipe> <一覧の行数>（integrate か integrate-done から始まる git の引数は標準入力に NUL 区切りで渡す）"
+
+// runGitIntegrate は `ccnavi git integrate <呼び方>...`（ccnavi-git.sh 用）。直接作業の取り込み（integrate・integrate --abort・
+// integrate-done）を行い、出力をそのまま標準出力・標準エラーに書く。終了コードは 0（済んだ）・1（止めた）・2（拒否）。
+// ロックはラッパーが取ってから呼ぶ。
+func runGitIntegrate(in *input, stdout, stderr io.Writer, root string, conf *config.Settings, words []string) int {
+	args, ok := nulArgs(in, stderr)
+	lines, err := strconv.Atoi(wordAt(words, 5))
+	if len(words) != 6 || !ok || err != nil || len(args) == 0 || args[0] != "integrate" && args[0] != "integrate-done" {
+		fmt.Fprintln(stderr, gitIntegrateUsage)
+		return config.ExitError
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: 作業場所を読めない（%s）\n", err)
+		return config.ExitError
+	}
+	return land.Run(land.Input{
+		Names: land.Names{Self: words[0], SelfQ: words[1], WorktreeQ: words[2], TicketQ: words[3]},
+		Root:  root, Cwd: cwd, Conf: conf, Terminal: words[4] == "terminal", MaxLines: lines,
+	}, stdout, stderr, args)
+}
+
+// wordAt は words[i]（無ければ空）。
+func wordAt(words []string, i int) string {
+	if i < len(words) {
+		return words[i]
+	}
+	return ""
+}
+
+// nulArgs は標準入力から NUL 区切りの git の引数を読む。読めなければ理由を書いて偽。
+func nulArgs(in *input, stderr io.Writer) ([]string, bool) {
+	data, err := io.ReadAll(in.buf)
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: git の引数を読めない（%s）\n", err)
+		return nil, false
+	}
+	if len(data) == 0 {
+		return nil, true
+	}
+	return strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00"), true
 }

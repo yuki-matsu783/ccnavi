@@ -117,6 +117,8 @@ var subTiers = map[string]map[string]int{
 		"branch":    3,
 		// 3: ラッパー（ccnavi-git.sh）の判定。統合先の決め方を integrate から読む
 		"gitwrap": 3,
+		// 4: 直接作業の取り込み（integrate・integrate-done）。取り込み先がチケットに結び付くかを branch から読む
+		"land": 4,
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,

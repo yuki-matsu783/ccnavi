@@ -53,6 +53,23 @@ func TreeRoots(conf *config.Settings, root string) []string {
 	return out
 }
 
+// TreeAt は、パス path のツリーを名前 name のワークツリーとして読む。登録されていないディレクトリでも、そのパスの
+// 置き場を見る。プロジェクトは、ワークスペースかプロジェクトのワークツリーなら元リポジトリから決める。
+func TreeAt(conf *config.Settings, root, path, name string) tree.Tree {
+	full := ospath.Abspath(path)
+	owners := append([]tree.Tree{tree.MainTree(root)}, tree.Projects(ProjectsDir(conf, root))...)
+	owner, _ := tree.OwnerOf(full, owners)
+	return tree.Tree{Name: name, Root: full, Project: owner.Project, Kind: tree.KindWorktree}
+}
+
+// ProjectsDir はプロジェクトの置き場の絶対パス（設定が空なら空）。
+func ProjectsDir(conf *config.Settings, root string) string {
+	if conf.Projects == "" || ospath.IsAbs(conf.Projects) {
+		return conf.Projects
+	}
+	return ospath.Join(root, conf.Projects)
+}
+
 // NamedFile はディレクトリの中の <名前>.md（実際の表記のパス）。大文字小文字と NFC は畳んで比べる。無ければ空。
 func NamedFile(directory, name string) string {
 	want := pathcase.Fold(pyfmt.NFC(name + config.MdExt))

@@ -71,16 +71,6 @@ func TestAnswersMatchGolden(t *testing.T) {
 		{"tree", "base-bound", root, "a\nb"},
 		{"tree", "base-bound", root, ""},
 		{"tree", "base-bound", nope, "main"},
-		{"tree", "guarded", root, ".ccnavi/config/common/rules.yml", "", "src/a.py", ".CCNAVI/config/common/RULES.yml"},
-		{"tree", "guarded", root, "src/a.py"},
-		{"tree", "guarded", nope, "a"},
-		{"tree", "guarded", root},
-		{"tree", "handoff-pending", w("fix-a")},
-		{"tree", "handoff-pending", w("fix-a"), "HEAD"},
-		{"tree", "handoff-pending", w("fix-a"), "no-such-rev"},
-		{"tree", "handoff-pending", w("i0001")},
-		{"tree", "handoff-pending", nope},
-		{"tree", "handoff-pending", w("fix-a"), "HEAD", "extra"},
 		{"tree", "other", root, "x"},
 	}
 	want := golden.Load[[][3]any](t, "answers")
