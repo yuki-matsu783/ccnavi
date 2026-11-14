@@ -8,8 +8,8 @@ git とファイルシステムに残ったものだけ。
 
 記録（`ccnavi-direct/<名前>`）は `ccnavi-worktree.sh` が書く形を、このテストが同じ形で書く。
 
-実行ファイル（`tree base-bound`・`tree guarded`・`tree handoff-pending`・`worktree drop`）の
-代わりに、tests/exe.py が組み立てたものを起こす（CCNAVI_ENTRY_PATH）。
+判定と操作は実行ファイル（`ccnavi git integrate`）が行う。tests/exe.py が組み立てたものを起こす
+（CCNAVI_ENTRY_PATH）。
 """
 
 from __future__ import annotations
@@ -118,18 +118,6 @@ class Fixture(unittest.TestCase):
         git(repo, "update-ref", f"refs/ccnavi/direct/{name}/s", head)
         git(repo, "worktree", "add", "-q", wt, "-b", name, "--no-track", head)
         return wt
-
-    def silent_exe(self):
-        """ラッパーの引数の形（`git check`）にだけ答え、ほかの問いには答えない実行ファイル。"""
-        path = os.path.join(self._tmp.name, "silent", "ccnavi")
-        write(
-            path,
-            "#!/bin/sh\n"
-            f'case " $* " in *" git check "*) exec \'{exe.sh_path()}\' "$@" ;; esac\n'
-            "exit 1\n",
-        )
-        os.chmod(path, 0o755)
-        return path
 
     def run_git_sh(self, *args, cwd=None, env_extra=None):
         env = {
@@ -412,12 +400,6 @@ class IntegrateTest(Fixture):
         self.assertOk(r, 2)
         self.assertIn("チケット", r.stderr)
 
-    def test_the_exe_that_cannot_answer_refuses(self):
-        self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": self.silent_exe()})
-        self.assertOk(r, 2)
-        self.assertIn("確かめられない", r.stderr)
-
     def test_without_a_record_it_points_at_adopt(self):
         self.work_in_branch()
         os.remove(self.record())
@@ -447,15 +429,6 @@ class IntegrateTest(Fixture):
         self.assertIn("ccnavi-ticket.sh", r.stderr)
         self.assertIn("status", r.stderr)
         self.assertFalse(os.path.exists(self.tmp_wt()))
-
-    def test_without_a_record_an_unanswerable_exe_still_points_at_adopt(self):
-        # 結び付くか確かめられないときは、従来どおり（--adopt 側が確かめて断る）。
-        self.work_in_branch()
-        os.remove(self.record())
-        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
-        r = self.run_git_sh("integrate", "wt", env_extra={"CCNAVI_ENTRY_PATH": self.silent_exe()})
-        self.assertOk(r, 2)
-        self.assertIn("--adopt", r.stderr)
 
     def test_a_record_of_another_repository_is_refused(self):
         self.work_in_branch()
