@@ -38,7 +38,7 @@ const (
 )
 
 // scriptVerbs は `ccnavi <語> --help` で scripts の節を選ぶ、スクリプト用のサブコマンド。
-var scriptVerbs = []string{"review", "worktree", "sync", "tree", "write-and-push", "branches", "start"}
+var scriptVerbs = []string{"review", "worktree", "sync", "tree", "write-and-push", "branches", "start", "git"}
 
 const overviewGuide = `
 話題ごとの使い方は、話題のオプションかサブコマンドに --help を付けると出ます

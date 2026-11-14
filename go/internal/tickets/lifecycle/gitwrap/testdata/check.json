@@ -1,0 +1,1866 @@
+[
+ {
+  "args": [
+   "-c",
+   "x=y",
+   "status"
+  ],
+  "verdict": "deny",
+  "id": "global-option",
+  "message": "サブコマンドより前のオプション (-c) は受け取りません。sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> ... の形で書き直してください。設定の一時上書きが必要なら、その理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "--git-dir=x",
+   "status"
+  ],
+  "verdict": "deny",
+  "id": "global-option",
+  "message": "サブコマンドより前のオプション (--git-dir=x) は受け取りません。sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> ... の形で書き直してください。設定の一時上書きが必要なら、その理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "-C",
+   ".",
+   "log"
+  ],
+  "verdict": "deny",
+  "id": "global-option",
+  "message": "サブコマンドより前のオプション (-C) は受け取りません。sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> ... の形で書き直してください。設定の一時上書きが必要なら、その理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "--no-pager",
+   "log"
+  ],
+  "verdict": "deny",
+  "id": "global-option",
+  "message": "サブコマンドより前のオプション (--no-pager) は受け取りません。sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド> ... の形で書き直してください。設定の一時上書きが必要なら、その理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "log",
+   "-c"
+  ],
+  "verdict": "deny",
+  "id": "config-override",
+  "message": "設定の一時上書き (-c) は受け取りません。設定の上書きを付けない形で書き直してください。"
+ },
+ {
+  "args": [
+   "diff",
+   "--config-env=x=y"
+  ],
+  "verdict": "deny",
+  "id": "config-override",
+  "message": "設定の一時上書き (--config-env=x=y) は受け取りません。設定の上書きを付けない形で書き直してください。"
+ },
+ {
+  "args": [
+   "log",
+   "--config-env",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "config-override",
+  "message": "設定の一時上書き (--config-env) は受け取りません。設定の上書きを付けない形で書き直してください。"
+ },
+ {
+  "args": [
+   "diff",
+   "--output=o.diff"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--output=o.diff は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "diff",
+   "--output",
+   "o"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--output は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "fetch",
+   "--upload-pack=x"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--upload-pack=x は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "push",
+   "--receive-pack=x"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--receive-pack=x は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "log",
+   "--exec-path"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--exec-path は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "status",
+   "--exec=x"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--exec=x は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "diff",
+   "--ext-diff"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--ext-diff は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "show",
+   "--textconv"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--textconv は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "log",
+   "--git-dir=.git"
+  ],
+  "verdict": "deny",
+  "id": "moved-root",
+  "message": "--git-dir=.git は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+ },
+ {
+  "args": [
+   "log",
+   "--work-tree",
+   "."
+  ],
+  "verdict": "deny",
+  "id": "moved-root",
+  "message": "--work-tree は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+ },
+ {
+  "args": [
+   "log",
+   "--namespace=x"
+  ],
+  "verdict": "deny",
+  "id": "moved-root",
+  "message": "--namespace=x は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+ },
+ {
+  "args": [
+   "status",
+   "-C"
+  ],
+  "verdict": "deny",
+  "id": "moved-root",
+  "message": "-C は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+ },
+ {
+  "args": [
+   "diff",
+   "--outp=x"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--outp=x は、止めているオプション（--output）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "diff",
+   "--upload-p"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--upload-p は、止めているオプション（--upload-pack）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "log",
+   "--e"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--e は、止めているオプション（--exec-path）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "diff",
+   "--text"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "diff",
+   "--tex"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--tex は、止めているオプション（--textconv）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "diff",
+   "--t"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--t は、止めているオプション（--textconv）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "log",
+   "--=x"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--=x は、止めているオプション（--output）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "commit",
+   "-m",
+   "--output text"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "log",
+   "--",
+   "--output"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--output は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "worktree",
+   "add",
+   "--git-dir"
+  ],
+  "verdict": "deny",
+  "id": "moved-root",
+  "message": "--git-dir は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+ },
+ {
+  "args": [
+   "log",
+   "--oneline",
+   "-3"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "diff",
+   "--stat"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "show",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "log",
+   "--no-ext-diff"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "status",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "log",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "show",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "diff",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "blame",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "shortlog",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "describe",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "rev-parse",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "rev-list",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "ls-files",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "ls-tree",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "merge-base",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "diff-tree",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "whatchanged",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "show-ref",
+   "--x-unknown"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "-t",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "-p",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "--batch"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "--batch-check"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "--batch-all-objects",
+   "--batch-check"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "--filters",
+   "HEAD:a.txt"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "cat-file の --filters は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "cat-file",
+   "--batc"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "cat-file の --batc は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "cat-file",
+   "-tp",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "-x"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "cat-file の -x は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "cat-file",
+   "--buffer=1"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "cat-file の --buffer=1 は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "cat-file",
+   "-e",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "commit",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "cat-file",
+   "--",
+   "--weird"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "-O"
+  ],
+  "verdict": "deny",
+  "id": "grep-pager",
+  "message": "-O には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので使用できません。一致したファイルを見るなら、sh .ccnavi/scripts/ccnavi-git.sh grep -l <型> で一覧を出し、Read で開いてください。"
+ },
+ {
+  "args": [
+   "grep",
+   "-iO",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "grep-pager",
+  "message": "-iO には -O（--open-files-in-pager）が含まれます。一致したファイルを外部コマンドで開くので使用できません。一致したファイルを見るなら、sh .ccnavi/scripts/ccnavi-git.sh grep -l <型> で一覧を出し、Read で開いてください。"
+ },
+ {
+  "args": [
+   "grep",
+   "--open-files-in-pager"
+  ],
+  "verdict": "deny",
+  "id": "grep-pager",
+  "message": "--open-files-in-pager は一致したファイルを外部コマンドで開きます。使用できません。一致したファイルを見るなら、sh .ccnavi/scripts/ccnavi-git.sh grep -l <型> で一覧を出し、Read で開いてください。"
+ },
+ {
+  "args": [
+   "grep",
+   "--open"
+  ],
+  "verdict": "deny",
+  "id": "grep-pager",
+  "message": "--open は一致したファイルを外部コマンドで開きます。使用できません。一致したファイルを見るなら、sh .ccnavi/scripts/ccnavi-git.sh grep -l <型> で一覧を出し、Read で開いてください。"
+ },
+ {
+  "args": [
+   "grep",
+   "--o"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--o は、止めているオプション（--output）の略として読まれます。読むだけのサブコマンドをファイル書き込みや外部コマンド実行、判定の起点の移動に変えるので使用できません。"
+ },
+ {
+  "args": [
+   "grep",
+   "--op",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "grep-pager",
+  "message": "--op は一致したファイルを外部コマンドで開きます。使用できません。一致したファイルを見るなら、sh .ccnavi/scripts/ccnavi-git.sh grep -l <型> で一覧を出し、Read で開いてください。"
+ },
+ {
+  "args": [
+   "grep",
+   "-eO"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "-e",
+   "O"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "-AO",
+   "x"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "--",
+   "-O"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "-n",
+   "seed"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "-l",
+   "a"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "grep",
+   "-mO",
+   "x"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "-a"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "-vv"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "-d",
+   "x"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "-D",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-delete-unmerged",
+  "message": "branch -D は未マージのブランチを削除します。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも削除したいならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-dD",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-delete-unmerged",
+  "message": "branch -D は未マージのブランチを削除します。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも削除したいならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-M",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-force-move",
+  "message": "branch -M はブランチを改名するか複製し、同じ名前の既存のブランチを上書きすることがあります。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューのときに名前からチケットを引けなくなります。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-m",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-move",
+  "message": "branch -m はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-C",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "moved-root",
+  "message": "-C は判定の起点を別のツリーへ動かします。対象のツリーの中で実行してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-c",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "config-override",
+  "message": "設定の一時上書き (-c) は受け取りません。設定の上書きを付けない形で書き直してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--move",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-force-move",
+  "message": "branch --move はブランチを改名するか複製し、同じ名前の既存のブランチを上書きすることがあります。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューのときに名前からチケットを引けなくなります。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--copy",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-force-move",
+  "message": "branch --copy はブランチを改名するか複製し、同じ名前の既存のブランチを上書きすることがあります。ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、変えると着手やレビューのときに名前からチケットを引けなくなります。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--force",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-force",
+  "message": "branch --force はブランチを強制的に削除するか、設定を書き換えます。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも必要ならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-f",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "branch-move",
+  "message": "branch -f はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-u",
+   "origin/x"
+  ],
+  "verdict": "deny",
+  "id": "branch-move",
+  "message": "branch -u はブランチを強制的に動かすか、追跡先を書き換えます。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--set-upstream-to=origin/x"
+  ],
+  "verdict": "deny",
+  "id": "branch-force",
+  "message": "branch --set-upstream-to はブランチを強制的に削除するか、設定を書き換えます。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも必要ならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--set-upstream-to",
+   "o/x"
+  ],
+  "verdict": "deny",
+  "id": "branch-force",
+  "message": "branch --set-upstream-to はブランチを強制的に削除するか、設定を書き換えます。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも必要ならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--unset-upstream"
+  ],
+  "verdict": "deny",
+  "id": "branch-force",
+  "message": "branch --unset-upstream はブランチを強制的に削除するか、設定を書き換えます。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも必要ならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--edit-description"
+  ],
+  "verdict": "deny",
+  "id": "branch-force",
+  "message": "branch --edit-description はブランチを強制的に削除するか、設定を書き換えます。安全側の削除 (sh .ccnavi/scripts/ccnavi-git.sh branch -d <名前>) を試し、それでも必要ならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--delete",
+   "x"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--del",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "branch の --del は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--sort=-date"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--sort",
+   "x"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--contains"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--contains=HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--merged",
+   "main"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--list",
+   "x*"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--show-current"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--quiet=1"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "branch の --quiet=1 は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--format"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "branch の --format は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "branch",
+   "-q",
+   "-l"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "-x"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "branch の -x は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "branch",
+   "--",
+   "-D"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "branch",
+   "--no-track",
+   "y"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "-l"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "--list",
+   "v*"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "v1"
+  ],
+  "verdict": "deny",
+  "id": "tag-write",
+  "message": "tag v1 はタグを作ります。tag は一覧のみ使用できます（絞り込むなら sh .ccnavi/scripts/ccnavi-git.sh tag -l <型>）。タグを作るのはユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "tag",
+   "-l",
+   "v1"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "-d",
+   "v1"
+  ],
+  "verdict": "deny",
+  "id": "tag-write",
+  "message": "tag は一覧のみ使用できます (-d は不可)。タグを作る・削除するのはユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "tag",
+   "-a",
+   "v1"
+  ],
+  "verdict": "deny",
+  "id": "tag-write",
+  "message": "tag は一覧のみ使用できます (-a は不可)。タグを作る・削除するのはユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "tag",
+   "--contains",
+   "HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "--contains",
+   "HEAD",
+   "v1"
+  ],
+  "verdict": "deny",
+  "id": "tag-write",
+  "message": "tag v1 はタグを作ります。tag は一覧のみ使用できます（絞り込むなら sh .ccnavi/scripts/ccnavi-git.sh tag -l <型>）。タグを作るのはユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "tag",
+   "--sort=v",
+   "-l"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "-n",
+   "-l"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "-n5"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "--points-at=HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "tag",
+   "--merged",
+   "main",
+   "-l",
+   "x"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "remote"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "remote",
+   "-v"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "remote",
+   "--verbose"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "remote",
+   "show",
+   "origin"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "remote",
+   "get-url",
+   "origin"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "remote",
+   "add",
+   "x",
+   "y"
+  ],
+  "verdict": "deny",
+  "id": "remote-write",
+  "message": "remote add は取得先・送信先を書き換えます。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "remote",
+   "set-url",
+   "o",
+   "u"
+  ],
+  "verdict": "deny",
+  "id": "remote-write",
+  "message": "remote set-url は取得先・送信先を書き換えます。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "remote",
+   "rm",
+   "o"
+  ],
+  "verdict": "deny",
+  "id": "remote-write",
+  "message": "remote rm は取得先・送信先を書き換えます。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "remote",
+   "prune",
+   "o"
+  ],
+  "verdict": "deny",
+  "id": "remote-write",
+  "message": "remote prune は取得先・送信先を書き換えます。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "remote",
+   "-x"
+  ],
+  "verdict": "deny",
+  "id": "remote-option",
+  "message": "remote は一覧のみ使用できます (-x は不可)。一覧は sh .ccnavi/scripts/ccnavi-git.sh remote -v、1 つの取得先は sh .ccnavi/scripts/ccnavi-git.sh remote get-url <名前> で見られます。ほかの操作が必要ならユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "remote",
+   "origin"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "list"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "show",
+   "-p"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "push",
+   "-u"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "save"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "pop"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "apply"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "-u"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "stash",
+   "drop"
+  ],
+  "verdict": "deny",
+  "id": "stash-drop",
+  "message": "stash drop は退避した変更を破棄します。中身を sh .ccnavi/scripts/ccnavi-git.sh stash show -p で確かめ、不要と判断した理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "stash",
+   "clear"
+  ],
+  "verdict": "deny",
+  "id": "stash-drop",
+  "message": "stash clear は退避した変更を破棄します。中身を sh .ccnavi/scripts/ccnavi-git.sh stash show -p で確かめ、不要と判断した理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "stash",
+   "branch",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "stash-action",
+  "message": "stash branch は指定できません。指定できるのは list / show / push / pop / apply です。"
+ },
+ {
+  "args": [
+   "add",
+   "a.txt"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-m",
+   "x",
+   "--allow-empty"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "--no-verify",
+   "-m",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "commit-no-verify",
+  "message": "commit の --no-verify (--no-verify) はコミット前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
+ },
+ {
+  "args": [
+   "commit",
+   "-n",
+   "-m",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "commit-no-verify",
+  "message": "commit の -n (--no-verify) はコミット前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
+ },
+ {
+  "args": [
+   "commit",
+   "-anm",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "commit-no-verify",
+  "message": "commit の -n (--no-verify) はコミット前の検査を飛ばします。検査が失敗するなら、その原因を直してください。"
+ },
+ {
+  "args": [
+   "commit",
+   "--no-verif",
+   "-m",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "commit の --no-verif は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "commit",
+   "--amend"
+  ],
+  "verdict": "deny",
+  "id": "commit-amend",
+  "message": "commit --amend は直前のコミットを書き換えます。直すなら新しいコミットを積んでください。"
+ },
+ {
+  "args": [
+   "commit",
+   "--amend=x"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "commit の --amend=x は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "commit",
+   "-mn"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-m"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "commit の -m は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "commit",
+   "--message=x",
+   "--allow-empty"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-F",
+   "-"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "--fixup=HEAD"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-u"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-uno",
+   "--dry-run"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "--untracked-files=no",
+   "--dry-run"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "--untracked-files",
+   "no"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-x"
+  ],
+  "verdict": "deny",
+  "id": "option-not-allowed",
+  "message": "commit の -x は使用できません。使用できるオプションは一覧にあるものだけで、長いオプションは略さずに書きます（略した表記を、git がここで止めているオプションとして読むことがあります）。使いたい形があれば、ユーザに伝えて一覧に追加してもらってください。"
+ },
+ {
+  "args": [
+   "commit",
+   "--verify",
+   "-m",
+   "y",
+   "--allow-empty"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "--",
+   "-n"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "commit",
+   "-m",
+   "x",
+   "--",
+   "--amend"
+  ],
+  "verdict": "allow",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "reset"
+  ],
+  "verdict": "deny",
+  "id": "reset",
+  "message": "reset は作業中の変更やコミットを削除します。退避は sh .ccnavi/scripts/ccnavi-git.sh stash push -u、戻すのは sh .ccnavi/scripts/ccnavi-git.sh restore <パス> です。リモートに合わせたいなら、親のブランチは sh .ccnavi/scripts/ccnavi-sync.sh <P> を実行してください（早送りか merge で取り込み、衝突したら取りやめます）。ほかのブランチは sh .ccnavi/scripts/ccnavi-git.sh fetch <リモート> <ブランチ> のあとsh .ccnavi/scripts/ccnavi-git.sh merge <リモート>/<ブランチ> です。分かれていて進めない（squash マージの後で fast-forward できない、など）なら、ブランチを移さずにユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "clean"
+  ],
+  "verdict": "deny",
+  "id": "clean",
+  "message": "clean は作業中の変更を削除します。退避は sh .ccnavi/scripts/ccnavi-git.sh stash push -u、戻すのは sh .ccnavi/scripts/ccnavi-git.sh restore <パス> です。"
+ },
+ {
+  "args": [
+   "rebase"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "rebase は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "cherry-pick"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "cherry-pick は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "revert"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "revert は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "am"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "am は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "apply"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "apply は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "bisect"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "bisect は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "filter-branch"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "filter-branch は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "replace"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "replace は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "update-ref"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "update-ref は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "symbolic-ref"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "symbolic-ref は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "reflog"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "reflog は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "gc"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "gc は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "notes"
+  ],
+  "verdict": "deny",
+  "id": "history-rewrite",
+  "message": "notes は履歴か参照を書き換えます。使用できません。必要な理由をユーザに伝えてください。"
+ },
+ {
+  "args": [
+   "config"
+  ],
+  "verdict": "deny",
+  "id": "config",
+  "message": "config は設定を読み書きします。値には資格情報が混ざるので使用できません。必要な値はユーザに尋ねてください。"
+ },
+ {
+  "args": [
+   "clone"
+  ],
+  "verdict": "deny",
+  "id": "import",
+  "message": "clone は外から中身を持ち込みます。使用できません。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "submodule"
+  ],
+  "verdict": "deny",
+  "id": "import",
+  "message": "submodule は外から中身を持ち込みます。使用できません。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "lfs"
+  ],
+  "verdict": "deny",
+  "id": "import",
+  "message": "lfs は外から中身を持ち込みます。使用できません。ユーザに依頼してください。"
+ },
+ {
+  "args": [
+   "frobnicate"
+  ],
+  "verdict": "deny",
+  "id": "not-allowed",
+  "message": "frobnicate は許可リストにありません。指定できる形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
+ },
+ {
+  "args": [
+   "init"
+  ],
+  "verdict": "deny",
+  "id": "not-allowed",
+  "message": "init は許可リストにありません。指定できる形は sh .ccnavi/scripts/ccnavi-git.sh --help で確認してください。"
+ },
+ {
+  "args": [
+   "worktree",
+   "list"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "rm",
+   "a.txt"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "restore",
+   "a.txt"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "merge",
+   "x"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "merge-file",
+   "-p"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "checkout",
+   "main"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "switch",
+   "main"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "fetch",
+   "origin"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "pull"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "push"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "integrate",
+   "x"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "integrate-done",
+   "x"
+  ],
+  "verdict": "pass",
+  "id": "",
+  "message": ""
+ },
+ {
+  "args": [
+   "push",
+   "--output=x"
+  ],
+  "verdict": "deny",
+  "id": "output-or-exec",
+  "message": "--output=x は、読むだけのサブコマンドをファイル書き込みや外部コマンド実行に変えます。出力を保存したいなら、このラッパースクリプトが logs/ に全量を残すのでそちらを読んでください。"
+ },
+ {
+  "args": [
+   "checkout",
+   "-c",
+   "x"
+  ],
+  "verdict": "deny",
+  "id": "config-override",
+  "message": "設定の一時上書き (-c) は受け取りません。設定の上書きを付けない形で書き直してください。"
+ }
+]
