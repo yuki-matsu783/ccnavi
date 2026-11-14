@@ -66,3 +66,17 @@ func TestRouteValuesStayOnOneLine(t *testing.T) {
 		t.Errorf("%q", got)
 	}
 }
+
+// 止める文は表から引き、値を差し込む。知らない名前は偽。
+func TestStop(t *testing.T) {
+	got, known := Stop(t.TempDir(), "host-unreadable", map[string]string{"host_why": "origin が無い"})
+	if !known || got != "fail host-unreadable 1\nmsg MR を作れません（origin が無い）。origin を確かめてください。\n" {
+		t.Errorf("%q", got)
+	}
+	if got, _ := Stop(t.TempDir(), "multi", map[string]string{"total": "2"}); !strings.Contains(got, "exit 3") || !strings.Contains(got, "reason multi") {
+		t.Errorf("%q", got)
+	}
+	if _, known := Stop(t.TempDir(), "nope", nil); known {
+		t.Error("知らない名前")
+	}
+}

@@ -45,7 +45,6 @@
 
 set -eu
 
-EXIT_MULTI=3
 EXIT_HOST=4
 
 # fail <識別子> <文面> [終了コード]。文面は標準エラーへ出す契約。識別子は診断ログにだけ残す。
@@ -170,10 +169,16 @@ start_do() {
 	fi
 	sd_exit=$(start_val exit | head -n 1)
 	if [ -n "$sd_exit" ]; then
-		log_info 止めた -- "exit=$sd_exit" "reason=start-$1"
+		sd_reason=$(start_val reason | head -n 1)
+		log_info 止めた -- "exit=$sd_exit" "reason=${sd_reason:-start-$1}"
 		exit "$sd_exit"
 	fi
 	return 0
+}
+
+# 止める（実行ファイルの `ccnavi start stop <名前> <名前>=<値>…` が文と終了コードを決める）。<名前> [<名前>=<値>]...
+stop() {
+	start_do stop "$@"
 }
 
 # 打ち直しの案内に使う。引数ごとに ' で包み（中の ' は '\''）、そのまま打てば同じ引数になるようにする。
@@ -214,12 +219,12 @@ opt_reopened=$(start_val reopened)
 check=$(start_val check)
 list_open=$(start_val list-open)
 state="$root/logs/state" # 固定
-mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
+mkdir -p "$state" 2>/dev/null || stop no-state "state=${state}"
 scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.resp" "$host_err.resp2" "$host_err.linked"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.resp" "$host_err.resp2" "$host_err.linked" "$host_err.pf"' EXIT
 log_info 始めた -- "kind=${what:-${check:+check}${list_open:+list-open}${new_issue_title:+new-issue}}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -230,34 +235,16 @@ if [ -n "$own_url" ] && ccnavi_host_parse "$own_url" >/dev/null 2>&1; then
 	own_path="$ccnavi_h_path"
 fi
 if [ "$what" = issue ] && [ -n "$issue_r" ] && [ -n "$own_path" ] && [ "$(lower "$issue_r")" != "$(lower "$own_path")" ]; then
-	fail issue-other-repo "別のリポジトリの issue（${issue_arg}）から MR を新しく作る道はありません。その issue を閉じる MR（説明欄に Closes ${issue_arg}）をユーザに作ってもらい、--mr <番号> と一緒に渡してください。" 2
+	stop issue-other-repo "issue_arg=${issue_arg}"
 fi
 
 # ---- --check（手で打つ事前確認。標準出力。何も作らない）
 if [ -n "$check" ]; then
 	ccnavi_preflight "$top"
 	log_info 事前確認 -- "result=$ccnavi_pf_result" "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
-	pc_name=$(ccnavi_project "$top" "$root")
-	printf '対象リポジトリ: %s（%s）\n' "${ccnavi_h_path:-$top}" "${pc_name:-ワークスペース自身}"
-	for pc_item in tools origin integration api access git ident; do
-		ccnavi_pf_line "$pc_item"
-		printf '確認: %s\n' "$ccnavi_pf_line_text"
-	done
-	case "$ccnavi_pf_result" in
-	ok)
-		printf '結論: チケット作業を始められる状態です。\n'
-		ccnavi_text "$root" NEXT_START_CHECK_OK
-		;;
-	ng) printf '結論: 不備があり、チケット作業を始められません。\n' ;;
-	*) printf '結論: 確かめられなかった項目があります（省略は前提の項目が OK でないため確かめていません）。\n' ;;
-	esac
-	ccnavi_pf_next
-	[ -z "$ccnavi_pf_next_text" ] || printf '%s\n' "$ccnavi_pf_next_text"
-	case "$ccnavi_pf_result" in
-	ok) exit 0 ;;
-	ng) exit 1 ;;
-	*) exit "$EXIT_HOST" ;;
-	esac
+	printf '%s\n' "$ccnavi_pf_out" >"$host_err.pf"
+	start_do check-report "$host_err.pf" "repo=${ccnavi_h_path:-$top}" "top=$top"
+	exit 0
 fi
 
 # ---- ccnavi-git.sh 経由の git。成功は何も出さず、失敗は出力を標準エラーへ出して 1 を返す（cwd で動く）。
@@ -309,7 +296,7 @@ host_open() {
 	ccnavi_host_connect || connect_rc=$?
 	case "$connect_rc" in
 	0) ;;
-	3) fail no-jq "jq が見つかりません。ホストからの応答を解析できません。" 2 ;;
+	3) stop no-jq ;;
 	4)
 		host_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません。"
 		host_rc=2
@@ -351,8 +338,7 @@ ${ccnavi_pf_next_text}" 1
 		ccnavi_pf_top="$top"
 		ccnavi_pf_fix=access
 		ccnavi_pf_next
-		fail access-denied "${ccnavi_h_path} への書き込みの権限が足りない（${ccnavi_h_access_why}）。ワークツリー・ブランチ・push・MR のどれも作らずに中断しました。
-${ccnavi_pf_next_text}" 1
+		stop access-denied "ccnavi_h_path=${ccnavi_h_path}" "ccnavi_h_access_why=${ccnavi_h_access_why}" "ccnavi_pf_next_text=${ccnavi_pf_next_text}"
 	fi
 	return 0
 }
@@ -654,8 +640,8 @@ resolve_issue() {
 				ri_irc=0
 				issue_title_get "$issue_n" || ri_irc=$?
 				case "$ri_irc" in
-				2) fail issue-missing "issue #${issue_n} が見つからない、または読む権限がありません（${issue_why}）。ユーザに確かめてください。" 1 ;;
-				3) fail issue-is-pr "#${issue_n} は issue ではなく PR です。" 1 ;;
+				2) stop issue-missing-mcp "issue_n=${issue_n}" "issue_why=${issue_why}" ;;
+				3) stop issue-is-pr-mcp "issue_n=${issue_n}" ;;
 				esac
 			fi
 			start_do resolve - "issue-n=$issue_n" "issue-r=$issue_r" "own=$own_path"
@@ -692,7 +678,7 @@ stop_host() {
 	sh_why="$2"
 	log_info ホストに届かず止めた -- "stage=$sh_stage" "kind=${ccnavi_h_kind:-}" "why=$sh_why"
 	if [ -z "${ccnavi_h_kind:-}" ]; then
-		fail host-unknown "ホストを読めない（${sh_why}）。origin を確かめてください。"
+		stop host-unknown "sh_why=${sh_why}"
 	fi
 	# 案内の文は実行ファイルが組み立てる（`ccnavi start guidance`）。引けなければ短い 1 行で止める。
 	start_read guidance "stage=$sh_stage" "why=$sh_why" "kind=$ccnavi_h_kind" "path=$ccnavi_h_path" \
@@ -706,7 +692,7 @@ stop_host() {
 # ---- 統合先。worktree.md の決め方（そのリポジトリの origin/HEAD → origin/main・master）。
 integration=$(ccnavi_integration "$top") || integration=""
 [ -n "$integration" ] ||
-	fail no-integration "$(ccnavi_integration_hint "$top")"
+	stop no-integration "hint=$(ccnavi_integration_hint "$top")"
 
 # ---- 小道具
 ref_exists() {
@@ -732,7 +718,7 @@ fetch_branch() {
 		remote_state=unchecked
 		log_info リモートを確かめられず -- "branch=$fb_branch"
 		ref_exists "refs/heads/$fb_branch" ||
-			fail fetch-failed "ブランチ $fb_branch を origin から取れなかった（$(printf '%s' "$cgit_out" | head -n 1)）。手元にも無いので続けられません。"
+			stop fetch-failed-branch "fb_branch=$fb_branch" "why=$(printf '%s' "$cgit_out" | head -n 1)"
 		;;
 	esac
 }
@@ -760,7 +746,7 @@ ensure_push() {
 		return 0
 	fi
 	(cd "$wt" && cgit push -u origin "$1") ||
-		fail push-failed "ブランチ $1 を push できなかった（上の出力を見てください。拒否されたら、そこに出ている案内に従ってください）。"
+		stop push-failed "branch=$1"
 	log_info push した -- "branch=$1"
 }
 
@@ -777,7 +763,7 @@ ensure_mr() {
 	em_rc=0
 	host_open || em_rc=$?
 	if [ "$em_rc" -eq 1 ]; then
-		fail host-unreadable "MR を作れません（${host_why}）。origin を確かめてください。"
+		stop host-unreadable "host_why=${host_why}"
 	elif [ "$em_rc" -eq 2 ]; then
 		stop_host create "$host_why"
 	fi
@@ -861,10 +847,10 @@ adopt_check() {
 	ad_state=$(route_get mr-state)
 	ad_base=$(route_get mr-base)
 	case "$(route_get problem)" in
-	not-open*) fail adopt-not-open "MR !${ad_num} は ${ad_state:-状態が不明}。open の MR だけ採用できます（閉じた・マージ済みの MR のブランチでは続けません）。ユーザに確かめてください。" ;;
-	fork) fail fork-mr "MR !${ad_num} はフォークから出ている。元ブランチ ${ad_branch} はこのリポジトリに無いので、ここでは作業を始められません。フォーク側のブランチで続けるか、ユーザに相談してください。" ;;
-	target*) fail adopt-target "MR !${ad_num} のマージ先は ${ad_base:-不明} で、統合先 ${integration} ではありません。マージ先を直すか、別の作業としてユーザに相談してください。" ;;
-	protected) fail adopt-protected "ブランチ ${ad_branch} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。" ;;
+	not-open*) stop adopt-not-open "ad_num=${ad_num}" "ad_state=${ad_state:-状態が不明}" ;;
+	fork) stop fork-mr "ad_num=${ad_num}" "ad_branch=${ad_branch}" ;;
+	target*) stop adopt-target "ad_num=${ad_num}" "ad_base=${ad_base:-不明}" "integration=${integration}" ;;
+	protected) stop adopt-protected "ad_branch=${ad_branch}" ;;
 	esac
 	branch_ok "$ad_branch" strict
 	merged_check "$ad_branch"
@@ -895,7 +881,7 @@ merged_check() {
 	mc_rc=0
 	host_open || mc_rc=$?
 	if [ "$mc_rc" -eq 1 ]; then
-		fail host-unreadable "同じブランチ名のマージ済み MR を確かめられません（${host_why}）。origin を確かめてください。"
+		stop host-unreadable-merged "host_why=${host_why}"
 	elif [ "$mc_rc" -eq 2 ]; then
 		[ -z "$mcp_checked" ] || return 0
 		stop_host merged "$host_why"
@@ -926,17 +912,11 @@ if [ -n "$list_open" ]; then
 	host_read_only=1
 	host_open || lo_rc=$?
 	if [ "$lo_rc" -eq 1 ]; then
-		fail host-unreadable "open の issue・MR の一覧を取れません（${host_why}）。origin を確かめてください。"
+		stop host-unreadable-list "host_why=${host_why}"
 	elif [ "$lo_rc" -ne 0 ]; then
-		printf 'ccnavi-start: ホストの API に届かず、open の issue・MR の一覧を取れなかった（%s）。\n' "${host_why:-?}"
-		if [ "${ccnavi_h_kind:-}" = github ]; then
-			ccnavi_text "$root" NEXT_START_LIST_OPEN__GITHUB
-		else
-			ccnavi_text "$root" NEXT_START_LIST_OPEN__GITLAB
-		fi
-		exit "$EXIT_HOST"
+		stop list-open-host "why=$host_why" "kind=${ccnavi_h_kind:-}"
 	fi
-	list_open_items || fail list-open-failed "open の issue・MR の一覧を取れなかった（$(api_failed_reason)）。ユーザに伝えて止まってください（直接実装には切り替えない）。" "$EXIT_HOST"
+	list_open_items || stop list-open-failed "v1=$(api_failed_reason)"
 	exit 0
 fi
 
@@ -945,44 +925,24 @@ if [ -n "$new_issue_title" ]; then
 	ni_rc=0
 	host_open || ni_rc=$?
 	if [ "$ni_rc" -eq 1 ]; then
-		fail host-unreadable "issue を作れません（${host_why}）。origin を確かめてください。"
+		stop host-unreadable-issue "host_why=${host_why}"
 	elif [ "$ni_rc" -eq 2 ]; then
-		printf 'ccnavi-start: ホストの API に届かず、issue を作れなかった（%s）。何も作成せずに処理を中断しました。\n' "$host_why"
-		if [ "$ccnavi_h_kind" = github ]; then
-			ccnavi_text "$root" NEXT_START_NEW_ISSUE__GITHUB
-		else
-			ccnavi_text "$root" NEXT_START_NEW_ISSUE__GITLAB "host=${ccnavi_h_host:-?}"
-		fi
-		exit "$EXIT_HOST"
+		stop new-issue-host "why=$host_why" "kind=$ccnavi_h_kind" "host=${ccnavi_h_host:-}"
 	fi
 	# 機械的な類似確認は、--similar-checked があっても必ず走らせる（決定的で安い）。--similar-checked が飛ばすのは、
 	# 似ているだけのもの。タイトルが同じ（類似度 100%）の open の issue・MR があれば、必ず止める
 	ni_rc=0
 	ni_found=$(find_similar "$new_issue_title" "${similar_checked:+checked}") || ni_rc=$?
 	if [ "$ni_rc" -ne 0 ]; then
-		fail issue-search-failed "似た issue・MR があるかを確かめられなかった（$(api_failed_reason)）。重複を作らないため、何も作成せずに処理を中断しました。ユーザに伝えて止まってください（直接実装には切り替えない）。" "$EXIT_HOST"
+		stop issue-search-failed "v1=$(api_failed_reason)"
 	fi
 	if [ -n "$ni_found" ]; then
-		if [ -n "$similar_checked" ]; then
-			printf 'ccnavi-start: 同じタイトルの open の issue・MR があるため、--similar-checked を付けても issue を作らずに処理を中断しました（タイトル: %s）。\n' "$new_issue_title"
-		else
-			printf 'ccnavi-start: タイトルの似た open の issue・MR があるため、issue を作らずに処理を中断しました（タイトル: %s）。\n' "$new_issue_title"
-		fi
-		printf '%s\n' "$ni_found"
-		ccnavi_text "$root" NEXT_START_SIMILAR_FOUND
-		if [ -n "$similar_checked" ]; then
-			ccnavi_text "$root" NOTE_START_SIMILAR_CHECKED
-		else
-			ccnavi_text "$root" NOTE_START_SIMILAR_UNCHECKED "orig_args_q=$orig_args"
-		fi
 		log_info 似た issue・MR がある -- "count=$(printf '%s\n' "$ni_found" | wc -l | tr -d ' ')" "checked=${similar_checked:-no}"
-		exit "$EXIT_MULTI"
+		stop similar-found "title=$new_issue_title" "checked=$similar_checked" "found=$ni_found" "orig=$orig_args"
 	fi
 	if [ -z "$similar_checked" ]; then
-		printf 'ccnavi-start: issue「%s」はまだ作っていません。タイトルの機械的な確認では似た open の issue・MR は見つかりませんでしたが、言い換えは拾えないので、意味が近いかの確認を挟みます。\n' "$new_issue_title"
-		ccnavi_text "$root" NEXT_START_SIMILAR_CONFIRM "title=$new_issue_title" "orig_args_q=$orig_args"
 		log_info 意味が近いかの確認を待つ -- "title=$new_issue_title"
-		exit "$EXIT_MULTI"
+		stop similar-confirm "title=$new_issue_title" "orig=$orig_args"
 	fi
 	if [ -n "$dry" ]; then
 		start_do dry new-issue "title=$new_issue_title" "real=$real_args"
@@ -994,7 +954,7 @@ if [ -n "$new_issue_title" ]; then
 	ni_rc=0
 	ni_made=$(new_issue_post "$new_issue_title" "$ni_body") || ni_rc=$?
 	if [ "$ni_rc" -ne 0 ] || [ -z "$ni_made" ]; then
-		fail issue-create-failed "issue を作れなかった（$(api_failed_reason)）。何も作成せずに処理を中断しました。ユーザに issue を作ってもらい、その番号で sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> を打つ。直接実装には切り替えない。" "$EXIT_HOST"
+		stop issue-create-failed "v1=$(api_failed_reason)"
 	fi
 	issue_n=$(printf '%s\n' "$ni_made" | sed -n 's/^number //p' | head -n 1)
 	printf 'issue #%s を作った（%s）。この番号で続ける。以降の打ち直しは --issue %s で行う（--new-issue は打ち直さない。重複 issue ができる）\n' "$issue_n" "$(printf '%s\n' "$ni_made" | sed -n 's/^url //p' | head -n 1)" "$issue_n"
@@ -1016,12 +976,12 @@ fi
 
 # ---- 1. 既存の候補
 if ! sh "$scripts/ccnavi-branches.sh" "--$what" "$number" --json >"$cand_json"; then
-	fail branches-failed "ccnavi-branches.sh が候補を出せなかった（上の文面を見てください）。"
+	stop branches-failed
 fi
 # 候補と引数とこのリポジトリの git から、進む道を実行ファイルに決めさせる（`ccnavi start route`）。答えは 1 行 1 項目。
 route_out=$(start_read route "$cand_json" "what=$what" "number=$number" "issue=$issue_arg" "mr=$mr_arg" \
 	"branch=$branch_arg" "mcp=$mcp_checked" "integration=$integration") ||
-	fail branches-bad-json "ccnavi-branches.sh の出力を読めなかった。"
+	stop branches-bad-json
 # route の答えの <項目> の値。<項目>
 route_get() {
 	printf '%s\n' "$route_out" | sed -n "s/^$1 //p" | head -n 1
@@ -1046,8 +1006,8 @@ unchecked=""
 if [ "$route" = mcp ]; then
 	cb="$branch_arg"
 	case "$(route_get problem)" in
-	protected) fail adopt-protected "ブランチ ${cb} は保護されたブランチ（統合先・main・master・develop・release など）か、使えない書き方です。MR の元ブランチとして採用できません。" ;;
-	branch-missing) fail branch-missing "ブランチ $cb が手元にも origin にもありません。--branch の綴りを確かめてください。" ;;
+	protected) stop adopt-protected "ad_branch=${cb}" ;;
+	branch-missing) stop branch-missing "cb=$cb" ;;
 	esac
 	branch_ok "$cb" lenient
 	[ -z "$clash_note" ] || printf 'ccnavi-start: 案内: %s\n' "$clash_note"
@@ -1071,9 +1031,7 @@ fi
 
 if [ "$route" = multi ]; then
 	show_list
-	printf 'ccnavi-start: 候補が %s 件見つかったため、何も作成せずに処理を中断しました。ユーザに見せ、既存のブランチで続けるか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$total"
-	log_info 候補が複数 -- "total=$total"
-	exit "$EXIT_MULTI"
+	stop multi "total=$total"
 fi
 
 # ホストを見られないまま続けない（手元の候補だけでは、既存の MR も閉じる issue も確かめられない）。
@@ -1082,7 +1040,7 @@ if [ "$route" = unchecked ]; then
 	host_rc=0
 	host_open || host_rc=$?
 	if [ "$host_rc" -eq 1 ]; then
-		fail host-unreadable "ホストを見られず（${host_reason}）、origin も読めない（${host_why}）。何も作成せずに処理を中断しました。"
+		stop host-unreadable-search "host_reason=${host_reason}" "host_why=${host_why}"
 	fi
 	stop_branch=$(route_get branch)
 	if [ -n "$mcp_checked" ]; then
@@ -1093,27 +1051,27 @@ fi
 
 if [ "$total" -eq 0 ]; then
 	if [ "$route" = mr-not-found ]; then
-		fail mr-not-found "MR #${number} の元ブランチを読めなかった。番号を確かめてください。"
+		stop mr-not-found "number=${number}"
 	fi
 	if [ "$route" = none-unchecked ]; then
 		# 既存の MR を見落として重複を作らないため、新規作成に進まず止める
 		host_rc=0
 		host_open || host_rc=$?
 		if [ "$host_rc" -eq 1 ]; then
-			fail host-unreadable "ホストを見られず（${host_reason}）、origin も読めない（${host_why}）。既存の MR を見落として重複を作らないため、何も作成せずに処理を中断しました。"
+			stop host-unreadable-none "host_reason=${host_reason}" "host_why=${host_why}"
 		fi
 		stop_host search "${host_reason:-$host_why}"
 	fi
 	if [ "$route" = none-branch ]; then
 		# --branch は既存の MR の元ブランチを指す。ホストを見られないなら 3 つそろえる案内、見られたのに MR が無ければ止める
 		[ -z "$unchecked" ] || stop_host mcp-args "${host_reason:-ホストを見られない}"
-		fail branch-no-mr "--branch ${branch_arg} を元ブランチに持つ開いた MR は見つかりません（issue #${number} に紐づく候補が 0 件）。ブランチ名を確かめるか、--branch を外して新しく始めてください。" 1
+		stop branch-no-mr "branch_arg=${branch_arg}" "number=${number}"
 	fi
 	# ---- 2. 新規作成（--issue だけ。MR の本文に Closes #<番号> を入れるので、issue と MR の組は作った時点で確定する）
 	host_rc=0
 	host_open || host_rc=$?
 	if [ "$host_rc" -eq 1 ]; then
-		fail host-unreadable "MR を作れません（${host_why}）。origin を確かめてください。"
+		stop host-unreadable "host_why=${host_why}"
 	fi
 	issue_rc=0
 	# --title を付けても issue の存在は確かめる（実在しない番号の Closes で別の課題を閉じないため）。
@@ -1121,13 +1079,13 @@ if [ "$total" -eq 0 ]; then
 	if [ "$host_rc" -eq 0 ]; then
 		issue_title_get || issue_rc=$?
 		case "$issue_rc" in
-		2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。番号を作らず、ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します（チケット作業は issue と MR のセットです）。" 2 ;;
+		2) stop issue-missing-create "number=${number}" "issue_why=${issue_why}" ;;
 		1)
 			# API が失敗して実在を確かめられなかった。--slug・--title があっても無確認で進まない
 			# （確かめた後の再実行は --mcp-checked を付ける）
 			[ -n "$mcp_checked" ] || stop_host title "$(api_failed_reason)"
 			;;
-		3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
+		3) stop issue-is-pr "number=${number}" ;;
 		esac
 	fi
 	if [ -n "$opt_slug" ]; then
@@ -1147,24 +1105,17 @@ if [ "$total" -eq 0 ]; then
 		issue_branch_make "${opt_title:-$issue_title_read}" || ib_rc=$?
 		case "$ib_rc" in
 		0) ;;
-		2) fail no-slug "issue #${number} からブランチ名を作れませんでした（${issue_branch_why}）。--slug <語> を付けて再実行してください。" 2 ;;
-		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
+		2) stop no-slug "number=${number}" "issue_branch_why=${issue_branch_why}" ;;
+		*) stop id-unchecked "number=${number}" ;;
 		esac
 		if [ "$issue_branch_long" = yes ]; then
 			# タイトルが長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
-			printf 'ccnavi-start: issue #%s のタイトルが長く、タイトルから作る名前 %s は途中で切れます。ブランチは作らずに止めました（--new-issue から来たときの issue は作成済み）。\n' "$number" "$issue_branch" >&2
-			ccnavi_text "$root" NOTE_START_SLUG_SHORT >&2
-			if [ -n "$ib_project" ]; then
-				ccnavi_text "$root" NOTE_START_SLUG_PROJECT "project=$ib_project" >&2
-			fi
-			ccnavi_text "$root" NEXT_START_LONG_SLUG "real_args_q=$real_args" >&2
-			log_info 止めた -- "exit=2" "reason=long-title"
-			exit 2
+			stop long-slug "number=$number" "branch=$issue_branch" "project=$ib_project" "real=$real_args"
 		fi
 		new_branch="$issue_branch"
 		slug="${new_branch#"${opt_prefix}-${number}-"}"
 	fi
-	ccnavi_is_branch "$new_branch" || fail bad-branch "ブランチ名 ${new_branch} は使えない書き方です（--prefix・--slug を見直してください）。" 2
+	ccnavi_is_branch "$new_branch" || stop bad-branch "new_branch=${new_branch}"
 	# 作る前に、既存の MR を採用するときと同じ識別子の確認をする。作ってから後のステップで詰まると、打ち直しても
 	# 採用の確認で止まり、手で消すまで戻れない
 	branch_ok "$new_branch" strict "--prefix・--slug を見直して再実行してください。" 2
@@ -1182,8 +1133,8 @@ if [ "$total" -eq 0 ]; then
 			"issue=$final_issue" "host-why=$ni_why" "real=$real_args"
 		exit 0
 	fi
-	cgit fetch origin "$integration" || fail fetch-failed "統合先 ${integration} を origin から取れなかった（上の出力を見てください）。"
-	ref_exists "refs/remotes/origin/$integration" || fail no-origin-integration "origin/${integration} がありません。統合先の名前を確かめてください。"
+	cgit fetch origin "$integration" || stop fetch-failed-integration "integration=${integration}"
+	ref_exists "refs/remotes/origin/$integration" || stop no-origin-integration "integration=${integration}"
 	prepare "$new_branch" "from=origin/$integration" initial=yes
 	ensure_push "$new_branch"
 	ensure_mr "$new_branch" "$new_title"
@@ -1200,27 +1151,24 @@ cb=$(route_get branch)
 c_mrs=$(route_get mrs)
 c_url=$(route_get url)
 c_mrnum=$(route_get mr)
-[ "$route" != bad-candidate ] || fail bad-candidate "候補のブランチ名（${cb}）が使えない書き方か、保護されたブランチ（統合先・main・master・develop・release など）です。ユーザに確かめてください。"
+[ "$route" != bad-candidate ] || stop bad-candidate "cb=${cb}"
 
 if [ "$route" = proposal-only ]; then
 	# どこにも実体が無い（チケットの提案だけ）。ユーザが決める
 	show_list
-	printf 'ccnavi-start: 候補 %s は、手元にも origin にも MR にも実体がありません（チケットの提案だけ）。何も作成せずに処理を中断しました。ユーザに確かめてください。\n' "$cb"
-	exit "$EXIT_MULTI"
+	stop proposal-only "branch=$cb"
 fi
 # --branch はホストに届くとき、普通に確かめる側の指定（MR の元ブランチと違えば止める）
 if [ "$route" = branch-mismatch ]; then
-	fail branch-mismatch "--branch ${branch_arg} は、ホストで見つかった元ブランチ ${cb} と違います。ブランチ名を確かめて打ち直してください。" 1
+	stop branch-mismatch "branch_arg=${branch_arg}" "cb=${cb}"
 fi
 # 紐づく MR がすでにある。--issue だけで来て、ローカルにそのブランチの親のワークツリーが無ければ、他の PC・他の
 # セッションの作業かもしれない。黙って引き継がず、ユーザに聞く（--mr を渡されたら、選んだものとして続ける）。
 # ワークツリーがあれば自分の作業の再開なので、聞かずに続ける
 if [ "$route" = mr-exists ]; then
 	show_list
-	printf 'ccnavi-start: issue #%s に紐づく MR !%s（%s）がすでにあります。この PC にそのブランチ %s のワークツリーが無いので、他の PC や他のセッションの作業かもしれません。何も作成せずに処理を中断しました。\n' "$number" "$c_mrnum" "$c_url" "$cb"
-	ccnavi_text "$root" NEXT_START_MR_EXISTS "issue=$number" "mr=$c_mrnum"
 	log_info 紐づく MR があり聞く -- "branch=$cb" "mr=$c_mrnum"
-	exit "$EXIT_MULTI"
+	stop mr-exists "number=$number" "mr=$c_mrnum" "url=$c_url" "branch=$cb"
 fi
 # 既存の MR を採用するときの確認。引っかかったら止める
 if [ "$route" = adopt ]; then
@@ -1244,25 +1192,21 @@ if [ "$route" = nomr ]; then
 	case "$(route_get after)" in
 	stale)
 		show_list
-		printf 'ccnavi-start: 候補 %s は、統合先 %s より進んでおらず、開いた MR もありません（取り込み済みで消し忘れた古いブランチかもしれない）。何も作成せずに処理を中断しました。ユーザに見せ、このブランチを使うか・新しく切るか・やめるかを聞いて、返事を待ってください。\n' "$cb" "$integration"
-		log_info 古いブランチらしい -- "branch=$cb"
-		exit "$EXIT_MULTI"
+		stop stale "branch=$cb" "integration=$integration"
 		;;
 	resume) resume=1 ;;
 	esac
 	if [ -z "$resume" ]; then
 		# MR の無い候補は成功させない（issue と MR のセットが確定しない）
 		show_list
-		printf 'ccnavi-start: 候補 %s には開いた MR がありません。issue と MR のセットが確定しないため、何も作成せずに処理を中断しました。このブランチで続けるなら、ユーザに MR（説明欄に Closes #%s）を作ってもらい、--mr <番号> を付けて打ち直します。新しく切るか・やめるかも含め、ユーザに聞いて返事を待ってください。\n' "$cb" "${issue_n:-<番号>}"
-		log_info MR の無い候補 -- "branch=$cb"
-		exit "$EXIT_MULTI"
+		stop no-mr "branch=$cb" "number=$issue_n"
 	fi
 	final_issue="$number"
 	# 作りかけの再開は MR を作る。ワークツリーを切る前に、ホストと権限を確かめる
 	host_rc=0
 	host_open || host_rc=$?
 	if [ "$host_rc" -eq 1 ]; then
-		fail host-unreadable "MR を作れません（${host_why}）。origin を確かめてください。"
+		stop host-unreadable "host_why=${host_why}"
 	elif [ "$host_rc" -eq 2 ]; then
 		stop_host search "$host_why"
 	fi
@@ -1281,8 +1225,8 @@ if [ -n "$resume" ]; then
 	issue_rc=0
 	issue_title_get || issue_rc=$?
 	case "$issue_rc" in
-	2) fail issue-missing "issue #${number} が見つからない、または読む権限がありません（${issue_why}）。何も作成せずに中断しました。ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します。" 2 ;;
-	3) fail issue-is-pr "#${number} は issue ではなく PR です。MR の番号なら --mr ${number} を使ってください。" 2 ;;
+	2) stop issue-missing-resume "number=${number}" "issue_why=${issue_why}" ;;
+	3) stop issue-is-pr "number=${number}" ;;
 	esac
 	merged_check "$cb"
 	issue_state_gate

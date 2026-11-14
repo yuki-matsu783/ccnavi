@@ -123,6 +123,27 @@ func runStart(stdout, stderr io.Writer, root string, conf *config.Settings, args
 				Integration: kv["integration"], MRTitle: kv["mr-title"], Number: kv["number"], Issue: kv["issue"],
 				HostWhy: kv["host-why"], MRURL: kv["mr-url"], Real: kv["real"], Resume: kv["resume"] != ""})
 		}
+	case op == "stop" && len(rest) >= 1:
+		kv := map[string]string{}
+		for _, w := range rest[1:] {
+			k, v, found := strings.Cut(w, "=")
+			if !found {
+				return usage()
+			}
+			kv[k] = v
+		}
+		out, known := start.Stop(root, rest[0], kv)
+		if !known {
+			return usage()
+		}
+		files, answer = nil, func([][]byte) (string, int) { return out, 0 }
+	case op == "check-report" && len(rest) >= 1:
+		kv, valid := pairs(rest[1:], "repo", "top")
+		if !valid {
+			return usage()
+		}
+		here, _ := tree.TreeOf(root, ospath.Abspath(kv["top"]), integrate.ProjectsDir(conf, root))
+		files, answer = nil, func([][]byte) (string, int) { return start.CheckReport(root, rest[0], kv["repo"], here.Project) }
 	case op == "route" && len(rest) >= 1:
 		ra, valid := routeArgs(rest[1:])
 		if !valid {

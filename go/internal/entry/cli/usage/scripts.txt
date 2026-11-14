@@ -171,6 +171,16 @@
     ccnavi start prepare <branch> [from=<起点>] [ff=yes] [initial=yes] integration=<branch> number=<n> [real=…]
         （ccnavi-start.sh 用。ワークツリーを出し、早送りと空の初期コミットを済ませます。初期コミットを積めなければ、
          この回で作ったワークツリーとブランチを片付けて止めます）
+    ccnavi start stop <名前> [<名前>=<値>]...
+        （ccnavi-start.sh 用。止めるときの文と終了コードを、"fail <識別子> <終了コード>" と "msg <文>"、
+         または出力の行と "exit <終了コード>" で出力します）
+    ccnavi start check-report <事前確認の答えのファイル> repo=<リポジトリ> top=<トップ>
+        （ccnavi-start.sh --check 用。対象リポジトリ・項目ごとの行・結論・次の一手を出力します）
+    ccnavi preflight plan|check|next <名前>=<値>...
+    ccnavi preflight access github|gitlab <プロジェクトの応答> [<member の応答>]
+    ccnavi preflight uid <user の応答>
+        （ccnavi-common-host.sh 用。チケット作業の事前確認の、手元の項目・項目ごとの結果・勧める対処・行と次の一手と、
+         書き込みの権限を判定します。ネットワークには出ません）
     ccnavi start report <名前>=<値>...
     ccnavi start dry new-issue|mcp|create|existing <名前>=<値>...
         （ccnavi-start.sh 用。開始の結果と、--dry-run の作る予定を出力します）

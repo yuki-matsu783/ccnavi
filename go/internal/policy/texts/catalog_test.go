@@ -383,7 +383,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 		called[k.id] = true
 	}
 	for _, id := range []string{"NOTE_GIT_WORKTREE_REMOVE_CWD", "NOTE_GIT_PULL_CONFLICT_ON_TARGET", "NOTE_WORKTREE_RECORD_MISSING",
-		"NOTE_START_SLUG_SHORT", "NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
+		"NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
 			t.Errorf("sh が %s を引かない", id)
 		}
