@@ -240,7 +240,7 @@ unapply_local() {
 	[ -n "$ua_op" ] || ua_op="${resume_op:-}"
 	[ -z "$ua_op" ] || ccnavi ops applied "$ua_op" local false 2>/dev/null || :
 }
-# --resume は、返信・解決の前から操作 ID のロックを持つ（同じ判断を同時に続けて、2 回送らない）。
+# --resume は、返信・解決の前から操作 ID のロックを持つ（同じ判断を同時に続けて、二重に送らない）。
 if [ -n "$resume_op" ]; then
 	post_warning=""
 	op_lock_take "$resume_op" || {
