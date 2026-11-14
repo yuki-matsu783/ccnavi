@@ -65,7 +65,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 ## テスト
 
-- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、Go の実行ファイルを起こす。sh の処理を実行ファイルへ移したら、その判断と解釈は Go の表駆動のテストへ移し、sh のテストは通しの確認だけに減らす（[実行ファイルの境界](exe-boundary.md)の「sh の処理を実行ファイルへ移すとき」）。実行ファイルは `tests/exe.py` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う。`tests/` は ccnavi の Python を読まない
+- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、Go の実行ファイルを起こす。sh の判断と解釈を Go で実装したら、それは Go の表駆動のテストで確かめ、sh のテストは通しの確認だけにする（[実行ファイルの境界](exe-boundary.md)の「テスト」）。実行ファイルは `tests/exe.py` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う。`tests/` は ccnavi の Python を読まない
 - 内部のモジュールを直に import していた単体テストは、`go test`（同じディレクトリの `*_test.go`）へ移した。表で書けるものは表駆動にした
 - `go test ./...` は Python を使わない。Python が無い機械でも、飛ばすテストは増えない
 
