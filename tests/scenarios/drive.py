@@ -78,7 +78,7 @@ def run_step(scn, step, out, idx, session_id, resume_id, persist, root, issue_no
 
 
 def _scripted(cmd, step, plan_path, env):
-    """claude の代わりに代役（tests/fake_claude.py）を同じ引数で起こす形にする。"""
+    """claude の代わりにスタブ（tests/fake_claude.py）を同じ引数で起こす形にする。"""
     plan = {"script": step["script"], "after_stop_block": step.get("after_stop_block") or []}
     plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
     env = dict(os.environ if env is None else env)
@@ -206,7 +206,7 @@ def finish(scn, out, st, root):
         rows = expect.read_decisions(Path(root) / "logs/decisions.jsonl", st["session_ids"])
         spec = scn["expect"]
         if schema.is_scripted(scn):
-            # 代役は台本どおりに打つので、モデルの振る舞いを読む judge は評価しない
+            # スタブは台本どおりに打つので、モデルの振る舞いを読む judge は評価しない
             spec = {k: v for k, v in spec.items() if k != "judge"}
         results = expect.evaluate(spec, rows, raw, root, st["pre_digests"])
         halt = st.get("halt")
@@ -353,7 +353,7 @@ def continue_scenario(scn, out, st, root):
         write_state(out, st)
         raise
     if rc == 10 and st.get("host"):
-        # 模擬は止める。置き場（bare・代役・模擬の状態）は、next が同じ環境で続けるので残す
+        # 模擬は止める。置き場（bare・スタブ・模擬の状態）は、next が同じ環境で続けるので残す
         hostenv.hold(root, st["host"])
         write_state(out, st)
         if st["host"].get("project_id"):

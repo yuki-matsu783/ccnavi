@@ -1,4 +1,4 @@
-"""GitLab API v4 の代役の本体。手で使う入口は `tests/manual/gitlab/fake_gitlab.py`。
+"""GitLab API v4 のスタブの本体。手で使う入口は `tests/manual/gitlab/fake_gitlab.py`。
 
 説明（何のためか、状態ファイルの形、時計のずらし、関数としての使い方）は入口の docstring にある。
 自動テストは、ここの `start` を import して起こす。
@@ -483,13 +483,13 @@ class Handler(BaseHTTPRequestHandler):
         view["sha"] = mr.get("sha", "0" * 40)
         # 実物の MR も持つ項目。sh（ccnavi-common-review.sh の find_mr など）が、jq でこれを見て
         # 「このプロジェクトから出た MR か」を絞り込む。
-        # 代役のプロジェクトの id は 1（`project` の答え）
+        # スタブのプロジェクトの id は 1（`project` の答え）
         view["source_project_id"] = mr.get("source_project_id", 1)
         return view
 
 
 class Server(ThreadingHTTPServer):
-    """起動した代役。`start` が返す。状態はすべてこのインスタンスが持つ。"""
+    """起動したスタブ。`start` が返す。状態はすべてこのインスタンスが持つ。"""
 
     # keep-alive の接続を開いたままの相手がいても、stop が待たされないようにする。
     # 既定（daemon_threads が False、block_on_close が True）だと、server_close が各接続の
@@ -580,7 +580,7 @@ def start(
     port: int = 0,
     echo: bool = False,
 ) -> Server:
-    """代役を別スレッドで立てて、接続を受けられるのを確かめてから返す。
+    """スタブを別スレッドで立てて、接続を受けられるのを確かめてから返す。
 
     確かめる上限は 5 秒で、超えたら TimeoutError。
 

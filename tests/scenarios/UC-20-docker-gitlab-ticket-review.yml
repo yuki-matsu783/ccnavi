@@ -31,7 +31,7 @@ steps:
       実装はまだしないで。
   - human: true
     instruction: >-
-      代役の git の環境（PATH 先頭の hostbin、`FAKE_BARE`・`FAKE_REAL_ORIGIN`・`FAKE_CRED_URL`、`GITLAB_TOKEN`。`state.json` の host と `hostenv.step_env` から組む）の中で、
+      スタブの git の環境（PATH 先頭の hostbin、`FAKE_BARE`・`FAKE_REAL_ORIGIN`・`FAKE_CRED_URL`、`GITLAB_TOKEN`。`state.json` の host と `hostenv.step_env` から組む）の中で、
       擬似 tty（`script`）を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を代行して打つ（識別子は 1 つ目の prompt の報告にある）。
       素の shell で打たない（`ccnavi-user-push-approved.sh` が本物の origin に push しうる）。
     check:
@@ -73,7 +73,7 @@ steps:
     resume: true
   - human: true
     instruction: >-
-      step 3 と同じ要領で、代役の git の環境の中で、擬似 tty を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を代行して打つ
+      step 3 と同じ要領で、スタブの git の環境の中で、擬似 tty を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を代行して打つ
       （フィードバック計画の改版の承認。`scenario_tools.py agree <出力の置き場> <親>`）。素の shell で打たない。
       `human_run` は使えない: 親の改版は識別子が承認済みと同じなので「新しく承認済みになった」と数えられず、打っても halt する（4 回目の次の回で確認）。
     check:

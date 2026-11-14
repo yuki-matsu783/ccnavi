@@ -199,7 +199,8 @@ class WriteAndPushHarness(unittest.TestCase):
             EXE.format(exe=exe.sh_path()),
         )
         self.state = os.path.join(self.ws, "logs", "state")
-        # ホストの代役（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
+        # ホストのスタブ（git remote get-url だけがホストの形を答える。
+        # 本物のネットワークには出ない）
         self.hostbin, self.routes, self.requests_log = host_stub.build(base, sys.executable)
         self.tree = self.parent_tree()
         self.approve_family()
@@ -280,7 +281,7 @@ class WriteAndPushHarness(unittest.TestCase):
         return self.sh("ccnavi-sync.sh", *args)
 
     def host_env(self, extra, token=None):
-        """`ccnavi-ticket.sh` に渡す環境。ホストの代役の置き場を PATH の先頭に足す。"""
+        """`ccnavi-ticket.sh` に渡す環境。ホストのスタブの置き場を PATH の先頭に足す。"""
         merged = dict(extra)
         merged.update(
             host_stub.env(
@@ -294,7 +295,8 @@ class WriteAndPushHarness(unittest.TestCase):
         return merged
 
     def ticket_env(self, **extra):
-        """`self.env()` にホストの代役を足したもの。`ccnavi-ticket.sh` を直接起こすテストが使う。"""
+        """`self.env()` にホストのスタブを足したもの。
+        `ccnavi-ticket.sh` を直接起こすテストが使う。"""
         return self.env(**self.host_env(extra))
 
     def set_routes(self, routes):
@@ -391,7 +393,7 @@ class PhaseOne:
         self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
 
 
-# `--accept-plan` の代役。実行ファイルと同じく、操作記録を作って、その操作ID を計画に書く
+# `--accept-plan` のスタブ。実行ファイルと同じく、操作記録を作って、その操作ID を計画に書く
 # （`tests/oprecord.py`。記録と計画の中身は ACCEPT_PLAN_SPEC）。
 ACCEPT_PLAN_SPEC = os.path.join(tempfile.mkdtemp(prefix="ccnavi-accept-plan-"), "spec.json")
 atexit.register(shutil.rmtree, os.path.dirname(ACCEPT_PLAN_SPEC), ignore_errors=True)
@@ -425,7 +427,7 @@ ACCEPT_PLAN_CASE = """*" --accept-plan "*)
     spec=ACCEPT_PLAN_SPEC.replace("\\", "/"),
 )
 
-# 実行ファイルの半分の代役。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
+# 実行ファイルの半分のスタブ。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
 # 残り（`write-and-push family`・`write-and-push sort`・`sync paths` など）は実際のものに渡す。
@@ -471,8 +473,8 @@ fi
 exec '{exe}' --guard-ticket-approval disable "$@"
 """
 
-# git の代役。`remote get-url origin` だけをホストの代役の URL で答え、残りは実際のものに渡す
-# （取り込みと push は bare のリモート、ホストの API は代役へ）。
+# git のスタブ。`remote get-url origin` だけをホストのスタブの URL で答え、残りは実際のものに渡す
+# （取り込みと push は bare のリモート、ホストの API はスタブへ）。
 URL_GIT = """#!/bin/sh
 case " $* " in
 *" remote get-url origin "*) printf '%s\\n' '{url}'; exit 0 ;;
@@ -481,7 +483,7 @@ exec '{git}' "$@"
 """
 
 
-# 実行ファイルの代役（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
+# 実行ファイルのスタブ（ホストに触る副命令の試験用）。状態を書く副命令だけを代わりに書き
 # （親のワークツリーにマーカーを置き、書いたパスの一覧を出す）、`write-and-push`・`sync` などは
 # 実際のものに渡す。
 # HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ失敗させる（打ち直しの試験）。
@@ -546,7 +548,7 @@ exec '{exe}' --guard-ticket-approval disable "$@"
 
 
 class Host(__import__("http.server").server.BaseHTTPRequestHandler):
-    """GitLab の代役。MR 1 つ、コメント（notes）の投稿と一覧、Draft 外し。"""
+    """GitLab のスタブ。MR 1 つ、コメント（notes）の投稿と一覧、Draft 外し。"""
 
     notes: list = []
     port = 0
@@ -607,7 +609,7 @@ class Host(__import__("http.server").server.BaseHTTPRequestHandler):
 
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class WriteAndPushHostHarness(WriteAndPushHarness):
-    """ホストの代役（GitLab）と実行ファイルの代役を用意する道具。試験は持たない。"""
+    """ホストのスタブ（GitLab）と実行ファイルのスタブを用意する道具。試験は持たない。"""
 
     def setUp(self):
         super().setUp()

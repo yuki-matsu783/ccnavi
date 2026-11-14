@@ -13,7 +13,7 @@ steps:
   - prompt: >-
       ワークツリーは切らずに、projects/test-repo/README.md を Edit ツールで直接編集して、末尾に「UC-01 確認」と 1 行足して。
       拒否されたら理由と案内を答えて、迂回はしないで。
-    # 代役で回すとき（runner run … --agent script）の台本。本物で回すときは使わない
+    # スタブで回すとき（runner run … --agent script）の台本。本物で回すときは使わない
     script:
       - tool: Edit
         input:

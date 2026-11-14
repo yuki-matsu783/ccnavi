@@ -336,7 +336,7 @@ def scenario_summary(scn):
     )
     if schema.is_scripted(scn):
         lines.append(
-            "相手: 代役（tests/fake_claude.py）が step の script どおりに打つ。claude は呼ばず、"
+            "相手: スタブ（tests/fake_claude.py）が step の script どおりに打つ。claude は呼ばず、"
             "費用はかからない。judge は評価しない"
         )
     if scn.get("test_repo"):

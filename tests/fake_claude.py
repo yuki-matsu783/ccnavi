@@ -1,4 +1,4 @@
-"""`claude -p` の代役。台本どおりにツールを呼び、Claude Code と同じ形で hook を呼び、
+"""`claude -p` のスタブ。台本どおりにツールを呼び、Claude Code と同じ形で hook を呼び、
 stream-json を出す。
 
 受入シナリオを `--agent script` で回すとき、実行器（`tests/scenarios/drive.py`）が

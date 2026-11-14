@@ -1,6 +1,6 @@
 """本物の `claude -p` に決まった手を打たせ、hook に渡る JSON と stream-json の形を録る。
 
-claude -p の代役の契約のうち、本物から録る側（仕様は `.agents/docs/claude-contract.md`）。
+claude -p のスタブの契約のうち、本物から録る側（仕様は `.agents/docs/claude-contract.md`）。
 手動で回す。費用がかかる。
 自動テストは呼ばない。
 
@@ -22,7 +22,7 @@ claude -p の代役の契約のうち、本物から録る側（仕様は `.agen
 4. 振る舞い（止めたツールが動いたか、理由がどこに出たか、Stop の差し戻しで続いたか、hook が並行に
    起きたか など）を `observations` に置く
 5. 生の記録（値を含む）は `--raw-dir` に残す。既定はワークスペースルート直下の
-   `scratchpad/claude-record/`（追跡されない）。代役を作るときに読む
+   `scratchpad/claude-record/`（追跡されない）。スタブを作るときに読む
 
 置く前に、記録に機密やモデルの名前・機械のパスが入っていないかを確かめ、当たれば置かない。
 """

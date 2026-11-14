@@ -1176,7 +1176,7 @@ class IntegrateGapsTest(Fixture):
 
     def install_failing_git(self):
         """環境変数 FAIL_GIT_MATCH の値を引数に含む git の呼び出しだけ、
-        終了コード 1 で失敗させる代役を PATH に置く。"""
+        終了コード 1 で失敗させるスタブを PATH に置く。"""
         shim = os.path.join(self._tmp.name, "failgit")
         write(
             os.path.join(shim, "git"),
@@ -1195,7 +1195,7 @@ class IntegrateGapsTest(Fixture):
         """integrate まで進めたうえで、match にヒットする git が失敗する状態にして、
         integrate-done -m を実行する。
 
-        K は載り、片付けは途中で止まる。戻り値は K が載る前の HEAD で、代役は外してから返す。
+        K は載り、片付けは途中で止まる。戻り値は K が載る前の HEAD で、スタブは外してから返す。
         """
         before = base or self.head()
         r = self.run_git_sh(

@@ -127,7 +127,7 @@ class WriteAndPushChromeConfirmTest(PhaseOne, WriteAndPushHarness):
 
     取り込み済みの親子のチケットでは、手元の CLI を直に打つと write-and-push に断られる
     （`--record-tree` が無い）。そこで write-and-push と同じ手順
-    （`ccnavi-review.sh review-request` と `confirm`。GitHub の代役は録った見本）で手元を
+    （`ccnavi-review.sh review-request` と `confirm`。GitHub のスタブは録った見本）で手元を
     回し、同じ状態から Chrome の入口が出す書くものと、write-and-push
     が親のブランチへ書いて送ったものを比べる。
     違ってよいのは経路（`via`）と時刻（`at`）だけ。アカウント（`actor`）は、手元は sh が

@@ -1,6 +1,6 @@
 """`find_marked`（ccnavi-common-review.sh）。目印で自分の投稿を探す、送信の照合の読み取り。
 
-ホストの一覧は代役（`ccnavi_host_pages` を差し替える）で返し、jq の絞り込みを GitHub と GitLab の
+ホストの一覧はスタブ（`ccnavi_host_pages` を差し替える）で返し、jq の絞り込みを GitHub と GitLab の
 両方で確かめる。
 
 - 目印の一致だけを数える（別の段階・別の操作ID・目印の無い投稿は数えない）

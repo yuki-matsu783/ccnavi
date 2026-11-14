@@ -1,6 +1,6 @@
 """`comment_staged`（ccnavi-common-review.sh）。エージェントの単発の投稿を操作記録に載せて送る。
 
-`ccnavi`・`comment`・`find_marked`・`account` は代役に差し替え、分岐だけを確かめる。
+`ccnavi`・`comment`・`find_marked`・`account` はスタブに差し替え、分岐だけを確かめる。
 
 - 記録を作れなければ、前と同じ `comment` に戻る
 - 送り済みなら送らない

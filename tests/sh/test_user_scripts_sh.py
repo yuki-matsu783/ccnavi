@@ -144,7 +144,7 @@ class EntryTest(unittest.TestCase):
         for name in os.listdir(SH_DIR):
             if name.endswith(".sh"):
                 shutil.copy(os.path.join(SH_DIR, name), scripts)
-        # 実行ファイルの代役。呼ばれたら印を残す（古い入口は呼ばないこと）
+        # 実行ファイルのスタブ。呼ばれたら印を残す（古い入口は呼ばないこと）
         self.called = os.path.join(self.work, "called")
         self.bin = os.path.join(self.work, "bin", "ccnavi")
         os.makedirs(os.path.dirname(self.bin))

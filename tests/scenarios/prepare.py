@@ -104,7 +104,7 @@ def host_env(st):
 
 
 def teardown_host(st, root):
-    """模擬を止め、代役の置き場を消す（何度呼んでもよい）。docker-gitlab のプロジェクトを
+    """模擬を止め、スタブの置き場を消す（何度呼んでもよい）。docker-gitlab のプロジェクトを
     消せなかったとき（手作業が要る）は True。"""
     if st.get("host"):
         return bool(hostenv.teardown(root, st["host"], repo.git))

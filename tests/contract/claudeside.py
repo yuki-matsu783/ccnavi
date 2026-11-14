@@ -1,4 +1,4 @@
-"""claude -p の契約の場面（本物と代役で同じもの）。仕様は `.agents/docs/claude-contract.md`。
+"""claude -p の契約の場面（本物とスタブで同じもの）。仕様は `.agents/docs/claude-contract.md`。
 
 GitLab の `fakeside.py` と同じ役回り。使い捨ての木、hook の入力を書き出すだけの hook、
 打たせる手を持つ。hook が受けた JSON と stream-json を、形（`shape.py`）と
@@ -6,7 +6,7 @@ GitLab の `fakeside.py` と同じ役回り。使い捨ての木、hook の入�
 
 - 本物の側: `tests/manual/claude/record_hooks.py` が `PROMPT` を `claude -p` に渡し、
   `recorded.json` に録る
-- 代役の側: `run_fake` が `SCRIPT`（`PROMPT` と同じ手の台本）を `tests/fake_claude.py` に渡す
+- スタブの側: `run_fake` が `SCRIPT`（`PROMPT` と同じ手の台本）を `tests/fake_claude.py` に渡す
 """
 
 from __future__ import annotations
@@ -148,7 +148,7 @@ def build_tree(base: str) -> str:
     return tree
 
 
-# PROMPT と同じ手の台本（代役用）。1 回目と、--resume でつなぐ 2 回目
+# PROMPT と同じ手の台本（スタブ用）。1 回目と、--resume でつなぐ 2 回目
 SCRIPT = (
     {
         "script": [
@@ -386,7 +386,7 @@ def collect(tree: str, run) -> dict:
 
 
 def run_fake(base: str) -> dict:
-    """使い捨ての木で代役を 2 回回し、collect の結果を返す。"""
+    """使い捨ての木でスタブを 2 回回し、collect の結果を返す。"""
     tree = build_tree(base)
     session = "00000000-0000-4000-8000-000000000000"
     env = {k: v for k, v in os.environ.items() if not k.startswith(("CLAUDE_", "CCNAVI_"))}
@@ -420,7 +420,7 @@ def run_fake(base: str) -> dict:
             env={**env, "CCNAVI_FAKE_CLAUDE_SCRIPT": script},
         )
         if r.returncode != 0:
-            raise RuntimeError(f"代役が終了コード {r.returncode} で終わった: {r.stderr}")
+            raise RuntimeError(f"スタブが終了コード {r.returncode} で終わった: {r.stderr}")
         return r.stdout
 
     return collect(tree, run)

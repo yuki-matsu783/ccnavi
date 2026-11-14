@@ -5,7 +5,7 @@
   uv run python tests/manual/gitlab/scenario_tools.py leak  <出力の置き場> [--root 根]
 
 issue: 使い捨てのプロジェクトに、人間役のトークンで issue を 1 件作る（human_api に無い操作）。
-agree: 代役の git の環境（hostenv.step_env）の中で、擬似 tty から y を送って承認を代行する。
+agree: スタブの git の環境（hostenv.step_env）の中で、擬似 tty から y を送って承認を代行する。
        ユーザ専用の承認の sh は hook が止めるので、ユーザの端末で実行する。素の shell で打たない。
 leak:  トークンの値が記録に出ていないかを、一致したファイル名だけで報告する（値は出さない）。
 

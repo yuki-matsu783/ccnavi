@@ -9,7 +9,7 @@ MR がマージ済みかで「閉じた」か「消えた」かを言う。親�
 した押し手で、ワークスペースからは「他の機械が push した」「ホストがブランチを消した」ように見える。
 
 読み返すのは終了コード・標準出力と、git に残った ref、片付けの記録（logs/state/retire/）の有無だけ。
-MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めた代役の sh に差し替える。
+MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めたスタブの sh に差し替える。
 
 `CCNAVI_SH_DIR` で、コピーする sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。`.ccnavi/scripts/` にコピーする前の版
@@ -226,7 +226,7 @@ class SyncHarness(unittest.TestCase):
         return self.sha(tree, "HEAD")
 
     def review_says(self, text, code=0):
-        """ccnavi-review.sh merged の代役。答えと終了コードを決める。"""
+        """ccnavi-review.sh merged のスタブ。答えと終了コードを決める。"""
         write(
             os.path.join(self.scripts, "ccnavi-review.sh"),
             f'#!/bin/sh\n[ "$1" = merged ] || exit 2\nprintf "%s\\n" "{text}"\nexit {code}\n'
@@ -814,7 +814,7 @@ class SyncTest(SyncHarness):
     # ---- リモートにブランチが残っていても、MR がマージ済みなら閉じている
 
     def review_log(self, answer):
-        """答えを決めた ccnavi-review.sh の代役。呼ばれた引数を 1 行ずつ残す。残す先を返す。"""
+        """答えを決めた ccnavi-review.sh のスタブ。呼ばれた引数を 1 行ずつ残す。残す先を返す。"""
         log = os.path.join(self._tmp.name, "review-args")
         write(
             os.path.join(self.scripts, "ccnavi-review.sh"),

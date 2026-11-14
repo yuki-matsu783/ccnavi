@@ -2,7 +2,7 @@
 
 ホストの API と git のリモートが使える状態かを、ロックを取る前に確かめる（直接作業では確かめない）。
 共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` と `tests/host_stub.py` にある。
-ホストは代役（失敗する gh / glab、routes.json で答える curl）で、本物のネットワークには出ない。
+ホストはスタブ（失敗する gh / glab、routes.json で答える curl）で、本物のネットワークには出ない。
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ class TicketPreflightTest(WriteAndPushHarness):
             return f.read().splitlines()
 
     def git_shim(self, body):
-        """ls-remote --heads だけ差し替える git の代役。呼ばれたことを ls-remote.log に残す。"""
+        """ls-remote --heads だけ差し替える git のスタブ。呼ばれたことを ls-remote.log に残す。"""
         shim = os.path.join(self._base, "shim")
         log = os.path.join(self._base, "ls-remote.log")
         executable(

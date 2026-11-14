@@ -1,4 +1,4 @@
-"""write-and-push の受入テスト（ホストの代役（GitLab・GitHub）とレビューの状態）。
+"""write-and-push の受入テスト（ホストのスタブ（GitLab・GitHub）とレビューの状態）。
 
 共通の道具と全体の説明は `tests/sh/write_and_push_harness.py` にある。
 """
@@ -339,7 +339,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             '  printf \'{"choices": {"u1": "keep"}, "digest": "d0"}\' >"$out"\n'
             "  exit 0 ;;\n"
             # 事前の検査（--check）は通す。受け入れる指摘の計画（--accept-plan）は、
-            # 操作記録を作る代役（hosthalf）に任せる
+            # 操作記録を作るスタブ（hosthalf）に任せる
             '*" --check "*) exit 0 ;;\n'
             f'*" --accept-plan "*) exec \'{self.half}\' "$@" ;;\n'
             '*" --yes "*)\n'

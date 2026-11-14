@@ -3134,7 +3134,7 @@ class LifecycleTest(unittest.TestCase):
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
 FAKE_PROJECT = "ns/proj"
-# 実行ファイルの代役。版の問い合わせにだけ答える
+# 実行ファイルのスタブ。版の問い合わせにだけ答える
 EXE_STUB = """#!/bin/sh
 case " $* " in
 *" --version --json "*)
@@ -4559,7 +4559,7 @@ for _name in [n for n in dir(DockerLifecycleTest) if n.startswith("test_")]:
 
 
 class ScriptedAgentTest(unittest.TestCase):
-    """agent: script の step を、claude の代わりに代役（tests/fake_claude.py）で回す。"""
+    """agent: script の step を、claude の代わりにスタブ（tests/fake_claude.py）で回す。"""
 
     def test_step_runs_the_fake_and_hook_denies(self):
         with tempfile.TemporaryDirectory() as d:

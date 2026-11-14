@@ -1,11 +1,11 @@
-"""claude -p の代役（`tests/fake_claude.py`）が、本物から録った形と振る舞いに合っているか。
+"""claude -p のスタブ（`tests/fake_claude.py`）が、本物から録った形と振る舞いに合っているか。
 
 本物の記録は `tests/manual/claude/record_hooks.py` が作る `tests/contract/claude/recorded.json`。
 場面（木・hook・打つ手）は `tests/contract/claudeside.py` で本物と共有する。
 
-- 形: 代役が出す欄は本物にもあり、型は本物の型に含まれる。本物にだけある欄は比べない
-  （代役は ccnavi と実行器が読む欄だけを出す）。ただし ccnavi が読む hook の欄（`READS`）は、
-  本物にあれば代役にもなければならない
+- 形: スタブが出す欄は本物にもあり、型は本物の型に含まれる。本物にだけある欄は比べない
+  （スタブは ccnavi と実行器が読む欄だけを出す）。ただし ccnavi が読む hook の欄（`READS`）は、
+  本物にあればスタブにもなければならない
 - 振る舞い: `observations`（呼ばれたイベントの並び、止めたときの理由の出どころ、Stop の差し戻し、
   サブエージェント、`--resume`、hook の環境）は本物と同じ
 """
@@ -44,7 +44,7 @@ RESPONSE_READS = {"PostToolUse:Write": ("type",), "PostToolUse:Agent": ("agentId
 
 
 def not_in_real(fake: dict, real: dict, path: str) -> list[str]:
-    """代役の形のうち、本物に無い欄と、本物の型に含まれない型。"""
+    """スタブの形のうち、本物に無い欄と、本物の型に含まれない型。"""
     out = []
     if not set(fake["t"]) <= set(real["t"]):
         out.append(f"{path}: 型 {fake['t']} が本物 {real['t']} に無い")
@@ -86,14 +86,14 @@ class ClaudeContractTest(unittest.TestCase):
         for key, real in self.real["hooks"].items():
             fake = self.fake["hooks"].get(key)
             if fake is None:
-                problems.append(f"{key}: 代役が出さない")
+                problems.append(f"{key}: スタブが出さない")
                 continue
             for field in READS:
                 if field in real["keys"] and field not in fake["keys"]:
-                    problems.append(f"{key}.{field}: 代役に無い")
+                    problems.append(f"{key}.{field}: スタブに無い")
             for field in RESPONSE_READS.get(key, ()):
                 if field not in fake["keys"]["tool_response"]["keys"]:
-                    problems.append(f"{key}.tool_response.{field}: 代役に無い")
+                    problems.append(f"{key}.tool_response.{field}: スタブに無い")
         self.assertEqual(problems, [])
 
     def test_observations_match_real(self):

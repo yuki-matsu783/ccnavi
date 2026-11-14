@@ -5,7 +5,7 @@
     uv run python -m tests.scenarios.runner preflight <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
-    uv run python -m tests.scenarios.runner run <シナリオ> --agent script --confirmed   代役で回す
+    uv run python -m tests.scenarios.runner run <シナリオ> --agent script --confirmed   スタブで回す
     uv run python -m tests.scenarios.runner run-all <ディレクトリ or glob> --max-total-usd <USD>
     uv run python -m tests.scenarios.runner run-all <...> --max-total-usd <USD> --confirmed <目印>
     uv run python -m tests.scenarios.runner next <出力の置き場>
@@ -21,7 +21,7 @@ run-all は、使い捨てのリポジトリのシナリオ（人間の操作が
 
 next は、人間の操作で止まったあと、人間が「次へ」と言ってから打つ。
 restore は、人間の操作で止まった回を続けずにやめるとき、setup のファイルを消し、
-setup.host の代役の置き場を消し、使い捨てのリポジトリを setup.reset の base へ戻して、
+setup.host のスタブの置き場を消し、使い捨てのリポジトリを setup.reset の base へ戻して、
 残し印を外す。next は、setup.host が fake-gitlab なら模擬を残した状態ファイルのまま起こし直す。
 
 --confirmed を付けるのは、人間が「状態がきれいで最新か」（と、test_repo のシナリオでは
@@ -69,7 +69,7 @@ def main(argv=None):
         "--agent",
         choices=[schema.AGENT_CLAUDE, schema.AGENT_SCRIPT],
         default=schema.AGENT_CLAUDE,
-        help="script なら step の script を代役（tests/fake_claude.py）で回す。claude は呼ばない",
+        help="script なら step の script をスタブ（tests/fake_claude.py）で回す。claude は呼ばない",
     )
     r.set_defaults(fn=commands.cmd_run)
     ra = sub.add_parser("run-all")
