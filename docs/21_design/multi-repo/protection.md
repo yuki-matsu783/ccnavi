@@ -32,7 +32,7 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 
 共通レイヤーのファイルは、フェーズ定義と配点もコアに入れる。シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通レイヤーのファイルを守るぶんも組み込み
 （`builtin:guard-common-layer`）で持つ（ルールの 1 行に任せると、書き換えたルールファイルのもとで通る）。組み込みで名指しのツールを止めるのは、
-実行ファイル・ccnavi ディレクトリ・共通レイヤーの 3 つ（`add_rules`）と、hook・hook の登録（`.claude/settings*.json`）・scripts・共通の設定 3 本を名前で書くツールから守る 4 本（`add_named_rules`）。ルールの `deny` には書かない。
+実行ファイル・ccnavi ディレクトリ・置き場のリンク・記録の置き場・共通レイヤーの 5 本（`selfguard.AddRules`。同じ関数がシェルから書き込む形と、置き場の中にリンクを作る `ln` の 2 本も足す）と、hook・hook の登録（`.claude/settings*.json`）・scripts・共通の設定 3 本を名前で書くツールから守る 4 本（`selfguard.AddNamedRules`）。ルールの `deny` には書かない。
 
 プロジェクトから切ったワークツリー側の設定も足す。ワークツリーは元リポジトリを添えて列挙し、ワークツリー側の設定の相対を元リポジトリから
 組む（REQ-MLT-08）。
@@ -44,8 +44,8 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 コアにすると数の定まらないファイルを呼び出しのたびに比べることになり、実行前チェックの期限を圧迫する。
 
 ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match: Write|Edit|NotebookEdit`、`glob: */.ccnavi/*` の 1 本を `deny` の先頭に足す
-（`builtin:guard-project-home`。パスは固定の `.ccnavi` で組む）。シェルからの書き込みも同じ 1 本
-（`builtin:guard-setting-files`）で止める。3 本に絞らないのは、配点が呼ぶスクリプトも含めるため。
+（`builtin:guard-project-home`。パスは ccnavi ディレクトリの名前（既定 `.ccnavi`）で組む）。シェルからの書き込みは
+`builtin:guard-setting-files` の 1 本で止める。3 本に絞らないのは、配点が呼ぶスクリプトも含めるため。
 
 シェルの側のパスは「区切りが続くか、そこで終わる」形 `\.ccnavi(?:[\\/ \x00\x01]|$)` で書き、`rm -rf .ccnavi` と
 `mv .ccnavi .ccnavi.bak` も止める。語の中の目印 `\x01` も終わりに数えるので、`rm ".ccnavi x"` も止まる（別名を指すので誤検知）。
@@ -59,10 +59,10 @@ ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match:
 `--` のあとの `-t` は行き先を名指ししないので、そのときも最後の引数を見る。
 `cp .ccnavi/config/common/rules.yml /tmp/backup.yml` や `cp -t /tmp/out .ccnavi/config/common/rules.yml` のように守る場所が元の側に出ただけの形は
 読むだけなので組み込みの保護では止めず、通すかどうかはルールに任せる。`cp /tmp/x .ccnavi && echo` や `cp /tmp/x .ccnavi > /dev/null` のように
-後ろに何か続けた形、`sudo` / `env` の後ろ（shellread が実行役のコマンドを外した層）、`cd` で移った先から見た表記も止める。
+後ろに何か続けた形、`sudo` / `env` の後ろ（`infra/shell` が実行役のコマンドを外した層）、`cd` で移った先から見た表記も止める。
 動かした ccnavi ディレクトリ・共通レイヤーの 3 本・実行ファイルの表記は、書き込み用・最後の引数用・`-t` の値用に分けて足す
 （`selfguard.shellWriteRegex`）。共通レイヤーの 3 本はファイルなので、書き込み用と最後の引数用にだけ足す。
-適用の仕方は組み込みのルールの regex 1 本のまま（`rules.build` を通る）で、語の割り方が 1 通りに決まる形に書いてある。
+適用の仕方は組み込みのルールの regex 1 本のまま（`rules.Builtin` を通る）で、語の割り方が 1 通りに決まる形に書いてある。
 
 行き先を、守るものが入っているディレクトリにした形（`cp /tmp/decisions.jsonl logs/`・`mv /tmp/decisions.jsonl logs/`・
 `cp -t logs /tmp/decisions.jsonl`）は、行き先の表記に守る名前が出ないので、元の名前で見る（`selfguard.HolderRegex`。`mv` も含める）。

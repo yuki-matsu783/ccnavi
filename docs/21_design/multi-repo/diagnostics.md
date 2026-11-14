@@ -17,22 +17,22 @@ keywords: [診断, --explain, 記録, レイヤー]
 ■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  workspace-root       Write|Edit|NotebookEdit  ^{root}[\\/]
   ...
-■ rules 自身のレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
+■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees       Write|Edit               */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 2 / ask 0 / allow 1）
   deny  lib:schema           Write|Edit               */schema/*
-■ phases（共通レイヤー 7 種、自身のレイヤー 4 種、lib 1 種。使うのは共通 + 親の project: が指すレイヤーの和）
+■ phases（共通レイヤー 7 種、ワークスペースのレイヤー 4 種、lib 1 種。共通レイヤーと、親チケットの project: で指定されたレイヤーを組み合わせて適用します）
   id            レイヤー     kind  title         review  scope
-  design        共通   work  設計          mr      wip/design/*, docs/*
-  build         lib    work  ビルド        mr      src/*
+  design        共通レイヤー work  設計          true    wip/design/*, docs/*
+  build         lib          work  ビルド        false   src/*
 ■ risk（levels: medium 20 / high 40 / critical 70）
   id            レイヤー     加点条件          points  message
-  big-diff      共通   lines_over 300    25      行数が多い
-  schema        lib    glob db/schema/*  30      スキーマに触った
+  big-diff      共通レイヤー lines_over 300    25      行数が多い
+  schema        lib          glob db/schema/*  30      スキーマに触った
 ```
 
 レイヤーごとの表は、判定と同じ順・同じ重ね方で読んだ結果を並べる。
-読めないレイヤーはその位置に「読めない: <理由>」と、空として扱っていることを出す。置いていないレイヤーは「置いていない（無い = 空）」と出す。
+読めないレイヤーはその位置に「読めない: <理由>。このレイヤーは空として扱う」と出す（phases と risk の表では頭にレイヤーの名前を付ける）。rules で置いていないレイヤーは「このレイヤーの設定ファイルはありません。設定なしとして扱います。」と出す。phases の `review` 列はレビューが要るかの真偽値（`true` / `false`）。
 `levels` の行に出るのは共通レイヤーの側の値で、実際に使われる値はチケットのレイヤーで決まる。phases の表はレイヤーごとに書いてある定義を並べ、判定が使うのは共通と親の `project:` が指すレイヤーの和（11.4.1）。和は `--explain --json` の `sums[].phases` に出す。ファイルが無いことは、どのレイヤーでも不備として出さない（11.2）。
 
 記録の 1 行は `tree` と `project`（この呼び出しがどのツリーのものと判定されたか）に加えて、出どころのレイヤー
@@ -64,7 +64,7 @@ VS Code 拡張は同じ warn をプロジェクト画面に出す。
 
 `--lint` の JSON も同じ指摘を同じ深刻度で出す。レイヤーの指摘は `where` にレイヤーの名前が入る（`(self) rule-id`、`(projects/lib) (risk) id`）。
 
-ターミナルから打つ `user agree` は、承認の対象の一部が外れたら終了コード 4 で終わる（何も置かずに失敗したときは 1）。通ったぶんの承認済みチケットは置き、外れたものは名指しする。`ccnavi-user-agree.sh` は 4 のときだけ、置かれたぶんをコミットして push する。
+ターミナルから打つ `user agree` は、承認の対象の一部が外れたら終了コード 4 で終わる（何も置かずに失敗したときは 1）。通ったぶんの承認済みチケットは置き、外れたものは名指しする。`ccnavi-user-agree.sh` は 0 と 4 のどちらでも、この承認で書いたパスをコミットして push し、4 のときは最後に 1 で終わる。
 拡張が子プロセスで打つ `user agree --yes`（10 章）の終了コードは別。
 
 導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml` のひな形を配る。自身のレイヤーの `phases.yml` は配らず、既にあれば触らない。
