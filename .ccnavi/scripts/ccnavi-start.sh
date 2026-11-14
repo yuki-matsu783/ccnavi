@@ -158,7 +158,7 @@ start_val() {
 # その文で止め、exit ならその終了コードで終える。値は start_val で読む。答えが無ければ止める。
 start_do() {
 	sd_out=$(start_read "$@") ||
-		fail start-unanswered "ccnavi の実行ファイルが答えませんでした（start $1）。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、直せなければユーザに伝えてください。" 2
+		fail start-unanswered "ccnavi の実行ファイルが答えませんでした（start $1）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください（sh .ccnavi/scripts/ccnavi-launcher.sh --version で確かめられます）。" 2
 	sd_say=$(printf '%s\n' "$sd_out" | sed -n 's/^out //p')
 	[ -z "$sd_say" ] || printf '%s\n' "$sd_say"
 	sd_say=$(start_val err)
