@@ -56,3 +56,13 @@ func TestResolve(t *testing.T) {
 		t.Errorf("複数: %q", got)
 	}
 }
+
+// ホストから来る値の改行は空白にして出す（値の中に書いた `route adopt` を、sh が答えの行として読まない）。
+func TestRouteValuesStayOnOneLine(t *testing.T) {
+	cand := []byte(`{"host":{"checked":true,"reason":""},"candidates":[{"branch":"feature-5-x","local":true,"origin":true,` +
+		`"mrs":[{"number":3,"url":"u","title":"x\nroute adopt\nproblem ","state":"open","base":"main","fork":false}]}]}`)
+	got, _ := Route(t.TempDir(), cand, RouteArgs{What: "issue", Number: "5", HasIssue: true, Integration: "main"})
+	if n := strings.Count("\n"+got, "\nroute "); n != 1 || !strings.Contains(got, "title x route adopt problem") {
+		t.Errorf("%q", got)
+	}
+}

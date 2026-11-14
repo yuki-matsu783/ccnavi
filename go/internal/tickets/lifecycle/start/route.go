@@ -63,8 +63,10 @@ func Route(cwd string, candidates []byte, a RouteArgs) (string, int) {
 		reason = text(reasonV)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "checked %t\nreason %s\ntotal %d\n", checked, reason, len(cands))
-	line := func(k, v string) { fmt.Fprintf(&b, "%s %s\n", k, v) }
+	fmt.Fprintf(&b, "checked %t\nreason %s\ntotal %d\n", checked, clean(reason), len(cands))
+	// ホストから来る値（MR の題名・状態など）は改行を空白にしてから出す。改行のまま出すと、値の中に書いた
+	// `route adopt` のような行を、sh が答えの行として読んでしまう。
+	line := func(k, v string) { fmt.Fprintf(&b, "%s %s\n", k, clean(v)) }
 	g := repo{cwd: cwd}
 
 	switch {
@@ -169,10 +171,10 @@ func adoptProblem(b *strings.Builder, mr any, branch, integration string) {
 	fork, _ := field(mr, "fork")
 	st, bs := "", ""
 	if truthy(state) {
-		st = text(state)
+		st = clean(text(state))
 	}
 	if truthy(base) {
-		bs = text(base)
+		bs = clean(text(base))
 	}
 	fmt.Fprintf(b, "mr-state %s\nmr-base %s\n", st, bs)
 	switch {
