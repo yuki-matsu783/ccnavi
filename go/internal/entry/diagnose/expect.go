@@ -182,7 +182,7 @@ func (b *expectations) object() *pyjson.Object {
 }
 
 // TestExpectations は `--test-expectations`。期待する判定をぜんぶ回して、食い違いを並べる。文字で出すときの終了コードは
-// 食い違いが 1 件でもあれば 1（`/ccnavi-config` スキルと scripts/check_rules.py が見る）。JSON は常に 0 で、数は本文の
+// 食い違いが 1 件でもあれば 1（`/ccnavi-config` スキルが見る）。JSON は常に 0 で、数は本文の
 // mismatches にある（読み手が「食い違った」と「試験が失敗した」を終了コードで分けられるように）。読めなければ 1。
 func TestExpectations(stdout, stderr io.Writer, conf *config.Settings, root, path string, asJSON bool) (int, error) {
 	body, err := runExpectations(stderr, conf, root, path)

@@ -81,7 +81,7 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 | `.agents/docs/` | ccnavi の開発で常に守る決まり。配布しない |
 | `.ccnavi/` | ccnavi 自身の設定と、配布先へ配るものの元。作業の決まり（`CCNAVI.md`）、使い方の文書（`docs/`）、設定 3 本（`config/`）、文面ファイル（`messages/`）、配布する sh（`scripts/`。一覧と役割は[配布するスクリプト](50_guide/scripts.md)）。`bin/` は `scripts/ccnavi-build.sh` が作る実行ファイルの置き場で追跡しない。`scripts/ccnavimd.sh` は配布先が作るファイルで、このリポジトリには無い |
 | `.claude/` | このリポジトリの Claude Code の設定。`settings.json`（hook の登録）、`hooks/`（開発用の hook）、`skills/`（このリポジトリのスキル）。`settings.local.json` は利用者ごとのファイルで追跡しない |
-| `scripts/` | ccnavi を入れる・配る・点検する側の道具。導入（`ccnavi-install.sh`・`ccnavi-setup.sh`・`ccnavi-doctor.sh`）、配布の zip（`ccnavi-package.sh`）、実行ファイルの組み立て（`ccnavi-build.sh`）、開発機への導入（`ccnavi-build-install.sh`）、Stop の AI 判定の登録（`ccnavi-stop-review.sh`）、PR の検査（`ccnavi-check-no-wip.sh`）、ルールの期待の点検（`check_rules.py`）。配布先には `ccnavi-setup.sh` が必要なものだけを配る |
+| `scripts/` | ccnavi を入れる・配る・点検する側の道具。導入（`ccnavi-install.sh`・`ccnavi-setup.sh`・`ccnavi-doctor.sh`）、配布の zip（`ccnavi-package.sh`）、実行ファイルの組み立て（`ccnavi-build.sh`）、開発機への導入（`ccnavi-build-install.sh`）、Stop の AI 判定の登録（`ccnavi-stop-review.sh`）、PR の検査（`ccnavi-check-no-wip.sh`）。配布先には `ccnavi-setup.sh` が必要なものだけを配る |
 | `extensions/` | VS Code 拡張（`vscode/ccnavi-board`）、Chrome 拡張（`chrome/ccnavi-approval`）、共有の部品（`shared/`）。拡張ごとの開発の手引きは各拡張の `docs/` と `VERIFY.md` にある |
 | `.github/` | Issue のテンプレートと CI の定義 |
 | `.vscode/` | VS Code の設定 |
