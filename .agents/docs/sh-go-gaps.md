@@ -18,7 +18,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | `ccnavi-start.sh` | 候補の振り分け（候補が複数・ホストを見られない・新しく作る・採用・作りかけ・古いブランチ・MR の無い候補などの道）と、採用の確認のうちローカルで決まるもの（MR の状態・フォーク・マージ先・保護されたブランチ） | `ccnavi start route`（`go/internal/tickets/lifecycle/start`） | 識別子・同じ識別子の別ブランチ・マージ済み MR の確認と、止めるときの文は sh |
 | `ccnavi-start.sh` | ホストに届かないときの案内（`stop_host` の文。GitHub の MCP の手順、GitLab の認証を頼む次の一手） | `ccnavi start guidance`（`go/internal/tickets/lifecycle/start`） | 案内のログを書くことと、ホストの種類が読めないときに止めることは sh |
 | `ccnavi-git.sh` | 引数だけで決まる判定（サブコマンドより前のオプション、全引数で止める形とその略、読むだけのサブコマンド、`cat-file`・`grep`・`branch`・`tag`・`remote`・`stash`・`add`・`commit`、通さないサブコマンド）と、そのオプションの許可リストの読み | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | 実行ファイルが無いとラッパーは止まる |
-| `ccnavi-git.sh` | 状態を見るサブコマンド（`rm`・`restore`・`checkout`・`switch`・`merge`・`merge-file`・`fetch`・`pull`・`push`・`worktree`）の判定、守る場所の判定（承認済みチケットの置き場と ccnavi 自身を守る場所）、`worktree add` の起点の新しさ、push のゲートを掛けるか | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | ゲートの ls-remote と、fetch が失敗した印の書き込みは sh |
+| `ccnavi-git.sh` | 状態を見るサブコマンド（`rm`・`restore`・`checkout`・`switch`・`merge`・`merge-file`・`fetch`・`pull`・`push`・`worktree`）の判定、守る場所の判定（承認済みチケットの置き場と ccnavi 自身を守る場所）、`worktree add` の起点の新しさ、push のゲートを掛けるか | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | ゲートの ls-remote と、fetch が失敗した印の書き込みは sh が行う |
 
 ## 残り
 
