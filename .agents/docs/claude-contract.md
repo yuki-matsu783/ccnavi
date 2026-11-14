@@ -84,7 +84,7 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 - **形**: スタブが出す欄は本物にもあり、型は本物の型に含まれる（hook の payload はイベントとツールごと、stream-json は `type/subtype` ごと）。本物にだけある欄は比べない。スタブは ccnavi と実行器が読む欄だけを出す
 - **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `READS`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
 - **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境と `settings.json` の `env` が hook に届くか）が本物と同じ。場面の hook の命令は ccnavi と同じく `settings.json` の `env` の変数で組むので、`env` が届かなければ hook が起きず、観察が空になって落ちる
-- 観察には、モデルの答え方で変わるものを入れない。理由の文が現れる行は、モデルが書く行（`assistant`・`result`）を除いて数える。サブエージェントの中の行は数ではなく有無で見る。本物には `run_in_background` を `false` と指示して、サブエージェントを同期に固定する
+- 観察には、モデルの答え方で変わるものを入れない。理由の文が現れる行は、モデルが書く行（`assistant`・`result`）を除いた、行の種類の集合で見る。サブエージェントの中の行は数ではなく有無で見る。本物には `run_in_background` を `false` と指示して、サブエージェントを同期に固定する
 
 ### 録り直す
 
