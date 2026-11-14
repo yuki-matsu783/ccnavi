@@ -1,4 +1,4 @@
-# ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh が出す次の一手。
+# ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh・ccnavi-review.sh が出す次の一手。
 # 条件の分岐は sh 側にある。引数の並び（args_q など）は sh が引用を済ませて渡す。
 version: 1
 messages:

@@ -1,4 +1,4 @@
-# チケットの CLI（ccnavi-ticket.sh・--agree・ccnavi-review.sh など）と `ccnavi git check`（ccnavi-git.sh の判定）が標準出力・標準エラーに出す次の一手。
+# チケットの CLI（ccnavi-ticket.sh・--agree・ccnavi-review.sh など）と `ccnavi git check`・`ccnavi git integrate`（ccnavi-git.sh の判定と直接作業の取り込み）が標準出力・標準エラーに出す次の一手。
 # 状態の報告（何をしたか・何が起きたか）はコード側にあり、ここは次の一手だけを持つ。
 # `次:` の行は組み立てる側が付ける。`note` は 1 行ごとに `案内: ` を付けて出す。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
