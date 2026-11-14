@@ -63,7 +63,7 @@ class Harness(unittest.TestCase):
 
 
 class TreeBoundTest(Harness):
-    """`ccnavi tree bound`。`ccnavi-git.sh integrate` が断る条件（Stop の促しと同じ判定）。"""
+    """`ccnavi tree bound`。`ccnavi-worktree.sh --adopt` が断る条件（Stop の促しと同じ判定）。"""
 
     def setUp(self):
         super().setUp()
