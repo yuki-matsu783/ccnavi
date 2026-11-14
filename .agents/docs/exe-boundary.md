@@ -75,16 +75,16 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
   - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
     ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
     `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
-- 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の可否の判定（統合先への push の拒否、push のゲートを掛けるか、親のワークツリーでの`checkout`・`switch`の行き先の確認など）は、実行ファイルの`ccnavi git check`が行う。`integrate`・`integrate-done`の判定（`integrate-ticket`。結び付くかは実行ファイルの`tree bound`に、取り込み先のブランチは`tree base-bound`に問い合わせる（Stop の促しと同じ判定））と状態操作は、いまshで実装されている（分担に合っていない所の一覧にある）。sh の中のこれらの判定は、次の3つを満たす形に限る。
+- 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の可否の判定（統合先への push の拒否、push のゲートを掛けるか、親のワークツリーでの`checkout`・`switch`の行き先の確認など）は、実行ファイルの`ccnavi git check`が行う。`integrate`・`integrate-done`の判定と状態操作は、実行ファイルの`ccnavi git integrate`が1回の起動で行い、ラッパーはロックを取ってから呼ぶ
+- 親のブランチの共通のpushゲート（`ccnavi_push_gate`。`ccnavi-common-state.sh`）は、いまshで実装されている。shに置く判定は、次の3つを満たす形に限る。
   生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
   （設計 9.2）。この3つを満たさない判定はshに足さない。新しい判定はGoで実装する
-- 親のブランチの共通のpushゲート（`ccnavi_push_gate`。`ccnavi-common-state.sh`）も、いまshで実装されていて、上の3つの条件の扱いを受ける。
   ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、
   `ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。この2つはラッパーを通らないので「ラッパーが許可リストで読むこと」を
   満たさないが、同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、ゲートだけを例外に入れる。ゲートの材料のうちチケットの中身
   （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。ゲートが`ls-remote`を打つのはshの側
   （ネットワークはshの仕事）。この2経路にほかの判定は足さない
-- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree guarded`・`tree leftover`・`tree handoff-pending`・`write-and-push family`・`sync retired`・
+- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree leftover`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
   （止める側の検査は止める向き、ツリーを動かす側は動かさない向き。ただし、親のワークツリーからの切り替えの拒否は、聞けないときも通す）。
 - 実行ファイルには、ディレクトリの外へ情報を取りに行くコードを足さない。取得する処理はshに任せ、

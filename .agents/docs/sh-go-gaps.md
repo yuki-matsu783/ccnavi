@@ -19,6 +19,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | `ccnavi-start.sh` | ホストに届かないときの案内（`stop_host` の文。GitHub の MCP の手順、GitLab の認証を頼む次の一手） | `ccnavi start guidance`（`go/internal/tickets/lifecycle/start`） | 案内のログを書くことと、ホストの種類が読めないときに止めることは sh |
 | `ccnavi-git.sh` | 引数だけで決まる判定（サブコマンドより前のオプション、全引数で止める形とその略、読むだけのサブコマンド、`cat-file`・`grep`・`branch`・`tag`・`remote`・`stash`・`add`・`commit`、通さないサブコマンド）と、そのオプションの許可リストの読み | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | 実行ファイルが無いとラッパーは止まる |
 | `ccnavi-git.sh` | 状態を見るサブコマンド（`rm`・`restore`・`checkout`・`switch`・`merge`・`merge-file`・`fetch`・`pull`・`push`・`worktree`）の判定、守る場所の判定（承認済みチケットの置き場と ccnavi 自身を守る場所）、`worktree add` の起点の新しさ、push のゲートを掛けるか | `ccnavi git check`（`go/internal/tickets/lifecycle/gitwrap`） | ゲートの ls-remote と、fetch が失敗した印の書き込みは sh が行う |
+| `ccnavi-git.sh` | 直接作業の取り込み（`integrate` / `integrate --abort` / `integrate-done`）の判定と状態操作（記録・一時ワークツリー・T と C の計算・コミット・ff-only・片付け） | `ccnavi git integrate`（`go/internal/tickets/lifecycle/land`） | ロックは sh が取る。コミットや fast-forward を git が断った理由の読み方は、sh の `ccnavi_git_refusal`（write-and-push などが使う）と同じ規則の写し |
 
 ## 残り
 
@@ -27,7 +28,7 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | sh | Go で実装するもの（いま sh にある） | sh で実装するもの | 備考 |
 |---|---|---|---|
 | `ccnavi-start.sh` | 引数の検査（`--new-issue` のタイトルの整えと長さ）、`--repo` と origin の照合、実行ファイルの答え（`--templates --json`）の jq での読み、`id_check`・`clash_check`・`merged_check` の判定、`resolve_issue`、`ensure_worktree`・`fast_forward`・`ensure_initial_commit`・`cleanup_created_worktree`、`report` と dry-run の出力 | `host_open`、API の取得と POST、`remote_heads`、fetch・push、`ccnavi-branches.sh` と `ccnavi-sync.sh` の呼び出し、`--check` | `--check`（`ccnavi_preflight`）は `ccnavi-common-host.sh` と一緒に直す |
-| `ccnavi-git.sh` | `integrate` / `integrate-done` の判定と状態操作（一時ワークツリー・コミット・ff-only・`update-ref -d`）、ログの書き出しと要約 | 環境の消去、実行ファイルへの受け渡し、fetch・pull・push とゲートの ls-remote | 直したら、設計書（チケット制御の「置き場」の文書の、ラッパーの中の判定と push のゲートの節）と、設計原則 P13 の例外の書き方を書き直す |
+| `ccnavi-git.sh` | ログの書き出しと要約 | 環境の消去、実行ファイルへの受け渡し、integrate のロック、fetch・pull・push とゲートの ls-remote | |
 | `ccnavi-common-state.sh` | `ccnavi_push_gate` の判定、`ccnavi_parent_trace`、`ccnavi_id_clash`、`ccnavi_git_refusal`、`ccnavi_record_*`、`ccnavi_integration` | `ccnavi_git_timed`、ゲートの ls-remote、実行ファイルに聞く口（`ccnavi_ask` など） | ゲートは素の push を打つ 3 経路が共有する |
 | `ccnavi-sync.sh` | 親子の選び方、`sync_family`・`merged_present`・`sync_absent`・`sync_retired` の分岐、ff・merge・abort、origin/HEAD の向け直し、出力の文 | ls-remote、`fetch_one`、`ccnavi-review.sh merged` の呼び出し、ロック、trap | merge の abort は実行ファイルの 1 回の起動の中で持つ |
 | `ccnavi-worktree.sh` | 引数と C1〜C7 の検査、`same_id_guard`、`make_candidate`、記録の書き出し、`worktree add`、報告の文 | ccnavi-git.sh 経由の fetch と ls-remote | 記録 `ccnavi-direct/<名前>` は integrate が読む |
@@ -49,7 +50,8 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 
 | ずれ | 場所 | 直し方 |
 |---|---|---|
-| 保護するブランチの一覧が 3 か所にあり、形が揃っていない（`release-*` と `release/*`） | `ccnavi-git.sh`（2 か所）・`ccnavi-user-push-approved.sh`。用途の違う写しとして、ブランチ名に使えない語の検査 `ccnavi-common.sh` の `ccnavi_is_branch`（実行ファイルの `ids.BranchProblem` の写し）も保護の名前を持つ | 実行ファイルの 1 つの関数で判定し、sh はそれに聞く。実行ファイルを起こさない `ccnavi-user-push-approved.sh` の写しは、一致をテストで確かめる |
+| 保護するブランチの一覧が 3 か所にあり、形が揃っていない（`release-*` と `release/*`） | 実行ファイルの `gitwrap` の `protected`（push）と `land` の `checkName`（integrate の名前）・`ccnavi-user-push-approved.sh`。用途の違う写しとして、ブランチ名に使えない語の検査 `ccnavi-common.sh` の `ccnavi_is_branch`（実行ファイルの `ids.BranchProblem` の写し）も保護の名前を持つ | 実行ファイルの 1 つの関数で判定し、sh はそれに聞く。実行ファイルを起こさない `ccnavi-user-push-approved.sh` の写しは、一致をテストで確かめる |
 | 実行ファイルの答え（`ops show` の JSON）を jq で読む | `ccnavi-user-lib-review.sh` の `op_field`・`reply_already_sent` | 1 行 1 項目で答えるサブコマンドを足す |
 | パスを自分で小文字にして比べている | `ccnavi-review.sh` の依頼文の置き場の照合 | 実行ファイルの `pathcase` で比べる |
 | 実行ファイルの規則の写し | `ccnavi-stage.sh` の `is_importable`、`ccnavi-branches.sh` の `names_number` | 実行ファイルに聞く |
+| git が断った理由の読み方が 2 か所にある | `ccnavi-common-state.sh` の `ccnavi_git_refusal`（write-and-push・`ccnavi-sync.sh`・`ccnavi-fetch.sh`・`ccnavi-user-push-approved.sh`）と、実行ファイルの `land` の `refusal`（integrate-done） | 使う sh を Go で実装し直すときに、実行ファイルの 1 つの関数に寄せる |
