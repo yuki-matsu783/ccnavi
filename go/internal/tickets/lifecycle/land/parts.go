@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
@@ -15,9 +16,8 @@ import (
 	"ccnavi/internal/tickets/sync/handoff"
 )
 
-// removeQuiet・removeDirQuiet は、消せなくても処理を止めない削除（removeDirQuiet は空のディレクトリだけを消す）。
-func removeQuiet(path string)    { _ = os.Remove(path) }
-func removeDirQuiet(path string) { _ = os.Remove(path) }
+// removeQuiet は、消せなくても処理を止めない削除（ディレクトリは空のときだけ消える）。
+func removeQuiet(path string) { _ = os.Remove(path) }
 
 // tmpUnder は、一時ワークツリーの置き場（logs/direct-tmp/）。
 func (r *run) tmpUnder() string {
@@ -47,7 +47,7 @@ func (r *run) removeTmp(allow ...string) bool {
 		return false
 	}
 	index, _ := r.git(r.tmp, "write-tree")
-	if index == "" || !contains(allow, index) {
+	if index == "" || !slices.Contains(allow, index) {
 		r.tmpWhy = "index の木が取り込み結果（C か K）と違います"
 		return false
 	}
@@ -74,15 +74,6 @@ func (r *run) removeTmp(allow ...string) bool {
 		return false
 	}
 	return true
-}
-
-func contains(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // tmpNote は一時ワークツリーを消せなかったときの案内。

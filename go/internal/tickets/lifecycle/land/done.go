@@ -103,7 +103,7 @@ func (r *run) done(args []string) {
 	cur := r.verify("HEAD")
 	if m.k != "" {
 		// K を作ったあとの再開。
-		if !r.ok("cat-file", "-e", m.k+"^{commit}") || r.verify(m.k+"^") != m.head || r.verify(m.k+"^{tree}") != m.ctree {
+		if !r.ok("cat-file", "-e", m.k+"^{commit}") || !r.isK(m.k, m) {
 			r.reject("integrate-done-bad-k", "記録の K（"+m.k+"）の親か木が、記録の head・c_tree と合いません。自動では取り込みません。ユーザに確かめてください。")
 		}
 		if r.isAncestor(m.k, "HEAD") {
@@ -327,7 +327,7 @@ func (r *run) tidy(m marker) {
 		r.stop("専用の ref（"+r.ref+"/ の "+r.refsFailed+"）を削除できませんでした。直接作業の記録と取り込みの記録は残しています", "refs")
 	}
 	removeQuiet(r.rec)
-	removeDirQuiet(ospath.Dirname(r.rec))
+	removeQuiet(ospath.Dirname(r.rec))
 	// ⑥ 記録
 	if !r.dropMark() {
 		r.stop("取り込みの記録（"+r.mark+"）を削除できませんでした。", "marker")

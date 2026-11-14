@@ -205,7 +205,7 @@ func (r *run) dirty(dir string) string {
 // dropMark は記録を消す。消せなければ偽。
 func (r *run) dropMark() bool {
 	removeQuiet(r.mark)
-	removeDirQuiet(ospath.Join(r.gdir, r.name))
-	removeDirQuiet(r.gdir)
+	removeQuiet(ospath.Join(r.gdir, r.name))
+	removeQuiet(r.gdir)
 	return !exists(r.mark)
 }
