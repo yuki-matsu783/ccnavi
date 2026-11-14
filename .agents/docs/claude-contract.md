@@ -83,7 +83,8 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 
 - **形**: スタブが出す欄は本物にもあり、型は本物の型に含まれる（hook の payload はイベントとツールごと、stream-json は `type/subtype` ごと）。本物にだけある欄は比べない。スタブは ccnavi と実行器が読む欄だけを出す
 - **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `READS`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
-- **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境）が本物と同じ
+- **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境と `settings.json` の `env` が hook に届くか）が本物と同じ。場面の hook の命令は ccnavi と同じく `settings.json` の `env` の変数で組むので、`env` が届かなければ hook が起きず、観察が空になって落ちる
+- 観察には、モデルの答え方で変わるものを入れない。理由の文が出た場所はモデルが書く行（`assistant`・`result`）を除いて数え、サブエージェントの中の行は数ではなく有無を見る。サブエージェントは、本物に `run_in_background` を `false` と指示して同期に固定する
 
 ### 録り直す
 
@@ -104,4 +105,5 @@ uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2
 - モデルが案内を読んで正しく動くか、拒否を迂回しないか（`judge`）
 - 並行に起こした hook が終わる順番
 - Claude Code 自身の権限の仕組みと確認の表示
+- 非同期（`run_in_background`）のサブエージェント。本物は既定で非同期に起動することがあり、そのときは Stop がサブエージェントの終わりより先に起きる。スタブは同期の形だけを出す
 - 場面に出てこない手（Glob・Grep・WebFetch などのツール、PostToolUse の `additionalContext` 以外の出力の形）。台本に書けるツールは Read・Write・Edit・Bash と `agent` だけ
