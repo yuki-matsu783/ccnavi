@@ -54,7 +54,7 @@ uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-de
 
 ### hook の呼び方
 
-- 読むのは `<cwd>/.claude/settings.json` の `hooks` だけ。ユーザ設定・`settings.local.json`・プラグインの hook は読まない
+- 読むのは `<cwd>/.claude/settings.json` の `hooks` と `env` だけ。ユーザ設定・`settings.local.json`・プラグインの設定は読まない
 - `matcher` が無いか空なら全部、あれば `tool_name` に正規表現で当てる。ツールの無いイベント（SessionStart・Subagent* など）で `matcher` を持つ hook は起こさない
 - 同じイベントに当たった hook は並行に起こす。`asyncRewake` の hook と `command` 以外の hook は起こさない
 - 命令は `sh -c` で起こし、payload を標準入力に渡す。環境に `CLAUDE_PROJECT_DIR`（= cwd）と `CLAUDE_ENV_FILE` を入れ、`CLAUDE_CODE_ENTRYPOINT` が無ければ `sdk-cli` を入れる（ccnavi はこれが `sdk` で始まるかで非対話を見分ける）
@@ -88,7 +88,7 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 
 ### 録り直す
 
-Claude Code の版を上げたとき、スタブに手を足すとき（`claudeside.py` の `PROMPT` と `SCRIPT` に同じ手を足す）に録り直す。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
+Claude Code の版を上げたとき、スタブに手を足すとき（`claudeside.py` の `PROMPT` と `SCRIPT` に同じ手を足す）に録り直す。`PROMPT` にだけある「サブエージェントを同期で起動する」指示は、本物を同期に固定するためのもので、`SCRIPT` には当たる欄が無い（スタブは同期の形だけを出す）。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
 
 ```sh
 uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2 --dry-run   # 置かずに標準出力へ
