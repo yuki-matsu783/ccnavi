@@ -6,6 +6,7 @@
     uv run python -m tests.scenarios.runner run <シナリオ>
     uv run python -m tests.scenarios.runner run <シナリオ> --confirmed
     uv run python -m tests.scenarios.runner run <シナリオ> --agent script --confirmed   スタブで回す
+    uv run python -m tests.scenarios.runner run-stub <ディレクトリ or glob>   使い捨ての木で回す
     uv run python -m tests.scenarios.runner run-all <ディレクトリ or glob> --max-total-usd <USD>
     uv run python -m tests.scenarios.runner run-all <...> --max-total-usd <USD> --confirmed <目印>
     uv run python -m tests.scenarios.runner next <出力の置き場>
@@ -44,7 +45,7 @@ inconclusive（未成立。fail にしない）。意味で読むもの（judge�
 中身は責務ごとのモジュールに分けてある（段の低い方から。この表は
 tests/core/test_scenario_layers.py が読んで import の向きを確かめる。表の持ち場はここだけ）。
 import は同じ段か下へだけ向ける。
-0 common・schema・stream・hostenv・hostsnap / 1 expect・evidence・workspace・issues /
+0 common・schema・stream・hostenv・hostsnap / 1 expect・evidence・workspace・issues・sandbox /
 2 repo / 3 prepare / 4 actors/ / 5 report / 6 drive / 7 commands / 8 この入口。
 """
 
@@ -72,6 +73,9 @@ def main(argv=None):
         help="script なら step の script をスタブ（tests/fake_claude.py）で回す。claude は呼ばない",
     )
     r.set_defaults(fn=commands.cmd_run)
+    rst = sub.add_parser("run-stub")
+    rst.add_argument("scenarios", nargs="+", help="ディレクトリ・glob・シナリオのファイル")
+    rst.set_defaults(fn=commands.cmd_run_stub)
     ra = sub.add_parser("run-all")
     ra.add_argument("scenarios", nargs="+", help="ディレクトリ・glob・シナリオのファイル")
     ra.add_argument("--max-total-usd", type=float, required=True, help="実費の累計の上限")

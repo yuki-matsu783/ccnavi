@@ -4,6 +4,7 @@ import glob
 import hashlib
 import json
 import math
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from tests.scenarios import (
     prepare,
     repo,
     report,
+    sandbox,
     schema,
     workspace,
 )
@@ -353,6 +355,45 @@ def _run_all_loop(eligible, root, cap, batch, rows):
         if rc in (3, 10):
             return f"{sid} が終了コード {rc} で止まった（対象の状態を手で確かめる）"
     return ""
+
+
+def run_stub(paths):
+    """シナリオごとに使い捨てのワークスペースを組み、スタブで回して消す。人間の確認は取らない
+    （ユーザのワークスペースに触れず、claude も呼ばない）。[(ID か パス, 終了コード, 理由)] を返す。
+    回せないシナリオは終了コード None で、理由を持つ。"""
+    results = []
+    for path in paths:
+        scn = schema.load_scenario(path)
+        why = schema.stub_unready(scn)
+        if why:
+            results.append((str(scn["id"]), None, why))
+            continue
+        scn = schema.load_scenario(path, schema.AGENT_SCRIPT)
+        scn["_prompt_steps"] = len(scn["steps"])
+        out = ROOT / "logs" / "scenarios" / f"{scn['id']}-stub-{datetime.now():%Y%m%d-%H%M%S-%f}"
+        base = sandbox.make_base()
+        try:
+            rc = drive.start_scenario(scn, path, sandbox.build(base), None, out)
+        finally:
+            shutil.rmtree(base, ignore_errors=True)
+        results.append((str(scn["id"]), rc, str(out)))
+    return results
+
+
+def cmd_run_stub(args):
+    """run-stub: 使い捨てのワークスペースでスタブで回す。0 全部 pass / 1 fail がある・回せるものが
+    無い / 2 未成立か意味の判定待ちがある。"""
+    results = run_stub(expand_scenario_paths(args.scenarios))
+    ran = [r for r in results if r[1] is not None]
+    for sid, rc, note in results:
+        verdict = "回さない" if rc is None else {0: PASS, 1: FAIL}.get(rc, f"終了コード {rc}")
+        print(f"{sid}\t{verdict}\t{note}")
+    if not ran:
+        print("使い捨てのワークスペースでスタブで回せるシナリオが無い")
+        return 1
+    if any(rc == 1 for _, rc, _ in ran):
+        return 1
+    return 0 if all(rc == 0 for _, rc, _ in ran) else 2
 
 
 def cmd_run_all(args):

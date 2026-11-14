@@ -815,18 +815,27 @@ class EntryGateTest(unittest.TestCase):
             run.assert_not_called()
 
 
-class FullRunDoesNotPickScenariosTest(unittest.TestCase):
-    """`python -m tests`（全量）が拾うのは、この実行器の単体テストだけ。"""
+# 全量テストが拾ってよい tests/scenarios のモジュール。実行器の単体テストと、
+# 使い捨てのワークスペースでスタブで回すテスト（本物の claude は呼ばない）だけ
+FULL_RUN_MODULES = ["test_runner", "test_stub_scenarios"]
 
-    def test_only_this_module_is_collected_from_scenarios(self):
+
+class FullRunDoesNotPickScenariosTest(unittest.TestCase):
+    """`python -m tests`（全量）が拾うのは、本物の claude を呼ばないモジュールだけ。"""
+
+    def test_only_these_modules_are_collected_from_scenarios(self):
         mine = [m for m in full_run.modules([]) if m.startswith("tests.scenarios")]
-        self.assertEqual(mine, ["tests.scenarios.test_runner"])
+        self.assertEqual(mine, [f"tests.scenarios.{m}" for m in FULL_RUN_MODULES])
 
     def test_no_other_test_module_in_scenarios(self):
         extra = [
-            p.name for p in Path(__file__).parent.glob("test_*.py") if p.name != "test_runner.py"
+            p.name
+            for p in Path(__file__).parent.glob("test_*.py")
+            if p.stem not in FULL_RUN_MODULES
         ]
-        self.assertEqual(extra, [], "シナリオを回す道を test_ のモジュールに置かない")
+        self.assertEqual(
+            extra, [], "本物の claude でシナリオを回す道を test_ のモジュールに置かない"
+        )
 
 
 class UiActorTest(unittest.TestCase):
