@@ -266,10 +266,10 @@ class RejectTest(GitWrapperTest):
 
 
 # 拒否の文に代わりの手段を書くと決めた理由の名前。次に何をすればよいかを必ず書く。
+# 引数だけで決まる拒否（grep-pager・remote-option・remote-write など）の文は実行ファイルが持ち、
+# go/internal/tickets/lifecycle/gitwrap のテストが同じことを確かめる。
 NEEDS_ALTERNATIVE = (
     "integrate-tmp",
-    "grep-pager",
-    "remote-option",
     "worktree-no-dest",
 )
 # 代わりの手段を示している印。ラッパーか取り込みの sh の形か、ユーザに頼むこと。
@@ -302,11 +302,6 @@ class RejectAlternativeTest(GitWrapperTest):
                         any(mark in text for mark in ALTERNATIVE_MARKS),
                         f"代わりの手段が無い: {text}",
                     )
-
-    def test_asking_the_user_counts_as_an_alternative(self):
-        # 検査が「ユーザに依頼」で終わる正しい拒否を落とさないこと。
-        for text in reject_texts("remote-write"):
-            self.assertTrue(any(mark in text for mark in ALTERNATIVE_MARKS), text)
 
     def test_the_pager_rejection_names_a_wrapper_form_that_passes(self):
         for args in (("grep", "-O", "line"), ("grep", "-iO", "line"), ("grep", "--open", "line")):
@@ -480,6 +475,7 @@ class PassTest(GitWrapperTest):
             return subprocess.run(
                 [SHELL, SCRIPT, "push", "-u", "origin", name],
                 cwd=trees[name],
+                env=with_exe(dict(os.environ)),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -987,6 +983,7 @@ class StoreRewindTest(GitWrapperTest):
         result = subprocess.run(
             [SHELL, SCRIPT, "checkout", "HEAD~1", "approved/doing/i0001.md"],
             cwd=cwd,
+            env=with_exe(dict(os.environ)),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -1364,16 +1361,12 @@ class ParentPushGateTest(GitWrapperTest):
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("リモートにあるかを確かめられない", result.stderr)
 
-    def test_no_executable_decides_by_the_reference_alone(self):
-        """実行ファイルが無いときは、参照の形跡だけで決める。参照が無ければ初回として通す。"""
-        approved_only = {"CCNAVI_ENTRY_PATH": os.path.join(self.dir, "no-such-ccnavi")}
+    def test_no_executable_stops_the_wrapper(self):
+        """実行ファイルが無ければ、ラッパーは引数の形を確かめられないので、push の前に止める。"""
         self.approve(started=True)
-        result = self.run_in_tree(approved_only)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.delete_on_remote()
-        result = self.run_in_tree(approved_only)
+        result = self.run_in_tree({"CCNAVI_ENTRY_PATH": os.path.join(self.dir, "no-such-ccnavi")})
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("リモートに無い", result.stderr)
+        self.assertIn("実行ファイルが見つからない", result.stderr)
 
     def run_in_tree(self, env):
         environment = with_exe(dict(os.environ))
