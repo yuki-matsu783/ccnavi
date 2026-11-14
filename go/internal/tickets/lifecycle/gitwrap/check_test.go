@@ -52,3 +52,37 @@ func TestRejectionsNameWhatToDoInstead(t *testing.T) {
 		}
 	}
 }
+
+// 代わりに示す形は、ラッパーか取り込みの sh の形にする。生の git（`git stash` など）は hook が止めるので、勧めると
+// 案内された先でもう一度止まる。強制のブランチの移動（`checkout -B`）は、ブランチにしか無いコミットを黙って外すので勧めない。
+func TestRejectionsDoNotSuggestRawGitOrForcedMoves(t *testing.T) {
+	names := Names{Self: "sh .ccnavi/scripts/ccnavi-git.sh", Sync: "sh .ccnavi/scripts/ccnavi-sync.sh"}
+	alternatives := map[string]bool{"reset": true, "clean": true, "stash-drop": true, "branch-delete-unmerged": true}
+	seen := map[string]bool{}
+	for _, c := range golden.Load[[]checkCase](t, "check") {
+		_, d := Check(names, c.Args)
+		if d == nil {
+			continue
+		}
+		rest := strings.NewReplacer(names.Self, "", names.Sync, "").Replace(d.Message)
+		for _, raw := range []string{"git stash", "git restore", "git branch", "git worktree", "git checkout", "git merge", "git fetch"} {
+			if strings.Contains(rest, raw) {
+				t.Errorf("%s の文が生の git（%s）を勧めている: %s", d.ID, raw, d.Message)
+			}
+		}
+		if strings.Contains(d.Message, "checkout -B") {
+			t.Errorf("%s の文が checkout -B を勧めている: %s", d.ID, d.Message)
+		}
+		if alternatives[d.ID] {
+			seen[d.ID] = true
+			if !strings.Contains(d.Message, names.Self) {
+				t.Errorf("%s の文にラッパーの形が無い: %s", d.ID, d.Message)
+			}
+		}
+	}
+	for id := range alternatives {
+		if !seen[id] {
+			t.Errorf("%s の拒否が見本に無い（確かめられない）", id)
+		}
+	}
+}
