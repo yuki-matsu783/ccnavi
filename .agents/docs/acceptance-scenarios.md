@@ -14,7 +14,7 @@ ccnavi の振る舞い（ガードの拒否、チケットの流れ、サブエ�
 ## 基本の決まり
 
 - **既定では回さない。** 明確な指示（「シナリオを回して」など）があったときだけ回す。
-  「全量テストを回して」と言われても回さない（仕組みは下の「全量テストに入らない仕組み」）
+  「全量テストを回して」と言われても、本物の claude では回さない（仕組みは下の「全量テストに入らない仕組み」。台本のあるシナリオは、全量テストで使い捨てのワークスペースでスタブで回る）
 - **普段のワークスペースルートで回す。** コピーは作らない（コピーの管理が、確かめたいことより重くなるため）
 - **ccnavi 本体のリポジトリに、ブランチ・コミット・MR・issue を作るシナリオは書かない。** そういう作業は `projects/test-repo` で行う。git の事前状態と戻しは `setup.git`・`setup.reset`（下の「使い捨てのリポジトリの事前状態と後片付け」）
   （MR やブランチが残ってよいプロジェクトとして用意したもの。後で片付ける）。ccnavi 本体に対するシナリオは、拒否されること（何も変わらないこと）の確認に限る
@@ -103,7 +103,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 
 ## 回し方
 
-1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。例外は `run-all` の 1 回の確認だけ（「続けて回す（run-all）」）。
+1. **回す前に、人間に確認する。** 確認が取れるまで、1 本も回さない。回すたびに取り直す（前の回の了承を使い回さない）。例外は `run-all` の 1 回の確認（「続けて回す（run-all）」）と、使い捨てのワークスペースでスタブで回す `run-stub`（ユーザのワークスペースに触れず claude も呼ばないので、確認を取らない。[claude-contract.md](claude-contract.md)）だけ。
    エージェントは先に次の事実を集め、そのまま見せて、人間に問う。
    - 概要: 実行器が出す「受け入れシナリオ」の節（何をさせ、何を期待し、何が残るか、まだ確かめていない点）。確認の前に、人間がこれを読んで決める
    - ワークスペース状態: ワークスペースルートと `projects/test-repo` の `ccnavi-git.sh status`、origin との先行・遅れ、残っているワークツリーとブランチ、
@@ -127,6 +127,8 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
    uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```
+
+   台本のあるシナリオを確認なしで回すなら、使い捨てのワークスペースで回す `run-stub` を使う（`uv run python -m tests.scenarios.runner run-stub tests/scenarios`。出力は `logs/scenarios/<ID>-stub-<日時>/`。[claude-contract.md](claude-contract.md) の「使い捨てのワークスペースで回す」）。
 
    `--agent script` を付けると、`claude -p` の代わりにスタブ（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、スタブが真似る範囲は [claude-contract.md](claude-contract.md)。
 
@@ -413,7 +415,7 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 ## 全量テストに入らない仕組み
 
-「全量テストを回して」（`uv run python -m tests`）で、シナリオが回らないようにしてある。
+「全量テストを回して」（`uv run python -m tests`）で、本物の claude でシナリオが回らないようにしてある（スタブで回る分は下の 1 つ目）。
 
 - **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と実行器のモジュール（`runner.py`・`drive.py`・`commands.py` など）は拾われない。
   `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）と `test_stub_scenarios.py`（台本のあるシナリオを、使い捨てのワークスペースでスタブで回す。[claude-contract.md](claude-contract.md)）だけで、どちらも `claude` を呼ばない

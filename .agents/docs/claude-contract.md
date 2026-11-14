@@ -58,8 +58,8 @@ uv run python -m tests.scenarios.runner run-stub tests/scenarios
 ```
 
 - 回すのは、人間の操作が無く、step がすべて `script` を持ち、`setup` が作るファイル（追記でないもの）だけのシナリオ（`schema.stub_unready`）。ほかは理由を出して回さない
-- ワークスペースは `tests/scenarios/sandbox.py` が一時ディレクトリに組む。このリポジトリの作業ツリーから、追跡している `.ccnavi/`・`.claude/settings.json`・`.claude/hooks/`・`.gitignore` をコピーし、テスト用に組んだ実行ファイル（`tests/exe.py`）を `.ccnavi/bin/` に置き、`settings.json` の `CCNAVI_MODE` を `enable` にする。`projects/test-repo` は README を 1 本持つ小さなリポジトリにする（UC-01 の台本が書き換える見出しを持つ）
-- 出力は `logs/scenarios/<ID>-stub-<日時>/`。終了コードは 0 全部 pass / 1 fail がある・回せるものが無い / 2 未成立がある
+- ワークスペースは `tests/scenarios/sandbox.py` が一時ディレクトリに組む。このリポジトリの作業ツリーから、追跡している `.ccnavi/`・`.claude/settings.json`・`.claude/hooks/`・`.gitignore` ・`docs/wiki/`（ccnavi が学びの案内に読む）をコピーし、テスト用に組んだ実行ファイル（`tests/exe.py`）を `.ccnavi/bin/` に置き、`settings.json` の `CCNAVI_MODE` を `enable` にする。`projects/test-repo` は README を 1 本持つ小さなリポジトリにする（UC-01 の台本が書き換える見出しを持つ）
+- 出力は `logs/scenarios/<ID>-stub-<日時>/`。終了コードは 0 全部 pass / 1 fail がある・回せるものが無い / 2 未成立がある / 3 後片付けができなかった回がある
 - 全量テストでも回る（`tests/scenarios/test_stub_scenarios.py`）。シナリオに台本を足すと、そこで回る
 
 ## スタブが真似ること
