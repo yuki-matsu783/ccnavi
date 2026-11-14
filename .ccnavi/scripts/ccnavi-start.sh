@@ -152,7 +152,6 @@ orig_count="$#"
 # 外から来る文字列（タイトル・本文）から、制御文字（C0・C1）、行・段落区切り（U+2028・U+2029）、全角空白を空白にする。
 # 案内の行を偽装されないよう、出力に流す前に必ず通す
 CLEAN_JQ='gsub("[\u0001-\u001f\u007f-\u009f\u2028\u2029\u3000]+"; " ")'
-JQ_DEFS="def clean: $CLEAN_JQ;"
 # 打ち直しの案内に使う。引数ごとに ' で包み（中の ' は '\''）、そのまま打てば同じ引数になるようにする。
 sh_quote() {
 	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
@@ -358,7 +357,7 @@ scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.items" "$host_err.issues" "$host_err.mrs"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.resp" "$host_err.resp2"' EXIT
 log_info 始めた -- "kind=${what:-${check:+check}${list_open:+list-open}${new_issue_title:+new-issue}}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -435,6 +434,19 @@ remote_heads() {
 }
 
 # ---- ホスト。origin を読んで繋ぐ。呼ぶのは親のシェルで（結果を変数に残す）、$( ) の中では呼ばない。
+# 取ってきたホストの応答を、実行ファイルの `ccnavi start <読み方> <引数>… <ファイル>…` に読ませる。応答は整えずに
+# ファイルで渡す（start_save）。答えは 1 行 1 項目で、行の先頭の語で分ける。実行ファイルが無い・応答を読めないときは 1。
+start_read() {
+	sr_bin=$(ccnavi_bin "$root") || return 1
+	sr_out=$("$sr_bin" --root "$root" start "$@" 2>/dev/null </dev/null) || return 1
+	printf '%s\n' "$sr_out" | tr -d '\r'
+}
+
+# 応答をそのままファイルに書く。<ファイル> <応答>
+start_save() {
+	printf '%s' "$2" >"$1"
+}
+
 host_tried=""
 host_rc=0
 host_why=""
@@ -572,18 +584,15 @@ issue_title_get() {
 		esac
 		return 1
 	}
-	if [ "$ccnavi_h_kind" = github ]; then
-		it_pr=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '(.pull_request // null) != null') || return 1
-		if [ "$it_pr" = true ]; then
-			issue_why="PR の番号だった"
-			return 3
-		fi
+	start_save "$host_err.resp" "$it_got"
+	it_read=$(start_read issue "$ccnavi_h_kind" "$host_err.resp") || return 1
+	if [ "$it_read" = pr ]; then
+		issue_why="PR の番号だった"
+		return 3
 	fi
-	it_raw=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '.title // empty') || return 1
-	issue_title_read=$(printf '%s\n' "$it_raw" | head -n 1 | LC_ALL=C tr '\001-\037\177' ' ' | sed -e 's/^ *//' -e 's/ *$//')
-	it_state=$(printf '%s' "$it_got" | "$ccnavi_h_jq" -r '.state // empty') || it_state=""
-	case "$it_state" in
-	open | opened) issue_state_read=open ;;
+	issue_title_read=$(printf '%s\n' "$it_read" | sed -n 's/^title //p' | head -n 1)
+	case "$(printf '%s\n' "$it_read" | sed -n 's/^state //p' | head -n 1)" in
+	open) issue_state_read=open ;;
 	closed) issue_state_read=closed ;;
 	esac
 	return 0
@@ -643,119 +652,100 @@ find_mr() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		fm_owner="${ccnavi_h_path%%/*}"
 		fm_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls?state=open&head=$(ccnavi_host_encode "$fm_owner:$1")") || return 1
-		printf '%s' "$fm_got" | "$ccnavi_h_jq" '.[0] // empty | {number: .number, url: .html_url}'
+		start_save "$host_err.resp" "$fm_got"
+		start_read pick open-mr github "$host_err.resp"
 	else
 		fm_pid=$(ccnavi_host_project_id) || return 1
 		fm_rc=0
 		fm_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$1")") || fm_rc=$?
 		[ "$fm_rc" -eq 0 ] || return 1
-		printf '%s' "$fm_got" | "$ccnavi_h_jq" --argjson pid "$fm_pid" \
-			'[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url}'
+		start_save "$host_err.resp" "$fm_got"
+		start_read pick open-mr gitlab "$fm_pid" "$host_err.resp"
 	fi
 }
 
-# 同じブランチ名のマージ済みの MR を探す。あれば {number, url}、無ければ空。API が失敗したら 1
+# 同じブランチ名のマージ済みの MR を探す。あれば `number <番号>` と `url <URL>` の 2 行、無ければ空。API が失敗したら 1
 # 手元の退避（logs/archive/）には頼らず、ホストに聞く。
 find_merged_mr() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		fx_owner="${ccnavi_h_path%%/*}"
 		fx_got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=closed&head=$(ccnavi_host_encode "$fx_owner:$1")") || return 1
-		printf '%s' "$fx_got" | "$ccnavi_h_jq" '[.[] | select(.merged_at != null)][0] // empty | {number: .number, url: .html_url}'
+		start_save "$host_err.resp" "$fx_got"
+		start_read pick merged-mr github "$host_err.resp"
 	else
 		fx_got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/merge_requests?state=merged&source_branch=$(ccnavi_host_encode "$1")") || return 1
-		printf '%s' "$fx_got" | "$ccnavi_h_jq" '.[0] // empty | {number: .iid, url: .web_url}'
+		start_save "$host_err.resp" "$fx_got"
+		start_read pick merged-mr gitlab "$host_err.resp"
 	fi
 }
 
-# Draft の MR を作る。{number, url} を出す。<ブランチ> <統合先> <タイトル> <本文>
+# Draft の MR を作る。`number <番号>` と `url <URL>` の 2 行を出す。<ブランチ> <統合先> <タイトル> <本文>
 create_mr() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		cm_payload=$("$ccnavi_h_jq" -n --arg h "$1" --arg b "$2" --arg t "$3" --arg d "$4" \
 			'{head: $h, base: $b, title: $t, body: $d, draft: true}')
 		cm_got=$(ccnavi_host_api POST "repos/$ccnavi_h_path/pulls" "$cm_payload") || return 1
-		printf '%s' "$cm_got" | "$ccnavi_h_jq" -e '{number: .number, url: .html_url} | select(.number != null)'
+		start_save "$host_err.resp" "$cm_got"
+		start_read pick made github "$host_err.resp"
 	else
 		cm_payload=$("$ccnavi_h_jq" -n --arg s "$1" --arg b "$2" --arg t "Draft: $3" --arg d "$4" \
 			'{source_branch: $s, target_branch: $b, title: $t, description: $d}')
 		cm_got=$(ccnavi_host_api POST "projects/$(ccnavi_host_encoded_path)/merge_requests" "$cm_payload") || return 1
-		printf '%s' "$cm_got" | "$ccnavi_h_jq" -e '{number: .iid, url: .web_url} | select(.number != null)'
+		start_save "$host_err.resp" "$cm_got"
+		start_read pick made gitlab "$host_err.resp"
 	fi
 }
 
-# タイトルの似た open の issue と MR を探す。JSON の配列（類似度の高い順、最大 5 件）を出す。無ければ空の配列。API が失敗したら 1。<タイトル>
+# タイトルの似た open の issue と MR を探し、1 件 1 行で出す（類似度の高い順、最大 5 件）。無ければ何も出さない。
+# API が失敗したら 1。<タイトル> <any|checked>（checked は同じタイトルだけ）
 # 似ているかは、空白を除いた小文字のタイトルの 2 文字組の一致率（Dice 係数）が 0.5 以上。日本語のタイトルでも同じ式で比べる。
 # 同じタイトルは 1.0。GitHub は issues の一覧に PR も入る（pull_request の有無で issue と MR を分ける）。GitLab は issues と merge_requests の 2 本。
-SIMILAR_JQ='
-def bg: ascii_downcase | gsub("\\s+"; "") | . as $t
-  | if ($t | length) < 2 then [$t] else [range(0; ($t | length) - 1) as $i | $t[$i:$i+2]] | unique end;
-def dice($a; $b): ($a | bg) as $x | ($b | bg) as $y
-  | if ($x | length) == 0 or ($y | length) == 0 then 0
-    else (([$x[] | . as $k | select(any($y[]; . == $k))] | length) * 2) / (($x | length) + ($y | length)) end;
-[.[] | {kind: .kind, number: .number, title: .title, url: .url, score: dice($t; .title)}
-  | select(.score >= 0.5)] | sort_by(-.score) | .[0:5]'
+# 読み方は実行ファイルの `ccnavi start similar`。
 find_similar() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		fs_got=$(ccnavi_host_pages "repos/$ccnavi_h_path/issues?state=open") || return 1
-		printf '%s' "$fs_got" | "$ccnavi_h_jq" "$JQ_DEFS"'[.[] | {kind: (if (.pull_request // null) != null then "MR" else "issue" end), number: .number, title: ((.title // "") | clean | .[0:200]), url: .html_url}]' >"$host_err.items" || return 1
+		start_save "$host_err.resp" "$fs_got"
+		start_read similar github "${2:-any}" "$1" "$host_err.resp"
 	else
 		fs_enc=$(ccnavi_host_encoded_path)
 		fs_issues=$(ccnavi_host_pages "projects/$fs_enc/issues?state=opened") || return 1
 		fs_mrs=$(ccnavi_host_pages "projects/$fs_enc/merge_requests?state=opened") || return 1
-		{
-			printf '%s' "$fs_issues" | "$ccnavi_h_jq" "$JQ_DEFS"'[.[] | {kind: "issue", number: .iid, title: ((.title // "") | clean | .[0:200]), url: .web_url}]'
-			printf '%s' "$fs_mrs" | "$ccnavi_h_jq" "$JQ_DEFS"'[.[] | {kind: "MR", number: .iid, title: ((.title // "") | clean | .[0:200]), url: .web_url}]'
-		} | "$ccnavi_h_jq" -s 'add' >"$host_err.items" || return 1
+		start_save "$host_err.resp" "$fs_issues"
+		start_save "$host_err.resp2" "$fs_mrs"
+		start_read similar gitlab "${2:-any}" "$1" "$host_err.resp" "$host_err.resp2"
 	fi
-	"$ccnavi_h_jq" --arg t "$1" "$SIMILAR_JQ" <"$host_err.items"
 }
 
 # open の issue と MR の一覧を出す（--list-open。読むだけ）。サブエージェントが意味の近いものを探すために読む。
 # タイトル・MR のブランチ・本文の先頭 500 字。最大 50 件ずつ。本文は外から来たデータなので、読み手に指示として読ませない。
-LIST_BODY_JQ='(. // "") | clean | .[0:500]'
-LIST_TITLE_JQ='(.title // "") | clean | .[0:200]'
+# 読み方は実行ファイルの `ccnavi start list-open`。
 list_open_items() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		lo_issues=$(ccnavi_host_pages "repos/$ccnavi_h_path/issues?state=open") || return 1
 		lo_mrs=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open") || return 1
-		lo_issues=$(printf '%s' "$lo_issues" | "$ccnavi_h_jq" -c '[.[] | select((.pull_request // null) == null)]') || return 1
-		lo_inum='.number'
-		lo_mnum='.number'
-		lo_mbranch='.head.ref'
-		lo_ibody='.body'
-		lo_mbody='.body'
 	else
 		lo_enc=$(ccnavi_host_encoded_path)
 		lo_issues=$(ccnavi_host_pages "projects/$lo_enc/issues?state=opened") || return 1
 		lo_mrs=$(ccnavi_host_pages "projects/$lo_enc/merge_requests?state=opened") || return 1
-		lo_inum='.iid'
-		lo_mnum='.iid'
-		lo_mbranch='.source_branch'
-		lo_ibody='.description'
-		lo_mbody='.description'
 	fi
-	lo_icount=$(printf '%s' "$lo_issues" | "$ccnavi_h_jq" 'length') || return 1
-	lo_mcount=$(printf '%s' "$lo_mrs" | "$ccnavi_h_jq" 'length') || return 1
-	printf '%s' "$lo_issues" | "$ccnavi_h_jq" -r "$JQ_DEFS"".[0:50] | .[] | \"issue #\($lo_inum)  \($LIST_TITLE_JQ)\n  本文: \($lo_ibody | $LIST_BODY_JQ)\"" >"$host_err.issues" || return 1
-	printf '%s' "$lo_mrs" | "$ccnavi_h_jq" -r "$JQ_DEFS"".[0:50] | .[] | \"MR !\($lo_mnum)  \($LIST_TITLE_JQ)  ブランチ: \(($lo_mbranch // \"\") | clean)\n  本文: \($lo_mbody | $LIST_BODY_JQ)\"" >"$host_err.mrs" || return 1
-	printf 'open の issue（全 %s 件。先頭 50 件を出す）:\n' "$lo_icount"
-	cat "$host_err.issues"
-	[ "$lo_icount" -le 50 ] || printf '（ほかに %s 件あります。一覧に無い古い issue は、この出力だけでは確かめられません）\n' "$((lo_icount - 50))"
-	printf 'open の MR（全 %s 件。先頭 50 件を出す）:\n' "$lo_mcount"
-	cat "$host_err.mrs"
-	[ "$lo_mcount" -le 50 ] || printf '（ほかに %s 件あります。一覧に無い古い MR は、この出力だけでは確かめられません）\n' "$((lo_mcount - 50))"
-	rm -f "$host_err.issues" "$host_err.mrs"
+	start_save "$host_err.resp" "$lo_issues"
+	start_save "$host_err.resp2" "$lo_mrs"
+	lo_out=$(start_read list-open "$ccnavi_h_kind" "$host_err.resp" "$host_err.resp2") || return 1
+	printf '%s\n' "$lo_out"
 }
 
-# issue を作る。{number, url} を出す。<タイトル> <本文>
+# issue を作る。`number <番号>` と `url <URL>` の 2 行を出す。<タイトル> <本文>
 new_issue_post() {
 	if [ "$ccnavi_h_kind" = github ]; then
 		ci_payload=$("$ccnavi_h_jq" -n --arg t "$1" --arg d "$2" '{title: $t, body: $d}')
 		ci_got=$(ccnavi_host_api POST "repos/$ccnavi_h_path/issues" "$ci_payload") || return 1
-		printf '%s' "$ci_got" | "$ccnavi_h_jq" -e '{number: .number, url: .html_url} | select(.number != null)'
+		start_save "$host_err.resp" "$ci_got"
+		start_read pick made github "$host_err.resp"
 	else
 		ci_payload=$("$ccnavi_h_jq" -n --arg t "$1" --arg d "$2" '{title: $t, description: $d}')
 		ci_got=$(ccnavi_host_api POST "projects/$(ccnavi_host_encoded_path)/issues" "$ci_payload") || return 1
-		printf '%s' "$ci_got" | "$ccnavi_h_jq" -e '{number: .iid, url: .web_url} | select(.number != null)'
+		start_save "$host_err.resp" "$ci_got"
+		start_read pick made gitlab "$host_err.resp"
 	fi
 }
 
@@ -763,12 +753,12 @@ new_issue_post() {
 # `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ出す。<MR の番号>
 # GitHub の closingIssuesReferences の代わり。本文だけを読む（コミットメッセージのキーワードや、手で付けたリンクは拾わない）。
 # コードブロック・インラインコード・HTML コメント・引用行の中の文字は対象外とする。`not close #n` や、語の途中の `fix`（`bug-fix #n`）も拾わない。
-# 戻り値: 0 読めた / 1 API の失敗
+# 読み方は実行ファイルの `ccnavi start linked-body`。戻り値: 0 読めた / 1 API の失敗か、応答を読めない
 mr_linked_issues_body() {
 	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
-	printf '%s' "$mb_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" \
-		'(.body // "") | gsub("(?s)```.*?```"; "") | gsub("(?s)<!--.*?-->"; "") | gsub("`[^`\n]*`"; "") | gsub("(?m)^[ \t]*>[^\n]*"; "")
-		| scan("(?i)(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])") | .[0] | if startswith("#") then $p + . else . end' || return 1
+	start_save "$host_err.resp" "$mb_got"
+	mb_read=$(start_read linked-body "$ccnavi_h_path" "$host_err.resp") || return 1
+	printf '%s\n' "$mb_read" | sed -n 's/^issue //p'
 }
 
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
@@ -796,19 +786,20 @@ mr_linked_issues() {
 				fi
 				return 1
 			fi
-			if ! printf '%s' "$ml_got" | "$ccnavi_h_jq" -e '(.errors // null) == null and (.data.repository.pullRequest.closingIssuesReferences.nodes | type) == "array"' >/dev/null 2>&1; then
+			start_save "$host_err.resp" "$ml_got"
+			ml_read=$(start_read linked-page "$host_err.resp") || ml_read=bad
+			if [ "$ml_read" = bad ]; then
 				printf '%s' "紐づく issue を読めなかった（GraphQL の応答に errors があるか、MR が見つからない）" >"$host_err.why"
 				return 1
 			fi
-			printf '%s' "$ml_got" | "$ccnavi_h_jq" -r '.data.repository.pullRequest.closingIssuesReferences.nodes[] | "\(.repository.nameWithOwner)#\(.number)"'
-			if [ "$(printf '%s' "$ml_got" | "$ccnavi_h_jq" -r '.data.repository.pullRequest.closingIssuesReferences.pageInfo.hasNextPage')" != true ]; then
-				return 0
-			fi
+			printf '%s\n' "$ml_read" | sed -n 's/^issue //p'
+			ml_next=$(printf '%s\n' "$ml_read" | sed -n 's/^next //p' | head -n 1)
+			[ -n "$ml_next" ] || return 0
 			if [ "$ml_page" -ge 5 ]; then
 				printf '%s' "紐づく issue が多すぎて読み切れない（5 ページを超えた）" >"$host_err.why"
 				return 2
 			fi
-			ml_cursor=$(printf '%s' "$ml_got" | "$ccnavi_h_jq" '.data.repository.pullRequest.closingIssuesReferences.pageInfo.endCursor')
+			ml_cursor="$ml_next"
 		done
 	else
 		ml_rc=0
@@ -818,7 +809,9 @@ mr_linked_issues() {
 			return 2
 		fi
 		[ "$ml_rc" -eq 0 ] || return 1
-		printf '%s' "$ml_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" '.[] | (.references.full // "\($p)#\(.iid)")'
+		start_save "$host_err.resp" "$ml_got"
+		ml_read=$(start_read linked-gitlab "$ccnavi_h_path" "$host_err.resp") || return 1
+		printf '%s\n' "$ml_read" | sed -n 's/^issue //p'
 	fi
 }
 
@@ -1195,16 +1188,16 @@ ensure_mr() {
 	em_mr=$(find_mr "$em_branch") || em_found_rc=$?
 	[ "$em_found_rc" -eq 0 ] || stop_host create "$(api_failed_reason)"
 	if [ -n "$em_mr" ]; then
-		mr_url=$(printf '%s' "$em_mr" | jq -r '.url')
-		mr_num=$(printf '%s' "$em_mr" | jq -r '.number')
+		mr_url=$(printf '%s\n' "$em_mr" | sed -n 's/^url //p' | head -n 1)
+		mr_num=$(printf '%s\n' "$em_mr" | sed -n 's/^number //p' | head -n 1)
 		log_info MR は飛ばす -- "branch=$em_branch"
 		return 0
 	fi
 	em_made_rc=0
 	em_made=$(create_mr "$em_branch" "$integration" "$em_title" "Closes #$number") || em_made_rc=$?
 	[ "$em_made_rc" -eq 0 ] || stop_host create "$(api_failed_reason)"
-	mr_url=$(printf '%s' "$em_made" | jq -r '.url')
-	mr_num=$(printf '%s' "$em_made" | jq -r '.number')
+	mr_url=$(printf '%s\n' "$em_made" | sed -n 's/^url //p' | head -n 1)
+	mr_num=$(printf '%s\n' "$em_made" | sed -n 's/^number //p' | head -n 1)
 	log_info MR を作った -- "branch=$em_branch"
 }
 
@@ -1416,7 +1409,7 @@ merged_check() {
 		stop_host merged "$(api_failed_reason)"
 	fi
 	if [ -n "$mc_merged" ]; then
-		fail adopt-merged "同じブランチ名 ${1} のマージ済み MR（!$(printf '%s' "$mc_merged" | jq -r '.number')）がある。マージ済みのブランチは再利用できません。新しいブランチで始めるか、ユーザに相談してください。"
+		fail adopt-merged "同じブランチ名 ${1} のマージ済み MR（!$(printf '%s\n' "$mc_merged" | sed -n 's/^number //p' | head -n 1)）がある。マージ済みのブランチは再利用できません。新しいブランチで始めるか、ユーザに相談してください。"
 	fi
 }
 
@@ -1469,25 +1462,24 @@ if [ -n "$new_issue_title" ]; then
 	# 機械的な類似確認は、--similar-checked があっても必ず走らせる（決定的で安い）。--similar-checked が飛ばすのは、
 	# 似ているだけのもの。タイトルが同じ（類似度 100%）の open の issue・MR があれば、必ず止める
 	ni_rc=0
-	ni_found=$(find_similar "$new_issue_title") || ni_rc=$?
+	ni_found=$(find_similar "$new_issue_title" "${similar_checked:+checked}") || ni_rc=$?
 	if [ "$ni_rc" -ne 0 ]; then
 		fail issue-search-failed "似た issue・MR があるかを確かめられなかった（$(api_failed_reason)）。重複を作らないため、何も作成せずに処理を中断しました。ユーザに伝えて止まってください（直接実装には切り替えない）。" "$EXIT_HOST"
 	fi
-	[ -z "$similar_checked" ] || ni_found=$(printf '%s' "$ni_found" | jq -c '[.[] | select(.score >= 1)]')
-	if [ "$(printf '%s' "$ni_found" | jq 'length')" -gt 0 ]; then
+	if [ -n "$ni_found" ]; then
 		if [ -n "$similar_checked" ]; then
 			printf 'ccnavi-start: 同じタイトルの open の issue・MR があるため、--similar-checked を付けても issue を作らずに処理を中断しました（タイトル: %s）。\n' "$new_issue_title"
 		else
 			printf 'ccnavi-start: タイトルの似た open の issue・MR があるため、issue を作らずに処理を中断しました（タイトル: %s）。\n' "$new_issue_title"
 		fi
-		printf '%s' "$ni_found" | jq -r '.[] | "  \(.kind) \(if .kind == "MR" then "!" else "#" end)\(.number)  \(.title)  \(.url)  類似度 \((.score * 100) | floor)%"'
+		printf '%s\n' "$ni_found"
 		ccnavi_text "$root" NEXT_START_SIMILAR_FOUND
 		if [ -n "$similar_checked" ]; then
 			ccnavi_text "$root" NOTE_START_SIMILAR_CHECKED
 		else
 			ccnavi_text "$root" NOTE_START_SIMILAR_UNCHECKED "orig_args_q=$orig_args"
 		fi
-		log_info 似た issue・MR がある -- "count=$(printf '%s' "$ni_found" | jq 'length')" "checked=${similar_checked:-no}"
+		log_info 似た issue・MR がある -- "count=$(printf '%s\n' "$ni_found" | wc -l | tr -d ' ')" "checked=${similar_checked:-no}"
 		exit "$EXIT_MULTI"
 	fi
 	if [ -z "$similar_checked" ]; then
@@ -1509,7 +1501,7 @@ if [ -n "$new_issue_title" ]; then
 	if [ "$ni_rc" -ne 0 ] || [ -z "$ni_made" ]; then
 		fail issue-create-failed "issue を作れなかった（$(api_failed_reason)）。何も作成せずに処理を中断しました。ユーザに issue を作ってもらい、その番号で sh .ccnavi/scripts/ccnavi-start.sh --issue <番号> を打つ。直接実装には切り替えない。" "$EXIT_HOST"
 	fi
-	issue_n=$(printf '%s' "$ni_made" | jq -r '.number')
+	issue_n=$(printf '%s\n' "$ni_made" | sed -n 's/^number //p' | head -n 1)
 	printf 'issue #%s を作った（%s）。この番号で続ける。以降の打ち直しは --issue %s で行う（--new-issue は打ち直さない。重複 issue ができる）\n' "$issue_n" "$(printf '%s' "$ni_made" | jq -r '.url')" "$issue_n"
 	log_info issue を作った -- "number=$issue_n"
 	issue_arg="$issue_n"
