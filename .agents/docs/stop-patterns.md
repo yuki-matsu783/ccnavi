@@ -93,7 +93,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 | `firstName` / `secondName` | 文面で A と B を呼ぶ名前 |
 | `message` | 文面ファイルの識別子（`DENY_NEEDS_USER_TURN__<宣言>`）。「なぜ」と「次の一手」と、`what` の場合分け（`same_command`・`no_user_turn`）をそこに書く。`{key}` と `{script:<sh の名前>}` を埋める |
 | `keyName` | キーが解けなかったときに `{key}` に入れる仮の値 |
-| `askIfAttended` / `askMessage` | 立てると、付き添いのあるセッションで B を発言を待たずに確認（ask）に出す。同じコマンドに A と B が並ぶ形だけは、どちらでも止める。`ask_message` は確認の文を持つ通知（`NOTICE_ASK_USER_CONFIRM__<宣言>`）の識別子 |
+| `askIfAttended` / `askMessage` | 立てると、付き添いのあるセッションで B を発言を待たずに確認（ask）に出す。同じコマンドに A と B が並ぶ形だけは、どちらでも止める。`askMessage` は確認の文を持つ通知（`NOTICE_ASK_USER_CONFIRM__<宣言>`）の識別子 |
 
 記録を読み書きできない場合と、ゲートの記録が壊れている場合の文は、宣言によらず `DENY_NEEDS_USER_TURN__STATE`。`what` を `unreadable`・`unwritable`・`broken` で、`next` を `place`・`broken` で分ける。
 
