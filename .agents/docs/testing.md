@@ -52,6 +52,8 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 `tests/contract/shape.py` と、`tests/contract/gitlab/` の `normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。
 
+`tests/fake_claude.py`（claude -p の代役）、`tests/contract/claudeside.py`、`tests/contract/claude/recorded.json` を変えたら、同じく `contract` を回す。本物の `claude -p` から録った形と比べる。仕様と録り直しは [claude-contract.md](claude-contract.md)。
+
 ## sh の試験の実行ファイルの代役
 
 sh を回す試験は、実行ファイルの代わりに小さな sh（代役、`STUB`）を `CCNAVI_ENTRY_PATH` に置く。sh は実行ファイルの答えに依存するので、sh に新しい要求が足されたら、代役も追従させる。追従が漏れると、代役が黙って空の答えを返し、sh が「操作記録を作れなかった」などで止まる。

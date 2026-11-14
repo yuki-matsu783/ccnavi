@@ -9,7 +9,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 # GitLab の応答の形の契約テスト
 
 本物の GitLab（Docker）の応答の**形**を録り、模擬（`tests/fake_gitlab.py`）の応答の形と比べる。値（ID・時刻・SHA）は比べない。
-置き場は `tests/contract/`（テストのグループ `contract`）と、データの `tests/contract/gitlab/`。
+置き場は `tests/contract/`（テストのグループ `contract`）と、データの `tests/contract/gitlab/`。同じグループにある claude -p の代役の契約（`tests/contract/claude/`）は [claude-contract.md](claude-contract.md)。
 
 ## 何が証明されるか
 

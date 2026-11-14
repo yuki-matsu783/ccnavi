@@ -49,6 +49,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | Python のテストを回す（特に全件）、回すグループを決める | `.agents/docs/testing.md` |
 | GitLab の模擬（`tests/fake_gitlab.py`）の応答を変える、契約テスト（`tests/contract/`）・録画した応答の形（`recorded*.json`）を足す・直す | `.agents/docs/gitlab-contract.md` |
 | 受入シナリオ（`tests/scenarios/`）を書く、`claude -p` で振る舞いを回す（明確な指示があったときだけ） | `.agents/docs/acceptance-scenarios.md` |
+| claude -p の代役（`tests/fake_claude.py`）・台本（step の `script`）を足す・直す、本物の `claude -p` から形を録り直す（明確な指示があったときだけ） | `.agents/docs/claude-contract.md` |
 | 手動で本物の GitLab（Docker）を立てて 1 周する | `.agents/docs/gitlab-manual.md` |
 | 本物の GitLab・code-server・Playwright・Haiku で、エージェントと人間の挙動を合わせて弱点を洗い出す・再測定する（明確な指示があったときだけ） | `.agents/docs/e2e-exploration.md` |
 | ユーザに実機確認（VS Code 拡張の画面）を頼まれた | `.agents/docs/real-screen-verification.md`（Playwright と code-server を入れてよい。まず自分で確かめる。手順は `extensions/vscode/ccnavi-board/docs/design/real-screen-check.md`） |
