@@ -27,7 +27,7 @@ import tempfile
 import unittest
 from urllib.parse import quote
 
-from tests import ROOT, common_sh, exe, put_messages
+from tests import ROOT, common_sh, exe, put_messages, shrink_repo
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 REAL_GIT = shutil.which("git")
@@ -169,25 +169,31 @@ class StartShHarness(unittest.TestCase):
 
     origin_url = GH_URL
 
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        base = self._tmp.name
-        self.bare = os.path.join(base, "origin.git")
-        git(base, "init", "-q", "--bare", "-b", "main", self.bare)
-        self.ws = os.path.join(base, "ws")
-        os.makedirs(self.ws)
-        git(base, "init", "-q", "-b", "main", self.ws)
+    @classmethod
+    def setUpClass(cls):
+        # リポジトリ（origin の代わりの bare とワークスペース）はクラスで 1 回だけ組み、テストごとに
+        # 写しを使う。どちらも自分の置き場の絶対パスを持たないので、別の場所へ写してよい。
+        cls._template = tempfile.mkdtemp(prefix="ccnavi-start-sh-")
+        cls.addClassCleanup(shutil.rmtree, cls._template, ignore_errors=True)
+        cls._build_repos(cls._template)
+
+    @classmethod
+    def _build_repos(cls, base):
+        bare = os.path.join(base, "origin.git")
+        git(base, "init", "-q", "--bare", "-b", "main", bare)
+        ws = os.path.join(base, "ws")
+        os.makedirs(ws)
+        git(base, "init", "-q", "-b", "main", ws)
         for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
-            git(self.ws, "config", key, value)
-        write(os.path.join(self.ws, ".gitignore"), "logs/\n.ccnavi/\n.claude/\n")
-        git(self.ws, "add", ".gitignore")
-        git(self.ws, "commit", "-q", "-m", "seed")
-        git(self.ws, "push", "-q", self.bare, "main")
-        git(self.ws, "remote", "add", "origin", self.origin_url)
-        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
-        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-        scripts = os.path.join(self.ws, ".ccnavi", "scripts")
+            git(ws, "config", key, value)
+        write(os.path.join(ws, ".gitignore"), "logs/\n.ccnavi/\n.claude/\n")
+        git(ws, "add", ".gitignore")
+        git(ws, "commit", "-q", "-m", "seed")
+        git(ws, "push", "-q", bare, "main")
+        git(ws, "remote", "add", "origin", cls.origin_url)
+        git(ws, "update-ref", "refs/remotes/origin/main", "HEAD")
+        git(ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+        scripts = os.path.join(ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
         for name in (
             "ccnavi-start.sh",
@@ -197,7 +203,20 @@ class StartShHarness(unittest.TestCase):
             *common_sh(SH_DIR),
         ):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
-        put_messages(self.ws)
+        put_messages(ws)
+        shrink_repo(os.path.join(ws, ".git"))
+        shrink_repo(bare)
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        base = self._tmp.name
+        self.bare = os.path.join(base, "origin.git")
+        self.ws = os.path.join(base, "ws")
+        for name in ("origin.git", "ws"):
+            shutil.copytree(
+                os.path.join(type(self)._template, name), os.path.join(base, name), symlinks=True
+            )
         self.exe = write(os.path.join(base, "exe", "ccnavi"), EXE.format(exe=exe.sh_path()))
         os.chmod(self.exe, os.stat(self.exe).st_mode | stat.S_IXUSR)
         self.bin = os.path.join(base, "bin")

@@ -52,7 +52,16 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, config_path, exe, host_stub, oprecord, put_messages
+from tests import (
+    ROOT,
+    common_path,
+    config_path,
+    exe,
+    host_stub,
+    oprecord,
+    put_messages,
+    shrink_repo,
+)
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -157,6 +166,8 @@ class WriteAndPushHarness(unittest.TestCase):
         cls.addClassCleanup(shutil.rmtree, cls._base, ignore_errors=True)
         inst = cls("run")
         inst._build(cls._base)
+        shrink_repo(os.path.join(inst.ws, ".git"))
+        shrink_repo(inst.remote)
         cls._pristine = cls._base + "-pristine"
         cls.addClassCleanup(shutil.rmtree, cls._pristine, ignore_errors=True)
         shutil.copytree(cls._base, cls._pristine, symlinks=True)
