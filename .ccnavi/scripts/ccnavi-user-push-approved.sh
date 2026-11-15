@@ -62,7 +62,8 @@
 # ツリーのコミットは、実行ファイルが無くても承認を送れるようにここに残す（sh で実装するもののうち「実行ファイルを
 # 起こさずに動くもの」）。そのために持つ規則の写しと、実行ファイルとの一致を確かめる表:
 # - 置き場の名前（ccnavi-common.sh の ccnavi_*_dir。tests/fixtures/layout.json）
-# - status の読みと書きかけの一時ファイル（ccnavi_porcelain_paths・ccnavi_drop_temp。tests/fixtures/approved-carry.json）
+# - status の読みと書きかけの一時ファイル（ccnavi_porcelain_paths・ccnavi_drop_temp）と、--path のパスの大文字小文字を
+#   区別しない比べ（ccnavi_path_under・ccnavi_path_pick）。tests/fixtures/approved-carry.json
 # - 識別子の形と保護されたブランチ（ccnavi_is_ident・ccnavi_is_protected。tests/fixtures/ident-cases.json）
 # - push の資格情報を選ぶための origin の読み（ccnavi_git_auth の ccnavi_host_parse。tests/fixtures/host-kinds.json）
 #
@@ -182,7 +183,7 @@ carry_paths() {
 	if [ -n "$given" ]; then
 		given_in "$1" >"$ccnavi_wap_tmp/given"
 		if [ -s "$ccnavi_wap_tmp/given" ]; then
-			grep -F -x -f "$ccnavi_wap_tmp/given" "$ccnavi_wap_tmp/carry" >"$ccnavi_wap_tmp/carry-given" || :
+			ccnavi_path_pick "$ccnavi_wap_tmp/given" <"$ccnavi_wap_tmp/carry" >"$ccnavi_wap_tmp/carry-given" || :
 			mv "$ccnavi_wap_tmp/carry-given" "$ccnavi_wap_tmp/carry"
 		else
 			: >"$ccnavi_wap_tmp/carry"
@@ -190,26 +191,18 @@ carry_paths() {
 	fi
 }
 
-# --path で渡したパスのうち、ツリー $1 の中のものを、そのツリーからの相対で 1 行ずつ。
-# ワークスペースルートのツリーには、projects/ と .claude/worktrees/ の下（別のツリー）を入れない。
+# --path で渡したパスのうち、ツリー $1 の中のものを、そのツリーからの相対で 1 行ずつ。大文字小文字を区別せず比べる
+# （ccnavi_path_under）。ワークスペースルートのツリーには、projects/ と .claude/worktrees/ の下（別のツリー）を入れない。
 given_in() {
-	case "$1" in
-	"$root") gi_pre="" ;;
-	*) gi_pre="${1#"$root"/}/" ;;
-	esac
 	printf '%s' "$given" | while IFS= read -r gi_path; do
 		[ -n "$gi_path" ] || continue
-		case "$gi_path" in
-		"$gi_pre"*) ;;
-		*) continue ;;
-		esac
-		gi_rel="${gi_path#"$gi_pre"}"
-		if [ -z "$gi_pre" ]; then
-			case "$gi_rel" in
-			"$projects"/* | "$worktrees"/*) continue ;;
-			esac
+		if [ "$1" = "$root" ]; then
+			ccnavi_path_under "$gi_path" "$projects" >/dev/null && continue
+			ccnavi_path_under "$gi_path" "$worktrees" >/dev/null && continue
+			printf '%s\n' "$gi_path"
+		elif gi_rel=$(ccnavi_path_under "$gi_path" "${1#"$root"/}") && [ "$gi_rel" != . ]; then
+			printf '%s\n' "$gi_rel"
 		fi
-		printf '%s\n' "$gi_rel"
 	done
 }
 

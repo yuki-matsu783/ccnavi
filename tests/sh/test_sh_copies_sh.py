@@ -6,8 +6,9 @@
 - 置き場の名前（`ccnavi-common.sh` の `ccnavi_worktrees_dir` など。`tests/fixtures/layout.json`）
 - 「origin にその ref が無い」の見分け（`ccnavi_no_remote_ref`。
   `tests/fixtures/no-remote-ref.json`）
-- 置き場の変更のパスの読みと、書きかけの一時ファイル（`ccnavi_porcelain_paths`・`ccnavi_drop_temp`。
-  `tests/fixtures/approved-carry.json`）
+- 置き場の変更のパスの読みと、書きかけの一時ファイル（`ccnavi_porcelain_paths`・
+  `ccnavi_drop_temp`）、パスの比べ（`ccnavi_path_under`・`ccnavi_path_pick`）。
+  `tests/fixtures/approved-carry.json`
 """
 
 from __future__ import annotations
@@ -88,6 +89,44 @@ class ShCopiesTest(unittest.TestCase):
         done = run("ccnavi_drop_temp", stdin=paths)
         kept = done.stdout.decode("utf-8").splitlines()
         self.assertEqual([c["path"] for c in cases if not c["temp"]], kept)
+
+    def test_path_under(self):
+        whole = table("approved-carry.json")
+        self.assertTrue(whole["under"])
+        for locale in ("C", "C.UTF-8"):
+            for case in whole["under"]:
+                with self.subTest(locale=locale, path=case["path"], base=case["base"]):
+                    done = subprocess.run(
+                        [SHELL, "-c", '. "$0"; ccnavi_path_under "$1" "$2"', COMMON]
+                        + [case["path"], case["base"]],
+                        capture_output=True,
+                        env={**os.environ, "LC_ALL": locale},
+                        check=False,
+                    )
+                    if case["rest"] is None:
+                        self.assertNotEqual(0, done.returncode, done.stdout)
+                    else:
+                        self.assertEqual(0, done.returncode, done.stderr)
+                        self.assertEqual(case["rest"], done.stdout.decode("utf-8").rstrip("\n"))
+        # ASCII の外の字の大文字小文字は、sh では畳まない（実行ファイルだけが同じとみなす）。
+        for case in whole["go_only"]:
+            done = run('ccnavi_path_under "$1" "$2"', case["path"], case["base"])
+            self.assertNotEqual(0, done.returncode)
+
+    def test_path_pick(self):
+        cases = table("approved-carry.json")["same"]
+        self.assertTrue(cases)
+        with tempfile.TemporaryDirectory() as d:
+            want = os.path.join(d, "want")
+            for case in cases:
+                with self.subTest(a=case["a"], b=case["b"]):
+                    with open(want, "w", encoding="utf-8", newline="\n") as f:
+                        f.write(case["a"] + "\n")
+                    done = run(
+                        'ccnavi_path_pick "$1"', want, stdin=(case["b"] + "\n").encode("utf-8")
+                    )
+                    picked = done.stdout.decode("utf-8").splitlines()
+                    self.assertEqual([case["b"]] if case["same"] else [], picked)
 
 
 if __name__ == "__main__":

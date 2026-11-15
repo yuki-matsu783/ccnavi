@@ -385,12 +385,12 @@ class ParentBranchShTest(unittest.TestCase):
 
     def test_a_parent_worktree_before_the_ticket_does_not_stop_the_approval(self):
         """`ccnavi-start.sh` はチケットの前に ccnavi-sync.sh を打つ。チケットが無いので取り込まない
-        （終了コード 1）が、最初の承認（--agree）の前に ccnavi-sync.sh を打ち直さなくても通る。
+        （終了コード 4）が、最初の承認（--agree）の前に ccnavi-sync.sh を打ち直さなくても通る。
         取り込み状態も統合先のコピーも作らない。"""
         self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
         self.ok(self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH))
         synced = self.sh("ccnavi-sync.sh", PARENT)
-        self.assertEqual(synced.returncode, 1, synced.stdout + synced.stderr)
+        self.assertEqual(synced.returncode, 4, synced.stdout + synced.stderr)
         self.assertIn("親チケットも提案もありません", synced.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.propose()

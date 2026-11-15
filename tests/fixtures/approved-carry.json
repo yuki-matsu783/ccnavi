@@ -1,26 +1,179 @@
 {
-  "note": "承認済みチケットの置き場の変更のパスの読み。sh（ccnavi-common-write-and-push.sh の ccnavi_porcelain_paths・ccnavi_drop_temp。tests/sh/test_sh_copies_sh.py）と実行ファイル（git.PorcelainPaths と wap の temp。go/internal/tickets/approval/wap/carry_sh_test.go）が同じ表で一致を確かめる。porcelain は `status --porcelain -z --no-renames` の 1 項目と、そのパス。temp はパスと、書きかけの一時ファイルとしてコミットから外すか。",
+  "note": "承認済みチケットの置き場の変更のパスの読み。sh（ccnavi-common-write-and-push.sh の ccnavi_porcelain_paths・ccnavi_drop_temp。tests/sh/test_sh_copies_sh.py）と実行ファイル（git.PorcelainPaths と wap の temp。go/internal/tickets/approval/wap/carry_sh_test.go）が同じ表で一致を確かめる。porcelain は `status --porcelain -z --no-renames` の 1 項目と、そのパス。temp はパスと、書きかけの一時ファイルとしてコミットから外すか。 under は --path のパスがどのツリーのものか（ccnavi_path_under と pathcase.Under。rest は基準からの相対で、null は下に無い）、same は渡したパスと変更のパスが同じか（ccnavi_path_pick と pathcase.Fold で畳んで比べる）。go_only は ASCII の外の字の大文字小文字で、実行ファイルだけが同じとみなす（sh は ASCII の英字だけを畳む）。",
   "porcelain": [
-    {"entry": " M .ccnavi/approved/a.md", "path": ".ccnavi/approved/a.md"},
-    {"entry": "?? .ccnavi/approved/新しい.md", "path": ".ccnavi/approved/新しい.md"},
-    {"entry": " D wip/proposals/review/x.md", "path": "wip/proposals/review/x.md"},
-    {"entry": "A  .ccnavi/approved/a b.md", "path": ".ccnavi/approved/a b.md"},
-    {"entry": "MM .ccnavi/approved/\"q\".md", "path": ".ccnavi/approved/\"q\".md"}
+    {
+      "entry": " M .ccnavi/approved/a.md",
+      "path": ".ccnavi/approved/a.md"
+    },
+    {
+      "entry": "?? .ccnavi/approved/新しい.md",
+      "path": ".ccnavi/approved/新しい.md"
+    },
+    {
+      "entry": " D wip/proposals/review/x.md",
+      "path": "wip/proposals/review/x.md"
+    },
+    {
+      "entry": "A  .ccnavi/approved/a b.md",
+      "path": ".ccnavi/approved/a b.md"
+    },
+    {
+      "entry": "MM .ccnavi/approved/\"q\".md",
+      "path": ".ccnavi/approved/\"q\".md"
+    }
   ],
   "temp": [
-    {"path": ".ccnavi/approved/.a.md.123.part", "temp": true},
-    {"path": ".ccnavi/approved/.a.123.part.md", "temp": true},
-    {"path": ".a.1.part", "temp": true},
-    {"path": ".ccnavi/approved/flows/.x.1.tmp", "temp": true},
-    {"path": "flows/.x.tmp", "temp": true},
-    {"path": ".ccnavi/approved/x.ccnavi-sync", "temp": true},
-    {"path": ".ccnavi/approved/a.md", "temp": false},
-    {"path": ".ccnavi/approved/part.md", "temp": false},
-    {"path": ".ccnavi/approved/a.part", "temp": false},
-    {"path": ".ccnavi/approved/flows/x.tmp", "temp": false},
-    {"path": ".ccnavi/approved/.x.tmp", "temp": false},
-    {"path": ".ccnavi/approved/.hidden.md", "temp": false},
-    {"path": ".ccnavi/approved/a.ccnavi-sync.md", "temp": false},
-    {"path": ".ccnavi/approved/.a.part/b.md", "temp": false}
+    {
+      "path": ".ccnavi/approved/.a.md.123.part",
+      "temp": true
+    },
+    {
+      "path": ".ccnavi/approved/.a.123.part.md",
+      "temp": true
+    },
+    {
+      "path": ".a.1.part",
+      "temp": true
+    },
+    {
+      "path": ".ccnavi/approved/flows/.x.1.tmp",
+      "temp": true
+    },
+    {
+      "path": "flows/.x.tmp",
+      "temp": true
+    },
+    {
+      "path": ".ccnavi/approved/x.ccnavi-sync",
+      "temp": true
+    },
+    {
+      "path": ".ccnavi/approved/a.md",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/part.md",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/a.part",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/flows/x.tmp",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/.x.tmp",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/.hidden.md",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/a.ccnavi-sync.md",
+      "temp": false
+    },
+    {
+      "path": ".ccnavi/approved/.a.part/b.md",
+      "temp": false
+    }
+  ],
+  "under": [
+    {
+      "path": ".ccnavi/approved/a.md",
+      "base": ".ccnavi/approved",
+      "rest": "a.md"
+    },
+    {
+      "path": "Projects/Foo/.ccnavi/approved/a.md",
+      "base": "projects/foo",
+      "rest": ".ccnavi/approved/a.md"
+    },
+    {
+      "path": "projects/FOO/X.md",
+      "base": "projects/foo/",
+      "rest": "X.md"
+    },
+    {
+      "path": ".Claude/Worktrees/I0001/.ccnavi/approved/b.md",
+      "base": ".claude/worktrees/i0001",
+      "rest": ".ccnavi/approved/b.md"
+    },
+    {
+      "path": "projects/foo",
+      "base": "projects/foo",
+      "rest": "."
+    },
+    {
+      "path": "projects/foobar/x.md",
+      "base": "projects/foo",
+      "rest": null
+    },
+    {
+      "path": "projects/fo/x.md",
+      "base": "projects/foo",
+      "rest": null
+    },
+    {
+      "path": "a/x.md",
+      "base": "b",
+      "rest": null
+    },
+    {
+      "path": "projects/日本/承認.md",
+      "base": "projects/日本",
+      "rest": "承認.md"
+    },
+    {
+      "path": "projects/a b/x.md",
+      "base": "projects/A B",
+      "rest": "x.md"
+    },
+    {
+      "path": "projects/a*/x.md",
+      "base": "projects/a*",
+      "rest": "x.md"
+    },
+    {
+      "path": "projects/ab/x.md",
+      "base": "projects/a*",
+      "rest": null
+    }
+  ],
+  "same": [
+    {
+      "a": ".ccnavi/approved/a.md",
+      "b": ".ccnavi/approved/a.md",
+      "same": true
+    },
+    {
+      "a": ".ccnavi/approved/A.md",
+      "b": ".ccnavi/approved/a.MD",
+      "same": true
+    },
+    {
+      "a": ".ccnavi/approved/承認.md",
+      "b": ".ccnavi/approved/承認.md",
+      "same": true
+    },
+    {
+      "a": ".ccnavi/approved/a.md",
+      "b": ".ccnavi/approved/b.md",
+      "same": false
+    },
+    {
+      "a": ".ccnavi/approved/a.md",
+      "b": ".ccnavi/approved/a.md.bak",
+      "same": false
+    }
+  ],
+  "go_only": [
+    {
+      "path": "projects/Ｆoo/x.md",
+      "base": "projects/ｆoo",
+      "rest": "x.md"
+    }
   ]
 }

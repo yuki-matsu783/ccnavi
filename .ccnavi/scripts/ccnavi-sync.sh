@@ -65,7 +65,9 @@
 # 終了コード: 0 全部取り込んだ（取り込むものが無いを含む） / 1 止めた親子のチケットかリポジトリがある /
 #           2 引数か環境の誤り（実行ファイルが無い・答えないを含む） /
 #           3 止めたもののうち、取り込み（早送りか merge）が書きかけと重なって止まったものがある（ほかの理由で
-#             止めたものがあっても 3。write-and-push はこれで「書きかけを先にコミットしてから取り込み直す」と言い分ける）
+#             止めたものがあっても 3。write-and-push はこれで「書きかけを先にコミットしてから取り込み直す」と言い分ける） /
+#           4 止めたのは、渡した <P> のワークツリーに親チケットも提案も無いものだけ（ワークツリーを切った直後。
+#             ccnavi-start.sh はこれで「取り込むものはまだ無い」と言い分ける）
 
 set -eu
 
@@ -121,6 +123,7 @@ scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-sync) || {
 	exit 2
 }
 : >"$scratch/failed"
+: >"$scratch/noticket"
 
 # 後始末（プロセスの寿命）。ロックを外し、一時ディレクトリを消す。merge の途中で切られたときの取りやめは、
 # merge を始めた実行ファイルが持つ（sh は子が終わるのを待ってからここに来る）。
@@ -168,6 +171,9 @@ said() {
 	fi
 	if ccnavi_has overlap "$answer"; then
 		printf 'overlap\n' >>"$scratch/failed"
+	fi
+	if ccnavi_has noticket "$answer"; then
+		printf 'noticket\n' >>"$scratch/noticket"
 	fi
 	next=$(ccnavi_val1 next "$answer")
 }
@@ -309,6 +315,11 @@ done 4<"$scratch/repos"
 if grep -qx overlap "$scratch/failed"; then
 	log_info 終わった -- "exit=3"
 	exit 3
+fi
+# 止めたもの（fail の行）が、どれも親チケットも提案も無いワークツリーなら 4。
+if [ -s "$scratch/noticket" ] && [ "$(grep -c '^fail$' "$scratch/failed")" -eq "$(grep -c . "$scratch/noticket")" ]; then
+	log_info 終わった -- "exit=4"
+	exit 4
 fi
 if [ -s "$scratch/failed" ]; then
 	log_info 終わった -- "exit=1"
