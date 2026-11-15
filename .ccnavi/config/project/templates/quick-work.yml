@@ -1,5 +1,5 @@
 name: quick-work
-description: 小さい作業を親 1 子 1 で回す。子は開発→haiku で横展開漏れ調査→sonnet で敵対的レビューの順で進める
+description: 小さい作業を親チケットと子チケットを1つずつ作成して実行する。
 when: 設計判断や並行作業が要らない小さい作業のとき。調査から文書まで通すなら full-phases を使う
 plan:
 - quick-work

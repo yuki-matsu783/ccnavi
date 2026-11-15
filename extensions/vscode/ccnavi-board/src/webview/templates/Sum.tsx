@@ -32,10 +32,9 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
   const used = sum.templates.filter((row) => row.effective).length;
   return (
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
-      <summary>統合結果（読み取り専用）</summary>
+      <summary>統合結果</summary>
       <p className="hint">
-        共通の設定に選んだ設定を重ねた、実行ファイルの答えをそのまま並べた結果です。中身を確認するときは、画面上部の「設定」の欄で見たい設定に切り替えます。
-        同じ名前が重なって破棄された側には、その理由を出します。
+        共通設定とプロジェクト設定を統合した結果を表示します。同じ名前が重なって破棄された側には、その理由を出します。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         統合結果{" "}

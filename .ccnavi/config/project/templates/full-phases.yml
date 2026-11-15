@@ -1,5 +1,5 @@
 name: full-phases
-description: phases.yml の作業フェーズ（work）を全部、番号順に一直線で回す。各子は開発→haiku で横展開漏れ調査→sonnet で敵対的レビューの順で進める
+description: phases.yml の作業フェーズ（work）を全部、番号順に直列で実行する。
 when: ccnavi 自身の変更で、調査・設計・受入テスト・実装・文書まで省かずに通したいとき。小さい作業なら quick-work を単独で提案する
 plan:
 - research

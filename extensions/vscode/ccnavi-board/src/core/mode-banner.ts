@@ -6,10 +6,10 @@
  */
 export function modeBanner(mode: string): string {
   if (mode === "dry-run") {
-    return "判定と記録をします。denyやaskにヒットしても、一般の保護はツールの実行を止めません。止まるのは、チケットのゲートと補助の保護です";
+    return "判定と記録をします。denyやaskにヒットしても、操作は止まりません";
   }
   if (mode === "disable") {
-    return "判定しません。ルールは使われず、denyやaskにヒットする操作も止まりません";
+    return "判定しません。denyやaskにヒットする操作も止まりません";
   }
   return "";
 }

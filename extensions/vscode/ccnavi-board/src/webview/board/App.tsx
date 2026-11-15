@@ -347,7 +347,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             <>
               <p className="board-empty">チケットなし</p>
               {/* finish済みでマージ待ちの親は、MRの状況を確認するまでボードに出ない。空のボードと区別できるよう一言添える */}
-              {mergeShown === undefined && !touring ? <p className="merge-note" data-merge="hint">マージ待ちの親は、［MRの状況を確認］で調べると出ます</p> : null}
+              {mergeShown === undefined && !touring ? <p className="merge-note" data-merge="hint">マージ待ちのチケットを見たい場合は、［MRの状況を確認］をクリックしてください</p> : null}
             </>
           ) : null}
           <div className="board" data-tour="board">
