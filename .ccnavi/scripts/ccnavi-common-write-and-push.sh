@@ -505,17 +505,9 @@ ccnavi_wap_sent() {
 # 後始末。ロックを外し、一時ディレクトリを消す。2 度呼んでも害は無い。
 ccnavi_wap_inflight=""
 ccnavi_wap_end() {
-	# タイムアウト監視（ccnavi_run_timed）の途中で切られたら、監視も止める。後で別のプロセスを kill しないようにするため。
-	if [ -n "${ccnavi_tm_dog:-}" ]; then
-		kill "$ccnavi_tm_dog" 2>/dev/null || :
-		wait "$ccnavi_tm_dog" 2>/dev/null || :
-		ccnavi_tm_dog=""
-		# 監視していた git（push）も止めて終わりを待つ。動いている途中のツリーを見て戻さない。
-		if [ -n "${ccnavi_tm_pid:-}" ]; then
-			kill "$ccnavi_tm_pid" 2>/dev/null || :
-			wait "$ccnavi_tm_pid" 2>/dev/null || :
-		fi
-	fi
+	# タイムアウト監視（ccnavi_run_timed）の途中で切られたら、監視していた git（push）を止めて終わりを待ち、監視も
+	# 止める。動いている途中のツリーを見て戻さないため、後で監視が別のプロセスを kill しないようにするため。
+	ccnavi_run_timed_end
 	if [ -n "$ccnavi_wap_inflight" ] && [ -n "$ccnavi_wap_tmp" ]; then
 		ccnavi_ce_answer="$ccnavi_wap_inflight"
 		ccnavi_wap_inflight=""

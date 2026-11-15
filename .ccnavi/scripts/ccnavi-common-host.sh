@@ -48,6 +48,24 @@ ccnavi_h_on_fail=""
 ccnavi_h_tmp=""
 ccnavi_h_max_time=120
 
+# ccnavi_run_timed の途中を止めて回収する。呼ぶ側の trap の後始末（ccnavi_wap_end）と ccnavi_run_timed の終わりが使う。
+# 子（コマンド）を止めて回収してから見張りを止める。この順が要る: 見張りは自分の trap を置く前に届いた TERM を
+# 受け損ねることがあり、子がもういないことでそれを見分ける（ccnavi_run_timed の見張りの説明）。子が先に TERM を
+# 受け損ねて走り続けても、見張りが上限で止める。終わったら変数を空にする（空が「途中ではない」の印）。
+ccnavi_run_timed_end() {
+	if [ -n "${ccnavi_tm_pid:-}" ]; then
+		kill "$ccnavi_tm_pid" 2>/dev/null || :
+		wait "$ccnavi_tm_pid" 2>/dev/null || :
+		ccnavi_tm_pid=""
+	fi
+	if [ -n "${ccnavi_tm_dog:-}" ]; then
+		kill "$ccnavi_tm_dog" 2>/dev/null || :
+		# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
+		wait "$ccnavi_tm_dog" 2>/dev/null || :
+		ccnavi_tm_dog=""
+	fi
+}
+
 # 時間を区切って実行する。<秒> <stdin のファイル> <stdout のファイル> <stderr のファイル> <コマンド>...
 # バックグラウンドで動かし、上限を過ぎたら止めて 124 を返す。時間切れは印のファイルで判定する。
 # <stdout のファイル> に `-` を渡すと、標準出力は呼ぶ側のものを引き継ぐ。ccnavi_git_timed がこの形で使う。
@@ -83,13 +101,15 @@ ccnavi_run_timed() {
 		ccnavi_tm_stop=""
 		# trap は印を立てるだけにし、分かっていれば sleep も止める。抜けるのは本流で、sleep の pid を控えた後に印を見る
 		# （sleep を起動した直後に TERM が来ても、sleep を残さないため）。
-		trap 'ccnavi_tm_stop=1; test -z "$ccnavi_tm_sleep" || kill "$ccnavi_tm_sleep"' TERM
+		# sleep は KILL で止める。sleep は exec するまでこの trap を引き継いだ dash の子で、その間に届いた TERM は
+		# 捨てられ、上限まで ppid 1 で残る（下の見張りと同じ競合）。KILL は捕まえられないので捨てられない。
+		trap 'ccnavi_tm_stop=1; test -z "$ccnavi_tm_sleep" || kill -KILL "$ccnavi_tm_sleep"' TERM
 		sleep "$ccnavi_tm_limit" &
 		ccnavi_tm_sleep=$!
 		# 呼ぶ側に TERM の trap があると、上の trap を置く前に届いた TERM を dash は捨てる（親の trap を引き継いだ
-		# 子が、trap を消すときに保留の信号も落とす）。本流は子を回収してから TERM を送るので、子がもういなければ
-		# TERM を受け損ねたとみて抜ける。抜けないと sleep の上限まで呼ぶ側の wait が止まる。
-		test -z "$ccnavi_tm_stop" && kill -0 "$ccnavi_tm_pid" 2>/dev/null || { kill "$ccnavi_tm_sleep"; exit 0; }
+		# 子が、trap を消すときに保留の信号も落とす）。呼ぶ側は子を回収してから TERM を送る（ccnavi_run_timed_end）ので、
+		# 子がもういなければ TERM を受け損ねたとみて抜ける。抜けないと sleep の上限まで呼ぶ側の wait が止まる。
+		test -z "$ccnavi_tm_stop" && kill -0 "$ccnavi_tm_pid" 2>/dev/null || { kill -KILL "$ccnavi_tm_sleep"; exit 0; }
 		wait "$ccnavi_tm_sleep"
 		test -z "$ccnavi_tm_stop" || exit 0
 		: >"$ccnavi_tm_flag"
@@ -98,12 +118,9 @@ ccnavi_run_timed() {
 	ccnavi_tm_dog=$!
 	ccnavi_tm_rc=0
 	wait "$ccnavi_tm_pid" 2>/dev/null || ccnavi_tm_rc=$?
-	kill "$ccnavi_tm_dog" 2>/dev/null || :
-	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
-	wait "$ccnavi_tm_dog" 2>/dev/null || :
-	# 終わった印。呼ぶ側の後始末が動いている最中かどうかを、これで見分ける。
-	ccnavi_tm_dog=""
+	# 回収済みの子は kill しない（pid が別のプロセスに使い回されていても当てない）。
 	ccnavi_tm_pid=""
+	ccnavi_run_timed_end
 	if [ -e "$ccnavi_tm_flag" ]; then
 		rm -f "$ccnavi_tm_flag" || :
 		return 124
