@@ -3,7 +3,7 @@
  * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
 import type { HostPlan } from "./decide-host.js";
-import type { ReviewReplies } from "./github.js";
+import type { ReviewReplies, WriteReplies } from "./github.js";
 import type { DecidePreview } from "./reviewed.js";
 
 /** 要求と答えの形の版。Go の `chrome.Schema` と揃える */
@@ -240,6 +240,46 @@ export interface ReviewCopy {
   readonly fetched_at: string;
 }
 
+/** 書く前に確かめる 1 つのスレッド（ccnavi の `write-info` の答え。`hostreply.ThreadAbility`） */
+export interface ThreadAbility {
+  readonly id: string;
+  /** ok: 扱える。pending: 保留中のレビューのスレッド（GitHub）。not-resolvable: 解決できない種類。non-diff: 差分以外の discussion（GitLab） */
+  readonly kind: "ok" | "pending" | "not-resolvable" | "non-diff";
+  readonly canReply: boolean;
+  readonly canResolve: boolean;
+  /** スレッドの既存のコメントにある、返信の印（`<!-- ccnavi:reply op=… -->`）の操作 ID。同じ返信を二度付けない */
+  readonly replyOps: readonly string[];
+  /** ok でないときの、Chrome で扱えない種類の名前（画面に出す） */
+  readonly unsupported?: string;
+}
+
+/** 足りないと分かった権限 1 つ。`for` は、その権限が要る操作（`all` はどれにも要る） */
+export interface Missing {
+  readonly need: string;
+  readonly for: "all" | "issue" | "reply" | "resolve" | "comment";
+}
+
+/** 書く前の確かめの材料（ccnavi の `write-info` の答え） */
+export interface WriteInfo {
+  readonly host: "github" | "gitlab";
+  readonly threads: readonly ThreadAbility[];
+  /** PAT かロールに足りないと分かったもの */
+  readonly missing: readonly Missing[];
+  /** 書く前には確かめられなかった権限の名前（実際に書くまで分からない） */
+  readonly unknown: readonly string[];
+}
+
+/** 計画と書く前の確かめの材料を突き合わせた答え（ccnavi の `precheck`） */
+export interface PrecheckAnswer {
+  readonly ok: boolean;
+  /** unsupported: Chrome で扱えない種類のスレッド。unreadable: 決めたスレッドがホストに無い。permission: 権限が足りない */
+  readonly kind?: "unsupported" | "unreadable" | "permission";
+  readonly reason?: string;
+  readonly missing: readonly string[];
+  readonly keys: readonly string[];
+  readonly unknown: readonly string[];
+}
+
 /** 「始める」の答え。`problems` が空なら `identifier` の名前でブランチを作れる */
 export interface StartResult {
   readonly identifier: string;
@@ -285,6 +325,12 @@ export const ccnavi = {
     ask<BoardResult>(call, "board", { snapshot, family }, ""),
   /** service worker が取ってきた MR のスレッドとレビューの応答を、取ってきた時点の状態にする */
   copy: (call: CcnaviCall, replies: ReviewReplies) => ask<ReviewCopy>(call, "copy", { replies }, "copy"),
+  /** service worker が書く前の確かめに取ってきた応答を読む */
+  writeInfo: (call: CcnaviCall, replies: WriteReplies) => ask<WriteInfo>(call, "write-info", { replies }, "info"),
+  /** ホストへ書く計画と書く前の確かめの材料を突き合わせる */
+  precheck: (call: CcnaviCall, plan: HostPlan, info: WriteInfo) => ask<PrecheckAnswer>(call, "precheck", { plan, info }, "precheck"),
+  /** 開いた MR の本文のそれぞれが、repo の issue を閉じるか（bodies と同じ順） */
+  closes: (call: CcnaviCall, body: { repo: string; issue: number; bodies: readonly string[] }) => ask<boolean[]>(call, "closes", { ...body }, "closes"),
   compat: (call: CcnaviCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: CcnaviCall,

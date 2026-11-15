@@ -1,8 +1,8 @@
 /**
  * 「始める」。`ccnavi-start.sh` と同じ手順で、issue から作業を始める。
  *
- *   1. issue を閉じる開いた MR を探す（タイトル・本文の `Closes #<番号>` など、閉じる語に続く issue の指定。
- *      参照しているだけの MR は採用しない）
+ *   1. issue を閉じる開いた MR を探す（本文の `Closes #<番号>` など、閉じる語に続く issue の指定。読みは ccnavi の
+ *      `closes`。参照しているだけの MR は採用しない）
  *   2. 1 本あれば、その元ブランチを親として採用する。ブランチも MR も作らない
  *      （採用の確認: MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える・
  *       同じ識別子になる別のブランチが無い・同じブランチ名のマージ済み MR が無い。引っかかったら止める）
@@ -56,36 +56,6 @@ export async function listIssues(repo: RepoConfig, deps: Deps): Promise<Issue[]>
 }
 
 /**
- * その issue を**閉じる** MR か。タイトル・本文に、閉じる語（close・closes・closed・closing、fix・fixes・fixed・fixing、
- * resolve・resolves・resolved・resolving）の直後に、この issue の指定（`#<番号>`、`<owner/repo>#<番号>`、
- * `.../issues/<番号>` の URL）が続くもの。指定が別のリポジトリの issue なら閉じない（`repoPath` は
- * `<owner>/<repo>`。大文字小文字は区別しない）。参照しているだけ（`#<番号>` の言及・元ブランチの名前の番号）、
- * コードブロック・インラインコード・引用（先頭が `>` の行）の中、閉じる語の直前に否定（not・n't・never）が
- * あるものは含めない。`ccnavi-start.sh` が MR の閉じる issue をホストのリンクで確かめて採用を決めるのと
- * 同じ考え方で、ここはタイトル・本文の語から見る（拡張はホストの閉じるリンクを読まない）。閉じる語 1 つにつき、
- * 直後の 1 つの指定だけを見る（`Closes #21, #20` の `#20` は閉じない）
- */
-export function closesIssue(mr: Pick<Mr, "title" | "body">, issue: number, repoPath: string): boolean {
-  const text = `${mr.title}\n${mr.body}`
-    .replace(/```[\s\S]*?(?:```|$)/g, " ")
-    .replace(/`[^`\n]*`/g, " ")
-    .replace(/^[ \t]*>.*$/gm, " ");
-  const keyword = /(?<![A-Za-z0-9_])(?:clos(?:e[sd]?|ing)|fix(?:e[sd]|ing)?|resolv(?:e[sd]?|ing))(?![A-Za-z])[:\s*_]*/gi;
-  const ref = /^[(\[]*(?:https?:\/\/[^\s/]+\/([\w.-]+(?:\/[\w.-]+)*?)\/(?:-\/)?issues\/(\d+)|([\w.-]+(?:\/[\w.-]+)+)?#(\d+))(?![\w-])/;
-  const own = repoPath.toLowerCase();
-  for (const m of text.matchAll(keyword)) {
-    const before = text.slice(Math.max(0, m.index - 12), m.index);
-    if (/(?:\b(?:not|never)|n['\u2019]t)\s+$/i.test(before)) continue;
-    const r = ref.exec(text.slice(m.index + m[0].length));
-    if (!r) continue;
-    const path = (r[1] ?? r[3] ?? repoPath).toLowerCase();
-    const number = r[2] ?? r[4];
-    if (number === String(issue) && path === own) return true;
-  }
-  return false;
-}
-
-/**
  * issue から始める。`issue` は一覧で選んだ issue（番号とタイトル。タイトルから識別子の slug を作る）、
  * `seen` はボードが読んだブランチ（開いた親子のチケットの見分けに使う）、`taken` はボードが見たブランチの名前。
  * 統合先は押した時点で読み直す。先頭の語は既定の `feature`（ラベルからは決めない）。
@@ -110,7 +80,10 @@ export async function startIssue(
     // 全部のブランチの名前（直近 N 日の上限を掛けない）で、大文字小文字をそろえた重なりを見る
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     // 1. issue を閉じる開いた MR を探す。見落として重複を作らないため、読めなければ（例外は）止める
-    const open = ((await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[]).filter((m) => closesIssue(m, issue.number, `${repo.owner}/${repo.repo}`));
+    // 閉じるかの読み（閉じる語に続くこの issue の指定）は ccnavi（sh の start と同じ hostreply）が持つ
+    const mrs = (await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[];
+    const closes = await ccnavi.closes(deps.ccnavi, { repo: `${repo.owner}/${repo.repo}`, issue: issue.number, bodies: mrs.map((m) => m.body) });
+    const open = mrs.filter((_, i) => closes[i] === true);
     if (open.length > 1) {
       return {
         kind: "refused",

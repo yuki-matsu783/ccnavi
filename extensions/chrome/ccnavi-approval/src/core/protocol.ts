@@ -29,7 +29,7 @@
  * MR へのコメントだけで、thread id は API の経路と GraphQL に使える字、タイトルは 1 行、本文は字数の上限を検査する。
  * 作る issue には assignee・labels・milestone を付けない。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く。
  * 本文は、コードフェンスの外にある quick action（GitLab）とメンションを無害にしてから送る。
- * 書く前の確かめ `writeInfo` と `issueComments` は読むだけ（登録したリポジトリだけ）。
+ * 書く前の確かめの応答 `writeReplies`（読みは ccnavi の `write-info`）と `issueComments` は読むだけ（登録したリポジトリだけ）。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
@@ -64,7 +64,7 @@ export type HostOp =
   | "findIssue"
   | "postComment"
   | "commentIssue"
-  | "writeInfo"
+  | "writeReplies"
   | "issueComments"
   | "commit";
 
@@ -654,9 +654,9 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       // decide: issue の続きのコメントが付いているかを見る。読むだけ
       value = await x.issueComments(client, o, r, github.checkNumber(a, "issue の番号"));
       break;
-    case "writeInfo":
+    case "writeReplies":
       // decide: 書く前の確かめ。読むだけ（登録したリポジトリだけ）
-      value = await x.writeInfo(client, o, r, github.checkNumber(a, "MR の番号"));
+      value = await x.writeReplies(client, o, r, github.checkNumber(a, "MR の番号"));
       break;
     case "listOpenMrs":
       // 「始める」: issue を閉じる開いた MR を探す。読むだけ

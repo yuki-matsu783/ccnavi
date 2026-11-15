@@ -914,39 +914,14 @@ export interface IssueRef {
   readonly url: string;
 }
 
-/** 書く前に確かめる 1 つのスレッドの状態 */
-export interface ThreadAbility {
-  readonly id: string;
-  /** ok: 扱える。pending: 保留中のレビューのスレッド（GitHub）。not-resolvable: 解決できない種類。non-diff: 差分以外の discussion（GitLab） */
-  readonly kind: "ok" | "pending" | "not-resolvable" | "non-diff";
-  readonly canReply: boolean;
-  readonly canResolve: boolean;
-  /** スレッドの既存のコメントにある、返信の印（`<!-- ccnavi:reply op=… -->`）の操作 ID。同じ返信を二度付けない */
-  readonly replyOps: readonly string[];
-}
-
-/** コメントの本文の並びから、返信の印の操作 ID を集める */
-export function replyOpsOf(bodies: readonly string[]): string[] {
-  const out: string[] = [];
-  for (const b of bodies) for (const m of b.matchAll(/<!-- ccnavi:reply op=([0-9a-f]{32}) key=\S* -->/g)) out.push(m[1]);
-  return out;
-}
-
-/** 足りないと分かった権限 1 つ。`for` は、その権限が要る操作（`all` はどれにも要る） */
-export interface Missing {
-  readonly need: string;
-  readonly for: "all" | "issue" | "reply" | "resolve" | "comment";
-}
-
-/** 書く前の確かめの材料（`precheckHostPlan` が計画と突き合わせる） */
-export interface WriteInfo {
-  readonly host: "github" | "gitlab";
-  readonly threads: readonly ThreadAbility[];
-  /** PAT かロールに足りないと分かったもの */
-  readonly missing: readonly Missing[];
-  /** 書く前には確かめられなかった権限の名前（実際に書くまで分からない） */
-  readonly unknown: readonly string[];
-}
+/**
+ * 書く前の確かめに取ってきた応答（読まずに渡す）。ccnavi（WASM の `write-info`。`hostreply.WriteInfoOf`）が読む。
+ * GitHub は書く前の確かめの GraphQL の応答をページごとに（`pages`）と、classic の PAT のスコープ（`scopes`）。
+ * GitLab は全ページを繋いだ discussions と、`personal_access_tokens/self`（`token`）・プロジェクト（`project`）の応答
+ */
+export type WriteReplies =
+  | { readonly host: "github"; readonly pages: readonly unknown[]; readonly scopes: string | null }
+  | { readonly host: "gitlab"; readonly discussions: readonly unknown[]; readonly token: { readonly status: number; readonly body: unknown }; readonly project: unknown };
 
 async function writeJson(client: Client, path: string, method: string, body: unknown, need: Need): Promise<{ status: number; body: unknown }> {
   client.counter.rest += 1;
@@ -1089,47 +1064,24 @@ const WRITE_THREADS = `query($owner: String!, $name: String!, $number: Int!, $af
 }`;
 
 /**
- * 書く前の確かめの材料。スレッドごとに返信・解決できるか（`viewerCanReply`・`viewerCanResolve`）と、保留中のレビューか
- * （最初のコメントの state が PENDING）を読み、Issues が使えるか・アーカイブされていないか・classic の PAT のスコープを見る。
- * fine-grained の PAT の権限は、書く前には読み取れない（`unknown` に入れる）。
+ * 書く前の確かめに要る応答を取ってくる（読みは ccnavi）。スレッドの返信・解決の可否（`viewerCanReply`・`viewerCanResolve`）・
+ * 最初のコメントの state・最近のコメントの本文と、Issues が使えるか・アーカイブされていないか。ページの送りだけを読む
  */
-export async function writeInfo(client: Client, owner: string, repo: string, number: number): Promise<WriteInfo> {
+export async function writeReplies(client: Client, owner: string, repo: string, number: number): Promise<WriteReplies> {
   const n = checkNumber(number, "PR の番号");
-  const threads: ThreadAbility[] = [];
-  const missing: Missing[] = [];
+  const pages: unknown[] = [];
   let after: string | null = null;
   for (let page = 0; ; page += 1) {
     const data = await graphql(client, WRITE_THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number: n, after });
-    const r = data.repository as {
-      hasIssuesEnabled?: unknown;
-      isArchived?: unknown;
-      viewerPermission?: unknown;
-      pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: Record<string, unknown>[] } } | null;
-    } | null;
-    const conn = r?.pullRequest?.reviewThreads;
-    if (!r || !conn) throw new HostError(`プルリクエスト #${n} のスレッドを取得できません`);
-    if (page === 0) {
-      if (r.isArchived === true) missing.push({ need: "リポジトリのアーカイブの解除（読み取り専用です）", for: "all" });
-      if (r.hasIssuesEnabled === false) missing.push({ need: "リポジトリの Issues の有効化", for: "issue" });
-    }
-    for (const t of conn.nodes) {
-      const first = ((t.comments as { nodes?: { state?: unknown }[] } | null)?.nodes ?? [])[0];
-      const pending = first?.state === "PENDING";
-      const recent = ((t.recent as { nodes?: { body?: unknown }[] } | null)?.nodes ?? []).map((c) => (typeof c.body === "string" ? c.body : ""));
-      threads.push({ id: String(t.id), kind: pending ? "pending" : "ok", canReply: t.viewerCanReply === true, canResolve: t.viewerCanResolve === true, replyOps: replyOpsOf(recent) });
-    }
-    if (!conn.pageInfo.hasNextPage) break;
+    const conn = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo?: { hasNextPage?: unknown; endCursor?: unknown } } } | null } | null)?.pullRequest?.reviewThreads;
+    if (!conn) throw new HostError(`プルリクエスト #${n} のスレッドを取得できません`);
+    // ccnavi（hostreply）は GraphQL の応答の形（data の下）で読む
+    pages.push({ data });
+    if (conn.pageInfo?.hasNextPage !== true) break;
     if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れません");
-    after = conn.pageInfo.endCursor;
+    after = typeof conn.pageInfo.endCursor === "string" ? conn.pageInfo.endCursor : null;
   }
+  // classic の PAT のスコープ（応答ヘッダ）。fine-grained の PAT には無い
   const scopes = client.seen?.scopes;
-  const unknown: string[] = [];
-  if (typeof scopes === "string") {
-    // classic の PAT: repo（公開リポジトリだけなら public_repo）が無ければ、issue もコメントも書けない
-    const have = scopes.split(",").map((x) => x.trim());
-    if (!have.includes("repo") && !have.includes("public_repo")) missing.push({ need: "repo スコープ（classic の PAT）", for: "all" });
-  } else {
-    unknown.push(NEED_TEXT.Issues, NEED_TEXT["Pull requests"]);
-  }
-  return { host: "github", threads, missing, unknown };
+  return { host: "github", pages, scopes: typeof scopes === "string" ? scopes : null };
 }

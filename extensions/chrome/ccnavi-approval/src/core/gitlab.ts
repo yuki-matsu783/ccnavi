@@ -27,7 +27,6 @@ import {
   checkWebUrl,
   checkWriteText,
   markerLine,
-  replyOpsOf,
   checkPath,
   fetchNoRedirect,
   HostError,
@@ -37,13 +36,11 @@ import {
   type Fetch,
   type FindResult,
   type IssueRef,
-  type Missing,
   type PathObject,
   type RecentRef,
+  type WriteReplies,
   type ReviewReplies,
-  type ThreadAbility,
   type TreeEntry,
-  type WriteInfo,
   BLOB_BATCH,
 } from "./github.js";
 
@@ -747,51 +744,13 @@ export async function issueNote(client: Client, owner: string, repo: string, num
   return { url: "" };
 }
 
-/** ロールの数値（Developer = 30。Reporter = 20） */
-const DEVELOPER = 30;
-const REPORTER = 20;
-
 /**
- * 書く前の確かめの材料。discussion ごとに、解決できる種類か（`resolvable` なノートがあるか、差分への指摘か）を読み、
- * PAT のスコープ（`personal_access_tokens/self` の `scopes` に `api` があるか。プロジェクトのトークンなどで読めなければ unknown）、
- * プロジェクトのロール（Developer 未満は解決できない）、Issues が使えるかを見る。
+ * 書く前の確かめに要る応答を取ってくる（読みは ccnavi）。discussion の全ページと、PAT のスコープ
+ * （`personal_access_tokens/self`。プロジェクトのトークンなどで読めないことがある）と、プロジェクト（ロール・Issues・アーカイブ）
  */
-export async function writeInfo(client: Client, owner: string, repo: string, number: number): Promise<WriteInfo> {
-  const all = await pages(client, `${mrPath(owner, repo, number)}/discussions`, THREAD_PAGES, `マージリクエスト !${number} のスレッド`);
-  const threads: ThreadAbility[] = [];
-  for (const d of all as { id?: unknown; notes?: unknown }[]) {
-    const notes = (Array.isArray(d.notes) ? (d.notes as Note[]) : []).filter((n) => n?.system !== true);
-    if (notes.length === 0) continue;
-    const replyOps = replyOpsOf(notes.map((n) => (typeof n?.body === "string" ? n.body : "")));
-    const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
-    if (resolvable.length === 0) {
-      threads.push({ id: tostring(d.id), kind: "not-resolvable", canReply: true, canResolve: false, replyOps });
-      continue;
-    }
-    const onDiff = resolvable.some((n) => n.type === "DiffNote" || (n.position !== null && n.position !== undefined));
-    threads.push({ id: tostring(d.id), kind: onDiff ? "ok" : "non-diff", canReply: true, canResolve: onDiff, replyOps });
-  }
-  const missing: Missing[] = [];
-  const unknown: string[] = [];
-  const self = await get(client, "/personal_access_tokens/self");
-  const scopes = (self.body as { scopes?: unknown } | null)?.scopes;
-  if (self.status === 200 && Array.isArray(scopes)) {
-    if (!scopes.includes("api")) missing.push({ need: "api スコープ（read_api では書けません）", for: "all" });
-  } else {
-    unknown.push("api スコープ");
-  }
+export async function writeReplies(client: Client, owner: string, repo: string, number: number): Promise<WriteReplies> {
+  const discussions = await pages(client, `${mrPath(owner, repo, number)}/discussions`, THREAD_PAGES, `マージリクエスト !${number} のスレッド`);
+  const token = await get(client, "/personal_access_tokens/self");
   const proj = await get(client, project(owner, repo));
-  const p = (proj.body ?? {}) as {
-    permissions?: { project_access?: { access_level?: unknown } | null; group_access?: { access_level?: unknown } | null } | null;
-    issues_enabled?: unknown;
-    issues_access_level?: unknown;
-    archived?: unknown;
-  };
-  const level = Math.max(...[p.permissions?.project_access?.access_level, p.permissions?.group_access?.access_level].map((x) => (typeof x === "number" ? x : 0)));
-  if (level === 0) unknown.push("プロジェクトのロール（Developer 以上）");
-  else if (level < REPORTER) missing.push({ need: "プロジェクトのロール（Reporter 以上。スレッドの解決は Developer 以上）", for: "all" });
-  else if (level < DEVELOPER) missing.push({ need: "プロジェクトのロール（スレッドの解決は Developer 以上）", for: "resolve" });
-  if (p.issues_enabled === false || p.issues_access_level === "disabled") missing.push({ need: "プロジェクトの Issues の有効化", for: "issue" });
-  if (p.archived === true) missing.push({ need: "プロジェクトのアーカイブの解除（読み取り専用です）", for: "all" });
-  return { host: "gitlab", threads: level > 0 && level < DEVELOPER ? threads.map((t) => ({ ...t, canResolve: false })) : threads, missing, unknown };
+  return { host: "gitlab", discussions, token, project: proj.body };
 }

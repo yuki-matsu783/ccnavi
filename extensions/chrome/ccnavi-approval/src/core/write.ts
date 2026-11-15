@@ -25,7 +25,7 @@ import type { RepoConfig } from "./settings.js";
 import { MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject } from "./github.js";
 import { askConfirm, askDecide, readCopy, type DecideChoice, type DecidePreview, type DecideThread } from "./reviewed.js";
-import { callOps, describeHostFailure, ISSUE_LINKS_SLOT, precheckHostPlan, runHostPlan, unsupportedReason, type HostPlan } from "./decide-host.js";
+import { callOps, describeHostFailure, ISSUE_LINKS_SLOT, precheckHostPlan, runHostPlan, type HostPlan } from "./decide-host.js";
 import { underPlaces } from "./guard.js";
 import { localStamp } from "./stamp.js";
 
@@ -628,8 +628,8 @@ export async function decidePreview(repo: RepoConfig, family: string, phase: num
   const ids = threadIds(copy);
   let abilities: Map<string, string> | null = null;
   try {
-    const info = await callOps(deps.call).writeInfo(repo, copy.mr.number);
-    abilities = new Map(info.threads.filter((t) => t.kind !== "ok").map((t) => [t.id, unsupportedReason(t.kind as Exclude<typeof t.kind, "ok">)]));
+    const info = await callOps(deps.call, deps.ccnavi).writeInfo(repo, copy.mr.number);
+    abilities = new Map(info.threads.filter((t) => t.kind !== "ok").map((t) => [t.id, t.unsupported ?? ""]));
   } catch {
     abilities = null;
   }
@@ -684,7 +684,7 @@ export async function decidePhase(
   }
   const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const ops = callOps(deps.call);
+  const ops = callOps(deps.call, deps.ccnavi);
   const target = { owner: repo.owner, repo: repo.repo };
   const base = { family, phase, actor, mode: "apply" as const, choices, digest };
   const hostKeys = Object.keys(choices).filter((k) => choices[k] !== "fix");
@@ -712,7 +712,7 @@ export async function decidePhase(
       planned = { comment: plan.comment, followup: res.followup };
       if (plan.issues.length > 0 || plan.replies.length > 0 || plan.resolves.length > 0) {
         // (2) 書く前の確かめ。足りなければ何も書かない
-        const pre = await precheckHostPlan(ops, target, mr, plan);
+        const pre = await precheckHostPlan(deps.ccnavi, ops, target, mr, plan);
         if (!pre.ok) return { kind: "refused", message: pre.reason };
         // (3) ホストへ書く。済んだ分を控える
         const done = await runHostPlan(ops, target, mr, { ...plan, comment: null } satisfies HostPlan);
