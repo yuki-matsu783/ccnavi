@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/tickets/lifecycle/refusal"
 	"ccnavi/internal/tickets/lifecycle/treeadd"
 )
 
@@ -23,7 +24,7 @@ type remoteState struct {
 func (r *run) compare(remote Remote) remoteState {
 	rs := remoteState{state: "even"}
 	if !remote.FetchOK {
-		if strings.Contains(remote.FetchOut, "couldn't find remote ref") {
+		if refusal.NoRemoteRef(remote.FetchOut) {
 			rs.state = "absent"
 		} else {
 			rs.state = "unverified"

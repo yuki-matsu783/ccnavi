@@ -10,6 +10,12 @@ import (
 // overwritten は、git が「書きかけを上書きする」と断ったときに並べるパスの行。
 var overwritten = regexp.MustCompile(`would be overwritten`)
 
+// NoRemoteRef は、fetch が「origin にその ref が無い」と断ったか（git の出力。LC_ALL=C で打ったもの）。
+// 届かない・認証が通らないなどの失敗とは分ける。
+func NoRemoteRef(out string) bool {
+	return strings.Contains(out, "couldn't find remote ref")
+}
+
 // Of は、git が断ったときの出力（標準エラー。標準出力を足してもよい）から、理由の 1 文を作る。
 // 書きかけとの重なり（「would be overwritten」の後に git が字下げして並べるパス）、索引のロック、コミットするユーザの
 // 名前が無い、署名の失敗、hook の順に見て、どれでもなければ git の 1 行目を添える。理由どおりに言い、重なっていないのに

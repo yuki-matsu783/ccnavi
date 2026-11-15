@@ -105,6 +105,13 @@ func runStart(stdout, stderr io.Writer, root string, conf *config.Settings, args
 			return start.Prepare(root, wd, start.PrepareArgs{Branch: rest[0], From: kv["from"], FastForward: kv["ff"] != "",
 				Initial: kv["initial"] != "", Integration: kv["integration"], Number: kv["number"], Real: kv["real"]})
 		}
+	case op == "fetched" && len(rest) == 3:
+		code, err := strconv.Atoi(rest[1])
+		if err != nil {
+			return usage()
+		}
+		wd, _ := ospath.Getwd()
+		files, answer = rest[2:], func(in [][]byte) (string, int) { return start.Fetched(root, wd, rest[0], code, string(in[0])) }
 	case op == "report":
 		kv, valid := pairs(rest, "top", "repo", "wt", "branch", "mr-url", "mr", "ff", "remote", "sync-note", "issue", "title",
 			"sync-next", "host-unseen", "sync-no-ticket", "sync-ok")

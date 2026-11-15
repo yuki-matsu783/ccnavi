@@ -223,7 +223,11 @@
         （ccnavi-start.sh 用。closed の issue なら止めて、どうするかの次の手を出力します）
     ccnavi start prepare <branch> [from=<起点>] [ff=yes] [initial=yes] integration=<branch> number=<n> [real=…]
         （ccnavi-start.sh 用。ワークツリーを出し、早送りと空の初期コミットを済ませます。初期コミットを積めなければ、
-         この回で作ったワークツリーとブランチを片付けて止めます）
+         この回で作ったワークツリーとブランチを片付けて止めます。from を渡すと、origin/<統合先> が手元に無ければ止めます。
+         push を飛ばすか（先頭が origin/<branch> と同じ）を "push needed|skip" で出力します）
+    ccnavi start fetched <branch> <終了コード> <fetch の出力のファイル>
+        （ccnavi-start.sh 用。続けるブランチの fetch の結果を "remote checked|gone|unchecked" で出力します。
+         取れず、origin に無いとも言えず、手元にも無ければ止めます）
     ccnavi start stop <名前> [<名前>=<値>]...
         （ccnavi-start.sh 用。止めるときの文と終了コードを、"fail <識別子> <終了コード>" と "msg <文>"、
          または出力の行と "exit <終了コード>" で出力します）

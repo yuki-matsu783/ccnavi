@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/lifecycle/refusal"
 	"ccnavi/internal/tickets/lifecycle/treeadd"
 	"ccnavi/internal/tickets/model/ids"
 )
@@ -30,8 +31,14 @@ const prepareTimeout = 10 * time.Minute
 
 // Prepare は、ブランチのワークツリーを出し（無ければ .claude/worktrees/<識別子> に作る）、求められれば早送りと空の初期
 // コミットを済ませる。どれも出来ていれば飛ばす。初期コミットを積めなければ、この回で作ったワークツリーとブランチを片付けて止める。
-// 答えは `wt <パス>`、作ったときは `created yes`、早送りの結果は `ff <文>`。
+// 統合先から切るとき（From）は、sh が取ってきた origin/<統合先> が手元に無ければ止める（no-origin-integration）。
+// 答えは `wt <パス>`、作ったときは `created yes`、早送りの結果は `ff <文>`、push の要否は `push needed|skip`
+// （ワークツリーの先頭が手元の origin/<ブランチ> と同じなら skip。sh は skip なら push を打たない）。
 func Prepare(root, cwd string, a PrepareArgs) (string, int) {
+	if a.From != "" && !(repo{cwd}).refExists("refs/remotes/origin/"+a.Integration) {
+		out, _ := Stop(root, "no-origin-integration", map[string]string{"integration": a.Integration})
+		return out, 0
+	}
 	var o outcome
 	p := preparer{root: root, cwd: cwd, a: a, o: &o}
 	if p.worktree() && (!a.FastForward || p.fastForward()) && (!a.Initial || p.initial()) {
@@ -40,6 +47,39 @@ func Prepare(root, cwd string, a PrepareArgs) (string, int) {
 			o.Val("created", "yes")
 		}
 		o.Val("ff", p.ff)
+		o.Val("push", p.pushPlan())
+	}
+	return o.String(), 0
+}
+
+// pushPlan は、ワークツリーの先頭を push するか。手元の origin/<ブランチ> が同じ先頭なら送らない（打ち直しで飛ばす）。
+func (p *preparer) pushPlan() string {
+	head := git.Head(p.wt, git.Options{})
+	if head != "" && head == git.Commit(p.wt, "refs/remotes/origin/"+p.a.Branch, git.Options{}) {
+		return "skip"
+	}
+	return "needed"
+}
+
+// Fetched は、続けるブランチを origin から取った結果を読む（sh が ccnavi-git.sh fetch を LC_ALL=C で打ち、終了コードと
+// 出力を渡す）。答えは `remote checked|gone|unchecked`。gone は origin にそのブランチが無い。取れず、origin に無いとも
+// 言えず、手元にも無ければ止める（fetch-failed-branch）。
+func Fetched(root, cwd, branch string, code int, out string) (string, int) {
+	var o outcome
+	switch {
+	case code == 0:
+		o.Val("remote", "checked")
+	case refusal.NoRemoteRef(out):
+		o.Val("remote", "gone")
+	case (repo{cwd}).refExists("refs/heads/" + branch):
+		o.Val("remote", "unchecked")
+	default:
+		why := ""
+		if lines := ospath.Splitlines(out); len(lines) > 0 {
+			why = lines[0]
+		}
+		stop, _ := Stop(root, "fetch-failed-branch", map[string]string{"fb_branch": branch, "why": why})
+		return stop, 0
 	}
 	return o.String(), 0
 }

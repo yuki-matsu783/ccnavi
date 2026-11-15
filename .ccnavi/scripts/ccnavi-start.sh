@@ -200,7 +200,8 @@ scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.err" "$host_err.resp" "$host_err.resp2" "$host_err.linked" "$host_err.pf"' EXIT
+fetch_file="$state/start-fetch-$$"
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.err" "$fetch_file" "$host_err.resp" "$host_err.resp2" "$host_err.linked" "$host_err.pf"' EXIT
 log_info 始めた -- "kind=${what:-${check:+check}${list_open:+list-open}${new_issue_title:+new-issue}}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -230,12 +231,6 @@ cgit() {
 		return 1
 	}
 	log_debug git を通した -- "sub=$1"
-	return 0
-}
-
-# cgit と同じく ccnavi-git.sh 経由。失敗を出さず、出力は cgit_out に残す（呼ぶ側が使い道を決める）。
-cgit_quiet() {
-	cgit_out=$(sh "$scripts/ccnavi-git.sh" "$@" 2>&1) || return 1
 	return 0
 }
 
@@ -662,54 +657,41 @@ integration=$(ccnavi_integration "$top") || integration=""
 [ -n "$integration" ] ||
 	stop no-integration "hint=$(ccnavi_integration_hint "$top")"
 
-# ---- 小道具
-ref_exists() {
-	git rev-parse --verify --quiet "$1^{commit}" >/dev/null 2>&1
-}
-
 # ---- 作る・続ける段階（どれも、出来ていれば飛ばす）
 
-# 続けるブランチを毎回 origin から取る（手元にあっても取る）。取れなくても、手元にあれば続ける（リモート未確認と言う）。
-# 結果は remote_state（checked / gone / unchecked）に入れる。gone は origin にそのブランチが無い。
+# 続けるブランチを毎回 origin から取る（手元にあっても取る。外との出入り）。取れたか・origin に無いか・リモート未確認かの
+# 読み分けと、取れず手元にも無いときに止めるのは実行ファイル（`ccnavi start fetched`）。git の断りの文を英語で読むので、
+# fetch は LC_ALL=C で打つ。結果は remote_state（checked / gone / unchecked）に入れる。
 remote_state=""
 fetch_branch() {
 	fb_branch="$1"
-	if cgit_quiet fetch origin "$fb_branch"; then
-		remote_state=checked
-		return 0
-	fi
-	case "$cgit_out" in
-	*"couldn't find remote ref"*)
-		remote_state=gone
-		;;
-	*)
-		remote_state=unchecked
-		log_info リモートを確かめられず -- "branch=$fb_branch"
-		ref_exists "refs/heads/$fb_branch" ||
-			stop fetch-failed-branch "fb_branch=$fb_branch" "why=$(printf '%s' "$cgit_out" | head -n 1)"
-		;;
-	esac
+	fb_rc=0
+	LC_ALL=C sh "$scripts/ccnavi-git.sh" fetch origin "$fb_branch" >"$fetch_file" 2>&1 || fb_rc=$?
+	start_do fetched "$fb_branch" "$fb_rc" "$fetch_file"
+	remote_state=$(ccnavi_val remote)
+	[ "$remote_state" != unchecked ] || log_info リモートを確かめられず -- "branch=$fb_branch"
 }
 
 # ブランチのワークツリーを出し（無ければ .claude/worktrees/<識別子> に作る）、求められれば origin/<ブランチ> への早送りと
 # 空の初期コミットを済ませる（実行ファイルの `ccnavi start prepare`。初期コミットを積めなければ、この回で作った
-# ワークツリーとブランチを片付けて止める）。<ブランチ> [from=<起点>] [ff=yes] [initial=yes]。wt と ff_note を決める。
+# ワークツリーとブランチを片付けて止める。from を渡すと、origin/<統合先> が手元に無ければ止める）。
+# <ブランチ> [from=<起点>] [ff=yes] [initial=yes]。wt・ff_note・push_plan（needed / skip）を決める。
 wt=""
 ff_note=""
+push_plan=""
 prepare() {
 	pp_branch="$1"
 	shift
 	start_do prepare "$pp_branch" "integration=$integration" "number=$number" "real=$real_args" "$@"
 	wt=$(ccnavi_val wt)
 	ff_note=$(ccnavi_val ff)
+	push_plan=$(ccnavi_val push)
 	log_info ワークツリーを用意した -- "branch=$pp_branch" "created=$(ccnavi_val created)"
 }
 
-# ensure_push <ブランチ>。origin に同じ先頭があれば飛ばす
+# ensure_push <ブランチ>。push は外との出入り。origin に同じ先頭があれば飛ばす（決めるのは prepare の答えの push_plan）
 ensure_push() {
-	head_sha=$(git -C "$wt" rev-parse HEAD 2>/dev/null || :)
-	remote_sha=$(git -C "$wt" rev-parse --verify --quiet "refs/remotes/origin/$1" 2>/dev/null || :)
-	if [ -n "$head_sha" ] && [ "$head_sha" = "$remote_sha" ]; then
+	if [ "$push_plan" = skip ]; then
 		log_info push は飛ばす -- "branch=$1"
 		return 0
 	fi
@@ -1098,7 +1080,6 @@ if [ "$total" -eq 0 ]; then
 		exit 0
 	fi
 	cgit fetch origin "$integration" || stop fetch-failed-integration "integration=${integration}"
-	ref_exists "refs/remotes/origin/$integration" || stop no-origin-integration "integration=${integration}"
 	prepare "$new_branch" "from=origin/$integration" initial=yes
 	ensure_push "$new_branch"
 	ensure_mr "$new_branch" "$new_title"

@@ -118,8 +118,8 @@ top=$(ccnavi_val top)
 log_info 始めた -- "target=$target"
 
 # 2. 外との出入り。fetch は取り込み先だけ（ccnavi-git.sh 経由）。届かなくても止めず、結果をそのまま実行ファイルに渡す
-# （origin に無い・リモート未確認の読み分けは実行ファイル）。fetch が通ったときだけ、origin のブランチの一覧を取る
-# （同じ名前・同じ識別子のブランチが origin に無いかを、実行ファイルが確かめる）。
+# （origin に無い・リモート未確認の読み分けは実行ファイル。git の断りの文を英語で読むので LC_ALL=C で打つ）。fetch が通ったときだけ、
+# origin のブランチの一覧を取る（同じ名前・同じ識別子のブランチが origin に無いかを、実行ファイルが確かめる）。
 state="$root/logs/state"
 mkdir -p "$state" 2>/dev/null || :
 fetch_out="$state/worktree-fetch-$$"
@@ -127,7 +127,7 @@ heads="$state/worktree-heads-$$"
 heads_err="$state/worktree-ls-remote-err-$$"
 trap 'rm -f "$fetch_out" "$heads" "$heads_err"' EXIT
 fetch=ok
-sh "$scripts/ccnavi-git.sh" fetch origin "$target" >"$fetch_out" 2>&1 || {
+LC_ALL=C sh "$scripts/ccnavi-git.sh" fetch origin "$target" >"$fetch_out" 2>&1 || {
 	fetch=failed
 	cat "$fetch_out" >&2
 	log_info fetch-failed -- "target=$target"
