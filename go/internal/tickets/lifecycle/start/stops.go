@@ -115,11 +115,12 @@ func Stop(root, key string, kv map[string]string) (string, bool) {
 	if !found {
 		return "", false
 	}
-	text := s.Text
+	// 差し込みは 1 回の走査で置き換える（値の中の `{名前}` を、もう一度差し込まない）。
+	var pairs []string
 	for k, v := range kv {
-		text = strings.ReplaceAll(text, "{"+k+"}", v)
+		pairs = append(pairs, "{"+k+"}", v)
 	}
-	o.fail(s.ID, s.Code, text)
+	o.fail(s.ID, s.Code, strings.NewReplacer(pairs...).Replace(s.Text))
 	return o.String(), true
 }
 

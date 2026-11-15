@@ -80,3 +80,13 @@ func TestStop(t *testing.T) {
 		t.Error("知らない名前")
 	}
 }
+
+// 値の中の `{名前}` は、もう一度差し込まない（並び順で結果が変わらない）。
+func TestStopDoesNotExpandValues(t *testing.T) {
+	for range 20 {
+		got, _ := Stop(t.TempDir(), "issue-missing-resume", map[string]string{"number": "5", "issue_why": "bad {number} here"})
+		if !strings.Contains(got, "（bad {number} here）") {
+			t.Fatalf("%q", got)
+		}
+	}
+}
