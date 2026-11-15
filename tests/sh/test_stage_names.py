@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe
 from tests.handoff_names_samples import RESERVED, SAMPLES
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -60,6 +60,8 @@ class StageNamesTest(unittest.TestCase):
     def stage(self, ws, *args):
         env = dict(os.environ)
         env.pop("CCNAVI_WORKSPACE", None)
+        # 取り込める種類は実行ファイル（stage importable）に聞く。
+        env["CCNAVI_ENTRY_PATH"] = exe.path()
         script = os.path.join(ws, ".ccnavi", "scripts", "ccnavi-stage.sh").replace(os.sep, "/")
         return subprocess.run(
             [SHELL, script, *args],
