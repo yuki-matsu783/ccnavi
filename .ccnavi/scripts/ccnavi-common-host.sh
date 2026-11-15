@@ -585,9 +585,11 @@ ccnavi_host_access() {
 	case "$(printf '%s\n' "$ccnavi_hc_out" | sed -n 's/^access //p')" in
 	ok) return 0 ;;
 	ng) return 1 ;;
+	unknown) return 2 ;;
 	esac
-	[ -n "$ccnavi_h_access_why" ] || ccnavi_h_access_why="実行ファイルに確かめられない"
-	return 2
+	# 実行ファイルが答えない。権限を確かめられないまま進めないよう、足りない側に倒す
+	ccnavi_h_access_why="ccnavi の実行ファイルが権限の判定に答えない"
+	return 1
 }
 
 # 事前確認（ccnavi-start.sh --check と ccnavi-ticket.sh が共有する）。手元で決まる項目（道具・origin・統合先・作成者）と、
