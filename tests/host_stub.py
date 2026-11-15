@@ -29,8 +29,11 @@ PROJECT = f"{API}/projects/acme%2Fwidgets"
 # FAKE_BARE と FAKE_REAL_ORIGIN があれば、本物へ渡すときに
 # `-c url.<FAKE_BARE>.insteadOf=<FAKE_REAL_ORIGIN>` を足す。origin が本物のホストでも、
 # fetch・push・ls-remote は FAKE_BARE へ向く（.git/config は書き換えない）。
+#
+# git を呼ぶたびに通るので、自分の置き場は dirname を起こさずに $0 から切り出す（PATH から
+# 見つかった $0 は置き場を含む）。
 GIT = """#!/bin/sh
-self=$(dirname "$0")
+self=${0%/*}
 rest=""
 oldifs=$IFS
 IFS=:
