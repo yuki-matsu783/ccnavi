@@ -542,39 +542,16 @@ export async function pullApprovals(client: Client, owner: string, repo: string,
 
 // ---- レビュー済み。MR のスレッドとレビューを取得した結果と、依頼の後の変更の一覧 --------------
 
-/** スレッド 1 つ（`ccnavi-review.sh` の `threads` と同じ形） */
-export interface ReviewThread {
-  readonly id: string;
-  readonly resolved: boolean;
-  readonly url: string;
-  readonly path: string;
-  readonly line: number;
-  readonly body: string;
-  readonly created_at: string;
-  /** 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を見分ける。取れなければ空 */
-  readonly last_id: string;
-  readonly last_at: string;
-  readonly last_author: string;
-  /** 最初のコメントを書いたアカウント。GitLab から取得した結果だけが持ち、ccnavi の依頼のスレッドを見分けるのに使う（目印は誰でも書けるので書き手で見る） */
-  readonly author?: string;
-  /** スレッドのノートが全部 ccnavi の目印で始まるか。GitLab から取得した結果だけが持つ。ユーザが依頼コメントに返信したスレッドは false */
-  readonly own?: boolean;
-}
-
-/** レビュー 1 つ（`ccnavi-review.sh` の `reviews` と同じ形） */
-export interface PullReview {
-  readonly state: string;
-  readonly url: string;
-  readonly submitted_at: string;
-  readonly author: string;
-}
-
-/** ホストから取得した結果（`ccnavi-review.sh fetch` と同じ形。ccnavi の `host.ResultOf` が読む） */
-export interface ReviewCopy {
+/**
+ * MR のスレッドとレビューを取ってきた応答（読まずに渡す）。ccnavi（WASM）の `copy` が、sh の `ccnavi host copy` と同じ読み
+ * （hostreply）で取ってきた時点の状態（`ReviewCopy`）にする。`threads` は、GitHub なら GraphQL の reviewThreads の応答を
+ * ページごとに、GitLab なら全ページを繋いだ discussions を 1 つだけ並べる。`reviews` は全ページを繋いだ一覧
+ */
+export interface ReviewReplies {
   readonly host: "github" | "gitlab";
   readonly mr: { readonly number: number; readonly url: string };
-  readonly threads: readonly ReviewThread[];
-  readonly reviews: readonly PullReview[];
+  readonly threads: readonly unknown[];
+  readonly reviews: readonly unknown[];
   readonly fetched_at: string;
 }
 
@@ -611,76 +588,45 @@ const THREADS = `query($owner: String!, $name: String!, $number: Int!, $after: S
   }
 }`;
 
-type ThreadNode = {
-  id?: unknown;
-  isResolved?: unknown;
-  comments?: { nodes?: Record<string, unknown>[] } | null;
-  last?: { nodes?: Record<string, unknown>[] } | null;
-};
-
-/** MR のスレッド（sh の `threads` と同じ読み方。最初のコメントの url・path・line・本文・時刻） */
-export async function reviewThreads(client: Client, owner: string, repo: string, number: number): Promise<ReviewThread[]> {
-  const out: ReviewThread[] = [];
+/** MR のスレッドの応答を、ページごとにそのまま返す（sh の `threads` と同じ問い合わせ。ページの送りだけを読む） */
+async function threadPages(client: Client, owner: string, repo: string, number: number): Promise<unknown[]> {
+  const out: unknown[] = [];
   let after: string | null = null;
   for (let page = 0; ; page += 1) {
     const data = await graphql(client, THREADS, { owner: checkName(owner, "owner"), name: checkName(repo, "repo"), number, after });
-    const threads = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo: { hasNextPage: boolean; endCursor: string | null }; nodes: ThreadNode[] } } | null } | null)
-      ?.pullRequest?.reviewThreads;
+    const threads = (data.repository as { pullRequest?: { reviewThreads?: { pageInfo?: { hasNextPage?: unknown; endCursor?: unknown } } } | null } | null)?.pullRequest
+      ?.reviewThreads;
     if (!threads) throw new HostError(`プルリクエスト #${number} のスレッドを取得できません`);
-    for (const t of threads.nodes) {
-      const c = t.comments?.nodes?.[0] ?? {};
-      const l = t.last?.nodes?.[0] ?? {};
-      const lastAuthor = (l.author ?? {}) as { login?: unknown };
-      out.push({
-        id: String(t.id),
-        resolved: t.isResolved === true,
-        url: String(alt(c.url, "")),
-        path: String(alt(c.path, "")),
-        line: Number(alt(c.line, 0)),
-        body: String(alt(c.body, "")),
-        created_at: String(alt(c.createdAt, "")),
-        last_id: String(alt(l.id, "")),
-        last_at: String(alt(l.createdAt, "")),
-        last_author: String(alt(lastAuthor.login, "")),
-      });
-    }
-    if (!threads.pageInfo.hasNextPage) return out;
+    // ccnavi（hostreply）は GraphQL の応答の形（data の下）で読む
+    out.push({ data });
+    if (threads.pageInfo?.hasNextPage !== true) return out;
     if (page + 1 > THREAD_PAGES) throw new HostError("reviewThreads が多すぎて読み切れません");
-    after = threads.pageInfo.endCursor;
+    after = typeof threads.pageInfo.endCursor === "string" ? threads.pageInfo.endCursor : null;
   }
 }
 
-/** MR のレビュー（sh の `reviews` と同じ: 100 件ずつページの番号で読み、100 件に満たないページで終える） */
-export async function pullReviews(client: Client, owner: string, repo: string, number: number): Promise<PullReview[]> {
-  const out: PullReview[] = [];
+/** MR のレビューの応答を繋いで返す（sh の `reviews` と同じ: 100 件ずつページの番号で読み、100 件に満たないページで終える） */
+export async function pullReviews(client: Client, owner: string, repo: string, number: number): Promise<unknown[]> {
+  const out: unknown[] = [];
   for (let page = 1; ; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/pulls/${number}/reviews?per_page=${PER_PAGE}&page=${page}`);
     // 404 や配列でない答えを「レビュー無し」と読むと、変更要求を見落として通してしまう
     if (status === 404) throw new HostError(`プルリクエスト #${number} のレビューを取得できません（404）`, 404);
     if (!Array.isArray(body)) throw new HostError(`プルリクエスト #${number} のレビューの応答が配列ではありません`);
-    const chunk = body as Record<string, unknown>[];
-    for (const r of chunk) {
-      const user = (r.user ?? null) as { id?: unknown; login?: unknown } | null;
-      out.push({
-        state: String(alt(r.state, "")),
-        url: String(alt(r.html_url, "")),
-        submitted_at: String(alt(r.submitted_at, "")),
-        author: String(alt(user?.id, alt(user?.login, ""))),
-      });
-    }
-    if (chunk.length < PER_PAGE) return out;
+    out.push(...body);
+    if (body.length < PER_PAGE) return out;
     if (page + 1 > REVIEW_PAGES) throw new HostError("レビューが多すぎて読み切れません");
   }
 }
 
 /**
- * 親のブランチの MR のスレッドとレビューを取得した結果。`ccnavi-review.sh fetch` と同じ形で、
- * 同じ見本（test/fixtures/host/github/）から同じ結果になることを試験が見る。MR が無ければ投げる。
+ * 親のブランチの MR のスレッドとレビューを取ってきた応答。`ccnavi-review.sh fetch` と同じ問い合わせとページの切り方で、
+ * 同じ見本（test/fixtures/host/github/）から ccnavi の `copy` が sh と同じ結果になることを試験が見る。MR が無ければ投げる。
  */
-export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<ReviewCopy> {
+export async function reviewReplies(client: Client, owner: string, repo: string, branch: string): Promise<ReviewReplies> {
   const mr = await openPull(client, owner, repo, branch);
   if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、オープン状態のプルリクエストがありません`);
-  const threads = await reviewThreads(client, owner, repo, mr.number);
+  const threads = await threadPages(client, owner, repo, mr.number);
   const reviews = await pullReviews(client, owner, repo, mr.number);
   return { host: "github", mr, threads, reviews, fetched_at: new Date().toISOString() };
 }

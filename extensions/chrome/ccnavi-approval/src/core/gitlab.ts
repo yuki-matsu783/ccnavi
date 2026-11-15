@@ -9,9 +9,9 @@
  * 「動いた」（409）で返す。それでも間に入った書き込みは防げないので、答えにコミットの親（`parent_ids[0]`）を返し、
  * 書く流れ（`write.ts`）が事後に確かめて、違えば判定し直し、元に戻す。ccnavi の書き込みどうしの競合の検出は、実際の GitLab で確かめるまで未実装。
  *
- * MR のスレッドとレビュー（`reviewCopy`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
- * （GitLab の枝）と同じ問い合わせ・同じページの切り方・同じ欄の省き方（jq の `//`・`tostring`、型は jq と同じく
- * そのまま残す）で組む。同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から同じ結果になることを試験が見る。
+ * MR のスレッドとレビュー（`reviewReplies`）は、手元の `ccnavi-review.sh` の `find_mr`・`threads`・`reviews`
+ * （GitLab の枝）と同じ問い合わせ・同じページの切り方で取り、応答をそのまま返す。読みは ccnavi（WASM）が持つ。
+ * 同じ見本（test/fixtures/host/gitlab/。手で組んだもの）から sh と同じ結果になることを試験が見る。
  *
  * 書き込みの update・delete には `last_commit_id`（そのファイルを最後に変えたコミット）を付け、
  * 同じファイルを他人が変えていれば GitLab が断る（ファイル単位の比較つきの書き込み）。MR は同じプロジェクトから
@@ -39,9 +39,8 @@ import {
   type IssueRef,
   type Missing,
   type PathObject,
-  type PullReview,
   type RecentRef,
-  type ReviewThread,
+  type ReviewReplies,
   type ThreadAbility,
   type TreeEntry,
   type WriteInfo,
@@ -152,11 +151,6 @@ function alt<T>(value: unknown, fallback: T): T {
 /** jq の `tostring`（数は 10 進、文字列はそのまま、ほかは JSON） */
 function tostring(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value) ?? "null";
-}
-
-/** jq の `ascii_upcase`（ASCII の英小文字だけを大文字に） */
-function asciiUpcase(value: string): string {
-  return value.replace(/[a-z]/g, (c) => c.toUpperCase());
 }
 
 /** 100 件ずつページの番号で読み、100 件に満たないページで終える。`pages` を超えたら止める（sh の `pages` と同じ） */
@@ -384,96 +378,17 @@ const THREAD_PAGES = 20;
 
 type Note = { id?: unknown; type?: unknown; system?: unknown; body?: unknown; created_at?: unknown; resolvable?: unknown; resolved?: unknown; author?: { id?: unknown; username?: unknown } | null; position?: { new_path?: unknown; new_line?: unknown } | null };
 
-/** 本文が ccnavi の目印で始まるか（jq の `marked` と同じ。文字列でない本文は目印ではない） */
-function marked(n: Note | undefined): boolean {
-  const body = alt(n?.body, "");
-  return typeof body === "string" && body.startsWith("<!-- ccnavi:");
-}
-
-/** ノートの書き手の id（取れなければ空） */
-function writer(n: Note | undefined): string {
-  return tostring(alt(n?.author?.id, ""));
-}
-
 /**
- * 機構自身のスレッドと見てよいノートの並びかどうか。目印で始まるだけでは足りず、書き手も代表のノートの書き手と同じでなければならない。
- * 依頼の投稿者のスレッドに他人が目印で始まる返信を足しても、未解決を隠せないようにするため。
- * 代表の書き手が依頼の投稿者かどうかは、呼ぶ側（ccnavi）が依頼の記録と比べる。
+ * MR のスレッド（discussions）とレビュアー（reviewers）の応答を、全ページ繋いでそのまま返す（sh の `threads`・`reviews` の
+ * GitLab の枝と同じ問い合わせとページの切り方）。読み（代表のノート・own・解決済み・状態のそろえ方）は ccnavi（WASM の
+ * `copy`。sh の `ccnavi host copy` と同じ hostreply）が持つ。
  */
-function ownThread(notes: Note[], first: Note): boolean {
-  const by = writer(first);
-  return by !== "" && notes.every((n) => marked(n) && writer(n) === by);
-}
-
-/**
- * MR のスレッド（sh の `threads` の GitLab の枝と同じ読み方）。判定に使うノートは、discussion のノートから
- * `system: true` を除いたもの（空なら discussion ごと除く）。対象は、そのノートが 1 つでも解決できる discussion。
- * 解決済みは、解決できるノートが全部解決しているとき。代表のノート（本文・位置・書き手・url）は、本文が
- * ccnavi の目印で始まらない最初のノート（無ければ先頭）。ユーザが依頼コメントに返信したスレッドは返信が代表になる。
- * url は MR の URL + `#note_<代表のノートの id>`。`own` は、ノートの本文が全部目印で始まり、書き手が全部代表と同じときだけ真
- */
-export async function discussions(client: Client, owner: string, repo: string, number: number, mrUrl: string): Promise<ReviewThread[]> {
-  const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/discussions`, THREAD_PAGES, `マージリクエスト !${number} のスレッド`);
-  const out: ReviewThread[] = [];
-  for (const d of all as { id?: unknown; notes?: unknown }[]) {
-    const given = (Array.isArray(alt(d.notes, [])) ? (alt(d.notes, []) as Note[]) : []) ?? [];
-    const notes = given.filter((n) => n?.system !== true);
-    if (notes.length === 0) continue;
-    const resolvable = notes.filter((n) => alt(n?.resolvable, false) !== false);
-    if (resolvable.length === 0) continue;
-    const first = notes.find((n) => !marked(n)) ?? notes[0] ?? {};
-    const pos = first.position ?? null;
-    const last = notes[notes.length - 1] ?? {};
-    // jq と同じく、欄の型はそのまま残す（文字列の行番号を数に直さない）。書き手は username でなく id
-    out.push({
-      id: tostring(d.id),
-      resolved: resolvable.every((n) => alt(n.resolved, false) !== false),
-      url: `${mrUrl}#note_${tostring(first.id)}`,
-      path: alt(pos?.new_path, "") as string,
-      line: alt(pos?.new_line, 0) as number,
-      body: alt(first.body, "") as string,
-      created_at: alt(first.created_at, "") as string,
-      author: tostring(alt(first.author?.id, "")),
-      own: ownThread(notes, first),
-      last_id: tostring(alt(last.id, "")),
-      last_at: alt(last.created_at, "") as string,
-      last_author: String(alt(last.author?.username, "")),
-    });
-  }
-  return out;
-}
-
-/** MR のレビュアーの状態（sh の `reviews` の GitLab の枝と同じ）。`requested_changes` を CHANGES_REQUESTED にそろえる */
-export async function reviewers(client: Client, owner: string, repo: string, number: number, mrUrl: string): Promise<PullReview[]> {
-  const all = await pages(client, `${project(owner, repo)}/merge_requests/${number}/reviewers`, THREAD_PAGES, `マージリクエスト !${number} のレビュアー`);
-  return (all as { state?: unknown; updated_at?: unknown; created_at?: unknown; user?: { id?: unknown; username?: unknown } | null }[]).map((r) => {
-    const raw = alt(r.state, "");
-    // jq の ascii_upcase は文字列でなければ失敗する（sh は取得した結果を組めずに止まる）。同じく止める
-    if (r.state !== "requested_changes" && typeof raw !== "string") throw new HostError(`マージリクエスト !${number} のレビュアーの state が文字列ではありません`);
-    return {
-      state: r.state === "requested_changes" ? "CHANGES_REQUESTED" : asciiUpcase(raw as string),
-      url: mrUrl,
-      submitted_at: alt(r.updated_at, alt(r.created_at, "")) as string,
-      author: tostring(alt(r.user?.id, alt(r.user?.username, ""))),
-    };
-  });
-}
-
-export interface GitLabReviewCopy {
-  readonly host: "gitlab";
-  readonly mr: { readonly number: number; readonly url: string };
-  readonly threads: readonly ReviewThread[];
-  readonly reviews: readonly PullReview[];
-  readonly fetched_at: string;
-}
-
-/** 親のブランチの MR のスレッドとレビューを取得した結果（`ccnavi-review.sh fetch` の GitLab の枝と同じ形） */
-export async function reviewCopy(client: Client, owner: string, repo: string, branch: string): Promise<GitLabReviewCopy> {
+export async function reviewReplies(client: Client, owner: string, repo: string, branch: string): Promise<ReviewReplies> {
   const mr = await openMr(client, owner, repo, branch);
   if (mr === null) throw new HostError(`親のブランチ ${branch} に対応する、オープン状態のマージリクエストがありません`);
-  const threads = await discussions(client, owner, repo, mr.number, mr.url);
-  const reviews = await reviewers(client, owner, repo, mr.number, mr.url);
-  return { host: "gitlab", mr, threads, reviews, fetched_at: new Date().toISOString() };
+  const discussions = await pages(client, `${project(owner, repo)}/merge_requests/${mr.number}/discussions`, THREAD_PAGES, `マージリクエスト !${mr.number} のスレッド`);
+  const reviews = await pages(client, `${project(owner, repo)}/merge_requests/${mr.number}/reviewers`, THREAD_PAGES, `マージリクエスト !${mr.number} のレビュアー`);
+  return { host: "gitlab", mr, threads: [discussions], reviews, fetched_at: new Date().toISOString() };
 }
 
 /**

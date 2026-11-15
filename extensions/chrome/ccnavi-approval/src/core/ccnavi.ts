@@ -3,6 +3,7 @@
  * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
 import type { HostPlan } from "./decide-host.js";
+import type { ReviewReplies } from "./github.js";
 import type { DecidePreview } from "./reviewed.js";
 
 /** 要求と答えの形の版。Go の `chrome.Schema` と揃える */
@@ -203,6 +204,42 @@ export interface Compare {
   readonly files: readonly string[] | null;
 }
 
+/** スレッド 1 つ（`ccnavi host copy` の `threads` と同じ形。ccnavi の `copy` が組む） */
+export interface ReviewThread {
+  readonly id: string;
+  readonly resolved: boolean;
+  readonly url: string;
+  readonly path: string;
+  readonly line: number;
+  readonly body: string;
+  readonly created_at: string;
+  /** 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を見分ける。取れなければ空 */
+  readonly last_id: string;
+  readonly last_at: string;
+  readonly last_author: string;
+  /** 代表のノートの書き手（GitLab だけ）。ccnavi が依頼の投稿者と比べ、ccnavi の依頼のスレッドを見分ける */
+  readonly author?: string;
+  /** ノートが全部 ccnavi の目印で始まり、書き手が全部代表と同じか（GitLab だけ） */
+  readonly own?: boolean;
+}
+
+/** レビュー 1 つ（`ccnavi host copy` の `reviews` と同じ形） */
+export interface PullReview {
+  readonly state: string;
+  readonly url: string;
+  readonly submitted_at: string;
+  readonly author: string;
+}
+
+/** 取ってきた時点の状態（`ccnavi host copy` と同じ形。confirm・decide の `result`） */
+export interface ReviewCopy {
+  readonly host: "github" | "gitlab";
+  readonly mr: { readonly number: number; readonly url: string };
+  readonly threads: readonly ReviewThread[];
+  readonly reviews: readonly PullReview[];
+  readonly fetched_at: string;
+}
+
 /** 「始める」の答え。`problems` が空なら `identifier` の名前でブランチを作れる */
 export interface StartResult {
   readonly identifier: string;
@@ -246,6 +283,8 @@ export const ccnavi = {
     ask<Closure>(call, "closure", { snapshot, family }, ""),
   board: (call: CcnaviCall, snapshot: Snapshot, family: string) =>
     ask<BoardResult>(call, "board", { snapshot, family }, ""),
+  /** service worker が取ってきた MR のスレッドとレビューの応答を、取ってきた時点の状態にする */
+  copy: (call: CcnaviCall, replies: ReviewReplies) => ask<ReviewCopy>(call, "copy", { replies }, "copy"),
   compat: (call: CcnaviCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: CcnaviCall,

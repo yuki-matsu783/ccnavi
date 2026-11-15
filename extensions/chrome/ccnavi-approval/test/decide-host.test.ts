@@ -558,37 +558,3 @@ test("CX-T333 GitHub の PAT の権限・スレッド・Issues の確かめ（wr
   assert.ok(!badNumber.ok);
 });
 
-test("CX-T334 GitLab の目印のスレッドは、書き手が全部同じときだけ機構自身のもの（own）と見る。依頼の投稿者のスレッドに他人が目印の返信を足しても隠せない", () => {
-  const note = (id: number, author: number, body: string, resolvable = true) => ({
-    id,
-    body,
-    system: false,
-    resolvable,
-    resolved: false,
-    author: { id: author, username: `u${author}` },
-    created_at: "2026-09-29T05:00:00.000Z",
-  });
-  const discussions = (notes: ReturnType<typeof note>[]) => [{ id: "d".repeat(40), notes }];
-  const run = async (notes: ReturnType<typeof note>[]) => {
-    const fetch: gh.Fetch = async (url) => {
-      const page = new URL(url).searchParams.get("page");
-      return { status: 200, ok: true, json: async () => (page === "1" ? discussions(notes) : []), headers: { get: () => null } };
-    };
-    const t = await gl.discussions({ host: HOSTS[1], token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait }, "acme", "widgets", 7, "https://gitlab.com/acme/widgets/-/merge_requests/7");
-    return t[0];
-  };
-  return (async () => {
-    const mark = "<!-- ccnavi:request x -->\n依頼";
-    // 依頼の投稿者だけ: 機構自身
-    assert.equal((await run([note(1, 201, mark)])).own, true);
-    // 他人が目印で始まる返信を足した: 機構自身ではない
-    const mixed = await run([note(1, 201, mark), note(2, 203, "<!-- ccnavi:request x -->\n偽の返信")]);
-    assert.equal(mixed.own, false);
-    // 他人が目印で始まる投稿だけで始めた: 書き手が違うので依頼の投稿者とは一致しない（author は代表の書き手）
-    const alone = await run([note(5, 203, mark)]);
-    assert.deepEqual([alone.own, alone.author], [true, "203"]);
-    // 書き手が分からない目印の投稿は機構自身と見ない
-    const unknown = await run([{ ...note(6, 0, mark), author: null } as never]);
-    assert.equal(unknown.own, false);
-  })();
-});

@@ -20,11 +20,11 @@
  * 新しい先頭から読み直して再試行する。元に戻すコミットもさらに競合して 2 回で収まらなければ、止めてユーザの対応に切り替える（`attention`）。
  * 書き込みどうしの競合は検出しない。
  */
-import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, ccnavi, CcnaviError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type Written } from "./ccnavi.js";
+import { APPROVE_DIGEST_CHANGED, APPROVE_LIST_CHANGED, ccnavi, CcnaviError, tagged, type Actor, type ChangeRow, type PlanResult, type ReasonCode, type ReviewCopy, type Written } from "./ccnavi.js";
 import type { RepoConfig } from "./settings.js";
 import { MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
-import type { BlobText, FileAddition, PathObject, ReviewCopy } from "./github.js";
-import { askConfirm, askDecide, type DecideChoice, type DecidePreview, type DecideThread } from "./reviewed.js";
+import type { BlobText, FileAddition, PathObject } from "./github.js";
+import { askConfirm, askDecide, readCopy, type DecideChoice, type DecidePreview, type DecideThread } from "./reviewed.js";
 import { callOps, describeHostFailure, ISSUE_LINKS_SLOT, precheckHostPlan, runHostPlan, unsupportedReason, type HostPlan } from "./decide-host.js";
 import { underPlaces } from "./guard.js";
 import { localStamp } from "./stamp.js";
@@ -522,7 +522,7 @@ export async function confirmPhase(repo: RepoConfig, family: string, phase: numb
   }
   const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
   return await writeLoop(repo, family, deps, "レビュー済みにし直してください。", async (read, stamp) => {
-    const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+    const copy = await readCopy(deps.ccnavi, ask, family);
     const res = await askConfirm(deps.ccnavi, ask, {
       snapshot: read.input,
       family,
@@ -622,7 +622,7 @@ export async function decidePreview(repo: RepoConfig, family: string, phase: num
   const ask = (op: string, args: readonly unknown[]) => deps.call(op, [repo.owner, repo.repo, ...args]);
   const read = await readSettled(repo, family, deps);
   if (read === null) throw new Error(`読み取り中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新してください`);
-  const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+  const copy = await readCopy(deps.ccnavi, ask, family);
   const res = await askDecide(deps.ccnavi, ask, { snapshot: read.input, family, phase, copy, stamp: localStamp(deps.now()), mode: "preview" });
   if (res.problems.length > 0 || !res.preview) throw new Error(res.problems.join("\n") || "残った指摘を読み取れませんでした");
   const ids = threadIds(copy);
@@ -701,7 +701,7 @@ export async function decidePhase(
     if (hostKeys.length > 0) {
       const read = await readSettled(repo, family, deps);
       if (read === null) return { kind: "conflict", message: `反映前の読み取り中に ${family} の先頭が ${MAX_ROUNDS} 回更新されました。少し待ってからボードを更新し、もう一度決めてください。` };
-      const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+      const copy = await readCopy(deps.ccnavi, ask, family);
       mr = copy.mr.number;
       const res = await askDecide(deps.ccnavi, ask, { ...base, snapshot: read.input, copy, stamp: localStamp(deps.now()), carry: [] });
       if (res.code === DECIDE_MISMATCH || res.mismatch) return { kind: "mismatch", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います" };
@@ -744,7 +744,7 @@ export async function decidePhase(
   const out = await writeLoop(repo, family, deps, "決め直してください。", async (read, stamp) => {
     let res!: Awaited<ReturnType<typeof askDecide>>;
     for (let attempt = 1; attempt <= CARRY_TRIES; attempt += 1) {
-      const copy = (await ask("reviewCopy", [family])) as ReviewCopy;
+      const copy = await readCopy(deps.ccnavi, ask, family);
       mr = copy.mr.number;
       res = await askDecide(deps.ccnavi, ask, { ...base, snapshot: read.input, copy, stamp, carry });
       // 書き終えたキーが、読み直した結果でまだ解決済みに見えない（ホストの読み取りの遅れ）ときだけ、待って取り直す

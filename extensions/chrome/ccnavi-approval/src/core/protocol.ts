@@ -5,7 +5,7 @@
  * 操作を頼む。PAT を書く・消すのは設定画面からだけ受ける。送り手は拡張の自分のページに限り、
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
  *
- * レビュー済みのために MR のスレッドとレビュー（`reviewCopy`）と、依頼の後の変更の
+ * レビュー済みのために MR のスレッドとレビューの応答（`reviewReplies`。読みは ccnavi の `copy`）と、依頼の後の変更の
  * 一覧（`compareFiles`）を読む。どちらも読むだけ。
  *
  * 書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
@@ -48,7 +48,7 @@ export type HostOp =
   | "viewer"
   | "pullApprovals"
   | "commitParents"
-  | "reviewCopy"
+  | "reviewReplies"
   | "compareFiles"
   | "pathCommitTime"
   | "issues"
@@ -576,10 +576,10 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     case "commitParents":
       value = await x.commitParents(client, o, r, github.checkOid(a));
       break;
-    case "reviewCopy":
+    case "reviewReplies":
       // レビュー済み: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
-      value = await x.reviewCopy(client, o, r, github.checkBranch(a));
+      value = await x.reviewReplies(client, o, r, github.checkBranch(a));
       break;
     case "compareFiles":
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };

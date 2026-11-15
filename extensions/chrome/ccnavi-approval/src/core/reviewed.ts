@@ -4,7 +4,8 @@
  * 判定（依頼の記録・依頼の後に動いたか・同じ MR か・変更要求・未解決のスレッド）は ccnavi の
  * `confirm`（手元の `ccnavi review confirm` と同じコア）が出す。ここはホストから材料を取ってきて渡すだけで、材料は次のとおり。
  *
- * - MR のスレッドとレビューを取得した結果（`reviewCopy`。`ccnavi-review.sh fetch` と同じ形）
+ * - MR のスレッドとレビューを取得した結果（service worker の `reviewReplies` が取ってきた応答を、ccnavi の `copy` が
+ *   `ccnavi-review.sh fetch` と同じ形にしたもの）
  * - 依頼の後に親のブランチが動いていれば、ccnavi が求める 2 つ（`need_compare`）の変更の一覧（`compareFiles`）
  *
  * ボードはこれで候補のフェーズごとに「通るか」と理由とスレッドを出し、書く流れ（`write.ts` の
@@ -12,13 +13,18 @@
  * （取得した結果の形は同じ。GitLab のスレッドは最初のノートの書き手 `author` を持ち、ccnavi が依頼の投稿者
  * `poster` と比べて ccnavi の依頼のスレッドを除く。目印は誰でも書けるので書き手で見分ける）。
  */
-import type { Compare, ConfirmResult, DecideResult, CcnaviCall, Reviewable, Snapshot, Actor } from "./ccnavi.js";
+import type { Compare, ConfirmResult, DecideResult, CcnaviCall, Reviewable, ReviewCopy, Snapshot, Actor } from "./ccnavi.js";
 import { ccnavi } from "./ccnavi.js";
-import type { ReviewCopy } from "./github.js";
+import type { ReviewReplies } from "./github.js";
 import { localStamp } from "./stamp.js";
 
 /** service worker へ頼む関数（`owner`・`repo` は呼び手が前に付ける） */
 export type Ask = (op: string, args: readonly unknown[]) => Promise<unknown>;
+
+/** 親のブランチの MR のスレッドとレビューを取ってきて（service worker）、ccnavi に読ませる */
+export async function readCopy(call: CcnaviCall, ask: Ask, family: string): Promise<ReviewCopy> {
+  return await ccnavi.copy(call, (await ask("reviewReplies", [family])) as ReviewReplies);
+}
 
 export interface ConfirmInput {
   /** 判定の入力（統合先・P・閉包の P_X） */
@@ -175,7 +181,7 @@ export async function reviewPanels(
   let copyError = "";
   if (reviewable.some((r) => r.host === "github" || r.host === "gitlab")) {
     try {
-      copy = (await ask("reviewCopy", [base.family])) as ReviewCopy;
+      copy = await readCopy(call, ask, base.family);
     } catch (err) {
       copyError = (err as Error).message ?? String(err);
     }
