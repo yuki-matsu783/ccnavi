@@ -29,7 +29,7 @@ keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可�
 
 - `--yes` が無い形は見るだけで、何も書かない。パスを省くと、種類の表に該当する下書き全部が対象になる
 - 見るだけの形を含めて、すべてユーザ専用（`user` の入口の中。外では断る）。エージェントは `ccnavi-stage.sh --commands` で状態を見る
-- `ccnavi-stage.sh --commands` は、編集済みの下書きに、`defense` を含む全種類で、このコマンドの手順（見るだけと `--yes --expect`）を出す。`mv` は出さない（`mv` は検査・差分・`--expect` を通らず、下書きを作ったあとに直された元を黙って上書きする）。表の外のパスには手順を出さず、取り込めないと標準エラーに言う（sh の `is_importable` が `handoff` の `kinds` と同じ表を持ち、ずれはテストで見つかる）。`defense` は取り込み先の無いファイルを作れないが、`ccnavi-stage.sh` が元の無いパスを断るので、元の無い `defense` の下書きは `--commands` に届かない（手で `wip/handoff/` に置いた下書きは届くが、取り込み先が無いので取り込みが断る。`defense` は新規作成できない）
+- `ccnavi-stage.sh --commands` は、編集済みの下書きに、`defense` を含む全種類で、このコマンドの手順（見るだけと `--yes --expect`）を出す。`mv` は出さない（`mv` は検査・差分・`--expect` を通らず、下書きを作ったあとに直された元を黙って上書きする）。表の外のパスには手順を出さず、取り込めないと標準エラーに言う（sh の `is_importable` は実行ファイルの `stage importable` で `handoff` の `kinds` に聞く）。`defense` は取り込み先の無いファイルを作れないが、`ccnavi-stage.sh` が元の無いパスを断るので、元の無い `defense` の下書きは `--commands` に届かない（手で `wip/handoff/` に置いた下書きは届くが、取り込み先が無いので取り込みが断る。`defense` は新規作成できない）
 
 **ツリー。** `--root` で指した 1 本のツリーだけを見る。ほかのツリーの `wip/handoff/` は読まない。`ccnavi-stage.sh` と `user handoff` は
 同じツリーの決め方（`ccnavi_workspace` と同じ規則）を使う。取り込み先は、下書きがあるツリーの、階層名の読み替えを戻した相対パス。

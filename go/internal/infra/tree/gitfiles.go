@@ -121,7 +121,7 @@ func repoOfURL(url string) string {
 
 const originHeadPrefix = "ref: refs/remotes/origin/"
 
-// OriginHead は `origin/HEAD` が指すブランチ名（`ccnavi_default_branch` が symbolic-ref で読むものと同じ）。
+// OriginHead は `origin/HEAD` が指すブランチ名（`git symbolic-ref refs/remotes/origin/HEAD` が読むものと同じ）。
 // 無ければ空。リンクされたワークツリーでも共通の git ディレクトリを読む。
 func OriginHead(repoRoot string) string {
 	gitdir, ok := GitDir(repoRoot)

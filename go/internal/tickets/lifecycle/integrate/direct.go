@@ -132,7 +132,7 @@ func AheadSince(worktree, snap string, deadline time.Time) (int, bool) {
 }
 
 // IntegrationName はそのリポジトリ（owner はそのチェックアウト）の統合先の名前。手元の origin/HEAD、無ければ
-// origin/main・origin/master の順（sh の ccnavi_integration と同じ）。決まらなければ空。
+// origin/main・origin/master の順。決まらなければ空。sh は `ccnavi git integration` でこれに聞く（ccnavi_integration）。
 func IntegrationName(owner string) string {
 	name, _ := Integration(owner, time.Time{})
 	return name

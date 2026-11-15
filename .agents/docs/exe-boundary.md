@@ -75,15 +75,16 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
   - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
     ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
     `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
+  - 保護されたブランチの名前は実行ファイルの`ids.Protected`が決める。実行ファイルを起こさない`ccnavi-user-push-approved.sh`と
+    `ccnavi_is_branch`は写しの`ccnavi_is_protected`（sh）を使い、`tests/fixtures/ident-cases.json`の同じ表で、Goと Python のテストが一致を確かめる
 - 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の可否の判定（統合先への push の拒否、push のゲートを掛けるか、親のワークツリーでの`checkout`・`switch`の行き先の確認など）は、実行ファイルの`ccnavi git check`が行う。`integrate`・`integrate-done`の判定と状態操作は、実行ファイルの`ccnavi git integrate`が1回の起動で行い、ラッパーはロックを取ってから呼ぶ
-- 親のブランチの共通のpushゲート（`ccnavi_push_gate`。`ccnavi-common-state.sh`）は、いまshで実装されている。shに置く判定は、次の3つを満たす形に限る。
-  生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
-  （設計 9.2）。この3つを満たさない判定はshに足さない。新しい判定はGoで実装する
-  ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、
-  `ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。この2つはラッパーを通らないので「ラッパーが許可リストで読むこと」を
-  満たさないが、同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、ゲートだけを例外に入れる。ゲートの材料のうちチケットの中身
-  （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。ゲートが`ls-remote`を打つのはshの側
-  （ネットワークはshの仕事）。この2経路にほかの判定は足さない
+- 親のブランチの共通のpushゲートは、判定を実行ファイルの`ccnavi tree gate`（`go/internal/entry/shask`の`pushGate`）が持ち、
+  次の一手（`gate pass`・`gate stop`・`gate ls-remote`）で答える。shの口（`ccnavi-common-state.sh`の`ccnavi_push_gate`）は、
+  `ls-remote`（外との出入り）を打って結果を返すだけ。ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、
+  write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、`ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。
+  同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、3経路とも同じ口を通す。形跡（手元の origin の参照・着手済み・`.requested`・退避）の
+  述語は`pushTrace`の1つで、write-and-pushの「一度も送っていない親」と`ccnavi-sync.sh`の「消えた親」も`tree parent <ツリー> <名前> <ブランチ>`の`trace`の行でこれを使う。
+  実行ファイルが答えないとき（実行ファイルを起こさない`ccnavi-user-push-approved.sh`だけが来る）は、手元に origin の参照があるブランチだけ`ls-remote`で確かめる
 - shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree leftover`・`write-and-push family`・`sync retired`・
   `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
   （止める側の検査は止める向き、ツリーを動かす側は動かさない向き。ただし、親のワークツリーからの切り替えの拒否は、聞けないときも通す）。

@@ -126,8 +126,9 @@ rename するか、バイト単位でコピーして元を消す。欄を書き�
 渡らない。どちらの経路でも、承認のあと `ccnavi-user-push-approved.sh` がコミットして push する。変更のあるツリーごとに
 置き場と、承認で `todo/` から消えた提案（追跡されていたものの削除だけ）をコミットし（パスを限る。
 `-a` も `add -A` も使わない）、保護されたブランチ
-（`main` / `master` / `develop` / `release` / `release/*` と、`ccnavi-common-state.sh` の `ccnavi_integration` が決める
-そのリポジトリの統合先。決まらなければ固定のリストだけ）でなければ push する。
+（`main` / `master` / `develop` / `release` / `release/*` / `release-*`。判定は実行ファイルの `ids.Protected` で、
+実行ファイルを起こさない `ccnavi-user-push-approved.sh` は写しの `ccnavi_is_protected` を使い、一致をテストで確かめる。
+加えて、実行ファイルの `git integration` が決めるそのリポジトリの統合先。決まらなければ固定のリストだけ）でなければ push する。
 
 | 経路 | 承認の push |
 |---|---|

@@ -87,13 +87,13 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 止める側の検査は止める向きに（ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 
-push のゲート（`ccnavi_push_gate`、`ccnavi-common-state.sh`）は P13 の例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
+push のゲート（sh の口は `ccnavi-common-state.sh` の `ccnavi_push_gate`、判定は実行ファイルの `ccnavi tree gate`）は P13 の例外に入る。範囲は `ccnavi-git.sh` の中に限らず、
 write-and-push（`ccnavi_wap_prepare`）と `ccnavi-user-push-approved.sh` の push の前も含める。この 3 経路はどれも素の push を打つので、
 ここを通さないと、消えた親のブランチを作り直してしまう。対象は親のワークツリーのブランチだけ（通常のブランチと子の push には掛けない）。
 形跡（`refs/remotes/origin/<B>`、または着手済み（承認済みの親チケットの `started_at`）・`.requested`・退避）があれば `ls-remote`（60 秒。`CCNAVI_WRITE_AND_PUSH_TIMEOUT` で変えられる）でリモートにあるかを聞き、
 無ければ拒否、失敗・時間切れは確かめられない（拒否側）。形跡が無く、着手も依頼も退避も無ければ初回の push として通す。ただし承認済みチケットを読めない（`tree parent` の `approved` が `unreadable`）ときは、着手済みかを確かめられないので拒否側にする。
 承認済みというだけでは形跡にしない（承認して最初に打つ push を通す。着手は write-and-push で push してから完了するので、着手済みなら一度は push している）。
-実行ファイルが無い・`tree parent` が読めないとき、答えに `started` などの行が無いときは、その行を形跡に数えず、参照の形跡だけで決める。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）はゲートでは呼ばない。
+掛けるか・形跡があるか・`ls-remote` が要るかは `ccnavi tree gate` が次の一手（`pass`・`stop`・`ls-remote`）で答え、`ls-remote` は sh が打つ。実行ファイルが答えないとき（`ccnavi-user-push-approved.sh` だけが、実行ファイルを起こさずにここへ来る）は、親かを確かめられないので、`origin/<B>` の参照があるブランチは親でなくても `ls-remote` で確かめ、リモートに無ければ送らない。`ccnavi-start.sh` の push も `ccnavi-git.sh push` を通るので掛かる。`merged`（ホストへの照会）はゲートでは呼ばない。
 迂回は、ユーザがターミナルで `git push origin <B>` を一度打つこと。破棄した親は、親のワークツリーを片付ければ対象から外れる。
 `branch.<B>.remote` は形跡に使わない（`origin/main` から切っただけの未 push の親でも設定されるため）。`ccnavi-git.sh push` は、引数のリモートが origin と同じ URL なら origin とみなす。
 write-and-push は、取り込みがマージ済みの親のワークツリーを片付けた後にツリーが無ければ、何も書かずに止める。診断は `sh .ccnavi/scripts/ccnavi-sync.sh <P>`。
@@ -102,7 +102,7 @@ write-and-push は、取り込みがマージ済みの親のワークツリー�
 | 状況 | 結果 |
 |---|---|
 | 親のワークツリーでない | 通す |
-| 実行ファイルが無い、または `tree parent` が読めない | `origin/<B>` の参照の形跡だけで続ける |
+| 実行ファイルが答えない | `origin/<B>` の参照があれば `ls-remote` で聞き、無ければ拒否（親かは確かめない） |
 | 形跡がある | `ls-remote` でリモートにあるかを聞く。あれば通す。無ければ拒否。失敗・時間切れは確かめられない（拒否側。エージェントは直せなければユーザに伝えて止まる） |
 | 形跡が無く、承認済みチケットを読めない（`approved` が `unreadable`） | 確かめられない（拒否側） |
 | 形跡が無く、着手も依頼も退避も無い（承認済みでも未着手・未 push の親を含む） | 通す（初回の push） |

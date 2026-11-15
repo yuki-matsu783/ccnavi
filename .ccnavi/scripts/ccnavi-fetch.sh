@@ -49,6 +49,8 @@
 # ツリーだけで、答えが得られなければ（実行ファイルが無い・入れ替え中）早送りしない。書きかけとの重なりは
 # git に任せ、拒まれたら重なったパスを言う。分かれていれば「取り込みが要る」と 1 行言う。
 # 取り込み（merge）・消えたかの確かめは、手で打つ ccnavi-sync.sh の仕事。
+# 実行ファイルが答えないときは、ほかに次を省く: 統合先（`git integration`）が決まらないので統合先の早送りをしない、
+# git が断った理由（`git refusal`）は読み分けず git の 1 行目だけを添える。
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
 # fetch 1 回のタイムアウトも枠の残りに収める（hook の上限は 60 秒）。
 #
@@ -204,7 +206,8 @@ ccnavi_fetch_or_note() {
 #
 # そのリポジトリの手元の `origin/HEAD`（無ければ `origin/main`・`origin/master`）。
 # 決め方は ccnavi-git.sh の push の拒否・ccnavi-review.sh のマージリクエストの宛先と揃えるため、
-# ccnavi-common-state.sh の ccnavi_integration に 1 つだけ置いてある。
+# 実行ファイル（`git integration`）が持ち、ccnavi-common-state.sh の ccnavi_integration で聞く。実行ファイルが
+# 答えなければ統合先は決まらず、その回は統合先の早送りを省く。
 ccnavi_fetch_integration() {
 	ccnavi_integration "$1"
 }
