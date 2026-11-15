@@ -41,10 +41,10 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 | 回したもの | 本数 | 時間 |
 |---|---|---|
-| `tests.sh.test_stage_sh` | 22 | 約 20 秒 |
-| `tests.guard`の関連 3 モジュール（`test_handoff_copy`・`test_wrapguard`・`test_selfguard`） | 184 | 約 66 秒 |
+| `tests.sh.test_stage_sh` | 23 | 約 2 秒 |
+| `tests.guard`の関連 3 モジュール（`test_handoff_copy`・`test_wrapguard`・`test_selfguard`） | 159 | 約 23 秒 |
 | `tests/core`・`ticket`・`guard`を同時に | — | 30 分たっても出力が出ず、打ち切った（遅いのか止まったのかは未確認） |
-| `tests.sh.test_write_and_push_merge` | 5 | 約 23 秒 |
+| `tests.sh.test_write_and_push_merge` | 6 | 約 28 秒 |
 
 出力が長く出ないときは、待ち続けない。10 分を目安に止めて、範囲を狭めてやり直す。出力が無いままでは、通ったのか止まったのか分からない。通ったと扱わない（下の「待つとき」と同じ）。変更が大きいときや、取り込む前は、関係しそうな範囲を広めに選ぶ。絞ると、関係ないと思った場所への影響を見落とす。
 
