@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import random
 import shutil
 import subprocess
 import tempfile
@@ -61,189 +60,30 @@ class RootShellWriteTest(unittest.TestCase):
         decision, reason = self.decide(command, cwd)
         return decision == "deny" and RULE_ID in reason
 
-    def test_writes_into_the_checkout_root_are_stopped(self):
-        for command in (
-            "sed -i 's/a/b/' README.md",
-            "echo x > README.md",
-            "echo x >> docs/notes.md",
-            "printf x | tee README.md",
-            "rm -f README.md",
-            "cp a.txt b.txt",
-            "mv a.txt scratchpad/../b.txt",
-            "rm docs/*.md",
-            f"echo x > {self.repo}/README.md",
-        ):
-            with self.subTest(command=command):
-                self.assertTrue(self.stopped(command))
+    # 書き込み先の読み（リダイレクト・`sed -i`・`tee`・`cp` の行き先・出力の指定・
+    # 読めない行き先・引用符の中の山括弧・サブシェルの起点・乱れた引用符で落ちないこと）と
+    # 止める・通すの答えは、Go の見本（go/internal/hook/shellguard の TestMatchesGolden）が
+    # 確かめる。ここでは hook を通した代表だけを見る。
 
-    def test_the_places_for_drafts_and_worktrees_are_open(self):
-        for command in (
-            "echo x > wip/handoff/a.md",
-            "sed -i 's/a/b/' scratchpad/a.txt",
-            "tee scratchpad/a.txt < /dev/null",
-            "cp a.txt wip/handoff/a.txt",
-            "rm -f scratchpad/*",
-            "echo x > .claude/worktrees/wt/README.md",
-            f"echo x > {self.repo}/scratchpad/a.txt",
-        ):
-            with self.subTest(command=command):
-                self.assertFalse(self.stopped(command))
-
-    def test_writes_outside_the_root_and_fd_redirects_pass(self):
-        for command in ("echo x > /dev/null", "echo x > /tmp/out.txt", "ls 2>&1 | head", "cat a"):
-            with self.subTest(command=command):
-                self.assertFalse(self.stopped(command))
-
-    def test_the_cwd_decides_where_a_relative_target_lands(self):
+    def test_hook_stops_a_root_write_and_opens_the_drafts_places(self):
+        self.assertTrue(self.stopped("sed -i 's/a/b/' README.md"))
+        self.assertFalse(self.stopped("echo x > wip/handoff/a.md"))
+        # payload の cwd が相対の行き先を決める。
         self.assertFalse(self.stopped("sed -i 's/a/b/' README.md", cwd=".claude/worktrees/wt"))
-        self.assertFalse(self.stopped("echo x > README.md", cwd="scratchpad"))
-        self.assertFalse(self.stopped("cd .claude/worktrees/wt && echo x > README.md"))
-        self.assertTrue(self.stopped("cd docs && echo x > README.md"))
 
-    def test_a_destination_that_is_the_root_itself_is_stopped(self):
-        for command in (
-            "cp scratchpad/a .",
-            "cp -t . scratchpad/a",
-            "install --target-directory=. x",
-            "mv scratchpad/a ./",
-            "cp x ..",
-        ):
-            cwd = "scratchpad" if command.endswith("..") else ""
-            with self.subTest(command=command):
-                self.assertTrue(self.stopped(command, cwd=cwd))
-        self.assertFalse(self.stopped("cp x .", cwd="scratchpad"))
-
-    def test_an_unreadable_cd_does_not_hide_a_relative_write(self):
-        for command in (
-            'cd "$PWD" && echo x > README.md',
-            "d=.; cd $d; echo x > README.md",
-            'cd "$(pwd)"; cp scratchpad/a .',
-        ):
-            with self.subTest(command=command):
-                self.assertTrue(self.stopped(command))
-        self.assertFalse(self.stopped('cd "$PWD" && echo x > a', cwd="scratchpad"))
-
-    def test_output_options_of_common_downloaders_are_writes(self):
-        for command in (
-            "curl -o README.md https://example.com",
-            "curl --output=README.md https://example.com",
-            "wget -O README.md https://example.com",
-            "sort -o README.md README.md",
-        ):
-            with self.subTest(command=command):
-                self.assertTrue(self.stopped(command))
-        self.assertFalse(self.stopped("curl -o scratchpad/x https://example.com"))
-
-    def test_the_refusal_points_to_the_drafts_places(self):
-        decision, reason = self.decide("sed -i 's/a/b/' README.md")
+    def test_the_refusal_points_to_the_drafts_places_and_the_command(self):
+        decision, reason = self.decide("cd docs && echo x > README.md")
         self.assertEqual("deny", decision)
+        self.assertIn(RULE_ID, reason)
         self.assertIn("DENY_SHELL_WORKSPACE_ROOT", reason)
         self.assertIn("wip/handoff/", reason)
         self.assertIn("scratchpad/", reason)
-
-    def test_unreadable_targets_are_left_to_the_post_check(self):
-        for command in ('echo x > "$FILE"', "echo x > ~/a.txt", "echo x > `pwd`/a"):
-            with self.subTest(command=command):
-                self.assertFalse(self.stopped(command))
-
-    GIT = "sh .ccnavi/scripts/ccnavi-git.sh"
-
-    def test_引用符の中の山括弧は書き込みではない(self):
-        for command in (
-            f"{self.GIT} log -n 2 --format='%H%n%an <%ae>%n%B---'",
-            f'{self.GIT} commit -m "feat: x\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n'
-            'Claude-Session: https://claude.ai/code/session_x"',
-            f"{self.GIT} log --format='%an <%ae>'",
-            f'{self.GIT} commit -m "a" -m "Co-Authored-By: C <n@a.com>"',
-            f'cd .claude/worktrees/wt && {self.GIT} commit -m "x <a@b>\nClaude-Session: s"',
-            f"cd docs && {self.GIT} log --format='<%an>'",
-            "echo '<a' 'b>' 'c<d>e' \"x>\" \"<y\"",
-            "echo \"a > b\" 'c >> d'",
-            f"{self.GIT} commit -m \"$(echo 'x <y@z>')\"",
-            "echo \"$(echo '<a>' > scratchpad/o.txt)\"",
-        ):
-            with self.subTest(command=command):
-                self.assertFalse(self.stopped(command))
-
-    def test_引用符の外の本物のリダイレクトの判定は変わらない(self):
-        for command, expected in (
-            ("echo x > f", True),
-            ("echo x >> f", True),
-            ('echo "a <b>" > f', True),
-            (f"{self.GIT} log --format='<%an>' > f", True),
-            ("cd docs && echo '<a>' >> f", True),
-            ("echo x 2>&1", False),
-            ("echo x > /dev/null 2>&1", False),
-            ("echo x > scratchpad/f", False),
-            ("echo '<a>' > scratchpad/f", False),
-        ):
-            with self.subTest(command=command):
-                self.assertEqual(self.stopped(command), expected)
-
-    def test_演算子が末尾の語でも落ちず書き込み先に数えない(self):
-        for command in ("echo x >", "echo x >>", "echo x 2>", "echo x <", "cd docs && echo x >"):
-            with self.subTest(command=command):
-                self.assertFalse(self.stopped(command))
-                self.assertNotIn("internal", self.decide(command)[1].lower())
-
-    def test_拒否の文面は書き込み先を取り出した元のコマンドを添える(self):
-        _, reason = self.decide("cd docs && echo x > README.md")
         self.assertIn("書き込み先: README.md", reason)
         self.assertIn("読んだ箇所: echo x > README.md", reason)
 
-    def test_引用符と演算子の乱れた組み合わせで例外を出さない(self):
-        rng = random.Random(554)
-        pieces = [
-            "'",
-            '"',
-            "<",
-            ">",
-            ">>",
-            "2>&1",
-            " ",
-            " ",
-            "a",
-            "b c",
-            "&&",
-            ";",
-            "(",
-            ")",
-            "cd x",
-            "echo",
-            "$(",
-            "`",
-        ]
-        for _ in range(400):
-            command = "".join(rng.choice(pieces) for _ in range(rng.randint(1, 14)))
-            with self.subTest(command=command):
-                self.decide(command)
-                self.assertNotIn("internal-error", self.last.stderr)
-                self.assertEqual(self.last.returncode, 0, self.last.stderr)
-
-    def test_サブシェルの直後の_セミコロンで_cd_の起点が漏れない(self):
-        # サブシェルの中の行き先（checkout のルート）が後ろに漏れると、ルート直下の書き込みになる。
-        outside = tempfile.mkdtemp(prefix="ccnavi-rootwrite-out-")
-        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
-        for command in (
-            f"cd {outside} && ( cd {self.repo} && ls ); printf x > f",
-            f"cd {outside} && ( cd {self.repo}; ls );printf x > f",
-            f"cd {outside} && ( cd {self.repo} && ls ) ; printf x > f",
-            f"cd {outside} && ( ( cd {self.repo} ); cd docs ); printf x > f",
-        ):
-            with self.subTest(command=command):
-                self.assertFalse(self.stopped(command, cwd=".claude/worktrees/wt"))
-        self.assertTrue(self.stopped(f"cd {outside} && ( ls ); cd {self.repo}; printf x > f"))
-
     def test_サブシェルの直後の語もコマンド名のルールに当たる(self):
-        tight = self.decide("(true); curl https://example.com")
-        spaced = self.decide("(true) ; curl https://example.com")
-        self.assertEqual(tight[0], spaced[0])
-        self.assertIn("prefer-webfetch", tight[1])
-        self.assertIn("prefer-webfetch", spaced[1])
-        self.assertEqual(
-            self.decide("$(cd docs && pwd); printf x > f")[0],
-            self.decide("$(cd docs && pwd) ; printf x > f")[0],
-        )
+        # `);` の前後の空白で読みが変わらないことは Go（TestSubshellSemicolonSpacing）が見る。
+        self.assertIn("prefer-webfetch", self.decide("(true); curl https://example.com")[1])
 
 
 if __name__ == "__main__":
