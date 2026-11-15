@@ -2,6 +2,7 @@ package hostreply
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -58,6 +59,12 @@ func TestAccount(t *testing.T) {
 		{"gitlab", `{"username":"a.b_c"}`, "a.b_c"},
 		{"github", `{"login":"-x"}`, ""},
 		{"github", `{"login":"a b"}`, ""},
+		{"github", `{"login":"a b;rm -rf /"}`, ""},
+		{"github", `{"login":"--actor"}`, ""},
+		{"github", `{"login":"ａｂｃ"}`, ""},
+		{"github", `{"login":"` + strings.Repeat("a", AccountMaxLength) + `"}`, strings.Repeat("a", AccountMaxLength)},
+		{"github", `{"login":"` + strings.Repeat("a", AccountMaxLength+1) + `"}`, ""},
+		{"github", `{"login":"octo-reviewer\r"}`, "octo-reviewer"},
 		{"github", `{"message":"Bad credentials"}`, ""},
 		{"gitlab", ``, ""},
 	}

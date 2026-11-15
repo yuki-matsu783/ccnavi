@@ -71,6 +71,20 @@ func TestMRState(t *testing.T) {
 		{"github", true, "glab: 401 Unauthorized", "unknown", "unknown auth 認証に失敗した（トークンか gh / glab の認証を確かめる）（HTTP 401）"},
 		{"github", true, "curl: (28) Operation timed out", "unknown", "unknown network ホストに届かない（ネットワークか、ホスト名を引けない）"},
 		{"github", true, "API rate limit exceeded\ncurl: (22) The requested URL returned error: 403", "unknown", "unknown api ホストの API の利用上限に達した（HTTP 403）"},
+		{"github", false, `{"number": 9, "state": "closed", "html_url": "https://u/9"}`, "closed", "closed 9 https://u/9"},
+		{"github", false, `{"number": 9, "state": "closed", "merged": true, "merged_at": null, "html_url": "https://u/9"}`, "merged", "merged 9 https://u/9"},
+		{"github", false, `{"number": 9, "state": "open", "draft": false, "html_url": "https://u/a\tb"}`, "open", "open 9 no https://h/g/p/pull/9"},
+		{"github", false, `{"number": 9, "state": "open", "draft": false}`, "open", "open 9 no https://h/g/p/pull/9"},
+		{"gitlab", false, `{"iid": 9, "state": "merged", "web_url": "https://u/9"}`, "merged", "merged 9 https://u/9"},
+		{"gitlab", false, `{"iid": 9, "state": "closed", "draft": false}`, "closed", "closed 9 https://h/g/p/-/merge_requests/9"},
+		{"github", false, `{"number": 9, "state": "weird"}`, "unknown", "unknown api ホストが想定外の state（weird）を返した"},
+		{"github", false, `not json`, "unknown", "unknown api ホストの答えを読めなかった"},
+		{"github", false, `"x"`, "unknown", "unknown api ホストの答えを読めなかった"},
+		{"github", false, `{}`, "unknown", "unknown api ホストが別の MR（-）を返した"},
+		{"github", true, "curl: (22) The requested URL returned error: 403", "unknown", "unknown auth 認証に失敗した（トークンか gh / glab の認証を確かめる）（HTTP 403）"},
+		{"github", true, "curl: (6) Could not resolve host: api.github.com", "unknown", "unknown network ホストに届かない（ネットワークか、ホスト名を引けない）"},
+		{"github", true, "curl: (7) Failed to connect to api.github.com port 443", "unknown", "unknown network ホストに届かない（ネットワークか、ホスト名を引けない）"},
+		{"github", true, "curl: (22) The requested URL returned error: 500", "unknown", "unknown api ホストの API が失敗した（HTTP 500）"},
 	}
 	for _, c := range cases {
 		state, answer := MRState(c.kind, "https", "h", "g/p", "9", c.failed, []byte(c.data))

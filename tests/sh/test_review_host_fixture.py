@@ -299,17 +299,11 @@ class HostFixtureTest(unittest.TestCase):
         return scene
 
     def test_a_malformed_owner_is_not_passed(self):
-        for login in ("a b;rm -rf /", "-rf", "--actor", "ａｂｃ", "a" * 101):
-            if os.path.exists(self.args):
-                os.remove(self.args)
-            done = self.review(self.scene_with_login(login), "confirm", "--phase", "1")
-            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-            self.assertFalse(any(a.startswith("--actor") for a in self.passed()), login)
-
-    def test_a_carriage_return_is_dropped_from_the_owner(self):
-        done = self.review(self.scene_with_login("octo-reviewer\r"), "confirm", "--phase", "1")
+        """名前の形（ほかの形・改行コードの扱い）は Go の hostreply.TestAccount が見る。"""
+        done = self.review(self.scene_with_login("a b;rm -rf /"), "confirm", "--phase", "1")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("--actor=octo-reviewer", self.passed())
+        self.assertIn("confirm", self.passed())
+        self.assertFalse(any(a.startswith("--actor") for a in self.passed()))
 
     def gh_path(self):
         """gh が認証済みの形（疎通が通る）。curl は置かない（gh の経路だけを通す）。"""
@@ -807,44 +801,27 @@ class GitLabHostFixtureTest(unittest.TestCase):
         )
 
     def test_request_removes_a_body_file_under_scratchpad(self):
-        """依頼文が scratchpad/ の中にあれば、成功のあとに request が消す。"""
-        for rel in ("scratchpad/req.md", "scratchpad/sub/../req2.md"):
-            with self.subTest(rel=rel):
-                os.makedirs(os.path.join(self.ws, "scratchpad", "sub"), exist_ok=True)
-                body = write(os.path.normpath(os.path.join(self.ws, rel)), "依頼文\n")
-                done = self.request_with_body(rel)
-                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-                self.assertFalse(os.path.exists(body), done.stdout)
-                self.assertIn("案内: 依頼文 ", done.stdout)
-                self.assertIn("消した", done.stdout)
-                shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
-                os.remove(os.path.join(self._tmp.name, "notes.json"))
-                # 本物の操作記録は送信済みを覚えている。次の回で投稿が省かれないよう、ここで消す
-                shutil.rmtree(os.path.join(self.ws, "logs", "state"), ignore_errors=True)
+        """依頼文が scratchpad/ の中にあれば、成功のあとに request が消す。
+        相対のパスは打った場所から読む。
+
+        中か外か（`..` の解き方・名前だけ似た場所）は Go の pathcase.TestUnder が見る。
+        """
+        os.makedirs(os.path.join(self.ws, "scratchpad", "sub"), exist_ok=True)
+        rel = "scratchpad/sub/../req.md"
+        body = write(os.path.join(self.ws, "scratchpad", "req.md"), "依頼文\n")
+        done = self.request_with_body(rel)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(body), done.stdout)
+        self.assertIn("案内: 依頼文 ", done.stdout)
+        self.assertIn("消した", done.stdout)
 
     def test_request_keeps_a_body_file_outside_scratchpad(self):
-        """scratchpad/ の外（外のファイル、wip/、名前だけ似た場所、.. で出る道）は消さない。"""
+        """scratchpad/ の外（ここでは絶対パスで渡した外のファイル）は消さない。"""
         outside = write(os.path.join(self._tmp.name, "mine.md"), "利用者のファイル\n")
-        near = write(os.path.join(self.ws, "wip", "scratchpad", "req.md"), "x\n")
-        likeness = write(os.path.join(self.ws, "scratchpadX", "req.md"), "x\n")
-        escaped = write(os.path.join(self.ws, "escaped.md"), "x\n")
-        cases = (
-            outside,
-            "wip/scratchpad/req.md",
-            "scratchpadX/req.md",
-            "scratchpad/../escaped.md",
-        )
-        for body in cases:
-            with self.subTest(body=body):
-                done = self.request_with_body(body)
-                self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-                self.assertNotIn("消した", done.stdout)
-                shutil.rmtree(os.path.join(self._tmp.name, "out"), ignore_errors=True)
-                os.remove(os.path.join(self._tmp.name, "notes.json"))
-                # 本物の操作記録は送信済みを覚えている。次の回で投稿が省かれないよう、ここで消す
-                shutil.rmtree(os.path.join(self.ws, "logs", "state"), ignore_errors=True)
-        for path in (outside, near, likeness, escaped):
-            self.assertTrue(os.path.exists(path), path)
+        done = self.request_with_body(outside)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("消した", done.stdout)
+        self.assertTrue(os.path.exists(outside))
 
     @unittest.skipIf(os.name == "nt" or os.geteuid() == 0, "書き込めないディレクトリを作れない")
     def test_request_only_warns_when_the_body_file_cannot_be_removed(self):
