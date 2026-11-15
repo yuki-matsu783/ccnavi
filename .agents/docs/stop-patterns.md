@@ -57,7 +57,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 ## 拒否の文面の型
 
-拒否の文は、それだけで読んで成立する。順に 4 つを書く。文は[文面ファイル](message-files.md)に置き、4 つの部分は `deny` の欄（`what` `why` `next` `no_bypass`）になる。欄の定義は設計書の文面ファイルの設計（`messages.md`）の「形式」の節にある。欄の欠け、`次:` の数、値の埋まり方は、文面ファイルの検査（`--lint` と `tests/core/test_texts_catalog.py`）が見る。
+拒否の文は、それだけで読んで成立する。順に 4 つを書く。文は[文面ファイル](message-files.md)に置き、4 つの部分は `deny` の欄（`what` `why` `next` `no_bypass`）になる。欄の定義は設計書の文面ファイルの設計（`messages.md`）の「形式」の節にある。欄の欠け、`次:` の数、値の埋まり方は、文面ファイルの検査（`--lint` と `go/internal/policy/texts/catalog_test.go`）が見る。
 
 | 部分 | 書くこと |
 |---|---|

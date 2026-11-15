@@ -35,9 +35,6 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
 既知の失敗が残っている間は `python -m tests` で全件を見られないので、グループごとに `discover -s tests/<グループ> -t .` で回し、失敗の数を既知と比べる。
 
-`tests/<グループ>/bench_*.py` はテストではなく（`discover` は拾わない）、`uv run python -m tests.core.bench_deadline` のように名指しで回す。
-実ルールを使う bench は `*x*` 形の glob の照合が入力の長さの 2 乗で伸び、小さい入力でも数分かかる。ターンの中で回すならバックグラウンドで回す。
-
 ## 回すグループ
 
 `core` はいつも回す。そのうえで、変えたファイルを下の表に適用して、ヒットした行のグループを足す。
