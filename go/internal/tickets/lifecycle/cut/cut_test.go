@@ -16,14 +16,16 @@ func TestArgs(t *testing.T) {
 		{[]string{"topic"}, ""},
 		{[]string{"topic", "--base=main", "--accept", "abc", "--no-wip", "--no-wip", "--side-by-side"}, ""},
 		{[]string{"topic", "--offline"}, "fail retired-arg 2"},
+		{[]string{"topic", "--from-origin"}, "fail retired-arg 2"},
+		{[]string{"--bogus"}, "usage yes"},
 		{[]string{"topic", "--base"}, "fail base-missing 2"},
 		{[]string{"topic", "--copy-wip", "--no-wip"}, "fail wip-both 2"},
-		{[]string{"--bogus"}, "usage yes"},
 		{[]string{}, "usage yes"},
 		{[]string{"a", "b"}, "fail two-names 2"},
 		{[]string{"a/b"}, "fail bad-name 2"},
 		{[]string{"main"}, "fail bad-name 2"},
 		{[]string{"feature-１２３"}, "fail bad-name 2"},
+		{[]string{"feature-\u304b\u3099"}, "fail bad-name 2"}, // NFD（か + 濁点）
 		{[]string{"topic-" + strings.Repeat("a", 59)}, "fail bad-name 2"},
 		{[]string{"--help", "--offline"}, "help yes"},
 	} {

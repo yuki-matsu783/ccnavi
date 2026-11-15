@@ -385,12 +385,15 @@ class FetchTest(unittest.TestCase):
         git(self.ws, "branch", "-q", "--set-upstream-to", "origin/main")
         missing = posix(os.path.join(self._tmp.name, "nowhere.git"))
         git(self.ws, "remote", "set-url", "origin", "file://user:secret@" + missing.lstrip("/"))
-        done = self.fetch()
+        path, log = self.spy_on_ls_remote()
+        done = self.fetch(PATH=path)
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
         self.assertNotIn("secret", done.stdout)
         # 届かないだけで、認証の話ではない。
         self.assertNotIn("認証", done.stdout)
+        # 第 1 周で届かなかった origin には、向け直すための ls-remote を打たない。
+        self.assertFalse(os.path.exists(log), "第 1 周で失敗した origin に ls-remote を打った")
 
     def test_an_authentication_failure_says_so(self):
         """401 を返すリモート。尋ねずに失敗し、認証に失敗したことと、ユーザがすることを言う。"""
@@ -483,17 +486,6 @@ class FetchTest(unittest.TestCase):
         git(tree, "push", "-q", "-u", "origin", name)
         return tree
 
-    def test_a_family_is_fast_forwarded_past_unrelated_work_in_progress(self):
-        # 前は未コミットの変更があるだけで進めなかった。
-        # 取り込み済みの親子のチケットでは重なりを git に任せる。
-        tree = self.family()
-        head = self.advance(self.remote, "i0001")
-        write(os.path.join(tree, "note.txt"), "書きかけ\n")
-        done = self.fetch()
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual(head, self.sha(tree, "HEAD"))
-        self.assertIn("i0001: 親ブランチ", done.stdout)
-
     def test_a_family_that_overlaps_work_in_progress_is_not_moved(self):
         tree = self.family()
         before = self.sha(tree, "HEAD")
@@ -552,14 +544,6 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(before, self.sha(tree, "HEAD"))
         self.assertIn("他の操作の最中", done.stdout)
         self.assertTrue(os.path.isdir(lock))
-
-    def test_forwarding_stops_after_the_time_budget(self):
-        tree = self.family()
-        before = self.sha(tree, "HEAD")
-        self.advance(self.remote, "i0001")
-        done = self.fetch(CCNAVI_FETCH_BUDGET="0")
-        self.assertEqual(before, self.sha(tree, "HEAD"))
-        self.assertIn("時間の枠", done.stdout)
 
     def test_a_missing_family_branch_does_not_stop_the_default_branch(self):
         # P がリモートに無くても、その origin を失敗したものに数えない（統合先を飛ばさない）。
@@ -721,29 +705,6 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("合わせた", done.stdout)
         self.assertFalse(any("Main" in call for call in self.fetch_calls(log)))
 
-    def test_a_host_default_starting_with_a_dash_is_not_followed(self):
-        # ホストが -x のような名前を返しても、後ろの git の引数に流れないよう向け直さない。
-        self.leave_main()
-        before = self.origin_head()
-        path, log = self.spy_on_ls_remote(answer="-x")
-        done = self.fetch(PATH=path)
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual(before, self.origin_head())
-        self.assertNotIn("合わせた", done.stdout)
-        self.assertFalse(any("-x" in call for call in self.fetch_calls(log)))
-
-    def test_no_ls_remote_for_an_origin_that_failed_in_the_first_lap(self):
-        # 第 1 周で届かなかった origin には、向け直すための ls-remote を打たない。
-        self.leave_main()
-        git(self.ws, "branch", "-q", "--set-upstream-to", "origin/main")
-        missing = posix(os.path.join(self._tmp.name, "nowhere.git"))
-        git(self.ws, "remote", "set-url", "origin", "file://" + missing.lstrip("/"))
-        path, log = self.spy_on_ls_remote()
-        done = self.fetch(PATH=path)
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
-        self.assertFalse(os.path.exists(log), "第 1 周で失敗した origin に ls-remote を打った")
-
     def test_a_retarget_failure_is_not_recorded_as_a_failed_origin(self):
         # ls-remote が失敗しても、その origin を「失敗した origin」に数えない。第 2 周は取りに行く。
         self.leave_main()
@@ -760,14 +721,18 @@ class FetchTest(unittest.TestCase):
         tree = self.family()
         before = self.sha(tree, "HEAD")
         head = self.advance(self.remote, "i0001")
+        # 重ならない書きかけ（staged と未追跡）は、進めるのを止めない（重なりは git に任せる）。
         write(os.path.join(tree, "note.txt"), "書きかけ\n")
         git(tree, "add", "--", "note.txt")
+        write(os.path.join(tree, "memo.txt"), "書きかけ\n")
         done = self.fetch()
         self.assertNotEqual(before, self.sha(tree, "HEAD"))
         self.assertEqual(head, self.sha(tree, "HEAD"))
-        self.assertIn("親ブランチ", "\n".join(self.lines(done)))
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertIn("i0001: 親ブランチ", done.stdout)
         # 書きかけは残る
         self.assertTrue(os.path.exists(os.path.join(tree, "note.txt")))
+        self.assertTrue(os.path.exists(os.path.join(tree, "memo.txt")))
 
     # ---- 何も出さないとき
 

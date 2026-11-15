@@ -369,7 +369,7 @@ op_lock_take() {
 	# 入れ子で何も取らなかったとき、ほかのロック（write-and-push）の置き場を取ったものと読まないよう、先に空にする。
 	ccnavi_lock_dir=""
 	ol_rc=0
-	ccnavi_lock_take "$root" ops "$1" 30 || ol_rc=$?
+	ccnavi_lock_take "$root" ops "$1" "$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 30)" || ol_rc=$?
 	if [ "$ol_rc" -eq 0 ] && [ -n "$ccnavi_lock_dir" ]; then
 		op_lk_dir="$ccnavi_lock_dir"
 		op_lk_mark="$ccnavi_lock_mark"
