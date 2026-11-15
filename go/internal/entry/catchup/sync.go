@@ -202,6 +202,8 @@ func (s *syncRun) wanted(want string, add func(name, path, branch string)) {
 			want, want, branch, want, want)
 	case notParent:
 		s.a.fail("%s: .claude/worktrees/%s に親チケットも提案もありません。親のワークツリーではないので取り込まない", want, want)
+		// ワークツリーを切った直後（ccnavi-start.sh）は、これが正常。sh は止めたのがこれだけなら終了コード 4 にする。
+		s.a.Line("noticket")
 	default:
 		s.a.fail("%s: .claude/worktrees/%s に親チケットか提案があるかを実行ファイルに確かめられなかった（実行ファイルが無い、またはチケットの frontmatter を読めない）。取り込まない", want, want)
 	}

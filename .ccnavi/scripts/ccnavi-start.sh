@@ -737,7 +737,7 @@ ensure_mr() {
 
 # 最後に ccnavi-sync.sh <識別子> を打つ。親チケットも提案もまだ無いと取り込まれないが、止めない。<ブランチ>
 sync_note=""
-# ccnavi-sync.sh が「親チケットも提案もありません」で取り込まなかったとき 1 にする。report が提案を作る次の一手を出す
+# ccnavi-sync.sh が親チケットも提案も無いので取り込まなかった（終了コード 4）とき 1 にする。report が提案を作る次の一手を出す
 sync_no_ticket=""
 # ccnavi-sync.sh が取り込んだとき 1 にする（親チケットか提案が既にある）。report が状態を確かめる次の一手を出す
 sync_ok=""
@@ -754,21 +754,16 @@ run_sync() {
 		printf 'ccnavi-sync.sh %s:\n' "$rs_id"
 		printf '%s\n' "$rs_out" | sed 's/^/  /'
 		sync_ok=1
+	elif [ "$rs_rc" -eq 4 ]; then
+		# 終了コード 4 は、親チケットも提案も無いので取り込まなかった。ワークツリーを切った直後はこれが正常なので、
+		# 失敗に見える見出しにしない
+		printf 'ccnavi-sync.sh %s: ワークツリーを切った直後なので、取り込むものはありません（親チケットも提案も、まだ無い）\n' "$rs_id"
+		sync_no_ticket=1
+		sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
 	else
-		# 「親チケットも提案もありません」は ccnavi-sync.sh の文言。変えるときはここと test_start_sh.py も直す
-		case "$rs_out" in
-		*親チケットも提案もありません*)
-			# ワークツリーを切った直後は、親チケットも提案もまだ無いのが正常。失敗に見える見出しにしない
-			printf 'ccnavi-sync.sh %s: ワークツリーを切った直後なので、取り込むものはありません（親チケットも提案も、まだ無い）\n' "$rs_id"
-			sync_no_ticket=1
-			sync_note="親チケットか提案が出来たら、sh $scripts/ccnavi-sync.sh $rs_id を打ち直す"
-			;;
-		*)
-			printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
-			printf '%s\n' "$rs_out" | sed 's/^/  /'
-			sync_next="$rs_id"
-			;;
-		esac
+		printf 'ccnavi-sync.sh %s は取り込まなかった（終了コード %s）:\n' "$rs_id" "$rs_rc"
+		printf '%s\n' "$rs_out" | sed 's/^/  /'
+		sync_next="$rs_id"
 	fi
 }
 

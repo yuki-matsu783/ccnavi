@@ -1035,7 +1035,7 @@ class SyncTest(SyncHarness):
         other = os.path.join(self.ws, ".claude", "worktrees", "free")
         git(self.ws, "worktree", "add", "-q", other, "-b", "free")
         done = self.sync("free")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        self.assertEqual(4, done.returncode, done.stdout + done.stderr)
         self.assertIn("親のワークツリーではない", done.stdout)
 
     def test_a_missing_worktree_says_how_to_cut_it(self):

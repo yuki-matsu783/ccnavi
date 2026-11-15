@@ -92,7 +92,8 @@
         （.ccnavi/scripts/ccnavi-sync.sh 用。sh が ls-remote・fetch・ccnavi-review.sh merged を
          打つ間の判定と、早送り・merge（失敗したら取りやめ）・origin/HEAD の向け直し・片付けを行います。
          "sync 1" の行に続いて、表示する "out <行>"、止めたことを表す "failed"、取り込みが書きかけと
-         重なって止まったことを表す "overlap"、次の一手の
+         重なって止まったことを表す "overlap"、渡された親のワークツリーに親チケットも提案も無いことを表す
+         "noticket"、次の一手の
          "next <語>"（fetch・ask・skip・go）を出力します。merged は片付けでブランチを消すので、
          エージェントからは打てません。ネットワークには出ません）
     ccnavi sync check <parent> [<repo>]
