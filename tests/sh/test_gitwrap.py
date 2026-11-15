@@ -1052,6 +1052,24 @@ class ParentPushGateTest(GitWrapperTest):
         result = self.push(free, "free")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
+    # 送り先は git と同じ順で解き、origin 以外へ送るときはゲートを掛けない。
+
+    def test_a_push_remote_other_than_origin_is_not_gated(self):
+        self.approve()
+        other = self.make_bare()
+        git(self.dir, "remote", "add", "other", other)
+        git(self.tree, "config", "branch.i0001.pushRemote", "other")
+        result = run_in(self.tree, "push")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_push_default_to_origin_is_gated(self):
+        self.approve(started=True)
+        git(self.tree, "config", "remote.pushDefault", "origin")
+        git(self.tree, "config", "push.default", "current")
+        result = run_in(self.tree, "push")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("リモートに無い", result.stderr)
+
 
 class AllowListTest(GitWrapperTest):
     """オプションは許可リストで読む。
@@ -1338,26 +1356,6 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
         result = run_in(self.via_link, "push", "-u", "origin", "i0001")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.dir, "logs", "state", "sync")))
-
-
-class PushRemoteResolutionTest(ParentPushGateTest):
-    """送り先は git と同じ順で解き、origin 以外へ送るときはゲートを掛けない。"""
-
-    def test_a_push_remote_other_than_origin_is_not_gated(self):
-        self.approve()
-        other = self.make_bare()
-        git(self.dir, "remote", "add", "other", other)
-        git(self.tree, "config", "branch.i0001.pushRemote", "other")
-        result = run_in(self.tree, "push")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_push_default_to_origin_is_gated(self):
-        self.approve(started=True)
-        git(self.tree, "config", "remote.pushDefault", "origin")
-        git(self.tree, "config", "push.default", "current")
-        result = run_in(self.tree, "push")
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("リモートに無い", result.stderr)
 
 
 class IntegrationPushTest(GitWrapperTest):
