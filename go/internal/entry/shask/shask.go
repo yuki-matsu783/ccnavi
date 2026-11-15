@@ -6,7 +6,6 @@ import (
 	"io"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -17,7 +16,6 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/lifecycle/branch"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/model/archive"
 	"ccnavi/internal/tickets/model/ids"
@@ -72,12 +70,6 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 		ok = parentTree(stdout, stderr, root, conf, args[0], args[1], args[2])
 	case verb == "gate" && len(args) == 4:
 		ok = pushGate(stdout, stderr, root, conf, args[0], args[1], args[2], args[3])
-	case verb == "bound" && len(args) == 2:
-		ok = boundTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "leftover" && len(args) == 2:
-		ok = leftoverTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "base-bound" && len(args) == 2:
-		ok = baseBoundTree(stdout, stderr, root, conf, args[0], args[1])
 	default:
 		return 0, false
 	}
@@ -189,33 +181,26 @@ func IsParentTree(root string, conf *config.Settings, path, name string) int {
 	return 2
 }
 
-// boundTree は `tree bound`。頭に続けて bound yes|no、結び付くなら why <理由>。
-func boundTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
-	if !identOK(stderr, "tree bound", name) || !treeOK(stderr, "tree bound", path) {
-		return false
-	}
-	why := integrate.BoundReason(conf, root, treeOf(root, conf, path, name))
-	lines := []string{head, "bound " + string(yesNo(why != ""))}
-	if why != "" {
-		lines = append(lines, "why "+why)
-	}
-	writeLines(stdout, lines...)
-	return true
+// LeftoverFacts は、親のワークツリーに残っているもの。Stage は親の段階で、doing/ に在れば doing（改版の提案が todo/ に
+// あっても）、なければ review/ なら review、todo/ なら todo、どれも無ければ空。MR は番号か空。
+type LeftoverFacts struct {
+	Leftover, Proposal bool
+	Doing              int
+	MR, Stage          string
 }
 
-// leftoverTree は `tree leftover`。頭に続けて leftover・proposal・doing・mr・stage を返す。
-// stage は親の段階である。doing/ に在れば doing（改版の提案が todo/ にあっても）、なければ review/ なら review、
-// todo/ なら todo、どれも無ければ "-" とする。親のワークツリーでなければ（読めないときも）leftover no を返し、
-// 案内を出さない答えにする。
-func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
-	if !identOK(stderr, "tree leftover", name) || !treeOK(stderr, "tree leftover", path) {
-		return false
+// Leftover は、ツリー path（名前 name）に、承認待ちの提案・作業中の子・MR が残っているか（ccnavi-worktree.sh が親の
+// ワークツリーから直接作業へ切り替えるときに見る）。親のワークツリーでない・名前が識別子でない・ツリーが無いときは、
+// 何も残っていない答えにする（案内を出さない）。
+func Leftover(root string, conf *config.Settings, path, name string) LeftoverFacts {
+	if !ids.IsValidFamily(name) || path == "" || !ospath.IsDir(path) {
+		return LeftoverFacts{}
 	}
 	// 親の置き場（doing・todo・review）を順に見て、残っているものを集める。
 	// doing は承認済みの置き場なので提案ではない（held が偽）。todo と review は提案の置き場。
 	work := treeOf(root, conf, path, name)
 	approvedDir := conf.ApprovedDir(work.Root)
-	proposal, mr := no, ""
+	proposal, mr := false, ""
 	found := map[place.State]bool{}
 	for _, c := range []struct {
 		stage place.State
@@ -233,14 +218,14 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 		}
 		found[c.stage] = true
 		if c.held {
-			proposal = yes
+			proposal = true
 		}
 		if mr == "" {
 			mr = mrOf(front)
 		}
 	}
 	// 段階は doing、review、todo の順で最初に見つかったもの（doing に在れば、改版の提案が todo にあっても doing）。
-	stage := none
+	stage := ""
 	for _, s := range []place.State{place.Doing, place.Review, place.Todo} {
 		if found[s] {
 			stage = string(s)
@@ -249,16 +234,10 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 	}
 	// 親のワークツリーと言える材料があるときだけ、作業中の子を数える（親でないツリーに案内を出さないため）。
 	doing := 0
-	if proposal == yes || mr != "" || holdsParent(conf, work) == yes {
+	if proposal || mr != "" || holdsParent(conf, work) == yes {
 		doing = childrenInDoing(approvedDir, name)
 	}
-	writeLines(stdout, head,
-		"leftover "+string(yesNo(proposal == yes || mr != "" || doing > 0)),
-		"proposal "+string(proposal),
-		"doing "+strconv.Itoa(doing),
-		"mr "+cmp.Or(mr, none),
-		"stage "+stage)
-	return true
+	return LeftoverFacts{Leftover: proposal || mr != "" || doing > 0, Proposal: proposal, Doing: doing, MR: mr, Stage: stage}
 }
 
 // childrenInDoing は doing/ にある、この親の子（parent: が親の識別子）の数。読めないファイルは数えない。
@@ -279,24 +258,6 @@ func childrenInDoing(approvedDir, parent string) int {
 		}
 	}
 	return count
-}
-
-// baseBoundTree は `tree base-bound`。頭に続けて bound yes|no|unknown、yes なら why <理由>。
-func baseBoundTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
-	if name == "" || strings.ContainsAny(name, "\n\x00") {
-		fmt.Fprintf(stderr, "ccnavi: tree base-bound のブランチ %s は有効な名前ではありません。\n", pyfmt.Repr(name))
-		return false
-	}
-	if !treeOK(stderr, "tree base-bound", path) {
-		return false
-	}
-	bound, why := branch.BaseBound(conf, root, path, name)
-	lines := []string{head, "bound " + string(bound)}
-	if why != "" {
-		lines = append(lines, "why "+why)
-	}
-	writeLines(stdout, lines...)
-	return true
 }
 
 // frontOfText は本文の frontmatter を対応表として読む。読めなければ nil。

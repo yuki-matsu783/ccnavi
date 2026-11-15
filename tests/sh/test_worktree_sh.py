@@ -368,19 +368,6 @@ class WorktreeShTest(unittest.TestCase):
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
 
-    def test_an_old_executable_without_stage_does_not_refuse(self):
-        path = self.parent_tree(**{"wip/proposals/todo/p0001.md": {}})
-        stub = write(
-            os.path.join(self._tmp.name, "exe2", "ccnavi"),
-            "#!/bin/sh\n"
-            'for a in "$@"; do [ "$a" = leftover ] &&'
-            ' { printf "tree 1\\nleftover yes\\ndoing 0\\n"; exit 0; }; done\n'
-            f"exec '{exe.sh_path()}' \"$@\"\n",
-        )
-        os.chmod(stub, 0o755)
-        result = self.run_sh("topic", "--base", "main", cwd=path, CCNAVI_ENTRY_PATH=stub)
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-
     def test_nothing_is_said_about_leftovers_without_a_parent(self):
         put_messages(self.ws)
         result = self.run_sh("topic")

@@ -29,7 +29,7 @@
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
 #
 #   ccnavi-common-state.sh  state の置き場、実行ファイルに聞く口（ccnavi_ask・ccnavi_text・ccnavi_integration・
-#                           ccnavi_parent_info・ccnavi_id_clash・ccnavi_git_refusal など）、親ブランチの push のゲートの
+#                           ccnavi_parent_info・ccnavi_git_refusal など）、親ブランチの push のゲートの
 #                           ls-remote（ccnavi_push_gate）、タイムアウト監視つきの git（ccnavi_git_timed）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
 #   ccnavi-common-write-and-push.sh     write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_wap_*）
@@ -385,7 +385,7 @@ ccnavi_is_ident() {
 #
 # 実行ファイルの `ids.BranchProblem` の複製（ASCII で見分けられる分だけ）。write-and-push の対象決めなど、呼ぶたびに
 # 実行ファイルを起こせない所で使う。名前を受け入れる入口（ccnavi-start.sh・
-# ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
+# ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイル（`ids.IDAnswer`）が確かめる。規則を変えるときは両方を直す。
 #
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
 # （`ids.BranchProblem`）が字と形を確かめたものを受け取る側の 2 つ目の確認で、パスや ref で意味を持つ

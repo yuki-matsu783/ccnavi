@@ -84,9 +84,6 @@
          1 行ずつ報告し、最後に
          "record yes|no"（片付けが済んだか）を出力します。済んだときは retire/<parent>.json も
          消します。ネットワークには出ません）
-    ccnavi worktree name <name>
-        （直接作業するワークツリーの名前が <prefix>-<number>-<slug> の形式でない場合に、
-         "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
     ccnavi sync paths
         （.ccnavi/scripts/ccnavi-sync.sh 用。1行に "<key> <value>" を1組ずつ出力します。
          対象は、承認済みと提案の置き場、ccnaviのディレクトリです。統合先ブランチは返しません
@@ -114,37 +111,21 @@
         （push のゲート用。"tree 1" の行に続いて、次の一手 "gate pass|stop|ls-remote" を出力します。
          stop には "why <理由>"、ls-remote にはリモートに無いときの "missing <理由>" と、
          確かめられないときの "unreachable <理由>" が続きます。ls-remote は呼ぶ側が打ちます）
-    ccnavi tree bound <tree> <name>
-        （ccnavi-worktree.sh --adopt 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
-         ワークツリーがチケットに結び付くか。結び付くと --adopt は断ります）、結び付くなら
-         "why <理由>" を出力します。Stop の促しと同じ判定です）
-    ccnavi tree leftover <tree> <name>
-        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"leftover yes|no"（そのツリーが親の
-         ワークツリーで、承認待ちの提案・着手中の子・MR が残っているか）、"proposal yes|no"
-         （todo/ か review/ の提案があるか）、"doing <件数>"（doing/ の子の数）、
-         "mr <番号>|-"（親の mr:）、"stage doing|review|todo|-"（親の段階。doing が最優先で、
-         承認済みなら doing、finish 済みでレビュー待ちなら review、承認前の提案だけなら todo）
-         を出力します。親でなければ "leftover no"、"stage -" です）
-    ccnavi tree base-bound <main-checkout> <branch>
-        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"bound yes|no|unknown"（取り込み先の
-         ブランチがチケットに結び付くか。yes と unknown は切るのを断ります）、yes なら
-         "why <理由>" を出力します。結び付きは取り込み先のリポジトリだけを見ます）
     ccnavi text <id> [name=value]... [@field=case]...
         （スクリプト用。文面ファイル（.ccnavi/messages/）の識別子 <id> の文を
          組み立てて出力します。
          name=value は文面の {name} に入る値、@field=case は欄の場合分けの選択です。
          引けないとき（識別子が無い・値の不足・文面ファイルの不備）は何も出力せず、
          理由を標準エラーに出して終了コード1になります）
-    ccnavi worktree id <branch>
-        （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
-         親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
-         直接作業や子のワークツリーの名前に指定できなければ
-         "direct <理由>"（64文字以内・字の種類・NFC）、
-         子の識別子の形なら "child yes" を出力します）
-    ccnavi worktree clash <branch> <file>
-        （スクリプト用。<file>（1 行 1 本のブランチ名）に、<branch> と同じ識別子（/ と - の違い・
-         大文字小文字の違いは同じ）になる別のブランチがあれば "clash <名前>"、無ければ "clash -"
-         を出力します）
+    ccnavi worktree direct plan -- <ccnavi-worktree.sh の引数>...
+        （ccnavi-worktree.sh 用。引数と、切る前に決まる検査（C1〜C3・同じ識別子・既にあるワークツリーとブランチ・
+         親のワークツリー・取り込みの途中の記録）を行い、引き取り（--adopt）と --dry-run はここで終えます。切る道に
+         進むなら "fetch <取り込み先>" と "top <ツリー>" を出力します。答えは 1 行 1 項目で、誤りは
+         "fail <識別子> <終了コード>" と "msg <文>"）
+    ccnavi worktree direct cut fetch=ok|failed fetch-out=<file> heads=<file> heads-err=<file> -- <ccnavi-worktree.sh の引数>...
+        （ccnavi-worktree.sh 用。sh が取った fetch の出力と ls-remote --heads の応答（heads が空なら取れなかった）から、
+         origin とのずれ・書きかけ・確認コードを決め、確認が要れば報告して終了コード 3 を返す答えを出し、要らなければ
+         記録（ccnavi-direct/<名前>）を書いてワークツリーを切ります）
     ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
         （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
          出力します。Chrome 拡張の「始める」と同じ作り方です。タイトルが長くて slug を

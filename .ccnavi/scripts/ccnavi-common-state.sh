@@ -98,60 +98,6 @@ ccnavi_text() {
 	esac
 }
 
-# 名前のワークツリーがチケットに結び付くかを実行ファイル（`tree bound`）に聞く。<ワークスペースルート> <ワークツリーのパス> <名前>
-#
-# 答えは ccnavi_tb_state（yes・no・unavailable（実行ファイルに確かめられない）・undecided（決められない））と、
-# 結び付くときの理由 ccnavi_tb_why に入れる。結び付かない（no）ときだけ 0。`ccnavi-worktree.sh --adopt` が
-# 断るための入口（`ccnavi-git.sh integrate` は実行ファイルの中で同じ判定を使う）で、sh はチケットの置き場を自分で読まない。
-# 止める側の呼び出し元は、no 以外を「引き取らない・取り込まない」に倒す。
-ccnavi_tree_bound() {
-	ccnavi_tb_out=$(ccnavi_ask "$1" tree bound "$2" "$3") || ccnavi_tb_out=""
-	ccnavi_tb_why=""
-	if [ "$(printf '%s\n' "$ccnavi_tb_out" | head -n 1)" != "tree 1" ]; then
-		ccnavi_tb_state=unavailable
-		return 1
-	fi
-	ccnavi_tb_why=$(printf '%s\n' "$ccnavi_tb_out" | sed -n 's/^why //p' | head -n 1)
-	case "$(printf '%s\n' "$ccnavi_tb_out" | sed -n 's/^bound //p' | head -n 1)" in
-	no)
-		ccnavi_tb_state=no
-		return 0
-		;;
-	yes) ccnavi_tb_state=yes ;;
-	*) ccnavi_tb_state=undecided ;;
-	esac
-	return 1
-}
-
-# ブランチ名から作る識別子と、それが使えるかを実行ファイル（`worktree id`）に聞く。<ワークスペースルート> <ブランチ>
-#
-# 答えは ccnavi_id_ident（識別子）・ccnavi_id_problem（親のブランチとして採用できない理由。58 文字・末尾の
-# -<2 桁>・字の種類・NFC）・ccnavi_id_direct（直接作業や子のワークツリーとして使えない理由。64 文字・字の種類・NFC）・
-# ccnavi_id_child（子の識別子の形なら yes）に入れる。sh は字の種類と NFC と文字数を自分で確かめない
-# （`ccnavi_is_ident` と `ccnavi_is_branch` は ASCII の外のバイトを通す。`${#x}` は dash ではバイト数になる）。
-# 実行ファイルが無い・答えないなら 1（呼ぶ側は「確かめられない」として止める）。
-ccnavi_id_ask() {
-	ccnavi_ia_out=$(ccnavi_ask "$1" worktree id "$2") || ccnavi_ia_out=""
-	ccnavi_id_ident=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^id //p' | head -n 1)
-	ccnavi_id_problem=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^problem //p' | head -n 1)
-	ccnavi_id_direct=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^direct //p' | head -n 1)
-	ccnavi_id_child=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^child //p' | head -n 1)
-	[ -n "$ccnavi_id_ident" ]
-}
-
-# <一覧> のブランチ名（1 行 1 本）のうち、<ブランチ> と同じ識別子になる別の名前を 1 つ出す。<ワークスペースルート> <ブランチ> <一覧>
-#
-# 判定は実行ファイル（`worktree clash`。ids.IDClash。/ と - の違いと大文字小文字の違いを同じ識別子と読む）。
-# 無ければ 1。実行ファイルが答えなければ 2（呼ぶ側は「確かめられない」として止める）。
-ccnavi_id_clash() {
-	ccnavi_ic_out=$(ccnavi_ask "$1" worktree clash "$2" "$3" | sed -n 's/^clash //p' | head -n 1) || ccnavi_ic_out=""
-	case "$ccnavi_ic_out" in
-	'') return 2 ;;
-	-) return 1 ;;
-	esac
-	printf '%s\n' "$ccnavi_ic_out"
-}
-
 # そのツリーが属するリポジトリの統合先の名前。分からなければ 1。<ツリー>
 #
 # 決め方（手元の origin/HEAD、無ければ origin/main・origin/master）は実行ファイル（`git integration`。
