@@ -507,7 +507,7 @@ put() {{
 }}
 m=.ccnavi/approved/phases/i0001
 case " $* " in
-*" ops "*) exec '{exe}' "$@" ;;
+*" ops "* | *" host "*) exec '{exe}' "$@" ;;
 *" review prepare "*)
   mkdir -p "$root/logs/state"
   printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"

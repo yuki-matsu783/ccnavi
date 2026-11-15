@@ -234,6 +234,9 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "  printf '%s\\n' \"$root/logs/state/note.md\"\n"
             "  printf 'tree %s\\n' \"$tree\"\n"
             f"  printf 'wip-from {head}\\nwip {WIP_NOTE}\\n'\n"
+            # 報告の文は実行ファイルが組み、sh は成功のあとにそのまま出す
+            f"  printf 'say wip/ の追跡済みのファイルを削除しました（1 件。削除する前のコミット {head[:12]} から戻せる）:\\n'\n"
+            f"  printf 'say   {WIP_NOTE}\\n'\n"
             "  exit 0 ;;\n"
             "esac\n"
             f"exec '{self.half}' \"$@\"\n",
