@@ -13,6 +13,9 @@
 - 戻すときは、いまの木と写しの違うファイルだけを消す・写す（木を丸ごと写し直さない）。
   `root(test)` を呼んだ後の最初の手順は、前のテストが残した木を空の木とみなして戻す。テストどうしで
   状態は持ち越さない（いつも写しと同じ中身から始まる）
+- `@cached` を付ける手順は、テストの属性への代入と `root(test)` の下への書き込みだけで済ませる。
+  属性の値は浅く取っておくので、リスト・辞書の中身の書き換え（`self.x.append(...)`）は再生で戻らない。
+  `root(test)` の外へ書いたものも写しに入らず、戻らない
 """
 
 from __future__ import annotations
@@ -69,7 +72,8 @@ def _listing(top):
                     digest = hashlib.sha1(f.read()).hexdigest()
                 found[key] = ("f", stat.S_IMODE(info.st_mode), digest)
             else:
-                # FIFO などは開くと待つので読まない。写しには入れられない（戻すときは消す）。
+                # FIFO などは開くと待つので読まない。FIFO を含む木は写しを取れない
+                # （写すときの copytree が止まる）。
                 found[key] = ("o", info.st_mode, "")
     return found
 
