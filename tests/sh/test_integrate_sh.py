@@ -239,15 +239,13 @@ class IntegrateTest(Fixture):
         )
         self.assertTrue(self.ref("t"))
         self.assertTrue(self.ref("c"))
-
-    def test_the_diff_is_only_the_agents_part(self):
-        self.work_in_branch()
-        self.advance_main()
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        c = self.marker_value("c_tree")
-        changed = git(self.ws, "diff-tree", "-r", "--name-only", "HEAD^{tree}", c).split()
+        # 差分はエージェントの分だけ（ルートの staged の編集も、進んだ main も入らない）。
+        changed = git(
+            self.ws, "diff-tree", "-r", "--name-only", "HEAD^{tree}", self.marker_value("c_tree")
+        ).split()
         self.assertEqual(["gone.txt", "keep.txt", "new.txt"], sorted(changed))
+        # 起点のままの下書き（wip/handoff/d.md）は並べない。
+        self.assertNotIn("取り込まない下書き", r.stdout)
 
     def test_a_same_place_commit_by_the_user_is_refused_with_paths(self):
         self.work_in_branch()
@@ -263,6 +261,7 @@ class IntegrateTest(Fixture):
         self.assertFalse(os.path.exists(self.marker()))
 
     def test_no_diff_is_reported_and_done_only_cleans(self):
+        self.assertOk(self.run_git_sh("integrate", "--abort", "wt"), 2)
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r)
         self.assertIn("取り込む差分は無かった", r.stdout)
@@ -319,12 +318,6 @@ class IntegrateTest(Fixture):
         self.assertNotIn("wip/handoff/notes.md", names.splitlines())
         self.assertFalse(os.path.exists(os.path.join(self.tmp_wt(), "wip/handoff/notes.md")))
         self.assertIn("new.txt", names.splitlines())
-
-    def test_a_draft_kept_as_in_the_start_point_is_not_listed(self):
-        self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        self.assertNotIn("取り込まない下書き", r.stdout)
 
     def test_an_unedited_copy_passes_and_is_not_listed(self):
         wt = self.cut_with_original()
@@ -405,13 +398,6 @@ class IntegrateTest(Fixture):
         os.remove(self.record())
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r, 2)
-        self.assertIn("--adopt", r.stderr)
-
-    def test_without_a_record_a_direct_name_is_not_told_about_merge_requests(self):
-        self.work_in_branch()
-        os.remove(self.record())
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
         self.assertIn("--adopt --base <取り込み先>", r.stderr)
         self.assertNotIn("マージリクエスト", r.stderr)
 
@@ -459,16 +445,6 @@ class IntegrateTest(Fixture):
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r, 2)
         self.assertIn("2.40", r.stderr)
-
-    def test_an_ignored_file_overlap_is_named(self):
-        write(os.path.join(self.wt, "added.local"), "agent\n")
-        git(self.wt, "add", "-f", "added.local")
-        git(self.wt, "commit", "-q", "-m", "tracked despite ignore")
-        write(os.path.join(self.ws, "added.local"), "user's ignored file\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        self.assertIn("ignored のファイルと重なっている", r.stdout)
-        self.assertIn("added.local", r.stdout)
 
     def test_a_ready_made_temp_worktree_with_unknown_files_is_not_thrown_away(self):
         self.work_in_branch()
@@ -569,6 +545,10 @@ class IntegrateTest(Fixture):
         self.assertEqual("1\n2\nmine\n", read(os.path.join(self.ws, "keep.txt")))
         self.assertTrue(self.has_branch())
         self.assertIn("k ", read(self.marker()))
+        # K が待っている間は、integrate を打ち直させない。
+        waiting = self.run_git_sh("integrate", "wt")
+        self.assertOk(waiting, 2)
+        self.assertIn("integrate-done", waiting.stderr)
         # 退避してもらって打ち直すと、K から再開して完了する。
         git(self.ws, "checkout", "--", "keep.txt")
         again = self.run_git_sh("integrate-done", "wt")
@@ -582,7 +562,10 @@ class IntegrateTest(Fixture):
         git(self.wt, "add", "-f", "added.local")
         git(self.wt, "commit", "-q", "-m", "tracked despite ignore")
         write(os.path.join(self.ws, "added.local"), "user's ignored file\n")
-        self.assertOk(self.run_git_sh("integrate", "wt"))
+        named = self.run_git_sh("integrate", "wt")
+        self.assertOk(named)
+        self.assertIn("ignored のファイルと重なっている", named.stdout)
+        self.assertIn("added.local", named.stdout)
         head = self.head()
         r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
         self.assertOk(r, 1)
@@ -614,19 +597,14 @@ class IntegrateTest(Fixture):
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
         write(os.path.join(self.wt, "late.txt"), "late\n")
+        dirty = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+        self.assertOk(dirty, 2)
+        self.assertIn("未コミットの変更", dirty.stderr)
         git(self.wt, "add", ".")
         git(self.wt, "commit", "-q", "-m", "late")
         r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
         self.assertOk(r, 2)
         self.assertIn("動いています", r.stderr)
-
-    def test_a_dirty_source_worktree_stops_done(self):
-        self.work_in_branch()
-        self.assertOk(self.run_git_sh("integrate", "wt"))
-        write(os.path.join(self.wt, "late.txt"), "late\n")
-        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
-        self.assertOk(r, 2)
-        self.assertIn("未コミットの変更", r.stderr)
 
     def test_a_branch_switch_is_refused(self):
         self.work_in_branch()
@@ -682,6 +660,10 @@ class IntegrateTest(Fixture):
         self.assertIn("取り込みました", r.stdout)
         self.assertIn("残したもの", r.stdout)
         self.assertEqual("somebody's file\n", read(os.path.join(self.tmp_wt(), "mystery.txt")))
+        # K が載ったあとは --abort で戻せない（revert を案内する）。
+        aborted = self.run_git_sh("integrate", "--abort", "wt")
+        self.assertOk(aborted, 2)
+        self.assertIn("git revert", aborted.stderr)
         # K が載ったあとにユーザがコミットしても、片付けは止まらない。
         self.advance_main("other.txt", "z\n")
         os.remove(os.path.join(self.tmp_wt(), "mystery.txt"))
@@ -747,15 +729,6 @@ class IntegrateTest(Fixture):
         self.assertTrue(os.path.isdir(self.wt))
         self.assertEqual(tip, git(self.ws, "rev-parse", "wt").strip())
 
-    def test_abort_refuses_when_k_has_landed(self):
-        self.work_in_branch()
-        self.assertOk(self.run_git_sh("integrate", "wt"))
-        write(os.path.join(self.tmp_wt(), "mystery.txt"), "x\n")
-        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"), 1)
-        r = self.run_git_sh("integrate", "--abort", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("git revert", r.stderr)
-
     def test_abort_after_k_was_made_but_not_landed(self):
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
@@ -768,25 +741,13 @@ class IntegrateTest(Fixture):
         self.assertEqual("1\n2\nmine\n", read(os.path.join(self.ws, "keep.txt")))
         self.assertFalse(os.path.exists(self.tmp_wt()))
 
-    def test_abort_with_nothing_to_undo_is_refused(self):
-        r = self.run_git_sh("integrate", "--abort", "wt")
-        self.assertOk(r, 2)
-
-    def test_integrate_is_refused_while_a_k_waits(self):
-        self.work_in_branch()
-        self.assertOk(self.run_git_sh("integrate", "wt"))
-        write(os.path.join(self.ws, "keep.txt"), "1\n2\nmine\n")
-        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"), 1)
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("integrate-done", r.stderr)
-
     # ---- 並行
 
     def test_two_operations_at_once_one_is_refused_by_the_lock(self):
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
-        self.hook("pre-commit", "sleep 3\n")
+        started = os.path.join(self._tmp.name, "hook-started")
+        self.hook("pre-commit", f": >'{started}'\nsleep 2\n")
         slow = subprocess.Popen(
             [
                 SHELL,
@@ -804,7 +765,10 @@ class IntegrateTest(Fixture):
             text=True,
         )
         try:
-            time.sleep(1.0)
+            # integrate-done がロックを持ったままフックに入るまで待つ。
+            deadline = time.time() + 30
+            while not os.path.exists(started) and time.time() < deadline:
+                time.sleep(0.05)
             other = self.run_git_sh("integrate", "wt")
             self.assertOk(other, 2)
             self.assertIn("動いています", other.stderr)
@@ -884,23 +848,18 @@ class IntegrateReviewTest(Fixture):
         self.advance_main("keep.txt", "1\n2\nTHREE\n")
         self.assertOk(self.run_git_sh("integrate", "wt"), 1)
         self.resolve_conflict()
+        # 解いたあとに取り込み先が動いても、結果に漏れない。
+        self.advance_main("other.txt", "later\n")
         r = self.run_git_sh("integrate", "wt")
         self.assertOk(r)
-        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
-        self.assertEqual("1\n2\nresolved\n", read(os.path.join(self.ws, "keep.txt")))
-        self.assertTrue(os.path.exists(os.path.join(self.ws, "new.txt")))
-
-    def test_the_base_moving_after_the_resolution_does_not_leak_into_the_result(self):
-        self.work_in_branch()
-        self.advance_main("keep.txt", "1\n2\nTHREE\n")
-        self.assertOk(self.run_git_sh("integrate", "wt"), 1)
-        self.resolve_conflict()
-        self.advance_main("other.txt", "later\n")
-        self.assertOk(self.run_git_sh("integrate", "wt"))
         changed = git(
             self.ws, "diff-tree", "-r", "--name-only", "HEAD^{tree}", self.marker_value("c_tree")
         ).split()
         self.assertEqual(["gone.txt", "keep.txt", "new.txt"], sorted(changed))
+        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
+        self.assertEqual("1\n2\nresolved\n", read(os.path.join(self.ws, "keep.txt")))
+        self.assertTrue(os.path.exists(os.path.join(self.ws, "new.txt")))
+        self.assertEqual("later\n", read(os.path.join(self.ws, "other.txt")))
 
     # ---- 名前のほうのチケットの結び付き
 
@@ -981,42 +940,32 @@ class IntegrateReviewTest(Fixture):
         self.assertEqual(head, self.head())
 
     def test_a_tracked_edit_in_the_temp_worktree_stops_done(self):
+        """一時ワークツリーの追跡済みの編集は、staged でも無くても integrate-done を止める。"""
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
         write(os.path.join(self.tmp_wt(), "keep.txt"), "edited while verifying\n")
         head = self.head()
-        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
-        self.assertOk(r, 2)
-        self.assertIn("違います", r.stderr)
-        self.assertEqual(head, self.head())
-
-    def test_a_staged_edit_in_the_temp_worktree_stops_done(self):
-        self.work_in_branch()
-        self.assertOk(self.run_git_sh("integrate", "wt"))
-        write(os.path.join(self.tmp_wt(), "keep.txt"), "edited while verifying\n")
-        git(self.tmp_wt(), "add", "keep.txt")
-        head = self.head()
-        r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
-        self.assertOk(r, 2)
-        self.assertIn("違います", r.stderr)
-        self.assertEqual(head, self.head())
+        for staged in (False, True):
+            with self.subTest(staged=staged):
+                if staged:
+                    git(self.tmp_wt(), "add", "keep.txt")
+                r = self.run_git_sh("integrate-done", "wt", "-m", "feat: x")
+                self.assertOk(r, 2)
+                self.assertIn("違います", r.stderr)
+                self.assertEqual(head, self.head())
 
     def test_cleanup_keeps_a_tracked_edit_in_the_temp_worktree(self):
+        """片付けは、一時ワークツリーの追跡済みの編集を staged でもそうでなくても消さない。"""
         mystery = self.landed_but_cleanup_stopped()
         os.remove(mystery)
         write(os.path.join(self.tmp_wt(), "keep.txt"), "edited later\n")
-        r = self.run_git_sh("integrate-done", "wt")
-        self.assertOk(r, 1)
-        self.assertEqual("edited later\n", read(os.path.join(self.tmp_wt(), "keep.txt")))
-
-    def test_cleanup_keeps_a_staged_edit_in_the_temp_worktree(self):
-        mystery = self.landed_but_cleanup_stopped()
-        os.remove(mystery)
-        write(os.path.join(self.tmp_wt(), "keep.txt"), "edited later\n")
-        git(self.tmp_wt(), "add", "keep.txt")
-        r = self.run_git_sh("integrate-done", "wt")
-        self.assertOk(r, 1)
-        self.assertEqual("edited later\n", read(os.path.join(self.tmp_wt(), "keep.txt")))
+        for staged in (False, True):
+            with self.subTest(staged=staged):
+                if staged:
+                    git(self.tmp_wt(), "add", "keep.txt")
+                r = self.run_git_sh("integrate-done", "wt")
+                self.assertOk(r, 1)
+                self.assertEqual("edited later\n", read(os.path.join(self.tmp_wt(), "keep.txt")))
 
     def test_cleanup_keeps_the_worktree_when_it_left_the_branch(self):
         self.work_in_branch()
@@ -1467,36 +1416,61 @@ class MergeOnTargetTest(Fixture):
         self.assertEqual(2, r.returncode, r.stdout + r.stderr)
         self.assertIn("merge できません", r.stderr)
 
-    def test_merge_main_inside_a_worktree_passes(self):
-        self.advance_main()
-        r = self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt)
-        self.assertOk(r)
-        self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
-
     def parents_of_head(self, wt):
         return len(git(wt, "rev-list", "--parents", "-n", "1", "HEAD").split()) - 1
 
     def test_merge_in_a_worktree_without_own_commits_makes_a_merge_commit(self):
-        # 自分のコミットが無いと git は早送りで済ませる。印が残るよう --no-ff を補う。
+        """ワークツリーの中の merge は通す。自分のコミットが無くても印が残るよう --no-ff を補う。
+
+        形（-m・--ff-only・-m の値の --ff・--no-commit・サブディレクトリ・--squash）ごとに、
+        別のワークツリーで打つ。
+        """
+        up_to_date = self.cut("uptodate")
+        before = git(up_to_date, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=up_to_date))
+        self.assertEqual(before, git(up_to_date, "rev-parse", "HEAD").strip(), "取り込む物が無い")
+        trees = {
+            name: self.cut(name) for name in ("msg", "ffonly", "msgff", "nocommit", "sub", "squash")
+        }
         self.advance_main()
         main_head = git(self.ws, "rev-parse", "HEAD").strip()
+
         self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt))
         self.assertEqual(2, self.parents_of_head(self.wt))
         self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD^2").strip())
         self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
 
-    def test_merge_in_a_worktree_with_a_message_adds_no_ff(self):
-        self.advance_main()
-        self.assertOk(self.run_git_sh("merge", "main", "-m", "main を取り込む", cwd=self.wt))
-        self.assertEqual(2, self.parents_of_head(self.wt))
-        self.assertEqual("main を取り込む", git(self.wt, "log", "-1", "--format=%s").strip())
+        msg = trees["msg"]
+        self.assertOk(self.run_git_sh("merge", "main", "-m", "main を取り込む", cwd=msg))
+        self.assertEqual(2, self.parents_of_head(msg))
+        self.assertEqual("main を取り込む", git(msg, "log", "-1", "--format=%s").strip())
 
-    def test_ff_only_in_a_worktree_fast_forwards(self):
-        self.advance_main()
-        main_head = git(self.ws, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "--ff-only", "main", cwd=self.wt))
-        self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD").strip())
-        self.assertEqual(1, self.parents_of_head(self.wt))
+        ffonly = trees["ffonly"]
+        self.assertOk(self.run_git_sh("merge", "--ff-only", "main", cwd=ffonly))
+        self.assertEqual(main_head, git(ffonly, "rev-parse", "HEAD").strip())
+        self.assertEqual(1, self.parents_of_head(ffonly))
+
+        # -m の値の --ff は形のオプションではない。
+        self.assertOk(self.run_git_sh("merge", "-m", "--ff", "main", cwd=trees["msgff"]))
+        self.assertEqual(2, self.parents_of_head(trees["msgff"]))
+
+        nocommit = trees["nocommit"]
+        before = git(nocommit, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "--no-commit", "main", cwd=nocommit))
+        self.assertEqual(before, git(nocommit, "rev-parse", "HEAD").strip())
+        self.assertTrue(
+            os.path.exists(os.path.join(self.common_dir(), "worktrees", "nocommit", "MERGE_HEAD"))
+        )
+
+        sub = os.path.join(trees["sub"], "sub")
+        os.makedirs(sub)
+        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=sub))
+        self.assertEqual(2, self.parents_of_head(trees["sub"]))
+
+        squash = trees["squash"]
+        before = git(squash, "rev-parse", "HEAD").strip()
+        self.assertOk(self.run_git_sh("merge", "--squash", "main", cwd=squash))
+        self.assertEqual(before, git(squash, "rev-parse", "HEAD").strip())
 
     def test_explicit_ff_and_no_ff_in_a_worktree_are_kept(self):
         other = self.cut("wt2")
@@ -1507,38 +1481,6 @@ class MergeOnTargetTest(Fixture):
         self.assertEqual(1, self.parents_of_head(self.wt))
         self.assertOk(self.run_git_sh("merge", "--no-ff", "main", "--no-edit", cwd=other))
         self.assertEqual(2, self.parents_of_head(other))
-
-    def test_already_up_to_date_adds_no_commit_in_a_worktree(self):
-        before = git(self.wt, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=self.wt))
-        self.assertEqual(before, git(self.wt, "rev-parse", "HEAD").strip())
-
-    def test_a_message_value_that_looks_like_ff_is_not_a_form_option(self):
-        self.advance_main()
-        self.assertOk(self.run_git_sh("merge", "-m", "--ff", "main", cwd=self.wt))
-        self.assertEqual(2, self.parents_of_head(self.wt))
-
-    def test_no_commit_in_a_worktree_stops_before_committing(self):
-        self.advance_main()
-        before = git(self.wt, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "--no-commit", "main", cwd=self.wt))
-        self.assertEqual(before, git(self.wt, "rev-parse", "HEAD").strip())
-        self.assertTrue(
-            os.path.exists(os.path.join(self.common_dir(), "worktrees", "wt", "MERGE_HEAD"))
-        )
-
-    def test_merge_from_a_subdirectory_of_a_worktree_adds_no_ff(self):
-        self.advance_main()
-        sub = os.path.join(self.wt, "sub")
-        os.makedirs(sub)
-        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=sub))
-        self.assertEqual(2, self.parents_of_head(self.wt))
-
-    def test_squash_in_a_worktree_is_not_given_no_ff(self):
-        self.advance_main()
-        before = git(self.wt, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "--squash", "main", cwd=self.wt))
-        self.assertEqual(before, git(self.wt, "rev-parse", "HEAD").strip())
 
     def test_abort_continue_and_quit_pass_on_the_target(self):
         # 途中の merge を終わらせる操作は、止める判定の対象外で、git の結果がそのまま返る。
@@ -1664,10 +1606,6 @@ class PullOnTargetTest(PullOnTargetBase):
                 self.assertOk(self.run_git_sh("pull", *args))
                 self.assertTrue(os.path.exists(os.path.join(self.ws, "next.txt")))
 
-    def test_pull_with_no_arguments_passes(self):
-        self.assertOk(self.run_git_sh("pull", "--ff-only"))
-        self.assertEqual("next\n", read(os.path.join(self.ws, "next.txt")))
-
     def test_pulling_a_parent_branch_inside_a_worktree_passes(self):
         self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "main", cwd=self.wt))
         self.assertEqual("next\n", read(os.path.join(self.wt, "next.txt")))
@@ -1678,6 +1616,7 @@ class PullOnTargetTest(PullOnTargetBase):
         self.assertTrue(os.path.exists(os.path.join(self.ws, "feat.txt")))
 
     def test_fetch_then_merge_fetch_head_is_refused(self):
+        # fetch 自体は止めない。
         self.assertOk(self.run_git_sh("fetch", "origin", "feat"))
         before = git(self.ws, "rev-parse", "HEAD").strip()
         r = self.run_git_sh("merge", "FETCH_HEAD")
@@ -1725,9 +1664,6 @@ class PullOnTargetTest(PullOnTargetBase):
         self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
         self.assertTrue(os.path.exists(os.path.join(self.ws, "feat.txt")))
 
-    def test_fetch_itself_is_not_blocked(self):
-        self.assertOk(self.run_git_sh("fetch", "origin", "feat"))
-
 
 class PullConflictNoteTest(PullOnTargetBase):
     """統合先のユーザのチェックアウトの pull が衝突したときだけ、ユーザへ頼む案内を足す。"""
@@ -1761,14 +1697,6 @@ class PullConflictNoteTest(PullOnTargetBase):
         self.assertOk(self.run_git_sh("merge", "--abort"))
         self.assertEqual("1\nlocal\n3\n", read(os.path.join(self.ws, "keep.txt")))
 
-    def test_pull_without_conflict_has_no_note(self):
-        write(os.path.join(self.ws, "mine.txt"), "m\n")
-        git(self.ws, "add", "mine.txt")
-        git(self.ws, "commit", "-q", "-m", "mine")
-        r = self.run_git_sh("pull", "--no-edit")
-        self.assertOk(r)
-        self.assertNotIn(self.NOTE, r.stdout)
-
     def test_conflict_inside_a_worktree_has_no_note(self):
         self.commit_local_edit(self.wt)
         r = self.run_git_sh("pull", "--no-edit", "origin", "main", cwd=self.wt)
@@ -1777,6 +1705,13 @@ class PullConflictNoteTest(PullOnTargetBase):
         self.assertNotIn(self.NOTE, r.stdout)
         r = self.run_git_sh("merge", "--abort", cwd=self.wt)
         self.assertOk(r)
+        # 統合先でも、衝突しない pull には足さない。
+        write(os.path.join(self.ws, "mine.txt"), "m\n")
+        git(self.ws, "add", "mine.txt")
+        git(self.ws, "commit", "-q", "-m", "mine")
+        r = self.run_git_sh("pull", "--no-edit")
+        self.assertOk(r)
+        self.assertNotIn(self.NOTE, r.stdout)
 
 
 if __name__ == "__main__":
