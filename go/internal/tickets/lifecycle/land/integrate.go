@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/lifecycle/branch"
 )
@@ -66,7 +67,7 @@ func (r *run) integrate(args []string) {
 		r.reject("integrate-source-dirty", "ワークツリー .claude/worktrees/"+r.name+" に未コミットの変更があります。取り込むのはコミットした分だけなので、ワークツリーの中でコミットしてから再実行してください。変更（先頭 10 件）: "+d)
 	}
 	if !r.drafts(s) {
-		r.reject("integrate-draft", r.draftWhy+"。ユーザに cd "+shQuote(r.wt)+" && ccnavi-user-handoff.sh を頼み、取り込んだ変更を作業ワークツリーでコミットしてください。要らない下書きは消してコミットします。")
+		r.reject("integrate-draft", r.draftWhy+"。ユーザに cd "+shell.SingleQuote(r.wt)+" && ccnavi-user-handoff.sh を頼み、取り込んだ変更を作業ワークツリーでコミットしてください。要らない下書きは消してコミットします。")
 	}
 	tip := r.verify("refs/heads/" + r.name + "^{commit}")
 	if all, _ := r.git(r.Cwd, "ls-tree", "-r", tip); hasLinePrefix(all, "160000 ") {
@@ -90,11 +91,6 @@ func hasLinePrefix(text, prefix string) bool {
 		}
 	}
 	return false
-}
-
-// shQuote は単引用符で囲む（中の ' は '"'"'）。
-func shQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }
 
 // baseBound は取り込み先がチケットに結び付かないことを確かめる（結び付かないと分かったときだけ通す）。

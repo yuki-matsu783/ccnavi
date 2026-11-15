@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/lifecycle/refusal"
 	"ccnavi/internal/tickets/lifecycle/worktrees"
@@ -158,7 +159,7 @@ func (r *run) makeK(m marker, cur, message string, hasMessage bool) string {
 			r.reject("integrate-done-source-dirty", "ワークツリー .claude/worktrees/"+r.name+" に未コミットの変更があります。コミットしてから "+r.SelfQ+" integrate --abort "+r.name+" と integrate を打ち直してください。変更（先頭 10 件）: "+d)
 		}
 		if !r.drafts(orNone(r.verify(r.ref+"/s^{commit}"), m.head)) {
-			r.reject("integrate-done-draft", r.draftWhy+"。ユーザに cd "+shQuote(r.wt)+" && ccnavi-user-handoff.sh を頼み、取り込んだ変更をコミットしてから、integrate を打ち直してください。")
+			r.reject("integrate-done-draft", r.draftWhy+"。ユーザに cd "+shell.SingleQuote(r.wt)+" && ccnavi-user-handoff.sh を頼み、取り込んだ変更をコミットしてから、integrate を打ち直してください。")
 		}
 	}
 	if m.empty == "yes" {

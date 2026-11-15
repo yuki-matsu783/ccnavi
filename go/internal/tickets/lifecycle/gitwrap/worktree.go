@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/model/ids"
 )
 
@@ -249,12 +250,12 @@ func (e *Env) fresh(f addForm) (*Deny, string) {
 	if behind != 0 && ahead != 0 {
 		return &Deny{"worktree-base-diverged", "ワークツリーの基点 " + integ + " が origin/" + integ + " と分岐しています（先行 " + a + " 件・遅れ " + n + " 件）。ワークツリーの基点は merge では進められません。基点を origin/" + integ + " にして切ると、手元にだけある先行 " + a + " 件を知らないブランチになり、統合で詰まります。ユーザに頼んで、先行分を push するか別のブランチに退避してから、手元の " + integ + " を origin/" + integ + " に揃えてください。揃えたら再実行します。"}, ""
 	}
-	cut := "`" + e.SelfQ + " worktree add " + shQuote(f.dest) + " -b " + shQuote(f.leaf) + " --no-track " + shQuote("origin/"+integ) + "`"
+	cut := "`" + e.SelfQ + " worktree add " + shell.SingleQuote(f.dest) + " -b " + shell.SingleQuote(f.leaf) + " --no-track " + shell.SingleQuote("origin/"+integ) + "`"
 	if behind != 0 {
-		return &Deny{"worktree-base-behind", "ワークツリーの基点 " + integ + " が origin/" + integ + " より " + n + " 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。直接作業なら `" + e.WorktreeQ + " " + shQuote(f.leaf) + "` で切り直すと、起点を自動で選びます。手で切るなら `" + e.SelfQ + " fetch origin " + shQuote(integ) + "` のあと、" + cut + " を実行してください（手元の " + integ + " は進めない）。"}, ""
+		return &Deny{"worktree-base-behind", "ワークツリーの基点 " + integ + " が origin/" + integ + " より " + n + " 件遅れています。古い統合先から切ると、取り込み済みの変更を知らないブランチになります。直接作業なら `" + e.WorktreeQ + " " + shell.SingleQuote(f.leaf) + "` で切り直すと、起点を自動で選びます。手で切るなら `" + e.SelfQ + " fetch origin " + shell.SingleQuote(integ) + "` のあと、" + cut + " を実行してください（手元の " + integ + " は進めない）。"}, ""
 	}
 	if stale && !offline {
-		return &Deny{"worktree-fetch-stale", "ワークツリーの基点 " + from + " の元になる origin/" + integ + " が古いかもしれません（最後の fetch が 10 分より前、または fetch の記録がありません）。まず `" + e.SelfQ + " fetch origin " + shQuote(integ) + "` を実行し、`" + e.SelfQ + " log --oneline " + shQuote(integ+"..origin/"+integ) + "` で遅れを確かめてから、再実行してください。遅れていれば、直接作業なら `" + e.WorktreeQ + " " + shQuote(f.leaf) + "` で切り直します。手で切るなら " + cut + " を実行してください（手元の " + integ + " は進めない）。"}, ""
+		return &Deny{"worktree-fetch-stale", "ワークツリーの基点 " + from + " の元になる origin/" + integ + " が古いかもしれません（最後の fetch が 10 分より前、または fetch の記録がありません）。まず `" + e.SelfQ + " fetch origin " + shell.SingleQuote(integ) + "` を実行し、`" + e.SelfQ + " log --oneline " + shell.SingleQuote(integ+"..origin/"+integ) + "` で遅れを確かめてから、再実行してください。遅れていれば、直接作業なら `" + e.WorktreeQ + " " + shell.SingleQuote(f.leaf) + "` で切り直します。手で切るなら " + cut + " を実行してください（手元の " + integ + " は進めない）。"}, ""
 	}
 	if stale {
 		return nil, "fetch を試して失敗した記録があるため、origin/" + integ + " が古いかもしれないまま " + from + " から切りました（オフラインの可能性）。つながったら " + e.Self + " fetch origin " + integ + " で遅れを確かめてください。"

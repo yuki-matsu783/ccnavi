@@ -132,8 +132,3 @@ func (e *Env) targetHere() string {
 	}
 	return ""
 }
-
-// shQuote は単引用符で囲む（中の ' は '"'"'）。案内の文に、そのまま打てる語を載せる。
-func shQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
-}

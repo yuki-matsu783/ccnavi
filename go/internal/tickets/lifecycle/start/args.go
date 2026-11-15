@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/shell"
 )
 
 // Options は ccnavi-start.sh の引数を読んだもの。
@@ -282,9 +283,9 @@ func sameRepo(o *outcome, cwd, root string, opt Options) bool {
 		return true
 	}
 	head := "依頼のリポジトリ（" + opt.Repo + "）と、実行した場所のリポジトリ（" + here + "）が違います。ホストには問い合わせていません。"
-	script := shq(ospath.Join(root, ".ccnavi", "scripts", "ccnavi-start.sh"))
+	script := shell.SingleQuote(ospath.Join(root, ".ccnavi", "scripts", "ccnavi-start.sh"))
 	if strings.EqualFold(originRepo(root), opt.Repo) {
-		o.fail("wrong-repo", exitUnmet, head+"ワークスペースルートに移動して実行し直してください: cd "+shq(root)+" && sh "+script+" "+opt.Orig)
+		o.fail("wrong-repo", exitUnmet, head+"ワークスペースルートに移動して実行し直してください: cd "+shell.SingleQuote(root)+" && sh "+script+" "+opt.Orig)
 		return false
 	}
 	dirs, _ := filepath.Glob(filepath.Join(root, "projects", "*"))
@@ -294,7 +295,7 @@ func sameRepo(o *outcome, cwd, root string, opt Options) bool {
 		}
 		if r := originRepo(d); r != "" && strings.EqualFold(r, opt.Repo) {
 			name := "projects/" + filepath.Base(d)
-			o.fail("wrong-repo", exitUnmet, head+name+"/ に移動して実行し直してください: cd "+shq(ospath.Join(root, name))+" && sh "+script+" "+opt.Orig)
+			o.fail("wrong-repo", exitUnmet, head+name+"/ に移動して実行し直してください: cd "+shell.SingleQuote(ospath.Join(root, name))+" && sh "+script+" "+opt.Orig)
 			return false
 		}
 	}

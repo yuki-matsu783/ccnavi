@@ -47,6 +47,3 @@ const (
 	exitUsage = 2 // 引数か環境の誤り
 	exitAsk   = 3 // 候補が複数などで、何も作らずにユーザに聞く
 )
-
-// shq は、文に載せる引数を単引用符で囲む（中の ' は '"'"'。sh の ccnavi_sh_quote と同じ）。
-func shq(s string) string { return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'" }
