@@ -1,9 +1,11 @@
 package scope
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/model/ticket"
@@ -121,5 +123,26 @@ func TestConsolidateChildIsCutByTheFixedDefinition(t *testing.T) {
 	ordinary := childOf(t, "i0001-01-01", "1", "", "src/*", "docs/*")
 	if v := Of(ordinary, parent, TypeFor(ordinary, parent), "docs/a.md"); !v.Outside() || v.Limit != LimitParent {
 		t.Errorf("ふつうの子は親で切り詰める: %+v", v)
+	}
+}
+
+// finish の合流の前の検査で、置き場（チケット・提案）のパスは範囲にかけず別に挙げ、下書きの置き場は数えない。
+func TestOutsideOfSeparatesTicketPlaces(t *testing.T) {
+	parent := parentOf(t, "  - work\n  - design\n", "src/*", "wip/*")
+	child := childOf(t, "i0001-02-01", "2", "", "wip/design/*")
+	conf := &config.Settings{Tickets: "wip/proposals", Approved: ".ccnavi/approved"}
+	paths := map[string]bool{
+		"wip/design/a.md":             true,
+		"wip/proposals/todo/evil.md":  true,
+		".ccnavi/approved/doing/x.md": true,
+		"wip/handoff/note.md":         true,
+		"src/x.py":                    true,
+	}
+	outside, places := outsideOf(conf, child, parent, paths)
+	if !slices.Equal(places, []string{".ccnavi/approved/doing/x.md", "wip/proposals/todo/evil.md"}) {
+		t.Errorf("置き場 %v", places)
+	}
+	if len(outside) != 1 || outside[0].Path != "src/x.py" {
+		t.Errorf("範囲の外 %+v", outside)
 	}
 }
