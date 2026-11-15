@@ -1,0 +1,57 @@
+{
+  "note": "単引用符で囲む写し（sh の ccnavi_sh_quote と Go の shell.SingleQuote）。sh は tests/sh/test_sh_quote_sh.py、Go は go/internal/infra/shell/quote_sh_test.go が同じ表で確かめる。",
+  "cases": [
+    {
+      "in": "",
+      "out": "''"
+    },
+    {
+      "in": "a",
+      "out": "'a'"
+    },
+    {
+      "in": "a b",
+      "out": "'a b'"
+    },
+    {
+      "in": "it's",
+      "out": "'it'\"'\"'s'"
+    },
+    {
+      "in": "'",
+      "out": "''\"'\"''"
+    },
+    {
+      "in": "''",
+      "out": "''\"'\"''\"'\"''"
+    },
+    {
+      "in": "a'b'c",
+      "out": "'a'\"'\"'b'\"'\"'c'"
+    },
+    {
+      "in": "$HOME `x` \"q\"",
+      "out": "'$HOME `x` \"q\"'"
+    },
+    {
+      "in": "C:\\Users\\a b",
+      "out": "'C:\\Users\\a b'"
+    },
+    {
+      "in": "日本語のパス/x",
+      "out": "'日本語のパス/x'"
+    },
+    {
+      "in": "-n",
+      "out": "'-n'"
+    },
+    {
+      "in": "line1\nline2",
+      "out": "'line1\nline2'"
+    },
+    {
+      "in": "*?[a]",
+      "out": "'*?[a]'"
+    }
+  ]
+}
