@@ -128,7 +128,8 @@ var subTiers = map[string]map[string]int{
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,
-		"useronly": 0, "via": 0,
+		// hostreply は sh が取ってきたホストの応答の読み方（start・branch・review と Chrome 拡張の WASM が共有する）
+		"useronly": 0, "via": 0, "hostreply": 0,
 		"ticket": 1, "standing": 1, "guard": 1,
 		"archive": 2, "fields": 2, "form": 2,
 	},

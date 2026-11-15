@@ -34,3 +34,43 @@ func TestRelatedPulls(t *testing.T) {
 		}
 	}
 }
+
+// ホストの応答のまま渡した MR を mrs の形にする。GitHub の PR はマージ済みなら merged、GitLab はこのプロジェクトから
+// 出ていなければフォークで、issue の一覧は開いたものだけ。
+func TestHostMRs(t *testing.T) {
+	read := func(s string) any {
+		v, err := pyjson.Loads(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	cases := []struct {
+		host  string
+		kind  Kind
+		data  string
+		state []any
+		fork  []bool
+	}{
+		{"github", mr, `{"number": 1, "state": "closed", "merged_at": "t", "head": {"ref": "a", "repo": {"full_name": "O/R"}}}`,
+			[]any{"merged"}, []bool{false}},
+		{"gitlab", mr, `{"iid": 2, "state": "opened", "source_project_id": 42}`, []any{"opened"}, []bool{false}},
+		{"gitlab", issue, `[{"iid": 3, "state": "merged"}, {"iid": 4, "state": "opened", "source_project_id": 7}]`,
+			[]any{"opened"}, []bool{true}},
+	}
+	for _, c := range cases {
+		got, ok := hostMRs(c.host, c.kind, 1, "o/r", "42", read(c.data), nil)
+		if !ok || len(got) != len(c.state) {
+			t.Fatalf("%s %s: %v %v", c.host, c.kind, got, ok)
+		}
+		for i, raw := range got {
+			m := raw.(*pyjson.Object)
+			if m.Value("state") != c.state[i] || m.Value("fork") != c.fork[i] {
+				t.Errorf("%s %s %d: %v", c.host, c.kind, i, m)
+			}
+		}
+	}
+	if _, ok := hostMRs("github", mr, 1, "o/r", "-", read(`[]`), nil); ok {
+		t.Error("MR 1 本の応答が表でなければ読めないとする")
+	}
+}

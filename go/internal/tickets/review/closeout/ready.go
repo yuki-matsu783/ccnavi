@@ -61,7 +61,12 @@ const (
 	outTree    = "tree %s\n"
 	outWipFrom = "wip-from %s\n"
 	outWip     = "wip %s\n"
+	// outSay は sh が成功のあとに出す文（wip/ から消したものの報告）。
+	outSay = "say %s\n"
 )
+
+// sayWipGone は wip/ から消したものの報告の見出し（件数と、消す前のコミットの先頭 12 字）。
+const sayWipGone = "wip/ の追跡済みのファイルを削除しました（%d 件。削除する前のコミット %s から戻せる）:"
 
 // Ready は、Draft を外してよいかを確かめる。確かめたうえで、マーカーとコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避し、wip/ の追跡済みのファイルを消す。
 // Draft を外すのは sh の仕事である（write-and-push がコミットして push してから外す）。
@@ -187,6 +192,10 @@ func archiveClosed(stdout, stderr io.Writer, conf *config.Settings, root string,
 		fmt.Fprintf(stdout, outWipFrom, head)
 		for _, rel := range removed {
 			fmt.Fprintf(stdout, outWip, rel)
+		}
+		fmt.Fprintf(stdout, outSay, fmt.Sprintf(sayWipGone, len(removed), pyfmt.Head(head, 12)))
+		for _, rel := range removed {
+			fmt.Fprintf(stdout, outSay, "  "+rel)
 		}
 	}
 	return config.ExitOK

@@ -158,11 +158,12 @@
         置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
     ccnavi write-and-push merge <child>
         （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
-    ccnavi branches issue|mr <number> [--result <json>] [--json]
-        （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
-    ccnavi branches pulls <number> <owner/repo> <file>
-        （ccnavi-branches.sh 用。GitHub の開いた PR の一覧（ホストの応答のまま）から issue に関係する PR を選び、
-         --result の mrs の形の JSON の配列を出力します。読み取り専用）
+    ccnavi branches issue|mr <number> [checked github|gitlab <host> <owner/repo> <project-id>|-] [--result <file>] [--json]
+    ccnavi branches issue|mr <number> unchecked <reason> [--json]
+    ccnavi branches issue|mr <number> failed <call> --result <file> [--json]
+        （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。checked の --result はホストの応答のまま
+         （MR は 1 本、issue は GitHub なら開いた PR の一覧、GitLab なら related_merge_requests）、failed の --result は
+         ホストの返事。読み取り専用）
     ccnavi path under <base> <path>
         （ccnavi-review.sh 用。"path 1" に続けて、path が base の下なら "under yes"、違えば "under no" を
          出力します。大文字小文字は区別しません。読み取り専用）
@@ -205,6 +206,13 @@
     ccnavi preflight uid <user の応答>
         （ccnavi-common-host.sh 用。チケット作業の事前確認について、手元の項目・項目ごとの結果・勧める対処・行と次の一手を出し、
          書き込みの権限を判定します。ネットワークには出ません）
+    ccnavi host fail <file>
+    ccnavi host probe ok|failed <file>
+    ccnavi host mr-state github|gitlab <scheme> <host> <path> <number> ok|failed <file>
+    ccnavi host find-mr|merged|copy|marked|undraft <args> <file>...
+        （ccnavi-common-host.sh・ccnavi-common-review.sh・ccnavi-review.sh 用。スクリプトが取得したホストの応答
+         （失敗したときはホストの返事）のファイルを読み、1行1項目で出力します。copy は --result に渡す JSON を出力します。
+         読めない応答は終了コード 1。読み取り専用）
     ccnavi start report <名前>=<値>...
     ccnavi start dry new-issue|mcp|create|existing <名前>=<値>...
         （ccnavi-start.sh 用。開始の結果と、--dry-run の作る予定を出力します）

@@ -5,6 +5,6 @@
 //
 // sh との契約（変えない）は次のとおり。ready の標準出力は、1 行目がコメントの下書きのパス、2 行目が
 // `tree <退避したツリーのルート>` である。wip/ から消したものがあれば、`wip-from <消す前の HEAD>` と
-// `wip <消したパス>`（1 行 1 本）が続く。足すのは後ろの行だけにする。下書きのファイル名（readyFile・earlyIssueFile・
+// `wip <消したパス>`（1 行 1 本）と、sh が成功のあとにそのまま出す報告の `say <文>` が続く。足すのは後ろの行だけにする。下書きのファイル名（readyFile・earlyIssueFile・
 // earlyNoteFile）と目印も、sh が拾う。ready の前提は readyGate の 1 か所にあり、本体と `--check` が同じものを通る。
 package closeout
