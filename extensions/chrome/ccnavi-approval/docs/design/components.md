@@ -29,7 +29,8 @@ keywords: [設計, 構成, service worker, WASM, Web Worker, hosts.json, ccnavi-
   service worker は操作ごとに、送り手がボードか、登録したリポジトリか、引数の形（thread id は API の経路と GraphQL に使える字、
   タイトルは 1 行、本文は字数の上限）を検査してからホストを呼ぶ
 - 書く前に `precheckHostPlan` が、スレッドごとの返信・解決の可否（GitHub は `viewerCanReply`・`viewerCanResolve` と保留中のレビューか、
-  GitLab は `resolvable` と差分への指摘か）と、PAT の権限・ロールを読む。足りなければ何も書かない。Chrome で扱えない種類は権限不足と分けて返す。扱えない指摘を含む確定は画面が先にブロックするので、ここでの見分けは、読み直しの間に変わった場合の保険である。
+  GitLab は `resolvable` と差分への指摘か）と、PAT の権限・ロールを確かめる。service worker は応答を読まずに返し（`writeReplies`）、
+  読みは同梱の ccnavi の `write-info`、計画との突き合わせは `precheck`（どちらも `go/internal/tickets/model/hostreply`）が出す。足りなければ何も書かない。Chrome で扱えない種類は権限不足と分けて返す。扱えない指摘を含む確定は画面が先にブロックするので、ここでの見分けは、読み直しの間に変わった場合の保険である。
   fine-grained の PAT の権限は書く前に読めないので、確かめられなかったものとして残し、実際に断られたときに権限の名前を言う
 - 実行は issue、返信、解決、コメントの順。issue は作る前に操作 ID の印で探して使い回す（探すのは PAT の持ち主が作ったものに限る）。
   返信の `{issue_url}` とコメントの `{issue_links}` は、ホストが返した URL（通信先の画面の下に限る）で置き換える。

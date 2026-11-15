@@ -46,7 +46,7 @@ class HostKindsShTest(unittest.TestCase):
     def test_every_case_in_the_shared_table(self):
         with open(TABLE, encoding="utf-8") as f:
             whole = json.load(f)
-        # sh_go_cases は Chrome 拡張の表に入れていない分（sh と実行ファイルだけが読む）。
+        # sh_go_cases は、資格情報の埋まった形などを足した分。
         table = whole["cases"] + whole["sh_go_cases"]
         for case in table:
             with self.subTest(origin=case["origin"]):

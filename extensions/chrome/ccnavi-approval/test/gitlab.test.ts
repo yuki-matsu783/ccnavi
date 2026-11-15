@@ -1,7 +1,7 @@
 /**
  * GitLab・プロジェクトのリポジトリ・「始める」。模擬の GitHub・GitLab と Node の上の WASM で回す。
  *
- * - 録ったホストの応答の見本（test/fixtures/host/gitlab/）から TS が組む結果は、sh が組んだ期待値と同じ
+ * - 手で組んだホストの応答の見本（test/fixtures/host/gitlab/）を拡張が取ってきて ccnavi（WASM）が読んだ結果は、sh が組んだ期待値と同じ
  * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェストを出す（読み取りの一致）
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の状態で判定し直し、同じなら残し、違えば元に戻して読み直す。元に戻すコミットも収まらなければユーザの対応に切り替える
@@ -17,7 +17,7 @@ import { JSDOM } from "jsdom";
 
 import * as gl from "../src/core/gitlab.js";
 import { dispatch, type Deps } from "../src/core/protocol.js";
-import type { CcnaviCall } from "../src/core/ccnavi.js";
+import { ccnavi as ccnaviOps, type CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -80,12 +80,12 @@ function placeFiles(files: Record<string, string>): Record<string, string> {
 const TODO = "wip/proposals/todo/i0001.md";
 const DOING = ".ccnavi/approved/doing/i0001.md";
 
-test("CX-T144 手で組んだ GitLab の応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
+test("CX-T144 手で組んだ GitLab の応答の見本ごとに、拡張が取ってきて ccnavi が読む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(gitlabSceneNames(), ["hostile", "impostor", "nested", "odd-types", "paged", "replies", "replies-accepted", "requested-changes", "resolved"]);
   for (const name of gitlabSceneNames()) {
     const scene = loadGitLabScene(name);
     const client = { host: GL, token: TOKEN, fetch: gitlabSceneFetch(scene), counter: { rest: 0, graphql: 0 }, sleep: noWait };
-    const copy = (await gl.reviewCopy(client, scene.namespace, scene.project, scene.branch)) as unknown as Record<string, unknown>;
+    const copy = (await ccnaviOps.copy(ccnavi, await gl.reviewReplies(client, scene.namespace, scene.project, scene.branch))) as unknown as Record<string, unknown>;
     assert.match(String(copy.fetched_at), /^\d{4}-\d\d-\d\dT/);
     delete copy.fetched_at;
     const expected = JSON.parse(fs.readFileSync(path.join(GITLAB_SCENES, name, "expected.json"), "utf8"));

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"unicode"
 
-	"ccnavi/internal/infra/pyre"
 	"ccnavi/internal/tickets/model/hostreply"
 )
 
@@ -105,19 +104,8 @@ func LinkedPage(data []byte) (string, int) {
 	return b.String(), ok
 }
 
-// 本文の Closes の読み方。コードブロック・HTML の注釈・インラインのコード・引用の行を除いてから、閉じるキーワードの
-// 後ろの参照を拾う。語の一部（`precloses`）と `not closes` は拾わない。
-var (
-	bodyFence   = pyre.MustCompile("```.*?```", pyre.DotAll)
-	bodyComment = pyre.MustCompile("<!--.*?-->", pyre.DotAll)
-	bodyCode    = pyre.MustCompile("`[^`\n]*`", 0)
-	bodyQuote   = pyre.MustCompile(`^[ \t]*>[^\n]*`, pyre.Multiline)
-	bodyClosing = pyre.MustCompile(`(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+`+
-		`(?P<ref>(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])`, pyre.IgnoreCase)
-)
-
-// LinkedBody は、GitHub の PR の応答の本文から、閉じる issue を `issue <owner/repo>#<番号>` で 1 件 1 行に出す。
-// 番号だけの参照には repo（owner/repo）を前に付ける。GraphQL を断られたときの代わりの読み方。
+// LinkedBody は、GitHub の PR の応答の本文から、閉じる issue を `issue <owner/repo>#<番号>` で 1 件 1 行に出す
+// （読み方は hostreply.ClosingRefs）。GraphQL を断られたときの代わりの読み方。
 func LinkedBody(repo string, data []byte) (string, int) {
 	v, err := hostreply.Decode(data)
 	if err != nil {
@@ -131,16 +119,8 @@ func LinkedBody(repo string, data []byte) (string, int) {
 	if err != nil {
 		return "", unreadable
 	}
-	drop := func(pyre.Found) string { return "" }
-	for _, re := range []*pyre.Regexp{bodyFence, bodyComment, bodyCode, bodyQuote} {
-		body = re.Sub(body, drop)
-	}
 	var b strings.Builder
-	for _, f := range bodyClosing.FindAll(body) {
-		ref, _ := f.Named("ref")
-		if strings.HasPrefix(ref, "#") {
-			ref = repo + ref
-		}
+	for _, ref := range hostreply.ClosingRefs(repo, body) {
 		fmt.Fprintf(&b, "issue %s\n", ref)
 	}
 	return b.String(), ok

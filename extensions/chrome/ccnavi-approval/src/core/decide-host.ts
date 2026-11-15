@@ -16,7 +16,8 @@
  * 書く前に `precheckHostPlan` で権限と、Chrome で扱えない種類のスレッドを見分け、足りなければ何も書かずに止める。
  */
 import type { HostCall } from "./snapshot.js";
-import type { FindResult, ThreadAbility, WriteInfo } from "./github.js";
+import { ccnavi, type CcnaviCall, type WriteInfo } from "./ccnavi.js";
+import type { FindResult, WriteReplies } from "./github.js";
 import type { IssueRef } from "./github.js";
 
 /** ccnavi の `decide` が返す、ホストへ書く計画（`host_plan`） */
@@ -73,10 +74,10 @@ export interface HostOps {
   postComment(repo: RepoRef, mr: number, body: string): Promise<void>;
 }
 
-/** service worker 経由の `HostOps`（画面から使う） */
-export function callOps(call: HostCall): HostOps {
+/** service worker 経由の `HostOps`（画面から使う）。書く前の確かめの応答は ccnavi（`wasm`）が読む */
+export function callOps(call: HostCall, wasm: CcnaviCall): HostOps {
   return {
-    writeInfo: async (r, mr) => (await call("writeInfo", [r.owner, r.repo, mr])) as WriteInfo,
+    writeInfo: async (r, mr) => await ccnavi.writeInfo(wasm, (await call("writeReplies", [r.owner, r.repo, mr])) as WriteReplies),
     findIssue: async (r, marker) => (await call("findIssue", [r.owner, r.repo, marker])) as FindResult,
     listIssueComments: async (r, issue) => (await call("issueComments", [r.owner, r.repo, issue])) as string[],
     createIssue: async (r, title, body) => (await call("createIssue", [r.owner, r.repo, title, body])) as IssueRef,
@@ -207,19 +208,14 @@ function reasonOf(err: unknown): string {
   return (err as { message?: string })?.message ?? String(err);
 }
 
-/** Chrome で扱えない種類のスレッドの名前（`ok` 以外） */
-export function unsupportedReason(kind: Exclude<ThreadAbility["kind"], "ok">): string {
-  return kind === "pending" ? "保留中のレビューのスレッド" : kind === "non-diff" ? "差分以外の discussion" : "解決できない種類のスレッド";
-}
-
 /**
- * 書く前に、PAT の権限とスレッドの種類を確かめる。足りなければ何も書かない。
+ * 書く前に、PAT の権限とスレッドの種類を確かめる。足りなければ何も書かない。突き合わせは ccnavi（`precheck`）が出す。
  * - Chrome で扱えない種類のスレッド（GitLab の差分以外の discussion、解決できないスレッド、GitHub の保留中のレビュー）は、
  *   `unsupported` とし、VS Code へ誘導する文面を出す。
  * - GitHub は、スレッドの `viewerCanReply`・`viewerCanResolve` で見る。GitLab は、note の `resolvable` とロール・スコープで見る。
  * - fine-grained の PAT の権限は、書く前には読めない。確かめられなかったものは、`ok` の `unknown` に残す。
  */
-export async function precheckHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan: HostPlan): Promise<Precheck> {
+export async function precheckHostPlan(wasm: CcnaviCall, ops: HostOps, repo: RepoRef, mr: number, plan: HostPlan): Promise<Precheck> {
   const problems = planProblems(plan);
   if (problems.length > 0) return { ok: false, kind: "plan", reason: `ホストへ書く計画の形が正しくないため、何も書きませんでした: ${problems.join(" / ")}`, missing: [], keys: [] };
   let info: WriteInfo;
@@ -228,67 +224,9 @@ export async function precheckHostPlan(ops: HostOps, repo: RepoRef, mr: number, 
   } catch (err) {
     return { ok: false, kind: "unreadable", reason: `書く前の確認ができなかったため、何も書きませんでした: ${reasonOf(err)}`, missing: [], keys: [] };
   }
-  const lab = info.host === "gitlab";
-  const threads = new Map(info.threads.map((t) => [t.id, t]));
-  const unsupported: string[] = [];
-  const why: string[] = [];
-  const gone: string[] = [];
-  const lacking = new Set<string>();
-  const keys = new Set<string>();
-  const flag = (key: string, id: string, need: "reply" | "resolve") => {
-    const t = threads.get(id);
-    if (!t) {
-      gone.push(key);
-      return;
-    }
-    if (t.kind !== "ok") {
-      unsupported.push(key);
-      why.push(unsupportedReason(t.kind));
-      return;
-    }
-    if ((need === "reply" && !t.canReply) || (need === "resolve" && !t.canResolve)) {
-      lacking.add(lab ? "api スコープと、Developer 以上のロール" : "Pull requests: Read and write");
-      keys.add(key);
-    }
-  };
-  for (const r of plan.replies) flag(r.key, r.thread_id, "reply");
-  for (const r of plan.resolves) flag(r.key, r.thread_id, "resolve");
-  if (unsupported.length > 0) {
-    const kinds = [...new Set(why)].join("・");
-    return {
-      ok: false,
-      kind: "unsupported",
-      reason: `Chrome では扱えない。VS Code で行ってください（${kinds}があります。何も書きませんでした）`,
-      missing: [],
-      keys: [...new Set(unsupported)],
-    };
-  }
-  if (gone.length > 0) {
-    return {
-      ok: false,
-      kind: "unreadable",
-      reason: "決めたスレッドがホストに見つかりませんでした（消えたか、別の MR のものです）。MR を読み直してください（何も書きませんでした）",
-      missing: [],
-      keys: [...new Set(gone)],
-    };
-  }
-  const needs = new Set<string>(["all"]);
-  if (plan.issues.length > 0) needs.add("issue");
-  if (plan.replies.length > 0) needs.add("reply");
-  if (plan.resolves.length > 0) needs.add("resolve");
-  if (plan.comment) needs.add("comment");
-  for (const m of info.missing) if (needs.has(m.for)) lacking.add(m.need);
-  if (lacking.size > 0) {
-    const names = [...lacking];
-    return {
-      ok: false,
-      kind: "permission",
-      reason: `PAT の権限が足りないため、何も書きませんでした。必要な権限: ${names.join("、")}。設定画面で PAT を作り直してください`,
-      missing: names,
-      keys: [...keys],
-    };
-  }
-  return { ok: true, unknown: info.unknown };
+  const got = await ccnavi.precheck(wasm, plan, info);
+  if (got.ok) return { ok: true, unknown: got.unknown };
+  return { ok: false, kind: got.kind ?? "unreadable", reason: got.reason ?? "", missing: got.missing, keys: got.keys };
 }
 
 // ---- 実行 -----------------------------------------------------------------------

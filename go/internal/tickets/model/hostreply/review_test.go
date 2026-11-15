@@ -2,7 +2,7 @@ package hostreply
 
 import "testing"
 
-// GitLab の discussions の読み方（Chrome 拡張の gitlab.ts と同じ）。system のノートを除き、解決できるノートの無い
+// GitLab の discussions の読み方（Chrome 拡張も WASM の copy で同じものを使う）。system のノートを除き、解決できるノートの無い
 // discussion は除く。代表は目印で始まらない最初のノートで、own は全部が目印で始まり、書き手が全部代表と同じときだけ真。
 func TestDiscussions(t *testing.T) {
 	data := `[
@@ -13,7 +13,8 @@ func TestDiscussions(t *testing.T) {
 	                       {"id": 14, "body": "直して", "resolvable": true, "resolved": true, "author": {"id": 8, "username": "bob"},
 	                        "position": {"new_path": "a.go", "new_line": 3}, "created_at": "t"}]},
 	 {"id": "c", "notes": [{"id": 15, "body": "<!-- ccnavi:request -->", "resolvable": true, "author": {"id": 7}}]},
-	 {"id": "d", "notes": [{"id": 16, "body": "x", "resolvable": false}]}
+	 {"id": "d", "notes": [{"id": 16, "body": "x", "resolvable": false}]},
+	 {"id": "e", "notes": [{"id": 17, "body": "<!-- ccnavi:request -->", "resolvable": true, "author": null}]}
 	]`
 	got, err := Threads(FormDiscussions, "https://h/mr/1", [][]byte{[]byte(data)})
 	if err != nil {
@@ -23,6 +24,8 @@ func TestDiscussions(t *testing.T) {
 		`{"id":"a","resolved":false,"url":"https://h/mr/1#note_11","path":"","line":0,"body":"<!-- ccnavi:request -->","created_at":"","author":"7","own":false,"last_id":"12","last_at":"","last_author":"eve"}`,
 		`{"id":"b","resolved":true,"url":"https://h/mr/1#note_14","path":"a.go","line":3,"body":"直して","created_at":"t","author":"8","own":false,"last_id":"14","last_at":"t","last_author":"bob"}`,
 		`{"id":"c","resolved":false,"url":"https://h/mr/1#note_15","path":"","line":0,"body":"<!-- ccnavi:request -->","created_at":"","author":"7","own":true,"last_id":"15","last_at":"","last_author":""}`,
+		// 書き手が分からない目印の投稿は機構自身と見ない
+		`{"id":"e","resolved":false,"url":"https://h/mr/1#note_17","path":"","line":0,"body":"<!-- ccnavi:request -->","created_at":"","author":"","own":false,"last_id":"17","last_at":"","last_author":""}`,
 	}
 	if len(got) != len(want) {
 		t.Fatalf("%d 件: %v", len(got), got)

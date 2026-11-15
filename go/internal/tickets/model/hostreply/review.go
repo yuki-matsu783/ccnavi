@@ -9,8 +9,9 @@ import (
 )
 
 // レビューの結果（`ccnavi-review.sh fetch` の JSON。実行ファイルの `--result` で host.ResultOf が読む形）を、
-// sh が取ってきたホストの応答から組む。Chrome 拡張（src/core/github.ts・gitlab.ts）も同じ形を組み、同じ見本
-// （extensions/chrome/ccnavi-approval/test/fixtures/host/）から同じ結果になることを試験が見る。
+// sh か Chrome 拡張の service worker（src/core/github.ts・gitlab.ts の reviewReplies）が取ってきたホストの応答から組む
+// （拡張は WASM の copy から呼ぶ）。同じ見本（extensions/chrome/ccnavi-approval/test/fixtures/host/）から sh と拡張が同じ
+// 結果になることを試験が見る。
 // 欄の省き方は jq の `//`・`tostring` と同じで、型はそのまま残す（文字列の行番号を数に直さない）。
 
 // ErrNotArrays は、GraphQL を使えない環境の REST の道で、スレッドかコメントの一覧の応答が配列でないこと。
@@ -280,7 +281,7 @@ func writer(n any) string {
 	return ToString(Alt(id, ""))
 }
 
-// discussions は GitLab の MR のスレッドを読む（Chrome 拡張の gitlab.ts の discussions と同じ読み方）。
+// discussions は GitLab の MR のスレッドを読む。
 // 判定に使うノートは、discussion のノートから system: true を除いたもの（空なら discussion ごと除く）。対象は、
 // そのノートが 1 つでも解決できる discussion。解決済みは、解決できるノートが全部解決しているとき。代表のノート
 // （本文・位置・書き手・url）は、本文が目印で始まらない最初のノート（無ければ先頭）で、ccnavi の依頼コメントに

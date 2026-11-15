@@ -1,5 +1,5 @@
 {
-  "note": "origin の URL -> ホストの分類と接続先。Python（review_host.classify）・sh（ccnavi_host_parse）・Chrome 拡張（hostclass.ts の classifyOrigin）が同じ表で一致を確かめる。host は分類に使うホスト（小文字・ポート無し）。api は REST の根、graphql は GitHub 系の GraphQL（GitLab は REST だけなので null）。problem があるものは接続先を組めず止まる（api と graphql は無い）。GHE.com の API の URL の規則は実物では未検証で、この表は仕様の前提を固定するもの。 connect は接続に使うホスト（sh の ccnavi_h_host。GitHub は host と同じ、GitLab は origin の表記のままのホストとポート）。sh_go_cases と unreadable（読めない表記）は sh と実行ファイル（host_test.go）だけが読む（Chrome 拡張の表は cases だけ）。",
+  "note": "origin の URL -> ホストの分類と接続先。実行ファイル（host.classify）・sh（ccnavi_host_parse）が同じ表で一致を確かめる。host は分類に使うホスト（小文字・ポート無し）。api は REST の根、graphql は GitHub 系の GraphQL（GitLab は REST だけなので null）。problem があるものは接続先を組めず止まる（api と graphql は無い）。GHE.com の API の URL の規則は実物では未検証で、この表は仕様の前提を固定するもの。 connect は接続に使うホスト（sh の ccnavi_h_host。GitHub は host と同じ、GitLab は origin の表記のままのホストとポート）。sh_go_cases と unreadable は、読めない表記などを足した表。",
   "cases": [
     {
       "origin": "https://github.com/acme/widgets.git",

@@ -1,7 +1,7 @@
 /**
  * Chrome の「レビュー済み」。模擬の GitHub と Node の上の WASM（拡張と同じ dist/ccnavi.wasm）で回す。
  *
- * - 録ったホストの応答の見本（test/fixtures/host/github/）から TS が組む結果が、sh が組んだ期待値と同じ
+ * - 録ったホストの応答の見本（test/fixtures/host/github/）を拡張が取ってきて ccnavi（WASM）が読んだ結果が、sh が組んだ期待値と同じ
  * - 依頼の後の変更の一覧（compare API）は、打ち切り・祖先でない・無い、のどれでも null（動いたと数える）
  * - ボードは依頼済みのフェーズにスレッドと通らない理由を出し、通るときだけ「レビュー済みにする」を出す
  * - 押すと読み直して ccnavi の confirm が通したときだけ 1 コミットで書く。マーカーは PAT の持ち主（actor）と
@@ -16,7 +16,7 @@ import path from "node:path";
 import { JSDOM } from "jsdom";
 
 import * as gh from "../src/core/github.js";
-import type { CcnaviCall } from "../src/core/ccnavi.js";
+import { ccnavi as ccnaviOps, type CcnaviCall } from "../src/core/ccnavi.js";
 import { renderBoard } from "./helpers/board-dom.js";
 import { createRenderer } from "../src/core/sanitize.js";
 import type { RepoConfig } from "../src/core/settings.js";
@@ -69,11 +69,11 @@ async function panelOf(mock: MockGitHub) {
   return { board, fam, panel: fam.reviews?.[0] };
 }
 
-test("CX-T129 録ったホストの応答の見本ごとに、TS が組む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
+test("CX-T129 録ったホストの応答の見本ごとに、拡張が取ってきて ccnavi が読む結果は sh が組んだ期待値（expected.json）と同じ", async () => {
   assert.deepEqual(sceneNames(), ["changes-requested", "cr-commented", "full-page", "hostile", "paged", "pending", "resolved"]);
   for (const name of sceneNames()) {
     const scene = loadScene(name);
-    const copy = (await gh.reviewCopy(client(sceneFetch(scene)), scene.owner, scene.repo, scene.branch)) as unknown as Record<string, unknown>;
+    const copy = (await ccnaviOps.copy(ccnavi, await gh.reviewReplies(client(sceneFetch(scene)), scene.owner, scene.repo, scene.branch))) as unknown as Record<string, unknown>;
     assert.match(String(copy.fetched_at), /^\d{4}-\d\d-\d\dT/);
     delete copy.fetched_at;
     const expected = JSON.parse(fs.readFileSync(path.join(SCENES, name, "expected.json"), "utf8"));
@@ -216,12 +216,12 @@ test("CX-T136 service worker の読み取り（スレッドを取得した結果
   const d = deps(mock, new Map([["github.com", TOKEN]]));
   const at = JSON.parse(mock.files(FAMILY)[REQUESTED]).head as string;
   const answers = [
-    await dispatch({ kind: "host", host: "github.com", op: "reviewCopy", args: ["acme", "widgets", FAMILY] }, BOARD, d),
+    await dispatch({ kind: "host", host: "github.com", op: "reviewReplies", args: ["acme", "widgets", FAMILY] }, BOARD, d),
     await dispatch({ kind: "host", host: "github.com", op: "compareFiles", args: ["acme", "widgets", at, mock.head(FAMILY)] }, BOARD, d),
   ];
   for (const a of answers) assert.ok(a.ok, JSON.stringify(a));
   assert.ok(!JSON.stringify(answers).includes(TOKEN));
-  const none = await dispatch({ kind: "host", host: "github.com", op: "reviewCopy", args: ["acme", "widgets", "feature-x"] }, BOARD, d);
+  const none = await dispatch({ kind: "host", host: "github.com", op: "reviewReplies", args: ["acme", "widgets", "feature-x"] }, BOARD, d);
   assert.equal(none.ok, false);
   assert.match((none as { error: string }).error, /オープン状態のプルリクエストがありません/);
 });
@@ -260,7 +260,7 @@ test("CX-T140 レビュー済みの読み取りのハンドラも、設定画面
   const d = deps(mock, new Map([["github.com", TOKEN]]), new Map(), () => new Date(), []);
   const at = JSON.parse(mock.files(FAMILY)[REQUESTED]).head as string;
   for (const [op, args] of [
-    ["reviewCopy", ["acme", "widgets", FAMILY]],
+    ["reviewReplies", ["acme", "widgets", FAMILY]],
     ["compareFiles", ["acme", "widgets", at, mock.head(FAMILY)]],
   ] as const) {
     const res = await dispatch({ kind: "host", host: "github.com", op, args }, BOARD, d);

@@ -233,7 +233,12 @@ test("CX-T169 GitLab の読みの上限と断り: tree は 50 ページ、discus
   };
   const client = (fetch: gh.Fetch) => ({ host: GL, token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait });
   await assert.rejects(gl.tree(client(answer(() => ({ status: 200, json: pageOf(100) }))), "acme", "widgets", "a".repeat(40), "b".repeat(40), "x"), /取得しきれません/);
-  await assert.rejects(gl.discussions(client(answer(() => ({ status: 200, json: Array(100).fill({ notes: [] }) }))), "acme", "widgets", 7, "u"), /多すぎて読み切れません/);
+  const endless = answer((u) => {
+    if (u.pathname.endsWith("/discussions")) return { status: 200, json: Array(100).fill({ notes: [] }) };
+    if (u.pathname.endsWith("/merge_requests")) return { status: 200, json: [{ iid: 7, web_url: "u", source_project_id: 42 }] };
+    return { status: 200, json: { id: 42 } };
+  });
+  await assert.rejects(gl.reviewReplies(client(endless), "acme", "widgets", "i0001"), /多すぎて読み切れません/);
   const limited = answer((_, n) => (n === 1 ? { status: 429, json: {}, headers: { "retry-after": "1" } } : { status: 200, json: { id: 42, default_branch: "main" } }));
   assert.equal((await gl.repoInfo(client(limited), "acme", "widgets")).defaultBranch, "main");
   await assert.rejects(gl.repoInfo(client(answer(() => ({ status: 429, json: {}, headers: { "retry-after": "600" } }))), "acme", "widgets"), /レート制限/);

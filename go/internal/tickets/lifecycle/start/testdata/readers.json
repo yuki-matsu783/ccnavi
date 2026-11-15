@@ -262,6 +262,18 @@
   "code": 0
  },
  {
+  "name": "issue の URL と入れ子のグループ。-ing の形と title は読まない",
+  "op": "linked-body",
+  "args": [
+   "acme/widgets"
+  ],
+  "inputs": [
+   "{\"body\": \"Closes https://github.com/acme/widgets/issues/20.\\nFixes https://gitlab.example/g/sub/p/-/issues/3\\nCloses g/sub/p#4\\nClosing #5\\n**Closes** #6\", \"title\": \"Closes #7\"}"
+  ],
+  "out": "issue acme/widgets#20\nissue g/sub/p#3\nissue g/sub/p#4\n",
+  "code": 0
+ },
+ {
   "name": "別のリポジトリ",
   "op": "linked-body",
   "args": [
@@ -286,7 +298,7 @@
   "code": 0
  },
  {
-  "name": "語の一部や not は読まない",
+  "name": "語の一部は読まない。否定は GitHub と同じく見分けない",
   "op": "linked-body",
   "args": [
    "acme/widgets"
@@ -294,7 +306,7 @@
   "inputs": [
    "{\"body\": \"precloses #1\\nnot closes #2\\nCloses #3abc\\nre-fixes #4\\nCloses  #5\"}"
   ],
-  "out": "issue acme/widgets#5\n",
+  "out": "issue acme/widgets#2\nissue acme/widgets#5\n",
   "code": 0
  },
  {
@@ -690,7 +702,7 @@
   "inputs": [
    "{\"body\": \"Closes #12\\n```\\nFixes #9\\n```\\n> Closes #7\\n<!-- Closes #100 -->\\n\\u4f8b: `Closes #50`\\nDoes not close #8 bug-fix #13 Closes #14abc\"}"
   ],
-  "out": "issue acme/widgets#12\n",
+  "out": "issue acme/widgets#12\nissue acme/widgets#8\n",
   "code": 0
  },
  {

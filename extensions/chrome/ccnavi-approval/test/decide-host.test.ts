@@ -8,7 +8,7 @@
  * - 権限ごとの 403 の文面、protocol の検査（拒否される引数）、issue に assignee などを入れない
  * - GitLab の目印のスレッドは、書き手が全部同じときだけ機構自身のものと見る
  */
-import { test } from "node:test";
+import { before, test } from "node:test";
 import assert from "node:assert/strict";
 
 import { callOps, describeHostResult, markerOf, oneLine, partMarker, planProblems, precheckHostPlan, runHostPlan, type HostPlan, type HostStepEvent } from "../src/core/decide-host.js";
@@ -19,6 +19,14 @@ import { fixture } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, newStats, OPTIONS, REPOS } from "./helpers/host.js";
 import { TOKEN } from "./helpers/mock-github.js";
 import { thread, WriteGitHub, WriteGitLab } from "./helpers/mock-write.js";
+import { ccnavi, type CcnaviCall, type WriteInfo } from "../src/core/ccnavi.js";
+import type { WriteReplies } from "../src/core/github.js";
+import { wasmCcnavi } from "./helpers/ccnavi.js";
+
+let wasm: CcnaviCall;
+before(async () => {
+  wasm = (await wasmCcnavi()).call;
+});
 
 const REPO = { owner: "acme", repo: "widgets" };
 const TOKENS = new Map([
@@ -38,14 +46,14 @@ function hub(): { mock: WriteGitHub; ops: ReturnType<typeof callOps> } {
   const mock = new WriteGitHub(fixture());
   mock.w.threads = [thread(T1), thread(T2), thread(T3)];
   const d = { ...deps(mock, TOKENS, new Map(), () => new Date(), [...REPOS, GITLAB_REPO]), sleep: noWait };
-  return { mock, ops: callOps(hostCall(d, newStats(), "github.com")) };
+  return { mock, ops: callOps(hostCall(d, newStats(), "github.com"), wasm) };
 }
 
 function lab(): { mock: WriteGitLab; ops: ReturnType<typeof callOps> } {
   const mock = new WriteGitLab(fixture());
   mock.w.threads = [thread(D1), thread(D2)];
   const d = { ...deps(mock, TOKENS, new Map(), () => new Date(), [...REPOS, GITLAB_REPO]), sleep: noWait };
-  return { mock, ops: callOps(hostCall(d, newStats(), "gitlab.com")) };
+  return { mock, ops: callOps(hostCall(d, newStats(), "gitlab.com"), wasm) };
 }
 
 const reply = (key: string, id: string, issue = false) => ({
@@ -367,42 +375,42 @@ test("CX-T326 ホストが返した URL が通信先の外や不正な形なら�
   assert.match(out.failed?.reason ?? "", /通信先の画面の外/);
   assert.equal(mock.w.threads.every((t) => t.replies.length === 0), true);
   // 直接も: 空白・引用符・括弧を含む URL は本文に入れない
-  const fake = { ...callOps(async () => null), createIssue: async () => ({ number: 1, url: "https://github.com/a b)" }), findIssue: async () => ({ issue: null, truncated: false }) };
+  const fake = { ...callOps(async () => null, wasm), createIssue: async () => ({ number: 1, url: "https://github.com/a b)" }), findIssue: async () => ({ issue: null, truncated: false }) };
   const r = await runHostPlan(fake, REPO, 7, { issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }], replies: [], resolves: [], comment: null });
   assert.match(r.failed?.reason ?? "", /URL を本文に入れられません/);
 });
 
 test("CX-T327 事前検査: 全部の権限があれば通り、fine-grained の PAT の権限は『確かめられなかった』として残す", async () => {
   const { mock, ops } = hub();
-  const ok = await precheckHostPlan(ops, REPO, 7, plan());
+  const ok = await precheckHostPlan(wasm, ops, REPO, 7, plan());
   assert.equal(ok.ok, true);
   assert.deepEqual(ok.ok && ok.unknown, ["Issues: Read and write", "Pull requests: Read and write"]);
   assert.deepEqual(mock.w.log, [], "確かめるだけで何も書かない");
   mock.scopes = "repo, read:org";
-  const classic = await precheckHostPlan(ops, REPO, 7, plan());
+  const classic = await precheckHostPlan(wasm, ops, REPO, 7, plan());
   assert.deepEqual(classic.ok && classic.unknown, []);
 });
 
 test("CX-T328 事前検査（GitHub）: 返信・解決の権限が無いスレッド、classic の repo スコープ無し、Issues 無効は、何も書かずに必要な権限名を言う", async () => {
   const a = hub();
   a.mock.w.threads[1].canResolve = false;
-  const r1 = await precheckHostPlan(a.ops, REPO, 7, plan());
+  const r1 = await precheckHostPlan(wasm, a.ops, REPO, 7, plan());
   assert.equal(r1.ok, false);
   assert.ok(!r1.ok && r1.kind === "permission" && r1.missing.includes("Pull requests: Read and write") && r1.keys.includes("k2"));
   assert.match(!r1.ok ? r1.reason : "", /何も書きませんでした。必要な権限: Pull requests: Read and write/);
 
   const b = hub();
   b.mock.scopes = "read:user";
-  const r2 = await precheckHostPlan(b.ops, REPO, 7, plan());
+  const r2 = await precheckHostPlan(wasm, b.ops, REPO, 7, plan());
   assert.ok(!r2.ok && r2.kind === "permission" && r2.missing.some((m) => /repo スコープ/.test(m)));
 
   const c = hub();
   c.mock.hasIssues = false;
-  const r3 = await precheckHostPlan(c.ops, REPO, 7, plan());
+  const r3 = await precheckHostPlan(wasm, c.ops, REPO, 7, plan());
   assert.ok(!r3.ok && r3.kind === "permission" && r3.missing.includes("リポジトリの Issues の有効化"));
   // issue を作らない計画なら、Issues の無効は関係ない
   const noIssue: HostPlan = { issues: [], replies: [reply("k3", T3)], resolves: [{ key: "k3", thread_id: T3 }], comment: null };
-  assert.equal((await precheckHostPlan(c.ops, REPO, 7, noIssue)).ok, true);
+  assert.equal((await precheckHostPlan(wasm, c.ops, REPO, 7, noIssue)).ok, true);
   for (const m of [a.mock, b.mock, c.mock]) assert.deepEqual(m.w.log, []);
 });
 
@@ -410,12 +418,12 @@ test("CX-T329 事前検査（GitHub）: 保留中のレビューのスレッド�
   const { mock, ops } = hub();
   mock.w.threads[0].pending = true;
   mock.w.threads[1].canReply = false;
-  const r = await precheckHostPlan(ops, REPO, 7, plan());
+  const r = await precheckHostPlan(wasm, ops, REPO, 7, plan());
   assert.ok(!r.ok && r.kind === "unsupported");
   assert.match(!r.ok ? r.reason : "", /Chrome では扱えない。VS Code で.*保留中のレビューのスレッド/);
   assert.deepEqual(!r.ok && r.keys, ["k1"]);
   // スレッドが MR に無い（消えた）なら読み直しを促す
-  const gone = await precheckHostPlan(ops, REPO, 7, plan(["PRRT_missing", T2, T3]));
+  const gone = await precheckHostPlan(wasm, ops, REPO, 7, plan(["PRRT_missing", T2, T3]));
   assert.ok(!gone.ok && gone.kind === "unreadable");
   assert.deepEqual(mock.w.log, []);
 });
@@ -428,42 +436,42 @@ test("CX-T330 事前検査（GitLab）: 差分以外の discussion・resolvable 
     comment: "c",
   };
   const ok = lab();
-  assert.equal((await precheckHostPlan(ok.ops, REPO, 7, gp)).ok, true);
+  assert.equal((await precheckHostPlan(wasm, ok.ops, REPO, 7, gp)).ok, true);
 
   const non = lab();
   non.mock.w.threads[0].nonDiff = true;
-  const r1 = await precheckHostPlan(non.ops, REPO, 7, gp);
+  const r1 = await precheckHostPlan(wasm, non.ops, REPO, 7, gp);
   assert.ok(!r1.ok && r1.kind === "unsupported");
   assert.match(!r1.ok ? r1.reason : "", /Chrome では扱えない。VS Code で.*差分以外の discussion/);
 
   const nr = lab();
   nr.mock.w.threads[1].notResolvable = true;
-  const r2 = await precheckHostPlan(nr.ops, REPO, 7, gp);
+  const r2 = await precheckHostPlan(wasm, nr.ops, REPO, 7, gp);
   assert.ok(!r2.ok && r2.kind === "unsupported" && /解決できない種類のスレッド/.test(r2.reason));
 
   const scope = lab();
   scope.mock.scopes = ["read_api"];
-  const r3 = await precheckHostPlan(scope.ops, REPO, 7, gp);
+  const r3 = await precheckHostPlan(wasm, scope.ops, REPO, 7, gp);
   assert.ok(!r3.ok && r3.kind === "permission" && r3.missing.some((m) => /api スコープ/.test(m)));
 
   const role = lab();
   role.mock.role = 20;
-  const r4 = await precheckHostPlan(role.ops, REPO, 7, gp);
+  const r4 = await precheckHostPlan(wasm, role.ops, REPO, 7, gp);
   assert.ok(!r4.ok && r4.kind === "permission");
   assert.ok(!r4.ok && r4.missing.some((m) => /Developer/.test(m)));
   // Reporter でも、解決しない計画（issue だけ）なら通る
   const only: HostPlan = { issues: gp.issues, replies: [], resolves: [], comment: null };
-  assert.equal((await precheckHostPlan(role.ops, REPO, 7, only)).ok, true);
+  assert.equal((await precheckHostPlan(wasm, role.ops, REPO, 7, only)).ok, true);
 
   const noIssues = lab();
   noIssues.mock.issuesEnabled = false;
-  const r5 = await precheckHostPlan(noIssues.ops, REPO, 7, gp);
+  const r5 = await precheckHostPlan(wasm, noIssues.ops, REPO, 7, gp);
   assert.ok(!r5.ok && r5.missing.includes("プロジェクトの Issues の有効化"));
 
   // プロジェクトのトークンなど、スコープを読めないときは通して『確かめられなかった』に残す
   const unknown = lab();
   unknown.mock.scopes = null;
-  const r6 = await precheckHostPlan(unknown.ops, REPO, 7, gp);
+  const r6 = await precheckHostPlan(wasm, unknown.ops, REPO, 7, gp);
   assert.deepEqual(r6.ok && r6.unknown, ["api スコープ"]);
   for (const m of [non.mock, nr.mock, scope.mock, role.mock, noIssues.mock]) assert.deepEqual(m.w.log, []);
 });
@@ -544,51 +552,17 @@ test("CX-T332 protocol: 新しい書き込みはボードからだけ、登録�
   assert.ok(!JSON.stringify([made]).includes(TOKEN));
 });
 
-test("CX-T333 GitHub の PAT の権限・スレッド・Issues の確かめ（writeInfo）は、読むだけ。登録したリポジトリだけ受ける", async () => {
+test("CX-T333 GitHub の PAT の権限・スレッド・Issues の確かめの応答（writeReplies）は、読むだけ。登録したリポジトリだけ受ける。読みは ccnavi の write-info", async () => {
   const { mock } = hub();
   const d = deps(mock, TOKENS, new Map(), () => new Date(), [...REPOS, GITLAB_REPO]);
-  const res = await dispatch({ kind: "host", host: "github.com", op: "writeInfo", args: ["acme", "widgets", 7] }, BOARD, d);
+  const res = await dispatch({ kind: "host", host: "github.com", op: "writeReplies", args: ["acme", "widgets", 7] }, BOARD, d);
   assert.ok(res.ok);
-  const info = (res as { value: { threads: { id: string; kind: string }[] } }).value;
+  const info: WriteInfo = await ccnavi.writeInfo(wasm, (res as { value: WriteReplies }).value);
   assert.deepEqual(info.threads.map((t) => t.id), [T1, T2, T3]);
   assert.deepEqual(mock.w.log, []);
-  const other = await dispatch({ kind: "host", host: "github.com", op: "writeInfo", args: ["acme", "other", 7] }, BOARD, d);
+  const other = await dispatch({ kind: "host", host: "github.com", op: "writeReplies", args: ["acme", "other", 7] }, BOARD, d);
   assert.ok(!other.ok);
-  const badNumber = await dispatch({ kind: "host", host: "github.com", op: "writeInfo", args: ["acme", "widgets", "7"] }, BOARD, d);
+  const badNumber = await dispatch({ kind: "host", host: "github.com", op: "writeReplies", args: ["acme", "widgets", "7"] }, BOARD, d);
   assert.ok(!badNumber.ok);
 });
 
-test("CX-T334 GitLab の目印のスレッドは、書き手が全部同じときだけ機構自身のもの（own）と見る。依頼の投稿者のスレッドに他人が目印の返信を足しても隠せない", () => {
-  const note = (id: number, author: number, body: string, resolvable = true) => ({
-    id,
-    body,
-    system: false,
-    resolvable,
-    resolved: false,
-    author: { id: author, username: `u${author}` },
-    created_at: "2026-09-29T05:00:00.000Z",
-  });
-  const discussions = (notes: ReturnType<typeof note>[]) => [{ id: "d".repeat(40), notes }];
-  const run = async (notes: ReturnType<typeof note>[]) => {
-    const fetch: gh.Fetch = async (url) => {
-      const page = new URL(url).searchParams.get("page");
-      return { status: 200, ok: true, json: async () => (page === "1" ? discussions(notes) : []), headers: { get: () => null } };
-    };
-    const t = await gl.discussions({ host: HOSTS[1], token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait }, "acme", "widgets", 7, "https://gitlab.com/acme/widgets/-/merge_requests/7");
-    return t[0];
-  };
-  return (async () => {
-    const mark = "<!-- ccnavi:request x -->\n依頼";
-    // 依頼の投稿者だけ: 機構自身
-    assert.equal((await run([note(1, 201, mark)])).own, true);
-    // 他人が目印で始まる返信を足した: 機構自身ではない
-    const mixed = await run([note(1, 201, mark), note(2, 203, "<!-- ccnavi:request x -->\n偽の返信")]);
-    assert.equal(mixed.own, false);
-    // 他人が目印で始まる投稿だけで始めた: 書き手が違うので依頼の投稿者とは一致しない（author は代表の書き手）
-    const alone = await run([note(5, 203, mark)]);
-    assert.deepEqual([alone.own, alone.author], [true, "203"]);
-    // 書き手が分からない目印の投稿は機構自身と見ない
-    const unknown = await run([{ ...note(6, 0, mark), author: null } as never]);
-    assert.equal(unknown.own, false);
-  })();
-});
