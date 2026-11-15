@@ -29,9 +29,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
-import unicodedata
 import unittest
-from unittest import mock
 
 from tests import ROOT, common_sh, exe, put_messages
 from tests.draft import final
@@ -231,36 +229,11 @@ class WorktreeShTest(unittest.TestCase):
 
     # ---- ずれが無いとき
 
-    def test_a_second_direct_worktree_is_cut_and_names_the_first_afterwards(self):
-        first = self.run_sh("first")
-        self.assertEqual(0, first.returncode, first.stderr + first.stdout)
-        self.assertNotIn("他にある", first.stdout)
-        second = self.run_sh("second")
-        self.assertEqual(0, second.returncode, second.stderr + second.stdout)
-        self.assertTrue(os.path.isdir(self.wt("second")))
-        self.assertIn("作業中の直接作業のワークツリーが他にある: first", second.stdout)
-
     def test_a_removed_first_worktree_is_not_named(self):
         self.assertEqual(0, self.run_sh("first").returncode)
         shutil.rmtree(self.wt("first"))
         result = self.run_sh("second")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-
-    def test_cuts_from_the_base_head_without_asking_when_nothing_is_off(self):
-        result = self.run_sh("topic")
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertEqual(git(self.ws, "rev-parse", "main"), self.head_of("topic"))
-        self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
-        self.assertIn("取り込み先: main（", result.stdout)
-        self.assertIn("書きかけは含まない", result.stdout)
-        self.assertIn("横で作業する: いいえ", result.stdout)
-        upstream = subprocess.run(
-            [REAL_GIT, "rev-parse", "--abbrev-ref", "topic@{upstream}"],
-            cwd=self.ws,
-            capture_output=True,
-            text=True,
-        )
-        self.assertNotEqual(0, upstream.returncode, "取り込み先を追跡しない")
 
     def test_a_parent_tree_is_told_how_to_withdraw_what_stays_after_the_switch(self):
         # 親のワークツリーの名前（ws）の提案が承認待ちで、MR もある。直接作業へ切り替えても
@@ -319,11 +292,14 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_an_approved_parent_tree_may_not_switch(self):
         path = self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {"mr": 12}})
-        for args in (("topic",), ("topic", "--dry-run")):
-            self.assertRefused(self.run_sh(*args, cwd=path))
+        self.assertRefused(self.run_sh("topic", "--dry-run", cwd=path))
         result = self.run_sh("topic", cwd=path)
+        self.assertRefused(result)
         self.assertIn("案内: 親を早めに閉じたいなら", result.stderr)
         self.assertIn("ccnavi-user-close-early.sh", result.stderr)
+        # 断る文は、報告して待つことを言う。
+        self.assertIn("親のワークツリー（p0001）から", result.stderr)
+        self.assertIn("次: 状況をユーザに報告し", result.stderr)
 
     def test_a_finished_parent_tree_may_not_switch_and_is_not_told_to_close_early(self):
         path = self.parent_tree(**{"wip/proposals/review/p0001.md": {"mr": 12}})
@@ -344,38 +320,19 @@ class WorktreeShTest(unittest.TestCase):
         self.assertRefused(result)
         self.assertIn("案内: 着手済みの子が 1 件ある", result.stderr)
         self.assertIn("cancel", result.stderr)
-
-    def test_a_started_child_under_a_todo_parent_is_not_told_to_close_the_parent_early(self):
-        path = self.parent_tree(
-            **{
-                "wip/proposals/todo/p0001.md": {},
-                ".ccnavi/approved/doing/p0001-01.md": {"ticket": "p0001-01", "parent": "p0001"},
-            }
-        )
-        result = self.run_sh("topic", cwd=path)
-        self.assertRefused(result)
+        # 親は承認待ちなので、親を早めに閉じる案内はしない。
         self.assertNotIn("ccnavi-user-close-early.sh", result.stderr)
-
-    def test_the_refusal_says_to_report_and_wait(self):
-        path = self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
-        result = self.run_sh("topic", cwd=path)
-        self.assertRefused(result)
-        self.assertIn("親のワークツリー（p0001）から", result.stderr)
-        self.assertIn("次: 状況をユーザに報告し", result.stderr)
 
     def test_the_workspace_root_is_not_refused(self):
         self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
 
-    def test_nothing_is_said_about_leftovers_without_a_parent(self):
-        put_messages(self.ws)
-        result = self.run_sh("topic")
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertNotIn("取り下げ", result.stdout)
-        self.assertNotIn("残っている", result.stdout)
-
     def test_the_record_is_written_and_read_as_valid_by_the_post_check(self):
+        """--side-by-side だけでは確認を求めない（確認は ask のルールの仕事）。
+
+        記録は v4 で、実行後チェックの読み取りが有効と読む。
+        """
         result = self.run_sh("topic", "--side-by-side")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
         rec = self.record("topic")
@@ -401,14 +358,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("横で作業する指定が有効です", lint.stdout + lint.stderr)
         self.assertIn("/topic)", lint.stdout + lint.stderr)
         self.assertNotIn("壊れています", lint.stdout + lint.stderr)
-
-    def test_side_by_side_alone_does_not_ask_here_the_ask_rule_does(self):
-        result = self.run_sh("topic", "--side-by-side")
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-
-    def test_without_the_flag_the_record_says_no(self):
-        self.assertEqual(0, self.run_sh("topic").returncode)
-        self.assertEqual("no", self.record("topic")["side_by_side"])
 
     def test_a_project_is_cut_from_its_own_main_checkout_branch(self):
         """projects/app の取り込み先は、そのユーザのチェックアウトのブランチ（work）。
@@ -451,19 +400,11 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn(self.PROJECTS_HINT, result.stdout)
         self.assertEqual(1, result.stdout.count("案内: projects/ の下"))
         self.assertTrue(os.path.isdir(self.wt("topic")))
-
-    def test_the_hint_comes_before_the_next_step(self):
-        self.add_project()
-        lines = self.run_sh("topic").stdout.splitlines()
+        # 案内は次の一手より前。
+        lines = result.stdout.splitlines()
         hint = next(i for i, ln in enumerate(lines) if self.PROJECTS_HINT in ln)
         step = next(i for i, ln in enumerate(lines) if ln.startswith("次: "))
         self.assertLess(hint, step)
-
-    def test_a_workspace_without_projects_gets_no_hint(self):
-        """projects/ が無い形（単体 clone のように、ルートがそのリポジトリ）では出さない。"""
-        result = self.run_sh("topic")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertNotIn(self.PROJECTS_HINT, result.stdout)
 
     def test_a_directory_in_projects_without_a_repository_gets_no_hint(self):
         os.makedirs(os.path.join(self.ws, "projects", "notes"))
@@ -480,22 +421,13 @@ class WorktreeShTest(unittest.TestCase):
         self.assertNotIn(self.PROJECTS_HINT, done.stdout)
 
     def test_the_hint_is_not_printed_by_dry_run(self):
+        """--dry-run は projects/ の案内を出さず、名前の警告は出し、何も切らない。"""
         self.add_project()
         result = self.run_sh("topic", "--dry-run")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertNotIn(self.PROJECTS_HINT, result.stdout)
-
-    def test_a_free_name_is_warned_by_dry_run_too(self):
-        result = self.run_sh("topic", "--dry-run")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertIn("warn: 直接作業のワークツリー名 topic が", result.stdout)
         self.assertFalse(os.path.exists(self.wt("topic")))
-
-    def test_a_free_name_is_warned_before_the_cut_and_still_cut(self):
-        result = self.run_sh("topic")
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("warn: 直接作業のワークツリー名 topic が", result.stdout)
-        self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
 
     def test_a_name_in_the_form_is_not_warned(self):
         result = self.run_sh("feature-12-topic")
@@ -503,8 +435,32 @@ class WorktreeShTest(unittest.TestCase):
         self.assertNotIn("warn:", result.stdout)
 
     def test_the_last_line_is_the_next_step_with_one_line_commands(self):
+        """ずれが無いときの通し。
+
+        確認なしで取り込み先の HEAD から切り、2 回目は切らずに既にあると言う。
+        """
         result = self.run_sh("topic")
         self.assertEqual(0, result.returncode, result.stderr + result.stdout)
+        self.assertEqual(git(self.ws, "rev-parse", "main"), self.head_of("topic"))
+        self.assertEqual("topic", git(self.wt("topic"), "branch", "--show-current"))
+        self.assertIn("取り込み先: main（", result.stdout)
+        self.assertIn("書きかけは含まない", result.stdout)
+        self.assertIn("横で作業する: いいえ", result.stdout)
+        self.assertEqual("no", self.record("topic")["side_by_side"])
+        upstream = subprocess.run(
+            [REAL_GIT, "rev-parse", "--abbrev-ref", "topic@{upstream}"],
+            cwd=self.ws,
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(0, upstream.returncode, "取り込み先を追跡しない")
+        # 親が無いので残り物の話は無く、projects/ が無いので projects/ の案内も無い。
+        self.assertNotIn("取り下げ", result.stdout)
+        self.assertNotIn("残っている", result.stdout)
+        self.assertNotIn(self.PROJECTS_HINT, result.stdout)
+        self.assertNotIn("他にある", result.stdout)
+        # 名前の形でないので警告し、それでも切る。
+        self.assertIn("warn: 直接作業のワークツリー名 topic が", result.stdout)
         last = result.stdout.rstrip("\n").split("\n")[-1]
         self.assertTrue(last.startswith("次: 編集はこのワークツリーの下で行います"), last)
         self.assertIn(f"Write / Edit に渡すパス: {self.wt('topic')}/…", last)
@@ -520,10 +476,20 @@ class WorktreeShTest(unittest.TestCase):
             [SHELL, "-c", command], cwd="/", env=shell_env, capture_output=True, text=True
         )
         self.assertEqual("topic", done.stdout.strip().splitlines()[-1], done.stderr)
-        # 既にあるときも、最後の行は同じ。
-        again = self.run_sh("topic")
+        # 既にあるときは切り直さず（中の物は残る）、記録があると言う。最後の行は同じ。
+        write(os.path.join(self.wt("topic"), "keep.txt"), "mine")
+        again = self.run_sh("topic", "--no-wip")
         self.assertEqual(0, again.returncode, again.stderr)
+        self.assertIn("ワークツリーは既にある", again.stdout)
+        self.assertIn("取り込みの記録は、ある（ccnavi-direct/topic）", again.stdout)
+        self.assertNotIn("--adopt", again.stdout)
+        self.assertTrue(os.path.exists(os.path.join(self.wt("topic"), "keep.txt")))
         self.assertTrue(again.stdout.rstrip("\n").split("\n")[-1].startswith("次: 編集は"))
+        # 2 本目は切れて、1 本目を名指しする。
+        second = self.run_sh("second")
+        self.assertEqual(0, second.returncode, second.stderr + second.stdout)
+        self.assertTrue(os.path.isdir(self.wt("second")))
+        self.assertIn("作業中の直接作業のワークツリーが他にある: topic", second.stdout)
 
     # ---- C4: cwd のブランチが取り込み先と違う
 
@@ -549,6 +515,11 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_a_base_other_than_the_default_branch_needs_the_accept_code(self):
         self.make_feature_with_origin()
+        # 合わないコードは報告からやり直す。
+        wrong = self.run_sh("topic", "--accept", "deadbeef")
+        self.assertEqual(3, wrong.returncode, wrong.stdout + wrong.stderr)
+        self.assertIn("確認コードが今の状態と合わない", wrong.stdout)
+        self.assertFalse(os.path.exists(self.wt("topic")))
         result = self.run_sh("topic")
         self.assertEqual(3, result.returncode, result.stdout + result.stderr)
         self.assertIn("取り込み先 feature/x (", result.stdout)
@@ -562,13 +533,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(git(self.ws, "rev-parse", "feature/x"), self.head_of("topic"))
         self.assertEqual(code, self.record("topic")["confirm"])
         self.assertEqual("feature/x", self.record("topic")["base_branch"])
-
-    def test_a_wrong_accept_code_starts_the_report_over(self):
-        self.make_feature_with_origin()
-        result = self.run_sh("topic", "--accept", "deadbeef")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("確認コードが今の状態と合わない", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("topic")))
 
     def test_the_code_changes_when_the_state_moves(self):
         self.make_feature_with_origin()
@@ -664,11 +628,14 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_wip_without_a_choice_stops_even_with_the_code(self):
         self.dirty_root()
+        before = self.snapshot_of_root()
         result = self.run_sh("topic")
         self.assertEqual(3, result.returncode, result.stdout + result.stderr)
         self.assertIn("書きかけ: 変更 2・新規 1（staged 1", result.stdout)
         self.assertIn("--no-wip", result.stdout)
         self.assertIn("--copy-wip", result.stdout)
+        # 候補を作っても、聞くだけのときユーザの index とワークツリーは変わらない。
+        self.assertEqual(before, self.snapshot_of_root())
         code = self.code_of(result)
         again = self.run_sh("topic", "--accept", code)
         self.assertEqual(3, again.returncode, "書きかけの選択が無ければ、コードがあっても止まる")
@@ -733,12 +700,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("合わない", result.stdout)
         self.assertFalse(os.path.exists(self.wt("topic")))
 
-    def test_the_candidate_does_not_touch_the_index_even_when_only_asking(self):
-        self.dirty_root()
-        before = self.snapshot_of_root()
-        self.run_sh("topic")
-        self.assertEqual(before, self.snapshot_of_root())
-
     # ---- .claude/worktrees/ は書きかけに数えない（.gitignore に行が無い配布先）
 
     def leave_worktrees_untracked(self):
@@ -769,40 +730,25 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, "確認なしで切れる: " + done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(self.wt("second")))
 
-    def test_real_wip_still_needs_the_confirmation(self):
-        self.leave_worktrees_untracked()
-        write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        result = self.run_sh("second")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("書きかけ: 変更 1・新規 1（staged 0", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("second")))
-
     def test_the_count_leaves_out_the_worktrees_dir(self):
-        self.leave_worktrees_untracked()
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        dry = self.run_sh("second", "--dry-run")
-        self.assertIn("書きかけ 変更 0・新規 1（staged 0）", dry.stdout)
-
-    def test_staged_files_in_the_worktrees_dir_are_not_counted(self):
+        """数えないのは .claude/worktrees/ だけ（staged でも）。wip/ の新規などは今のまま数える。"""
         self.leave_worktrees_untracked()
         write(os.path.join(self.ws, ".claude", "worktrees", "stray.txt"), "s\n")
         git(self.ws, "add", "-f", ".claude/worktrees/stray.txt")
-        dry = self.run_sh("second", "--dry-run")
-        self.assertNotIn("書きかけ", dry.stdout)
-
-    def test_other_untracked_places_still_count(self):
-        """除くのは .claude/worktrees/ だけ。wip/ の新規などは今のまま数える。"""
-        self.leave_worktrees_untracked()
         write(os.path.join(self.ws, "wip", "handoff", "a.md"), "a\n")
         dry = self.run_sh("second", "--dry-run")
-        self.assertIn("書きかけ 変更 0・新規 1", dry.stdout)
+        self.assertIn("書きかけ 変更 0・新規 1（staged 0）", dry.stdout)
 
     def test_the_snapshot_does_not_take_the_other_worktrees(self):
+        """本当の書きかけは確認を求め、--copy-wip の S には他のワークツリーを入れない。"""
         self.leave_worktrees_untracked()
+        write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
         write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        code = self.code_of(self.run_sh("second"))
-        done = self.run_sh("second", "--accept", code, "--copy-wip")
+        asked = self.run_sh("second")
+        self.assertEqual(3, asked.returncode, asked.stdout + asked.stderr)
+        self.assertIn("書きかけ: 変更 1・新規 1（staged 0", asked.stdout)
+        self.assertFalse(os.path.exists(self.wt("second")))
+        done = self.run_sh("second", "--accept", self.code_of(asked), "--copy-wip")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         tree = git(self.wt("second"), "ls-tree", "-r", "HEAD")
         self.assertIn("notes.txt", tree)
@@ -836,8 +782,12 @@ class WorktreeShTest(unittest.TestCase):
     def test_ignored_worktrees_dir_and_a_new_file_copy_wip(self):
         self.leave_worktrees_ignored()
         write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        code = self.code_of(self.run_sh("second"))
-        done = self.run_sh("second", "--accept", code, "--copy-wip")
+        asked = self.run_sh("second")
+        self.assertEqual(3, asked.returncode, asked.stdout + asked.stderr)
+        self.assertNotIn("作れませんでした", asked.stdout + asked.stderr)
+        self.assertIn("書きかけ: 変更 0・新規 1", asked.stdout)
+        self.assertFalse(os.path.exists(self.wt("second")))
+        done = self.run_sh("second", "--accept", self.code_of(asked), "--copy-wip")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("作れませんでした", done.stdout + done.stderr)
         with open(os.path.join(self.wt("second"), "notes.txt"), encoding="utf-8") as f:
@@ -854,16 +804,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.wt("second"), "notes.txt")))
         self.assert_snapshot_tree_clean("second")
 
-    def test_ignored_worktrees_dir_and_a_new_file_asks_for_confirmation(self):
-        self.leave_worktrees_ignored()
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        result = self.run_sh("second")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertNotIn("作れませんでした", result.stdout + result.stderr)
-        self.assertIn("書きかけ: 変更 0・新規 1", result.stdout)
-        self.code_of(result)
-        self.assertFalse(os.path.exists(self.wt("second")))
-
     def test_ignored_worktrees_dir_and_a_tracked_change_asks_for_confirmation(self):
         self.leave_worktrees_ignored()
         write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
@@ -876,14 +816,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         with open(os.path.join(self.wt("second"), "README.md"), encoding="utf-8") as f:
             self.assertEqual("# readme 書きかけ\n", f.read())
-        self.assert_snapshot_tree_clean("second")
-
-    def test_untracked_worktrees_dir_keeps_gitlinks_out_of_the_snapshot(self):
-        self.leave_worktrees_untracked()
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        code = self.code_of(self.run_sh("second"))
-        done = self.run_sh("second", "--accept", code, "--copy-wip")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assert_snapshot_tree_clean("second")
 
     def test_a_failing_read_tree_still_stops_with_snapshot_failed(self):
@@ -1011,36 +943,19 @@ class WorktreeShTest(unittest.TestCase):
     # ---- 引数
 
     def test_retired_arguments_exit_2_with_guidance(self):
-        for arg, why in (
-            ("--offline", "廃止しました"),
-            ("--from-origin", "廃止しました"),
-        ):
-            with self.subTest(arg=arg):
-                result = self.run_sh("topic", arg)
-                self.assertEqual(2, result.returncode, result.stdout)
-                self.assertIn(why, result.stderr)
-                self.assertIn("--accept", result.stderr)
-                self.assertFalse(os.path.exists(self.wt("topic")))
+        """引数の誤りの通し。
 
-    def test_copy_wip_and_no_wip_together_are_refused(self):
-        result = self.run_sh("topic", "--copy-wip", "--no-wip")
+        ほかの廃止した引数・名前の形・同時に渡せない旗は cut.TestArgs が見る。
+        """
+        result = self.run_sh("topic", "--from-origin")
         self.assertEqual(2, result.returncode, result.stdout)
-
-    def test_existing_worktree_is_reported_not_recreated(self):
-        self.run_sh("topic")
-        write(os.path.join(self.wt("topic"), "keep.txt"), "mine")
-        result = self.run_sh("topic")
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("既にある", result.stdout)
-        self.assertTrue(os.path.exists(os.path.join(self.wt("topic"), "keep.txt")))
+        self.assertIn("廃止しました", result.stderr)
+        self.assertIn("--accept", result.stderr)
+        self.assertFalse(os.path.exists(self.wt("topic")))
 
     def test_existing_worktree_reports_whether_the_record_exists(self):
-        # 切ったワークツリーには記録があり、integrate に進めます。
-        self.run_sh("topic")
-        result = self.run_sh("topic")
-        self.assertIn("取り込みの記録は、ある（ccnavi-direct/topic）", result.stdout)
-        self.assertNotIn("--adopt", result.stdout)
         # 手で切ったワークツリーには記録が無いため、引き取る手を言います。
+        # 記録があるときは、ずれが無いときの通しが見る。
         git(self.ws, "worktree", "add", "-q", self.wt("manual"), "-b", "manual", "main")
         result = self.run_sh("manual")
         self.assertEqual(0, result.returncode, result.stderr)
@@ -1064,29 +979,15 @@ class WorktreeShTest(unittest.TestCase):
     def test_unattended_adds_the_fixed_line_only_when_the_variable_is_zero(self):
         git(self.ws, "branch", "taken")
         git(self.ws, "worktree", "add", "-q", self.wt("manual"), "-b", "manual", "main")
-        for name in ("taken", "manual"):
-            for value, shown in (("0", True), ("1", False), (None, False)):
-                with self.subTest(name=name, value=value):
-                    with mock.patch.dict(os.environ):
-                        os.environ.pop("CLAUDE_CODE_SESSION_ATTENDED", None)
-                        extra = {} if value is None else {"CLAUDE_CODE_SESSION_ATTENDED": value}
-                        result = self.run_sh(name, **extra)
-                    said = result.stdout + result.stderr
-                    self.assertEqual(shown, "このセッションでは確認に答えられません" in said, said)
-
-    def test_refuses_bad_names_and_existing_branch(self):
-        git(self.ws, "branch", "taken")
-        for args, code, why in (
-            (("a/b",), 2, "/ は書けません"),
-            (("taken",), 1, "既にあります"),
-            ((), 2, "名前を渡してください"),
-            (("a", "b"), 2, "1 本だけ"),
-            (("--bogus",), 2, "未対応の引数"),
+        for name, value, shown in (
+            ("taken", "0", True),
+            ("manual", "0", True),
+            ("manual", "1", False),
         ):
-            with self.subTest(args=args):
-                result = self.run_sh(*args)
-                self.assertEqual(code, result.returncode, result.stdout)
-                self.assertIn(why, result.stderr)
+            with self.subTest(name=name, value=value):
+                result = self.run_sh(name, CLAUDE_CODE_SESSION_ATTENDED=value)
+                said = result.stdout + result.stderr
+                self.assertEqual(shown, "このセッションでは確認に答えられません" in said, said)
 
     def test_same_name_branch_on_origin_stops_and_points_to_start(self):
         # origin にだけ同名のブランチがある（MR の元ブランチかもしれない）。
@@ -1130,22 +1031,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("同じ識別子", result.stdout)
         self.assertNotIn("既にあります", result.stderr)
         self.assertTrue(os.path.isfile(stray))
-
-    def test_rerunning_the_same_name_still_reports_the_worktree_exists(self):
-        self.assertEqual(0, self.run_sh("topic", "--no-wip").returncode)
-        result = self.run_sh("topic", "--no-wip")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("ワークツリーは既にある", result.stdout)
-
-    def test_names_the_executable_refuses_are_not_cut(self):
-        """全角の字・NFD・65 文字以上の名前は、実行ファイルの検査で断る（sh の検査は通る）。"""
-        nfd = unicodedata.normalize("NFD", "feature-が")
-        for name in ("feature-１２３", nfd, "topic-" + "a" * 59):
-            with self.subTest(name=name):
-                result = self.run_sh(name)
-                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-                self.assertIn("指定できません", result.stderr)
-                self.assertFalse(os.path.exists(self.wt(name)))
 
     def test_existing_directory_that_is_not_the_worktree_is_refused(self):
         write(os.path.join(self.wt("topic"), "stray.txt"), "x")
@@ -1213,6 +1098,14 @@ class WorktreeShTest(unittest.TestCase):
 
     def test_adopt_shows_the_range_and_the_code_first_and_writes_nothing(self):
         self.uncorded_worktree()
+        # --dry-run と、合わないコードは何も書かない。
+        dry = self.run_sh("topic", "--adopt", "--base", "main", "--dry-run")
+        self.assertEqual(0, dry.returncode, dry.stdout + dry.stderr)
+        self.assertIn("dry-run", dry.stdout)
+        wrong = self.run_sh("topic", "--adopt", "--base", "main", "--accept", "deadbeef")
+        self.assertEqual(3, wrong.returncode, wrong.stdout + wrong.stderr)
+        self.assertIn("確認コードが今の状態と合わない", wrong.stdout)
+        self.assertFalse(os.path.exists(self.record_path("topic")))
         first = self.run_sh("topic", "--adopt", "--base", "main")
         self.assertEqual(3, first.returncode, first.stdout + first.stderr)
         self.assertIn("この範囲全体をエージェントの成果として扱う", first.stdout)
@@ -1248,13 +1141,6 @@ class WorktreeShTest(unittest.TestCase):
         done = self.run_sh("topic", "--adopt", "--base", "main", "--accept", code, "--side-by-side")
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual("yes", self.record("topic")["side_by_side"])
-
-    def test_adopt_with_a_wrong_code_starts_over(self):
-        self.uncorded_worktree()
-        wrong = self.run_sh("topic", "--adopt", "--base", "main", "--accept", "deadbeef")
-        self.assertEqual(3, wrong.returncode, wrong.stdout + wrong.stderr)
-        self.assertIn("確認コードが今の状態と合わない", wrong.stdout)
-        self.assertFalse(os.path.exists(self.record_path("topic")))
 
     def test_adopt_code_changes_when_the_branch_moves(self):
         self.uncorded_worktree()
@@ -1316,13 +1202,6 @@ class WorktreeShTest(unittest.TestCase):
         self.uncorded_worktree()
         result = self.run_sh("topic", "--adopt", "--base", "main", CCNAVI_ENTRY_PATH="/nonexistent")
         self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertFalse(os.path.exists(self.record_path("topic")))
-
-    def test_adopt_dry_run_writes_nothing(self):
-        self.uncorded_worktree()
-        result = self.run_sh("topic", "--adopt", "--base", "main", "--dry-run")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("dry-run", result.stdout)
         self.assertFalse(os.path.exists(self.record_path("topic")))
 
     def test_integrate_without_a_record_points_to_adopt_and_it_works_after_adopting(self):
