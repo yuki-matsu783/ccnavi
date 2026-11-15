@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"ccnavi/internal/infra/config"
@@ -36,33 +37,38 @@ func named(prefix, suffix string) *regexp.Regexp {
 }
 
 // 名前からセッションがそのまま読める記録（括弧の中は書く側）。
-var sessionOnly = []*regexp.Regexp{
-	named("nudged-", fsio.JSONExt),                  // lifecycle の Stop の促し
-	named(tally.DenyPrefix, fsio.JSONExt),           // tally の拒否の数え
-	named(config.StopPrefix, fsio.JSONExt),          // ctxfile
-	named("", ".turn"+fsio.JSONExt),                 // post のターンの基準
-	named("", ".accepted"+fsio.JSONExt),             // post
-	named(turn.BusyPrefix, fsio.JSONExt),            // turn
-	named(turn.TurnPrefix, fsio.JSONExt),            // turn
-	named(turn.UserPromptPrefix, fsio.JSONExt),      // turn
-	named(stopreview.TurnStartPrefix, fsio.JSONExt), // stopreview
-	named(stopreview.RefsPrefix, fsio.JSONExt),      // stopreview
-	named(stopreview.TaintPrefix, fsio.JSONExt),     // hook の stopjudge
-	named(stopreview.LastStopPrefix, fsio.JSONExt),  // stopreview
-	named(config.DirectPrefix, fsio.JSONExt),        // direct_candidates（compact・clear では破棄しない）
-	// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
-	// 同じ置き場の別のファイル（package.json など）を消す。
-	regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),
-}
+// sessionOnly と ownDate は記録を片づける起動でだけ使うので、初めて使うときに 1 回だけ組む。
+var sessionOnly = sync.OnceValue(func() []*regexp.Regexp {
+	return []*regexp.Regexp{
+		named("nudged-", fsio.JSONExt),                  // lifecycle の Stop の促し
+		named(tally.DenyPrefix, fsio.JSONExt),           // tally の拒否の数え
+		named(config.StopPrefix, fsio.JSONExt),          // ctxfile
+		named("", ".turn"+fsio.JSONExt),                 // post のターンの基準
+		named("", ".accepted"+fsio.JSONExt),             // post
+		named(turn.BusyPrefix, fsio.JSONExt),            // turn
+		named(turn.TurnPrefix, fsio.JSONExt),            // turn
+		named(turn.UserPromptPrefix, fsio.JSONExt),      // turn
+		named(stopreview.TurnStartPrefix, fsio.JSONExt), // stopreview
+		named(stopreview.RefsPrefix, fsio.JSONExt),      // stopreview
+		named(stopreview.TaintPrefix, fsio.JSONExt),     // hook の stopjudge
+		named(stopreview.LastStopPrefix, fsio.JSONExt),  // stopreview
+		named(config.DirectPrefix, fsio.JSONExt),        // direct_candidates（compact・clear では破棄しない）
+		// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
+		// 同じ置き場の別のファイル（package.json など）を消す。
+		regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),
+	}
+})
 
 // ownDate はセッションを名前に持たない Stop の AI 判定の記録と、ミラーの指紋（親の識別子ごと）。それ自身の日付で消す。
-var ownDate = regexp.MustCompile(`^(?:` + strings.Join([]string{
-	regexp.QuoteMeta(stopreview.PlanPrefix) + `.+`,
-	regexp.QuoteMeta(stopreview.AttemptPrefix) + `.+`,
-	regexp.QuoteMeta(stopreview.PrePrefix) + `.+`,
-	regexp.QuoteMeta(stopreview.OpPrefix) + `.+`,
-	`mirror-.+`, // promptsync
-}, "|") + `)` + regexp.QuoteMeta(fsio.JSONExt) + `$`)
+var ownDate = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile(`^(?:` + strings.Join([]string{
+		regexp.QuoteMeta(stopreview.PlanPrefix) + `.+`,
+		regexp.QuoteMeta(stopreview.AttemptPrefix) + `.+`,
+		regexp.QuoteMeta(stopreview.PrePrefix) + `.+`,
+		regexp.QuoteMeta(stopreview.OpPrefix) + `.+`,
+		`mirror-.+`, // promptsync
+	}, "|") + `)` + regexp.QuoteMeta(fsio.JSONExt) + `$`)
+})
 
 // sessionAndKey は名前の後ろにセッション以外のキーが `-` で続く記録。セッションにも `-` が入るので、
 // 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。

@@ -3,6 +3,7 @@ package handoff
 import (
 	"regexp"
 	"strings"
+	"sync"
 
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
@@ -58,64 +59,67 @@ func full(patterns ...string) []*regexp.Regexp {
 }
 
 // kinds は取り込み先の表（許可リスト）。直すときは設計書の表も直す。ccnavi-stage.sh の本体（stage）も --commands でこの表を引く。
-var kinds = []*Kind{
-	{
-		ID: Template,
-		shown: []string{
-			".ccnavi/config/common/templates/<名前>.yml",
-			".ccnavi/config/project/templates/<名前>.yml",
-			"projects/<名前>/.ccnavi/config/project/templates/<名前>.yml",
+// 式を組むのは取り込み先を読む起動だけなので、初めて引くときに 1 回だけ組む。
+var kinds = sync.OnceValue(func() []*Kind {
+	return []*Kind{
+		{
+			ID: Template,
+			shown: []string{
+				".ccnavi/config/common/templates/<名前>.yml",
+				".ccnavi/config/project/templates/<名前>.yml",
+				"projects/<名前>/.ccnavi/config/project/templates/<名前>.yml",
+			},
+			patterns: full(
+				`\.ccnavi/config/common/templates/`+reName+`\.yml`,
+				`\.ccnavi/config/project/templates/`+reName+`\.yml`,
+				`projects/`+reName+`/\.ccnavi/config/project/templates/`+reName+`\.yml`,
+			),
+			creatable: true, onBoard: true,
 		},
-		patterns: full(
-			`\.ccnavi/config/common/templates/`+reName+`\.yml`,
-			`\.ccnavi/config/project/templates/`+reName+`\.yml`,
-			`projects/`+reName+`/\.ccnavi/config/project/templates/`+reName+`\.yml`,
-		),
-		creatable: true, onBoard: true,
-	},
-	{
-		ID:        messages,
-		shown:     []string{".ccnavi/messages/<名前>.yml"},
-		patterns:  full(`\.ccnavi/messages/` + reName + `\.yml`),
-		creatable: true,
-	},
-	{
-		ID: layerConfig,
-		shown: []string{
-			".ccnavi/config/{common,project}/{rules,phases,risks}.yml",
-			"projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml",
+		{
+			ID:        messages,
+			shown:     []string{".ccnavi/messages/<名前>.yml"},
+			patterns:  full(`\.ccnavi/messages/` + reName + `\.yml`),
+			creatable: true,
 		},
-		patterns: full(
-			`\.ccnavi/config/(?:common|project)/`+reLayer,
-			`projects/`+reName+`/\.ccnavi/config/project/`+reLayer,
-		),
-		onBoard: true,
-	},
-	{
-		ID:       docs,
-		shown:    []string{".ccnavi/docs/**/*.md", ".ccnavi/CCNAVI.md"},
-		patterns: full(`\.ccnavi/docs/`+reDeep+`\.md`, `\.ccnavi/ccnavi\.md`),
-		onBoard:  true,
-	},
-	{
-		ID: defense,
-		shown: []string{
-			".ccnavi/scripts/**",
-			".claude/hooks/**",
-			".claude/settings.json",
-			".claude/settings.local.json",
-			".claude/skills/**/*.md",
+		{
+			ID: layerConfig,
+			shown: []string{
+				".ccnavi/config/{common,project}/{rules,phases,risks}.yml",
+				"projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml",
+			},
+			patterns: full(
+				`\.ccnavi/config/(?:common|project)/`+reLayer,
+				`projects/`+reName+`/\.ccnavi/config/project/`+reLayer,
+			),
+			onBoard: true,
 		},
-		// スキルの frontmatter は使えるツールや hook を持てる（権限を広げうる）ので、docs ではなく防御にする。
-		patterns: full(
-			`\.ccnavi/scripts/`+reDeep,
-			`\.claude/hooks/`+reDeep,
-			`\.claude/settings\.json`,
-			`\.claude/settings\.local\.json`,
-			`\.claude/skills/`+reDeep+`\.md`,
-		),
-	},
-}
+		{
+			ID:       docs,
+			shown:    []string{".ccnavi/docs/**/*.md", ".ccnavi/CCNAVI.md"},
+			patterns: full(`\.ccnavi/docs/`+reDeep+`\.md`, `\.ccnavi/ccnavi\.md`),
+			onBoard:  true,
+		},
+		{
+			ID: defense,
+			shown: []string{
+				".ccnavi/scripts/**",
+				".claude/hooks/**",
+				".claude/settings.json",
+				".claude/settings.local.json",
+				".claude/skills/**/*.md",
+			},
+			// スキルの frontmatter は使えるツールや hook を持てる（権限を広げうる）ので、docs ではなく防御にする。
+			patterns: full(
+				`\.ccnavi/scripts/`+reDeep,
+				`\.claude/hooks/`+reDeep,
+				`\.claude/settings\.json`,
+				`\.claude/settings\.local\.json`,
+				`\.claude/skills/`+reDeep+`\.md`,
+			),
+		},
+	}
+})
 
 // FoldPart はパスの 1 要素を比べるための形（NFC と fold）。開く表記には使わない。
 func FoldPart(part string) string {
@@ -133,7 +137,7 @@ func Key(rel string) string {
 
 // KindOf はそろえた相対パスが当たる種類。どれにも当たらなければ nil（対象外）。
 func KindOf(key string) *Kind {
-	for _, k := range kinds {
+	for _, k := range kinds() {
 		if k.matches(key) {
 			return k
 		}
