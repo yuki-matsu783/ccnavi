@@ -30,7 +30,7 @@ import json
 import os
 import unittest
 
-from tests import common_path, script_command
+from tests import common_path, script_command, treecache
 from tests.ticket.test_flow import WORKFLOW_YAML
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
@@ -82,11 +82,13 @@ class LaunchHarness(PhaseHarness):
         result = self.approve()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    @treecache.cached
     def one_child(self):
         """子 CHILD を着手済みにして、そのワークツリーを返す。"""
         self.open_family(["research", "design"], [(CHILD, 1, RESEARCH)])
         return self.run_child(CHILD)
 
+    @treecache.cached
     def two_children(self):
         self.open_family(PARALLEL, [(CHILD, 1, RESEARCH), (CHILD2, 2, DESIGN)])
         return self.run_child(CHILD), self.run_child(CHILD2)

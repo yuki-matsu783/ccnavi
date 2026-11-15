@@ -34,14 +34,31 @@ def as_write_and_push(root: str, state: str, parent_tree: str, args) -> tuple:
     )
     if not is_state_op or "--record-tree" in args:
         return tuple(args)
-    origin = subprocess.run(
-        ["git", "-C", root, "config", "--get", "remote.origin.url"],
-        capture_output=True,
-        text=True,
-    )
-    if origin.returncode != 0 or not origin.stdout.strip():
+    if not _has_origin(root):
         return tuple(args)
     place = os.path.join(state, "write-and-push", "self")
     os.makedirs(place, exist_ok=True)
     target = os.path.join(place, f"as-write-and-push-{next(_COUNT)}.writes")
     return ("--record-writes", target, "--record-tree", parent_tree, *args)
+
+
+def _has_origin(root: str) -> bool:
+    """root に origin の URL があるか。テストの木（`.git` がディレクトリ）は設定ファイルを直に読み、
+    git を起こさない。それ以外は git に聞く。"""
+    config = os.path.join(root, ".git", "config")
+    if not os.path.isfile(config):
+        origin = subprocess.run(
+            ["git", "-C", root, "config", "--get", "remote.origin.url"],
+            capture_output=True,
+            text=True,
+        )
+        return origin.returncode == 0 and bool(origin.stdout.strip())
+    section = ""
+    with open(config, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("["):
+                section = line
+            elif section == '[remote "origin"]' and line.partition("=")[0].strip() == "url":
+                return bool(line.partition("=")[2].strip())
+    return False

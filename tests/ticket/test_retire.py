@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 
+from tests import treecache
 from tests.ticket.test_archive import ReadyHarness
 from tests.ticket.test_ticket import git, write
 
@@ -22,6 +23,7 @@ CHILD = "i0001-01-01"
 
 
 class RetireHarness(ReadyHarness):
+    @treecache.cached
     def closed_and_pushed(self):
         """親を閉じて ready を済ませ、退避の削除をコミットして push した状態。fixture を返す。"""
         fixture = self.closable()
@@ -145,8 +147,8 @@ class RetireAfterReadyTest(RetireHarness):
         self.assertFalse(os.path.exists(self.child_tree))
 
 
-class CancelledChildTest(RetireHarness):
-    """取り消した子のブランチは、確認なしでは消さない。"""
+class CancelledChildHarness(RetireHarness):
+    """取り消した子を記録に足した状態。テストは持たない（継ぐクラスで同じテストが重ねて回らないように）。"""
 
     def setUp(self):
         super().setUp()
@@ -166,6 +168,10 @@ class CancelledChildTest(RetireHarness):
         lines = ["---", "version: 1", f"ticket: {name}", f"parent: {parent}", "phase: 1"]
         lines += ["title: t", "cancelled_at: 2026-10-01T00:00:00+09:00", "---", ""]
         write(path, "\n".join(lines) + "\n")
+
+
+class CancelledChildTest(CancelledChildHarness):
+    """取り消した子のブランチは、確認なしでは消さない。"""
 
     def test_retire_lists_it_and_keeps_it(self):
         done = self.retire()
@@ -554,7 +560,7 @@ class BrokenChildrenTest(RetireHarness):
         self.assertIn("children が配列ではない", done.stderr)
 
 
-class BrokenSiblingRecordTest(CancelledChildTest):
+class BrokenSiblingRecordTest(CancelledChildHarness):
     def test_a_broken_record_of_another_parent_does_not_stop_the_branch_tidy(self):
         write(
             os.path.join(self.state, "retire", "i0000.json"),
@@ -567,7 +573,7 @@ class BrokenSiblingRecordTest(CancelledChildTest):
         self.assertNotIn("i0001-01-09", self.branches())
 
 
-class CaseFoldTest(CancelledChildTest):
+class CaseFoldTest(CancelledChildHarness):
     """大文字小文字だけが違う名前は同じものとして扱う（Linux でも）。"""
 
     def test_abandon_with_another_spelling_keeps_the_record_while_the_worktree_stays(self):

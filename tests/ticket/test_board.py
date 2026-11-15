@@ -20,6 +20,7 @@ import os
 import re
 import unittest
 
+from tests import treecache
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
 from tests.ticketsample import child_text, parent_text
@@ -35,6 +36,7 @@ class BoardTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
+    @treecache.cached
     def scene(self):
         """親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、
         同じフェーズに未承認の子が 1 枚ある。その子は着手済みの子のワークツリーにも入っている。"""

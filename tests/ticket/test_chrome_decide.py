@@ -48,8 +48,8 @@ def thread(ident, body, url=None, resolved=False, line=3):
 
 
 class ChromeDecideHarness(CoreHarness):
-    def setUp(self):
-        super().setUp()
+    def prepare(self):
+        """フェーズ 1 を依頼まで進めた木。"""
         write(
             os.path.join(self.root, *Chrome.COMPAT_FILE.split("/")),
             f"#!/bin/sh\nCCNAVI_COMPAT={exe.compat()}\n",
