@@ -6,7 +6,9 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/entry/catchup"
 	"ccnavi/internal/entry/diagnose"
+	"ccnavi/internal/entry/dirs"
 	"ccnavi/internal/entry/lint"
 	"ccnavi/internal/entry/shask"
 	"ccnavi/internal/entry/suggest"
@@ -23,6 +25,7 @@ import (
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
+	"ccnavi/internal/tickets/sync/stage"
 )
 
 // ticketControlOff はチケット制御が切られているときの断り。
@@ -425,16 +428,17 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case cmd[0] == "accept":
 		// 受け入れの計画を sh が jq を使わずに読む（返信と解決をホストに書く前の確かめを含む）。
 		return runAccept(stdout, stderr, cmd[1:]), true
-	case slices.Equal(cmd, []string{"sync", "paths"}):
-		return okIf(syncPaths(stdout, conf) == 0), true
 	case slices.Equal(cmd, []string{"sync", "retired"}):
-		return okIf(syncRetired(stdout, conf) == 0), true
+		return okIf(catchup.Retired(stdout, conf) == 0), true
 	case (len(cmd) == 3 || len(cmd) == 4) && a.head("sync", "check"):
 		repo := ""
 		if len(cmd) == 4 {
 			repo = cmd[3]
 		}
-		return okIf(syncCheck(stdout, stderr, root, conf, cmd[2], repo) == 0), true
+		return okIf(catchup.Check(stdout, stderr, root, conf, cmd[2], repo) == 0), true
+	case len(cmd) >= 2 && cmd[0] == "fetch":
+		// ccnavi-fetch.sh の段取りの間の判定と早送り。チケット制御の有無に依らない。
+		return catchup.Fetch(stdout, stderr, root, conf, cmd[1:]), true
 	case cmd[0] == "text":
 		return runText(stdout, stderr, root, cmd[1:]), true
 	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "integrate":
@@ -455,16 +459,25 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case cmd[0] == "preflight":
 		// チケット作業の入口の事前確認（ccnavi-common-host.sh の ccnavi_preflight と ccnavi_host_access）。
 		return runPreflight(stdout, stderr, root, cmd[1:]), true
+	case cmd[0] == "host":
+		// sh が取ってきたホストの応答（失敗の返事・MR・スレッド・レビュー）を読む。チケット制御の有無に依らない。
+		return runHost(stdout, stderr, cmd[1:]), true
 	case cmd[0] == "start":
 		// ccnavi-start.sh が取ってきたホストの応答を読む。チケット制御の有無に依らない。
 		return runStart(stdout, stderr, root, conf, cmd[1:]), true
+	case cmd[0] == "ticket-sh":
+		// ccnavi-ticket.sh の段取り（識別子の読み・子のワークツリー・次の手の文・approval-request の結果ファイル）。
+		return runTicketSh(stdout, stderr, root, conf, cmd[1:]), true
 	}
 	if code, matched := shask.Answer(stdout, stderr, root, conf, cmd); matched {
 		return code, true
 	}
 	switch {
 	case len(cmd) == 6 && a.head("sync", "tidy"):
-		return okIf(syncTidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5]) == 0), true
+		return okIf(catchup.Tidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5]) == 0), true
+	case len(cmd) >= 3 && cmd[0] == "sync":
+		// ccnavi-sync.sh の段取りの間の判定・取り込み・片付け。
+		return catchup.Sync(stdout, stderr, root, conf, cwdOf(a), cmd[1:]), true
 	case len(cmd) == 3 && a.head("write-and-push", "family"):
 		if !ids.IsValidFamily(cmd[2]) {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push family の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))
@@ -503,15 +516,25 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return wapUnsent(stdout, cmd[2], cmd[3]), true
 	case len(cmd) == 4 && cmd[0] == "path" && cmd[1] == "under":
 		return pathUnder(stdout, cmd[2], cmd[3]), true
-	case len(cmd) == 3 && cmd[0] == "stage" && cmd[1] == "importable":
-		return stageImportable(stdout, cmd[2]), true
-	case len(cmd) == 5 && cmd[0] == "branches" && cmd[1] == "pulls":
-		// GitHub の開いた PR の一覧（sh が取ってきたまま）から、issue に関係する PR を選ぶ。
-		return okIf(branch.Pulls(stdout, stderr, conf, cmd[2], cmd[3], cmd[4]) == 0), true
-	case len(cmd) == 3 && cmd[0] == "branches":
-		// ホストの結果は sh が取ってきて `--result` で渡す。
-		return okIf(branch.Report(stdout, stderr, conf, root, cwdOf(a), cmd[1], cmd[2], a.Str("result"),
-			a.Truthy("json")) == 0), true
+	case len(cmd) == 1 && cmd[0] == "dirs":
+		// ccnavi-dirs.sh の本体（projects/ の clone 済みリポジトリの一覧）。
+		dirs.Report(stdout, root)
+		return config.ExitOK, true
+	case cmd[0] == "stage":
+		// ccnavi-stage.sh の本体（下書きを作る・取り込みの手順を出す）。出力はそのまま標準出力・標準エラーに書く。
+		wd, _ := ospath.Getwd()
+		return stage.Run(stdout, stderr, root, wd, cmd[1:]), true
+	case len(cmd) >= 3 && cmd[0] == "branches":
+		// ホストの結果は sh が取ってきたまま `--result` で渡し、渡し方（checked・unchecked・failed）と引数を後ろに並べる。
+		from := branch.Source{Result: a.Str("result")}
+		if len(cmd) > 3 {
+			from.How, from.Args = cmd[3], cmd[4:]
+			if want, ok := branch.SourceArgs[from.How]; !ok || len(from.Args) != want {
+				fmt.Fprintf(stderr, "ccnavi: branches の渡し方が読めない（%s）\n", pyfmt.Repr(cmd[3:]))
+				return config.ExitError, true
+			}
+		}
+		return okIf(branch.Report(stdout, stderr, conf, root, cwdOf(a), cmd[1], cmd[2], from, a.Truthy("json")) == 0), true
 	case cmd[0] == "idle":
 		return runIdle(in, stdout, stderr, conf, cmd), true
 	case cmd[0] == "stop-review":

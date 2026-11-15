@@ -57,7 +57,7 @@ func full(patterns ...string) []*regexp.Regexp {
 	return out
 }
 
-// kinds は取り込み先の表（許可リスト）。直すときは設計書の表も直す。ccnavi-stage.sh は `stage importable` でこの表に聞く。
+// kinds は取り込み先の表（許可リスト）。直すときは設計書の表も直す。ccnavi-stage.sh の本体（stage）も --commands でこの表を引く。
 var kinds = []*Kind{
 	{
 		ID: Template,

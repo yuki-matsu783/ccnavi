@@ -76,6 +76,19 @@ func (t *Table) FromDraft(rel string) string {
 	return t.convert(rel, func(p Pair) (string, string) { return p.Draft, p.Original })
 }
 
+// Reserved は、元の相対パス（"/" 区切り）の要素のうち、表の下書きでの名前と同じもの（予約した名前）の最初の 1 つ。
+// 無ければ空。その名前の階層を含むファイルを下書きにすると、取り込みで元に戻すときに別のパスへ読み替わってしまう。
+func (t *Table) Reserved(rel string) string {
+	for _, part := range strings.Split(rel, "/") {
+		for _, p := range t.pairs {
+			if same(part, p.Draft) {
+				return part
+			}
+		}
+	}
+	return ""
+}
+
 func (t *Table) convert(rel string, way func(Pair) (from, to string)) string {
 	parts := strings.Split(rel, "/")
 	for i, part := range parts {

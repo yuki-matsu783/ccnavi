@@ -74,7 +74,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 親のブランチの確かめ（閉じたかは MR がマージ済みかで決める。ホストに聞けなければ推定せず止まる）は、ユーザが打つ
 `ccnavi-sync.sh` が持つ。統合先は、ホストに聞いた名前（`ls-remote --symref origin HEAD`）、聞けなければ手元の `origin/HEAD`、`main`・`master` の順で、
 リモートにある最初の名前にする。どれも無ければ止める。親のブランチ名は、実行ファイルの `ccnavi write-and-push family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
-`ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
+`ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` と同じ判定（`sync recheck`）でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
 （理由を直して打ち直せば通る）。MR がマージ済みと分かったら、手元の片付け（`ccnavi sync tidy`。9.11）を行う。
 
 **`ccnavi-git.sh` の判定は実行ファイルが持つ。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
@@ -83,7 +83,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 `checkout`・`switch` の行き先を、今のブランチと、変換した名前がフォルダ名になるブランチに限る（`worktree add` も変換した名前の
 形だけ）。直接作業の取り込み（`integrate` / `integrate-done`）は、判定（チケットに結び付くブランチを断る `integrate-ticket`）と状態操作（取り込みの記録・一時ワークツリー・取り込み先への `merge --ff-only --no-overwrite-ignore`・取り込んだブランチの
 `update-ref -d`）を実行ファイルの `ccnavi git integrate` が 1 回の起動で行い、sh はロックを取ってから呼ぶだけ。
-親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・親チケットの `mr:` は `ccnavi tree parent`、親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは `ccnavi tree leftover`、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める（sh はチケットの YAML を読まない）。答えが得られないときは、
+親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・親チケットの `mr:` は `ccnavi tree parent`、親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは `ccnavi-worktree.sh` の本体（実行ファイルの `worktree direct`）が `shask.Leftover` で、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める（sh はチケットの YAML を読まない）。答えが得られないときは、
 止める側の検査は止める向きに（ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 

@@ -157,7 +157,7 @@ func commitWithSpecs(tree string, specs []string, timeout time.Duration, args ..
 		return git.Done{Code: 1, Stderr: err.Error()}
 	}
 	full := append(append([]string{}, args...), "--pathspec-from-file="+f.Name(), "--pathspec-file-nul")
-	return git.Run(tree, full, git.Options{Timeout: timeout, RawPaths: true, Graceful: true})
+	return git.Run(tree, full, git.Options{Timeout: timeout, RawPaths: true, Graceful: true, CLocale: true})
 }
 
 // failedOutput は git が断った出力（標準エラーと標準出力。期限切れなら期限の文）。
@@ -294,7 +294,7 @@ func Begin(tree, base, sha, child, branch string) (*Merging, Said, bool) {
 	if git.IsAncestor(tree, sha, "HEAD", localOptions()).OK() {
 		return m, said, true
 	}
-	done := git.Run(tree, []string{"merge", "--no-ff", "--no-commit", "--quiet", sha}, git.Options{Timeout: git.MergeTimeout, RawPaths: true, LazyFetch: true})
+	done := git.Run(tree, []string{"merge", "--no-ff", "--no-commit", "--quiet", sha}, git.Options{Timeout: git.MergeTimeout, RawPaths: true, LazyFetch: true, CLocale: true})
 	if done.OK() {
 		m.Active = true
 		return m, said, true
@@ -364,7 +364,7 @@ func (m *Merging) Commit(written []string, message string, timeout time.Duration
 		}
 		git.Run(m.Tree, []string{"rm", "--cached", "--quiet", "--ignore-unmatch", "--", literal(rel)}, localOptions())
 	}
-	done := git.Run(m.Tree, []string{"commit", "--quiet", "--no-verify", "-m", message}, git.Options{Timeout: timeout, RawPaths: true, Graceful: true})
+	done := git.Run(m.Tree, []string{"commit", "--quiet", "--no-verify", "-m", message}, git.Options{Timeout: timeout, RawPaths: true, Graceful: true, CLocale: true})
 	if !done.OK() {
 		c.Refused = refusal.Of(failedOutput(done))
 		return c

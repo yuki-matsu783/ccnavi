@@ -81,28 +81,31 @@
          チケットの parent: でもその親の子であることを確かめます。取り消した子は confirmed が
          要ります。ユーザが ! を付けて打つコマンドで、エージェントからは打てません）
     ccnavi sync tidy <parent> <repo> <branch> <sha>
-        （ccnavi-sync.sh 用。親の MR がマージ済みと分かった後に、親のワークツリーと
+        （親の MR がマージ済みと分かった後に、親のワークツリーと
          手元のブランチを、<branch> が親のブランチで、手元の先頭が push 済みの先頭
          （origin/<branch>）と <sha>（MR の先頭）の両方に含まれるときだけ削除します。
          エージェントからは打てません。
          1 行ずつ報告し、最後に
          "record yes|no"（片付けが済んだか）を出力します。済んだときは retire/<parent>.json も
          消します。ネットワークには出ません）
-    ccnavi worktree name <name>
-        （直接作業するワークツリーの名前が <prefix>-<number>-<slug> の形式でない場合に、
-         "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
-    ccnavi sync paths
-        （.ccnavi/scripts/ccnavi-sync.sh 用。1行に "<key> <value>" を1組ずつ出力します。
-         対象は、承認済みと提案の置き場、ccnaviのディレクトリです。統合先ブランチは返しません
-         （sh が各リポジトリの origin/HEAD で決めます））
+    ccnavi sync plan|integ|fetched|family|pull|merged|recheck <scripts> <args>...
+        （.ccnavi/scripts/ccnavi-sync.sh 用。sh が ls-remote・fetch・ccnavi-review.sh merged を
+         打つ間の判定と、早送り・merge（失敗したら取りやめ）・origin/HEAD の向け直し・片付けを行います。
+         "sync 1" の行に続いて、表示する "out <行>"、止めたことを表す "failed"、次の一手の
+         "next <語>"（fetch・ask・skip・go）を出力します。merged は片付けでブランチを消すので、
+         エージェントからは打てません。ネットワークには出ません）
     ccnavi sync check <parent> [<repo>]
-        （ccnavi-sync.sh が <parent> を取り込んだ後に使用します。ファミリーの承認済みチケットと
+        （<parent> を取り込んだ後の検査です（ccnavi-sync.sh は sync recheck で同じ判定をします）。ファミリーの承認済みチケットと
          その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を
          1行ずつ出力します（warn には、手元のレイヤーが取得済みの origin/<統合先> のレイヤーと
          違うことを含みます。git show でローカルの参照を読むだけで、ネットワークには出ません）。
          error がある場合は終了コード1になります）
+    ccnavi fetch plan|forward|track|retarget|base|advance <args>...
+        （.ccnavi/scripts/ccnavi-fetch.sh 用。sh が fetch・ls-remote を打つ間の判定と、早送り・
+         update-ref・origin/HEAD の向け直しを行います。"fetch 1" の行に続いて、表示する "out <行>" と
+         次の一手の "next <語>"（fetch・lock）を出力します。ネットワークには出ません）
     ccnavi sync retired
-        （ccnavi-sync.sh 用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
+        （ボード用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
          （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
          形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
          です。ネットワークにも git にも触れません）
@@ -118,37 +121,21 @@
         （push のゲート用。"tree 1" の行に続いて、次の一手 "gate pass|stop|ls-remote" を出力します。
          stop には "why <理由>"、ls-remote にはリモートに無いときの "missing <理由>" と、
          確かめられないときの "unreachable <理由>" が続きます。ls-remote は呼ぶ側が打ちます）
-    ccnavi tree bound <tree> <name>
-        （ccnavi-worktree.sh --adopt 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
-         ワークツリーがチケットに結び付くか。結び付くと --adopt は断ります）、結び付くなら
-         "why <理由>" を出力します。Stop の促しと同じ判定です）
-    ccnavi tree leftover <tree> <name>
-        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"leftover yes|no"（そのツリーが親の
-         ワークツリーで、承認待ちの提案・着手中の子・MR が残っているか）、"proposal yes|no"
-         （todo/ か review/ の提案があるか）、"doing <件数>"（doing/ の子の数）、
-         "mr <番号>|-"（親の mr:）、"stage doing|review|todo|-"（親の段階。doing が最優先で、
-         承認済みなら doing、finish 済みでレビュー待ちなら review、承認前の提案だけなら todo）
-         を出力します。親でなければ "leftover no"、"stage -" です）
-    ccnavi tree base-bound <main-checkout> <branch>
-        （ccnavi-worktree.sh 用。"tree 1" の行に続いて、"bound yes|no|unknown"（取り込み先の
-         ブランチがチケットに結び付くか。yes と unknown は切るのを断ります）、yes なら
-         "why <理由>" を出力します。結び付きは取り込み先のリポジトリだけを見ます）
     ccnavi text <id> [name=value]... [@field=case]...
         （スクリプト用。文面ファイル（.ccnavi/messages/）の識別子 <id> の文を
          組み立てて出力します。
          name=value は文面の {name} に入る値、@field=case は欄の場合分けの選択です。
          引けないとき（識別子が無い・値の不足・文面ファイルの不備）は何も出力せず、
          理由を標準エラーに出して終了コード1になります）
-    ccnavi worktree id <branch>
-        （スクリプト用。"id <識別子>"（ブランチ名の / を - に置き換えたもの）に続いて、
-         親に採用できなければ "problem <理由>"（58文字以内・末尾が -2桁でない・字の種類・NFC）、
-         直接作業や子のワークツリーの名前に指定できなければ
-         "direct <理由>"（64文字以内・字の種類・NFC）、
-         子の識別子の形なら "child yes" を出力します）
-    ccnavi worktree clash <branch> <file>
-        （スクリプト用。<file>（1 行 1 本のブランチ名）に、<branch> と同じ識別子（/ と - の違い・
-         大文字小文字の違いは同じ）になる別のブランチがあれば "clash <名前>"、無ければ "clash -"
-         を出力します）
+    ccnavi worktree direct plan -- <ccnavi-worktree.sh の引数>...
+        （ccnavi-worktree.sh 用。引数と、切る前に決まる検査（C1〜C3・同じ識別子・既にあるワークツリーとブランチ・
+         親のワークツリー・取り込みの途中の記録）を行い、引き取り（--adopt）と --dry-run はここで終えます。切る道に
+         進むなら "fetch <取り込み先>" と "top <ツリー>" を出力します。答えは 1 行 1 項目で、誤りは
+         "fail <識別子> <終了コード>" と "msg <文>"）
+    ccnavi worktree direct cut fetch=ok|failed fetch-out=<file> heads=<file> heads-err=<file> -- <ccnavi-worktree.sh の引数>...
+        （ccnavi-worktree.sh 用。sh が取った fetch の出力と ls-remote --heads の応答（heads が空なら取れなかった）から、
+         origin とのずれ・書きかけ・確認コードを決め、確認が要れば報告して終了コード 3 を返す答えを出し、要らなければ
+         記録（ccnavi-direct/<名前>）を書いてワークツリーを切ります）
     ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
         （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
          出力します。Chrome 拡張の「始める」と同じ作り方です。タイトルが長くて slug を
@@ -178,17 +165,30 @@
         （write-and-push 用。取り込み直した先頭に自分のコミットが入っていれば "landed yes <sha>" を出力します）
     ccnavi write-and-push unsent <tree> <branch>
         （ccnavi-user-push-approved.sh 用。まだ送れていないパスを "unsent <パス>" で1行ずつ出力します。読み取り専用）
-    ccnavi branches issue|mr <number> [--result <json>] [--json]
-        （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
-    ccnavi branches pulls <number> <owner/repo> <file>
-        （ccnavi-branches.sh 用。GitHub の開いた PR の一覧（ホストの応答のまま）から issue に関係する PR を選び、
-         --result の mrs の形の JSON の配列を出力します。読み取り専用）
+    ccnavi branches issue|mr <number> [checked github|gitlab <host> <owner/repo> <project-id>|-] [--result <file>] [--json]
+    ccnavi branches issue|mr <number> unchecked <reason> [--json]
+    ccnavi branches issue|mr <number> failed <call> --result <file> [--json]
+        （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。checked の --result はホストの応答のまま
+         （MR は 1 本、issue は GitHub なら開いた PR の一覧、GitLab なら related_merge_requests）、failed の --result は
+         ホストの返事。読み取り専用）
     ccnavi path under <base> <path>
         （ccnavi-review.sh 用。"path 1" に続けて、path が base の下なら "under yes"、違えば "under no" を
          出力します。大文字小文字は区別しません。読み取り専用）
-    ccnavi stage importable <path>
-        （ccnavi-stage.sh 用。ccnavi-user-handoff.sh で取り込める種類のパスなら "importable yes"、
-         違えば "importable no" を出力します。読み取り専用）
+    ccnavi stage -- [--commands] <path>...
+        （ccnavi-stage.sh の本体。保護対象のファイルを下書きの置き場（wip/handoff/）へコピーするか、--commands で
+         編集済みの下書きの取り込みの手順を出します。出力はそのまま標準出力・標準エラーに書きます）
+    ccnavi dirs
+        （ccnavi-dirs.sh の本体。projects/ に clone 済みのリポジトリを、最新コミットが新しい順に最大 10 件出力します）
+    ccnavi ticket-sh id -- <ccnavi-ticket.sh の引数>...
+        （ccnavi-ticket.sh 用。識別子を "id <識別子>" で出力します。使えなければ "bad yes" と "msg <文>"）
+    ccnavi ticket-sh child <child> <parent-tree> <parent-branch> <parent>
+        （ccnavi-ticket.sh 用。子の start で、子のワークツリーが無ければ親のブランチの先頭から作ります。
+         手元の子のブランチに親に無いコミットがあれば作らずに "fail <識別子> 1" を出力します）
+    ccnavi ticket-sh unsent <op> <parent-branch> <mr|->
+        （ccnavi-ticket.sh 用。一度も送っていない親で止めたときの次の手を "err <行>" で出力します）
+    ccnavi ticket-sh result-begin | result-end <file> <rc> <started> -- <ccnavi-ticket.sh の引数>...
+        （ccnavi-ticket.sh 用。approval-request の結果ファイルの名前を決め（"file <パス>"・"started <時刻>"）、
+         終わったあとに中身を書きます）
     ccnavi git check <self> <sync> <start> <self_q> <worktree_q>
         （ccnavi-git.sh 用。標準入力に NUL 区切りで受けた git の引数を、git の状態とあわせて通すかを、
          allow・pass か "deny <識別子>" と拒否の文で出力します。読み取り専用）
@@ -225,6 +225,13 @@
     ccnavi preflight uid <user の応答>
         （ccnavi-common-host.sh 用。チケット作業の事前確認について、手元の項目・項目ごとの結果・勧める対処・行と次の一手を出し、
          書き込みの権限を判定します。ネットワークには出ません）
+    ccnavi host fail <file>
+    ccnavi host probe ok|failed <file>
+    ccnavi host mr-state github|gitlab <scheme> <host> <path> <number> ok|failed <file>
+    ccnavi host find-mr|merged|copy|marked|undraft <args> <file>...
+        （ccnavi-common-host.sh・ccnavi-common-review.sh・ccnavi-review.sh 用。スクリプトが取得したホストの応答
+         （失敗したときはホストの返事）のファイルを読み、1行1項目で出力します。copy は --result に渡す JSON を出力します。
+         読めない応答は終了コード 1。読み取り専用）
     ccnavi start report <名前>=<値>...
     ccnavi start dry new-issue|mcp|create|existing <名前>=<値>...
         （ccnavi-start.sh 用。開始の結果と、--dry-run の作る予定を出力します）

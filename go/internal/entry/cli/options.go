@@ -3,11 +3,11 @@ package cli
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	"ccnavi/internal/catalog/docs"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/policy/selfguard"
@@ -243,15 +243,12 @@ func fromTerminal(in *input, conf *config.Settings, stderr io.Writer, op useronl
 	return false
 }
 
-// `write-and-push sort` の版は sha か `refs/remotes/origin/<親のブランチ>` の形だけ（git の引数として読まれる文字列を
-// 入れない）。
-var shaForm = regexp.MustCompile(`\A[0-9a-f]{7,64}\z`)
-
 const originRef = "refs/remotes/origin/"
 
-// revisionOK は `write-and-push sort` の版として渡された文字列が、許す 2 つの形のどちらかか。
+// revisionOK は `write-and-push sort` の版として渡された文字列が、許す 2 つの形（sha か
+// `refs/remotes/origin/<親のブランチ>`）のどちらかか。git の引数として読まれる文字列を入れない。
 func revisionOK(since string) bool {
-	if shaForm.MatchString(since) {
+	if git.IsSHA(since) {
 		return true
 	}
 	name, ok := strings.CutPrefix(since, originRef)

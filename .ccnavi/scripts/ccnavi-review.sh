@@ -53,7 +53,7 @@
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
 #
-# mr-state <番号>: 読むだけ。何も書かず、実行ファイルも起こさない。標準出力は 2 行で、機械が読む。
+# mr-state <番号>: 読むだけ。何も書かない。応答の読みは実行ファイル（`ccnavi host mr-state`）。標準出力は 2 行で、機械が読む。
 # 区切りは空白 1 つ。1 行目は版 `mr-state 1`、2 行目は次のどれか。
 #   open <番号> <yes|no> <URL>        開いている（3 つめは Draft か）
 #   merged <番号> <URL>               マージ済み
@@ -185,74 +185,14 @@ mr_state_known() {
 	exit 0
 }
 
-# API の失敗の本文（gh / glab / curl の出力）から、種類（mrs_kind）と理由（mrs_why）を決める。
-# 本文は理由にコピーしない。ネットワークの失敗を先に見て（curl は 404 などを "error: 404" と書く）、次に状態コード。
-mr_state_classify() {
-	mrs_low=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
-	mrs_code=$(printf '%s' "$mrs_low" | grep -o -E '(http |error: |: )[0-9]{3}( |$)' | head -n 1 | grep -o -E '[0-9]{3}' | head -n 1 || :)
-	mrs_with=""
-	[ -z "$mrs_code" ] || mrs_with="（HTTP ${mrs_code}）"
-	case "$mrs_low" in
-	*"could not resolve"* | *"couldn't resolve"* | *"no such host"* | *"failed to connect"* | *"couldn't connect"* | *"connection refused"* | *"connection reset"* | *"timed out"* | *"timeout"* | *"network is unreachable"* | *"dial tcp"* | *"i/o timeout"* | *"curl: (6)"* | *"curl: (7)"* | *"curl: (28)"* | *"curl: (35)"* | *"curl: (52)"* | *"curl: (56)"* | *"curl: (60)"*)
-		mrs_kind=network
-		mrs_why="ホストに届かない（ネットワークか、ホスト名を引けない）"
-		return 0
-		;;
-	*"rate limit"*)
-		mrs_kind=api
-		mrs_why="ホストの API の利用上限に達した${mrs_with}"
-		return 0
-		;;
-	esac
-	case "$mrs_code" in
-	404)
-		mrs_kind=not-found
-		mrs_why="MR #${mrs_n} が見つからない（番号か、リポジトリへの権限を確かめる）${mrs_with}"
-		return 0
-		;;
-	401 | 403)
-		mrs_kind=auth
-		mrs_why="認証に失敗した（トークンか gh / glab の認証を確かめる）${mrs_with}"
-		return 0
-		;;
-	esac
-	case "$mrs_low" in
-	*"not found"*)
-		mrs_kind=not-found
-		mrs_why="MR #${mrs_n} が見つからない（番号か、リポジトリへの権限を確かめる）"
-		;;
-	*"bad credentials"* | *"unauthorized"* | *"forbidden"* | *"authentication"*)
-		mrs_kind=auth
-		mrs_why="認証に失敗した（トークンか gh / glab の認証を確かめる）"
-		;;
-	*)
-		mrs_kind=api
-		mrs_why="ホストの API が失敗した${mrs_with}"
-		;;
-	esac
-}
-
 # 失敗の本文を受ける置き場。ccnavi_host_api は部分シェルの中で失敗を知らせるので、ファイルで受け渡す。
 mr_state_note() {
 	printf '%s' "$3" >"$mrs_err" 2>/dev/null || :
 }
 
-# URL を 1 語にそろえる。空・空白や制御文字を含む・読めないときは、ホスト名とパスから組む。
-mr_state_url() {
-	mrs_url=$(ccnavi_mask_url "$1")
-	mrs_clean=$(printf '%s' "$mrs_url" | tr -d '\001-\040\177')
-	if [ -z "$mrs_clean" ] || [ "$mrs_clean" != "$mrs_url" ]; then
-		if [ "$ccnavi_h_kind" = github ]; then
-			mrs_url="$ccnavi_h_scheme://$ccnavi_h_host/$ccnavi_h_path/pull/$mrs_n"
-		else
-			mrs_url="$ccnavi_h_scheme://$ccnavi_h_host/$ccnavi_h_path/-/merge_requests/$mrs_n"
-		fi
-	fi
-}
-
 mr_state() {
 	mrs_n="$1"
-	# ホストの返事の読み方は ccnavi-common-host.sh と同じ。ここは失敗を、決まった種類に分けて答えるだけ。
+	# 接続できないときの種類と理由は sh が決める（接続は外との出入り）。応答の読みは実行ファイル。
 	origin=$(git remote get-url origin 2>/dev/null || :)
 	[ -n "$origin" ] || mr_state_unknown not-found "origin がありません"
 	mrs_rc=0
@@ -284,56 +224,39 @@ mr_state() {
 		mrs_tmp="${TMPDIR:-/tmp}"
 	fi
 	mrs_err="$mrs_tmp/ccnavi-mr-state-err-$$"
-	trap 'rm -f "$mrs_err" 2>/dev/null || :' EXIT
+	trap 'rm -f "$mrs_err" "$mrs_tmp/ccnavi-mr-state-$$" 2>/dev/null || :' EXIT
 	ccnavi_h_tmp="$mrs_tmp"
 	ccnavi_h_on_fail=mr_state_note
 	ccnavi_h_max_time=30
 
 	if [ "$ccnavi_h_kind" = github ]; then
 		mrs_rel="repos/$ccnavi_h_path/pulls/$mrs_n"
-		mrs_jq='if type == "object" then "\(.number // "-") \(.state // "-") \(.merged == true or (.merged_at // null) != null) \(.draft == true) \(.html_url // "")" else empty end'
 	else
 		mrs_rel="projects/$(ccnavi_host_encoded_path)/merge_requests/$mrs_n"
-		mrs_jq='if type == "object" then "\(.iid // "-") \(.state // "-") \(.state == "merged") \((.draft // .work_in_progress) == true) \(.web_url // "")" else empty end'
 	fi
-	mrs_rc=0
-	mrs_answer=$(ccnavi_host_api GET "$mrs_rel") || mrs_rc=$?
-	if [ "$mrs_rc" -ne 0 ]; then
-		mrs_body=$(cat "$mrs_err" 2>/dev/null || :)
-		mr_state_classify "$mrs_body"
-		mr_state_unknown "$mrs_kind" "$mrs_why"
-	fi
-	mrs_line=$(printf '%s' "$mrs_answer" | "$ccnavi_h_jq" -r "$mrs_jq" 2>/dev/null) || mrs_line=""
-	[ -n "$mrs_line" ] || mr_state_unknown api "ホストの答えを読めなかった"
-
-	# 空白で 5 つに分ける（URL は最後。展開を避けるため、パラメータ展開だけで切る）。
-	mrs_number="${mrs_line%% *}"
-	mrs_line="${mrs_line#* }"
-	mrs_st="${mrs_line%% *}"
-	mrs_line="${mrs_line#* }"
-	mrs_merged="${mrs_line%% *}"
-	mrs_line="${mrs_line#* }"
-	mrs_draft="${mrs_line%% *}"
-	mrs_raw_url="${mrs_line#* }"
-	[ "$mrs_raw_url" != "$mrs_line" ] || mrs_raw_url=""
-	[ "$mrs_number" = "$mrs_n" ] || mr_state_unknown api "ホストが別の MR（${mrs_number}）を返した"
-	mr_state_url "$mrs_raw_url"
-	if [ "$mrs_merged" = true ]; then
-		mr_state_known merged "merged $mrs_n $mrs_url"
-	fi
-	case "$mrs_st" in
-	open | opened)
-		if [ "$mrs_draft" = true ]; then
-			mrs_yes=yes
-		else
-			mrs_yes=no
-		fi
-		mr_state_known open "open $mrs_n $mrs_yes $mrs_url"
+	mrs_file="$mrs_tmp/ccnavi-mr-state-$$"
+	mrs_how=ok
+	ccnavi_host_api GET "$mrs_rel" >"$mrs_file" || {
+		mrs_how=failed
+		cp "$mrs_err" "$mrs_file" 2>/dev/null || : >"$mrs_file"
+	}
+	# 応答（失敗なら返事）の読みは実行ファイル。失敗の種類の分け方・URL の組み方・理由の文もそこにある
+	# （ホストの返事の本文は理由にコピーしない）。
+	mrs_out=$(ccnavi_ask "$root" host mr-state "$ccnavi_h_kind" "$ccnavi_h_scheme" "$ccnavi_h_host" "$ccnavi_h_path" "$mrs_n" \
+		"$mrs_how" "$mrs_file") || mr_state_unknown no-tool "ccnavi の実行ファイルが見つからない（scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で配置する）"
+	rm -f "$mrs_file" || :
+	mrs_state=$(printf '%s\n' "$mrs_out" | sed -n 's/^state //p')
+	mrs_answer=$(printf '%s\n' "$mrs_out" | sed -n 's/^answer //p')
+	case "$mrs_state" in
+	open | merged | closed) mr_state_known "$mrs_state" "$mrs_answer" ;;
+	unknown)
+		mrs_kind="${mrs_answer#unknown }"
+		log_info mr-stateを答えた -- "state=unknown" "kind=${mrs_kind%% *}" "exit=1"
+		mr_state_emit "$mrs_answer"
+		exit 1
 		;;
-	closed) mr_state_known closed "closed $mrs_n $mrs_url" ;;
-	locked) mr_state_unknown api "MR #${mrs_n} はマージの途中（locked）" ;;
-	*) mr_state_unknown api "ホストが想定外の state（${mrs_st}）を返した" ;;
 	esac
+	mr_state_unknown no-tool "ccnavi の実行ファイルが答えない（scripts/ccnavi-build.sh で組み立て直す）"
 }
 
 review_place
@@ -464,64 +387,78 @@ find_posted() {
 
 # ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境では REST の ccr/ready_for_review を使う）。GitLab はタイトルの "Draft: " を除く。
 
-# タイトルの頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
-# sed の大文字小文字を区別しない指定（`I`）は GNU だけで、BSD の sed（macOS）では失敗するので、字ごとに書く。
-strip_draft() {
-	sed -E 's/^[[:space:]]*(\[?([Dd][Rr][Aa][Ff][Tt]|[Ww][Ii][Pp])\]?:?[[:space:]]*)+//'
+# タイトルの頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など）を除いたタイトルと、Draft を外した後にまだ Draft かは、
+# 実行ファイル（`ccnavi host undraft title`・`undraft done`）が応答から読む。sh は応答を取ってきてファイルに書き、
+# 送る本文を組む（外との出入り）。
+
+# undraft_ask <title|done> <種類か形> <応答のファイル> 実行ファイルの答えを出す。答えなければ空。
+undraft_ask() {
+	ccnavi host undraft "$1" "$2" "$3" 2>/dev/null | tr -d '\r' || :
 }
 
 undraft() {
 	mr_number="$1"
+	ud_file="$state/review-undraft-$$.json"
 	if [ "$kind" = github ]; then
-		pr=$(api GET "repos/$path/pulls/$mr_number")
-		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
+		api GET "repos/$path/pulls/$mr_number" >"$ud_file" || : >"$ud_file"
+		ud_title=$(undraft_ask title github "$ud_file")
+		node=$(printf '%s\n' "$ud_title" | sed -n 's/^node //p')
 		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
 		# タイトルの "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときにタイトルからも除く。
-		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
-		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
-		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
+		if [ "$(printf '%s\n' "$ud_title" | sed -n 's/^title //p')" = new ]; then
+			stripped=$(printf '%s\n' "$ud_title" | sed -n 's/^new //p')
 			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null || return 1
 		fi
 		query=$("$JQ" -n --arg id "$node" '{
 			query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{number isDraft}}}",
 			variables: {id: $id}}')
 		gql_rc=0
-		res=$(gql "$query") || gql_rc=$?
+		gql "$query" >"$ud_file" || gql_rc=$?
 		case "$gql_rc" in
-		0) printf '%s' "$res" | "$JQ" -r '.data.markPullRequestReadyForReview.pullRequest.isDraft' ;;
+		0) undraft_ask done graphql "$ud_file" | sed -n 's/^draft //p' ;;
 		3)
 			# GraphQL を使えない環境。Draft を外したあと、実状態（draft）を読んで返す（戻り値の形は GraphQL と同じ true / false）
 			rest_rc=0
 			api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" '{}' >/dev/null || rest_rc=$?
 			if [ "$rest_rc" -eq 0 ]; then
-				pr=$(api GET "repos/$path/pulls/$mr_number") || rest_rc=$?
+				api GET "repos/$path/pulls/$mr_number" >"$ud_file" || rest_rc=$?
 			fi
 			if [ "$rest_rc" -ne 0 ]; then
+				rm -f "$ud_file" || :
 				rest_fallback_failed "Draft の解除"
 				return 1
 			fi
 			rm -f "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
-			printf '%s' "$pr" | "$JQ" -r '.draft // false'
+			undraft_ask done rest "$ud_file" | sed -n 's/^draft //p'
 			;;
-		*) return 1 ;;
+		*)
+			rm -f "$ud_file" || :
+			return 1
+			;;
 		esac
 	else
-		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
-		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number のタイトルを読めない。"
-		stripped=$(printf '%s' "$title" | strip_draft) ||
-			fail undraft-title "マージリクエスト !$mr_number のタイトルから Draft を除けなかった。タイトルは変えていない。"
-		if [ "$stripped" = "$title" ]; then
+		api GET "projects/$(encoded_path)/merge_requests/$mr_number" >"$ud_file" || : >"$ud_file"
+		ud_title=$(undraft_ask title gitlab "$ud_file")
+		case "$(printf '%s\n' "$ud_title" | sed -n 's/^title //p')" in
+		same)
+			rm -f "$ud_file" || :
 			printf 'false\n'
 			return 0
-		fi
-		# 除いた結果が空なら、空のタイトルで更新しない。
-		[ -n "$stripped" ] ||
+			;;
+		empty)
+			# 除いた結果が空なら、空のタイトルで更新しない。
 			fail undraft-empty-title "マージリクエスト !$mr_number のタイトルから Draft を除くと空になる。タイトルは変えていない。タイトルを付けてから再実行してください。"
+			;;
+		new) stripped=$(printf '%s\n' "$ud_title" | sed -n 's/^new //p') ;;
+		*) fail no-mr-title "マージリクエスト !$mr_number のタイトルを読めない。" ;;
+		esac
 		# squash も有効にする。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
 		# （マージのときにユーザが選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
-		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" | "$JQ" -r '.draft // .work_in_progress // false'
+		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" >"$ud_file" || : >"$ud_file"
+		undraft_ask done gitlab "$ud_file" | sed -n 's/^draft //p'
 	fi
+	rm -f "$ud_file" || :
 }
 
 review_begin "$args_n"
@@ -560,59 +497,46 @@ merged)
 	case "$merged_number" in
 	*[!0-9]*) fail merged-number "merged の MR の番号 (${merged_number}) は数字で渡してください。" 2 ;;
 	esac
-	found=""
-	if [ "$kind" = github ]; then
+	# sh は応答を取ってくるだけ。マージ済みか（GitLab はこのプロジェクトから出たものだけ）と答えの行は実行ファイル
+	# （`ccnavi host merged`）が読む。実行ファイルが無い・答えないときも、確かめられなかったとして unknown。
+	merged_file="$state/review-merged-$$.json"
+	merged_pid=-
+	merged_rc=0
+	if [ -z "${bin:-}" ]; then
+		merged_rc=1
+	elif [ "$kind" = github ]; then
 		owner="${path%%/*}"
 		if [ -n "$merged_number" ]; then
-			answer=$(api GET "repos/$path/pulls/$merged_number") || {
-				printf 'unknown\n'
-				exit 3
-			}
-			found=$(printf '%s' "$answer" | "$JQ" -r 'select(.merged_at != null) | "\(.number) \(.head.sha // "") \(.head.ref // "")"') || {
-				printf 'unknown\n'
-				exit 3
-			}
+			api GET "repos/$path/pulls/$merged_number" >"$merged_file" || merged_rc=$?
 		else
-			answer=$(api GET "repos/$path/pulls?state=closed&head=$(ccnavi_host_encode "$owner:$branch")") || {
-				printf 'unknown\n'
-				exit 3
-			}
-			found=$(printf '%s' "$answer" | "$JQ" -r '[.[] | select(.merged_at != null)][0] | select(. != null) | "\(.number) \(.head.sha // "") \(.head.ref // "")"') || {
-				printf 'unknown\n'
-				exit 3
-			}
+			api GET "repos/$path/pulls?state=closed&head=$(ccnavi_host_encode "$owner:$branch")" >"$merged_file" || merged_rc=$?
 		fi
 	else
-		pid=$(project_id) || {
-			printf 'unknown\n'
-			exit 3
-		}
-		if [ -n "$merged_number" ]; then
-			answer=$(api GET "projects/$(encoded_path)/merge_requests/$merged_number") || {
-				printf 'unknown\n'
-				exit 3
-			}
-			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" 'select(.state == "merged" and .source_project_id == $pid) | "\(.iid) \(.sha // "") \(.source_branch // "")"') || {
-				printf 'unknown\n'
-				exit 3
-			}
+		merged_pid=$(project_id) || merged_rc=1
+		if [ "$merged_rc" -ne 0 ]; then
+			:
+		elif [ -n "$merged_number" ]; then
+			api GET "projects/$(encoded_path)/merge_requests/$merged_number" >"$merged_file" || merged_rc=$?
 		else
 			# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
-			answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$(ccnavi_host_encode "$branch")") || {
-				printf 'unknown\n'
-				exit 3
-			}
-			found=$(printf '%s' "$answer" | "$JQ" -r --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] | select(. != null) | "\(.iid) \(.sha // "") \(.source_branch // "")"') || {
-				printf 'unknown\n'
-				exit 3
-			}
+			# 多すぎて読み切れないときの fail は部分シェルの中で止め、確かめられなかった（unknown）として答える
+			(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$(ccnavi_host_encode "$branch")") >"$merged_file" ||
+				merged_rc=$?
 		fi
 	fi
-	if [ -n "$found" ]; then
-		printf 'merged %s\n' "$found"
-	else
-		printf 'none\n'
+	merged_out=""
+	if [ "$merged_rc" -eq 0 ]; then
+		merged_out=$(ccnavi host merged "$kind" "${merged_number:--}" "$merged_pid" "$merged_file" 2>/dev/null | tr -d '\r') ||
+			merged_out=""
 	fi
+	rm -f "$merged_file" || :
+	case "$merged_out" in
+	'merged '* | none) printf '%s\n' "$merged_out" ;;
+	*)
+		printf 'unknown\n'
+		exit 3
+		;;
+	esac
 	;;
 confirm)
 	# マーカーに残すアカウントはここがホストに聞く。呼び手が渡したもの（--actor）は受けない
@@ -678,19 +602,17 @@ review-request)
 	fi
 	# ステップ 1.5: マージリクエストの確認。無ければ作らずに止める（作るのは ccnavi-start.sh）。
 	# 元ブランチがこのツリーの HEAD のブランチと同じで、マージ先が統合先であること。
-	mr=$(find_mr)
-	[ -n "$mr" ] ||
+	find_mr
+	[ -n "$mr_number" ] ||
 		fail no-mr-for-request "親ブランチ $branch に対応する open のマージリクエストが $host にありません。依頼は作らずに止めた。マージリクエストは ccnavi-start.sh が作る（既存のものは --mr で採用する）。ユーザに相談してください。"
-	mr_source=$(printf '%s' "$mr" | "$JQ" -r '.source // ""')
-	mr_target=$(printf '%s' "$mr" | "$JQ" -r '.target // ""')
 	[ "$mr_source" = "$branch" ] ||
 		fail mr-source-mismatch "マージリクエストの元ブランチ（${mr_source:-不明}）がこのツリーの HEAD のブランチ（${branch}）と違う。依頼は作らずに止めた。"
 	mr_integration=$(default_branch) || exit "$?"
 	[ "$mr_target" = "$mr_integration" ] ||
 		fail mr-target-mismatch "マージリクエストのマージ先（${mr_target:-不明}）が統合先（${mr_integration}）ではない。依頼は作らずに止めた。マージ先を直すか、ユーザに相談してください。"
-	number=$(printf '%s' "$mr" | "$JQ" '.number')
-	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
+	number="$mr_number"
+	url="$mr_url"
+	mr=$("$JQ" -n --argjson n "$number" --arg u "$url" '{number: $n, url: $u}')
 	# --check はここまでの前提を全部通ったところで終える。何も書かない（本文も書き出さない）。
 	if [ -n "$rr_check" ]; then
 		printf '確認: ok（前提は通った。取り込みとロックは確かめていない。MR #%s）\n' "$number"
@@ -759,10 +681,10 @@ comment)
 		esac
 	done
 	[ -n "$body" ] && [ -f "$body" ] || fail no-body-file "comment には --body-file <本文> が必要です。" 2
-	mr=$(find_mr)
-	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
-	number=$(printf '%s' "$mr" | "$JQ" '.number')
-	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
+	find_mr
+	[ -n "$mr_number" ] || fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
+	number="$mr_number"
+	url="$mr_url"
 	noted="$state/review-comment-$$.md"
 	{
 		printf '<!-- ccnavi:comment -->\n'
@@ -793,27 +715,20 @@ ready)
 	# 何も変えずに断る。検査は本体と同じ関数（読むだけ）。`--check` は位置引数の前に置く。
 	ccnavi --check review ready >/dev/null || exit $?
 	wap_start "$family"
-	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。
-	"$JQ" --argjson d "${mr_draft:-false}" '.mr.draft = $d' "$result" >"$result.draft" && mv -f "$result.draft" "$result"
+	fetch_all draft >"$result"
 	ccnavi_wap_capture="$state/review-ready-$$.out"
 	ready_rc=0
 	wap_ccnavi "$branch の Draft を解除するマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
 	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
-	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）。
+	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>`・`wip <パス>`（1 行 1 本）と、成功のあとに出す報告の
+	# `say <文>`。number と url は fetch_all が残したもの。
 	noted=$(sed -n '1p' "$ccnavi_wap_capture" 2>/dev/null || :)
-	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_wap_capture" 2>/dev/null | head -n 1)
-	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_wap_capture" 2>/dev/null || :)
+	ready_say=$(sed -n 's/^say //p' "$ccnavi_wap_capture" 2>/dev/null || :)
 	rm -f "$ccnavi_wap_capture"
 	ccnavi_wap_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
-	if [ -n "$wip_gone" ]; then
-		printf 'wip/ の追跡済みのファイルを削除しました（%s 件。削除する前のコミット %s から戻せる）:\n' \
-			"$(printf '%s\n' "$wip_gone" | wc -l | tr -d ' ')" "$(printf '%.12s' "$wip_from")"
-		printf '%s\n' "$wip_gone" | sed 's/^/  /'
-	fi
-	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
-	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
+	[ -z "$ready_say" ] || printf '%s\n' "$ready_say"
 	still=$(undraft "$number") || still=""
 	[ "$still" = "false" ] || fail undraft-failed "Draft を解除できませんでした（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then

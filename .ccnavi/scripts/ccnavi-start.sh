@@ -339,14 +339,14 @@ host_open() {
 # API が失敗したら、どの呼び出しかと、ホストの返事（HTTP の番号と本文）を覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
-	# ホストが HTTP のエラーを返したなら、その番号も残す（届いてはいるのか、届かないのかを見分けるため）。
-	# curl は「returned error: 404」、gh は「(HTTP 404)」、glab は「404 Not Found」の形
-	ccnavi_host_fail_status "$3" >"$host_err.status"
-	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
-	ccnavi_host_fail_body "$3" >"$host_err.body"
-	# GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する。この結果で mr_linked_issues が REST に替えるかを決める
+	# ホストが HTTP のエラーを返したなら、その番号（届いてはいるのか、届かないのかを見分けるため）と、
+	# ホストの返事の本文（先頭200文字、1行。トークンは伏せる）を残す。読むのは実行ファイル（ccnavi_host_fail）
+	ccnavi_host_fail "$3"
+	printf '%s' "$ccnavi_hf_status" >"$host_err.status"
+	printf '%s' "$ccnavi_hf_body" >"$host_err.body"
+	# GraphQL を使えない環境（Claude Code のクラウド）の 403 か。この結果で mr_linked_issues が REST に替えるかを決める
 	rm -f "$host_err.blocked" || :
-	if ccnavi_host_graphql_blocked "$3"; then
+	if [ "$ccnavi_hf_blocked" = yes ]; then
 		: >"$host_err.blocked"
 	fi
 }

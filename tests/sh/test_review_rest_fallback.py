@@ -42,7 +42,8 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "* | *" accept plan "* | *" accept threads "*) exec '@EXE@' "$@" ;;
+*" ops "* | *" host "*) exec '@EXE@' "$@" ;;
+*" accept plan "* | *" accept threads "*) exec '@EXE@' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -222,7 +223,7 @@ class RestFallbackTest(unittest.TestCase):
                 "review_exe || review_no_bin",
                 "review_host",
                 'mkdir -p "$state"',
-                "eval \"$(sed -n '/^strip_draft() {/,/^}/p;/^undraft() {/,/^}/p'"
+                "eval \"$(sed -n '/^undraft_ask() {/,/^}/p;/^undraft() {/,/^}/p'"
                 ' .ccnavi/scripts/ccnavi-review.sh)"',
                 body,
             ]

@@ -43,21 +43,6 @@ ccnavi_branch_ok() {
 	fi
 }
 
-# ワークツリーの HEAD が指すブランチ名。<ワークツリー> <識別子>
-#
-# HEAD のブランチ名を変換（ccnavi_branch_to_id。/ を - に置き換え）
-# したものがフォルダ名の識別子と一致し、ブランチ名として受けてよいときだけ出す。
-# ワークツリーが無い・ブランチの外（detached HEAD）なら 1、一致しない・使えない名前なら 2。
-# git は読み取りの 1 回だけ。
-ccnavi_head_branch() {
-	{ [ -d "$1" ] && [ ! -L "$1" ]; } || return 1
-	ccnavi_hb_name=$(git -C "$1" symbolic-ref --quiet --short HEAD 2>/dev/null) || ccnavi_hb_name=""
-	[ -n "$ccnavi_hb_name" ] || return 1
-	[ "$(ccnavi_branch_to_id "$ccnavi_hb_name")" = "$2" ] || return 2
-	ccnavi_branch_ok "$ccnavi_hb_name" "$2" || return 2
-	printf '%s\n' "$ccnavi_hb_name"
-}
-
 # 実行ファイルに聞く。答え（標準出力）を、Windows の実行ファイルの CR を除いて出す。<ワークスペースルート> <引数>...
 #
 # 実行ファイルが無ければ 1。実行ファイルが
@@ -98,60 +83,6 @@ ccnavi_text() {
 	esac
 }
 
-# 名前のワークツリーがチケットに結び付くかを実行ファイル（`tree bound`）に聞く。<ワークスペースルート> <ワークツリーのパス> <名前>
-#
-# 答えは ccnavi_tb_state（yes・no・unavailable（実行ファイルに確かめられない）・undecided（決められない））と、
-# 結び付くときの理由 ccnavi_tb_why に入れる。結び付かない（no）ときだけ 0。`ccnavi-worktree.sh --adopt` が
-# 断るための入口（`ccnavi-git.sh integrate` は実行ファイルの中で同じ判定を使う）で、sh はチケットの置き場を自分で読まない。
-# 止める側の呼び出し元は、no 以外を「引き取らない・取り込まない」に倒す。
-ccnavi_tree_bound() {
-	ccnavi_tb_out=$(ccnavi_ask "$1" tree bound "$2" "$3") || ccnavi_tb_out=""
-	ccnavi_tb_why=""
-	if [ "$(printf '%s\n' "$ccnavi_tb_out" | head -n 1)" != "tree 1" ]; then
-		ccnavi_tb_state=unavailable
-		return 1
-	fi
-	ccnavi_tb_why=$(printf '%s\n' "$ccnavi_tb_out" | sed -n 's/^why //p' | head -n 1)
-	case "$(printf '%s\n' "$ccnavi_tb_out" | sed -n 's/^bound //p' | head -n 1)" in
-	no)
-		ccnavi_tb_state=no
-		return 0
-		;;
-	yes) ccnavi_tb_state=yes ;;
-	*) ccnavi_tb_state=undecided ;;
-	esac
-	return 1
-}
-
-# ブランチ名から作る識別子と、それが使えるかを実行ファイル（`worktree id`）に聞く。<ワークスペースルート> <ブランチ>
-#
-# 答えは ccnavi_id_ident（識別子）・ccnavi_id_problem（親のブランチとして採用できない理由。58 文字・末尾の
-# -<2 桁>・字の種類・NFC）・ccnavi_id_direct（直接作業や子のワークツリーとして使えない理由。64 文字・字の種類・NFC）・
-# ccnavi_id_child（子の識別子の形なら yes）に入れる。sh は字の種類と NFC と文字数を自分で確かめない
-# （`ccnavi_is_ident` と `ccnavi_is_branch` は ASCII の外のバイトを通す。`${#x}` は dash ではバイト数になる）。
-# 実行ファイルが無い・答えないなら 1（呼ぶ側は「確かめられない」として止める）。
-ccnavi_id_ask() {
-	ccnavi_ia_out=$(ccnavi_ask "$1" worktree id "$2") || ccnavi_ia_out=""
-	ccnavi_id_ident=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^id //p' | head -n 1)
-	ccnavi_id_problem=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^problem //p' | head -n 1)
-	ccnavi_id_direct=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^direct //p' | head -n 1)
-	ccnavi_id_child=$(printf '%s\n' "$ccnavi_ia_out" | sed -n 's/^child //p' | head -n 1)
-	[ -n "$ccnavi_id_ident" ]
-}
-
-# <一覧> のブランチ名（1 行 1 本）のうち、<ブランチ> と同じ識別子になる別の名前を 1 つ出す。<ワークスペースルート> <ブランチ> <一覧>
-#
-# 判定は実行ファイル（`worktree clash`。ids.IDClash。/ と - の違いと大文字小文字の違いを同じ識別子と読む）。
-# 無ければ 1。実行ファイルが答えなければ 2（呼ぶ側は「確かめられない」として止める）。
-ccnavi_id_clash() {
-	ccnavi_ic_out=$(ccnavi_ask "$1" worktree clash "$2" "$3" | sed -n 's/^clash //p' | head -n 1) || ccnavi_ic_out=""
-	case "$ccnavi_ic_out" in
-	'') return 2 ;;
-	-) return 1 ;;
-	esac
-	printf '%s\n' "$ccnavi_ic_out"
-}
-
 # そのツリーが属するリポジトリの統合先の名前。分からなければ 1。<ツリー>
 #
 # 決め方（手元の origin/HEAD、無ければ origin/main・origin/master）は実行ファイル（`git integration`。
@@ -178,26 +109,6 @@ ccnavi_integration_hint() {
 	else
 		printf '統合先が決まらない（実行ファイルが答えない）。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。'
 	fi
-}
-
-# そのツリーが、名前の親子のチケットの親のワークツリーか。<ツリー> <名前>
-#
-# 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
-# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。ready が退避した後は、手元の退避の親チケットも見る。
-# 子チケット（`parent:` を持つ）は数えない。
-#
-# sh はチケットを読まない。読むのは実行ファイル（`tree parent <ツリー> <名前>`）で、sh は答えの 1 行を見る。
-# 親でなければ 1。ツリーが無ければ聞かずに 1。決められなければ 2（実行ファイルが無い・答えない・古くて
-# サブコマンドを知らない、置き場に名前のファイルが在るのに frontmatter を読めない）。2 をどちらに倒すかは
-# 呼ぶ側が決める。止める側の検査は親として扱い、ツリーを動かす側は親でないとして扱う。
-# 実行ファイルの --root に渡すワークスペースルートは `.claude/worktrees/<名前>` の 2 つ上。
-ccnavi_parent_tree() {
-	ccnavi_parent_info "$1" "$2" || return 2
-	case "$ccnavi_pi_parent" in
-	yes) return 0 ;;
-	no) return 1 ;;
-	esac
-	return 2
 }
 
 # `tree parent` の答えを変数に入れる。ツリーが無ければ 1、答えを得られなければ 2。<ツリー> <名前> [<ブランチ>]

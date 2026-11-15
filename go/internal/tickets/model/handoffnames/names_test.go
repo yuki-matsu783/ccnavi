@@ -58,6 +58,21 @@ func TestConvert(t *testing.T) {
 	}
 }
 
+// 予約した名前（表の下書きでの名前）の階層を含む元のパスは、ccnavi-stage.sh が下書きにしない。
+func TestReserved(t *testing.T) {
+	tb := table(t)
+	for rel, want := range map[string]string{
+		"handoff-.claude/x.json":   "handoff-.claude",
+		"a/Handoff-.Claude/b":      "Handoff-.Claude",
+		".claude/settings.json":    "",
+		"handoff-.claude-old/x.md": "",
+	} {
+		if got := tb.Reserved(rel); got != want {
+			t.Errorf("Reserved(%q) = %q, want %q", rel, got, want)
+		}
+	}
+}
+
 // sh は ASCII の大文字小文字しか畳めない。`ﬀ` は畳むと `ff` になるが、表には当てない。
 func TestNonASCIIElementsAreNeverMatched(t *testing.T) {
 	tb := table(t)

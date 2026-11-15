@@ -3,14 +3,12 @@ package branch
 import (
 	"fmt"
 	"io"
-	"math/big"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
@@ -132,55 +130,6 @@ func clean(value any, limit int) string {
 		return r
 	}, text)
 	return pyfmt.Head(ospath.Strip(text), limit)
-}
-
-// readHost は sh が書いたホストの結果（checked・reason・host・repo・mrs のキーがある JSON）。無い・読めない・
-// 形が違うなら「見ていない」として理由を付ける。
-func readHost(path string) host {
-	if path == "" {
-		return host{reason: "ホストの結果が渡されていない（--result がありません）"}
-	}
-	value, err := fsio.ReadJSON(path)
-	data, ok := value.(*pyjson.Object)
-	if err != nil || !ok {
-		return host{reason: "ホストの結果を読めない"}
-	}
-	if checked, _ := data.Value("checked").(bool); !checked {
-		reason := clean(data.Value("reason"), cleanLimit)
-		if reason == "" {
-			reason = "理由は分からない"
-		}
-		return host{reason: reason}
-	}
-	var mrs []*pyjson.Object
-	list, _ := data.Value("mrs").([]any)
-	for _, raw := range list {
-		m, ok := raw.(*pyjson.Object)
-		if !ok {
-			continue
-		}
-		number := m.Value("number")
-		switch number.(type) {
-		case int, *big.Int:
-		default:
-			continue
-		}
-		branch := clean(m.Value("branch"), cleanBranchLimit)
-		if branch == "" {
-			continue
-		}
-		fork, _ := m.Value("fork").(bool)
-		mrs = append(mrs, pyjson.NewObject(
-			"number", number,
-			"branch", branch,
-			"state", clean(m.Value("state"), cleanStateLimit),
-			"url", clean(m.Value("url"), cleanURLLimit),
-			"title", clean(m.Value("title"), cleanLimit),
-			"base", clean(m.Value("base"), cleanBranchLimit),
-			"fork", fork,
-		))
-	}
-	return host{checked: true, name: clean(data.Value("host"), cleanLimit), repo: clean(data.Value("repo"), cleanLimit), mrs: mrs}
 }
 
 // namesNumber はブランチ名が番号を含むか。ccnavi の命名 `<先頭の語>-<番号>-<slug>` に合う名前は 2 つ目の番号だけで
@@ -532,8 +481,8 @@ func numberText(s string) bool {
 	return strings.Trim(s, "0123456789") == ""
 }
 
-// Report は `ccnavi branches <issue|mr> <番号>`。0 は出した、1 は引数か場所の誤り。
-func Report(stdout, stderr io.Writer, conf *config.Settings, root, cwd, kind, number, resultPath string, asJSON bool) int {
+// Report は `ccnavi branches <issue|mr> <番号> [<渡し方> <引数>...]`（ホストの結果の渡し方は Source）。0 は出した、1 は引数か場所の誤り。
+func Report(stdout, stderr io.Writer, conf *config.Settings, root, cwd, kind, number string, from Source, asJSON bool) int {
 	if Kind(kind) != issue && Kind(kind) != mr {
 		fmt.Fprintf(stderr, "ccnavi: branches の種類は issue か mr（%s は違う）\n", pyfmt.Repr(kind))
 		return 1
@@ -543,7 +492,7 @@ func Report(stdout, stderr io.Writer, conf *config.Settings, root, cwd, kind, nu
 		return 1
 	}
 	n, _ := strconv.Atoi(number)
-	data, failed := collect(conf, root, cwd, Kind(kind), n, readHost(resultPath))
+	data, failed := collect(conf, root, cwd, Kind(kind), n, readHost(from, Kind(kind), n, conf.BranchPrefixes))
 	if failed != "" {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", failed)
 		return 1

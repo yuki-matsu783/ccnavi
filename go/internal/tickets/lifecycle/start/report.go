@@ -27,30 +27,30 @@ func Report(root string, a ReportArgs) (string, int) {
 	if project == "" {
 		project = "ワークスペース自身"
 	}
-	o.out("対象リポジトリ: " + a.Repo + "（" + project + "）")
-	o.out("ワークツリー: " + a.WT)
-	o.out("ブランチ: " + a.Branch)
-	o.out("識別子: " + ids.BranchToID(a.Branch))
-	o.out("MR: " + orDash(a.MRURL))
+	o.Out("対象リポジトリ: " + a.Repo + "（" + project + "）")
+	o.Out("ワークツリー: " + a.WT)
+	o.Out("ブランチ: " + a.Branch)
+	o.Out("識別子: " + ids.BranchToID(a.Branch))
+	o.Out("MR: " + orDash(a.MRURL))
 	if a.FF != "" {
-		o.out("最新化: " + a.FF)
+		o.Out("最新化: " + a.FF)
 	}
 	if a.HostUnseen {
-		o.out("案内: ホストは見ていない（MCP などで確認済みとして扱った）。既存の MR と閉じる issue は、渡された --issue・--mr・--branch のとおりに扱った")
+		o.Out("案内: ホストは見ていない（MCP などで確認済みとして扱った）。既存の MR と閉じる issue は、渡された --issue・--mr・--branch のとおりに扱った")
 	}
 	switch a.Remote {
 	case "unchecked":
-		o.out(texts.Say(root, "NOTE_START_REMOTE_UNCHECKED", nil, nil))
+		o.Out(texts.Say(root, "NOTE_START_REMOTE_UNCHECKED", nil, nil))
 	case "gone":
-		o.out("案内: origin にブランチ " + a.Branch + " が無い（手元だけのブランチ）")
+		o.Out("案内: origin にブランチ " + a.Branch + " が無い（手元だけのブランチ）")
 	}
 	if a.SyncNote != "" {
-		o.out("案内: " + a.SyncNote)
+		o.Out("案内: " + a.SyncNote)
 	}
 	mr := ""
 	if digits(a.MRNumber) {
 		mr = a.MRNumber
-		o.out("必須: 提案の frontmatter に issue: " + a.Issue + " と mr: " + mr + " を書く（この issue とこの MR の組。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない。sh .ccnavi/scripts/ccnavi-launcher.sh ticket new の --issue と --mr が書く）")
+		o.Out("必須: 提案の frontmatter に issue: " + a.Issue + " と mr: " + mr + " を書く（この issue とこの MR の組。書かないと、この MR の番号を含む依頼が、すでにあるチケットに結び付かない。sh .ccnavi/scripts/ccnavi-launcher.sh ticket new の --issue と --mr が書く）")
 	}
 	if a.SyncNoTicket {
 		// 親チケットも提案も無いワークツリーの次の一手。提案を作る ticket new を、埋められる値を埋めて出す。触るファイルは
@@ -63,17 +63,17 @@ func Report(root string, a ReportArgs) (string, int) {
 		if mr != "" {
 			tail += " --mr " + mr
 		}
-		o.out(texts.Say(root, "NEXT_START_TICKET_NEW", texts.Values{"id": ids.BranchToID(a.Branch), "title_q": quote(title),
+		o.Out(texts.Say(root, "NEXT_START_TICKET_NEW", texts.Values{"id": ids.BranchToID(a.Branch), "title_q": quote(title),
 			"scope_q": quote("<触るファイルの glob>"), "tail_q": tail}, nil))
 		if a.Templates > 0 {
-			o.out(texts.Say(root, "NOTE_START_TEMPLATES", texts.Values{"count": strconv.Itoa(a.Templates)}, nil))
+			o.Out(texts.Say(root, "NOTE_START_TEMPLATES", texts.Values{"count": strconv.Itoa(a.Templates)}, nil))
 		}
 	}
 	if a.SyncNext != "" {
-		o.out(texts.Say(root, "NEXT_START_SYNC_RETRY", texts.Values{"id": a.SyncNext}, nil))
+		o.Out(texts.Say(root, "NEXT_START_SYNC_RETRY", texts.Values{"id": a.SyncNext}, nil))
 	}
 	if a.SyncOK {
-		o.out(texts.Say(root, "NEXT_START_TICKET_STATUS", texts.Values{"id": ids.BranchToID(a.Branch)}, nil))
+		o.Out(texts.Say(root, "NEXT_START_TICKET_STATUS", texts.Values{"id": ids.BranchToID(a.Branch)}, nil))
 	}
 	return o.String(), 0
 }
@@ -91,34 +91,34 @@ func DryRun(root, cwd string, a DryArgs) (string, int) {
 	var o outcome
 	switch a.Kind {
 	case "new-issue":
-		o.out("dry-run: 何も作らない。issue「" + a.Title + "」を作ってから、その番号で --issue と同じに進める予定。")
+		o.Out("dry-run: 何も作らない。issue「" + a.Title + "」を作ってから、その番号で --issue と同じに進める予定。")
 	case "mcp":
-		o.out("dry-run: 何も作らない。ブランチ " + a.Branch + " で続ける予定（ホストは見ていない）。")
+		o.Out("dry-run: 何も作らない。ブランチ " + a.Branch + " で続ける予定（ホストは見ていない）。")
 	case "create":
-		o.out("dry-run: 何も作らない。作る予定は次のとおり。")
-		o.out("ブランチ: " + a.Branch + "（起点 origin/" + a.Integration + "）")
-		o.out("ワークツリー: " + ospath.Join(root, ".claude", "worktrees", a.Branch))
-		o.out("MR のタイトル: " + a.MRTitle + "（Draft。本文: Closes #" + a.Number + "）")
-		o.out("issue: " + a.Issue + "（MR を作ると確定する）")
+		o.Out("dry-run: 何も作らない。作る予定は次のとおり。")
+		o.Out("ブランチ: " + a.Branch + "（起点 origin/" + a.Integration + "）")
+		o.Out("ワークツリー: " + ospath.Join(root, ".claude", "worktrees", a.Branch))
+		o.Out("MR のタイトル: " + a.MRTitle + "（Draft。本文: Closes #" + a.Number + "）")
+		o.Out("issue: " + a.Issue + "（MR を作ると確定する）")
 		if a.HostWhy != "" {
-			o.out("案内: ホストに届かず、タイトルは仮のもの（" + a.HostWhy + "）")
+			o.Out("案内: ホストに届かず、タイトルは仮のもの（" + a.HostWhy + "）")
 		}
 	default:
-		o.out("dry-run: 何も作らない。既存のブランチ " + a.Branch + " で続ける予定。")
+		o.Out("dry-run: 何も作らない。既存のブランチ " + a.Branch + " で続ける予定。")
 		if wt := (repo{cwd}).worktreeOf(a.Branch); wt != "" {
-			o.out("ワークツリー: " + wt)
+			o.Out("ワークツリー: " + wt)
 		} else {
-			o.out("ワークツリー: " + ospath.Join(root, ".claude", "worktrees", ids.BranchToID(a.Branch)) + "（無いので作る）")
+			o.Out("ワークツリー: " + ospath.Join(root, ".claude", "worktrees", ids.BranchToID(a.Branch)) + "（無いので作る）")
 		}
-		o.out("ブランチ: " + a.Branch)
+		o.Out("ブランチ: " + a.Branch)
 		if a.Resume {
-			o.out("作りかけなので、残りの段階（初期コミット・push・Draft MR）も続ける予定。MR のタイトル: " + a.MRTitle)
+			o.Out("作りかけなので、残りの段階（初期コミット・push・Draft MR）も続ける予定。MR のタイトル: " + a.MRTitle)
 		} else {
-			o.out("MR: " + orDash(a.MRURL))
+			o.Out("MR: " + orDash(a.MRURL))
 		}
-		o.out("issue: " + a.Issue)
+		o.Out("issue: " + a.Issue)
 	}
-	o.out(texts.Say(root, "NEXT_START_DRY_RUN", texts.Values{"real_args_q": a.Real}, nil))
+	o.Out(texts.Say(root, "NEXT_START_DRY_RUN", texts.Values{"real_args_q": a.Real}, nil))
 	return o.String(), 0
 }
 

@@ -6,8 +6,9 @@
    複数候補（終了コード 3）はユーザに確かめ、ホストに届かない（4）ときは MCP で代行させる指示が
    `additionalContext` に載る。表記はワークスペースルートの絶対パスから書く。
    指定が無い・外れ・チケット制御が disable のときは載らない。判定（止める・聞く）は返さない
-2. サブコマンド `ccnavi branches <issue|mr> <番号> --result <json>`: 手元の候補（名前に番号を含む
-   ブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh が書いたホストの結果と合わせて出す。
+2. サブコマンド `ccnavi branches <issue|mr> <番号> checked <github|gitlab> <ホスト> <リポジトリ> <id> --result <応答>`:
+   手元の候補（名前に番号を含むブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh が取ってきたホストの
+   応答（のまま）と合わせて出す。
    ホストの結果が無いときは「ホストは見ていない」と言う。チケットは識別子になるブランチ
    （`/` を `-` に置き換えて識別子と一致するもの）に結び付ける
 """
@@ -173,19 +174,20 @@ class BranchesCommandTest(PhaseHarness):
         self.login_tree = os.path.join(self.root, ".claude", "worktrees", "feature-152-login")
         git(self.root, "worktree", "add", "--quiet", self.login_tree, "feature-152-login")
 
-    def branches(self, kind, number, result="", *extra, cwd=None):
-        args = ["branches", kind, str(number), "--cwd", cwd or self.root]
-        if result:
-            args += ["--result", result]
+    def branches(self, kind, number, result=(), *extra, cwd=None):
+        """result はホストの結果の渡し方（`checked ...`・`unchecked <理由>` と `--result <ファイル>`）。"""
+        args = ["branches", kind, str(number), *result, "--cwd", cwd or self.root]
         return self.ccnavi(*args, *extra)
 
-    def json_of(self, kind, number, result="", *extra, **kw):
+    def json_of(self, kind, number, result=(), *extra, **kw):
         done = self.branches(kind, number, result, *extra, "--json", **kw)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         return json.loads(done.stdout)
 
-    def host(self, data):
-        return write(os.path.join(self.root, "host.json"), json.dumps(data))
+    def host(self, kind, name, data, pid="-"):
+        """sh が取ってきたホストの応答（のまま）を渡す形。"""
+        path = write(os.path.join(self.root, "host.json"), json.dumps(data))
+        return ("checked", kind, name, "acme/widgets", pid, "--result", path)
 
     def test_local_candidates_without_the_host(self):
         done = self.branches("issue", 152)
@@ -258,23 +260,22 @@ class BranchesCommandTest(PhaseHarness):
         self.assertIn("チケット feature-153-slash", text)
 
     def test_host_merge_requests_join_the_candidates(self):
+        # GitHub の開いた PR の一覧。issue を参照する PR だけが候補になり、番号が数でないものは使わない
         result = self.host(
-            {
-                "checked": True,
-                "host": "github.com",
-                "repo": "acme/widgets",
-                "mrs": [
-                    {
-                        "number": 7,
-                        "branch": "topic/login",
-                        "state": "open",
-                        "url": "https://github.com/acme/widgets/pull/7",
-                        "title": "Closes #152",
-                        "fork": False,
-                    },
-                    {"number": "x", "branch": "bad"},
-                ],
-            }
+            "github",
+            "github.com",
+            [
+                {
+                    "number": 7,
+                    "head": {"ref": "topic/login", "repo": {"full_name": "acme/widgets"}},
+                    "state": "open",
+                    "html_url": "https://github.com/acme/widgets/pull/7",
+                    "title": "Closes #152",
+                    "base": {"ref": "main"},
+                },
+                {"number": "x", "head": {"ref": "bad"}, "title": "#152"},
+                {"number": 8, "head": {"ref": "unrelated"}, "title": "other"},
+            ],
         )
         data = self.json_of("issue", 152, result)
         self.assertTrue(data["host"]["checked"])
@@ -283,18 +284,18 @@ class BranchesCommandTest(PhaseHarness):
         self.assertEqual(topic["mrs"][0]["number"], 7)
         self.assertFalse(topic["local"] or topic["origin"])
         self.assertNotIn("bad", [c["branch"] for c in data["candidates"]])
+        self.assertNotIn("unrelated", [c["branch"] for c in data["candidates"]])
         text = self.branches("issue", 152, result).stdout
         self.assertIn("ホスト: github.com acme/widgets を見た", text)
         self.assertIn("候補 topic/login  在りか=ホストだけ  由来=MR  MR=!7(open)", text)
 
     def test_an_mr_lists_its_source_branch_only(self):
+        # GitLab の MR 1 本。このプロジェクト（id 42）から出ていなければフォーク
         result = self.host(
-            {
-                "checked": True,
-                "host": "gitlab.com",
-                "repo": "acme/widgets",
-                "mrs": [{"number": 5, "branch": "issue-152", "state": "opened", "fork": True}],
-            }
+            "gitlab",
+            "gitlab.com",
+            {"iid": 5, "source_branch": "issue-152", "state": "opened", "source_project_id": 99},
+            pid="42",
         )
         data = self.json_of("mr", 5, result)
         self.assertEqual([c["branch"] for c in data["candidates"]], ["issue-152"])
@@ -314,14 +315,14 @@ class BranchesCommandTest(PhaseHarness):
         self.assertEqual(self.json_of("issue", 12)["issue_tickets"], [])
 
     def test_an_mr_without_the_host_says_so_and_has_no_candidate(self):
-        result = self.host({"checked": False, "reason": "origin が無い"})
+        result = ("unchecked", "origin が無い")
         text = self.branches("mr", 5, result).stdout
         self.assertIn("ホストは見ていない（origin が無い）", text)
         self.assertIn("候補なし", text)
 
     def test_ticket_control_disabled_skips_the_tickets(self):
         self.propose("feature-152-login", parent_text("feature-152-login", ["research"], issue=152))
-        data = self.json_of("issue", 152, "", "--ticket-control", "disable")
+        data = self.json_of("issue", 152, (), "--ticket-control", "disable")
         self.assertFalse(data["tickets_checked"])
         self.assertEqual(data["issue_tickets"], [])
 

@@ -256,7 +256,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 | git・ワークツリー（`ccnavi-git.sh`・`ccnavi-worktree.sh`・`ccnavi-sync.sh`・`ccnavi-clean.sh`・`ccnavi-stage.sh`） | 生の git の代わりの入口、直接作業のワークツリーを切る、親のブランチの取り込み、ワークツリーの生成物の掃除、保護対象のファイルを `wip/handoff/` へ下書きにする |
 | issue・MR・チケット・レビュー（`ccnavi-branches.sh`・`ccnavi-start.sh`・`ccnavi-ticket.sh`・`ccnavi-review.sh`） | 着手の入口と、チケット・レビューの状態を動かす入口。本体は実行ファイルの `ticket`・`review`。取り込み済みの親子のチケットの書き込みは write-and-push（取り込んでから書き、書いたパスだけをコミットして push するまで完了にしない） |
 | ユーザ専用（`ccnavi-user-*.sh`） | 承認・判断・取り込み・整理など、ユーザがターミナルで打つ入口。エージェントからは止まる。実行ファイルの `user …` を入口の印を付けて起こす薄い包みで、承認済みチケットの置き場のコミットと push は `ccnavi-user-push-approved.sh` が受け持つ |
-| 共通の部品（`ccnavi-common*.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-handoff-names.txt`） | 他の sh が読み込む。state・ロック・write-and-push・ホスト・ログ・レビューの部品と、`.claude` の階層の読み替え表 |
+| 共通の部品（`ccnavi-common*.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-handoff-names.txt`） | 他の sh が読み込む。state・ロック・write-and-push・ホスト・ログ・レビューの部品と、`.claude` の階層の読み替え表（表は元の写しで、実行ファイルが同じ中身を埋め込んで使う） |
 
 #### 配布物の条件
 

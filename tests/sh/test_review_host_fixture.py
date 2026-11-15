@@ -71,7 +71,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "* | *" git integration "* | *" path under "*) exec '{exe}' "$@" ;;
+*" ops "* | *" git integration "* | *" path under "* | *" host "*) exec '{exe}' "$@" ;;
 *" accept plan "* | *" accept threads "*) exec '{exe}' "$@" ;;
 esac
 prev=""
@@ -637,7 +637,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             + "; exit 0 ;; esac\n"
             + 'case " $* " in *" write-and-push family "*)'
             + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
-            + 'case " $* " in *" ops "* | *" path under "* | *" git integration "*)'
+            + 'case " $* " in *" ops "* | *" path under "* | *" git integration "* | *" host "*)'
             + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"
             + 'case " $* " in *" accept plan "* | *" accept threads "*)'
             + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"

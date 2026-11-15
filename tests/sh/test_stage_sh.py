@@ -38,7 +38,7 @@ class StageShTest(unittest.TestCase):
         self.ws = os.path.join(self._tmp.name, "ws")
         scripts = os.path.join(self.ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-stage.sh", "ccnavi-handoff-names.txt", *common_sh(SH_DIR)):
+        for name in ("ccnavi-stage.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
         put_messages(self.ws)
         self.exe = os.path.join(self._tmp.name, "bin", "ccnavi")

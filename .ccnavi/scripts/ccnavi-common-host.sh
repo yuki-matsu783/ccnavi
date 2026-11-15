@@ -32,8 +32,9 @@
 #   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドは使わない。時間切れのときは 124 を返す。stdout に `-` を渡すと、呼ぶ側の標準出力を引き継ぐ）
-#   ccnavi_host_fail_status <ホストの返事の文>  curl・gh・glab の失敗の文から HTTP の番号を取り出す
-#   ccnavi_host_graphql_blocked <ホストの返事の文>  GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する（0 なら該当）
+#   ccnavi_host_fail <ホストの返事の文>  curl・gh・glab の失敗の文を実行ファイル（`ccnavi host fail`）に読ませ、
+#                               HTTP の番号（ccnavi_hf_status）・GraphQL を使えない環境（Claude Code のクラウド）の 403 か
+#                               （ccnavi_hf_blocked が yes）・画面に出せる 1 行の本文（ccnavi_hf_body）に入れる
 #   ccnavi_host_probe           プロジェクトを 1 回読む。結果は ccnavi_h_probe と ccnavi_h_project_json
 #   ccnavi_host_access          書き込みの権限を判定する（0 足りる / 1 足りない / 2 判定できない。判定は実行ファイル）
 #   ccnavi_preflight <top>      チケット作業の事前確認（下の説明。判定と文は実行ファイルの ccnavi preflight）
@@ -354,36 +355,20 @@ ccnavi_host_failed() {
 	"$ccnavi_h_on_fail" "$ccnavi_ha_method" "$ccnavi_ha_rel" "$1"
 }
 
-# 失敗の返事（本文と標準エラー）から HTTP の番号を取り出す。取れなければ何も出さない。
-# 本文の中の数字に引かれないよう、まず形の決まった書き方（curl の returned error・gh の (HTTP nnn)・glab の行）だけを全体から探し、
-# 無ければ最後の行（gh / glab の標準エラー）だけを緩い式で読む。
-ccnavi_host_fail_status() {
-	ccnavi_hs_val=$(printf '%s' "$1" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^glab: HTTP ([0-9]{3})$/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1)
-	if [ -z "$ccnavi_hs_val" ]; then
-		ccnavi_hs_val=$(printf '%s\n' "$1" | sed '/^$/d' | tail -n 1 | sed -n -E -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1)
-	fi
-	printf '%s' "$ccnavi_hs_val"
-}
-
-# GraphQL を使えない実行環境（Claude Code のクラウド）で出る 403 かを判定する。失敗の返事（本文と標準エラー）を渡し、そうなら 0 を返す。
-# gh は本文を返すので、「GitHub GraphQL is not available」の文言で見分ける（別の理由の 403・401 は 1）。
-# curl は -f が本文を捨て、403 の番号だけが残る。番号だけの 403 は、認証の失敗と見分けが付かないので 0 とする。
-# 呼び手は REST の道（/ccr/）を試し、それも失敗したら元の GraphQL の失敗を言う（通常の GitHub では /ccr/ は 404 になるだけ）。
-ccnavi_host_graphql_blocked() {
-	case "$1" in
-	*"GraphQL is not available"*) return 0 ;;
-	esac
-	[ "$(ccnavi_host_fail_status "$1")" = 403 ] || return 1
-	case "$1" in
-	*"returned error: 403"*) return 0 ;;
-	esac
-	return 1
-}
-
-# 失敗の返事の本文を、画面に出せる形（1 行・制御文字なし・先頭 200 文字・トークンは伏せる）にして出す。
-# 文字数は jq で数える（cut -c は環境によってバイトで切り、日本語の途中で壊れる）。
-ccnavi_host_fail_body() {
-	printf '%s' "$1" | "$ccnavi_h_jq" -Rjs --arg t "${ccnavi_h_token:-}" '(if $t == "" then . else split($t) | join("***") end) | gsub("[\u0000-\u001f\u007f]+"; " ") | .[0:200]'
+# 失敗の返事（本文と標準エラー）の解析は実行ファイル（`ccnavi host fail`。hostreply.FailStatus・GraphQLBlocked・FailBody）が
+# 行う。sh は返事をファイルに書いて渡し、1 行 1 項目の答えを変数に入れるだけ。実行ファイルが答えなければ全部空にする
+# （番号の分からない失敗として扱う）。本文のトークン（GITHUB_TOKEN・GITLAB_TOKEN）は実行ファイルが環境変数から引いて伏せる。
+ccnavi_host_fail() {
+	ccnavi_hf_status=""
+	ccnavi_hf_blocked=""
+	ccnavi_hf_body=""
+	ccnavi_hf_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-fail-$$"
+	printf '%s' "$1" >"$ccnavi_hf_file" 2>/dev/null || return 0
+	ccnavi_hf_out=$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host fail "$ccnavi_hf_file") || ccnavi_hf_out=""
+	rm -f "$ccnavi_hf_file" || :
+	ccnavi_hf_status=$(printf '%s\n' "$ccnavi_hf_out" | sed -n 's/^status //p')
+	ccnavi_hf_blocked=$(printf '%s\n' "$ccnavi_hf_out" | sed -n 's/^blocked //p')
+	ccnavi_hf_body=$(printf '%s\n' "$ccnavi_hf_out" | sed -n 's/^body //p')
 }
 
 ccnavi_host_pages() {
@@ -535,23 +520,16 @@ ccnavi_host_probe() {
 	ccnavi_hq_rc=0
 	ccnavi_host_api GET "$ccnavi_hq_rel" >"$ccnavi_hq_file" || ccnavi_hq_rc=$?
 	ccnavi_h_on_fail="$ccnavi_hq_prev"
+	# 分類（ok / auth / notfound / network / badjson）は実行ファイル（`ccnavi host probe`）が決める。失敗なら返事を渡す
+	ccnavi_hq_how=ok
 	if [ "$ccnavi_hq_rc" -ne 0 ]; then
-		rm -f "$ccnavi_hq_file" || :
-		case "$(ccnavi_host_fail_status "$ccnavi_hq_text")" in
-		401 | 403) ccnavi_h_probe=auth ;;
-		404) ccnavi_h_probe=notfound ;;
-		*) ccnavi_h_probe=network ;;
-		esac
-		return 0
+		ccnavi_hq_how=failed
+		printf '%s' "$ccnavi_hq_text" >"$ccnavi_hq_file"
 	fi
-	ccnavi_h_project_json=$(cat "$ccnavi_hq_file")
+	ccnavi_h_probe=$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host probe "$ccnavi_hq_how" "$ccnavi_hq_file" |
+		sed -n 's/^probe //p') || ccnavi_h_probe=""
+	[ "$ccnavi_h_probe" != ok ] || ccnavi_h_project_json=$(cat "$ccnavi_hq_file")
 	rm -f "$ccnavi_hq_file" || :
-	if printf '%s' "$ccnavi_h_project_json" | "$ccnavi_h_jq" -e 'type == "object"' >/dev/null 2>&1; then
-		ccnavi_h_probe=ok
-	else
-		ccnavi_h_project_json=""
-		ccnavi_h_probe=badjson
-	fi
 	return 0
 }
 

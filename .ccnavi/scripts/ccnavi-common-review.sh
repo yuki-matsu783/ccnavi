@@ -164,7 +164,7 @@ api_failed() {
 #
 # gql <JSON> GraphQL を打つ。成功なら応答を標準出力へ出す。戻り値は、0 成功 / 1 失敗（理由は api_failed が出している。認証の失敗や
 # 別の理由の 403 もここ） / 3 GraphQL を使えない環境の 403（何も出さない。呼び手が REST に替える）。
-# 戻り値 3 かどうかは ccnavi_host_graphql_blocked が決める。
+# 戻り値 3 かどうかは実行ファイル（ccnavi_host_fail の ccnavi_hf_blocked）が決める。
 gql_text=""
 gql_failed() {
 	gql_text="$3"
@@ -183,9 +183,10 @@ gql() {
 		return 0
 	fi
 	rm -f "$gql_file" || :
-	if ccnavi_host_graphql_blocked "$gql_text"; then
+	ccnavi_host_fail "$gql_text"
+	if [ "$ccnavi_hf_blocked" = yes ]; then
 		# 元の返事は、REST の代わりの道も失敗したときに rest_fallback_failed が併記する。$( ) の中で呼ばれても渡るように、ファイルに残す。
-		ccnavi_host_fail_body "$gql_text" >"${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" 2>/dev/null || :
+		printf '%s' "$ccnavi_hf_body" >"${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" 2>/dev/null || :
 		return 3
 	fi
 	api_failed POST graphql "$gql_text"
@@ -215,22 +216,34 @@ encoded_path() {
 	ccnavi_host_encoded_path
 }
 
-# ---- マージリクエスト。無ければ空。
+# ---- マージリクエスト。親のブランチ（branch）の開いた MR を探し、mr_number・mr_url・mr_source・mr_target・mr_draft に入れる。
+# 無ければ mr_number が空。どれを選ぶか（GitLab はこのプロジェクトから出たものだけ）と欄の読みは実行ファイル（`ccnavi host find-mr`）で、
+# sh は一覧を取ってくるだけ。GitHub は一覧の API が失敗したら「無い」と読む。
 
 find_mr() {
+	mr_number=""
+	mr_url=""
+	mr_source=""
+	mr_target=""
+	mr_draft=false
+	fm_file="$state/review-mrs-$$.json"
+	fm_pid=-
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
-		api GET "repos/$path/pulls?state=open&head=$(ccnavi_host_encode "$owner:$branch")" |
-			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref, draft: (.draft // false)}'
+		api GET "repos/$path/pulls?state=open&head=$(ccnavi_host_encode "$owner:$branch")" >"$fm_file" || : >"$fm_file"
 	else
-		# このプロジェクトのブランチから出た MR だけ。
 		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
-		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
-		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$branch")") ||
+		fm_pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
+		pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$(ccnavi_host_encode "$branch")" >"$fm_file" ||
 			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
-		printf '%s' "$mrs" |
-			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url, source: .source_branch, target: .target_branch, draft: (.draft // .work_in_progress // false)}'
 	fi
+	fm_out=$(ccnavi host find-mr "$kind" "$fm_pid" "$fm_file" 2>/dev/null | tr -d '\r') || fm_out=""
+	rm -f "$fm_file" || :
+	mr_number=$(printf '%s\n' "$fm_out" | sed -n 's/^number //p')
+	mr_url=$(printf '%s\n' "$fm_out" | sed -n 's/^url //p')
+	mr_source=$(printf '%s\n' "$fm_out" | sed -n 's/^source //p')
+	mr_target=$(printf '%s\n' "$fm_out" | sed -n 's/^target //p')
+	mr_draft=$(printf '%s\n' "$fm_out" | sed -n 's/^draft //p')
 }
 
 # GitLab のプロジェクトの数の id。読めなければ 1
@@ -238,115 +251,77 @@ project_id() {
 	ccnavi_host_project_id
 }
 
-# ---- スレッド。GitHub は GraphQL で解決状態を読む（GraphQL が 403 の環境では REST の /ccr/ で読む）。GitLab は discussions。
+# ---- スレッド。sh は応答を取ってきて <置き場>.t<i> に書き、形を threads_form（graphql / rest / discussions）、
+# ファイルの数を threads_n に入れる。読むのは実行ファイル（`ccnavi host copy`）。<MR の番号> <置き場>
 #
-# どちらも [{id, resolved, url, path, line, body, created_at, last_id, last_at, last_author}] を返す。
-# id は GraphQL ならスレッドの node id、REST ならスレッドの先頭コメントの id（数字。REST にはスレッド自体の id が無い）。
+# GitHub は GraphQL で解決状態を読む（GraphQL が 403 の環境では REST の /ccr/ で読む）。GitLab は discussions。
+# スレッドの id は GraphQL ならスレッドの node id、REST ならスレッドの先頭コメントの id（数字。REST にはスレッド自体の id が無い）。
 # 受け入れ（accept_reply・accept_resolve）は id の形（数字だけか）で道を選ぶ。取った道と同じ道で書く。
 
 threads() {
-	mr_number="$1"
-	mr_url="$2"
+	th_number="$1"
+	threads_n=0
 	if [ "$kind" = github ]; then
 		owner="${path%%/*}"
 		repo="${path#*/}"
 		cursor=null
-		all='[]'
 		page=0
+		threads_form=graphql
 		while :; do
-			query=$("$JQ" -n --arg o "$owner" --arg r "$repo" --argjson n "$mr_number" --argjson c "$cursor" '{
+			query=$("$JQ" -n --arg o "$owner" --arg r "$repo" --argjson n "$th_number" --argjson c "$cursor" '{
 				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}} last:comments(last:1){nodes{id createdAt author{login}}}}}}}}",
 				variables: {o: $o, r: $r, n: $n, c: $c}}')
 			gql_rc=0
-			res=$(gql "$query") || gql_rc=$?
+			gql "$query" >"$2.t$page" || gql_rc=$?
 			case "$gql_rc" in
 			0) ;;
 			3)
 				# 最初のページで GraphQL を使えないと分かったときだけ（2 ページ目以降で変わることは無い）
 				[ "$page" -eq 0 ] || fail graphql-changed "reviewThreads の 2 ページ目以降で GraphQL を使えなくなった。取り直してください。"
-				threads_rest "$mr_number"
+				threads_rest "$th_number" "$2"
 				return
 				;;
 			*) return 1 ;;
 			esac
-			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c | (.last.nodes[0] // {}) as $l |
-				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // ""),
-				 last_id: ($l.id // ""), last_at: ($l.createdAt // ""), last_author: ($l.author.login // "")}]')
-			all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
-			more=$(printf '%s' "$res" | "$JQ" -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
+			threads_n=$((page + 1))
+			# 次のページを取るかの最小の読み（段取り）。スレッドの中身は実行ファイルが読む
+			more=$("$JQ" -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage' "$2.t$page")
 			[ "$more" = true ] || break
-			cursor=$(printf '%s' "$res" | "$JQ" '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
+			cursor=$("$JQ" '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor' "$2.t$page")
 			page=$((page + 1))
 			[ "$page" -gt 20 ] && fail too-many-threads "reviewThreads が多すぎて読み切れない。"
 		done
-		printf '%s' "$all"
 	else
-		# 判定に使う note は、discussion の note から system: true を除いたもの（空なら discussion ごと除く）。
-		# 対象は、その note が 1 つでも resolvable な discussion。代表の note（本文・url・位置・作成者）は
-		# 本文が目印 `<!-- ccnavi:` で始まらない最初の note（無ければ先頭）。ccnavi の依頼コメントに
-		# ユーザが返信したスレッドは、返信が代表になる。own は、note の本文が全部目印で始まるときだけ真
-		# （ccnavi の投稿だけのスレッド）。last_* は集合の最後の note。
-		pages "projects/$(encoded_path)/merge_requests/$mr_number/discussions" |
-			"$JQ" --arg u "$mr_url" 'def marked: ((.body // "") | if type == "string" then startswith("<!-- ccnavi:") else false end);
-				[.[] | . as $d | [($d.notes // [])[] | select(.system != true)] as $ns
-				| select(($ns | length) > 0) | select($ns | any(.resolvable))
-				| ([$ns[] | select(marked | not)] | .[0] // $ns[0]) as $n | $ns[-1] as $l |
-				{id: ($d.id | tostring), resolved: ([$ns[] | select(.resolvable) | .resolved] | all),
-				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
-				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring),
-				 own: ($ns | all(marked)),
-				 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.author.username // "")}]'
+		threads_form=discussions
+		pages "projects/$(encoded_path)/merge_requests/$th_number/discussions" >"$2.t0"
+		threads_n=1
 	fi
 }
 
-# GraphQL が使えない環境で、スレッドを REST で読む。<MR の番号>
-# /ccr/review_threads が返すのは {resolved, outdated, path, line, comment_ids} だけで、スレッドの id・本文・url・作成者は含まない。
-# コメントの一覧（pulls/<N>/comments。全ページ）から、先頭のコメント（id・url・本文・作成の時刻）と最後のコメント
-# （last_*）を引く。スレッドの id は先頭コメントの id（文字列）。
+# GraphQL が使えない環境で、スレッドを REST で読む。<MR の番号> <置き場>
+# /ccr/review_threads（.t0）とコメントの一覧（pulls/<N>/comments。全ページ。.t1）を取ってくる。どちらかが取れなければ、
+# REST の代わりの道も失敗したと言う（配列でないことは実行ファイルが見る）。
 threads_rest() {
+	threads_form=rest
 	tr_rc=0
-	tr_threads=$(api GET "repos/$path/pulls/$1/ccr/review_threads") || tr_rc=$?
+	api GET "repos/$path/pulls/$1/ccr/review_threads" >"$2.t0" || tr_rc=$?
 	if [ "$tr_rc" -eq 0 ]; then
-		tr_comments=$(pages "repos/$path/pulls/$1/comments") || tr_rc=$?
+		pages "repos/$path/pulls/$1/comments" >"$2.t1" || tr_rc=$?
 	fi
 	if [ "$tr_rc" -ne 0 ]; then
 		rest_fallback_failed "スレッドの取得"
 		return 1
 	fi
-	# コメントの一覧は diff_hunk を含むため大きい。引数 1 個の上限を超えるので、引数ではなくファイルで渡す。
-	tr_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-threads-$$"
-	printf '%s' "$tr_threads" >"$tr_file.rt"
-	printf '%s' "$tr_comments" >"$tr_file.cs"
-	if ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.rt" >/dev/null 2>&1 || ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.cs" >/dev/null 2>&1; then
-		rm -f "$tr_file.rt" "$tr_file.cs" || :
-		printf '%s: %s\n' "$review_label" "ccr/review_threads の返事か、コメント一覧の返事が配列でない。" >&2
-		rest_fallback_failed "スレッドの取得"
-		return 1
-	fi
-	tr_rc=0
-	"$JQ" -n --slurpfile rt "$tr_file.rt" --slurpfile cs "$tr_file.cs" '
-		($cs[0] | map({key: (.id | tostring), value: .}) | from_entries) as $m |
-		[$rt[0][] | ((.comment_ids // []) | map(tostring)) as $ids | (($ids[0]) // "") as $first | (($ids | last) // "") as $final |
-			($m[$first] // {}) as $f | ($m[$final] // {}) as $l |
-			{id: $first, resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
-			 body: ($f.body // ""), created_at: ($f.created_at // ""),
-			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]' || tr_rc=$?
-	rm -f "$tr_file.rt" "$tr_file.cs" "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
-	return "$tr_rc"
+	threads_n=2
 }
 
-# ---- レビュー。変更要求の状態を CHANGES_REQUESTED にそろえる。
+# ---- レビュー。<MR の番号> <置き場>。応答を <置き場>.r に書く。変更要求の状態を CHANGES_REQUESTED にそろえるのは実行ファイル。
 
 reviews() {
-	mr_number="$1"
-	mr_url="$2"
 	if [ "$kind" = github ]; then
-		pages "repos/$path/pulls/$mr_number/reviews" |
-			"$JQ" '[.[] | {state: (.state // ""), url: (.html_url // ""), submitted_at: (.submitted_at // ""), author: ((.user.id // .user.login // "") | tostring)}]'
+		pages "repos/$path/pulls/$1/reviews" >"$2.r"
 	else
-		pages "projects/$(encoded_path)/merge_requests/$mr_number/reviewers" |
-			"$JQ" --arg u "$mr_url" '[.[] | {state: (if .state == "requested_changes" then "CHANGES_REQUESTED" else ((.state // "") | ascii_upcase) end),
-				url: $u, submitted_at: (.updated_at // .created_at // ""), author: ((.user.id // .user.username // "") | tostring)}]'
+		pages "projects/$(encoded_path)/merge_requests/$1/reviewers" >"$2.r"
 	fi
 }
 
@@ -391,9 +366,6 @@ find_marked() {
 		else
 			fm_rel="repos/$path/issues/$fm_mr/comments?sort=created&direction=desc"
 		fi
-		fm_list=$(ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel") || fm_rc=$?
-		fm_urls=$(printf '%s' "$fm_list" | "$JQ" -r --arg m "$fm_mark" --arg w "$fm_who" \
-			'[.[]? | select(has("pull_request") | not) | select((.body // "") | contains($m)) | select($w == "" or ((.user.login // "") == $w)) | .html_url] | join(",")' 2>/dev/null) || fm_rc=1
 	else
 		if [ "$fm_kind" = issue ]; then
 			fm_rel="projects/$(encoded_path)/issues?scope=all&order_by=created_at&sort=desc"
@@ -403,10 +375,16 @@ find_marked() {
 		else
 			fm_rel="projects/$(encoded_path)/merge_requests/$fm_mr/notes?order_by=created_at&sort=desc"
 		fi
-		fm_list=$(ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel") || fm_rc=$?
-		fm_urls=$(printf '%s' "$fm_list" | "$JQ" -r --arg m "$fm_mark" --arg w "$fm_who" --arg u "${fm_url:-}" \
-			'[.[]? | select(((.description // "") + (.body // "")) | contains($m)) | select($w == "" or ((.author.username // "") == $w)) | (.web_url // ($u + "#note_" + (.id | tostring)))] | join(",")' 2>/dev/null) || fm_rc=1
 	fi
+	# 一覧から目印の投稿を選ぶのは実行ファイル（`ccnavi host marked`）。途中で打ち切った一覧（2）も読ませる
+	fm_file="$state/review-marked-$$.json"
+	ccnavi_hg_partial=1 ccnavi_host_pages "$fm_rel" >"$fm_file" || fm_rc=$?
+	fm_urls=""
+	if [ "$fm_rc" -eq 0 ] || [ "$fm_rc" -eq 2 ]; then
+		fm_out=$(ccnavi host marked "$kind" "$fm_mark" "$fm_who" "$fm_url" "$fm_file" 2>/dev/null) || fm_rc=1
+		fm_urls=$(printf '%s\n' "$fm_out" | tr -d '\r' | sed -n 's/^urls //p')
+	fi
+	rm -f "$fm_file" || :
 	case "$fm_rc" in
 	0) printf 'yes %s\n' "$fm_urls" ;;
 	2) printf 'no %s\n' "$fm_urls" ;;
@@ -606,20 +584,43 @@ account() {
 
 # ---- 取ってきた時点の状態。exe に渡す JSON。
 
+# [draft] を渡すと、MR がまだ Draft か（mr.draft）を足す（`ready` の打ち直しの判断にだけ使う。ほかでは足さず、Chrome が組む
+# 結果と形を揃えたまま）。number・url・mr_draft も変数に残す（呼ぶ側が投稿に使う）。
 fetch_all() {
-	mr=$(find_mr)
-	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
-	number=$(printf '%s' "$mr" | "$JQ" '.number')
-	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	# Draft のままか。`ready` の打ち直しの判断にだけ使うので、結果の JSON には入れず変数に覚える
-	# （`ready` が結果に足す。Chrome が組む結果と形を揃えたまま）。
-	mr_draft=$(printf '%s' "$mr" | "$JQ" -r '.draft // false')
-	# 実行ファイルに渡す形は番号と url だけ（元ブランチとマージ先は依頼のときだけ sh が確かめる）
-	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
-	t=$(threads "$number" "$url")
-	r=$(reviews "$number" "$url")
-	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson threads "$t" --argjson reviews "$r" \
-		'{host: $host, mr: $mr, threads: $threads, reviews: $reviews, fetched_at: (now | todate)}'
+	find_mr
+	[ -n "$mr_number" ] || fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
+	number="$mr_number"
+	url="$mr_url"
+	fa_draft=-
+	[ "${1:-}" != draft ] || fa_draft="${mr_draft:-false}"
+	fa_base="$state/review-fetch-$$"
+	threads "$number" "$fa_base"
+	reviews "$number" "$fa_base"
+	set -- host copy "$kind" "$number" "$url" "$fa_draft" "$threads_form" "$fa_base.r"
+	fa_i=0
+	while [ "$fa_i" -lt "$threads_n" ]; do
+		set -- "$@" "$fa_base.t$fa_i"
+		fa_i=$((fa_i + 1))
+	done
+	fa_rc=0
+	ccnavi "$@" || fa_rc=$?
+	fa_i=0
+	while [ "$fa_i" -le 21 ]; do
+		rm -f "$fa_base.t$fa_i" || :
+		fa_i=$((fa_i + 1))
+	done
+	rm -f "$fa_base.r" || :
+	case "$fa_rc" in
+	0) ;;
+	3)
+		# REST の道の応答が配列でなかった（実行ファイルの exitNotArrays）
+		printf '%s: %s\n' "$review_label" "ccr/review_threads の返事か、コメント一覧の返事が配列でない。" >&2
+		rest_fallback_failed "スレッドの取得"
+		return 1
+		;;
+	*) fail host-unreadable "取ってきたマージリクエスト（${url}）のスレッドかレビューを読めない（上の文面を見てください）。" ;;
+	esac
+	rm -f "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
 }
 
 # ---- 受け付けたことを診断ログに残し、取ってきた結果（実行ファイルに渡す JSON）の置き場を決める。
