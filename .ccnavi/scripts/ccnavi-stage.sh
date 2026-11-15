@@ -224,37 +224,16 @@ relative_of() {
 }
 
 # 元の相対パス <$1> が、ccnavi-user-handoff.sh で取り込める種類（template・messages・layer-config・docs・defense）なら 0。
-# 表は go/internal/tickets/sync/handoff/kinds.go の kinds（表の外は 1）。
-# 比べ方は ASCII の大文字小文字を区別しない（実行ファイル側は NFC と fold）。表を変えたら、test_stage_sh の例も直す。
+# 表は実行ファイルが持つ（`stage importable`。go/internal/tickets/sync/handoff/kinds.go の kinds）。実行ファイルが
+# 答えなければ、取り込めるかを言えないので止める。
 is_importable() {
-	im_k=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
-	im_b=$im_k
-	case "$im_k" in
-	projects/*)
-		im_p=${im_k#projects/}
-		im_n=${im_p%%/*}
-		case "$im_p" in
-		"$im_n"/.ccnavi/config/project/*) im_b=${im_p#"$im_n"/} ;;
-		esac
-		;;
+	im_out=$(ccnavi_ask "$root" stage importable "$1") || im_out=""
+	case "$(printf '%s\n' "$im_out" | sed -n 's/^importable //p' | head -n 1)" in
+	yes) return 0 ;;
+	no) return 1 ;;
 	esac
-	case "$im_b" in
-	*/.yml | */.md) return 1 ;;
-	.ccnavi/config/common/templates/*.yml | .ccnavi/config/project/templates/*.yml)
-		case "${im_b#*/templates/}" in */*) return 1 ;; esac
-		return 0
-		;;
-	.ccnavi/messages/*.yml)
-		case "${im_b#*/messages/}" in */*) return 1 ;; esac
-		return 0
-		;;
-	.ccnavi/config/common/rules.yml | .ccnavi/config/common/phases.yml | .ccnavi/config/common/risks.yml) return 0 ;;
-	.ccnavi/config/project/rules.yml | .ccnavi/config/project/phases.yml | .ccnavi/config/project/risks.yml) return 0 ;;
-	.ccnavi/docs/*.md | .ccnavi/ccnavi.md) return 0 ;;
-	.ccnavi/scripts/* | .claude/hooks/* | .claude/settings.json | .claude/settings.local.json) return 0 ;;
-	.claude/skills/*.md) return 0 ;;
-	esac
-	return 1
+	printf 'ccnavi-stage: 実行ファイルが答えないため、%s を取り込めるかを確かめられません。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' "$1" >&2
+	exit 2
 }
 
 # 下書きを書く前に、全引数が使えるかを確かめる。1 つでも不正なら、何も書かずに止める

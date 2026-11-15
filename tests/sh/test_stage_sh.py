@@ -333,59 +333,6 @@ class StageShTest(unittest.TestCase):
         self.assertEqual(1, len(nexts), result.stdout)
         self.assertIn("取り込みの手順をユーザに案内", nexts[0])
 
-    def test_importable_classification(self):
-        """sh の is_importable が、取り込める種類の表と同じ答えを返す（表のずれを見つける）。
-
-        実行ファイルの種類（handoff の KindOf）は go test（stage_sh_test.go）が同じ表で見る。
-        """
-        cases = [
-            (".ccnavi/config/common/templates/a.yml", True),
-            (".ccnavi/messages/a.yml", True),
-            (".ccnavi/messages/sub/a.yml", False),
-            ("projects/p/.ccnavi/messages/a.yml", False),
-            (".ccnavi/config/common/messages/deny.yml", False),  # 古い置き場。取り込めない
-            (".ccnavi/config/project/templates/a.yml", True),
-            (".ccnavi/config/project/templates/sub/a.yml", False),
-            (".ccnavi/config/common/templates/x/templates/a.yml", False),
-            (".ccnavi/docs/.md", False),
-            ("projects/p/.ccnavi/config/project/templates/a.yml", True),
-            (".ccnavi/config/common/rules.yml", True),
-            (".ccnavi/config/project/risks.yml", True),
-            ("projects/p/.ccnavi/config/project/phases.yml", True),
-            ("projects/p/.ccnavi/config/common/rules.yml", False),
-            (".ccnavi/docs/a/b.md", True),
-            (".ccnavi/CCNAVI.md", True),
-            (".ccnavi/scripts/ccnavi-stage.sh", True),
-            (".claude/hooks/lint-py.sh", True),
-            (".claude/settings.json", True),
-            (".claude/settings.local.json", True),
-            (".claude/hooks/a/b/c.py", True),
-            (".ccnavi/scripts/ccnavi-handoff-names.txt", True),
-            (".ccnavi/scripts/sub/x.sh", True),
-            (".claude/skills/x/SKILL.md", True),
-            (".claude/skills/x/y/z.md", True),
-            (".claude/skills/x/y/z.txt", False),
-            ("README.md", False),
-        ]
-        script = os.path.join(SH_DIR, "ccnavi-stage.sh")
-        # 保護対象の下書き（取り込み前）があれば、取り込んだ後の姿として下書きを読む。
-        draft = os.path.join(ROOT, "wip", "handoff", ".ccnavi", "scripts", "ccnavi-stage.sh")
-        if os.path.isfile(draft):
-            script = draft
-        with open(script, encoding="utf-8") as f:
-            text = f.read()
-        start = text.index("is_importable() {")
-        func = text[start : text.index("\n}\n", start) + 3]
-        for rel, want in cases:
-            with self.subTest(rel=rel):
-                got = (
-                    subprocess.run(
-                        [SHELL, "-c", f"{func}\nis_importable '{rel}'"], capture_output=True
-                    ).returncode
-                    == 0
-                )
-                self.assertEqual(want, got)
-
     def test_commands_without_draft_or_edit_prints_nothing(self):
         result = self.stage("--commands", ".ccnavi/config/common/rules.yml")
         self.assertEqual(1, result.returncode)

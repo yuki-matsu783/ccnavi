@@ -151,6 +151,15 @@
         （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
     ccnavi branches issue|mr <number> [--result <json>] [--json]
         （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
+    ccnavi branches pulls <number> <owner/repo> <file>
+        （ccnavi-branches.sh 用。GitHub の開いた PR の一覧（ホストの応答のまま）から issue に関係する PR を選び、
+         --result の mrs の形の JSON の配列を出力します。読み取り専用）
+    ccnavi path under <base> <path>
+        （ccnavi-review.sh 用。"path 1" に続けて、path が base の下なら "under yes"、違えば "under no" を
+         出力します。大文字小文字は区別しません。読み取り専用）
+    ccnavi stage importable <path>
+        （ccnavi-stage.sh 用。ccnavi-user-handoff.sh で取り込める種類のパスなら "importable yes"、
+         違えば "importable no" を出力します。読み取り専用）
     ccnavi git check <self> <sync> <start> <self_q> <worktree_q>
         （ccnavi-git.sh 用。標準入力に NUL 区切りで受けた git の引数を、git の状態とあわせて通すかを、
          allow・pass か "deny <識別子>" と拒否の文で出力します。読み取り専用）

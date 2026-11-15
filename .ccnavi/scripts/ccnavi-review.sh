@@ -730,11 +730,11 @@ review-request)
 		/* | [A-Za-z]:[\\/]*) request_body_path="$request_body" ;;
 		*) request_body_path="$here/$request_body" ;;
 		esac
-		# `.` と `..` を解いてから、大文字小文字を区別せずに scratchpad/ の中かを見る（ASCII の範囲）。
-		request_body_abs=$(ccnavi_abs "$request_body_path" | tr '\\' '/' | LC_ALL=C tr 'A-Z' 'a-z') || request_body_abs=""
-		request_scratch=$(printf '%s/scratchpad/' "$root" | tr '\\' '/' | LC_ALL=C tr 'A-Z' 'a-z')
-		case "$request_body_abs" in
-		"$request_scratch"?*)
+		# scratchpad/ の中かは実行ファイルが比べる（`.` と `..` を解き、大文字小文字を区別しない）。答えなければ消さない。
+		request_under=$(ccnavi_ask "$root" path under "$root/scratchpad" "$request_body_path" | sed -n 's/^under //p' | head -n 1) ||
+			request_under=""
+		case "$request_under" in
+		yes)
 			if [ -f "$request_body_path" ] || [ -L "$request_body_path" ]; then
 				if rm -f "$request_body_path" 2>/dev/null; then
 					printf '案内: 依頼文 %s を消した（scratchpad/ の下書き。依頼したあとは不要）\n' "$request_body"

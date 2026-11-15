@@ -2,8 +2,7 @@ package handoff
 
 import "testing"
 
-// 取り込めるか（種類があるか）。sh の is_importable（ccnavi-stage.sh）も同じ表で同じ答えを返す
-// （tests/sh/test_stage_sh.py）。どちらかだけ変えると、stage が置いた下書きを取り込めない。
+// 取り込めるか（種類があるか）。ccnavi-stage.sh の is_importable は、この答えを `stage importable` で聞く。
 func TestImportableAgreesWithTheStageSh(t *testing.T) {
 	cases := map[string]bool{
 		".ccnavi/config/common/templates/a.yml":             true,

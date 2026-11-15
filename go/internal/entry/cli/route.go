@@ -479,6 +479,13 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 			return config.ExitError, true
 		}
 		return okIf(wapmerge.Plan(stdout, conf, root, cmd[2]) == 0), true
+	case len(cmd) == 4 && cmd[0] == "path" && cmd[1] == "under":
+		return pathUnder(stdout, cmd[2], cmd[3]), true
+	case len(cmd) == 3 && cmd[0] == "stage" && cmd[1] == "importable":
+		return stageImportable(stdout, cmd[2]), true
+	case len(cmd) == 5 && cmd[0] == "branches" && cmd[1] == "pulls":
+		// GitHub の開いた PR の一覧（sh が取ってきたまま）から、issue に関係する PR を選ぶ。
+		return okIf(branch.Pulls(stdout, stderr, conf, cmd[2], cmd[3], cmd[4]) == 0), true
 	case len(cmd) == 3 && cmd[0] == "branches":
 		// ホストの結果は sh が取ってきて `--result` で渡す。
 		return okIf(branch.Report(stdout, stderr, conf, root, cwdOf(a), cmd[1], cmd[2], a.Str("result"),

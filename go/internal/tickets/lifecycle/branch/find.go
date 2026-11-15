@@ -185,8 +185,8 @@ func readHost(path string) host {
 
 // namesNumber はブランチ名が番号を含むか。ccnavi の命名 `<先頭の語>-<番号>-<slug>` に合う名前は 2 つ目の番号だけで
 // 比べ（`feature-102-…-1-…` は 102）、形に合わない名前は番号の前後が区切り（`-` `/` `_` `.`）か端であること。
-// `claude/tender-volta-qmy99q` の乱数や `i152` を候補にしない。`ccnavi-branches.sh` の jq も同じ規則なので、
-// 片方だけを直さないこと。
+// `claude/tender-volta-qmy99q` の乱数や `i152` を候補にしない。手元のブランチと、GitHub の PR の元ブランチ
+// （relatedPulls）が同じ規則で選ばれる。
 func namesNumber(name string, number int, prefixes []string) bool {
 	if ident, ok := ids.IdentifierNumber(pyfmt.Casefold(name), prefixes); ok {
 		return ident == number

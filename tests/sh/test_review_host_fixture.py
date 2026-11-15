@@ -636,7 +636,7 @@ class GitLabHostFixtureTest(unittest.TestCase):
             + "; exit 0 ;; esac\n"
             + 'case " $* " in *" write-and-push family "*)'
             + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
-            + 'case " $* " in *" ops "*)'
+            + 'case " $* " in *" ops "* | *" path under "*)'
             + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'

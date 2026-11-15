@@ -94,7 +94,7 @@ state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"
-trap 'rm -f "$result" "$host_err" "$host_err.status" "$host_err.body"' EXIT
+trap 'rm -f "$result" "$result.pulls" "$host_err" "$host_err.status" "$host_err.body"' EXIT
 
 # ---- 実行ファイル。
 if bin=$(ccnavi_bin "$root"); then
@@ -151,27 +151,12 @@ github_mr() {
 		  fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
 }
 
-# GitHub: その issue を参照している開いた PR。タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名に含む番号を下の jq の規則で見る。
+# GitHub: その issue を参照している開いた PR。開いた PR の一覧を取るのは sh（外との出入り）で、どれが関係するか
+# （タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名に含む番号）は実行ファイルが選ぶ（`branches pulls`）。
 github_issue() {
 	got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open") || return "$?"
-	# 元ブランチ名の規則は実行ファイルの names_number と同じ。`<先頭の語>-<番号>-<slug>` の形なら 2 つ目の番号だけ、
-	# 形に合わなければ、番号の前後が区切りか端であること。先頭の語は CCNAVI_BRANCH_PREFIXES（無ければ既定のリスト）。
-	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" --arg n "$number" \
-		--arg pre "${CCNAVI_BRANCH_PREFIXES:-feature hotfix fix bugfix chore refactor docs}" '
-		# 既定のリストは config.DefaultBranchPrefixes、文字クラスは ids の JAChars・IDChars と同じ。変えるなら両方直す。
-		def names_number($n; $pre):
-			([ascii_downcase
-			 | capture("^(?<w>[a-z][a-z0-9]*)-(?<num>[1-9][0-9]*)-[A-Za-z0-9々ぁ-ゖァ-ヺー一-鿿][A-Za-z0-9._\\-々ぁ-ゖァ-ヺー一-鿿]*$")?] | .[0]) as $f
-			| if $f != null and ($pre | split("[ ,\t\n]+"; "g") | index($f.w)) != null
-			  then $f.num == $n
-			  else test("(^|[-/_.])" + $n + "([-/_.]|$)") end;
-		[.[] | select(
-			(((.title // "") + " " + (.body // "")) as $t
-			 | ($t | test("(^|[^0-9A-Za-z_&/])#" + $n + "([^0-9]|$)"))
-			   or ($t | test("issues/" + $n + "([^0-9]|$)")))
-			or ((.head.ref // "") | names_number($n; $pre)))
-		 | {number: .number, branch: .head.ref, state: .state, url: .html_url, title: .title, base: (.base.ref // ""),
-		    fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
+	printf '%s' "$got" >"$result.pulls" || return 1
+	ccnavi branches pulls "$number" "$ccnavi_h_path" "$result.pulls"
 }
 
 # GitLab: MR 1 本の元ブランチ。フォークから出た MR は元ブランチがこのプロジェクトに無い。
