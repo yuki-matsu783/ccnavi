@@ -257,14 +257,16 @@ class BuiltinFormsTest(ConfigUnionHarness):
 
     git のグローバルオプションを挟んだ形、rm の再帰と強制の組み合わせ・順序・長い形。
     片方だけの rm や、`git` を含む別の語は止めない。共通レイヤーが無いときと、壊れて組み込みの
-    既定に戻ったときの両方で見る（hook と同じ経路）。
+    既定に戻ったときの両方で見る（hook と同じ経路）。表は共通レイヤーが無いときに全部を回し、
+    壊れたときは代表だけを回す（土台の deny の読みは状態に依らない。表の読みは Go の
+    policy/builtin の見本も見る）。
     """
 
-    def check(self):
-        for command, rule in BUILTIN_DENIED:
+    def check(self, denied=BUILTIN_DENIED, passed=BUILTIN_PASSED):
+        for command, rule in denied:
             with self.subTest(command=command):
                 self.assert_denied(self.hook("Bash", self.ws, command=command), rule)
-        for command in BUILTIN_PASSED:
+        for command in passed:
             with self.subTest(command=command):
                 result = self.hook("Bash", self.ws, command=command)
                 # 生の git は組み込みで常に止まる。ほかの土台の deny にヒットしていないことを見る。
@@ -277,7 +279,7 @@ class BuiltinFormsTest(ConfigUnionHarness):
 
     def test_with_a_broken_common_layer(self):
         write(self.rules, BROKEN)
-        self.check()
+        self.check(BUILTIN_DENIED[:1] + BUILTIN_DENIED[6:7], BUILTIN_PASSED[:1])
 
     def test_next_step_names_the_git_wrapper(self):
         """次の一手に挙げる git の操作は、ラッパーがあればラッパーの実パスで書く。
@@ -440,31 +442,35 @@ class BuiltinGitDirTest(ConfigUnionHarness):
     名指しのツール（Write / Edit / NotebookEdit）は `.git/` の下と `.git` そのもの、
     シェルは守る場所と同じ書き込みの形で見る。読むだけと、`.gitignore`・`.github/` は
     止めない。git のラッパーの呼び出しは、`.git` がコマンド文字列に出ないのでヒットしない。
+    表は共通レイヤーが無いときに全部を回し、ほかの状態では代表だけを回す。
     """
 
-    def check(self):
-        for tool in ("Write", "Edit", "NotebookEdit"):
-            for path in (
-                os.path.join(self.ws, ".git", "config"),
-                os.path.join(self.ws, ".git", "hooks", "pre-commit"),
-                os.path.join(self.ws, "wt", ".git"),
-            ):
+    def check(self, full=True):
+        tools = ("Write", "Edit", "NotebookEdit") if full else ("Write",)
+        paths = (
+            os.path.join(self.ws, ".git", "config"),
+            os.path.join(self.ws, ".git", "hooks", "pre-commit"),
+            os.path.join(self.ws, "wt", ".git"),
+        )
+        for tool in tools:
+            for path in paths if full else paths[:1]:
                 with self.subTest(tool=tool, path=path):
                     field = "notebook_path" if tool == "NotebookEdit" else "file_path"
                     result = self.hook(tool, self.ws, **{field: path})
                     self.assert_denied(result, GIT_DIR_BUILTIN)
-        for name in (".gitignore", os.path.join(".github", "w.yml"), "repo.git"):
+        names = (".gitignore", os.path.join(".github", "w.yml"), "repo.git")
+        for name in names if full else names[:1]:
             with self.subTest(path=name):
                 self.hook("Write", self.ws, file_path=os.path.join(self.ws, name))
                 self.assertNotIn(GIT_DIR_BUILTIN, self.last_record().get("rules", []))
-        for command in GIT_DIR_SHELL_DENIED:
+        for command in GIT_DIR_SHELL_DENIED if full else GIT_DIR_SHELL_DENIED[:1]:
             with self.subTest(command=command):
                 self.assert_denied(
                     self.hook("Bash", self.ws, command=command), GIT_DIR_SHELL_BUILTIN
                 )
         wrapper = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
         for command in (
-            *GIT_DIR_SHELL_PASSED,
+            *(GIT_DIR_SHELL_PASSED if full else GIT_DIR_SHELL_PASSED[:1]),
             f"sh {wrapper} integrate x",
             f"sh {wrapper} -C {self.ws} status",
         ):
@@ -475,7 +481,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
         self.assertNotIn(GIT_DIR_BUILTIN, self.last_record().get("rules", []))
 
     def test_with_the_common_layer(self):
-        self.check()
+        self.check(full=False)
 
     def test_without_the_common_layer(self):
         os.remove(self.rules)
@@ -483,7 +489,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
 
     def test_with_a_broken_common_layer(self):
         write(self.rules, BROKEN)
-        self.check()
+        self.check(full=False)
 
     def test_the_message_names_the_git_wrapper(self):
         os.remove(self.rules)
