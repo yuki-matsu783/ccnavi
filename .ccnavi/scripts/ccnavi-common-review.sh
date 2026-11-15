@@ -461,7 +461,7 @@ staged_send() {
 		cs_sv_set="$ccnavi_lock_set_held"
 		cs_sv_prev="$ccnavi_lock_prev_held"
 		cs_sv_prev_set="$ccnavi_lock_prev_set"
-		if ccnavi_lock_take "$root" ops "$cs_id" 30; then
+		if ccnavi_lock_take "$root" ops "$cs_id" "$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 30)"; then
 			cs_locked=1
 		else
 			ccnavi_lock_dir="$cs_sv_dir"

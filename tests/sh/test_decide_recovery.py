@@ -4,7 +4,7 @@
 
 1. AT43: ホストに書いたあとの照合が外れたとき、続きの子もマーカーも置かず（置く呼び出しが断る）、
    ホストの解決は残り、操作記録に解決した分が残る
-2. AT19: 置く段階で失敗し、あとから --resume で完了させる。返信は 1 回だけ
+2. AT19: 置く段階で 2 回失敗し、あとから --resume で完了させる。返信は 1 回だけ
 3. AT17: 適用済み（applied.local）の記録を --resume しても、自分の変化を食い違いとして断らない
 4. AT25: 親のワークツリーを消したあと、ワークスペースのルートから --resume する
 5. AT20: 操作のロック（sh の `locks/ops/<操作ID>`）が取られている間の --resume は投稿しない
@@ -106,19 +106,21 @@ class DecideRecoveryShTest(unittest.TestCase):
     # ---- AT19
 
     def test_a_failed_placement_then_resume_replies_once_and_places_once(self):
-        """AT19"""
+        """AT19（置く段階で 2 回続けて失敗しても、返信は 1 回）"""
         failed = self.choose(STUB_FAIL_YES="1")
         self.assertEqual(failed.returncode, 1, failed.stderr)
         self.assertEqual(self.kinds(), ["reply", "resolve"])
         record = self.record()
         self.assertFalse(record["applied"].get("local"))
+        again = self.run_decide("--resume", stdin="y\n", STUB_FAIL_YES="1")
+        self.assertEqual(again.returncode, 1, again.stdout + again.stderr)
         done = self.run_decide("--resume", stdin="y\n")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.kinds().count("reply"), 1, "返信は 1 回だけ")
         self.assertEqual(self.kinds().count("resolve"), 1)
-        # 置く呼び出し（続きの子・マーカーを置くところ）は、失敗した 1 回と成功した 1 回
+        # 置く呼び出し（続きの子・マーカーを置くところ）は、失敗した 2 回と成功した 1 回
         placing = [c for c in self.calls() if "--accept-done" in c]
-        self.assertEqual(len(placing), 2, placing)
+        self.assertEqual(len(placing), 3, placing)
         self.assertEqual(len([c for c in self.calls() if "--accept-plan" in c]), 1)
         # 投稿も 1 回ずつ。記録は消える
         self.assertEqual(len(STORE["issues"]), 1)
@@ -129,16 +131,6 @@ class DecideRecoveryShTest(unittest.TestCase):
             [],
             "置けたので計画は消える",
         )
-
-    def test_resume_after_a_second_failure_still_replies_once(self):
-        """AT19（置く段階で 2 回続けて失敗しても、返信は 1 回）"""
-        self.assertEqual(self.choose(STUB_FAIL_YES="1").returncode, 1)
-        again = self.run_decide("--resume", stdin="y\n", STUB_FAIL_YES="1")
-        self.assertEqual(again.returncode, 1, again.stdout + again.stderr)
-        done = self.run_decide("--resume", stdin="y\n")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertEqual(self.kinds().count("reply"), 1)
-        self.assertEqual(len(STORE["issues"]), 1)
 
     # ---- AT17
 
@@ -239,7 +231,8 @@ class DecideRecoveryShTest(unittest.TestCase):
         # 最初の判断で issue 以外の段階（note）は送り済み。--resume でも増えないことを確かめる
         notes_before = len(STORE["notes"])
         calls_before = len(self.calls())
-        result = self.run_decide("--resume", stdin="y\n")
+        # 待つ秒を縮める（既定の 30 秒を待たずに、取れないと分かる）
+        result = self.run_decide("--resume", stdin="y\n", CCNAVI_LOCK_WAIT="1")
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
         self.assertEqual(len(STORE["notes"]), notes_before, "ロック中なのに投稿した")
