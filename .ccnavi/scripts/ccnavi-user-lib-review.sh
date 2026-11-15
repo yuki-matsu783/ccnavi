@@ -6,6 +6,8 @@
 #   ccnavi_load ccnavi-common-review.sh
 #   ccnavi_load ccnavi-user-lib-review.sh
 #
+# 環境変数: CCNAVI_LOCK_WAIT（同じ操作の投稿のロックを待つ秒。未設定なら 30）
+#
 # 置くのは、受け入れた指摘のスレッドへの返信と解決（accept_*）と、issue を作る関数（create_issue）。
 # どれもユーザが決めたことをホストに書くので、エージェントも読む共通部（ccnavi-common*.sh）には置かない。
 # 共通部に置くと、`sh -c '. …common….sh; 関数'` の形で、ユーザ専用の sh の名前を出さずに呼べてしまう

@@ -56,13 +56,14 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh`、`go/internal/entry/catchup/`・`dirs/` | `sh` |
 | `.ccnavi/scripts/ccnavi-stage.sh`・`ccnavi-branches.sh`・`ccnavi-worktree.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`、`go/internal/entry/shask/`・`go/internal/tickets/lifecycle/gitlog/`・`refusal/`・`cut/`・`treeadd/`・`go/internal/tickets/sync/stage/` | `sh`（`treeadd/` は `test_start_sh`・`test_start_sh_adopt` も） |
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`・`test_start_sh_adopt`） |
-| `.ccnavi/scripts/ccnavi-common-host.sh`・`go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_start_sh_adopt`・`test_ticket_preflight_sh`・`test_write_and_push_ticket`） |
+| `go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_start_sh_adopt`・`test_ticket_preflight_sh`・`test_write_and_push_ticket`）。`ccnavi-common-host.sh` は多くの sh が読むので、下の「全件を回すとき」に従う |
 | `.ccnavi/scripts/ccnavi-common-write-and-push.sh`・`go/internal/tickets/lifecycle/wapmerge/`・`go/internal/entry/cli/wapwrite.go` | `sh`（`test_write_and_push_*`・`test_push_approved_sh`）`ticket`（`test_write_and_push`） |
 | `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`・`test_branches_sh`・`test_mask_url_sh`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
+| `tests/treecache.py`（チケットの受入テストの木を写しに取る） | `ticket` |
 | `tests/fake_claude.py`・`tests/contract/claudeside.py`・`tests/contract/claude/recorded.json` | `contract` `scenarios`（`scenarios` の `test_runner`・`test_stub_scenarios` はスタブを使う） |
 | `tests/manual/claude/record_hooks.py` | `contract`（`claudeside` を使う。本物を呼ぶので自動テストは回さない） |
 | `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つのスタブと模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |

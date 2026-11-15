@@ -32,6 +32,7 @@
 #   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドは使わない。時間切れのときは 124 を返す。stdout に `-` を渡すと、呼ぶ側の標準出力を引き継ぐ）
+#   ccnavi_run_timed_end        ccnavi_run_timed のコマンドと見張りを止めて回収する（終わりと、呼ぶ側の trap の両方から呼ぶ）
 #   ccnavi_host_fail <ホストの返事の文>  curl・gh・glab の失敗の文を実行ファイル（`ccnavi host fail`）に読ませ、
 #                               HTTP の番号（ccnavi_hf_status）・GraphQL を使えない環境（Claude Code のクラウド）の 403 か
 #                               （ccnavi_hf_blocked が yes）・画面に出せる 1 行の本文（ccnavi_hf_body）に入れる

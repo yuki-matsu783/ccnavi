@@ -6,6 +6,8 @@
 #
 # 読むのは ccnavi-review.sh（エージェントも使う）と、ユーザ専用の ccnavi-user-decide.sh・
 # ccnavi-user-close-early.sh。ccnavi-common.sh はこのファイルを自分では読まない（ホストの道具が要るので、レビューの sh だけが読む）。
+# 環境変数: CCNAVI_LOCK_WAIT（同じ操作の投稿のロックを待つ秒。未設定なら 30）
+#
 # 読んだだけでは何もしない。関数と変数の既定値を決めるだけで、呼ぶ側が次の順に呼ぶ。
 #
 #   review_place            ワークスペースルート・いまのワークツリー・state の置き場（root・here・state・script_dir・exe_cwd）

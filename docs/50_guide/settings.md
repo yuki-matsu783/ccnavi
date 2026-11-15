@@ -199,7 +199,7 @@ ccnavi の動作に依存する決まりと考え方なので、ワークスペ�
 | `CCNAVI_STOP_REVIEW_TTL_SECONDS` | 停止レビューの判定計画を待つ時間と、試行の期限（秒）。既定は `600`。読めない値と 0 以下は既定に戻る |
 | `CCNAVI_FETCH_TIMEOUT` | セッション開始時の `ccnavi-fetch.sh` が、fetch 1 回を打ち切る秒数。既定は `15`。数字でない値は既定に戻る（[複数人・別 PC](multi-pc.md)） |
 | `CCNAVI_FETCH_BUDGET` | 同じ sh が親のブランチを早送りする時間の枠（秒）。既定は `45`。数字でない値は既定に戻る |
-| `CCNAVI_LOCK_WAIT` | `ccnavi-sync.sh` と write-and-push 系の sh が、他のセッションのロックを待つ秒数。既定は `120`。レビューの判断の投稿（同じ操作の投稿のロック）も同じ値で待ち、そちらの既定は `30`。数字でない値は既定に戻る |
+| `CCNAVI_LOCK_WAIT` | `ccnavi-sync.sh` と write-and-push 系の sh が、他のセッションのロックを待つ秒数。未設定のときは `120`。レビューの判断の投稿（同じ操作の投稿のロック）は、未設定のときだけ `30` 秒で、設定した値はこちらにも効く。数字でない値は既定に戻る |
 | `CCNAVI_SYNC_TIMEOUT` | `ccnavi-sync.sh` が、`ls-remote` と fetch 1 回を打ち切る秒数。既定は `60` |
 | `CCNAVI_WRITE_AND_PUSH_TIMEOUT` | write-and-push 系の sh と子のワークツリーからの push が、push と `ls-remote` 1 回を打ち切る秒数。既定は `60` |
 | `CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT` | write-and-push 系の sh が、コミット 1 回を打ち切る秒数。既定は `60` |
