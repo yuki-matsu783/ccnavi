@@ -25,7 +25,7 @@ func readJSON(t *testing.T, parts ...string) any {
 	return data
 }
 
-// sh・Chrome 拡張と同じ表で、分類と接続先を突き合わせる。
+// sh と同じ表で、分類と接続先を突き合わせる。
 func TestHostKindsTable(t *testing.T) {
 	table := readJSON(t, "tests", "fixtures", "host-kinds.json").(*pyjson.Object)
 	cases, _ := table.Value("cases").([]any)
