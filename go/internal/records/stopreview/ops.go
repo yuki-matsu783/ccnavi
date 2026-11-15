@@ -105,7 +105,7 @@ func runs(before []string) bool {
 }
 
 // ProposeIdent はコマンドの語から、実行される `ccnavi-ticket.sh approval-request <識別子>` の識別子を取る。
-// 無ければ空。識別子は `--` と `--reason <値>` を読み飛ばした最初の語（sh の ticket_id と同じ読み方）。
+// 無ければ空。識別子は `--` と `--reason <値>` を読み飛ばした最初の語（ccnavi-ticket.sh が聞く ticketsh.ID と同じ読み方）。
 // `--check` は確かめるだけで提案を送らないので、操作実績に載せない。
 func ProposeIdent(words []string) string {
 	for at, word := range words {
