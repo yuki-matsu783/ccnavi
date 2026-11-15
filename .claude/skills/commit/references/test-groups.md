@@ -51,6 +51,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.ccnavi/scripts/ccnavi-git.sh`・`go/internal/tickets/lifecycle/gitwrap/`・`go/internal/tickets/lifecycle/land/` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh`・`ccnavi-user-handoff.sh`・`ccnavi-user-mirror.sh`・`ccnavi-user-prune.sh`・`ccnavi-clean.sh` | `sh` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-common-state.sh`（答えを読む口 `ccnavi_val`・`ccnavi_do` はどの sh も使う）・`go/internal/infra/reply/` | `sh` `ticket` `e2e` |
 | `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh`、`go/internal/entry/catchup/`・`dirs/` | `sh` |
 | `.ccnavi/scripts/ccnavi-stage.sh`・`ccnavi-branches.sh`・`ccnavi-worktree.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`、`go/internal/entry/shask/`・`go/internal/tickets/lifecycle/gitlog/`・`refusal/`・`cut/`・`treeadd/`・`go/internal/tickets/sync/stage/` | `sh`（`treeadd/` は `test_start_sh` も） |
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`） |
