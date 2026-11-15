@@ -16,7 +16,8 @@ import (
 	"ccnavi/internal/tickets/model/standing"
 )
 
-// answer は sh への答え（`infra/reply` の形）。行の先頭の語は out・err・failed・overlap（取り込みが書きかけと重なって止まった。sync の終了コード 3）・noticket（渡された親のワークツリーに親チケットも提案も無い。止めたのがこれだけなら sync の終了コード 4）・next と、データの行（plan の repo・family など）。
+// answer は sh への答え（`infra/reply` の形）。行の先頭の語は out・err・failed・overlap（取り込みが書きかけと重なって止まった）・noticket（渡された親のワークツリーに親チケットも提案も無い）・next・exit と、データの行（plan の repo・family など）。
+// sync の終了コードは、1 回の起動の答えを並べて end が決める（exitOf）。
 // 値はどれも 1 行に収める（reply.Lines.Line）。
 type answer struct{ reply.Lines }
 
@@ -144,12 +145,12 @@ func familyAt(root string, conf *config.Settings, name string) (path, branch str
 	return path, branch, unknown
 }
 
-// worktreeNames は `.claude/worktrees/` の直下の名前（並びはディスクのとおり）。
 // familyKey は親のワークツリーの元のリポジトリの名前（ロックの置き場の名前。ワークスペース自身は self）。
 func familyKey(root string, conf *config.Settings, path, name string) string {
 	return tree.RepoKey(integrate.TreeAt(conf, root, path, name).Project)
 }
 
+// worktreeNames は `.claude/worktrees/` の直下の名前（並びはディスクのとおり）。
 func worktreeNames(root string) []string {
 	names, _ := ospath.DiskListdir(tree.WorktreesPath(root))
 	return names

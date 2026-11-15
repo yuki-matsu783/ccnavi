@@ -56,7 +56,8 @@
 # （早送り・merge と取りやめ・origin/HEAD の向け直し・片付け）、出力の文は実行ファイル（`ccnavi sync <段取り>`。
 # go/internal/entry/catchup）が持つ。この sh に残すのは外との出入り（ls-remote・fetch・ccnavi-review.sh merged）と、
 # ロック・trap（プロセスの寿命）と、それらを並べる段取りだけ。実行ファイルが答えの out の行を出せと言い、failed で
-# 止めたものに数えさせ、next の語（fetch・ask・skip・go）で次の外との出入りを決める。merge の取りやめは実行ファイルの
+# 止めたものに数えさせ（終了コードは、答えを並べたファイルから実行ファイルの sync end が決める）、next の語
+# （fetch・ask・skip・go）で次の外との出入りを決める。merge の取りやめは実行ファイルの
 # 1 回の起動の中で済み（信号を受けたときも）、trap は子を待ってロックを外すだけ。実行ファイルが無い・答えないときは、
 # 組むか置くかを言って止める。
 #
@@ -122,8 +123,7 @@ scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-sync) || {
 	printf 'ccnavi-sync: 一時ディレクトリが作れません。\n' >&2
 	exit 2
 }
-: >"$scratch/failed"
-: >"$scratch/noticket"
+: >"$scratch/answers"
 
 # 後始末（プロセスの寿命）。ロックを外し、一時ディレクトリを消す。merge の途中で切られたときの取りやめは、
 # merge を始めた実行ファイルが持つ（sh は子が終わるのを待ってからここに来る）。
@@ -162,19 +162,12 @@ ask_sync() {
 	fi
 }
 
-# 答えの out・err の行を出し、failed があれば止めたものに数える。次の一手（next の語）を $next に入れる。
+# 答えの out・err の行を出し、答えを終了コードの決め手（sync end）に渡すファイルへ足す。次の一手（next の語）を
+# $next に入れる。
 said() {
 	ccnavi_val out "$answer"
 	ccnavi_val err "$answer" >&2
-	if ccnavi_has failed "$answer"; then
-		printf 'fail\n' >>"$scratch/failed"
-	fi
-	if ccnavi_has overlap "$answer"; then
-		printf 'overlap\n' >>"$scratch/failed"
-	fi
-	if ccnavi_has noticket "$answer"; then
-		printf 'noticket\n' >>"$scratch/noticket"
-	fi
+	printf '%s\n' "$answer" >>"$scratch/answers"
 	next=$(ccnavi_val1 next "$answer")
 }
 
@@ -217,7 +210,7 @@ take_lock() {
 	2) printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$2" "$state" "$1" "$2" ;;
 	*) printf '%s: 他の操作がロックを持っている（%s）。終わってから再実行してください\n' "$2" "$(ccnavi_lock_owner "$state/locks/$1/$2")" ;;
 	esac
-	printf 'fail\n' >>"$scratch/failed"
+	printf 'failed\n' >>"$scratch/answers"
 	return 1
 }
 
@@ -301,7 +294,7 @@ while IFS= read -r line <&4; do
 			ccnavi_lock_drop
 		else
 			printf '%s: 他の操作がロックを持っている。終わってから再実行してください\n' "$ret_p"
-			printf 'fail\n' >>"$scratch/failed"
+			printf 'failed\n' >>"$scratch/answers"
 		fi
 	done 3<"$scratch/retired"
 
@@ -312,18 +305,7 @@ while IFS= read -r line <&4; do
 	done 3<"$scratch/families"
 done 4<"$scratch/repos"
 
-if grep -qx overlap "$scratch/failed"; then
-	log_info 終わった -- "exit=3"
-	exit 3
-fi
-# 止めたもの（fail の行）が、どれも親チケットも提案も無いワークツリーなら 4。
-if [ -s "$scratch/noticket" ] && [ "$(grep -c '^fail$' "$scratch/failed")" -eq "$(grep -c . "$scratch/noticket")" ]; then
-	log_info 終わった -- "exit=4"
-	exit 4
-fi
-if [ -s "$scratch/failed" ]; then
-	log_info 終わった -- "exit=1"
-	exit 1
-fi
-log_info 終わった -- "exit=0"
-exit 0
+ask_sync end "$here_sh" "$scratch/answers"
+exit_code=$(ccnavi_val1 exit "$answer")
+log_info 終わった -- "exit=$exit_code"
+exit "$exit_code"

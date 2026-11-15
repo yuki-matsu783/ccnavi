@@ -137,3 +137,19 @@ func TestAuthFailedOnly(t *testing.T) {
 		t.Errorf("届かないだけなのに案内した: %q", a.String())
 	}
 }
+
+func TestExitOf(t *testing.T) {
+	for _, c := range []struct {
+		answers string
+		want    int
+	}{
+		{"sync 1\nout a\n", 0},
+		{"sync 1\nout a\nnoticket\nsync 1\nout b\n", 4},
+		{"sync 1\nnoticket\nout b\nfailed\n", 1},
+		{"sync 1\nfailed\noverlap\nfailed\nnoticket\n", 3},
+	} {
+		if got := exitOf(c.answers); got != c.want {
+			t.Errorf("exitOf(%q) = %d, want %d", c.answers, got, c.want)
+		}
+	}
+}

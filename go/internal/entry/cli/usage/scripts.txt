@@ -88,13 +88,14 @@
          1 行ずつ報告し、最後に
          "record yes|no"（片付けが済んだか）を出力します。済んだときは retire/<parent>.json も
          消します。ネットワークには出ません）
-    ccnavi sync plan|integ|fetched|family|pull|merged|recheck <scripts> <args>...
+    ccnavi sync plan|integ|fetched|family|pull|merged|recheck|end <scripts> <args>...
         （.ccnavi/scripts/ccnavi-sync.sh 用。sh が ls-remote・fetch・ccnavi-review.sh merged を
          打つ間の判定と、早送り・merge（失敗したら取りやめ）・origin/HEAD の向け直し・片付けを行います。
          "sync 1" の行に続いて、表示する "out <行>"、止めたことを表す "failed"、取り込みが書きかけと
          重なって止まったことを表す "overlap"、渡された親のワークツリーに親チケットも提案も無いことを表す
          "noticket"、次の一手の
-         "next <語>"（fetch・ask・skip・go）を出力します。merged は片付けでブランチを消すので、
+         "next <語>"（fetch・ask・skip・go）を出力します。end は、それまでの答えを並べたファイルから
+         sync の終了コードを決め、"exit <コード>" を出力します。merged は片付けでブランチを消すので、
          エージェントからは打てません。ネットワークには出ません）
     ccnavi sync check <parent> [<repo>]
         （<parent> を取り込んだ後の検査です（ccnavi-sync.sh は sync recheck で同じ判定をします）。ファミリーの承認済みチケットと

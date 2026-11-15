@@ -29,7 +29,7 @@ import (
 const syncHead = "sync 1"
 
 // syncUsage は `ccnavi sync <段取り>` の使い方。
-const syncUsage = "ccnavi: sync plan|integ|fetched|family|pull|merged|recheck <scripts> <引数>...（ccnavi-sync.sh 用）"
+const syncUsage = "ccnavi: sync plan|integ|fetched|family|pull|merged|recheck|end <scripts> <引数>...（ccnavi-sync.sh 用）"
 
 // syncRun は ccnavi-sync.sh の 1 回の起動で共通の値。here は sh の置き場（文に出すコマンドの頭）。
 type syncRun struct {
@@ -48,6 +48,7 @@ type syncRun struct {
 //	merged <present|absent|retired> <P> <リポジトリ> <ブランチ> <MR> <rc> <答え> <一覧>
 //	                                                  MR がマージ済みかを聞いた後、片付ける
 //	recheck <P> <リポジトリ> <ブランチ> <一覧>           取り込みの後の検査
+//	end <答え>                                         終了コードを決める（それまでの答えを並べたファイル）
 //
 // <has> は、そのリポジトリに親子のチケットがあるか（yes・no。無ければ失敗しても終了コードを 1 にしない）。
 // <rc>・<err> は sh が打った ls-remote・fetch の終了コードと標準エラーのファイル、<一覧>・<symref>・<答え> は
@@ -77,6 +78,8 @@ func Sync(stdout, stderr io.Writer, root string, conf *config.Settings, cwd stri
 		s.merged(rest[0], rest[1], rest[2], rest[3], rest[4], rest[5], rest[6], rest[7])
 	case args[0] == "recheck" && len(rest) == 4:
 		s.recheck(rest[0], rest[1], rest[2], rest[3])
+	case args[0] == "end" && len(rest) == 1:
+		s.a.Exit(exitOf(readText(rest[0])))
 	default:
 		fmt.Fprintln(stderr, syncUsage)
 		return config.ExitError
@@ -201,8 +204,9 @@ func (s *syncRun) wanted(want string, add func(name, path, branch string)) {
 		s.a.fail("%s: 親のワークツリー（.claude/worktrees/%s）の HEAD のブランチ（%s）の / を - に置き換えたものが %s と合わない。取り込まずに止めた。ブランチ名の / を - に置き換えたものが %s になるブランチに戻してから再実行してください",
 			want, want, branch, want, want)
 	case notParent:
-		s.a.fail("%s: .claude/worktrees/%s に親チケットも提案もありません。親のワークツリーではないので取り込まない", want, want)
-		// ワークツリーを切った直後（ccnavi-start.sh）は、これが正常。sh は止めたのがこれだけなら終了コード 4 にする。
+		// ワークツリーを切った直後（ccnavi-start.sh）は、これが正常。failed とは別の語で言い、止めたのがこれだけなら
+		// end が終了コード 4 にする。
+		s.a.out("%s: .claude/worktrees/%s に親チケットも提案もありません。親のワークツリーではないので取り込まない", want, want)
 		s.a.Line("noticket")
 	default:
 		s.a.fail("%s: .claude/worktrees/%s に親チケットか提案があるかを実行ファイルに確かめられなかった（実行ファイルが無い、またはチケットの frontmatter を読めない）。取り込まない", want, want)
@@ -440,12 +444,28 @@ func (s *syncRun) merge(name, branch, path, remote string) (interrupted bool) {
 	return interrupted
 }
 
-// overlapped は、取り込みが書きかけと重なって止まったなら overlap の行を足す。sh はこれを終了コード 3 にし、
+// overlapped は、取り込みが書きかけと重なって止まったなら overlap の行を足す。end はこれを終了コード 3 にし、
 // write-and-push が「書きかけを先にコミットしてから取り込み直す」と言い分ける（文を読ませないため）。
 func (s *syncRun) overlapped(said string) {
 	if refusal.Overlap(said) {
 		s.a.Line("overlap")
 	}
+}
+
+// exitOf は、1 回の起動の答え（各段取りの答えと sh が足した failed の行を並べたもの）から sync の終了コードを決める。
+// 3 取り込みが書きかけと重なって止まったものがある（ほかに止めたものがあっても 3）、1 止めたものがある、4 止めたのは
+// 親チケットも提案も無い親のワークツリー（noticket）だけ、0 それ以外。
+func exitOf(answers string) int {
+	lines := ospath.Splitlines(answers)
+	switch {
+	case slices.Contains(lines, "overlap"):
+		return 3
+	case slices.Contains(lines, "failed"):
+		return 1
+	case slices.Contains(lines, "noticket"):
+		return 4
+	}
+	return 0
 }
 
 // merged は、MR がマージ済みかを `ccnavi-review.sh merged <MR>` に聞いた後。答えの 1 行目は
