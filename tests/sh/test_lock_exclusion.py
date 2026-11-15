@@ -43,6 +43,7 @@ log_debug() { :; }
 ccnavi_state() { printf '%s\\n' "$1/state"; }
 case "$mode" in
 race)
+	: >"$dir/ready.$$"
 	while [ ! -e "$dir/go" ]; do :; done
 	ccnavi_lock_take "$ws" self "$PARENT" 0
 	rc=$?
@@ -138,7 +139,14 @@ class LockExclusionTest(unittest.TestCase):
                 os.makedirs(self.dir)
                 self.stale_lock()
                 procs = [self.start("race") for _ in range(CONTENDERS)]
-                time.sleep(0.2)
+                # 全員が部品を読み終えて合図を待つまで待つ（決まった時間は待たない）
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline:
+                    ready = [n for n in os.listdir(self.dir) if n.startswith("ready.")]
+                    if len(ready) == CONTENDERS:
+                        break
+                    time.sleep(0.005)
+                self.assertEqual(CONTENDERS, len(ready), "取りに行くプロセスが揃わなかった")
                 with open(os.path.join(self.dir, "go"), "w"):
                     pass
                 for proc in procs:
