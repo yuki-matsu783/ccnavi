@@ -24,8 +24,8 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
 
     合流の前の検査（置き場・範囲・親で無視されるファイル・戻せない形・子の未コミット）と衝突の文は
     Go の単体テスト（`go/internal/tickets/lifecycle/wapmerge/`・`phase/scope/`）が見る。ここでは、
-    止まったときに sh が何も変えないことを、戻せない形（改行を含むパス）と衝突の 2 つで
-    代表して見る。
+    止まったときに sh が何も変えないことを、範囲の外・置き場の変更（1 本の通し）・戻せない形
+    （改行を含むパス）・衝突で代表して見る。
     """
 
     # ---- 1. 合流と状態は 1 つのマージコミット
@@ -113,6 +113,25 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         self.assertIn(f"子のワークツリー（.claude/worktrees/{CHILD}）", result.stderr)
         # 取り込みは済んでいるが、合流は何も残していない
         self.assert_untouched(remote)
+
+    def test_a_path_outside_the_scope_or_a_ticket_place_stops_without_merging(self):
+        # 子の準備は 1 回にして、子のコミットを差し替えて finish を 2 回回す。
+        self.start_parent()
+        tree = self.start_child()
+        start = self.sha(tree, "HEAD")
+        before = self.sha(self.tree, "HEAD")
+        for rel, kind in (
+            ("src/x.py", "範囲の外のパス"),
+            ("wip/proposals/todo/evil.md", "置き場の変更"),
+        ):
+            with self.subTest(kind=kind):
+                git(tree, "reset", "-q", "--hard", start)
+                self.work(tree, rel, "x\n")
+                result = self.ticket("finish", CHILD)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(kind, result.stderr)
+                self.assertIn(rel, result.stderr)
+                self.assert_untouched(before)
 
     def test_a_path_with_a_newline_stops_without_merging(self):
         self.start_parent()
