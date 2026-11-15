@@ -334,13 +334,23 @@ func BranchProblem(name string) string {
 			return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛らわしい"
 		}
 	}
-	// 統合先や保護されたブランチの名前は、親のブランチにさせない。
-	if slices.Contains(config.ReservedBranchIDs(), folded) || slices.Contains(config.ReservedBranchIDs(), parts[0]) ||
-		strings.HasPrefix(folded, "release-") {
+	// 統合先や保護されたブランチの名前は、親のブランチにさせない。先頭の階層で見るので main/x・release/1 も止まる。
+	if Protected(parts[0]) {
 		return "統合先や保護されたブランチの名前（main・master・develop・release と、" +
 			"それを先頭の階層に持つ main/*・release/* など、release-*）は親のブランチにしない"
 	}
 	return ""
+}
+
+// Protected は、名前だけで統合先とみなす保護されたブランチか。main・master・develop・release と、release/ か
+// release- で始まる名前で、大文字小文字は区別しない。ブランチ名（release/1）にも、それを識別子にした名前（release-1）にも
+// 同じ答えを出す。push を断る（gitwrap）、取り込む名前を断る（land）、親のブランチ名を断る（BranchProblem）がこれを使う。
+// 実行ファイルを起こさない sh（ccnavi-common.sh の ccnavi_is_protected）は写しを持ち、tests/fixtures/ident-cases.json の
+// 同じ表で一致を確かめる。
+func Protected(name string) bool {
+	folded := pyfmt.Casefold(name)
+	return slices.Contains(config.ReservedBranchIDs(), folded) ||
+		strings.HasPrefix(folded, "release/") || strings.HasPrefix(folded, "release-")
 }
 
 // SameID は大文字小文字だけが違う識別子を同じと読む（区別しないファイルシステムではぶつかるため）。

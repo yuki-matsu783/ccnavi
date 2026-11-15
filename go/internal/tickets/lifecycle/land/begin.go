@@ -22,8 +22,7 @@ func (r *run) checkName(name string) {
 	if !ids.IsValidFamily(name) {
 		r.reject("integrate-name", r.sub+" の名前（"+name+"）は .claude/worktrees/ の直下の名前の形ではありません。パスではなく名前だけを渡してください（"+r.Self+" "+r.sub+" <名前>）。")
 	}
-	switch {
-	case name == "main" || name == "master" || name == "develop" || name == "release" || strings.HasPrefix(name, "release-"):
+	if ids.Protected(name) {
 		r.reject("integrate-name", name+" は統合先に使う名前です。取り込むのは .claude/worktrees/<名前> の作業用のブランチです（"+r.Self+" "+r.sub+" <名前>）。")
 	}
 }

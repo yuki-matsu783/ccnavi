@@ -11,6 +11,7 @@ import (
 
 // sh（ccnavi_is_ident・ccnavi_is_branch）と同じ表（tests/fixtures/ident-cases.json）で、実行ファイルの
 // 答えを確かめる。sh が通す識別子は実行ファイルも通し、sh_only は実行ファイルだけが止める（2 つ目の守り）。
+// protected・unprotected は ccnavi_is_protected と同じ答えか（ids.Protected）。
 // ident_bad は sh だけの答え（`..` のように実行ファイルは識別子として通すものがある）。
 func TestIdentCasesTable(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "ident-cases.json"))
@@ -22,6 +23,8 @@ func TestIdentCasesTable(t *testing.T) {
 		ShOnly     []string `json:"sh_only"`
 		BranchGood []string `json:"branch_good"`
 		BranchBad  []string `json:"branch_bad"`
+		Protected  []string `json:"protected"`
+		Unprot     []string `json:"unprotected"`
 	}
 	if err := json.Unmarshal(data, &table); err != nil {
 		t.Fatal(err)
@@ -47,6 +50,19 @@ func TestIdentCasesTable(t *testing.T) {
 	for _, v := range table.BranchBad {
 		if BranchProblem(v) == "" {
 			t.Errorf("ブランチ名 %q を通した", v)
+		}
+	}
+	if len(table.Protected) == 0 || len(table.Unprot) == 0 {
+		t.Fatal("保護の表が空")
+	}
+	for _, v := range table.Protected {
+		if !Protected(v) {
+			t.Errorf("%q を保護されたブランチと読まなかった", v)
+		}
+	}
+	for _, v := range table.Unprot {
+		if Protected(v) {
+			t.Errorf("%q を保護されたブランチと読んだ", v)
 		}
 	}
 }

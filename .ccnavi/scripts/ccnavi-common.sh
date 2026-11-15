@@ -21,6 +21,7 @@
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
 #   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
+#   ccnavi_is_protected <名前> 名前だけで統合先とみなす保護されたブランチか（終了コードで返す）
 #   ccnavi_branch_to_id <ブランチ>  親のブランチ名から親の識別子を作る（/ を - に置き換える）
 #   ccnavi_load <ファイル名>   呼ぶ側が読む部品を読む（無ければ標準エラーに書いて 1 で終わる）
 #
@@ -400,15 +401,28 @@ ccnavi_is_branch() {
 	# 末尾の改行が `$( )` で無くならないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
 	[ "$ccnavi_ib_rest" = '\' ] || return 1
-	# git の ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の
-	# 階層を持つもの（`ids.BranchProblem` と同じ。大文字小文字は区別しない）。
+	# git の ref の名前・リモートの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の階層を持つもの、保護された
+	# ブランチの名前を先頭の階層に持つもの（`ids.BranchProblem` と同じ。大文字小文字は区別しない）。
 	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
 	case "$ccnavi_ib_low" in
 	refs | refs/* | heads | heads/* | remotes | remotes/* | tags | tags/* | origin | origin/* | upstream | upstream/*) return 1 ;;
-	main | main/* | master | master/* | develop | develop/* | release | release/* | release-*) return 1 ;;
 	head | head/* | */head | */head/* | *_head | *_head/*) return 1 ;;
 	esac
-	return 0
+	! ccnavi_is_protected "${1%%/*}"
+}
+
+# 名前だけで統合先とみなす保護されたブランチなら 0。<名前>
+#
+# 実行ファイルの `ids.Protected` の写し。実行ファイルを起こさない所（ccnavi_is_branch・ccnavi-user-push-approved.sh）
+# が使う。main・master・develop・release と、release/ か release- で始まる名前で、英字の大文字小文字は区別しない。
+# 一致は tests/fixtures/ident-cases.json の同じ表で、Go（ident_sh_test.go）と Python（tests/sh/test_ident_sh.py）が確かめる。
+# 規則を変えるときは両方を直す。
+ccnavi_is_protected() {
+	ccnavi_ip_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_ip_low" in
+	main | master | develop | release | release/* | release-*) return 0 ;;
+	esac
+	return 1
 }
 
 # 親のブランチ名から親の識別子を作る。`/` を `-` に置き換えるだけ。<ブランチ>

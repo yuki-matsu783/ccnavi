@@ -44,7 +44,7 @@
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
-# - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common-state.sh の
+# - 保護されたブランチ（ccnavi_is_protected。main / master / develop / release / release/* / release-*）と、そのリポジトリの統合先（ccnavi-common-state.sh の
 #   ccnavi_integration。決まらなければ固定のリストだけ）はコミットだけして push しない
 # - 1 本のツリーで add・commit・push が失敗しても、他のツリーはコミットして push する
 #
@@ -480,13 +480,11 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 			continue
 		}
 	fi
-	case "$branch" in
-	main | master | develop | release | release/*)
+	if ccnavi_is_protected "$branch"; then
 		printf 'ccnavi-user-push-approved: %s では保護対象のブランチ %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2
 		continue
-		;;
-	esac
+	fi
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
 	# ccnavi-git.sh と同じ決め方（origin/HEAD → origin/main・master）で、そのツリーが属する
 	# リポジトリについて決める。決まらなければ固定のリストだけ。

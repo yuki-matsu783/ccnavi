@@ -1,4 +1,4 @@
-"""sh の識別子の検査（`ccnavi-common.sh` の `ccnavi_is_ident`）。
+"""sh の識別子と名前の検査（`ccnavi-common.sh` の `ccnavi_is_ident` など 3 つ）。
 
 日本語の識別子を通し、パスやシェルで意味を持つ表記（`/`・`..`・先頭の `-`・空白・制御文字・
 記号）を止める。ロケール（C・C.UTF-8）とシェル（sh・bash）を変えても答えが同じこと、
@@ -32,17 +32,24 @@ SH_ONLY = _CASES["sh_only"]
 # 親のブランチ名（`ccnavi_is_branch`）。識別子の字に階層の区切りの `/` を足したもの。
 BRANCH_GOOD = _CASES["branch_good"]
 BRANCH_BAD = _CASES["branch_bad"]
+# 保護されたブランチ（`ccnavi_is_protected`。実行ファイルの `ids.Protected` の写し）。
+PROTECTED = _CASES["protected"]
+UNPROTECTED = _CASES["unprotected"]
 
 
-def is_ident(shell, value, locale):
+def probe(shell, func, value, locale):
     # 値は引数でなく環境変数で渡す。Windows の引数は、改行や `'` をそのまま運べない。
     env = {**os.environ, "LC_ALL": locale, "CCNAVI_PROBE": value}
     done = subprocess.run(
-        [shell, "-c", '. "$0"; ccnavi_is_ident "$CCNAVI_PROBE"', COMMON],
+        [shell, "-c", '. "$0"; ' + func + ' "$CCNAVI_PROBE"', COMMON],
         env=env,
         capture_output=True,
     )
     return done.returncode == 0
+
+
+def is_ident(shell, value, locale):
+    return probe(shell, "ccnavi_is_ident", value, locale)
 
 
 @unittest.skipUnless(SHELLS, "sh が無い")
@@ -65,14 +72,7 @@ class IsIdentTest(unittest.TestCase):
 
 
 def is_branch(shell, value, locale):
-    # 値は引数でなく環境変数で渡す。Windows の引数は、改行や `'` をそのまま運べない。
-    env = {**os.environ, "LC_ALL": locale, "CCNAVI_PROBE": value}
-    done = subprocess.run(
-        [shell, "-c", '. "$0"; ccnavi_is_branch "$CCNAVI_PROBE"', COMMON],
-        env=env,
-        capture_output=True,
-    )
-    return done.returncode == 0
+    return probe(shell, "ccnavi_is_branch", value, locale)
 
 
 @unittest.skipUnless(SHELLS, "sh が無い")
@@ -86,6 +86,18 @@ class IsBranchTest(unittest.TestCase):
                 for value in BRANCH_BAD:
                     with self.subTest(shell=shell, locale=locale, value=value):
                         self.assertFalse(is_branch(shell, value, locale))
+
+
+@unittest.skipUnless(SHELLS, "sh が無い")
+class IsProtectedTest(unittest.TestCase):
+    def test_the_answers(self):
+        for shell in SHELLS:
+            for value in PROTECTED:
+                with self.subTest(shell=shell, value=value):
+                    self.assertTrue(probe(shell, "ccnavi_is_protected", value, "C"))
+            for value in UNPROTECTED:
+                with self.subTest(shell=shell, value=value):
+                    self.assertFalse(probe(shell, "ccnavi_is_protected", value, "C"))
 
 
 if __name__ == "__main__":

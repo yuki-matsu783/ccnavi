@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/tickets/model/ids"
 )
 
 // fetch は fetch と pull。手元の参照を書き換える形（--force・--prune）と、履歴を書き換える pull --rebase と、取ってきた
@@ -84,15 +85,6 @@ func (e *Env) fetch(sub string, args []string) *Deny {
 	return e.onTarget(integ, "統合先 "+integ+" のユーザのチェックアウトでは、pull <リモート> <ブランチ>（"+strings.Join(refs, " ")+"）で別のブランチ・リモートを取り込めません（merge できないのと同じです）。統合先へは直接 merge しない決まりなので、取り込みは integrate が行います。", "NOTE_GIT_PULL_ON_TARGET_ALLOWED")
 }
 
-// protected は、名前だけで統合先とみなすブランチ。
-func protected(branch string) bool {
-	switch branch {
-	case "main", "master", "develop", "release":
-		return true
-	}
-	return strings.HasPrefix(branch, "release/")
-}
-
 // push は、今のブランチを同じ名前でそのまま送る形だけを通す。通さないのは「戻せなくなる形」（force・delete・
 // all/mirror/tags）と「ユーザの判断を経ない形」（別の名前へ送る refspec、統合先への直接の push、子チケットのワークツリーからの
 // push）。統合はユーザがマージリクエストで行う。
@@ -112,7 +104,7 @@ func (e *Env) push(args []string, a *Answer) *Deny {
 		}
 	}
 	// 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。統合先の名前は、このツリーが属するリポジトリごとに決める。
-	if protected(branch) || branch == integration(cmpOr(top, e.Cwd)) {
+	if ids.Protected(branch) || branch == integration(cmpOr(top, e.Cwd)) {
 		return &Deny{"push-integration-branch", branch + " は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"}
 	}
 	remote := ""
