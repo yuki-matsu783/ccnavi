@@ -267,8 +267,8 @@ func AdoptionIDProblem(branch string) string {
 	return ""
 }
 
-// IDAnswer は sh の `worktree id <ブランチ>` への答え（1 行 1 項目。id・problem・direct・child）。
-// sh は字の種類と NFC と文字数を自分で確かめない（ロケールでバイト数と字数が変わる）ので、ここに聞く。
+// IDAnswer はブランチ名から作る識別子と、それが使えるかの答え（1 行 1 項目。id・problem・direct・child）。
+// ラッパーの worktree add（gitwrap）と ccnavi-worktree.sh の名前の検査（cut）が使う。
 func IDAnswer(branch string) []string {
 	ident := BranchToID(branch)
 	lines := []string{"id " + ident}
@@ -355,7 +355,7 @@ func Protected(name string) bool {
 
 // IDClash は names（ブランチ名の一覧）のうち、branch と同じ識別子（BranchToID。大文字小文字は区別しない）になる別の
 // 名前を 1 つ返す。無ければ空。同じ識別子のブランチが 2 本あると、ワークツリーの置き場（.claude/worktrees/<識別子>）が
-// 重なる。ccnavi-start.sh の採用の確認（start.BranchOK）と ccnavi-worktree.sh（`worktree clash`）がこれを使う。
+// 重なる。ccnavi-start.sh の採用の確認（start.BranchOK）と ccnavi-worktree.sh（cut）がこれを使う。
 func IDClash(branch string, names []string) string {
 	want := BranchToID(branch)
 	for _, n := range names {

@@ -32,7 +32,7 @@ const (
 // slow は、ユーザのチェックアウトの全体を読む・書く git の期限（status・add・rev-list など）。
 const slow = 10 * time.Minute
 
-// Leftover は、親のワークツリーに残っているもの（`tree leftover` と同じ答え）。Stage は doing・review・todo か空。
+// Leftover は、親のワークツリーに残っているもの（shask.Leftover の答え）。Stage は doing・review・todo か空。
 type Leftover struct {
 	Leftover, Proposal bool
 	Doing              int
@@ -128,15 +128,6 @@ func samePath(a, b string) bool { return pathcase.Fold(a) == pathcase.Fold(b) }
 // q は sh の 1 語に引用する。
 func q(s string) string { return shell.SingleQuote(s) }
 
-// say は文面ファイルの文。
-func (r *run) say(id string, kv ...string) string {
-	values := texts.Values{}
-	for i := 0; i+1 < len(kv); i += 2 {
-		values[kv[i]] = kv[i+1]
-	}
-	return texts.Say(r.in.Root, id, values, nil)
-}
-
 // unattended は、非対話（CLAUDE_CODE_SESSION_ATTENDED が 0）のときだけ足す、確認に答えられないことと次の行動。
 func unattended() string {
 	if !hookio.Unattended() {
@@ -146,7 +137,9 @@ func unattended() string {
 }
 
 // next は最後の行（名前の警告よりも後）に出す次の一手。
-func (r *run) next() { r.o.Out(r.say("NEXT_WORKTREE_EDIT", "dest", r.dest)) }
+func (r *run) next() {
+	r.o.Out(texts.Say(r.in.Root, "NEXT_WORKTREE_EDIT", texts.Values{"dest": r.dest}, nil))
+}
 
 // args は引数を読む。
 func (r *run) args() bool {
@@ -351,7 +344,7 @@ func (r *run) existing() bool {
 	if common := commonOf(r.top); common != "" && ospath.DiskLexists(ospath.Join(common, tree.DirectDir, r.name)) {
 		r.o.Out("案内: 取り込みの記録は、ある（ccnavi-direct/" + r.name + "）。integrate に進めます")
 	} else {
-		r.o.Out(r.say("NOTE_WORKTREE_RECORD_MISSING", "name", r.name, "name_q", q(r.name), "unattended", unattended()))
+		r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_RECORD_MISSING", texts.Values{"name": r.name, "name_q": q(r.name), "unattended": unattended()}, nil))
 	}
 	r.next()
 	r.o.Exit(0)
@@ -423,12 +416,12 @@ func (r *run) parentTree() bool {
 	r.o.Err("ccnavi-worktree: ワークツリーは切っていない。親のワークツリー（" + name + "）から直接作業へは切り替えられない。" + why + "。")
 	r.o.Err("親のワークツリーから切り替えられるのは、承認依頼の時点（親の提案が todo/ にあり、承認前）だけ。")
 	if f.Stage == "doing" {
-		r.o.Err(r.say("NOTE_WORKTREE_PARENT_CLOSE"))
+		r.o.Err(texts.Say(r.in.Root, "NOTE_WORKTREE_PARENT_CLOSE", nil, nil))
 	}
 	if f.Doing != 0 {
-		r.o.Err(r.say("NOTE_WORKTREE_PARENT_CHILDREN", "count", strconv.Itoa(f.Doing)))
+		r.o.Err(texts.Say(r.in.Root, "NOTE_WORKTREE_PARENT_CHILDREN", texts.Values{"count": strconv.Itoa(f.Doing)}, nil))
 	}
-	r.o.Err(r.say("NEXT_WORKTREE_PARENT_ACTIVE"))
+	r.o.Err(texts.Say(r.in.Root, "NEXT_WORKTREE_PARENT_ACTIVE", nil, nil))
 	r.o.Val("reason", "parent-active")
 	r.o.Exit(exitUnmet)
 	return false

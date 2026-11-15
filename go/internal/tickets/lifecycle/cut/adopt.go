@@ -1,6 +1,7 @@
 package cut
 
 import (
+	"ccnavi/internal/policy/texts"
 	"strings"
 
 	"ccnavi/internal/infra/fsio"
@@ -90,7 +91,7 @@ func (r *run) adoptTree() {
 	report := func(stale bool) {
 		r.o.Out("引き取りの確認が要る: 記録はまだ書いていない。")
 		if stale {
-			r.o.Out(r.say("NOTE_WORKTREE_ADOPT_CODE_STALE"))
+			r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_ADOPT_CODE_STALE", nil, nil))
 		}
 		r.o.Out("状態:")
 		r.o.Out("  取り込み先 " + r.target + " (" + r.mainTree + ")")
@@ -101,8 +102,8 @@ func (r *run) adoptTree() {
 		r.o.Out("取り込みの差分:")
 		r.o.Out(prefixed(gitOut(r.in.Cwd, slow, "diff", "--stat", s, tip)))
 		r.o.Out("了承の文面: この範囲全体をエージェントの成果として扱う。範囲に他人のコミットや、取り込み先に入れたくない変更が混ざっていないかを、ユーザに確かめる")
-		r.o.Out(r.say("NEXT_WORKTREE_ADOPT", "name", r.name, "target", r.target, "code", adoptCode))
-		r.o.Out(r.say("NOTE_WORKTREE_SIDE_BY_SIDE"))
+		r.o.Out(texts.Say(r.in.Root, "NEXT_WORKTREE_ADOPT", texts.Values{"name": r.name, "target": r.target, "code": adoptCode}, nil))
+		r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_SIDE_BY_SIDE", nil, nil))
 	}
 	switch {
 	case r.dry:

@@ -1,6 +1,10 @@
 package cut
 
-import "strconv"
+import (
+	"strconv"
+
+	"ccnavi/internal/policy/texts"
+)
 
 // ask は、確認が要るときの報告。切らずに終了コード 3 で止まる。書きかけの候補は refs/ccnavi/direct/<名前>/pending に
 // 置き、切ったら消す。why は wip・base・accept・code（code は渡された確認コードが今の状態と合わない）。
@@ -12,7 +16,7 @@ func (r *run) ask(rs remoteState, cand, confirm string, needAccept bool, why str
 	target, integ := r.target, r.integ
 	r.o.Out("確認が要る: ワークツリーはまだ切っていない。")
 	if why == "code" {
-		r.o.Out(r.say("NOTE_WORKTREE_CODE_STALE"))
+		r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_CODE_STALE", nil, nil))
 	}
 	r.o.Out("状態:")
 	r.o.Out("  取り込み先 " + target + " (" + r.mainTree + ")。リモートのデフォルトは " + integ)
@@ -101,8 +105,8 @@ func (r *run) ask(rs remoteState, cand, confirm string, needAccept bool, why str
 	if len(args) > 0 {
 		args = args[1:]
 	}
-	r.o.Out(r.say("NEXT_WORKTREE_CONFIRM", "name", r.name, "args_q", args))
-	r.o.Out(r.say("NOTE_WORKTREE_WAIT_FOR_OK"))
+	r.o.Out(texts.Say(r.in.Root, "NEXT_WORKTREE_CONFIRM", texts.Values{"name": r.name, "args_q": args}, nil))
+	r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_WAIT_FOR_OK", nil, nil))
 	r.o.Val("reason", "confirm-"+why)
 	r.o.Exit(exitConfirm)
 }

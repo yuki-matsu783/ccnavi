@@ -1,6 +1,7 @@
 package cut
 
 import (
+	"ccnavi/internal/policy/texts"
 	"os"
 	"regexp"
 	"strconv"
@@ -223,13 +224,13 @@ func (r *run) done(rs remoteState, c6 bool, s, sShort string, wip bool) {
 	if c6 {
 		switch rs.state {
 		case "behind", "diverged":
-			r.o.Out(r.say("NOTE_WORKTREE_REMOTE_BEHIND", "target", r.target, "behind", strconv.Itoa(rs.behind), "main_tree", r.mainTree, "branch", r.target))
+			r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_REMOTE_BEHIND", texts.Values{"target": r.target, "behind": strconv.Itoa(rs.behind), "main_tree": r.mainTree, "branch": r.target}, nil))
 		case "ahead":
 			r.o.Out("案内: 手元の " + r.target + " は origin/" + r.target + " より " + strconv.Itoa(rs.ahead) + " 件進んでいる（まだ送っていない）")
 		case "absent":
 			r.o.Out("案内: origin に " + r.target + " が無い。成果は手元の " + r.target + " に載る")
 		case "unverified":
-			r.o.Out(r.say("NOTE_WORKTREE_REMOTE_UNVERIFIED", "target", r.target))
+			r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_REMOTE_UNVERIFIED", texts.Values{"target": r.target}, nil))
 		}
 	}
 	// ワークスペースのルートで実行され、projects/ の下にリポジトリがあるときは、projects/ の変更なら cd してから実行し直す
@@ -238,7 +239,7 @@ func (r *run) done(rs remoteState, c6 bool, s, sShort string, wip bool) {
 		names, _ := ospath.DiskListdir(ospath.Join(r.in.Root, "projects"))
 		for _, n := range names {
 			if ospath.DiskLexists(ospath.Join(r.in.Root, "projects", n, ".git")) {
-				r.o.Out(r.say("NOTE_WORKTREE_PROJECTS_HINT"))
+				r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_PROJECTS_HINT", nil, nil))
 				break
 			}
 		}
@@ -246,16 +247,16 @@ func (r *run) done(rs remoteState, c6 bool, s, sShort string, wip bool) {
 	// 親のワークツリーから切り替えたとき（承認前の提案だけ。それ以外は切る前に断った）、承認待ちの提案・MR は取り下げられずに残る。
 	parent := ospath.Basename(r.top)
 	if f := r.in.Leftover(r.top, parent); f.Leftover {
-		r.o.Out(r.say("NOTE_WORKTREE_LEFTOVER", "parent", parent))
+		r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_LEFTOVER", texts.Values{"parent": parent}, nil))
 		if f.Proposal {
-			r.o.Out(r.say("NOTE_WORKTREE_LEFTOVER_PROPOSAL", "parent", parent))
+			r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_LEFTOVER_PROPOSAL", texts.Values{"parent": parent}, nil))
 		}
 		if f.MR != "" {
-			r.o.Out(r.say("NOTE_WORKTREE_LEFTOVER_MR", "mr", "#"+f.MR))
+			r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_LEFTOVER_MR", texts.Values{"mr": "#" + f.MR}, nil))
 		}
 	}
 	if r.others != "" {
-		r.o.Out(r.say("NOTE_WORKTREE_OTHER_ACTIVE", "others", r.others))
+		r.o.Out(texts.Say(r.in.Root, "NOTE_WORKTREE_OTHER_ACTIVE", texts.Values{"others": r.others}, nil))
 	}
 	r.next()
 	r.o.Val("snap", s)

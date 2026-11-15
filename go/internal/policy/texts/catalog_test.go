@@ -195,7 +195,8 @@ func TestEveryIDTheCodeAsksForExists(t *testing.T) {
 	repo := repoRoot(t)
 	c := Load(repo)
 	sh := shCalls(t, repo)
-	if len(sh) < 25 {
+	// 文を出す処理の多くは実行ファイルへ移った（sh の本体の Go が texts.Say で引く）。sh に残る呼び出しも拾えていることだけを見る。
+	if len(sh) == 0 {
 		t.Fatalf("ccnavi_text の呼び出しを拾えていない（%d 件）", len(sh))
 	}
 	for _, k := range append(goCalls(t, repo), sh...) {
@@ -355,7 +356,7 @@ func TestCheckTextMatchesGolden(t *testing.T) {
 	}
 }
 
-// sh の案内（note-sh.yml）は、値を埋めると案内: の行だけになり、次: の行を足さない（次: は 1 行と数える）。
+// sh とその本体の実行ファイルの案内（note-sh.yml）は、値を埋めると案内: の行だけになり、次: の行を足さない（次: は 1 行と数える）。
 func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 	repo := repoRoot(t)
 	data, err := os.ReadFile(filepath.Join(dir(repo), "note-sh.yml"))
@@ -378,14 +379,15 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 			}
 		}
 	}
+	// sh か、sh の本体の実行ファイル（cut・stage・ticketsh など）が引く。
 	called := map[string]bool{}
-	for _, k := range shCalls(t, repo) {
+	for _, k := range append(shCalls(t, repo), goCalls(t, repo)...) {
 		called[k.id] = true
 	}
 	for _, id := range []string{"NOTE_WORKTREE_RECORD_MISSING",
 		"NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
-			t.Errorf("sh が %s を引かない", id)
+			t.Errorf("sh も実行ファイルも %s を引かない", id)
 		}
 	}
 }
