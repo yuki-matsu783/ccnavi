@@ -3,6 +3,7 @@ package git
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -46,6 +47,12 @@ func Head(top string, o Options) string {
 	}
 	return ospath.Strip(done.Out)
 }
+
+// shaForm は sha の形（7〜64 桁の小文字の 16 進）。
+var shaForm = regexp.MustCompile(`\A[0-9a-f]{7,64}\z`)
+
+// IsSHA は text が sha の形か（外から渡った sha を git の引数にする前に確かめる）。
+func IsSHA(text string) bool { return shaForm.MatchString(text) }
 
 // NotAncestorCode は IsAncestor の git が「祖先ではない」と答える終了コード（ほかの非 0 は読めない）。
 const NotAncestorCode = 1
