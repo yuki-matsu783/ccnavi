@@ -47,12 +47,12 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `go/**` | `guard` `config` `ticket` |
 | `go/internal/infra/platformtag/` | 上に加えて `sh` |
 | `scripts/ccnavi-build.sh` | `core` `sh` `e2e` |
-| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh`、`go/internal/tickets/lifecycle/ticketsh/` | `ticket` `config` `e2e`。`ccnavi-ticket.sh`・`ticketsh/` は `sh`（`test_write_and_push_propose`・`test_write_and_push_ticket`）も |
 | `.ccnavi/scripts/ccnavi-git.sh`・`go/internal/tickets/lifecycle/gitwrap/`・`go/internal/tickets/lifecycle/land/` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh`・`ccnavi-user-handoff.sh`・`ccnavi-user-mirror.sh`・`ccnavi-user-prune.sh`・`ccnavi-clean.sh` | `sh` `config` `e2e` |
-| `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh` | `sh` |
-| `.ccnavi/scripts/ccnavi-stage.sh`・`ccnavi-branches.sh`・`ccnavi-worktree.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`、`go/internal/entry/shask/`・`go/internal/tickets/lifecycle/gitlog/`・`refusal/` | `sh` |
+| `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh`、`go/internal/entry/dirs/` | `sh` |
+| `.ccnavi/scripts/ccnavi-stage.sh`・`ccnavi-branches.sh`・`ccnavi-worktree.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`、`go/internal/entry/shask/`・`go/internal/tickets/lifecycle/gitlog/`・`refusal/`・`cut/`・`treeadd/`・`go/internal/tickets/sync/stage/` | `sh`（`treeadd/` は `test_start_sh` も） |
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`） |
 | `.ccnavi/scripts/ccnavi-common-host.sh`・`go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_write_and_push_ticket`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
