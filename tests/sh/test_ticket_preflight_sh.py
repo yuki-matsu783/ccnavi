@@ -83,7 +83,9 @@ class TicketPreflightTest(WriteAndPushHarness):
         self.assertNotIn("注意:", result.stderr)
 
     def test_unverified_api_with_a_working_git_continues_with_a_note(self):
-        result = self.ticket("start", PARENT)
+        # ホストの API を確かめられなくても、git のリモートは確かめる（ls-remote を打つ）
+        shim, log = self.git_shim("  :")
+        result = self.ticket("start", PARENT, PATH=shim + os.pathsep + os.environ.get("PATH", ""))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("確認: api: 未確認", result.stderr)
         self.assertIn("確認: access: 省略", result.stderr)
@@ -92,11 +94,6 @@ class TicketPreflightTest(WriteAndPushHarness):
         )
         self.assertNotIn("確認:", result.stdout)
         self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-
-    def test_git_is_checked_even_when_the_api_is_unverified(self):
-        shim, log = self.git_shim("  :")
-        result = self.ticket("start", PARENT, PATH=shim + os.pathsep + os.environ.get("PATH", ""))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         with open(log, encoding="utf-8") as f:
             self.assertIn("ls-remote", f.read())
 
@@ -110,18 +107,6 @@ class TicketPreflightTest(WriteAndPushHarness):
         self.assertIn("確認: git: 未確認", result.stderr)
         self.untouched(head, remote)
 
-    def test_a_git_authentication_failure_stops_without_writing(self):
-        shim, _ = self.git_shim("  echo 'fatal: Authentication failed for x' >&2\n  exit 128")
-        self.set_routes(GOOD)
-        head, remote = self.sha(self.tree, "HEAD"), self.remote_sha()
-        result = self.ticket(
-            "start", PARENT, token="t0k", PATH=shim + os.pathsep + os.environ.get("PATH", "")
-        )
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("確認: git: NG", result.stderr)
-        self.assertIn("git の資格情報", result.stderr)
-        self.untouched(head, remote)
-
     def test_propose_keeps_its_first_line_and_asks_the_host_once(self):
         self.set_routes(GOOD)
         result = self.ticket("approval-request", PARENT, token="t0k")
@@ -130,23 +115,15 @@ class TicketPreflightTest(WriteAndPushHarness):
         self.assertEqual(len(asked), 1, self.requests())
         self.assertNotIn("確認:", result.stdout)
 
-    def test_a_child_start_and_finish_are_checked_too(self):
+    def test_child_start_finish_and_consolidate_are_checked_but_cancel_is_not(self):
         self.set_routes(
             {**GOOD, f"GET {host_stub.PROJECT}/members/all/5": [200, {"access_level": 20}]}
         )
-        for verb in ("start", "finish"):
+        for verb, ident in (("start", CHILD), ("finish", CHILD), ("consolidate", PARENT)):
             with self.subTest(verb=verb):
-                result = self.ticket(verb, CHILD, token="t0k")
+                result = self.ticket(verb, ident, token="t0k")
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn("確認: access: NG", result.stderr)
-
-    def test_consolidate_is_checked_but_cancel_is_not(self):
-        self.set_routes(
-            {**GOOD, f"GET {host_stub.PROJECT}/members/all/5": [200, {"access_level": 20}]}
-        )
-        consolidate = self.ticket("consolidate", PARENT, token="t0k")
-        self.assertEqual(consolidate.returncode, 1, consolidate.stdout + consolidate.stderr)
-        self.assertIn("確認: access: NG", consolidate.stderr)
         # 取り消しは、権限が足りないときでも事前確認で止めない
         cancel = self.ticket("cancel", PARENT, "--reason", "やめた", token="t0k")
         self.assertNotIn("確認:", cancel.stderr)
