@@ -209,6 +209,31 @@ func sgCases(root string) []sgCase {
 		"env sh -c 'echo x > README.md'", "sudo tee README.md",
 	)
 	add("scratchpad", "cp x ..", "cp x .", "echo x > README.md")
+	// ルート直下への書き込みの続き（出力の指定・読めない行き先・引用符の中の山括弧・サブシェルの起点）。
+	outside := "/nonexistent-outside"
+	add("",
+		"curl -o README.md https://example.com", "curl --output=README.md https://example.com",
+		"wget -O README.md https://example.com", "sort -o README.md README.md", "curl -o scratchpad/x https://example.com",
+		`echo x > "$FILE"`, "echo x > ~/a.txt", "echo x > `pwd`/a", `cd "$(pwd)"; cp scratchpad/a .`,
+		rootGitSh+" log -n 2 --format='%H%n%an <%ae>%n%B---'",
+		rootGitSh+` commit -m "feat: x`+"\n\n"+`Co-Authored-By: Claude <noreply@anthropic.com>`+"\n"+`Claude-Session: s"`,
+		rootGitSh+` commit -m "a" -m "Co-Authored-By: C <n@a.com>"`,
+		`cd .claude/worktrees/plain && `+rootGitSh+` commit -m "x <a@b>`+"\n"+`Claude-Session: s"`,
+		"cd docs && "+rootGitSh+" log --format='<%an>'",
+		`echo '<a' 'b>' 'c<d>e' "x>" "<y"`, `echo "a > b" 'c >> d'`,
+		rootGitSh+` commit -m "$(echo 'x <y@z>')"`, `echo "$(echo '<a>' > scratchpad/o.txt)"`,
+		"echo x > f", `echo "a <b>" > f`, rootGitSh+" log --format='<%an>' > f", "cd docs && echo '<a>' >> f",
+		"echo x 2>&1", "echo x > /dev/null 2>&1", "echo '<a>' > scratchpad/f",
+		"cd "+outside+" && ( ls ); cd "+root+"; printf x > f",
+	)
+	add("scratchpad", `cd "$PWD" && echo x > a`)
+	add(".claude/worktrees/plain",
+		"sed -i 's/a/b/' README.md",
+		"cd "+outside+" && ( cd "+root+" && ls ); printf x > f",
+		"cd "+outside+" && ( cd "+root+"; ls );printf x > f",
+		"cd "+outside+" && ( cd "+root+" && ls ) ; printf x > f",
+		"cd "+outside+" && ( ( cd "+root+" ); cd docs ); printf x > f",
+	)
 	// 引用符と演算子の乱れた組み合わせ（落ちないこと、答えが見本と同じこと）。
 	pieces := []string{"'", `"`, "<", ">", ">>", "2>&1", " ", " ", "a", "b c", "&&", ";", "(", ")", "cd x", "echo", "$(", "`",
 		"sh .ccnavi/scripts/ccnavi-git.sh", "rm", ".ccnavi", "../i0001/x", "tee", "env -C ../i0001", "CCNAVI_X=1"}

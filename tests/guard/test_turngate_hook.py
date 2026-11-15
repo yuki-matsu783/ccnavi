@@ -265,33 +265,19 @@ class NotUserTurnTest(TurnGateHookTest):
 
     def test_ユーザの発言の判定の形ごとに_数える_数えない(self):
         # 数えない形は、そのあとも止まったまま。数える形は、開く。
-        not_counted = (
-            NOTICE,
-            "経過です。<task-notification> が終わりました",
-            "[idle-handoff] 引き継ぎを書いてください",
-            '<wake reason="external-event"><event source="github"></event></wake>',
-            "<webhook-payload>{}</webhook-payload>",
-            "<child-session-event>failed</child-session-event>",
-            "[SYSTEM NOTIFICATION] ビルドが終わりました",
-            "<system-reminder>メモ</system-reminder>",
-            "",
-        )
-        for text in not_counted:
-            with self.subTest(not_counted=text):
+        # 発言の形ごとの見分け（封筒・通知・空など）は Go（hookio の TestIsUserPrompt）が見る。
+        # ここでは、見分けがゲートに届くことを、数えない形と数える形の代表で見る。
+        for text, counted in (
+            ("<system-reminder>メモ</system-reminder>", False),
+            ("予約した実行の文のように見える文", True),
+        ):
+            with self.subTest(text=text):
                 self.hook("SessionStart", source="startup")
                 self.say()
                 self.run_command(INTEGRATE)
                 self.hook("Stop")
                 self.say(text)
-                self.assertTrue(self.stopped(self.run_command(DONE)))
-        for text in ("取り込んでください", "ok", "予約した実行の文のように見える文"):
-            with self.subTest(counted=text):
-                self.hook("SessionStart", source="startup")
-                self.say()
-                self.run_command(INTEGRATE)
-                self.hook("Stop")
-                self.say(text)
-                self.assertFalse(self.stopped(self.run_command(DONE)))
+                self.assertEqual(self.stopped(self.run_command(DONE)), not counted)
 
     def test_Stop_の促しで同じターンを続けても開かない(self):
         self.say()

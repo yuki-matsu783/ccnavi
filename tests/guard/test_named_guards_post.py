@@ -23,7 +23,7 @@ import tempfile
 import unittest
 
 from tests import ROOT, script_command
-from tests.guard.test_post import DOING, STARTED, TICKET, git, write
+from tests.guard.test_post import DOING, STARTED, TICKET, copy_repo, git, template, write
 from tests.inproc import run_ccnavi
 
 HOOKS = "builtin:guard-hooks"
@@ -84,27 +84,35 @@ class Fixture(unittest.TestCase):
     enable との組み合わせは `test_with_the_self_guard_enabled_the_files_end_up_restored` が見る。
     """
 
+    @classmethod
+    def build(cls, base):
+        """4 種類のツリーを組む。このプロセスで 1 回だけ組み、テストごとに写す（copy_repo）。"""
+        root = os.path.join(base, "ws")
+        os.makedirs(root)
+        git(root, "init", "--quiet")
+        write(os.path.join(root, ".gitignore"), ".claude/worktrees/\nprojects/\nlogs/\n")
+        cls.populate(root)
+        git(root, "add", "-A")
+        git(root, "commit", "--quiet", "-m", "init")
+        lib = os.path.join(root, "projects", "lib")
+        os.makedirs(lib)
+        git(lib, "init", "--quiet")
+        cls.populate(lib)
+        git(lib, "add", "-A")
+        git(lib, "commit", "--quiet", "-m", "init")
+        worktrees = os.path.join(root, ".claude", "worktrees")
+        git(root, "worktree", "add", "--quiet", os.path.join(worktrees, "w"), "-b", "w")
+        git(lib, "worktree", "add", "--quiet", os.path.join(worktrees, "pw"), "-b", "pw")
+
     def setUp(self):
         base = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-named-post-"))
         self.addCleanup(shutil.rmtree, base, ignore_errors=True)
+        copy_repo(template(Fixture, Fixture.build), base)
         self.root = os.path.join(base, "ws")
         self.state = os.path.join(self.root, "logs", "state")
         self.log = os.path.join(self.root, "logs", "decisions.jsonl")
-        os.makedirs(self.root)
-        git(self.root, "init", "--quiet")
-        write(os.path.join(self.root, ".gitignore"), ".claude/worktrees/\nprojects/\nlogs/\n")
-        self.populate(self.root)
-        git(self.root, "add", "-A")
-        git(self.root, "commit", "--quiet", "-m", "init")
         lib = os.path.join(self.root, "projects", "lib")
-        os.makedirs(lib)
-        git(lib, "init", "--quiet")
-        self.populate(lib)
-        git(lib, "add", "-A")
-        git(lib, "commit", "--quiet", "-m", "init")
         worktrees = os.path.join(self.root, ".claude", "worktrees")
-        git(self.root, "worktree", "add", "--quiet", os.path.join(worktrees, "w"), "-b", "w")
-        git(lib, "worktree", "add", "--quiet", os.path.join(worktrees, "pw"), "-b", "pw")
         self.trees = {
             "ws": self.root,
             "worktree": os.path.join(worktrees, "w"),
@@ -112,7 +120,8 @@ class Fixture(unittest.TestCase):
             "project-worktree": os.path.join(worktrees, "pw"),
         }
 
-    def populate(self, repo):
+    @staticmethod
+    def populate(repo):
         for rel in TARGETS:
             write(os.path.join(repo, *rel.split("/")), initial(rel))
         write(os.path.join(repo, *DOING.split("/")), TICKET)
@@ -184,22 +193,29 @@ class Fixture(unittest.TestCase):
     def said(self, result):
         return result.stdout + result.stderr
 
+    def undo(self, tree, rels=TARGETS):
+        """書き換えたものをコミットした中身に戻す（git を起こさずに書き戻す）。"""
+        for rel in rels:
+            write(self.path(tree, rel), initial(rel))
+
 
 class NamedPostTest(Fixture):
     def test_each_place_is_detected_with_its_builtin_and_restored(self):
+        # 守る場所ごとに、ツリーを順に入れ替えて 1 回ずつ（全部の組み合わせは回さない）。
+        # どの場所も、どのツリーも少なくとも 1 回は通る。
         self.baseline()
-        for tree in TREES:
-            for rel, rule_id in TARGETS.items():
-                with self.subTest(tree=tree, path=rel):
-                    path = self.path(tree, rel)
-                    write(path, changed(rel))
+        for at, (rel, rule_id) in enumerate(TARGETS.items()):
+            tree = TREES[at % len(TREES)]
+            with self.subTest(tree=tree, path=rel):
+                path = self.path(tree, rel)
+                write(path, changed(rel))
 
-                    result = self.run_hook(cwd=self.trees[tree], command="python build.py")
+                result = self.run_hook(cwd=self.trees[tree], command="python build.py")
 
-                    self.assertEqual(result.returncode, 2, self.said(result))
-                    self.assertIn(rel, result.stderr.replace(os.sep, "/"))
-                    self.assertEqual(self.last_record()["rules"], [rule_id])
-                    self.assertEqual(read(path), initial(rel), "復元される")
+                self.assertEqual(result.returncode, 2, self.said(result))
+                self.assertIn(rel, result.stderr.replace(os.sep, "/"))
+                self.assertEqual(self.last_record()["rules"], [rule_id])
+                self.assertEqual(read(path), initial(rel), "復元される")
 
     def test_post_tool_use_failure_detects_and_restores_too(self):
         self.baseline()
@@ -221,25 +237,24 @@ class NamedPostTest(Fixture):
                 )
 
     def test_restore_off_reports_without_restoring(self):
-        for restore in ("dry-run", "disable"):
-            for tree in TREES:
-                with self.subTest(restore=restore, tree=tree):
-                    session = f"{restore}-{tree}"
-                    self.baseline(session=session)
-                    rel = ".claude/hooks/guard.sh"
-                    write(self.path(tree, rel), changed(rel))
+        # 値ごとに別のツリーで 1 回ずつ。ツリーごとの検知は上のテストが見る。
+        for restore, tree in (("dry-run", "worktree"), ("disable", "project-worktree")):
+            with self.subTest(restore=restore, tree=tree):
+                session = f"{restore}-{tree}"
+                self.baseline(session=session)
+                rel = ".claude/hooks/guard.sh"
+                write(self.path(tree, rel), changed(rel))
 
-                    result = self.run_hook(
-                        cwd=self.trees[tree],
-                        command="python build.py",
-                        restore=restore,
-                        session=session,
-                    )
+                result = self.run_hook(
+                    cwd=self.trees[tree],
+                    command="python build.py",
+                    restore=restore,
+                    session=session,
+                )
 
-                    self.assertEqual(result.returncode, 2, self.said(result))
-                    self.assertEqual(read(self.path(tree, rel)), changed(rel))
-                    self.assertEqual(self.last_record()["rules"], [HOOKS])
-                    git(self.trees[tree], "checkout", "--quiet", "--", rel)
+                self.assertEqual(result.returncode, 2, self.said(result))
+                self.assertEqual(read(self.path(tree, rel)), changed(rel))
+                self.assertEqual(self.last_record()["rules"], [HOOKS])
 
     def test_with_the_self_guard_enabled_the_files_end_up_restored(self):
         # 設定ファイルを守る側（selfguard）が先に戻すものがあるので、検知した側は問わない。
@@ -284,8 +299,7 @@ class NamedPostTest(Fixture):
                 self.assertEqual(
                     self.last_record()["rules"], sorted({HOOKS, SETTINGS, SCRIPTS, CONFIG})
                 )
-                for rel in TARGETS:
-                    git(self.trees[tree], "checkout", "--quiet", "--", rel)
+                self.undo(tree)
 
     def test_changes_that_were_there_before_are_not_reverted(self):
         for tree in TREES:
@@ -300,8 +314,7 @@ class NamedPostTest(Fixture):
                 self.assertEqual(result.returncode, 0, self.said(result))
                 for rel in TARGETS:
                     self.assertEqual(read(self.path(tree, rel)), changed(rel))
-                for rel in TARGETS:
-                    git(self.trees[tree], "checkout", "--quiet", "--", rel)
+                self.undo(tree)
 
     def test_changes_the_user_made_are_not_reverted_after_a_prompt(self):
         for tree in TREES:
@@ -317,8 +330,7 @@ class NamedPostTest(Fixture):
                 self.assertEqual(result.returncode, 0, self.said(result))
                 for rel in TARGETS:
                     self.assertEqual(read(self.path(tree, rel)), changed(rel))
-                for rel in TARGETS:
-                    git(self.trees[tree], "checkout", "--quiet", "--", rel)
+                self.undo(tree)
 
     def test_a_plain_handoff_copy_is_not_detected(self):
         self.baseline()
@@ -374,8 +386,7 @@ class NamedPostTest(Fixture):
 
                 self.assertEqual(result.returncode, 0, self.said(result))
                 self.assertEqual(result.stderr, "")
-                for rel in TARGETS:
-                    git(self.trees[tree], "checkout", "--quiet", "--", rel)
+                self.undo(tree)
 
     def test_stop_with_the_self_guard_off_reports_nothing_for_the_four(self):
         self.run_hook(event="UserPromptSubmit", prompt="続き", guard="disable")
@@ -415,9 +426,10 @@ class ApprovedPostTest(Fixture):
         write(self.path(tree, DOING), TICKET.replace('glob: "src/*"', 'glob: "*"'))
 
     def test_enabled_tickets_detect_and_restore_whatever_the_self_guard(self):
-        for guard in ("enable", "disable"):
+        # 自己防衛の値ごとに 2 つのツリーで（どのツリーも 1 回は通る）。
+        for guard, trees in (("enable", TREES[:2]), ("disable", TREES[2:])):
             self.baseline(guard=guard, session=f"g-{guard}")
-            for tree in TREES:
+            for tree in trees:
                 with self.subTest(guard=guard, tree=tree):
                     self.widen(tree)
 
@@ -470,7 +482,7 @@ class ApprovedPostTest(Fixture):
         self.assertEqual(result.returncode, 0, self.said(result))
         self.assertNotEqual(read(self.path("ws", DOING)), TICKET)
 
-        git(self.root, "checkout", "--quiet", "--", DOING)
+        write(self.path("ws", DOING), TICKET)
         self.run_hook(event="SessionStart", source="startup", session="user")
         self.widen("ws")
         self.run_hook(event="UserPromptSubmit", prompt="直しました", session="user")
@@ -494,7 +506,7 @@ class ApprovedPostTest(Fixture):
                 self.assertEqual(result.returncode, 0, self.said(result))
                 self.assertEqual(result.stderr, "")
                 self.assertNotEqual(read(self.path("ws", DOING)), TICKET)
-                git(self.root, "checkout", "--quiet", "--", DOING)
+                write(self.path("ws", DOING), TICKET)
 
     def test_a_handoff_copy_in_the_approved_place_is_not_exempt(self):
         self.baseline()

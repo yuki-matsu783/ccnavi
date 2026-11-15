@@ -145,131 +145,43 @@ class ClassificationTest(HookCase):
 
 
 class PlacesTest(HookCase):
-    PLACES = (
-        ".ccnavi/approved/phases/i0001/1.reviewed",
-        ".ccnavi/approved/phases/i0001/accepted.json",
-        ".ccnavi/approved/done/i0001-01-01.md",
-        ".ccnavi/approved/doing/i0001-01-01.md",
-        ".ccnavi/approved/flows/i0001.md",
-        "logs/state/ops/a1.json",
-    )
+    """承認済みの置き場と操作記録の置き場は、どのモードでも自己防衛を切っても止める。
 
-    def test_the_tools_cannot_write_the_places_in_any_mode(self):
-        for rel in self.PLACES:
-            for mode in ("enable", "dry-run"):
-                for core in ("enable", "disable"):
-                    for tool in ("Write", "Edit"):
-                        with self.subTest(rel=rel, mode=mode, core=core, tool=tool):
-                            decision, text = self.hook(
-                                tool,
-                                {"file_path": os.path.join(self.root, rel)},
-                                mode=mode,
-                                CCNAVI_GUARD_CORE_FILES=core,
-                            )
-                            self.assertEqual(decision, "deny", text)
+    場所・モード・自己防衛の値・ツール（Write / Edit / シェルの書き込み / Read）の全部の組み合わせは
+    Go（hook/judge の TestThePlacesAreStoppedInAnyMode）が見る。ここでは hook を通した代表だけ。
+    """
 
-    def test_the_shell_cannot_write_the_places_in_any_mode(self):
-        for rel in self.PLACES:
-            for command in (f"echo x > {rel}", f"rm {rel}", f"cp /tmp/x {rel}", f"tee {rel}"):
-                for mode in ("enable", "dry-run"):
-                    with self.subTest(command=command, mode=mode):
-                        decision, text = self.bash(
-                            command, mode=mode, CCNAVI_GUARD_CORE_FILES="disable"
-                        )
-                        self.assertEqual(decision, "deny", text)
-
-    def test_reading_the_places_is_not_stopped_by_them(self):
-        for rel in self.PLACES:
-            decision, text = self.hook(
-                "Read", {"file_path": os.path.join(self.root, rel)}, mode="dry-run"
-            )
-            self.assertNotIn("builtin:ticket-approved", text)
-            self.assertNotIn("builtin:ticket-ops", text)
-            self.assertNotEqual(decision, "deny", text)
+    def test_the_tools_and_the_shell_cannot_write_the_places_in_dry_run(self):
+        rel = ".ccnavi/approved/phases/i0001/1.reviewed"
+        decision, text = self.hook(
+            "Write",
+            {"file_path": os.path.join(self.root, rel)},
+            mode="dry-run",
+            CCNAVI_GUARD_CORE_FILES="disable",
+        )
+        self.assertEqual(decision, "deny", text)
+        decision, text = self.bash(
+            "echo x > logs/state/ops/a1.json", mode="dry-run", CCNAVI_GUARD_CORE_FILES="disable"
+        )
+        self.assertEqual(decision, "deny", text)
 
 
 class SubagentRolesTest(HookCase):
-    STOPPED = (
-        "sh .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh cancel i0001-01-01",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh approval-request i0001",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh record-risk i0001",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh judge i0001",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh unknown-sub",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh",
-        "bash -x .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-        "./.ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "/work/.ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "'/work/.ccnavi/scripts/ccnavi-ticket.sh' start i0001",
-        "exec sh .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "command sh .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "source .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        ". .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "cd x && sh .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "env X=1 sh .ccnavi/scripts/ccnavi-ticket.sh start i0001",
-        "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1",
-        "sh .ccnavi/scripts/ccnavi-review.sh confirm --phase 1",
-        "sh .ccnavi/scripts/ccnavi-review.sh comment 3",
-        "sh .ccnavi/scripts/ccnavi-review.sh ready",
-        "sh .ccnavi/scripts/ccnavi-review.sh decide 3",
-        "sh .ccnavi/scripts/ccnavi-review.sh unknown-sub",
-        "sh .ccnavi/scripts/ccnavi-git.sh push origin x",
-        "sh .ccnavi/scripts/ccnavi-git.sh worktree add x",
-        "sh .ccnavi/scripts/ccnavi-git.sh integrate",
-        "sh .ccnavi/scripts/ccnavi-git.sh integrate-done",
-        "sh .ccnavi/scripts/ccnavi-start.sh",
-        "sh .ccnavi/scripts/ccnavi-start.sh --issue 3",
-        "sh .ccnavi/scripts/ccnavi-start.sh --issue 3 --list-open",
-        "sh .ccnavi/scripts/ccnavi-start.sh --new-issue x --similar-checked",
-        "sh .ccnavi/scripts/ccnavi-sync.sh",
-        "sh .ccnavi/scripts/ccnavi-worktree.sh add x",
-        "sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01",
-        "sh .ccnavi/scripts/ccnavi-launcher.sh worktree add x",
-        "sh .ccnavi/scripts/ccnavi-launcher.sh review comment 3",
-        "sh .ccnavi/scripts/ccnavi-launcher.sh",
-    )
-    PASSED = (
-        "sh .ccnavi/scripts/ccnavi-ticket.sh status",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh next-id",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh --help",
-        "sh .ccnavi/scripts/ccnavi-ticket.sh learn",
-        "sh .ccnavi/scripts/ccnavi-review.sh fetch",
-        "sh .ccnavi/scripts/ccnavi-review.sh origin",
-        "sh .ccnavi/scripts/ccnavi-review.sh merged",
-        "sh .ccnavi/scripts/ccnavi-review.sh decide 3 --preview",
-        "sh .ccnavi/scripts/ccnavi-review.sh --help",
-        "sh .ccnavi/scripts/ccnavi-git.sh status",
-        "sh .ccnavi/scripts/ccnavi-git.sh add -- a.py",
-        "sh .ccnavi/scripts/ccnavi-fetch.sh",
-        "sh .ccnavi/scripts/ccnavi-branches.sh",
-        "sh .ccnavi/scripts/ccnavi-launcher.sh --docs x",
-        "sh .ccnavi/scripts/ccnavi-launcher.sh --lint",
-        "sh .ccnavi/scripts/ccnavi-launcher.sh --explain x",
-        "sh .ccnavi/scripts/ccnavi-start.sh --list-open",
-        "sh .ccnavi/scripts/ccnavi-start.sh --check",
-        "sh .ccnavi/scripts/ccnavi-start.sh --help",
-    )
+    """サブエージェントは状態を動かす・公開する操作を打てない。読み取りは打てる。
 
-    def test_the_subagent_cannot_type_them_in_any_mode(self):
-        for command in self.STOPPED:
-            for mode in ("enable", "dry-run"):
-                with self.subTest(command=command, mode=mode):
-                    decision, text = self.bash(command, mode=mode, agent="a1")
-                    self.assertEqual(decision, "deny", text)
+    止める形・通す形の表（モードごと、git の副命令を含む）は Go（hook/judge の
+    TestTheSubagentRoles）が見る。ここでは hook を通した代表と、実行ファイルを直に打つ形だけ。
+    """
 
-    def test_the_subagent_can_type_the_reads(self):
-        for command in self.PASSED:
-            with self.subTest(command=command):
-                decision, text = self.bash(command, agent="a1")
-                self.assertNotIn("DENY_SUBAGENT_TICKET_OP", text)
-                self.assertNotEqual(decision, "deny", text)
-
-    def test_the_main_agent_is_not_stopped_by_the_roles(self):
-        for command in self.STOPPED[:8]:
-            with self.subTest(command=command):
-                _, text = self.bash(command)
-                self.assertNotIn("DENY_SUBAGENT_TICKET_OP", text)
+    def test_the_subagent_cannot_type_a_ticket_op_and_the_main_agent_can(self):
+        command = "sh .ccnavi/scripts/ccnavi-ticket.sh start i0001"
+        decision, text = self.bash(command, mode="dry-run", agent="a1")
+        self.assertEqual(decision, "deny", text)
+        self.assertIn("DENY_SUBAGENT_TICKET_OP", text)
+        _, text = self.bash(command)
+        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", text)
+        decision, text = self.bash("sh .ccnavi/scripts/ccnavi-ticket.sh status", agent="a1")
+        self.assertNotEqual(decision, "deny", text)
 
     def test_the_executable_called_directly_stops_the_subagent_even_if_the_guard_is_off(self):
         for command in ("ccnavi ticket start i0001", "ccnavi review confirm --phase 1"):
@@ -280,26 +192,6 @@ class SubagentRolesTest(HookCase):
                 self.assertEqual(decision, "deny", text)
                 decision, text = self.bash(command, CCNAVI_GUARD_TICKET_APPROVAL="disable")
                 self.assertNotEqual(decision, "deny", text)
-
-
-class GitRolesInChildTreeTest(HookCase):
-    """AT44：状態を動かさない git の副命令は、役割の表で止めない。"""
-
-    def test_the_subagent_git_rm_mv_restore_stash_reset_are_not_stopped_by_the_roles(self):
-        for sub in ("rm", "mv", "restore", "stash", "reset"):
-            for mode in ("enable", "dry-run"):
-                with self.subTest(sub=sub, mode=mode):
-                    decision, text = self.bash(
-                        f"sh .ccnavi/scripts/ccnavi-git.sh {sub} -- a.py", mode=mode, agent="a1"
-                    )
-                    self.assertNotIn("DENY_SUBAGENT_TICKET_OP", text)
-                    self.assertNotEqual(decision, "deny", text)
-
-    def test_the_subagent_git_push_family_is_still_stopped(self):
-        for sub in ("push", "worktree add x", "integrate"):
-            with self.subTest(sub=sub):
-                decision, text = self.bash(f"sh .ccnavi/scripts/ccnavi-git.sh {sub}", agent="a1")
-                self.assertEqual(decision, "deny", text)
 
 
 class DryRunGeneralConfigTest(HookCase):

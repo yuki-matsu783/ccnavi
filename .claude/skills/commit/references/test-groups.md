@@ -15,7 +15,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 | グループ | 主題 | 時間 |
 |---|---|---|
 | `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 6 秒 |
-| `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
+| `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 40 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 140 秒 |
 | `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 7 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
