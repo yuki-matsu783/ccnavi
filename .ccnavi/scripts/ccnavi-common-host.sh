@@ -86,7 +86,10 @@ ccnavi_run_timed() {
 		trap 'ccnavi_tm_stop=1; test -z "$ccnavi_tm_sleep" || kill "$ccnavi_tm_sleep"' TERM
 		sleep "$ccnavi_tm_limit" &
 		ccnavi_tm_sleep=$!
-		test -z "$ccnavi_tm_stop" || { kill "$ccnavi_tm_sleep"; exit 0; }
+		# 呼ぶ側に TERM の trap があると、上の trap を置く前に届いた TERM を dash は捨てる（親の trap を引き継いだ
+		# 子が、trap を消すときに保留の信号も落とす）。本流は子を回収してから TERM を送るので、子がもういなければ
+		# TERM を受け損ねたとみて抜ける。抜けないと sleep の上限まで呼ぶ側の wait が止まる。
+		test -z "$ccnavi_tm_stop" && kill -0 "$ccnavi_tm_pid" 2>/dev/null || { kill "$ccnavi_tm_sleep"; exit 0; }
 		wait "$ccnavi_tm_sleep"
 		test -z "$ccnavi_tm_stop" || exit 0
 		: >"$ccnavi_tm_flag"
