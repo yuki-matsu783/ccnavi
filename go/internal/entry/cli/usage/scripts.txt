@@ -162,6 +162,12 @@
         置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
     ccnavi write-and-push merge <child>
         （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
+    ccnavi accept plan <plan>
+        （ccnavi-user-lib-review.sh 用。受け入れの計画の操作 ID とスレッドの数を "op"・"count" の行で出力します。読み取り専用）
+    ccnavi accept threads <plan> <result> <github|gitlab> <dir>
+        （ccnavi-user-lib-review.sh 用。返信と解決をホストに書く前の確かめをして、"mr" と
+         スレッドごとの "thread <番号> <id> <キー>" を出力し、返信の本文を <dir>/<番号>.reply に書きます。
+         止めるときは "stop <文>"）
     ccnavi write-and-push busy <tree>
         （write-and-push 用。親のワークツリーに途中の操作があれば "busy <名前>" を出力します。読み取り専用）
     ccnavi write-and-push commit <tree> <list> <message>

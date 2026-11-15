@@ -215,6 +215,41 @@ func (r *Record) Lines() []string {
 	return out
 }
 
+// ResumeLines は止まった判断の続き（`ops resume`）の 1 行 1 項目。sh（ccnavi-user-decide.sh --resume）が要約を
+// 見せてから、選択（choices。1 行の JSON）とダイジェストを置く呼び出しへそのまま渡す。
+func (r *Record) ResumeLines() []string {
+	one := func(v string) string { return strings.NewReplacer("\r", " ", "\n", " ").Replace(v) }
+	var left []string
+	for _, s := range r.Unfinished() {
+		left = append(left, s.ID+"="+string(s.State))
+	}
+	// 選択ごとの件数。選択の値の順に並べる。
+	var picked []string
+	for _, v := range orEmpty(r.Choices).All() {
+		picked = append(picked, pyfmt.Str(v))
+	}
+	slices.Sort(picked)
+	var counts []string
+	for i := 0; i < len(picked); {
+		j := i
+		for j < len(picked) && picked[j] == picked[i] {
+			j++
+		}
+		counts = append(counts, picked[i]+" "+strconv.Itoa(j-i)+" 件")
+		i = j
+	}
+	choices, _ := pyjson.Dumps(orEmpty(r.Choices), pyjson.Options{Compact: true, RawUnicode: true})
+	digest := ""
+	if d := orEmpty(r.Plan).Value("digest"); d != nil {
+		digest = pyfmt.Str(d)
+	}
+	return []string{
+		"kind " + string(r.Kind), "parent " + one(r.Parent), "phase " + strconv.Itoa(r.Phase), "mr " + strconv.Itoa(r.MR),
+		"left " + one(strings.Join(left, ", ")), "counts " + one(strings.Join(counts, "、")),
+		"digest " + one(digest), "choices " + one(choices),
+	}
+}
+
 // Summary は未完了の記録を 1 行で言う（status・ボード・Stop が出す）。
 func Summary(r *Record) string {
 	if r.Broken != "" {

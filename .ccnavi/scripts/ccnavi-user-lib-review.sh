@@ -40,24 +40,17 @@ reply_mark() {
 }
 
 # このスレッドへの返信を送り済みか。<スレッドの id> <取り直した結果のファイル>。送り済みなら 0。
+# 記録の印とホストのスレッドの最後のコメントの読み方は実行ファイル（ops replied）が持つ。アカウントは要ると
+# 言われたときだけホストに聞く（試した印が無ければ問い合わせない）。
 reply_already_sent() {
 	[ -n "${op_id:-}" ] || return 1
-	ra_rec=$(ccnavi ops get "$op_id" 2>/dev/null) || return 1
-	if [ "$(ccnavi_op_line "applied.reply_$1" "$ra_rec")" = true ]; then
-		return 0
+	ra_said=$(ccnavi ops replied "$op_id" "$1" "$2" 2>/dev/null | sed -n 's/^replied //p') || ra_said=""
+	if [ "$ra_said" = account ]; then
+		op_account
+		[ -n "${op_who:-}" ] || return 1
+		ra_said=$(ccnavi ops replied "$op_id" "$1" "$2" "$op_who" 2>/dev/null | sed -n 's/^replied //p') || ra_said=""
 	fi
-	[ "$(ccnavi_op_line "applied.reply_try_$1" "$ra_rec")" = true ] || return 1
-	ra_last=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].last_author // empty' "$2" 2>/dev/null)
-	# 最後のコメントがスレッドの最初のコメントと別のもの（作成の時刻が違う）のときだけ、返信とみなす。
-	# 自分が立てたスレッドの最初のコメントを、自分の返信と取り違えないため（取り違えると返信が欠ける。
-	# 時刻が同じ秒に収まる返信は送り直す側に倒れ、二重の返信は出うるが欠落は出さない）。
-	ra_later=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0] | if (.last_at // "") != "" and (.last_at // "") != (.created_at // "") then "yes" else "" end' "$2" 2>/dev/null)
-	op_account
-	if [ -n "$ra_last" ] && [ -n "${op_who:-}" ] && [ "$ra_last" = "$op_who" ] && [ -n "$ra_later" ]; then
-		reply_mark "reply_$1"
-		return 0
-	fi
-	return 1
+	[ "$ra_said" = yes ]
 }
 
 # <スレッドの id> <返信の本文> <MR の番号>
@@ -108,79 +101,81 @@ accept_resolve() {
 }
 
 # <計画のファイル> <取り直した結果のファイル>。成功は 0、できなければ理由を標準エラーへ出して 1。
+# 計画の読みと、書く前の確かめ（id の字・GitLab の 16 進・取り直した結果に在るか）は実行ファイル（accept threads）が
+# 持つ。返信の本文は実行ファイルが <置き場>/<番号>.reply に書く。ここは段取り（全部に返信してから全部を解決する）と送信。
 accept_threads() {
 	accept_file="$1"
 	accept_rfile="$2"
-	accept_mr=$("$JQ" '.mr.number' "$accept_rfile")
-	accept_n=$("$JQ" '.threads | length' "$accept_file" 2>/dev/null) || {
+	accept_dir="$state/review-accept-replies-$$"
+	rm -rf "$accept_dir"
+	accept_said="$accept_dir.said"
+	ccnavi accept threads "$accept_file" "$accept_rfile" "$kind" "$accept_dir" 2>/dev/null >"$accept_said" || :
+	if [ "$(head -n 1 "$accept_said" 2>/dev/null)" != "accept 1" ] || ! grep -E -q '^(mr|stop) ' "$accept_said"; then
 		printf '%s: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$review_label" "$accept_file" >&2
+		accept_done_files
 		return 1
-	}
+	fi
 	# 1. ホストに書く前の確かめ（できなければ、ホストには何も書かない）
-	accept_i=0
-	while [ "$accept_i" -lt "$accept_n" ]; do
-		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
-		case "$accept_id" in
-		'' | *[!A-Za-z0-9_=-]*)
-			printf '%s: 受け入れの計画のスレッドの id が読めない。ホストには何も書いていない。\n' "$review_label" >&2
-			return 1
-			;;
-		esac
-		if [ "$kind" != github ]; then
-			case "$accept_id" in
-			*[!0-9a-f]*)
-				printf '%s: 受け入れの計画のスレッドの id が GitLab の discussion の id（16 進）でない。ホストには何も書いていない。\n' "$review_label" >&2
-				return 1
-				;;
-			esac
-		fi
-		if [ "$("$JQ" --arg id "$accept_id" '[.threads[].id] | index($id) != null' "$accept_rfile")" != true ]; then
-			printf '%s: 受け入れるスレッドが取り直した結果に無い。ホストには何も書いていない。\n' "$review_label" >&2
-			return 1
-		fi
-		accept_i=$((accept_i + 1))
-	done
-	# 2. 全部に返信する
-	accept_i=0
-	while [ "$accept_i" -lt "$accept_n" ]; do
-		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
-		accept_key=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].key' "$accept_file")
-		accept_text=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].reply' "$accept_file")
+	accept_stop=$(sed -n 's/^stop //p' "$accept_said" | head -n 1)
+	if [ -n "$accept_stop" ]; then
+		printf '%s: %s\n' "$review_label" "$accept_stop" >&2
+		accept_done_files
+		return 1
+	fi
+	accept_mr=$(sed -n 's/^mr //p' "$accept_said" | head -n 1)
+	sed -n 's/^thread //p' "$accept_said" >"$accept_dir/threads"
+	# 2. 全部に返信する（一覧は 3 番で読む。ホストの API の道具が標準入力を読んでも、一覧を食わないように）
+	while IFS=' ' read -r accept_i accept_id accept_key <&3; do
+		accept_text=$(cat "$accept_dir/$accept_i.reply")
 		# 操作記録があれば、返信を送り済みのスレッドには重ねない（打ち直し・--resume で二重に返信しない）。
 		# 試して結果が分からないスレッド（記録に試した印だけある）は、ホストのスレッドの最後のコメントが
 		# 自分のものなら送り済みとみなし、そうでなければ送り直す。
 		if reply_already_sent "$accept_id" "$accept_rfile"; then
 			accept_kept="$accept_file"
 			accept_plan=""
-			accept_i=$((accept_i + 1))
 			continue
 		fi
 		# 送る前の印を書けなければ送らない（書けないまま送って落ちると、二重に返信しうる）
 		if [ -n "${op_id:-}" ] && ! ccnavi ops applied "$op_id" "reply_try_$accept_id" true 2>/dev/null; then
 			printf '%s: 操作記録に返信の印を書けなかった。何も送らずに止めた。\n' "$review_label" >&2
+			accept_done_files
 			return 1
 		fi
 		if ! accept_reply "$accept_id" "$accept_text" "$accept_mr"; then
 			printf '%s: 受け入れを完了できない。スレッド %s に返信を残せなかった。何も置いていない（返信が済んだ分は残る。解決はまだ誰もしていない）。\n' "$review_label" "$accept_key" >&2
+			accept_done_files
 			return 1
 		fi
 		reply_mark "reply_$accept_id"
 		# 1 件でも書いたら、置けずに終わったとき計画を残す（accept_cleanup）
 		accept_kept="$accept_file"
 		accept_plan=""
-		accept_i=$((accept_i + 1))
-	done
+	done 3<"$accept_dir/threads"
 	# 3. 全部を解決する
-	accept_i=0
-	while [ "$accept_i" -lt "$accept_n" ]; do
-		accept_id=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].id' "$accept_file")
-		accept_key=$("$JQ" -r --argjson i "$accept_i" '.threads[$i].key' "$accept_file")
+	while IFS=' ' read -r accept_i accept_id accept_key <&3; do
 		if ! accept_resolve "$accept_id" "$accept_mr"; then
 			printf '%s: 受け入れを完了できない。スレッド %s を解決できなかった（返信は残した）。何も置いていない（先に解決した分は残る）。\n' "$review_label" "$accept_key" >&2
+			accept_done_files
 			return 1
 		fi
-		accept_i=$((accept_i + 1))
-	done
+	done 3<"$accept_dir/threads"
+	accept_done_files
+}
+
+# accept_threads が使った返信の本文の置き場を消す。
+accept_done_files() {
+	rm -rf "$accept_dir" "$accept_said"
+}
+
+# 計画のスレッドの数（accept plan）。読めなければ 1。<計画のファイル>
+accept_count() {
+	ac_said=$(ccnavi accept plan "$1" 2>/dev/null) || return 1
+	printf '%s\n' "$ac_said" | sed -n 's/^count //p' | head -n 1
+}
+
+# 計画の操作ID（accept plan）。無い・読めなければ空。<計画のファイル>
+accept_op() {
+	ccnavi accept plan "$1" 2>/dev/null | sed -n 's/^op //p' | head -n 1
 }
 
 # 計画のスレッドに返信と解決をして、結果を取り直す。<計画のファイル>（$result は計画を書いたときの結果）
@@ -188,11 +183,12 @@ accept_threads() {
 # 失敗して終わったときは残す（accept_cleanup）。置く呼び出しには $accept_file を渡す。
 accept_execute() {
 	accept_file="$1"
-	accept_count=$("$JQ" '.threads | length' "$accept_file" 2>/dev/null) || {
+	accept_n=$(accept_count "$accept_file") || accept_n=""
+	[ -n "$accept_n" ] || {
 		printf '%s: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$review_label" "$accept_file" >&2
 		exit 1
 	}
-	[ "$accept_count" -gt 0 ] || return 0
+	[ "$accept_n" -gt 0 ] || return 0
 	accept_threads "$accept_file" "$result" || exit 1
 	op_set reply sent
 	refetch
@@ -251,7 +247,7 @@ op_who=""
 op_who_read=""
 
 op_use_plan() {
-	op_id=$("$JQ" -r '.op // empty' "$1" 2>/dev/null || :)
+	op_id=$(accept_op "$1")
 	[ -n "$op_id" ] ||
 		fail decide-no-op "受け入れの計画に操作 ID が無く、何も送らずに止めました。実行ファイルが sh より古いので、ccnavi を更新（ccnavi-install）してから打ち直してください。" 1
 }

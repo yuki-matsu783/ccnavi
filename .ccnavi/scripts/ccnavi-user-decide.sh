@@ -100,13 +100,15 @@ fi
 
 # ---- --resume: 保存した判断（操作記録）から、止まった判断の続きを送る。
 #
+# ops resume の答えの 1 項目。<名前>
+rp_val() {
+	printf '%s\n' "$rp_said" | sed -n "s/^$1 //p" | head -n 1
+}
+
 # 操作ID を決め、内容の要約を見せて y/N を聞く。親のワークツリーへ移り、保存した選択とダイジェストを
 # 使って、以降は選択を置く形（--choices --digest）と同じ道を通る。選び直しはさせない。
 # 返信・解決が済んでいれば繰り返さず、適用が済んでいれば投稿の段階だけを進める。
 resume_prepare() {
-	# review_host（JQ を決める）の前に動くので、jq は自分で探す。
-	rp_jq=$(command -v jq || :)
-	[ -n "$rp_jq" ] || fail no-jq "jq が見つかりません。" 2
 	if [ -z "$resume_op" ]; then
 		rp_list=$(ccnavi ops pending 2>/dev/null | grep ' decide ' | sed 's/ .*//' || :)
 		rp_count=$(printf '%s\n' "$rp_list" | grep -c . || :)
@@ -122,24 +124,23 @@ resume_prepare() {
 			;;
 		esac
 	fi
-	rp_json=$(ccnavi ops show "$resume_op" 2>/dev/null) ||
+	# 記録の読みは実行ファイル（ops resume）が持つ。1 行 1 項目で、選択は 1 行の JSON（置く呼び出しへそのまま渡す）。
+	rp_said=$(ccnavi ops resume "$resume_op" 2>/dev/null) ||
 		fail decide-no-op "操作記録 $resume_op がありません。" 1
-	[ "$(printf '%s' "$rp_json" | "$rp_jq" -r '.kind')" = decide ] ||
+	[ "$(rp_val kind)" = decide ] ||
 		fail decide-not-decide "操作 $resume_op は decide ではありません。" 1
-	rp_parent=$(printf '%s' "$rp_json" | "$rp_jq" -r '.parent')
-	n=$(printf '%s' "$rp_json" | "$rp_jq" -r '.phase')
-	rp_left=$(printf '%s' "$rp_json" | "$rp_jq" -r '[.stages[] | select(.state != "sent") | .id + "=" + .state] | join(", ")')
-	rp_counts=$(printf '%s' "$rp_json" | "$rp_jq" -r '[.choices[]] | group_by(.) | map(.[0] + " " + (length | tostring) + " 件") | join("、")')
+	rp_parent=$(rp_val parent)
+	n=$(rp_val phase)
 	printf '%s: 未完了の判断 %s\n  親 %s のフェーズ %s（MR !%s）\n  選択: %s\n  済んでいない段階: %s\n' \
-		"$review_label" "$resume_op" "$rp_parent" "$n" "$(printf '%s' "$rp_json" | "$rp_jq" -r '.mr')" "$rp_counts" "$rp_left"
+		"$review_label" "$resume_op" "$rp_parent" "$n" "$(rp_val mr)" "$(rp_val counts)" "$(rp_val left)"
 	printf '続きを送りますか [y/N]: '
 	read -r rp_answer || rp_answer=n
 	case "$rp_answer" in
 	y | Y | yes | YES) ;;
 	*) fail decide-not-confirmed "送らずにやめました。" 1 ;;
 	esac
-	choices=$(printf '%s' "$rp_json" | "$rp_jq" -c '.choices')
-	digest=$(printf '%s' "$rp_json" | "$rp_jq" -r '.plan.digest')
+	choices=$(rp_val choices)
+	digest=$(rp_val digest)
 	# 今いる場所が、その親のブランチのワークツリーならそのまま。そうでなければ親のワークツリーへ移る。
 	rp_here=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ "$rp_here" != "$rp_parent" ]; then
@@ -168,7 +169,7 @@ accept_before_place() {
 		# 保存した判断から計画を書き直す。返信・解決が済んでいれば繰り返さず、結果を取り直して置く側へ渡す。
 		ccnavi ops resume-plan "$resume_op" "$accept_plan" || exit 1
 		op_use_plan "$accept_plan"
-		if [ "$(op_field reply state)" = sent ] || [ "$("$JQ" '.threads | length' "$accept_plan")" -eq 0 ]; then
+		if [ "$(op_field reply state)" = sent ] || [ "$(accept_count "$accept_plan")" = 0 ]; then
 			accept_file="$accept_plan"
 			refetch
 			return 0
@@ -236,7 +237,7 @@ fi
 # 適用（ローカルへの反映）が write-and-push で戻された・失敗したとき、記録の「適用済み」を外す。
 # 外さないと、--resume が存在しない適用を前提に、実在しない子を名指しして投稿してしまう。
 unapply_local() {
-	ua_op=$("$JQ" -r '.op // empty' "$accept_file" 2>/dev/null || :)
+	ua_op=$(accept_op "$accept_file")
 	[ -n "$ua_op" ] || ua_op="${resume_op:-}"
 	[ -z "$ua_op" ] || ccnavi ops applied "$ua_op" local false 2>/dev/null || :
 }

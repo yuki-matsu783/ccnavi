@@ -72,6 +72,7 @@ case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 *" ops "* | *" git integration "* | *" path under "*) exec '{exe}' "$@" ;;
+*" accept plan "* | *" accept threads "*) exec '{exe}' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
@@ -637,6 +638,8 @@ class GitLabHostFixtureTest(unittest.TestCase):
             + 'case " $* " in *" write-and-push family "*)'
             + " printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;; esac\n"
             + 'case " $* " in *" ops "* | *" path under "* | *" git integration "*)'
+            + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"
+            + 'case " $* " in *" accept plan "* | *" accept threads "*)'
             + f" exec '{exe.sh_path()}' \"$@\" ;; esac\n"
             f"for a in \"$@\"; do printf '%s\\n' \"$a\"; done >>'{out}/args.txt'\n"
             'case " $* " in *" prepare "*)\n'

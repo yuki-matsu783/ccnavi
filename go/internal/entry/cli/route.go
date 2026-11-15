@@ -422,6 +422,9 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case cmd[0] == "ops":
 		// 操作記録の読み書き。チケット制御の有無に依らない。
 		return opsCommand(stdout, stderr, conf, cmd[1:]), true
+	case cmd[0] == "accept":
+		// 受け入れの計画を sh が jq を使わずに読む（返信と解決をホストに書く前の確かめを含む）。
+		return runAccept(stdout, stderr, cmd[1:]), true
 	case slices.Equal(cmd, []string{"sync", "paths"}):
 		return okIf(syncPaths(stdout, conf) == 0), true
 	case slices.Equal(cmd, []string{"sync", "retired"}):

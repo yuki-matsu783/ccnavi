@@ -114,3 +114,61 @@ func ReadAcceptPlan(path string) *AcceptPlan {
 	}
 	return plan
 }
+
+// AcceptThread は計画のスレッド 1 つ（sh が返信と解決をホストに書く）。
+type AcceptThread struct{ ID, Key, Reply string }
+
+// gitlabDiscussion は GitLab の discussion の id の字（16 進の小文字）。
+var gitlabDiscussion = regexp.MustCompile(`\A[0-9a-f]+\z`)
+
+// 書く前の確かめで止める理由の文（sh が文面の頭を付けて言う）。
+const (
+	msgAcceptBadID     = "受け入れの計画のスレッドの id が読めない。ホストには何も書いていない。"
+	msgAcceptNotGitLab = "受け入れの計画のスレッドの id が GitLab の discussion の id（16 進）でない。ホストには何も書いていない。"
+	msgAcceptGone      = "受け入れるスレッドが取り直した結果に無い。ホストには何も書いていない。"
+)
+
+// ReadAcceptThreads は計画の操作ID とスレッドの並び。計画が JSON のオブジェクトとして読めなければ ok が偽。
+func ReadAcceptThreads(path string) (op string, threads []AcceptThread, ok bool) {
+	data, ok := fsio.ReadObject(path)
+	if !ok {
+		return "", nil, false
+	}
+	for _, t := range objects(data.Value("threads")) {
+		threads = append(threads, AcceptThread{ID: text(t.Value("id")), Key: text(t.Value("key")), Reply: text(t.Value("reply"))})
+	}
+	return text(data.Value("op")), threads, true
+}
+
+// AcceptCheck は、計画のスレッドの返信と解決をホストに書く前の確かめ。id が API の経路に使える字で（GitLab は
+// 16 進）、取り直した結果に在ること。止めるなら理由（よければ空）。
+func AcceptCheck(kind Kind, threads []AcceptThread, r Result) string {
+	present := map[string]bool{}
+	for _, t := range r.Threads {
+		present[t.ID] = true
+	}
+	for _, t := range threads {
+		switch {
+		case !acceptID.MatchString(t.ID):
+			return msgAcceptBadID
+		case kind != GitHub && !gitlabDiscussion.MatchString(t.ID):
+			return msgAcceptNotGitLab
+		case !present[t.ID]:
+			return msgAcceptGone
+		}
+	}
+	return ""
+}
+
+// RepliedByHost は、返信を試した印だけが残ったスレッドに、ホストで自分の返信が付いているか。最後のコメントが
+// 自分（who）のもので、スレッドの最初のコメントと別のもの（作成の時刻が違う）のときだけ真。自分が立てたスレッドの
+// 最初のコメントを自分の返信と取り違えないため（取り違えると返信が欠ける。時刻が同じ秒に収まる返信は送り直す側に
+// 倒れ、二重の返信は出うるが欠落は出さない）。
+func RepliedByHost(r Result, id, who string) bool {
+	for _, t := range r.Threads {
+		if t.ID == id {
+			return who != "" && t.LastCommentAuthor == who && t.LastCommentAt != "" && t.LastCommentAt != t.CreatedAt
+		}
+	}
+	return false
+}

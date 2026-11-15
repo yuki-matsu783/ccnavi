@@ -193,6 +193,27 @@ func TestLines(t *testing.T) {
 	}
 }
 
+// ops resume の行は sh（ccnavi-user-decide.sh --resume）が読む契約。要約（済んでいない段階・選択ごとの件数）と、
+// 置く呼び出しへ渡す選択（1 行の JSON）とダイジェスト。
+func TestResumeLines(t *testing.T) {
+	state := stateDir(t)
+	id := begin(t, state, Options{
+		Parent: "i0001", Phase: 2, MR: 7,
+		Choices: pyjson.NewObject("u1", "issue", "u2", "keep", "u3", "issue"),
+		Plan:    pyjson.NewObject("digest", "d0"),
+	})
+	stageSet(t, state, id, "reply", StateSent, "", "")
+	got := load(t, state, id).ResumeLines()
+	want := []string{
+		"kind decide", "parent i0001", "phase 2", "mr 7",
+		"left issue=pending, note=pending", "counts issue 2 件、keep 1 件",
+		"digest d0", `choices {"u1":"issue","u2":"keep","u3":"issue"}`,
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("行:\n%s", strings.Join(got, "\n"))
+	}
+}
+
 func TestPendingAndCompleteIfDone(t *testing.T) {
 	state := stateDir(t)
 	done := begin(t, state, Options{})

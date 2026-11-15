@@ -42,7 +42,7 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) exec '@EXE@' "$@" ;;
+*" ops "* | *" accept plan "* | *" accept threads "*) exec '@EXE@' "$@" ;;
 esac
 prev=""
 for a in "$@"; do

@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/oplog"
 	"ccnavi/internal/tickets/review/decide"
 )
@@ -20,7 +21,8 @@ const (
 		"stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / " +
 		"begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>… / applied <操作ID> <キー> <値> / " +
 		"reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / " +
-		"post-text <操作ID> <段階ID> <ファイル> / resume-plan <操作ID> <ファイル> / " +
+		"post-text <操作ID> <段階ID> <ファイル> / resume-plan <操作ID> <ファイル> / resume <操作ID> / " +
+		"replied <操作ID> <スレッドの id> <結果> [アカウント] / " +
 		"mark-sent <種類> <親> <MR> <キー> <段階ID> <URL> / done <操作ID> / retire <親>\n"
 	opsMissing  = "ccnavi: 操作記録 %s が無い\n"
 	opsOutState = "ccnavi: 書き先は state の置き場の下に限る"
@@ -128,6 +130,18 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 		return opsBegin(stdout, stderr, state, words)
 	case verb == "post-text" && n == 4:
 		return opsPostText(stderr, state, words)
+	case verb == "resume" && n == 2:
+		// 止まった判断の続き（ccnavi-user-decide.sh --resume）が見せる要約と、置く呼び出しに渡す選択とダイジェスト。
+		r, err := loadRecord(stderr, state, words[1])
+		if r == nil {
+			return config.ExitError, true, err
+		}
+		for _, line := range r.ResumeLines() {
+			fmt.Fprintln(stdout, line)
+		}
+		return config.ExitOK, true, nil
+	case verb == "replied" && (n == 4 || n == 5):
+		return opsReplied(stdout, stderr, state, words[1], words[2], words[3], arg(4))
 	case verb == "resume-plan" && n == 3:
 		r, err := loadRecord(stderr, state, words[1])
 		if r == nil {
@@ -169,6 +183,39 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 		return config.ExitOK, true, nil
 	}
 	return 0, false, nil
+}
+
+// opsReplied は `replied <操作ID> <スレッドの id> <取り直した結果> [<アカウント>]`。このスレッドへの返信を送り済みか
+// （打ち直し・--resume で二重に返信しない）を `replied yes|no` で答える。記録に送れた印があれば yes、試した印も
+// 無ければ no。試した印だけなら、ホストのスレッドの最後のコメントが自分の返信か（host.RepliedByHost）で決め、
+// 自分の返信なら送れた印を書く。アカウントが要るのに渡されていなければ `replied account`（sh がホストに聞いて
+// 打ち直す。印が無いときにホストへ問い合わせないため）。
+func opsReplied(stdout, stderr io.Writer, state, id, thread, result, who string) (int, bool, error) {
+	r, err := loadRecord(stderr, state, id)
+	if r == nil {
+		return config.ExitError, true, err
+	}
+	applied := func(key string) bool {
+		if r.Applied == nil {
+			return false
+		}
+		b, _ := r.Applied.Value(key).(bool)
+		return b
+	}
+	answer := "no"
+	switch {
+	case applied("reply_" + thread):
+		answer = "yes"
+	case !applied("reply_try_" + thread):
+	case who == "":
+		answer = "account"
+	case host.RepliedByHost(host.LoadResult(result), thread, who):
+		// 印を書けなくても送り済みと答える（書けないまま送り直すと二重に返信する）。
+		_ = oplog.AppliedSet(state, id, "reply_"+thread, true)
+		answer = "yes"
+	}
+	fmt.Fprintln(stdout, "replied "+answer)
+	return config.ExitOK, true, nil
 }
 
 // loadRecord は操作記録を読む。無ければ言って nil。
