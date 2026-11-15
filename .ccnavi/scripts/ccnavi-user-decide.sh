@@ -253,7 +253,7 @@ fetch_all >"$result"
 if [ -n "$choices" ]; then
 	# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
 	# 適用まで済んでいる判断の続きは、投稿の段階だけを進める。
-	if [ -n "$resume_op" ] && [ "$(ccnavi ops show "$resume_op" | "$JQ" -r '.applied.local // empty')" = true ]; then
+	if [ -n "$resume_op" ] && [ "$(ccnavi_op_line applied.local "$(ccnavi ops get "$resume_op")")" = true ]; then
 		op_id="$resume_op"
 		if ! post_decision_staged; then
 			printf '%s: %s\n' "$review_label" "$post_warning" >&2

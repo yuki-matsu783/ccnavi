@@ -3,6 +3,7 @@ package oplog
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -190,6 +191,28 @@ func (r *Record) Object() *pyjson.Object {
 		"created_at", r.createdAt,
 		"updated_at", r.updatedAt,
 	)
+}
+
+// Lines は記録のうち sh が読む項目を、1 行 1 項目（`<名前> <値>`）にする。`ops get` はこれを出す。
+// 段階は送る順に `stage <段階ID>` を並べ、続けて `<段階ID>.state`・`<段階ID>.url`・`<段階ID>.tries` を置く。
+// applied は `applied.<キー> <値>`（真偽は true・false）。値の改行は空白にして、答えの行に紛れさせない。
+func (r *Record) Lines() []string {
+	one := func(v string) string { return strings.NewReplacer("\r", " ", "\n", " ").Replace(v) }
+	var out []string
+	for _, s := range r.Stages {
+		out = append(out, "stage "+one(s.ID))
+	}
+	for _, s := range r.Stages {
+		out = append(out, one(s.ID)+".state "+string(s.State), one(s.ID)+".url "+one(s.URL), one(s.ID)+".tries "+strconv.Itoa(s.tries))
+	}
+	for key, value := range orEmpty(r.Applied).All() {
+		text := fmt.Sprint(value)
+		if b, ok := value.(bool); ok {
+			text = strconv.FormatBool(b)
+		}
+		out = append(out, "applied."+one(fmt.Sprint(key))+" "+one(text))
+	}
+	return out
 }
 
 // Summary は未完了の記録を 1 行で言う（status・ボード・Stop が出す）。

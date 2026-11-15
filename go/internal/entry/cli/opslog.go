@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	opsUsage = "ccnavi: ops の使い方: pending / show <操作ID> / " +
+	opsUsage = "ccnavi: ops の使い方: pending / show <操作ID> / get <操作ID> / " +
 		"stage-set <操作ID> <段階ID> <pending|sent|unknown> [URL] [アカウント] / " +
 		"begin <種類> <親> <フェーズ> <MR> <キー> <段階ID:種類>… / applied <操作ID> <キー> <値> / " +
 		"reconcile <操作ID> <段階ID> <URL,…> <yes|no|error> [アカウント] / " +
@@ -88,6 +88,16 @@ func opsStep(stdout, stderr io.Writer, state string, words []string) (code int, 
 		}
 		if err := pyjson.Write(stdout, r.Object(), pyjson.Options{RawUnicode: true}); err != nil {
 			return 0, true, err
+		}
+		return config.ExitOK, true, nil
+	case verb == "get" && n == 2:
+		// sh が jq を使わずに読む形（1 行 1 項目）。show の JSON はボードと人が読む。
+		r, err := loadRecord(stderr, state, words[1])
+		if r == nil {
+			return config.ExitError, true, err
+		}
+		for _, line := range r.Lines() {
+			fmt.Fprintln(stdout, line)
 		}
 		return config.ExitOK, true, nil
 	case verb == "stage-set" && n >= 4 && n <= 6:

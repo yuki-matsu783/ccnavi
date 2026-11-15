@@ -35,10 +35,7 @@ ccnavi() {
 	printf '%s\\n' "$*" >>"$STATE/ops.log"
 	case "$1" in
 	begin) [ -z "${NO_RECORD:-}" ] || return 1; printf '%s\\n' "$OPID" ;;
-	show)
-		printf '{"stages":[{"id":"comment","state":"%s","url":"u0","tries":%s}]}' \\
-			"$ST" "$TRIES"
-		;;
+	get) printf 'stage comment\\ncomment.state %s\\ncomment.url u0\\ncomment.tries %s\\n' "$ST" "$TRIES" ;;
 	reconcile) printf '%s\\n' "$VERDICT" ;;
 	*) : ;;
 	esac

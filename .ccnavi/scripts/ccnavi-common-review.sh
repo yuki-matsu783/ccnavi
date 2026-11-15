@@ -432,8 +432,15 @@ cs_set() {
 	}
 }
 
+# 操作記録の答え（`ccnavi ops get` の 1 行 1 項目）から、<名前> の行の値を出す。無ければ空。<名前> <答え>
+#
+# 名前は sed の式に入れずに awk で頭の語と比べる（スレッドの id に式で意味を持つ字が入りうるため）。
+ccnavi_op_line() {
+	printf '%s\n' "$2" | awk -v k="$1" 'index($0, k " ") == 1 { print substr($0, length(k) + 2); exit }'
+}
+
 cs_field() {
-	ccnavi ops show "$cs_id" 2>/dev/null | "$JQ" -r --arg s "$cs_stage" --arg f "$1" '[.stages[]? | select(.id == $s)][0][$f] // empty'
+	ccnavi_op_line "$cs_stage.$1" "$(ccnavi ops get "$cs_id" 2>/dev/null)"
 }
 
 # 送った先の URL から、返す JSON を作る。

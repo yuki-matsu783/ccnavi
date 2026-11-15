@@ -42,11 +42,11 @@ reply_mark() {
 # このスレッドへの返信を送り済みか。<スレッドの id> <取り直した結果のファイル>。送り済みなら 0。
 reply_already_sent() {
 	[ -n "${op_id:-}" ] || return 1
-	ra_rec=$(ccnavi ops show "$op_id" 2>/dev/null) || return 1
-	if [ "$(printf '%s' "$ra_rec" | "$JQ" -r --arg k "reply_$1" '.applied[$k] // empty')" = true ]; then
+	ra_rec=$(ccnavi ops get "$op_id" 2>/dev/null) || return 1
+	if [ "$(ccnavi_op_line "applied.reply_$1" "$ra_rec")" = true ]; then
 		return 0
 	fi
-	[ "$(printf '%s' "$ra_rec" | "$JQ" -r --arg k "reply_try_$1" '.applied[$k] // empty')" = true ] || return 1
+	[ "$(ccnavi_op_line "applied.reply_try_$1" "$ra_rec")" = true ] || return 1
 	ra_last=$("$JQ" -r --arg id "$1" '[.threads[] | select(.id == $id)][0].last_author // empty' "$2" 2>/dev/null)
 	# 最後のコメントがスレッドの最初のコメントと別のもの（作成の時刻が違う）のときだけ、返信とみなす。
 	# 自分が立てたスレッドの最初のコメントを、自分の返信と取り違えないため（取り違えると返信が欠ける。
@@ -264,7 +264,7 @@ op_set() {
 
 # <段階ID> <欄>。無ければ空。
 op_field() {
-	ccnavi ops show "$op_id" 2>/dev/null | "$JQ" -r --arg s "$1" --arg f "$2" '[.stages[]? | select(.id == $s)][0][$f] // empty'
+	ccnavi_op_line "$1.$2" "$(ccnavi ops get "$op_id" 2>/dev/null)"
 }
 
 op_account() {
@@ -434,7 +434,7 @@ post_decision_staged_locked() {
 	post_warning=""
 	pd_mr=$("$JQ" '.mr.number' "$result")
 	pd_mr_url=$("$JQ" -r '.mr.url' "$result")
-	pd_ids=$(ccnavi ops show "$op_id" 2>/dev/null | "$JQ" -r '.stages[].id') || pd_ids=""
+	pd_ids=$(ccnavi ops get "$op_id" 2>/dev/null | sed -n 's/^stage //p') || pd_ids=""
 	pd_issue_no=""
 	pd_failed=""
 	for pd_stage in $pd_ids; do
