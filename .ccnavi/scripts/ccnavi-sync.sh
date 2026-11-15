@@ -486,7 +486,7 @@ sync_family() {
 	esac
 
 	# 親チケットの mr 欄と、送った形跡（着手済み・依頼・退避）を実行ファイルに聞く。
-	ccnavi_parent_info "$tree" "$P" || :
+	ccnavi_parent_info "$tree" "$P" "$B" || :
 	fam_mr="$ccnavi_pi_mr"
 
 	busy=$(busy_state "$tree")
@@ -527,7 +527,7 @@ sync_present() {
 		if LC_ALL=C git -C "$tree" merge --ff-only --no-overwrite-ignore --quiet "$remote_sha" </dev/null >/dev/null 2>"$scratch/err"; then
 			printf '%s: リモートの %s 件を早送りで取り込んだ\n' "$P" "$behind"
 		else
-			printf '%s: 早送りできなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"
+			printf '%s: 早送りできなかった。%s\n' "$P" "$(ccnavi_git_refusal "$root" "$scratch/err")"
 			fail_note
 		fi
 	else
@@ -553,7 +553,7 @@ sync_present() {
 						"$P" "$conflicted"
 				else
 					cat "$scratch/out" >>"$scratch/err"
-					printf '%s: リモートと分かれていて merge できなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"
+					printf '%s: リモートと分かれていて merge できなかった。%s\n' "$P" "$(ccnavi_git_refusal "$root" "$scratch/err")"
 				fi
 				fail_note
 			fi
@@ -682,13 +682,10 @@ tidy_merged() {
 
 # P がリモートに無い。閉じたか、消えたか。
 #
-# 送った形跡は push のゲートと同じ述語（ccnavi_parent_trace）。形跡が無ければ、一度も送っていない親子のチケット。
+# 送った形跡は push のゲートと同じ述語（実行ファイルの tree parent の trace の行。ccnavi_parent_info が読む）。
+# 形跡が無ければ、一度も送っていない親子のチケット。答えが無い（unknown）ときは、送ったものとして消えたかを確かめる。
 sync_absent() {
-	trace=no
-	if ccnavi_parent_trace "$tree" "$B"; then
-		trace=yes
-	fi
-	if [ "$trace" = no ]; then
+	if [ "$ccnavi_pi_trace" = no ]; then
 		if [ "$ccnavi_pi_approved" = unreadable ]; then
 			printf '%s: 承認済みの親チケットを読めないので、送った親子のチケットかを確かめられない（チケットの frontmatter を直してから再実行してください）\n' "$P"
 			fail_note

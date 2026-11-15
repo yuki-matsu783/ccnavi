@@ -28,9 +28,9 @@
 # 残りの関数は、同じディレクトリの部品 5 本に分けてあり、このファイルの最後で読む。
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
 #
-#   ccnavi-common-state.sh  state の置き場と統合先（ccnavi_state・ccnavi_integration・ccnavi_parent_tree など）、
-#                           親ブランチの push のゲート（ccnavi_push_gate）、
-#                           タイムアウト監視つきの git（ccnavi_git_timed・ccnavi_git_refusal）
+#   ccnavi-common-state.sh  state の置き場、実行ファイルに聞く口（ccnavi_ask・ccnavi_text・ccnavi_integration・
+#                           ccnavi_parent_info・ccnavi_id_clash・ccnavi_git_refusal など）、親ブランチの push のゲートの
+#                           ls-remote（ccnavi_push_gate）、タイムアウト監視つきの git（ccnavi_git_timed）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
 #   ccnavi-common-write-and-push.sh     write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_wap_*）
 #   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）と、時間を区切って実行する ccnavi_run_timed

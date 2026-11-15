@@ -440,6 +440,12 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "check":
 		// ccnavi-git.sh が受けた git の引数を通すかを決める。チケット制御の有無に依らない。
 		return runGitCheck(in, stdout, stderr, root, conf, cmd[2:]), true
+	case len(cmd) == 3 && cmd[0] == "git" && cmd[1] == "integration":
+		// 統合先の名前か、決まらないときの案内（ccnavi_integration・ccnavi_integration_hint）。
+		return runGitIntegration(stdout, cmd[2]), true
+	case len(cmd) == 3 && cmd[0] == "git" && cmd[1] == "refusal":
+		// git が断った理由の 1 文（ccnavi_git_refusal）。
+		return runGitRefusal(stdout, cmd[2]), true
 	case cmd[0] == "preflight":
 		// チケット作業の入口の事前確認（ccnavi-common-host.sh の ccnavi_preflight と ccnavi_host_access）。
 		return runPreflight(stdout, stderr, root, cmd[1:]), true

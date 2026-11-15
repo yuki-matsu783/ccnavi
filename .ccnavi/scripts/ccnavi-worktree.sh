@@ -216,7 +216,12 @@ cand_index="$root/logs/state/worktree-index-$$"
 mkdir -p "$root/logs/state" 2>/dev/null || :
 trap 'rm -f "$heads_list" "$heads_list.names" "$cand_index"' EXIT
 same_id_guard() {
-	sg_other=$(ccnavi_id_clash "$name" "$1") || return 0
+	sg_rc=0
+	sg_other=$(ccnavi_id_clash "$root" "$name" "$1") || sg_rc=$?
+	case "$sg_rc" in
+	1) return 0 ;;
+	2) fail exe-missing "実行ファイルが答えないため、同じ識別子になる別のブランチが無いかを確かめられません。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。" 2 ;;
+	esac
 	log_info 同じ識別子のブランチ -- "name=$name" "where=$2"
 	printf 'ワークツリーは切っていない。%s にブランチ %s があり、%s と同じ識別子（%s。英字の大文字小文字は区別しない）になる。\n' "$2" "$sg_other" "$name" "$name"
 	printf '同じ識別子のブランチが 2 本あると、ワークツリーの置き場が重なる。既にあるブランチは ccnavi-start.sh で始める:\n'

@@ -134,17 +134,9 @@ class Workspace(unittest.TestCase):
             f"*\" --version \"*) printf 'compat: {exe.compat()}\\n'; exit 0 ;;\n"
             '*" write-and-push family "*) printf \'write-and-push 1\\nfamily i0001\\ntarget '
             "no\\n'; exit 0 ;;\n"
-            # 親か・承認済みか（push のゲートが聞く）。STUB_PARENT があるときだけ答える。
-            # STUB_PARENT=old は、新しい行（approved など）を知らない古い実行ファイル。
-            '*" tree parent "*)\n'
-            '  [ -n "${STUB_PARENT:-}" ] || exit 0\n'
-            "  [ \"$STUB_PARENT\" = no ] && { printf 'tree 1\\nparent no\\n'; exit 0; }\n"
-            "  printf 'tree 1\\nparent yes\\n'\n"
-            '  [ "$STUB_PARENT" = old ] && exit 0\n'
-            "  printf 'approved %s\\nrequested %s\\narchived %s\\nstarted %s\\nmr -\\n' "
-            '"${STUB_APPROVED:-no}" "${STUB_REQUESTED:-no}" "${STUB_ARCHIVED:-no}" '
-            '"${STUB_STARTED:-no}"\n'
-            "  exit 0 ;;\n"
+            # push のゲート・統合先・git が断った理由は本物の実行ファイルが答える。
+            '*" tree gate "* | *" git integration "* | *" git refusal "*)'
+            f" exec '{exe.sh_path()}' \"$@\" ;;\n"
             "esac\nexit 0\n",
         )
         os.chmod(
@@ -163,7 +155,11 @@ class Workspace(unittest.TestCase):
         return path
 
     def place(self, tree, ticket="i0001"):
-        return write(os.path.join(tree, *APPROVED.split("/"), ticket + ".md"), "approved\n")
+        # 承認済みの親チケット（着手前。push のゲートは最初の push として通す）。
+        return write(
+            os.path.join(tree, *APPROVED.split("/"), ticket + ".md"),
+            f"---\nversion: 1\nticket: {ticket}\ntitle: t\n---\n",
+        )
 
     def env(self, **extra):
         env = {
@@ -435,24 +431,28 @@ class PushApprovedTest(Workspace):
         self.assertIn("i0001", result.stderr)
 
     # ---- 親のブランチの push のゲート（ccnavi_push_gate）。
-    # 実行ファイルのスタブが `tree parent` に答える（STUB_PARENT）。答えなければ参照だけで決める。
+    # 掛けるか・形跡があるかの判定は実行ファイル（tree gate）の go test が見る。
+    # ここでは通しで、ゲートが
+    # ls-remote を頼んだときに sh が打って止めること、通すときに送ることを確かめる。
 
-    def sent_parent(self, name="i0001", started="yes", **extra):
-        """送ったことのある親のワークツリー。ホストがブランチを消した（参照だけが残る）形にする。
+    def parent_ticket(self, tree, name):
+        """着手済みの承認済み親チケット（送った形跡になる）を置く。"""
+        write(
+            os.path.join(tree, *APPROVED.split("/"), name + ".md"),
+            f"---\nversion: 1\nticket: {name}\nstarted_at: 2026-01-01T00:00:00Z\ntitle: 親\n---\n",
+        )
 
-        返すのは、ツリーと、ゲートに聞かれる実行ファイルの答えを入れた環境。
-        承認済みの親チケットは置いてある（STUB_APPROVED=yes）。着手済み（STUB_STARTED）が形跡になる。
-        """
+    def sent_parent(self, name="i0001"):
+        """送ったことのある親のワークツリー。ホストがブランチを消した（参照だけが残る）形にする。"""
         tree = self.worktree(name)
         git(tree, "push", "-q", "-u", "origin", name)
         git(self._tmp.name, "--git-dir", self.remote, "update-ref", "-d", f"refs/heads/{name}")
-        self.place(tree)
-        env = self.env(STUB_PARENT="1", STUB_APPROVED="yes", STUB_STARTED=started, **extra)
-        return tree, env
+        self.parent_ticket(tree, name)
+        return tree
 
     def test_a_parent_gone_from_the_remote_is_committed_but_not_pushed(self):
-        tree, env = self.sent_parent()
-        result = self.push(env=env)
+        tree = self.sent_parent()
+        result = self.push()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertEqual(self.subject(tree), MESSAGE)
         self.assertEqual(self.remote_head("i0001"), "")
@@ -462,71 +462,38 @@ class PushApprovedTest(Workspace):
         # ユーザがターミナルで元の名前に戻せば、打ち直して送れる。
         git(tree, "push", "-q", "origin", "i0001")
         write(os.path.join(tree, *APPROVED.split("/"), "i0002.md"), "approved\n")
-        result = self.push(env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
-
-    def test_an_approved_parent_without_a_reference_is_still_guarded(self):
-        # fetch.prune で参照が消えても、着手済みの親チケットがあれば、作り直さない。
-        tree, env = self.sent_parent()
-        git(self.ws, "update-ref", "-d", "refs/remotes/origin/i0001")
-        result = self.push(env=env)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertEqual(self.remote_head("i0001"), "")
-        self.assertIn("リモートに無い", result.stderr)
-
-    def test_a_request_marker_or_an_archive_also_counts_as_having_been_sent(self):
-        for key in ("STUB_REQUESTED", "STUB_ARCHIVED"):
-            with self.subTest(key=key):
-                tree, env = self.sent_parent(name=f"i0001-{key[5:9].lower()}", started="no")
-                git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{os.path.basename(tree)}")
-                env[key] = "yes"
-                result = self.push(env=env)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn("リモートに無い", result.stderr)
-
-    def test_an_approved_parent_never_started_passes_as_the_first_push(self):
-        # 直接作業で提案を書き、同名のワークツリーで承認して、最初に打つ承認の push。
-        # 承認済みというだけでは形跡にしない。
-        tree = self.worktree("i0001")
-        self.place(tree)
-        env = self.env(STUB_PARENT="1", STUB_APPROVED="yes", STUB_STARTED="no")
-        result = self.push(env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
-
-    def test_the_first_push_of_a_parent_never_sent_passes(self):
-        # 形跡が無く、承認済みの親チケットも依頼も退避も無い。最初の push として通す。
-        tree = self.worktree("i0001")
-        self.place(tree)
-        env = self.env(STUB_PARENT="1", STUB_APPROVED="no")
-        result = self.push(env=env)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
-
-    def test_an_old_executable_without_the_new_rows_is_judged_by_the_reference_alone(self):
-        tree = self.worktree("i0001")
-        self.place(tree)
-        env = self.env(STUB_PARENT="old")
-        result = self.push(env=env)
+        result = self.push()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(self.remote_head("i0001"), self.head(tree))
 
     def test_a_remote_that_cannot_be_asked_is_refused(self):
-        tree, env = self.sent_parent()
+        tree = self.sent_parent()
         git(self.ws, "remote", "set-url", "origin", os.path.join(self._tmp.name, "missing.git"))
-        result = self.push(env=env)
+        result = self.push()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("リモートにあるかを確かめられない", result.stderr)
         self.assertEqual(self.subject(tree), MESSAGE)
 
-    def test_a_tree_that_is_not_a_parent_is_not_gated(self):
-        # 実行ファイルが親でないと答えれば、参照が残っていてもリモートに無い名前を送る。
-        tree, env = self.sent_parent()
-        env["STUB_PARENT"] = "no"
-        result = self.push(env=env)
+    def test_without_the_executable_only_a_tracked_branch_is_checked(self):
+        """実行ファイルが答えないときも送る（実行ファイルを起こさない作り）。
+
+        手元に origin の参照があるブランチだけは ls-remote で確かめ、
+        リモートから消えていれば送らない。"""
+        project = os.path.join(self.ws, "projects", "app")
+        remote = self.repository(project, "work")
+        git(project, "push", "-q", "-u", "origin", "work")
+        git(self._tmp.name, "--git-dir", remote, "update-ref", "-d", "refs/heads/work")
+        self.place(project)
+        gone = self.env(CCNAVI_ENTRY_PATH=posix(os.path.join(self._tmp.name, "no-such-bin")))
+        result = self.push(env=gone)
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("実行ファイルが答えないため", result.stderr)
+        self.assertEqual(self.head_of(remote, "work"), "")
+        git(project, "update-ref", "-d", "refs/remotes/origin/work")
+        self.place(project, "i0002")
+        result = self.push(env=gone)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.remote_head("i0001"), self.head(tree))
+        self.assertEqual(self.head_of(remote, "work"), self.head(project))
 
     # ---- 21. detached
 

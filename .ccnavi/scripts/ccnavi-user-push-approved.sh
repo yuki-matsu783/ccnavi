@@ -275,7 +275,7 @@ carry_family() {
 			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
 			--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul >"$ccnavi_wap_tmp/out"; then
 			cat "$ccnavi_wap_tmp/out" >>"$ccnavi_wap_tmp/err"
-			printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$(ccnavi_git_refusal "$ccnavi_wap_tmp/err")" >&2
+			printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$(ccnavi_git_refusal "$root" "$ccnavi_wap_tmp/err")" >&2
 			ccnavi_wap_tree="$cf_tree"
 			ccnavi_wap_unstage "$ccnavi_wap_tmp/carry" "$cf_base"
 			ccnavi_lock_drop

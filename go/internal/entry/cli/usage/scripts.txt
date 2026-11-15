@@ -102,13 +102,18 @@
          （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
          形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
          です。ネットワークにも git にも触れません）
-    ccnavi tree parent <tree> <name>
+    ccnavi tree parent <tree> <name> [<branch>]
         （スクリプト用。"tree 1" の行に続いて、"parent yes|no|unreadable"（そのツリーが
          親のチケットまたは提案 <name> を保持しているか）、"approved yes|no|unreadable"
          （承認済みの親チケットがあるか。提案は数えません）、"requested yes|no"
          （.requested のマーカーがあるか）、"archived yes|no"（手元の退避に親があるか）、
-         "mr <番号>|-"（親チケットの mr:）を出力します。スクリプト自身は
-         チケットのYAMLを読み込みません）
+         "started yes|no"（着手済みか）、"mr <番号>|-"（親チケットの mr:）を出力します。
+         <branch> を渡すと、続けて "trace yes|no"（親のブランチを一度は送った形跡があるか）を
+         出力します。スクリプト自身はチケットのYAMLを読み込みません）
+    ccnavi tree gate <tree> <branch> <id> <seconds>
+        （push のゲート用。"tree 1" の行に続いて、次の一手 "gate pass|stop|ls-remote" を出力します。
+         stop には "why <理由>"、ls-remote にはリモートに無いときの "missing <理由>" と、
+         確かめられないときの "unreachable <理由>" が続きます。ls-remote は呼ぶ側が打ちます）
     ccnavi tree bound <tree> <name>
         （ccnavi-worktree.sh --adopt 用。"tree 1" の行に続いて、"bound yes|no"（その名前の
          ワークツリーがチケットに結び付くか。結び付くと --adopt は断ります）、結び付くなら
@@ -136,6 +141,10 @@
          直接作業や子のワークツリーの名前に指定できなければ
          "direct <理由>"（64文字以内・字の種類・NFC）、
          子の識別子の形なら "child yes" を出力します）
+    ccnavi worktree clash <branch> <file>
+        （スクリプト用。<file>（1 行 1 本のブランチ名）に、<branch> と同じ識別子（/ と - の違い・
+         大文字小文字の違いは同じ）になる別のブランチがあれば "clash <名前>"、無ければ "clash -"
+         を出力します）
     ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
         （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
          出力します。Chrome 拡張の「始める」と同じ作り方です。タイトルが長くて slug を
@@ -163,6 +172,12 @@
     ccnavi git check <self> <sync> <start> <self_q> <worktree_q>
         （ccnavi-git.sh 用。標準入力に NUL 区切りで受けた git の引数を、git の状態とあわせて通すかを、
          allow・pass か "deny <識別子>" と拒否の文で出力します。読み取り専用）
+    ccnavi git integration <tree>
+        （スクリプト用。そのツリーが属するリポジトリの統合先（origin/HEAD、無ければ origin/main・
+         origin/master）が決まれば "integration <名前>"、決まらなければ "hint <案内>" を出力します）
+    ccnavi git refusal <file>
+        （スクリプト用。git の標準エラーを書いた <file> から、git が断った理由を "refusal <文>" で
+         出力します）
     ccnavi git integrate <self> <self_q> <worktree_q> <ticket_q> <lines> -- integrate|integrate-done <args>...
         （ccnavi-git.sh 用。integrate・integrate --abort・integrate-done を行い、結果をそのまま出力します。
          0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）

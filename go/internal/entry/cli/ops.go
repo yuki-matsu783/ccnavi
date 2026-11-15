@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 
 	"ccnavi/internal/entry/status"
@@ -311,6 +312,15 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 		for _, line := range ids.IDAnswer(words[2]) {
 			fmt.Fprintln(stdout, line)
 		}
+		return config.ExitOK
+	case verb == "clash" && len(words) == 4:
+		// 一覧のファイル（1 行 1 本）に、ブランチと同じ識別子になる別のブランチがあれば `clash <名前>`、無ければ `clash -`。
+		text, err := os.ReadFile(words[3])
+		if err != nil {
+			fmt.Fprintf(stderr, "ccnavi: worktree clash の一覧 %s を読めない\n", pyfmt.Repr(words[3]))
+			return config.ExitError
+		}
+		fmt.Fprintf(stdout, "clash %s\n", cmp.Or(ids.IDClash(words[2], ospath.Splitlines(string(text))), "-"))
 		return config.ExitOK
 	case verb == "issue-id" && (len(words) == 4 || len(words) == 5):
 		return issueID(stdout, stderr, root, a, words)

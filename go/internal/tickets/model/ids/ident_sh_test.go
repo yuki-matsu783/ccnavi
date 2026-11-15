@@ -66,3 +66,17 @@ func TestIdentCasesTable(t *testing.T) {
 		}
 	}
 }
+
+// 同じ識別子になる別の名前（/ と - の違い、大文字小文字の違い）を見つけ、自分自身と違う識別子は見ない。
+func TestIDClash(t *testing.T) {
+	names := []string{"feature/12-x", "Feature-12-X", "feature-99-x", ""}
+	if got := IDClash("feature-12-x", names); got != "feature/12-x" {
+		t.Errorf("IDClash = %q", got)
+	}
+	if got := IDClash("feature/12-x", names[:1]); got != "" {
+		t.Errorf("自分自身を返した: %q", got)
+	}
+	if got := IDClash("feature-7-y", names); got != "" {
+		t.Errorf("違う識別子を返した: %q", got)
+	}
+}

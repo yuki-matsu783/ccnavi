@@ -353,5 +353,18 @@ func Protected(name string) bool {
 		strings.HasPrefix(folded, "release/") || strings.HasPrefix(folded, "release-")
 }
 
+// IDClash は names（ブランチ名の一覧）のうち、branch と同じ識別子（BranchToID。大文字小文字は区別しない）になる別の
+// 名前を 1 つ返す。無ければ空。同じ識別子のブランチが 2 本あると、ワークツリーの置き場（.claude/worktrees/<識別子>）が
+// 重なる。ccnavi-start.sh の採用の確認（start.BranchOK）と ccnavi-worktree.sh（`worktree clash`）がこれを使う。
+func IDClash(branch string, names []string) string {
+	want := BranchToID(branch)
+	for _, n := range names {
+		if n != "" && n != branch && SameID(BranchToID(n), want) {
+			return n
+		}
+	}
+	return ""
+}
+
 // SameID は大文字小文字だけが違う識別子を同じと読む（区別しないファイルシステムではぶつかるため）。
 func SameID(a, b string) bool { return pyfmt.Casefold(a) == pyfmt.Casefold(b) }

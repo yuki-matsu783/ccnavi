@@ -62,27 +62,14 @@ func BranchOK(cwd string, a BranchArgs) (string, int) {
 	}
 	names = append(names, strings.Split(gitOut(cwd, "for-each-ref", "--format=%(refname:short)", "refs/heads"), "\n")...)
 	slices.Sort(names)
-	want := asciiLower(ids.BranchToID(a.Branch))
-	for _, n := range slices.Compact(names) {
-		if n != "" && n != a.Branch && asciiLower(ids.BranchToID(n)) == want {
-			o.fail("adopt-id-clash", exitUnmet, "ブランチ "+a.Branch+" と "+n+" は、どちらも識別子 "+ids.BranchToID(a.Branch)+"（英字の大文字小文字は区別しない）になる。ワークツリーの置き場が重なるので使えません。何も作成せずに処理を中断しました。ユーザに相談してください。")
-			return o.String(), 0
-		}
+	if n := ids.IDClash(a.Branch, slices.Compact(names)); n != "" {
+		o.fail("adopt-id-clash", exitUnmet, "ブランチ "+a.Branch+" と "+n+" は、どちらも識別子 "+ids.BranchToID(a.Branch)+"（英字の大文字小文字は区別しない）になる。ワークツリーの置き場が重なるので使えません。何も作成せずに処理を中断しました。ユーザに相談してください。")
+		return o.String(), 0
 	}
 	if !remote {
 		o.val("note", "リモート未確認。origin のブランチ一覧を取れなかったので、同じ識別子になる別のブランチは手元に残る origin の追跡ブランチでだけ確かめた")
 	}
 	return o.String(), 0
-}
-
-// asciiLower は英字だけを小文字にする（識別子の字の大文字小文字を、英字に限って区別しない）。
-func asciiLower(s string) string {
-	return strings.Map(func(r rune) rune {
-		if r >= 'A' && r <= 'Z' {
-			return r + 'a' - 'A'
-		}
-		return r
-	}, s)
 }
 
 // Merged は、同じブランチ名のマージ済み MR の応答（ホストの一覧）を読み、あれば止める（マージ済みのブランチは再利用しない）。

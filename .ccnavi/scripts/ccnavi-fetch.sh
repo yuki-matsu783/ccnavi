@@ -350,7 +350,7 @@ ccnavi_fetch_forward() {
 		printf '%s: 親ブランチ %s を %s コミット進めた\n' "$2" "$3" "$ccnavi_fw_behind"
 	else
 		printf '%s: 早送りできなかった。%s（取り込みは sh %s/.ccnavi/scripts/ccnavi-sync.sh %s）\n' \
-			"$2" "$(ccnavi_git_refusal "$scratch/ff")" "$root" "$2"
+			"$2" "$(ccnavi_git_refusal "$root" "$scratch/ff")" "$root" "$2"
 	fi
 	ccnavi_lock_drop
 	return 0

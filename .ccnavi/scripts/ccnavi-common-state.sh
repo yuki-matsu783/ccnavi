@@ -1,6 +1,8 @@
 # ccnavi-common-state.sh  ccnavi-common.sh が読む部品。単体では読まない（読み方は ccnavi-common.sh の冒頭）。
 #
-# state の置き場とロック、統合先の名前、親ブランチの push のゲート、タイムアウト監視つきの git。
+# state の置き場とロック、実行ファイルに聞く口、親ブランチの push のゲートの ls-remote、タイムアウト監視つきの git。
+# 判定と解釈（統合先・親か・送った形跡・ゲートの次の一手・git が断った理由・同じ識別子のブランチ）は実行ファイルが持つ。
+# ここに残すのは、sh で実装するもののうち「外との出入り」（ls-remote と時間の上限）と、実行ファイルに聞く口だけ。
 
 # ---- state の置き場とロック
 #
@@ -137,97 +139,44 @@ ccnavi_id_ask() {
 	[ -n "$ccnavi_id_ident" ]
 }
 
-# <一覧> のブランチ名（1 行 1 本）のうち、<ブランチ> と同じ識別子になる別の名前を 1 つ出す。無ければ 1。<ブランチ> <一覧>
+# <一覧> のブランチ名（1 行 1 本）のうち、<ブランチ> と同じ識別子になる別の名前を 1 つ出す。<ワークスペースルート> <ブランチ> <一覧>
 #
-# 識別子（/ を - に置き換えたもの）は英字の大文字小文字をそろえて比べる。大文字小文字を区別しない機械
-# （macOS・Windows）では、`.claude/worktrees/Feature-12-x` と `feature-12-x` が同じ置き場になる。
-# 同じ識別子になる名前は長さも同じ（`${#x}` がバイト数でも字数でも、同じシェルの中では同じ数え方）なので、
-# 長さの違うものは比べずに飛ばす。
+# 判定は実行ファイル（`worktree clash`。ids.IDClash。/ と - の違いと大文字小文字の違いを同じ識別子と読む）。
+# 無ければ 1。実行ファイルが答えなければ 2（呼ぶ側は「確かめられない」として止める）。
 ccnavi_id_clash() {
-	ccnavi_ic_want=$(ccnavi_branch_to_id "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
-	while IFS= read -r ccnavi_ic_other; do
-		[ -n "$ccnavi_ic_other" ] || continue
-		[ "$ccnavi_ic_other" != "$1" ] || continue
-		[ "${#ccnavi_ic_other}" -eq "${#1}" ] || continue
-		if [ "$(ccnavi_branch_to_id "$ccnavi_ic_other" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')" = "$ccnavi_ic_want" ]; then
-			printf '%s\n' "$ccnavi_ic_other"
-			return 0
-		fi
-	done <"$2"
-	return 1
-}
-
-# 1 行 1 項目のファイル（integrate のマーカー）から 1 項目を読む。無ければ空。<ファイル> <キー>
-ccnavi_record_get() {
-	[ -f "$1" ] || return 0
-	sed -n "s/^$2 //p" "$1" 2>/dev/null | head -n 1
-}
-
-# 1 行 1 項目のファイル（integrate のマーカー）を書き直す。<ファイル> <キー> <値> [<キー> <値>...]
-#
-# 同じディレクトリの一時ファイルに書いてから mv で置き換える（読む側が半端な中身を見ない）。
-# 値の改行は空白に置き換える（1 行 1 項目の契約）。書けなければ 1。渡したキーだけを書く。
-ccnavi_record_write() {
-	ccnavi_rw_file="$1"
-	shift
-	mkdir -p "${ccnavi_rw_file%/*}" 2>/dev/null || return 1
-	ccnavi_rw_tmp="$ccnavi_rw_file.tmp.$$"
-	: >"$ccnavi_rw_tmp" 2>/dev/null || return 1
-	while [ "$#" -ge 2 ]; do
-		ccnavi_rw_value=$(printf '%s' "$2" | tr '\r\n' '  ')
-		printf '%s %s\n' "$1" "$ccnavi_rw_value" >>"$ccnavi_rw_tmp" || {
-			rm -f "$ccnavi_rw_tmp"
-			return 1
-		}
-		shift 2
-	done
-	mv -f "$ccnavi_rw_tmp" "$ccnavi_rw_file" 2>/dev/null || {
-		rm -f "$ccnavi_rw_tmp"
-		return 1
-	}
-}
-
-# そのリポジトリのデフォルトブランチの名前。分からなければ 1。<リポジトリ>
-#
-# `origin/HEAD` は clone のときに置かれる。`git init` してから `remote add` した手元や、
-# 古い clone には無いので、そのときは `origin/main`・`origin/master` の在る側を使う。
-# どちらも無ければ「分からない」。
-# ネットワークには出ない（手元の ref だけを読む）。
-ccnavi_default_branch() {
-	ccnavi_db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
-	case "$ccnavi_db_head" in
-	origin/?*)
-		printf '%s\n' "${ccnavi_db_head#origin/}"
-		return 0
-		;;
+	ccnavi_ic_out=$(ccnavi_ask "$1" worktree clash "$2" "$3" | sed -n 's/^clash //p' | head -n 1) || ccnavi_ic_out=""
+	case "$ccnavi_ic_out" in
+	'') return 2 ;;
+	-) return 1 ;;
 	esac
-	for ccnavi_db_try in main master; do
-		if git -C "$1" rev-parse --verify --quiet "refs/remotes/origin/$ccnavi_db_try" >/dev/null 2>&1; then
-			printf '%s\n' "$ccnavi_db_try"
-			return 0
-		fi
-	done
-	return 1
+	printf '%s\n' "$ccnavi_ic_out"
 }
 
 # そのツリーが属するリポジトリの統合先の名前。分からなければ 1。<ツリー>
 #
-# 手元の origin/HEAD（無ければ origin/main・origin/master。ccnavi_default_branch）だけで決める。
-# 手元の origin/HEAD は ccnavi-fetch.sh がホストに合わせる。
-# ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
-# ccnavi-review.sh（マージリクエストの宛先）が同じ決め方になるよう、ここに 1 つだけ置く。
+# 決め方（手元の origin/HEAD、無ければ origin/main・origin/master）は実行ファイル（`git integration`。
+# integrate.IntegrationName）が持つ。ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の
+# 拒否）・ccnavi-review.sh（マージリクエストの宛先）が同じ決め方になる。実行ファイルが答えなければ「分からない」
+# （実行ファイルを起こさずに動く ccnavi-fetch.sh・ccnavi-user-push-approved.sh は、統合先を使う処理を省く）。
+# 実行ファイルの --root はツリーから探したワークスペースルート（無ければツリー）。
 ccnavi_integration() {
-	ccnavi_default_branch "$1"
+	ccnavi_ig_ws=$(cd "$1" 2>/dev/null && ccnavi_workspace) || ccnavi_ig_ws="$1"
+	ccnavi_ig_name=$(ccnavi_ask "$ccnavi_ig_ws" git integration "$1" | sed -n 's/^integration //p' | head -n 1) || ccnavi_ig_name=""
+	[ -n "$ccnavi_ig_name" ] || return 1
+	printf '%s\n' "$ccnavi_ig_name"
 }
 
 # 統合先が決まらないときの案内の 1 文。<ツリー>
 #
-# origin が無ければ「origin が無い」と言い、あれば origin/HEAD を直す方法を示す。呼ぶ側が前置きを付ける。
+# 文は実行ファイル（`git integration` の hint の行。integrate.IntegrationHint）が持つ。origin が無ければ「origin が無い」と言い、
+# あれば origin/HEAD を直す方法を示す。呼ぶ側が前置きを付ける。実行ファイルが答えなければ、組むか置くかを言う。
 ccnavi_integration_hint() {
-	if git -C "$1" remote get-url origin >/dev/null 2>&1; then
-		printf '統合先 (origin/HEAD) が決まらない。ユーザに git fetch origin のあと git remote set-head origin -a を頼んでください。'
+	ccnavi_ih_ws=$(cd "$1" 2>/dev/null && ccnavi_workspace) || ccnavi_ih_ws="$1"
+	ccnavi_ih_text=$(ccnavi_ask "$ccnavi_ih_ws" git integration "$1" | sed -n 's/^hint //p' | head -n 1) || ccnavi_ih_text=""
+	if [ -n "$ccnavi_ih_text" ]; then
+		printf '%s' "$ccnavi_ih_text"
 	else
-		printf 'origin が無いので統合先が決まらない。ユーザに origin を足してもらい、git fetch origin のあと git remote set-head origin -a を頼んでください。'
+		printf '統合先が決まらない（実行ファイルが答えない）。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。'
 	fi
 }
 
@@ -251,7 +200,7 @@ ccnavi_parent_tree() {
 	return 2
 }
 
-# `tree parent` の答えを変数に入れる。ツリーが無ければ 1、答えを得られなければ 2。<ツリー> <名前>
+# `tree parent` の答えを変数に入れる。ツリーが無ければ 1、答えを得られなければ 2。<ツリー> <名前> [<ブランチ>]
 #
 # 入れる変数は、どれも yes / no / unreadable / unknown のどれか（unknown は、実行ファイルが無い・答えない）。
 #   ccnavi_pi_parent     そのツリーが親のワークツリーか
@@ -260,6 +209,8 @@ ccnavi_parent_tree() {
 #   ccnavi_pi_archived   手元の退避（ready 済み）に親がある
 #   ccnavi_pi_started    承認済みの親チケットの started_at が空でない（着手は push してから完了する）
 #   ccnavi_pi_mr         親チケットの mr 欄（無ければ空）
+#   ccnavi_pi_trace      <ブランチ> を渡したときだけ。親のブランチを一度は送った形跡があるか（yes / no / unknown。
+#                        手元の origin の参照・.requested・退避・着手済み。push のゲートと同じ述語）
 ccnavi_parent_info() {
 	ccnavi_pi_parent=unknown
 	ccnavi_pi_approved=unknown
@@ -267,14 +218,15 @@ ccnavi_parent_info() {
 	ccnavi_pi_archived=unknown
 	ccnavi_pi_started=unknown
 	ccnavi_pi_mr=""
+	ccnavi_pi_trace=unknown
 	[ -d "$1" ] || return 1
 	case "$1" in
 	*/.claude/worktrees/*) ccnavi_pi_ws="${1%/.claude/worktrees/*}" ;;
 	*) ccnavi_pi_ws=$(ccnavi_workspace) || return 2 ;;
 	esac
-	ccnavi_pi_out=$(ccnavi_ask "$ccnavi_pi_ws" tree parent "$1" "$2") || return 2
+	ccnavi_pi_out=$(ccnavi_ask "$ccnavi_pi_ws" tree parent "$1" "$2" ${3:+"$3"}) || return 2
 	[ "$(printf '%s\n' "$ccnavi_pi_out" | head -n 1)" = "tree 1" ] || return 2
-	for ccnavi_pi_key in parent approved requested archived started; do
+	for ccnavi_pi_key in parent approved requested archived started trace; do
 		ccnavi_pi_ans=$(printf '%s\n' "$ccnavi_pi_out" | sed -n "s/^$ccnavi_pi_key //p" | head -n 1)
 		case "$ccnavi_pi_ans" in
 		yes | no | unreadable) ;;
@@ -286,6 +238,7 @@ ccnavi_parent_info() {
 		requested) ccnavi_pi_requested="$ccnavi_pi_ans" ;;
 		archived) ccnavi_pi_archived="$ccnavi_pi_ans" ;;
 		started) ccnavi_pi_started="$ccnavi_pi_ans" ;;
+		trace) ccnavi_pi_trace="$ccnavi_pi_ans" ;;
 		esac
 	done
 	ccnavi_pi_mr=$(printf '%s\n' "$ccnavi_pi_out" | sed -n 's/^mr //p' | head -n 1)
@@ -293,75 +246,60 @@ ccnavi_parent_info() {
 	return 0
 }
 
-# 親のブランチを一度は送った形跡があれば 0。ccnavi_parent_info を呼んだ後に使う。<ツリー> <ブランチ>
-#
-# 形跡は、手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から切った
-# だけの未 push の親でも設定されるため）か、実行ファイルが答える .requested・退避・着手済み（started_at）
-# （fetch.prune で参照が消えても残る）。承認済みというだけでは形跡にしない（直接作業で提案を書き、同名のワークツリーを
-# 切って承認し、最初の push を打つ流れが、初回の push として通らなくなる）。着手（ticket start）は write-and-push で push して
-# から完了するので、started_at があれば一度は push している。push のゲート（ccnavi_push_gate）と ccnavi-sync.sh の
-# 「消えた親」の判定が同じ述語を使う。
-ccnavi_parent_trace() {
-	if git -C "$1" show-ref --verify --quiet "refs/remotes/origin/$2" 2>/dev/null; then
-		return 0
-	fi
-	[ "$ccnavi_pi_requested" = yes ] || [ "$ccnavi_pi_archived" = yes ] || [ "$ccnavi_pi_started" = yes ]
-}
-
 # 親のブランチの push のゲート。0 通す、1 拒否、2 確かめられない（拒否側）。
 #   ccnavi_push_gate <ツリー> <ブランチ> <識別子> <ワークスペースルート> [<秒>]
 # 理由は変数 ccnavi_pg_why に入る（拒否と確かめられないとき）。
 #
-# 親のワークツリー（<ワークスペースルート>/.claude/worktrees/<識別子> で、ブランチ名から作る識別子がそれと
-# 一致し、実行ファイルが親と答える）のブランチだけを見る。通常のブランチと子の push には掛けない。
-# 親のブランチがリモートに無いまま push すると、改名・消し間違い・破棄した親子のチケットの理由を確かめないまま
-# 同じ名前で作り直してしまう。リモートから消えた形跡があるのにリモートに無いときだけ止める。
+# 素の push を打つ 3 経路（ccnavi-git.sh の push・write-and-push・ccnavi-user-push-approved.sh）が共有する。
+# 掛けるかと、形跡から ls-remote が要るかは実行ファイル（`tree gate`。shask の pushGate）が次の一手の語で返す
+# （pass・stop・ls-remote）。ここに残すのは「外との出入り」の ls-remote と、その時間の上限だけ。
 #
-# 形跡は 2 つ。手元の `refs/remotes/origin/<ブランチ>`（`branch.<ブランチ>.remote` は使わない。origin/main から
-# 切っただけの未 push の親でも設定されるため）と、実行ファイルが答える .requested・退避・着手済み
-# （fetch.prune で参照が消えても残る）。どちらかがあれば `ls-remote` で在るかを聞く。聞けない・時間切れは 2。
-# 承認済みというだけでは形跡にしない（承認して最初に打つ push が、初回として通る）。
-# 形跡が無ければ、最初の push として通す。ただし承認済みチケットを読めない（unreadable）ときは、
-# 着手済みかを確かめられないので 2。実行ファイルが無い・古くて新しい行を知らないときは、参照の形跡だけで決める。
+# 実行ファイルが答えない（入れ替え中など。実行ファイルを起こさずに push する ccnavi-user-push-approved.sh だけが
+# ここに来る）ときは、手元の `refs/remotes/origin/<ブランチ>` が在るときだけ ls-remote で確かめる。親のワークツリーか
+# は確かめられないので、リモートから消えたブランチへは、親でなくても送らない（送るのはユーザが確かめてから）。
 ccnavi_push_gate() {
 	ccnavi_pg_why=""
-	ccnavi_pg_tree=$(ccnavi_phys "$1")
 	ccnavi_pg_b="$2"
-	ccnavi_pg_id="$3"
-	ccnavi_pg_ws=$(ccnavi_phys "$4")
 	ccnavi_pg_secs="${5:-15}"
-	case "$ccnavi_pg_tree" in
-	"$ccnavi_pg_ws"/.claude/worktrees/"$ccnavi_pg_id") ;;
-	*) return 0 ;;
-	esac
-	[ "$(ccnavi_branch_to_id "$ccnavi_pg_b" | LC_ALL=C tr 'A-Z' 'a-z')" = "$(printf '%s' "$ccnavi_pg_id" | LC_ALL=C tr 'A-Z' 'a-z')" ] || return 0
-	ccnavi_parent_info "$ccnavi_pg_tree" "$ccnavi_pg_id" || :
-	[ "$ccnavi_pi_parent" != no ] || return 0
-	if ! ccnavi_parent_trace "$ccnavi_pg_tree" "$ccnavi_pg_b"; then
-		if [ "$ccnavi_pi_approved" = unreadable ]; then
-			ccnavi_pg_why="親のブランチ $ccnavi_pg_b の承認済みチケットを読めないため、リモートから消えた親かを確かめられない。チケットの frontmatter を直してから打ち直してください"
-			return 2
-		fi
-		return 0
+	ccnavi_pg_out=$(ccnavi_ask "$4" tree gate "$1" "$2" "$3" "$ccnavi_pg_secs") || ccnavi_pg_out=""
+	ccnavi_pg_line() { printf '%s\n' "$ccnavi_pg_out" | sed -n "s/^$1 //p" | head -n 1; }
+	if [ "$(printf '%s\n' "$ccnavi_pg_out" | head -n 1)" = "tree 1" ]; then
+		ccnavi_pg_next=$(ccnavi_pg_line gate)
+		ccnavi_pg_missing=$(ccnavi_pg_line missing)
+		ccnavi_pg_unreachable=$(ccnavi_pg_line unreachable)
+	else
+		ccnavi_pg_next=pass
+		git -C "$1" show-ref --verify --quiet "refs/remotes/origin/$ccnavi_pg_b" 2>/dev/null && ccnavi_pg_next=ls-remote
+		ccnavi_pg_missing="実行ファイルが答えないため、$ccnavi_pg_b が親のブランチかを確かめられない。$ccnavi_pg_b はリモートに無いので送らない。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください"
+		ccnavi_pg_unreachable="$ccnavi_pg_b がリモートにあるかを確かめられない（ls-remote が失敗したか、${ccnavi_pg_secs} 秒で終わらなかった）。ネットワークと認証を確かめて打ち直してください"
 	fi
+	case "$ccnavi_pg_next" in
+	pass) return 0 ;;
+	ls-remote) ;;
+	*)
+		ccnavi_pg_why=$(ccnavi_pg_line why)
+		return 2
+		;;
+	esac
 	ccnavi_pg_err=$(mktemp 2>/dev/null || mktemp -t ccnavi-pg) || {
 		ccnavi_pg_why="親のブランチ $ccnavi_pg_b がリモートにあるかを確かめられない（一時ファイルを作れない）"
 		return 2
 	}
-	ccnavi_pg_out="$ccnavi_pg_err.out"
+	ccnavi_pg_lsout="$ccnavi_pg_err.out"
 	ccnavi_pg_rc=0
-	ccnavi_git_timed "$ccnavi_pg_secs" "$ccnavi_pg_err" "$ccnavi_pg_tree" ls-remote --heads origin "refs/heads/$ccnavi_pg_b" >"$ccnavi_pg_out" || ccnavi_pg_rc=$?
+	ccnavi_git_timed "$ccnavi_pg_secs" "$ccnavi_pg_err" "$1" ls-remote --heads origin "refs/heads/$ccnavi_pg_b" >"$ccnavi_pg_lsout" || ccnavi_pg_rc=$?
+	# ls-remote の答えの 2 列目が、送る ref と一致する行があるか（段取りの最小の読み）。
 	ccnavi_pg_found=""
-	if awk -F '\t' -v r="refs/heads/$ccnavi_pg_b" '$2 == r { f = 1 } END { exit f ? 0 : 1 }' "$ccnavi_pg_out" 2>/dev/null; then
+	if awk -F '\t' -v r="refs/heads/$ccnavi_pg_b" '$2 == r { f = 1 } END { exit f ? 0 : 1 }' "$ccnavi_pg_lsout" 2>/dev/null; then
 		ccnavi_pg_found=yes
 	fi
-	rm -f "$ccnavi_pg_err" "$ccnavi_pg_out"
+	rm -f "$ccnavi_pg_err" "$ccnavi_pg_lsout"
 	if [ "$ccnavi_pg_rc" -ne 0 ]; then
-		ccnavi_pg_why="親のブランチ $ccnavi_pg_b がリモートにあるかを確かめられない（ls-remote が失敗したか、${ccnavi_pg_secs} 秒で終わらなかった）。ネットワークと認証を確かめて打ち直してください"
+		ccnavi_pg_why="$ccnavi_pg_unreachable"
 		return 2
 	fi
 	[ -z "$ccnavi_pg_found" ] || return 0
-	ccnavi_pg_why="親のブランチ $ccnavi_pg_b がリモートに無い。改名・消し間違いなら、ユーザに元の名前で戻してもらい（ユーザがターミナルで git push origin $ccnavi_pg_b を一度打つ）、破棄した親なら親のワークツリーを片付ける。診断は ccnavi-sync.sh $ccnavi_pg_id"
+	ccnavi_pg_why="$ccnavi_pg_missing"
 	return 1
 }
 
@@ -395,26 +333,16 @@ ccnavi_git_timed() {
 	fi
 }
 
-# git が拒んだ理由を 1 行にする（ccnavi-fetch.sh と ccnavi-sync.sh の文面）。<標準エラーを書いたファイル>
+# git が拒んだ理由を 1 行にする。<ワークスペースルート> <標準エラーを書いたファイル>
 #
-# 書きかけとの重なり（「would be overwritten」の後に git が字下げして並べるパス）、索引のロック、
-# コミットするユーザの名前が無い、署名の失敗、hook、それ以外は git の 1 行目。理由どおりに言い、
-# 重なっていないのに「重なる」とは言わない。
+# 読み方（書きかけとの重なり・索引のロック・ユーザの名前・署名・hook・それ以外は git の 1 行目）は実行ファイル
+# （`git refusal`。refusal.Of）が持つ。実行ファイルが答えないとき（実行ファイルを起こさずに動く ccnavi-fetch.sh・
+# ccnavi-user-push-approved.sh で、入れ替え中など）は、読み分けを省いて git の 1 行目だけを添える。
 ccnavi_git_refusal() {
-	ccnavi_gr_paths=$(awk '/would be overwritten/ { f = 1; next }
-		/^[^ \t]/ { f = 0 }
-		f && /^[ \t]+[^ \t]/ { sub(/^[ \t]+/, ""); printf "%s%s", sep, $0; sep = " " }' "$1" 2>/dev/null)
-	if [ -n "$ccnavi_gr_paths" ]; then
-		printf '書きかけの %s と重なる。コミットか退避をしてから再実行してください' "$ccnavi_gr_paths"
-	elif grep -q 'index\.lock' "$1" 2>/dev/null; then
-		printf '索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、異常終了して残ったものならユーザが削除します。'
-	elif grep -Eqi 'tell me who you are|empty ident|user\.email|user\.name' "$1" 2>/dev/null; then
-		printf 'コミットするユーザの名前（user.name・user.email）が決まっていない'
-	elif grep -Eqi 'gpg|signing' "$1" 2>/dev/null; then
-		printf 'コミットの署名に失敗した'
-	elif grep -qi 'hook' "$1" 2>/dev/null; then
-		printf 'git の hook が止めた（%s）' "$(head -n 1 "$1")"
+	ccnavi_gr_text=$(ccnavi_ask "$1" git refusal "$2" | sed -n 's/^refusal //p' | head -n 1) || ccnavi_gr_text=""
+	if [ -n "$ccnavi_gr_text" ]; then
+		printf '%s' "$ccnavi_gr_text"
 	else
-		printf 'git が拒んだ（%s）' "$(head -n 1 "$1" 2>/dev/null)"
+		printf 'git が拒んだ（%s）' "$(head -n 1 "$2" 2>/dev/null)"
 	fi
 }

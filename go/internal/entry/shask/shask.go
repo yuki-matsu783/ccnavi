@@ -67,7 +67,11 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 	var ok bool
 	switch {
 	case verb == "parent" && len(args) == 2:
-		ok = parentTree(stdout, stderr, root, conf, args[0], args[1])
+		ok = parentTree(stdout, stderr, root, conf, args[0], args[1], "")
+	case verb == "parent" && len(args) == 3 && args[2] != "":
+		ok = parentTree(stdout, stderr, root, conf, args[0], args[1], args[2])
+	case verb == "gate" && len(args) == 4:
+		ok = pushGate(stdout, stderr, root, conf, args[0], args[1], args[2], args[3])
 	case verb == "bound" && len(args) == 2:
 		ok = boundTree(stdout, stderr, root, conf, args[0], args[1])
 	case verb == "leftover" && len(args) == 2:
@@ -118,26 +122,43 @@ func writeLines(w io.Writer, lines ...string) {
 	fmt.Fprint(w, strings.Join(lines, "\n")+"\n")
 }
 
-// parentTree は `tree parent`。頭に続けて parent・approved・requested・archived・started・mr の 6 行。
-func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
+// parentTree は `tree parent`。頭に続けて parent・approved・requested・archived・started・mr の 6 行。ブランチを
+// 渡したときは、続けて trace（親のブランチを一度は送った形跡。pushTrace）の行を足す。
+func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name, branch string) bool {
 	if !identOK(stderr, "tree parent", name) || !treeOK(stderr, "tree parent", path) {
 		return false
 	}
-	// 置き場（提案と承認済み）から、親か・承認済みか・着手済みか・MR の番号を読む。
-	work := treeOf(root, conf, path, name)
-	approved, mr, started := approvedParent(conf, work)
-	held, archived := parentHeld(root, conf, work, path, name)
-	if archived == yes && mr == "" {
-		mr = archivedMR(root, work.Project, name)
+	f := parentFactsOf(root, conf, path, name)
+	lines := []string{head,
+		"parent " + string(f.held),
+		"approved " + string(f.approved),
+		"requested " + string(f.requested),
+		"archived " + string(f.archived),
+		"started " + string(f.started),
+		"mr " + cmp.Or(f.mr, none)}
+	if branch != "" {
+		lines = append(lines, "trace "+string(yesNo(pushTrace(path, branch, f))))
 	}
-	writeLines(stdout, head,
-		"parent "+string(held),
-		"approved "+string(approved),
-		"requested "+string(requested(conf, work)),
-		"archived "+string(archived),
-		"started "+string(started),
-		"mr "+cmp.Or(mr, none))
+	writeLines(stdout, lines...)
 	return true
+}
+
+// parentFacts は親のワークツリーについて、置き場（提案と承認済み）と手元の退避から読んだこと。
+type parentFacts struct {
+	held, approved, requested, archived, started answer
+	mr                                           string
+}
+
+// parentFactsOf は、ツリー path（名前 name）の parentFacts を読む。
+func parentFactsOf(root string, conf *config.Settings, path, name string) parentFacts {
+	work := treeOf(root, conf, path, name)
+	f := parentFacts{requested: requested(conf, work)}
+	f.approved, f.mr, f.started = approvedParent(conf, work)
+	f.held, f.archived = parentHeld(root, conf, work, path, name)
+	if f.archived == yes && f.mr == "" {
+		f.mr = archivedMR(root, work.Project, name)
+	}
+	return f
 }
 
 // parentHeld は、ツリーが親のワークツリーか（held）と、手元の退避に親があるか（archived）。手元の退避を見るのは

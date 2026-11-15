@@ -296,12 +296,10 @@ ccnavi_wap_prepare() {
 	# 親のブランチが一度も送られていない（ccnavi-start.sh を通さずに手で切った親）。5 の見分けは
 	# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
 	# 送った形跡があるのに参照が無い親は、上の push のゲートと ccnavi-sync.sh の判定に任せる。
-	ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" || :
-	# 実行ファイルが答えない・古くて値が unknown のときは、断定せず従来のゲートに任せる
+	ccnavi_parent_info "$ccnavi_wap_tree" "$ccnavi_wap_family_id" "$ccnavi_wap_branch" || :
+	# 実行ファイルが答えない・値が unknown のときは、断定せず上のゲートに任せる
 	if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" != unreadable ] &&
-		[ "$ccnavi_pi_approved" != unknown ] && [ "$ccnavi_pi_requested" != unknown ] &&
-		[ "$ccnavi_pi_archived" != unknown ] && [ "$ccnavi_pi_started" != unknown ] &&
-		! ccnavi_parent_trace "$ccnavi_wap_tree" "$ccnavi_wap_branch"; then
+		[ "$ccnavi_pi_approved" != unknown ] && [ "$ccnavi_pi_trace" = no ]; then
 		ccnavi_wap_unsent_parent=1
 		ccnavi_wap_say "親のブランチ ${ccnavi_wap_branch} はリモートにありません。ccnavi-start.sh を通さずに切った親です。何も反映していません"
 		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-never-pushed"
@@ -361,7 +359,7 @@ ccnavi_wap_commit() {
 		commit --quiet --only --no-verify -m "$2" \
 		--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul >"$ccnavi_wap_tmp/out"; then
 		cat "$ccnavi_wap_tmp/out" >>"$ccnavi_wap_tmp/err"
-		ccnavi_wap_say "コミットできなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_wap_tmp/err")"
+		ccnavi_wap_say "コミットできなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_wap_root" "$ccnavi_wap_tmp/err")"
 		ccnavi_wap_unstage "$ccnavi_wap_tmp/added" "$ccnavi_cc_base"
 		return 1
 	fi
@@ -479,7 +477,7 @@ ccnavi_wap_merge_begin() {
 		ccnavi_wap_say "子 ${ccnavi_wap_merge_child} を親のブランチ ${ccnavi_wap_branch} へ合流すると衝突する（${ccnavi_mb_conflicts}）。合流を取りやめて、何も変えずに止めた。並行していた子とぶつかったときも、解くのは後から finish した側（この子）です"
 		ccnavi_wap_say "  子のワークツリー（.claude/worktrees/${ccnavi_wap_merge_child}）で親のブランチ ${ccnavi_wap_branch} を merge して衝突を解き、コミットしてから finish をやり直してください"
 	else
-		ccnavi_wap_say "子 ${ccnavi_wap_merge_child} を合流できなかった（$(ccnavi_git_refusal "$ccnavi_wap_tmp/merge-git-err")）。何も変えずに止めた"
+		ccnavi_wap_say "子 ${ccnavi_wap_merge_child} を合流できなかった（$(ccnavi_git_refusal "$ccnavi_wap_root" "$ccnavi_wap_tmp/merge-git-err")）。何も変えずに止めた"
 	fi
 	log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=write-and-push-merge-conflict"
 	return 1
@@ -532,7 +530,7 @@ ccnavi_wap_commit_merge() {
 	if ! ccnavi_git_timed "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_wap_tmp/err" "$ccnavi_wap_tree" \
 		commit --quiet --no-verify -m "$2" >"$ccnavi_wap_tmp/out"; then
 		cat "$ccnavi_wap_tmp/out" >>"$ccnavi_wap_tmp/err"
-		ccnavi_wap_say "合流のコミットができなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_wap_tmp/err")"
+		ccnavi_wap_say "合流のコミットができなかった（制限時間で打ち切った場合を含む）。$(ccnavi_git_refusal "$ccnavi_wap_root" "$ccnavi_wap_tmp/err")"
 		return 1
 	fi
 	ccnavi_wap_committed=$(git -C "$ccnavi_wap_tree" rev-parse HEAD)

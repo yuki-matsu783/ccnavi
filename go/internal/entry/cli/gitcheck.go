@@ -10,7 +10,9 @@ import (
 	"ccnavi/internal/entry/shask"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/tickets/lifecycle/gitwrap"
+	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/lifecycle/land"
+	"ccnavi/internal/tickets/lifecycle/refusal"
 )
 
 // gitCheckUsage は `ccnavi git check` の使い方。
@@ -99,4 +101,24 @@ func nulArgs(in *input, stderr io.Writer) ([]string, bool) {
 		return nil, true
 	}
 	return strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00"), true
+}
+
+// runGitIntegration は `ccnavi git integration <ツリー>`（sh の ccnavi_integration・ccnavi_integration_hint）。そのツリーが
+// 属するリポジトリの統合先が決まれば `integration <名前>`、決まらなければ `hint <案内の 1 文>` を書く
+// （決め方は integrate.IntegrationName、案内は integrate.IntegrationHint）。
+func runGitIntegration(stdout io.Writer, top string) int {
+	if name := integrate.IntegrationName(top); name != "" {
+		fmt.Fprintf(stdout, "integration %s\n", name)
+		return config.ExitOK
+	}
+	fmt.Fprintf(stdout, "hint %s\n", integrate.IntegrationHint(top))
+	return config.ExitOK
+}
+
+// runGitRefusal は `ccnavi git refusal <ファイル>`（sh の ccnavi_git_refusal）。git の標準エラーを書いたファイルから、
+// git が断った理由の 1 文（refusal.Of）を `refusal <文>` で書く。ファイルが読めなければ空の出力として読む。
+func runGitRefusal(stdout io.Writer, path string) int {
+	text, _ := os.ReadFile(path)
+	fmt.Fprintf(stdout, "refusal %s\n", strings.NewReplacer("\r", " ", "\n", " ").Replace(refusal.Of(string(text))))
+	return config.ExitOK
 }
