@@ -165,6 +165,20 @@ func parentHeld(root string, conf *config.Settings, work tree.Tree, path, name s
 	return held, archived
 }
 
+// Parent は、親のワークツリーについて `tree parent <ツリー> <名前> <ブランチ>` が答えることのうち、ccnavi-sync.sh の
+// 答え（catchup）が使うもの。Held・Approved は yes・no・unreadable。Trace は送った形跡（pushTrace）。
+type Parent struct {
+	Held, Approved string
+	MR             string
+	Trace          bool
+}
+
+// ParentOf は、ツリー path（名前 name、親のブランチ branch）の Parent を読む。名前とツリーは呼ぶ側が確かめてある。
+func ParentOf(root string, conf *config.Settings, path, name, branch string) Parent {
+	f := parentFactsOf(root, conf, path, name)
+	return Parent{Held: string(f.held), Approved: string(f.approved), MR: f.mr, Trace: pushTrace(path, branch, f)}
+}
+
 // IsParentTree は、ツリー path（名前 name）が親子のチケットの親のワークツリーか（`tree parent` の parent の行と同じ判定）。
 // 0 は親、1 は親でない、2 は決められない（名前が識別子でない・ツリーが無い・置き場のファイルを読めない）。
 func IsParentTree(root string, conf *config.Settings, path, name string) int {

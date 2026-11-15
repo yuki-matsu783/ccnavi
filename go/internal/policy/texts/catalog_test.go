@@ -385,7 +385,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 		called[k.id] = true
 	}
 	for _, id := range []string{"NOTE_WORKTREE_RECORD_MISSING",
-		"NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
+		"NOTE_STAGE_NONINTERACTIVE", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
 			t.Errorf("sh も実行ファイルも %s を引かない", id)
 		}

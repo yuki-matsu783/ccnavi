@@ -141,6 +141,8 @@ type Options struct {
 	IndexFile string
 	// Env は足す環境変数（`名前=値`）。作成者と日付を固定したコミットを組むときに使う。
 	Env []string
+	// CLocale は LC_ALL=C を掛ける。git が断った文を英語の文言で読み分ける（refusal.Of）ときに付ける。
+	CLocale bool
 }
 
 func (o Options) timeout() time.Duration {
@@ -248,6 +250,9 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 		cmd.Env = append(cmd.Env, env.GitIndexFile+"="+o.IndexFile)
 	}
 	cmd.Env = append(cmd.Env, o.Env...)
+	if o.CLocale {
+		cmd.Env = append(cmd.Env, "LC_ALL=C")
+	}
 	// 子プロセスが孫に出力の口を渡したまま残ると Run が返らないので、終わったあとの待ちに上限を付ける。
 	cmd.WaitDelay = killedPipeWait
 	if o.input != nil {

@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"ccnavi/internal/infra/pyre"
+	"ccnavi/internal/tickets/model/hostreply"
 )
 
 // 終了コード。unreadable は、応答が JSON でないか、読み方の前提の形でないこと。
@@ -22,30 +23,30 @@ const (
 // GitHub で PR の番号なら `pr` の 1 行だけ。それ以外は `title <タイトル>`（1 行目だけ。制御文字は空白にして前後の空白を
 // 落とす。無ければ空）と `state open|closed|unknown`。
 func Issue(kind string, data []byte) (string, int) {
-	v, err := decode(data)
+	v, err := hostreply.Decode(data)
 	if err != nil {
 		return "", unreadable
 	}
 	if kind == "github" {
-		pr, err := field(v, "pull_request")
+		pr, err := hostreply.Field(v, "pull_request")
 		if err != nil {
 			return "", unreadable
 		}
-		if truthy(pr) {
+		if hostreply.Truthy(pr) {
 			return "pr\n", ok
 		}
 	}
-	t, err := field(v, "title")
+	t, err := hostreply.Field(v, "title")
 	if err != nil {
 		return "", unreadable
 	}
 	title := ""
-	if truthy(t) {
-		title = issueTitle(text(t))
+	if hostreply.Truthy(t) {
+		title = issueTitle(hostreply.Text(t))
 	}
-	s, _ := field(v, "state")
+	s, _ := hostreply.Field(v, "state")
 	state := "unknown"
-	switch text(s) {
+	switch hostreply.Text(s) {
 	case "open", "opened":
 		state = "open"
 	case "closed":
@@ -71,33 +72,33 @@ func issueTitle(raw string) string {
 // errors があるか、PR が見つからず nodes が列でなければ `bad` の 1 行。読めれば `issue <owner/repo>#<番号>` を 1 件 1 行で
 // 出し、最後に `next <endCursor の JSON>`（次のページがある）か `done`。sh は next の値を次の問い合わせにそのまま渡す。
 func LinkedPage(data []byte) (string, int) {
-	v, err := decode(data)
+	v, err := hostreply.Decode(data)
 	if err != nil {
 		return "", unreadable
 	}
-	refs, err := path(v, "data", "repository", "pullRequest", "closingIssuesReferences")
+	refs, err := hostreply.Path(v, "data", "repository", "pullRequest", "closingIssuesReferences")
 	if err != nil {
 		return "bad\n", ok
 	}
-	errs, err := field(v, "errors")
-	nodes, nerr := field(refs, "nodes")
+	errs, err := hostreply.Field(v, "errors")
+	nodes, nerr := hostreply.Field(refs, "nodes")
 	list, isList := nodes.([]any)
-	if err != nil || nerr != nil || truthy(errs) || !isList {
+	if err != nil || nerr != nil || hostreply.Truthy(errs) || !isList {
 		return "bad\n", ok
 	}
 	var b strings.Builder
 	for _, n := range list {
-		repo, err := path(n, "repository", "nameWithOwner")
-		num, nerr := field(n, "number")
+		repo, err := hostreply.Path(n, "repository", "nameWithOwner")
+		num, nerr := hostreply.Field(n, "number")
 		if err != nil || nerr != nil {
 			return "", unreadable
 		}
-		fmt.Fprintf(&b, "issue %s#%s\n", text(repo), text(num))
+		fmt.Fprintf(&b, "issue %s#%s\n", hostreply.Text(repo), hostreply.Text(num))
 	}
-	more, _ := path(refs, "pageInfo", "hasNextPage")
+	more, _ := hostreply.Path(refs, "pageInfo", "hasNextPage")
 	if more == true {
-		cursor, _ := path(refs, "pageInfo", "endCursor")
-		fmt.Fprintf(&b, "next %s\n", jsonText(cursor))
+		cursor, _ := hostreply.Path(refs, "pageInfo", "endCursor")
+		fmt.Fprintf(&b, "next %s\n", hostreply.JSONText(cursor))
 	} else {
 		b.WriteString("done\n")
 	}
@@ -118,15 +119,15 @@ var (
 // LinkedBody は、GitHub の PR の応答の本文から、閉じる issue を `issue <owner/repo>#<番号>` で 1 件 1 行に出す。
 // 番号だけの参照には repo（owner/repo）を前に付ける。GraphQL を断られたときの代わりの読み方。
 func LinkedBody(repo string, data []byte) (string, int) {
-	v, err := decode(data)
+	v, err := hostreply.Decode(data)
 	if err != nil {
 		return "", unreadable
 	}
-	raw, err := field(v, "body")
+	raw, err := hostreply.Field(v, "body")
 	if err != nil {
 		return "", unreadable
 	}
-	body, err := str(raw)
+	body, err := hostreply.Str(raw)
 	if err != nil {
 		return "", unreadable
 	}
@@ -148,25 +149,25 @@ func LinkedBody(repo string, data []byte) (string, int) {
 // LinkedGitLab は、GitLab の closes_issues の応答から、閉じる issue を `issue <参照>` で 1 件 1 行に出す。
 // 参照は references.full、無ければ `<repo>#<iid>`。
 func LinkedGitLab(repo string, data []byte) (string, int) {
-	v, err := decode(data)
+	v, err := hostreply.Decode(data)
 	if err != nil {
 		return "", unreadable
 	}
-	items, err := list(v)
+	items, err := hostreply.List(v)
 	if err != nil {
 		return "", unreadable
 	}
 	var b strings.Builder
 	for _, it := range items {
-		full, err := path(it, "references", "full")
-		iid, ierr := field(it, "iid")
+		full, err := hostreply.Path(it, "references", "full")
+		iid, ierr := hostreply.Field(it, "iid")
 		if err != nil || ierr != nil {
 			return "", unreadable
 		}
-		if truthy(full) {
-			fmt.Fprintf(&b, "issue %s\n", text(full))
+		if hostreply.Truthy(full) {
+			fmt.Fprintf(&b, "issue %s\n", hostreply.Text(full))
 		} else {
-			fmt.Fprintf(&b, "issue %s#%s\n", repo, text(iid))
+			fmt.Fprintf(&b, "issue %s#%s\n", repo, hostreply.Text(iid))
 		}
 	}
 	return b.String(), ok
@@ -187,47 +188,47 @@ func openItems(kind string, inputs [][]byte) ([]item, error) {
 	var sources []source
 	if kind == "github" {
 		if len(inputs) != 1 {
-			return nil, errShape
+			return nil, hostreply.ErrShape
 		}
 		sources = []source{{inputs[0], "issue", "number", "html_url", "MR"}}
 	} else {
 		if len(inputs) != 2 {
-			return nil, errShape
+			return nil, hostreply.ErrShape
 		}
 		sources = []source{{inputs[0], "issue", "iid", "web_url", ""}, {inputs[1], "MR", "iid", "web_url", ""}}
 	}
 	var items []item
 	for _, s := range sources {
-		v, err := decode(s.data)
+		v, err := hostreply.Decode(s.data)
 		if err != nil {
 			return nil, err
 		}
-		list, err := list(v)
+		list, err := hostreply.List(v)
 		if err != nil {
 			return nil, err
 		}
 		for _, x := range list {
 			k := s.kind
 			if s.prKind != "" {
-				pr, err := field(x, "pull_request")
+				pr, err := hostreply.Field(x, "pull_request")
 				if err != nil {
 					return nil, err
 				}
-				if truthy(pr) {
+				if hostreply.Truthy(pr) {
 					k = s.prKind
 				}
 			}
-			t, err := field(x, "title")
+			t, err := hostreply.Field(x, "title")
 			if err != nil {
 				return nil, err
 			}
-			title, err := cleanField(t, 200)
+			title, err := hostreply.CleanField(t, 200)
 			if err != nil {
 				return nil, err
 			}
-			num, _ := field(x, s.num)
-			url, _ := field(x, s.url)
-			items = append(items, item{kind: k, number: text(num), title: title, url: text(url)})
+			num, _ := hostreply.Field(x, s.num)
+			url, _ := hostreply.Field(x, s.url)
+			items = append(items, item{kind: k, number: hostreply.Text(num), title: title, url: hostreply.Text(url)})
 		}
 	}
 	return items, nil
@@ -313,21 +314,21 @@ func ListOpen(kind string, issuesData, mrsData []byte) (string, int) {
 		num, branch, body = "iid", []string{"source_branch"}, "description"
 	}
 	read := func(data []byte, dropPR bool) ([]any, error) {
-		v, err := decode(data)
+		v, err := hostreply.Decode(data)
 		if err != nil {
 			return nil, err
 		}
-		l, err := list(v)
+		l, err := hostreply.List(v)
 		if err != nil || !dropPR {
 			return l, err
 		}
 		var kept []any
 		for _, x := range l {
-			pr, err := field(x, "pull_request")
+			pr, err := hostreply.Field(x, "pull_request")
 			if err != nil {
 				return nil, err
 			}
-			if !truthy(pr) {
+			if !hostreply.Truthy(pr) {
 				kept = append(kept, x)
 			}
 		}
@@ -342,32 +343,32 @@ func ListOpen(kind string, issuesData, mrsData []byte) (string, int) {
 		return "", unreadable
 	}
 	line := func(x any, isMR bool) (string, error) {
-		n, _ := field(x, num)
-		t, err := field(x, "title")
+		n, _ := hostreply.Field(x, num)
+		t, err := hostreply.Field(x, "title")
 		if err != nil {
 			return "", err
 		}
-		title, err := cleanField(t, 200)
+		title, err := hostreply.CleanField(t, 200)
 		if err != nil {
 			return "", err
 		}
-		bv, _ := field(x, body)
-		bodyText, err := cleanField(bv, 500)
+		bv, _ := hostreply.Field(x, body)
+		bodyText, err := hostreply.CleanField(bv, 500)
 		if err != nil {
 			return "", err
 		}
 		if !isMR {
-			return fmt.Sprintf("issue #%s  %s\n  本文: %s\n", text(n), title, bodyText), nil
+			return fmt.Sprintf("issue #%s  %s\n  本文: %s\n", hostreply.Text(n), title, bodyText), nil
 		}
-		br, err := path(x, branch...)
+		br, err := hostreply.Path(x, branch...)
 		if err != nil {
 			return "", err
 		}
-		brText, err := str(br)
+		brText, err := hostreply.Str(br)
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("MR !%s  %s  ブランチ: %s\n  本文: %s\n", text(n), title, clean(brText), bodyText), nil
+		return fmt.Sprintf("MR !%s  %s  ブランチ: %s\n  本文: %s\n", hostreply.Text(n), title, hostreply.Clean(brText), bodyText), nil
 	}
 	var b strings.Builder
 	for _, part := range []struct {
@@ -393,11 +394,11 @@ func ListOpen(kind string, issuesData, mrsData []byte) (string, int) {
 
 // Pick は、MR・issue の応答から 1 件を選び、`number <番号>` と `url <URL>` の 2 行で出す。選ぶものが無ければ何も出さない。
 //
-//   - open-mr: 開いた MR の一覧の先頭。GitLab はフォークから出た MR を除く（source_project_id が pid のものだけ）
-//   - merged-mr: マージ済みの MR。GitHub は閉じた PR の一覧のうち merged_at のあるもの、GitLab はマージ済みの一覧の先頭
+//   - open-mr: 開いた MR の一覧から hostreply.OpenMR が選ぶもの（GitLab はフォークから出た MR を除く）
+//   - merged-mr: マージ済みの MR の一覧から hostreply.MergedMR が選ぶもの（pid を渡さないので、GitLab は一覧の先頭）
 //   - made: MR か issue を作った答え。番号が無ければ作れなかったとして unreadable
 func Pick(what, kind, pid string, data []byte) (string, int) {
-	v, err := decode(data)
+	v, err := hostreply.Decode(data)
 	if err != nil {
 		return "", unreadable
 	}
@@ -408,49 +409,30 @@ func Pick(what, kind, pid string, data []byte) (string, int) {
 	var chosen any
 	switch what {
 	case "made":
-		n, err := field(v, num)
+		n, err := hostreply.Field(v, num)
 		if err != nil || n == nil {
 			return "", unreadable
 		}
 		chosen = v
 	case "open-mr", "merged-mr":
-		l, err := list(v)
+		l, err := hostreply.List(v)
 		if err != nil {
 			return "", unreadable
 		}
-		for _, x := range l {
-			if keep, err := picks(what, kind, pid, x); err != nil {
-				return "", unreadable
-			} else if keep {
-				chosen = x
-				break
-			}
+		pickOne := hostreply.OpenMR
+		if what == "merged-mr" {
+			pickOne = hostreply.MergedMR
 		}
-		if !truthy(chosen) {
+		if chosen, err = pickOne(kind, pid, l); err != nil {
+			return "", unreadable
+		}
+		if !hostreply.Truthy(chosen) {
 			return "", ok
 		}
 	default:
 		return "", unreadable
 	}
-	n, _ := field(chosen, num)
-	u, _ := field(chosen, url)
-	return fmt.Sprintf("number %s\nurl %s\n", text(n), text(u)), ok
-}
-
-// picks は、一覧の x が選ぶ 1 件に当たるか。条件の無い一覧は先頭の 1 件を選ぶ。
-func picks(what, kind, pid string, x any) (bool, error) {
-	switch {
-	case what == "open-mr" && kind != "github":
-		src, err := field(x, "source_project_id")
-		if err != nil {
-			return false, err
-		}
-		got, isNum := number(src)
-		want, wantNum := number(jsonNumber(pid))
-		return isNum && wantNum && got == want, nil
-	case what == "merged-mr" && kind == "github":
-		at, err := field(x, "merged_at")
-		return err == nil && at != nil, err
-	}
-	return true, nil
+	n, _ := hostreply.Field(chosen, num)
+	u, _ := hostreply.Field(chosen, url)
+	return fmt.Sprintf("number %s\nurl %s\n", hostreply.Text(n), hostreply.Text(u)), ok
 }

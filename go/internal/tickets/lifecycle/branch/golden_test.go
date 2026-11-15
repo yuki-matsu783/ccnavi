@@ -52,30 +52,41 @@ func fixture(t *testing.T) string {
 	testkit.Git(t, proj, "remote", "add", "origin", "git@host.example:grp/Proj.git")
 	testkit.Commit(t, proj, "init")
 	testkit.Git(t, proj, "branch", "feature-152-p", "main")
-	testkit.Put(t, filepath.Join(root, "host.json"), `{"checked": true, "host": "gitlab\n", "repo": "acme/w", "mrs": [`+
-		`{"number": 5, "branch": "feature-152-login", "state": "opened", "url": "https://h/5", "title": "t\tx", "base": "main", "fork": true},`+
-		`{"number": true, "branch": "b"}, {"number": 6, "branch": ""}, "x", {"number": 8, "branch": "only-host", "state": "merged"}]}`)
-	testkit.Put(t, filepath.Join(root, "unchecked.json"), `{"checked": false, "reason": "glab が無い\n"}`)
+	// ホストの応答のまま（GitHub の開いた PR の一覧と PR 1 本）。番号が数でないもの・元ブランチが空のもの・表でないものは使わない。
+	testkit.Put(t, filepath.Join(root, "pulls.json"), `[`+
+		`{"number": 5, "head": {"ref": "feature-152-login", "repo": {"full_name": "fork/w"}}, "state": "opened", "html_url": "https://h/5", "title": "t\tx", "base": {"ref": "main"}},`+
+		`{"number": true, "head": {"ref": "b"}, "body": "#152"}, {"number": 6, "head": {"ref": ""}, "body": "#152"}, "x",`+
+		`{"number": 8, "head": {"ref": "only-host", "repo": {"full_name": "acme/w"}}, "state": "merged", "body": "#152"}]`)
+	testkit.Put(t, filepath.Join(root, "pull.json"), `{"number": 5, "head": {"ref": "feature-152-login", "repo": {"full_name": "fork/w"}}, `+
+		`"state": "opened", "html_url": "https://h/5", "title": "t\tx", "base": {"ref": "main"}}`)
 	testkit.Put(t, filepath.Join(root, "broken.json"), `[`)
+	testkit.Put(t, filepath.Join(root, "failed.txt"), "curl: (22) The requested URL returned error: 404\n")
 	return root
 }
 
 type report struct {
-	Kind, Number, Result, Cwd string
-	JSON                      bool
+	Kind, Number, Cwd string
+	From              Source
+	JSON              bool
 }
 
 func reports(root string) []report {
 	proj := filepath.Join(root, "projects", "proj")
+	checked := func(file string) Source {
+		return Source{How: howChecked, Args: []string{"github", "gitlab\n", "acme/w", "-"}, Result: file}
+	}
+	unchecked := Source{How: howUnchecked, Args: []string{"glab が無い\n"}}
+	failed := Source{How: howFailed, Args: []string{"GET repos/acme/w/pulls/5"}, Result: "failed.txt"}
 	var out []report
 	for _, j := range []bool{false, true} {
 		out = append(out,
-			report{"issue", "152", "host.json", root, j}, report{"issue", "152", "unchecked.json", root, j},
-			report{"mr", "5", "host.json", root, j}, report{"mr", "5", "", root, j}, report{"issue", "7", "broken.json", root, j},
-			report{"issue", "152", "", proj, j})
+			report{"issue", "152", root, checked("pulls.json"), j}, report{"issue", "152", root, unchecked, j},
+			report{"mr", "5", root, checked("pull.json"), j}, report{"mr", "5", root, Source{}, j},
+			report{"issue", "7", root, checked("broken.json"), j}, report{"issue", "152", proj, Source{}, j},
+			report{"mr", "5", root, failed, j})
 	}
-	return append(out, report{"pr", "1", "", root, false}, report{"issue", "012", "", root, false},
-		report{"issue", "1234567890", "", root, false}, report{"issue", "1", "", "/elsewhere", false})
+	return append(out, report{"pr", "1", root, Source{}, false}, report{"issue", "012", root, Source{}, false},
+		report{"issue", "1234567890", root, Source{}, false}, report{"issue", "1", "/elsewhere", Source{}, false})
 }
 
 var contexts = []string{
@@ -112,11 +123,10 @@ func TestMatchesGolden(t *testing.T) {
 	reps := []any{}
 	for _, r := range reports(root) {
 		var o, e bytes.Buffer
-		path := ""
-		if r.Result != "" {
-			path = filepath.Join(root, r.Result)
+		if r.From.Result != "" {
+			r.From.Result = filepath.Join(root, r.From.Result)
 		}
-		code := Report(&o, &e, conf, root, r.Cwd, r.Kind, r.Number, path, r.JSON)
+		code := Report(&o, &e, conf, root, r.Cwd, r.Kind, r.Number, r.From, r.JSON)
 		reps = append(reps, []any{code, rel(o.String()), rel(e.String())})
 	}
 	got["reports"] = reps

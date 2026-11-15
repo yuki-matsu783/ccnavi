@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
@@ -75,6 +75,7 @@ class ReviewMergedTest(unittest.TestCase):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
+            "CCNAVI_ENTRY_PATH": exe.path(),
         }
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)
@@ -197,6 +198,7 @@ class ReviewMergedGitLabTest(ReviewMergedTest):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
+            "CCNAVI_ENTRY_PATH": exe.path(),
         }
         env.pop("GITHUB_TOKEN", None)
         env.pop("GITLAB_TOKEN", None)

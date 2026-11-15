@@ -430,7 +430,7 @@ ACCEPT_PLAN_CASE = """*" --accept-plan "*)
 # 実行ファイルの半分のスタブ。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
-# 残り（`write-and-push family`・`write-and-push sort`・`sync paths` など）は実際のものに渡す。
+# 残り（`write-and-push family`・`write-and-push sort` など）は実際のものに渡す。
 HALF = """#!/bin/sh
 case " $* " in
 {plan_case}*" user reviewed "*" --yes "*)
@@ -507,7 +507,7 @@ put() {{
 }}
 m=.ccnavi/approved/phases/i0001
 case " $* " in
-*" ops "*) exec '{exe}' "$@" ;;
+*" ops "* | *" host "*) exec '{exe}' "$@" ;;
 *" review prepare "*)
   mkdir -p "$root/logs/state"
   printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"

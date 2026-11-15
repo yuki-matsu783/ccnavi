@@ -133,7 +133,8 @@ var subTiers = map[string]map[string]int{
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,
-		"useronly": 0, "via": 0,
+		// hostreply は sh が取ってきたホストの応答の読み方（start・branch・review と Chrome 拡張の WASM が共有する）
+		"useronly": 0, "via": 0, "hostreply": 0,
 		"ticket": 1, "standing": 1, "guard": 1,
 		"archive": 2, "fields": 2, "form": 2,
 	},
@@ -166,7 +167,9 @@ var subTiers = map[string]map[string]int{
 		// 0: セッションの頭の projects/ の一覧（ccnavi-dirs.sh）
 		"dirs":    0,
 		"suggest": 1, "chrome": 1,
-		"cli": 2,
+		// 1: 手元をリモートに合わせる sh（ccnavi-sync.sh・ccnavi-fetch.sh）への答え。親の状態を shask、検査を lint から読む
+		"catchup": 1,
+		"cli":     2,
 	},
 }
 

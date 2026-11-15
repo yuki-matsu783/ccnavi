@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/git"
+	"ccnavi/internal/tickets/model/hostreply"
 	"ccnavi/internal/tickets/model/ids"
 )
 
@@ -45,28 +46,28 @@ type RouteArgs struct {
 //
 // 候補の JSON を読めなければ何も出さずに unreadable。
 func Route(cwd string, candidates []byte, a RouteArgs) (string, int) {
-	v, err := decode(candidates)
+	v, err := hostreply.Decode(candidates)
 	if err != nil {
 		return "", unreadable
 	}
-	host, herr := field(v, "host")
-	checkedV, cerr := field(host, "checked")
-	reasonV, rerr := field(host, "reason")
-	listV, lerr := field(v, "candidates")
-	cands, lerr2 := list(listV)
+	host, herr := hostreply.Field(v, "host")
+	checkedV, cerr := hostreply.Field(host, "checked")
+	reasonV, rerr := hostreply.Field(host, "reason")
+	listV, lerr := hostreply.Field(v, "candidates")
+	cands, lerr2 := hostreply.List(listV)
 	if herr != nil || cerr != nil || rerr != nil || lerr != nil || lerr2 != nil {
 		return "", unreadable
 	}
 	checked := checkedV == true
 	reason := ""
-	if truthy(reasonV) {
-		reason = text(reasonV)
+	if hostreply.Truthy(reasonV) {
+		reason = hostreply.Text(reasonV)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "checked %t\nreason %s\ntotal %d\n", checked, clean(reason), len(cands))
+	fmt.Fprintf(&b, "checked %t\nreason %s\ntotal %d\n", checked, hostreply.Clean(reason), len(cands))
 	// ホストから来る値（MR の題名・状態など）は改行を空白にしてから出す。改行のまま出すと、値の中に書いた
 	// `route adopt` のような行を、sh が答えの行として読んでしまう。
-	line := func(k, v string) { fmt.Fprintf(&b, "%s %s\n", k, clean(v)) }
+	line := func(k, v string) { fmt.Fprintf(&b, "%s %s\n", k, hostreply.Clean(v)) }
 	g := repo{cwd: cwd}
 
 	switch {
@@ -86,9 +87,9 @@ func Route(cwd string, candidates []byte, a RouteArgs) (string, int) {
 		line("route", "unchecked")
 		first := ""
 		if len(cands) >= 1 {
-			br, _ := field(cands[0], "branch")
-			if truthy(br) {
-				first = text(br)
+			br, _ := hostreply.Field(cands[0], "branch")
+			if hostreply.Truthy(br) {
+				first = hostreply.Text(br)
 			}
 		}
 		line("branch", first)
@@ -108,15 +109,15 @@ func Route(cwd string, candidates []byte, a RouteArgs) (string, int) {
 	}
 
 	c := cands[0]
-	cb, err := field(c, "branch")
+	cb, err := hostreply.Field(c, "branch")
 	if err != nil {
 		return "", unreadable
 	}
-	branch := text(cb)
-	local, _ := field(c, "local")
-	origin, _ := field(c, "origin")
-	mrsV, _ := field(c, "mrs")
-	mrs, err := list(mrsV)
+	branch := hostreply.Text(cb)
+	local, _ := hostreply.Field(c, "local")
+	origin, _ := hostreply.Field(c, "origin")
+	mrsV, _ := hostreply.Field(c, "mrs")
+	mrs, err := hostreply.List(mrsV)
 	if err != nil {
 		return "", unreadable
 	}
@@ -124,13 +125,13 @@ func Route(cwd string, candidates []byte, a RouteArgs) (string, int) {
 	if len(mrs) > 0 {
 		mr = mrs[0]
 	}
-	num, _ := field(mr, "number")
-	url, _ := field(mr, "url")
-	title, _ := field(mr, "title")
+	num, _ := hostreply.Field(mr, "number")
+	url, _ := hostreply.Field(mr, "url")
+	title, _ := hostreply.Field(mr, "title")
 	lineOr := func(k string, v any) {
 		s := ""
-		if truthy(v) {
-			s = text(v)
+		if hostreply.Truthy(v) {
+			s = hostreply.Text(v)
 		}
 		line(k, s)
 	}
@@ -166,15 +167,15 @@ func protected(branch, integration string) bool {
 
 // adoptProblem は、開いた MR を採用できない理由の最初の 1 つを書く（状態・フォーク・マージ先・保護の順）。
 func adoptProblem(b *strings.Builder, mr any, branch, integration string) {
-	state, _ := field(mr, "state")
-	base, _ := field(mr, "base")
-	fork, _ := field(mr, "fork")
+	state, _ := hostreply.Field(mr, "state")
+	base, _ := hostreply.Field(mr, "base")
+	fork, _ := hostreply.Field(mr, "fork")
 	st, bs := "", ""
-	if truthy(state) {
-		st = clean(text(state))
+	if hostreply.Truthy(state) {
+		st = hostreply.Clean(hostreply.Text(state))
 	}
-	if truthy(base) {
-		bs = clean(text(base))
+	if hostreply.Truthy(base) {
+		bs = hostreply.Clean(hostreply.Text(base))
 	}
 	fmt.Fprintf(b, "mr-state %s\nmr-base %s\n", st, bs)
 	switch {

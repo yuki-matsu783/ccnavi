@@ -188,7 +188,7 @@ func proposalBody(root string, p stopreview.Proposal) string {
 		}
 		return strings.Join(parts, "\n")
 	}
-	if root == "" || !shaForm.MatchString(p.Commit) {
+	if root == "" || !git.IsSHA(p.Commit) {
 		return ""
 	}
 	for _, f := range p.Files {

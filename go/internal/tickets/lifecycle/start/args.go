@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/shell"
+	"ccnavi/internal/tickets/model/hostreply"
 )
 
 // Options は ccnavi-start.sh の引数を読んだもの。
@@ -196,7 +197,7 @@ func combination(o *outcome, opt *Options, count int) bool {
 		if opt.IssueArg != "" || opt.MRArg != "" || opt.BranchArg != "" || opt.MCP {
 			return failed("new-issue-alone", "--new-issue は --issue・--mr・--branch・--mcp-checked と一緒に渡せません（issue を作ってから、その番号で進みます）。")
 		}
-		opt.NewTitle = strings.Trim(clean(opt.NewTitle), " ")
+		opt.NewTitle = strings.Trim(hostreply.Clean(opt.NewTitle), " ")
 		if opt.NewTitle == "" {
 			return failed("bad-new-issue", "--new-issue のタイトルが空です。作る issue のタイトルを渡してください。")
 		}

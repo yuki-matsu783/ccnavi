@@ -1,4 +1,4 @@
-# sh（ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-sync.sh・ccnavi-ticket.sh）と、その本体や ccnavi-git.sh の
+# sh（ccnavi-git.sh・ccnavi-worktree.sh・ccnavi-stage.sh・ccnavi-ticket.sh）と、その本体や ccnavi-git.sh の
 # 出力を返す実行ファイル（gitlog・cut・stage・ticketsh）が、標準出力・標準エラーに出す `案内:`。いつ出すかの条件と状態の報告は出す側にある。
 # `案内: ` の見出しは、文を組み立てる側が付ける。sh が引用を済ませた値（`$SELF_Q` など）は、名前の末尾を `_q` にする。
 # 形式と欄は docs/21_design/messages.md。差し込みは {名前}・{名前:sh}・{名前:path}・{script:<sh の名前>}。
@@ -72,12 +72,6 @@ messages:
     kind: note
     note: |-
       非対話セッションでは、編集済みの下書きを push し、確認と取り込みをユーザに頼んでターンを終える
-
-  # ---- ccnavi-sync.sh
-  NOTE_SYNC_RETIRED_UNANSWERED:
-    kind: note
-    note: |-
-      実行ファイルが片付けの記録の一覧（sync retired）に答えなかった。ready の後の親の片付けは列挙できない。再実行してください
 
   # ---- ccnavi-ticket.sh
   NOTE_TICKET_NEW_ISSUE:
