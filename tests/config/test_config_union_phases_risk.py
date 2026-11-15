@@ -32,7 +32,7 @@ from tests.config.test_config_union import (
     write,
     write_layer,
 )
-from tests.config.test_config_union_guard import from_template
+from tests.config.test_config_union_guard import derived_template
 
 # 共通レイヤーに足す項目。どれも `factors:` の続きなので、COMMON_RISK の後ろに繋げる。
 COMMON_SCRIPT_FACTOR = (
@@ -468,9 +468,8 @@ class RiskUnionHarness(ConfigUnionHarness):
         git(lib, "add", "-A")
         git(lib, "commit", "--quiet", "-m", "phases")
 
-    def setUp(self):
-        super().setUp()
-        from_template(self, "risk", self.prepare)
+    def template(self):
+        return derived_template(super().template(), "risk", self.prepare)
 
     def risk_problems(self, severity, layer=""):
         """risk の Problem。

@@ -388,14 +388,19 @@ def layer_id(name: str) -> str:
 class ConfigUnionHarness(unittest.TestCase):
     """ワークスペースと 2 つのプロジェクトを配る道具。テストは持たない。"""
 
-    def setUp(self):
+    def template(self):
+        """写す雛形の置き場。継いだ道具は、雛形に手を足した形を返してよい（1 回だけ組んで写す）。"""
         global _TEMPLATE
         if not _TEMPLATE:
             _TEMPLATE = build_template()
+        return _TEMPLATE
+
+    def setUp(self):
+        source = self.template()
         base = tempfile.mkdtemp(prefix="ccnavi-union-")
         self.addCleanup(shutil.rmtree, base, ignore_errors=True)
         self.ws = os.path.join(base, "ws")
-        shutil.copytree(_TEMPLATE, self.ws)
+        shutil.copytree(source, self.ws)
 
         common = os.path.join(self.ws, ".ccnavi", "config", "common")
         self.rules = os.path.join(common, "rules.yml")

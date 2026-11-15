@@ -59,21 +59,19 @@ BROKEN_RULES = "version: 1\ndeny: [\n"
 _DERIVED: dict[str, str] = {}
 
 
-def from_template(case, key, prepare):
-    """setUp が写したワークスペース（case.ws）を、prepare(ws) を済ませた形に差し替える。
+def derived_template(base, key, prepare):
+    """雛形（base）に prepare(ws) を済ませた形の置き場。key ごとにこのプロセスで 1 回だけ組む。
 
-    prepare を済ませた形は key ごとにこのプロセスで 1 回だけ組み、以後は写す（テストごとに
-    git のコミットを打たない）。prepare は渡した ws の下だけを書く。
+    テストごとに写すので、git のコミットをテストごとに打たない。prepare は渡した ws の下だけを書く。
     """
     if key not in _DERIVED:
         holder = tempfile.mkdtemp(prefix="ccnavi-union-derived-")
         atexit.register(shutil.rmtree, holder, ignore_errors=True)
         made = os.path.join(holder, "ws")
-        shutil.copytree(case.ws, made, symlinks=True)
+        shutil.copytree(base, made)
         prepare(made)
         _DERIVED[key] = made
-    shutil.rmtree(case.ws)
-    shutil.copytree(_DERIVED[key], case.ws, symlinks=True)
+    return _DERIVED[key]
 
 
 class GuardHarness(ConfigUnionHarness):
@@ -89,9 +87,8 @@ class GuardHarness(ConfigUnionHarness):
         git(ws, "add", "-A")
         git(ws, "commit", "--quiet", "-m", "common phases")
 
-    def setUp(self):
-        super().setUp()
-        from_template(self, "guard", self.prepare)
+    def template(self):
+        return derived_template(super().template(), "guard", self.prepare)
 
     def guarded_hook(self, tool, cwd, *, event="PreToolUse", **tool_input):
         return self.hook(tool, cwd, event=event, guard="enable", **tool_input)
