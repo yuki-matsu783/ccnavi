@@ -240,8 +240,8 @@
     ccnavi host find-mr|merged|copy|marked|posted|found|account|undraft <args> <file>...
     ccnavi host sent comment|issue <url>
     ccnavi host requested github|gitlab <number> <url> <posted-url> <created-at> <author>
-        （ccnavi-common-host.sh・ccnavi-common-review.sh・ccnavi-review.sh 用。スクリプトが取得したホストの応答
-         （失敗したときはホストの返事）のファイルを読み、1行1項目で出力します。copy と requested は --result に渡す JSON を出力します。
+        （ccnavi-common-host.sh・ccnavi-common-review.sh・ccnavi-review.sh 用。スクリプトが取ったホストの応答のファイル
+         （失敗したときはホストの返事）を読み、1行1項目で出力します。copy と requested は --result に渡す JSON を出力します。
          読めない応答は終了コード 1。読み取り専用）
     ccnavi start report <名前>=<値>...
     ccnavi start dry new-issue|mcp|create|existing <名前>=<値>...

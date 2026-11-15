@@ -83,7 +83,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 `checkout`・`switch` の行き先を、今のブランチと、変換した名前がフォルダ名になるブランチに限る（`worktree add` も変換した名前の
 形だけ）。直接作業の取り込み（`integrate` / `integrate-done`）は、判定（チケットに結び付くブランチを断る `integrate-ticket`）と状態操作（取り込みの記録・一時ワークツリー・取り込み先への `merge --ff-only --no-overwrite-ignore`・取り込んだブランチの
 `update-ref -d`）を実行ファイルの `ccnavi git integrate` が 1 回の起動で行い、sh はロックを取ってから呼ぶだけ。
-親のワークツリーか・承認済みの親チケットと着手済みか・`.requested`・退避の有無・親チケットの `mr:` は `ccnavi tree parent`、親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは `ccnavi-worktree.sh` の本体（実行ファイルの `worktree direct`）が `shask.Leftover` で、親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める（sh はチケットの YAML を読まない）。答えが得られないときは、
+親のワークツリーか、承認済みの親チケットと着手済みか、`.requested`・退避の有無、親チケットの `mr:` は `ccnavi tree parent` で聞く。親のワークツリーからの切り替えを断るか（親の段階 `stage` と `doing/` の子の件数）と、切り替えたあとに残る承認待ちの提案・MR があるかは、`ccnavi-worktree.sh` の本体（実行ファイルの `worktree direct`）が `shask.Leftover` で決める。親のブランチ名は `ccnavi write-and-push family` の 1 行の答えで決める（sh はチケットの YAML を読まない）。答えが得られないときは、
 止める側の検査は止める向きに（ただし親のワークツリーからの切り替えの拒否は、聞けないときや `stage` が無いときも通す）、ツリーを動かす側
 （`ccnavi-fetch.sh` の早送り、`ccnavi-sync.sh` の取り込み）は動かさない向きに倒す。
 
