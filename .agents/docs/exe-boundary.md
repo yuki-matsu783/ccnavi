@@ -109,6 +109,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
   | `ccnavi-git.sh` | —（拒否はすべて 2。前提の未充足を 1 で返す区別はしない） | — |
   | `ccnavi-review.sh merged` | `unknown`（MR がマージ済みかを確かめられない） | — |
   | `ccnavi-fetch.sh` | 常に 0（取ってこられないことは失敗ではない） | — |
+  | `ccnavi-sync.sh` | 書きかけと重なって止まった（write-and-push はこれで止め、再実行を頼む） | 親チケットも提案も無いワークツリーで、取り込まなかった（start はこれを正常として続ける） |
 
   `ccnavi-review.sh mr-state <番号>`（読み取りだけ）は 3 と 4 を使わず、0（状態が分かった）・1（`unknown`。状態が分からない）・
   2（引数の誤り）で返す。1 行目は `mr-state 1`、2 行目は `open <番号> <yes|no> <URL>`・`merged <番号> <URL>`・`closed <番号> <URL>`・

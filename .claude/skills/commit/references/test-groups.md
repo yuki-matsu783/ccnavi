@@ -58,7 +58,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`） |
 | `.ccnavi/scripts/ccnavi-common-host.sh`・`go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_write_and_push_ticket`） |
 | `.ccnavi/scripts/ccnavi-common-write-and-push.sh`・`go/internal/tickets/lifecycle/wapmerge/`・`go/internal/entry/cli/wapwrite.go` | `sh`（`test_write_and_push_*`・`test_push_approved_sh`）`ticket`（`test_write_and_push`） |
-| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_branches_sh`） |
+| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_branches_sh`・`test_mask_url_sh`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
