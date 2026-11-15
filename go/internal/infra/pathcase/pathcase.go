@@ -16,6 +16,12 @@ func Fold(path string) string {
 	return pyfmt.Casefold(path)
 }
 
+// SameName は名前（ブランチ名・識別子・ファイル名）が同じか。大文字小文字と Unicode の正規形（macOS の NFD など）の
+// 違いは同じものとする。区切りは名前に無い前提で、パスの比べには使わない。
+func SameName(a, b string) bool {
+	return Fold(pyfmt.NFC(a)) == Fold(pyfmt.NFC(b))
+}
+
 // HasExt は name が拡張子 ext で終わるか。大文字小文字を区別しない（"A.MD" も ".md"）。
 // ospath は pathcase より下の層なので、Fold を通す比べはここに置く。
 func HasExt(name, ext string) bool {

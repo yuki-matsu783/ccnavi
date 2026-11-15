@@ -74,8 +74,10 @@ func (r *run) knownVersion(version string) {
 
 // userCheckout は git worktree list の先頭（ユーザのチェックアウト）。
 func (r *run) userCheckout() string {
-	first, _, _ := strings.Cut(r.out("worktree", "list", "--porcelain"), "\n")
-	return strings.TrimPrefix(first, "worktree ")
+	if list := r.worktrees(); len(list) > 0 {
+		return list[0].Path
+	}
+	return ""
 }
 
 // begin は、名前・場所・記録の置き場を決める。ユーザのチェックアウト（git worktree list の先頭）から打たれたことを求める。
@@ -182,13 +184,9 @@ func (r *run) bound() (string, string) {
 
 // worktreeBranch は .claude/worktrees/<名前> がこのリポジトリのワークツリーなら、チェックアウトしている ref。
 func (r *run) worktreeBranch() string {
-	path := ""
-	for _, line := range strings.Split(r.out("worktree", "list", "--porcelain"), "\n") {
-		switch {
-		case strings.HasPrefix(line, "worktree "):
-			path = strings.TrimPrefix(line, "worktree ")
-		case strings.HasPrefix(line, "branch ") && path != "" && pathcase.SameReal(path, r.wt):
-			return strings.TrimPrefix(line, "branch ")
+	for _, w := range r.worktrees() {
+		if w.Path != "" && pathcase.SameReal(w.Path, r.wt) {
+			return w.Ref
 		}
 	}
 	return ""

@@ -28,6 +28,21 @@ func TestHasExt(t *testing.T) {
 	}
 }
 
+func TestSameName(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{
+		{"main", "Main", true},
+		{"i0001-が", "I0001-\u304b\u3099", true}, // NFC と NFD
+		{"main", "mai", false},
+	} {
+		if got := SameName(c.a, c.b); got != c.want {
+			t.Errorf("SameName(%q, %q) = %v", c.a, c.b, got)
+		}
+	}
+}
+
 func TestSameNorm(t *testing.T) {
 	cases := []struct {
 		a, b string

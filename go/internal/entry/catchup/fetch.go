@@ -80,11 +80,11 @@ func syncCommand(root, name string) string {
 // 「取り込みが要る」と 1 行言う（取り込みは手で打つ ccnavi-sync.sh の仕事）。
 func forward(a *answer, root, name, branch, mode string) {
 	path := tree.WorktreePath(root, name)
-	remote := commitOf(path, "refs/remotes/origin/"+branch)
-	local := commitOf(path, "HEAD")
+	remote := git.Commit(path, "refs/remotes/origin/"+branch, git.Options{})
+	local := git.Commit(path, "HEAD", git.Options{})
 	switch {
-	case remote == "" || local == "" || remote == local || isAncestor(path, remote, local):
-	case !isAncestor(path, local, remote):
+	case remote == "" || local == "" || remote == local || git.IsAncestor(path, remote, local, git.Options{}).OK():
+	case !git.IsAncestor(path, local, remote, git.Options{}).OK():
 		// 分岐か、浅い clone で履歴が足りないだけかは見分けない。見るのは一致しているかどうかだけ。
 		a.out("%s: リモートの最新と一致しないので、取り込みが必要です（ローカル %s、リモート %s。浅い clone なら git fetch --unshallow。%s）",
 			name, shortOf(path, local), shortOf(path, remote), syncCommand(root, name))
@@ -135,7 +135,7 @@ func retargetHost(a *answer, repo, symref string, fetched bool) {
 	name := hostDefault(repo, symref)
 	old := integrate.IntegrationName(repo)
 	switch {
-	case name == "" || sameName(name, old):
+	case name == "" || pathcase.SameName(name, old):
 	case !fetched:
 		a.next("fetch", name)
 	case retarget(repo, name):

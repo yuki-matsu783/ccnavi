@@ -31,15 +31,6 @@ func TestReadsWhatShFetched(t *testing.T) {
 			t.Errorf("hasHead(%q) = %v", c.name, got)
 		}
 	}
-	listing := "worktree /ws\nHEAD aaa\nbranch refs/heads/main\n\nworktree /ws/.claude/worktrees/i0001\nHEAD bbb\n" +
-		"branch refs/heads/i0001\n\nworktree /ws/x\nHEAD ccc\ndetached\n"
-	for _, c := range []struct{ branch, want string }{
-		{"main", "/ws"}, {"i0001", "/ws/.claude/worktrees/i0001"}, {"ma", ""}, {"trunk", ""},
-	} {
-		if got := worktreeHolding(listing, c.branch); got != c.want {
-			t.Errorf("worktreeHolding(%q) = %q, want %q", c.branch, got, c.want)
-		}
-	}
 }
 
 // said は答えのうち out の行と、止めたか（failed）。

@@ -27,8 +27,6 @@ const (
 	unknown Bound = "unknown"
 )
 
-func sameName(a, b string) bool { return pathcase.Fold(pyfmt.NFC(a)) == pathcase.Fold(pyfmt.NFC(b)) }
-
 // owner はユーザのチェックアウトに当たるワークスペースかプロジェクト。どれでもなければ偽。
 func owner(conf *config.Settings, root, mainRoot string) (tree.Tree, bool) {
 	projects := ""
@@ -117,7 +115,7 @@ func BaseBound(conf *config.Settings, root, mainRoot, branch string) (Bound, str
 				continue
 			}
 			tied := frontText(front.Get("branch"))
-			if (tied != "" && sameName(tied, branch)) || sameName(frontText(front.Get("ticket")), ident) {
+			if (tied != "" && pathcase.SameName(tied, branch)) || pathcase.SameName(frontText(front.Get("ticket")), ident) {
 				return yes, "取り込み先のリポジトリの承認済みチケット（" + relSlashed(root, path) + "）に結び付く"
 			}
 		}

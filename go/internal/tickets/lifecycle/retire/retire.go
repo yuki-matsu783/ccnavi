@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
@@ -45,36 +46,16 @@ type outcome struct {
 
 // ---- git（ローカルの読み取りと、ブランチの削除だけ）
 
-func commitOf(repo, rev string) string {
-	done := git.Run(repo, []string{"rev-parse", "--verify", "--quiet", rev + "^{commit}"}, git.Options{})
-	if !done.OK() {
-		return ""
-	}
-	return ospath.Strip(done.Out)
-}
-
-func tipOf(repo, name string) string { return commitOf(repo, headsPrefix+name) }
-
-func isAncestor(repo, older, newer string) bool {
-	return git.IsAncestor(repo, older, newer, git.Options{}).OK()
-}
+func tipOf(repo, name string) string { return git.Commit(repo, headsPrefix+name, git.Options{}) }
 
 // checkedOutAt はそのブランチをチェックアウトしているワークツリーのパス。無ければ空。
 func checkedOutAt(repo, name string) string {
-	done := git.Run(repo, []string{"worktree", "list", "--porcelain"}, git.Options{RawPaths: true})
-	if !done.OK() {
+	list, ok := git.Worktrees(repo, git.Options{RawPaths: true})
+	if !ok {
 		return "（ワークツリーの一覧を読めない）"
 	}
-	for _, block := range strings.Split(done.Out, "\n\n") {
-		lines := ospath.Splitlines(block)
-		if slices.Contains(lines, "branch "+headsPrefix+name) {
-			if where, ok := strings.CutPrefix(lines[0], "worktree "); ok {
-				return where
-			}
-			return "?"
-		}
-	}
-	return ""
+	w, _ := git.Holding(list, name)
+	return w.Path
 }
 
 // deleteBranch は `git branch -D`。失敗した理由（無ければ空）。条件の確認は呼び手が済ませてある。
@@ -105,12 +86,12 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 	}
 	base := ""
 	if reference != "" {
-		base = commitOf(repo, reference)
+		base = git.Commit(repo, reference, git.Options{})
 	}
 	// 取り消した子は、親に入っていないコミットを含みうる。ユーザが確認したときだけ消し、確認がなければ尋ねる側に倒す。
 	if c.kind == cancelled {
 		extra := ""
-		if base != "" && !isAncestor(repo, tip, base) {
+		if base != "" && !git.IsAncestor(repo, tip, base, git.Options{}).OK() {
 			extra = "（親に入っていないコミットがある）"
 		}
 		if !confirmed {
@@ -128,7 +109,7 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 	if c.mergedSHA == "" {
 		return keep(repo, name, "合流した先頭の sha（merged_sha）が記録に無く、合流済みか確かめられない")
 	}
-	mergedHead := commitOf(repo, c.mergedSHA)
+	mergedHead := git.Commit(repo, c.mergedSHA, git.Options{})
 	if mergedHead == "" {
 		return keep(repo, name, "合流した先頭 "+pyfmt.Head(c.mergedSHA, git.ShortSHA)+" が手元に無い")
 	}
@@ -139,7 +120,7 @@ func judgeChild(repo string, c child, reference string, confirmed bool, tool str
 	if base == "" {
 		return keep(repo, name, "push 済みの親の先頭を読めず、合流した先頭が含まれるか確かめられない")
 	}
-	if !isAncestor(repo, mergedHead, base) {
+	if !git.IsAncestor(repo, mergedHead, base, git.Options{}).OK() {
 		return keep(repo, name, "合流した先頭 "+pyfmt.Head(mergedHead, git.ShortSHA)+" が push 済みの親に含まれない")
 	}
 	return dropBranch(repo, name, tip, "合流済み")
@@ -183,7 +164,7 @@ func confirmCommand(root, name string) string {
 // 見る。見つからなければ空。
 func parentOf(approved *approval.Approved, root, project, ident string) string {
 	for _, t := range approved.All() {
-		if same(t.ID, ident) {
+		if pathcase.SameName(t.ID, ident) {
 			return t.Parent
 		}
 	}
@@ -309,11 +290,11 @@ func RunBranch(stdout, stderr io.Writer, conf *config.Settings, root, name strin
 		}
 		// 壊れた記録は飛ばして続ける（1 本の壊れで、ほかの親の子のブランチ片付けを止めない）。
 		held, broken := heldRecord(ospath.Join(directory, entry))
-		if broken != "" || !same(textOf(held.Value(keyParent)), parent) {
+		if broken != "" || !pathcase.SameName(textOf(held.Value(keyParent)), parent) {
 			continue
 		}
 		for _, c := range childrenFrom(held) {
-			if same(c.ticket, name) {
+			if pathcase.SameName(c.ticket, name) {
 				c := c
 				found, record = &c, held
 			}
@@ -327,7 +308,7 @@ func RunBranch(stdout, stderr io.Writer, conf *config.Settings, root, name strin
 	// 記録は書き換えれば消す対象を広げられるので、記録の子が実際にこの親の子かを確かめ直す。
 	parent := textOf(record.Value(keyParent))
 	actual := parentOf(approval.ScanApproved(conf, root, nil), root, found.project, name)
-	if parent == "" || !same(actual, parent) {
+	if parent == "" || !pathcase.SameName(actual, parent) {
 		shownParent, shownActual := parent, actual
 		if shownParent == "" {
 			shownParent = "空"
@@ -378,19 +359,19 @@ func parentHeadBlocker(parentPath, branch string, hasRef bool) string {
 // remote-tracking ref）に含まれることも確かめる。MR の先頭は sh が渡す値で、ブランチ自身の先頭を渡せば必ず
 // 「含まれる」になるため。
 func mergedBlocker(repo, branch, tip, headSHA string) string {
-	pushed := commitOf(repo, originPrefix+branch)
+	pushed := git.Commit(repo, originPrefix+branch, git.Options{})
 	if pushed == "" {
 		return "push 済みの先頭（origin/" + branch + "）が手元に無く、未 push のコミットが無いか確かめられない"
 	}
-	if !isAncestor(repo, tip, pushed) {
+	if !git.IsAncestor(repo, tip, pushed, git.Options{}).OK() {
 		return "手元の先頭 " + pyfmt.Head(tip, git.ShortSHA) + " が、push 済みの先頭（origin/" + branch + "）" + pyfmt.Head(pushed, git.ShortSHA) +
 			" に含まれない（未 push のコミットがある）"
 	}
-	mergedHead := commitOf(repo, headSHA)
+	mergedHead := git.Commit(repo, headSHA, git.Options{})
 	if mergedHead == "" {
 		return "マージされた MR の先頭 " + pyfmt.Head(headSHA, git.ShortSHA) + " が手元に無く、含まれるか確かめられない"
 	}
-	if !isAncestor(repo, tip, mergedHead) {
+	if !git.IsAncestor(repo, tip, mergedHead, git.Options{}).OK() {
 		return "手元の先頭 " + pyfmt.Head(tip, git.ShortSHA) + " が、マージされた MR の先頭 " + pyfmt.Head(mergedHead, git.ShortSHA) +
 			" に含まれない（未 push のコミットがある）"
 	}

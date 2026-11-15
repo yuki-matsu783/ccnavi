@@ -105,10 +105,12 @@ func (e *Env) worktreeName(top string) (string, bool) {
 
 // userCheckout は、top がユーザのチェックアウト（`git worktree list` の先頭）か。先頭の場所も返す。
 func (e *Env) userCheckout(top string) (string, bool) {
-	out, _ := e.git("worktree", "list", "--porcelain")
-	first, _, _ := strings.Cut(out, "\n")
-	main, ok := strings.CutPrefix(first, "worktree ")
-	return main, ok && main != "" && pathcase.SameReal(top, main)
+	list, _ := git.Worktrees(e.Cwd, git.Options{Timeout: git.MergeTimeout})
+	if len(list) == 0 {
+		return "", false
+	}
+	main := list[0].Path
+	return main, main != "" && pathcase.SameReal(top, main)
 }
 
 // integration は top が属するリポジトリの統合先の名前。決まらなければ空。

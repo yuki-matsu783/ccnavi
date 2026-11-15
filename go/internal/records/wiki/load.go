@@ -103,15 +103,6 @@ func LoadTree(treeRoot string) *Wiki {
 	return t.build()
 }
 
-// CommitOf は参照が指すコミットの sha。決められなければ空。deadline がゼロ値なら git の既定の期限。
-func CommitOf(repo, ref string, deadline time.Time) string {
-	done := git.Run(repo, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{Deadline: deadline})
-	if !done.OK() {
-		return ""
-	}
-	return ospath.Strip(done.Out)
-}
-
 // LoadCommit はコミット rev の docs/wiki/ を、チェックアウトせずに読む。読めなければ nil。
 // docs/wiki/ がそのコミットに無いのは読めた結果で、Present が偽の空の Wiki。期限を過ぎた・git が失敗した・
 // blob が読めないときは nil（一部だけ読んだ答えは返さない）。

@@ -54,9 +54,6 @@ type child struct {
 	project   string
 }
 
-// same は名前を、大文字小文字（と NFC/NFD）を区別せずに比べる。
-func same(a, b string) bool { return pathcase.Fold(pyfmt.NFC(a)) == pathcase.Fold(pyfmt.NFC(b)) }
-
 func recordDir(conf *config.Settings) string {
 	if conf.State == "" {
 		return ""
@@ -74,7 +71,7 @@ func recordPath(conf *config.Settings, parent string) string {
 	want := parent + fsio.JSONExt
 	existing, _ := ospath.DiskListdir(base)
 	for _, entry := range existing {
-		if same(entry, want) {
+		if pathcase.SameName(entry, want) {
 			return ospath.Join(base, entry)
 		}
 	}
@@ -289,7 +286,7 @@ func Entries(conf *config.Settings) []Entry {
 			out = append(out, Entry{Parent: stem, Incomplete: "記録を読めない（" + reason + "）"})
 			continue
 		}
-		if !same(textOf(obj.Value(keyParent)), stem) {
+		if !pathcase.SameName(textOf(obj.Value(keyParent)), stem) {
 			continue
 		}
 		if v, has := obj.Get(keyChildren); has {

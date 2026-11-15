@@ -313,12 +313,11 @@ func (r *run) sameID(names []string, where string) bool {
 
 // branchAt は、パス path にあるこのリポジトリのワークツリーが開いているブランチ（refs/heads/…）。無ければ空。
 func (r *run) branchAt(path string) string {
-	want, at := phys(path), ""
-	for _, line := range strings.Split(gitOut(r.in.Cwd, 0, "worktree", "list", "--porcelain"), "\n") {
-		if p, found := strings.CutPrefix(line, "worktree "); found {
-			at = p
-		} else if b, found := strings.CutPrefix(line, "branch "); found && samePath(at, want) {
-			return b
+	want := phys(path)
+	list, _ := git.Worktrees(r.in.Cwd, git.Options{})
+	for _, w := range list {
+		if samePath(w.Path, want) {
+			return w.Ref
 		}
 	}
 	return ""
@@ -357,9 +356,12 @@ var gitVersion = regexp.MustCompile(`^git version ([0-9]+)\.([0-9]+)`)
 // mainCheckout は C1〜C3: ユーザのチェックアウト（git worktree list の先頭）がブランチを開いていること、git が 2.40 以上で
 // あること、取り込み先がチケットに結び付かないこと。
 func (r *run) mainCheckout() bool {
-	first, _, _ := strings.Cut(gitOut(r.top, 0, "worktree", "list", "--porcelain"), "\n")
-	main, found := strings.CutPrefix(first, "worktree ")
-	if !found || main == "" {
+	list, _ := git.Worktrees(r.top, git.Options{})
+	main := ""
+	if len(list) > 0 {
+		main = list[0].Path
+	}
+	if main == "" {
 		return r.fail("no-main-tree", "このリポジトリのユーザのチェックアウトを git worktree list から読めません。", exitUnmet)
 	}
 	r.mainTree = phys(main)
@@ -478,9 +480,10 @@ func (r *run) state() bool {
 	return true
 }
 
-// inWorktrees は、status・diff の出すパス（"…" で囲まれることがある）が .claude/worktrees/ の下か。
+// inWorktrees は、status・diff の出すパス（"…" で囲まれることがある）が .claude/worktrees/ の下か。大文字小文字は
+// 区別しない（綴り違いの置き場も同じ場所）。
 func inWorktrees(path string) bool {
-	return strings.HasPrefix(strings.TrimPrefix(path, `"`), ".claude/worktrees/")
+	return strings.HasPrefix(pathcase.Fold(strings.TrimPrefix(path, `"`)), pathcase.Fold(".claude/worktrees/"))
 }
 
 // nameNote は直接作業の名前の形が合わないときの警告。切る前に（--dry-run でも）言う。

@@ -9,7 +9,6 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/reply"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/model/ids"
@@ -43,17 +42,6 @@ func (a *answer) write(w io.Writer) int {
 // mergeOptions は早送りと merge の git の起こし方。断った文を英語で読み分ける（refusal.Of）ので LC_ALL=C にする。
 var mergeOptions = git.Options{Timeout: git.MergeTimeout, CLocale: true}
 
-// commitOf は ref が指すコミットの sha。無ければ空。
-func commitOf(dir, ref string) string {
-	text, _ := git.Text(dir, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{})
-	return text
-}
-
-// isAncestor は a が b の祖先か（同じコミットも含む）。
-func isAncestor(dir, a, b string) bool {
-	return git.IsAncestor(dir, a, b, git.Options{}).OK()
-}
-
 // countOf は rev-list --count の数。読めなければ空。
 func countOf(dir, revs string) string {
 	text, ok := git.Text(dir, []string{"rev-list", "--count", revs}, git.Options{})
@@ -75,10 +63,6 @@ func fastForward(dir, target string) (bool, string) {
 	done := git.Run(dir, []string{"merge", "--ff-only", "--no-overwrite-ignore", "--quiet", target}, mergeOptions)
 	return done.OK(), done.Stderr + done.Out
 }
-
-// sameName はブランチ名が同じか。大文字小文字だけ違う名前は同じものとする（大文字小文字を区別しない FS で
-// origin/<名前> が衝突するので、綴り違いの ref を並べて作らない）。
-func sameName(a, b string) bool { return pathcase.Fold(a) == pathcase.Fold(b) }
 
 // hostDefault は `ls-remote --symref origin HEAD` の出力から、ホストの既定ブランチの名前を読む。読めない・
 // 先頭が `-`（後ろの git の引数でオプションに読まれる）・ブランチ名の形でないときは空。
@@ -105,7 +89,7 @@ func hostDefault(dir, text string) string {
 // retarget は手元の origin/HEAD を origin/<名前> に向け直す。origin/<名前> が無ければ（取ってこられていなければ）
 // 向け直さない（無い ref を指す状態を残さない）。向け直したら真。
 func retarget(repo, name string) bool {
-	if commitOf(repo, "refs/remotes/origin/"+name) == "" {
+	if git.Commit(repo, "refs/remotes/origin/"+name, git.Options{}) == "" {
 		return false
 	}
 	return git.Run(repo, []string{"symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/" + name}, git.Options{}).OK()
@@ -115,22 +99,9 @@ func retarget(repo, name string) bool {
 // どこにも無ければ空。チェックアウトされているブランチの ref は update-ref で書き換えない（索引とワークツリーが
 // 食い違う）ので、在れば早送り、無ければ update-ref に分ける。
 func treeOf(repo, branch string) string {
-	out, _ := git.Text(repo, []string{"worktree", "list", "--porcelain"}, git.Options{})
-	return worktreeHolding(out, branch)
-}
-
-// worktreeHolding は `worktree list --porcelain` の出力から、branch をチェックアウトしているツリーを選ぶ。
-func worktreeHolding(listing, branch string) string {
-	want := "branch refs/heads/" + branch
-	path := ""
-	for _, line := range ospath.Splitlines(listing) {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok {
-			path = p
-		} else if line == want {
-			return path
-		}
-	}
-	return ""
+	list, _ := git.Worktrees(repo, git.Options{})
+	w, _ := git.Holding(list, branch)
+	return w.Path
 }
 
 // ---- 親のワークツリーの選び方

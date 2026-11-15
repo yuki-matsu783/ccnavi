@@ -15,6 +15,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/records/diaglog"
@@ -270,7 +271,7 @@ func defaultBranch(dir, heads, symref string) (name string, host bool) {
 		name = local
 	}
 	// ホストの答えが手元の origin/HEAD と綴りの大文字小文字だけ違うなら、同じ名前として手元の綴りを使う。
-	if host && local != "" && sameName(local, name) {
+	if host && local != "" && pathcase.SameName(local, name) {
 		return local, false
 	}
 	if name != "" && hasHead(heads, name) {
@@ -382,16 +383,16 @@ func (s *syncRun) pull(name, branch, rc, errFile string) int {
 
 // take は origin/<ブランチ> を取り込む。信号で切られたら真。
 func (s *syncRun) take(name, branch, path string) (interrupted bool) {
-	remote := commitOf(path, "refs/remotes/origin/"+branch)
-	local := commitOf(path, "HEAD")
+	remote := git.Commit(path, "refs/remotes/origin/"+branch, git.Options{})
+	local := git.Commit(path, "HEAD", git.Options{})
 	switch {
 	case remote == "" || local == "":
 		s.a.fail("%s: 先頭を読めなかった", name)
 	case remote == local:
 		s.a.out("%s: リモートと同じ", name)
-	case isAncestor(path, remote, local):
+	case git.IsAncestor(path, remote, local, git.Options{}).OK():
 		s.a.out("%s: 手元が %s 件先に進んでいる（まだ送っていない）。取り込むものはありません。", name, cmp.Or(countOf(path, remote+".."+local), "?"))
-	case isAncestor(path, local, remote):
+	case git.IsAncestor(path, local, remote, git.Options{}).OK():
 		behind := cmp.Or(countOf(path, local+".."+remote), "?")
 		if ok, said := fastForward(path, remote); ok {
 			s.a.out("%s: リモートの %s 件を早送りで取り込んだ", name, behind)

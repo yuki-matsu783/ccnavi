@@ -45,3 +45,15 @@ func TestCode(t *testing.T) {
 		t.Error("材料が違っても同じコード")
 	}
 }
+
+// ワークツリーの置き場は、綴りの大文字小文字が違っても置き場と見る（書きかけに数えない）。
+func TestInWorktrees(t *testing.T) {
+	for path, want := range map[string]bool{
+		".claude/worktrees/a/x": true, `".claude/worktrees/a b"`: true, ".Claude/Worktrees/a": true,
+		".claude/worktree": false, "src/.claude/worktrees/a": false,
+	} {
+		if got := inWorktrees(path); got != want {
+			t.Errorf("inWorktrees(%q) = %v", path, got)
+		}
+	}
+}

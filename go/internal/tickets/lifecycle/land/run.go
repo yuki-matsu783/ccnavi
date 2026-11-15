@@ -127,6 +127,12 @@ func (r *run) out(args ...string) string {
 	return out
 }
 
+// worktrees は cwd のリポジトリのワークツリーの一覧。読めなければ空。
+func (r *run) worktrees() []git.Worktree {
+	list, _ := git.Worktrees(r.Cwd, git.Options{Timeout: gitTimeout, LazyFetch: true})
+	return list
+}
+
 // ok は cwd で起こした git が 0 で終わったか。
 func (r *run) ok(args ...string) bool {
 	_, ok := r.git(r.Cwd, args...)

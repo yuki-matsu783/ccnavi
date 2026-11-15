@@ -468,11 +468,7 @@ func TreeHead(treeRoot, rev string) string {
 	if treeRoot == "" {
 		return ""
 	}
-	done := git.Run(treeRoot, []string{"rev-parse", "--verify", "--quiet", rev + "^{commit}"}, git.Options{})
-	if !done.OK() {
-		return ""
-	}
-	return ospath.Strip(done.Out)
+	return git.Commit(treeRoot, rev, git.Options{})
 }
 
 func readReady(root, project, name string) *pyjson.Object {

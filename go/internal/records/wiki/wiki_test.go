@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ccnavi/internal/infra/git"
 )
 
 func pattern(target string, sources ...string) string {
@@ -200,16 +202,16 @@ func TestLoadTreeAndCommit(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git が無い")
 	}
-	git := func(args ...string) {
+	run := func(args ...string) {
 		cmd := exec.Command("git", append([]string{"-C", root, "-c", "user.email=a@b", "-c", "user.name=t"}, args...)...)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v %s", args, err, out)
 		}
 	}
-	git("init", "--quiet", "-b", "main")
-	git("add", "-A")
-	git("commit", "--quiet", "-m", "wiki")
-	sha := CommitOf(root, "main", time.Time{})
+	run("init", "--quiet", "-b", "main")
+	run("add", "-A")
+	run("commit", "--quiet", "-m", "wiki")
+	sha := git.Commit(root, "main", git.Options{})
 	if len(sha) < 40 {
 		t.Fatalf("sha = %q", sha)
 	}
@@ -220,8 +222,5 @@ func TestLoadTreeAndCommit(t *testing.T) {
 	}
 	if LoadCommit(root, strings.Repeat("0", 40), time.Time{}) != nil {
 		t.Error("無いコミットを読めた")
-	}
-	if CommitOf(root, "nope", time.Time{}) != "" {
-		t.Error("無い参照を読めた")
 	}
 }

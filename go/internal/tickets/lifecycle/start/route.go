@@ -194,7 +194,7 @@ func adoptProblem(b *strings.Builder, mr any, branch, integration string) {
 type repo struct{ cwd string }
 
 func (r repo) refExists(ref string) bool {
-	return git.Run(r.cwd, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{}).Code == 0
+	return git.Commit(r.cwd, ref, git.Options{}) != ""
 }
 
 // branchRef は手元のブランチの参照、無ければ origin の追跡参照。どちらも無ければ空。
@@ -209,19 +209,9 @@ func (r repo) branchRef(branch string) string {
 
 // worktreeOf はそのブランチをチェックアウトしているワークツリーのパス。無ければ空。
 func (r repo) worktreeOf(branch string) string {
-	code, out := git.Output(r.cwd, []string{"worktree", "list", "--porcelain"}, git.Options{})
-	if code != 0 {
-		return ""
-	}
-	path := ""
-	for l := range strings.SplitSeq(out, "\n") {
-		if p, found := strings.CutPrefix(l, "worktree "); found {
-			path = p
-		} else if l == "branch refs/heads/"+branch {
-			return path
-		}
-	}
-	return ""
+	list, _ := git.Worktrees(r.cwd, git.Options{})
+	w, _ := git.Holding(list, branch)
+	return w.Path
 }
 
 // nomrAfter は、MR の無い候補の行き先。統合先より進んでいなければ stale、初期コミットだけの作りかけ（--issue で来た
