@@ -90,7 +90,6 @@ func TestCorePathsCommandTable(t *testing.T) {
 
 // サブエージェントが子のワークツリーからシェルで親のワークツリーへ書く形の、止める・通すの表。受入テスト
 // （tests/guard/test_wrapguard.py の SubagentParentTreeTest）が hook を 1 件ずつ起こして見ていた表。
-// テストの名前に「Write」を入れない。一時置き場のパスに入り、コードの中の書き込みを疑う語として読まれる。
 func TestParentTreeShellTable(t *testing.T) {
 	root := workspace(t)
 	conf := testkit.Settings(t, root)
@@ -132,5 +131,28 @@ func TestParentTreeShellTable(t *testing.T) {
 	}
 	for _, c := range passes {
 		check(c, false)
+	}
+}
+
+// ワークスペースのパスに書き込みを疑う語（テストの名前の Write・Copy が一時置き場のパスに入る）があっても、
+// 親のワークツリーを読むだけのコードは止めず、書くコードは止める。パスの中の語を書き込みと読まない。
+func TestParentTreeReadWhenThePathSaysWriteOrCopy(t *testing.T) {
+	root := workspace(t)
+	conf := testkit.Settings(t, root)
+	parent, child := worktree(root, parentTree), worktree(root, childTree)
+	x := filepath.Join(parent, "src", "x.py")
+	for _, c := range []struct {
+		command string
+		stops   bool
+	}{
+		{`python3 -c "print(open('` + x + `').read())"`, false},
+		{`python3 -c "import os; print(os.listdir('` + parent + `'))"`, false},
+		{`python3 -c "open('` + x + `','w').write('x')"`, true},
+		{`python3 -c "import shutil; shutil.rmtree('` + parent + `')"`, true},
+	} {
+		r := shell.Read(c.command)
+		if got := CheckParentWrite(conf, root, child, c.command, r.Degraded, nil).Parent != ""; got != c.stops {
+			t.Errorf("%q: 止めた=%v, want %v", c.command, got, c.stops)
+		}
 	}
 }

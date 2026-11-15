@@ -75,7 +75,7 @@ func CheckParentWrite(conf *config.Settings, root, cwd, subject string, degraded
 	// 読み切れなかった部分は、中で何が書かれるか分からない。親のパスと書き込みを疑う語が並んでいれば止める側に倒す。
 	if degraded || unread {
 		for _, text := range all {
-			if name := mentionedParent(root, parents, text); name != "" && writeHint.Search(text) {
+			if name := mentionedParent(root, parents, text); name != "" && hintsWrite(root, parents, text) {
 				return ParentWrite{short(text), name, kindCode}
 			}
 		}
@@ -119,8 +119,29 @@ func isParentName(parents []string, name string) bool {
 	return slices.ContainsFunc(parents, func(p string) bool { return pathcase.Fold(p) == folded })
 }
 
+// hintsWrite は、text に書き込みを疑う語があるか。ワークスペースルートと親のワークツリーのパスは除いてから探す。
+// パスの中の語（`~/system-tools/` や、ブランチ名に揃えたワークツリーの `feature-12-remove-x`）を書き込みと読むと、
+// 親のワークツリーを読むだけのコードまで止めてしまうため。
+func hintsWrite(root string, parents []string, text string) bool {
+	rest := strings.ReplaceAll(text, `\`, "/")
+	base := tree.WorktreesPath(root)
+	var paths []string
+	for _, name := range parents {
+		paths = append(paths, ospath.Join(base, name), ospath.Realpath(ospath.Join(base, name)), "worktrees/"+name, "../"+name)
+	}
+	paths = append(paths, root, ospath.Realpath(root))
+	for _, path := range paths {
+		re, err := pyre.Compile(pyre.Escape(strings.ReplaceAll(path, `\`, "/")), pyre.IgnoreCase)
+		if err != nil {
+			continue
+		}
+		rest = re.Sub(rest, func(pyre.Found) string { return " " })
+	}
+	return writeHint.Search(rest)
+}
+
 func checkCode(conf *config.Settings, root string, parents []string, c code) ParentWrite {
-	if !writeHint.Search(c.text) {
+	if !hintsWrite(root, parents, c.text) {
 		return ParentWrite{}
 	}
 	if name := mentionedParent(root, parents, c.text); name != "" {
