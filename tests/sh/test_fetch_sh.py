@@ -814,6 +814,22 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stderr)
         self.assertEqual("", done.stdout.strip())
 
+    def test_without_the_executable_it_only_fetches(self):
+        # 実行ファイルが無い（入れ替え中など）ときは取ってくるだけ。早送りも、origin/HEAD の向け直し
+        # （ホストに聞く ls-remote ごと）もせず、何も言わない（毎回「合わせた」と出さない）。
+        head = self.advance(self.remote)
+        before = self.sha(self.ws, "HEAD")
+        git(self.ws, "push", "-q", "origin", "main:trunk")
+        self.host_default("trunk")
+        path, log = self.spy_on_ls_remote()
+        done = self.fetch(PATH=path, CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "nowhere"))
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual("", done.stdout.strip())
+        self.assertEqual(head, self.sha(self.ws, "refs/remotes/origin/main"))
+        self.assertEqual(before, self.sha(self.ws, "HEAD"))
+        self.assertEqual("refs/remotes/origin/main", self.origin_head())
+        self.assertFalse(os.path.exists(log))
+
     def test_quiet_without_a_remote(self):
         git(self.ws, "remote", "remove", "origin")
         self.leave_main()

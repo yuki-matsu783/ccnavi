@@ -430,7 +430,7 @@ ACCEPT_PLAN_CASE = """*" --accept-plan "*)
 # 実行ファイルの半分のスタブ。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
-# 残り（`write-and-push family`・`write-and-push sort`・`sync paths` など）は実際のものに渡す。
+# 残り（`write-and-push family`・`write-and-push sort` など）は実際のものに渡す。
 HALF = """#!/bin/sh
 case " $* " in
 {plan_case}*" user reviewed "*" --yes "*)

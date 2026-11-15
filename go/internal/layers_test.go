@@ -159,7 +159,9 @@ var subTiers = map[string]map[string]int{
 	"entry": {
 		"lint": 0, "diagnose": 0, "status": 0, "version": 0, "shask": 0,
 		"suggest": 1, "chrome": 1,
-		"cli": 2,
+		// 1: 手元をリモートに合わせる sh（ccnavi-sync.sh・ccnavi-fetch.sh）への答え。親の状態を shask、検査を lint から読む
+		"catchup": 1,
+		"cli":     2,
 	},
 }
 

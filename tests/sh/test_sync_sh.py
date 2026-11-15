@@ -422,10 +422,10 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, PARENT)
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertEqual(1, done.stdout.count(f"{PARENT}: リモートと同じ"), done.stdout)
-        # 実行ファイルが無ければ、親のワークツリーかを確かめられないので取り込まない。
+        # 実行ファイルが無ければ、判定を持つ側がいないので、組むか置くかを言って止める。
         done = self.sync(PARENT, CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "nowhere"))
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("実行ファイルに確かめられなかった", done.stdout)
+        self.assertEqual(2, done.returncode, done.stdout + done.stderr)
+        self.assertIn("ccnavi-build.sh", done.stderr)
 
     # ---- 取り込みの後の検査（`--lint` の該当分と判定し直し）
 
@@ -451,59 +451,13 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertNotIn("検査で止める", done.stdout)
 
-    def test_an_executable_that_cannot_check_does_not_block(self):
-        # `sync check` が失敗して答えない実行ファイルは、検査の error と分けて警告だけにする。
-        launcher = self.launcher()
-        failing = write(
-            os.path.join(self._tmp.name, "bin", "failing-ccnavi"),
-            "#!/bin/sh\n"
-            'case "$*" in *"sync check"*) echo "ccnavi: failed" >&2; exit 2 ;; esac\n'
-            f'exec "{launcher}" "$@"\n',
-        )
-        os.chmod(failing, 0o755)
-        write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", f"{PARENT}-01-01.md"),
-            child_copy_text(),
-        )
-        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=failing)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("検査を実行できなかった", done.stdout)
-
-    def test_the_check_shows_warnings_and_errors_from_the_executable(self):
-        # sh は実行ファイルの `warn` と `error` の行をそのまま見せ、error があれば 1 で終わる。
-        fake = write(
-            os.path.join(self._tmp.name, "bin", "fake-check"),
-            "#!/bin/sh\n"
-            'case "$*" in *"sync check"*)\n'
-            '  printf "check 1\\nwarn 層がずれている\\nerror 正とする側が合わない\\n"; '
-            "exit 1 ;; esac\n"
-            f'exec "{self.launcher()}" "$@"\n',
-        )
-        os.chmod(fake, 0o755)
-        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=fake)
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("注意: 層がずれている", done.stdout)
-        self.assertIn("- 正とする側が合わない", done.stdout)
-        # warn だけなら通る。
-        warn_only = write(
-            os.path.join(self._tmp.name, "bin", "warn-check"),
-            "#!/bin/sh\n"
-            'case "$*" in *"sync check"*)\n'
-            '  printf "check 1\\nwarn 層がずれている\\n"; exit 0 ;; esac\n'
-            f'exec "{self.launcher()}" "$@"\n',
-        )
-        os.chmod(warn_only, 0o755)
-        done = self.sync(PARENT, CCNAVI_ENTRY_PATH=warn_only)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertIn("注意: 層がずれている", done.stdout)
-
     def test_the_check_never_ends_with_3(self):
         # 検査が error を言っても、ロックの再取得も書き込みも無い。終了コードは 1 だけ。
         launcher = self.launcher()
         holder = write(
             os.path.join(self._tmp.name, "bin", "holder"),
             "#!/bin/sh\n"
-            'case "$*" in *"sync check"*)\n'
+            'case "$*" in *"sync recheck"*)\n'
             f'  mkdir -p "{self.state}/locks/self/{PARENT}" && '
             f'printf "elsewhere 1 9999999999 1-1\\n" '
             f'> "{self.state}/locks/self/{PARENT}/owner" ;; esac\n'
@@ -998,31 +952,6 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, CCNAVI_ENTRY_PATH=launcher)
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
         self.assertIn("返さなかった", done.stderr)
-
-    def test_the_fallback_without_an_answer_uses_the_default_places(self):
-        """実行ファイルが `sync paths` に空で答える道（予備）。sh が既定の置き場の綴りを直に使う。
-
-        `sync paths` だけを空で返し、ほか（`write-and-push family` の `branch` の行）
-        は実際のものに答えさせる。
-        `write-and-push family` まで空だと、sh は親のブランチ名を知らずに取り込みを止める。
-        """
-        head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
-        # 提案（wip/proposals/todo/）だけがある親。既定の提案の置き場で家族と見つける。
-        other = os.path.join(self.ws, ".claude", "worktrees", "i0002")
-        git(self.ws, "worktree", "add", "-q", other, "-b", "i0002", "main")
-        rel = "wip/proposals/todo/i0002.md"
-        write(os.path.join(other, rel), "---\nversion: 1\nticket: i0002\n---\n")
-        git(other, "add", "--", rel)
-        git(other, "commit", "-q", "-m", "approval-request")
-        git(other, "push", "-q", "-u", "origin", "i0002")
-        body = (
-            '#!/bin/sh\nif [ "$3" = sync ] && [ "$4" = paths ]; then exit 0; fi\n'
-            f'exec "{exe.sh_path()}" "$@"\n'
-        )
-        done = self.sync(CCNAVI_ENTRY_PATH=self.launcher(body))
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual(head, self.sha(self.tree, "HEAD"))
-        self.assertIn("i0002: リモートと同じ", done.stdout)
 
     def test_the_host_default_branch_is_read_from_the_remote(self):
         # 手元の origin/HEAD が無くても、ls-remote --symref でホストの既定を読む。

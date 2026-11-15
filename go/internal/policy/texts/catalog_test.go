@@ -195,7 +195,7 @@ func TestEveryIDTheCodeAsksForExists(t *testing.T) {
 	repo := repoRoot(t)
 	c := Load(repo)
 	sh := shCalls(t, repo)
-	if len(sh) < 25 {
+	if len(sh) < 20 {
 		t.Fatalf("ccnavi_text の呼び出しを拾えていない（%d 件）", len(sh))
 	}
 	for _, k := range append(goCalls(t, repo), sh...) {
@@ -383,7 +383,7 @@ func TestShNotesRenderAsNoteLinesOnly(t *testing.T) {
 		called[k.id] = true
 	}
 	for _, id := range []string{"NOTE_WORKTREE_RECORD_MISSING",
-		"NOTE_STAGE_NONINTERACTIVE", "NOTE_SYNC_RETIRED_UNANSWERED", "NOTE_TICKET_NEW_ISSUE"} {
+		"NOTE_STAGE_NONINTERACTIVE", "NOTE_TICKET_NEW_ISSUE"} {
 		if !called[id] {
 			t.Errorf("sh が %s を引かない", id)
 		}
