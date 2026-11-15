@@ -105,7 +105,8 @@ func LinkedPage(data []byte) (string, int) {
 }
 
 // LinkedBody は、GitHub の PR の応答の本文から、閉じる issue を `issue <owner/repo>#<番号>` で 1 件 1 行に出す
-// （読み方は hostreply.ClosingRefs）。GraphQL を断られたときの代わりの読み方。
+// （読み方は hostreply.ClosingRefs の GitHub の書き方）。GraphQL を断られたときの代わりの読み方で、GitHub だけが使う
+// （GitLab は closes_issues の API を読む。LinkedGitLab）。
 func LinkedBody(repo string, data []byte) (string, int) {
 	v, err := hostreply.Decode(data)
 	if err != nil {
@@ -120,7 +121,7 @@ func LinkedBody(repo string, data []byte) (string, int) {
 		return "", unreadable
 	}
 	var b strings.Builder
-	for _, ref := range hostreply.ClosingRefs(repo, body) {
+	for _, ref := range hostreply.ClosingRefs("github", repo, body) {
 		fmt.Fprintf(&b, "issue %s\n", ref)
 	}
 	return b.String(), ok

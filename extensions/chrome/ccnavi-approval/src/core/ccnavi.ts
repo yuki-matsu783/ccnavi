@@ -330,7 +330,7 @@ export const ccnavi = {
   /** ホストへ書く計画と書く前の確かめの材料を突き合わせる */
   precheck: (call: CcnaviCall, plan: HostPlan, info: WriteInfo) => ask<PrecheckAnswer>(call, "precheck", { plan, info }, "precheck"),
   /** 開いた MR の本文のそれぞれが、repo の issue を閉じるか（bodies と同じ順） */
-  closes: (call: CcnaviCall, body: { repo: string; issue: number; bodies: readonly string[] }) => ask<boolean[]>(call, "closes", { ...body }, "closes"),
+  closes: (call: CcnaviCall, body: { host: "github" | "gitlab"; repo: string; issue: number; bodies: readonly string[] }) => ask<boolean[]>(call, "closes", { ...body }, "closes"),
   compat: (call: CcnaviCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: CcnaviCall,

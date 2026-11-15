@@ -107,19 +107,20 @@ func answerOf(key string, v any) (*pyjson.Object, error) {
 }
 
 // opCloses は「始める」の、開いた MR の本文のそれぞれが issue を閉じるか（sh の start の代わりの読み方と同じ
-// hostreply.ClosesIssue）。要求は {repo: "<owner>/<repo>", issue: <番号>, bodies: [本文か null...]}、答えは
-// {closes: [真偽...]}（bodies と同じ順）。
+// hostreply.ClosesIssue を、ホストの種類の書き方で読む）。要求は {host: "github"|"gitlab", repo: "<owner>/<repo>",
+// issue: <番号>, bodies: [本文か null...]}、答えは {closes: [真偽...]}（bodies と同じ順）。
 func opCloses(req *pyjson.Object, _ string) (*pyjson.Object, error) {
+	kind, _ := text(req, "host")
 	repo, okRepo := text(req, "repo")
 	issue, okIssue := integer(req.Value("issue"))
 	bodies, okList := req.Value("bodies").([]any)
-	if !okRepo || repo == "" || !okIssue || issue <= 0 || !okList {
-		return nil, refused("closes の要求の形が違います（repo・issue・bodies）")
+	if !hostreply.ClosesHost(kind) || !okRepo || repo == "" || !okIssue || issue <= 0 || !okList {
+		return nil, refused("closes の要求の形が違います（host・repo・issue・bodies）")
 	}
 	out := make([]any, 0, len(bodies))
 	for _, b := range bodies {
 		body, _ := b.(string)
-		out = append(out, hostreply.ClosesIssue(repo, issue, body))
+		out = append(out, hostreply.ClosesIssue(kind, repo, issue, body))
 	}
 	return pyjson.NewObject("closes", out), nil
 }

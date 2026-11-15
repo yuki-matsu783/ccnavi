@@ -1,8 +1,8 @@
 /**
  * 「始める」。`ccnavi-start.sh` と同じ手順で、issue から作業を始める。
  *
- *   1. issue を閉じる開いた MR を探す（本文の `Closes #<番号>` など、閉じる語に続く issue の指定。読みは ccnavi の
- *      `closes`。参照しているだけの MR は採用しない）
+ *   1. issue を閉じる開いた MR を探す（本文の `Closes #<番号>` など、閉じる語に続く issue の指定。語の形はホストの
+ *      書き方に従う。読みは ccnavi の `closes`。参照しているだけの MR は採用しない）
  *   2. 1 本あれば、その元ブランチを親として採用する。ブランチも MR も作らない
  *      （採用の確認: MR が open・フォークでない・マージ先が統合先・ブランチ名が保護されていない・識別子が使える・
  *       同じ識別子になる別のブランチが無い・同じブランチ名のマージ済み MR が無い。引っかかったら止める）
@@ -24,6 +24,7 @@ import { ccnavi, CcnaviError, type Snapshot } from "./ccnavi.js";
 import type { RepoConfig } from "./settings.js";
 import { readIntegration, Reader, type Deps } from "./snapshot.js";
 import type { Issue } from "./github.js";
+import type { HostKind } from "./hosts.js";
 
 export interface MrRef {
   readonly number: number;
@@ -81,8 +82,9 @@ export async function startIssue(
     const all = (await deps.call("branchNames", [repo.owner, repo.repo])) as string[];
     // 1. issue を閉じる開いた MR を探す。見落として重複を作らないため、読めなければ（例外は）止める
     // 閉じるかの読み（閉じる語に続くこの issue の指定）は ccnavi（sh の start と同じ hostreply）が持つ
-    const mrs = (await deps.call("listOpenMrs", [repo.owner, repo.repo])) as Mr[];
-    const closes = await ccnavi.closes(deps.ccnavi, { repo: `${repo.owner}/${repo.repo}`, issue: issue.number, bodies: mrs.map((m) => m.body) });
+    // 閉じる語の書き方はホストで違う（GitLab は Closing・Implements なども閉じる）ので、ホストの種類も渡す
+    const { host, mrs } = (await deps.call("listOpenMrs", [repo.owner, repo.repo])) as { host: HostKind; mrs: Mr[] };
+    const closes = await ccnavi.closes(deps.ccnavi, { host, repo: `${repo.owner}/${repo.repo}`, issue: issue.number, bodies: mrs.map((m) => m.body) });
     const open = mrs.filter((_, i) => closes[i] === true);
     if (open.length > 1) {
       return {

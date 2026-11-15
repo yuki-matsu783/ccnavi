@@ -84,12 +84,15 @@ function message(out: StartOutcome): string {
   return out.kind === "refused" || out.kind === "failed" ? out.message : "";
 }
 
-test("CX-T251 issue を閉じる MR かは ccnavi（WASM の closes。sh の start と同じ読み）に聞く。本文の閉じる語に続くこのリポジトリの指定だけを拾う", async () => {
+test("CX-T251 issue を閉じる MR かは ccnavi（WASM の closes。sh の start と同じ読み）にホストの種類と一緒に聞く。本文の閉じる語に続くこのリポジトリの指定だけを拾う", async () => {
   // 読み方の細かい表は Go（go/internal/tickets/lifecycle/start/testdata/readers.json の linked-body）が持つ。ここは口の往復だけ
   const bodies = ["Closes #20", "See #20", "Closes other/repo#20", "Closes https://github.com/acme/widgets/issues/20", "`Closes #20`", "Closes ACME/Widgets#20", "Closes #200"];
-  const got = await ccnaviOps.closes(ccnavi, { repo: "acme/widgets", issue: 20, bodies });
+  const got = await ccnaviOps.closes(ccnavi, { host: "github", repo: "acme/widgets", issue: 20, bodies });
   assert.deepEqual(got, [true, false, false, true, false, true, false]);
-  assert.deepEqual(await ccnaviOps.closes(ccnavi, { repo: "group/sub/proj", issue: 20, bodies: ["Closes group/sub/proj#20"] }), [true]);
+  // 語の形はホストの書き方に従う（Closing・Implements は GitLab だけが閉じる）
+  const lab = ["Closes group/sub/proj#20", "Closing #20", "Implements #20"];
+  assert.deepEqual(await ccnaviOps.closes(ccnavi, { host: "gitlab", repo: "group/sub/proj", issue: 20, bodies: lab }), [true, true, true]);
+  assert.deepEqual(await ccnaviOps.closes(ccnavi, { host: "github", repo: "group/sub/proj", issue: 20, bodies: lab }), [true, false, false]);
 });
 
 test("CX-T251b 参照しているだけの MR（本文が #番号 の言及だけ・元ブランチの名前に番号がある）は採用せず、新しく作る", async () => {

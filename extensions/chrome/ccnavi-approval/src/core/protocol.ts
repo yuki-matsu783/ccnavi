@@ -659,8 +659,8 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       value = await x.writeReplies(client, o, r, github.checkNumber(a, "MR の番号"));
       break;
     case "listOpenMrs":
-      // 「始める」: issue を閉じる開いた MR を探す。読むだけ
-      value = await x.listOpenMrs(client, o, r);
+      // 「始める」: issue を閉じる開いた MR を探す。読むだけ。閉じる語の読み方がホストで違うので、ホストの種類も返す
+      value = { host: client.host.kind, mrs: await x.listOpenMrs(client, o, r) };
       break;
     case "listMergedMrs":
       // 「始める」: 採用する MR のブランチと同じ名前のマージ済み MR があるか。読むだけ

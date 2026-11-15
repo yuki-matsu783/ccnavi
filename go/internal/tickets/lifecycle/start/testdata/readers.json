@@ -334,6 +334,18 @@
   "code": 0
  },
  {
+  "name": "GitHub は GitLab だけの語（Closing・Implements）を読まない",
+  "op": "linked-body",
+  "args": [
+   "acme/widgets"
+  ],
+  "inputs": [
+   "{\"body\": \"Closing #1\\nImplements #2\\nCloses issue #3\\nCloses #4, #5\"}"
+  ],
+  "out": "issue acme/widgets#4\n",
+  "code": 0
+ },
+ {
   "name": "references.full がある",
   "op": "linked-gitlab",
   "args": [
