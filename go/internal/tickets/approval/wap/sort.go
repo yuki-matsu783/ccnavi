@@ -35,7 +35,8 @@ const (
 
 var (
 	// temp は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
-	// configsync の `*.ccnavi-sync`）。末尾に改行が 1 つ付いていても当たる
+	// configsync の `*.ccnavi-sync`）。sh の ccnavi_drop_temp（ccnavi-common-write-and-push.sh）が写しを持ち、一致は
+	// tests/fixtures/approved-carry.json で確かめる。末尾に改行が 1 つ付いていても当たる
 	// （`$` と同じ扱い）ので `\n?\z` にする。
 	temp = regexp.MustCompile(`(?:(?:\A|/)\.[^/]*\.part(?:\.[^/]*)?|(?:\A|/)flows/\.[^/]*\.tmp|\.ccnavi-sync)\n?\z`)
 	// number はマーカーのフェーズ番号（ASCII の数字だけ。全角の数字は通さない）。
@@ -125,11 +126,7 @@ func changedPaths(treeRoot string, where places, since string) ([]string, string
 		if !done.OK() {
 			return nil, "git の状態を読めない（" + failureText(done) + "）"
 		}
-		for _, entry := range strings.Split(done.Out, "\x00") {
-			if r := []rune(entry); len(r) > 3 {
-				out = append(out, string(r[3:]))
-			}
-		}
+		out = append(out, git.PorcelainPaths(done.Out)...)
 	}
 	sort.Strings(out)
 	return out, ""

@@ -1,0 +1,26 @@
+{
+  "note": "承認済みチケットの置き場の変更のパスの読み。sh（ccnavi-common-write-and-push.sh の ccnavi_porcelain_paths・ccnavi_drop_temp。tests/sh/test_sh_copies_sh.py）と実行ファイル（git.PorcelainPaths と wap の temp。go/internal/tickets/approval/wap/carry_sh_test.go）が同じ表で一致を確かめる。porcelain は `status --porcelain -z --no-renames` の 1 項目と、そのパス。temp はパスと、書きかけの一時ファイルとしてコミットから外すか。",
+  "porcelain": [
+    {"entry": " M .ccnavi/approved/a.md", "path": ".ccnavi/approved/a.md"},
+    {"entry": "?? .ccnavi/approved/新しい.md", "path": ".ccnavi/approved/新しい.md"},
+    {"entry": " D wip/proposals/review/x.md", "path": "wip/proposals/review/x.md"},
+    {"entry": "A  .ccnavi/approved/a b.md", "path": ".ccnavi/approved/a b.md"},
+    {"entry": "MM .ccnavi/approved/\"q\".md", "path": ".ccnavi/approved/\"q\".md"}
+  ],
+  "temp": [
+    {"path": ".ccnavi/approved/.a.md.123.part", "temp": true},
+    {"path": ".ccnavi/approved/.a.123.part.md", "temp": true},
+    {"path": ".a.1.part", "temp": true},
+    {"path": ".ccnavi/approved/flows/.x.1.tmp", "temp": true},
+    {"path": "flows/.x.tmp", "temp": true},
+    {"path": ".ccnavi/approved/x.ccnavi-sync", "temp": true},
+    {"path": ".ccnavi/approved/a.md", "temp": false},
+    {"path": ".ccnavi/approved/part.md", "temp": false},
+    {"path": ".ccnavi/approved/a.part", "temp": false},
+    {"path": ".ccnavi/approved/flows/x.tmp", "temp": false},
+    {"path": ".ccnavi/approved/.x.tmp", "temp": false},
+    {"path": ".ccnavi/approved/.hidden.md", "temp": false},
+    {"path": ".ccnavi/approved/a.ccnavi-sync.md", "temp": false},
+    {"path": ".ccnavi/approved/.a.part/b.md", "temp": false}
+  ]
+}

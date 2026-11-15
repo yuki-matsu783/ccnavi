@@ -534,3 +534,19 @@ ccnavi_wap_end() {
 	fi
 	return 0
 }
+
+# ---- 置き場の変更のパスの読み（実行ファイルを起こさずに動く ccnavi-user-push-approved.sh が使う写し）
+#
+# 実行ファイル（wap の changedPaths の git.PorcelainPaths と、書きかけの一時ファイルの temp）と同じ読み方。一致は
+# tests/fixtures/approved-carry.json で確かめる。
+
+# `git status --porcelain -z` の出力（標準入力）から、パスを 1 行ずつ。改名を読まない（--no-renames）形だけを受ける。
+ccnavi_porcelain_paths() {
+	tr '\000' '\n' | sed -n 's/^...//p'
+}
+
+# 標準入力のパスのうち、書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、
+# 設定の同期（tickets/sync/mirror）の `*.ccnavi-sync`）でないものを 1 行ずつ。
+ccnavi_drop_temp() {
+	grep -v -E '(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$' || :
+}
