@@ -75,67 +75,11 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             ready.stdout.index(f"ワークツリー {PARENT} を削除しました"),
         )
         self.assertFalse(os.path.exists(self.tree))
-
-    def test_ready_commits_and_pushes_the_archive_removals_before_undrafting(self):
-        """ready の退避（閉じたチケットの削除）は、write-and-push がコミットして push してから
-        Draft を外す。"""
-        old = f"{APPROVED}/phases/old/closed.json"
-        write(os.path.join(self.tree, *old.split("/")), "{}\n")
-        git(self.tree, "add", old)
-        git(self.tree, "commit", "-q", "-m", "old")
-        git(self.tree, "push", "-q", "origin", PARENT)
-        mover = executable(
-            os.path.join(self._base, "bin", "mover"),
-            "#!/bin/sh\n" + wap_prelude(exe.sh_path()) + 'case " $* " in\n'
-            '*" review ready "*)\n'
-            '  prev=""; for a in "$@"; do\n'
-            '    [ "$prev" = --record-writes ] && list="$a"\n'
-            '    [ "$prev" = --record-tree ] && tree="$a"\n'
-            '    prev="$a"; done\n'
-            f'  rm "$tree/{old}"\n'
-            f"  printf '{old}\\n' >\"$list\"\n"
-            "  exit 0 ;;\n"
-            "esac\n"
-            f"exec '{self.half}' \"$@\"\n",
-        )
-        ready = self.review("ready", "--parent", PARENT, cwd=self.ws, CCNAVI_ENTRY_PATH=mover)
-        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を解除した", ready.stdout)
-        self.assertFalse(os.path.exists(self.tree))
-        self.assertEqual(self.remote_sha(), self.sha(self.ws, PARENT))
-        self.assertIn(old, self.committed(PARENT, self.ws))
-        self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", old).stdout, "")
-
-    def test_ready_from_outside_drops_the_parent_worktree_after_undrafting(self):
-        """`ready --parent <親>` を親のワークツリーの外（ワークスペースルート）から打つ。
-        Draft を外し、最後に親のワークツリーを消す（ブランチは残す）。"""
-        ready = self.sh(
-            "ccnavi-review.sh",
-            "ready",
-            "--parent",
-            PARENT,
-            cwd=self.ws,
-            PATH=self.path,
-            GITLAB_TOKEN="t0k",
-            CCNAVI_ENTRY_PATH=self.half,
-            HALF_TREE=self.tree,
-        )
-        self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
-        self.assertIn("Draft を解除した", ready.stdout)
-        self.assertIn(f"ワークツリー {PARENT} を削除しました", ready.stdout)
+        self.assertEqual(git(self.ws, "branch", "--list", PARENT).stdout.strip(), PARENT)
         # 成功の終わりに、次の一手（ユーザのマージ待ち）を 1 行だけ言う
         self.assertEqual(
             1, len([ln for ln in ready.stdout.splitlines() if ln.startswith("次: ")]), ready.stdout
         )
-        self.assertLess(
-            ready.stdout.index("Draft を解除した"),
-            ready.stdout.index(f"ワークツリー {PARENT} を削除しました"),
-        )
-        self.assertFalse(os.path.exists(self.tree))
-        self.assertEqual(git(self.ws, "branch", "--list", PARENT).stdout.strip(), PARENT)
-        # 送ったものはリモートに届いている（ready のマーカー）
-        shown = git(self.ws, "show", "--name-only", "--format=", f"{PARENT}").stdout
-        self.assertIn(f"{APPROVED}/phases/{PARENT}/ready.json", shown)
 
     def test_ready_keeps_the_parent_worktree_when_the_draft_stays(self):
         """Draft を外し損ねたら、外から打っても親のワークツリーは消さない。
@@ -212,10 +156,14 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
                 self.assertNotIn("Draft を解除した", refused.stdout)
         self.assertTrue(os.path.isdir(self.tree))
 
-    def test_ready_commits_the_wip_removals_and_names_them(self):
-        """ready が消した wip/ の追跡済みのファイルは、write-and-push
-        が退避と一緒にコミットして push する。
-        消したものと、戻せる版（消す前の HEAD）を出す。"""
+    def test_ready_commits_the_archive_and_wip_removals_and_names_them(self):
+        """ready の退避（閉じたチケットの削除）と、消した wip/ の追跡済みのファイルは、
+        write-and-push がコミットして push してから Draft を外す。
+        消した wip/ のファイルと、戻せる版（消す前の HEAD）を出す。"""
+        old = f"{APPROVED}/phases/old/closed.json"
+        write(os.path.join(self.tree, *old.split("/")), "{}\n")
+        git(self.tree, "add", old)
+        git(self.tree, "commit", "-q", "-m", "old")
         self.wip_note()
         head = self.sha(self.tree, "HEAD")
         mover = executable(
@@ -227,8 +175,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             '    [ "$prev" = --record-tree ] && tree="$a"\n'
             '    [ "$prev" = --root ] && root="$a"\n'
             '    prev="$a"; done\n'
-            f'  rm "$tree/{WIP_NOTE}"\n'
-            f"  printf '{WIP_NOTE}\\n' >\"$list\"\n"
+            f'  rm "$tree/{old}" "$tree/{WIP_NOTE}"\n'
+            f"  printf '{old}\\n{WIP_NOTE}\\n' >\"$list\"\n"
             '  mkdir -p "$root/logs/state"; : >"$root/logs/state/note.md"\n'
             "  printf '%s\\n' \"$root/logs/state/note.md\"\n"
             "  printf 'tree %s\\n' \"$tree\"\n"
@@ -242,11 +190,14 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         )
         ready = self.review("ready", "--parent", PARENT, cwd=self.ws, CCNAVI_ENTRY_PATH=mover)
         self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
+        self.assertIn("Draft を解除した", ready.stdout)
         self.assertIn("wip/ の追跡済みのファイルを削除しました（1 件", ready.stdout)
         self.assertIn(head[:12], ready.stdout)
         self.assertIn(f"  {WIP_NOTE}", ready.stdout)
         self.carried_after_drop(WIP_NOTE)
-        self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", WIP_NOTE).stdout, "")
+        self.assertIn(old, self.committed(PARENT, self.ws))
+        for rel in (old, WIP_NOTE):
+            self.assertEqual(git(self.ws, "ls-tree", PARENT, "--", rel).stdout, "")
 
     def test_the_real_ready_moves_the_rest_again_after_a_failed_push(self):
         """実際の実行ファイルの ready（退避を始めた後の打ち直し）を write-and-push の中で通す。

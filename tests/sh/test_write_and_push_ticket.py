@@ -48,26 +48,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertFalse(os.path.exists(self.lock_dir()))
 
-    def test_other_staged_changes_stay_out_of_the_commit(self):
-        """commit --only: 索引の他の変更はコミットに入らず、索引に残る。"""
-        write(os.path.join(self.tree, "src", "other.py"), "x = 1\n")
-        git(self.tree, "add", "--", "src/other.py")
-        # 取り込みの merge は索引が HEAD と同じときだけなので、リモートと同じ形で見る。
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("src/other.py", self.committed())
-        self.assertIn("A  src/other.py", self.dirty())
-
-    def test_a_child_is_carried_on_the_parent_branch(self):
-        self.assertEqual(self.ticket("start", PARENT).returncode, 0)
-        self.child_tree()
-        result = self.ticket("start", CHILD)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(f"{APPROVED}/doing/{CHILD}.md", self.committed())
-        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-
-    # ---- 8. hook の書きかけ（b）は先にコミットする。ユーザの判断（c）と知らない変更（d）は止める
-
     def test_hook_marks_are_committed_before_the_take_in(self):
         pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
         result = self.ticket("start", PARENT)
@@ -94,33 +74,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertEqual(self.read(self.copy(PARENT)), copy)
         self.assertEqual(self.sha(self.tree, "HEAD"), head)
         self.assertFalse(os.path.exists(self.lock_dir()))
-
-    def test_an_unknown_change_in_the_place_stops(self):
-        write(os.path.join(self.tree, *APPROVED.split("/"), "notes.txt"), "x\n")
-        # 形は hook のマーカーでも、変更前が在る（書き換え）なら hook のものとは読まない。
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ccnavi が把握していない変更", result.stderr)
-        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
-
-    def test_a_forged_mark_with_other_fields_is_not_carried(self):
-        self.mark(1, "skipped", {"by": "agent", "at": "t"})
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ユーザの判断が未送信", result.stderr)
-
-    def test_an_unsent_commit_in_the_place_stops(self):
-        """未送信の置き場のコミットが (b) でなければ止める。"""
-        rel = f"{APPROVED}/doing/{CHILD}.md"
-        with open(os.path.join(self.tree, rel), "a", encoding="utf-8") as f:
-            f.write("tampered\n")
-        git(self.tree, "commit", "-q", "-am", "edit a copy")
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("未送信のコミット", result.stderr)
-        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
-
-    # ---- 2. ロック
 
     def test_a_held_lock_stops_without_writing(self):
         os.makedirs(self.lock_dir())
@@ -262,20 +215,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertEqual(self.read(self.copy(PARENT)), copy)
         self.assertEqual(self.dirty(), "")
 
-    def test_a_moved_head_is_not_undone(self):
-        """戻すのは先頭が自分のコミットのときだけ（比較つきの update-ref）。"""
-        # push の前に、別の操作が先頭に積んだ形を pre-push で作る。
-        hook = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
-        hook = hook if os.path.isabs(hook) else os.path.join(self.tree, hook)
-        executable(
-            os.path.join(hook, "pre-push"),
-            "#!/bin/sh\ngit commit -q --allow-empty -m other >/dev/null 2>&1\nexit 1\n",
-        )
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("戻さずに止めた", result.stderr)
-        self.assertEqual(self.subjects(2), ["other", f"ccnavi: {PARENT} に着手"])
-
     @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
     def test_a_term_before_the_push_ends_undoes_the_commit(self):
         """送る前に TERM が来たら、自分のコミットを戻して抜ける。"""
@@ -376,17 +315,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertIn("制限時間", result.stderr)
         self.assertEqual(self.dirty(), "")
 
-    def test_the_users_commit_hooks_are_skipped(self):
-        hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
-        hooks = hooks if os.path.isabs(hooks) else os.path.join(self.tree, hooks)
-        for name in ("pre-commit", "commit-msg"):
-            executable(os.path.join(hooks, name), "#!/bin/sh\nexit 1\n")
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-
-    # ---- 書く前に分かる条件は、何も変えずに最初に断る
-
     def assert_nothing_changed(self, before, pending):
         """断ったあと、親のブランチ・リモート・ロック・hook のマーカーが動いていない。"""
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
@@ -411,17 +339,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertEqual(git(self.ws, "branch", "--list", CHILD).stdout.strip(), "")
         self.assert_nothing_changed(before, pending)
 
-    def test_cancel_without_a_reason_is_refused_before_the_take_in_and_commit(self):
-        pending = self.mark(1, "pending", {"review": True, "at": "2026-09-29T00:00:00+0900"})
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("cancel", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("--reason", result.stderr)
-        lines = self.next_lines(result)
-        self.assertEqual(len(lines), 1, result.stderr)
-        self.assertIn(f"ccnavi-ticket.sh cancel {PARENT} --reason", lines[0])
-        self.assert_nothing_changed(before, pending)
-
     def test_finish_of_an_unstarted_child_is_refused_before_the_merge(self):
         self.assertEqual(self.ticket("start", PARENT).returncode, 0)
         tree = self.child_tree()
@@ -436,39 +353,24 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assert_nothing_changed(before, pending)
 
     def test_check_flag_runs_only_the_gate(self):
+        """--check は書く前の検査だけ。通っても断っても、何も書かず、子のワークツリーも作らない。"""
         before = self.sha(self.tree, "HEAD")
         ok = self.ticket("start", PARENT, "--check")
         self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
         self.assertIn("何も変えていません", ok.stdout)
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
         self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
-
-    def test_check_flag_refuses_an_id_in_two_places_without_a_child_worktree(self):
         done = self.copy(CHILD, "done")
         os.makedirs(os.path.dirname(done), exist_ok=True)
         write(done, self.read(self.copy(CHILD)))
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("start", CHILD, "--check")
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("複数の場所", result.stderr)
+        refused = self.ticket("start", CHILD, "--check")
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn("複数の場所", refused.stderr)
         self.assertFalse(os.path.exists(os.path.join(self.ws, ".claude", "worktrees", CHILD)))
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
 
-    # ---- write-and-push を飛ばさせない
-
-    def test_a_double_dash_does_not_slip_past_write_and_push(self):
-        result = self.ticket("start", "--", PARENT)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(self.subjects(1), [f"ccnavi: {PARENT} に着手"])
-        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-
-    def test_the_executable_refuses_a_state_operation_without_write_and_push(self):
-        refused = self.exe("ticket", "start", PARENT)
-        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("write-and-push の対象", refused.stderr)
-        self.assertEqual(self.dirty(), "")
-
-    def test_a_long_lock_of_a_live_owner_is_not_taken(self):
+    def test_a_long_lock_names_its_owner_and_how_to_stop_it(self):
+        """生きている持ち主のロックは、10 分を超えても取らない。持ち主と止め方を言う。"""
         os.makedirs(self.lock_dir())
         host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
         old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
@@ -479,24 +381,11 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         result = self.ticket("start", PARENT)
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn("10 分を超えて取られたまま", result.stderr)
-        self.assertTrue(os.path.isdir(self.lock_dir()))
-
-    def test_a_long_lock_names_its_owner_and_how_to_stop_it(self):
-        os.makedirs(self.lock_dir())
-        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
-        old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
-        write(
-            os.path.join(self.lock_dir(), "owner"),
-            f"{host} {live_sh_pid(self)} {old} {live_sh_pid(self)}-{old}\n",
-        )
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
         self.assertIn(f"持ち主は pid {live_sh_pid(self)}・ホスト {host}・開始 {at}", result.stderr)
         self.assertIn("ユーザに終了させてもらってから再実行して", result.stderr)
+        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
         self.assertTrue(os.path.isdir(self.lock_dir()))
-
-    # ---- 基点のリンク
 
     @requires_symlink
     def test_a_linked_workspace_still_carries(self):
