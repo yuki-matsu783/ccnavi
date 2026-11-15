@@ -16,7 +16,7 @@ import (
 //
 //   - plan <名前>=<値>…: 手元の項目から、ホストの API とリモートの git を確かめに行くか（`api yes|no`・`git yes|no`）
 //   - check <名前>=<値>…: 項目ごとの結果（`item <項目> <結果>`・`line <項目> <行>`）、`result`・`fix`・`auth`・
-//     `access-unknown yes`、勧める対処の `next <行>`
+//     `access-unknown yes`、確かめきれなくても続けてよいなら `continue yes`、勧める対処の `next <行>`
 //   - next <名前>=<値>…: 勧める対処（fix=）の `次:` の行
 //   - access github|gitlab <プロジェクトの応答> [<member の応答>]: 書き込みの権限（`access ok|ng|unknown` と `why <理由>`）
 //   - uid <user の応答>: GitLab の自分の id（`uid <id>`。読めなければ何も出さない）
@@ -68,6 +68,9 @@ func runPreflight(stdout, stderr io.Writer, root string, args []string) int {
 			}
 			if r.AccessUnknown {
 				say("access-unknown", "yes")
+			}
+			if r.Continue() {
+				say("continue", "yes")
 			}
 			if next := preflight.Next(root, f.Top, r.Fix, f.Kind, f.Host, f.Path); next != "" {
 				say("next", next)

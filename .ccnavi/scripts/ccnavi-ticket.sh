@@ -322,8 +322,7 @@ ticket_preflight() {
 	ccnavi_pf_top="${ccnavi_wap_tree:-$here}"
 	ccnavi_pf_next
 	[ -z "$ccnavi_pf_next_text" ] || ccnavi_wap_say "$ccnavi_pf_next_text"
-	if [ "$ccnavi_pf_result" = unverified ] && [ "$ccnavi_pf_api" = unverified ] &&
-		[ "$ccnavi_pf_access" = skipped ] && [ "$ccnavi_pf_git" = ok ]; then
+	if [ "$ccnavi_pf_continue" = yes ]; then
 		ccnavi_wap_say "注意: ホストの API を確かめられなかったが、続ける。このあとの review-request・confirm・ready はホストの API が要る"
 		log_info 事前確認で注意して続ける -- "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
 		return 0

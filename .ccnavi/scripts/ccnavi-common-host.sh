@@ -2,7 +2,7 @@
 #
 # ホスト（GitHub / GitLab）への接続。
 
-# ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh と ccnavi-branches.sh が使う）
+# ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh・ccnavi-branches.sh・ccnavi-start.sh と事前確認が使う）
 #
 # origin の URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
 # （GITHUB_TOKEN / GITLAB_TOKEN）でホストの API を読み書きする。結果の組み立てには jq が要る。
@@ -507,7 +507,7 @@ ccnavi_git_auth() {
 # ---- 事前確認（チケット作業の入口と、子チケットの作業から始める操作が使う）
 #
 # ホストの API と git のリモートが使える状態かを確かめる。ここの関数はユーザ向けの文面を出さず、
-# 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（.agents/docs/script-output.md）。
+# 結果・勧める対処と、実行ファイルが組み立てた行と `次:` の行を変数で返す。出すかどうかは呼ぶ側が決める。
 
 # ccnavi_host_connect の後に呼ぶ。経路によらずプロジェクトを 1 回読む（GitHub は repos/<パス>、GitLab は projects/<パス>）。
 #   ccnavi_h_project_json  応答の JSON
@@ -600,6 +600,7 @@ ccnavi_host_access() {
 #     ccnavi_pf_fix          勧める対処の種類（無ければ空）
 #     ccnavi_pf_auth_source  認証の出どころの種類（cli / token / none。値は入れない）
 #     ccnavi_pf_access_unknown  権限を判定できなかった（ok として続ける）なら yes
+#     ccnavi_pf_continue     確かめきれなくても続けてよい（ホストの API だけを確かめられず、git は通る）なら yes
 # 1 回の問い合わせは 15 秒、git の確認は 30 秒（どちらも CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。
 # 全体を過ぎたら残りは skipped。キャッシュはしない。毎回確かめる。
 ccnavi_pf_late() {
@@ -666,6 +667,7 @@ ccnavi_preflight() {
 	ccnavi_pf_fix=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^fix //p')
 	ccnavi_pf_auth_source=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^auth //p')
 	ccnavi_pf_access_unknown=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^access-unknown //p')
+	ccnavi_pf_continue=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^continue //p')
 	return 0
 }
 

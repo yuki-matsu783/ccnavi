@@ -216,6 +216,12 @@ func Check(f Facts) Result {
 	return r
 }
 
+// Continue は、確かめきれなくても作業を続けてよいか。ホストの API だけを確かめられず（権限は確かめていない）、リモートの
+// git は通るとき（子チケットの作業から始める操作は、このあとホストの API が要る操作まで進めてよい）。
+func (r Result) Continue() bool {
+	return r.Total == unverified && r.Kind["api"] == unverified && r.Kind["access"] == skipped && r.Kind["git"] == ok
+}
+
 // gitAuthFailed は、ls-remote の標準エラーが認証の失敗を言っているか。
 func gitAuthFailed(text string) bool {
 	for _, word := range []string{"Authentication failed", "could not read Username", "Permission denied", "error: 403", "HTTP 403", "returned error: 403"} {
