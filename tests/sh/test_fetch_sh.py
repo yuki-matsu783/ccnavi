@@ -409,7 +409,9 @@ class FetchTest(unittest.TestCase):
                 pass
 
         server = http.server.HTTPServer(("127.0.0.1", 0), Unauthorized)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(
+            target=server.serve_forever, args=(0.05,), daemon=True
+        ).start()  # 止めるときの待ちを縮める
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         url = f"http://127.0.0.1:{server.server_address[1]}/o/r.git"
@@ -438,7 +440,9 @@ class FetchTest(unittest.TestCase):
                 pass
 
         server = http.server.HTTPServer(("127.0.0.1", 0), Unauthorized)
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(
+            target=server.serve_forever, args=(0.05,), daemon=True
+        ).start()  # 止めるときの待ちを縮める
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         return server.server_address[1]

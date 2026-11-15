@@ -363,7 +363,9 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
         GitLab.fail_notes = False
         server = http.server.HTTPServer(("127.0.0.1", 0), GitLab)
         GitLab.port = server.server_address[1]
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(
+            target=server.serve_forever, args=(0.05,), daemon=True
+        ).start()  # 止めるときの待ちを縮める
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         self.posted = GitLab.posted
