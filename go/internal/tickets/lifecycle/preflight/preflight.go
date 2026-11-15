@@ -32,7 +32,7 @@ const (
 
 // Facts は sh が渡す事実。空の欄は「確かめていない」。
 type Facts struct {
-	// Top はリポジトリのトップ、Root はワークスペースルート（文面を引く）。
+	// Top はリポジトリのトップ、Root はワークスペースルート（案内の文面ファイルを引く場所）。
 	Top, Root string
 	// Parse は origin の URL をホストのものとして読めたか（ok / ng）、ParseWhy と Masked はその理由と伏せた URL。
 	Parse, ParseWhy, Masked string
@@ -194,7 +194,7 @@ func Check(f Facts) Result {
 			}
 		}
 	}
-	// 勧める対処: ng か unverified の項目のうち、次の順で最初に当たるもの
+	// 勧める対処: ng か unverified の項目のうち、次の順で最初に該当するもの
 	switch {
 	case r.Kind["tools"] == ng:
 		r.Fix = "tool"
@@ -216,8 +216,8 @@ func Check(f Facts) Result {
 	return r
 }
 
-// Continue は、確かめきれなくても作業を続けてよいか。ホストの API だけを確かめられず（権限は確かめていない）、リモートの
-// git は通るとき（子チケットの作業から始める操作は、このあとホストの API が要る操作まで進めてよい）。
+// Continue は、確かめきれなくても作業を続けてよいかを返す。ホストの API だけを確かめられず（権限は確かめていない）、
+// リモートの git は通るときに限る。子チケットの作業から始める操作は、このあとホストの API が要る操作まで進めてよい。
 func (r Result) Continue() bool {
 	return r.Total == unverified && r.Kind["api"] == unverified && r.Kind["access"] == skipped && r.Kind["git"] == ok
 }

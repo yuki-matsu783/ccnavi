@@ -602,7 +602,7 @@ ccnavi_host_access() {
 #     ccnavi_pf_access_unknown  権限を判定できなかった（ok として続ける）なら yes
 #     ccnavi_pf_continue     確かめきれなくても続けてよい（ホストの API だけを確かめられず、git は通る）なら yes
 # 1 回の問い合わせは 15 秒、git の確認は 30 秒（どちらも CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。
-# 全体を過ぎたら残りは skipped。キャッシュはしない。毎回確かめる。
+# 全体が 60 秒を過ぎたら残りは skipped。キャッシュはしない。毎回確かめる。
 ccnavi_pf_late() {
 	[ $(($(date +%s) - ccnavi_pf_t0)) -lt "${CCNAVI_PREFLIGHT_TOTAL:-60}" ] && return 1
 	return 0

@@ -23,7 +23,7 @@ func UserID(user []byte) string {
 }
 
 // Access は、プロジェクトの応答（GitLab は自分の member の応答も。無ければ nil）から書き込みの権限を判定する。答えは
-// ok（足りる）・ng（足りない）・unknown（判定できない）と理由。「足りる」は、リポジトリのロールの上で書き込めるという
+// ok（足りる）・ng（足りない）・unknown（判定できない）と理由。「足りる」は、リポジトリのロールで書き込めるという
 // 意味に限る（トークンの scope・ブランチの保護・API と git が別の資格情報で動いていることは確かめていない）。
 func Access(kind string, project, member []byte) (string, string) {
 	if kind == "github" {
