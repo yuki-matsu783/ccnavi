@@ -3150,6 +3150,7 @@ case " $* " in
   printf '{{"compat": {compat}}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+*" host "* | *" path under "* | *" git integration "*) exec '{exe}' "$@" ;;
 esac
 exit 0
 """
@@ -3484,7 +3485,7 @@ class FakeGitlabHostTest(unittest.TestCase):
         git(self.ws.target, "switch", "-q", "-c", "i0001")
         exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            EXE_STUB.format(compat=built.compat(), log=os.path.join(self._tmp.name, "args.txt")),
+            EXE_STUB.format(compat=built.compat(), log=os.path.join(self._tmp.name, "args.txt"), exe=built.sh_path()),
         )
         os.chmod(exe, 0o755)
         env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})
