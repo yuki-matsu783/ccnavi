@@ -1,5 +1,5 @@
 {
-  "note": "origin の URL -> ホストの分類と接続先。Python（review_host.classify）・sh（ccnavi_host_parse）・Chrome 拡張（hostclass.ts の classifyOrigin）が同じ表で一致を確かめる。host は分類に使うホスト（小文字・ポート無し）。api は REST の根、graphql は GitHub 系の GraphQL（GitLab は REST だけなので null）。problem があるものは接続先を組めず止まる（api と graphql は無い）。GHE.com の API の URL の規則は実物では未検証で、この表は仕様の前提を固定するもの。",
+  "note": "origin の URL -> ホストの分類と接続先。実行ファイル（host.classify）・sh（ccnavi_host_parse）が同じ表で一致を確かめる。host は分類に使うホスト（小文字・ポート無し）。api は REST の根、graphql は GitHub 系の GraphQL（GitLab は REST だけなので null）。problem があるものは接続先を組めず止まる（api と graphql は無い）。GHE.com の API の URL の規則は実物では未検証で、この表は仕様の前提を固定するもの。",
   "cases": [
     {"origin": "https://github.com/acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},
     {"origin": "https://GITHUB.COM/acme/widgets.git", "kind": "github", "host": "github.com", "api": "https://api.github.com", "graphql": "https://api.github.com/graphql", "path": "acme/widgets"},

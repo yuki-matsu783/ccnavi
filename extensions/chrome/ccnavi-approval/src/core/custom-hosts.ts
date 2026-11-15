@@ -7,10 +7,18 @@
  * 足すときの許可（`chrome.permissions.request`）は設定画面の役目で、ここには持たない。
  */
 import type { StorageArea } from "./settings.js";
-import { isGheHost } from "./hostclass.js";
 import { endpoint, type Host, type HostKind } from "./hosts.js";
 
 export const CUSTOM_KEY = "customHosts";
+
+/**
+ * 小文字のホスト名が `ghe.com` か、そのサブドメインか（`.` の区切りで照合する。`evilghe.com` は当たらない）。
+ * 規則は実行ファイルの `host.classify` の GHE.com の枝と同じ。設定画面と service worker で使い、ccnavi（WASM）を
+ * 起こさない場面なので、ここに写しを置く
+ */
+export function isGheHost(host: string): boolean {
+  return host === "ghe.com" || (host.endsWith(".ghe.com") && host.length > ".ghe.com".length);
+}
 
 /** 足すホストの id の形（`ホスト名[_ポート][_http]`。組み込みの一覧の ID より `_` の分だけ広い） */
 const CUSTOM_ID = /^[a-z0-9][a-z0-9._-]*$/;

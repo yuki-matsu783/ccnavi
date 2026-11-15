@@ -11,8 +11,8 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 )
 
-// remote は origin の URL の読み方。sh の ccnavi_host_parse（ccnavi-common-host.sh）と Chrome 拡張の
-// hostclass.ts と同じ規則で、tests/fixtures/host-kinds.json の同じ表で突き合わせる。
+// remote は origin の URL の読み方。sh の ccnavi_host_parse（ccnavi-common-host.sh）と同じ規則で、
+// tests/fixtures/host-kinds.json の同じ表で突き合わせる。
 //   - ホストにはポートが付く（localhost:8929）。ssh の git@host:group/proj の `:` はパスの区切りなので、
 //     数字だけのときにポートと見なす
 //   - ユーザ情報（https://oauth2:token@host/）は authority の最後の `@` までと見る（トークンに `@` が入る）
