@@ -9,7 +9,7 @@ func TestWorktreesAndHolding(t *testing.T) {
 		t.Fatalf("parseWorktrees = %+v", list)
 	}
 	for _, c := range []struct{ branch, want string }{
-		{"main", "/ws"}, {"i0001", "/ws/.claude/worktrees/i0001"}, {"I0001", "/ws/.claude/worktrees/i0001"}, {"ma", ""}, {"", ""},
+		{"main", "/ws"}, {"i0001", "/ws/.claude/worktrees/i0001"}, {"I0001", ""}, {"ma", ""}, {"", ""},
 	} {
 		if w, _ := Holding(list, c.branch); w.Path != c.want {
 			t.Errorf("Holding(%q) = %q, want %q", c.branch, w.Path, c.want)

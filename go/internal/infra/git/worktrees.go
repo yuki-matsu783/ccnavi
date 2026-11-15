@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
-	"ccnavi/internal/infra/pathcase"
 )
 
 // worktreeArgs は、ワークツリーの一覧を機械向けの形で出す git の引数。
@@ -43,11 +42,11 @@ func Worktrees(cwd string, o Options) ([]Worktree, bool) {
 	return parseWorktrees(done.Out), true
 }
 
-// Holding は、list のうちブランチ branch を開いているツリー。名前は大文字小文字と NFC を区別せずに比べる
-// （pathcase.SameName）。無ければ偽。
+// Holding は、list のうちブランチ branch を開いているツリー。名前は完全一致で比べる（ブランチ名は git が
+// 大文字小文字を区別するので、畳むと綴り違いの別のブランチを取り違える）。無ければ偽。
 func Holding(list []Worktree, branch string) (Worktree, bool) {
 	for _, w := range list {
-		if w.Ref != "" && pathcase.SameName(w.Branch(), branch) {
+		if w.Ref != "" && w.Branch() == branch {
 			return w, true
 		}
 	}

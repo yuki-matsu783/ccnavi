@@ -85,13 +85,13 @@ type Porcelain struct {
 }
 
 // PorcelainPaths は `git status --porcelain -z --no-renames` の出力のパス（並びは git のとおり）。各項目の頭の
-// 3 字（状態の 2 字と空白）を除く。sh の ccnavi_porcelain_paths（ccnavi-common-write-and-push.sh）と同じ読み方で、
-// 一致は tests/fixtures/approved-carry.json で確かめる。
+// 3 バイト（状態の 2 字と空白。ASCII）を除き、パスはバイトのまま返す。sh の ccnavi_porcelain_paths
+// （ccnavi-common-write-and-push.sh）と同じ読み方で、一致は tests/fixtures/approved-carry.json で確かめる。
 func PorcelainPaths(out string) []string {
 	var paths []string
 	for _, entry := range strings.Split(out, "\x00") {
-		if r := []rune(entry); len(r) > 3 {
-			paths = append(paths, string(r[3:]))
+		if len(entry) > 3 {
+			paths = append(paths, entry[3:])
 		}
 	}
 	return paths
