@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import unittest
 
 from tests import script_command
@@ -26,6 +27,25 @@ from tests.config.test_config_union import (
     layer_path,
     write,
 )
+
+
+def judge_calls(case, calls):
+    """(ツール, 対象) を何件も 1 回の起動で判定し、1 件ごとに (決定, ヒットしたルールの id) を返す。
+
+    `--test-expectations` に渡す。判定は hook の実行前と同じ関数（TryOne）を通り、居場所は
+    ワークスペースルート。期待のタイプは判定に効かない。JSON は YAML としても読める。
+    """
+    calls = list(calls)
+    with tempfile.TemporaryDirectory(prefix="ccnavi-absent-expect-") as scratch:
+        path = os.path.join(scratch, "expectations.yml")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"ask": [{"tool": t, "subject": x} for t, x in calls]}, f)
+        done = case.ccnavi("--test-expectations", path, "--json")
+    case.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+    bodies = json.loads(done.stdout)["expectations"]
+    case.assertEqual(len(bodies), len(calls))
+    return [(b["verdict"], [hit["id"] for hit in b["rules"]]) for b in bodies]
+
 
 # 組み込みの既定は `Read` だけを通す（allow）。deny は取り返しの付かない操作。
 RM_RF = "rm -rf /tmp/x"
@@ -257,21 +277,23 @@ class BuiltinFormsTest(ConfigUnionHarness):
 
     git のグローバルオプションを挟んだ形、rm の再帰と強制の組み合わせ・順序・長い形。
     片方だけの rm や、`git` を含む別の語は止めない。共通レイヤーが無いときと、壊れて組み込みの
-    既定に戻ったときの両方で見る（hook と同じ経路）。表は共通レイヤーが無いときに全部を回し、
-    壊れたときは代表だけを回す（土台の deny の読みは状態に依らない。表の読みは Go の
-    policy/builtin の見本も見る）。
+    既定に戻ったときの両方で見る（hook の実行前と同じ判定の本体を、表ごとに 1 回の起動で通す）。
     """
 
-    def check(self, denied=BUILTIN_DENIED, passed=BUILTIN_PASSED):
-        for command, rule in denied:
+    def check(self):
+        denied, passed = BUILTIN_DENIED, BUILTIN_PASSED
+        # 何本も 1 回の起動で判定する。hook を通した代表は test_next_step_names_the_git_wrapper。
+        calls = [("Bash", c) for c, _ in denied] + [("Bash", c) for c in passed]
+        answers = judge_calls(self, calls)
+        for (command, rule), (verdict, ids) in zip(denied, answers, strict=False):
             with self.subTest(command=command):
-                self.assert_denied(self.hook("Bash", self.ws, command=command), rule)
-        for command in passed:
+                self.assertEqual(verdict, "deny", ids)
+                self.assertIn(rule, ids)
+        for command, (verdict, ids) in zip(passed, answers[len(denied) :], strict=True):
             with self.subTest(command=command):
-                result = self.hook("Bash", self.ws, command=command)
                 # 生の git は組み込みで常に止まる。ほかの土台の deny にヒットしていないことを見る。
-                if self.decision(result) == "deny":
-                    self.assert_denied(result, RAW_GIT_BUILTIN)
+                if verdict == "deny":
+                    self.assertIn(RAW_GIT_BUILTIN, ids)
 
     def test_without_the_common_layer(self):
         os.remove(self.rules)
@@ -279,7 +301,7 @@ class BuiltinFormsTest(ConfigUnionHarness):
 
     def test_with_a_broken_common_layer(self):
         write(self.rules, BROKEN)
-        self.check(BUILTIN_DENIED[:1] + BUILTIN_DENIED[6:7], BUILTIN_PASSED[:1])
+        self.check()
 
     def test_next_step_names_the_git_wrapper(self):
         """次の一手に挙げる git の操作は、ラッパーがあればラッパーの実パスで書く。
@@ -442,46 +464,42 @@ class BuiltinGitDirTest(ConfigUnionHarness):
     名指しのツール（Write / Edit / NotebookEdit）は `.git/` の下と `.git` そのもの、
     シェルは守る場所と同じ書き込みの形で見る。読むだけと、`.gitignore`・`.github/` は
     止めない。git のラッパーの呼び出しは、`.git` がコマンド文字列に出ないのでヒットしない。
-    表は共通レイヤーが無いときに全部を回し、ほかの状態では代表だけを回す。
+    表は状態ごとに 1 回の起動でまとめて判定する。
     """
 
-    def check(self, full=True):
-        tools = ("Write", "Edit", "NotebookEdit") if full else ("Write",)
+    def check(self):
+        # 何件も 1 回の起動で判定する。hook を通した代表は test_the_message_names_the_git_wrapper。
+        tools = ("Write", "Edit", "NotebookEdit")
         paths = (
             os.path.join(self.ws, ".git", "config"),
             os.path.join(self.ws, ".git", "hooks", "pre-commit"),
             os.path.join(self.ws, "wt", ".git"),
         )
-        for tool in tools:
-            for path in paths if full else paths[:1]:
-                with self.subTest(tool=tool, path=path):
-                    field = "notebook_path" if tool == "NotebookEdit" else "file_path"
-                    result = self.hook(tool, self.ws, **{field: path})
-                    self.assert_denied(result, GIT_DIR_BUILTIN)
         names = (".gitignore", os.path.join(".github", "w.yml"), "repo.git")
-        for name in names if full else names[:1]:
-            with self.subTest(path=name):
-                self.hook("Write", self.ws, file_path=os.path.join(self.ws, name))
-                self.assertNotIn(GIT_DIR_BUILTIN, self.last_record().get("rules", []))
-        for command in GIT_DIR_SHELL_DENIED if full else GIT_DIR_SHELL_DENIED[:1]:
-            with self.subTest(command=command):
-                self.assert_denied(
-                    self.hook("Bash", self.ws, command=command), GIT_DIR_SHELL_BUILTIN
-                )
         wrapper = os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-git.sh")
-        for command in (
-            *(GIT_DIR_SHELL_PASSED if full else GIT_DIR_SHELL_PASSED[:1]),
-            f"sh {wrapper} integrate x",
-            f"sh {wrapper} -C {self.ws} status",
-        ):
-            with self.subTest(command=command):
-                self.hook("Bash", self.ws, command=command)
-                self.assertNotIn(GIT_DIR_SHELL_BUILTIN, self.last_record().get("rules", []))
-        self.hook("Read", self.ws, file_path=os.path.join(self.ws, ".git", "config"))
-        self.assertNotIn(GIT_DIR_BUILTIN, self.last_record().get("rules", []))
+        cases = [(tool, path, GIT_DIR_BUILTIN, True) for tool in tools for path in paths]
+        cases += [("Write", os.path.join(self.ws, n), GIT_DIR_BUILTIN, False) for n in names]
+        cases += [("Bash", c, GIT_DIR_SHELL_BUILTIN, True) for c in GIT_DIR_SHELL_DENIED]
+        cases += [
+            ("Bash", c, GIT_DIR_SHELL_BUILTIN, False)
+            for c in (
+                *GIT_DIR_SHELL_PASSED,
+                f"sh {wrapper} integrate x",
+                f"sh {wrapper} -C {self.ws} status",
+            )
+        ]
+        cases.append(("Read", os.path.join(self.ws, ".git", "config"), GIT_DIR_BUILTIN, False))
+        answers = judge_calls(self, [(tool, subject) for tool, subject, _, _ in cases])
+        for (tool, subject, rule, stops), (verdict, ids) in zip(cases, answers, strict=True):
+            with self.subTest(tool=tool, subject=subject):
+                if stops:
+                    self.assertEqual(verdict, "deny", ids)
+                    self.assertIn(rule, ids)
+                else:
+                    self.assertNotIn(rule, ids)
 
     def test_with_the_common_layer(self):
-        self.check(full=False)
+        self.check()
 
     def test_without_the_common_layer(self):
         os.remove(self.rules)
@@ -489,7 +507,7 @@ class BuiltinGitDirTest(ConfigUnionHarness):
 
     def test_with_a_broken_common_layer(self):
         write(self.rules, BROKEN)
-        self.check(full=False)
+        self.check()
 
     def test_the_message_names_the_git_wrapper(self):
         os.remove(self.rules)
