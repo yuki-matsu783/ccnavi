@@ -18,7 +18,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 140 秒 |
-| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 6 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
+| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 7 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
 | `contract` | 本物の GitLab から録った応答の形（`recorded.json`）と、Python の模擬（`tests/fake_gitlab.py`）・sh の見本（`tests/sh/gitlab_host.py` とフィクスチャ）の応答の形を、`reads` のキーで比べる。比較器・変異・機密・置く分岐の試験を含む。TS 側（Chrome 拡張の `MockGitLab` との比較）は `extensions/chrome/ccnavi-approval` の `pnpm test`（下の表）。録り直しは手動（Docker。`.agents/docs/gitlab-contract.md`）。claude -p のスタブ（`tests/fake_claude.py`）と、本物から録った形（`tests/contract/claude/recorded.json`）の比較も含む（`.agents/docs/claude-contract.md`）。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 15 秒 |
 | `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
 
@@ -46,6 +46,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `tests/<グループ>/` の中 | そのグループ |
 | `go/**` | `guard` `config` `ticket` |
 | `go/internal/infra/platformtag/` | 上に加えて `sh` |
+| sh が実行ファイルに聞く判定と操作の部品（`go/internal/infra/git/`・`tree/`・`reply/`、`go/internal/tickets/lifecycle/` の `integrate/`・`branch/`・`refusal/`・`gitlog/`・`treeadd/`・`cut/`、`go/internal/tickets/review/decide/`、`go/internal/tickets/sync/`、`go/internal/tickets/approval/wap/`、`go/internal/tickets/model/` の `ids/`・`oplog/`・`handoffnames/`、`go/internal/records/stopreview/`） | 上に加えて `sh` |
 | `scripts/ccnavi-build.sh` | `core` `sh` `e2e` |
 | `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh`、`go/internal/tickets/lifecycle/ticketsh/` | `ticket` `config` `e2e`。`ccnavi-ticket.sh`・`ticketsh/` は `sh`（`test_write_and_push_propose`・`test_write_and_push_ticket`）も |
 | `.ccnavi/scripts/ccnavi-git.sh`・`go/internal/tickets/lifecycle/gitwrap/`・`go/internal/tickets/lifecycle/land/` | `sh` `guard` `config` `e2e` |

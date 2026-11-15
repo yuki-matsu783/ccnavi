@@ -167,6 +167,13 @@
         （write-and-push 用。取り込み直した先頭に自分のコミットが入っていれば "landed yes <sha>" を出力します）
     ccnavi write-and-push unsent <tree> <branch>
         （ccnavi-user-push-approved.sh 用。まだ送れていないパスを "unsent <パス>" で1行ずつ出力します。読み取り専用）
+    ccnavi ops get <op-id>
+        （レビューの sh 用。操作記録の段階と applied を "stage <id>"・"<id>.state" などの1行1つで出力します。読み取り専用）
+    ccnavi ops replied <op-id> <thread-id> <result> [<account>]
+        （ccnavi-user-lib-review.sh 用。スレッドへの返信をホストが既に持っているかを "replied yes|no" で出力します。判定にアカウントが要るときは "replied account"）
+    ccnavi ops resume <op-id>
+    ccnavi ops resume-plan <op-id> <file>
+        （ccnavi-user-decide.sh の --resume 用。resume は再開の表示に使う項目を1行1つで出力し、resume-plan は再開の計画を <file> に書きます）
     ccnavi branches issue|mr <number> [checked github|gitlab <host> <owner/repo> <project-id>|-] [--result <file>] [--json]
     ccnavi branches issue|mr <number> unchecked <reason> [--json]
     ccnavi branches issue|mr <number> failed <call> --result <file> [--json]
