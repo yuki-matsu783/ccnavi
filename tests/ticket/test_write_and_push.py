@@ -420,8 +420,9 @@ class ChooseTest(PhaseHarness):
             "--choose-out", out, "--result", fixture, stdin="k\n",
         )  # fmt: skip
         self.assertEqual(chosen.returncode, 0, chosen.stdout + chosen.stderr)
-        answer = read_json(out)
-        self.assertEqual(answer["choices"], {"u/7#t0": "keep"})
+        with open(out, encoding="utf-8") as f:
+            answer = dict(line.rstrip("\n").split(" ", 1) for line in f)
+        self.assertEqual(json.loads(answer["choices"]), {"u/7#t0": "keep"})
         status = git(self.parent_tree, "status", "--porcelain")
         self.assertEqual(status.strip(), "")
         outside = self.ccnavi(
@@ -431,7 +432,7 @@ class ChooseTest(PhaseHarness):
         self.assertEqual(outside.returncode, 1)
         done = self.ccnavi(
             "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
-            "--yes", json.dumps(answer["choices"]), "--digest", answer["digest"],
+            "--yes", answer["choices"], "--digest", answer["digest"],
             "--json", "--result", fixture,
         )  # fmt: skip
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)

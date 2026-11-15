@@ -148,32 +148,12 @@ start_save() {
 	printf '%s' "$2" >"$1"
 }
 
-# 答えの <名前> の値（同じ名前の行が続けば改行でつなぐ）。
-start_val() {
-	printf '%s\n' "$sd_out" | sed -n "s/^$1 //p"
-}
-
-# 段取りの判定と出力を実行ファイルに任せる（`ccnavi start <動詞>`）。答えの out・err の行を出し、fail なら
-# その文で止め、exit ならその終了コードで終える。値は start_val で読む。答えが無ければ止める。
+# 段取りの判定と出力を実行ファイルに任せる（`ccnavi start <動詞>`）。答えは ccnavi_do（ccnavi-common-state.sh）が
+# 実行し、値は ccnavi_val で読む。答えが無ければ止める。
 start_do() {
 	sd_out=$(start_read "$@") ||
 		fail start-unanswered "ccnavi の実行ファイルが答えませんでした（start $1）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください（sh .ccnavi/scripts/ccnavi-launcher.sh --version で確かめられます）。" 2
-	sd_say=$(printf '%s\n' "$sd_out" | sed -n 's/^out //p')
-	[ -z "$sd_say" ] || printf '%s\n' "$sd_say"
-	sd_say=$(start_val err)
-	[ -z "$sd_say" ] || printf '%s\n' "$sd_say" >&2
-	sd_fail=$(start_val fail | head -n 1)
-	if [ -n "$sd_fail" ]; then
-		[ -z "$(start_val usage)" ] || usage >&2
-		fail "${sd_fail% *}" "$(start_val msg)" "${sd_fail##* }"
-	fi
-	sd_exit=$(start_val exit | head -n 1)
-	if [ -n "$sd_exit" ]; then
-		sd_reason=$(start_val reason | head -n 1)
-		[ "$sd_exit" = 0 ] || log_info 止めた -- "exit=$sd_exit" "reason=${sd_reason:-start-$1}"
-		exit "$sd_exit"
-	fi
-	return 0
+	ccnavi_do "$sd_out" "start-$1"
 }
 
 # 止める（実行ファイルの `ccnavi start stop <名前> <名前>=<値>…` が文と終了コードを決める）。<名前> [<名前>=<値>]...
@@ -192,39 +172,35 @@ lower() {
 # ---- 引数の検査と、依頼のリポジトリ（--repo）と実行した場所の origin の照合は実行ファイル（`ccnavi start args`）が行う。
 # --repo が違えば、ホストに問い合わせる前に止める。
 start_do args -- "$@"
-if [ -n "$(start_val help)" ]; then
-	usage
-	exit 0
-fi
-what=$(start_val what)
-number=$(start_val number)
-issue_arg=$(start_val issue)
-issue_n=$(start_val issue-n)
-issue_r=$(start_val issue-r)
-mr_arg=$(start_val mr)
-branch_arg=$(start_val branch)
-opt_slug=$(start_val slug)
-opt_prefix=$(start_val prefix)
-opt_title=$(start_val title)
-opt_repo=$(start_val repo)
-new_issue_title=$(start_val new-title)
-new_issue_body=$(start_val body)
-orig_args=$(start_val orig)
-real_args=$(start_val real)
-top=$(start_val top)
-dry=$(start_val dry)
-mcp_checked=$(start_val mcp)
-similar_checked=$(start_val similar)
-opt_reopened=$(start_val reopened)
-check=$(start_val check)
-list_open=$(start_val list-open)
+what=$(ccnavi_val what)
+number=$(ccnavi_val number)
+issue_arg=$(ccnavi_val issue)
+issue_n=$(ccnavi_val issue-n)
+issue_r=$(ccnavi_val issue-r)
+mr_arg=$(ccnavi_val mr)
+branch_arg=$(ccnavi_val branch)
+opt_slug=$(ccnavi_val slug)
+opt_prefix=$(ccnavi_val prefix)
+opt_title=$(ccnavi_val title)
+opt_repo=$(ccnavi_val repo)
+new_issue_title=$(ccnavi_val new-title)
+new_issue_body=$(ccnavi_val body)
+orig_args=$(ccnavi_val orig)
+real_args=$(ccnavi_val real)
+top=$(ccnavi_val top)
+dry=$(ccnavi_val dry)
+mcp_checked=$(ccnavi_val mcp)
+similar_checked=$(ccnavi_val similar)
+opt_reopened=$(ccnavi_val reopened)
+check=$(ccnavi_val check)
+list_open=$(ccnavi_val list-open)
 state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || stop no-state "state=${state}"
 scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.resp" "$host_err.resp2" "$host_err.linked" "$host_err.pf"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.err" "$host_err.resp" "$host_err.resp2" "$host_err.linked" "$host_err.pf"' EXIT
 log_info 始めた -- "kind=${what:-${check:+check}${list_open:+list-open}${new_issue_title:+new-issue}}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -263,11 +239,10 @@ cgit_quiet() {
 	return 0
 }
 
-# origin の全ブランチ名を 1 行 1 本で $heads_file に書く（ls-remote）。読めなければ 1。
-# 識別子の重なりは、MR の有無によらず origin の全ブランチで見る。
+# origin の全ブランチの一覧（ls-remote の応答のまま）を $heads_file に書く。読めなければ 1。
+# 識別子の重なりは、MR の有無によらず origin の全ブランチで見る。応答から名前を読むのは実行ファイル（start branch-ok）。
 remote_heads() {
-	ccnavi_git_timed "${CCNAVI_START_GIT_TIMEOUT:-30}" "$heads_file.err" "$top" ls-remote --heads origin >"$heads_file.raw" || return 1
-	sed -n 's#^[0-9a-fA-F]\{1,\}[[:space:]]\{1,\}refs/heads/##p' "$heads_file.raw" | tr -d '\r' >"$heads_file"
+	ccnavi_git_timed "${CCNAVI_START_GIT_TIMEOUT:-30}" "$heads_file.err" "$top" ls-remote --heads origin >"$heads_file"
 }
 
 # ---- ホスト。origin を読んで繋ぐ。呼ぶのは親のシェルで（結果を変数に残す）、$( ) の中では呼ばない。
@@ -406,8 +381,8 @@ issue_title_get() {
 		issue_why="PR の番号だった"
 		return 3
 	fi
-	issue_title_read=$(printf '%s\n' "$it_read" | sed -n 's/^title //p' | head -n 1)
-	case "$(printf '%s\n' "$it_read" | sed -n 's/^state //p' | head -n 1)" in
+	issue_title_read=$(ccnavi_val1 title "$it_read")
+	case "$(ccnavi_val1 state "$it_read")" in
 	open) issue_state_read=open ;;
 	closed) issue_state_read=closed ;;
 	esac
@@ -442,8 +417,8 @@ issue_branch_make() {
 	fi
 	issue_branch_why=$(tr -d '\r' <"$state/start-issue-id-$$" 2>/dev/null | head -n 1 | sed 's/^ccnavi: //')
 	rm -f "$state/start-issue-id-$$"
-	issue_branch=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^id //p' | head -n 1)
-	issue_branch_long=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^long //p' | head -n 1)
+	issue_branch=$(ccnavi_val1 id "$ib_out")
+	issue_branch_long=$(ccnavi_val1 long "$ib_out")
 	[ -n "$issue_branch" ] && return 0
 	[ "$ib_rc" -ne 0 ] && return 2
 	return 1
@@ -557,7 +532,7 @@ mr_linked_issues_body() {
 	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
 	start_save "$host_err.resp" "$mb_got"
 	mb_read=$(start_read linked-body "$ccnavi_h_path" "$host_err.resp") || return 1
-	printf '%s\n' "$mb_read" | sed -n 's/^issue //p'
+	ccnavi_val issue "$mb_read"
 }
 
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
@@ -591,8 +566,8 @@ mr_linked_issues() {
 				printf '%s' "紐づく issue を読めなかった（GraphQL の応答に errors があるか、MR が見つからない）" >"$host_err.why"
 				return 1
 			fi
-			printf '%s\n' "$ml_read" | sed -n 's/^issue //p'
-			ml_next=$(printf '%s\n' "$ml_read" | sed -n 's/^next //p' | head -n 1)
+			ccnavi_val issue "$ml_read"
+			ml_next=$(ccnavi_val1 next "$ml_read")
 			[ -n "$ml_next" ] || return 0
 			if [ "$ml_page" -ge 5 ]; then
 				printf '%s' "紐づく issue が多すぎて読み切れない（5 ページを超えた）" >"$host_err.why"
@@ -610,7 +585,7 @@ mr_linked_issues() {
 		[ "$ml_rc" -eq 0 ] || return 1
 		start_save "$host_err.resp" "$ml_got"
 		ml_read=$(start_read linked-gitlab "$ccnavi_h_path" "$host_err.resp") || return 1
-		printf '%s\n' "$ml_read" | sed -n 's/^issue //p'
+		ccnavi_val issue "$ml_read"
 	fi
 }
 
@@ -638,7 +613,7 @@ resolve_issue() {
 				esac
 			fi
 			start_do resolve - "issue-n=$issue_n" "issue-r=$issue_r" "own=$own_path"
-			final_issue=$(start_val issue)
+			final_issue=$(ccnavi_val issue)
 			final_mr="$ri_mr"
 			[ "$host_tried" = 1 ] && [ "$host_rc" -eq 0 ] || host_unseen=1
 			log_info 閉じる issue を MCP で確かめ済みとして決めた -- "mr=$ri_mr"
@@ -649,7 +624,7 @@ resolve_issue() {
 	start_save "$host_err.linked" "$ri_raw"
 	start_do resolve "$host_err.linked" "issue=$issue_arg" "issue-n=$issue_n" "issue-r=$issue_r" "own=$own_path" \
 		"mr=$ri_mr" "orig=$orig_args"
-	final_issue=$(start_val issue)
+	final_issue=$(ccnavi_val issue)
 	final_mr="$ri_mr"
 	log_info 閉じる issue を決めた -- "mr=$ri_mr"
 }
@@ -725,9 +700,9 @@ prepare() {
 	pp_branch="$1"
 	shift
 	start_do prepare "$pp_branch" "integration=$integration" "number=$number" "real=$real_args" "$@"
-	wt=$(start_val wt)
-	ff_note=$(start_val ff)
-	log_info ワークツリーを用意した -- "branch=$pp_branch" "created=$(start_val created)"
+	wt=$(ccnavi_val wt)
+	ff_note=$(ccnavi_val ff)
+	log_info ワークツリーを用意した -- "branch=$pp_branch" "created=$(ccnavi_val created)"
 }
 
 # ensure_push <ブランチ>。origin に同じ先頭があれば飛ばす
@@ -765,16 +740,16 @@ ensure_mr() {
 	em_mr=$(find_mr "$em_branch") || em_found_rc=$?
 	[ "$em_found_rc" -eq 0 ] || stop_host create "$(api_failed_reason)"
 	if [ -n "$em_mr" ]; then
-		mr_url=$(printf '%s\n' "$em_mr" | sed -n 's/^url //p' | head -n 1)
-		mr_num=$(printf '%s\n' "$em_mr" | sed -n 's/^number //p' | head -n 1)
+		mr_url=$(ccnavi_val1 url "$em_mr")
+		mr_num=$(ccnavi_val1 number "$em_mr")
 		log_info MR は飛ばす -- "branch=$em_branch"
 		return 0
 	fi
 	em_made_rc=0
 	em_made=$(create_mr "$em_branch" "$integration" "$em_title" "Closes #$number") || em_made_rc=$?
 	[ "$em_made_rc" -eq 0 ] || stop_host create "$(api_failed_reason)"
-	mr_url=$(printf '%s\n' "$em_made" | sed -n 's/^url //p' | head -n 1)
-	mr_num=$(printf '%s\n' "$em_made" | sed -n 's/^number //p' | head -n 1)
+	mr_url=$(ccnavi_val1 url "$em_made")
+	mr_num=$(ccnavi_val1 number "$em_made")
 	log_info MR を作った -- "branch=$em_branch"
 }
 
@@ -837,9 +812,9 @@ report() {
 adopt_check() {
 	ad_branch="$1"
 	ad_num="$c_mrnum"
-	ad_state=$(route_get mr-state)
-	ad_base=$(route_get mr-base)
-	case "$(route_get problem)" in
+	ad_state=$(ccnavi_val1 mr-state "$route_out")
+	ad_base=$(ccnavi_val1 mr-base "$route_out")
+	case "$(ccnavi_val1 problem "$route_out")" in
 	not-open*) stop adopt-not-open "ad_num=${ad_num}" "ad_state=${ad_state:-状態が不明}" ;;
 	fork) stop fork-mr "ad_num=${ad_num}" "ad_branch=${ad_branch}" ;;
 	target*) stop adopt-target "ad_num=${ad_num}" "ad_base=${ad_base:-不明}" "integration=${integration}" ;;
@@ -864,7 +839,7 @@ branch_ok() {
 		bo_err=$(head -n 1 "$heads_file.err" 2>/dev/null || :)
 	fi
 	start_do branch-ok "$1" "$2" "heads=$bo_heads" "err=$bo_err" "hint=${3:-}" "exit=${4:-}"
-	clash_note=$(start_val note)
+	clash_note=$(ccnavi_val note)
 	[ -z "$clash_note" ] || log_info 同じ識別子の確認でリモート未確認 -- "branch=$1"
 }
 
@@ -949,8 +924,8 @@ if [ -n "$new_issue_title" ]; then
 	if [ "$ni_rc" -ne 0 ] || [ -z "$ni_made" ]; then
 		stop issue-create-failed "v1=$(api_failed_reason)"
 	fi
-	issue_n=$(printf '%s\n' "$ni_made" | sed -n 's/^number //p' | head -n 1)
-	printf 'issue #%s を作った（%s）。この番号で続ける。以降の打ち直しは --issue %s で行う（--new-issue は打ち直さない。重複 issue ができる）\n' "$issue_n" "$(printf '%s\n' "$ni_made" | sed -n 's/^url //p' | head -n 1)" "$issue_n"
+	issue_n=$(ccnavi_val1 number "$ni_made")
+	printf 'issue #%s を作った（%s）。この番号で続ける。以降の打ち直しは --issue %s で行う（--new-issue は打ち直さない。重複 issue ができる）\n' "$issue_n" "$(ccnavi_val1 url "$ni_made")" "$issue_n"
 	log_info issue を作った -- "number=$issue_n"
 	issue_arg="$issue_n"
 	what=issue
@@ -975,14 +950,10 @@ fi
 route_out=$(start_read route "$cand_json" "what=$what" "number=$number" "issue=$issue_arg" "mr=$mr_arg" \
 	"branch=$branch_arg" "mcp=$mcp_checked" "integration=$integration") ||
 	stop branches-bad-json
-# route の答えの <項目> の値。<項目>
-route_get() {
-	printf '%s\n' "$route_out" | sed -n "s/^$1 //p" | head -n 1
-}
-checked=$(route_get checked)
-host_reason=$(route_get reason)
-total=$(route_get total)
-route=$(route_get route)
+checked=$(ccnavi_val1 checked "$route_out")
+host_reason=$(ccnavi_val1 reason "$route_out")
+total=$(ccnavi_val1 total "$route_out")
+route=$(ccnavi_val1 route "$route_out")
 log_debug 候補を読んだ -- "checked=$checked" "total=$total"
 
 # 一覧を出す（ccnavi-branches.sh の人が読む形）
@@ -998,7 +969,7 @@ unchecked=""
 # 候補の探索の代わりに --branch のブランチで、ホストを見ずに続ける。ホストにしか無い情報は補わない
 if [ "$route" = mcp ]; then
 	cb="$branch_arg"
-	case "$(route_get problem)" in
+	case "$(ccnavi_val1 problem "$route_out")" in
 	protected) stop adopt-protected "ad_branch=${cb}" ;;
 	branch-missing) stop branch-missing "cb=$cb" ;;
 	esac
@@ -1013,7 +984,7 @@ if [ "$route" = mcp ]; then
 	fetch_branch "$cb"
 	prepare "$cb" ff=yes
 	start_do resolve - "issue-n=$issue_n" "issue-r=$issue_r" "own=$own_path"
-	final_issue=$(start_val issue)
+	final_issue=$(ccnavi_val issue)
 	final_mr="$mr_arg"
 	next_title=""
 	finish_up "$cb" "$mr_arg"
@@ -1035,7 +1006,7 @@ if [ "$route" = unchecked ]; then
 	if [ "$host_rc" -eq 1 ]; then
 		stop host-unreadable-search "host_reason=${host_reason}" "host_why=${host_why}"
 	fi
-	stop_branch=$(route_get branch)
+	stop_branch=$(ccnavi_val1 branch "$route_out")
 	if [ -n "$mcp_checked" ]; then
 		stop_host mcp-args "${host_reason:-$host_why}"
 	fi
@@ -1140,10 +1111,10 @@ if [ "$total" -eq 0 ]; then
 fi
 
 # ---- 3. 候補がちょうど 1 件（ホストを見られている）
-cb=$(route_get branch)
-c_mrs=$(route_get mrs)
-c_url=$(route_get url)
-c_mrnum=$(route_get mr)
+cb=$(ccnavi_val1 branch "$route_out")
+c_mrs=$(ccnavi_val1 mrs "$route_out")
+c_url=$(ccnavi_val1 url "$route_out")
+c_mrnum=$(ccnavi_val1 mr "$route_out")
 [ "$route" != bad-candidate ] || stop bad-candidate "cb=${cb}"
 
 if [ "$route" = proposal-only ]; then
@@ -1182,7 +1153,7 @@ fi
 # 続けると空コミット・push・新しい Draft MR を作ってしまう。一覧を出してユーザに聞く
 resume=""
 if [ "$route" = nomr ]; then
-	case "$(route_get after)" in
+	case "$(ccnavi_val1 after "$route_out")" in
 	stale)
 		show_list
 		stop stale "branch=$cb" "integration=$integration"
@@ -1238,7 +1209,7 @@ fi
 stop_branch="$cb"
 fetch_branch "$cb"
 prepare "$cb" ff=yes
-next_title=$(route_get title)
+next_title=$(ccnavi_val1 title "$route_out")
 finish_up "$cb" "$c_mrnum"
 report "$cb" "$c_url" "$c_mrnum"
 log_info 続ける -- "branch=$cb"

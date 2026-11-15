@@ -337,7 +337,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             '*" --choose-out "*)\n'
             '  prev=""; for a in "$@"; do [ "$prev" = --choose-out ] && out="$a"; prev="$a"; done\n'
             f"  [ -d '{self.lock_dir()}' ] && echo LOCKED-WHILE-CHOOSING >&2\n"
-            '  printf \'{"choices": {"u1": "keep"}, "digest": "d0"}\' >"$out"\n'
+            '  printf \'choices {"u1":"keep"}\\ndigest d0\\n\' >"$out"\n'
             "  exit 0 ;;\n"
             # 事前の検査（--check）は通す。受け入れる指摘の計画（--accept-plan）は、
             # 操作記録を作るスタブ（hosthalf）に任せる

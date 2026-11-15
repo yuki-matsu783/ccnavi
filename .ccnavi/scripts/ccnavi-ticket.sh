@@ -172,8 +172,8 @@ ticket_ask() {
 	ccnavi_wap_exe ticket-sh "$@" 2>/dev/null </dev/null | tr -d '\r'
 }
 ticket_out=$(ticket_ask id -- "$@") || ticket_out=""
-ticket_id=$(printf '%s\n' "$ticket_out" | sed -n 's/^id //p')
-ticket_bad=$(printf '%s\n' "$ticket_out" | sed -n 's/^msg //p')
+ticket_id=$(ccnavi_val id "$ticket_out")
+ticket_bad=$(ccnavi_val msg "$ticket_out")
 
 # approval-request は、どの道を通っても結果ファイルを 1 つ書く（Stop の AI 判定が、提案を送ったか送らなかったかを
 # 確定する）。自分をもう 1 度起こし（CCNAVI_PROPOSE_INNER）、終わった後に外側が書く。中がどこで終わっても
@@ -192,8 +192,8 @@ esac
 # 段取り（中の終了コードを外が受ける）だけを持つ。
 if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$po_check" ]; then
 	po_out=$(ticket_ask result-begin) || po_out=""
-	po_file=$(printf '%s\n' "$po_out" | sed -n 's/^file //p')
-	po_start=$(printf '%s\n' "$po_out" | sed -n 's/^started //p')
+	po_file=$(ccnavi_val file "$po_out")
+	po_start=$(ccnavi_val started "$po_out")
 	po_rc=0
 	CCNAVI_PROPOSE_INNER=1 CCNAVI_PROPOSE_NOTE="${po_file:+$po_file.note}" sh "$0" "$@" || po_rc=$?
 	[ -z "$po_file" ] || ticket_ask result-end "$po_file" "$po_rc" "$po_start" -- "$@" >/dev/null || :
@@ -222,21 +222,21 @@ tidy_after() {
 # 作る（実行ファイルの `ticket-sh child`。手元に残る子のブランチの扱いもそこにある）。ネットワークには出ない。
 ensure_child_worktree() {
 	ew_out=$(ticket_ask child "$wap_id" "$ccnavi_wap_tree" "$ccnavi_wap_branch" "$ccnavi_wap_family_id") || ew_out=""
-	ew_say=$(printf '%s\n' "$ew_out" | sed -n 's/^err //p')
+	ew_say=$(ccnavi_val err "$ew_out")
 	[ -z "$ew_say" ] || printf '%s\n' "$ew_say" >&2
-	if [ -z "$ew_out" ] || printf '%s\n' "$ew_out" | grep -q '^fail '; then
+	if [ -z "$ew_out" ] || ccnavi_has fail "$ew_out"; then
 		[ -n "$ew_out" ] || printf 'ccnavi-ticket: 実行ファイルが答えないため、子のワークツリー .claude/worktrees/%s を用意できなかった。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください\n' "$wap_id" >&2
-		log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=$(printf '%s\n' "$ew_out" | sed -n 's/^fail \([^ ]*\).*/\1/p')"
+		log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=$(ccnavi_val1 fail "$ew_out" | sed 's/ .*//')"
 		return 1
 	fi
-	[ -z "$(printf '%s\n' "$ew_out" | sed -n 's/^made //p')" ] || log_info 子のワークツリーを作った -- "child=$wap_id" "parent=$ccnavi_wap_family_id"
+	[ -z "$(ccnavi_val made "$ew_out")" ] || log_info 子のワークツリーを作った -- "child=$wap_id" "parent=$ccnavi_wap_family_id"
 }
 
 # 親のブランチが一度も送られていないために止まったときの次の手（共通関数は事実だけを言う）。文と、出す操作
 # （approval-request・start）は実行ファイル（`ticket-sh unsent`）が決める。
 ticket_unsent_parent_next() {
 	[ -n "${ccnavi_wap_unsent_parent:-}" ] || return 0
-	ticket_ask unsent "${1:-}" "$ccnavi_wap_branch" "${ccnavi_pi_mr:--}" | sed -n 's/^err //p' >&2
+	ccnavi_val err "$(ticket_ask unsent "${1:-}" "$ccnavi_wap_branch" "${ccnavi_pi_mr:--}")" >&2
 }
 
 # 事前確認（ホストの API と git のリモートが使える状態か）。標準出力には何も足さず、ok でない項目だけを

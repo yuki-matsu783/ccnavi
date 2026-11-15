@@ -128,15 +128,16 @@ ccnavi_wap_family() {
 		ccnavi_wap_why="実行ファイルが write-and-push の問い合わせ（write-and-push family）に応答しない（$(head -n 1 "$ccnavi_wap_tmp/family-err" 2>/dev/null)）。書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
-	ccnavi_wap_target=$(sed -n 's/^target //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_why=$(sed -n 's/^why //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_family_id=$(sed -n 's/^family //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_repo=$(sed -n 's/^repo //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_tree=$(sed -n 's/^tree //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_approved=$(sed -n 's/^approved //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_review=$(sed -n 's/^review //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	ccnavi_wap_branch=$(sed -n 's/^branch //p' "$ccnavi_wap_tmp/family" | head -n 1)
-	sed -n 's/^hint //p' "$ccnavi_wap_tmp/family" >"$ccnavi_wap_tmp/hints"
+	ccnavi_cf_ans=$(cat "$ccnavi_wap_tmp/family")
+	ccnavi_wap_target=$(ccnavi_val1 target "$ccnavi_cf_ans")
+	ccnavi_wap_why=$(ccnavi_val1 why "$ccnavi_cf_ans")
+	ccnavi_wap_family_id=$(ccnavi_val1 family "$ccnavi_cf_ans")
+	ccnavi_wap_repo=$(ccnavi_val1 repo "$ccnavi_cf_ans")
+	ccnavi_wap_tree=$(ccnavi_val1 tree "$ccnavi_cf_ans")
+	ccnavi_wap_approved=$(ccnavi_val1 approved "$ccnavi_cf_ans")
+	ccnavi_wap_review=$(ccnavi_val1 review "$ccnavi_cf_ans")
+	ccnavi_wap_branch=$(ccnavi_val1 branch "$ccnavi_cf_ans")
+	ccnavi_val hint "$ccnavi_cf_ans" >"$ccnavi_wap_tmp/hints"
 	case "$ccnavi_wap_target" in
 	yes)
 		if ! ccnavi_branch_ok "$ccnavi_wap_branch" "$ccnavi_wap_family_id"; then
@@ -170,7 +171,7 @@ ccnavi_wap_refuse() {
 }
 # 実行ファイルの答え（ファイル）の `say` の行を、文面の頭を付けて言う。<答えのファイル>
 ccnavi_wap_said() {
-	sed -n 's/^say //p' "$1" 2>/dev/null | while IFS= read -r ccnavi_sd_line; do
+	ccnavi_val say "$(cat "$1" 2>/dev/null)" | while IFS= read -r ccnavi_sd_line; do
 		ccnavi_wap_say "$ccnavi_sd_line"
 	done
 }
@@ -185,7 +186,7 @@ ccnavi_wap_busy() {
 		return 0
 		;;
 	esac
-	printf '%s\n' "$ccnavi_bz_out" | sed -n 's/^busy //p' | head -n 1
+	ccnavi_val1 busy "$ccnavi_bz_out"
 	return 0
 }
 
@@ -235,12 +236,13 @@ ccnavi_wap_sort() {
 
 # 見分けで止めるものがあれば言って 1。<見分けの出力> <c の前置き> <c の後書き> <d の前置き> <d の後書き>
 ccnavi_wap_stops() {
-	ccnavi_cs_c=$(sed -n 's/^c //p' "$1" | tr '\n' ' ' | sed 's/ *$//')
-	ccnavi_cs_d=$(sed -n 's/^d //p' "$1" | tr '\n' ' ' | sed 's/ *$//')
+	ccnavi_cs_ans=$(cat "$1")
+	ccnavi_cs_c=$(ccnavi_val c "$ccnavi_cs_ans" | tr '\n' ' ' | sed 's/ *$//')
+	ccnavi_cs_d=$(ccnavi_val d "$ccnavi_cs_ans" | tr '\n' ' ' | sed 's/ *$//')
 	[ -z "$ccnavi_cs_c$ccnavi_cs_d" ] && return 0
 	[ -n "$ccnavi_cs_c" ] && ccnavi_wap_say "$2（${ccnavi_cs_c}）$3"
 	[ -n "$ccnavi_cs_d" ] && ccnavi_wap_say "$4（${ccnavi_cs_d}）$5"
-	sed -n 's/^why /  - /p' "$1" >&2
+	ccnavi_val why "$ccnavi_cs_ans" | sed 's/^/  - /' >&2
 	log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=write-and-push-unknown-change"
 	return 1
 }
@@ -252,7 +254,7 @@ ccnavi_wap_prepare() {
 	ccnavi_wap_stops "$ccnavi_wap_tmp/sort" "ユーザの判断が未送信" \
 		"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
 		"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
-	sed -n 's/^b //p' "$ccnavi_wap_tmp/sort" >"$ccnavi_wap_tmp/b"
+	ccnavi_val b "$(cat "$ccnavi_wap_tmp/sort")" >"$ccnavi_wap_tmp/b"
 	if [ -s "$ccnavi_wap_tmp/b" ]; then
 		ccnavi_wap_commit "$ccnavi_wap_tmp/b" "ccnavi: $ccnavi_wap_family_id の hook のマーカーをコミットする" || {
 			[ -z "$ccnavi_wap_refused" ] ||
@@ -324,8 +326,9 @@ ccnavi_wap_commit() {
 		return 1
 	fi
 	ccnavi_wap_said "$ccnavi_wap_tmp/commit"
-	ccnavi_wap_refused=$(sed -n 's/^refused //p' "$ccnavi_wap_tmp/commit" | head -n 1)
-	ccnavi_cc_sha=$(sed -n 's/^commit //p' "$ccnavi_wap_tmp/commit" | head -n 1)
+	ccnavi_cc_ans=$(cat "$ccnavi_wap_tmp/commit")
+	ccnavi_wap_refused=$(ccnavi_val1 refused "$ccnavi_cc_ans")
+	ccnavi_cc_sha=$(ccnavi_val1 commit "$ccnavi_cc_ans")
 	[ -n "$ccnavi_cc_sha" ] || return 1
 	[ "$ccnavi_cc_sha" = none ] || ccnavi_wap_committed="$ccnavi_cc_sha"
 	return 0
@@ -358,16 +361,17 @@ ccnavi_wap_merge_plan() {
 		ccnavi_lock_drop
 		return 1
 	fi
-	ccnavi_pm_stop=$(sed -n 's/^stop //p' "$ccnavi_wap_tmp/merge" | head -n 1)
+	ccnavi_pm_ans=$(cat "$ccnavi_wap_tmp/merge")
+	ccnavi_pm_stop=$(ccnavi_val1 stop "$ccnavi_pm_ans")
 	if [ -n "$ccnavi_pm_stop" ]; then
 		ccnavi_wap_say "$ccnavi_pm_stop"
-		sed -n 's/^hint /  - /p' "$ccnavi_wap_tmp/merge" >&2
+		ccnavi_val hint "$ccnavi_pm_ans" | sed 's/^/  - /' >&2
 		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=write-and-push-merge-stop"
 		ccnavi_lock_drop
 		return 1
 	fi
-	if [ "$(sed -n 's/^merge //p' "$ccnavi_wap_tmp/merge" | head -n 1)" = yes ]; then
-		ccnavi_wap_merge_sha=$(sed -n 's/^head //p' "$ccnavi_wap_tmp/merge" | head -n 1)
+	if [ "$(ccnavi_val1 merge "$ccnavi_pm_ans")" = yes ]; then
+		ccnavi_wap_merge_sha=$(ccnavi_val1 head "$ccnavi_pm_ans")
 		[ -n "$ccnavi_wap_merge_sha" ] || {
 			ccnavi_wap_say "合流する子の先頭を読めない。何も反映していません"
 			ccnavi_lock_drop
@@ -410,14 +414,15 @@ ccnavi_wap_write() {
 			rm -f "$ccnavi_cw_list" "$ccnavi_cw_answer"
 			return "$ccnavi_cw_rc"
 		fi
-		if [ "$(sed -n 's/^push //p' "$ccnavi_cw_answer" | head -n 1)" = no ]; then
+		ccnavi_cw_ans=$(cat "$ccnavi_cw_answer")
+		if [ "$(ccnavi_val1 push "$ccnavi_cw_ans")" = no ]; then
 			ccnavi_wap_inflight=""
 			rm -f "$ccnavi_cw_list" "$ccnavi_cw_answer"
 			ccnavi_wap_note "route=unchanged"
 			return 0 # 書いたものが無く、送るものも無い
 		fi
-		ccnavi_cw_c=$(sed -n 's/^commit //p' "$ccnavi_cw_answer" | head -n 1)
-		ccnavi_cw_head=$(sed -n 's/^head //p' "$ccnavi_cw_answer" | head -n 1)
+		ccnavi_cw_c=$(ccnavi_val1 commit "$ccnavi_cw_ans")
+		ccnavi_cw_head=$(ccnavi_val1 head "$ccnavi_cw_ans")
 		[ "$ccnavi_cw_c" != none ] || ccnavi_wap_inflight=""
 		# 9. push（--force なし）。
 		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_wap_tmp/push-err" "$ccnavi_wap_tree" \
@@ -462,8 +467,7 @@ ccnavi_wap_write() {
 		# 届いていたのに確かめ（ls-remote）も失敗していた回は、取り込みで自分のコミットが戻ってくる。
 		# そのときは書き直さず、届いていたとして終える。
 		if [ "$ccnavi_cw_c" != none ]; then
-			ccnavi_cw_landed=$(ccnavi_wap_exe write-and-push landed "$ccnavi_cw_answer" </dev/null 2>/dev/null |
-				tr -d '\r' | sed -n 's/^landed yes //p' | head -n 1)
+			ccnavi_cw_landed=$(ccnavi_val1 "landed yes" "$(ccnavi_wap_exe write-and-push landed "$ccnavi_cw_answer" </dev/null 2>/dev/null)")
 			if [ -n "$ccnavi_cw_landed" ]; then
 				rm -f "$ccnavi_cw_answer"
 				ccnavi_wap_say "取り込み直すと、前の回のコミット（$(printf '%.12s' "$ccnavi_cw_c")）がリモートに届いていた。書き直さずに終える"
@@ -483,7 +487,7 @@ ccnavi_wap_undo() {
 		return 1
 	fi
 	ccnavi_wap_said "$ccnavi_wap_tmp/undo"
-	grep -q '^undone yes$' "$ccnavi_wap_tmp/undo" || return 1
+	[ "$(ccnavi_val1 undone "$(cat "$ccnavi_wap_tmp/undo")")" = yes ] || return 1
 	log_info write-and-push で書いたものを戻した -- "family=$ccnavi_wap_family_id"
 	return 0
 }
@@ -498,7 +502,7 @@ ccnavi_wap_sent() {
 	ccnavi_wap_note "route=sent"
 	ccnavi_wap_note "commit=$1"
 	if [ -n "${CCNAVI_PROPOSE_NOTE:-}" ] && [ -n "$2" ]; then
-		sed -n 's/^file /file=/p' "$2" >>"$CCNAVI_PROPOSE_NOTE" 2>/dev/null || :
+		ccnavi_val file "$(cat "$2" 2>/dev/null)" | sed 's/^/file=/' >>"$CCNAVI_PROPOSE_NOTE" 2>/dev/null || :
 	fi
 	ccnavi_wap_say "親子のチケット $ccnavi_wap_family_id のチケットの状態を送った（$(printf '%.12s' "$1")）"
 	log_info write-and-push で送った -- "family=$ccnavi_wap_family_id"
@@ -521,7 +525,7 @@ ccnavi_wap_end() {
 	if [ -n "$ccnavi_wap_inflight" ] && [ -n "$ccnavi_wap_tmp" ]; then
 		ccnavi_ce_answer="$ccnavi_wap_inflight"
 		ccnavi_wap_inflight=""
-		ccnavi_ce_c=$(sed -n 's/^commit //p' "$ccnavi_ce_answer" 2>/dev/null | head -n 1)
+		ccnavi_ce_c=$(ccnavi_val1 commit "$(cat "$ccnavi_ce_answer" 2>/dev/null)")
 		if [ -n "$ccnavi_ce_c" ] && [ "$ccnavi_ce_c" != none ]; then
 			# 送る前に切られた。自分のコミットを実行ファイルに比較つきで戻させる（先頭が動いていれば戻さない）。
 			ccnavi_wap_say "送る前に止められた。書いたものを戻す"

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,12 @@ import (
 //   - copy <github|gitlab> <番号> <URL> <Draft: true|false|-> <graphql|rest|discussions> <レビュー> <スレッド>...:
 //     取ってきた時点の状態の JSON（`--result` に渡すもの）。REST の道の応答が配列でなければ終了コード 3
 //   - marked <github|gitlab> <目印> <アカウント> <URL> <一覧>: 目印を含む投稿の `urls <URL,URL,…>`
+//   - posted <github|gitlab> <comment|issue> <対象の URL> <応答>: 投稿した応答の `url`・`number`（issue）・`created_at`・`author`。
+//     URL（GitLab のコメントは id）が無ければ終了コード 1
+//   - found <github|gitlab> <目印> <MR の URL> <一覧>: 本文が目印で始まる最初のコメント（posted と同じ行。無ければ何も出さない）
+//   - sent <comment|issue> <URL>: 操作記録の送り済みの URL から、posted と同じ行（issue の番号は URL の最後の区切り）
+//   - account <github|gitlab> <応答>: トークンの持ち主の `account <名前>`（読めない・形に合わなければ何も出さない）
+//   - requested <github|gitlab> <MR の番号> <MR の URL> <投稿の URL> <作成時刻> <作者>: review requested の `--result` に渡す JSON
 //   - undraft title <github|gitlab> <応答>: Draft を外すときのタイトル（`node`・`title`・`new`）
 //   - undraft done <graphql|rest|gitlab> <応答>: まだ Draft か（`draft true|false`）
 //
@@ -85,6 +92,41 @@ func runHost(stdout, stderr io.Writer, args []string) int {
 			return unreadable(err)
 		}
 		fmt.Fprintf(stdout, "urls %s\n", got)
+	case op == "posted" && n == 5 && (args[2] == string(hostreply.PostComment) || args[2] == string(hostreply.PostIssue)):
+		got, err := hostreply.Posted(args[1], hostreply.PostForm(args[2]), args[3], file(args[4]))
+		if err != nil {
+			return unreadable(err)
+		}
+		fmt.Fprint(stdout, got.Lines())
+	case op == "found" && n == 5:
+		got, ok, err := hostreply.Found(args[1], args[2], args[3], file(args[4]))
+		if err != nil {
+			return unreadable(err)
+		}
+		if ok {
+			fmt.Fprint(stdout, got.Lines())
+		}
+	case op == "sent" && n == 3 && (args[1] == string(hostreply.PostComment) || args[1] == string(hostreply.PostIssue)):
+		fmt.Fprint(stdout, hostreply.Sent(hostreply.PostForm(args[1]), args[2]).Lines())
+	case op == "account" && n == 3:
+		if who := hostreply.Account(args[1], file(args[2])); who != "" {
+			fmt.Fprintf(stdout, "account %s\n", who)
+		}
+	case op == "requested" && n == 7:
+		if !numberText(args[2]) {
+			return usage()
+		}
+		got, _ := json.Marshal(struct {
+			Host      string `json:"host"`
+			MR        any    `json:"mr"`
+			URL       string `json:"url"`
+			CreatedAt string `json:"created_at"`
+			Author    string `json:"author"`
+		}{args[1], struct {
+			Number json.Number `json:"number"`
+			URL    string      `json:"url"`
+		}{json.Number(args[2]), args[3]}, args[4], args[5], args[6]})
+		fmt.Fprintln(stdout, string(got))
 	case op == "undraft" && n == 4 && args[1] == "title":
 		fmt.Fprint(stdout, hostreply.UndraftTitle(args[2], file(args[3])))
 	case op == "undraft" && n == 4 && args[1] == "done":

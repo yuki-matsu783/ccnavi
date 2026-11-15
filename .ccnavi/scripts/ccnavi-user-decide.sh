@@ -100,11 +100,6 @@ fi
 
 # ---- --resume: 保存した判断（操作記録）から、止まった判断の続きを送る。
 #
-# ops resume の答えの 1 項目。<名前>
-rp_val() {
-	printf '%s\n' "$rp_said" | sed -n "s/^$1 //p" | head -n 1
-}
-
 # 操作ID を決め、内容の要約を見せて y/N を聞く。親のワークツリーへ移り、保存した選択とダイジェストを
 # 使って、以降は選択を置く形（--choices --digest）と同じ道を通る。選び直しはさせない。
 # 返信・解決が済んでいれば繰り返さず、適用が済んでいれば投稿の段階だけを進める。
@@ -127,20 +122,20 @@ resume_prepare() {
 	# 記録の読みは実行ファイル（ops resume）が持つ。1 行 1 項目で、選択は 1 行の JSON（置く呼び出しへそのまま渡す）。
 	rp_said=$(ccnavi ops resume "$resume_op" 2>/dev/null) ||
 		fail decide-no-op "操作記録 $resume_op がありません。" 1
-	[ "$(rp_val kind)" = decide ] ||
+	[ "$(ccnavi_val1 kind "$rp_said")" = decide ] ||
 		fail decide-not-decide "操作 $resume_op は decide ではありません。" 1
-	rp_parent=$(rp_val parent)
-	n=$(rp_val phase)
+	rp_parent=$(ccnavi_val1 parent "$rp_said")
+	n=$(ccnavi_val1 phase "$rp_said")
 	printf '%s: 未完了の判断 %s\n  親 %s のフェーズ %s（MR !%s）\n  選択: %s\n  済んでいない段階: %s\n' \
-		"$review_label" "$resume_op" "$rp_parent" "$n" "$(rp_val mr)" "$(rp_val counts)" "$(rp_val left)"
+		"$review_label" "$resume_op" "$rp_parent" "$n" "$(ccnavi_val1 mr "$rp_said")" "$(ccnavi_val1 counts "$rp_said")" "$(ccnavi_val1 left "$rp_said")"
 	printf '続きを送りますか [y/N]: '
 	read -r rp_answer || rp_answer=n
 	case "$rp_answer" in
 	y | Y | yes | YES) ;;
 	*) fail decide-not-confirmed "送らずにやめました。" 1 ;;
 	esac
-	choices=$(rp_val choices)
-	digest=$(rp_val digest)
+	choices=$(ccnavi_val1 choices "$rp_said")
+	digest=$(ccnavi_val1 digest "$rp_said")
 	# 今いる場所が、その親のブランチのワークツリーならそのまま。そうでなければ親のワークツリーへ移る。
 	rp_here=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 	if [ "$rp_here" != "$rp_parent" ]; then
@@ -206,10 +201,11 @@ resume_report() {
 	return 0
 }
 
+decide_out=""
 review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても、`set -e` がその失敗の値で抜けて元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
-trap 'review_exit=$?; ccnavi_wap_end; op_lock_release; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'review_exit=$?; ccnavi_wap_end; op_lock_release; accept_cleanup "$review_exit"; rm -f "$result" "$result.re" ${accept_plan:+"$accept_plan"} ${decide_out:+"$decide_out"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
 trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
 review_wap
@@ -254,7 +250,7 @@ fetch_all >"$result"
 if [ -n "$choices" ]; then
 	# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
 	# 適用まで済んでいる判断の続きは、投稿の段階だけを進める。
-	if [ -n "$resume_op" ] && [ "$(ccnavi_op_line applied.local "$(ccnavi ops get "$resume_op")")" = true ]; then
+	if [ -n "$resume_op" ] && [ "$(ccnavi_val1 applied.local "$(ccnavi ops get "$resume_op")")" = true ]; then
 		op_id="$resume_op"
 		if ! post_decision_staged; then
 			printf '%s: %s\n' "$review_label" "$post_warning" >&2
@@ -266,18 +262,18 @@ if [ -n "$choices" ]; then
 	# 受け入れる指摘（対応しない・このフェーズで直す・issue に回す）のうち、受け入れる分には、置く前に返信を残して解決する。
 	# できなければここで止める。
 	accept_before_place "$choices" "$digest"
-	ccnavi_wap_capture="$state/review-decide-$$.out"
+	# 置いた答え（JSON）は、投稿のあとに issue の URL と警告を足して返すので、投稿が済むまでファイルに残す（抜けるときに消す）
+	decide_out="$state/review-decide-$$.out"
+	ccnavi_wap_capture="$decide_out"
 	decide_rc=0
 	# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
 	wap_ccnavi "$branch のフェーズ $n の指摘の対応方針を決めた" -- \
 		--entry sh user reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" --accept-done "$accept_file" $decide_who ||
 		decide_rc=$?
-	out=$(cat "$ccnavi_wap_capture" 2>/dev/null || :)
-	rm -f "$ccnavi_wap_capture"
 	ccnavi_wap_capture=""
 	[ "$decide_rc" -eq 0 ] || {
 		unapply_local
-		printf '%s\n' "$out"
+		printf '%s\n' "$(cat "$decide_out" 2>/dev/null || :)"
 		exit 1
 	}
 	post_decision "$n"
@@ -285,7 +281,8 @@ if [ -n "$choices" ]; then
 		resume_report
 		exit 0
 	fi
-	printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
+	# issue の URL と警告を足すのは実行ファイル（`accept decided`）
+	ccnavi accept decided "$decide_out" "$issue_url" "$post_warning"
 	exit 0
 fi
 ccnavi_wap_family "$family"
@@ -301,7 +298,11 @@ ccnavi --entry sh user reviewed "$n" --accept-unresolved --choose-out "$chosen" 
 	rm -f "$chosen"
 	exit 1
 }
-choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen") || {
+# 実行ファイルが書く 1 行 1 項目（`choices <1 行の JSON>`・`digest <ダイジェスト>`）。選択は置く呼び出しへそのまま渡す
+chosen_ans=$(cat "$chosen" 2>/dev/null || :)
+choices=$(ccnavi_val1 choices "$chosen_ans")
+digest=$(ccnavi_val1 digest "$chosen_ans")
+[ -n "$choices" ] && [ -n "$digest" ] || {
 	rm -f "$chosen"
 	fail decide-choose-unreadable "選んだものを読めません（${chosen}）。" 1
 }

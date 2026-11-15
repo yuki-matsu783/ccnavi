@@ -10,40 +10,31 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
+	"ccnavi/internal/infra/reply"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/standing"
 )
 
-// answer は sh への答え。行の先頭の語は out・err・failed・next と、データの行（plan の repo・family など）。
-type answer struct{ b strings.Builder }
-
-// line は 1 行を書く。値の改行は空白にする（答えの行に紛れさせない）。
-func (a *answer) line(word string, values ...string) {
-	text := strings.Join(values, " ")
-	text = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(text)
-	if text == "" {
-		a.b.WriteString(word + "\n")
-		return
-	}
-	a.b.WriteString(word + " " + text + "\n")
-}
+// answer は sh への答え（`infra/reply` の形）。行の先頭の語は out・err・failed・next と、データの行（plan の repo・family など）。
+// 値はどれも 1 行に収める（reply.Lines.Line）。
+type answer struct{ reply.Lines }
 
 // out は標準出力に出す 1 行。
-func (a *answer) out(format string, args ...any) { a.line("out", fmt.Sprintf(format, args...)) }
+func (a *answer) out(format string, args ...any) { a.Line("out", fmt.Sprintf(format, args...)) }
 
 // fail は標準出力に出す 1 行で、その親子のチケットかリポジトリを止めたものに数える（終了コード 1）。
 func (a *answer) fail(format string, args ...any) {
 	a.out(format, args...)
-	a.b.WriteString("failed\n")
+	a.Line("failed")
 }
 
 // next は次の一手（sh が打つ外との出入り）。
-func (a *answer) next(words ...string) { a.line("next", words...) }
+func (a *answer) next(words ...string) { a.Line("next", words...) }
 
 // write は答えを書いて 0 を返す。
 func (a *answer) write(w io.Writer) int {
-	fmt.Fprint(w, a.b.String())
+	fmt.Fprint(w, a.String())
 	return config.ExitOK
 }
 

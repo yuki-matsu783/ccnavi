@@ -46,7 +46,7 @@ func TestReadsWhatShFetched(t *testing.T) {
 func said(a *answer) (string, bool) {
 	var out []string
 	failed := false
-	for _, line := range strings.Split(strings.TrimSuffix(a.b.String(), "\n"), "\n") {
+	for _, line := range strings.Split(strings.TrimSuffix(a.String(), "\n"), "\n") {
 		if text, ok := strings.CutPrefix(line, "out "); ok {
 			out = append(out, text)
 		}

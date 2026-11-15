@@ -42,15 +42,10 @@ esac
 
 payload=$(cat)
 
-# 値の取り出し（1 行 1 項目の `<キー> <値>`）。
-pick() {
-	printf '%s\n' "$plan" | sed -n "s/^$1 //p" | head -n 1
-}
-
 plan=$(printf '%s' "$payload" | "$bin" --root "$root" idle start 2>/dev/null) || exit 0
-wait_seconds=$(pick wait)
-session=$(pick session)
-token=$(pick token)
+wait_seconds=$(ccnavi_val1 wait "$plan")
+session=$(ccnavi_val1 session "$plan")
+token=$(ccnavi_val1 token "$plan")
 [ -n "$wait_seconds" ] && [ -n "$session" ] && [ -n "$token" ] || exit 0
 case "$wait_seconds" in
 *[!0-9]*) exit 0 ;;

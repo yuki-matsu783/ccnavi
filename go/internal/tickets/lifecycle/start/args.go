@@ -148,6 +148,7 @@ func parseArgs(o *outcome, argv []string) (Options, bool) {
 			opt.Lists = true
 		case "-h", "--help", "help":
 			o.Val("help", "yes")
+			o.Exit(0)
 			return opt, false
 		default:
 			o.Val("usage", "yes")

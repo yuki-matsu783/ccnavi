@@ -26,7 +26,7 @@ case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 *" ops "* | *" host "*) exec "$STUB_EXE" "$@" ;;
-*" accept plan "* | *" accept threads "*) exec "$STUB_EXE" "$@" ;;
+*" accept plan "* | *" accept threads "* | *" accept decided "*) exec "$STUB_EXE" "$@" ;;
 esac
 printf '%s\\n' "$*" >>"$STUB_LOG"
 root="$2"

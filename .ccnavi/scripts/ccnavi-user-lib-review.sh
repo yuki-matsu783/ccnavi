@@ -44,15 +44,16 @@ reply_mark() {
 # 言われたときだけホストに聞く（試した印が無ければ問い合わせない）。
 reply_already_sent() {
 	[ -n "${op_id:-}" ] || return 1
-	ra_said=$(ccnavi ops replied "$op_id" "$1" "$2" 2>/dev/null | sed -n 's/^replied //p') || ra_said=""
+	ra_said=$(ccnavi_val1 replied "$(ccnavi ops replied "$op_id" "$1" "$2" 2>/dev/null)")
 	if [ "$ra_said" = account ]; then
 		op_account
 		[ -n "${op_who:-}" ] || return 1
-		ra_said=$(ccnavi ops replied "$op_id" "$1" "$2" "$op_who" 2>/dev/null | sed -n 's/^replied //p') || ra_said=""
+		ra_said=$(ccnavi_val1 replied "$(ccnavi ops replied "$op_id" "$1" "$2" "$op_who" 2>/dev/null)")
 	fi
 	[ "$ra_said" = yes ]
 }
 
+# 返信と解決の応答は、id（解決は isResolved）が在るかだけを見る（段取りの最小の読み。送る本文の組み立ては jq -n）。
 # <スレッドの id> <返信の本文> <MR の番号>
 accept_reply() {
 	accept_id="$1"
@@ -108,22 +109,21 @@ accept_threads() {
 	accept_rfile="$2"
 	accept_dir="$state/review-accept-replies-$$"
 	rm -rf "$accept_dir"
-	accept_said="$accept_dir.said"
-	ccnavi accept threads "$accept_file" "$accept_rfile" "$kind" "$accept_dir" 2>/dev/null >"$accept_said" || :
-	if [ "$(head -n 1 "$accept_said" 2>/dev/null)" != "accept 1" ] || ! grep -E -q '^(mr|stop) ' "$accept_said"; then
+	accept_ans=$(ccnavi accept threads "$accept_file" "$accept_rfile" "$kind" "$accept_dir" 2>/dev/null) || :
+	if [ "$(printf '%s\n' "$accept_ans" | head -n 1)" != "accept 1" ] || { ! ccnavi_has mr "$accept_ans" && ! ccnavi_has stop "$accept_ans"; }; then
 		printf '%s: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$review_label" "$accept_file" >&2
 		accept_done_files
 		return 1
 	fi
 	# 1. ホストに書く前の確かめ（できなければ、ホストには何も書かない）
-	accept_stop=$(sed -n 's/^stop //p' "$accept_said" | head -n 1)
+	accept_stop=$(ccnavi_val1 stop "$accept_ans")
 	if [ -n "$accept_stop" ]; then
 		printf '%s: %s\n' "$review_label" "$accept_stop" >&2
 		accept_done_files
 		return 1
 	fi
-	accept_mr=$(sed -n 's/^mr //p' "$accept_said" | head -n 1)
-	sed -n 's/^thread //p' "$accept_said" >"$accept_dir/threads"
+	accept_mr=$(ccnavi_val1 mr "$accept_ans")
+	ccnavi_val thread "$accept_ans" >"$accept_dir/threads"
 	# 2. 全部に返信する（一覧は 3 番で読む。ホストの API の道具が標準入力を読んでも、一覧を食わないように）
 	while IFS=' ' read -r accept_i accept_id accept_key <&3; do
 		accept_text=$(cat "$accept_dir/$accept_i.reply")
@@ -164,18 +164,18 @@ accept_threads() {
 
 # accept_threads が使った返信の本文の置き場を消す。
 accept_done_files() {
-	rm -rf "$accept_dir" "$accept_said"
+	rm -rf "$accept_dir"
 }
 
 # 計画のスレッドの数（accept plan）。読めなければ 1。<計画のファイル>
 accept_count() {
 	ac_said=$(ccnavi accept plan "$1" 2>/dev/null) || return 1
-	printf '%s\n' "$ac_said" | sed -n 's/^count //p' | head -n 1
+	ccnavi_val1 count "$ac_said"
 }
 
 # 計画の操作ID（accept plan）。無い・読めなければ空。<計画のファイル>
 accept_op() {
-	ccnavi accept plan "$1" 2>/dev/null | sed -n 's/^op //p' | head -n 1
+	ccnavi_val1 op "$(ccnavi accept plan "$1" 2>/dev/null)"
 }
 
 # 計画のスレッドに返信と解決をして、結果を取り直す。<計画のファイル>（$result は計画を書いたときの結果）
@@ -205,31 +205,30 @@ accept_cleanup() {
 	}
 }
 
-# ---- issue を作る。下書きの 1 行目がタイトル、3 行目からが本文。{number, url} を返す。
+# ---- issue を作る。下書きの 1 行目がタイトル、3 行目からが本文。答えは `url`・`number`（post_read。ccnavi-common-review.sh）。
+# 送る本文の組み立て（jq -n）は外との出入りなので sh。
 
 create_issue() {
 	draft="$1"
 	if [ "$kind" = github ]; then
 		payload=$("$JQ" -n --rawfile all "$draft" \
 			'($all | split("\n")) as $l | {title: ($l[0]), body: ($l[2:] | join("\n"))}')
-		api POST "repos/$path/issues" "$payload" | "$JQ" '{number: .number, url: .html_url}'
+		post_read issue - POST "repos/$path/issues" "$payload"
 	else
 		payload=$("$JQ" -n --rawfile all "$draft" \
 			'($all | split("\n")) as $l | {title: ($l[0]), description: ($l[2:] | join("\n"))}')
-		api POST "projects/$(encoded_path)/issues" "$payload" | "$JQ" '{number: .iid, url: .web_url}'
+		post_read issue - POST "projects/$(encoded_path)/issues" "$payload"
 	fi
 }
 
-# ---- issue へのコメント（長い指摘の続き）。{url} を返す。<issue の番号> <issue の URL> <本文のファイル>
+# ---- issue へのコメント（長い指摘の続き）。答えは comment と同じ（post_read）。<issue の番号> <issue の URL> <本文のファイル>
 
 issue_note() {
 	in_body=$("$JQ" -Rs '{body: .}' <"$3")
 	if [ "$kind" = github ]; then
-		api POST "repos/$path/issues/$1/comments" "$in_body" |
-			"$JQ" 'if ((.html_url // "") == "") then error("no html_url") else {url: .html_url} end'
+		post_read comment "$2" POST "repos/$path/issues/$1/comments" "$in_body"
 	else
-		api POST "projects/$(encoded_path)/issues/$1/notes" "$in_body" |
-			"$JQ" --arg u "$2" 'if .id == null then error("no note id") else {url: ($u + "#note_" + (.id | tostring))} end'
+		post_read comment "$2" POST "projects/$(encoded_path)/issues/$1/notes" "$in_body"
 	fi
 }
 
@@ -260,7 +259,7 @@ op_set() {
 
 # <段階ID> <欄>。無ければ空。
 op_field() {
-	ccnavi_op_line "$1.$2" "$(ccnavi ops get "$op_id" 2>/dev/null)"
+	ccnavi_val1 "$1.$2" "$(ccnavi ops get "$op_id" 2>/dev/null)"
 }
 
 op_account() {
@@ -326,12 +325,13 @@ post_staged() {
 		rm -f "$ps_text" "$ps_body"
 		return 1
 	fi
-	ps_posted=""
+	ps_out=""
 	case "$ps_kind" in
-	issue) ps_posted=$(create_issue "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
-	note) ps_posted=$(comment "$ps_target" "$ps_url" "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
-	issue-note) ps_posted=$(issue_note "$ps_target" "$ps_url" "$ps_body" | "$JQ" -r '.url // empty' 2>/dev/null || :) ;;
+	issue) ps_out=$(create_issue "$ps_body") || ps_out="" ;;
+	note) ps_out=$(comment "$ps_target" "$ps_url" "$ps_body") || ps_out="" ;;
+	issue-note) ps_out=$(issue_note "$ps_target" "$ps_url" "$ps_body") || ps_out="" ;;
 	esac
+	ps_posted=$(ccnavi_val1 url "$ps_out")
 	rm -f "$ps_text" "$ps_body"
 	if [ -z "$ps_posted" ]; then
 		op_set "$ps_stage" unknown
@@ -428,9 +428,10 @@ post_decision_staged() {
 post_decision_staged_locked() {
 	issue_url=""
 	post_warning=""
-	pd_mr=$("$JQ" '.mr.number' "$result")
-	pd_mr_url=$("$JQ" -r '.mr.url' "$result")
-	pd_ids=$(ccnavi ops get "$op_id" 2>/dev/null | sed -n 's/^stage //p') || pd_ids=""
+	# MR の番号と URL は、$result を取ってきた fetch_all が残したもの（ccnavi-common-review.sh）
+	pd_mr="$number"
+	pd_mr_url="$url"
+	pd_ids=$(ccnavi_val stage "$(ccnavi ops get "$op_id" 2>/dev/null)")
 	pd_issue_no=""
 	pd_failed=""
 	for pd_stage in $pd_ids; do

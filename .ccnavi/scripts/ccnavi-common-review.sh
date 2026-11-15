@@ -239,11 +239,11 @@ find_mr() {
 	fi
 	fm_out=$(ccnavi host find-mr "$kind" "$fm_pid" "$fm_file" 2>/dev/null | tr -d '\r') || fm_out=""
 	rm -f "$fm_file" || :
-	mr_number=$(printf '%s\n' "$fm_out" | sed -n 's/^number //p')
-	mr_url=$(printf '%s\n' "$fm_out" | sed -n 's/^url //p')
-	mr_source=$(printf '%s\n' "$fm_out" | sed -n 's/^source //p')
-	mr_target=$(printf '%s\n' "$fm_out" | sed -n 's/^target //p')
-	mr_draft=$(printf '%s\n' "$fm_out" | sed -n 's/^draft //p')
+	mr_number=$(ccnavi_val number "$fm_out")
+	mr_url=$(ccnavi_val url "$fm_out")
+	mr_source=$(ccnavi_val source "$fm_out")
+	mr_target=$(ccnavi_val target "$fm_out")
+	mr_draft=$(ccnavi_val draft "$fm_out")
 }
 
 # GitLab のプロジェクトの数の id。読めなければ 1
@@ -325,20 +325,32 @@ reviews() {
 	fi
 }
 
-# ---- 投稿。{url, created_at} を返す。
+# ---- 投稿。答えは `url`・`number`（issue）・`created_at`・`author` の 1 行 1 項目（値は ccnavi_val で読む）。
 
+# 投稿して、応答を実行ファイルに読ませる（`ccnavi host posted`）。<comment|issue> <対象の URL> <METHOD> <path> <本文>
+# 応答に投稿の URL（GitLab のコメントは id）が無ければ、投稿できたと読める答えを出さずに 1。
+post_read() {
+	pr_file="$state/review-posted-$$.json"
+	if ! api "$3" "$4" "$5" >"$pr_file"; then
+		rm -f "$pr_file" || :
+		return 1
+	fi
+	pr_rc=0
+	pr_out=$(ccnavi host posted "$kind" "$1" "$2" "$pr_file" 2>/dev/null) || pr_rc=$?
+	rm -f "$pr_file" || :
+	[ "$pr_rc" -eq 0 ] || return 1
+	printf '%s\n' "$pr_out"
+}
+
+# MR へのコメント。<MR の番号> <MR の URL> <本文のファイル>
 comment() {
 	mr_number="$1"
 	mr_url="$2"
 	body_json=$("$JQ" -Rs '{body: .}' <"$3")
 	if [ "$kind" = github ]; then
-		# 応答に URL（GitLab は id）が無ければ、投稿できたと読める出力をせず、jq の非 0 で終える
-		# （パイプの終了コードは最後の jq のもの）。呼び出し元は、終了コードでも .url の有無でも失敗と読む。
-		api POST "repos/$path/issues/$mr_number/comments" "$body_json" |
-			"$JQ" 'if ((.html_url // "") == "") then error("no html_url") else {url: .html_url, created_at: (.created_at // ""), author: (.user.login // "")} end'
+		post_read comment "$mr_url" POST "repos/$path/issues/$mr_number/comments" "$body_json"
 	else
-		api POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json" |
-			"$JQ" --arg u "$mr_url" 'if .id == null then error("no note id") else {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)} end'
+		post_read comment "$mr_url" POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json"
 	fi
 }
 
@@ -382,7 +394,7 @@ find_marked() {
 	fm_urls=""
 	if [ "$fm_rc" -eq 0 ] || [ "$fm_rc" -eq 2 ]; then
 		fm_out=$(ccnavi host marked "$kind" "$fm_mark" "$fm_who" "$fm_url" "$fm_file" 2>/dev/null) || fm_rc=1
-		fm_urls=$(printf '%s\n' "$fm_out" | tr -d '\r' | sed -n 's/^urls //p')
+		fm_urls=$(ccnavi_val urls "$fm_out")
 	fi
 	rm -f "$fm_file" || :
 	case "$fm_rc" in
@@ -398,8 +410,8 @@ find_marked() {
 # staged_send <操作の種類> <キー> <段階ID> <note|issue> <MR の番号> <MR の URL> <本文のファイル>
 # 操作ID は種類・親・MR・キーから決まる（打ち直しが同じ記録にヒットする）。段階は issue と comment の 2 つを
 # 記録に持つ。note は MR へのコメント、issue は issue の作成（create_issue が要る。本文の 1 行目がタイトル）。
-# 標準出力は note なら `comment`、issue なら `create_issue` と同じ形の JSON（送り済みと分かったときは
-# {url}、issue はそれに {number}）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
+# 標準出力は note なら `comment`、issue なら `create_issue` と同じ答え（送り済みと分かったときは
+# `url`、issue はそれに `number`。`ccnavi host sent`）。送り済みなら送らず、前に試した形跡があれば先にホストを目印で照合する。
 # 確定できないときは止めて 1（自動では送り直さない）。
 # 記録を作れないときは、二重投稿を防ぐため、送らずに止める。
 
@@ -410,23 +422,17 @@ cs_set() {
 	}
 }
 
-# 操作記録の答え（`ccnavi ops get` の 1 行 1 項目）から、<名前> の行の値を出す。無ければ空。<名前> <答え>
-#
-# 名前は sed の式に入れずに awk で頭の語と比べる（スレッドの id に式で意味を持つ字が入りうるため）。
-ccnavi_op_line() {
-	printf '%s\n' "$2" | awk -v k="$1" 'index($0, k " ") == 1 { print substr($0, length(k) + 2); exit }'
-}
-
+# 操作記録の答え（`ccnavi ops get` の 1 行 1 項目）の <段階>.<欄> の値。
 cs_field() {
-	ccnavi_op_line "$cs_stage.$1" "$(ccnavi ops get "$cs_id" 2>/dev/null)"
+	ccnavi_val1 "$cs_stage.$1" "$(ccnavi ops get "$cs_id" 2>/dev/null)"
 }
 
-# 送った先の URL から、返す JSON を作る。
-cs_sent_json() {
+# 送った先の URL から、返す答えを作る（`ccnavi host sent`。issue の番号は URL から読む）。
+cs_sent() {
 	if [ "$cs_skind" = issue ]; then
-		"$JQ" -n --arg u "$1" '{url: $u, number: ($u | split("/") | last | tonumber? // 0)}'
+		ccnavi host sent issue "$1"
 	else
-		"$JQ" -n --arg u "$1" '{url: $u}'
+		ccnavi host sent comment "$1"
 	fi
 }
 
@@ -487,7 +493,7 @@ staged_send_locked() {
 	cs_state=$(cs_field state)
 	if [ "$cs_state" = sent ]; then
 		printf '%s: 同じ投稿は送信済み（%s）。送り直さない\n' "${review_label:-ccnavi-review}" "$(cs_field url)" >&2
-		cs_sent_json "$(cs_field url)"
+		cs_sent "$(cs_field url)"
 		return 0
 	fi
 	cs_who=""
@@ -500,7 +506,7 @@ staged_send_locked() {
 		case "$cs_verdict" in
 		sent*)
 			cs_set sent "$cs_urls" "$cs_who" || :
-			cs_sent_json "$cs_urls"
+			cs_sent "$cs_urls"
 			return 0
 			;;
 		send*) : ;;
@@ -529,7 +535,7 @@ staged_send_locked() {
 		cs_out=$(comment "$cs_mr" "$cs_url" "$cs_body") || cs_out=""
 	fi
 	rm -f "$cs_body"
-	cs_posted=$(printf '%s' "$cs_out" | "$JQ" -r '.url // empty' 2>/dev/null || :)
+	cs_posted=$(ccnavi_val1 url "$cs_out")
 	if [ -z "$cs_posted" ]; then
 		cs_set unknown || :
 		return 1
@@ -554,13 +560,13 @@ refetch() {
 #
 # gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
 # GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
-# 形（英数字と _ . - の 1〜100 字で、- で始まらない。実行ファイルの --actor と同じ）に合わなければ使わない。
+# 名前の読みと形（英数字と _ . - の 1〜100 字で、- で始まらない。実行ファイルの --actor と同じ）は実行ファイル
+# （`ccnavi host account`）が持ち、合わなければ空を答える。
 # マーカーに残すだけなので、長く待たない（account_max_time 秒）。gh / glab の標準エラーは応答に混ぜない。
 
 account_max_time="${CCNAVI_REVIEW_ACCOUNT_TIMEOUT:-15}"
 
 account() {
-	if [ "$kind" = github ]; then field=login; else field=username; fi
 	account_out="$state/review-account-$$.json"
 	case "$transport" in
 	gh | glab) ccnavi_run_timed "$account_max_time" /dev/null "$account_out" /dev/null "$CLI" api --hostname "$host" user || : >"$account_out" ;;
@@ -570,16 +576,8 @@ account() {
 		ccnavi_h_max_time=120
 		;;
 	esac
-	who=$("$JQ" -r --arg f "$field" '.[$f] // empty' <"$account_out" 2>/dev/null | tr -d '\r') || who=""
+	ccnavi_val1 account "$(ccnavi host account "$kind" "$account_out" 2>/dev/null)"
 	rm -f "$account_out"
-	[ -n "$who" ] || return 0
-	# 形は C ロケールで見る（ロケールによって [A-Za-z] が英字の外にヒットしないように）
-	if printf '%s\n' "$who" | LC_ALL=C grep -q '[^A-Za-z0-9_.-]'; then return 0; fi
-	case "$who" in
-	-*) return 0 ;;
-	esac
-	[ "${#who}" -le 100 ] || return 0
-	printf '%s' "$who"
 }
 
 # ---- 取ってきた時点の状態。exe に渡す JSON。

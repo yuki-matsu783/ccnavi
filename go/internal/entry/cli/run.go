@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/model/hostreply"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
 )
@@ -33,12 +33,6 @@ func (in *input) terminal() bool {
 	f, ok := in.raw.(*os.File)
 	return ok && ospath.IsTerminal(f.Fd())
 }
-
-// actorMaxLength は `--actor` の長さの上限（字）。
-const actorMaxLength = 100
-
-// actorForm は `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
-var actorForm = regexp.MustCompile(`\A[A-Za-z0-9_.-]{1,` + strconv.Itoa(actorMaxLength) + `}\z`)
 
 // Run は 1 回の起動を処理し、終了コードを返す。マーカーに書く経路（via）の既定はエージェントが sh から打つ
 // サブコマンド（cli）で、ユーザの判断の経路と hook は枝の中で差し替える。
@@ -172,8 +166,8 @@ func usageRefusal(parser *argparse.Parser, a opts) string {
 		return "--record-merge は --record-commit と一緒に、子の先頭の sha を指定してください。"
 	}
 	actor := a.Str("actor")
-	if actor != "" && !actorForm.MatchString(actor) {
-		return "--actor にはホストのアカウント名（英数字と _ . - の 1〜" + strconv.Itoa(actorMaxLength) + " 字）を渡す"
+	if actor != "" && !hostreply.AccountForm.MatchString(actor) {
+		return "--actor にはホストのアカウント名（英数字と _ . - の 1〜" + strconv.Itoa(hostreply.AccountMaxLength) + " 字）を渡す"
 	}
 	if actor != "" && !a.head("review", "confirm") && !decideWrites(a) {
 		return "--actor は review confirm か、反映する形の decide（--reviewed <N> --accept-unresolved）と一緒に指定してください。"

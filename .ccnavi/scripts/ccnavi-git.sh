@@ -195,20 +195,19 @@ gc_out=$(printf '%s\0' "$@" | "$gc_bin" --root "$WS" git check "$SELF" "$SYNC" "
 gc_out=$(printf '%s\n' "$gc_out" | tr -d '\r')
 # 答えの行を読む。allow に続けて、git の引数の前に足す語（prepend）・出力の後ろに出す警告（warn）・push の前に確かめる
 # 親のブランチ（gate-top・gate-branch）・統合先のユーザのチェックアウトの統合先（target）が付くことがある。
-gc_line() { printf '%s\n' "$gc_out" | sed -n "s/^$1 //p" | head -n 1; }
 case "$(printf '%s\n' "$gc_out" | head -n 1)" in
 allow | pass) ;;
 deny\ *)
-	gc_id=$(printf '%s\n' "$gc_out" | sed -n '1s/^deny //p')
+	gc_id=$(ccnavi_val1 deny "$gc_out")
 	exe_reject "$gc_id" "$(printf '%s\n' "$gc_out" | sed -n '2,$p')"
 	;;
 *) reject no-exe "ccnavi の実行ファイルが git の引数の形に答えませんでした。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、直せなければユーザに伝えてください。" ;;
 esac
-gc_warn=$(gc_line warn)
-gc_gate_top=$(gc_line gate-top)
-gc_gate_branch=$(gc_line gate-branch)
-gc_target=$(gc_line target)
-gc_prepend=$(gc_line prepend)
+gc_warn=$(ccnavi_val1 warn "$gc_out")
+gc_gate_top=$(ccnavi_val1 gate-top "$gc_out")
+gc_gate_branch=$(ccnavi_val1 gate-branch "$gc_out")
+gc_target=$(ccnavi_val1 target "$gc_out")
+gc_prepend=$(ccnavi_val1 prepend "$gc_out")
 
 sub="$1"
 shift

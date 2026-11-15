@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/ids"
 )
@@ -16,7 +16,7 @@ type BranchArgs struct {
 	// Strict は、origin のブランチの一覧（ls-remote）を取れなければ止めるか。偽なら手元に残る origin の追跡ブランチで
 	// 代わりに確かめて「リモート未確認」と言う。
 	Strict bool
-	// Heads は origin のブランチの一覧（1 行 1 本）のファイル。空なら取れなかった（HeadsErr がその理由の 1 行）。
+	// Heads は `ls-remote --heads origin` の出力のまま（sh が取ってきたもの）のファイル。空なら取れなかった（HeadsErr がその理由の 1 行）。
 	Heads, HeadsErr string
 	// Hint は識別子が使えないときに添える案内、IDExit はそのときの終了コード（既定は 1）。
 	Hint   string
@@ -48,7 +48,7 @@ func BranchOK(cwd string, a BranchArgs) (string, int) {
 	remote := a.Heads != ""
 	if remote {
 		text, _ := os.ReadFile(a.Heads)
-		names = ospath.Splitlines(string(text))
+		names = git.RemoteHeads(string(text))
 	} else {
 		if a.Strict {
 			o.Fail("adopt-heads", exitUnmet, "origin のブランチ一覧を取れなかった（"+a.HeadsErr+"）。同じ識別子になる別のブランチが無いか確かめられないので止めた。")

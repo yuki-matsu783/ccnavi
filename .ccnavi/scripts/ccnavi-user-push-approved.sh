@@ -228,8 +228,7 @@ given_in() {
 # push に失敗したとき、何が未送信かを言うため。差は実行ファイル（write-and-push unsent）が読む。実行ファイルが
 # 答えないときは言わない（送れなかったことは呼ぶ側が言っている）。$1 ツリー $2 ブランチ
 unsent_paths() {
-	ccnavi_wap_exe write-and-push unsent "$1" "$2" </dev/null 2>/dev/null | tr -d '\r' |
-		sed -n 's/^unsent /  未送信: /p' >&2 || :
+	ccnavi_val unsent "$(ccnavi_wap_exe write-and-push unsent "$1" "$2" </dev/null 2>/dev/null)" | sed 's/^/  未送信: /' >&2 || :
 }
 
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_wap_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した

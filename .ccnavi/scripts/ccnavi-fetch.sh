@@ -212,8 +212,8 @@ ccnavi_fetch_ask() {
 	ccnavi_fx_next=""
 	ccnavi_fx_out=$(ccnavi_ask "$root" fetch "$@") || return 1
 	[ "$(printf '%s\n' "$ccnavi_fx_out" | head -n 1)" = "fetch 1" ] || return 1
-	printf '%s\n' "$ccnavi_fx_out" | sed -n 's/^out //p'
-	ccnavi_fx_next=$(printf '%s\n' "$ccnavi_fx_out" | sed -n 's/^next //p' | head -n 1)
+	ccnavi_val out "$ccnavi_fx_out"
+	ccnavi_fx_next=$(ccnavi_val1 next "$ccnavi_fx_out")
 	return 0
 }
 
@@ -316,7 +316,7 @@ fetch_bin=$(ccnavi_bin "$root") || fetch_bin=""
 # 親子のチケットの親のワークツリー（<P> <親のブランチ> を 1 行ずつ）。
 : >"$scratch/families"
 if [ -n "$fetch_bin" ]; then
-	ccnavi_ask "$root" fetch plan 2>/dev/null | sed -n 's/^family //p' >"$scratch/families" || :
+	ccnavi_val family "$(ccnavi_ask "$root" fetch plan 2>/dev/null)" >"$scratch/families" || :
 fi
 # 第 1 周が承認済みチケットを持つツリーとして見たツリー（第 2 周は、統合先をチェックアウトしているのがこれなら見ない）。
 : >"$scratch/seen"

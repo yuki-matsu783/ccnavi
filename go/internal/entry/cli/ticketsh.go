@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 	"time"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/reply"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/tickets/lifecycle/ticketsh"
 )
@@ -38,11 +38,9 @@ func runTicketSh(stdout, stderr io.Writer, root string, conf *config.Settings, a
 		if mr == "-" {
 			mr = ""
 		}
-		if text := ticketsh.UnsentNext(root, rest[0], rest[1], mr); text != "" {
-			for _, line := range strings.Split(text, "\n") {
-				fmt.Fprintf(stdout, "err %s\n", line)
-			}
-		}
+		var o reply.Lines
+		o.Err(ticketsh.UnsentNext(root, rest[0], rest[1], mr))
+		io.WriteString(stdout, o.String())
 	case op == "result-begin" && len(rest) == 0:
 		path, started, ok := stopreview.BeginResult(conf.State, time.Now())
 		if !ok {

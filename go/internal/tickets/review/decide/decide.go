@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/reply"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/approval"
@@ -271,7 +272,7 @@ func Reviewed(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settin
 }
 
 // Choose は対話の decide の前半（`--choose-out <ファイル>`）。残った指摘を見せて選ばせ、選択とダイジェストを
-// 書くだけ。置くのは sh が write-and-push の中で `--yes` で打つ（ロックを持ったままユーザを待たない）。
+// 書くだけ（1 行 1 項目）。置くのは sh が write-and-push の中で `--yes` で打つ（ロックを持ったままユーザを待たない）。
 func Choose(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, outPath string) int {
 	d := decision(stderr, conf, root, cwd, number, resultPath, nil)
 	if d == nil {
@@ -287,8 +288,12 @@ func Choose(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings
 	} else {
 		fmt.Fprintf(stdout, msgNoThreads, number, d.Parent.ID)
 	}
-	chosen := pyjson.NewObject("choices", choices, "digest", Digest(d))
-	if failed := fsio.WriteJSONAs(outPath, chosen, fsio.JSONFormat{FinalNewline: true}); failed != "" {
+	// sh が jq を使わずに読む 1 行 1 項目（`choices <1 行の JSON>`・`digest <ダイジェスト>`）。選択は置く呼び出しへそのまま渡す
+	compact, _ := pyjson.Dumps(choices, pyjson.Options{Compact: true, RawUnicode: true})
+	var chosen reply.Lines
+	chosen.Val("choices", compact)
+	chosen.Val("digest", Digest(d))
+	if failed := fsio.WriteText(outPath, chosen.String(), fsio.LF, fsio.Atomic); failed != "" {
 		fmt.Fprintf(stderr, msgChooseFailed, outPath, failed)
 		return config.ExitError
 	}

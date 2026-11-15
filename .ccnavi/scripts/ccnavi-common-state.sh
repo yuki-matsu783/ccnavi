@@ -1,12 +1,12 @@
 # ccnavi-common-state.sh  ccnavi-common.sh が読む部品。単体では読まない（読み方は ccnavi-common.sh の冒頭）。
 #
-# state の置き場とロック、実行ファイルに聞く口、親ブランチの push のゲートの ls-remote、タイムアウト監視つきの git。
+# state の置き場とロック、実行ファイルに聞く口と答えを読む口、親ブランチの push のゲートの ls-remote、タイムアウト監視つきの git。
 # 判定と解釈（統合先・親か・送った形跡・ゲートの次の一手・git が断った理由・同じ識別子のブランチ）は実行ファイルが持つ。
-# ここに残すのは、sh で実装するもののうち「外との出入り」（ls-remote と時間の上限）と、実行ファイルに聞く口だけ。
+# ここに残すのは、sh で実装するもののうち「外との出入り」（ls-remote と時間の上限）と、実行ファイルに聞く口と答えを読む口だけ。
 
 # ---- state の置き場とロック
 #
-# 1 行 1 項目の `<キー> <値>` のファイルは、sh が `sed -n 's/^<キー> //p'` で読み、jq を使わない
+# 1 行 1 項目の `<キー> <値>` のファイルは、sh が ccnavi_val（下の「実行ファイルの答えを読む口」）で読み、jq を使わない
 # （JSON とチケットの YAML は実行ファイルが読んで、sh には 1 行で返す）。
 # 置き場はワークスペースルートの `logs/state`（固定。ccnavi-review.sh と同じ）。
 #
@@ -58,6 +58,61 @@ ccnavi_ask() {
 	printf '%s\n' "$ccnavi_ak_out" | tr -d '\r'
 }
 
+# ---- 実行ファイルの答え（1 行 1 項目）を読む口。どの sh もここを使い、行の読み方を写さない。
+#
+#   ccnavi_val <名前> [<答え>]   <名前> の行の値。同じ名前の行が続けば改行でつなぐ。無ければ空
+#   ccnavi_val1 <名前> [<答え>]  <名前> の最初の行の値
+#   ccnavi_has <名前> [<答え>]   <名前> の行（値の無い語だけの行も）があれば 0
+#   ccnavi_do <答え> [<理由>]    out・err の行を出し、fail ならその文で止め、exit ならその終了コードで終える
+#
+# <答え> を省くと、直前に ccnavi_do に渡した答え（ccnavi_said）を読む。行の終わりの CR（Windows の実行ファイル）は除く。
+# 名前は awk で行の頭と文字どおりに比べる（sed の式に入れると、名前やスレッドの id の字が式として働くため）。
+ccnavi_said=""
+
+ccnavi_val() {
+	if [ "$#" -ge 2 ]; then ccnavi_vl_in="$2"; else ccnavi_vl_in="$ccnavi_said"; fi
+	printf '%s\n' "$ccnavi_vl_in" | awk -v k="$1 " '{ sub(/\r$/, "") } index($0, k) == 1 { print substr($0, length(k) + 1) }'
+}
+
+ccnavi_val1() {
+	if [ "$#" -ge 2 ]; then ccnavi_vl_in="$2"; else ccnavi_vl_in="$ccnavi_said"; fi
+	printf '%s\n' "$ccnavi_vl_in" | awk -v k="$1 " '{ sub(/\r$/, "") } index($0, k) == 1 { print substr($0, length(k) + 1); exit }'
+}
+
+ccnavi_has() {
+	if [ "$#" -ge 2 ]; then ccnavi_vl_in="$2"; else ccnavi_vl_in="$ccnavi_said"; fi
+	printf '%s\n' "$ccnavi_vl_in" | awk -v k="$1" '{ sub(/\r$/, "") } $0 == k || index($0, k " ") == 1 { f = 1; exit } END { exit f ? 0 : 1 }'
+}
+
+# 段取りの判定と出力を実行ファイルに任せた答え（`infra/reply` の形）を実行する。<答え> [<理由>]
+#
+#   out <行> / err <行>      標準出力・標準エラーにそのまま出す
+#   help                     呼ぶ側の usage を標準出力に出す
+#   fail <識別子> <終了コード> と msg <行>  呼ぶ側の fail <識別子> <文> <終了コード> で止める（usage の行があれば先に usage を標準エラーへ）
+#   exit <終了コード>        出し終えてからその終了コードで終える（0 でなければ診断ログに reason の行か <理由> を残す）
+#
+# 呼ぶ側は fail・usage・log_info を持つこと。答えの値は ccnavi_val で読む。
+ccnavi_do() {
+	ccnavi_said="$1"
+	ccnavi_dd_say=$(ccnavi_val out)
+	[ -z "$ccnavi_dd_say" ] || printf '%s\n' "$ccnavi_dd_say"
+	ccnavi_dd_say=$(ccnavi_val err)
+	[ -z "$ccnavi_dd_say" ] || printf '%s\n' "$ccnavi_dd_say" >&2
+	! ccnavi_has help || usage
+	ccnavi_dd_fail=$(ccnavi_val1 fail)
+	if [ -n "$ccnavi_dd_fail" ]; then
+		! ccnavi_has usage || usage >&2
+		fail "${ccnavi_dd_fail% *}" "$(ccnavi_val msg)" "${ccnavi_dd_fail##* }"
+	fi
+	ccnavi_dd_exit=$(ccnavi_val1 exit)
+	if [ -n "$ccnavi_dd_exit" ]; then
+		ccnavi_dd_reason=$(ccnavi_val1 reason)
+		[ "$ccnavi_dd_exit" = 0 ] || log_info 止めた -- "exit=$ccnavi_dd_exit" "reason=${ccnavi_dd_reason:-${2:-}}"
+		exit "$ccnavi_dd_exit"
+	fi
+	return 0
+}
+
 # 文面ファイルの文を、実行ファイル（`ccnavi text`）に引かせて標準出力に出す。
 # <ワークスペースルート> <識別子> [<名前>=<値>]... [@<欄>=<場合>]...
 #
@@ -92,7 +147,7 @@ ccnavi_text() {
 # 実行ファイルの --root はツリーから探したワークスペースルート（無ければツリー）。
 ccnavi_integration() {
 	ccnavi_ig_ws=$(cd "$1" 2>/dev/null && ccnavi_workspace) || ccnavi_ig_ws="$1"
-	ccnavi_ig_name=$(ccnavi_ask "$ccnavi_ig_ws" git integration "$1" | sed -n 's/^integration //p' | head -n 1) || ccnavi_ig_name=""
+	ccnavi_ig_name=$(ccnavi_val1 integration "$(ccnavi_ask "$ccnavi_ig_ws" git integration "$1")") || ccnavi_ig_name=""
 	[ -n "$ccnavi_ig_name" ] || return 1
 	printf '%s\n' "$ccnavi_ig_name"
 }
@@ -103,7 +158,7 @@ ccnavi_integration() {
 # あれば origin/HEAD を直す方法を示す。呼ぶ側が前置きを付ける。実行ファイルが答えなければ、組むか置くかを言う。
 ccnavi_integration_hint() {
 	ccnavi_ih_ws=$(cd "$1" 2>/dev/null && ccnavi_workspace) || ccnavi_ih_ws="$1"
-	ccnavi_ih_text=$(ccnavi_ask "$ccnavi_ih_ws" git integration "$1" | sed -n 's/^hint //p' | head -n 1) || ccnavi_ih_text=""
+	ccnavi_ih_text=$(ccnavi_val1 hint "$(ccnavi_ask "$ccnavi_ih_ws" git integration "$1")") || ccnavi_ih_text=""
 	if [ -n "$ccnavi_ih_text" ]; then
 		printf '%s' "$ccnavi_ih_text"
 	else
@@ -138,7 +193,7 @@ ccnavi_parent_info() {
 	ccnavi_pi_out=$(ccnavi_ask "$ccnavi_pi_ws" tree parent "$1" "$2" ${3:+"$3"}) || return 2
 	[ "$(printf '%s\n' "$ccnavi_pi_out" | head -n 1)" = "tree 1" ] || return 2
 	for ccnavi_pi_key in parent approved requested archived started trace; do
-		ccnavi_pi_ans=$(printf '%s\n' "$ccnavi_pi_out" | sed -n "s/^$ccnavi_pi_key //p" | head -n 1)
+		ccnavi_pi_ans=$(ccnavi_val1 "$ccnavi_pi_key" "$ccnavi_pi_out")
 		case "$ccnavi_pi_ans" in
 		yes | no | unreadable) ;;
 		*) ccnavi_pi_ans=unknown ;;
@@ -152,7 +207,7 @@ ccnavi_parent_info() {
 		trace) ccnavi_pi_trace="$ccnavi_pi_ans" ;;
 		esac
 	done
-	ccnavi_pi_mr=$(printf '%s\n' "$ccnavi_pi_out" | sed -n 's/^mr //p' | head -n 1)
+	ccnavi_pi_mr=$(ccnavi_val1 mr "$ccnavi_pi_out")
 	[ "$ccnavi_pi_mr" != "-" ] || ccnavi_pi_mr=""
 	return 0
 }
@@ -173,11 +228,10 @@ ccnavi_push_gate() {
 	ccnavi_pg_b="$2"
 	ccnavi_pg_secs="${5:-15}"
 	ccnavi_pg_out=$(ccnavi_ask "$4" tree gate "$1" "$2" "$3" "$ccnavi_pg_secs") || ccnavi_pg_out=""
-	ccnavi_pg_line() { printf '%s\n' "$ccnavi_pg_out" | sed -n "s/^$1 //p" | head -n 1; }
 	if [ "$(printf '%s\n' "$ccnavi_pg_out" | head -n 1)" = "tree 1" ]; then
-		ccnavi_pg_next=$(ccnavi_pg_line gate)
-		ccnavi_pg_missing=$(ccnavi_pg_line missing)
-		ccnavi_pg_unreachable=$(ccnavi_pg_line unreachable)
+		ccnavi_pg_next=$(ccnavi_val1 gate "$ccnavi_pg_out")
+		ccnavi_pg_missing=$(ccnavi_val1 missing "$ccnavi_pg_out")
+		ccnavi_pg_unreachable=$(ccnavi_val1 unreachable "$ccnavi_pg_out")
 	else
 		ccnavi_pg_next=pass
 		git -C "$1" show-ref --verify --quiet "refs/remotes/origin/$ccnavi_pg_b" 2>/dev/null && ccnavi_pg_next=ls-remote
@@ -188,7 +242,7 @@ ccnavi_push_gate() {
 	pass) return 0 ;;
 	ls-remote) ;;
 	*)
-		ccnavi_pg_why=$(ccnavi_pg_line why)
+		ccnavi_pg_why=$(ccnavi_val1 why "$ccnavi_pg_out")
 		return 2
 		;;
 	esac
@@ -250,7 +304,7 @@ ccnavi_git_timed() {
 # （`git refusal`。refusal.Of）が持つ。実行ファイルが答えないとき（実行ファイルを起こさずに動く ccnavi-fetch.sh・
 # ccnavi-user-push-approved.sh で、入れ替え中など）は、読み分けを省いて git の 1 行目だけを添える。
 ccnavi_git_refusal() {
-	ccnavi_gr_text=$(ccnavi_ask "$1" git refusal "$2" | sed -n 's/^refusal //p' | head -n 1) || ccnavi_gr_text=""
+	ccnavi_gr_text=$(ccnavi_val1 refusal "$(ccnavi_ask "$1" git refusal "$2")") || ccnavi_gr_text=""
 	if [ -n "$ccnavi_gr_text" ]; then
 		printf '%s' "$ccnavi_gr_text"
 	else

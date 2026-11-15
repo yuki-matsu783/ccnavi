@@ -5,10 +5,12 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/host"
 )
 
@@ -22,6 +24,8 @@ const acceptHead = "accept 1"
 //   - plan: `op <操作ID>`・`count <スレッドの数>`
 //   - threads: 書く前の確かめ（host.AcceptCheck）に通れば `mr <MR の番号>` と、スレッドごとに `thread <番号> <id> <キー>`。
 //     返信の本文は <置き場>/<番号>.reply に書く（本文は複数行なので答えの行に入れない）。止めるなら `stop <文>`
+//   - decided <置いた答え> <issue の URL> <警告>: 置いた答え（`user reviewed --yes --json` の出力）の JSON に `issue_url`・`warning`
+//     を足した 1 行の JSON（ccnavi-user-decide.sh がボードに返す）。答えが空なら何も出さない
 //
 // 計画を読めなければ何も答えず 1 で終わる。
 func runAccept(stdout, stderr io.Writer, words []string) int {
@@ -62,7 +66,36 @@ func runAccept(stdout, stderr io.Writer, words []string) int {
 			fmt.Fprintf(stdout, "thread %s %s %s\n", name, t.ID, ospath.Squeeze(t.Key))
 		}
 		return config.ExitOK
+	case len(words) == 4 && words[0] == "decided":
+		return acceptDecided(stdout, stderr, words[1], words[2], words[3])
 	}
-	io.WriteString(stderr, "ccnavi: accept の使い方: plan <計画> / threads <計画> <結果> <github|gitlab> <置き場>\n")
+	io.WriteString(stderr, "ccnavi: accept の使い方: plan <計画> / threads <計画> <結果> <github|gitlab> <置き場> / decided <置いた答え> <issue の URL> <警告>\n")
 	return config.ExitError
+}
+
+// acceptDecided は `accept decided`。置いた答えが JSON の表でなければ 1。
+func acceptDecided(stdout, stderr io.Writer, path, issueURL, warning string) int {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: 置いた答え %s を読めない（%s）\n", path, fsio.ErrorText(err))
+		return config.ExitError
+	}
+	if strings.TrimSpace(string(data)) == "" {
+		return config.ExitOK
+	}
+	v, err := pyjson.Loads(string(data))
+	top, ok := v.(*pyjson.Object)
+	if err != nil || !ok {
+		fmt.Fprintf(stderr, "ccnavi: 置いた答え %s が JSON の表ではない\n", path)
+		return config.ExitError
+	}
+	top.Set("issue_url", issueURL)
+	top.Set("warning", warning)
+	text, err := pyjson.Dumps(top, pyjson.Options{Compact: true, RawUnicode: true})
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: 置いた答えを書き出せない（%s）\n", err)
+		return config.ExitError
+	}
+	fmt.Fprintln(stdout, text)
+	return config.ExitOK
 }

@@ -3,7 +3,6 @@ package cut
 import (
 	"ccnavi/internal/policy/texts"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -19,9 +18,6 @@ type remoteState struct {
 	ahead, behind  int
 	originSha, why string
 }
-
-// headLine は ls-remote --heads の 1 行（`<sha> refs/heads/<名前>`）。
-var headLine = regexp.MustCompile(`^[0-9a-fA-F]+\s+refs/heads/(.+)$`)
 
 // compare は fetch の結果と手元の origin/<取り込み先> から、ずれを決める。fetch が届かなくても止めず、リモート未確認にする。
 func (r *run) compare(remote Remote) remoteState {
@@ -71,12 +67,7 @@ func (r *run) originTaken(remote Remote, rs *remoteState) bool {
 		rs.state, rs.why = "unverified", "origin のブランチ一覧を取れなかった（"+why+"）"
 		return true
 	}
-	var names []string
-	for _, line := range lines(remote.Heads) {
-		if m := headLine.FindStringSubmatch(line); m != nil {
-			names = append(names, m[1])
-		}
-	}
+	names := git.RemoteHeads(remote.Heads)
 	for _, n := range names {
 		if n == r.name {
 			r.o.Out("ワークツリーは切っていない。origin にブランチ " + r.name + " が既にある（MR の元ブランチかもしれない）。")

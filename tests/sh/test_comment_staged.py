@@ -1,6 +1,7 @@
 """`comment_staged`（ccnavi-common-review.sh）。エージェントの単発の投稿を操作記録に載せて送る。
 
-`ccnavi`・`comment`・`find_marked`・`account` はスタブに差し替え、分岐だけを確かめる。
+`ccnavi`・`comment`・`find_marked`・`account` はスタブに差し替え（答えは 1 行 1 項目）、
+分岐だけを確かめる。
 
 - 記録を作れなければ、前と同じ `comment` に戻る
 - 送り済みなら送らない
@@ -30,6 +31,7 @@ JQ="$JQ_BIN"
 state="$STATE"
 branch=feature
 ccnavi() {
+	if [ "$1 $2" = "host sent" ]; then printf 'url %s\\n' "$4"; return 0; fi
 	[ "$1" = ops ] || return 1
 	shift
 	printf '%s\\n' "$*" >>"$STATE/ops.log"
@@ -43,11 +45,11 @@ ccnavi() {
 comment() {
 	cat "$3" >"$STATE/posted.md"
 	[ -z "${POST_FAIL:-}" ] || return 1
-	printf '{"url":"https://h/c/1","created_at":"","author":"me"}\\n'
+	printf 'url https://h/c/1\\nauthor me\\n'
 }
 create_issue() {
 	cat "$1" >"$STATE/issue.md"
-	printf '{"number":5,"url":"https://h/o/r/issues/5"}\\n'
+	printf 'url https://h/o/r/issues/5\\nnumber 5\\n'
 }
 find_marked() { printf 'yes %s\\n' "${FOUND:-}"; }
 account() { printf 'me'; }

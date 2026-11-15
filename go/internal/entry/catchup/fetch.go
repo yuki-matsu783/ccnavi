@@ -41,12 +41,12 @@ func Fetch(stdout, stderr io.Writer, root string, conf *config.Settings, args []
 		return config.ExitError
 	}
 	var a answer
-	a.line(fetchHead)
+	a.Line(fetchHead)
 	switch {
 	case len(args) == 1 && args[0] == "plan":
 		for _, name := range worktreeNames(root) {
 			if _, branch, why := familyAt(root, conf, name); why == isFamily {
-				a.line("family", name, branch)
+				a.Line("family", name, branch)
 			}
 		}
 	case args[0] == "forward" && (len(args) == 3 || len(args) == 4):

@@ -245,8 +245,8 @@ mr_state() {
 	mrs_out=$(ccnavi_ask "$root" host mr-state "$ccnavi_h_kind" "$ccnavi_h_scheme" "$ccnavi_h_host" "$ccnavi_h_path" "$mrs_n" \
 		"$mrs_how" "$mrs_file") || mr_state_unknown no-tool "ccnavi の実行ファイルが見つからない（scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で配置する）"
 	rm -f "$mrs_file" || :
-	mrs_state=$(printf '%s\n' "$mrs_out" | sed -n 's/^state //p')
-	mrs_answer=$(printf '%s\n' "$mrs_out" | sed -n 's/^answer //p')
+	mrs_state=$(ccnavi_val state "$mrs_out")
+	mrs_answer=$(ccnavi_val answer "$mrs_out")
 	case "$mrs_state" in
 	open | merged | closed) mr_state_known "$mrs_state" "$mrs_answer" ;;
 	unknown)
@@ -367,22 +367,25 @@ default_branch() {
 	printf '%s' "$db_name"
 }
 
-# ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
-
+# ---- 目印で始まる投稿を探す。答えは comment と同じ 1 行 1 項目（無ければ空）。読めなければ 1。<番号> <URL> <目印>
+#
+# 一覧は取ってくるだけで、どれが目印で始まるかと欄の読みは実行ファイル（`ccnavi host found`）。pages は ( ) の中で打つ
+# （ページが多すぎて止まるときも、ここで 1 を返して呼び手の文で止める）。
 find_posted() {
 	case "$3" in
 	'<!-- ccnavi:'*) ;;
 	*) return 0 ;;
 	esac
+	fp_file="$state/review-found-$$.json"
+	fp_rc=0
 	if [ "$kind" = github ]; then
-		found_all=$(pages "repos/$path/issues/$1/comments") || return 1
-		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" \
-			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: (.html_url // ""), created_at: (.created_at // ""), author: (.user.login // "")}'
+		(pages "repos/$path/issues/$1/comments") >"$fp_file" || fp_rc=$?
 	else
-		found_all=$(pages "projects/$(encoded_path)/merge_requests/$1/notes") || return 1
-		printf '%s' "$found_all" | "$JQ" -c --arg m "$3" --arg u "$2" \
-			'[.[] | select((.body // "") | startswith($m))][0] // empty | {url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)}'
+		(pages "projects/$(encoded_path)/merge_requests/$1/notes") >"$fp_file" || fp_rc=$?
 	fi
+	[ "$fp_rc" -ne 0 ] || ccnavi host found "$kind" "$3" "$2" "$fp_file" 2>/dev/null || fp_rc=$?
+	rm -f "$fp_file" || :
+	return "$fp_rc"
 }
 
 # ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境では REST の ccr/ready_for_review を使う）。GitLab はタイトルの "Draft: " を除く。
@@ -402,11 +405,11 @@ undraft() {
 	if [ "$kind" = github ]; then
 		api GET "repos/$path/pulls/$mr_number" >"$ud_file" || : >"$ud_file"
 		ud_title=$(undraft_ask title github "$ud_file")
-		node=$(printf '%s\n' "$ud_title" | sed -n 's/^node //p')
+		node=$(ccnavi_val node "$ud_title")
 		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
 		# タイトルの "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときにタイトルからも除く。
-		if [ "$(printf '%s\n' "$ud_title" | sed -n 's/^title //p')" = new ]; then
-			stripped=$(printf '%s\n' "$ud_title" | sed -n 's/^new //p')
+		if [ "$(ccnavi_val title "$ud_title")" = new ]; then
+			stripped=$(ccnavi_val new "$ud_title")
 			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null || return 1
 		fi
 		query=$("$JQ" -n --arg id "$node" '{
@@ -415,7 +418,7 @@ undraft() {
 		gql_rc=0
 		gql "$query" >"$ud_file" || gql_rc=$?
 		case "$gql_rc" in
-		0) undraft_ask done graphql "$ud_file" | sed -n 's/^draft //p' ;;
+		0) ccnavi_val draft "$(undraft_ask done graphql "$ud_file")" ;;
 		3)
 			# GraphQL を使えない環境。Draft を外したあと、実状態（draft）を読んで返す（戻り値の形は GraphQL と同じ true / false）
 			rest_rc=0
@@ -429,7 +432,7 @@ undraft() {
 				return 1
 			fi
 			rm -f "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
-			undraft_ask done rest "$ud_file" | sed -n 's/^draft //p'
+			ccnavi_val draft "$(undraft_ask done rest "$ud_file")"
 			;;
 		*)
 			rm -f "$ud_file" || :
@@ -439,7 +442,7 @@ undraft() {
 	else
 		api GET "projects/$(encoded_path)/merge_requests/$mr_number" >"$ud_file" || : >"$ud_file"
 		ud_title=$(undraft_ask title gitlab "$ud_file")
-		case "$(printf '%s\n' "$ud_title" | sed -n 's/^title //p')" in
+		case "$(ccnavi_val title "$ud_title")" in
 		same)
 			rm -f "$ud_file" || :
 			printf 'false\n'
@@ -449,14 +452,14 @@ undraft() {
 			# 除いた結果が空なら、空のタイトルで更新しない。
 			fail undraft-empty-title "マージリクエスト !$mr_number のタイトルから Draft を除くと空になる。タイトルは変えていない。タイトルを付けてから再実行してください。"
 			;;
-		new) stripped=$(printf '%s\n' "$ud_title" | sed -n 's/^new //p') ;;
+		new) stripped=$(ccnavi_val new "$ud_title") ;;
 		*) fail no-mr-title "マージリクエスト !$mr_number のタイトルを読めない。" ;;
 		esac
 		# squash も有効にする。途中のコミットを既定のブランチに残さない。GitHub は MR ごとに持てない
 		# （マージのときにユーザが選ぶ）ので、コメントに書くだけ。
 		payload=$("$JQ" -n --arg t "$stripped" '{title: $t, squash: true}')
 		api PUT "projects/$(encoded_path)/merge_requests/$mr_number" "$payload" >"$ud_file" || : >"$ud_file"
-		undraft_ask done gitlab "$ud_file" | sed -n 's/^draft //p'
+		ccnavi_val draft "$(undraft_ask done gitlab "$ud_file")"
 	fi
 	rm -f "$ud_file" || :
 }
@@ -612,7 +615,6 @@ review-request)
 		fail mr-target-mismatch "マージリクエストのマージ先（${mr_target:-不明}）が統合先（${mr_integration}）ではない。依頼は作らずに止めた。マージ先を直すか、ユーザに相談してください。"
 	number="$mr_number"
 	url="$mr_url"
-	mr=$("$JQ" -n --argjson n "$number" --arg u "$url" '{number: $n, url: $u}')
 	# --check はここまでの前提を全部通ったところで終える。何も書かない（本文も書き出さない）。
 	if [ -n "$rr_check" ]; then
 		printf '確認: ok（前提は通った。取り込みとロックは確かめていない。MR #%s）\n' "$number"
@@ -624,16 +626,17 @@ review-request)
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
 		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
 	if [ -n "$posted" ]; then
-		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
+		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(ccnavi_val1 url "$posted")"
 		# 前の試みが結果を確定できないまま残っていても、ここで送り済みに直す（「引き継ぎ未完了」を残さない）
 		ccnavi ops mark-sent request "${branch:-}" "$number" "$request_marker" comment \
-			"$(printf '%s' "$posted" | "$JQ" -r '.url' | tr -d '\r')" >/dev/null 2>&1 || :
+			"$(ccnavi_val1 url "$posted")" >/dev/null 2>&1 || :
 	else
 		posted=$(comment_staged request "$request_marker" "$number" "$url" "$file") ||
 			fail request-post-failed "依頼を投稿できたか確定できなかった（上の案内を見る）。マーカーは置いていない。確かめてから、同じコマンドを打ち直す。"
 	fi
-	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
-		'{host: $host, mr: $mr} + $posted' >"$result"
+	# review requested に渡す結果の JSON は実行ファイルが組む（MR と投稿の URL・作成時刻・作者）
+	ccnavi host requested "$kind" "$number" "$url" "$(ccnavi_val1 url "$posted")" \
+		"$(ccnavi_val1 created_at "$posted")" "$(ccnavi_val1 author "$posted")" >"$result"
 	# ステップ 3: マーカー。
 	wap_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
 	# ステップ 3.5: 依頼文の後始末。依頼文は review-request の入力で、依頼した後は要らない。ここからはレビュー待ちで、
@@ -653,7 +656,7 @@ review-request)
 		*) request_body_path="$here/$request_body" ;;
 		esac
 		# scratchpad/ の中かは実行ファイルが比べる（`.` と `..` を解き、大文字小文字を区別しない）。答えなければ消さない。
-		request_under=$(ccnavi_ask "$root" path under "$root/scratchpad" "$request_body_path" | sed -n 's/^under //p' | head -n 1) ||
+		request_under=$(ccnavi_val1 under "$(ccnavi_ask "$root" path under "$root/scratchpad" "$request_body_path")") ||
 			request_under=""
 		case "$request_under" in
 		yes)
@@ -697,7 +700,7 @@ comment)
 			fail comment-post-failed "コメントを投稿できたか確定できなかった（上の案内を見る）。確かめてから、同じコマンドを打ち直す。"
 		}
 	rm -f "$noted"
-	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
+	printf 'OK: 記録した（%s）\n' "$(ccnavi_val1 url "$posted")"
 	;;
 decide)
 	# 残った指摘の一覧を JSON で返す。何も置かない（ボードとエージェントが読む）。
@@ -724,7 +727,7 @@ ready)
 	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>`・`wip <パス>`（1 行 1 本）と、成功のあとに出す報告の
 	# `say <文>`。number と url は fetch_all が残したもの。
 	noted=$(sed -n '1p' "$ccnavi_wap_capture" 2>/dev/null || :)
-	ready_say=$(sed -n 's/^say //p' "$ccnavi_wap_capture" 2>/dev/null || :)
+	ready_say=$(ccnavi_val say "$(cat "$ccnavi_wap_capture" 2>/dev/null)")
 	rm -f "$ccnavi_wap_capture"
 	ccnavi_wap_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"

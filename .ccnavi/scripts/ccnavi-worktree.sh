@@ -100,41 +100,21 @@ root=$(ccnavi_workspace) ||
 ccnavi_log_root="$root"
 scripts="$root/.ccnavi/scripts"
 
-# 段取りの判定と出力を実行ファイルに任せる（`ccnavi worktree direct <動詞>`）。答えの out・err の行を出し、fail なら
-# その文で止め、exit ならその終了コードで終える。値は wt_val で読む。答えが無ければ止める。
+# 段取りの判定と出力を実行ファイルに任せる（`ccnavi worktree direct <動詞>`）。答えは ccnavi_do（ccnavi-common-state.sh）が
+# 実行し、値は ccnavi_val で読む。答えが無ければ止める。
 wt_do() {
 	wd_bin=$(ccnavi_bin "$root") ||
 		fail exe-missing "ccnavi の実行ファイルが見つかりません。何も切らずに止めました。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。"
 	wd_out=$("$wd_bin" --root "$root" worktree direct "$@" 2>/dev/null </dev/null | tr -d '\r') || wd_out=""
 	[ -n "$wd_out" ] ||
 		fail exe-unanswered "ccnavi の実行ファイルが答えませんでした（worktree direct $1）。何も切らずに止めました。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。"
-	wd_say=$(wt_val out)
-	[ -z "$wd_say" ] || printf '%s\n' "$wd_say"
-	wd_say=$(wt_val err)
-	[ -z "$wd_say" ] || printf '%s\n' "$wd_say" >&2
-	[ -z "$(wt_val help)" ] || usage
-	wd_fail=$(wt_val fail | head -n 1)
-	if [ -n "$wd_fail" ]; then
-		[ -z "$(wt_val usage)" ] || usage >&2
-		fail "${wd_fail% *}" "$(wt_val msg)" "${wd_fail##* }"
-	fi
-	wd_exit=$(wt_val exit | head -n 1)
-	if [ -n "$wd_exit" ]; then
-		[ "$wd_exit" = 0 ] || log_info 止めた -- "exit=$wd_exit" "reason=$(wt_val reason | head -n 1)"
-		exit "$wd_exit"
-	fi
-	return 0
-}
-
-# 答えの <名前> の値（同じ名前の行が続けば改行でつなぐ）。
-wt_val() {
-	printf '%s\n' "$wd_out" | sed -n "s/^$1 //p"
+	ccnavi_do "$wd_out"
 }
 
 # 1. 切る前に決まることを確かめる。引き取り（--adopt）と --dry-run はここで終わる。
 wt_do plan -- "$@"
-target=$(wt_val fetch)
-top=$(wt_val top)
+target=$(ccnavi_val fetch)
+top=$(ccnavi_val top)
 log_info 始めた -- "target=$target"
 
 # 2. 外との出入り。fetch は取り込み先だけ（ccnavi-git.sh 経由）。届かなくても止めず、結果をそのまま実行ファイルに渡す
@@ -166,4 +146,4 @@ fi
 
 # 3. ずれと書きかけを確かめ、確認が要れば報告して止め、要らなければ記録を書いて切る。
 wt_do cut "fetch=$fetch" "fetch-out=$fetch_out" "heads=$heads_arg" "heads-err=$err_arg" -- "$@"
-log_info 完了 -- "target=$target" "snap=$(wt_val snap)"
+log_info 完了 -- "target=$target" "snap=$(ccnavi_val snap)"

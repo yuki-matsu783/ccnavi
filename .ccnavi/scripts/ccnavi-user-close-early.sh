@@ -115,13 +115,12 @@ accept_execute "$accept_plan"
 ccnavi --entry sh user close-early --reason "$reason" --result "$result" --accept-done "$accept_file" || exit $?
 issue_draft="$state/review-close-early-issue-$family.md"
 noted="$state/review-close-early-note-$family.md"
-number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
-url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
+# MR の番号と URL（number・url）は、$result を取ってきた fetch_all が残したもの（ccnavi-common-review.sh）
 if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
 	issue=$(staged_send close-early "$family" issue issue "$number" "$url" "$issue_draft") || issue=""
 	[ -z "$issue" ] && fail issue-create-failed "残りを書き出す issue を作れなかった。下書きは $issue_draft にある。"
-	issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
-	issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
+	issue_url=$(ccnavi_val1 url "$issue")
+	issue_no=$(ccnavi_val1 number "$issue")
 	printf '残りを #%s に書き出した（%s）\n' "$issue_no" "$issue_url"
 	printf '残りは #%s へ: %s\n' "$issue_no" "$issue_url" >>"$noted"
 	rm -f "$issue_draft"

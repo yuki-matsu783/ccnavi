@@ -165,12 +165,12 @@ ask_sync() {
 
 # 答えの out・err の行を出し、failed があれば止めたものに数える。次の一手（next の語）を $next に入れる。
 said() {
-	printf '%s\n' "$answer" | sed -n 's/^out //p'
-	printf '%s\n' "$answer" | sed -n 's/^err //p' >&2
-	if printf '%s\n' "$answer" | grep -q '^failed$'; then
+	ccnavi_val out "$answer"
+	ccnavi_val err "$answer" >&2
+	if ccnavi_has failed "$answer"; then
 		printf 'fail\n' >>"$scratch/failed"
 	fi
-	next=$(printf '%s\n' "$answer" | sed -n 's/^next //p' | head -n 1)
+	next=$(ccnavi_val1 next "$answer")
 }
 
 # ---- 外との出入り
@@ -220,12 +220,13 @@ take_lock() {
 
 ask_sync plan "$here_sh" ${1+"$@"}
 said
-if exit_code=$(printf '%s\n' "$answer" | sed -n 's/^exit //p' | head -n 1) && [ -n "$exit_code" ]; then
+if exit_code=$(ccnavi_val1 exit "$answer") && [ -n "$exit_code" ]; then
 	exit "$exit_code"
 fi
+# repo と skip の行は語ごと並びのまま残す（下の while が先頭の語で分ける）
 printf '%s\n' "$answer" | grep -E '^(repo|skip) ' >"$scratch/repos" || :
-printf '%s\n' "$answer" | sed -n 's/^family //p' >"$scratch/families"
-printf '%s\n' "$answer" | sed -n 's/^retired //p' >"$scratch/retired"
+ccnavi_val family "$answer" >"$scratch/families"
+ccnavi_val retired "$answer" >"$scratch/retired"
 
 # ---- リポジトリごと
 #

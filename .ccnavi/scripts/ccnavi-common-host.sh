@@ -366,9 +366,9 @@ ccnavi_host_fail() {
 	printf '%s' "$1" >"$ccnavi_hf_file" 2>/dev/null || return 0
 	ccnavi_hf_out=$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host fail "$ccnavi_hf_file") || ccnavi_hf_out=""
 	rm -f "$ccnavi_hf_file" || :
-	ccnavi_hf_status=$(printf '%s\n' "$ccnavi_hf_out" | sed -n 's/^status //p')
-	ccnavi_hf_blocked=$(printf '%s\n' "$ccnavi_hf_out" | sed -n 's/^blocked //p')
-	ccnavi_hf_body=$(printf '%s\n' "$ccnavi_hf_out" | sed -n 's/^body //p')
+	ccnavi_hf_status=$(ccnavi_val status "$ccnavi_hf_out")
+	ccnavi_hf_blocked=$(ccnavi_val blocked "$ccnavi_hf_out")
+	ccnavi_hf_body=$(ccnavi_val body "$ccnavi_hf_out")
 }
 
 ccnavi_host_pages() {
@@ -526,8 +526,8 @@ ccnavi_host_probe() {
 		ccnavi_hq_how=failed
 		printf '%s' "$ccnavi_hq_text" >"$ccnavi_hq_file"
 	fi
-	ccnavi_h_probe=$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host probe "$ccnavi_hq_how" "$ccnavi_hq_file" |
-		sed -n 's/^probe //p') || ccnavi_h_probe=""
+	ccnavi_h_probe=$(ccnavi_val probe "$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host probe "$ccnavi_hq_how" "$ccnavi_hq_file")") ||
+		ccnavi_h_probe=""
 	[ "$ccnavi_h_probe" != ok ] || ccnavi_h_project_json=$(cat "$ccnavi_hq_file")
 	rm -f "$ccnavi_hq_file" || :
 	return 0
@@ -550,7 +550,7 @@ ccnavi_host_access() {
 	set -- "$ccnavi_h_kind" "$ccnavi_hc_project"
 	# GitLab: 自分の id → プロジェクトの member の access_level。読めなければ、プロジェクトの permissions で判定する
 	if [ "$ccnavi_h_kind" = gitlab ] && ccnavi_host_api GET user >"$ccnavi_hc_file" 2>/dev/null; then
-		ccnavi_hc_uid=$(ccnavi_ask "$ccnavi_hc_root" preflight uid "$ccnavi_hc_file" | sed -n 's/^uid //p')
+		ccnavi_hc_uid=$(ccnavi_val uid "$(ccnavi_ask "$ccnavi_hc_root" preflight uid "$ccnavi_hc_file")")
 		if [ -n "$ccnavi_hc_uid" ] &&
 			ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/members/all/$ccnavi_hc_uid" >"$ccnavi_hc_file" 2>/dev/null; then
 			set -- "$@" "$ccnavi_hc_file"
@@ -559,8 +559,8 @@ ccnavi_host_access() {
 	ccnavi_h_on_fail="$ccnavi_hc_prev"
 	ccnavi_hc_out=$(ccnavi_ask "$ccnavi_hc_root" preflight access "$@") || ccnavi_hc_out=""
 	rm -f "$ccnavi_hc_project" "$ccnavi_hc_file" || :
-	ccnavi_h_access_why=$(printf '%s\n' "$ccnavi_hc_out" | sed -n 's/^why //p')
-	case "$(printf '%s\n' "$ccnavi_hc_out" | sed -n 's/^access //p')" in
+	ccnavi_h_access_why=$(ccnavi_val why "$ccnavi_hc_out")
+	case "$(ccnavi_val access "$ccnavi_hc_out")" in
 	ok) return 0 ;;
 	ng) return 1 ;;
 	unknown) return 2 ;;
@@ -606,7 +606,7 @@ ccnavi_preflight() {
 		"masked=$(ccnavi_mask_url "$ccnavi_pf_url")" "kind=${ccnavi_h_kind:-}" "host=${ccnavi_h_host:-}" "path=${ccnavi_h_path:-}"
 	ccnavi_pf_plan=$(ccnavi_ask "$ccnavi_pf_root" preflight plan "$@") || ccnavi_pf_plan=""
 	# ホストの API（接続とプロジェクトの取得）と権限
-	if [ "$(printf '%s\n' "$ccnavi_pf_plan" | sed -n 's/^api //p')" = yes ] && ! ccnavi_pf_late; then
+	if [ "$(ccnavi_val api "$ccnavi_pf_plan")" = yes ] && ! ccnavi_pf_late; then
 		ccnavi_h_tmp="$ccnavi_pf_dir"
 		ccnavi_h_on_fail=""
 		ccnavi_h_max_time="$ccnavi_pf_each"
@@ -629,7 +629,7 @@ ccnavi_preflight() {
 		fi
 	fi
 	# リモートの git（API の結果によらず行う）
-	if [ "$(printf '%s\n' "$ccnavi_pf_plan" | sed -n 's/^git //p')" = yes ] && ! ccnavi_pf_late; then
+	if [ "$(ccnavi_val git "$ccnavi_pf_plan")" = yes ] && ! ccnavi_pf_late; then
 		ccnavi_pf_err="$ccnavi_pf_dir/git-err"
 		ccnavi_git_auth "$ccnavi_pf_top"
 		ccnavi_pf_grc=0
@@ -638,16 +638,16 @@ ccnavi_preflight() {
 	fi
 	[ "$ccnavi_pf_dir" = "${TMPDIR:-/tmp}" ] || rm -rf "$ccnavi_pf_dir" || :
 	ccnavi_pf_out=$(ccnavi_ask "$ccnavi_pf_root" preflight check "$@") || ccnavi_pf_out=""
-	ccnavi_pf_result=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^result //p')
+	ccnavi_pf_result=$(ccnavi_val result "$ccnavi_pf_out")
 	[ -n "$ccnavi_pf_result" ] || ccnavi_pf_result=unverified
 	for ccnavi_pf_k in tools origin integration api access git ident; do
-		ccnavi_pf_v=$(printf '%s\n' "$ccnavi_pf_out" | sed -n "s/^item $ccnavi_pf_k //p")
+		ccnavi_pf_v=$(ccnavi_val "item $ccnavi_pf_k" "$ccnavi_pf_out")
 		eval "ccnavi_pf_$ccnavi_pf_k=\${ccnavi_pf_v:-skipped}"
 	done
-	ccnavi_pf_fix=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^fix //p')
-	ccnavi_pf_auth_source=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^auth //p')
-	ccnavi_pf_access_unknown=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^access-unknown //p')
-	ccnavi_pf_continue=$(printf '%s\n' "$ccnavi_pf_out" | sed -n 's/^continue //p')
+	ccnavi_pf_fix=$(ccnavi_val fix "$ccnavi_pf_out")
+	ccnavi_pf_auth_source=$(ccnavi_val auth "$ccnavi_pf_out")
+	ccnavi_pf_access_unknown=$(ccnavi_val access-unknown "$ccnavi_pf_out")
+	ccnavi_pf_continue=$(ccnavi_val continue "$ccnavi_pf_out")
 	return 0
 }
 
@@ -657,11 +657,11 @@ ccnavi_preflight() {
 #   ccnavi_pf_next         ccnavi_pf_fix から `次:` の行を ccnavi_pf_next_text に入れる（無ければ空）。文は実行ファイル
 #                          （`ccnavi preflight next`）が組み立てる
 ccnavi_pf_line() {
-	ccnavi_pf_line_text=$(printf '%s\n' "${ccnavi_pf_out:-}" | sed -n "s/^line $1 //p")
+	ccnavi_pf_line_text=$(ccnavi_val "line $1" "${ccnavi_pf_out:-}")
 	[ -n "$ccnavi_pf_line_text" ] || ccnavi_pf_line_text="$1: 省略"
 }
 
 ccnavi_pf_next() {
-	ccnavi_pf_next_text=$(ccnavi_ask "${root:-.}" preflight next "fix=${ccnavi_pf_fix:-}" "top=${ccnavi_pf_top:-.}" \
-		"kind=${ccnavi_h_kind:-}" "host=${ccnavi_h_host:-}" "path=${ccnavi_h_path:-}" | sed -n 's/^next //p')
+	ccnavi_pf_next_text=$(ccnavi_val next "$(ccnavi_ask "${root:-.}" preflight next "fix=${ccnavi_pf_fix:-}" "top=${ccnavi_pf_top:-.}" \
+		"kind=${ccnavi_h_kind:-}" "host=${ccnavi_h_host:-}" "path=${ccnavi_h_path:-}")")
 }

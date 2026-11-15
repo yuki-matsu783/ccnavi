@@ -58,7 +58,7 @@ func Sync(stdout, stderr io.Writer, root string, conf *config.Settings, cwd stri
 		return config.ExitError
 	}
 	s := &syncRun{root: root, here: args[1], cwd: cwd, conf: conf}
-	s.a.line(syncHead)
+	s.a.Line(syncHead)
 	rest := args[2:]
 	code := config.ExitOK
 	switch {
@@ -98,8 +98,8 @@ type planned struct{ name, key, branch string }
 func (s *syncRun) plan(wants []string) {
 	for _, want := range wants {
 		if !ids.IsValidFamily(want) {
-			s.a.line("err", fmt.Sprintf("ccnavi-sync: %s は親の識別子の形ではありません（親のブランチ名ではなく識別子を渡します）。", want))
-			s.a.line("exit", "2")
+			s.a.Line("err", fmt.Sprintf("ccnavi-sync: %s は親の識別子の形ではありません（親のブランチ名ではなく識別子を渡します）。", want))
+			s.a.Line("exit", "2")
 			return
 		}
 	}
@@ -170,17 +170,17 @@ func (s *syncRun) plan(wants []string) {
 		dir := s.repoDir(key)
 		switch {
 		case git.Run(dir, []string{"remote", "get-url", "origin"}, git.Options{}).OK():
-			s.a.line("repo", key, hasFamily, dir)
+			s.a.Line("repo", key, hasFamily, dir)
 		case hasFamily == "yes":
 			// origin の無いリポジトリは取り込みの対象外（今の手元の動きのまま）。
-			s.a.line("skip", key+": origin がありません。取り込みの対象外（今の手元の動きのまま）")
+			s.a.Line("skip", key+": origin がありません。取り込みの対象外（今の手元の動きのまま）")
 		}
 	}
 	for _, f := range families {
-		s.a.line("family", f.name, f.key, f.branch)
+		s.a.Line("family", f.name, f.key, f.branch)
 	}
 	for _, e := range retired {
-		s.a.line("retired", e.Parent, e.Repo, e.MR, cmp.Or(e.Branch, "-"))
+		s.a.Line("retired", e.Parent, e.Repo, e.MR, cmp.Or(e.Branch, "-"))
 	}
 }
 

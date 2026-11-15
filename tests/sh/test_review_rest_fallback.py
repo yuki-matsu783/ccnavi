@@ -43,14 +43,14 @@ case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
 *" ops "* | *" host "*) exec '@EXE@' "$@" ;;
-*" accept plan "* | *" accept threads "*) exec '@EXE@' "$@" ;;
+*" accept plan "* | *" accept threads "* | *" accept decided "*) exec '@EXE@' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
   case "$prev" in
   --result) cp "$a" '{copy}' ;;
   --accept-plan) cp "$STUB_PLAN" "$a" ;;
-  --choose-out) printf '{{"choices": {{}}, "digest": "d"}}\\n' >"$a" ;;
+  --choose-out) printf 'choices {{}}\\ndigest d\\n' >"$a" ;;
   esac
   prev="$a"
 done

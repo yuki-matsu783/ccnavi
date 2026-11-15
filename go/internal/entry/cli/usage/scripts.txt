@@ -155,6 +155,8 @@
         （ccnavi-user-lib-review.sh 用。返信と解決をホストに書く前の確かめをして、"mr" と
          スレッドごとの "thread <番号> <id> <キー>" を出力し、返信の本文を <dir>/<番号>.reply に書きます。
          止めるときは "stop <文>"）
+    ccnavi accept decided <answer> <issue-url> <warning>
+        （ccnavi-user-decide.sh 用。置いた答えの JSON に issue_url と warning を足した 1 行の JSON を出力します）
     ccnavi write-and-push busy <tree>
         （write-and-push 用。親のワークツリーに途中の操作があれば "busy <名前>" を出力します。読み取り専用）
     ccnavi write-and-push commit <tree> <list> <message>
@@ -228,9 +230,11 @@
     ccnavi host fail <file>
     ccnavi host probe ok|failed <file>
     ccnavi host mr-state github|gitlab <scheme> <host> <path> <number> ok|failed <file>
-    ccnavi host find-mr|merged|copy|marked|undraft <args> <file>...
+    ccnavi host find-mr|merged|copy|marked|posted|found|account|undraft <args> <file>...
+    ccnavi host sent comment|issue <url>
+    ccnavi host requested github|gitlab <number> <url> <posted-url> <created-at> <author>
         （ccnavi-common-host.sh・ccnavi-common-review.sh・ccnavi-review.sh 用。スクリプトが取得したホストの応答
-         （失敗したときはホストの返事）のファイルを読み、1行1項目で出力します。copy は --result に渡す JSON を出力します。
+         （失敗したときはホストの返事）のファイルを読み、1行1項目で出力します。copy と requested は --result に渡す JSON を出力します。
          読めない応答は終了コード 1。読み取り専用）
     ccnavi start report <名前>=<値>...
     ccnavi start dry new-issue|mcp|create|existing <名前>=<値>...

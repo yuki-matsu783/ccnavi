@@ -1,7 +1,7 @@
 """`find_marked`（ccnavi-common-review.sh）。目印で自分の投稿を探す、送信の照合の読み取り。
 
-ホストの一覧はスタブ（`ccnavi_host_pages` を差し替える）で返し、jq の絞り込みを GitHub と GitLab の
-両方で確かめる。
+ホストの一覧はスタブ（`ccnavi_host_pages` を差し替える）で返し、
+実行ファイル（`ccnavi host marked`）の絞り込みを GitHub と GitLab の両方で通しで確かめる。
 
 - 目印の一致だけを数える（別の段階・別の操作ID・目印の無い投稿は数えない）
 - アカウントが分かれば、その人の投稿だけを数える
@@ -18,7 +18,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
@@ -31,6 +31,8 @@ HARNESS = """
 review_label=t
 ccnavi_load ccnavi-common-review.sh
 JQ="$JQ_BIN"
+state="$STATE"
+ccnavi() { "$CCNAVI_EXE" "$@"; }
 kind="$KIND"
 path="o/r"
 encoded_path() { printf 'o%%2Fr'; }
@@ -67,6 +69,8 @@ class FindMarkedTest(unittest.TestCase):
             env={
                 **os.environ,
                 "JQ_BIN": JQ,
+                "STATE": self.dir,
+                "CCNAVI_EXE": exe.path(),
                 "KIND": kind,
                 "LIST": listing,
                 "LIST_RC": str(rc),

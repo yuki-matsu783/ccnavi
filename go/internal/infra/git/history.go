@@ -246,3 +246,17 @@ func CommittedText(top, path string, timeout time.Duration) (text string, presen
 	}
 	return "", false, ospath.Strip(strings.Trim(listed.Out, "\x00")) == ""
 }
+
+// headLine は ls-remote --heads の 1 行（`<sha> refs/heads/<名前>`）。
+var headLine = regexp.MustCompile(`^[0-9a-fA-F]+\s+refs/heads/(.+)$`)
+
+// RemoteHeads は `ls-remote --heads` の出力（sh が取ってきたまま）からブランチの名前を並べる。
+func RemoteHeads(out string) []string {
+	var names []string
+	for _, l := range strings.Split(out, "\n") {
+		if m := headLine.FindStringSubmatch(strings.TrimRight(l, "\r")); m != nil {
+			names = append(names, m[1])
+		}
+	}
+	return names
+}
