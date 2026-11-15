@@ -139,6 +139,8 @@ type Options struct {
 	LazyFetch bool
 	// IndexFile は索引のファイル（GIT_INDEX_FILE）。空ならリポジトリの索引。一時の索引で木を組むときに使う。
 	IndexFile string
+	// Env は足す環境変数（`名前=値`）。作成者と日付を固定したコミットを組むときに使う。
+	Env []string
 }
 
 func (o Options) timeout() time.Duration {
@@ -245,6 +247,7 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	if o.IndexFile != "" {
 		cmd.Env = append(cmd.Env, env.GitIndexFile+"="+o.IndexFile)
 	}
+	cmd.Env = append(cmd.Env, o.Env...)
 	// 子プロセスが孫に出力の口を渡したまま残ると Run が返らないので、終わったあとの待ちに上限を付ける。
 	cmd.WaitDelay = killedPipeWait
 	if o.input != nil {

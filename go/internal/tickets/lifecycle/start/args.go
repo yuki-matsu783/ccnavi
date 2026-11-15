@@ -47,7 +47,7 @@ func Args(cwd, root string, argv []string) (string, int) {
 	}
 	top := strings.TrimRight(gitOut(cwd, "rev-parse", "--show-toplevel"), "\n")
 	if top == "" {
-		o.fail("not-git", exitUnmet, "cwd（"+ospath.Slashed(cwd)+"）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。")
+		o.Fail("not-git", exitUnmet, "cwd（"+ospath.Slashed(cwd)+"）が git のリポジトリの中ではありません。ワークスペースか projects/<名前>/ の中で実行してください。")
 		return o.String(), 0
 	}
 	if opt.Repo != "" && !sameRepo(&o, cwd, root, opt) {
@@ -57,14 +57,14 @@ func Args(cwd, root string, argv []string) (string, int) {
 		{"issue-r", opt.IssueR}, {"mr", opt.MRArg}, {"branch", opt.BranchArg}, {"slug", opt.Slug}, {"prefix", opt.Prefix},
 		{"title", opt.Title}, {"repo", opt.Repo}, {"new-title", opt.NewTitle}, {"body", opt.NewBody}, {"orig", opt.Orig},
 		{"real", opt.Real}, {"top", top}} {
-		o.val(kv[0], kv[1])
+		o.Val(kv[0], kv[1])
 	}
 	for _, kv := range []struct {
 		key string
 		on  bool
 	}{{"dry", opt.Dry}, {"mcp", opt.MCP}, {"similar", opt.Similar}, {"reopened", opt.Reopened}, {"check", opt.Check}, {"list-open", opt.Lists}} {
 		if kv.on {
-			o.val(kv.key, "yes")
+			o.Val(kv.key, "yes")
 		}
 	}
 	return o.String(), 0
@@ -91,7 +91,7 @@ func parseArgs(o *outcome, argv []string) (Options, bool) {
 	}
 	opt.Orig, opt.Real = strings.Join(orig, " "), strings.Join(real, " ")
 	failed := func(id, msg string) (Options, bool) {
-		o.fail(id, exitUsage, msg)
+		o.Fail(id, exitUsage, msg)
 		return opt, false
 	}
 	for i := 0; i < len(argv); i++ {
@@ -146,10 +146,10 @@ func parseArgs(o *outcome, argv []string) (Options, bool) {
 		case "--list-open":
 			opt.Lists = true
 		case "-h", "--help", "help":
-			o.val("help", "yes")
+			o.Val("help", "yes")
 			return opt, false
 		default:
-			o.val("usage", "yes")
+			o.Val("usage", "yes")
 			return failed("unknown-arg", "未対応の引数です（"+a+"）。")
 		}
 	}
@@ -174,7 +174,7 @@ func parseArgs(o *outcome, argv []string) (Options, bool) {
 // combination は、一緒に渡せない引数と、--new-issue のタイトルを確かめる。count は引数の数。
 func combination(o *outcome, opt *Options, count int) bool {
 	failed := func(id, msg string) bool {
-		o.fail(id, exitUsage, msg)
+		o.Fail(id, exitUsage, msg)
 		return false
 	}
 	switch {
@@ -189,7 +189,7 @@ func combination(o *outcome, opt *Options, count int) bool {
 		}
 		return true
 	case opt.IssueArg == "" && opt.MRArg == "" && opt.NewTitle == "":
-		o.val("usage", "yes")
+		o.Val("usage", "yes")
 		return failed("no-kind", "--issue <番号> か --mr <番号> を渡してください（チケット作業は issue と MR のセットです。issue がまだ無ければ --new-issue <タイトル>）。")
 	}
 	if opt.NewTitle != "" {
@@ -220,7 +220,7 @@ func combination(o *outcome, opt *Options, count int) bool {
 // numbers は --issue と --mr の値を読み、開始の種類と番号を決める。
 func numbers(o *outcome, opt *Options) bool {
 	failed := func(id, msg string) bool {
-		o.fail(id, exitUsage, msg)
+		o.Fail(id, exitUsage, msg)
 		return false
 	}
 	positive := func(s string) bool {
@@ -285,7 +285,7 @@ func sameRepo(o *outcome, cwd, root string, opt Options) bool {
 	head := "依頼のリポジトリ（" + opt.Repo + "）と、実行した場所のリポジトリ（" + here + "）が違います。ホストには問い合わせていません。"
 	script := shell.SingleQuote(ospath.Join(root, ".ccnavi", "scripts", "ccnavi-start.sh"))
 	if strings.EqualFold(originRepo(root), opt.Repo) {
-		o.fail("wrong-repo", exitUnmet, head+"ワークスペースルートに移動して実行し直してください: cd "+shell.SingleQuote(root)+" && sh "+script+" "+opt.Orig)
+		o.Fail("wrong-repo", exitUnmet, head+"ワークスペースルートに移動して実行し直してください: cd "+shell.SingleQuote(root)+" && sh "+script+" "+opt.Orig)
 		return false
 	}
 	dirs, _ := filepath.Glob(filepath.Join(root, "projects", "*"))
@@ -295,10 +295,10 @@ func sameRepo(o *outcome, cwd, root string, opt Options) bool {
 		}
 		if r := originRepo(d); r != "" && strings.EqualFold(r, opt.Repo) {
 			name := "projects/" + filepath.Base(d)
-			o.fail("wrong-repo", exitUnmet, head+name+"/ に移動して実行し直してください: cd "+shell.SingleQuote(ospath.Join(root, name))+" && sh "+script+" "+opt.Orig)
+			o.Fail("wrong-repo", exitUnmet, head+name+"/ に移動して実行し直してください: cd "+shell.SingleQuote(ospath.Join(root, name))+" && sh "+script+" "+opt.Orig)
 			return false
 		}
 	}
-	o.fail("wrong-repo", exitUnmet, head+opt.Repo+" を origin に持つプロジェクトは projects/ に見つかりません（まだ clone していないなど）。ユーザに伝えて止まってください。")
+	o.Fail("wrong-repo", exitUnmet, head+opt.Repo+" を origin に持つプロジェクトは projects/ に見つかりません（まだ clone していないなど）。ユーザに伝えて止まってください。")
 	return false
 }

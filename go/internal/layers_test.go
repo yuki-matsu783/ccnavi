@@ -40,6 +40,7 @@ var subTiers = map[string]map[string]int{
 		"digest":  0, // 16 進の要約と乱数（記録・バックアップの名前）
 		"fault":   0, // 読み手に届くエラーの共通の形（識別子・値・What）。文面は境界が引く
 		"difflib": 0, // 見せる差分（difflib の写し）
+		"reply":   0, // sh の段取りへの答え（1 行 1 項目）の組み立て
 		"golden":  0, // テストの見本（testdata の JSON）を読む。テストからだけ読む
 		// 1: 土台だけを読む
 		"pathcase":    1,
@@ -111,7 +112,7 @@ var subTiers = map[string]map[string]int{
 	"tickets/approval": {"marks": 0, "wap": 1},
 	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
 	"tickets/lifecycle": {
-		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0, "start": 0,
+		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0,
 		// 0: git が断った理由の 1 文（land と、sh が git refusal で聞く経路が共有する）
 		"refusal": 0,
 		// 0: ラッパー（ccnavi-git.sh）が打った git の出力の記録と要約
@@ -125,6 +126,10 @@ var subTiers = map[string]map[string]int{
 		"land": 4,
 		// 3: チケット作業の入口の事前確認。統合先の決め方を integrate から読む
 		"preflight": 3,
+		// 4: ワークツリーを出す共通の口。ラッパーと同じ検査を gitwrap から読む
+		"treeadd": 4,
+		// 5: ワークツリーを出す段取り（ccnavi-start.sh の start、ccnavi-worktree.sh の cut、ccnavi-ticket.sh の ticketsh）。treeadd を読む
+		"start": 5, "cut": 5, "ticketsh": 5,
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,

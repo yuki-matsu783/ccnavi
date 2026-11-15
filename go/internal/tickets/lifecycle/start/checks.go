@@ -41,7 +41,7 @@ func BranchOK(cwd string, a BranchArgs) (string, int) {
 		if code == 0 {
 			code = exitUnmet
 		}
-		o.fail("adopt-id", code, "ブランチ "+a.Branch+" から作る識別子 "+answer["id"]+" は使えない（"+p+"）。何も作成せずに処理を中断しました。"+hint)
+		o.Fail("adopt-id", code, "ブランチ "+a.Branch+" から作る識別子 "+answer["id"]+" は使えない（"+p+"）。何も作成せずに処理を中断しました。"+hint)
 		return o.String(), 0
 	}
 	var names []string
@@ -51,7 +51,7 @@ func BranchOK(cwd string, a BranchArgs) (string, int) {
 		names = ospath.Splitlines(string(text))
 	} else {
 		if a.Strict {
-			o.fail("adopt-heads", exitUnmet, "origin のブランチ一覧を取れなかった（"+a.HeadsErr+"）。同じ識別子になる別のブランチが無いか確かめられないので止めた。")
+			o.Fail("adopt-heads", exitUnmet, "origin のブランチ一覧を取れなかった（"+a.HeadsErr+"）。同じ識別子になる別のブランチが無いか確かめられないので止めた。")
 			return o.String(), 0
 		}
 		for _, n := range strings.Split(gitOut(cwd, "for-each-ref", "--format=%(refname:lstrip=3)", "refs/remotes/origin"), "\n") {
@@ -63,11 +63,11 @@ func BranchOK(cwd string, a BranchArgs) (string, int) {
 	names = append(names, strings.Split(gitOut(cwd, "for-each-ref", "--format=%(refname:short)", "refs/heads"), "\n")...)
 	slices.Sort(names)
 	if n := ids.IDClash(a.Branch, slices.Compact(names)); n != "" {
-		o.fail("adopt-id-clash", exitUnmet, "ブランチ "+a.Branch+" と "+n+" は、どちらも識別子 "+ids.BranchToID(a.Branch)+"（英字の大文字小文字は区別しない）になる。ワークツリーの置き場が重なるので使えません。何も作成せずに処理を中断しました。ユーザに相談してください。")
+		o.Fail("adopt-id-clash", exitUnmet, "ブランチ "+a.Branch+" と "+n+" は、どちらも識別子 "+ids.BranchToID(a.Branch)+"（英字の大文字小文字は区別しない）になる。ワークツリーの置き場が重なるので使えません。何も作成せずに処理を中断しました。ユーザに相談してください。")
 		return o.String(), 0
 	}
 	if !remote {
-		o.val("note", "リモート未確認。origin のブランチ一覧を取れなかったので、同じ識別子になる別のブランチは手元に残る origin の追跡ブランチでだけ確かめた")
+		o.Val("note", "リモート未確認。origin のブランチ一覧を取れなかったので、同じ識別子になる別のブランチは手元に残る origin の追跡ブランチでだけ確かめた")
 	}
 	return o.String(), 0
 }
@@ -80,7 +80,7 @@ func Merged(kind, branch string, data []byte) (string, int) {
 	}
 	var o outcome
 	if number, _, _ := strings.Cut(strings.TrimPrefix(got, "number "), "\n"); got != "" {
-		o.fail("adopt-merged", exitUnmet, "同じブランチ名 "+branch+" のマージ済み MR（!"+number+"）がある。マージ済みのブランチは再利用できません。新しいブランチで始めるか、ユーザに相談してください。")
+		o.Fail("adopt-merged", exitUnmet, "同じブランチ名 "+branch+" のマージ済み MR（!"+number+"）がある。マージ済みのブランチは再利用できません。新しいブランチで始めるか、ユーザに相談してください。")
 	}
 	return o.String(), 0
 }
@@ -107,7 +107,7 @@ func IssueShow(repo, own, number string) string {
 func Resolve(root string, a ResolveArgs) (string, int) {
 	var o outcome
 	if a.Trust {
-		o.val("issue", IssueShow(a.IssueR, a.Own, a.IssueN))
+		o.Val("issue", IssueShow(a.IssueR, a.Own, a.IssueN))
 		return o.String(), 0
 	}
 	// 大文字小文字を区別せず重複を除く（先に出た表記を残す）。
@@ -133,7 +133,7 @@ func Resolve(root string, a ResolveArgs) (string, int) {
 		want := strings.ToLower(repo + "#" + a.IssueN)
 		for _, l := range list {
 			if strings.ToLower(l) == want {
-				o.val("issue", show(l))
+				o.Val("issue", show(l))
 				return o.String(), 0
 			}
 		}
@@ -141,18 +141,18 @@ func Resolve(root string, a ResolveArgs) (string, int) {
 		if len(list) > 0 {
 			shown = strings.Join(list, " ") + " "
 		}
-		o.fail("issue-not-linked", exitUnmet, "MR !"+a.MR+" は issue #"+a.IssueN+" を閉じるリンクを持たない（参照しているだけ）。この MR が閉じる issue: "+shown+"。説明欄に Closes #"+a.IssueN+" を書くようユーザに頼み、打ち直してください。")
+		o.Fail("issue-not-linked", exitUnmet, "MR !"+a.MR+" は issue #"+a.IssueN+" を閉じるリンクを持たない（参照しているだけ）。この MR が閉じる issue: "+shown+"。説明欄に Closes #"+a.IssueN+" を書くようユーザに頼み、打ち直してください。")
 	case len(list) == 0:
-		o.fail("issue-none", exitUnmet, "MR !"+a.MR+" が閉じる issue が無い。説明欄に Closes #<番号> を書くようユーザに頼み、打ち直してください。")
+		o.Fail("issue-none", exitUnmet, "MR !"+a.MR+" が閉じる issue が無い。説明欄に Closes #<番号> を書くようユーザに頼み、打ち直してください。")
 	case len(list) > 1:
-		o.out("ccnavi-start: MR !" + a.MR + " が閉じる issue が " + itoa(len(list)) + " 件ある。どれで進めるかをユーザに聞いてください。")
+		o.Out("ccnavi-start: MR !" + a.MR + " が閉じる issue が " + itoa(len(list)) + " 件ある。どれで進めるかをユーザに聞いてください。")
 		for _, l := range list {
-			o.out("  - " + l)
+			o.Out("  - " + l)
 		}
-		o.out(texts.Say(root, "NEXT_START_MULTI_ISSUE", texts.Values{"orig_args_q": a.Orig}, nil))
-		o.exit(exitAsk)
+		o.Out(texts.Say(root, "NEXT_START_MULTI_ISSUE", texts.Values{"orig_args_q": a.Orig}, nil))
+		o.Exit(exitAsk)
 	default:
-		o.val("issue", show(list[0]))
+		o.Val("issue", show(list[0]))
 	}
 	return o.String(), 0
 }
@@ -163,14 +163,14 @@ func IssueState(root, state, number, real string, reopened bool) (string, int) {
 	var o outcome
 	switch {
 	case state == "":
-		o.out("確認: issue #" + number + " の状態: 未確認（ホストから読めなかった。closed かどうかは見ていない）")
+		o.Out("確認: issue #" + number + " の状態: 未確認（ホストから読めなかった。closed かどうかは見ていない）")
 	case state != "closed":
 	case reopened:
-		o.out("案内: issue #" + number + " は closed。--reopened が付いているので、そのまま続ける")
+		o.Out("案内: issue #" + number + " は closed。--reopened が付いているので、そのまま続ける")
 	default:
-		o.out("ccnavi-start: issue #" + number + " は closed です。完了済み・却下・重複のことが多いので、何も作成せずに処理を中断しました。ユーザに状況を伝えて、どれにするか聞いて返事を待ってください。直接実装には切り替えないでください。")
-		o.out(texts.Say(root, "CHOICES_START_ISSUE_CLOSED", texts.Values{"number": number, "real_args_q": real}, nil))
-		o.exit(exitAsk)
+		o.Out("ccnavi-start: issue #" + number + " は closed です。完了済み・却下・重複のことが多いので、何も作成せずに処理を中断しました。ユーザに状況を伝えて、どれにするか聞いて返事を待ってください。直接実装には切り替えないでください。")
+		o.Out(texts.Say(root, "CHOICES_START_ISSUE_CLOSED", texts.Values{"number": number, "real_args_q": real}, nil))
+		o.Exit(exitAsk)
 	}
 	return o.String(), 0
 }

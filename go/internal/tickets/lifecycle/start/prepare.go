@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/lifecycle/treeadd"
 	"ccnavi/internal/tickets/model/ids"
 )
 
@@ -34,11 +35,11 @@ func Prepare(root, cwd string, a PrepareArgs) (string, int) {
 	var o outcome
 	p := preparer{root: root, cwd: cwd, a: a, o: &o}
 	if p.worktree() && (!a.FastForward || p.fastForward()) && (!a.Initial || p.initial()) {
-		o.val("wt", p.wt)
+		o.Val("wt", p.wt)
 		if p.created {
-			o.val("created", "yes")
+			o.Val("created", "yes")
 		}
-		o.val("ff", p.ff)
+		o.Val("ff", p.ff)
 	}
 	return o.String(), 0
 }
@@ -54,7 +55,7 @@ type preparer struct {
 func (p *preparer) run(dir string, args ...string) bool {
 	done := git.Run(dir, args, git.Options{Timeout: prepareTimeout, LazyFetch: true})
 	if !done.OK() {
-		p.o.err(strings.TrimRight(done.Stderr+done.Out, "\n"))
+		p.o.Err(strings.TrimRight(done.Stderr+done.Out, "\n"))
 	}
 	return done.OK()
 }
@@ -71,18 +72,16 @@ func (p *preparer) worktree() bool {
 		if cur == "" {
 			cur = "?"
 		}
-		p.o.fail("worktree-busy", exitUnmet, "ワークツリーの作成先 "+dest+" が既にあり、ブランチ "+p.a.Branch+" のものではありません（現在のブランチ："+cur+"）。中を確かめ、不要なら片付けてから再実行してください。")
+		p.o.Fail("worktree-busy", exitUnmet, "ワークツリーの作成先 "+dest+" が既にあり、ブランチ "+p.a.Branch+" のものではありません（現在のブランチ："+cur+"）。中を確かめ、不要なら片付けてから再実行してください。")
 		return false
 	}
-	args := []string{"worktree", "add", dest, p.a.Branch}
-	if p.a.From != "" {
-		args = []string{"worktree", "add", dest, "-b", p.a.Branch, "--no-track", p.a.From}
-	} else if r.branchRef(p.a.Branch) == "" {
-		p.o.fail("branch-missing", exitUnmet, "ブランチ "+p.a.Branch+" が手元にも origin にもありません。ホストにだけある MR の元ブランチ（消された後など）かもしれません。")
+	if p.a.From == "" && r.branchRef(p.a.Branch) == "" {
+		p.o.Fail("branch-missing", exitUnmet, "ブランチ "+p.a.Branch+" が手元にも origin にもありません。ホストにだけある MR の元ブランチ（消された後など）かもしれません。")
 		return false
 	}
-	if !p.run(p.cwd, args...) {
-		p.o.fail("worktree-failed", exitUnmet, "ワークツリーを作成できませんでした（上の出力を確認してください）。")
+	if said, ok := treeadd.Add(p.root, p.cwd, dest, p.a.Branch, p.a.From); !ok {
+		p.o.Err(said)
+		p.o.Fail("worktree-failed", exitUnmet, "ワークツリーを作成できませんでした（上の出力を確認してください）。")
 		return false
 	}
 	p.wt, p.created = dest, p.a.From != ""
@@ -127,13 +126,13 @@ func (p *preparer) initial() bool {
 	if !git.Run(p.wt, []string{"var", "GIT_AUTHOR_IDENT"}, git.Options{}).OK() ||
 		!git.Run(p.wt, []string{"var", "GIT_COMMITTER_IDENT"}, git.Options{}).OK() {
 		p.cleanup()
-		p.o.out(texts.Say(p.root, "NEXT_START_IDENT", texts.Values{"real_args_q": p.a.Real}, nil))
-		p.o.fail("ident-missing", exitUnmet, "git の作成者情報（user.name と user.email）が無いため、初期コミットを積めません。")
+		p.o.Out(texts.Say(p.root, "NEXT_START_IDENT", texts.Values{"real_args_q": p.a.Real}, nil))
+		p.o.Fail("ident-missing", exitUnmet, "git の作成者情報（user.name と user.email）が無いため、初期コミットを積めません。")
 		return false
 	}
 	if !p.run(p.wt, "commit", "--allow-empty", "-m", InitSubject(p.a.Number)) {
 		p.cleanup()
-		p.o.fail("commit-failed", exitUnmet, "初期コミットを積めなかった（上の出力を見てください）。")
+		p.o.Fail("commit-failed", exitUnmet, "初期コミットを積めなかった（上の出力を見てください）。")
 		return false
 	}
 	return true
@@ -146,10 +145,10 @@ func (p *preparer) cleanup() {
 		return
 	}
 	if !git.Run(p.cwd, []string{"worktree", "remove", p.wt}, git.Options{Timeout: prepareTimeout, LazyFetch: true}).OK() {
-		p.o.out(texts.Say(p.root, "NOTE_START_WORKTREE_KEPT", texts.Values{"wt": p.wt, "branch": p.a.Branch}, nil))
+		p.o.Out(texts.Say(p.root, "NOTE_START_WORKTREE_KEPT", texts.Values{"wt": p.wt, "branch": p.a.Branch}, nil))
 		return
 	}
 	if !git.Run(p.cwd, []string{"branch", "-d", p.a.Branch}, git.Options{}).OK() {
-		p.o.out(texts.Say(p.root, "NOTE_START_BRANCH_KEPT", texts.Values{"branch": p.a.Branch}, nil))
+		p.o.Out(texts.Say(p.root, "NOTE_START_BRANCH_KEPT", texts.Values{"branch": p.a.Branch}, nil))
 	}
 }
