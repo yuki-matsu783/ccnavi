@@ -440,6 +440,9 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "check":
 		// ccnavi-git.sh が受けた git の引数を通すかを決める。チケット制御の有無に依らない。
 		return runGitCheck(in, stdout, stderr, root, conf, cmd[2:]), true
+	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "report":
+		// ccnavi-git.sh が打った git の出力を記録に残し、要約を返す。
+		return runGitReport(in, stdout, stderr, root, conf, cmd[2:]), true
 	case len(cmd) == 3 && cmd[0] == "git" && cmd[1] == "integration":
 		// 統合先の名前か、決まらないときの案内（ccnavi_integration・ccnavi_integration_hint）。
 		return runGitIntegration(stdout, cmd[2]), true

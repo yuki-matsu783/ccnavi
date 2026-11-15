@@ -9,6 +9,9 @@ import (
 
 	"ccnavi/internal/entry/shask"
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/tickets/lifecycle/gitlog"
 	"ccnavi/internal/tickets/lifecycle/gitwrap"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/lifecycle/land"
@@ -120,5 +123,55 @@ func runGitIntegration(stdout io.Writer, top string) int {
 func runGitRefusal(stdout io.Writer, path string) int {
 	text, _ := os.ReadFile(path)
 	fmt.Fprintf(stdout, "refusal %s\n", strings.NewReplacer("\r", " ", "\n", " ").Replace(refusal.Of(string(text))))
+	return config.ExitOK
+}
+
+// gitReportUsage は `ccnavi git report` の使い方。
+const gitReportUsage = "ccnavi: git report <終了コード> <出力のファイル> <行数> <失敗の行数> <残す本数> <自分の呼び方（引用済み）> <警告> <統合先>（サブコマンドと git の引数は標準入力に NUL 区切りで渡す）"
+
+// runGitReport は `ccnavi git report …`（ccnavi-git.sh 用）。ラッパーが打った git の出力（ファイル）を記録に残し、要約と
+// 本文の一部を標準出力に書く（gitlog.Report）。記録の置き場は、cwd がプロジェクトの中なら logs/<プロジェクト>/、ほかは
+// logs/。書けなければ理由を標準エラーに書いて 1。
+func runGitReport(in *input, stdout, stderr io.Writer, root string, conf *config.Settings, words []string) int {
+	if len(words) != 8 {
+		fmt.Fprintln(stderr, gitReportUsage)
+		return config.ExitError
+	}
+	nums := make([]int, 0, 4)
+	for _, w := range []string{words[0], words[2], words[3], words[4]} {
+		n, err := strconv.Atoi(w)
+		if err != nil {
+			fmt.Fprintln(stderr, gitReportUsage)
+			return config.ExitError
+		}
+		nums = append(nums, n)
+	}
+	args, ok := nulArgs(in, stderr)
+	if !ok || len(args) == 0 {
+		fmt.Fprintln(stderr, gitReportUsage)
+		return config.ExitError
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: 作業場所を読めない（%s）\n", err)
+		return config.ExitError
+	}
+	output, err := os.ReadFile(words[1])
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: git の出力 %s を読めない（%s）\n", words[1], err)
+		return config.ExitError
+	}
+	logDir := ospath.Join(root, "logs")
+	if t, ok := tree.TreeOf(root, cwd, integrate.ProjectsDir(conf, root)); ok && t.Project != "" {
+		logDir = ospath.Join(logDir, t.Project)
+	}
+	_, _, err = gitlog.Report(stdout, gitlog.Input{
+		Root: root, Cwd: cwd, LogDir: logDir, Sub: args[0], Args: args[1:], Status: nums[0], Output: output,
+		MaxLines: nums[1], FailLines: nums[2], Keep: nums[3], SelfQ: words[5], Warn: words[6], Target: words[7],
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "ccnavi: git の記録を書けない（%s）\n", err)
+		return config.ExitError
+	}
 	return config.ExitOK
 }

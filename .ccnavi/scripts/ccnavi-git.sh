@@ -280,34 +280,17 @@ root=$(git rev-parse --show-toplevel 2>/dev/null || :)
 log_info 受け付けた -- "sub=$sub" "args=$#"
 log_debug 判定の材料 -- "sub=$sub" "action=${action:-}" "top=$root" "cwd=$PWD" "workspace=$WS"
 
-# 記録はワークスペースの下にまとめる（git のトップとワークスペースルートは別で、モード B では異なるため）。git のトップに書くと、
-# モード B ではプロジェクトのリポジトリの中に出る。ワークスペースの .gitignore の
-# /logs/ はワークスペースルート起点なので該当せず、public のリポジトリに運用の痕跡が入る。
-logproject=$(ccnavi_project "$(pwd)" "$WS")
-if [ -n "$logproject" ]; then
-	logdir="$WS/logs/$logproject"
-else
-	logdir="$WS/logs"
-fi
-mkdir -p "$logdir"
-logfile="$logdir/git-$(date '+%Y%m%d-%H%M%S')-$$.log"
-
-# 全量を必ず残す。成功でも書く。破棄すると「あのとき何が出ていたか」を後から
-# 確かめられない。logs/ は .gitignore に入っていて、コミット対象にならない。
-{
-	printf '# %s  cwd=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$(pwd)"
-	printf '$ git %s' "$sub"
-	for arg in ${1+"$@"}; do printf ' %s' "$arg"; done
-	printf '\n--- 出力 ---\n'
-} >"$logfile"
-
 # ネットワークに出る git には、gh / glab の資格情報を使わせる（認証済みなら git の認証も通る）。
 case "$sub" in
 push | fetch | pull | ls-remote) ccnavi_git_auth . ;;
 esac
 
+# 出力は一時ファイルに受け、記録に残すのと要約は実行ファイル（`ccnavi git report`。gitlog.Report）が行う。
+# git を打つのはここ（ラッパーの受け口。fetch・pull・push は外との出入り）。
+out=$(mktemp 2>/dev/null || mktemp -t ccnavi-git) || reject no-temp "一時ファイルを作れないため、git の出力を受けられません。ユーザに伝えてください。"
+trap 'rm -f "$out"' EXIT
 status=0
-git --no-pager "$sub" ${1+"$@"} >>"$logfile" 2>&1 || status=$?
+git --no-pager "$sub" ${1+"$@"} >"$out" 2>&1 || status=$?
 
 # fetch を試して失敗した印（worktree add の起点の確認が、オフラインで詰まらないように使う）。
 # 成功すれば消す。FETCH_HEAD の更新時刻は成功した fetch でしか進まない。
@@ -322,82 +305,14 @@ if [ "$sub" = fetch ]; then
 	fi
 fi
 
-# 記録のパス。エージェントがそのまま sed -n で開ける形で返す。
-#
-# 基準はワークスペースルート。モード B ではエージェントの cwd がプロジェクトの中に
-# あるので、git のトップからの相対を返すと届かない。ワークスペースの中に居るときは
-# 短い相対、そうでなければ絶対を返す（git のトップとワークスペースルートは別だから）。
-case "$logfile" in
-"$WS"/*) logrel="${logfile#"$WS"/}" ;;
-*) logrel="$logfile" ;;
-esac
-# cwd から相対で開けないなら、絶対パスをそのまま返す。2 つ並べない。
-# 並べると、受け取った側がどちらを開くか迷い、パスの切り出しも要る。
-if [ ! -f "$logrel" ]; then
-	logrel="$logfile"
-fi
+report_rc=0
+printf '%s\0' "$sub" ${1+"$@"} |
+	"$gc_bin" --root "$WS" git report "$status" "$out" "$MAX_LINES" "$FAIL_LINES" "$KEEP_LOGS" "$SELF_Q" "$gc_warn" "$gc_target" ||
+	report_rc=$?
+[ "$report_rc" -eq 0 ] ||
+	reject no-report "git は終了コード ${status} で終わりましたが、実行ファイルが出力を記録に残せませんでした（上の理由を見てください）。直せなければユーザに伝えてください。"
 
-# 本文は目印の次の行から。目印と同じ行が出力に含まれても、awk は最初の 1 件で
-# f を立て、それより後ろだけを出すので取り違えない。
-body() { awk 'f; /^--- 出力 ---$/ { f = 1 }' "$logfile"; }
-
-lines=$(body | awk 'END { print NR + 0 }')
-
-# 要約は「次の判断に使う数値」だけにする。本文をもう 1 度読ませないためのもので、
-# 本文の代わりではない。
-summary=$(body | awk -v cmd="$sub" '
-	/^diff --git /			{ files++ }
-	/^\+/ && !/^\+\+\+/		{ plus++ }
-	/^-/ && !/^---/			{ minus++ }
-	/^commit [0-9a-f]/		{ commits++ }
-	/^[ MADRCU?!][ MADRCU?!] /	{ entries++ }
-	/^\t/				{ entries++ }
-					{ n++ }
-	END {
-		if ((cmd == "diff" || cmd == "show") && files > 0)
-			printf "%d ファイル +%d -%d", files, plus, minus
-		else if ((cmd == "log" || cmd == "shortlog") && commits > 0)
-			printf "%d コミット", commits
-		else if (cmd == "status")
-			printf "変更 %d 件", entries + 0
-		else
-			printf "%d 行", n + 0
-	}')
-
-if [ "$status" -eq 0 ]; then
-	printf 'ok  git %s  %s  log=%s\n' "$sub" "$summary" "$logrel"
-	body | head -n "$MAX_LINES"
-	if [ "$lines" -gt "$MAX_LINES" ]; then
-		printf '... 残り %d 行は %s にある（全文は Read ツールでこのファイルを読む）\n' "$((lines - MAX_LINES))" "$logrel"
-	fi
-	if [ -n "$gc_warn" ]; then
-		printf '警告: %s\n' "$gc_warn"
-	fi
-else
-	printf 'fail  git %s  exit=%d  log=%s\n' "$sub" "$status" "$logrel"
-	body | tail -n "$FAIL_LINES"
-	# Windows では、プロセスの cwd になっているディレクトリは使用中になる。Bash ツールの cwd は呼び出しを
-	# またいで残る親のシェルのものなので、ワークツリーの中へ cd したまま remove すると、git が
-	# 中身を消したあと最後のディレクトリで Permission denied になり、空のディレクトリが残る。
-	# サブシェルの中で cd してから打っても防げず、ここで pwd を見ても親の cwd は分からないので、
-	# 起きたときに直し方を言う。
-	if [ "$sub" = worktree ] && [ "${action:-}" = remove ] && body | grep -q 'Permission denied'; then
-		rm_path_q='<パス>'
-		[ -z "${2:-}" ] || rm_path_q=$(ccnavi_sh_quote "$2")
-		ccnavi_text "$WS" NOTE_GIT_WORKTREE_REMOVE_CWD "ws=$WS" "self_q=$SELF_Q" "path_q=$rm_path_q"
-	fi
-	# 統合先のユーザのチェックアウトの pull が衝突したとき（未解決の索引がある）だけ、解かずにユーザへ頼む案内を足す。
-	# ワークツリーの中の衝突は、そこで解く普段の作業なので足さない。
-	if [ -n "$gc_target" ] && [ -n "$(git ls-files -u 2>/dev/null)" ]; then
-		ccnavi_text "$WS" NOTE_GIT_PULL_CONFLICT_ON_TARGET "integ=$gc_target"
-	fi
-fi
-
-# 世代で切る。新しい順に並べ、上限より後ろを消す。
-ls -1t "$logdir"/git-*.log 2>/dev/null | awk -v keep="$KEEP_LOGS" 'NR > keep' |
-	while IFS= read -r old; do rm -f "$old"; done
-
-log_info 終わった -- "sub=$sub" "exit=$status" "lines=$lines" "log=$logrel"
+log_info 終わった -- "sub=$sub" "exit=$status"
 
 [ "$status" -eq 0 ] || exit 1
 exit 0
