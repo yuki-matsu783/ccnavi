@@ -35,7 +35,7 @@ SCRIPT_FIELDS = (
 class ReviseTest(PhaseHarness):
     # 全体計画のレビューを依頼したところまでの流れは、承認の試験の部品を借りる（継承すると
     # 承認の試験が丸ごともう 1 度走る。クラスを名前で取り込んでも、このモジュールで走る）
-    requested = test_feedback_plan_approval.FeedbackPlanApprovalTest.requested
+    requested = test_feedback_plan_approval.FeedbackPlanHarness.requested
 
     def revise(self, *extra, ident="i0001", cwd=None):
         return self.ccnavi("ticket", "revise", ident, *extra, "--cwd", cwd or self.parent_tree)

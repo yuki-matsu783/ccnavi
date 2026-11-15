@@ -18,7 +18,7 @@ import os
 import unittest
 
 from tests import script_command
-from tests.ticket.test_feedback_plan_approval import FeedbackPlanApprovalTest
+from tests.ticket.test_feedback_plan_approval import FeedbackPlanHarness
 from tests.ticket.test_ticket import write
 
 CODE = "NUDGE_TICKET_FEEDBACK"
@@ -33,7 +33,7 @@ def load_tests(loader, tests, pattern):
     return suite
 
 
-class FeedbackNudgeTest(FeedbackPlanApprovalTest):
+class FeedbackNudgeTest(FeedbackPlanHarness):
     def waiting(self):
         """全体計画のレビューが済み、フィードバック計画が決まっていない局面まで。"""
         fixture = self.requested()
