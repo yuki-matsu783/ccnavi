@@ -26,18 +26,21 @@ var ops map[string]handler
 
 func init() {
 	ops = map[string]handler{
-		"placement": opPlacement,
-		"families":  opFamilies,
-		"closure":   opClosure,
-		"board":     opBoard,
-		"plan":      opPlan,
-		"confirm":   opConfirm,
-		"decide":    opDecide,
-		"compat":    opCompat,
-		"start":     opStart,
-		"adopt":     opAdopt,
-		"version":   opVersion,
-		"copy":      opCopy,
+		"placement":  opPlacement,
+		"families":   opFamilies,
+		"closure":    opClosure,
+		"board":      opBoard,
+		"plan":       opPlan,
+		"confirm":    opConfirm,
+		"decide":     opDecide,
+		"compat":     opCompat,
+		"start":      opStart,
+		"adopt":      opAdopt,
+		"version":    opVersion,
+		"copy":       opCopy,
+		"closes":     opCloses,
+		"write-info": opWriteInfo,
+		"precheck":   opPrecheck,
 	}
 }
 
