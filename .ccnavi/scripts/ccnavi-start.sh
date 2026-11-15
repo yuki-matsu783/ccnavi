@@ -170,7 +170,7 @@ start_do() {
 	sd_exit=$(start_val exit | head -n 1)
 	if [ -n "$sd_exit" ]; then
 		sd_reason=$(start_val reason | head -n 1)
-		log_info 止めた -- "exit=$sd_exit" "reason=${sd_reason:-start-$1}"
+		[ "$sd_exit" = 0 ] || log_info 止めた -- "exit=$sd_exit" "reason=${sd_reason:-start-$1}"
 		exit "$sd_exit"
 	fi
 	return 0
@@ -314,16 +314,9 @@ host_open() {
 	ok) ;;
 	auth | notfound)
 		ccnavi_pf_top="$top"
-		if [ "$ccnavi_h_probe" = auth ]; then
-			ccnavi_pf_fix=auth
-			host_fail_why="ホストの API が認証を受け付けない（HTTP 401 か 403）"
-		else
-			ccnavi_pf_fix=notfound
-			host_fail_why="ホストにリポジトリ ${ccnavi_h_path} が見つからない（HTTP 404）"
-		fi
+		ccnavi_pf_fix="$ccnavi_h_probe"
 		ccnavi_pf_next
-		fail host-"$ccnavi_h_probe" "${host_fail_why}。何も作成せずに処理を中断しました。
-${ccnavi_pf_next_text}" 1
+		stop "host-$ccnavi_h_probe" "path=$ccnavi_h_path" "next=$ccnavi_pf_next_text"
 		;;
 	*)
 		host_why="ホストの API に届かない、または応答を読めない（probe=${ccnavi_h_probe}）。"

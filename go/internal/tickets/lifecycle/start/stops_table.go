@@ -9,6 +9,8 @@ var stops = map[string]stopText{
 	"access-denied":            {"access-denied", 1, "{ccnavi_h_path} への書き込みの権限が足りない（{ccnavi_h_access_why}）。ワークツリー・ブランチ・push・MR のどれも作らずに中断しました。\n{ccnavi_pf_next_text}"},
 	"issue-missing-mcp":        {"issue-missing", 1, "issue #{issue_n} が見つからない、または読む権限がありません（{issue_why}）。ユーザに確かめてください。"},
 	"issue-is-pr-mcp":          {"issue-is-pr", 1, "#{issue_n} は issue ではなく PR です。"},
+	"host-auth":                {"host-auth", 1, "ホストの API が認証を受け付けない（HTTP 401 か 403）。何も作成せずに処理を中断しました。\n{next}"},
+	"host-notfound":            {"host-notfound", 1, "ホストにリポジトリ {path} が見つからない（HTTP 404）。何も作成せずに処理を中断しました。\n{next}"},
 	"host-unknown":             {"host-unknown", 1, "ホストを読めない（{sh_why}）。origin を確かめてください。"},
 	"no-integration":           {"no-integration", 1, "{hint}"},
 	"fetch-failed-branch":      {"fetch-failed", 1, "ブランチ {fb_branch} を origin から取れなかった（{why}）。手元にも無いので続けられません。"},
