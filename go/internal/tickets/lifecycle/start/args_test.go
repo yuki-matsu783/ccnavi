@@ -19,6 +19,26 @@ func TestParseArgs(t *testing.T) {
 		{[]string{"--branch", "b", "--issue", "1"}, "fail branch-alone 2"},
 		{[]string{"--bogus"}, "usage yes"},
 		{[]string{"-h"}, "help yes"},
+		{nil, "usage yes"},
+		{[]string{"--issue"}, "fail no-number 2"},
+		{[]string{"--issue", "0"}, "fail bad-number 2"},
+		{[]string{"--issue", "1", "--mr", "x"}, "fail bad-number 2"},
+		{[]string{"--issue", "a/b#c"}, "fail bad-number 2"},
+		{[]string{"--issue", "1", "--slug", "Bad Slug"}, "fail bad-slug 2"},
+		{[]string{"--issue", "152", "--slug", "<語>"}, "fail bad-slug 2"},
+		{[]string{"--branch", "x", "--mr", "1"}, "fail branch-alone 2"},
+		{[]string{"--check", "--dry-run"}, "fail check-alone 2"},
+		{[]string{"--check", "--mr", "1"}, "fail check-alone 2"},
+		{[]string{"--list-open", "--dry-run"}, "fail list-open-alone 2"},
+		{[]string{"--mr", "1", "--slug", "x"}, "fail mr-with-new 2"},
+		{[]string{"--mr", "5", "--reopened"}, "fail reopened-alone 2"},
+		{[]string{"--new-issue", "x", "--issue", "1"}, "fail new-issue-alone 2"},
+		{[]string{"--new-issue", "x", "--mr", "1"}, "fail new-issue-alone 2"},
+		{[]string{"--new-issue", "x", "--mcp-checked"}, "fail new-issue-alone 2"},
+		{[]string{"--new-issue", "   "}, "fail bad-new-issue 2"},
+		{[]string{"--new-issue", strings.Repeat("x", 201)}, "fail bad-new-issue 2"},
+		{[]string{"--issue-body", "b", "--issue", "1"}, "fail body-alone 2"},
+		{[]string{"--similar-checked", "--issue", "1"}, "fail similar-alone 2"},
 	}
 	for _, c := range cases {
 		var o outcome
@@ -31,6 +51,18 @@ func TestParseArgs(t *testing.T) {
 	opt, ok := parseArgs(&o, []string{"--issue", "Acme/W#7", "--dry-run", "--title", "it's"})
 	if !ok || opt.What != "issue" || opt.Number != "7" || opt.IssueR != "Acme/W" || opt.Real != `'--issue' 'Acme/W#7' '--title' 'it'\''s'` {
 		t.Errorf("%+v", opt)
+	}
+	// --new-issue のタイトルは字で数える（日本語 100 字は通る）
+	if opt, ok := parseArgs(&o, []string{"--new-issue", strings.Repeat("あ", 100), "--similar-checked"}); !ok || opt.NewTitle != strings.Repeat("あ", 100) {
+		t.Errorf("日本語 100 字: %+v", opt)
+	}
+	// 引数の順によらず、--mr があれば MR で始める
+	if opt, ok := parseArgs(&o, []string{"--issue", "13", "--mr", "5"}); !ok || opt.What != "mr" || opt.Number != "5" || opt.IssueN != "13" {
+		t.Errorf("--issue と --mr: %+v", opt)
+	}
+	// 打ち直しの引数は、シェルの特殊な字を含んでも 1 引数ずつ単引用符で囲む
+	if opt, _ := parseArgs(&o, []string{"--issue", "152", "--title", `It's $HOME  "x" ` + "`a`"}); opt.Real != `'--issue' '152' '--title' 'It'\''s $HOME  "x" `+"`a`'" {
+		t.Errorf("引用: %s", opt.Real)
 	}
 }
 
@@ -45,6 +77,8 @@ func TestResolve(t *testing.T) {
 		{ResolveArgs{Linked: "acme/w#7\n", IssueArg: "8", IssueN: "8", Own: "acme/w", MR: "3"}, "fail issue-not-linked 1\n"},
 		{ResolveArgs{Linked: "", Own: "acme/w", MR: "3"}, "fail issue-none 1\n"},
 		{ResolveArgs{Trust: true, IssueN: "9", IssueR: "Acme/W", Own: "acme/w"}, "issue 9\n"},
+		{ResolveArgs{Linked: "acme/w#12\nacme/w#13\n", IssueArg: "13", IssueN: "13", Own: "acme/w", MR: "5"}, "issue 13\n"},
+		{ResolveArgs{Linked: "acme/w#12\n", IssueArg: "ACME/W#12", IssueN: "12", IssueR: "ACME/W", Own: "acme/w", MR: "5"}, "issue 12\n"},
 	}
 	for _, c := range cases {
 		got, _ := Resolve(t.TempDir(), c.a)
