@@ -379,7 +379,9 @@ class GuardScriptTest(_Workspace):
             self.assertTrue(calls, name)
             for line in calls:
                 with self.subTest(script=name, line=line.strip()[:60]):
-                    self.assertRegex(line, rf"(^|[\s;|&(]){word} [a-z][a-z-]* \"")
+                    # 識別子は文字どおりに書く。例外は実行ファイルが決めた識別子（`ccnavi git check` の答えの `$gc_id`）で、
+                    # その識別子の名前は実行ファイルの側が持つ。
+                    self.assertRegex(line, rf"(^|[\s;|&(]){word} ([a-z][a-z-]*|\"\$gc_id\") \"")
 
     def test_reject_logs_the_identifier_not_the_text(self):
         result = self.run_script("ccnavi-git.sh", "log", "--upload-pack=https://u:SECRET@h/x")
