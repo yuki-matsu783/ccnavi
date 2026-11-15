@@ -286,7 +286,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
               {layer.writable && !touring && (
                 <p className="tpl-new" data-role="new-template">
                   <label htmlFor="new-template-name" className="dim">
-                    新しいテンプレートの名前
+                    新しいテンプレート名
                   </label>{" "}
                   <input id="new-template-name" type="text" className="f-new-name" value={newName} placeholder="例: my-feature" onChange={(event) => setNewName(event.target.value.trim())} />{" "}
                   <button
@@ -297,7 +297,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                     title={newName === "" || validNewTemplateName(newName) ? "このレイヤーに新しいテンプレートを作ります。保存するまでファイルは作りません" : NEW_TEMPLATE_NAME_RULE}
                     onClick={() => startEdit({ type: "editNew", name: newName })}
                   >
-                    作る
+                    作成
                   </button>
                   {validNewTemplateName(newName) && templateNameTaken(page.data.layers, layer.name, newName) !== undefined && (
                     <span className="hint" role="status" data-role="name-taken">
@@ -328,7 +328,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           <h2>
             下書き <span className="count">{page.data.drafts.length}</span>
           </h2>
-          <p className="hint">エージェントが作った効力のない下書きです。取り込むまでテンプレートとしては使われません。この画面では読むだけです。</p>
+          <p className="hint">エージェントが作った下書きです。取り込むまでテンプレートとしては使われません。</p>
           <p className="handoff-link">
             <HandoffLink entry={page.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
           </p>
