@@ -7,7 +7,7 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 14 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 17 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
@@ -19,6 +19,8 @@
 #   ccnavi_bin_path <振り分けの sh>  PATH の ccnavi（これ自身へのリンクは飛ばす）
 #   ccnavi_bin_try <パス>      そのパス（または .exe）が実行できれば返す
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
+#   ccnavi_path_under <パス> <基準>  パスが基準の下なら基準からの相対を出す（大文字小文字を区別しない）
+#   ccnavi_path_pick <一覧>    標準入力のパスのうち一覧にあるものを出す（大文字小文字を区別しない）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
 #   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
@@ -368,6 +370,33 @@ ccnavi_worktrees_dir=.claude/worktrees
 ccnavi_projects_dir=projects
 ccnavi_approved_dir=.ccnavi/approved
 ccnavi_proposals_dir=wip/proposals
+
+# <パス> が <基準> の下（同じを含む）なら、基準からの相対（同じなら .）を元の表記で出して 0。<パス> <基準>
+#
+# どちらも / 区切りの相対パス（改行を含まない）。実行ファイルの pathcase.Under の写しで、区切りごとに大文字小文字を
+# 区別せずに比べる。実行ファイルを起こさずに動く ccnavi-user-push-approved.sh が、渡されたパスがどのツリーのものかを
+# 決めるのに使う。sh で畳むのは ASCII の英字だけで、ASCII の外の字（全角の英字など）の大文字小文字は区別する
+# （そこだけ実行ファイルと違う）。一致は tests/fixtures/approved-carry.json の under で確かめる。
+ccnavi_path_under() {
+	ccnavi_pu_low=$(printf '%s/' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	ccnavi_pu_base=$(printf '%s/' "${2%/}" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_pu_low" in
+	"$ccnavi_pu_base"*) ;;
+	*) return 1 ;;
+	esac
+	# 畳んでもバイトの長さは変わらないので、元の表記の残りを同じバイトの位置から切り出す（${#} はシェルとロケールで
+	# 字とバイトのどちらを数えるかが違うので、wc -c で数える）。
+	ccnavi_pu_skip=$(printf '%s' "$ccnavi_pu_base" | wc -c | tr -d ' ')
+	ccnavi_pu_rest=$(printf '%s/' "$1" | LC_ALL=C cut -b "$((ccnavi_pu_skip + 1))-")
+	ccnavi_pu_rest="${ccnavi_pu_rest%/}"
+	printf '%s\n' "${ccnavi_pu_rest:-.}"
+}
+
+# 標準入力のパスのうち、<一覧のファイル>（1 行 1 つ）のどれかと同じものを 1 行ずつ。大文字小文字を区別せず比べる
+# （pathcase.Fold で畳んで比べるのと同じ。畳むのは ASCII の英字だけ）。一致は tests/fixtures/approved-carry.json の same。
+ccnavi_path_pick() {
+	LC_ALL=C awk 'NR == FNR { want[tolower($0)] = 1; next } tolower($0) in want' "$1" -
+}
 
 # URL に埋まった資格情報を伏せる。
 #

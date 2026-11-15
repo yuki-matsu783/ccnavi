@@ -78,7 +78,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
   - 保護されたブランチの名前は実行ファイルの`ids.Protected`が決める。実行ファイルを起こさない`ccnavi-user-push-approved.sh`と
     `ccnavi_is_branch`は、写しの`ccnavi_is_protected`（sh）を使う。Go と Python のテストは、`tests/fixtures/ident-cases.json`の同じ表で一致を確かめる
   - 実行ファイルを起こさずに動く sh が持つ写しは、ほかに置き場の名前（`tests/fixtures/layout.json`）、「origin にその ref が無い」の見分け
-    （`tests/fixtures/no-remote-ref.json`）、置き場の変更のパスの読みと書きかけの一時ファイル（`tests/fixtures/approved-carry.json`）、
+    （`tests/fixtures/no-remote-ref.json`）、置き場の変更のパスの読みと書きかけの一時ファイル、`--path` のパスの大文字小文字を区別しない比べ（`tests/fixtures/approved-carry.json`）、
     origin の URL の読み（`tests/fixtures/host-kinds.json`）。どれも同じ表で Go と Python が一致を確かめる
 - write-and-push の親のワークツリーへのローカルの書き込み（元の先頭を読む・子の合流・状態を書く・コミット）は、実行ファイルの
   `--record-commit <文>`（子の finish は `--record-merge <sha>`）の1回の起動で行い、失敗と INT・TERM・HUP の戻しもその中で持つ。答えは
