@@ -15,7 +15,7 @@ import shutil
 import time
 import unittest
 
-from tests import script_command
+from tests import script_command, treecache
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
@@ -459,6 +459,7 @@ class PlannedRequestNudgeTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(result.stdout) if result.stdout.strip() else {}
 
+    @treecache.cached
     def close_first_child(self, plan, allow, rel, review=True):
         """計画の 1 番目の子を閉じて親に合流する。親のツリーで子は全部閉じた形になる。"""
         self.family(plan=plan)

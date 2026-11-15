@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 
+from tests import treecache
 from tests.ticket.test_archive import ReadyHarness
 from tests.ticket.test_ticket import git, write
 
@@ -22,6 +23,7 @@ CHILD = "i0001-01-01"
 
 
 class RetireHarness(ReadyHarness):
+    @treecache.cached
     def closed_and_pushed(self):
         """親を閉じて ready を済ませ、退避の削除をコミットして push した状態。fixture を返す。"""
         fixture = self.closable()

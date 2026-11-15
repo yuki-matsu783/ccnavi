@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import os
 
-from tests import exe
+from tests import exe, treecache
 from tests.ticket.test_swap_points import STAMP, CoreHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text
@@ -37,6 +37,7 @@ class ActorHarness(CoreHarness):
     def mark_path(self, kind="reviewed"):
         return os.path.join(self.parent_tree, ".ccnavi", "approved", "phases", "i0001", f"1.{kind}")
 
+    @treecache.cached
     def ready(self):
         """フェーズ 1 を依頼まで進め、取得した結果を置いた fixture を返す。"""
         fixture = self.reviewed_phase_one()

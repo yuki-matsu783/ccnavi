@@ -27,7 +27,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_path, script_command, userform, write_and_push_flag
+from tests import ROOT, common_path, script_command, treecache, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticketsample import (
     RULES,
@@ -130,8 +130,12 @@ def ticket_text(
 
 class TicketTest(unittest.TestCase):
     def setUp(self):
-        self.root = tempfile.mkdtemp(prefix="ccnavi-ticket-")
-        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.root = treecache.root(self)
+        self.build_tree()
+
+    @treecache.cached
+    def build_tree(self):
+        """リポジトリと親のワークツリーを組む。2 度目からは写しを戻す（`tests/treecache.py`）。"""
         os.makedirs(os.path.join(self.root, ".claude"))
         git(self.root, "init", "--quiet", "-b", "main")
         write(os.path.join(self.root, "src", "keep.py"), "print(1)\n")
@@ -257,6 +261,7 @@ class TicketTest(unittest.TestCase):
         if started.returncode != 0:
             self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
 
+    @treecache.cached
     def family(
         self, review=(True, False), plan=1, allow=("src/*", "wip/*"), child_allow=("src/a/*",)
     ):
@@ -1088,6 +1093,7 @@ class TicketTest(unittest.TestCase):
 
     # ---- 4. フェーズの終わりと HITL ポイント
 
+    @treecache.cached
     def close_phase(self):
         for child in ("i0001-01-01", "i0001-01-02"):
             done = self.ccnavi("ticket", "finish", child)
@@ -1276,6 +1282,7 @@ class TicketTest(unittest.TestCase):
 
     # ---- レビュー（sh の代わりに、テストがリモートから取得した結果を渡す）
 
+    @treecache.cached
     def remote(self, merge=("i0001-01-01", "i0001-01-02")):
         """origin と、合流して push した親ブランチ。リモートから取得した結果（JSON）の置き場を返す。
 

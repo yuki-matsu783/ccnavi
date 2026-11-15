@@ -26,12 +26,11 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_path, userform
+from tests import ROOT, common_path, treecache, userform
 from tests.inproc import run_ccnavi
 from tests.ticketsample import plain_parent, write_plain_phases
 
@@ -158,8 +157,12 @@ class Workspace(unittest.TestCase):
     APPROVED = ".ccnavi/approved"
 
     def setUp(self):
-        self.root = tempfile.mkdtemp(prefix="ccnavi-merge-")
-        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.root = treecache.root(self)
+        self.build_tree()
+
+    @treecache.cached
+    def build_tree(self):
+        """リポジトリと親のワークツリーを組む。2 度目からは写しを戻す（`tests/treecache.py`）。"""
         os.makedirs(os.path.join(self.root, ".claude"))
         git(self.root, "init", "--quiet", "-b", "main")
         write(os.path.join(self.root, "src", "keep.py"), "print(1)\n")
@@ -297,6 +300,7 @@ class Workspace(unittest.TestCase):
         if started.returncode != 0:
             self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
 
+    @treecache.cached
     def family(self, parent=None, child=None):
         """親と子を提案して承認し、子のワークツリーを親のブランチから切って着手する。"""
         self.propose("i0001", **(parent or {"allow": ("src/*",)}))
