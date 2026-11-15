@@ -26,11 +26,13 @@ const (
 )
 
 // writeHint は書き込みを疑う語。読むだけのコードを止めないための線引きで、広めに取る。`open(` は書くモード
-// （`'w'`・`"a"`・`'x'`・`+`）を添えたときだけ数える（読むだけの `open(p).read()` を通す）。
+// （`'w'`・`"a"`・`'x'`・`+`）を添えたときだけ数える（読むだけの `open(p).read()` を通す）。短い語（mv・cp・ln・
+// install）と link は語の境で区切り、link は呼び出し（`link(`）だけ数える。読むだけの `islink`・`readlink`・
+// `linkcheck` を書き込みと読まないため。
 var writeHint = pyre.MustCompile(
 	`open\s*\([^)]*['"][rbt]*[wax][bt+]*['"]|write|append|unlink|remove|rename|replace\s*\(|rmtree|copy|move|mkdir|`+
-		`makedirs|truncate|chmod|symlink|touch|system|exec|spawn|popen|subprocess|`+
-		`out-file|set-content|add-content|new-item|>`,
+		`makedirs|truncate|chmod|chown|\butime|symlink|\blink\s*\(|\bln\b|\bmv\b|\bcp\b|\binstall\b|touch|system|exec|`+
+		`spawn|popen|subprocess|out-file|set-content|add-content|new-item|>`,
 	pyre.IgnoreCase,
 )
 
@@ -124,20 +126,31 @@ func isParentName(parents []string, name string) bool {
 // 親のワークツリーを読むだけのコードまで止めてしまうため。
 func hintsWrite(root string, parents []string, text string) bool {
 	rest := strings.ReplaceAll(text, `\`, "/")
-	base := tree.WorktreesPath(root)
 	var paths []string
 	for _, name := range parents {
-		paths = append(paths, ospath.Join(base, name), ospath.Realpath(ospath.Join(base, name)), "worktrees/"+name, "../"+name)
+		paths = append(paths, parentForms(root, name)...)
 	}
-	paths = append(paths, root, ospath.Realpath(root))
+	paths = append(paths, strings.ReplaceAll(root, `\`, "/"), strings.ReplaceAll(ospath.Realpath(root), `\`, "/"))
 	for _, path := range paths {
-		re, err := pyre.Compile(pyre.Escape(strings.ReplaceAll(path, `\`, "/")), pyre.IgnoreCase)
+		re, err := pyre.Compile(pyre.Escape(path), pyre.IgnoreCase)
 		if err != nil {
 			continue
 		}
 		rest = re.Sub(rest, func(pyre.Found) string { return " " })
 	}
 	return writeHint.Search(rest)
+}
+
+// parentForms は文字列の中で親のワークツリーを指す形（絶対パス・実パス・`worktrees/<名前>`・`../<名前>`）。
+// 区切りは `/` にそろえる。
+func parentForms(root, name string) []string {
+	at := ospath.Join(tree.WorktreesPath(root), name)
+	return []string{
+		strings.ReplaceAll(at, `\`, "/"),
+		strings.ReplaceAll(ospath.Realpath(at), `\`, "/"),
+		"worktrees/" + name,
+		"../" + name,
+	}
 }
 
 func checkCode(conf *config.Settings, root string, parents []string, c code) ParentWrite {
@@ -160,15 +173,8 @@ func checkCode(conf *config.Settings, root string, parents []string, c code) Par
 func mentionedParent(root string, parents []string, text string) string {
 	folded := strings.ReplaceAll(text, `\`, "/")
 	runes := []rune(folded)
-	base := tree.WorktreesPath(root)
 	for _, name := range parents {
-		forms := []string{
-			strings.ReplaceAll(ospath.Join(base, name), `\`, "/"),
-			strings.ReplaceAll(ospath.Realpath(ospath.Join(base, name)), `\`, "/"),
-			"worktrees/" + name,
-			"../" + name,
-		}
-		for _, form := range forms {
+		for _, form := range parentForms(root, name) {
 			re, err := pyre.Compile(pyre.Escape(form), pyre.IgnoreCase)
 			if err != nil {
 				continue

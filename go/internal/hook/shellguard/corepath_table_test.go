@@ -149,6 +149,10 @@ func TestParentTreeReadWhenThePathSaysWriteOrCopy(t *testing.T) {
 		{`python3 -c "import os; print(os.listdir('` + parent + `'))"`, false},
 		{`python3 -c "open('` + x + `','w').write('x')"`, true},
 		{`python3 -c "import shutil; shutil.rmtree('` + parent + `')"`, true},
+		{`python3 -c "import os; os.chown('` + x + `',0,0)"`, true},
+		{`ruby -e "FileUtils.mv('a','` + x + `')"`, true},
+		{`python3 -c "import os; print(os.path.islink('` + x + `'))"`, false},
+		{`python3 -c "import os; print(os.readlink('` + x + `'))"`, false},
 	} {
 		r := shell.Read(c.command)
 		if got := CheckParentWrite(conf, root, child, c.command, r.Degraded, nil).Parent != ""; got != c.stops {
