@@ -57,4 +57,4 @@ sh と Go の分担は[実行ファイルの境界](exe-boundary.md)の「sh で
 | パスを自分で小文字にして比べている | `ccnavi-review.sh` の依頼文の置き場の照合 | 実行ファイルの `pathcase` で比べる |
 | 実行ファイルの規則の写し | `ccnavi-stage.sh` の `is_importable`、`ccnavi-branches.sh` の `names_number` | 実行ファイルに聞く |
 | git が断った理由の読み方が 2 か所にある | `ccnavi-common-state.sh` の `ccnavi_git_refusal`（write-and-push・`ccnavi-sync.sh`・`ccnavi-fetch.sh`・`ccnavi-user-push-approved.sh`）と、実行ファイルの `land` の `refusal`（integrate-done） | 使う sh を Go で実装し直すときに、実行ファイルの 1 つの関数に寄せる |
-| 統合先が決まらないときの案内の文が 2 か所にある | `ccnavi-common-state.sh` の `ccnavi_integration_hint`（`ccnavi-review.sh`・`ccnavi-sync.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh`）と、実行ファイルの `preflight` の `IntegrationHint`（事前確認の次の一手） | 使う sh を Go で実装し直すときに、実行ファイルの 1 つの関数に寄せる |
+| 統合先が決まらないときの案内の文が 2 か所にある | `ccnavi-common-state.sh` の `ccnavi_integration_hint`（`ccnavi-review.sh`・`ccnavi-sync.sh`・`ccnavi-worktree.sh`・`ccnavi-start.sh`）と、実行ファイルの `preflight` の `IntegrationHint`（事前確認の次の一手） | 今の sh を Go で実装し直すときに、実行ファイルの 1 つの関数に寄せる |
