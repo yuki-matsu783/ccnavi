@@ -262,7 +262,7 @@ func Next(root, top, fix, kind, host, path string) string {
 	case "origin":
 		return texts.Say(root, "NEXT_PF_ORIGIN", nil, nil)
 	case "integration":
-		return "次: " + IntegrationHint(top)
+		return "次: " + integrate.IntegrationHint(top)
 	case "auth":
 		if github {
 			return texts.Say(root, "NEXT_PF_AUTH__GITHUB", texts.Values{"host": host}, nil)
@@ -286,13 +286,4 @@ func Next(root, top, fix, kind, host, path string) string {
 		return texts.Say(root, "NEXT_PF_NETWORK__GITLAB", nil, nil)
 	}
 	return ""
-}
-
-// IntegrationHint は、統合先が決まらないときの案内の 1 文。origin が無ければ「origin が無い」と言い、あれば origin/HEAD を
-// 直す方法を示す。
-func IntegrationHint(top string) string {
-	if git.Run(top, []string{"remote", "get-url", "origin"}, git.Options{}).OK() {
-		return "統合先 (origin/HEAD) が決まらない。ユーザに git fetch origin のあと git remote set-head origin -a を頼んでください。"
-	}
-	return "origin が無いので統合先が決まらない。ユーザに origin を足してもらい、git fetch origin のあと git remote set-head origin -a を頼んでください。"
 }

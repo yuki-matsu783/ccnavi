@@ -24,12 +24,14 @@ type DirectRecord struct {
 	baseBranch string
 }
 
-// ParseDirect は `<キー> <値>` の行をマップにする。空行と形の違う行は飛ばし、同じキーは後が勝つ。
-func ParseDirect(text string) map[string]string {
+// ParseRecord は 1 行 1 項目（`<キー> <値>`）の記録をマップにする。直接作業の記録（ccnavi-direct/<名前>）と
+// integrate の記録（marker・片付けた記録のコピー）の読み方はこれ 1 つ。空行は飛ばし、同じキーが 2 行あれば最初の行を
+// 採る（どの読み手も同じ行を採らないと、同じ記録で片方だけが「記録あり」と言う）。
+func ParseRecord(text string) map[string]string {
 	out := map[string]string{}
 	for _, line := range ospath.Splitlines(text) {
 		k, v, _ := strings.Cut(ospath.Strip(line), " ")
-		if k != "" {
+		if _, seen := out[k]; k != "" && !seen {
 			out[k] = ospath.Strip(v)
 		}
 	}
@@ -93,7 +95,7 @@ func DirectRecords(root string, main Tree) []DirectRecord {
 		if err != nil {
 			continue
 		}
-		fields := ParseDirect(text)
+		fields := ParseRecord(text)
 		if validDirect(root, main, common, name, fields) {
 			out = append(out, DirectRecord{name, main.Root, fields["base_branch"]})
 		}

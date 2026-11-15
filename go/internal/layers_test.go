@@ -112,7 +112,9 @@ var subTiers = map[string]map[string]int{
 	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
 	"tickets/lifecycle": {
 		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0, "start": 0,
-		"stop": 1, "consolidate": 1, "retire": 1, "wapmerge": 1, "ops": 1,
+		// 0: git が断った理由の 1 文（land と、sh が git refusal で聞く経路が共有する）
+		"refusal": 0,
+		"stop":    1, "consolidate": 1, "retire": 1, "wapmerge": 1, "ops": 1,
 		"integrate": 2,
 		"branch":    3,
 		// 3: ラッパー（ccnavi-git.sh）の判定。統合先の決め方を integrate から読む

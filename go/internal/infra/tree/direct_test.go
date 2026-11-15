@@ -86,15 +86,15 @@ func TestDirectRecords(t *testing.T) {
 	}
 }
 
-func TestParseDirect(t *testing.T) {
-	got := ParseDirect("version 3\r\n\n  side_by_side  yes \nversion 4\nlonely\n")
-	want := map[string]string{"version": "4", "side_by_side": "yes", "lonely": ""}
+func TestParseRecord(t *testing.T) {
+	got := ParseRecord("version 3\r\n\n  side_by_side  yes \nversion 4\nlonely\n")
+	want := map[string]string{"version": "3", "side_by_side": "yes", "lonely": ""}
 	if len(got) != len(want) {
-		t.Fatalf("ParseDirect = %q", got)
+		t.Fatalf("ParseRecord = %q", got)
 	}
 	for k, v := range want {
 		if got[k] != v {
-			t.Errorf("ParseDirect[%q] = %q, want %q", k, got[k], v)
+			t.Errorf("ParseRecord[%q] = %q, want %q", k, got[k], v)
 		}
 	}
 }

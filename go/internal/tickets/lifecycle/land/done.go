@@ -5,6 +5,7 @@ import (
 
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/lifecycle/refusal"
 	"ccnavi/internal/tickets/lifecycle/worktrees"
 )
 
@@ -180,7 +181,7 @@ func (r *run) makeK(m marker, cur, message string, hasMessage bool) string {
 			r.reject("integrate-done-no-message", "取り込みをコミットするので、メッセージが要ります（"+r.SelfQ+" integrate-done "+r.name+" -m <メッセージ>）。")
 		}
 		if done := r.gitDone(r.tmp, "", "commit", "-q", "-m", message); !done.OK() {
-			r.say("fail  git integrate-done  %s をコミットできなかった（%s）。ユーザのチェックアウトは変えていない", r.name, refusal(said(done.Stderr, done.Out)))
+			r.say("fail  git integrate-done  %s をコミットできなかった（%s）。ユーザのチェックアウトは変えていない", r.name, refusal.Of(said(done.Stderr, done.Out)))
 			r.print(texts.Say(r.Root, "NOTE_GIT_DONE_COMMIT_FAILED", texts.Values{"self_q": r.SelfQ, "name": r.name}, nil))
 			r.log.Error("コミットできなかった", "name", r.name, "exit", done.Code)
 			r.finish(1)
@@ -230,7 +231,7 @@ func said(parts ...string) string {
 // land は、ユーザのチェックアウトで K を fast-forward で取り込み、片付ける。
 func (r *run) land(m marker) {
 	if done := r.gitDone(r.Cwd, "", "merge", "--ff-only", "--no-overwrite-ignore", m.k); !done.OK() {
-		r.say("fail  git integrate-done  %s を取り込めなかった（%s）。ユーザのチェックアウトは変えていない", r.name, refusal(said(done.Stderr, done.Out)))
+		r.say("fail  git integrate-done  %s を取り込めなかった（%s）。ユーザのチェックアウトは変えていない", r.name, refusal.Of(said(done.Stderr, done.Out)))
 		r.print(texts.Say(r.Root, "NOTE_GIT_DONE_FF_FAILED", texts.Values{"self_q": r.SelfQ, "name": r.name, "short": r.short(m.k)}, nil))
 		r.log.Error("取り込めなかった", "name", r.name, "exit", done.Code)
 		r.finish(1)

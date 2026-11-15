@@ -3,7 +3,6 @@ package land
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -196,44 +195,4 @@ func (r *run) guarded(rels []string) (hits []string) {
 		}
 	}
 	return hits
-}
-
-// overwritten は、git が「書きかけを上書きする」と断ったときに並べるパスの行。
-var overwritten = regexp.MustCompile(`would be overwritten`)
-
-// refusal は、コミットや fast-forward を git が断った理由の 1 文（sh の ccnavi_git_refusal と同じ読み方）。
-func refusal(out string) string {
-	lines := ospath.Splitlines(out)
-	first := ""
-	if len(lines) > 0 {
-		first = lines[0]
-	}
-	var paths []string
-	in := false
-	for _, line := range lines {
-		switch {
-		case overwritten.MatchString(line):
-			in = true
-			continue
-		case line != "" && line[0] != ' ' && line[0] != '\t':
-			in = false
-		case in && strings.TrimSpace(line) != "":
-			paths = append(paths, strings.TrimLeft(line, " \t"))
-		}
-	}
-	low := strings.ToLower(out)
-	switch {
-	case len(paths) > 0:
-		return "書きかけの " + strings.Join(paths, " ") + " と重なる。コミットか退避をしてから再実行してください"
-	case strings.Contains(out, "index.lock"):
-		return "索引のロック（index.lock）が残っている。別の git が動いていないか確かめ、異常終了して残ったものならユーザが削除します。"
-	case strings.Contains(low, "tell me who you are") || strings.Contains(low, "empty ident") ||
-		strings.Contains(low, "user.email") || strings.Contains(low, "user.name"):
-		return "コミットするユーザの名前（user.name・user.email）が決まっていない"
-	case strings.Contains(low, "gpg") || strings.Contains(low, "signing"):
-		return "コミットの署名に失敗した"
-	case strings.Contains(low, "hook"):
-		return "git の hook が止めた（" + first + "）"
-	}
-	return "git が拒んだ（" + first + "）"
 }

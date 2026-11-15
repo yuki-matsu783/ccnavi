@@ -115,12 +115,27 @@ func TestTheNudgeHasNoGitOutsideTheWrapper(t *testing.T) {
 	}
 }
 
-// 記録に同じキーが 2 行あるときは、どの読み手も最初の行を採る（sh の ccnavi_record_get と同じ）。Stop の促しと
+// 記録に同じキーが 2 行あるときは、どの読み手も最初の行を採る（tree.ParseRecord）。Stop の促しと
 // 取り込み後の確認が別の行を採ると、同じ記録で片方だけが「記録あり」と言う。
-func TestReadRecordTakesTheFirstLineLikeTheSh(t *testing.T) {
+func TestReadRecordTakesTheFirstLine(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "feat")
 	testkit.Put(t, path, "branch_sha aaa\nversion 4\nbranch_sha bbb\n")
 	if got := ReadRecord(path)["branch_sha"]; got != "aaa" {
 		t.Fatalf("branch_sha = %q, want aaa", got)
+	}
+}
+
+// 書いた記録は読み直すと同じ値になり、値の改行は空白になる（1 行 1 項目の契約）。
+func TestWriteRecordRoundTrips(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "d", "rec")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !WriteRecord(path, "state", "staged", "reason", "a\nb") {
+		t.Fatal("書けない")
+	}
+	got := ReadRecord(path)
+	if got["state"] != "staged" || got["reason"] != "a b" || len(got) != 2 {
+		t.Fatalf("記録 = %q", got)
 	}
 }

@@ -11,8 +11,11 @@ import (
 	"ccnavi/internal/tickets/model/ids"
 )
 
-// readRecord は記録を読む（同じキーが 2 行あれば最初の行）。
-var readRecord = integrate.ReadRecord
+// readRecord・writeRecord は 1 行 1 項目の記録の読み書き（integrate の ReadRecord・WriteRecord）。
+var (
+	readRecord  = integrate.ReadRecord
+	writeRecord = integrate.WriteRecord
+)
 
 // checkName は取り込むワークツリーの名前を確かめる。
 func (r *run) checkName(name string) {

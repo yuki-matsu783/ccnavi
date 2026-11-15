@@ -8,6 +8,6 @@
 // `.claude/worktrees/<名前>/` にあるだけではワークツリーと呼ばない。`.git` ファイルの gitdir が元の
 // `.git/worktrees/<名前>` を指し、そこの gitdir が候補を指し返す相互参照が成り立つものだけを数える。
 //
-// 直接作業の記録は ParseDirect・DirectRecords で読み、共通の .git の置き場は CommonDir、
+// 直接作業の記録は ParseRecord・DirectRecords で読み、共通の .git の置き場は CommonDir、
 // HEAD の読みは headText（読めなければ ok が偽）、`.git` の有無は HasGit で調べる。
 package tree

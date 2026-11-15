@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/config"
-	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/records/diaglog"
@@ -179,21 +178,12 @@ func exists(path string) bool {
 	return ospath.DiskLexists(path)
 }
 
-// record は「キー 値」の行の記録を読む（sh の ccnavi_record_get と同じ）。
+// record は「キー 値」の行の記録を読む（integrate.ReadRecord）。無ければ空。
 func record(path string) map[string]string {
 	if !ospath.IsFile(path) {
 		return map[string]string{}
 	}
 	return readRecord(path)
-}
-
-// writeRecord は記録を書き直す（同じディレクトリの一時ファイルに書いてから置き換える）。値の改行は空白にする。
-func writeRecord(path string, kv ...string) bool {
-	var b strings.Builder
-	for i := 0; i+1 < len(kv); i += 2 {
-		b.WriteString(kv[i] + " " + strings.NewReplacer("\r", " ", "\n", " ").Replace(kv[i+1]) + "\n")
-	}
-	return fsio.ReplaceFile(path, []byte(b.String()), ".tmp") == ""
 }
 
 // now は記録に残す時刻（秒）。
