@@ -36,7 +36,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
 - sh は、取ってきた応答を整えずにファイルへ書き、そのパスを実行ファイルに渡す（`--result`。応答が複数のときは引数で並べる。例: `ccnavi start list-open <github|gitlab> <issue の一覧> <MR の一覧>`）。引数もそのまま渡す。応答の意味を読み取るのは実行ファイル
 - 実行ファイルは 1 行 1 項目で答える（Go は `go/internal/infra/reply` で組む）。判断は次の一手の語で返す（`create <branch>`・`stop <終了コード>`・`fetch <何を>` など）。sh は行の先頭の語で分ける。読むときは `ccnavi-common-state.sh` の `ccnavi_val`・`ccnavi_val1`・`ccnavi_has`（値を引く）か `ccnavi_do`（`out`・`err`・`fail`・`exit` を実行する）を使い、sh ごとに `sed` で写さない
 - sh は JSON（実行ファイルの答えを含む）もチケットの YAML も読まない。例外は、段取りの最小の読みと、実行ファイルを起こさずに動く検査だけ
-- 規則の写しを sh に置かない。保護するブランチ・識別子・ホストの種類などは実行ファイルに聞く。実行ファイルを起こさずに動く sh が写しを持つときは、一致をテストで確かめる
+- 規則の写しを sh に置かない。保護するブランチ・識別子・ホストの種類などは実行ファイルに聞く。実行ファイルを起こさずに動く sh が写しを持つのは、実行ファイルが無いときに省くと本来の仕事（fetch・承認の push）が止まるものだけにする。省いても止まらないものは、実行ファイルが無いときは省く。写しを持つときは、`tests/fixtures/` の共通の JSON の表で、Go と Python（sh を起動）の両方から一致を確かめる（今の写しと表は [sh と Go の分担に合っていない所](sh-go-gaps.md) の「規則の写し」の行）
 - 信号を受けたときの戻しは、その操作を始めた側が持つ。Go で実装する一続きのローカルの書き込みは 1 回の起動の中で完結させ、戻しもその中で持つ。sh の trap は子を止めて待つだけ
 - Go で実装するローカルの git の書き込みは、ラッパー（`ccnavi-git.sh`）が通すかを決めるのと同じ検査の関数を通す。ワークツリーを出す（`git worktree add`）口は `treeadd.Add`（`go/internal/tickets/lifecycle/treeadd`）だけで、新しい親（start）・直接作業（cut）・子の着手（ticketsh）がこれを共有する
 - 実行ファイルを起こさずに動く sh は、実行ファイルが無いときに何を省くかを、sh の先頭の説明に書く
@@ -77,6 +77,9 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
     `ccnavi-git.sh`の worktree add）は、実行ファイル（`ids.IDAnswer`）が確かめる。規則を変えるときは両方を直す
   - 保護されたブランチの名前は実行ファイルの`ids.Protected`が決める。実行ファイルを起こさない`ccnavi-user-push-approved.sh`と
     `ccnavi_is_branch`は、写しの`ccnavi_is_protected`（sh）を使う。Go と Python のテストは、`tests/fixtures/ident-cases.json`の同じ表で一致を確かめる
+  - 実行ファイルを起こさずに動く sh が持つ写しは、ほかに置き場の名前（`tests/fixtures/layout.json`）、「origin にその ref が無い」の見分け
+    （`tests/fixtures/no-remote-ref.json`）、置き場の変更のパスの読みと書きかけの一時ファイル（`tests/fixtures/approved-carry.json`）、
+    origin の URL の読み（`tests/fixtures/host-kinds.json`）。どれも同じ表で Go と Python が一致を確かめる
 - write-and-push の親のワークツリーへのローカルの書き込み（元の先頭を読む・子の合流・状態を書く・コミット）は、実行ファイルの
   `--record-commit <文>`（子の finish は `--record-merge <sha>`）の1回の起動で行い、失敗と INT・TERM・HUP の戻しもその中で持つ。答えは
   `<一覧>.answer` に1行1項目で書く（標準出力は状態の操作のもの）。push が通らなかったときの、比較つきの戻しは `write-and-push undo <答え>` で行う。
