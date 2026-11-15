@@ -76,7 +76,7 @@ var exeOptions = []string{
 	"--permission-mode", "--phase", "--phases", "--placed-out", "--plan", "--plan-order",
 	"--preview",
 	"--project-home", "--project-phases-file", "--project-risk-file", "--project-rules-file",
-	"--projects", "--prune", "--reason", "--record-tree", "--record-writes",
+	"--projects", "--prune", "--reason", "--record-commit", "--record-merge", "--record-tree", "--record-writes",
 	"--restore-if-deny", "--result", "--reverse", "--reviewed", "--risk", "--root", "--rules",
 	"--scope", "--show", "--signal", "--since", "--sort", "--state", "--suggest", "--tag",
 	"--target",

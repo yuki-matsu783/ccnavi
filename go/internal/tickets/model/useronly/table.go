@@ -161,7 +161,7 @@ const (
 
 // wrapperOptions は sh と拡張が実行ファイルを呼ぶときに先に付ける値つきのオプション。`user` はこれらを
 // 読み飛ばした後の最初の語。実行ファイルの読み飛ばしと hook の式の両方がこの一覧から作る。
-var wrapperOptions = []string{"--root", "--cwd", "--record-writes", "--record-tree", entryOption}
+var wrapperOptions = []string{"--root", "--cwd", "--record-writes", "--record-tree", "--record-commit", "--record-merge", entryOption}
 
 var entryValues = []string{entrySh, entryBoard}
 

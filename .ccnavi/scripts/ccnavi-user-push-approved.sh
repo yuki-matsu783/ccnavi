@@ -54,6 +54,13 @@
 # - 統合先（ccnavi_integration）は決まらないので、固定の保護されたブランチ（ccnavi_is_protected）だけで送らないと決める
 # - push のゲートは親かを確かめられないので、手元に origin の参照があるブランチだけ ls-remote で確かめる
 # - git が断った理由（ccnavi_git_refusal）は読み分けず、git の 1 行目だけを添える
+# - push に失敗したツリーの未送信のパスの一覧（unsent_paths。実行ファイルの write-and-push unsent）は出さない
+#
+# 実行ファイルに任せるのは、実行ファイルが無いときに省いても push が止まらないものだけ。取り込み済みの親子のチケットの
+# 途中の操作の確かめとコミット（write-and-push busy・commit）は、実行ファイルが取り込み済みと答えたときだけ通る道なので
+# 実行ファイルに任せる。ツリーの列挙とリンクの検査、置き場の変更のパス（carry_paths・given_in）、親子のチケットでない
+# ツリーのコミット、保護されたブランチの写し（ccnavi_is_protected）は、実行ファイルが無くても承認を送れるようにここに残す
+# （sh で実装するもののうち「実行ファイルを起こさずに動くもの」）。
 #
 # 終了コード: 0 コミットするものが無い・全部コミットした（push しなかったブランチ、処理しなかったツリーを含む） /
 #           1 ステージかコミットできなかったツリーか、push が失敗したツリーが 1 つ以上ある /
@@ -218,13 +225,11 @@ given_in() {
 }
 
 # まだ送れていないパス（リモートの先頭との差。リモートの先頭が無ければ直近のコミットの分）を 1 行ずつ。
-# push に失敗したとき、何が未送信かを言うため。$1 ツリー $2 ブランチ
+# push に失敗したとき、何が未送信かを言うため。差は実行ファイル（write-and-push unsent）が読む。実行ファイルが
+# 答えないときは言わない（送れなかったことは呼ぶ側が言っている）。$1 ツリー $2 ブランチ
 unsent_paths() {
-	if git -C "$1" rev-parse --verify -q "refs/remotes/origin/$2" >/dev/null 2>&1; then
-		git -C "$1" -c core.quotepath=false diff --name-only "refs/remotes/origin/$2" HEAD 2>/dev/null
-	else
-		git -C "$1" -c core.quotepath=false show --name-only --format= HEAD 2>/dev/null
-	fi | sed 's/^/  未送信: /' >&2 || :
+	ccnavi_wap_exe write-and-push unsent "$1" "$2" </dev/null 2>/dev/null | tr -d '\r' |
+		sed -n 's/^unsent /  未送信: /p' >&2 || :
 }
 
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_wap_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した
@@ -271,20 +276,11 @@ carry_family() {
 	fi
 	carry_paths "$cf_tree"
 	if [ -s "$ccnavi_wap_tmp/carry" ]; then
-		cf_base=$(git -C "$cf_tree" rev-parse HEAD)
-		while IFS= read -r cf_path; do
-			[ -n "$cf_path" ] || continue
-			git -C "$cf_tree" add -A -- ":(literal)$cf_path" 2>/dev/null || :
-		done <"$ccnavi_wap_tmp/carry"
-		sed 's/^/:(literal)/' "$ccnavi_wap_tmp/carry" | tr '\n' '\000' >"$ccnavi_wap_tmp/pathspec"
-		# write-and-push と同じく、署名などで止まらないようタイムアウトで切る。
-		if ! ccnavi_git_timed "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_wap_tmp/err" "$cf_tree" \
-			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
-			--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul >"$ccnavi_wap_tmp/out"; then
-			cat "$ccnavi_wap_tmp/out" >>"$ccnavi_wap_tmp/err"
-			printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$(ccnavi_git_refusal "$root" "$ccnavi_wap_tmp/err")" >&2
-			ccnavi_wap_tree="$cf_tree"
-			ccnavi_wap_unstage "$ccnavi_wap_tmp/carry" "$cf_base"
+		# コミットは write-and-push と同じ実行ファイルの口（パスを限る・タイムアウト・失敗したら索引を戻す）。
+		# ここに来るのは実行ファイルが取り込み済みと答えた親子のチケットだけなので、実行ファイルはある。
+		if ! ccnavi_wap_commit "$ccnavi_wap_tmp/carry" "ccnavi: 承認済みチケットを更新"; then
+			[ -z "$ccnavi_wap_refused" ] ||
+				printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$ccnavi_wap_refused" >&2
 			ccnavi_lock_drop
 			return 1
 		fi

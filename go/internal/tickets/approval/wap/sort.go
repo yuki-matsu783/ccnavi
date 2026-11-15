@@ -84,6 +84,27 @@ func Sort(stdout, stderr io.Writer, conf *config.Settings, root, parent, since s
 	return config.ExitOK
 }
 
+// Kept は親のワークツリーの未コミットの record-risk の記録（Sort の keep。その子の finish がコミットする）。
+// write-and-push が書いたものを戻すとき、この実行の前から未コミットだったこれらには触らない。
+func Kept(conf *config.Settings, treeRoot string) []string {
+	where, relative := relativePlaces(conf)
+	if !relative {
+		return nil
+	}
+	changed, why := changedPaths(treeRoot, where, "")
+	if why != "" {
+		return nil
+	}
+	var out []string
+	for _, rel := range changed {
+		inside, ok := strings.CutPrefix(rel, where.approved+"/")
+		if ok && !temp.MatchString(rel) && judgeRecord(strings.Split(inside, "/")) {
+			out = append(out, rel)
+		}
+	}
+	return out
+}
+
 // changedPaths は置き場の変更のパス（ツリーからの相対、"/" 区切り、名前の順）。
 func changedPaths(treeRoot string, where places, since string) ([]string, string) {
 	specs := []string{literalSpec(where.approved), literalSpec(where.review)}

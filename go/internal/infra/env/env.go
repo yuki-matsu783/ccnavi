@@ -55,6 +55,8 @@ const (
 	SubagentRunningMaxSeconds = "CCNAVI_SUBAGENT_RUNNING_MAX_SECONDS"
 	TurnStaleSeconds          = "CCNAVI_TURN_STALE_SECONDS"
 	FetchTimeout              = "CCNAVI_FETCH_TIMEOUT"
+	// WriteAndPushCommitTimeout は write-and-push のコミット 1 回の秒（既定 60）。
+	WriteAndPushCommitTimeout = "CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT"
 )
 
 // git のラッパーの記録。

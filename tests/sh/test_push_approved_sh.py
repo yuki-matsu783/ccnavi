@@ -48,6 +48,8 @@ STUB = """#!/bin/sh
 case " $* " in
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
+# 未送信のパスは本物の実行ファイルが答える。
+*" write-and-push unsent "*) exec '{exe}' "$@" ;;
 esac
 [ -z "${STUB_ARGS:-}" ] || printf '%s\\n' "$@" > "$STUB_ARGS"
 # 実行ファイルは書き込みに入ると、書けたパスの一覧を --placed-out のファイルへ書く。
@@ -137,6 +139,7 @@ class Workspace(unittest.TestCase):
             # push のゲート・統合先・git が断った理由は本物の実行ファイルが答える。
             '*" tree gate "* | *" git integration "* | *" git refusal "*)'
             f" exec '{exe.sh_path()}' \"$@\" ;;\n"
+            f'*" write-and-push unsent "*) exec \'{exe.sh_path()}\' "$@" ;;\n'
             "esac\nexit 0\n",
         )
         os.chmod(
@@ -742,7 +745,7 @@ class ApproveCarriesTest(Workspace):
         super().setUp()
         self.stub = write(
             os.path.join(self._tmp.name, "bin", "ccnavi"),
-            STUB.replace("{compat}", exe.compat()),
+            STUB.replace("{compat}", exe.compat()).replace("{exe}", exe.sh_path()),
         )
         os.chmod(self.stub, os.stat(self.stub).st_mode | stat.S_IXUSR | stat.S_IXGRP)
 

@@ -488,6 +488,16 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 			return config.ExitError, true
 		}
 		return okIf(wapmerge.Plan(stdout, conf, root, cmd[2]) == 0), true
+	case len(cmd) == 3 && a.head("write-and-push", "busy"):
+		return wapBusy(stdout, cmd[2]), true
+	case len(cmd) == 5 && a.head("write-and-push", "commit"):
+		return wapCommit(stdout, cmd[2], cmd[3], cmd[4]), true
+	case len(cmd) == 3 && a.head("write-and-push", "undo"):
+		return wapUndo(stdout, cmd[2]), true
+	case len(cmd) == 3 && a.head("write-and-push", "landed"):
+		return wapLanded(stdout, cmd[2]), true
+	case len(cmd) == 4 && a.head("write-and-push", "unsent"):
+		return wapUnsent(stdout, cmd[2], cmd[3]), true
 	case len(cmd) == 4 && cmd[0] == "path" && cmd[1] == "under":
 		return pathUnder(stdout, cmd[2], cmd[3]), true
 	case len(cmd) == 3 && cmd[0] == "stage" && cmd[1] == "importable":

@@ -77,6 +77,10 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
     `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
   - 保護されたブランチの名前は実行ファイルの`ids.Protected`が決める。実行ファイルを起こさない`ccnavi-user-push-approved.sh`と
     `ccnavi_is_branch`は写しの`ccnavi_is_protected`（sh）を使い、`tests/fixtures/ident-cases.json`の同じ表で、Goと Python のテストが一致を確かめる
+- write-and-push の親のワークツリーへのローカルの書き込み（元の先頭を読む・子の合流・状態を書く・コミット）は、実行ファイルの
+  `--record-commit <文>`（子の finish は `--record-merge <sha>`）の1回の起動で行い、失敗と INT・TERM・HUP の戻しもその中で持つ。答えは
+  `<一覧>.answer` に1行1項目で書く（標準出力は状態の操作のもの）。push が通らなかった回の比較つきの戻しは `write-and-push undo <答え>`。
+  sh が持つのは push と ls-remote、ロック、取り込みの起動だけ（`go/internal/tickets/lifecycle/wapmerge`）
 - 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の可否の判定（統合先への push の拒否、push のゲートを掛けるか、親のワークツリーでの`checkout`・`switch`の行き先の確認など）は、実行ファイルの`ccnavi git check`が行う。`integrate`・`integrate-done`の判定と状態操作は、実行ファイルの`ccnavi git integrate`が1回の起動で行い、ラッパーはロックを取ってから呼ぶ
 - 親のブランチの共通のpushゲートは、判定を実行ファイルの`ccnavi tree gate`（`go/internal/entry/shask`の`pushGate`）が持ち、
   次の一手（`gate pass`・`gate stop`・`gate ls-remote`）で答える。shの口（`ccnavi-common-state.sh`の`ccnavi_push_gate`）は、

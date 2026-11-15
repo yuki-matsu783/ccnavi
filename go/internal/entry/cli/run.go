@@ -140,6 +140,10 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		unmarked = entry
 	}
 	// 書き込みの記録を取る回（試験が使う）は、通常の経路を記録の枠で包む。--version は何も書かないので包まない。
+	if a.Str("record_commit") != "" {
+		// write-and-push のローカルの書き込み（合流・書く・コミット）を 1 回の起動で行う。
+		return wapWrite(in, stdout, stderr, parser, a, unmarked)
+	}
 	if a.Str("record_writes") != "" && !a.Truthy("version") {
 		return recordedRun(in, stdout, stderr, parser, a, unmarked)
 	}
@@ -160,6 +164,12 @@ func usageRefusal(parser *argparse.Parser, a opts) string {
 	}
 	if a.Str("record_tree") != "" && a.Str("record_writes") == "" {
 		return "--record-tree は --record-writes と一緒に指定してください。"
+	}
+	if a.Str("record_commit") != "" && a.Str("record_tree") == "" {
+		return "--record-commit は --record-writes と --record-tree と一緒に指定してください。"
+	}
+	if a.Str("record_merge") != "" && (a.Str("record_commit") == "" || !revisionOK(a.Str("record_merge"))) {
+		return "--record-merge は --record-commit と一緒に、子の先頭の sha を指定してください。"
 	}
 	actor := a.Str("actor")
 	if actor != "" && !actorForm.MatchString(actor) {

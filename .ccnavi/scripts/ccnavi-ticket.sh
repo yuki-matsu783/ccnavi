@@ -385,10 +385,6 @@ start | finish | cancel | approval-request | consolidate)
 		if [ "$1" = start ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
 			ensure_child_worktree || exit 1
 		fi
-		if [ "$1" = approval-request ]; then
-			# 失敗しても、利用者が書いた提案はワークツリーに残す（戻すのは自分のコミットだけ）。
-			ccnavi_wap_keep_worktree=yes
-		fi
 		wap_rc=0
 		ccnavi_wap_write "ccnavi: ${wap_words}" -- ticket "$@" || wap_rc=$?
 		ccnavi_wap_end

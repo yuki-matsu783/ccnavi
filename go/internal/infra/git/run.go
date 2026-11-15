@@ -139,6 +139,9 @@ type Options struct {
 	LazyFetch bool
 	// IndexFile は索引のファイル（GIT_INDEX_FILE）。空ならリポジトリの索引。一時の索引で木を組むときに使う。
 	IndexFile string
+	// Graceful は期限に達したとき、殺す前に TERM を送る（git が index.lock などの書きかけの印を片付けて終われる）。
+	// 索引を書き換える操作（commit など）に付ける。TERM を送れない OS では、そのまま殺す。
+	Graceful bool
 }
 
 func (o Options) timeout() time.Duration {
@@ -247,6 +250,9 @@ func start(cwd string, args []string, o Options) (int, []byte, []byte, error) {
 	}
 	// 子プロセスが孫に出力の口を渡したまま残ると Run が返らないので、終わったあとの待ちに上限を付ける。
 	cmd.WaitDelay = killedPipeWait
+	if o.Graceful {
+		cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	}
 	if o.input != nil {
 		cmd.Stdin = strings.NewReader(*o.input)
 	} else {

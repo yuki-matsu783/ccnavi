@@ -16,6 +16,10 @@
         （この実行で書いた・消したパスを、logs/state/write-and-push/ の下の <file> に1行1つで
          書き出します。--record-tree を渡すと一覧はそのツリーからの相対になり、
          置き場の外に書いたらエラーになります。write-and-push と ccnavi-user-agree.sh が使います）
+    --record-commit <message> [--record-merge <sha>]
+        （write-and-push 専用。--record-writes と --record-tree と一緒に渡します。書く前に元の先頭を読み、
+         --record-merge なら子の先頭を合流してから書き、書いたパスを <message> でコミットします。
+         失敗したら合流ごと戻します。答えは <file>.answer に1行1つで書き出します）
     --placed-out <file>
         （--agree 専用。実際に書けた承認済みチケットのパスなどを JSON で書き出します）
     --choose-out <file>
@@ -158,6 +162,16 @@
         置き場の変更をコミットしてよいものと止めるものに分けて1行ずつ出力します）
     ccnavi write-and-push merge <child>
         （write-and-push 用。finish が子を親のブランチへ合流する前の検査）
+    ccnavi write-and-push busy <tree>
+        （write-and-push 用。親のワークツリーに途中の操作があれば "busy <名前>" を出力します。読み取り専用）
+    ccnavi write-and-push commit <tree> <list> <message>
+        （write-and-push 用。<list> のパスだけをコミットし、"commit <sha>|none" を出力します）
+    ccnavi write-and-push undo <answer>
+        （write-and-push 用。--record-commit の答えの自分のコミットを、比較つきで元の先頭に戻します）
+    ccnavi write-and-push landed <answer>
+        （write-and-push 用。取り込み直した先頭に自分のコミットが入っていれば "landed yes <sha>" を出力します）
+    ccnavi write-and-push unsent <tree> <branch>
+        （ccnavi-user-push-approved.sh 用。まだ送れていないパスを "unsent <パス>" で1行ずつ出力します。読み取り専用）
     ccnavi branches issue|mr <number> [--result <json>] [--json]
         （ccnavi-branches.sh 用。issue・MR に紐づくブランチの候補を出力します。読み取り専用）
     ccnavi branches pulls <number> <owner/repo> <file>

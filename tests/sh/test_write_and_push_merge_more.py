@@ -222,7 +222,9 @@ class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
         self.work(tree, "wip/design/a.md", "a\n")
         before = self.sha(self.tree, "HEAD")
         err = self.term_after(" merge --no-ff --no-commit ")
-        self.assertIn("合流の途中で止められた", err)
+        # 合流から書いてコミットするまでは実行ファイルの 1 回の起動で、
+        # sh の trap はその終わりを待つ。戻すのは、コミットまで済んだ自分のコミット。
+        self.assertIn("送る前に止められた", err)
         self.assert_rolled_back(before)
         again = self.ticket("finish", CHILD)
         self.assertEqual(again.returncode, 0, again.stdout + again.stderr)

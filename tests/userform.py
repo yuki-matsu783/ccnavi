@@ -1,7 +1,8 @@
 """テストが実行ファイルへ渡す引数に、`user` の入口の形を置く。
 
-実行ファイルの `user` は、`--root`・`--cwd`・`--record-writes`・`--record-tree`・`--entry` を
-読み飛ばした後の最初の語でなければならない。テストのヘルパーは、`--guard-ticket-approval` など
+実行ファイルの `user` は、`--root`・`--cwd`・`--record-writes`・`--record-tree`・
+`--record-commit`・`--record-merge`・`--entry` を読み飛ばした後の最初の語でなければならない。
+テストのヘルパーは、`--guard-ticket-approval` など
 読み飛ばされないオプションを先頭に付けて呼ぶので、そのまま `user …` を後ろに渡すと入口として
 読まれない。`place` は、`user <操作> [値]` を先頭のラッパーのオプションのすぐ後ろへ寄せ、
 ヘルパーのオプションをその後ろに置く。
@@ -20,7 +21,15 @@ from collections.abc import Sequence
 
 USER_WORD = "user"
 # sh と拡張が実行ファイルを呼ぶときに、先に付ける値つきのオプション。
-WRAPPER_OPTIONS = ("--root", "--cwd", "--record-writes", "--record-tree", "--entry")
+WRAPPER_OPTIONS = (
+    "--root",
+    "--cwd",
+    "--record-writes",
+    "--record-tree",
+    "--record-commit",
+    "--record-merge",
+    "--entry",
+)
 # `user` の後ろの操作の語と、値を 1 つ取るか（`user reviewed 3`）。
 VERBS: dict[tuple[str, ...], bool] = {
     ("agree",): False,

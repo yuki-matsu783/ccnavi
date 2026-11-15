@@ -50,7 +50,7 @@ var notWithDocs = []string{
 	"--accept-unresolved", "--flow", "--project-rules-file", "--project-phases-file", "--project-risk-file",
 	"--mode", "--rules", "--restore-if-deny", "--guard-core-files", "--guard-ticket-approval", "--ticket-control",
 	"--approved", "--phases", "--risk", "--projects", "--project-home", "--cwd", "--permission-mode", "--agent-id",
-	"--record-writes", "--record-tree", "--choose-out", "--accept-plan", "--accept-done", "--accept-check",
+	"--record-writes", "--record-tree", "--record-commit", "--record-merge", "--choose-out", "--accept-plan", "--accept-done", "--accept-check",
 	"--placed-out", "--actor", "--via",
 }
 

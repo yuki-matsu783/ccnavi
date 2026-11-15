@@ -27,6 +27,7 @@ from tests.sh.write_and_push_harness import (
     WriteAndPushHostHarness,
     executable,
     git,
+    wap_prelude,
     write,
 )
 from tests.ticketsample import parent_text
@@ -85,8 +86,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         git(self.tree, "push", "-q", "origin", PARENT)
         mover = executable(
             os.path.join(self._base, "bin", "mover"),
-            "#!/bin/sh\n"
-            'case " $* " in\n'
+            "#!/bin/sh\n" + wap_prelude(exe.sh_path()) + 'case " $* " in\n'
             '*" review ready "*)\n'
             '  prev=""; for a in "$@"; do\n'
             '    [ "$prev" = --record-writes ] && list="$a"\n'
@@ -220,8 +220,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         head = self.sha(self.tree, "HEAD")
         mover = executable(
             os.path.join(self._base, "bin", "mover"),
-            "#!/bin/sh\n"
-            'case " $* " in\n'
+            "#!/bin/sh\n" + wap_prelude(exe.sh_path()) + 'case " $* " in\n'
             '*" review ready "*)\n'
             '  prev=""; for a in "$@"; do\n'
             '    [ "$prev" = --record-writes ] && list="$a"\n'
@@ -331,8 +330,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         --yes で書くだけ。"""
         chooser = executable(
             os.path.join(self._base, "bin", "chooser"),
-            "#!/bin/sh\n"
-            'case " $* " in\n'
+            "#!/bin/sh\n" + wap_prelude(exe.sh_path()) + 'case " $* " in\n'
             '*" --choose-out "*)\n'
             '  prev=""; for a in "$@"; do [ "$prev" = --choose-out ] && out="$a"; prev="$a"; done\n'
             f"  [ -d '{self.lock_dir()}' ] && echo LOCKED-WHILE-CHOOSING >&2\n"
@@ -421,7 +419,9 @@ class WriteAndPushReviewTest(WriteAndPushHarness):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
             os.path.join(self._base, "bin", "half"),
-            HALF.format(exe=exe.sh_path(), plan_case=ACCEPT_PLAN_CASE),
+            HALF.format(
+                exe=exe.sh_path(), plan_case=ACCEPT_PLAN_CASE, prelude=wap_prelude(exe.sh_path())
+            ),
         )
 
     def decide(self, *args):
