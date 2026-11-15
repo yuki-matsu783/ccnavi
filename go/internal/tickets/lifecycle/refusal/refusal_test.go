@@ -1,6 +1,13 @@
 package refusal
 
-import "testing"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"ccnavi/internal/tickets/testkit"
+)
 
 func TestOf(t *testing.T) {
 	cases := []struct{ out, want string }{
@@ -27,5 +34,44 @@ func TestOverlap(t *testing.T) {
 	}
 	if Overlap("fatal: something\n") || Overlap("error: x would be overwritten by merge:\nAborting\n") {
 		t.Error("重なっていないのに重なりと言った")
+	}
+}
+
+// sh の写し（ccnavi_no_remote_ref）と同じ表（tests/fixtures/no-remote-ref.json）で、NoRemoteRef を確かめる。
+func TestNoRemoteRefTable(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "no-remote-ref.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var table struct {
+		Cases []struct {
+			Err   string `json:"err"`
+			NoRef bool   `json:"no_ref"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &table); err != nil || len(table.Cases) == 0 {
+		t.Fatal("表が読めない", err)
+	}
+	for _, c := range table.Cases {
+		if got := NoRemoteRef(c.Err); got != c.NoRef {
+			t.Errorf("%q: %v", c.Err, got)
+		}
+	}
+}
+
+func TestAuthFailed(t *testing.T) {
+	for _, out := range []string{
+		"fatal: Authentication failed for 'https://h/g/p.git/'\n",
+		"fatal: could not read Username for 'https://h': terminal prompts disabled\n",
+		"git@h: Permission denied (publickey).\n",
+		"fatal: unable to access 'https://h/': The requested URL returned error: 403\n",
+		"remote: HTTP Basic: Access denied\n",
+	} {
+		if !AuthFailed(out) {
+			t.Errorf("認証の失敗を見落とした: %q", out)
+		}
+	}
+	if AuthFailed("fatal: unable to access 'https://h/': Could not resolve host: h\n") {
+		t.Error("届かないだけなのに認証の失敗と言った")
 	}
 }

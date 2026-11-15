@@ -26,6 +26,9 @@
 #   ccnavi_branch_to_id <ブランチ>  親のブランチ名から親の識別子を作る（/ を - に置き換える）
 #   ccnavi_load <ファイル名>   呼ぶ側が読む部品を読む（無ければ標準エラーに書いて 1 で終わる）
 #
+# 置き場の名前 4 つ（ccnavi_worktrees_dir・ccnavi_projects_dir・ccnavi_approved_dir・ccnavi_proposals_dir）も
+# ここに置く（下の「置き場」）。
+#
 # 残りの関数は、同じディレクトリの部品 5 本に分けてあり、このファイルの最後で読む。
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
 #
@@ -357,19 +360,26 @@ ccnavi_project() {
 	return 0
 }
 
+# 置き場（ワークスペースルートかツリーのルートからの相対、/ 区切り）。実行ファイルを起こさずに動く sh
+# （ccnavi-fetch.sh・ccnavi-user-push-approved.sh）が、どのツリーを見るか・何をコミットするかを決めるのに使う写し。
+# 実行ファイルの既定（tree.WorktreesDir・config.DefaultProjects・DefaultApproved・DefaultTickets）との一致は
+# tests/fixtures/layout.json で確かめる。
+ccnavi_worktrees_dir=.claude/worktrees
+ccnavi_projects_dir=projects
+ccnavi_approved_dir=.ccnavi/approved
+ccnavi_proposals_dir=wip/proposals
+
 # URL に埋まった資格情報を伏せる。
 #
-# `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。
-#
-# 書き方の要点が 3 つ。
-#   - `[^/]*@` で最後の `@` まで消す。解析側（authority の ${##*@}）が最後まで
-#     見ているので、伏せる範囲も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
-#   - scheme は大文字も `git+ssh` も拾う
-#   - scheme の無い `git@host:path` の形も伏せる
+# `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。伏せ方（scheme の後ろから最後の `@` まで、
+# scheme の無い `user:token@host:path` も）は実行ファイル（`host mask`。hostreply.MaskURL）が持つ。使うのは実行ファイルを
+# 要る sh だけ。実行ファイルが答えなければ、漏らさないよう全体を伏せる。
 ccnavi_mask_url() {
-	printf '%s' "${1:-}" | sed -E \
-		-e 's#^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@#\1<伏せた>@#' \
-		-e 's#^[^/:@]*:[^/]*@#<伏せた>@#'
+	[ -n "${1:-}" ] || return 0
+	ccnavi_mu_root=$(ccnavi_workspace 2>/dev/null) || ccnavi_mu_root=""
+	ccnavi_mu_out=""
+	[ -z "$ccnavi_mu_root" ] || ccnavi_mu_out=$(ccnavi_val1 masked "$(ccnavi_ask "$ccnavi_mu_root" host mask "${1:-}" 2>/dev/null)") || ccnavi_mu_out=""
+	printf '%s' "${ccnavi_mu_out:-<伏せた>}"
 }
 
 # 親や子の識別子として受けてよい書き方なら 0。<語>

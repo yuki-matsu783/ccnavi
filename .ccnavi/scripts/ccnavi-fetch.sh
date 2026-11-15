@@ -37,9 +37,9 @@
 #
 # 認証で失敗したときは、そう言う。 尋ねないので、資格情報が無いか切れていると毎回失敗する。
 # オフラインと同じ 1 行では、ユーザは理由を調べることになる。認証はユーザがターミナルで打つ git（承認の
-# sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けは
-# git の文言に頼るので、LC_ALL=C で英語に揃えてから見る。見分けられなければ、ただの
-# 「取ってこられなかった」に戻るだけ。
+# sh を含む）で一度済ませれば保存され、次のセッションから hook の fetch も通る。見分けと案内の文は実行ファイル
+# （`fetch auth`）が持ち、git の文言に頼るので、LC_ALL=C で英語に揃えて打った標準エラーを渡す。見分けられなければ、
+# ただの「取ってこられなかった」に戻るだけ。
 #
 # 親子のチケットは早送りだけ。親のワークツリー（`.claude/worktrees/<P>` で、親チケットか
 # 提案があり、HEAD のブランチ名の `/` を `-` に置き換えたものがディレクトリ名になっている）は、`origin/<親のブランチ>` の
@@ -49,17 +49,23 @@
 # 開始から CCNAVI_FETCH_BUDGET 秒（既定 45）を過ぎたら、残りの fetch と早送りはせずに名指しする。
 # fetch 1 回のタイムアウトも枠の残りに収める（hook の上限は 60 秒）。
 #
-# 分担: どれを進めるかの判定（親のワークツリーの選び方・第 1 周が見たツリー・統合先）、早送り・update-ref・
-# origin/HEAD の向け直し、その出力の文は実行ファイル（`ccnavi fetch <段取り>`。go/internal/entry/catchup）が持つ。
-# この sh に残すのは、fetch と ls-remote（ccnavi_fetch_git・ccnavi_fetch_retarget）とその失敗の報せ、時間の枠、
-# ロック、段取り。実行ファイルの入れ替え中も fetch できるよう、実行ファイルが無くても fetch は止まらない作りにしてある。
+# 分担: どれを進めるかの判定（親のワークツリーの選び方とそのロックの置き場・第 1 周が見たツリー・統合先）、早送り・
+# update-ref・origin/HEAD の向け直し、認証の失敗の見分けと案内、その出力の文は実行ファイル（`ccnavi fetch <段取り>`。
+# go/internal/entry/catchup）が持つ。この sh に残すのは、fetch と ls-remote（ccnavi_fetch_git・ccnavi_fetch_retarget）と
+# その失敗の報せ、時間の枠、ロック、段取り。実行ファイルの入れ替え中も fetch できるよう、実行ファイルが無くても fetch は
+# 止まらない作りにしてある。
 #
 # 実行ファイルが無い・答えないときは、取ってくる（fetch）だけにして、次を省く: 親の早送り（親子のチケットも、承認済み
-# チケットを持つツリーのブランチも）、origin/HEAD の向け直し（ホストに聞く ls-remote ごと）、統合先の早送り。
-# 省いたことは言わない（毎回同じ行を返さない）。
+# チケットを持つツリーのブランチも）、origin/HEAD の向け直し（ホストに聞く ls-remote ごと）、統合先の取得と早送り、
+# 認証に失敗したときの案内（「取ってこられなかった」の 1 行だけにする）。省いたことは言わない（毎回同じ行を返さない）。
+#
+# 実行ファイルが無くても取ってくるために、sh が写しを持つものは 2 つ。どちらも実行ファイルとの一致をテストで確かめる。
+# - 見るツリーの置き場（ccnavi-common.sh の ccnavi_worktrees_dir・ccnavi_projects_dir・ccnavi_approved_dir。
+#   tests/fixtures/layout.json）
+# - 「リモートにその ref が無い」の見分け（ccnavi-common-state.sh の ccnavi_no_remote_ref。tests/fixtures/no-remote-ref.json）
 #
 # 「リモートにその ref が無い」で失敗した fetch は、その origin を失敗したものに数えない。 数えると、
-# 同じ origin の統合先の取り込みまで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
+# 同じ origin の残りの取得まで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
 #
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
@@ -68,8 +74,9 @@ set -u
 # 共通部分。ワークスペースルートの探し方はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-approved=.ccnavi/approved # 固定
-projects=projects          # 固定
+approved="$ccnavi_approved_dir"
+projects="$ccnavi_projects_dir"
+worktrees="$ccnavi_worktrees_dir"
 
 # 見つからなければ何も出さずに終わる。セッションの頭に走るので、ここで止めても得るものが無い。
 root=$(ccnavi_workspace) || exit 0
@@ -109,11 +116,6 @@ trap 'fetch_cleanup; exit 130' INT TERM HUP
 # 覚える（failed とは別。ここは第 1 周の取得の失敗ではない）。
 : >"$scratch/rt-failed"
 
-# 認証で失敗したときに git（と資格情報の仕組み）が出す文言。https・ssh・GitHub・GitLab。
-auth_failed='Authentication failed|could not read (Username|Password)|terminal prompts disabled'
-auth_failed="$auth_failed"'|Invalid username or password|HTTP Basic: Access denied'
-auth_failed="$auth_failed"'|Permission denied \(publickey|returned error: 40[13]'
-
 # 時間の枠の残り（秒）。負なら 0。
 ccnavi_fetch_left() {
 	ccnavi_fl_now=$(date +%s)
@@ -122,7 +124,7 @@ ccnavi_fetch_left() {
 	printf '%s\n' "$ccnavi_fl_left"
 }
 
-# origin へ 1 本取りに行く。取れたら 0、失敗したら 1、認証で失敗したら 3。取りに行かなかったら 2。
+# origin へ 1 本取りに行く。取れたら 0、失敗したら 1。取りに行かなかったら 2。
 # リモートにその ref が無くて失敗したら 4（その origin を失敗したものに数えない）。
 # 時間の枠（CCNAVI_FETCH_BUDGET、既定 45 秒）を過ぎていたら取りに行かずに 5。
 #
@@ -148,36 +150,11 @@ ccnavi_fetch_git() {
 	ccnavi_git_timed "$ccnavi_fg_limit" "$scratch/err" "$1" \
 		fetch --quiet origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null || ccnavi_fg_rc=$?
 	if [ "$ccnavi_fg_rc" -ne 0 ]; then
-		grep -qi "couldn't find remote ref" "$scratch/err" 2>/dev/null && return 4
+		ccnavi_no_remote_ref "$scratch/err" && return 4
 		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
-		grep -qiE "$auth_failed" "$scratch/err" 2>/dev/null && return 3
 		return 1
 	fi
 	return 0
-}
-
-# 認証に失敗したときに添える案内を、origin のホストに合わせて 1 行出す。<ツリー>
-#
-# ホストの見分けは ccnavi_host_parse に任せる（規則を二重に持たない）。呼び手の ccnavi_h_* を壊さないよう
-# サブシェルで読み、ホストへは新たに通信しない。origin が読めなければ glab を先に書く。
-ccnavi_fetch_auth_note() {
-	ccnavi_an_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
-	ccnavi_an_info=$(ccnavi_host_parse "$ccnavi_an_url" >/dev/null 2>&1 && printf '%s %s' "$ccnavi_h_kind" "$ccnavi_h_host") || ccnavi_an_info=""
-	ccnavi_an_kind="${ccnavi_an_info%% *}"
-	ccnavi_an_host="${ccnavi_an_info#* }"
-	ccnavi_an_head='  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。'
-	ccnavi_an_tail="または、ユーザにターミナルで一度 'git fetch origin' を実行して認証を済ませてもらう。そうすれば次のセッションから通る"
-	if [ "$ccnavi_an_kind" = gitlab ]; then
-		ccnavi_an_how="glab でログイン済みなら自動で通る。無ければユーザに glab auth login --hostname ${ccnavi_an_host} を頼む。"
-	elif [ "$ccnavi_an_kind" = github ]; then
-		# github.com 以外（GHE.com）は、ホストを指定しないと github.com にログインしてしまう。
-		ccnavi_an_gh_host=""
-		[ "$ccnavi_an_host" = github.com ] || ccnavi_an_gh_host=" --hostname ${ccnavi_an_host}"
-		ccnavi_an_how="gh でログイン済みなら自動で通る。無ければユーザに gh auth login${ccnavi_an_gh_host} を頼む。"
-	else
-		ccnavi_an_how="glab でログイン済みなら自動で通る（GitHub なら gh）。無ければユーザに glab auth login（GitHub なら gh auth login）を頼む。"
-	fi
-	printf '%s\n' "${ccnavi_an_head}${ccnavi_an_how}${ccnavi_an_tail}"
 }
 
 # 取りに行く。取れたら 0。<ツリー> <ブランチ> <失敗したときの 1 行> [<リモートに無いときの 1 行>]
@@ -199,7 +176,8 @@ ccnavi_fetch_or_note() {
 		return 1
 	fi
 	printf '%s\n' "$3"
-	[ "$ccnavi_fn_rc" -eq 3 ] && ccnavi_fetch_auth_note "$1"
+	# 認証の失敗なら、その案内を添える（見分けと文は実行ファイル。答えなければ省く）。
+	[ -z "$fetch_bin" ] || ccnavi_fetch_ask auth "$1" "$scratch/err" || :
 	return 1
 }
 
@@ -263,12 +241,12 @@ ccnavi_fetch_retarget() {
 	return 0
 }
 
-# 親子のチケットを早送りする。<ツリー> <P> <親のブランチ>
+# 親子のチケットを早送りする。<ツリー> <P> <親のブランチ> <ロックの置き場の名前（plan の答え）>
 #
 # 取ってくるのと時間の枠とロックはここ、早送りするかの判定と早送りは実行ファイル（`fetch forward`）。早送りが要ると
 # 答えたときだけ、ロックを 1 回だけ試し（取れなければ他の操作の最中）、取れたかを渡して聞き直す。
 ccnavi_fetch_forward() {
-	ccnavi_fw_key=$(ccnavi_repo_key "$1" "$root")
+	ccnavi_fw_key="$4"
 	ccnavi_fetch_or_note "$1" "$3" \
 		"${2}: リモートを取ってこられなかった。ローカルの版で判定する" \
 		"${2}: 親のブランチ ${3} をリモートから取ってこられなかった（リモートにありません）。sh ${root}/.ccnavi/scripts/ccnavi-sync.sh ${2} で確かめてください" ||
@@ -290,12 +268,18 @@ ccnavi_fetch_forward() {
 	return 0
 }
 
-# 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、ワークツリー。
-trees="$root"
-for dir in "$root/$projects"/* "$root/.claude/worktrees"/*; do
+# 承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、ワークツリー。1 行に「<w|-> <ディレクトリ>」。
+# w はワークツリーの置き場の下（親子のチケットの親のワークツリーでありうる）。
+trees="- $root"
+for dir in "$root/$projects"/*; do
 	[ -d "$dir" ] || continue
 	trees="$trees
-$dir"
+- $dir"
+done
+for dir in "$root/$worktrees"/*; do
+	[ -d "$dir" ] || continue
+	trees="$trees
+w $dir"
 done
 
 # デフォルトブランチを持つリポジトリ。ワークスペース自身と、プロジェクト。
@@ -313,25 +297,37 @@ done
 
 # 実行ファイル。無ければ（入れ替え中など）fetch だけにする（先頭の説明）。
 fetch_bin=$(ccnavi_bin "$root") || fetch_bin=""
-# 親子のチケットの親のワークツリー（<P> <親のブランチ> を 1 行ずつ）。
+# 親子のチケットの親のワークツリー（<P> <ロックの置き場の名前> <親のブランチ> を 1 行ずつ）。
 : >"$scratch/families"
 if [ -n "$fetch_bin" ]; then
 	ccnavi_val family "$(ccnavi_ask "$root" fetch plan 2>/dev/null)" >"$scratch/families" || :
 fi
+
+# ワークツリーの名前とブランチが親子のチケットの親のワークツリーなら、ロックの置き場の名前を出して 0。<名前> <ブランチ>
+ccnavi_fetch_family() {
+	while read -r ccnavi_ff_p ccnavi_ff_key ccnavi_ff_branch; do
+		if [ "$ccnavi_ff_p" = "$1" ] && [ "$ccnavi_ff_branch" = "$2" ]; then
+			printf '%s\n' "$ccnavi_ff_key"
+			return 0
+		fi
+	done <"$scratch/families"
+	return 1
+}
+
 # 第 1 周が承認済みチケットを持つツリーとして見たツリー（第 2 周は、統合先をチェックアウトしているのがこれなら見ない）。
 : >"$scratch/seen"
 
 report=$(
 	# 第 1 周。そのツリーがチェックアウトしているブランチを upstream まで進める。
-	printf '%s\n' "$trees" | while IFS= read -r tree; do
+	printf '%s\n' "$trees" | while read -r place tree; do
 		[ -n "$tree" ] || continue
 		git -C "$tree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
 		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
 		[ -n "$branch" ] && [ "$branch" != "HEAD" ] || continue
 		name=$(basename "$tree")
 		# 親子のチケットは早送りだけ（upstream の設定に依らず origin/<親のブランチ> を見る）。
-		if [ "$tree" = "$root/.claude/worktrees/$name" ] && grep -qxF -- "$name $branch" "$scratch/families"; then
-			ccnavi_fetch_forward "$tree" "$name" "$branch"
+		if [ "$place" = w ] && key=$(ccnavi_fetch_family "$name" "$branch"); then
+			ccnavi_fetch_forward "$tree" "$name" "$branch" "$key"
 			continue
 		fi
 

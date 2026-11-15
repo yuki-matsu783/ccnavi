@@ -112,3 +112,28 @@ func TestChecksShowWarningsAndStopOnErrors(t *testing.T) {
 		t.Errorf("warn だけなら止めない: failed=%v out=%s", failed, out)
 	}
 }
+
+// 認証に失敗したときの案内は、origin のホストに合わせてログインを頼む道具とホストを言う。
+func TestAuthText(t *testing.T) {
+	cases := []struct{ url, want, not string }{
+		{"http://127.0.0.1:8929/o/r.git", "glab auth login --hostname 127.0.0.1:8929 を頼む", "gh auth"},
+		{"https://github.com/o/r.git", "gh auth login を頼む", "glab"},
+		{"https://acme.ghe.com/o/r.git", "gh auth login --hostname acme.ghe.com を頼む", "glab"},
+		{"junk", "glab auth login（GitHub なら gh auth login）を頼む", "--hostname"},
+	}
+	for _, c := range cases {
+		got := authText(c.url)
+		if !strings.Contains(got, c.want) || strings.Contains(got, c.not) || !strings.Contains(got, "git fetch origin") {
+			t.Errorf("%s: %s", c.url, got)
+		}
+	}
+}
+
+// 認証の失敗の見分けは git の文言（LC_ALL=C）で行い、届かないだけの失敗は認証と言わない。
+func TestAuthFailedOnly(t *testing.T) {
+	var a answer
+	authNote(&a, t.TempDir(), "fatal: unable to access 'http://x/': Could not resolve host: x\n")
+	if a.String() != "" {
+		t.Errorf("届かないだけなのに案内した: %q", a.String())
+	}
+}

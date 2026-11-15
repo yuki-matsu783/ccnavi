@@ -16,6 +16,15 @@ func NoRemoteRef(out string) bool {
 	return strings.Contains(out, "couldn't find remote ref")
 }
 
+// authFailed は、認証で失敗したときに git（と資格情報の仕組み）が出す文言（LC_ALL=C）。https・ssh・GitHub・GitLab。
+var authFailed = regexp.MustCompile(`(?i)Authentication failed|could not read (Username|Password)|terminal prompts disabled|` +
+	`Invalid username or password|HTTP Basic: Access denied|Permission denied \(publickey|returned error: 40[13]`)
+
+// AuthFailed は、fetch・push が認証で失敗したか（git の出力。LC_ALL=C で打ったもの）。
+func AuthFailed(out string) bool {
+	return authFailed.MatchString(out)
+}
+
 // Of は、git が断ったときの出力（標準エラー。標準出力を足してもよい）から、理由の 1 文を作る。
 // 書きかけとの重なり（「would be overwritten」の後に git が字下げして並べるパス）、索引のロック、コミットするユーザの
 // 名前が無い、署名の失敗、hook の順に見て、どれでもなければ git の 1 行目を添える。理由どおりに言い、重なっていないのに

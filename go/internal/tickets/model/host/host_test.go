@@ -29,14 +29,16 @@ func readJSON(t *testing.T, parts ...string) any {
 func TestHostKindsTable(t *testing.T) {
 	table := readJSON(t, "tests", "fixtures", "host-kinds.json").(*pyjson.Object)
 	cases, _ := table.Value("cases").([]any)
-	if len(cases) == 0 {
+	more, _ := table.Value("sh_go_cases").([]any)
+	if len(cases) == 0 || len(more) == 0 {
 		t.Fatal("表が空")
 	}
-	for _, raw := range cases {
+	for _, raw := range append(cases, more...) {
 		c := raw.(*pyjson.Object)
 		origin := c.String("origin")
 		got := classify(origin)
-		if string(got.kind) != c.String("kind") || got.host != c.String("host") || got.path != c.String("path") {
+		if string(got.kind) != c.String("kind") || got.host != c.String("host") || got.path != c.String("path") ||
+			got.connect != c.String("connect") {
 			t.Errorf("%s: %+v", origin, got)
 		}
 		if problem, has := c.Get("problem"); has {
@@ -45,6 +47,20 @@ func TestHostKindsTable(t *testing.T) {
 			}
 		} else if got.problem != "" || got.api != c.String("api") || got.graphQL != c.String("graphql") {
 			t.Errorf("%s: 接続先 %+v", origin, got)
+		}
+	}
+}
+
+// sh が読めない（ccnavi_host_parse が 0 以外で返す）表記は、実行ファイルも読めない。
+func TestHostKindsUnreadable(t *testing.T) {
+	table := readJSON(t, "tests", "fixtures", "host-kinds.json").(*pyjson.Object)
+	bad, _ := table.Value("unreadable").([]any)
+	if len(bad) == 0 {
+		t.Fatal("表が空")
+	}
+	for _, raw := range bad {
+		if got := classify(raw.(string)); got.kind != "" {
+			t.Errorf("%q: %+v（読めない表記）", raw, got)
 		}
 	}
 }

@@ -117,7 +117,7 @@ func (s *syncRun) plan(wants []string) {
 			slices.ContainsFunc(retired, func(e retire.Entry) bool { return e.Parent == name })
 	}
 	addFamily := func(name, path, branch string) {
-		key := tree.RepoKey(integrate.TreeAt(s.conf, s.root, path, name).Project)
+		key := familyKey(s.root, s.conf, path, name)
 		families = append(families, planned{name, key, branch, path})
 		addKey(key)
 	}

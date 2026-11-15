@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/reply"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/standing"
 )
@@ -144,6 +145,11 @@ func familyAt(root string, conf *config.Settings, name string) (path, branch str
 }
 
 // worktreeNames は `.claude/worktrees/` の直下の名前（並びはディスクのとおり）。
+// familyKey は親のワークツリーの元のリポジトリの名前（ロックの置き場の名前。ワークスペース自身は self）。
+func familyKey(root string, conf *config.Settings, path, name string) string {
+	return tree.RepoKey(integrate.TreeAt(conf, root, path, name).Project)
+}
+
 func worktreeNames(root string) []string {
 	names, _ := ospath.DiskListdir(tree.WorktreesPath(root))
 	return names

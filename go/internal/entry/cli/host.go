@@ -34,6 +34,7 @@ import (
 //   - requested <github|gitlab> <MR の番号> <MR の URL> <投稿の URL> <作成時刻> <作者>: review requested の `--result` に渡す JSON
 //   - undraft title <github|gitlab> <応答>: Draft を外すときのタイトル（`node`・`title`・`new`）
 //   - undraft done <graphql|rest|gitlab> <応答>: まだ Draft か（`draft true|false`）
+//   - mask <URL>: 埋まった資格情報を伏せた `masked <URL>`（ccnavi_mask_url）
 //
 // 読めない応答は終了コード 1（sh は API の失敗と同じに扱う）。
 func runHost(stdout, stderr io.Writer, args []string) int {
@@ -129,6 +130,8 @@ func runHost(stdout, stderr io.Writer, args []string) int {
 		fmt.Fprintln(stdout, string(got))
 	case op == "undraft" && n == 4 && args[1] == "title":
 		fmt.Fprint(stdout, hostreply.UndraftTitle(args[2], file(args[3])))
+	case op == "mask" && n == 2:
+		fmt.Fprintf(stdout, "masked %s\n", strings.ReplaceAll(hostreply.MaskURL(args[1]), "\n", " "))
 	case op == "undraft" && n == 4 && args[1] == "done":
 		fmt.Fprintf(stdout, "draft %s\n", hostreply.UndraftDone(args[2], file(args[3])))
 	default:

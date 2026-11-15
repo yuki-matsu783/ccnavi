@@ -68,8 +68,11 @@ const (
 // scheme・ホスト・ポートを保つ）。GHE.com の origin にポートが付くと API の URL を組めないので problem を言う
 // （GHE.com の API の URL の規則は実物では未検証）。
 type class struct {
-	kind    Kind
-	host    string
+	kind Kind
+	host string
+	// connect は接続に使うホスト。GitHub は host と同じ、GitLab は origin の表記のままのホストとポート
+	// （sh の ccnavi_h_host と同じ。資格情報の helper の鍵と、glab auth login --hostname に使う）。
+	connect string
 	api     string
 	graphQL string
 	path    string
@@ -90,12 +93,12 @@ func classify(url string) class {
 	host := pyfmt.Lower(raw)
 	switch {
 	case host == githubHost:
-		return class{GitHub, host, githubAPI, githubAPI + graphQLSuffix, path, ""}
+		return class{kind: GitHub, host: host, connect: host, api: githubAPI, graphQL: githubAPI + graphQLSuffix, path: path}
 	case isGHEHost(host) && port != "":
-		return class{kind: GitHub, host: host, path: path, problem: fmt.Sprintf(msgGHEPort, host, port, host)}
+		return class{kind: GitHub, host: host, connect: host + ":" + port, path: path, problem: fmt.Sprintf(msgGHEPort, host, port, host)}
 	case isGHEHost(host):
 		api := "https://api." + host
-		return class{GitHub, host, api, api + graphQLSuffix, path, ""}
+		return class{kind: GitHub, host: host, connect: host, api: api, graphQL: api + graphQLSuffix, path: path}
 	}
 	scheme := "https"
 	if strings.EqualFold(pyfmt.Head(url, len(httpPrefix)), httpPrefix) {
@@ -105,7 +108,13 @@ func classify(url string) class {
 	if port != "" {
 		authority += ":" + port
 	}
-	return class{GitLab, host, scheme + "://" + authority + gitlabAPIPath, "", path, ""}
+	return class{kind: GitLab, host: host, connect: authority, api: scheme + "://" + authority + gitlabAPIPath, path: path}
+}
+
+// Origin は origin の URL のホストの分類と、接続に使うホスト（class の connect）。読めない表記なら kind が空。
+func Origin(url string) (Kind, string) {
+	found := classify(strings.TrimSpace(url))
+	return found.kind, found.connect
 }
 
 // TransportProblem は sh がリモートを読み書きできる形になっているか。なっていなければその説明（--lint が言う）。

@@ -454,44 +454,6 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("glab", done.stdout)
         self.assertIn("git fetch origin", done.stdout)
 
-    def test_an_authentication_failure_with_unreadable_origin_lists_glab_first(self):
-        """origin の表記が読めないときは、glab を先に、GitHub なら gh と書く。"""
-        # 読めない origin では認証の失敗を起こせないので、ccnavi_fetch_auth_note を直接呼ぶ。
-        script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
-        probe = (
-            '. "$(dirname "$0")/ccnavi-common.sh"; '
-            'eval "$(sed -n "/^ccnavi_fetch_auth_note()/,/^}/p" "$0")"; '
-            "git remote set-url origin junk; ccnavi_fetch_auth_note ."
-        )
-        done = subprocess.run(
-            [SHELL, "-c", probe, script],
-            cwd=self.ws,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("glab auth login（GitHub なら gh auth login）", done.stdout)
-
-    def test_an_authentication_failure_on_ghe_names_the_host(self):
-        """GHE.com の origin は、gh auth login にホストを付ける。"""
-        script = posix(os.path.join(self.ws, ".ccnavi", "scripts", "ccnavi-fetch.sh"))
-        probe = (
-            '. "$(dirname "$0")/ccnavi-common.sh"; '
-            'eval "$(sed -n "/^ccnavi_fetch_auth_note()/,/^}/p" "$0")"; '
-            "git remote set-url origin https://acme.ghe.com/o/r.git; ccnavi_fetch_auth_note ."
-        )
-        done = subprocess.run(
-            [SHELL, "-c", probe, script],
-            cwd=self.ws,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("gh auth login --hostname acme.ghe.com", done.stdout)
-        self.assertIn("git fetch origin", done.stdout)
-
     def test_a_hanging_remote_is_cut_off(self):
         """応答しないリモートは CCNAVI_FETCH_TIMEOUT 秒で切る。hook の上限まで待たない。"""
         helpers = os.path.join(self._tmp.name, "bin")

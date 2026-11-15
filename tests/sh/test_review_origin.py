@@ -16,11 +16,10 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, exe
 
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
@@ -66,8 +65,8 @@ class OriginSubcommandTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         env.update(extra_env or {})
-        # `origin` は exe を呼ばない。在ることだけ見るので、確実に在る実行ファイルを指す。
-        env["CCNAVI_ENTRY_PATH"] = sys.executable
+        # 資格情報の伏せ方は実行ファイル（`host mask`）に聞く。
+        env["CCNAVI_ENTRY_PATH"] = exe.sh_path()
         env["GITLAB_TOKEN"] = "x"
         env["GITHUB_TOKEN"] = "x"
         return subprocess.run(

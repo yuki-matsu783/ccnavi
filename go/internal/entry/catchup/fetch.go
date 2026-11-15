@@ -13,19 +13,21 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/lifecycle/refusal"
+	"ccnavi/internal/tickets/model/host"
 )
 
 // fetchHead は ccnavi-fetch.sh への答えの頭の行。
 const fetchHead = "fetch 1"
 
 // fetchUsage は `ccnavi fetch <段取り>` の使い方。
-const fetchUsage = "ccnavi: fetch plan|forward|track|retarget|base|advance <引数>...（ccnavi-fetch.sh 用）"
+const fetchUsage = "ccnavi: fetch plan|forward|track|retarget|base|advance|auth <引数>...（ccnavi-fetch.sh 用）"
 
 // Fetch は `ccnavi fetch <段取り> <引数>...`（ccnavi-fetch.sh 用）。fetch・ls-remote・時間の枠・ロックは sh が持ち、
 // ここは何を進めるかの判定と、早送り・update-ref・origin/HEAD の向け直しと、その文を持つ。動いたときだけ out を出す
 // （何も動かなかったときに毎回同じ行を返すと、セッションの頭の文脈がそれで埋まる）。
 //
-//	plan                                 親子のチケットの親のワークツリー（family <P> <ブランチ>）
+//	plan                                 親子のチケットの親のワークツリー（family <P> <リポジトリ> <ブランチ>。リポジトリは
+//	                                     ロックの置き場の名前）
 //	forward <P> <ブランチ> [locked|busy]  親のブランチを origin/<ブランチ> まで早送りする（取ってきた後）。早送りが
 //	                                     要れば `next lock` と答え、sh がロックを 1 回だけ試して locked か busy で聞き直す
 //	track <ツリー> <ブランチ>             承認済みチケットを持つツリーのブランチを upstream まで早送りする（取ってきた後）
@@ -35,6 +37,7 @@ const fetchUsage = "ccnavi: fetch plan|forward|track|retarget|base|advance <引�
 //	base <リポジトリ> <見たツリー>         統合先を進めるなら `next fetch <統合先>`。統合先をチェックアウトしている
 //	                                     ツリーを第 1 周が見た（<見たツリー> のファイルに並ぶ）なら、そこで済んでいる
 //	advance <リポジトリ> <統合先>          統合先を origin/<統合先> まで進める（取ってきた後）
+//	auth <ツリー> <標準エラー>             取ってこられなかった fetch が認証の失敗なら、origin のホストに合わせた案内を 1 行
 func Fetch(stdout, stderr io.Writer, root string, conf *config.Settings, args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, fetchUsage)
@@ -45,8 +48,8 @@ func Fetch(stdout, stderr io.Writer, root string, conf *config.Settings, args []
 	switch {
 	case len(args) == 1 && args[0] == "plan":
 		for _, name := range worktreeNames(root) {
-			if _, branch, why := familyAt(root, conf, name); why == isFamily {
-				a.Line("family", name, branch)
+			if path, branch, why := familyAt(root, conf, name); why == isFamily {
+				a.Line("family", name, familyKey(root, conf, path, name), branch)
 			}
 		}
 	case args[0] == "forward" && (len(args) == 3 || len(args) == 4):
@@ -63,6 +66,8 @@ func Fetch(stdout, stderr io.Writer, root string, conf *config.Settings, args []
 		base(&a, args[1], readText(args[2]))
 	case len(args) == 3 && args[0] == "advance":
 		advance(&a, args[1], args[2])
+	case len(args) == 3 && args[0] == "auth":
+		authNote(&a, args[1], readText(args[2]))
 	default:
 		fmt.Fprintln(stderr, fetchUsage)
 		return config.ExitError
@@ -200,4 +205,34 @@ func advance(a *answer, repo, name string) {
 		return
 	}
 	a.out("%s: 統合先ブランチ %s を %s コミット進めた", label, name, behind)
+}
+
+// authNote は、取ってこられなかった fetch（標準エラーは LC_ALL=C で打ったもの）が認証の失敗なら、origin のホストに
+// 合わせた案内を 1 行言う。hook は資格情報の入力を求めないので、資格情報が無いか切れていると毎回失敗する。オフラインと
+// 同じ 1 行では、ユーザは理由を調べることになる。origin が読めなければ glab を先に書く。
+func authNote(a *answer, dir, said string) {
+	if !refusal.AuthFailed(said) {
+		return
+	}
+	url, _ := git.Text(dir, []string{"remote", "get-url", "origin"}, git.Options{})
+	a.out("%s", authText(url))
+}
+
+// authText は認証に失敗したときの案内。ログインを頼む道具とホストを origin に合わせる。
+func authText(url string) string {
+	kind, name := host.Origin(url)
+	how := "glab でログイン済みなら自動で通る（GitHub なら gh）。無ければユーザに glab auth login（GitHub なら gh auth login）を頼む。"
+	switch kind {
+	case host.GitLab:
+		how = "glab でログイン済みなら自動で通る。無ければユーザに glab auth login --hostname " + name + " を頼む。"
+	case host.GitHub:
+		// github.com 以外（GHE.com）は、ホストを指定しないと github.com にログインしてしまう。
+		option := ""
+		if name != "github.com" {
+			option = " --hostname " + name
+		}
+		how = "gh でログイン済みなら自動で通る。無ければユーザに gh auth login" + option + " を頼む。"
+	}
+	return "  認証に失敗した（資格情報が無いか、切れているか、権限がありません）。hook は資格情報の入力を求めない。" + how +
+		"または、ユーザにターミナルで一度 'git fetch origin' を実行して認証を済ませてもらう。そうすれば次のセッションから通る"
 }
