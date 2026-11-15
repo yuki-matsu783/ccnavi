@@ -401,7 +401,7 @@ ccnavi_path_pick() {
 # URL に埋まった資格情報を伏せる。
 #
 # `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。伏せ方（scheme の後ろから最後の `@` まで、
-# scheme の無い `user:token@host:path` も）は実行ファイル（`host mask`。hostreply.MaskURL）が持つ。使うのは実行ファイルを
+# scheme の無い `user:token@host:path` も）は実行ファイル（`host mask`。redact.URLCredentials）が持つ。使うのは実行ファイルを
 # 要る sh だけ。実行ファイルが答えなければ、漏らさないよう全体を伏せる。
 ccnavi_mask_url() {
 	[ -n "${1:-}" ] || return 0

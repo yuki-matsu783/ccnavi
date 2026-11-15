@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/records/redact"
 )
 
 // remote は origin の URL の読み方。sh の ccnavi_host_parse（ccnavi-common-host.sh）と同じ規則で、
@@ -23,18 +24,6 @@ var remote = regexp.MustCompile(
 	`\A(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?` +
 		`(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?\n?\z`)
 
-// URL に埋めた資格情報（`//user:token@` と、scheme の無い `user:token@host:path`）。苦情の文には残さない。
-// トークンに `@` が入ることがあるので、ホストの手前の最後の `@` までとする（sh の ccnavi_mask_url と同じ）。
-var (
-	credentials    = regexp.MustCompile(`//[^/]*@`)
-	scpCredentials = regexp.MustCompile(`^[^/:@]*:[^/]*@`)
-)
-
-func maskCredentials(url string) string {
-	url = credentials.ReplaceAllLiteralString(url, "//"+hidden)
-	return scpCredentials.ReplaceAllLiteralString(url, hidden)
-}
-
 const (
 	githubHost    = "github.com"
 	githubAPI     = "https://api.github.com"
@@ -42,7 +31,6 @@ const (
 	graphQLSuffix = "/graphql"
 	gitlabAPIPath = "/api/v4"
 	httpPrefix    = "http://"
-	hidden        = "<伏せた>@"
 )
 
 // 道具の名前。
@@ -122,7 +110,7 @@ func Origin(url string) (Kind, string) {
 func TransportProblem(url string) string {
 	found := classify(url)
 	if found.kind == "" {
-		return fmt.Sprintf(msgNotAHost, maskCredentials(url))
+		return fmt.Sprintf(msgNotAHost, redact.URLCredentials(url))
 	}
 	if found.problem != "" {
 		return found.problem

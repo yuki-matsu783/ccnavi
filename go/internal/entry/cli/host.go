@@ -12,6 +12,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/records/redact"
 	"ccnavi/internal/tickets/model/hostreply"
 )
 
@@ -131,7 +132,7 @@ func runHost(stdout, stderr io.Writer, args []string) int {
 	case op == "undraft" && n == 4 && args[1] == "title":
 		fmt.Fprint(stdout, hostreply.UndraftTitle(args[2], file(args[3])))
 	case op == "mask" && n == 2:
-		fmt.Fprintf(stdout, "masked %s\n", strings.ReplaceAll(hostreply.MaskURL(args[1]), "\n", " "))
+		fmt.Fprintf(stdout, "masked %s\n", strings.ReplaceAll(redact.URLCredentials(args[1]), "\n", " "))
 	case op == "undraft" && n == 4 && args[1] == "done":
 		fmt.Fprintf(stdout, "draft %s\n", hostreply.UndraftDone(args[2], file(args[3])))
 	default:

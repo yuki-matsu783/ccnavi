@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"ccnavi/internal/records/redact"
 )
 
 // MR の今の状態（`ccnavi-review.sh mr-state`。ボードとの約束）。答えの 2 行目の形は
@@ -89,21 +91,9 @@ func mrFields(kind string, data []byte) (mrSeen, error) {
 	}, nil
 }
 
-// URL に埋めた資格情報（sh の ccnavi_mask_url と同じ式）。
-var (
-	urlCredentials = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@`)
-	scpCredentials = regexp.MustCompile(`^[^/:@]*:[^/]*@`)
-)
-
-// MaskURL は URL に埋めた資格情報を伏せる（sh の ccnavi_mask_url と同じ）。
-func MaskURL(url string) string {
-	url = urlCredentials.ReplaceAllString(url, "${1}<伏せた>@")
-	return scpCredentials.ReplaceAllLiteralString(url, "<伏せた>@")
-}
-
 // mrURL は答えに書く URL。資格情報を伏せ、空・空白や制御文字を含むときは、ホスト名とパスから組む。
 func mrURL(kind, scheme, host, path, n, raw string) string {
-	url := MaskURL(raw)
+	url := redact.URLCredentials(raw)
 	if url != "" && !strings.ContainsFunc(url, func(r rune) bool { return r <= 0x20 || r == 0x7f }) {
 		return url
 	}
