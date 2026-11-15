@@ -2,7 +2,7 @@ package handoff
 
 import "testing"
 
-// 取り込めるか（種類があるか）。ccnavi-stage.sh の is_importable は、この答えを `stage importable` で聞く。
+// 取り込めるか（種類があるか）。ccnavi-stage.sh の --commands（stage パッケージ）が、この答えで取り込みの手順を出すかを決める。
 func TestImportableAgreesWithTheStageSh(t *testing.T) {
 	cases := map[string]bool{
 		".ccnavi/config/common/templates/a.yml":             true,

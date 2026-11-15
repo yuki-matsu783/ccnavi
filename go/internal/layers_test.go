@@ -139,7 +139,7 @@ var subTiers = map[string]map[string]int{
 	},
 	"tickets/proposal": {"internal": 0, "candidates": 0, "propose": 0, "templates": 1, "planedit": 1, "agree": 2, "scaffold": 2},
 	"tickets/review":   {"request": 0, "closeout": 1, "decide": 1},
-	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1},
+	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1, "stage": 1},
 	// 目録。1 つのツリーの索引（docindex）の上に、ツリーを合わせて引く docs が立つ。
 	"catalog": {"docindex": 0, "skills": 0, "docs": 1},
 	// hook の中。
@@ -163,6 +163,8 @@ var subTiers = map[string]map[string]int{
 	// entry の中。検査・診断・状態・版・sh への答えの上に、CLI の入口（cli）と Chrome 拡張の入口（chrome）が立つ。
 	"entry": {
 		"lint": 0, "diagnose": 0, "status": 0, "version": 0, "shask": 0,
+		// 0: セッションの頭の projects/ の一覧（ccnavi-dirs.sh）
+		"dirs":    0,
 		"suggest": 1, "chrome": 1,
 		"cli": 2,
 	},

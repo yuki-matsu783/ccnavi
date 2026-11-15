@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/entry/diagnose"
+	"ccnavi/internal/entry/dirs"
 	"ccnavi/internal/entry/lint"
 	"ccnavi/internal/entry/shask"
 	"ccnavi/internal/entry/suggest"
@@ -23,6 +24,7 @@ import (
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
+	"ccnavi/internal/tickets/sync/stage"
 )
 
 // ticketControlOff はチケット制御が切られているときの断り。
@@ -455,6 +457,9 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case cmd[0] == "start":
 		// ccnavi-start.sh が取ってきたホストの応答を読む。チケット制御の有無に依らない。
 		return runStart(stdout, stderr, root, conf, cmd[1:]), true
+	case cmd[0] == "ticket-sh":
+		// ccnavi-ticket.sh の段取り（識別子の読み・子のワークツリー・次の手の文・approval-request の結果ファイル）。
+		return runTicketSh(stdout, stderr, root, conf, cmd[1:]), true
 	}
 	if code, matched := shask.Answer(stdout, stderr, root, conf, cmd); matched {
 		return code, true
@@ -490,8 +495,14 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 		return okIf(wapmerge.Plan(stdout, conf, root, cmd[2]) == 0), true
 	case len(cmd) == 4 && cmd[0] == "path" && cmd[1] == "under":
 		return pathUnder(stdout, cmd[2], cmd[3]), true
-	case len(cmd) == 3 && cmd[0] == "stage" && cmd[1] == "importable":
-		return stageImportable(stdout, cmd[2]), true
+	case len(cmd) == 1 && cmd[0] == "dirs":
+		// ccnavi-dirs.sh の本体（projects/ の clone 済みリポジトリの一覧）。
+		dirs.Report(stdout, root)
+		return config.ExitOK, true
+	case cmd[0] == "stage":
+		// ccnavi-stage.sh の本体（下書きを作る・取り込みの手順を出す）。出力はそのまま標準出力・標準エラーに書く。
+		wd, _ := ospath.Getwd()
+		return stage.Run(stdout, stderr, root, wd, cmd[1:]), true
 	case len(cmd) == 5 && cmd[0] == "branches" && cmd[1] == "pulls":
 		// GitHub の開いた PR の一覧（sh が取ってきたまま）から、issue に関係する PR を選ぶ。
 		return okIf(branch.Pulls(stdout, stderr, conf, cmd[2], cmd[3], cmd[4]) == 0), true

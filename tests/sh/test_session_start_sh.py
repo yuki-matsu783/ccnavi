@@ -17,14 +17,14 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 
 
 def run(script: str, project: str, scripts: str) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "CLAUDE_PROJECT_DIR": project}
+    env = {**os.environ, "CLAUDE_PROJECT_DIR": project, "CCNAVI_ENTRY_PATH": exe.path()}
     return subprocess.run(
         [SHELL, os.path.join(scripts, script)],
         cwd=project,
@@ -44,7 +44,7 @@ class SessionStartSh(unittest.TestCase):
         self.scripts = os.path.join(self._tmp.name, "scripts")
         os.makedirs(self.project)
         os.makedirs(self.scripts)
-        for name in ("ccnavi-session-start.sh", "ccnavi-dirs.sh"):
+        for name in ("ccnavi-session-start.sh", "ccnavi-dirs.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), self.scripts)
 
     def commit_at(self, path: str, ts: int):

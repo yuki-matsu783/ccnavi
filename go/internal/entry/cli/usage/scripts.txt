@@ -147,9 +147,21 @@
     ccnavi path under <base> <path>
         （ccnavi-review.sh 用。"path 1" に続けて、path が base の下なら "under yes"、違えば "under no" を
          出力します。大文字小文字は区別しません。読み取り専用）
-    ccnavi stage importable <path>
-        （ccnavi-stage.sh 用。ccnavi-user-handoff.sh で取り込める種類のパスなら "importable yes"、
-         違えば "importable no" を出力します。読み取り専用）
+    ccnavi stage -- [--commands] <path>...
+        （ccnavi-stage.sh の本体。保護対象のファイルを下書きの置き場（wip/handoff/）へコピーするか、--commands で
+         編集済みの下書きの取り込みの手順を出します。出力はそのまま標準出力・標準エラーに書きます）
+    ccnavi dirs
+        （ccnavi-dirs.sh の本体。projects/ に clone 済みのリポジトリを、最新コミットが新しい順に最大 10 件出力します）
+    ccnavi ticket-sh id -- <ccnavi-ticket.sh の引数>...
+        （ccnavi-ticket.sh 用。識別子を "id <識別子>" で出力します。使えなければ "bad yes" と "msg <文>"）
+    ccnavi ticket-sh child <child> <parent-tree> <parent-branch> <parent>
+        （ccnavi-ticket.sh 用。子の start で、子のワークツリーが無ければ親のブランチの先頭から作ります。
+         手元の子のブランチに親に無いコミットがあれば作らずに "fail <識別子> 1" を出力します）
+    ccnavi ticket-sh unsent <op> <parent-branch> <mr|->
+        （ccnavi-ticket.sh 用。一度も送っていない親で止めたときの次の手を "err <行>" で出力します）
+    ccnavi ticket-sh result-begin | result-end <file> <rc> <started> -- <ccnavi-ticket.sh の引数>...
+        （ccnavi-ticket.sh 用。approval-request の結果ファイルの名前を決め（"file <パス>"・"started <時刻>"）、
+         終わったあとに中身を書きます）
     ccnavi git check <self> <sync> <start> <self_q> <worktree_q>
         （ccnavi-git.sh 用。標準入力に NUL 区切りで受けた git の引数を、git の状態とあわせて通すかを、
          allow・pass か "deny <識別子>" と拒否の文で出力します。読み取り専用）

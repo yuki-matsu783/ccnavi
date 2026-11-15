@@ -2,11 +2,10 @@
 
 見るのは次のとおり。見本は tests/handoff_names_samples.py の表（`SAMPLES`）を使う。
 
-1. 表に仮の 1 行を足した場合も含め、sh が見本どおりに変換する（実行ファイルの変換は
+1. stage が見本どおりに変換する（表に行を足した場合と、表の読み方は
    go/internal/tickets/model/handoffnames の go test が同じ見本で見る）
 2. 元のパスに予約名（`handoff-.claude`）の階層があれば、stage が断る
 3. stage → 編集 → `--commands` で、取り込みの手順が、読み替えを戻した元のパスを指す
-4. 表のファイルが無い・読めない行があれば、stage は何も作らずに断る
 """
 
 from __future__ import annotations
@@ -22,7 +21,6 @@ from tests.handoff_names_samples import RESERVED, SAMPLES
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
-NAMES = "ccnavi-handoff-names.txt"
 
 
 def write(path, text=""):
@@ -43,24 +41,20 @@ class StageNamesTest(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.count = 0
 
-    def workspace(self, extra=""):
-        """使い捨てのワークスペース。表のファイルは、配布元の写しに `extra`（1 行以上）を
-        足したものにする。"""
+    def workspace(self):
+        """使い捨てのワークスペース。"""
         self.count += 1
         ws = os.path.join(self._tmp.name, f"ws{self.count}")
         scripts = os.path.join(ws, ".ccnavi", "scripts")
         os.makedirs(scripts)
-        for name in ("ccnavi-stage.sh", NAMES, *common_sh(SH_DIR)):
+        for name in ("ccnavi-stage.sh", *common_sh(SH_DIR)):
             shutil.copy(os.path.join(SH_DIR, name), scripts)
-        if extra:
-            with open(os.path.join(scripts, NAMES), "a", encoding="utf-8", newline="\n") as f:
-                f.write(extra)
         return ws
 
     def stage(self, ws, *args):
         env = dict(os.environ)
         env.pop("CCNAVI_WORKSPACE", None)
-        # 取り込める種類は実行ファイル（stage importable）に聞く。
+        # 本体は実行ファイル（ccnavi stage）。
         env["CCNAVI_ENTRY_PATH"] = exe.path()
         script = os.path.join(ws, ".ccnavi", "scripts", "ccnavi-stage.sh").replace(os.sep, "/")
         return subprocess.run(
@@ -82,33 +76,17 @@ class StageNamesTest(unittest.TestCase):
         self.assertEqual(1, len(found), (rel, found))
         return found[0].replace(os.sep, "/")
 
-    def check_samples(self, samples, extra=""):
+    def check_samples(self, samples):
         for orig, expected in samples:
             with self.subTest(orig=orig):
-                ws = self.workspace(extra)
+                ws = self.workspace()
                 write(os.path.join(ws, *orig.split("/")), "x\n")
                 result = self.stage(ws, orig)
                 self.assertEqual(0, result.returncode, result.stderr)
-                self.assertEqual(expected, self.draft_of(ws, orig), "sh の変換")
+                self.assertEqual(expected, self.draft_of(ws, orig), "stage の変換")
 
     def test_sh_converts_every_sample(self):
         self.check_samples(SAMPLES)
-
-    def test_a_row_added_to_the_table_works(self):
-        """sh は写しの表を使う。足す行は 1 行だけ。"""
-        extra = ".vscode handoff-.vscode\n"
-        samples = [
-            (".vscode/settings.json", "handoff-.vscode/settings.json"),
-            ("a/.VSCode/tasks.json", "a/handoff-.vscode/tasks.json"),
-            (".claude/settings.json", "handoff-.claude/settings.json"),
-            (".github/x.yml", ".github/x.yml"),
-        ]
-        self.check_samples(samples, extra)
-        ws = self.workspace(extra)
-        write(os.path.join(ws, "handoff-.vscode", "x.json"), "x\n")
-        result = self.stage(ws, "handoff-.vscode/x.json")
-        self.assertEqual(2, result.returncode)
-        self.assertIn("予約", result.stderr)
 
     def test_an_original_path_with_the_reserved_name_is_refused(self):
         for rel in RESERVED:
@@ -131,25 +109,9 @@ class StageNamesTest(unittest.TestCase):
         result = self.stage(ws, "--commands", ".claude/settings.json")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertNotIn("mv ", result.stdout)
-        self.assertIn(f"'.claude/settings.json' --yes --expect <上のハッシュ>", result.stdout)
+        self.assertIn("'.claude/settings.json' --yes --expect <上のハッシュ>", result.stdout)
         self.assertNotIn("handoff-.claude", result.stdout)
         self.assertNotIn("wip/handoff/.claude", result.stdout)
-
-    def test_a_missing_table_stops_before_anything_is_made(self):
-        ws = self.workspace()
-        os.remove(os.path.join(ws, ".ccnavi", "scripts", NAMES))
-        write(os.path.join(ws, ".claude", "settings.json"), "x\n")
-        result = self.stage(ws, ".claude/settings.json")
-        self.assertEqual(2, result.returncode)
-        self.assertIn(NAMES, result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(ws, "wip")))
-
-    def test_an_unreadable_row_stops_too(self):
-        ws = self.workspace("only-one-word\n")
-        write(os.path.join(ws, ".claude", "settings.json"), "x\n")
-        result = self.stage(ws, ".claude/settings.json")
-        self.assertEqual(2, result.returncode)
-        self.assertIn("only-one-word", result.stderr)
 
 
 if __name__ == "__main__":
