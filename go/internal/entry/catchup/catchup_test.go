@@ -61,6 +61,9 @@ func TestMergedAnswersWithoutTidying(t *testing.T) {
 		{"a gone branch with an open request stops with ways back", "absent", "0", "none", "", true,
 			[]string{"消し間違いか破棄か", "戻し方 1", "戻し方 2", "sh /s/ccnavi-sync.sh i0001"}},
 		{"a gone branch that cannot be checked stops", "absent", "3", "unknown", "", true, []string{"止めた"}},
+		{"a gone branch with an empty answer stops", "absent", "2", "", "", true, []string{"確かめられなかった"}},
+		{"an empty answer with exit 0 is not none", "absent", "0", "", "", true, []string{"確かめられなかった"}},
+		{"an answer of another form is not merged", "absent", "0", "merged?", "", true, []string{"確かめられなかった"}},
 		{"a retired family waits for the merge", "retired", "0", "none", "-", false,
 			[]string{"まだマージされていない", "worktree retire --abandon i0001"}},
 		{"a retired family without the source branch stops", "retired", "0", "merged 42 abc1234", "-", true,
@@ -91,6 +94,9 @@ func TestMergedAnswersWithoutTidying(t *testing.T) {
 				if !strings.Contains(out, h) {
 					t.Errorf("%q が無い: %s", h, out)
 				}
+			}
+			if c.where == "absent" && c.rc+c.said != "0none" && strings.Contains(out, "戻し方") {
+				t.Errorf("確かめられないのに消えたと言っている: %s", out)
 			}
 		})
 	}
