@@ -260,8 +260,9 @@ ccnavi_wap_prepare() {
 	sh "$ccnavi_wap_sh/ccnavi-sync.sh" "$ccnavi_wap_family_id" </dev/null >"$ccnavi_wap_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
 	sed "s/^/  /" "$ccnavi_wap_tmp/sync" >&2
 	if [ "$ccnavi_cp_rc" -ne 0 ]; then
-		# 3 と 4 の間に hook が書いた（merge が書きかけと重なった）。やり直さずに止める。再実行すれば 3 でコミットされる。
-		if grep -q '書きかけの' "$ccnavi_wap_tmp/sync" 2>/dev/null; then
+		# 3 と 4 の間に hook が書いた（取り込みが書きかけと重なった。sync の終了コード 3）。やり直さずに止める。
+		# 再実行すれば 3 でコミットされる。
+		if [ "$ccnavi_cp_rc" -eq 3 ]; then
 			ccnavi_wap_say "取り込みが書きかけ（変更の見分けの後に hook が書いたもの）と重なった。何も反映していません。再実行してください（書きかけを先にコミットしてから取り込みます）"
 			return 1
 		fi

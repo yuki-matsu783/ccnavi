@@ -20,3 +20,12 @@ func TestOf(t *testing.T) {
 		}
 	}
 }
+
+func TestOverlap(t *testing.T) {
+	if !Overlap("error: Your local changes to the following files would be overwritten by merge:\n\ta.txt\nAborting\n") {
+		t.Error("重なりを見落とした")
+	}
+	if Overlap("fatal: something\n") || Overlap("error: x would be overwritten by merge:\nAborting\n") {
+		t.Error("重なっていないのに重なりと言った")
+	}
+}

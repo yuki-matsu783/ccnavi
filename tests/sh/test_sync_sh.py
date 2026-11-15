@@ -394,7 +394,8 @@ class SyncTest(SyncHarness):
         before = self.sha(self.tree, "HEAD")
         write(os.path.join(self.tree, "README.md"), "書きかけ\n")
         done = self.sync(PARENT)
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
+        # 書きかけとの重なりは終了コード 3（write-and-push が文を読まずに言い分ける）
+        self.assertEqual(3, done.returncode, done.stdout + done.stderr)
         self.assertIn("書きかけの README.md と重なる", done.stdout)
         self.assertEqual(before, self.sha(self.tree, "HEAD"))
         with open(os.path.join(self.tree, "README.md"), encoding="utf-8") as f:

@@ -63,7 +63,9 @@
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
 #   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回のタイムアウト監視の秒、既定 60）
 # 終了コード: 0 全部取り込んだ（取り込むものが無いを含む） / 1 止めた親子のチケットかリポジトリがある /
-#           2 引数か環境の誤り（実行ファイルが無い・答えないを含む）
+#           2 引数か環境の誤り（実行ファイルが無い・答えないを含む） /
+#           3 止めたもののうち、取り込み（早送りか merge）が書きかけと重なって止まったものがある（ほかの理由で
+#             止めたものがあっても 3。write-and-push はこれで「書きかけを先にコミットしてから取り込み直す」と言い分ける）
 
 set -eu
 
@@ -164,6 +166,9 @@ said() {
 	if ccnavi_has failed "$answer"; then
 		printf 'fail\n' >>"$scratch/failed"
 	fi
+	if ccnavi_has overlap "$answer"; then
+		printf 'overlap\n' >>"$scratch/failed"
+	fi
 	next=$(ccnavi_val1 next "$answer")
 }
 
@@ -263,19 +268,20 @@ while IFS= read -r line <&4; do
 	said
 	[ "$next" = go ] || continue
 
-	while read -r fam_p fam_key fam_branch <&3; do
+	# family <P> <リポジトリの名前> <ブランチ> <親のワークツリー>。ワークツリーは空白を含みうるので最後（read の残り）。
+	while read -r fam_p fam_key fam_branch fam_tree <&3; do
 		[ "$fam_key" = "$key" ] || continue
 		take_lock "$key" "$fam_p" || continue
 		ask_sync family "$here_sh" "$fam_p" "$key" "$fam_branch" "$heads"
 		said
 		case "$next" in
 		'fetch '*)
-			fetch_one "$root/.claude/worktrees/$fam_p" "$fam_branch"
+			fetch_one "$fam_tree" "$fam_branch"
 			ask_sync pull "$here_sh" "$fam_p" "$key" "$fam_branch" "$fetched" "$scratch/err"
 			said
-			ask_and_tidy present "$fam_p" "$key" "$fam_branch" "$root/.claude/worktrees/$fam_p" "$heads"
+			ask_and_tidy present "$fam_p" "$key" "$fam_branch" "$fam_tree" "$heads"
 			;;
-		*) ask_and_tidy absent "$fam_p" "$key" "$fam_branch" "$root/.claude/worktrees/$fam_p" "$heads" ;;
+		*) ask_and_tidy absent "$fam_p" "$key" "$fam_branch" "$fam_tree" "$heads" ;;
 		esac
 		ccnavi_lock_drop
 	done 3<"$scratch/families"
@@ -293,13 +299,17 @@ while IFS= read -r line <&4; do
 		fi
 	done 3<"$scratch/retired"
 
-	while read -r fam_p fam_key fam_branch <&3; do
+	while read -r fam_p fam_key fam_branch _ <&3; do
 		[ "$fam_key" = "$key" ] || continue
 		ask_sync recheck "$here_sh" "$fam_p" "$key" "$fam_branch" "$heads"
 		said
 	done 3<"$scratch/families"
 done 4<"$scratch/repos"
 
+if grep -qx overlap "$scratch/failed"; then
+	log_info 終わった -- "exit=3"
+	exit 3
+fi
 if [ -s "$scratch/failed" ]; then
 	log_info 終わった -- "exit=1"
 	exit 1

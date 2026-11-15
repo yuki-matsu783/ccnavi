@@ -26,19 +26,7 @@ func Of(out string) string {
 	if len(lines) > 0 {
 		first = lines[0]
 	}
-	var paths []string
-	in := false
-	for _, line := range lines {
-		switch {
-		case overwritten.MatchString(line):
-			in = true
-			continue
-		case line != "" && line[0] != ' ' && line[0] != '\t':
-			in = false
-		case in && strings.TrimSpace(line) != "":
-			paths = append(paths, strings.TrimLeft(line, " \t"))
-		}
-	}
+	paths := overlapped(lines)
 	low := strings.ToLower(out)
 	switch {
 	case len(paths) > 0:
@@ -54,4 +42,27 @@ func Of(out string) string {
 		return "git の hook が止めた（" + first + "）"
 	}
 	return "git が拒んだ（" + first + "）"
+}
+
+// Overlap は、git が書きかけとの重なりで断ったか（Of が「書きかけの … と重なる」と言う場合）。
+func Overlap(out string) bool {
+	return len(overlapped(ospath.Splitlines(out))) > 0
+}
+
+// overlapped は「would be overwritten」の後に git が字下げして並べるパス。
+func overlapped(lines []string) []string {
+	var paths []string
+	in := false
+	for _, line := range lines {
+		switch {
+		case overwritten.MatchString(line):
+			in = true
+			continue
+		case line != "" && line[0] != ' ' && line[0] != '\t':
+			in = false
+		case in && strings.TrimSpace(line) != "":
+			paths = append(paths, strings.TrimLeft(line, " \t"))
+		}
+	}
+	return paths
 }

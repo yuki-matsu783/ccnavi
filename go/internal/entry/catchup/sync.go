@@ -88,9 +88,9 @@ func Sync(stdout, stderr io.Writer, root string, conf *config.Settings, cwd stri
 // ---- plan
 
 // planned は plan が選んだ親子のチケット。
-type planned struct{ name, key, branch string }
+type planned struct{ name, key, branch, path string }
 
-// plan は取り込む親子のチケット（family <P> <リポジトリ> <ブランチ>）、親のワークツリーを片付けた後の親子のチケット
+// plan は取り込む親子のチケット（family <P> <リポジトリ> <ブランチ> <親のワークツリー>。ワークツリーは空白を含みうるので最後）、親のワークツリーを片付けた後の親子のチケット
 // （retired <P> <リポジトリ> <MR> <ブランチ|->）、リポジトリ（repo <リポジトリ> <has> <ディレクトリ>。origin の無い
 // リポジトリは skip <文>）を、sh が処理する順に答える。選べなかった親子のチケットは、その場で out・failed で言う。
 //
@@ -118,7 +118,7 @@ func (s *syncRun) plan(wants []string) {
 	}
 	addFamily := func(name, path, branch string) {
 		key := tree.RepoKey(integrate.TreeAt(s.conf, s.root, path, name).Project)
-		families = append(families, planned{name, key, branch})
+		families = append(families, planned{name, key, branch, path})
 		addKey(key)
 	}
 	entries := retire.Entries(s.conf)
@@ -178,7 +178,7 @@ func (s *syncRun) plan(wants []string) {
 		}
 	}
 	for _, f := range families {
-		s.a.Line("family", f.name, f.key, f.branch)
+		s.a.Line("family", f.name, f.key, f.branch, f.path)
 	}
 	for _, e := range retired {
 		s.a.Line("retired", e.Parent, e.Repo, e.MR, cmp.Or(e.Branch, "-"))
@@ -398,6 +398,7 @@ func (s *syncRun) take(name, branch, path string) (interrupted bool) {
 			s.a.out("%s: リモートの %s 件を早送りで取り込んだ", name, behind)
 		} else {
 			s.a.fail("%s: 早送りできなかった。%s", name, refusal.Of(said))
+			s.overlapped(said)
 		}
 	case !git.Run(path, []string{"diff", "--cached", "--quiet"}, git.Options{}).OK():
 		// 分かれている。非 ff の merge は、重ならないステージ済みの変更があっても拒む（git 2.43）ので、先に見て言う。
@@ -432,8 +433,17 @@ func (s *syncRun) merge(name, branch, path, remote string) (interrupted bool) {
 			name, strings.Join(ospath.Splitlines(conflicted), " "))
 	default:
 		s.a.fail("%s: リモートと分かれていて merge できなかった。%s", name, refusal.Of(done.Stderr+done.Out))
+		s.overlapped(done.Stderr + done.Out)
 	}
 	return interrupted
+}
+
+// overlapped は、取り込みが書きかけと重なって止まったなら overlap の行を足す。sh はこれを終了コード 3 にし、
+// write-and-push が「書きかけを先にコミットしてから取り込み直す」と言い分ける（文を読ませないため）。
+func (s *syncRun) overlapped(said string) {
+	if refusal.Overlap(said) {
+		s.a.Line("overlap")
+	}
 }
 
 // merged は、MR がマージ済みかを `ccnavi-review.sh merged <MR>` に聞いた後。答えの 1 行目は

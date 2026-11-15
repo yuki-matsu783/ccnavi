@@ -15,7 +15,7 @@ import (
 	"ccnavi/internal/tickets/model/standing"
 )
 
-// answer は sh への答え（`infra/reply` の形）。行の先頭の語は out・err・failed・next と、データの行（plan の repo・family など）。
+// answer は sh への答え（`infra/reply` の形）。行の先頭の語は out・err・failed・overlap（取り込みが書きかけと重なって止まった。sync の終了コード 3）・next と、データの行（plan の repo・family など）。
 // 値はどれも 1 行に収める（reply.Lines.Line）。
 type answer struct{ reply.Lines }
 
