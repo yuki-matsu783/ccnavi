@@ -68,7 +68,7 @@ func same(ch rune) string {
 	return pyre.Escape(string(ch))
 }
 
-// notRootEnd は展開の各段で「ここで文字列が終わる」ことを表す式。`$` は末尾の改行の直前にも当たるので使わない。
+// notRootEnd は展開の各階層で「ここで文字列が終わる」ことを表す式。`$` は末尾の改行の直前にも当たるので使わない。
 const notRootEnd = `\Z`
 
 // notRootPattern は「ワークスペースルートで始まらない」を、先読みなしに書いた式。ルートを 1 字ずつ

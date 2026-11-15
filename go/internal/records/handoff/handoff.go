@@ -316,7 +316,7 @@ func Notice(state, session string, usage *Usage, limit int, waitOverride string)
 		return "", false
 	}
 	mark := statePath(state, session, noticeSuffix)
-	// 有無はディスクだけで決め、溜める段は見ない。
+	// 有無はディスクだけで決め、溜める段階は見ない。
 	if ospath.DiskExists(mark) {
 		return "", false
 	}

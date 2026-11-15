@@ -15,11 +15,12 @@
 #   - ホスト（GitHub / GitLab）はこの sh が読む。MR 指定なら、その MR の元ブランチ。issue 指定なら、
 #     その issue を参照している開いた MR の元ブランチ。繋ぎ方は ccnavi-common-host.sh の「ホスト（GitHub /
 #     GitLab）への接続」（ccnavi-review.sh と同じ。gh / glab か、curl と GITHUB_TOKEN / GITLAB_TOKEN）
-#   - 読んだ結果を JSON に書き、実行ファイルの
-#     `ccnavi branches <issue|mr> <番号> --result <json>` に渡す。手元の候補（名前に番号を含むブランチ・
-#     ワークツリー・`issue:` を持つチケット）は実行ファイルが集め、合わせて 1 候補 1 行（--json なら JSON）で出す
-#   - ホストに繋げないときは止めない。理由を JSON に書き、実行ファイルが「ホストは見ていない」と言って
-#     手元の候補だけを出す
+#   - 取ってきた応答は整えずにファイルへ書き、実行ファイルの
+#     `ccnavi branches <issue|mr> <番号> checked <github|gitlab> <ホスト> <リポジトリ> <プロジェクトの id> --result <応答>` に渡す。
+#     どの MR が関係するか・フォークか・マージ済みかを読むのも、手元の候補（名前に番号を含むブランチ・ワークツリー・
+#     `issue:` を持つチケット）を集めるのも実行ファイルで、合わせて 1 候補 1 行（--json なら JSON）で出す
+#   - ホストに繋げないときは止めない。`unchecked <理由>`（API が失敗したら `failed <呼び出し> --result <ホストの返事>`）を
+#     渡し、実行ファイルが「ホストは見ていない」と言って手元の候補だけを出す
 #
 # 終了コード: 0 出した / 1 前提の未充足（git の外・実行ファイルが異常終了した）/ 2 引数か環境の誤り
 
@@ -94,7 +95,7 @@ state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"
-trap 'rm -f "$result" "$host_err" "$host_err.status" "$host_err.body"' EXIT
+trap 'rm -f "$result" "$host_err" "$host_err.text"' EXIT
 
 # ---- 実行ファイル。
 if bin=$(ccnavi_bin "$root"); then
@@ -103,94 +104,42 @@ else
 	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 fi
 
-# ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。
+# ---- ホスト。sh は応答を取ってきてファイルに書くだけ（外との出入り）。読めなければ理由を渡して、手元の候補だけにする。
+# 実行ファイルに渡すホストの結果の渡し方（host_how が checked・unchecked・failed。unchecked の理由は host_why）。
 
-# JSON の文字列に入れる表記（`\` と `"` を逃がす）。理由の文面は改行を含まない。
-json_text() {
-	printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
-}
-
-# unchecked <理由> ホストを見ていないことを書く。jq が無くても書けるように printf で書く。
+# unchecked <理由> <診断ログの識別子> ホストを見ていないことを渡す。
 unchecked() {
-	printf '{"checked": false, "reason": "%s"}\n' "$(json_text "$1")" >"$result"
+	host_how=unchecked
+	host_why="$1"
 	log_info ホストを見ていない -- "kind=$kind" "reason=$2"
 }
 
-# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
+# API が失敗したら、どの呼び出しかと、ホストの返事を覚えておく（`$( )` の中から呼ばれることがあるのでファイルに書く）。
+# 返事から HTTP の番号と本文を読むのは実行ファイル（`branches ... failed`）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
-	# ホストが HTTPのエラーを返したときは、その番号と本文（先頭200文字、1行）も残す
-	ccnavi_host_fail_status "$3" >"$host_err.status"
-	ccnavi_host_fail_body "$3" >"$host_err.body"
+	printf '%s' "$3" >"$host_err.text"
 }
 
-api_failed_reason() {
-	what=$(cat "$host_err" 2>/dev/null || :)
-	af_status=$(cat "$host_err.status" 2>/dev/null || :)
-	af_body=$(cat "$host_err.body" 2>/dev/null || :)
-	if [ -n "$af_status" ]; then
-		printf 'ホストの API が失敗した（%s）。HTTP %s: %s' "${what:-?}" "$af_status" "${af_body:-（本文なし）}"
-	else
-		printf 'ホストの API が失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
-	fi
-}
-
-# write_checked <mrs の JSON 配列> 見た結果を書く。
-write_checked() {
-	printf '%s' "$1" | "$ccnavi_h_jq" --arg h "$ccnavi_h_host" --arg p "$ccnavi_h_path" \
-		'{checked: true, host: $h, repo: $p, mrs: .}' >"$result"
-}
-
-# GitHub: MR（PR）1 本の元ブランチ。
+# 応答を取ってきて $result に書く。<github|gitlab>_<issue|mr>。開いた MR の一覧が多すぎれば 2、API が失敗したら 1。
 github_mr() {
-	got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$number") || return 1
-	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" '
-		[{number: .number, branch: .head.ref,
-		  state: (if .merged_at then "merged" else .state end),
-		  url: .html_url, title: .title, base: (.base.ref // ""),
-		  fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
+	ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$number" >"$result"
 }
 
-# GitHub: その issue を参照している開いた PR。タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名に含む番号を下の jq の規則で見る。
+# GitHub: 開いた PR の一覧。その issue を参照しているか（タイトル・本文の `#<番号>` か `issues/<番号>`、元ブランチ名に含む番号）は
+# 実行ファイルが選ぶ。
 github_issue() {
-	got=$(ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open") || return "$?"
-	# 元ブランチ名の規則は実行ファイルの names_number と同じ。`<先頭の語>-<番号>-<slug>` の形なら 2 つ目の番号だけ、
-	# 形に合わなければ、番号の前後が区切りか端であること。先頭の語は CCNAVI_BRANCH_PREFIXES（無ければ既定のリスト）。
-	printf '%s' "$got" | "$ccnavi_h_jq" --arg p "$ccnavi_h_path" --arg n "$number" \
-		--arg pre "${CCNAVI_BRANCH_PREFIXES:-feature hotfix fix bugfix chore refactor docs}" '
-		# 既定のリストは config.DefaultBranchPrefixes、文字クラスは ids の JAChars・IDChars と同じ。変えるなら両方直す。
-		def names_number($n; $pre):
-			([ascii_downcase
-			 | capture("^(?<w>[a-z][a-z0-9]*)-(?<num>[1-9][0-9]*)-[A-Za-z0-9々ぁ-ゖァ-ヺー一-鿿][A-Za-z0-9._\\-々ぁ-ゖァ-ヺー一-鿿]*$")?] | .[0]) as $f
-			| if $f != null and ($pre | split("[ ,\t\n]+"; "g") | index($f.w)) != null
-			  then $f.num == $n
-			  else test("(^|[-/_.])" + $n + "([-/_.]|$)") end;
-		[.[] | select(
-			(((.title // "") + " " + (.body // "")) as $t
-			 | ($t | test("(^|[^0-9A-Za-z_&/])#" + $n + "([^0-9]|$)"))
-			   or ($t | test("issues/" + $n + "([^0-9]|$)")))
-			or ((.head.ref // "") | names_number($n; $pre)))
-		 | {number: .number, branch: .head.ref, state: .state, url: .html_url, title: .title, base: (.base.ref // ""),
-		    fork: (((.head.repo.full_name // "") | ascii_downcase) != ($p | ascii_downcase))}]'
+	ccnavi_host_pages "repos/$ccnavi_h_path/pulls?state=open" >"$result"
 }
 
-# GitLab: MR 1 本の元ブランチ。フォークから出た MR は元ブランチがこのプロジェクトに無い。
+# GitLab: MR 1 本。フォークから出た MR（元ブランチがこのプロジェクトに無い）かは、プロジェクトの id と比べて実行ファイルが決める。
 gitlab_mr() {
-	pid=$(ccnavi_host_project_id) || return 1
-	got=$(ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/merge_requests/$number") || return 1
-	printf '%s' "$got" | "$ccnavi_h_jq" --argjson pid "$pid" '
-		[{number: .iid, branch: .source_branch, state: .state, url: .web_url, title: .title,
-		  base: (.target_branch // ""), fork: (.source_project_id != $pid)}]'
+	ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/merge_requests/$number" >"$result"
 }
 
-# GitLab: その issue に関係する開いた MR（related_merge_requests。本文で参照した MR を含む）。
+# GitLab: その issue に関係する MR（related_merge_requests。本文で参照した MR を含む）。開いたものだけを選ぶのは実行ファイル。
 gitlab_issue() {
-	pid=$(ccnavi_host_project_id) || return 1
-	got=$(ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/issues/$number/related_merge_requests") || return "$?"
-	printf '%s' "$got" | "$ccnavi_h_jq" --argjson pid "$pid" '
-		[.[] | select(.state == "opened")
-		 | {number: .iid, branch: .source_branch, state: .state, url: .web_url, title: .title,
-		    base: (.target_branch // ""), fork: (.source_project_id != $pid)}]'
+	ccnavi_host_pages "projects/$(ccnavi_host_encoded_path)/issues/$number/related_merge_requests" >"$result"
 }
 
 look_at_host() {
@@ -225,20 +174,33 @@ look_at_host() {
 	ccnavi_h_on_fail=host_api_failed
 	# 待ちすぎない。候補を出すための読み取りで、作業の前に打つものなので。
 	ccnavi_h_max_time="${CCNAVI_BRANCHES_HOST_TIMEOUT:-30}"
+	pid=-
 	look_rc=0
-	mrs=$("${ccnavi_h_kind}_$kind") || look_rc=$?
+	if [ "$ccnavi_h_kind" = gitlab ]; then
+		pid=$(ccnavi_host_project_id) || look_rc=1
+	fi
+	[ "$look_rc" -ne 0 ] || "${ccnavi_h_kind}_$kind" || look_rc=$?
 	case "$look_rc" in
-	0) write_checked "$mrs" ;;
+	0) host_how=checked ;;
 	2) unchecked "開いた MR が多すぎて読み切れない（2000 本まで）" too-many-pages ;;
-	*) unchecked "$(api_failed_reason)" api-failed ;;
+	*)
+		host_how=failed
+		log_info ホストを見ていない -- "kind=$kind" "reason=api-failed"
+		;;
 	esac
 	return 0
 }
 
+host_how=""
+host_why=""
 look_at_host
 
 # ---- 手元の候補と合わせて出す（実行ファイル）。
-set -- branches "$kind" "$number" --result "$result"
+case "$host_how" in
+checked) set -- branches "$kind" "$number" checked "$ccnavi_h_kind" "$ccnavi_h_host" "$ccnavi_h_path" "$pid" --result "$result" ;;
+failed) set -- branches "$kind" "$number" failed "$(cat "$host_err" 2>/dev/null || :)" --result "$host_err.text" ;;
+*) set -- branches "$kind" "$number" unchecked "$host_why" ;;
+esac
 [ -z "$json" ] || set -- "$@" --json
 ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください）。" 1
 log_info 候補を出した -- "kind=$kind"

@@ -1,4 +1,4 @@
-"""人間役の画面操作（human_ui。段 4）。足場。
+"""人間役の画面操作（human_ui。層 4）。足場。
 
 ブラウザ（Playwright）で画面を操作する人間役の口。`api.py`・`terminal.py` と同じ
 `run(out, st, idx, step, root)` の形を持つ。schema と drive にはまだつないでいない

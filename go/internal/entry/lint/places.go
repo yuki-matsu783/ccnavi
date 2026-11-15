@@ -122,7 +122,7 @@ func projectsRel(conf *config.Settings, root string) string {
 }
 
 // indexUnder は索引で `<rel>/` の下に載っているものの、最初の通常のファイルと gitlink の一覧。-z で読むのでパスの
-// 引用に左右されない。衝突中の段で同じパスが並ぶのは 1 本に畳む。git が無い・失敗したときは偽。
+// 引用に左右されない。衝突中の段階で同じパスが並ぶのは 1 本に畳む。git が無い・失敗したときは偽。
 func indexUnder(root, rel string) (string, []string, bool) {
 	code, out := git.Output(root, []string{"ls-files", "-s", "-z", "--", rel + "/"}, git.Options{Timeout: git.StateTimeout})
 	if code != 0 {

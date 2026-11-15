@@ -108,7 +108,7 @@ func DirectRecord(owner, name string) *Record {
 		return nil
 	}
 	text, _ := fsio.ReadText(path, fsio.Replace)
-	fields := tree.ParseDirect(text)
+	fields := tree.ParseRecord(text)
 	broken := fields["version"] != tree.DirectVersion || fields["base_branch"] == "" || fields["snap_sha"] == ""
 	return &Record{fields, common, broken}
 }
@@ -120,7 +120,7 @@ func MarkerKind(marks, name string) Marker {
 		return markerNone
 	}
 	text, _ := fsio.ReadText(ospath.Join(folder, markerFile), fsio.Replace)
-	if tree.ParseDirect(text)["version"] == tree.DirectVersion {
+	if tree.ParseRecord(text)["version"] == tree.DirectVersion {
 		return MarkerV4
 	}
 	return MarkerUnknown
@@ -132,10 +132,20 @@ func AheadSince(worktree, snap string, deadline time.Time) (int, bool) {
 }
 
 // IntegrationName はそのリポジトリ（owner はそのチェックアウト）の統合先の名前。手元の origin/HEAD、無ければ
-// origin/main・origin/master の順（sh の ccnavi_integration と同じ）。決まらなければ空。
+// origin/main・origin/master の順。決まらなければ空。sh は `ccnavi git integration` でこれに聞く（ccnavi_integration）。
 func IntegrationName(owner string) string {
 	name, _ := Integration(owner, time.Time{})
 	return name
+}
+
+// IntegrationHint は、統合先（IntegrationName）が決まらないときの案内の 1 文。事前確認の次の一手と、sh が
+// `ccnavi git integration` で受け取る案内が同じ文を使う。origin が無ければ「origin が無い」と言い、あれば origin/HEAD を
+// 直す方法を示す。
+func IntegrationHint(top string) string {
+	if git.Run(top, []string{"remote", "get-url", "origin"}, git.Options{}).OK() {
+		return "統合先 (origin/HEAD) が決まらない。ユーザに git fetch origin のあと git remote set-head origin -a を頼んでください。"
+	}
+	return "origin が無いので統合先が決まらない。ユーザに origin を足してもらい、git fetch origin のあと git remote set-head origin -a を頼んでください。"
 }
 
 // Integration は IntegrationName の期限つきの版。期限不足・git の失敗で決められなければ偽。
@@ -171,21 +181,20 @@ func GitPath(top, name string, deadline time.Time) (string, bool) {
 	return ospath.Join(top, path), true
 }
 
-// ReadRecord は ccnavi_record_write が書いた「キー 値」の行の記録。読めなければ空。同じキーが 2 行あれば最初の行を
-// 採り、値はそのまま残す。sh の ccnavi_record_get と同じ読み方にして、hook と sh が同じ記録から同じ値を読むようにする。
+// ReadRecord は 1 行 1 項目の記録のファイルを読む（読み方は tree.ParseRecord）。読めなければ空。
 func ReadRecord(path string) map[string]string {
 	text, _ := fsio.ReadText(path, fsio.Replace)
-	out := map[string]string{}
-	for _, line := range ospath.Splitlines(text) {
-		key, value, _ := strings.Cut(line, " ")
-		if key == "" {
-			continue
-		}
-		if _, seen := out[key]; !seen {
-			out[key] = value
-		}
+	return tree.ParseRecord(text)
+}
+
+// WriteRecord は 1 行 1 項目の記録を書き直す。同じディレクトリの一時ファイルに書いてから置き換える（読む側が半端な中身を
+// 見ない）。値の改行は空白にする（1 行 1 項目の契約）。渡したキーだけを書く。書けなければ偽。
+func WriteRecord(path string, kv ...string) bool {
+	var b strings.Builder
+	for i := 0; i+1 < len(kv); i += 2 {
+		b.WriteString(kv[i] + " " + strings.NewReplacer("\r", " ", "\n", " ").Replace(kv[i+1]) + "\n")
 	}
-	return out
+	return fsio.ReplaceFile(path, []byte(b.String()), ".tmp") == ""
 }
 
 // HasRecord は integrate <名前> の記録があるか。取り込みの途中の記録があれば有り。片付けた記録のコピーは、

@@ -8,7 +8,7 @@ import (
 )
 
 // NotePrompt はユーザの発言（hookio の is_user_prompt）の時刻を書く。ターンの印は Stop で消えるので、
-// ターン分離のゲートが「前の段のあとにユーザが発言したか」を見るために別に持つ。書けなくても何も言わない。
+// ターン分離のゲートが「前の段階のあとにユーザが発言したか」を見るために別に持つ。書けなくても何も言わない。
 func NotePrompt(state, session string, now time.Time) {
 	if state == "" || session == "" {
 		return

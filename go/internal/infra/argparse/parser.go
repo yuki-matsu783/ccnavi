@@ -41,7 +41,7 @@ type Arg struct {
 	dest    string   // 空なら Flags から決める
 }
 
-// Action は足した 1 つの引数。上の段は名前と既定値だけを読む。
+// Action は足した 1 つの引数。上の層は名前と既定値だけを読む。
 type Action struct {
 	OptionStrings []string
 	Dest          string

@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"unicode/utf8"
 
 	"ccnavi/internal/infra/ospath"
@@ -117,125 +118,130 @@ func notAfter(in func(rune) bool) func(string, int) bool {
 	}
 }
 
-var forms = []form{
-	// 秘密キーの本文。見出しと結びの行は残す。結びが無ければ終わりまで（`$` と同じく、最後の改行の手前で終わる）。
-	{
-		start: mustRE(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),
-		whole: mustRE(`^(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----(?P<bare>.*?)(?:-----END [A-Z ]*PRIVATE KEY-----|\n?\z)`),
-	},
-	// 形そのものがトークンだと言えるもの。
-	{
-		start: mustRE(`AKIA|ASIA|gh[pousr]_|github_pat_|glpat-|xox[abprs]-|sk-|[sr]k_(?:live|test)_|AIza|npm_|hf_|do[opr]_v1_|ya29\.|pypi-|eyJ`),
-		whole: mustRE(`^(?P<bare>` +
-			`(?:AKIA|ASIA)[0-9A-Z]{16}` + // AWS のアクセスキー ID
-			`|gh[pousr]_[A-Za-z0-9]{20,}` + // GitHub の各種トークン
-			`|github_pat_[A-Za-z0-9_]{20,}` + // GitHub の fine-grained トークン
-			`|glpat-[A-Za-z0-9_-]{20,}` + // GitLab の個人アクセストークン
-			`|xox[abprs]-[A-Za-z0-9-]{10,}` + // Slack
-			`|sk-[A-Za-z0-9_-]{20,}` + // OpenAI・Anthropic の API キー
-			`|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}` + // Stripe
-			`|AIza[0-9A-Za-z_-]{30,}` + // Google の API キー
-			`|npm_[A-Za-z0-9]{30,}` + // npm
-			`|hf_[A-Za-z0-9]{30,}` + // Hugging Face
-			`|do[opr]_v1_[0-9a-f]{64}` + // DigitalOcean
-			`|ya29\.[0-9A-Za-z_-]{20,}` + // Google の OAuth のアクセストークン
-			`|pypi-[A-Za-z0-9_-]{50,}` + // PyPI
-			`|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}` + // JWT
-			`)`),
-		before: notAfter(isASCIIAlnum),
-		after: func(text string, end int) bool {
-			r, ok := nextRune(text, end)
-			return !ok || !isASCIIAlnum(r)
+// forms と segments は、記録に書く文字列を伏せる起動でだけ使う。式が多いので、初めて伏せるときに 1 回だけ組む。
+var forms = sync.OnceValue(func() []form {
+	return []form{
+		// 秘密キーの本文。見出しと結びの行は残す。結びが無ければ終わりまで（`$` と同じく、最後の改行の手前で終わる）。
+		{
+			start: mustRE(`-----BEGIN [A-Z ]*PRIVATE KEY-----`),
+			whole: mustRE(`^(?s)-----BEGIN [A-Z ]*PRIVATE KEY-----(?P<bare>.*?)(?:-----END [A-Z ]*PRIVATE KEY-----|\n?\z)`),
 		},
-	},
-	// HTTP の Authorization ヘッダの値。方式の語（Bearer・Basic など）は残す。
-	{
-		start:  mustRE(`(?i)(?:proxy-)?` + iword(`authorization`) + sp + `*:`),
-		whole:  mustRE(`^(?i)(?:proxy-)?` + iword(`authorization`) + sp + `*:` + sp + `*(?:[A-Za-z` + dottedI + `]+` + sp + `+)?(?P<bare>` + bareBody + `)`),
-		before: wordStart,
-	},
-	{
-		start:  mustRE(`(?i)bearer` + sp + `+`),
-		whole:  mustRE(`^(?i)bearer` + sp + `+(?P<bare>[A-Za-z0-9._~+/=` + dottedI + `-]+)`),
-		before: wordStart,
-	},
-	// URL に埋めた資格情報。値に `@` が入ることがあるので、ホストの手前の最後の `@` までを伏せる
-	// （ccnavi-common.sh の ccnavi_mask_url と同じ読み）。空白と `/` はまたがない。
-	{
-		start: mustRE(`://`),
-		whole: mustRE(`^://[^/` + spaceSet + `:@'"\x00]+:(?P<bare>[^` + spaceSet + `/'"\x00]+)@`),
-	},
-	// HTTP の Cookie ヘッダの値。`;` で並ぶ値を全部、引用か行の終わりまで伏せる。
-	{
-		start:  mustRE(`(?i)(?:set-)?` + iword(`cookie`) + sp + `*:`),
-		whole:  mustRE(`^(?i)(?:set-)?` + iword(`cookie`) + sp + `*:` + sp + `*(?P<bare>[^'"\n\x00]+)`),
-		before: wordStart,
-	},
-	// 名前が秘密を指す `名前=値` / `名前: 値`。照らすのはキーワードから値までで、名前の頭は読まない。
-	// 伏せるのは値だけなので、名前の始まりは結果に効かない。
-	// 名前の頭から照らすと、長さを限らない場合は `-` が続くだけの文字列で手間が長さの 2 乗に増え、
-	// 実行前チェックの期限を過ぎる。長さを限る場合は、長い名前の値を取りこぼす。
-	{
-		start: mustRE(`(?i)(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]`),
-		whole: mustRE(`^(?i)(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]` + sp + `*` + value),
-	},
-	// 空白で値を渡すフラグ（`--password xxx`）。`=` の形は上の名前の形が読む。
-	{
-		start:  mustRE(`(?i)--(?:` + iword(flagWords) + `)` + sp + `+`),
-		whole:  mustRE(`^(?i)--(?:` + iword(flagWords) + `)` + sp + `+` + value),
-		before: notAfter(isFlagRune),
-	},
-}
+		// 形そのものがトークンだと言えるもの。
+		{
+			start: mustRE(`AKIA|ASIA|gh[pousr]_|github_pat_|glpat-|xox[abprs]-|sk-|[sr]k_(?:live|test)_|AIza|npm_|hf_|do[opr]_v1_|ya29\.|pypi-|eyJ`),
+			whole: mustRE(`^(?P<bare>` +
+				`(?:AKIA|ASIA)[0-9A-Z]{16}` + // AWS のアクセスキー ID
+				`|gh[pousr]_[A-Za-z0-9]{20,}` + // GitHub の各種トークン
+				`|github_pat_[A-Za-z0-9_]{20,}` + // GitHub の fine-grained トークン
+				`|glpat-[A-Za-z0-9_-]{20,}` + // GitLab の個人アクセストークン
+				`|xox[abprs]-[A-Za-z0-9-]{10,}` + // Slack
+				`|sk-[A-Za-z0-9_-]{20,}` + // OpenAI・Anthropic の API キー
+				`|[sr]k_(?:live|test)_[A-Za-z0-9]{10,}` + // Stripe
+				`|AIza[0-9A-Za-z_-]{30,}` + // Google の API キー
+				`|npm_[A-Za-z0-9]{30,}` + // npm
+				`|hf_[A-Za-z0-9]{30,}` + // Hugging Face
+				`|do[opr]_v1_[0-9a-f]{64}` + // DigitalOcean
+				`|ya29\.[0-9A-Za-z_-]{20,}` + // Google の OAuth のアクセストークン
+				`|pypi-[A-Za-z0-9_-]{50,}` + // PyPI
+				`|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}` + // JWT
+				`)`),
+			before: notAfter(isASCIIAlnum),
+			after: func(text string, end int) bool {
+				r, ok := nextRune(text, end)
+				return !ok || !isASCIIAlnum(r)
+			},
+		},
+		// HTTP の Authorization ヘッダの値。方式の語（Bearer・Basic など）は残す。
+		{
+			start:  mustRE(`(?i)(?:proxy-)?` + iword(`authorization`) + sp + `*:`),
+			whole:  mustRE(`^(?i)(?:proxy-)?` + iword(`authorization`) + sp + `*:` + sp + `*(?:[A-Za-z` + dottedI + `]+` + sp + `+)?(?P<bare>` + bareBody + `)`),
+			before: wordStart,
+		},
+		{
+			start:  mustRE(`(?i)bearer` + sp + `+`),
+			whole:  mustRE(`^(?i)bearer` + sp + `+(?P<bare>[A-Za-z0-9._~+/=` + dottedI + `-]+)`),
+			before: wordStart,
+		},
+		// URL に埋めた資格情報。値に `@` が入ることがあるので、ホストの手前の最後の `@` までを伏せる
+		// （ccnavi-common.sh の ccnavi_mask_url と同じ読み）。空白と `/` はまたがない。
+		{
+			start: mustRE(`://`),
+			whole: mustRE(`^://[^/` + spaceSet + `:@'"\x00]+:(?P<bare>[^` + spaceSet + `/'"\x00]+)@`),
+		},
+		// HTTP の Cookie ヘッダの値。`;` で並ぶ値を全部、引用か行の終わりまで伏せる。
+		{
+			start:  mustRE(`(?i)(?:set-)?` + iword(`cookie`) + sp + `*:`),
+			whole:  mustRE(`^(?i)(?:set-)?` + iword(`cookie`) + sp + `*:` + sp + `*(?P<bare>[^'"\n\x00]+)`),
+			before: wordStart,
+		},
+		// 名前が秘密を指す `名前=値` / `名前: 値`。照らすのはキーワードから値までで、名前の頭は読まない。
+		// 伏せるのは値だけなので、名前の始まりは結果に効かない。
+		// 名前の頭から照らすと、長さを限らない場合は `-` が続くだけの文字列で手間が長さの 2 乗に増え、
+		// 実行前チェックの期限を過ぎる。長さを限る場合は、長い名前の値を取りこぼす。
+		{
+			start: mustRE(`(?i)(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]`),
+			whole: mustRE(`^(?i)(?:` + iword(keyWords) + `)["']?` + sp + `*[=:]` + sp + `*` + value),
+		},
+		// 空白で値を渡すフラグ（`--password xxx`）。`=` の形は上の名前の形が読む。
+		{
+			start:  mustRE(`(?i)--(?:` + iword(flagWords) + `)` + sp + `+`),
+			whole:  mustRE(`^(?i)--(?:` + iword(flagWords) + `)` + sp + `+` + value),
+			before: notAfter(isFlagRune),
+		},
+	}
+})
 
-var segments = []segment{
-	// mysql 系の `-p<パスワード>`（空白を挟まない形だけがパスワードになる）。
-	{
-		head:   mustRE(`(?:mysql|mariadb)[\p{L}\p{N}_]*`),
-		option: form{start: mustRE(`-p`), whole: mustRE(`^-p` + value), before: afterSpace},
-	},
-	// curl の `-u user:<パスワード>` / `--user user:<パスワード>`。
-	{
-		head: mustRE(`curl`),
-		option: form{
-			start:  mustRE(`-u|--user`),
-			whole:  mustRE(`^(?:-u|--user)[` + spaceSet + `=]*['"]?[^` + spaceSet + `:'"\x00]+:(?P<bare>[^` + spaceSet + `'"\x00]+)`),
-			before: afterSpace,
+var segments = sync.OnceValue(func() []segment {
+	return []segment{
+		// mysql 系の `-p<パスワード>`（空白を挟まない形だけがパスワードになる）。
+		{
+			head:   mustRE(`(?:mysql|mariadb)[\p{L}\p{N}_]*`),
+			option: form{start: mustRE(`-p`), whole: mustRE(`^-p` + value), before: afterSpace},
 		},
-	},
-	// curl の `-b <クッキー>` / `--cookie <クッキー>`。
-	{
-		head:   mustRE(`curl`),
-		option: form{start: mustRE(`-b|--cookie`), whole: mustRE(`^(?:-b|--cookie)[` + spaceSet + `=]+` + value), before: afterSpace},
-	},
-	// sshpass の `-p <パスワード>`。見るのは sshpass 自身のオプションだけで、後ろのコマンド（ssh -p 22）は読まない。
-	{
-		head: mustRE(`sshpass`),
-		option: form{
-			start:  mustRE(`sshpass`),
-			whole:  mustRE(`^sshpass(?:` + sp + `+-[^p` + spaceSet + `]` + notSp + `*)*` + sp + `+-p` + sp + `*` + value),
-			before: func(_ string, at int) bool { return at == 0 },
+		// curl の `-u user:<パスワード>` / `--user user:<パスワード>`。
+		{
+			head: mustRE(`curl`),
+			option: form{
+				start:  mustRE(`-u|--user`),
+				whole:  mustRE(`^(?:-u|--user)[` + spaceSet + `=]*['"]?[^` + spaceSet + `:'"\x00]+:(?P<bare>[^` + spaceSet + `'"\x00]+)`),
+				before: afterSpace,
+			},
 		},
-	},
-	// docker login の `-p <パスワード>`（--password は上のフラグの形が読む）。
-	{
-		head:   mustRE(`docker` + sp + `+login`),
-		option: form{start: mustRE(`-p`), whole: mustRE(`^-p` + sp + `*` + value), before: afterSpace},
-	},
-	// redis-cli の `-a <パスワード>` / `--pass <パスワード>`。
-	{
-		head:   mustRE(`redis-cli`),
-		option: form{start: mustRE(`-a|--pass`), whole: mustRE(`^(?:-a|--pass)` + sp + `+` + value), before: afterSpace},
-	},
-	// `aws configure set aws_secret_access_key <値>`（名前と値を空白で分ける形）。
-	{
-		head: mustRE(`aws` + sp + `+configure`),
-		option: form{
-			start:  mustRE(`aws_secret_access_key|aws_session_token`),
-			whole:  mustRE(`^(?:aws_secret_access_key|aws_session_token)` + sp + `+` + value),
-			before: afterSpace,
+		// curl の `-b <クッキー>` / `--cookie <クッキー>`。
+		{
+			head:   mustRE(`curl`),
+			option: form{start: mustRE(`-b|--cookie`), whole: mustRE(`^(?:-b|--cookie)[` + spaceSet + `=]+` + value), before: afterSpace},
 		},
-	},
-}
+		// sshpass の `-p <パスワード>`。見るのは sshpass 自身のオプションだけで、後ろのコマンド（ssh -p 22）は読まない。
+		{
+			head: mustRE(`sshpass`),
+			option: form{
+				start:  mustRE(`sshpass`),
+				whole:  mustRE(`^sshpass(?:` + sp + `+-[^p` + spaceSet + `]` + notSp + `*)*` + sp + `+-p` + sp + `*` + value),
+				before: func(_ string, at int) bool { return at == 0 },
+			},
+		},
+		// docker login の `-p <パスワード>`（--password は上のフラグの形が読む）。
+		{
+			head:   mustRE(`docker` + sp + `+login`),
+			option: form{start: mustRE(`-p`), whole: mustRE(`^-p` + sp + `*` + value), before: afterSpace},
+		},
+		// redis-cli の `-a <パスワード>` / `--pass <パスワード>`。
+		{
+			head:   mustRE(`redis-cli`),
+			option: form{start: mustRE(`-a|--pass`), whole: mustRE(`^(?:-a|--pass)` + sp + `+` + value), before: afterSpace},
+		},
+		// `aws configure set aws_secret_access_key <値>`（名前と値を空白で分ける形）。
+		{
+			head: mustRE(`aws` + sp + `+configure`),
+			option: form{
+				start:  mustRE(`aws_secret_access_key|aws_session_token`),
+				whole:  mustRE(`^(?:aws_secret_access_key|aws_session_token)` + sp + `+` + value),
+				before: afterSpace,
+			},
+		},
+	}
+})
 
 // valueGroups は値の範囲を読むグループ。書いた順に、先に当たったものを採る。
 var valueGroups = []string{"sq", "dq", "bare"}
@@ -276,10 +282,10 @@ func mask(value string) string {
 // 形ごとに順に置き換えると、伏せた後の文字列を次の形がもう 1 度伏せてしまい、残した頭と尻まで消える。
 func spans(text string) []span {
 	var found []span
-	for _, f := range forms {
+	for _, f := range forms() {
 		found = f.spans(text, 0, found)
 	}
-	for _, seg := range segments {
+	for _, seg := range segments() {
 		found = seg.spans(text, found)
 	}
 	sort.Slice(found, func(i, j int) bool {

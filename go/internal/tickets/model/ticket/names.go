@@ -2,11 +2,9 @@ package ticket
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"unicode/utf8"
 
-	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/tickets/model/ids"
 )
@@ -30,7 +28,7 @@ func (t *Ticket) BranchNameProblems(integration string, prefixes []string) []str
 	if t.IsChild() {
 		return found
 	}
-	if slices.Contains(config.ReservedBranchIDs(), folded) || strings.HasPrefix(folded, "release-") {
+	if ids.Protected(name) {
 		found = append(found, "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"+
 			"と同じ。親のブランチ名が統合先と同じになる")
 	} else if integration != "" && folded == pyfmt.Casefold(integration) {

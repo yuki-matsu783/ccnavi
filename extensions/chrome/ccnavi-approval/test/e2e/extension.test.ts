@@ -271,7 +271,7 @@ test("CX-T138 レビュー済み: スレッドの悪意のある本文を描い�
   assert.ok(!(await page.content()).includes(TOKEN));
   const copy = await page.evaluate(async () => {
     const send = (m: unknown) => (globalThis as unknown as { chrome: { runtime: { sendMessage(m: unknown): Promise<unknown> } } }).chrome.runtime.sendMessage(m);
-    return JSON.stringify(await send({ kind: "host", host: "github.com", op: "reviewCopy", args: ["acme", "widgets", "i0004"] }));
+    return JSON.stringify(await send({ kind: "host", host: "github.com", op: "reviewReplies", args: ["acme", "widgets", "i0004"] }));
   });
   assert.ok(copy.includes('"ok":true') && !copy.includes(TOKEN), copy);
   await page.close();

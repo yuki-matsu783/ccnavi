@@ -102,11 +102,11 @@ func (r *run) sessionEntries(stateDir string) (map[string][]string, []string) {
 			withKey = append(withKey, k)
 			continue
 		}
-		if ownDate.MatchString(name) {
+		if ownDate().MatchString(name) {
 			loose = append(loose, path)
 			continue
 		}
-		for _, pattern := range sessionOnly {
+		for _, pattern := range sessionOnly() {
 			if m := pattern.FindStringSubmatch(name); m != nil {
 				token := m[pattern.SubexpIndex("s")]
 				groups[token] = append(groups[token], path)

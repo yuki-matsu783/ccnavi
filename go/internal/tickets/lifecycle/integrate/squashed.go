@@ -131,7 +131,7 @@ func isSquash(top, sha, parent string, records []doneCopy, bound func(string) bo
 		if tip == "" || bound(r.name) {
 			continue
 		}
-		if got, ok := git.Text(top, []string{"rev-parse", "--verify", "--quiet", tip + "^{commit}"}, git.Options{}); !ok || got != tip {
+		if git.Commit(top, tip, git.Options{}) != tip {
 			continue
 		}
 		// 祖先でなければ NotAncestorCode。それ以外（起こせない・読めない・祖先）は外さない。

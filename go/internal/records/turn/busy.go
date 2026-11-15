@@ -27,7 +27,7 @@ func Busy(state, session string) bool {
 		return false
 	}
 	file := path(state, BusyPrefix, session)
-	// 有無はディスクだけで決め、溜める段は見ない。
+	// 有無はディスクだけで決め、溜める段階は見ない。
 	if !ospath.DiskExists(file) {
 		return false
 	}

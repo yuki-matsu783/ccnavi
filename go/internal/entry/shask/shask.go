@@ -4,10 +4,8 @@ import (
 	"cmp"
 	"fmt"
 	"io"
-	"path/filepath"
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -17,16 +15,12 @@ import (
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/infra/yaml"
-	"ccnavi/internal/policy/ruleload"
-	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/tickets/approval"
-	"ccnavi/internal/tickets/lifecycle/branch"
 	"ccnavi/internal/tickets/lifecycle/integrate"
 	"ccnavi/internal/tickets/model/archive"
 	"ccnavi/internal/tickets/model/ids"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
-	"ccnavi/internal/tickets/sync/handoff"
 )
 
 // head は答えの頭の行。
@@ -71,17 +65,11 @@ func Answer(stdout, stderr io.Writer, root string, conf *config.Settings, comman
 	var ok bool
 	switch {
 	case verb == "parent" && len(args) == 2:
-		ok = parentTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "bound" && len(args) == 2:
-		ok = boundTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "leftover" && len(args) == 2:
-		ok = leftoverTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "base-bound" && len(args) == 2:
-		ok = baseBoundTree(stdout, stderr, root, conf, args[0], args[1])
-	case verb == "guarded" && len(args) >= 2:
-		ok = guardedTree(stdout, stderr, root, conf, args[0], args[1:])
-	case verb == "handoff-pending" && len(args) <= 2:
-		ok = handoffPendingTree(stdout, stderr, args[0], args[1:])
+		ok = parentTree(stdout, stderr, root, conf, args[0], args[1], "")
+	case verb == "parent" && len(args) == 3 && args[2] != "":
+		ok = parentTree(stdout, stderr, root, conf, args[0], args[1], args[2])
+	case verb == "gate" && len(args) == 4:
+		ok = pushGate(stdout, stderr, root, conf, args[0], args[1], args[2], args[3])
 	default:
 		return 0, false
 	}
@@ -109,21 +97,9 @@ func treeOK(stderr io.Writer, verb, path string) bool {
 	return false
 }
 
-// treeOf は sh が渡したツリーのパスを、名前を付けたワークツリーとして読む。登録されていないディレクトリでも、そのパスの
-// 置き場を見る。プロジェクトは、ワークスペースかプロジェクトのワークツリーなら元リポジトリから決める。
+// treeOf は sh が渡したツリーのパスを、名前を付けたワークツリーとして読む（integrate.TreeAt）。
 func treeOf(root string, conf *config.Settings, path, name string) tree.Tree {
-	full := ospath.Abspath(path)
-	owners := append([]tree.Tree{tree.MainTree(root)}, tree.Projects(projectsDir(root, conf))...)
-	owner, _ := tree.OwnerOf(full, owners)
-	return tree.Tree{Name: name, Root: full, Project: owner.Project, Kind: tree.KindWorktree}
-}
-
-// projectsDir はプロジェクトの置き場の絶対パス。
-func projectsDir(root string, conf *config.Settings) string {
-	if conf.Projects == "" || ospath.IsAbs(conf.Projects) {
-		return conf.Projects
-	}
-	return ospath.Join(root, conf.Projects)
+	return integrate.TreeAt(conf, root, path, name)
 }
 
 // underWorktrees は path が `.claude/worktrees/` の下か（大文字小文字を畳んで比べる）。
@@ -138,63 +114,107 @@ func writeLines(w io.Writer, lines ...string) {
 	fmt.Fprint(w, strings.Join(lines, "\n")+"\n")
 }
 
-// parentTree は `tree parent`。頭に続けて parent・approved・requested・archived・started・mr の 6 行。
-func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
+// parentTree は `tree parent`。頭に続けて parent・approved・requested・archived・started・mr の 6 行。ブランチを
+// 渡したときは、続けて trace（親のブランチを一度は送った形跡。pushTrace）の行を足す。
+func parentTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name, branch string) bool {
 	if !identOK(stderr, "tree parent", name) || !treeOK(stderr, "tree parent", path) {
 		return false
 	}
-	// 置き場（提案と承認済み）から、親か・承認済みか・着手済みか・MR の番号を読む。
-	work := treeOf(root, conf, path, name)
-	held := holdsParent(conf, work)
-	approved, mr, started := approvedParent(conf, work)
-	// 手元の退避を見るのは `.claude/worktrees/<名前>` の形のときだけ（退避のリポジトリはワークツリーの元リポジトリで
-	// 決まる）。
-	archived := no
-	if underWorktrees(root, path) {
-		if copy, ok := archive.ArchivedFields(root, work.Project, name); ok && copy.Ticket == name && copy.Parent == "" {
-			archived, held = yes, yes
-			if mr == "" {
-				mr = archivedMR(root, work.Project, name)
-			}
-		}
-	}
-	writeLines(stdout, head,
-		"parent "+string(held),
-		"approved "+string(approved),
-		"requested "+string(requested(conf, work)),
-		"archived "+string(archived),
-		"started "+string(started),
-		"mr "+cmp.Or(mr, none))
-	return true
-}
-
-// boundTree は `tree bound`。頭に続けて bound yes|no、結び付くなら why <理由>。
-func boundTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
-	if !identOK(stderr, "tree bound", name) || !treeOK(stderr, "tree bound", path) {
-		return false
-	}
-	why := integrate.BoundReason(conf, root, treeOf(root, conf, path, name))
-	lines := []string{head, "bound " + string(yesNo(why != ""))}
-	if why != "" {
-		lines = append(lines, "why "+why)
+	f := parentFactsOf(root, conf, path, name)
+	lines := []string{head,
+		"parent " + string(f.held),
+		"approved " + string(f.approved),
+		"requested " + string(f.requested),
+		"archived " + string(f.archived),
+		"started " + string(f.started),
+		"mr " + cmp.Or(f.mr, none)}
+	if branch != "" {
+		lines = append(lines, "trace "+string(yesNo(pushTrace(path, branch, f))))
 	}
 	writeLines(stdout, lines...)
 	return true
 }
 
-// leftoverTree は `tree leftover`。頭に続けて leftover・proposal・doing・mr・stage を返す。
-// stage は親の段階である。doing/ に在れば doing（改版の提案が todo/ にあっても）、なければ review/ なら review、
-// todo/ なら todo、どれも無ければ "-" とする。親のワークツリーでなければ（読めないときも）leftover no を返し、
-// 案内を出さない答えにする。
-func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
-	if !identOK(stderr, "tree leftover", name) || !treeOK(stderr, "tree leftover", path) {
-		return false
+// parentFacts は親のワークツリーについて、置き場（提案と承認済み）と手元の退避から読んだこと。
+type parentFacts struct {
+	held, approved, requested, archived, started answer
+	mr                                           string
+}
+
+// parentFactsOf は、ツリー path（名前 name）の parentFacts を読む。
+func parentFactsOf(root string, conf *config.Settings, path, name string) parentFacts {
+	work := treeOf(root, conf, path, name)
+	f := parentFacts{requested: requested(conf, work)}
+	f.approved, f.mr, f.started = approvedParent(conf, work)
+	f.held, f.archived = parentHeld(root, conf, work, path, name)
+	if f.archived == yes && f.mr == "" {
+		f.mr = archivedMR(root, work.Project, name)
+	}
+	return f
+}
+
+// parentHeld は、ツリーが親のワークツリーか（held）と、手元の退避に親があるか（archived）。手元の退避を見るのは
+// `.claude/worktrees/<名前>` の形のときだけ（退避のリポジトリはワークツリーの元リポジトリで決まる）。
+func parentHeld(root string, conf *config.Settings, work tree.Tree, path, name string) (held, archived answer) {
+	held, archived = holdsParent(conf, work), no
+	if underWorktrees(root, path) {
+		if copy, ok := archive.ArchivedFields(root, work.Project, name); ok && copy.Ticket == name && copy.Parent == "" {
+			held, archived = yes, yes
+		}
+	}
+	return held, archived
+}
+
+// Parent は、親のワークツリーについて `tree parent <ツリー> <名前> <ブランチ>` が答えることのうち、ccnavi-sync.sh の
+// 答え（catchup）が使うもの。Held・Approved は yes・no・unreadable。Trace は送った形跡（pushTrace）。
+type Parent struct {
+	Held, Approved string
+	MR             string
+	Trace          bool
+}
+
+// ParentOf は、ツリー path（名前 name、親のブランチ branch）の Parent を読む。名前とツリーは呼ぶ側が確かめてある。
+func ParentOf(root string, conf *config.Settings, path, name, branch string) Parent {
+	f := parentFactsOf(root, conf, path, name)
+	return Parent{Held: string(f.held), Approved: string(f.approved), MR: f.mr, Trace: pushTrace(path, branch, f)}
+}
+
+// IsParentTree は、ツリー path（名前 name）が親子のチケットの親のワークツリーか（`tree parent` の parent の行と同じ判定）。
+// 0 は親、1 は親でない、2 は決められない（名前が識別子でない・ツリーが無い・置き場のファイルを読めない）。
+func IsParentTree(root string, conf *config.Settings, path, name string) int {
+	if !ids.IsValidFamily(name) || path == "" || !ospath.IsDir(path) {
+		return 2
+	}
+	held, _ := parentHeld(root, conf, treeOf(root, conf, path, name), path, name)
+	switch held {
+	case yes:
+		return 0
+	case no:
+		return 1
+	}
+	return 2
+}
+
+// LeftoverFacts は、親のワークツリーに残っているもの。Stage は親の段階で、doing/ に在れば doing（改版の提案が todo/ に
+// あっても）、なければ review/ なら review、todo/ なら todo、どれも無ければ空。MR は番号か空。
+type LeftoverFacts struct {
+	Leftover, Proposal bool
+	Doing              int
+	MR, Stage          string
+}
+
+// Leftover は、ツリー path（名前 name）に、承認待ちの提案・作業中の子・MR が残っているか（ccnavi-worktree.sh が親の
+// ワークツリーから直接作業へ切り替えるときに見る）。親のワークツリーでない・名前が識別子でない・ツリーが無いときは、
+// 何も残っていない答えにする（案内を出さない）。
+func Leftover(root string, conf *config.Settings, path, name string) LeftoverFacts {
+	if !ids.IsValidFamily(name) || path == "" || !ospath.IsDir(path) {
+		return LeftoverFacts{}
 	}
 	// 親の置き場（doing・todo・review）を順に見て、残っているものを集める。
 	// doing は承認済みの置き場なので提案ではない（held が偽）。todo と review は提案の置き場。
 	work := treeOf(root, conf, path, name)
 	approvedDir := conf.ApprovedDir(work.Root)
-	proposal, mr := no, ""
+	proposal, mr := false, ""
 	found := map[place.State]bool{}
 	for _, c := range []struct {
 		stage place.State
@@ -212,14 +232,14 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 		}
 		found[c.stage] = true
 		if c.held {
-			proposal = yes
+			proposal = true
 		}
 		if mr == "" {
 			mr = mrOf(front)
 		}
 	}
 	// 段階は doing、review、todo の順で最初に見つかったもの（doing に在れば、改版の提案が todo にあっても doing）。
-	stage := none
+	stage := ""
 	for _, s := range []place.State{place.Doing, place.Review, place.Todo} {
 		if found[s] {
 			stage = string(s)
@@ -228,16 +248,10 @@ func leftoverTree(stdout, stderr io.Writer, root string, conf *config.Settings, 
 	}
 	// 親のワークツリーと言える材料があるときだけ、作業中の子を数える（親でないツリーに案内を出さないため）。
 	doing := 0
-	if proposal == yes || mr != "" || holdsParent(conf, work) == yes {
+	if proposal || mr != "" || holdsParent(conf, work) == yes {
 		doing = childrenInDoing(approvedDir, name)
 	}
-	writeLines(stdout, head,
-		"leftover "+string(yesNo(proposal == yes || mr != "" || doing > 0)),
-		"proposal "+string(proposal),
-		"doing "+strconv.Itoa(doing),
-		"mr "+cmp.Or(mr, none),
-		"stage "+stage)
-	return true
+	return LeftoverFacts{Leftover: proposal || mr != "" || doing > 0, Proposal: proposal, Doing: doing, MR: mr, Stage: stage}
 }
 
 // childrenInDoing は doing/ にある、この親の子（parent: が親の識別子）の数。読めないファイルは数えない。
@@ -258,77 +272,6 @@ func childrenInDoing(approvedDir, parent string) int {
 		}
 	}
 	return count
-}
-
-// baseBoundTree は `tree base-bound`。頭に続けて bound yes|no|unknown、yes なら why <理由>。
-func baseBoundTree(stdout, stderr io.Writer, root string, conf *config.Settings, path, name string) bool {
-	if name == "" || strings.ContainsAny(name, "\n\x00") {
-		fmt.Fprintf(stderr, "ccnavi: tree base-bound のブランチ %s は有効な名前ではありません。\n", pyfmt.Repr(name))
-		return false
-	}
-	if !treeOK(stderr, "tree base-bound", path) {
-		return false
-	}
-	bound, why := branch.BaseBound(conf, root, path, name)
-	lines := []string{head, "bound " + string(bound)}
-	if why != "" {
-		lines = append(lines, "why "+why)
-	}
-	writeLines(stdout, lines...)
-	return true
-}
-
-// guardedTree は `tree guarded`。頭に続けて guarded yes|no、守る対象に当たるパスごとに path <パス>。パスはチェックアウト
-// からの相対で、自己防衛が守る対象と、行き着く先まで解いたパスを大文字小文字を畳んで比べる。
-func guardedTree(stdout, stderr io.Writer, root string, conf *config.Settings, path string, rels []string) bool {
-	if !treeOK(stderr, "tree guarded", path) {
-		return false
-	}
-	guarded := map[string]bool{}
-	for _, t := range selfguard.Targets(root, conf.Rules, conf.Bin, ruleload.LayerFiles(conf, root), conf.Projects) {
-		guarded[pathcase.Fold(ospath.Realpath(t.Path))] = true
-	}
-	var hits []string
-	for _, rel := range rels {
-		if rel != "" && guarded[pathcase.Fold(ospath.Realpath(ospath.Join(path, filepath.FromSlash(rel))))] {
-			hits = append(hits, rel)
-		}
-	}
-	lines := []string{head, "guarded " + string(yesNo(len(hits) > 0))}
-	for _, rel := range hits {
-		lines = append(lines, "path "+rel)
-	}
-	writeLines(stdout, lines...)
-	return true
-}
-
-// handoffPendingTree は `tree handoff-pending`。頭に続けて pending <件数> と、取り込んでいない下書きごとに path <パス>。
-// 起点（start の 1 つめ）があれば、元があり中身が違う写しごとに foreign <パス>、元の無い下書きごとに note <パス>。
-func handoffPendingTree(stdout, stderr io.Writer, path string, start []string) bool {
-	if !treeOK(stderr, "tree handoff-pending", path) {
-		return false
-	}
-	root := ospath.Abspath(path)
-	left := handoff.Pending(root)
-	var foreign, notes []string
-	if len(start) > 0 {
-		var ok bool
-		if foreign, notes, ok = handoff.Survey(root, start[0]); !ok {
-			fmt.Fprintf(stderr, "ccnavi: tree handoff-pending の起点 %s の木を読めません。\n", pyfmt.Repr(start[0]))
-			return false
-		}
-	}
-	lines := []string{head, "pending " + strconv.Itoa(len(left))}
-	for _, group := range []struct {
-		key   string
-		paths []string
-	}{{"path", left}, {"foreign", foreign}, {"note", notes}} {
-		for _, rel := range group.paths {
-			lines = append(lines, group.key+" "+rel)
-		}
-	}
-	writeLines(stdout, lines...)
-	return true
 }
 
 // frontOfText は本文の frontmatter を対応表として読む。読めなければ nil。

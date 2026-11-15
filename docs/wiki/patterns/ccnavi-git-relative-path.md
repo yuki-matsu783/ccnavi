@@ -16,7 +16,7 @@ keywords: [ccnavi-git.sh, 相対パス, 絶対パス, ワークツリー, cwd, g
 
 ## 原因
 
-相対パスは cwd がワークツリーの最上段のときしか合わない。サブディレクトリに cd した後や、cwd が別のツリーに戻ったときは外れる。
+相対パスは cwd がワークツリーのルートのときしか合わない。サブディレクトリに cd した後や、cwd が別のツリーに戻ったときは外れる。
 commit スキルの「git の入口」と `.ccnavi/docs/worktree.md` の「基本」の表がこの書き方で、git を直接呼んだときの拒否の案内（絶対パスの形）と食い違っている。
 `.ccnavi/docs/worktree.md` の直しは `chore-212-worktree-doc-absolute-path` で出した（スキルの提案ではないので `impact/` には載せない）。
 

@@ -328,7 +328,7 @@ test("CB-T290 意味の色を文字に使うときは前景色へ混ぜ、Light 
   }
 });
 
-test("CB-T291 狭い幅（520px以下）では一覧の欄を1列にして行の見出しを段に分け、ルール管理の表は入れ物の中で横に送る", () => {
+test("CB-T291 狭い幅（520px以下）では一覧の欄を1列にして行の見出しを複数行に分け、ルール管理の表は入れ物の中で横に送る", () => {
   const rules = flatStyle(rulesOnly());
   assert.match(rules, /@media \(max-width: 520px\) \{ \.row-body \{ padding-left: 14px; grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(rules, /\.rule \.sum > \.clip:not\(\.mono\) \{ grid-row: 2; grid-column: 2 \/ -1; \}/);

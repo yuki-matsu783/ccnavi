@@ -92,7 +92,7 @@ type Child struct {
 }
 
 // ParseChild は子の識別子の形なら、その親・フェーズ番号・連番と真。識別子だけから親を割り出すときは
-// 右から 2 段を剥がすので、親が "-" や数字を含んでも 1 通りに決まる。
+// 右から 2 階層を剥がすので、親が "-" や数字を含んでも 1 通りに決まる。
 func ParseChild(id string) (Child, bool) {
 	m := childPattern.FindStringSubmatch(id)
 	if m == nil {
@@ -267,8 +267,8 @@ func AdoptionIDProblem(branch string) string {
 	return ""
 }
 
-// IDAnswer は sh の `worktree id <ブランチ>` への答え（1 行 1 項目。id・problem・direct・child）。
-// sh は字の種類と NFC と文字数を自分で確かめない（ロケールでバイト数と字数が変わる）ので、ここに聞く。
+// IDAnswer はブランチ名から作る識別子と、それが使えるかの答え（1 行 1 項目。id・problem・direct・child）。
+// ラッパーの worktree add（gitwrap）と ccnavi-worktree.sh の名前の検査（cut）が使う。
 func IDAnswer(branch string) []string {
 	ident := BranchToID(branch)
 	lines := []string{"id " + ident}
@@ -334,11 +334,34 @@ func BranchProblem(name string) string {
 			return "`HEAD`・`FETCH_HEAD` のような階層は git の特別な名前と紛らわしい"
 		}
 	}
-	// 統合先や保護されたブランチの名前は、親のブランチにさせない。
-	if slices.Contains(config.ReservedBranchIDs(), folded) || slices.Contains(config.ReservedBranchIDs(), parts[0]) ||
-		strings.HasPrefix(folded, "release-") {
+	// 統合先や保護されたブランチの名前は、親のブランチにさせない。先頭の階層で見るので main/x・release/1 も止まる。
+	if Protected(parts[0]) {
 		return "統合先や保護されたブランチの名前（main・master・develop・release と、" +
 			"それを先頭の階層に持つ main/*・release/* など、release-*）は親のブランチにしない"
+	}
+	return ""
+}
+
+// Protected は、名前だけで統合先とみなす保護されたブランチか。main・master・develop・release と、release/ か
+// release- で始まる名前で、大文字小文字は区別しない。ブランチ名（release/1）にも、それを識別子にした名前（release-1）にも
+// 同じ答えを出す。push を断る（gitwrap）、取り込む名前を断る（land）、親のブランチ名を断る（BranchProblem）がこれを使う。
+// 実行ファイルを起こさない sh（ccnavi-common.sh の ccnavi_is_protected）は写しを持ち、tests/fixtures/ident-cases.json の
+// 同じ表で一致を確かめる。
+func Protected(name string) bool {
+	folded := pyfmt.Casefold(name)
+	return slices.Contains(config.ReservedBranchIDs(), folded) ||
+		strings.HasPrefix(folded, "release/") || strings.HasPrefix(folded, "release-")
+}
+
+// IDClash は names（ブランチ名の一覧）のうち、branch と同じ識別子（BranchToID。大文字小文字は区別しない）になる別の
+// 名前を 1 つ返す。無ければ空。同じ識別子のブランチが 2 本あると、ワークツリーの置き場（.claude/worktrees/<識別子>）が
+// 重なる。ccnavi-start.sh の採用の確認（start.BranchOK）と ccnavi-worktree.sh（cut）がこれを使う。
+func IDClash(branch string, names []string) string {
+	want := BranchToID(branch)
+	for _, n := range names {
+		if n != "" && n != branch && SameID(BranchToID(n), want) {
+			return n
+		}
 	}
 	return ""
 }

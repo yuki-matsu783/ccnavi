@@ -31,7 +31,7 @@ UNDECLARED なので、権限モードが `auto` なら確認なしに実行さ�
 
 **2 つめは、読み分けの規則を持っているが、作業ではほとんど書かれない形。** バッククォートは、中で `\` が外れる文字が
 二重引用の中かどうかで変わり、入れ子は外したあとの中身を読み直さないと分からない。`$( )` の中の `case`、`$((cmd) | x)`、
-16 段を超える入れ子は bash と zsh で読みが分かれるので縮退して確認にしていた。`coproc NAME { … }` は NAME を切り分ける
+16 階層を超える入れ子は bash と zsh で読みが分かれるので縮退して確認にしていた。`coproc NAME { … }` は NAME を切り分ける
 読みを持っていた。これは敵対的レビューで、一覧にない予約語が見つかって足したもの（shellread-subst-04）。
 
 このワークスペースの記録（Bash のコマンド 2,841 種類）での頻度は次のとおり。
@@ -53,7 +53,7 @@ UNDECLARED なので、権限モードが `auto` なら確認なしに実行さ�
 | `brace-expansion` | `DENY_BRACE_EXPANSION` | 引用の外のブレース展開（ADR-0046） | 語を並べる、単一引用 |
 | `command-name-expansion` | `DENY_COMMAND_NAME_EXPANSION` | コマンドの位置の語に、変数か置換の `$`、`*` `?`、閉じた `[…]` | コマンド名とスクリプトのパスをそのまま書く |
 | `backquote` | `DENY_BACKQUOTE` | 単一引用・`$'…'`・`` \` ``・引用付きヒアドキュメントの本文・コメントの外のバッククォート | `$( )`、単一引用、`--body-file` |
-| `ambiguous-form` | `DENY_AMBIGUOUS_FORM` | `$( )` の中の `case`、`$((cmd) \| x)`、16 段を超える入れ子、コマンドの位置の `coproc`・`select` | if/elif、空白を入れる、分けて打つ、`&`、`for` |
+| `ambiguous-form` | `DENY_AMBIGUOUS_FORM` | `$( )` の中の `case`、`$((cmd) \| x)`、16 階層を超える入れ子、コマンドの位置の `coproc`・`select` | if/elif、空白を入れる、分けて打つ、`&`、`for` |
 
 - コマンドの位置の語は、前に置いた代入（`a[1]=x`・`x+=1` を含む）とリダイレクト（`>/dev/null`・`2>&1`・`{fd}>/dev/null`）を
   飛ばした最初の語。`case` `for` `select` の直後の 1 本は、調べる値と変数名なので見ない。`coproc`・`select` も、この位置では並べない

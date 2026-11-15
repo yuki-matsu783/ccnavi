@@ -279,10 +279,10 @@ func ticketOrReview(stdout, stderr io.Writer, conf *config.Settings, root string
 
 const worktreeUsage = "ccnavi: worktree drop <名前> か worktree clean <名前> [--preview] か worktree tidy <親> [--phase <N>]" +
 	" か worktree remaining <親> か worktree retire <親> か worktree retire --abandon <親>" +
-	" か worktree branch <名前> [confirmed] か worktree name <名前> か worktree id <ブランチ>" +
+	" か worktree branch <名前> [confirmed] か worktree direct plan|cut …" +
 	" か worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>\n"
 
-// worktree は `worktree drop|clean|tidy|remaining|retire|branch|name|id|issue-id …`。sh が状態を書く操作の後に呼ぶ。
+// worktree は `worktree drop|clean|tidy|remaining|retire|branch|direct|issue-id …`。sh が状態を書く操作の後に呼ぶ。
 // 名前は、clean 以外は識別子の形だけを受ける（パスを渡して任意の場所を消させない。clean は RunClean が置き場の直下の
 // 名前かを見る）。
 func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a opts, words []string, cwd string) int {
@@ -290,7 +290,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 	if len(words) > 1 {
 		verb = words[1]
 	}
-	// 1. 放棄した親の記録を消す形（retire --abandon）と、引数が名前だけで済む動詞（name・id・issue-id・branch・clean）。
+	// 1. 放棄した親の記録を消す形（retire --abandon）と、引数が名前だけで済む動詞（direct・issue-id・branch・clean）。
 	if !a.IsNone("abandon") {
 		// 放棄した親の片付けの記録を消す。ユーザがターミナルで打つ（hook がエージェントからは止める）。
 		if !slices.Equal(words, []string{"worktree", "retire"}) || !ids.IsValidID(a.Str("abandon")) {
@@ -300,18 +300,9 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 		return okIf(retire.RunAbandon(stdout, stderr, conf, root, a.Str("abandon")) == 0)
 	}
 	switch {
-	case verb == "name" && len(words) == 3:
-		// 直接作業の名前の形を言う（warn の 1 行）。sh の作成の後に呼ぶ。
-		if text := ids.DirectNameWarning(words[2], conf.BranchPrefixes, root); text != "" {
-			fmt.Fprintf(stdout, "warn: %s\n", text)
-		}
-		return config.ExitOK
-	case verb == "id" && len(words) == 3:
-		// ブランチ名から識別子を作り、使えるかを言う（字の種類・NFC・長さはここで判定する）。
-		for _, line := range ids.IDAnswer(words[2]) {
-			fmt.Fprintln(stdout, line)
-		}
-		return config.ExitOK
+	case verb == "direct":
+		// 直接作業のワークツリーを切る（ccnavi-worktree.sh）。fetch と ls-remote は sh が打って結果を渡す。
+		return directCut(stdout, stderr, conf, root, cwd, words[2:])
 	case verb == "issue-id" && (len(words) == 4 || len(words) == 5):
 		return issueID(stdout, stderr, root, a, words)
 	case verb == "branch" && (len(words) == 3 || len(words) == 4 && words[3] == "confirmed"):

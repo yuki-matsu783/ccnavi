@@ -1,19 +1,19 @@
 ---
 type: adr
-title: 役割ごとのサブパッケージと段、approval/agree の分割、--agree への改名
+title: 役割ごとのサブパッケージと層、approval/agree の分割、--agree への改名
 description: ccnavi/ を役割ごとの 6 つのサブパッケージに分けて読む向きを固定し、import の循環を無くすために承認済みチケットの置き場（approval）と合意の手続き（agree）を分け、承認の CLI を --agree に改名する
 tags: [design-doc, ticket]
-keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree, --approve, ccnavi-agree.sh, 互換の版, COMPAT, test_module_layers, flow-match]
+keywords: [サブパッケージ, 層, 循環, import, approval, agree, --agree, --approve, ccnavi-agree.sh, 互換の版, COMPAT, test_module_layers, flow-match]
 ---
-# ADR-0099: 役割ごとのサブパッケージと段、approval/agree の分割、--agree への改名
+# ADR-0099: 役割ごとのサブパッケージと層、approval/agree の分割、--agree への改名
 
 状態: 採用（旧名 `--approve`・`ccnavi-approve.sh` を止める分は、配布前なので削除した。下の表の該当の行はその前の決定）
 
 ## 状況
 
 `ccnavi/` は 49 本のモジュールが 1 つのディレクトリに並んでいた。読む向きは
-`tests/core/test_module_layers.py` の段（7 段）だけが持ち、ディレクトリにも名前にも現れなかった。
-段の検査は循環を 2 組だけ既知として通していた。
+`tests/core/test_module_layers.py` の層（7 層）だけが持ち、ディレクトリにも名前にも現れなかった。
+層の検査は循環を 2 組だけ既知として通していた。
 
 | 循環 | 中身 |
 |---|---|
@@ -27,12 +27,12 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
-| `WIP_ROOT` を `ticket` に移す（`ELI5` の隣） | 置き場のパスはチケットの置き場と同じ性質で、review にある理由が無かった。ops ↔ review の循環が消える | 関数の中の import のまま既知の循環として残す（隠すだけで、段の検査は同じに数える） |
+| `WIP_ROOT` を `ticket` に移す（`ELI5` の隣） | 置き場のパスはチケットの置き場と同じ性質で、review にある理由が無かった。ops ↔ review の循環が消える | 関数の中の import のまま既知の循環として残す（隠すだけで、層の検査は同じに数える） |
 | `approval` を置き場に限り、合意の手続きを新しい `agree` に分ける。`reasons.approved` は `agree_screen.approved_text` の本体にする | 置き場は判定が読む土台で、手続きはユーザの操作。分けると approval は phase・reasons を読まなくなり、向きが agree → approval の 1 本になる | approval の中で手続きを関数の中の import にしたまま残す |
 | 循環を 1 つも許さない。既知の循環の一覧（`KNOWN_KNOTS`）を消す | 既知として通す一覧は、次に同じ場所で循環ができたときに何も言わない | 一覧を残して空にする |
-| `ccnavi/` を 6 つのサブパッケージに分ける（infra < records < policy < tickets < hook < entry）。直下は `__init__.py`（空）と `__main__.py` だけ | 役割がディレクトリで見え、サブパッケージをまたぐ向きをテストで固定できる。実測でこの順に上向きの import が 0 本だった | 段（7 段）をそのままディレクトリにする（段は深さで切ったもので役割と合わず、名前で探せない） |
-| 段（TIERS）は残し、ドットの名前（`infra.fsio`）で持つ。サブパッケージの表（PACKAGES）を足す | サブパッケージの中の読む順はディレクトリでは言えないので、段が補う | 段を破棄してサブパッケージだけにする |
-| 再輸出しない。サブパッケージの `__init__.py` は役割の docstring だけ。パッケージの中は相対の 2 形（`from . import x`、`from ..infra import fsio`）だけ | 行き先が import 文にそのまま残り、段とサブパッケージの検査が 1 通りの読みで済む | `__init__.py` で名前を並べ直す（行き先が `__init__.py` に見える）、絶対の `ccnavi.` を許す（表記が 2 通りになる） |
+| `ccnavi/` を 6 つのサブパッケージに分ける（infra < records < policy < tickets < hook < entry）。直下は `__init__.py`（空）と `__main__.py` だけ | 役割がディレクトリで見え、サブパッケージをまたぐ向きをテストで固定できる。実測でこの順に上向きの import が 0 本だった | 層（7 層）をそのままディレクトリにする（層は深さで切ったもので役割と合わず、名前で探せない） |
+| 層（TIERS）は残し、ドットの名前（`infra.fsio`）で持つ。サブパッケージの表（PACKAGES）を足す | サブパッケージの中の読む順はディレクトリでは言えないので、層が補う | 層を破棄してサブパッケージだけにする |
+| 再輸出しない。サブパッケージの `__init__.py` は役割の docstring だけ。パッケージの中は相対の 2 形（`from . import x`、`from ..infra import fsio`）だけ | 行き先が import 文にそのまま残り、層とサブパッケージの検査が 1 通りの読みで済む | `__init__.py` で名前を並べ直す（行き先が `__init__.py` に見える）、絶対の `ccnavi.` を許す（表記が 2 通りになる） |
 | `ccnavi --approve` を `--agree` に改名し、別名は残さない。sh は `ccnavi-agree.sh` に改名する | 「合意」を表す語を 1 つにする。古い名前を残すと、保護（組み込みの deny）とヘルプの両方に 2 つの表記が残り続ける | `--approve` を別名として残す |
 | 互換の版（COMPAT）を上げる | 呼ぶ側（sh と拡張）が頼るフラグの名前が変わり、呼ぶ側を直さないと動かない形になった（`ccnavi/entry/version.py` の上げ方どおり） | 上げない（古い sh は `--approve` を渡して argparse の苦情で落ち、理由が分からない） |
 | 組み込みの deny（`builtin-guard-ticket-approval`）は `--agree` と承認のスクリプトを止める（旧名 `--approve`・`ccnavi-approve.sh` の止めは削除した。スクリプトの現行名は `ccnavi-user-agree.sh`） | 当時は、実行ファイルがもう `--approve` を受け付けなくても、古い実行ファイルや sh のコピーが手元に残っていれば通ってしまうので、旧名も止めた。配布前なので、その旧名の止めは後で削除した | 新しい表記だけを止める |
@@ -69,4 +69,4 @@ keywords: [サブパッケージ, 段, 循環, import, approval, agree, --agree,
 |---|---|---|
 | 新しいサブパッケージ `catalog` を `tickets` と `hook` の間に置き、4 本を移す。`catalog` が読むのは `infra`・`policy`・`tickets` だけ。`hook`（judge・events・subagent）と `entry/cli_args.py` が `catalog` を読む | `hook/` を開いたときに、hook の判定の流れだけを追える。読む向きは `infra < records < policy < tickets < catalog < hook < entry` で、上向きの import は 0 本のまま | `hook/` に残して docstring で役割を書き分ける（判定とそうでないものが同じ階層に並ぶ）、`entry` 寄りに置く（`hook` が `entry` を読めない） |
 
-サブパッケージは 7 つになった。上の決定の表の「6 つ」と段の並びは、決めた時点の記録として残す。`tests/core/test_module_layers.py` の `PACKAGES`・`TIERS` は `catalog` を持つ。
+サブパッケージは 7 つになった。上の決定の表の「6 つ」と層の並びは、決めた時点の記録として残す。`tests/core/test_module_layers.py` の `PACKAGES`・`TIERS` は `catalog` を持つ。

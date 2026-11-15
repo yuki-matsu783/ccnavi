@@ -157,6 +157,12 @@ func lex(src string) ([]string, error) {
 	}
 }
 
+// SingleQuote は、いつも単引用符で囲む（中の ' は '"'"'。sh の ccnavi_sh_quote と同じ）。案内の文に、そのまま打てる語を
+// 載せる。
+func SingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
 // Quote は Python の shlex.quote。置換を全文で書き戻すときと、ユーザに見せるコマンドで 1 語にする。
 func Quote(s string) string {
 	if s == "" {
@@ -167,7 +173,7 @@ func Quote(s string) string {
 		safe := c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
 			strings.IndexByte("_@%+=:,./-", c) >= 0
 		if !safe {
-			return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+			return SingleQuote(s)
 		}
 	}
 	return s

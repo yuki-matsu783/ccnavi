@@ -354,7 +354,7 @@ func joinEscaped(parts []string) string {
 func spelled(path string) string { return joinEscaped(splitSeps(path)) }
 
 // movedHolders は、設定で動く場所の、入っているディレクトリと名前の組。
-//   - ccnavi ディレクトリと、ルートの下に置いた共通レイヤー: ルートからの相対の各段の組。いちばん上の名前はルートの組に足す
+//   - ccnavi ディレクトリと、ルートの下に置いた共通レイヤー: ルートからの相対の各要素の組。いちばん上の名前はルートの組に足す
 //   - ルートの外に置いた共通レイヤー: 書かれた表記と行き着く先の、すぐ上のディレクトリと名前の組だけ
 //   - ルート: rootNames と上で足した名前を、ルートを指す行き先（`.` とルートの絶対パス）で組む
 func movedHolders(root, projectHome string, commonFiles []string) []holder {
@@ -381,7 +381,7 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 			}
 		}
 	}
-	// 2. ranked の各パスを、段ごとの組にする。ccnavi ディレクトリの下は、行き先がそこなら名前を問わずに止まる
+	// 2. ranked の各パスを、段階ごとの組にする。ccnavi ディレクトリの下は、行き先がそこなら名前を問わずに止まる
 	//（場所の表記）ので、組は作らず、いちばん上の名前だけ top に足す。
 	homes := []string{}
 	for _, h := range []string{pyfmt.Lower(homeName(projectHome)), config.DefaultProjectHome} {

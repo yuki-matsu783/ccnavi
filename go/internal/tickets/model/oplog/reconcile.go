@@ -14,7 +14,7 @@ type Verdict string
 const (
 	// verdictSent は送ったと確かめた（URL を保存する）。
 	verdictSent Verdict = "sent"
-	// verdictSend は送っていないと確定した（同じ段階 ID で送る）。
+	// verdictSend は送っていないと確定した（同じ層階 ID で送る）。
 	verdictSend Verdict = "send"
 	// verdictUnknown は送ったか確定できない（自動では送らない）。
 	verdictUnknown Verdict = "unknown"

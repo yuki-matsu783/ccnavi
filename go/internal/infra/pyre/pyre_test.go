@@ -3,6 +3,7 @@ package pyre
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -92,11 +93,11 @@ func TestErrorsReadExpected(t *testing.T) {
 func TestTooDeepAndOverflow(t *testing.T) {
 	ok := strings.Repeat("(", maxNesting) + "x" + strings.Repeat(")", maxNesting)
 	if _, err := Compile(ok, 0); err != nil {
-		t.Errorf("%d 段: %v", maxNesting, err)
+		t.Errorf("%d 階層: %v", maxNesting, err)
 	}
 	deep := "(" + ok + ")"
 	if _, err := Compile(deep, 0); !errors.Is(err, ErrTooDeep) {
-		t.Errorf("%d 段: %v", maxNesting+1, err)
+		t.Errorf("%d 階層: %v", maxNesting+1, err)
 	}
 	if _, err := Compile("a{4294967295}", 0); !errors.Is(err, errOverflow) {
 		t.Errorf("%v", err)
@@ -201,5 +202,31 @@ func TestDepthLimit(t *testing.T) {
 	}
 	if ok, err := MustCompile(`^(?!(?:ab)*$)`, 0).SearchChecked(short); ok || err != nil {
 		t.Errorf("short lookahead: (%v, %v)", ok, err)
+	}
+}
+
+// 組んだ式を覚える表と、使うときに組む固定の式は、並行に呼ばれても同じ答えを返す（-race で確かめる）。
+// 組めない式は、覚えたあとも同じ苦情を返す。
+func TestCompileShared(t *testing.T) {
+	lazy := MustCompile(`(?P<w>sh|bash)\s+x`, IgnoreCase)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			re, err := Compile(`(?P<w>sh|bash)\s+x`, IgnoreCase)
+			if err != nil || !re.Search("BASH x") || !lazy.Search("sh  x") {
+				t.Error("並行に組んだ式の答えが違う")
+			}
+			if f, ok := lazy.Find("a bash x"); !ok || f.Text() != "bash x" {
+				t.Errorf("Find: %v %v", f, ok)
+			}
+		}()
+	}
+	wg.Wait()
+	_, first := Compile(`(`, 0)
+	_, again := Compile(`(`, 0)
+	if first == nil || again == nil || first.Error() != again.Error() {
+		t.Errorf("組めない式の苦情: %v / %v", first, again)
 	}
 }

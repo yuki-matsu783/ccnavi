@@ -6,7 +6,7 @@
  *
  * - リンクは辿らない。 ツリーのルートからファイルまでの途中（ファイルそのものを含む）に1つでも
  *   シンボリックリンクがあれば書かない。辿ると、承認済みの領域の外（エージェントが書ける場所）に書いたり、
- *   外のファイルをユーザの手順書として置いたりすることになる。足りないディレクトリも1段ずつ作り、作ったものが
+ *   外のファイルをユーザの手順書として置いたりすることになる。足りないディレクトリも1階層ずつ作り、作ったものが
  *   リンクでないことを確かめる
  * - 書き込みは入れ替え。 同じディレクトリに一時ファイルを`wx`（在れば失敗する。リンクも辿らない）で書き、
  *   `rename`で置き換える。`rename`は行き先がリンクでもリンクそのものを置き換え、指す先には書かない
@@ -48,7 +48,7 @@ function code(error: unknown): string {
   return (error as NodeJS.ErrnoException).code ?? "";
 }
 
-/** treeの下の相対の各段。treeの下でなければundefined */
+/** treeの下の相対の各階層。treeの下でなければundefined */
 function segments(tree: string, file: string): readonly string[] | undefined {
   if (tree === "" || !path.isAbsolute(tree) || !path.isAbsolute(file)) {
     return undefined;
@@ -62,7 +62,7 @@ function segments(tree: string, file: string): readonly string[] | undefined {
 
 /**
  * treeからfileまでの途中（file自身を含む）で最初に見つかったシンボリックリンクのパス。無ければundefined。
- * 無い段から先は見ない（まだ無いものはリンクではない）。fileがtreeの下に無ければfile自身を返す（書かない扱い）。
+ * 無い階層から先は見ない（まだ無いものはリンクではない）。fileがtreeの下に無ければfile自身を返す（書かない扱い）。
  */
 export function linkedSegment(tree: string, file: string): string | undefined {
   const parts = segments(tree, file);
@@ -88,7 +88,7 @@ export function linkedSegment(tree: string, file: string): string | undefined {
   return undefined;
 }
 
-/** 足りないディレクトリを1段ずつ作る。作った・在ったものがリンクかディレクトリでなければ止める */
+/** 足りないディレクトリを1階層ずつ作る。作った・在ったものがリンクかディレクトリでなければ止める */
 function makeDirs(tree: string, dir: string): string | undefined {
   const parts = segments(tree, dir);
   if (parts === undefined) {

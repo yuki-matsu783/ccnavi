@@ -11,9 +11,11 @@ sh を外から呼び、GitLab のスタブと実行ファイルのスタブで 
 1. `--preview` は実行ファイルの答えをそのまま返し、何も投稿しない
 2. `--choices … --digest …` は、受け入れの計画の操作 ID で issue とコメントを投稿し、答えに issue の
    URL を足す
-3. 投稿に失敗したら操作記録を残し、警告を答えに載せる（置いたことは戻さない）。計画に操作 ID が
-   無ければ、何も送らずに止める
-4. フェーズ番号の表記を揃える（`01` でも、実行ファイルが `1` で書いた下書きを拾う）
+3. 投稿に失敗したら操作記録を残し、警告を答えに載せる（置いたことは戻さない。
+   test_decide_ops が見る）。
+   計画に操作 ID が無ければ、何も送らずに止める
+4. フェーズ番号の表記を揃える（`01` でも、実行ファイルが `1` で書いた下書きを拾う。
+   通しの代表で見る）
 5. 引数の組み合わせの誤りは、実行ファイルを起こす前に断る。ccnavi-review.sh の decide の置く形と、
    ccnavi-user-decide.sh の --preview も断る
 6. 抜けるときの片付け（EXIT の trap）で rm が失敗しても、元の終了コードで抜ける（dash と bash）
@@ -38,7 +40,7 @@ import tempfile
 import threading
 import unittest
 
-from tests import ROOT, common_sh
+from tests import ROOT, common_sh, oprecord
 from tests.sh import decide_support
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -254,7 +256,8 @@ class ReviewDecideShTest(unittest.TestCase):
         GitLab.fetches = 0
         server = http.server.HTTPServer(("127.0.0.1", 0), GitLab)
         GitLab.port = server.server_address[1]
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        # shutdown は serve_forever の見回りの間隔だけ待つ（既定の 0.5 秒だと 1 件ごとに待つ）
+        threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         self.tree = os.path.join(self.ws, "tree")
@@ -336,7 +339,7 @@ class ReviewDecideShTest(unittest.TestCase):
             return f.read().splitlines()
 
     def calls(self) -> list[str]:
-        """置く・計画の段の呼び出し。事前の検査（`--check`）は `all_calls` にだけ入る。"""
+        """置く・計画の段階の呼び出し。事前の検査（`--check`）は `all_calls` にだけ入る。"""
         return [c for c in self.all_calls() if " --check " not in f" {c} "]
 
     def test_preview_passes_the_answer_through_and_posts_nothing(self):
@@ -347,7 +350,8 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(GitLab.posted, [])
 
     def test_choices_create_the_issue_and_post_the_decision(self):
-        done = self.decide("1", "--choices", '{"u1":"issue"}', "--digest", "d0")
+        """置く形の通しの代表。フェーズ番号は `01` で渡し、`1` に揃えて呼ぶ。"""
+        done = self.decide("01", "--choices", '{"u1":"issue"}', "--digest", "d0")
         self.assertEqual(done.returncode, 0, done.stderr)
         answer = json.loads(done.stdout.strip().splitlines()[-1])
         self.assertTrue(answer["ok"])
@@ -370,19 +374,19 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertTrue(reply["body"].startswith("<!-- ccnavi:accept -->"))
         self.assertTrue(resolve["path"].endswith("/merge_requests/1/discussions/d1"))
         self.assertIs(resolve["resolved"], True)
-        self.assertTrue(GitLab.posted[2][1]["title"].startswith("レビューで残った指摘"))
+        issue = GitLab.posted[2][1]
+        self.assertTrue(issue["title"].startswith("レビューで残った指摘"))
         note = GitLab.posted[3][1]["body"]
         self.assertTrue(note.startswith("<!-- ccnavi:decide -->"))
         self.assertIn("issue に回した分: #1", note)
+        # 投稿の末尾に操作記録の段階の目印を足す
+        self.assertRegex(issue["description"], r"<!-- ccnavi:op=[0-9a-f]{32} stage=issue -->\s*$")
+        self.assertRegex(note, r"<!-- ccnavi:op=[0-9a-f]{32} stage=note -->\s*$")
+        # 本文は保存した判断から作り直し、全文をフェンスで囲んでいる
+        self.assertIn("````text", issue["description"])
+        self.assertIn("指摘の本文", issue["description"])
         self.assertEqual(self.leftovers(), [])
-
-    def test_a_failed_comment_warns_and_keeps_the_record(self):
-        decide_support.STORE["reject"].add("note")
-        done = self.decide("1", "--choices", '{"u1":"issue"}', "--digest", "d0")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        answer = json.loads(done.stdout.strip().splitlines()[-1])
-        self.assertIn("引き継ぎ未完了", answer["warning"])
-        self.assertEqual(len(os.listdir(os.path.join(self.state, "ops"))), 1)
+        self.assertEqual(oprecord.ids(self.state), [], "すべて送れたら記録を消す")
 
     def test_a_plan_without_an_op_id_stops_and_sends_nothing(self):
         path = self.plan_file("d1", op="")
@@ -390,12 +394,6 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(stopped.returncode, 1, stopped.stderr)
         self.assertIn("操作 ID が無く", stopped.stderr)
         self.assertNotIn("--accept-done", " ".join(self.calls()))
-
-    def test_the_phase_number_is_normalized(self):
-        done = self.decide("01", "--choices", '{"u1":"keep"}', "--digest", "d0")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertIn("user reviewed 1 ", self.calls()[-1])
-        self.assertEqual([kind for kind, _ in GitLab.posted], ["reply", "resolve", "issue", "note"])
 
     def test_a_failed_reply_stops_before_anything_is_placed(self):
         GitLab.fail_reply = True
@@ -410,20 +408,12 @@ class ReviewDecideShTest(unittest.TestCase):
         self.assertEqual(GitLab.posted, [])
         self.assertEqual(self.leftovers(), [])
 
-    def test_a_failed_resolve_stops_before_anything_is_placed(self):
-        GitLab.fail_resolve = True
-        stopped = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0")
-        self.assertEqual(stopped.returncode, 1, stopped.stderr)
-        self.assertIn("解決できなかった", stopped.stderr)
-        self.assertEqual([kind for kind, _ in GitLab.posted], ["reply"])
-        self.assertTrue(all("--accept-plan" in call for call in self.calls()))
-        # 返信は書いたので、計画を残す
-        self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
-
     def plan_file(self, *ids: str, op: str | None = None) -> str:
         """実行ファイルが `--accept-plan` に書くのと同じ形の計画（go の host.WriteAcceptPlan）。
 
         形の書き手と読み手の往復は go test（host_test.go の TestAcceptPlanRoundTrip）が見る。
+        `--accept-plan` のスタブ（decide_support.BEGIN）も同じ形で書くので、通る形は
+        test_choices_create_the_issue_and_post_the_decision が見る。
         """
         path = os.path.join(self.work, "plan-in.json")
         if op is None:
@@ -449,7 +439,10 @@ class ReviewDecideShTest(unittest.TestCase):
         return path
 
     def test_all_replies_come_before_any_resolve_and_a_partial_failure_stops(self):
-        """全部に返信してから解決する。途中で解決に失敗したら、置かずに止まり、計画を残す。"""
+        """全部に返信してから解決する。途中で解決に失敗したら、置かずに止まり、計画を残す。
+
+        計画のファイルは、実行ファイルが `--accept-plan` に書く形（plan_file）で渡す。
+        """
         GitLab.discussions = {"d1": False, "d2": False}
         GitLab.fail_resolve_ids = {"d2"}
         stopped = self.decide(
@@ -463,39 +456,25 @@ class ReviewDecideShTest(unittest.TestCase):
         )
         self.assertEqual(stopped.returncode, 1, stopped.stderr)
         self.assertEqual([k for k, _ in GitLab.posted], ["reply", "reply", "resolve"])
+        self.assertIn("解決できなかった", stopped.stderr)
         self.assertIn("先に解決した分は残る", stopped.stderr)
-        self.assertNotIn("--accept-done", " ".join(self.calls()))
+        self.assertTrue(all("--accept-plan" in call for call in self.calls()))
         # ホストに書いたので、計画は残す（打ち直すと d1 は見せる指摘から外れる）
         self.assertIn("計画を残した", stopped.stderr)
         self.assertEqual(self.leftovers(), ["review-accept-i0001-1.json"])
 
     def test_nothing_is_written_when_the_plan_does_not_match_the_fetched_result(self):
-        """計画の id が結果に無い、または API の経路に使えない字なら、ホストに書かない。"""
-        for ident in ("abcdef", "d1/../x", "ZZ"):
-            with self.subTest(ident=ident):
-                GitLab.posted.clear()
-                stopped = self.decide(
-                    "1",
-                    "--choices",
-                    '{"u1":"keep"}',
-                    "--digest",
-                    "d0",
-                    STUB_PLAN=self.plan_file(ident),
-                )
-                self.assertEqual(stopped.returncode, 1, stopped.stderr)
-                self.assertEqual(GitLab.posted, [])
-                self.assertIn("ホストには何も書いていない", stopped.stderr)
+        """計画の id を実行ファイル（accept threads）が断れば、ホストに書かない。
 
-    def test_a_plan_in_the_executables_shape_is_read_by_the_sh(self):
-        done = self.decide(
-            "1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_PLAN=self.plan_file("d1")
+        断る id の種類（結果に無い・経路に使えない字・GitLab で 16 進でない）は Go の
+        host.TestAcceptCheck が見る。ここでは経路に使えない字の 1 つで、sh が止まることだけを見る。
+        """
+        stopped = self.decide(
+            "1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_PLAN=self.plan_file("d1/../x")
         )
-        self.assertEqual(done.returncode, 0, done.stderr)
-        reply = GitLab.posted[0][1]
-        self.assertTrue(reply["body"].startswith(MARKER_ACCEPT))
-        self.assertEqual(GitLab.discussions, {"d1": True})
-        # 置けて終わったら計画は消える
-        self.assertEqual(self.leftovers(), [])
+        self.assertEqual(stopped.returncode, 1, stopped.stderr)
+        self.assertEqual(GitLab.posted, [])
+        self.assertIn("ホストには何も書いていない", stopped.stderr)
 
     def test_a_failed_placement_after_the_host_was_written_keeps_the_plan(self):
         failed = self.decide("1", "--choices", '{"u1":"keep"}', "--digest", "d0", STUB_FAIL_YES="1")

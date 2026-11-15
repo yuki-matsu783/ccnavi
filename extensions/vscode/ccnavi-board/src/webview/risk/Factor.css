@@ -4,7 +4,7 @@
  */
 /* 1行 = 開閉、id、points、加点条件と値と理由 */
 .factor .row-head { grid-template-columns: 18px minmax(110px, 160px) 60px minmax(0, 1fr); }
-/* 狭いときは2段。1段目 = 開閉、id、points。2段目 = 加点条件と値と理由 */
+/* 狭いときは2行。1行目 = 開閉、id、points。2行目 = 加点条件と値と理由 */
 @media (max-width: 520px) {
   .factor .row-head { grid-template-columns: 18px minmax(0, 1fr) 60px; }
   .factor .sum > .clip { grid-row: 2; grid-column: 2 / -1; }

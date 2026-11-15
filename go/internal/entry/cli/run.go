@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -15,6 +14,7 @@ import (
 	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/model/hostreply"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
 )
@@ -33,12 +33,6 @@ func (in *input) terminal() bool {
 	f, ok := in.raw.(*os.File)
 	return ok && ospath.IsTerminal(f.Fd())
 }
-
-// actorMaxLength は `--actor` の長さの上限（字）。
-const actorMaxLength = 100
-
-// actorForm は `--actor` の形。拡張がホストから読むアカウント名の形（`github.ts` の NAME）と同じ。
-var actorForm = regexp.MustCompile(`\A[A-Za-z0-9_.-]{1,` + strconv.Itoa(actorMaxLength) + `}\z`)
 
 // Run は 1 回の起動を処理し、終了コードを返す。マーカーに書く経路（via）の既定はエージェントが sh から打つ
 // サブコマンド（cli）で、ユーザの判断の経路と hook は枝の中で差し替える。
@@ -140,6 +134,10 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		unmarked = entry
 	}
 	// 書き込みの記録を取る回（試験が使う）は、通常の経路を記録の枠で包む。--version は何も書かないので包まない。
+	if a.Str("record_commit") != "" {
+		// write-and-push のローカルの書き込み（合流・書く・コミット）を 1 回の起動で行う。
+		return wapWrite(in, stdout, stderr, parser, a, unmarked)
+	}
 	if a.Str("record_writes") != "" && !a.Truthy("version") {
 		return recordedRun(in, stdout, stderr, parser, a, unmarked)
 	}
@@ -161,9 +159,15 @@ func usageRefusal(parser *argparse.Parser, a opts) string {
 	if a.Str("record_tree") != "" && a.Str("record_writes") == "" {
 		return "--record-tree は --record-writes と一緒に指定してください。"
 	}
+	if a.Str("record_commit") != "" && a.Str("record_tree") == "" {
+		return "--record-commit は --record-writes と --record-tree と一緒に指定してください。"
+	}
+	if a.Str("record_merge") != "" && (a.Str("record_commit") == "" || !revisionOK(a.Str("record_merge"))) {
+		return "--record-merge は --record-commit と一緒に、子の先頭の sha を指定してください。"
+	}
 	actor := a.Str("actor")
-	if actor != "" && !actorForm.MatchString(actor) {
-		return "--actor にはホストのアカウント名（英数字と _ . - の 1〜" + strconv.Itoa(actorMaxLength) + " 字）を渡す"
+	if actor != "" && !hostreply.AccountForm.MatchString(actor) {
+		return "--actor にはホストのアカウント名（英数字と _ . - の 1〜" + strconv.Itoa(hostreply.AccountMaxLength) + " 字）を渡す"
 	}
 	if actor != "" && !a.head("review", "confirm") && !decideWrites(a) {
 		return "--actor は review confirm か、反映する形の decide（--reviewed <N> --accept-unresolved）と一緒に指定してください。"

@@ -99,7 +99,7 @@ func build(conf *config.Settings, root string, parent *ticket.Ticket, items []le
 	front.Put("predecessors", []any{})
 	review := &yaml.Map{}
 	review.Put("required", false)
-	review.Put("reason", "学びの統合は wiki への書き込みだけで、人の承認は提案の段で行う")
+	review.Put("reason", "学びの統合は wiki への書き込みだけで、人の承認は提案の段階で行う")
 	front.Put("human_review", review)
 	front.Put("title", "学びの統合")
 	front.Put("rationale", "親を閉じる前に、親の HEAD にある気づきを 1 件残らず判定し、手順の材料にするものを "+

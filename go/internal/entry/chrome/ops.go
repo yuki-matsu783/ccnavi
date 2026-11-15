@@ -195,8 +195,7 @@ func writeRefusal(s *snapshot, family string) string {
 	if c := compat(s); !c.same {
 		return c.message + "。表示のみとし、承認のボタンは表示しません"
 	}
-	folded := pyfmt.Casefold(family)
-	if slices.Contains(config.ReservedBranchIDs(), folded) || strings.HasPrefix(folded, "release-") || folded == pyfmt.Casefold(s.integration) {
+	if ids.Protected(family) || pyfmt.Casefold(family) == pyfmt.Casefold(s.integration) {
 		return family + " は予約された名前か統合先の名前のため、Chrome からは書き込めません"
 	}
 	return ""

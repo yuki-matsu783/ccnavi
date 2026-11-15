@@ -355,7 +355,7 @@ def quiet_deploy(args):
 
     配布は既定で走る。設定の話をするテストでそれを許すと、テストが「コードの
     こと」ではなく「走った機械に dist/ が組み立ててあるかどうか」を報告する。
-    配布そのものは DeploysWhatTheProjectNeeds が、偽の配布元を作って見る。
+    配布そのものは DeployTest を継ぐクラスが、偽の配布元を作って見る。
     """
     if any(a in ("--deploy", "--no-deploy") for a in args):
         return list(args)
@@ -576,7 +576,7 @@ class WritesTheExpectedShape(SetupTest):
     def test_the_unwatched_gate_is_written_as_enable(self):
         """確認できる者が居ないモードの切り替えの環境変数も、モードに合わせず enable で書く。
 
-        この環境変数も enable か disable しか取らない。止めずに報告する段は
+        この環境変数も enable か disable しか取らない。止めずに報告する段階は
         CCNAVI_MODE=dry-run が持つので、dry-run で導入したプロジェクトでも
         ここは enable のまま書く。切るプロジェクトは自分で 1 行書き換える。
         """
@@ -995,12 +995,10 @@ class WritesWithoutLeavingTraces(SetupTest):
         self.assertEqual(landed["env"]["KEEP"], "yes")
 
 
-class DeploysWhatTheProjectNeeds(SetupTest):
-    """`--deploy` が、設定だけでは動かないものを配布元から配る。
+class DeployTest(SetupTest):
+    """配布を試すクラスの共通の部品。テストを持たない。
 
-    `dist/` は .gitignore に入っていて git では渡らず、`CCNAVI_ENTRY_PATH` は相対で
-    しか書けない。よそで組んだ実行ファイルを指すこともできないので、対象
-    プロジェクトの中に実体を置く経路がこのスクリプトに要る。
+    テストを持つクラスを継ぐと、継いだクラスの数だけ同じテストが回る。部品はここに置く。
     """
 
     def make_source(
@@ -1138,6 +1136,23 @@ class DeploysWhatTheProjectNeeds(SetupTest):
 
     def deployed(self, *parts):
         return os.path.join(self.dir, *parts)
+
+    def write_gitignore(self, text):
+        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+
+    def read_raw(self):
+        with open(os.path.join(self.dir, ".gitignore"), encoding="utf-8", newline="") as f:
+            return f.read()
+
+
+class DeploysWhatTheProjectNeeds(DeployTest):
+    """`--deploy` が、設定だけでは動かないものを配布元から配る。
+
+    `dist/` は .gitignore に入っていて git では渡らず、`CCNAVI_ENTRY_PATH` は相対で
+    しか書けない。よそで組んだ実行ファイルを指すこともできないので、対象
+    プロジェクトの中に実体を置く経路がこのスクリプトに要る。
+    """
 
     def test_writes_the_settings_and_copies_the_parts_in_one_run(self):
         """1 回で、設定を書き、実行ファイル・ルール・代わりに通る sh を配る。"""
@@ -1329,6 +1344,27 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         )
         self.assertEqual(found, ["SKILL.md", "references/common/add.md"])
 
+    def assert_deploys_only_flagged(self, cases):
+        """cases（{ラベル: (SKILL.md の中身, 配るか)}）を 1 つの配布元に並べ、1 回で配って見る。
+
+        スキルごとに判定するので、1 回に並べても答えは変わらない。
+        """
+        probes = {label: f"probe-{i}" for i, label in enumerate(cases)}
+        src = self.make_source(
+            skills={
+                f"{probes[label]}/SKILL.md": text.encode("utf-8")
+                for label, (text, _) in cases.items()
+            }
+        )
+        result = self.run_setup("--mode", "enable", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for label, (_, expected) in cases.items():
+            with self.subTest(label=label):
+                self.assertIs(
+                    os.path.isfile(self.deployed(".claude", "skills", probes[label], "SKILL.md")),
+                    expected,
+                )
+
     def test_reads_the_distribute_flag_as_carefully_as_the_process_flag(self):
         cases = {
             "lf": ("---\nname: x\ndistribute: true\n---\n", True),
@@ -1340,17 +1376,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "false": ("---\ndistribute: false\n---\n", False),
             "in the body": ("---\nname: x\n---\ndistribute: true\n", False),
         }
-        for label, (text, expected) in cases.items():
-            with self.subTest(label=label):
-                src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
-                target = tempfile.mkdtemp(prefix="ccnavi-setup-")
-                self.addCleanup(shutil.rmtree, target, ignore_errors=True)
-                result = self.run_raw(target, "--mode", "enable", "--deploy", src)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIs(
-                    os.path.exists(os.path.join(target, ".claude", "skills", "probe", "SKILL.md")),
-                    expected,
-                )
+        self.assert_deploys_only_flagged(cases)
 
     def test_keeps_a_process_skill_the_project_already_has_unless_forced(self):
         src = self.make_source(skills=self.skill_files())
@@ -1385,97 +1411,7 @@ class DeploysWhatTheProjectNeeds(SetupTest):
             "commented out": ("---\n# process: true\n---\n", False),
             "in the body": ("---\nname: x\n---\nprocess: true\n", False),
         }
-        for label, (text, expected) in cases.items():
-            with self.subTest(label=label):
-                src = self.make_source(skills={"probe/SKILL.md": text.encode("utf-8")})
-                target = tempfile.mkdtemp(prefix="ccnavi-setup-")
-                self.addCleanup(shutil.rmtree, target, ignore_errors=True)
-                result = self.run_raw(target, "--mode", "enable", "--deploy", src)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIs(
-                    os.path.exists(os.path.join(target, ".claude", "skills", "probe", "SKILL.md")),
-                    expected,
-                )
-
-    def deploy_the_real_tree(self):
-        """本物の skills・docs・CCNAVI.md を配布元に置いて配り、配布先の根を返す。"""
-        src = self.make_source(docs=False)
-        shutil.rmtree(os.path.join(src, ".claude", "skills"), ignore_errors=True)
-        shutil.copytree(
-            os.path.join(ROOT, ".claude", "skills"), os.path.join(src, ".claude", "skills")
-        )
-        shutil.copytree(os.path.join(ROOT, *DOCS_PARTS), os.path.join(src, *DOCS_PARTS))
-        shutil.copy(os.path.join(ROOT, *CCNAVI_MD_PARTS), os.path.join(src, *CCNAVI_MD_PARTS))
-        result = self.run_setup("--mode", "enable", "--force", "--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        return self.dir
-
-    def test_the_real_ccnavi_config_skill_reaches_the_project(self):
-        root = self.deploy_the_real_tree()
-        base = os.path.join(root, ".claude", "skills", "ccnavi-config")
-        for rel in ("SKILL.md", "references/common/add.md", "references/common/check.md"):
-            self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
-        # 配布元固有のスキルは配らない。
-        for name in ("commit", "yomiyasu", "eli5", "ccnavi-install"):
-            self.assertFalse(os.path.exists(os.path.join(root, ".claude", "skills", name)), name)
-
-    def test_the_deployed_docs_point_only_at_what_the_project_has(self):
-        """配布先の文書が案内する `/<スキル名>` と `.claude/skills/...` が、配布先に実在する。"""
-        root = self.deploy_the_real_tree()
-        skills_dir = os.path.join(root, ".claude", "skills")
-        deployed_skills = set(os.listdir(skills_dir))
-        docs = [os.path.join(root, *CCNAVI_MD_PARTS)]
-        docs_dir = os.path.join(root, *DOCS_PARTS)
-        docs += [
-            os.path.join(docs_dir, n) for n in sorted(os.listdir(docs_dir)) if n.endswith(".md")
-        ]
-        # 配布元の .claude/skills にあるスキル名を、配布先にも無ければならない名前として拾う
-        # （組み込みのコマンド `/compact` などは、配布元にスキルが無いので拾わない）。
-        source_skills = set(os.listdir(os.path.join(ROOT, ".claude", "skills")))
-        problems = []
-        for path in docs:
-            with open(path, encoding="utf-8") as f:
-                text = f.read()
-            rel = os.path.relpath(path, root).replace(os.sep, "/")
-            for m in re.finditer(r"`/([a-z][a-z0-9-]*)(?:\s[^`]*)?`", text):
-                name = m.group(1)
-                if name in source_skills and name not in deployed_skills:
-                    problems.append(f"{rel}: /{name} は配布先に無い")
-            for m in re.finditer(r"\.claude/skills/[A-Za-z0-9._/\-]+", text):
-                ref = m.group(0).rstrip("./-")
-                if text[m.end() : m.end() + 1] == "*":
-                    continue  # glob（範囲の例）は場所の案内ではない
-                if not os.path.exists(os.path.join(root, *ref.split("/"))):
-                    problems.append(f"{rel}: {ref} は配布先に無い")
-        self.assertEqual(problems, [])
-
-    def test_the_deployed_skills_do_not_mention_what_only_the_source_has(self):
-        """配るスキルの本文が、配布元にしか無いパスや `uv run` を指さない。"""
-        root = self.deploy_the_real_tree()
-        forbidden = {
-            "uv run": r"\buv run\b",
-            "配布元の docs/": r"(?<![\w])(?:docs/\d\d_|\.agents/docs)",
-            "配布元の go/": r"(?<![\w/])go/(?:internal|cmd)/",
-            "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
-        }
-        problems = []
-        skills_dir = os.path.join(root, ".claude", "skills")
-        for d, _, files in os.walk(skills_dir):
-            for name in files:
-                path = os.path.join(d, name)
-                with open(path, encoding="utf-8") as f:
-                    text = f.read()
-                rel = os.path.relpath(path, root).replace(os.sep, "/")
-                for label, pattern in forbidden.items():
-                    if re.search(pattern, text):
-                        problems.append(f"{rel}: {label}")
-                # 同じスキルの中を指すリンクは、配布先で辿れる。
-                for m in re.finditer(r"\]\(((?:references/)[^)#]+)\)", text):
-                    if name == "SKILL.md" and not os.path.isfile(
-                        os.path.join(d, *m.group(1).split("/"))
-                    ):
-                        problems.append(f"{rel}: {m.group(1)} は配布先に無い")
-        self.assertEqual(problems, [])
+        self.assert_deploys_only_flagged(cases)
 
     def test_deploys_only_markdown_under_references_common(self):
         """ccnavi-index.jsonl や .DS_Store のような生成物は配らない
@@ -2257,7 +2193,101 @@ class DeploysWhatTheProjectNeeds(SetupTest):
         self.assertEqual(result.returncode, 2)
 
 
-class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
+class DeploysTheRealTree(DeployTest):
+    """本物の skills・docs・CCNAVI.md を配布元に置いて配った結果を読む。
+
+    どのテストも配った結果を読むだけなので、配るのはクラスで 1 回にする。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        once = cls("deploy_once")
+        once.setUp()
+        cls.addClassCleanup(once.doCleanups)
+        once.deploy_once()
+        cls.root = once.dir
+
+    def deploy_once(self):
+        src = self.make_source(docs=False)
+        shutil.rmtree(os.path.join(src, ".claude", "skills"), ignore_errors=True)
+        shutil.copytree(
+            os.path.join(ROOT, ".claude", "skills"), os.path.join(src, ".claude", "skills")
+        )
+        shutil.copytree(os.path.join(ROOT, *DOCS_PARTS), os.path.join(src, *DOCS_PARTS))
+        shutil.copy(os.path.join(ROOT, *CCNAVI_MD_PARTS), os.path.join(src, *CCNAVI_MD_PARTS))
+        result = self.run_setup("--mode", "enable", "--force", "--deploy", src)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_the_real_ccnavi_config_skill_reaches_the_project(self):
+        root = self.root
+        base = os.path.join(root, ".claude", "skills", "ccnavi-config")
+        for rel in ("SKILL.md", "references/common/add.md", "references/common/check.md"):
+            self.assertTrue(os.path.isfile(os.path.join(base, *rel.split("/"))), rel)
+        # 配布元固有のスキルは配らない。
+        for name in ("commit", "yomiyasu", "eli5", "ccnavi-install"):
+            self.assertFalse(os.path.exists(os.path.join(root, ".claude", "skills", name)), name)
+
+    def test_the_deployed_docs_point_only_at_what_the_project_has(self):
+        """配布先の文書が案内する `/<スキル名>` と `.claude/skills/...` が、配布先に実在する。"""
+        root = self.root
+        skills_dir = os.path.join(root, ".claude", "skills")
+        deployed_skills = set(os.listdir(skills_dir))
+        docs = [os.path.join(root, *CCNAVI_MD_PARTS)]
+        docs_dir = os.path.join(root, *DOCS_PARTS)
+        docs += [
+            os.path.join(docs_dir, n) for n in sorted(os.listdir(docs_dir)) if n.endswith(".md")
+        ]
+        # 配布元の .claude/skills にあるスキル名を、配布先にも無ければならない名前として拾う
+        # （組み込みのコマンド `/compact` などは、配布元にスキルが無いので拾わない）。
+        source_skills = set(os.listdir(os.path.join(ROOT, ".claude", "skills")))
+        problems = []
+        for path in docs:
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            for m in re.finditer(r"`/([a-z][a-z0-9-]*)(?:\s[^`]*)?`", text):
+                name = m.group(1)
+                if name in source_skills and name not in deployed_skills:
+                    problems.append(f"{rel}: /{name} は配布先に無い")
+            for m in re.finditer(r"\.claude/skills/[A-Za-z0-9._/\-]+", text):
+                ref = m.group(0).rstrip("./-")
+                if text[m.end() : m.end() + 1] == "*":
+                    continue  # glob（範囲の例）は場所の案内ではない
+                if not os.path.exists(os.path.join(root, *ref.split("/"))):
+                    problems.append(f"{rel}: {ref} は配布先に無い")
+        self.assertEqual(problems, [])
+
+    def test_the_deployed_skills_do_not_mention_what_only_the_source_has(self):
+        """配るスキルの本文が、配布元にしか無いパスや `uv run` を指さない。"""
+        root = self.root
+        forbidden = {
+            "uv run": r"\buv run\b",
+            "配布元の docs/": r"(?<![\w])(?:docs/\d\d_|\.agents/docs)",
+            "配布元の go/": r"(?<![\w/])go/(?:internal|cmd)/",
+            "親ディレクトリをさかのぼる": r"\]\((?:\.\./)+",
+        }
+        problems = []
+        skills_dir = os.path.join(root, ".claude", "skills")
+        for d, _, files in os.walk(skills_dir):
+            for name in files:
+                path = os.path.join(d, name)
+                with open(path, encoding="utf-8") as f:
+                    text = f.read()
+                rel = os.path.relpath(path, root).replace(os.sep, "/")
+                for label, pattern in forbidden.items():
+                    if re.search(pattern, text):
+                        problems.append(f"{rel}: {label}")
+                # 同じスキルの中を指すリンクは、配布先で辿れる。
+                for m in re.finditer(r"\]\(((?:references/)[^)#]+)\)", text):
+                    if name == "SKILL.md" and not os.path.isfile(
+                        os.path.join(d, *m.group(1).split("/"))
+                    ):
+                        problems.append(f"{rel}: {m.group(1)} は配布先に無い")
+        self.assertEqual(problems, [])
+
+
+class ChecksWhereTheExecutableRuns(DeployTest):
     """実行ファイルを、組み立てた機械の置き場（`<os>-<arch>/`）に入れる。
 
     実行ファイルは組み立てた向きの OS と CPU でしか動かない。機械ごとに
@@ -2333,21 +2363,13 @@ class ChecksWhereTheExecutableRuns(DeploysWhatTheProjectNeeds):
                 self.assertFalse(os.path.exists(self.deployed("escape")))
 
 
-class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
+class KeepsTheExecutableOutOfGit(DeployTest):
     """配った実行ファイルなどを .gitignore に足す。足す行は目印の行で囲んだ 1 つの領域に入る。
 
     配布先は git で持ち回るのが普通なので、書かないと次のコミットで実行ファイルと
     実行ファイルがまるごと履歴に入る。入ってしまうと、消すには履歴を書き換えるしか
     ない。
     """
-
-    def write_gitignore(self, text):
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
-            f.write(text)
-
-    def read_raw(self):
-        with open(os.path.join(self.dir, ".gitignore"), encoding="utf-8", newline="") as f:
-            return f.read()
 
     def test_adds_only_the_place_of_the_build(self):
         """実行ファイルの行は /.ccnavi/bin/<built>/ の 1 行だけ（S5）。
@@ -2604,16 +2626,8 @@ class KeepsTheExecutableOutOfGit(DeploysWhatTheProjectNeeds):
         self.assertIn(WORKTREES_LINE, section(result.stdout, ".gitignore に足す"))
 
 
-class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
+class KeepsTheRegionTidy(DeployTest):
     """領域の壊れ方と、同等の綴り・否定の行の扱い。"""
-
-    def write_gitignore(self, text):
-        with open(os.path.join(self.dir, ".gitignore"), "w", encoding="utf-8", newline="") as f:
-            f.write(text)
-
-    def read_raw(self):
-        with open(os.path.join(self.dir, ".gitignore"), encoding="utf-8", newline="") as f:
-            return f.read()
 
     def settle(self, text):
         """配布を済ませたあと、.gitignore の中身を text に置き換える。"""
@@ -2818,7 +2832,7 @@ class KeepsTheRegionTidy(DeploysWhatTheProjectNeeds):
         self.assertIsNone(self.gitignore())
 
 
-class LeavesAPathItDidNotWrite(DeploysWhatTheProjectNeeds):
+class LeavesAPathItDidNotWrite(DeployTest):
     """既定でない CCNAVI_ENTRY_PATH（ユーザが決めたパス）は書き換えず、名指しする。"""
 
     def test_leaves_a_path_it_did_not_write_and_names_it(self):
@@ -2933,7 +2947,6 @@ class WritesTheVscodeSettings(SetupTest):
         self.assertFalse(os.path.exists(self.vscode_path()), "--check は書かない")
 
 
-
 # 入れ終わりに見せる `--lint` の見出しと、起こさないときの 1 行。
 LINT_HEADING = f"sh {BIN_PATH} --lint の結果:"
 LINT_LATER = f"案内: 導入したあとに、ワークスペースルートで sh {BIN_PATH} --lint を実行して"
@@ -2947,12 +2960,14 @@ class ShowsTheLintAtTheEnd(SetupTest):
     """
 
     # 配布元の作り方だけを借りる（継ぐと配布のテストがもう一度走る）。
-    make_source = DeploysWhatTheProjectNeeds.make_source
+    make_source = DeployTest.make_source
 
     def source_with_exe(self, body):
         """配る実行ファイルを、body の sh にした配布元。"""
         src = self.make_source()
-        with open(os.path.join(src, "dist", "ccnavi", "ccnavi"), "w", encoding="utf-8", newline="\n") as f:
+        with open(
+            os.path.join(src, "dist", "ccnavi", "ccnavi"), "w", encoding="utf-8", newline="\n"
+        ) as f:
             f.write(body)
         return src
 

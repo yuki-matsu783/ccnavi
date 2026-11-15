@@ -118,7 +118,7 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子
 | 1 | `git add` / `commit` / push が失敗したツリーが 1 つ以上ある。巻き戻さないので、もう一度打てば送れる |
 | 2 | 引数の誤り、ワークスペースルートが見つからない |
 
-`ccnavi-user-agree.sh` は承認が通れば、承認の push の段が 1 で終わっても 0 を返す（未送信のパスは文面で言う）。
+`ccnavi-user-agree.sh` は承認が通れば、承認の push の段階が 1 で終わっても 0 を返す（未送信のパスは文面で言う）。
 
 消えた親ブランチを作り直す push は拒否される。迂回は、ユーザがターミナルで `git push origin <B>` を一度打つこと。詳しくは [複数人・別 PC・別セッションで進める](multi-pc.md)。
 

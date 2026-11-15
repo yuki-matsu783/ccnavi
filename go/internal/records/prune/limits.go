@@ -53,7 +53,7 @@ func (l limit) read() (float64, string) {
 		return l.fallback, fmt.Sprintf("%s=%s は 0 以上の数ではないので既定の %s で動く", l.env, pyfmt.Repr(raw), g(l.fallback))
 	}
 	if value > 0 && value < l.floor {
-		return l.fallback, fmt.Sprintf("%s=%s は下限の %s より小さいので既定の %s で動く（0 はその段を止める）",
+		return l.fallback, fmt.Sprintf("%s=%s は下限の %s より小さいので既定の %s で動く（0 はその段階を止める）",
 			l.env, pyfmt.Repr(raw), g(l.floor), g(l.fallback))
 	}
 	return value, ""

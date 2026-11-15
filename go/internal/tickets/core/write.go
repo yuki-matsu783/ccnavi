@@ -17,7 +17,7 @@ import (
 //   - FailLine: 行を出し、同じ組の残り（続く書き込みと行）を飛ばす。
 //   - FailQuiet: 何も出さずに続ける。
 //
-// 並べる段で止まっていれば（Stopped）、並べた分を書いてから、同じ形で言って止める。
+// 並べる段階で止まっていれば（Stopped）、並べた分を書いてから、同じ形で言って止める。
 // Call には、同じ組で書けた Tag を渡す。マーカーを消した行は、実際に消せた種類で書く。
 func write(stdout, stderr io.Writer, planned *agree.Planned) agree.Applied {
 	placed := []string{}

@@ -19,12 +19,15 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `PARSE_UNCERTAIN` | コマンドを読み切れず生の文字列に適用し、どこにもヒットしなかった |
 | `DENY_SHELL_WORKSPACE_ROOT` | Bash の書き込み先（`>`・`tee`・`sed -i`・`rm`・`mv`・`cp` など）を、`cd` で移った先をたどって絶対パスに解くと、ルールファイルの `workspace-root` にヒットした。ワークスペースルート直下には書かず、`wip/handoff/`・`scratchpad/`・ワークツリーの中に書くよう案内して止める。ガード自身の保護など、ほかの `deny` にヒットした呼び出しはその文面で止まる。変数・置換・`~`・`{}` で組んだ書き込み先と、インタプリタに渡したコードの中は見ず、実行後チェックが戻す |
 | `DENY_REDIRECT_LIMIT` | 生の文字列（読み切れなかった Bash と PowerShell）に `>` が 50 個を超えて含まれ、シェルから書き込む形の保護を適用せずに止めた。権限モードに依らず止め、確認には回さない。Write / Edit で書くかコマンドを分ける案内を付けて返す。ほかのルールの `deny` と `ask` には適用し、`deny` にヒットすればそのルールの `deny` のまま。`allow` には適用しない。上限を掛けるのは、外す保護（ガード自身の設定とチケットの置き場を守る組み込み）がそのツールにヒットするときだけ |
+| `DENY_WRITE_TARGET_UNREAD` | 書き込みのツールなのに、書き込み先の欄（Write・Edit は `file_path`、NotebookEdit は `notebook_path`）が読めない。保護の対象か決められないので、ルールより先に止める |
+| `DENY_COMMAND_TOO_LONG` | シェルのコマンド（中で実行されるコマンドを含め、いちばん長いもの）が 4,000 文字を超えた。ルールの照合が hook の期限に収まらないおそれがあるので、照合せずに止める。ヒアドキュメントの本文とコメントは数えない |
 | `DENY_BRACE_EXPANSION` | 引用の外にブレース展開を書いた。ルールより先に止める（6.3） |
 | `DENY_COMMAND_NAME_EXPANSION` | コマンド名の位置に変数・置換・グロブを書いた。ルールより先に止める（6.3） |
 | `DENY_BACKQUOTE` | 実行されるバッククォートを書いた。ルールより先に止める（6.3） |
 | `DENY_AMBIGUOUS_FORM` | シェルによって読みが分かれる形（`$( )` の中の `case` など）か `coproc`・`select` を書いた。ルールより先に止める（6.3） |
 | `DENY_TICKET_SCOPE` / `TICKET_ASK` | チケットの範囲の外 / 範囲の `ask` |
 | `DENY_TICKET_BLOCKED` | 承認済みチケット自体が信頼できない。範囲を適用する前に止める（親が引けない、番号が親の計画に無い、`project:` が置き場と違う、など。9.4） |
+| `DENY_TICKET_PARENT` | 親のワークツリーに、下書きと提案の置き場（`wip/proposals/`・`wip/handoff/`）以外を書こうとした。親の範囲を広げても通らず、子のワークツリーで作業するよう案内する。親かどうかは、索引とワークツリー自身のチケットのどちらかが親と言えば親とする |
 | `DENY_TICKET_PROJECT_MISMATCH` | 行き先のプロジェクトと承認済みチケットの `project:` が違う |
 | `DENY_TICKET_FLOW_LOCKED` | 着手中の子のフロー（承認済みの領域の `flows/<子>.yml`。ハードリンクの別名も）に書こうとした。ルールより先に止める（9.3.1） |
 | `NOTICE_TICKET_FLOW_CHANGED` | 着手中の子のフローが、着手のときに記録したハッシュから変わっている。`SubagentStart` / `SubagentStop` が知らせるだけで、止めない（9.3.1） |
@@ -54,7 +57,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `CORE_CONFIRM_NO_PARENT` / `CORE_CONFIRM_NO_PHASE` / `CORE_CONFIRM_ALREADY_REVIEWED` / `CORE_CONFIRM_NOT_REQUESTED` | レビュー済み（`review confirm` と Chrome の「レビュー済み」）が通らなかった。親の承認済みチケットが作業中に無い / そのフェーズの子が無い / もうレビュー済み / 依頼の記録が無い |
 | `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_UNSHARED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 手で `done/` へ動かした子の移動が未コミットか未 push（指摘が無くても確定しない）/ 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
 | `CORE_DECIDE_NO_DIGEST` / `CORE_DECIDE_MISMATCH` / `CORE_DECIDE_CHOICES` / `CORE_DECIDE_THREAD_ID` / `CORE_DECIDE_FOLLOWUP` / `CORE_DECIDE_STOPPED` | Chrome 拡張の decide（入口の `decide`）が通らなかった。親・フェーズ・依頼の記録・変更要求などは `CORE_CONFIRM_*` と同じコードで返す。見せた指摘のダイジェストが無い・読めない / 見せた指摘と今の指摘が違う（`mismatch` に内訳。何も積まない）/ 選択か受け入れ済みのキーが見せた指摘と合わない / 返信と解決をするスレッドの id が無い / 続きの子を起こせない / 書くものを並べる途中で止まった。通らなければ書くものもホストへの書き込みの計画も返さない |
-| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認と同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`core.approve.refusal_code` で 1 か所で決める） |
+| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認と同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`tickets/core` の `verdict.refusal` で 1 か所で決める） |
 | `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書で付けないとされている md（`README.md`・`CLAUDE.md`・`CHANGELOG.md` と、`.ccnavi/docs/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/handoff/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 | `NOTICE_PROPOSAL_PARENT_KEY` / `NOTICE_PROPOSAL_PARENT_FIELDS` | `PostToolUse`。Write で新しく作った提案（`wip/proposals/todo/` の直下の md）の書式の誤り。識別子が子の形でないのに `parent:` がある（`parent:` と `phase:` を消すよう言う）/ `parent:` の無い親に `mr:`・`plan:`・`phases:` が欠けている（欠けた欄を名指しし、`ccnavi ticket new` の雛形を勧める）。止めずに `additionalContext` で案内する。Edit・上書きでは出さない。案内しても記録の `code` には残らない |
 | `NOTICE_DIRECT_COMMIT` | `PostToolUse`。メインのエージェントが直接作業のワークツリーで `ccnavi-git.sh commit` を成功させた、またはメインの Agent ツールが返ったとき（サブエージェントのコミットを拾う）に、直接作業のワークツリーの HEAD が動いていた。止めずに `additionalContext` で、レビュー手順の次の一手を、ワークツリーごとにセッションで 1 度だけ言う（6.6） |
@@ -89,6 +92,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `builtin:guard-raw-git` | 生の `git`。補助（チケット制御が有効なら `dry-run` でも止める） |
 | `builtin:ticket-scope` | `DENY_TICKET_SCOPE` / `TICKET_ASK`、実行後チェックと `SubagentStop` の `POST_TICKET_SCOPE` |
 | `builtin:ticket-blocked` | `DENY_TICKET_BLOCKED` |
+| `builtin:ticket-parent` | `DENY_TICKET_PARENT` |
 | `builtin:ticket-project` | `DENY_TICKET_PROJECT_MISMATCH` |
 | `builtin:ticket-flow-lock` | `DENY_TICKET_FLOW_LOCKED` |
 | `builtin:phase-review` | `DENY_PHASE_REVIEW` |
@@ -97,6 +101,8 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `builtin:ask-context` | `DENY_ASK_NEEDS_CONTEXT`（`hook/askcontext`） |
 | `builtin:turn-gate:<宣言 id>` | `DENY_NEEDS_USER_TURN`。宣言ごとに名前を分ける（組み込みは `integrate-user-turn`・`review-confirm-user-turn`。6.7） |
 | `builtin:redirect-limit` | `DENY_REDIRECT_LIMIT` |
+| `builtin:write-target-unread` | `DENY_WRITE_TARGET_UNREAD` |
+| `builtin:command-length` | `DENY_COMMAND_TOO_LONG` |
 | `<ルールファイルのパス>:workspace-root` | `DENY_SHELL_WORKSPACE_ROOT`（Bash の書き込み先にヒットしたとき。Write / Edit にヒットしたときは `DENY_PATH`） |
 
 ## 付録 B. 記録の 1 行
@@ -158,7 +164,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | 期限の数値（残り − 0.5 秒・0.2 秒以下は起動しない・SessionStart の 2 秒）で足りるか | Linux では足りる（ワークツリー 8 本・記録 1 件で、Stop も SessionStart も 1 回 0.3 秒未満）。Windows の Git Bash は未測定で、測ってから見直す |
 | `/clear` の後の `SessionStart` の `session_id` と `source` | 未実測（ユーザの操作が要る）。`compact` は上の行のとおり |
 | `${CLAUDE_PROJECT_DIR}` は `env` で展開されるか | hook の `command` では展開されるが `env` では展開されない |
-| `env` は再読み込みされるか | されない。セッションを開き直すまで古い値が残る。hook の `command` は即座に反映される |
+| `env` は再読み込みされるか | されない。セッションを開き直すまで前の値が残る。hook の `command` は即座に反映される |
 | Bash ツールの環境に `CLAUDE_PROJECT_DIR` は来るか | 来ない。hook の環境にだけ来る |
 | `.claude/settings.json` に独自のトップレベルキーを足せるか | スキーマ検証に弾かれる |
 | Windows は実行中の実行ファイルを上書きできるか | できない。名前の変更はできる |
@@ -173,7 +179,7 @@ URL の `user:<値>@`、mysql の `-p<値>`、sshpass・docker login の `-p`、
 | `isolation: worktree` で起動したサブエージェントの hook が受け取る `cwd` | 隔離したワークツリーのパス（実測）。親の `PreToolUse`（`Agent`）の `cwd` はリポジトリのルートで、`SubagentStart` とサブエージェント内の `PreToolUse`（`Bash`・`Read`）の `cwd` は `<ルート>/.claude/worktrees/agent-<id>`。`agent_id`・`agent_type` も付く。`isolation` は値にも cwd にもよらず起動の PreToolUse で止める（`DENY_AGENT_ISOLATION`）ので、この実測は止める判定に影響しない |
 
 `shlex` は引用・`#`・改行・行継続・`<<` の扱いがシェルと違う。`infra/shell` は先に原文を走査してから、語の分割だけを
-shlex と同じ規則で行う。走査か語の分割のどちらかに手を入れたら `tests/core/test_shellread.py` の `SHELL_CASES`（bash 3.2 と zsh で実測）を回す。
+shlex と同じ規則で行う。走査か語の分割のどちらかに手を入れたら `go/internal/infra/shell/read_test.go` の `TestShellRunsOnlyWhatShellRuns`（bash 3.2 と zsh で実測）を回す。
 引用された `<<` で縮退する形は、許容する誤検知（6.3、12.2）。
 
 ### 探すツールと `.gitignore`（ripgrep の既定の挙動）
@@ -228,7 +234,7 @@ GitLab の実物で分かったこと。
 | 分かったこと | どうしたか |
 |---|---|
 | 変更要求（`POST .../request_changes`）は EE 限定 | 適用されない。CE の `reviewers` の `state` は `unreviewed` / `reviewed` / `approved` だけ |
-| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を除いて伏せる。実行ファイルの `remote_kind` も読み飛ばす |
+| URL にトークンを埋めた origin はそのままでは `origin` の出力に出る | sh はユーザの情報を除いて伏せる。実行ファイル（`tickets/model/host`）もユーザの情報を読み飛ばしてホストを読み、苦情の文では伏せる |
 | ラッパースクリプト経由の push は `GIT_CONFIG_COUNT` を引き継がないので、環境変数で credential helper を差し替えても反映されない | 認証は git の設定側に置く。ただし gh / glab で認証済みなら、ccnavi が `ccnavi_git_auth` でその helper を足す（利用者の環境変数での差し替えは効かない）。probe はリポジトリの `credential.helper` を空にしてから足す |
 | トークンは `docker exec -i gitlab gitlab-rails runner -` に Ruby を流して作れる（`tests/manual/gitlab/make_gitlab_tokens.rb`） | root と reviewer の 2 人分を作る |
 | 起動直後は API の `PUT` が 30 秒を超えることがある | probe は 120 秒で 3 回まで待つ |

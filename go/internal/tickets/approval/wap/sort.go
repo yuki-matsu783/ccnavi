@@ -35,7 +35,8 @@ const (
 
 var (
 	// temp は書きかけの一時ファイル（fsio の `.<名前>.<一意>.part.*`、フローの保存の `flows/.*.tmp`、
-	// configsync の `*.ccnavi-sync`）。末尾に改行が 1 つ付いていても当たる
+	// configsync の `*.ccnavi-sync`）。sh の ccnavi_drop_temp（ccnavi-common-write-and-push.sh）が写しを持ち、一致は
+	// tests/fixtures/approved-carry.json で確かめる。末尾に改行が 1 つ付いていても当たる
 	// （`$` と同じ扱い）ので `\n?\z` にする。
 	temp = regexp.MustCompile(`(?:(?:\A|/)\.[^/]*\.part(?:\.[^/]*)?|(?:\A|/)flows/\.[^/]*\.tmp|\.ccnavi-sync)\n?\z`)
 	// number はマーカーのフェーズ番号（ASCII の数字だけ。全角の数字は通さない）。
@@ -84,6 +85,27 @@ func Sort(stdout, stderr io.Writer, conf *config.Settings, root, parent, since s
 	return config.ExitOK
 }
 
+// Kept は親のワークツリーの未コミットの record-risk の記録（Sort の keep。その子の finish がコミットする）。
+// write-and-push が書いたものを戻すとき、この実行の前から未コミットだったこれらには触らない。
+func Kept(conf *config.Settings, treeRoot string) []string {
+	where, relative := relativePlaces(conf)
+	if !relative {
+		return nil
+	}
+	changed, why := changedPaths(treeRoot, where, "")
+	if why != "" {
+		return nil
+	}
+	var out []string
+	for _, rel := range changed {
+		inside, ok := strings.CutPrefix(rel, where.approved+"/")
+		if ok && !temp.MatchString(rel) && judgeRecord(strings.Split(inside, "/")) {
+			out = append(out, rel)
+		}
+	}
+	return out
+}
+
 // changedPaths は置き場の変更のパス（ツリーからの相対、"/" 区切り、名前の順）。
 func changedPaths(treeRoot string, where places, since string) ([]string, string) {
 	specs := []string{literalSpec(where.approved), literalSpec(where.review)}
@@ -104,11 +126,7 @@ func changedPaths(treeRoot string, where places, since string) ([]string, string
 		if !done.OK() {
 			return nil, "git の状態を読めない（" + failureText(done) + "）"
 		}
-		for _, entry := range strings.Split(done.Out, "\x00") {
-			if r := []rune(entry); len(r) > 3 {
-				out = append(out, string(r[3:]))
-			}
-		}
+		out = append(out, git.PorcelainPaths(done.Out)...)
 	}
 	sort.Strings(out)
 	return out, ""

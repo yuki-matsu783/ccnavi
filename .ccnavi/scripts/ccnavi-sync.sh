@@ -37,34 +37,38 @@
 #     push のゲートと同じ述語）が無ければ、一度も送っていない親子のチケットで今のまま。
 #     送った形跡があれば、ccnavi-review.sh merged <番号> に聞く。閉じたかの根拠は MR がマージ済みかだけ。答えが得られなければ止める。
 #     マージされていないと分かったときは、診断（戻し方）を言って止める
-#   - マージ済みと分かったら、手元を片付ける（実行ファイルの `sync tidy`。条件の確認も削除も実行ファイルが行う）。
+#   - マージ済みと分かったら、手元を片付ける（`sync tidy` と同じ片付け。条件の確認も削除も実行ファイルが行う）。
 #     親のワークツリー（未コミットの変更があれば残す。git が無視しているファイルは scratchpad/worktrees/<名前>/ へ退避する）と、親の手元のブランチ
 #     （手元の先頭が MR の先頭に含まれ、未 push のコミットが無いときだけ）を消し、残ったものは理由と手で消す
 #     コマンドを 1 行ずつ言う。何も残らなければ ready の後の片付けの記録（retire/<P>.json）も実行ファイルが消す。
 #     MR の先頭の sha はホストが答えた（ccnavi-review.sh merged <番号> の <sha>）。MR の番号は親チケットの
 #     mr 欄から引く。番号が無ければ、閉じたか判断できないと 1 行言う
-#   - 親のワークツリーを片付けた後（ready の後）の親子のチケットは、実行ファイルの `sync retired`
-#     （retire/<P>.json の一覧）から引く。同じく MR がマージ済みかを聞き、マージ済みなら同じ片付けをする。
+#   - 親のワークツリーを片付けた後（ready の後）の親子のチケットは、片付けの記録
+#     （retire/<P>.json）から引く。同じく MR がマージ済みかを聞き、マージ済みなら同じ片付けをする。
 #     ブランチ名はホストが答えた MR の元ブランチを使う。マージされていなければ片付けない。
 #     確かめられなければ推定せずに止める。<P> を渡したときも同じ
 #
-# 統合先を取ってきた後、親のブランチがリモートにある親子のチケットごとに、実行ファイルの
-# `ccnavi sync check <P> <リポジトリ>` で判定し直す（どのチケットを正とするかの検査と、承認済みチケットの
-# 判定し直し）。`error ...` の行があれば表示して終了コード 1 にする（状態は書かない）。`warn ...` の行は表示だけ。
-# 直してから同じ P でこの sh を打ち直すと、検査し直す。実行ファイルが検査を実行できなかった
-# （失敗した。答えの頭に `check 1` が無い）ときは、警告だけ出す（検査の error とは分ける）。
+# 統合先を取ってきた後、親のブランチがリモートにある親子のチケットごとに判定し直す（どのチケットを正とするかの
+# 検査と、承認済みチケットの判定し直し）。error があれば言って終了コード 1 にする（状態は書かない）。warn は表示だけ。
+# 直してから同じ P でこの sh を打ち直すと、検査し直す。
 #
-# 実行ファイルはネットワークに出ない。ここが git で取ってくる。
-# 置き場のパスは実行ファイル（`ccnavi sync paths`）に、チケットの YAML が要る
-# 親の状態（親のワークツリーか・承認済みか・依頼のマーカーがあるか・退避にあるか・mr 欄）は
-# `ccnavi tree parent` に聞く（sh はチケットを読まない）。
-# 実行ファイルが無ければ、ほかの sh と同じく既定のパス（固定）を使う。在るのに
-# 答えなかったときは、置き場を取り違えないよう止める。
+# 分担: 判定（親子のチケットの選び方・統合先の決め方・リモートにあるか・閉じたか）、ローカルの git の書き込み
+# （早送り・merge と取りやめ・origin/HEAD の向け直し・片付け）、出力の文は実行ファイル（`ccnavi sync <段取り>`。
+# go/internal/entry/catchup）が持つ。この sh に残すのは外との出入り（ls-remote・fetch・ccnavi-review.sh merged）と、
+# ロック・trap（プロセスの寿命）と、それらを並べる段取りだけ。実行ファイルが答えの out の行を出せと言い、failed で
+# 止めたものに数えさせ（終了コードは、答えを並べたファイルから実行ファイルの sync end が決める）、next の語
+# （fetch・ask・skip・go）で次の外との出入りを決める。merge の取りやめは実行ファイルの
+# 1 回の起動の中で済み（信号を受けたときも）、trap は子を待ってロックを外すだけ。実行ファイルが無い・答えないときは、
+# 組むか置くかを言って止める。
 #
 # 環境変数: CCNAVI_LOCK_WAIT（ロックを待つ秒、既定 120）/
 #   CCNAVI_SYNC_TIMEOUT（ls-remote・fetch 1 回のタイムアウト監視の秒、既定 60）
 # 終了コード: 0 全部取り込んだ（取り込むものが無いを含む） / 1 止めた親子のチケットかリポジトリがある /
-#           2 引数か環境の誤り
+#           2 引数か環境の誤り（実行ファイルが無い・答えないを含む） /
+#           3 止めたもののうち、取り込み（早送りか merge）が書きかけと重なって止まったものがある（ほかの理由で
+#             止めたものがあっても 3。write-and-push はこれで「書きかけを先にコミットしてから取り込み直す」と言い分ける） /
+#           4 止めたのは、渡した <P> のワークツリーに親チケットも提案も無いものだけ（ワークツリーを切った直後。
+#             ccnavi-start.sh はこれで「取り込むものはまだ無い」と言い分ける）
 
 set -eu
 
@@ -102,13 +106,6 @@ case "${1:-}" in
 	;;
 esac
 
-for want in ${1+"$@"}; do
-	if ! ccnavi_is_ident "$want"; then
-		printf 'ccnavi-sync: %s は親の識別子の形ではありません（親のブランチ名ではなく識別子を渡します）。\n' "$want" >&2
-		exit 2
-	fi
-done
-
 root=$(ccnavi_workspace) || {
 	printf 'ccnavi-sync: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
@@ -119,32 +116,22 @@ here_sh="$(dirname "$0")"
 # 打った場所。手元の片付けが、自分の居るワークツリーを消さないために渡す。
 sync_cwd="$(pwd -W 2>/dev/null || pwd)"
 
-number_or() {
-	case "${1:-}" in
-	'' | *[!0-9]*) printf '%s\n' "$2" ;;
-	*) printf '%s\n' "$1" ;;
-	esac
-}
-lock_wait=$(number_or "${CCNAVI_LOCK_WAIT:-}" 120)
-timeout=$(number_or "${CCNAVI_SYNC_TIMEOUT:-}" 60)
+lock_wait=$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 120)
+timeout=$(ccnavi_number_or "${CCNAVI_SYNC_TIMEOUT:-}" 60)
 
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-sync) || {
 	printf 'ccnavi-sync: 一時ディレクトリが作れません。\n' >&2
 	exit 2
 }
-: >"$scratch/failed"
-tab=$(printf '\t')
+: >"$scratch/answers"
 
-# 後始末。この sh が始めた merge の途中（目印の変数 sync_merging）で切られたら取りやめ、ロックを外す。
+# 後始末（プロセスの寿命）。ロックを外し、一時ディレクトリを消す。merge の途中で切られたときの取りやめは、
+# merge を始めた実行ファイルが持つ（sh は子が終わるのを待ってからここに来る）。
 # dash は EXIT の trap を INT・TERM・HUP で走らせないので、そちらにも置く。2 度走っても害は無い。
-sync_merging=""
 cleaned=""
 cleanup() {
 	[ -z "$cleaned" ] || return 0
 	cleaned=yes
-	if [ -n "$sync_merging" ] && [ -e "$(git_path "$sync_merging" MERGE_HEAD)" ]; then
-		git -C "$sync_merging" merge --abort >/dev/null 2>&1 || :
-	fi
 	ccnavi_lock_drop
 	rm -rf "$scratch"
 }
@@ -153,766 +140,172 @@ trap 'cleanup; exit 130' INT TERM HUP
 
 log_info 受け付けた -- "args=$#"
 
-# `git rev-parse --git-path <名前>` をツリーからのパスにする（ワークツリーでは git ディレクトリが別）。
-git_path() {
-	gp_rel=$(git -C "$1" rev-parse --git-path "$2" 2>/dev/null || :)
-	case "$gp_rel" in
-	'') printf '%s\n' "$1/.git/$2" ;;
-	/* | [A-Za-z]:*) printf '%s\n' "$gp_rel" ;;
-	*) printf '%s\n' "$1/$gp_rel" ;;
-	esac
-}
-
-# ---- 置き場のパス。実行ファイルに聞く（設定ファイルは sh で読まない）。
-
-sync_info=""
-info_from=""
-if bin=$(ccnavi_bin "$root"); then
-	info_from="$bin"
-	sync_info=$("$bin" --root "$root" sync paths 2>"$scratch/info" </dev/null) || info_from="failed:$bin"
-fi
-# Windows の実行ファイルの CRLF の CR を除く（1 行 1 項目の値の末尾に CR を残さない）。
-sync_info=$(printf '%s\n' "$sync_info" | tr -d '\r')
-case "$info_from" in
-failed:*)
-	printf 'ccnavi-sync: 実行ファイル（%s）が置き場のパスを返さなかった（%s）。置き場を取り違えないよう止めた。\n' \
-		"${info_from#failed:}" "$(head -n 1 "$scratch/info" 2>/dev/null)" >&2
+if ! bin=$(ccnavi_bin "$root"); then
+	printf 'ccnavi-sync: 実行ファイルが見つからない。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' >&2
 	exit 2
-	;;
-esac
-info() {
-	printf '%s\n' "$sync_info" | sed -n "s/^$1 //p" | head -n 1
-}
+fi
 
-# 実行ファイルを起こす。`sync paths` を答えたのと同じもの。<引数>...
-run_ccnavi() {
-	"$info_from" --root "$root" "$@" </dev/null
-}
-
-# 親子のチケットの親のブランチ名。<P>
+# ---- 実行ファイルに聞く（段取り）
 #
-# 親のワークツリー（.claude/worktrees/<P>）の HEAD から読む（ccnavi_head_branch）。HEAD のブランチ名を
-# 変換（/ を - に置き換え）した識別子が <P> と一致するときだけ出す。ワークツリーが無い・ブランチの外なら 1、
-# 一致しない・使えない名前なら 2（呼ぶ側はその親子のチケットを取り込まずに止めたと言う）。
-family_branch() {
-	ccnavi_head_branch "$root/.claude/worktrees/$1" "$1"
-}
-projects=projects # 固定
-projects="${projects%/}"
-
-# ---- 統合先の名前
-
-# ls-remote の一覧に refs/heads/<名前> があるか。前方一致で取り違えないよう、2 列目を
-# grep -F -x で完全一致に比べる（i0131 と i0131-x）。<一覧> <名前>
-has_head() {
-	cut -f 2 "$1" | grep -F -x -q -- "refs/heads/$2"
+# ask_sync <段取り> <引数>...: 答えを $answer に入れる。頭の行（sync 1）が無ければ、置き場や判定を取り違えないよう止める。
+# 信号で切られた（130）なら、そのまま抜ける（trap が後始末する）。
+ask_sync() {
+	as_rc=0
+	"$bin" --root "$root" --cwd "$sync_cwd" sync "$@" </dev/null >"$scratch/answer-raw" 2>"$scratch/answer-err" || as_rc=$?
+	[ "$as_rc" -ne 130 ] || exit 130
+	# Windows の実行ファイルの CRLF の CR を除く（1 行 1 項目の値の末尾に CR を残さない）。
+	answer=$(tr -d '\r' <"$scratch/answer-raw")
+	if [ "$(printf '%s\n' "$answer" | head -n 1)" != "sync 1" ]; then
+		printf 'ccnavi-sync: 実行ファイル（%s）が sync %s の答えを返さなかった（%s）。止めた。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' \
+			"$bin" "$1" "$(head -n 1 "$scratch/answer-err" 2>/dev/null)" >&2
+		exit 2
+	fi
 }
 
-# ホストのデフォルトブランチ。`ls-remote --symref origin HEAD` が指すもの（一覧にあるもの）、
-# 読めなければ手元の origin/HEAD、無ければ一覧にある main・master。どれも無ければ 1。<リポジトリ> <一覧>
-default_branch() {
-	db_head=""
-	db_host=""
-	rm -f "$scratch/db-host"
-	if ccnavi_git_timed "$timeout" "$scratch/err-symref" "$1" ls-remote --symref origin HEAD >"$scratch/symref"; then
-		db_head=$(sed -n "s|^ref: refs/heads/\\(.*\\)${tab}HEAD\$|\\1|p" "$scratch/symref" | head -n 1)
-		[ -z "$db_head" ] || db_host=yes
-	fi
-	if [ -z "$db_head" ]; then
-		db_head=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
-		db_head="${db_head#origin/}"
-	fi
-	# 先頭が - の名前は、後ろの git の引数に渡るとオプションに読まれる。使わず、main・master に回す。
-	case "$db_head" in
-	-*)
-		db_head=""
-		db_host=""
-		;;
-	esac
-	# ホストの答えが手元の origin/HEAD と綴りの大文字小文字だけ違うなら、同じ名前として手元の綴りを使う。
-	# 別の綴りで取ると、大文字小文字を区別しない FS で origin/<名前> が衝突する。
-	if [ -n "$db_host" ]; then
-		db_local=$(git -C "$1" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
-		db_local="${db_local#origin/}"
-		db_local_f=$(printf '%s' "$db_local" | tr '[:upper:]' '[:lower:]')
-		db_head_f=$(printf '%s' "$db_head" | tr '[:upper:]' '[:lower:]')
-		if [ -n "$db_local" ] && [ "$db_local_f" = "$db_head_f" ]; then
-			printf '%s\n' "$db_local"
-			return 0
-		fi
-	fi
-	if [ -n "$db_head" ] && has_head "$2" "$db_head"; then
-		# ホストに聞いて得た名前か。`$( )` の中で呼ぶので、変数ではなくファイルで呼び元へ渡す。
-		[ -z "$db_host" ] || : >"$scratch/db-host"
-		printf '%s\n' "$db_head"
-		return 0
-	fi
-	for db_try in main master; do
-		if has_head "$2" "$db_try"; then
-			printf '%s\n' "$db_try"
-			return 0
-		fi
-	done
-	return 1
+# 答えの out・err の行を出し、答えを終了コードの決め手（sync end）に渡すファイルへ足す。次の一手（next の語）を
+# $next に入れる。
+said() {
+	ccnavi_val out "$answer"
+	ccnavi_val err "$answer" >&2
+	printf '%s\n' "$answer" >>"$scratch/answers"
+	next=$(ccnavi_val1 next "$answer")
 }
+
+# ---- 外との出入り
 
 # fetch 1 本。単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る
 # （sh の中の git。ccnavi-git.sh の入口の refspec の拒否とは別の話）。
-# 失敗した理由（git の標準エラー）は $scratch/err に残る。<リポジトリ> <ブランチ>
+# 終了コードを $fetched に、失敗した理由（git の標準エラー）を $scratch/err に残す。<リポジトリ> <ブランチ>
 fetch_one() {
+	fetched=0
 	ccnavi_git_timed "$timeout" "$scratch/err" "$1" \
-		fetch --quiet --no-tags origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null
+		fetch --quiet --no-tags origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null || fetched=$?
 }
 
-fail_note() {
-	printf 'fail\n' >>"$scratch/failed"
-}
-
-# 途中の操作（merge・cherry-pick・revert・sequencer・rebase）の名前。無ければ空。<ツリー>
-busy_state() {
-	for bs_name in MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD sequencer rebase-merge rebase-apply; do
-		if [ -e "$(git_path "$1" "$bs_name")" ]; then
-			printf '%s\n' "$bs_name"
-			return 0
-		fi
-	done
-	return 0
-}
-
-# 親のブランチ名が決まらなかった親子のチケットの文面。<P> <family_branch の終了コード>
-branch_refused() {
-	if [ "$2" = 1 ]; then
-		printf '%s: 親のワークツリー（.claude/worktrees/%s）の HEAD からブランチ名を読めない（ブランチの外にいる）。取り込まずに止めた。ブランチ名の / を - に置き換えたものが %s になるブランチに戻してから再実行してください\n' "$1" "$1" "$1"
-	else
-		printf '%s: 親のワークツリー（.claude/worktrees/%s）の HEAD のブランチ（%s）の / を - に置き換えたものが %s と合わない。取り込まずに止めた。ブランチ名の / を - に置き換えたものが %s になるブランチに戻してから再実行してください\n' \
-			"$1" "$1" "$(git -C "$root/.claude/worktrees/$1" symbolic-ref --quiet --short HEAD 2>/dev/null || :)" "$1" "$1"
-	fi
-}
-
-# ---- 親子のチケットを集める。<P><タブ><ツリー><タブ><リポジトリの名前><タブ><親のブランチ名> を 1 行ずつ。
-
-: >"$scratch/families"
-: >"$scratch/repos"
-repo_dir_of() {
-	# <リポジトリの名前> → そのリポジトリのディレクトリ
-	if [ "$1" = self ]; then
-		printf '%s\n' "$root"
-	else
-		case "$projects" in
-		/* | [A-Za-z]:*) printf '%s/%s\n' "$projects" "$1" ;;
-		*) printf '%s/%s/%s\n' "$root" "$projects" "$1" ;;
-		esac
-	fi
-}
-has_family_line() {
-	awk -F "$tab" -v p="$1" '$1 == p { found = 1 } END { exit found ? 0 : 1 }' "$scratch/families"
-}
-repo_has_families() {
-	awk -F "$tab" -v k="$1" '$3 == k { found = 1 } END { exit found ? 0 : 1 }' "$scratch/families"
-}
-add_family() {
-	has_family_line "$1" && return 0
-	af_key=$(ccnavi_repo_key "$2" "$root")
-	printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$af_key" "$3" >>"$scratch/families"
-	grep -F -x -q -- "$af_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$af_key" >>"$scratch/repos"
-}
-
-# 親のワークツリーを片付けた後の親子のチケット（ready が書いた retire/<P>.json）。実行ファイルの
-# `sync retired` から引く。retired_all は全部、retired は今回の対象に選んだもの。
-# どちらも <P><タブ><リポジトリの名前><タブ><MR の番号><タブ><ブランチ>（空は -）。
-# retired_bad は列挙できなかったもの（<P> <理由>）。
-: >"$scratch/retired-all"
-: >"$scratch/retired"
-: >"$scratch/retired-bad"
-load_retired() {
-	[ -n "$info_from" ] || return 0
-	run_ccnavi sync retired >"$scratch/retired-raw" 2>/dev/null || :
-	tr -d '\r' <"$scratch/retired-raw" >"$scratch/retired-out"
-	if [ "$(head -n 1 "$scratch/retired-out")" != "retired 1" ]; then
-		ccnavi_text "$root" NOTE_SYNC_RETIRED_UNANSWERED
-		return 0
-	fi
-	awk 'BEGIN { OFS = "\t" } $1 == "retired" && NF >= 5 { print $2, $3, $4, $5 }' "$scratch/retired-out" >"$scratch/retired-all"
-	sed -n 's/^incomplete //p' "$scratch/retired-out" >"$scratch/retired-bad"
-}
-retired_loaded=""
-ensure_retired() {
-	[ -z "$retired_loaded" ] || return 0
-	retired_loaded=yes
-	load_retired
-}
-# <P> が片付けの記録を持つなら対象に選んで 0。
-add_retired() {
-	ensure_retired
-	ar_line=$(awk -F "$tab" -v p="$1" '$1 == p { print; exit }' "$scratch/retired-all")
-	[ -n "$ar_line" ] || return 1
-	if ! awk -F "$tab" -v p="$1" '$1 == p { found = 1 } END { exit found ? 0 : 1 }' "$scratch/retired"; then
-		printf '%s\n' "$ar_line" >>"$scratch/retired"
-		ar_key=$(printf '%s\n' "$ar_line" | cut -f 2)
-		grep -F -x -q -- "$ar_key" "$scratch/repos" 2>/dev/null || printf '%s\n' "$ar_key" >>"$scratch/repos"
-	fi
-	return 0
-}
-# <P> の片付けの記録が列挙できないものなら、1 行言って 0。
-say_retired_bad() {
-	ensure_retired
-	sb_line=$(awk -v p="$1" '$1 == p { print; exit }' "$scratch/retired-bad")
-	[ -n "$sb_line" ] || return 1
-	printf '%s: ready の後の片付けの記録（retire/%s.json）が利用できない（%s）。閉じたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、破棄した親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください\n' \
-		"$1" "$1" "${sb_line#"$1" }" "$here_sh" "$1"
-	return 0
-}
-
-if [ "$#" -gt 0 ]; then
-	for want in "$@"; do
-		has_family_line "$want" && continue
-		tree="$root/.claude/worktrees/$want"
-		if [ ! -e "$tree" ] && [ ! -L "$tree" ]; then
-			if add_retired "$want"; then
-				continue
-			fi
-			if say_retired_bad "$want"; then
-				continue
-			fi
-		fi
-		if [ ! -d "$tree" ] || [ -L "$tree" ]; then
-			printf '%s: 親のワークツリー（.claude/worktrees/%s）がありません。切り直してから再実行してください（sh %s/ccnavi-git.sh fetch origin <ブランチ> のあと worktree add .claude/worktrees/%s <ブランチ>。ブランチ名の / を - に置き換えたものが %s になる）\n' \
-				"$want" "$want" "$here_sh" "$want" "$want"
-			fail_note
-			continue
-		fi
-		fb_rc=0
-		want_branch=$(family_branch "$want") || fb_rc=$?
-		if [ "$fb_rc" -ne 0 ]; then
-			branch_refused "$want" "$fb_rc"
-			fail_note
-			continue
-		fi
-		pt_rc=0
-		ccnavi_parent_tree "$tree" "$want" || pt_rc=$?
-		case "$pt_rc" in
-		1)
-			printf '%s: .claude/worktrees/%s に親チケットも提案もありません。親のワークツリーではないので取り込まない\n' "$want" "$want"
-			fail_note
-			continue
-			;;
-		2)
-			printf '%s: .claude/worktrees/%s に親チケットか提案があるかを実行ファイルに確かめられなかった（実行ファイルが無い、またはチケットの frontmatter を読めない）。取り込まない\n' "$want" "$want"
-			fail_note
-			continue
-			;;
-		esac
-		add_family "$want" "$tree" "$want_branch"
-	done
-else
-	printf 'self\n' >"$scratch/repos"
-	case "$projects" in
-	/* | [A-Za-z]:*) project_root="$projects" ;;
-	*) project_root="$root/$projects" ;;
-	esac
-	for dir in "$project_root"/*; do
-		[ -e "$dir/.git" ] || continue
-		[ -L "$dir" ] && continue
-		printf '%s\n' "$(basename "$dir")" >>"$scratch/repos"
-	done
-	for tree in "$root/.claude/worktrees"/*; do
-		[ -d "$tree" ] || continue
-		[ -L "$tree" ] && continue
-		name=$(basename "$tree")
-		branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-		[ -n "$branch" ] && [ "$branch" != HEAD ] || continue
-		ccnavi_parent_tree "$tree" "$name" || continue
-		# HEAD のブランチ名を変換した識別子がフォルダ名と合うものだけ。
-		name_branch=$(family_branch "$name") || continue
-		[ "$branch" = "$name_branch" ] || continue
-		add_family "$name" "$tree" "$name_branch"
-	done
-	ensure_retired
-	while IFS="$tab" read -r ar_p ar_rest; do
-		[ -n "$ar_p" ] || continue
-		has_family_line "$ar_p" && continue
-		[ -e "$root/.claude/worktrees/$ar_p" ] || [ -L "$root/.claude/worktrees/$ar_p" ] && continue
-		add_retired "$ar_p" || :
-	done <"$scratch/retired-all"
-	while IFS= read -r bad_line; do
-		bad_p="${bad_line%% *}"
-		[ -n "$bad_p" ] || continue
-		[ -e "$root/.claude/worktrees/$bad_p" ] || [ -L "$root/.claude/worktrees/$bad_p" ] && continue
-		say_retired_bad "$bad_p" || :
-	done <"$scratch/retired-bad"
-fi
-
-# ---- 親子のチケット 1 つ。<P> <ツリー> <リポジトリの名前> <リポジトリ> <統合先> <一覧> <親のブランチ名>
-#
-# ロックは識別子 P、ref・fetch・ls-remote の一覧は親のブランチ名 B。
-
-sync_family() {
-	P="$1"
-	tree="$2"
-	key="$3"
-	repo="$4"
-	integ="$5"
-	heads="$6"
-	# 親のブランチ名は、呼び手が親のワークツリーの HEAD から読んだもの。
-	B="${7:-}"
-	if [ -z "$B" ]; then
-		printf '%s: 親のブランチ名を親のワークツリーの HEAD から読めなかった。取り込まない\n' "$P"
-		fail_note
-		return 0
-	fi
-
-	branch=$(git -C "$tree" rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-	if [ "$branch" != "$B" ]; then
-		printf '%s: 親のワークツリーが %s の上に居る。親のブランチ %s に戻してから再実行してください\n' "$P" "${branch:-（ブランチの外）}" "$B"
-		fail_note
-		return 0
-	fi
-	# set -e の下なので、戻り値は || で受ける（そのまま打つと、取れなかった時点で sh ごと抜ける）。
-	lock_rc=0
-	ccnavi_lock_take "$root" "$key" "$P" "$lock_wait" || lock_rc=$?
-	case "$lock_rc" in
-	0) ;;
-	2)
-		printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$P" "$state" "$key" "$P"
-		fail_note
-		return 0
-		;;
-	*)
-		printf '%s: 他の操作がロックを持っている（%s）。終わってから再実行してください\n' "$P" \
-			"$(ccnavi_lock_owner "$state/locks/$key/$P")"
-		fail_note
-		return 0
-		;;
-	esac
-
-	# 親チケットの mr 欄と、送った形跡（着手済み・依頼・退避）を実行ファイルに聞く。
-	ccnavi_parent_info "$tree" "$P" || :
-	fam_mr="$ccnavi_pi_mr"
-
-	busy=$(busy_state "$tree")
-	if [ -n "$busy" ]; then
-		printf '%s: 親のワークツリーに途中の操作（%s）がある。済ませるか取りやめてから再実行してください（この sh は変更しない）\n' "$P" "$busy"
-		fail_note
-	elif has_head "$heads" "$B"; then
-		sync_present
-		merged_present
-	else
-		sync_absent
-	fi
-	ccnavi_lock_drop
-	return 0
-}
-
-# P がリモートにある。取ってきて、早送りか merge。
-sync_present() {
-	if ! fetch_one "$tree" "$B"; then
-		printf '%s: 親のブランチ %s を取ってこられなかった（%s）\n' "$P" "$B" "$(head -n 1 "$scratch/err")"
-		fail_note
-		return 0
-	fi
-	remote_sha=$(git -C "$tree" rev-parse --verify --quiet "refs/remotes/origin/$B^{commit}" 2>/dev/null || :)
-	local_sha=$(git -C "$tree" rev-parse --verify --quiet "HEAD^{commit}" 2>/dev/null || :)
-	if [ -z "$remote_sha" ] || [ -z "$local_sha" ]; then
-		printf '%s: 先頭を読めなかった\n' "$P"
-		fail_note
-		return 0
-	fi
-	if [ "$remote_sha" = "$local_sha" ]; then
-		printf '%s: リモートと同じ\n' "$P"
-	elif git -C "$tree" merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
-		ahead=$(git -C "$tree" rev-list --count "$remote_sha..$local_sha" 2>/dev/null || echo '?')
-		printf '%s: 手元が %s 件先に進んでいる（まだ送っていない）。取り込むものはありません。\n' "$P" "$ahead"
-	elif git -C "$tree" merge-base --is-ancestor "$local_sha" "$remote_sha" 2>/dev/null; then
-		behind=$(git -C "$tree" rev-list --count "$local_sha..$remote_sha" 2>/dev/null || echo '?')
-		if LC_ALL=C git -C "$tree" merge --ff-only --no-overwrite-ignore --quiet "$remote_sha" </dev/null >/dev/null 2>"$scratch/err"; then
-			printf '%s: リモートの %s 件を早送りで取り込んだ\n' "$P" "$behind"
-		else
-			printf '%s: 早送りできなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"
-			fail_note
-		fi
-	else
-		# 分かれている。非 ff の merge は、重ならないステージ済みの変更があっても拒む（git 2.43）ので、
-		# 先に見て言う。
-		if ! git -C "$tree" diff --cached --quiet 2>/dev/null; then
-			printf '%s: リモートと分かれていて merge が必要ですが、ステージ済みの変更がある。コミットするか sh %s/ccnavi-git.sh restore --staged <パス> で外してから再実行してください\n' \
-				"$P" "$here_sh"
-			fail_note
-		else
-			# 途中の操作が無いのは確かめてあるので、この後の MERGE_HEAD はこの merge のもの。
-			sync_merging="$tree"
-			if LC_ALL=C git -C "$tree" merge --no-edit --quiet -m "ccnavi: origin/$B を取り込む" "$remote_sha" \
-				</dev/null >"$scratch/out" 2>"$scratch/err"; then
-				printf '%s: リモートと分かれていたので merge で取り込んだ\n' "$P"
-			else
-				conflicted=$(git -C "$tree" diff --name-only --diff-filter=U 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
-				if [ -e "$(git_path "$tree" MERGE_HEAD)" ]; then
-					git -C "$tree" merge --abort >/dev/null 2>&1 || :
-				fi
-				if [ -n "$conflicted" ]; then
-					printf '%s: リモートと分かれていて merge が衝突した（%s）。取り込みをやめた（merge --abort）。どちらを採るかはユーザが決める\n' \
-						"$P" "$conflicted"
-				else
-					cat "$scratch/out" >>"$scratch/err"
-					printf '%s: リモートと分かれていて merge できなかった。%s\n' "$P" "$(ccnavi_git_refusal "$scratch/err")"
-				fi
-				fail_note
-			fi
-			sync_merging=""
-		fi
-	fi
-	return 0
-}
-
-# P がリモートにあっても、MR がマージ済みなら閉じている。ホストはマージの後もブランチを残すことがあり
-# （GitHub の既定）、ready が親のワークツリーを片付けられなかった（未コミットの変更など）ときは、
-# ブランチが残る限り片付けの機会が無くなる。親チケットの mr 欄の MR の番号で聞き、マージ済みなら片付ける。
-# 番号が無ければ推定せず 1 行言う（親が承認待ちのときは、承認済みのチケットだけを読む決まりで番号を読めないので、言わない）。
-# マージされていなければ何も言わない。確かめられなければ 1 行言うが、
-# 取り込みそのものは済んでいるので失敗にはしない（次の取り込みでまた聞く）。
-merged_present() {
-	merged=$(ask_merged "$tree" "$fam_mr")
-	merged_rc="${merged%%:*}"
-	merged="${merged#*:}"
-	case "$merged_rc:$merged" in
-	nomr:*)
-		# 親が承認待ち（todo/ の提案）のときは、mr 欄を読めないのが正常。判定は承認済みのチケットだけを読み、
-		# 承認前の親は閉じてもいない。承認後に、mr 欄で聞く
-		if [ "$ccnavi_pi_parent" = yes ] && [ "$ccnavi_pi_approved" = no ]; then
-			log_debug 承認待ちの親なので mr 欄の警告を出さない -- "parent=$P"
-		else
-			no_mr_note "（親のブランチはリモートにある）"
-		fi
-		;;
-	*:'merged '*)
-		split_merged "${merged#merged }"
-		if [ -n "$merged_branch" ] && [ "$merged_branch" != "$B" ]; then
-			printf '%s: マージリクエスト（%s）の元ブランチ %s が親のブランチ %s と違う。手元は片付けない（親チケットの mr 欄を確かめてください）\n' \
-				"$P" "$merged_mr" "$merged_branch" "$B"
-			fail_note
-			return 0
-		fi
-		printf '%s: 親のブランチ %s はリモートに残っているが、マージリクエスト（%s）はマージ済み（クローズ済みの親子のチケット）。手元を片付ける\n' \
-			"$P" "$B" "$merged_mr"
-		tidy_merged "$merged_sha"
-		;;
-	0:none) ;;
-	*)
-		printf '%s: マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった）。閉じていれば次の取り込みで片付ける\n' "$P"
-		;;
-	esac
-	return 0
-}
-
-# 親の MR がマージ済みかをホストに聞く（ccnavi-review.sh merged <番号>）。<リポジトリかツリーのディレクトリ> <MR の番号>
-#
-# 聞くのは親チケットの mr 欄（ワークツリーの後は retire/<P>.json）の MR の番号だけ。番号が無ければ聞かずに
-# nomr: を返す（ディレクトリのブランチから MR を探すと、HEAD が別のブランチなら別の MR を拾うため）。
-# 答えは「終了コード:1 行目」で、1 行目は merged <番号> <先頭の sha> <元ブランチ> / none /
-# それ以外（道具・トークンが無い、API が失敗した）。
+# 親の MR がマージ済みかをホストに聞く（ccnavi-review.sh merged <番号>）。答えを $scratch/merged に、終了コードを
+# $asked に入れる。<リポジトリかツリーのディレクトリ> <MR の番号>
 ask_merged() {
-	am_mr="${2:-}"
-	case "$am_mr" in
-	'' | *[!0-9]*)
-		printf 'nomr:\n'
-		return 0
-		;;
-	esac
-	am_rc=0
-	am_out=$(cd "$1" && sh "$here_sh/ccnavi-review.sh" merged "$am_mr" 2>/dev/null </dev/null) || am_rc=$?
-	printf '%s:%s\n' "$am_rc" "$(printf '%s\n' "$am_out" | head -n 1)"
+	asked=0
+	(cd "$1" && sh "$here_sh/ccnavi-review.sh" merged "$2" 2>/dev/null </dev/null) >"$scratch/merged" || asked=$?
 }
 
-# ask_merged の merged の行を分ける。<merged の後ろ（<番号> <先頭の sha> <元ブランチ>）>
-# merged_mr・merged_sha・merged_branch に入れる。無い欄は空。
-split_merged() {
-	merged_mr="${1%% *}"
-	merged_sha=""
-	merged_branch=""
-	case "$1" in
-	*' '*)
-		sm_rest="${1#* }"
-		merged_sha="${sm_rest%% *}"
-		case "$sm_rest" in
-		*' '*) merged_branch="${sm_rest#* }" ;;
-		esac
-		;;
+# 閉じたかを聞く次の一手（next ask <MR>）なら聞いて、片付けまでを実行ファイルに任せる。
+# <場面（present・absent・retired）> <P> <リポジトリの名前> <ブランチ> <聞くディレクトリ> <一覧> [<記録の MR>]
+ask_and_tidy() {
+	case "$next" in
+	'ask '*) ;;
+	*) return 0 ;;
 	esac
-	merged_branch="${merged_branch%% *}"
+	ask_merged "$5" "${next#ask }"
+	ask_sync merged "$here_sh" "$1" "$2" "$3" "$4" "${7:-${next#ask }}" "$asked" "$scratch/merged" "$6"
+	said
 }
 
-# MR の番号が無いときの 1 行。<添える語>
-no_mr_note() {
-	printf '%s: 親チケットの mr 欄に MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない%s\n' "$P" "$1"
-}
-
-# MR がマージ済みと分かった後の手元の片付け。<MR の先頭の sha>
-#
-# 親のワークツリーと手元のブランチは実行ファイル（`sync tidy`）が消す。手元の先頭が MR の先頭に含まれ
-# （未 push のコミットが無い）、未コミットの変更が無いときだけ。消さなかったものは理由と手で消すコマンドを
-# 1 行ずつ言う。片付けの記録（retire/<P>.json）は、実行ファイルが「残ったものは無い」（record yes）ときに消す。
-# sha が分からない・実行ファイルが無いときは、含まれるか確かめられないので何も消さない。
-tidy_merged() {
-	if [ -z "$1" ]; then
-		printf '%s: マージリクエストの先頭の sha をホストから取れなかったので、手元のブランチは片付けない（含まれるか確かめられない）\n' "$P"
-		return 0
-	fi
-	if [ -z "$info_from" ]; then
-		printf '%s: 実行ファイルが無いので、手元の片付けはしなかった\n' "$P"
-		return 0
-	fi
-	tm_rc=0
-	run_ccnavi --cwd "$sync_cwd" sync tidy "$P" "$key" "$B" "$1" >"$scratch/tidy-raw" 2>"$scratch/tidy-err" || tm_rc=$?
-	tr -d '\r' <"$scratch/tidy-raw" >"$scratch/tidy"
-	if [ "$tm_rc" -ne 0 ]; then
-		printf '%s: 手元の片付けを実行できなかった（%s）。実行ファイルを新しくして再実行してください\n' "$P" "$(head -n 1 "$scratch/tidy-err" 2>/dev/null)"
-		fail_note
-		return 0
-	fi
-	sed -e '/^record /d' -e 's/^/  /' "$scratch/tidy"
-	case "$(tail -n 1 "$scratch/tidy")" in
-	'record yes')
-		printf '%s: 片付けた\n' "$P"
-		log_info マージ済みの親を片付けた -- "family=$P" "repo=$key"
-		;;
-	'record no')
-		printf '%s: 消さなかったものがある（理由は上。直してから再実行すれば片付く）\n' "$P"
-		;;
-	esac
-}
-
-# P がリモートに無い。閉じたか、消えたか。
-#
-# 送った形跡は push のゲートと同じ述語（ccnavi_parent_trace）。形跡が無ければ、一度も送っていない親子のチケット。
-sync_absent() {
-	trace=no
-	if ccnavi_parent_trace "$tree" "$B"; then
-		trace=yes
-	fi
-	if [ "$trace" = no ]; then
-		if [ "$ccnavi_pi_approved" = unreadable ]; then
-			printf '%s: 承認済みの親チケットを読めないので、送った親子のチケットかを確かめられない（チケットの frontmatter を直してから再実行してください）\n' "$P"
-			fail_note
-			return 0
-		fi
-		printf '%s: リモートにありません（まだ送っていない親子のチケット）。今の手元の動きのまま（ccnavi-start.sh を通さずに切った親は、approval-request・start がリモートへ送る前に止まる）\n' "$P"
-		return 0
-	fi
-	# ccnavi-review.sh の道具（gh / glab / curl とトークン）で、MR がマージ済みかを先に聞く。答えは
-	# merged <番号> / none（マージされた MR が無い）/ それ以外（道具・トークンが無い、API が失敗した）。
-	merged=$(ask_merged "$tree" "$fam_mr")
-	merged_rc="${merged%%:*}"
-	merged="${merged#*:}"
-	case "$merged_rc:$merged" in
-	nomr:*)
-		no_mr_note "。止めた（親チケットの mr 欄に MR の番号を書く。ユーザが確かめてください）"
-		fail_note
-		return 0
-		;;
-	*:'merged '*)
-		split_merged "${merged#merged }"
-		if [ -n "$merged_branch" ] && [ "$merged_branch" != "$B" ]; then
-			printf '%s: マージリクエスト（%s）の元ブランチ %s が親のブランチ %s と違う。手元は片付けずに止めた（親チケットの mr 欄を確かめてください）\n' \
-				"$P" "$merged_mr" "$merged_branch" "$B"
-			fail_note
-			return 0
-		fi
-		printf '%s: リモートから消えたが、マージリクエスト（%s）はマージ済み（クローズ済みの親子のチケット）。手元を片付ける\n' \
-			"$P" "$merged_mr"
-		tidy_merged "$merged_sha"
-		return 0
-		;;
-	0:none) ;;
-	*)
-		# マージ済みかを確かめられないときは、統合先の done/ や手元の退避（logs/archive/）からは推定せずに止める。
-		printf '%s: 親のブランチがリモートに無い。マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった。gh・glab か、curl とトークンが必要です）。止めた。確かめられる道具を用意して再実行するか、ユーザが確かめてください\n' "$P"
-		fail_note
-		return 0
-		;;
-	esac
-	printf '%s: 親のブランチ %s がリモートに無く、マージリクエストもマージされていないので、消し間違いか破棄かを決められない。このブランチへの push は止まる（push のゲート）。どちらかをユーザに確かめてもらう\n' "$P" "$B"
-	printf '  戻し方 1（改名・消し間違い）: ユーザが手元の親のワークツリーで git push origin %s を一度打つ（ホストの MR の画面から戻してもよい）。戻したら sh %s/ccnavi-sync.sh %s を打ち直す\n' \
-		"$B" "$here_sh" "$P"
-	printf '  戻し方 2（破棄した）: sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s で親のワークツリーを片付ける。ready の後に閉じた親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは打たない）\n' \
-		"$here_sh" "$P" "$here_sh" "$P"
-	fail_note
-	return 0
-}
-
-# ---- 親のワークツリーを片付けた後の親子のチケット（ready が書いた片付けの記録だけが残っている）
-#
-# `ready` が親のワークツリーを片付けた後は、片付けの記録（retire/<P>.json）と手元のブランチだけが残る。
-# 記録の MR の番号で MR がマージ済みかを聞き（ホストは、マージ後にブランチを消さないこともある）、
-# マージ済みなら手元を片付ける。マージされていなければ何もしない（待っている）。
-# 確かめられなければ、推定せずに止める。
-#
-# ブランチ名は、ワークツリーが無く HEAD も無いので、ホストが答えた MR の元ブランチを使う。
-# 記録にブランチがあれば、元ブランチと合うことを確かめる。
-# <P> <リポジトリの名前> <リポジトリ> <一覧> <MR の番号> <記録のブランチ>
-sync_retired() {
-	P="$1"
-	key="$2"
-	repo="$3"
-	heads="$4"
-	sr_mr="$5"
-	sr_branch="$6"
-	B=""
-	case "$sr_mr" in
-	'' | *[!0-9]*)
-		printf '%s: 片付けの記録に MR の番号が無く、閉じたか判断できない。手元は片付けない\n' "$P"
-		return 0
-		;;
-	esac
+# ロックを待って取る（プロセスの寿命）。取れなければ理由を言って 1。<リポジトリの名前> <P>
+take_lock() {
 	lock_rc=0
-	ccnavi_lock_take "$root" "$key" "$P" "$lock_wait" || lock_rc=$?
-	if [ "$lock_rc" -ne 0 ]; then
-		printf '%s: 他の操作がロックを持っている。終わってから再実行してください\n' "$P"
-		fail_note
-		return 0
-	fi
-	merged=$(ask_merged "$repo" "$sr_mr")
-	merged_rc="${merged%%:*}"
-	merged="${merged#*:}"
-	case "$merged_rc:$merged" in
-	*:'merged '*)
-		split_merged "${merged#merged }"
-		B="$merged_branch"
-		if [ -z "$B" ]; then
-			printf '%s: マージリクエスト（%s）はマージ済みだが、元ブランチの名前をホストから取れなかった。手元は片付けない\n' "$P" "$merged_mr"
-			fail_note
-		elif [ "$sr_branch" != "-" ] && [ -n "$sr_branch" ] && [ "$sr_branch" != "$B" ]; then
-			printf '%s: マージリクエスト（%s）の元ブランチ %s が、片付けの記録のブランチ %s と違う。手元は片付けない（記録の MR の番号を確かめてください）\n' \
-				"$P" "$merged_mr" "$B" "$sr_branch"
-			fail_note
-		else
-			if has_head "$heads" "$B"; then
-				sr_where="リモートに残っている"
-			else
-				sr_where="リモートから消えた"
-			fi
-			printf '%s: ワークツリーは片付け済み。親のブランチ %s は%s。マージリクエスト（%s）はマージ済み。手元を片付ける\n' \
-				"$P" "$B" "$sr_where" "$merged_mr"
-			tree="$repo"
-			tidy_merged "$merged_sha"
-		fi
-		;;
-	0:none)
-		printf '%s: ワークツリーは片付け済み。マージリクエスト（%s）はまだマージされていないので片付けない。破棄した親なら、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消す\n' \
-			"$P" "$sr_mr" "$here_sh" "$P"
-		;;
-	*)
-		printf '%s: ワークツリーは片付け済みだが、マージリクエスト（%s）がマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった。gh・glab か、curl とトークンが必要です）。手元は片付けずに止めた\n' "$P" "$sr_mr"
-		fail_note
-		;;
+	ccnavi_lock_take "$root" "$1" "$2" "$lock_wait" || lock_rc=$?
+	case "$lock_rc" in
+	0) return 0 ;;
+	2) printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$2" "$state" "$1" "$2" ;;
+	*) printf '%s: 他の操作がロックを持っている（%s）。終わってから再実行してください\n' "$2" "$(ccnavi_lock_owner "$state/locks/$1/$2")" ;;
 	esac
-	# ロックは自分が取ったものだけを外す（持ち主を確かめる。入れ子で外側が持つロックは外さない）。
-	ccnavi_lock_drop
-	return 0
+	printf 'failed\n' >>"$scratch/answers"
+	return 1
 }
 
-# ---- 取り込みの後の検査
+# ---- 取り込む親子のチケットとリポジトリを選ぶ
 
-# 親のブランチがリモートにある親子のチケットを判定し直す。error があれば言って終了コード 1 にする。
-# <P> <リポジトリの名前>
-check_family() {
-	# 手元の片付けで親のワークツリーを消した親子のチケットは、判定し直す先が無い。
-	[ -d "$root/.claude/worktrees/$1" ] || return 0
-	if [ -z "$info_from" ]; then
-		printf '%s: 実行ファイルが無いので、取り込みの後の検査（判定し直し）はしなかった\n' "$1"
-		return 0
-	fi
-	cf_rc=0
-	run_ccnavi sync check "$1" "$2" >"$scratch/check-raw" 2>"$scratch/check-err" || cf_rc=$?
-	tr -d '\r' <"$scratch/check-raw" >"$scratch/check"
-	if [ "$(head -n 1 "$scratch/check" 2>/dev/null)" != "check 1" ]; then
-		# 検査を実行できなかった（失敗した）。検査の error ではないので親子のチケットは止めない。
-		printf '%s: 注意: 取り込みの後の検査を実行できなかった（%s）。再実行してください\n' \
-			"$1" "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
-		log_warn 取り込みの後の検査を実行できなかった -- "family=$1" "rc=$cf_rc"
-		return 0
-	fi
-	sed -n 's/^warn /  注意: /p' "$scratch/check"
-	cf_errors=$(sed -n 's/^error /  - /p' "$scratch/check")
-	if [ -n "$cf_errors" ] || [ "$cf_rc" -ne 0 ]; then
-		printf '%s: 取り込みの後の検査で止める理由がある。直してから、sh %s/ccnavi-sync.sh %s を再実行してください（検査し直す）\n' "$1" "$here_sh" "$1"
-		if [ -n "$cf_errors" ]; then
-			printf '%s\n' "$cf_errors"
-		else
-			printf '  - 検査が失敗した（%s）\n' "$(head -n 1 "$scratch/check-err" 2>/dev/null)"
-		fi
-		fail_note
-	fi
-	return 0
-}
+ask_sync plan "$here_sh" ${1+"$@"}
+said
+if exit_code=$(ccnavi_val1 exit "$answer") && [ -n "$exit_code" ]; then
+	exit "$exit_code"
+fi
+# repo と skip の行は語ごと並びのまま残す（下の while が先頭の語で分ける）
+printf '%s\n' "$answer" | grep -E '^(repo|skip) ' >"$scratch/repos" || :
+ccnavi_val family "$answer" >"$scratch/families"
+ccnavi_val retired "$answer" >"$scratch/retired"
 
 # ---- リポジトリごと
+#
+# 段取り: ls-remote → 統合先を決める → 統合先を fetch → 親子のチケットごとに（ロック → fetch → 取り込み → 閉じたかを
+# 聞く → 片付け）→ 片付けた後の親子のチケット → 取り込みの後の検査。読む先は fd 3・4。中で起こす git が標準入力を
+# 読んでも、一覧を読み取ってしまわない。
 
-while IFS= read -r key <&4; do
-	[ -n "$key" ] || continue
-	repo=$(repo_dir_of "$key")
-	has_family=no
-	repo_has_families "$key" && has_family=yes
-	# 親子のチケットの無いリポジトリ（引数を省いた回のプロジェクトなど）で失敗しても、名指しして続け、1 にしない。
-	repo_fail() {
-		[ "$has_family" = yes ] && fail_note
-		return 0
-	}
-	if ! git -C "$repo" remote get-url origin >/dev/null 2>&1; then
-		# origin の無いリポジトリは取り込みの対象外（今の手元の動きのまま）。
-		if [ "$has_family" = yes ]; then
-			printf '%s: origin がありません。取り込みの対象外（今の手元の動きのまま）\n' "$key"
-		fi
+while IFS= read -r line <&4; do
+	case "$line" in
+	'skip '*)
+		printf '%s\n' "${line#skip }"
 		continue
-	fi
-	label=""
-	[ "$key" = self ] || label="$key: "
+		;;
+	esac
+	# repo <リポジトリの名前> <yes|no（親子のチケットがあるか）> <ディレクトリ>。ディレクトリは空白を含みうるので最後に置く。
+	line="${line#repo }"
+	key="${line%% *}"
+	line="${line#* }"
+	has="${line%% *}"
+	dir="${line#* }"
 	heads="$scratch/heads-$key"
-	if ! ccnavi_git_timed "$timeout" "$scratch/err" "$repo" ls-remote --heads origin >"$heads"; then
-		printf '%sリモートのブランチの一覧を取ってこられなかった（オフラインか、認証の失敗。%s）。止める\n' "$label" \
-			"$(head -n 1 "$scratch/err")"
-		repo_fail
-		continue
+	: >"$scratch/symref"
+	ls_rc=0
+	ccnavi_git_timed "$timeout" "$scratch/err" "$dir" ls-remote --heads origin >"$heads" || ls_rc=$?
+	if [ "$ls_rc" -eq 0 ]; then
+		ccnavi_git_timed "$timeout" "$scratch/err-symref" "$dir" ls-remote --symref origin HEAD >"$scratch/symref" ||
+			: >"$scratch/symref"
 	fi
-	if ! integ=$(default_branch "$repo" "$heads"); then
-		printf '%s %s 取り込みを止めた\n' "$label" "$(ccnavi_integration_hint "$repo")"
-		repo_fail
-		continue
-	fi
-	printf '%s 統合先: %s\n' "$label" "$integ"
-	if ! fetch_one "$repo" "$integ"; then
-		printf '%s 統合先 %s を取ってこられなかった（%s）。止める\n' "$label" "$integ" "$(head -n 1 "$scratch/err")"
-		repo_fail
-		continue
-	fi
-	# ホストに聞いた名前と手元の origin/HEAD が違えば、fetch が成功した今、向け直す。
-	if [ -e "$scratch/db-host" ]; then
-		old_head=$(git -C "$repo" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || :)
-		old_head="${old_head#origin/}"
-		if [ "$old_head" != "$integ" ] &&
-			git -C "$repo" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$integ" 2>/dev/null; then
-			printf '%s 統合先を %s から %s に合わせた（ホストの既定ブランチ）\n' "$label" "${old_head:-未設定}" "$integ"
+	ask_sync integ "$here_sh" "$key" "$has" "$ls_rc" "$heads" "$scratch/err" "$scratch/symref"
+	said
+	case "$next" in
+	'fetch '*) ;;
+	*) continue ;;
+	esac
+	integ="${next#fetch }"
+	host="${integ#* }"
+	integ="${integ% *}"
+	fetch_one "$dir" "$integ"
+	ask_sync fetched "$here_sh" "$key" "$has" "$integ" "$host" "$fetched" "$scratch/err"
+	said
+	[ "$next" = go ] || continue
+
+	# family <P> <リポジトリの名前> <ブランチ> <親のワークツリー>。ワークツリーは空白を含みうるので最後（read の残り）。
+	while read -r fam_p fam_key fam_branch fam_tree <&3; do
+		[ "$fam_key" = "$key" ] || continue
+		take_lock "$key" "$fam_p" || continue
+		ask_sync family "$here_sh" "$fam_p" "$key" "$fam_branch" "$heads"
+		said
+		case "$next" in
+		'fetch '*)
+			fetch_one "$fam_tree" "$fam_branch"
+			ask_sync pull "$here_sh" "$fam_p" "$key" "$fam_branch" "$fetched" "$scratch/err"
+			said
+			ask_and_tidy present "$fam_p" "$key" "$fam_branch" "$fam_tree" "$heads"
+			;;
+		*) ask_and_tidy absent "$fam_p" "$key" "$fam_branch" "$fam_tree" "$heads" ;;
+		esac
+		ccnavi_lock_drop
+	done 3<"$scratch/families"
+
+	while read -r ret_p ret_key ret_mr ret_branch <&3; do
+		[ "$ret_key" = "$key" ] || continue
+		# ロックは自分が取ったものだけを外す（持ち主を確かめる。入れ子で外側が持つロックは外さない）。
+		if ccnavi_lock_take "$root" "$key" "$ret_p" "$lock_wait"; then
+			next="ask $ret_mr"
+			ask_and_tidy retired "$ret_p" "$key" "$ret_branch" "$dir" "$heads" "$ret_mr"
+			ccnavi_lock_drop
+		else
+			printf '%s: 他の操作がロックを持っている。終わってから再実行してください\n' "$ret_p"
+			printf 'failed\n' >>"$scratch/answers"
 		fi
-	fi
-	awk -F "$tab" -v k="$key" '$3 == k' "$scratch/families" >"$scratch/these"
-	# 読む先は fd 3。中で起こす git が標準入力を読んでも、親子のチケットの一覧を読み取ってしまわない。
-	while IFS="$tab" read -r fam_p fam_tree fam_key fam_branch <&3; do
-		[ -n "$fam_p" ] || continue
-		sync_family "$fam_p" "$fam_tree" "$fam_key" "$repo" "$integ" "$heads" "$fam_branch"
-	done 3<"$scratch/these"
-	awk -F "$tab" -v k="$key" '$2 == k' "$scratch/retired" >"$scratch/these-retired"
-	while IFS="$tab" read -r ret_p ret_key ret_mr ret_branch <&3; do
-		[ -n "$ret_p" ] || continue
-		sync_retired "$ret_p" "$ret_key" "$repo" "$heads" "$ret_mr" "$ret_branch"
-	done 3<"$scratch/these-retired"
-	while IFS="$tab" read -r fam_p fam_tree fam_key fam_branch <&3; do
-		[ -n "$fam_p" ] || continue
-		has_head "$heads" "$fam_branch" || continue
-		check_family "$fam_p" "$fam_key"
-	done 3<"$scratch/these"
+	done 3<"$scratch/retired"
+
+	while read -r fam_p fam_key fam_branch _ <&3; do
+		[ "$fam_key" = "$key" ] || continue
+		ask_sync recheck "$here_sh" "$fam_p" "$key" "$fam_branch" "$heads"
+		said
+	done 3<"$scratch/families"
 done 4<"$scratch/repos"
 
-if [ -s "$scratch/failed" ]; then
-	log_info 終わった -- "exit=1"
-	exit 1
-fi
-log_info 終わった -- "exit=0"
-exit 0
+ask_sync end "$here_sh" "$scratch/answers"
+exit_code=$(ccnavi_val1 exit "$answer")
+log_info 終わった -- "exit=$exit_code"
+exit "$exit_code"

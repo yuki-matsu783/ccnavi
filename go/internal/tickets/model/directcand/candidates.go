@@ -54,8 +54,8 @@ func (r row) entry() Entry {
 	return Entry{r.name, r.path, seen, checked}
 }
 
-// IntegrableName は `integrate` が受ける名前か（ccnavi-git.sh の ig_name と同じ検査）。統合先の名前と、
-// ccnavi_is_ident を通らない形は integrate が断るので、促さない。
+// IntegrableName は `integrate` が受ける名前か（実行ファイルの land の checkName と同じ検査）。統合先の名前と、
+// 識別子の形でない名前は integrate が断るので、促さない。
 func IntegrableName(name string) bool {
 	if slices.Contains(reservedNames, name) || strings.HasPrefix(name, releasePrefix) {
 		return false

@@ -90,7 +90,7 @@ func TestStagedChangesInAGuardedPlaceAreReported(t *testing.T) {
 	}
 }
 
-// records/prune は post の記録の名前を写して持つ（prune は上の段を読めない）。古い記録が消えることで突き合わせる。
+// records/prune は post の記録の名前を写して持つ（prune は上の層を読めない）。古い記録が消えることで突き合わせる。
 func TestPruneRemovesTheRecords(t *testing.T) {
 	root := testkit.TempRoot(t)
 	state := filepath.Join(root, config.DefaultState)

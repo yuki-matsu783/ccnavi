@@ -5,7 +5,7 @@
  *
  * 実行ファイルは、リポジトリの`go/`から一時の置き場へ組み立てる（`go build ./cmd/ccnavi`）。組み立てられない
  * 環境では`reason`に理由を入れ、呼ぶテストは飛ばす。1つのファイルの中では組み立てた結果を使い回す。
- * このファイルは`out/test/helpers/`から走るので、リポジトリのルートは6段上。
+ * このファイルは`out/test/helpers/`から走るので、リポジトリのルートは6階層上。
  */
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";

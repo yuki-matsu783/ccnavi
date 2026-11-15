@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/digest"
 	"ccnavi/internal/infra/fsio"
+	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/infra/pyjson"
@@ -164,7 +165,7 @@ func learningOne(conf *config.Settings, main tree.Tree, threshold, count int, de
 	if branch == "" {
 		return ""
 	}
-	sha := wiki.CommitOf(main.Root, "refs/remotes/origin/"+branch, deadline)
+	sha := git.Commit(main.Root, "refs/remotes/origin/"+branch, git.Options{Deadline: deadline})
 	if sha == "" {
 		return ""
 	}

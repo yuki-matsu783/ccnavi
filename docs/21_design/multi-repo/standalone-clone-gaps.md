@@ -50,7 +50,7 @@ keywords: [単体 clone, ワークスペース内 clone, 根, ルート, 統合�
 ## プロジェクトのスキル
 
 - `skills/<名前>/SKILL.md` は git に入るので、単体 clone の手元にもある
-- 目録は、`project_of` がプロジェクトの名前を返したときだけ出る。単体 clone では空を返し、単体 clone であることは検出せず、何も出さない
+- 目録は、`skills.projectOf` がプロジェクトの名前を返したときだけ出る。単体 clone では空を返し、単体 clone であることは検出せず、何も出さない
 - 単体 clone で Claude Code が自動で読むのは、`skills/` ではなく `.claude/skills/` のほう（11.13）
 
 ## ワークツリーの認識

@@ -41,7 +41,7 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// 書き手の失敗の仕方（失敗の枝ごとに 1 つずつ）。溜める段では書き込みが失敗しないので、書くときに当てる。
+// 書き手の失敗の仕方（失敗の枝ごとに 1 つずつ）。溜める段階では書き込みが失敗しないので、書くときに当てる。
 // 行き先のディレクトリをファイルで塞いで書けなくする。
 func TestWriteFailureModes(t *testing.T) {
 	dir := t.TempDir()
@@ -108,7 +108,7 @@ func TestWriteFailureModes(t *testing.T) {
 	}
 }
 
-// 並べる段で止まっていたら、並べた分を書いてから止まった理由を言う。
+// 並べる段階で止まっていたら、並べた分を書いてから止まった理由を言う。
 func TestWriteStoppedWhilePlanning(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "a.md")
 	s := staged(t, func(*fsio.Stage) { fsio.WriteFile(path, []byte("a"), fsio.Plain) })

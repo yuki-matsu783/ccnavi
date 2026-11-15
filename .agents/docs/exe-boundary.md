@@ -8,6 +8,55 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Go, WASM, 判定,
 
 # 実行ファイルの境界
 
+## sh で実装するものと、Go で実装するもの
+
+sh で実装するのは、外との出入りと段取りだけ。プロジェクトのディレクトリの中で決められることは、すべて Go（実行ファイル）で実装する。sh は実行ファイルに次の一手を聞き、言われたネットワーク操作をして、結果をファイルで渡す。判断と解釈を sh で書くと、jq・sed・ローカルの git の外部プロセスが増えて遅くなり、テストも sh を走らせるしかなくなる。Go で書けば、表駆動のテストでプロセスを起こさずに確かめられ、ホストの応答の読み方を Chrome 拡張とも共有できる。
+
+| sh で実装するもの | 当たるもの |
+|---|---|
+| 外との出入り | ホストの API、origin への fetch・push・ls-remote、認証、その時間の上限（`ccnavi_run_timed`・`ccnavi_git_timed`）。API のパスとページの送り方 |
+| 段取り | ネットワークと実行ファイルの呼び出しを並べる順序。次に何を取るかを決める最小の読み（ページの件数・cursor・GitLab の権限の 2 つ目に要る id） |
+| sh のプロセスの寿命に結び付くもの | ロック（`ccnavi-common-lock.sh`。持ち主は sh の pid）、信号を受けたときの trap、idle の待機 |
+| 起動役 | `ccnavi-launcher.sh`、ワークスペースと実行ファイルの探し方、診断ログ |
+| 実行ファイルを起こさずに動くもの | `ccnavi-fetch.sh`・`ccnavi-user-push-approved.sh`（実行ファイルの入れ替え中も fetch・push できるように） |
+| ユーザだけが打つ入口 | `ccnavi-user-*` の名前、y/N の確認、引数の許可リスト |
+| ラッパーの受け口 | `ccnavi-git.sh` が受けた引数を、環境を整えてから実行ファイルへ渡すこと |
+
+| Go で実装するもの | 当たるもの |
+|---|---|
+| 応答の解釈 | GitHub と GitLab の形の吸収、本文の解析、失敗の種類の分け方。Chrome 拡張の WASM と同じ関数を使う |
+| 判断 | 引数の検査、振り分け、止める条件。ラッパーが何を通すか |
+| ローカルの git とファイルの操作 | ワークツリー、早送り、コミット、merge、integrate、記録の読み書き |
+| 出力の文 | 文面ファイルに置く（[文面ファイルに文を足す・直す](message-files.md)） |
+
+sh に処理を書くときは、上の「sh で実装するもの」のどれに当たるかを先に言う。どれにも当たらない処理は、Go のサブコマンドにする。
+
+### sh と実行ファイルの約束
+
+- sh は、取ってきた応答を整えずにファイルへ書き、そのパスを実行ファイルに渡す（`--result`。応答が複数のときは引数で並べる。例: `ccnavi start list-open <github|gitlab> <issue の一覧> <MR の一覧>`）。引数もそのまま渡す。応答の意味を読み取るのは実行ファイル
+- 実行ファイルは 1 行 1 項目で答える（Go は `go/internal/infra/reply` で組む）。判断は次の一手の語で返す（`create <branch>`・`stop <終了コード>`・`fetch <何を>` など）。sh は行の先頭の語で分ける。読むときは `ccnavi-common-state.sh` の `ccnavi_val`・`ccnavi_val1`・`ccnavi_has`（値を引く）か `ccnavi_do`（`out`・`err`・`fail`・`exit` を実行する）を使い、sh ごとに `sed` で写さない
+- sh は JSON（実行ファイルの答えを含む）もチケットの YAML も読まない。例外は、段取りの最小の読みと、実行ファイルを起こさずに動く検査だけ
+- 規則の写しを sh に置かない。保護するブランチ・識別子・ホストの種類などは実行ファイルに聞く。実行ファイルを起こさずに動く sh が写しを持つのは、実行ファイルが無いと本来の仕事（fetch・承認の push）が止まるものだけにする。写しを持たなくても止まらないものは、実行ファイルが無いときに省く。写しを持つときは、`tests/fixtures/` の共通の JSON の表を使い、Go と Python（sh を起動）の両方で一致を確かめる（今の写しと表は [sh と Go の分担に合っていない所](sh-go-gaps.md) の「規則の写し」の行）
+- 信号を受けたときの戻しは、その操作を始めた側が持つ。Go で実装する一続きのローカルの書き込みは 1 回の起動の中で完結させ、戻しもその中で持つ。sh の trap は子を止めて待つだけ
+- Go で実装するローカルの git の書き込みは、ラッパー（`ccnavi-git.sh`）が通すかを決めるのと同じ検査の関数を通す。ワークツリーを出す（`git worktree add`）口は `treeadd.Add`（`go/internal/tickets/lifecycle/treeadd`）だけで、新しい親（start）・直接作業（cut）・子の着手（ticketsh）がこれを共有する
+- 実行ファイルを起こさずに動く sh は、実行ファイルが無いときに何を省くかを、sh の先頭の説明に書く
+
+### テスト
+
+- Go で実装した判断と解釈は、Go の表駆動のテストで確かめる（`go test`。プロセスを起こさない）
+- sh のテストは通しの確認だけにする。経路ごとに数本とし、1 回の実行で終了コード・出力・作られた物・ホストへの要求をまとめて確かめる。Go のテストが確かめる観点を、sh のテストで重ねて確かめない
+
+### 分担に合っていない処理を直すとき
+
+今の sh のうち、上の分担に合っていない処理は [sh と Go の分担に合っていない所](sh-go-gaps.md) に並べてある。直すときは次の順に進める。
+
+1. 処理を「sh で実装するもの」と「Go で実装するもの」に分け、サブコマンドの形（受け取るファイル・答えの行・次の一手の語）を決める
+2. 書き換える前に、今の sh の出力（終了コード・標準出力・標準エラー）を代表の入力で見本に取る。文面は変えない
+3. Go で実装し、表駆動のテストを書く。sh は段取りだけにし、Go のテストが確かめる観点の sh のテストは消す
+4. 一覧の行を「済み」へ動かす。消したテストと理由は、直した単位ごとに報告にまとめる
+
+## 境界の細目
+
 - ccnaviの実行ファイルはネットワークにつながない。実行ファイルが判断の材料にするのは、ワークツリー、git、
   承認済みチケット、マーカー、hookのpayloadといった、プロジェクトのディレクトリの中で確かめられるものだけ
 - マージリクエスト、レビューのスレッド、ホストのAPI、認証のような、ディレクトリの外にあるものは、
@@ -15,30 +64,37 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Go, WASM, 判定,
   実行ファイルが行うのは、そのJSONを読んでチケットを状態ごとの置き場へ移すことと、マーカーを置くことだけ
 - 例外が1つある。リスクの配点の`script:`は、ユーザが置いたスクリプトを実行ファイルが`sh`で起動し、標準出力の点を受け取る
   （設計 9.9）。起動するのはプロジェクトの中のユーザのスクリプトだけで、実行ファイル自身はネットワークに出ない
-- ホストへ出るのは、shと、Chrome 拡張の TypeScript（service worker）だけ。Chrome 拡張は、取得した結果を、実行ファイルと同じ判定のコア（Go を WASM に組んだもの。`go/cmd/ccnavi-chrome`）へ渡して判定させ、ホストへの書き込み（issue・返信・解決・コミット）は、拡張自身が行う
+- ホストへ出るのは、shと、Chrome 拡張の TypeScript（service worker）だけ。Chrome 拡張は、取得した結果を実行ファイルと同じ判定のコア（Go を WASM に組んだもの。`go/cmd/ccnavi-chrome`）へ渡して判定させる。ホストへの書き込み（issue・返信・解決・コミット）は拡張自身が行う。MR のスレッドとレビューの応答は、service worker が読まずに返し、ボードが WASM の `copy` に渡して、sh と同じ `hostreply` で読ませる（service worker は WASM を動かさない）
 - メッセージ送信（UserPromptSubmit）のhookも実行ファイルの側にあり、ホストに問い合わせない。ホストへの問い合わせは
   sh（`ccnavi-start.sh`・`ccnavi-branches.sh`）が受け持ち、hookは記録（承認済みチケット・マーカーなど）を読むだけ。
   hookのtimeoutは10秒で、ネットワークを待てないため
 - 操作を止めるか通すかは、hookと実行ファイルが判定する（P13）。shがccnaviの状態を読んで操作を止める処理は、
-  hookと実行ファイルの判定に重ねた2段目の確認にあたる。shに新しい判定を足したくなったら、まずhook側に置けないかを検討する
-  - gitの状態だけを見て止める処理（`ccnavi-ticket.sh`の`ensure_child_worktree`が、手元だけのコミットがある子のブランチを
+  hookと実行ファイルの判定に重ねた2つ目の確認にあたる。新しい判定はshに足さない。まずhook側に置けないかを考え、置けなければ実行ファイル（Go）に置く
+  - gitの状態だけを見て止める処理（子の start で`ccnavi-ticket.sh`が実行ファイルの`ticket-sh child`に聞いて行う。手元だけのコミットがある子のブランチを
     消さずに止めるなど）は、ccnaviの状態を読まないので、この決まりの対象ではない
   - `ccnavi_is_ident`・`ccnavi_is_branch`・`ccnavi_branch_ok`（sh）は、実行ファイルの`id_problem`・`branch_problem`の
-    ASCIIで見分けられる分だけの複製。字の種類・NFC・長さは見ないので、名前を受け入れる入口は実行ファイルの
-    `worktree id`に聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す
-- P13の例外: 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の中の可否の判定（`integrate-ticket`（結び付くかは実行ファイルの`tree bound`に聞く（Stopの促しと同じ判定）。取り込み先のブランチは`tree base-bound`に聞く）、統合先と消えた親のブランチへの
-  pushの拒否、親のワークツリーでの`checkout`・`switch`の行き先の確認）と、`integrate`・`integrate-done`の状態操作はshに置く。条件は3つで、
-  生の`git`が組み込みで止まっていること、ラッパーが許可リストで読むこと、判定の材料のうちチケットの中身は実行ファイルに聞くこと
-  （設計 9.2）。この3つを満たさない判定はshに足さない
-- P13の例外の範囲は、親のブランチの共通のpushゲート（`ccnavi_push_gate`。`ccnavi-common-state.sh`）にも広げる。
-  ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、
-  `ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。この2つはラッパーを通らないので「ラッパーが許可リストで読むこと」を
-  満たさないが、同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、ゲートだけを例外に入れる。ゲートの材料のうちチケットの中身
-  （着手済み＝承認済みの親チケットの`started_at`・`.requested`・退避の有無）は実行ファイルの`tree parent`に聞き、shは自分で読まない。承認済みというだけでは形跡にしない。ゲートが`ls-remote`を打つのはshの側
-  （ネットワークはshの仕事）。この2経路にほかの判定は足さない
-- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`tree bound`・`tree base-bound`・`tree guarded`・`tree leftover`・`tree handoff-pending`・`write-and-push family`・`sync retired`・
-  `sync paths`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
-  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き。ただし、親のワークツリーからの切り替えの拒否は、聞けないときも通す）。
+    ASCIIで見分けられる分だけの複製で、字の種類・NFC・長さは見ない。名前を受け入れる入口（`ccnavi-worktree.sh`・
+    `ccnavi-git.sh`の worktree add）は、実行ファイル（`ids.IDAnswer`）が確かめる。規則を変えるときは両方を直す
+  - 保護されたブランチの名前は実行ファイルの`ids.Protected`が決める。実行ファイルを起こさない`ccnavi-user-push-approved.sh`と
+    `ccnavi_is_branch`は、写しの`ccnavi_is_protected`（sh）を使う。Go と Python のテストは、`tests/fixtures/ident-cases.json`の同じ表で一致を確かめる
+  - 実行ファイルを起こさずに動く sh が持つ写しは、ほかに置き場の名前（`tests/fixtures/layout.json`）、「origin にその ref が無い」の見分け
+    （`tests/fixtures/no-remote-ref.json`）、置き場の変更のパスの読みと書きかけの一時ファイル、`--path` のパスの大文字小文字を区別しない比べ（`tests/fixtures/approved-carry.json`）、
+    origin の URL の読み（`tests/fixtures/host-kinds.json`）。どれも同じ表で Go と Python が一致を確かめる
+- write-and-push の親のワークツリーへのローカルの書き込み（元の先頭を読む・子の合流・状態を書く・コミット）は、実行ファイルの
+  `--record-commit <文>`（子の finish は `--record-merge <sha>`）の1回の起動で行い、失敗と INT・TERM・HUP の戻しもその中で持つ。答えは
+  `<一覧>.answer` に1行1項目で書く（標準出力は状態の操作のもの）。push が通らなかったときの、比較つきの戻しは `write-and-push undo <答え>` で行う。
+  sh が持つのは push と ls-remote、ロック、取り込みの起動だけ（`go/internal/tickets/lifecycle/wapmerge`）
+- 入口を1本に寄せたラッパー（`ccnavi-git.sh`）の可否の判定（統合先への push の拒否、push のゲートを掛けるか、親のワークツリーでの`checkout`・`switch`の行き先の確認など）は、実行ファイルの`ccnavi git check`が行う。`integrate`・`integrate-done`の判定と状態操作は、実行ファイルの`ccnavi git integrate`が1回の起動で行い、ラッパーはロックを取ってから呼ぶ
+- 親のブランチの共通のpushゲートは、判定を実行ファイルの`ccnavi tree gate`（`go/internal/entry/shask`の`pushGate`）が持ち、
+  次の一手（`gate pass`・`gate stop`・`gate ls-remote`）で答える。shの口（`ccnavi-common-state.sh`の`ccnavi_push_gate`）は、
+  `ls-remote`（外との出入り）を打って結果を返すだけ。ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、
+  write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、`ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。
+  同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、3経路とも同じ口を通す。形跡（手元の origin の参照・着手済み・`.requested`・退避）の
+  判定は`pushTrace`が持つ。write-and-pushの「一度も送っていない親」と`ccnavi-sync.sh`の「消えた親」も、`tree parent <ツリー> <名前> <ブランチ>`の`trace`の行で`pushTrace`を使う。
+  実行ファイルが答えないとき（実行ファイルを起こさない`ccnavi-user-push-approved.sh`だけが来る）は、手元に origin の参照があるブランチだけ`ls-remote`で確かめる
+- shはチケットのYAMLもJSONも自分で読まない。要る答えは実行ファイルのサブコマンド（`tree parent`・`write-and-push family`・`sync retired`・
+  `sync plan`など）に聞き、1行1項目の答えを見る。答えが得られないときにどちらへ倒すかは呼ぶ側が決める
+  （止める側の検査は止める向き、ツリーを動かす側は動かさない向き）。
 - 実行ファイルには、ディレクトリの外へ情報を取りに行くコードを足さない。取得する処理はshに任せ、
   実行ファイルには取得した結果を読む処理だけを足す。shと実行ファイルの間の契約は、このJSONの形で決まる。
   形は設計 9.10に書いてある
@@ -48,11 +104,12 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Go, WASM, 判定,
   | どこ | 3 | 4 |
   |---|---|---|
   | 実行ファイル | `EXIT_ANSWER_NO`（問われたことへの「いいえ」。`--agree --preview --verify`） | `EXIT_PARTIAL`（`user agree` だけ。承認済みチケットを一部だけ置いて止まった） |
-  | `ccnavi-start.sh` | `EXIT_MULTI`（候補が複数・MR の無い候補・closed の issue・ワークツリーの無い既存の MR・似た issue・MR・意味が近いかの確認待ち。何も作らず、ユーザに聞く） | `EXIT_HOST`（ホストに届かず、代行が要る。GitHub は MCP、GitLab はユーザに認証を頼んで打ち直す） |
+  | `ccnavi-start.sh` | 終了コード 3（実行ファイルの `ccnavi start stop`・`resolve`・`issue-state` が返す。候補が複数・MR の無い候補・closed の issue・ワークツリーの無い既存の MR・似た issue・MR・意味が近いかの確認待ち。何も作らず、ユーザに聞く） | `EXIT_HOST`（ホストに届かず、代行が要る。GitHub は MCP、GitLab はユーザに認証を頼んで打ち直す） |
   | `ccnavi-worktree.sh` | `EXIT_CONFIRM`（確認が要る。何も切らず、ユーザの了承を待つ） | —（origin に届かなくても止めず、リモート未確認として 3 で確認を求める） |
   | `ccnavi-git.sh` | —（拒否はすべて 2。前提の未充足を 1 で返す区別はしない） | — |
   | `ccnavi-review.sh merged` | `unknown`（MR がマージ済みかを確かめられない） | — |
   | `ccnavi-fetch.sh` | 常に 0（取ってこられないことは失敗ではない） | — |
+  | `ccnavi-sync.sh` | 書きかけと重なって止まった（ほかの理由で止めたものがあっても 3 を返す。write-and-push はこれで止め、再実行を頼む） | 親チケットも提案も無いワークツリーで、取り込まなかった（ほかに止めたものが無いとき。start はこれを正常として続ける） |
 
   `ccnavi-review.sh mr-state <番号>`（読み取りだけ）は 3 と 4 を使わず、0（状態が分かった）・1（`unknown`。状態が分からない）・
   2（引数の誤り）で返す。1 行目は `mr-state 1`、2 行目は `open <番号> <yes|no> <URL>`・`merged <番号> <URL>`・`closed <番号> <URL>`・
@@ -60,7 +117,7 @@ keywords: [実行ファイル, ネットワーク, 境界, sh, Go, WASM, 判定,
 
 - shは文面ファイル（`.ccnavi/messages/`）を直接 grep・cat しない。文は実行ファイルの `text <識別子> [名前=値]…` に引かせる（`ccnavi_text`）。引けないとき（実行ファイルが無い・呼べない・識別子が無い・文面ファイルが壊れている）は sh の短い既定の文を出して先へ進み、止める・止めないの判定は変えない（[文面ファイルに文を足す・直す](message-files.md)）
 - 実行ファイルの標準出力をshが読む約束もある。`review ready`は1行目にコメントの下書きのパス、2行目に`tree <退避したツリーのルート>`を出し、
-  `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）を出す。shはwrite-and-pushの中でこの削除を
+  `wip/`から消したものがあれば続けて`wip-from <消す前のHEAD>`と`wip <パス>`（1行1本）、成功のあとにshがそのまま出す報告は`say <文>`で出す。shはwrite-and-pushの中でこの削除を
   コミットして送ってからDraftを外す（設計 9.10）。ファイルを`logs/archive/`へ動かすのと`wip/`の追跡済みのファイルを消すのは実行ファイルで、
   ネットワーク（push・Draftを外す・コメント）はshが受け持つ
 - 親を閉じたときのブランチの片付けも実行ファイルが行う（`worktree retire <親>`・`worktree branch <名前> [confirmed]`・

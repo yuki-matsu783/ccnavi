@@ -479,7 +479,7 @@ func TestEnviron(t *testing.T) {
 	t.Setenv(env.GitLiteralPathspecs, "1")
 	t.Setenv(env.GitDir, "x")
 	for _, plain := range []bool{false, true} {
-		got := environ(plain)
+		got := environ(plain, false)
 		count := func(prefix string) int {
 			n := 0
 			for _, kv := range got {
@@ -563,5 +563,15 @@ func TestRunIgnoresTheRepositoryOfTheEnvironment(t *testing.T) {
 	want, _ := filepath.EvalSymlinks(mine)
 	if gotReal, _ := filepath.EvalSymlinks(got); !ok || gotReal != want {
 		t.Fatalf("show-toplevel = %q (%v), want %q", got, ok, want)
+	}
+}
+
+// 中身を書き出す操作（LazyFetch）では、partial clone の無い blob を取りに行けるよう GIT_NO_LAZY_FETCH を付けない。
+func TestEnvironLazyFetch(t *testing.T) {
+	t.Setenv(env.GitNoLazyFetch, "1")
+	for _, kv := range environ(false, true) {
+		if strings.HasPrefix(kv, env.GitNoLazyFetch+"=") {
+			t.Errorf("付いている: %s", kv)
+		}
 	}
 }

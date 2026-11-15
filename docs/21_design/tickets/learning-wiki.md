@@ -1,7 +1,7 @@
 ---
 type: design
 title: 9.16 学びの蓄積（learning-wiki）
-description: 子チケットの気づきを learning-wiki に溜め、ルール・配点・フェーズ・テンプレート・スキル・文書への提案として育てる流れの設計。集める・溜める・提案する・人が決める・採否を残すの各段と、置き場・形・検査・診断
+description: 子チケットの気づきを learning-wiki に溜め、ルール・配点・フェーズ・テンプレート・スキル・文書への提案として育てる流れの設計。集める・溜める・提案する・人が決める・採否を残すの各段階と、置き場・形・検査・診断
 tags: [design-doc, ticket, learning-wiki]
 keywords: [学び, 気づき, learning-wiki, wiki, パターン, 提案, 採否, 再発, 反映先, learn, 揮発, 子, 親, フィードバック計画, impact]
 ---
@@ -112,7 +112,7 @@ learnings: 2
 - 要約は機械が書き機械が読む。ユーザとエージェントは直さない（直せば次の `learn` で書き直される）
 
 子の `ticket finish` は、学びの蓄積が有効な親の子について、`wip/handoff/learnings/<子>.md` が子のブランチの HEAD にコミットされた通常のファイル（モードが `100644` か `100755` の blob。ディレクトリとシンボリックリンクは不可）で、空でなく、親の `finish` と同じ読み取りの検査と節の整合の検査を通ることを確かめる
-（子の閉じる操作の検査のうち、成果物を見る `lifecycle.close.deliverables_missing` の隣に置く。フェーズ定義の `deliverables` とは別に持つ）。満たさなければ閉じるのを拒み、置き場と `ticket learn` を示す。
+（子の閉じる操作の検査のうち、成果物を見る `closing.DeliverablesMissing` の隣に置く。フェーズ定義の `deliverables` とは別に持つ）。満たさなければ閉じるのを拒み、置き場と `ticket learn` を示す。
 この検査はフェーズ定義の `deliverables` に載せず、閉じる操作に固定で持つ。
 `deliverables` と同じく、ファイルが在って追跡されているかを確かめたうえで、親の `finish` が見る形式（`learnings` の値と節の数）も同じ関数で確かめる。
 
@@ -126,16 +126,16 @@ learnings: 2
 | 項目 | 中身 |
 |---|---|
 | 識別子 | `<親>-00-<2 桁の連番>`。`phase: 0`、`maintenance: learning-consolidate`。`allow` は固定の範囲（`docs/wiki/patterns/*`、`docs/wiki/inbox/*`） |
-| 作る操作 | `ccnavi-ticket.sh consolidate <親>`（`ticket consolidate`）。write-and-push に組み込み、親の操作ロックの中で、条件の確認・連番の決定（`next_child_id` のフェーズ 0）・作成・コミット・push を行う。出力で `start` を案内する |
+| 作る操作 | `ccnavi-ticket.sh consolidate <親>`（`ticket consolidate`）。write-and-push に組み込み、親の操作ロックの中で、条件の確認・連番の決定（`approval.NextChildID` のフェーズ 0）・作成・コミット・push を行う。出力で `start` を案内する |
 | 打てる条件 | 学びの蓄積が `enable`。親の `finish` の学び以外の検査をすべて通る。処理すべきものの判定が 1 件以上。読み取れない記録・整合の検査にヒットする記録が無い |
 | 打ち直し | 開いている統合の子があれば新しく作らず、その識別子を出し、そのチケットを書いたパスの一覧に載せる（前の回の push が済んでいなければ write-and-push が送り直す） |
 | 位置づけ | `CCNAVI_LEARNING=enable` のときにシステムが事前に許す、限られた保守操作。ユーザの承認の代わりではない。通常の提案・承認の経路では `maintenance:` の印を使えず、印を持つ提案は承認で拒む |
 
-統合の子だけに適用する例外は、すべて `Ticket.is_consolidate` の 1 か所で決める（子・`phase: 0`・印の 3 つがそろうとき）。識別子の形や名前から推定しない。
+統合の子だけに適用する例外は、すべて `Ticket.IsConsolidate` の 1 か所で決める（子・`phase: 0`・印の 3 つがそろうとき）。識別子の形や名前から推定しない。
 
-- 構造エラー（例外を適用せず、子を止める）: 親に印がある、印があるのに `phase` が 0 でない、`maintenance` の値が `learning-consolidate` 以外。承認の側（`candidates.Validate`）でも判定の側（`approval.checks.blocking_problems`）でも適用する。印の無い `phase: 0` の子は、計画に無い番号として止まる
+- 構造エラー（例外を適用せず、子を止める）: 親に印がある、印があるのに `phase` が 0 でない、`maintenance` の値が `learning-consolidate` 以外。承認の側（`candidates.Validate`）でも判定の側（`approval.blockingProblems`）でも適用する。印の無い `phase: 0` の子は、計画に無い番号として止まる
 - 計画への所属: `phase: 0` を計画のステップと照合しない。フェーズの進行・レビュー待ちの集計・レビュー依頼の対象に含めない（`phase.Phases` が除く）。開いている子の検査・親への合流・連番の管理は通常の子と同じ
-- 範囲: ccnavi の中に固定した定義（`phases.ConsolidateType`）を上限に使い、`scope_verdict` で親の範囲の上限だけを適用しない。子の `allow` も適用する。実行前・実行後・サブエージェント終了時・合流前の 4 か所は `scope_verdict` を共有するので、判定が揃う
+- 範囲: ccnavi の中に固定した定義（`phases.ConsolidateType`）を上限に使い、`scope.Of` で親の範囲の上限だけを適用しない。子の `allow` も適用する。実行前・実行後・サブエージェント終了時・合流前の 4 か所は `scope.Of` を共有するので、判定が揃う
 - 学び・リスク・レビュー: 気づきの記録を求めず、実績リスクを測らず、必ずレビュー不要で `finish` が `done/` へ移す
 
 統合の子の手順は次のとおり。
@@ -158,13 +158,13 @@ learnings: 2
 
 `ticket learn --note` の追記も同じ扱いで、frontmatter の無い空でない記録には、雛形を推して前置せず、読み取れない記録として止めて直し方を言う（空の記録は雛形から始める）。
 
-処理すべきものは、親の HEAD で次を列挙する（`learning.records.pending`）。親の `finish` と `consolidate` が同じ結果を使う。
+処理すべきものは、親の HEAD で次を列挙する（`learning.Find`）。親の `finish` と `consolidate` が同じ結果を使う。
 
 - 処理の行が無い節（`learnings: none` でない記録）
 - `処理: 反映` の指すパターンが無い節、または、そのパターンの `sources` に記録の観測元の ID が無い節
 - `処理: 対象外` の後ろに理由が無い節、または `信号: 誤り`（仕様バグの学び）の節の `対象外`
 - `処理: issue` の後ろが `<番号> <理由>` の形でない節
-- `処理: 反映` の指すパターンの `sources` が `MIN_SOURCES_TO_REFLECT`（2）件に満たない節（観測元 1 件の気づきはパターンにしない。`wiki.SourcesThreshold` の提案の閾値とは別）
+- `処理: 反映` の指すパターンの `sources` が `wiki.MinSourcesToReflect`（2）件に満たない節（観測元 1 件の気づきはパターンにしない。`wiki.SourcesThreshold` の提案の閾値とは別）
 - `docs/wiki/inbox/` のファイル
 
 #### 親の finish の検査
@@ -185,7 +185,7 @@ learnings: 2
 |---|---|
 | `type` | `learning-wiki` |
 | `target` | 反映先の種類（`rule` `risk` `phase` `template` `skill` `docs`）。複数にまたがるときは、手順を実行する側の 1 つだけ |
-| `sources` | 重複しない観測元の ID の一覧。この数を**観測元の数**と呼ぶ（「再発の回数」とは言わない）。子の記録は子の識別子、親の記録は親の識別子、受信箱は `inbox:<ファイル名から .md を除いたもの>`。統合の子が `反映` できるのは 2 件以上のパターンだけ（`MIN_SOURCES_TO_REFLECT`） |
+| `sources` | 重複しない観測元の ID の一覧。この数を**観測元の数**と呼ぶ（「再発の回数」とは言わない）。子の記録は子の識別子、親の記録は親の識別子、受信箱は `inbox:<ファイル名から .md を除いたもの>`。統合の子が `反映` できるのは 2 件以上のパターンだけ（`wiki.MinSourcesToReflect`） |
 | `title` `description` `tags` `keywords` | `.ccnavi/docs/frontmatter.md` に従う |
 
 `index.md` と `log.md` は置かない。一覧は `ccnavi --learnings`、経過は git の履歴で見る。プロジェクトの wiki は、親と同じリポジトリの `docs/wiki/` に溜め、その親の統合の子が処理する。
@@ -203,7 +203,7 @@ learnings: 2
 
 本文に差分を書く。決着するときは、`patterns` の各値を、その時点でマージ先のパターンから数えた観測元の数に書き直す（提案を作ったときの値のままにしない）。取り下げは延期として扱う。
 
-パターンの状態は 1 つに決まる（`records.wiki.pattern_status`）。
+パターンの状態は 1 つに決まる（`wiki.status`）。
 
 1. そのパターンを `patterns` に含む採否の記録に `承認待ち` が 1 つでもあれば「提案中」
 2. それ以外は、`decided_at` が最も新しい採否の記録で決める。同じ日時なら `proposal` の名前順で後のもの。`承認`・`却下` なら「決着」。`延期` なら、今の観測元の数がその記録の `patterns` にある数より多ければ「候補」、多くなければ「決着」
@@ -224,7 +224,7 @@ learnings: 2
 
 `ccnavi --learnings [--json]`: 指定したツリー（既定は cwd のツリー）の wiki について、パターンごとの状態と観測元の数を一覧にし、「候補」を数える。`target` ごとの内訳、閾値（`CCNAVI_LEARNING_SOURCES`、既定 3）以上かどうか、`承認待ち` の提案の一覧、壊れたファイルの名指しを出す。
 
-SessionStart の通知（`learning_notice`）は、ユーザにだけ `systemMessage` で知らせる。`additionalContext` の今の起動案内はそのまま残し、学びの情報は足さない（wiki を作業のセッションに渡さないため）。
+SessionStart の通知（`notice.Learning`）は、ユーザにだけ `systemMessage` で知らせる。`additionalContext`（起動案内）には学びの情報を足さない（wiki を作業のセッションに渡さないため）。
 
 - 数える対象: リポジトリごと（ワークスペース自身と `projects/<名前>/`）に、`ccnavi_integration` の規則（手元の `origin/HEAD`、無ければ `origin/main`・`origin/master`）で統合先を決め、その手元の参照が指すコミットの `docs/wiki/` を git のオブジェクトから読む。チェックアウトは要らない。決められないか読めないリポジトリは、その回の通知を見送り、通知済みの記録も変えない。同じ回の `ccnavi-fetch.sh` による取り込みが終わっているかは保証しない（間に合わなければ次の回に知らせる）
 - 条件と変化: 「候補」の集合を C、そのうち観測元の数が閾値以上のものを R とする。C が `CCNAVI_LEARNING_NOTICE_COUNT`（既定 5）件以上か、R が 1 件以上、かつ、通知済みの記録に無い ID が C にある、または通知済みの記録で閾値未満だった ID が R にある、のときに知らせる

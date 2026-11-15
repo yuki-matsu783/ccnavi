@@ -166,7 +166,7 @@ test("CB-D704 フェーズ行: 一言（9通り）・手で動かした注意の
     assert.equal(rows[1].querySelector(".phase-manual")?.textContent, "手で動かした子の確認待ち");
     assert.equal(rows[0].querySelectorAll(".phase-manual").length, 0);
     assert.ok(rows[1].classList.contains("review-hold"));
-    // 状態は1か所にだけ描く。段の名前やマーカーの経過は出さない
+    // 状態は1か所にだけ描く。段階の名前やマーカーの経過は出さない
     assert.ok(!rows[1].textContent.includes("レビュー依頼済み"));
   } finally {
     await page.close();

@@ -52,6 +52,7 @@ sh scripts/ccnavi-build.sh                         # 実行ファイルの組み
 cd go && gofmt -l . && go vet ./... && go test ./...  # 実行ファイルの整形・検査・テスト
 ```
 
+- git の入口（`.ccnavi/scripts/ccnavi-git.sh`）は、実行ファイルに引数の形を確かめさせる。組み立てる前は使えないので、新しい環境（Claude Code on the web など）では最初に `sh scripts/ccnavi-build.sh` を打つ。`go/` を変えたら組み立て直す（`.ccnavi/bin/` の実行ファイルは、組み立てたときの判定のまま）
 - テストは `python -m tests` か `python -m unittest` で回す。ファイルを直接実行すると `tests` パッケージを import できずに失敗する。全件の回し方と、回すグループの決め方は[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)にある
 - 拡張（`extensions/`）のテストは、各拡張のディレクトリで `pnpm test` を回す。触ったファイルから回すグループを決める仕組みは[開発用の hook](../.agents/docs/dev-hooks.md)にある
 - ログの置き場と書き方は[ログの書き方](../.agents/docs/logging.md)にある
@@ -74,7 +75,7 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 
 | 場所 | 中身 |
 |---|---|
-| `go/` | 実行ファイルのソース（`internal/` に段ごとのパッケージ、`cmd/ccnavi/` に入口、`cmd/ccnavi-chrome/` に Chrome 拡張の WASM の入口）。組み立ては `scripts/ccnavi-build.sh`（[組み立てと配布物](../.agents/docs/build-and-dist.md)） |
+| `go/` | 実行ファイルのソース（`internal/` に層ごとのパッケージ、`cmd/ccnavi/` に入口、`cmd/ccnavi-chrome/` に Chrome 拡張の WASM の入口）。組み立ては `scripts/ccnavi-build.sh`（[組み立てと配布物](../.agents/docs/build-and-dist.md)） |
 | `pyproject.toml`・`uv.lock` | テスト（Python）を回すための設定と、依存の固定 |
 | `tests/` | テスト。グループごとのディレクトリに分ける（グループは[ccnaviのPythonのテストを回す](../.agents/docs/testing.md)で決める）。入口の標準入出力・終了コード・ファイルだけを見る受入テスト（`guard`・`sh`・`e2e` が中心）と、`ccnavi` の部品を直接呼ぶ単体テスト（`core`・`ticket` に多い）が混在する。GitLab の模擬と契約テスト（`contract/`）、受入シナリオ（`scenarios/`）、手動の道具（`manual/`）、テスト用の見本（`fixtures/`）もここにある |
 | `docs/` | 設計・要件・ADR・手引き。番号の付け方は[文書の置き場・読み手・リンクの向き](../.agents/docs/docs-structure.md)の「番号」にある。`CONTEXT.md` は用語集、`wiki/` は学びの蓄積 |

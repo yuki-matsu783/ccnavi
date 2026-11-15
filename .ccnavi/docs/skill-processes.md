@@ -31,14 +31,14 @@ keywords: [工程スキル, reference, references, skill-reference, 入口, proc
 
 ## reference の置き場
 
-`references/` の最上段は 2 つに分ける。ワークスペースもプロジェクトも同じ形にする。
+`references/` の最上位は 2 つに分ける。ワークスペースもプロジェクトも同じ形にする。
 
-| 最上段 | 中身 | コピーされるか |
+| 最上位 | 中身 | コピーされるか |
 |---|---|---|
 | `common/` | 共通の reference。ワークスペースの `.claude/skills/<工程>/references/common/` が元 | プロジェクトの `skills/<工程>/references/common/` へコピーされる。共通側から無くなった `.md` はコピー先からも消える |
 | `project/` | そのリポジトリ固有の reference。ワークスペースの固有分は `.claude/skills/<工程>/references/project/`、プロジェクトの固有分は `projects/<名前>/skills/<工程>/references/project/` | コピーされない。触れられない |
 
-`common/` と `project/` の中のディレクトリ構造は任意。最上段の 2 つ以外のディレクトリや、`references/` 直下のファイルは作らない。
+`common/` と `project/` の中のディレクトリ構造は任意。最上位の 2 つ以外のディレクトリや、`references/` 直下のファイルは作らない。
 
 - 共通の工程スキルの `SKILL.md` と `references/common/` は、着手済みの親があるときのユーザの発言が、そのワークツリーのプロジェクトの `skills/<工程>/` へコピーする。`common/` は共通のコピーなので、上書き・追加に加えて、共通側から無くなった `.md` を消す（空になったディレクトリも片付ける）。`SKILL.md` は消さない。
   プロジェクトだけを clone した人の手元にも入口と reference が入るようにするため。コピーした分は同期の出力に出るので、その場でコミットする。単体 clone では、reference は`sh .ccnavi/scripts/ccnavi-launcher.sh --docs`で引ける。入口の`SKILL.md`を読ませる目録は出ない（未解決）

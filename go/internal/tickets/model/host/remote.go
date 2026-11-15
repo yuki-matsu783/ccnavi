@@ -9,10 +9,11 @@ import (
 
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/records/redact"
 )
 
-// remote は origin の URL の読み方。sh の ccnavi_host_parse（ccnavi-common-host.sh）と Chrome 拡張の
-// hostclass.ts と同じ規則で、tests/fixtures/host-kinds.json の同じ表で突き合わせる。
+// remote は origin の URL の読み方。sh の ccnavi_host_parse（ccnavi-common-host.sh）と同じ規則で、
+// tests/fixtures/host-kinds.json の同じ表で突き合わせる。
 //   - ホストにはポートが付く（localhost:8929）。ssh の git@host:group/proj の `:` はパスの区切りなので、
 //     数字だけのときにポートと見なす
 //   - ユーザ情報（https://oauth2:token@host/）は authority の最後の `@` までと見る（トークンに `@` が入る）
@@ -23,18 +24,6 @@ var remote = regexp.MustCompile(
 	`\A(?:(?i:https?)://|(?i:ssh)://git@|git@)(?:[^/]*@)?` +
 		`(?P<host>\[[^\]/]+\]|[^/:@]+)(?::(?P<port>[0-9]+))?[/:]+(?P<path>.+?)(?:\.git)?/?\n?\z`)
 
-// URL に埋めた資格情報（`//user:token@` と、scheme の無い `user:token@host:path`）。苦情の文には残さない。
-// トークンに `@` が入ることがあるので、ホストの手前の最後の `@` までとする（sh の ccnavi_mask_url と同じ）。
-var (
-	credentials    = regexp.MustCompile(`//[^/]*@`)
-	scpCredentials = regexp.MustCompile(`^[^/:@]*:[^/]*@`)
-)
-
-func maskCredentials(url string) string {
-	url = credentials.ReplaceAllLiteralString(url, "//"+hidden)
-	return scpCredentials.ReplaceAllLiteralString(url, hidden)
-}
-
 const (
 	githubHost    = "github.com"
 	githubAPI     = "https://api.github.com"
@@ -42,7 +31,6 @@ const (
 	graphQLSuffix = "/graphql"
 	gitlabAPIPath = "/api/v4"
 	httpPrefix    = "http://"
-	hidden        = "<伏せた>@"
 )
 
 // 道具の名前。
@@ -68,8 +56,11 @@ const (
 // scheme・ホスト・ポートを保つ）。GHE.com の origin にポートが付くと API の URL を組めないので problem を言う
 // （GHE.com の API の URL の規則は実物では未検証）。
 type class struct {
-	kind    Kind
-	host    string
+	kind Kind
+	host string
+	// connect は接続に使うホスト。GitHub は host と同じ、GitLab は origin の表記のままのホストとポート
+	// （sh の ccnavi_h_host と同じ。資格情報の helper の鍵と、glab auth login --hostname に使う）。
+	connect string
 	api     string
 	graphQL string
 	path    string
@@ -90,12 +81,12 @@ func classify(url string) class {
 	host := pyfmt.Lower(raw)
 	switch {
 	case host == githubHost:
-		return class{GitHub, host, githubAPI, githubAPI + graphQLSuffix, path, ""}
+		return class{kind: GitHub, host: host, connect: host, api: githubAPI, graphQL: githubAPI + graphQLSuffix, path: path}
 	case isGHEHost(host) && port != "":
-		return class{kind: GitHub, host: host, path: path, problem: fmt.Sprintf(msgGHEPort, host, port, host)}
+		return class{kind: GitHub, host: host, connect: host + ":" + port, path: path, problem: fmt.Sprintf(msgGHEPort, host, port, host)}
 	case isGHEHost(host):
 		api := "https://api." + host
-		return class{GitHub, host, api, api + graphQLSuffix, path, ""}
+		return class{kind: GitHub, host: host, connect: host, api: api, graphQL: api + graphQLSuffix, path: path}
 	}
 	scheme := "https"
 	if strings.EqualFold(pyfmt.Head(url, len(httpPrefix)), httpPrefix) {
@@ -105,7 +96,13 @@ func classify(url string) class {
 	if port != "" {
 		authority += ":" + port
 	}
-	return class{GitLab, host, scheme + "://" + authority + gitlabAPIPath, "", path, ""}
+	return class{kind: GitLab, host: host, connect: authority, api: scheme + "://" + authority + gitlabAPIPath, path: path}
+}
+
+// Origin は origin の URL のホストの分類と、接続に使うホスト（class の connect）。読めない表記なら kind が空。
+func Origin(url string) (Kind, string) {
+	found := classify(strings.TrimSpace(url))
+	return found.kind, found.connect
 }
 
 // TransportProblem は sh がリモートを読み書きできる形になっているか。なっていなければその説明（--lint が言う）。
@@ -113,7 +110,7 @@ func classify(url string) class {
 func TransportProblem(url string) string {
 	found := classify(url)
 	if found.kind == "" {
-		return fmt.Sprintf(msgNotAHost, maskCredentials(url))
+		return fmt.Sprintf(msgNotAHost, redact.URLCredentials(url))
 	}
 	if found.problem != "" {
 		return found.problem

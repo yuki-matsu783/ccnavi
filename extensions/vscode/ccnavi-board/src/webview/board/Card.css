@@ -86,8 +86,8 @@
    右の列をautoにすると状態の1行分の幅が行を占め、フェーズ名の列が0になって省略記号ごと
    消えるので、状態の列は55% で止める。状態は項目（.phase-item）ごとに折り返さない塊にし、
    折り返すのは項目の間だけにする（1項目が列より長いときだけ項目の中で折る）。
-   丸は1行目の高さの真ん中に置く。行が2段以上になっても縦の真ん中へずれない。
-   フェーズ一覧が300px以下（4列並べたときのカード）では、名前と状態を縦2段にして名前に幅を渡す */
+   丸は1行目の高さの真ん中に置く。行が2行以上になっても縦の真ん中へずれない。
+   フェーズ一覧が300px以下（4列並べたときのカード）では、名前と状態を縦2行にして名前に幅を渡す */
 .phases { list-style: none; margin: 8px 0 0; padding: 6px 0 0; border-top: 1px solid var(--vscode-panel-border); font-size: var(--font-sm); display: flex; flex-direction: column; gap: var(--gap-2); container-type: inline-size; }
 .phase { display: grid; grid-template-columns: 12px minmax(0, 1fr) fit-content(55%); gap: var(--gap-1) var(--gap-3); align-items: baseline; color: var(--vscode-descriptionForeground); }
 .phase-dot { box-sizing: border-box; width: 10px; height: 10px; border-radius: var(--radius-round); border: 1.5px solid var(--vscode-descriptionForeground); align-self: start; margin-top: calc((1lh - 10px) / 2); }

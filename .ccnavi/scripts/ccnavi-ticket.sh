@@ -160,29 +160,20 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-# 識別子を実行ファイル（argparse）と同じに読む。`--` と `--reason <値>` を読み飛ばした最初の語。
-# サブコマンド（1 つ目の語）は読まない。
-ticket_id() {
-	ti_id=""
-	ti_skip=""
-	ti_first=yes
-	for ti_arg in "$@"; do
-		if [ -n "$ti_first" ]; then
-			ti_first=""
-			continue
-		fi
-		if [ -n "$ti_skip" ]; then
-			ti_skip=""
-			continue
-		fi
-		case "$ti_arg" in
-		--reason) ti_skip=yes ;;
-		--* | -?*) ;;
-		*) [ -n "$ti_id" ] || ti_id="$ti_arg" ;;
-		esac
-	done
-	printf '%s' "$ti_id"
+# 実行ファイル。識別子の読み・結果ファイル・子のワークツリーも実行ファイルに聞くので、最初に探す。
+if ! ccnavi_wap_use_exe "$root"; then
+	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	exit 2
+fi
+
+# 識別子は実行ファイル（`ticket-sh id`）が、本体の ticket の引数の読み（argparse）と同じに読む。`--` と `--reason <値>` を
+# 読み飛ばした最初の語。使える識別子なら ticket_id に入れ、使えなければ空にして断りの文を ticket_bad に入れる。
+ticket_ask() {
+	ccnavi_wap_exe ticket-sh "$@" 2>/dev/null </dev/null | tr -d '\r'
 }
+ticket_out=$(ticket_ask id -- "$@") || ticket_out=""
+ticket_id=$(ccnavi_val id "$ticket_out")
+ticket_bad=$(ccnavi_val msg "$ticket_out")
 
 # approval-request は、どの道を通っても結果ファイルを 1 つ書く（Stop の AI 判定が、提案を送ったか送らなかったかを
 # 確定する）。自分をもう 1 度起こし（CCNAVI_PROPOSE_INNER）、終わった後に外側が書く。中がどこで終わっても
@@ -197,34 +188,16 @@ start | finish | cancel | approval-request | consolidate)
 	done
 	;;
 esac
+# 結果ファイルの名前と中身（道の決め方）は実行ファイル（`ticket-sh result-begin`・`result-end`）が持つ。ここは自分を起こし直す
+# 段取り（中の終了コードを外が受ける）だけを持つ。
 if [ "$1" = approval-request ] && [ -z "${CCNAVI_PROPOSE_INNER:-}" ] && [ -z "$po_check" ]; then
-	po_id=$(ticket_id "$@")
-	po_dir="$root/logs/state/stopops-result"
-	po_start=$(date +%s 2>/dev/null || printf 0)
-	po_file="$po_dir/$po_start-$$.kv"
-	mkdir -p "$po_dir" 2>/dev/null || :
-	: >"$po_file.note" 2>/dev/null || :
+	po_out=$(ticket_ask result-begin) || po_out=""
+	po_file=$(ccnavi_val file "$po_out")
+	po_start=$(ccnavi_val started "$po_out")
 	po_rc=0
-	CCNAVI_PROPOSE_INNER=1 CCNAVI_PROPOSE_NOTE="$po_file.note" sh "$0" "$@" || po_rc=$?
-	po_route=$(sed -n 's/^route=//p' "$po_file.note" 2>/dev/null | tail -n 1)
-	if [ -z "$po_route" ]; then
-		po_route=failed_before
-	elif [ "$po_rc" -ne 0 ] && [ "$po_route" = sent ]; then
-		po_route=failed_after
-	fi
-	{
-		printf 'id=%s\nroute=%s\nrc=%s\nstarted=%s\nended=%s\n' \
-			"$po_id" "$po_route" "$po_rc" "$po_start" "$(date +%s 2>/dev/null || printf 0)"
-		grep -v '^route=' "$po_file.note" 2>/dev/null || :
-	} >"$po_file.tmp" 2>/dev/null && mv "$po_file.tmp" "$po_file" 2>/dev/null || :
-	rm -f "$po_file.note" "$po_file.tmp" 2>/dev/null || :
+	CCNAVI_PROPOSE_INNER=1 CCNAVI_PROPOSE_NOTE="${po_file:+$po_file.note}" sh "$0" "$@" || po_rc=$?
+	[ -z "$po_file" ] || ticket_ask result-end "$po_file" "$po_rc" "$po_start" -- "$@" >/dev/null || :
 	exit "$po_rc"
-fi
-
-# 実行ファイル。
-if ! ccnavi_wap_use_exe "$root"; then
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-	exit 2
 fi
 
 here="$(pwd -W 2>/dev/null || pwd)"
@@ -239,48 +212,31 @@ tidy_after() {
 	finish | cancel) ;;
 	*) return 0 ;;
 	esac
-	ta_id=$(ticket_id "$@")
-	ccnavi_is_ident "$ta_id" || return 0
+	[ -n "$ticket_id" ] || return 0
 	# 子の識別子のまま渡す。親へ割り出すのは実行ファイル（チケットの `parent:` を読む）。名前の形で
 	# 末尾の `-<2 桁>-<2 桁>` を剥がすと、その形で終わる親の識別子（rel-2026-10-06 など）を読み違える。
-	ccnavi_wap_exe --cwd "$here" worktree tidy "$ta_id" || :
+	ccnavi_wap_exe --cwd "$here" worktree tidy "$ticket_id" || :
 }
 
-# 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（write-and-push の親のワークツリーの HEAD）から作る。
-# 別のPCで承認された子でも、どのPCでも同じ場所に作る。ネットワークには出ない（git の局所の操作だけ）。
-# 子のブランチ（子の識別子の名前）が手元に残っていれば、親の先頭が含むものだけ親の先頭に揃えて使う
-# （含まない = 手元だけに積んだ仕事があるので、消さずに止める）。
-# ここで止めるのは git の状態（手元だけのコミット・作れない行き先）を見た判定で、ccnavi の状態（チケット・
-# マーカー）を読んで操作を止める判定ではない。shに判定を足さない決まり（hookと実行ファイルが判定する）の外になる。
+# 子の start で、このPCに子のワークツリーが無ければ、取り込み直後の親ブランチ（write-and-push の親のワークツリーの HEAD）から
+# 作る（実行ファイルの `ticket-sh child`。手元に残る子のブランチの扱いもそこにある）。ネットワークには出ない。
 ensure_child_worktree() {
-	ew_path="$root/.claude/worktrees/$wap_id"
-	if [ -e "$ew_path" ] || [ -L "$ew_path" ]; then
-		return 0
-	fi
-	if git -C "$ccnavi_wap_tree" show-ref --verify --quiet "refs/heads/$wap_id"; then
-		if ! git -C "$ccnavi_wap_tree" merge-base --is-ancestor "refs/heads/$wap_id" HEAD 2>/dev/null; then
-			printf 'ccnavi-ticket: 手元のブランチ %s に親のブランチ %s に無いコミットがある。子のワークツリーを作らずに止めた。内容を確かめて、親へ取り込むか、ユーザが消してから再実行してください\n' "$wap_id" "$ccnavi_wap_branch" >&2
-			log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=child-branch-ahead"
-			return 1
-		fi
-		git -C "$ccnavi_wap_tree" branch -f "$wap_id" HEAD >/dev/null 2>&1 || {
-			printf 'ccnavi-ticket: 手元のブランチ %s を親のブランチの先頭に揃えられなかった\n' "$wap_id" >&2
-			log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=child-branch-reset"
-			return 1
-		}
-		ew_rc=0
-		git -C "$ccnavi_wap_tree" worktree add "$ew_path" "$wap_id" >/dev/null 2>"$ccnavi_wap_tmp/ew-err" || ew_rc=$?
-	else
-		ew_rc=0
-		git -C "$ccnavi_wap_tree" worktree add "$ew_path" -b "$wap_id" HEAD >/dev/null 2>"$ccnavi_wap_tmp/ew-err" || ew_rc=$?
-	fi
-	if [ "$ew_rc" -ne 0 ]; then
-		printf 'ccnavi-ticket: 子のワークツリー %s を作れなかった（%s）\n' "$ew_path" "$(head -n 1 "$ccnavi_wap_tmp/ew-err" 2>/dev/null)" >&2
-		log_info 子のワークツリーを作れなかった -- "child=$wap_id" "reason=child-worktree-add"
+	ew_out=$(ticket_ask child "$wap_id" "$ccnavi_wap_tree" "$ccnavi_wap_branch" "$ccnavi_wap_family_id") || ew_out=""
+	ew_say=$(ccnavi_val err "$ew_out")
+	[ -z "$ew_say" ] || printf '%s\n' "$ew_say" >&2
+	if [ -z "$ew_out" ] || ccnavi_has fail "$ew_out"; then
+		[ -n "$ew_out" ] || printf 'ccnavi-ticket: 実行ファイルが答えないため、子のワークツリー .claude/worktrees/%s を用意できなかった。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください\n' "$wap_id" >&2
+		log_info 子のワークツリーを作らずに止めた -- "child=$wap_id" "reason=$(ccnavi_val1 fail "$ew_out" | sed 's/ .*//')"
 		return 1
 	fi
-	printf 'ccnavi-ticket: 子のワークツリー .claude/worktrees/%s を親のブランチ %s の先頭から作った\n' "$wap_id" "$ccnavi_wap_branch" >&2
-	log_info 子のワークツリーを作った -- "child=$wap_id" "parent=$ccnavi_wap_family_id"
+	[ -z "$(ccnavi_val made "$ew_out")" ] || log_info 子のワークツリーを作った -- "child=$wap_id" "parent=$ccnavi_wap_family_id"
+}
+
+# 親のブランチが一度も送られていないために止まったときの次の手（共通関数は事実だけを言う）。文と、出す操作
+# （approval-request・start）は実行ファイル（`ticket-sh unsent`）が決める。
+ticket_unsent_parent_next() {
+	[ -n "${ccnavi_wap_unsent_parent:-}" ] || return 0
+	ccnavi_val err "$(ticket_ask unsent "${1:-}" "$ccnavi_wap_branch" "${ccnavi_pi_mr:--}")" >&2
 }
 
 # 事前確認（ホストの API と git のリモートが使える状態か）。標準出力には何も足さず、ok でない項目だけを
@@ -288,28 +244,6 @@ ensure_child_worktree() {
 # 続けるのは、全体が ok か、ng が無く「api が確かめられず、権限は省略、git が ok」のときだけ（後者は注意を添える）。
 # それ以外は何も書かずに止める。事前確認は保証ではない（通ったあとの取り込みや push のゲートで止まることはある）。
 # approval-request は外側と内側の 2 回起動するので、呼ぶのは内側（ここ）だけ。
-# 親のブランチが一度も送られていないために止まったときの次の手（共通関数は事実だけを言う）。
-# MR の有無はホストの事柄でエージェントは調べられないので、決めるのはユーザ。
-ticket_unsent_parent_next() {
-	[ -n "${ccnavi_wap_unsent_parent:-}" ] || return 0
-	# 次の手は、手で切った親が最初に打つ approval-request・start のためのもの。ほかの操作は事実の文だけにする
-	case "${1:-}" in
-	start | approval-request) ;;
-	*) return 0 ;;
-	esac
-	tup_mr="<MR の番号>"
-	[ -z "${ccnavi_pi_mr:-}" ] || tup_mr="$ccnavi_pi_mr"
-	tup_b="$ccnavi_wap_branch"
-	tup_s=$(ccnavi_sh_quote "$ccnavi_wap_sh/ccnavi-start.sh")
-	{
-		printf '次の手: ユーザに状況を伝えて、どれにするか聞いて返事を待つ。直接実装には切り替えない\n'
-		printf '  1. issue に紐づく MR がすでにある: その MR のブランチで作業するかを聞く。作業するなら sh %s --mr %s（--issue <番号> と一緒に渡せる）\n' "$tup_s" "$tup_mr"
-		printf '  2. MR は無く、issue はある: %s を使わず sh %s --issue <番号> で新しく切る（ブランチ・ワークツリー・Draft MR を作る）。提案は新しい親のワークツリーへ移す。%s にコミットがあれば先に伝える\n' "$tup_b" "$tup_s" "$tup_b"
-		printf '  3. %s を使い続ける: ユーザが git push -u origin %s と MR（説明欄に Closes #<番号>）の作成をしてから、sh %s --mr %s で採用する\n' "$tup_b" "$tup_b" "$tup_s" "$tup_mr"
-		ccnavi_text "$root" NOTE_TICKET_NEW_ISSUE
-	} >&2
-}
-
 ticket_preflight() {
 	ccnavi_preflight "${ccnavi_wap_tree:-$here}"
 	[ "$ccnavi_pf_result" != ok ] || return 0
@@ -322,8 +256,7 @@ ticket_preflight() {
 	ccnavi_pf_top="${ccnavi_wap_tree:-$here}"
 	ccnavi_pf_next
 	[ -z "$ccnavi_pf_next_text" ] || ccnavi_wap_say "$ccnavi_pf_next_text"
-	if [ "$ccnavi_pf_result" = unverified ] && [ "$ccnavi_pf_api" = unverified ] &&
-		[ "$ccnavi_pf_access" = skipped ] && [ "$ccnavi_pf_git" = ok ]; then
+	if [ "$ccnavi_pf_continue" = yes ]; then
 		ccnavi_wap_say "注意: ホストの API を確かめられなかったが、続ける。このあとの review-request・confirm・ready はホストの API が要る"
 		log_info 事前確認で注意して続ける -- "fix=${ccnavi_pf_fix:-none}" "auth=${ccnavi_pf_auth_source:-none}"
 		return 0
@@ -341,10 +274,10 @@ start | finish | cancel | approval-request | consolidate)
 	ccnavi_wap_sh="$(dirname "$0")"
 	trap 'ccnavi_wap_end' EXIT
 	trap 'ccnavi_wap_end; exit 130' INT TERM HUP
-	# 識別子は実行ファイル（argparse）と同じに読む（ticket_id。`start -- <親>` で write-and-push を経ずに通らないようにする）。
-	wap_id=$(ticket_id "$@")
-	if ! ccnavi_is_ident "$wap_id"; then
-		printf 'ccnavi-ticket: %s には識別子を指定してください（%s は有効な識別子の形式ではありません）。\n' "$1" "${wap_id:-（無い）}" >&2
+	# 識別子は実行ファイル（argparse）と同じに読む（上の ticket_id。`start -- <親>` で write-and-push を経ずに通らないようにする）。
+	wap_id="$ticket_id"
+	if [ -z "$wap_id" ]; then
+		printf 'ccnavi-ticket: %s\n' "${ticket_bad:-$1 には識別子を指定してください（実行ファイルが答えませんでした）。}" >&2
 		exit 2
 	fi
 	ccnavi_wap_family "$wap_id"
@@ -385,10 +318,6 @@ start | finish | cancel | approval-request | consolidate)
 		fi
 		if [ "$1" = start ] && [ "$wap_id" != "$ccnavi_wap_family_id" ]; then
 			ensure_child_worktree || exit 1
-		fi
-		if [ "$1" = approval-request ]; then
-			# 失敗しても、利用者が書いた提案はワークツリーに残す（戻すのは自分のコミットだけ）。
-			ccnavi_wap_keep_worktree=yes
 		fi
 		wap_rc=0
 		ccnavi_wap_write "ccnavi: ${wap_words}" -- ticket "$@" || wap_rc=$?

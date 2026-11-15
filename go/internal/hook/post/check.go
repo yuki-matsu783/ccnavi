@@ -301,7 +301,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 		carried, known = known, nil
 	}
 
-	// 戻しの段。戻すのは fresh のうち戻せるものだけ。横のチェックアウトと、受け入れ済みの上に重なったものは戻さない。
+	// 戻しの段階。戻すのは fresh のうち戻せるものだけ。横のチェックアウトと、受け入れ済みの上に重なったものは戻さない。
 	restored := map[string]string{}
 	tried := false
 	if restore == config.Enable {

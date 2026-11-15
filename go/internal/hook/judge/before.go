@@ -294,7 +294,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 		if kind, found := useronly.HumanPathForm(record.Subject); found != "" {
 			return stop(useronly.CodeTicketApproval, useronly.TicketApprovalRuleID, useronly.HumanMessage(root, kind, found), config.Gate)
 		}
-		// 2 段目の無いユーザの入口は、引数を変数・置換・glob で組むと表記の検査から外れるので、読めなければ止める。
+		// 2 つ目の無いユーザの入口は、引数を変数・置換・glob で組むと表記の検査から外れるので、読めなければ止める。
 		layers := make([]useronly.Layer, len(inner))
 		for i, l := range inner {
 			layers[i] = useronly.Layer{Runner: l.runner, Text: l.text}
@@ -303,7 +303,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 			return stop(useronly.CodeTicketApproval, useronly.TicketApprovalRuleID, useronly.HiddenEntryMessage(root, entry, found), config.Gate)
 		}
 	}
-	// 子チケットのワークツリーからの push は誰が打っても止める（sh の検査は 2 重目）。
+	// 子チケットのワークツリーからの push は誰が打っても止める（sh の検査は 2 つ目）。
 	if conf.TicketsEnabled() && in.ToolName == config.ToolBash {
 		if name, parent := shellguard.CheckChildPush(conf, root, in.Cwd, record.Subject, degraded); name != "" {
 			return stop(shellguard.CodeChildPush, shellguard.ChildPushRuleID, shellguard.ChildPushMessage(root, name, parent), config.Gate)
@@ -342,7 +342,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 }
 
 // turnGate はユーザの発言をまたぐゲート。ルールが allow でも、ユーザの返事を待つ手順は外さない。B は止め、通した A は
-// 記録する。付き添いのあるセッションでは、ask_if_attended の宣言があると B を確認に出す（同じコマンドに A と B を並べたら止める）。
+// 記録する。付き添いのあるセッションでは、askIfAttended の宣言があると B を確認に出す（同じコマンドに A と B を並べたら止める）。
 // サブエージェントは対話でも発言を待つ。確認で先に返すと、後のサブエージェントの禁止に届かないため。
 func (j *judgement) turnGate(notices []string, subject string, inner []layer) (int, bool, error) {
 	conf, in, record := j.conf, j.in, j.record

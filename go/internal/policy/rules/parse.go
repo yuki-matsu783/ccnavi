@@ -5,6 +5,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"sync"
 
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -20,12 +21,12 @@ const needsMessage = Deny
 // 読めない（ファイルが無い、UTF-8 でない、YAML として読めない、マッピングでない）ときは error を返す。
 // 組み立てられないルールは外して Problem で名指しし、組み立てられたものは返す。1 件の不備でガード全体を止めないため。
 func Load(path, root string) (*RuleSet, []Problem, error) {
-	// UTF-8 として厳密に読む。fsio を通さずディスクだけを読むので、溜める段も見ない。
+	// UTF-8 として厳密に読む。fsio を通さずディスクだけを読むので、溜める段階も見ない。
 	text, err := fsio.ReadDiskText(path, fsio.Strict)
 	if err != nil {
 		return nil, nil, err
 	}
-	data, err := yaml.Load(text)
+	data, err := loadYAML(text)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s を YAML として読めない: %w", path, err)
 	}
@@ -35,6 +36,28 @@ func Load(path, root string) (*RuleSet, []Problem, error) {
 	}
 	rs, problems := Parse(m, root)
 	return rs, problems, nil
+}
+
+// yamlResult はルールファイルの中身 1 つを YAML として読んだ結果。
+type yamlResult struct {
+	data any
+	err  error
+}
+
+// loadedYAML は、この起動で YAML として読んだルールファイルの中身を、中身ごとに覚える。診断
+// （`--test-expectations`）は期待ごとに判定を回し直し、そのたびに同じルールファイルを読み直す。Parse は読んだ値を
+// 読むだけで変えないので、同じ値を何度渡してもよい。中身を鍵にするので、ファイルが書き換わったら読み直す。
+var loadedYAML sync.Map
+
+func loadYAML(text string) (any, error) {
+	if v, ok := loadedYAML.Load(text); ok {
+		r := v.(yamlResult)
+		return r.data, r.err
+	}
+	data, err := yaml.Load(text)
+	v, _ := loadedYAML.LoadOrStore(text, yamlResult{data, err})
+	r := v.(yamlResult)
+	return r.data, r.err
 }
 
 // Parse は読み込み済みのルールを組み立てる。ファイルを開く部分と分けるのは、ルールファイルを
@@ -395,7 +418,7 @@ func readWhen(written any, name string) (*Condition, *Problem) {
 	var node func(raw any, where string, depth int) (*Condition, whenError)
 	node = func(raw any, where string, depth int) (*Condition, whenError) {
 		if depth > maxWhenDepth {
-			return nil, whenError(fmt.Sprintf("%s で入れ子が %d 段を超える。判定が重くならないように、段を浅くするか、ルールを分けてください", where, maxWhenDepth))
+			return nil, whenError(fmt.Sprintf("%s で入れ子が %d 階層を超える。判定が重くならないように、入れ子を浅くするか、ルールを分けてください", where, maxWhenDepth))
 		}
 		count++
 		if count > maxWhenNodes {

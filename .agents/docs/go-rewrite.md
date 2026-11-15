@@ -17,11 +17,11 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 - 一括で書き直し、全部を Go にしてから切り替えた。配る実行ファイルは Go のバイナリで、Python の実行ファイル（PyInstaller）は組まない。`src/ccnavi/` は消した
 - CLI の引数・標準出力（JSON を含む）・標準エラー・終了コードは変えない。拡張（TS）・sh・Chrome 拡張はそれを読むので、直さずに済ませる
 - 書き直しを機にリファクタする。外から見える振る舞いは変えず、中の構成は今後の拡張がしやすい形に変える
-- 下の段から移す。段の並び（`infra` → `records` → `policy` → `tickets` → `catalog` → `hook` → `entry`）と、依存を下へだけ向ける決まりは Python と同じ
+- 下の層から移す。層の並び（`infra` → `records` → `policy` → `tickets` → `catalog` → `hook` → `entry`）と、依存を下へだけ向ける決まりは Python と同じ
 - Go のパッケージは責務ごとにまとめる。Python のモジュールと 1 対 1 にしない。大きさだけで分けたモジュールは、1 つのパッケージの複数ファイルにする（例: `shellread_*` の 4 つは `infra/shell`、`gitcmd` と `gitstate` は `infra/git`）
-- 同じことをしている関数は 1 つにまとめ、差はオプションで表す。呼び手の無い関数は移さない。公開する API は、上の段が使うものに絞る
+- 同じことをしている関数は 1 つにまとめ、差はオプションで表す。呼び手の無い関数は移さない。公開する API は、上の層が使うものに絞る
 - コメントの粒度は `environment.md` の「コードのコメントの粒度」に従う。docstring は丸写ししない。直感的でない処理（Python と答えを合わせるための分岐、順序に依存する手順、意外な既定値、照合や後戻りの仕掛け、OS ごとの違い）には、何をしているかとなぜそうするかの両方を書く。長い関数は、処理のまとまりごとに何をするかを 1 行で書き、上から読めば流れが分かるようにする。経緯、ほかのファイルの説明の繰り返し、1 行ごとの実況は書かない。パッケージの役割は `doc.go` に 1 段落で書く
-- 上の段が同じ下ごしらえを繰り返さないように、下の段に土台を置く（YAML の値を型を確かめて取り出す関数、Python の `json.dumps` と同じバイト列を作る JSON の出力など）
+- 上の層が同じ下ごしらえを繰り返さないように、下の層に土台を置く（YAML の値を型を確かめて取り出す関数、Python の `json.dumps` と同じバイト列を作る JSON の出力など）
 
 ## 書き方の標準
 
@@ -45,7 +45,7 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 ### エラー
 
-- 下の段は `error` を返し、包むときは `fmt.Errorf("…: %w", err)` を使う。呼び手が種類で分けるエラーは、`var ErrX = errors.New(…)` か型で定義し、`errors.Is`・`errors.As` で見る
+- 下の層は `error` を返し、包むときは `fmt.Errorf("…: %w", err)` を使う。呼び手が種類で分けるエラーは、`var ErrX = errors.New(…)` か型で定義し、`errors.Is`・`errors.As` で見る
 - `panic` は使わない。想定外のエラーは入口（`entry`）で受け、Python の内部エラーと同じ出力にする
 - 起動時に組む固定の式の `pyre.MustCompile` は `panic` の例外として許す（組めないのはビルドの不備で、テストが起動の時点で落ちる）
 
@@ -55,17 +55,17 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 - ファイルは責務ごとに分ける。1 ファイルに型とその操作をまとめる
 - interface は使う側のパッケージで、使うメソッドだけを含む形で定義する
 - 略語は Go の慣習に従う（`ID`・`JSON`・`URL`・`SHA`）
-- OS の違いは `ospath.Windows` で分ける（`runtime.GOOS` を直に比べない）。分ける場所は `infra` の中に閉じ、上の段に OS の分岐を書かない。build タグでファイルを分けるのはよい
+- OS の違いは `ospath.Windows` で分ける（`runtime.GOOS` を直に比べない）。分ける場所は `infra` の中に閉じ、上の層に OS の分岐を書かない。build タグでファイルを分けるのはよい
 - 外部のプロセスは `exec.CommandContext` で、期限を定数から渡して起動する
 
 ### 検査
 
 - `gofmt` と `go vet` を通す
-- 依存の向きは `go/internal/layers_test.go` が見る。見るのは本体のファイル（`_test.go` 以外）の import で、段は親のパスごとの表で決める。`topTiers` は `internal/` 直下の段、`subTiers` は親（`infra`・`tickets`・`tickets/config` など）ごとの子の段で、兄弟は段が小さい兄弟（とその下）だけを読める。表に親が無い所の兄弟どうしと、親と子のあいだは見ない。テストだけが読む道具（`tickets/testkit`）は親の表の一番上に置き、本体から読めないようにする。`go/internal/conventions_test.go` が見るのは、いまは環境変数の名前の直書き（`CCNAVI_*`・`CLAUDE_*`）だけで、ほかの定数の決まりは読む人が守る。機械で見られる決まりを足したら、`conventions_test.go` に検査も足す
+- 依存の向きは `go/internal/layers_test.go` が見る。見るのは本体のファイル（`_test.go` 以外）の import で、層は親のパスごとの表で決める。`topTiers` は `internal/` 直下の層、`subTiers` は親（`infra`・`tickets`・`tickets/config` など）ごとの子の層で、兄弟は層が小さい兄弟（とその下）だけを読める。表に親が無い所の兄弟どうしと、親と子のあいだは見ない。テストだけが読む道具（`tickets/testkit`）は親の表の一番上に置き、本体から読めないようにする。`go/internal/conventions_test.go` が見るのは、いまは環境変数の名前の直書き（`CCNAVI_*`・`CLAUDE_*`）だけで、ほかの定数の決まりは読む人が守る。機械で見られる決まりを足したら、`conventions_test.go` に検査も足す
 
 ## テスト
 
-- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、Go の実行ファイルを起こす。実行ファイルは `tests/exe.py` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う。`tests/` は ccnavi の Python を読まない
+- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、Go の実行ファイルを起こす。sh の判断と解釈を Go で実装したら、それは Go の表駆動のテストで確かめ、sh のテストは通しの確認だけにする（[実行ファイルの境界](exe-boundary.md)の「テスト」）。実行ファイルは `tests/exe.py` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う。`tests/` は ccnavi の Python を読まない
 - 内部のモジュールを直に import していた単体テストは、`go test`（同じディレクトリの `*_test.go`）へ移した。表で書けるものは表駆動にした
 - `go test ./...` は Python を使わない。Python が無い機械でも、飛ばすテストは増えない
 
@@ -100,7 +100,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 | `os.path.normcase` | Windows だけ `/` を `\` にして小文字にする。Linux・macOS は何もしない |
 | 正規表現 | Python の re の答えが要る式は `infra/pyre`（Python 3.13 の re の写し）を使う。固定の式で RE2 で書けるものは `regexp`。pyre は RE2 の 5〜10 倍遅い |
 | 正規表現の照合の深さ | pyre は入れ子が `pyre.depthLimit` を越えた照合を打ち切る（Python の sre は打ち切らない。Go はスタックがあふれるとプロセスごと落ちるため）。打ち切りは `SearchChecked` が知らせ、ルールの照合（`rules.Rule.Matches`）は止める側（deny・ask）を当たり、allow を外れにする。数 KB の通常のコマンドでは届かない |
-| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の段は `*yaml.Map` の取り出し（`Text`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う。書き出し（`yaml.safe_dump`）は純 Python の書き手を写した `yaml.Dump`（80 字の折り返しも同じ） |
+| YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の層は `*yaml.Map` の取り出し（`Text`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う。書き出し（`yaml.safe_dump`）は純 Python の書き手を写した `yaml.Dump`（80 字の折り返しも同じ） |
 | 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を保つ型で組む |
 | JSON の出力 | Python の `json.dumps` の既定（`ensure_ascii`・区切りの空白）に合わせる。呼び出しごとに引数を確かめる |
 | 文字列の長さ・切り出し | Python は符号位置で数える。Go の `len` はバイト。`[]rune` か `utf8` で数える |
@@ -109,7 +109,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 
 書き直しは終わった。配る実行ファイルは `scripts/ccnavi-build.sh` が組む Go のバイナリ、Chrome 拡張の判定は Go の WASM（`go/cmd/ccnavi-chrome`）、Python のテストが起こす ccnavi も Go のバイナリ（`tests/exe.py`）。Python の実行ファイル（`src/ccnavi/`）と、それを直に読む白箱のテストは消した。
 
-行数は書き直す前の Python（消した `src/ccnavi/<段>` の `*.py`。空行・コメントも含む）の行数。
+行数は書き直す前の Python（消した `src/ccnavi/<層>` の `*.py`。空行・コメントも含む）の行数。
 
 | パッケージ | 行数（Python） | 状態 |
 |---|---|---|
@@ -123,7 +123,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 
 ## 後で扱うこと
 
-レビューで見つかり、いまは直さずに、扱う段に持ち越したもの。扱ったら行を消す。
+レビューで見つかり、いまは直さずに、扱う層に持ち越したもの。扱ったら行を消す。
 
 | いつ | 何を |
 |---|---|
@@ -135,7 +135,7 @@ Go の版は `go/go.mod` の `go 1.26.0` に合わせる。
 
 ```sh
 cd go && go vet ./... && go test ./...
-cd go && go test ./internal/hook/reasons -run TestTextsMatchPython -update   # golden.Check の見本を書き直す
+cd go && go test ./internal/hook/reasons -run TestTextsMatchGolden -update   # golden.Check の見本を書き直す
 ```
 
 `go/cmd/ccnavi/main.go` は標準入出力と引数を `entry/cli` の `Run` に渡して終わるだけ。配る実行ファイルは `scripts/ccnavi-build.sh` が組む（[組み立てと配布物](build-and-dist.md)）。Python の CLI のテストは、次のように Go の実行ファイルに当てる（版のコミットは `-ldflags "-X ccnavi/internal/entry/version.commit=<sha>"` で入れる）。

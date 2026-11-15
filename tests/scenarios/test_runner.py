@@ -3150,6 +3150,7 @@ case " $* " in
   printf '{{"compat": {compat}}}\\n'
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
+*" host "* | *" path under "* | *" git integration "*) exec '{exe}' "$@" ;;
 esac
 exit 0
 """
@@ -3410,6 +3411,8 @@ class BareHostTest(unittest.TestCase):
             if name.startswith("ccnavi-") and name.endswith(".sh"):
                 shutil.copy(os.path.join(SH_DIR, name), scripts)
         git(self.ws.target, "switch", "-q", "-c", "feat")
+        # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+        env = {**env, "CCNAVI_ENTRY_PATH": built.sh_path()}
         done = subprocess.run(
             ["sh", str(scripts / "ccnavi-git.sh"), "fetch", "origin"],
             cwd=self.top,
@@ -3482,7 +3485,7 @@ class FakeGitlabHostTest(unittest.TestCase):
         git(self.ws.target, "switch", "-q", "-c", "i0001")
         exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            EXE_STUB.format(compat=built.compat(), log=os.path.join(self._tmp.name, "args.txt")),
+            EXE_STUB.format(compat=built.compat(), log=os.path.join(self._tmp.name, "args.txt"), exe=built.sh_path()),
         )
         os.chmod(exe, 0o755)
         env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})

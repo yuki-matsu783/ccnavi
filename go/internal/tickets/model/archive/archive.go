@@ -468,11 +468,7 @@ func TreeHead(treeRoot, rev string) string {
 	if treeRoot == "" {
 		return ""
 	}
-	done := git.Run(treeRoot, []string{"rev-parse", "--verify", "--quiet", rev + "^{commit}"}, git.Options{})
-	if !done.OK() {
-		return ""
-	}
-	return ospath.Strip(done.Out)
+	return git.Commit(treeRoot, rev, git.Options{})
 }
 
 func readReady(root, project, name string) *pyjson.Object {
@@ -618,7 +614,7 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 	return moved, ""
 }
 
-// safeDir は行き先のディレクトリを、ルートから 1 段ずつ確かめながら作る。リンクがあれば理由を返す。
+// safeDir は行き先のディレクトリを、ルートから 1 階層ずつ確かめながら作る。リンクがあれば理由を返す。
 func safeDir(root, project, rel string) string {
 	relParts := strings.Split(rel, "/")
 	path := root

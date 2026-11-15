@@ -13,7 +13,7 @@ keywords: [ゲート, 最初に断る, --check, approval-request, confirm, ready
 
 ADR-0217・0221・0225 で、開始前に分かる条件はロック・取り込みの前に `--check` で断る型にした。横展開の調査で、次が残っていた。
 
-- `ccnavi-ticket.sh approval-request` だけ、`--check` の前段を飛ばしていた。コメントは「事前確認の流れで検査が済む」と書いたが、事前確認は環境の確認で、後のゲート（`approval_request_gate`）ではない。本体の検査はロックと取り込みのあとだった
+- `ccnavi-ticket.sh approval-request` だけ、`--check` の前の段階を飛ばしていた。コメントは「事前確認の流れで検査が済む」と書いたが、事前確認は環境の確認で、後のゲート（`approval_request_gate`）ではない。本体の検査はロックと取り込みのあとだった
 - `ccnavi-review.sh confirm` と `ready` は `wap_start`（ロック・取り込み）のあとで、依頼の記録・依頼のあとに動いたか・親を閉じられるかを確かめていた
 - `decide` の `--yes` の選択とダイジェストの形が不正なとき、`--check` では `次:` が付くが、本体は付かなかった
 - ADR-0226 は、実行ファイルの `--version --json` の `flags`・`features` を「Chrome 拡張や診断が読みうる」として残した。確かめると、本番の読み手は無かった

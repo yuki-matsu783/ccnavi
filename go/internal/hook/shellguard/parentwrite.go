@@ -26,11 +26,13 @@ const (
 )
 
 // writeHint は書き込みを疑う語。読むだけのコードを止めないための線引きで、広めに取る。`open(` は書くモード
-// （`'w'`・`"a"`・`'x'`・`+`）を添えたときだけ数える（読むだけの `open(p).read()` を通す）。
+// （`'w'`・`"a"`・`'x'`・`+`）を添えたときだけ数える（読むだけの `open(p).read()` を通す）。短い語（mv・cp・ln・
+// install）と link は語の境で区切り、link は呼び出し（`link(`）だけ数える。読むだけの `islink`・`readlink`・
+// `linkcheck` を書き込みと読まないため。
 var writeHint = pyre.MustCompile(
 	`open\s*\([^)]*['"][rbt]*[wax][bt+]*['"]|write|append|unlink|remove|rename|replace\s*\(|rmtree|copy|move|mkdir|`+
-		`makedirs|truncate|chmod|symlink|touch|system|exec|spawn|popen|subprocess|`+
-		`out-file|set-content|add-content|new-item|>`,
+		`makedirs|truncate|chmod|chown|\butime|symlink|\blink\s*\(|\bln\b|\bmv\b|\bcp\b|\binstall\b|touch|system|exec|`+
+		`spawn|popen|subprocess|out-file|set-content|add-content|new-item|>`,
 	pyre.IgnoreCase,
 )
 
@@ -75,7 +77,7 @@ func CheckParentWrite(conf *config.Settings, root, cwd, subject string, degraded
 	// 読み切れなかった部分は、中で何が書かれるか分からない。親のパスと書き込みを疑う語が並んでいれば止める側に倒す。
 	if degraded || unread {
 		for _, text := range all {
-			if name := mentionedParent(root, parents, text); name != "" && writeHint.Search(text) {
+			if name := mentionedParent(root, parents, text); name != "" && hintsWrite(root, parents, text) {
 				return ParentWrite{short(text), name, kindCode}
 			}
 		}
@@ -119,8 +121,40 @@ func isParentName(parents []string, name string) bool {
 	return slices.ContainsFunc(parents, func(p string) bool { return pathcase.Fold(p) == folded })
 }
 
+// hintsWrite は、text に書き込みを疑う語があるか。ワークスペースルートと親のワークツリーのパスは除いてから探す。
+// パスの中の語（`~/system-tools/` や、ブランチ名に揃えたワークツリーの `feature-12-remove-x`）を書き込みと読むと、
+// 親のワークツリーを読むだけのコードまで止めてしまうため。
+func hintsWrite(root string, parents []string, text string) bool {
+	rest := strings.ReplaceAll(text, `\`, "/")
+	var paths []string
+	for _, name := range parents {
+		paths = append(paths, parentForms(root, name)...)
+	}
+	paths = append(paths, strings.ReplaceAll(root, `\`, "/"), strings.ReplaceAll(ospath.Realpath(root), `\`, "/"))
+	for _, path := range paths {
+		re, err := pyre.Compile(pyre.Escape(path), pyre.IgnoreCase)
+		if err != nil {
+			continue
+		}
+		rest = re.Sub(rest, func(pyre.Found) string { return " " })
+	}
+	return writeHint.Search(rest)
+}
+
+// parentForms は文字列の中で親のワークツリーを指す形（絶対パス・実パス・`worktrees/<名前>`・`../<名前>`）。
+// 区切りは `/` にそろえる。
+func parentForms(root, name string) []string {
+	at := ospath.Join(tree.WorktreesPath(root), name)
+	return []string{
+		strings.ReplaceAll(at, `\`, "/"),
+		strings.ReplaceAll(ospath.Realpath(at), `\`, "/"),
+		"worktrees/" + name,
+		"../" + name,
+	}
+}
+
 func checkCode(conf *config.Settings, root string, parents []string, c code) ParentWrite {
-	if !writeHint.Search(c.text) {
+	if !hintsWrite(root, parents, c.text) {
 		return ParentWrite{}
 	}
 	if name := mentionedParent(root, parents, c.text); name != "" {
@@ -139,15 +173,8 @@ func checkCode(conf *config.Settings, root string, parents []string, c code) Par
 func mentionedParent(root string, parents []string, text string) string {
 	folded := strings.ReplaceAll(text, `\`, "/")
 	runes := []rune(folded)
-	base := tree.WorktreesPath(root)
 	for _, name := range parents {
-		forms := []string{
-			strings.ReplaceAll(ospath.Join(base, name), `\`, "/"),
-			strings.ReplaceAll(ospath.Realpath(ospath.Join(base, name)), `\`, "/"),
-			"worktrees/" + name,
-			"../" + name,
-		}
-		for _, form := range forms {
+		for _, form := range parentForms(root, name) {
 			re, err := pyre.Compile(pyre.Escape(form), pyre.IgnoreCase)
 			if err != nil {
 				continue

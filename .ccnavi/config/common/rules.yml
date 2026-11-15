@@ -209,14 +209,14 @@ allow:
 
   # 直接作業のワークツリーは {script:ccnavi-worktree.sh} だけで切る。手の worktree add に誘わない。
   # ccnavi-git.sh の worktree add を直接打ったときの止めない案内（既存のブランチを出すときなど、親や子のワークツリー用）。
-  # 止める 2 重目の確認は ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
+  # 止める 2 つ目の確認は ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
   - id: ccnavi-git-worktree-add
     match: Bash
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
     additionalContextOnce: >-
       直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ります。取り込み先の確認・リモートとのずれの確認・
       書きかけの扱いをまとめて行うので、新しく切るときに手で worktree add を打つ必要はありません。
-      ブランチが既にあるときの worktree add（ccnavi-worktree.sh が案内する 1 段目）のあとは、
+      ブランチが既にあるときの worktree add（ccnavi-worktree.sh が案内する 1 つ目）のあとは、
       {script:ccnavi-worktree.sh} <名前> --adopt --base <統合先> で引き取ります。引き取りにはユーザの確認が要ります。
       引き取らないと integrate できません。
       worktree add が断られたら、出力の案内どおりに打ち直してください。手元の取り込み先は進めません。

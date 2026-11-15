@@ -5,7 +5,7 @@
  * 操作を頼む。PAT を書く・消すのは設定画面からだけ受ける。送り手は拡張の自分のページに限り、
  * 他の拡張・ウェブページからの呼び出し（`onMessageExternal`）は受けない。
  *
- * レビュー済みのために MR のスレッドとレビュー（`reviewCopy`）と、依頼の後の変更の
+ * レビュー済みのために MR のスレッドとレビューの応答（`reviewReplies`。読みは ccnavi の `copy`）と、依頼の後の変更の
  * 一覧（`compareFiles`）を読む。どちらも読むだけ。
  *
  * 書く操作 `commit` を受ける。受けるのはボードからだけで、設定画面で登録したリポジトリだけに
@@ -29,7 +29,7 @@
  * MR へのコメントだけで、thread id は API の経路と GraphQL に使える字、タイトルは 1 行、本文は字数の上限を検査する。
  * 作る issue には assignee・labels・milestone を付けない。GitHub のスレッドは、登録したリポジトリのその MR のものかを確かめてから書く。
  * 本文は、コードフェンスの外にある quick action（GitLab）とメンションを無害にしてから送る。
- * 書く前の確かめ `writeInfo` と `issueComments` は読むだけ（登録したリポジトリだけ）。
+ * 書く前の確かめの応答 `writeReplies`（読みは ccnavi の `write-info`）と `issueComments` は読むだけ（登録したリポジトリだけ）。
  */
 import { expiryNotice, parseManual, type Notice, type TokenMeta } from "./expiry.js";
 import * as github from "./github.js";
@@ -48,7 +48,7 @@ export type HostOp =
   | "viewer"
   | "pullApprovals"
   | "commitParents"
-  | "reviewCopy"
+  | "reviewReplies"
   | "compareFiles"
   | "pathCommitTime"
   | "issues"
@@ -64,7 +64,7 @@ export type HostOp =
   | "findIssue"
   | "postComment"
   | "commentIssue"
-  | "writeInfo"
+  | "writeReplies"
   | "issueComments"
   | "commit";
 
@@ -576,10 +576,10 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     case "commitParents":
       value = await x.commitParents(client, o, r, github.checkOid(a));
       break;
-    case "reviewCopy":
+    case "reviewReplies":
       // レビュー済み: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
-      value = await x.reviewCopy(client, o, r, github.checkBranch(a));
+      value = await x.reviewReplies(client, o, r, github.checkBranch(a));
       break;
     case "compareFiles":
       if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
@@ -654,13 +654,13 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       // decide: issue の続きのコメントが付いているかを見る。読むだけ
       value = await x.issueComments(client, o, r, github.checkNumber(a, "issue の番号"));
       break;
-    case "writeInfo":
+    case "writeReplies":
       // decide: 書く前の確かめ。読むだけ（登録したリポジトリだけ）
-      value = await x.writeInfo(client, o, r, github.checkNumber(a, "MR の番号"));
+      value = await x.writeReplies(client, o, r, github.checkNumber(a, "MR の番号"));
       break;
     case "listOpenMrs":
-      // 「始める」: issue を閉じる開いた MR を探す。読むだけ
-      value = await x.listOpenMrs(client, o, r);
+      // 「始める」: issue を閉じる開いた MR を探す。読むだけ。閉じる語の読み方がホストで違うので、ホストの種類も返す
+      value = { host: client.host.kind, mrs: await x.listOpenMrs(client, o, r) };
       break;
     case "listMergedMrs":
       // 「始める」: 採用する MR のブランチと同じ名前のマージ済み MR があるか。読むだけ

@@ -3,6 +3,7 @@
  * ここは形だけを持つ。TS で判定し直すと、手元の hook・lint と答えが 2 か所に分かれるため。
  */
 import type { HostPlan } from "./decide-host.js";
+import type { ReviewReplies, WriteReplies } from "./github.js";
 import type { DecidePreview } from "./reviewed.js";
 
 /** 要求と答えの形の版。Go の `chrome.Schema` と揃える */
@@ -203,6 +204,82 @@ export interface Compare {
   readonly files: readonly string[] | null;
 }
 
+/** スレッド 1 つ（`ccnavi host copy` の `threads` と同じ形。ccnavi の `copy` が組む） */
+export interface ReviewThread {
+  readonly id: string;
+  readonly resolved: boolean;
+  readonly url: string;
+  readonly path: string;
+  readonly line: number;
+  readonly body: string;
+  readonly created_at: string;
+  /** 最後のコメントの id・時刻・作成者。再提起（受け入れたあとに付いたコメント）を見分ける。取れなければ空 */
+  readonly last_id: string;
+  readonly last_at: string;
+  readonly last_author: string;
+  /** 代表のノートの書き手（GitLab だけ）。ccnavi が依頼の投稿者と比べ、ccnavi の依頼のスレッドを見分ける */
+  readonly author?: string;
+  /** ノートが全部 ccnavi の目印で始まり、書き手が全部代表と同じか（GitLab だけ） */
+  readonly own?: boolean;
+}
+
+/** レビュー 1 つ（`ccnavi host copy` の `reviews` と同じ形） */
+export interface PullReview {
+  readonly state: string;
+  readonly url: string;
+  readonly submitted_at: string;
+  readonly author: string;
+}
+
+/** 取ってきた時点の状態（`ccnavi host copy` と同じ形。confirm・decide の `result`） */
+export interface ReviewCopy {
+  readonly host: "github" | "gitlab";
+  readonly mr: { readonly number: number; readonly url: string };
+  readonly threads: readonly ReviewThread[];
+  readonly reviews: readonly PullReview[];
+  readonly fetched_at: string;
+}
+
+/** 書く前に確かめる 1 つのスレッド（ccnavi の `write-info` の答え。`hostreply.ThreadAbility`） */
+export interface ThreadAbility {
+  readonly id: string;
+  /** ok: 扱える。pending: 保留中のレビューのスレッド（GitHub）。not-resolvable: 解決できない種類。non-diff: 差分以外の discussion（GitLab） */
+  readonly kind: "ok" | "pending" | "not-resolvable" | "non-diff";
+  readonly canReply: boolean;
+  readonly canResolve: boolean;
+  /** スレッドの既存のコメントにある、返信の印（`<!-- ccnavi:reply op=… -->`）の操作 ID。同じ返信を二度付けない */
+  readonly replyOps: readonly string[];
+  /** ok でないときの、Chrome で扱えない種類の名前（画面に出す） */
+  readonly unsupported?: string;
+}
+
+/** 足りないと分かった権限 1 つ。`for` は、その権限が要る操作（`all` はどれにも要る） */
+export interface Missing {
+  readonly need: string;
+  readonly for: "all" | "issue" | "reply" | "resolve" | "comment";
+}
+
+/** 書く前の確かめの材料（ccnavi の `write-info` の答え） */
+export interface WriteInfo {
+  readonly host: "github" | "gitlab";
+  readonly threads: readonly ThreadAbility[];
+  /** PAT かロールに足りないと分かったもの */
+  readonly missing: readonly Missing[];
+  /** 書く前には確かめられなかった権限の名前（実際に書くまで分からない） */
+  readonly unknown: readonly string[];
+}
+
+/** 計画と書く前の確かめの材料を突き合わせた答え（ccnavi の `precheck`） */
+export interface PrecheckAnswer {
+  readonly ok: boolean;
+  /** unsupported: Chrome で扱えない種類のスレッド。unreadable: 決めたスレッドがホストに無い。permission: 権限が足りない */
+  readonly kind?: "unsupported" | "unreadable" | "permission";
+  readonly reason?: string;
+  readonly missing: readonly string[];
+  readonly keys: readonly string[];
+  readonly unknown: readonly string[];
+}
+
 /** 「始める」の答え。`problems` が空なら `identifier` の名前でブランチを作れる */
 export interface StartResult {
   readonly identifier: string;
@@ -246,6 +323,14 @@ export const ccnavi = {
     ask<Closure>(call, "closure", { snapshot, family }, ""),
   board: (call: CcnaviCall, snapshot: Snapshot, family: string) =>
     ask<BoardResult>(call, "board", { snapshot, family }, ""),
+  /** service worker が取ってきた MR のスレッドとレビューの応答を、取ってきた時点の状態にする */
+  copy: (call: CcnaviCall, replies: ReviewReplies) => ask<ReviewCopy>(call, "copy", { replies }, "copy"),
+  /** service worker が書く前の確かめに取ってきた応答を読む */
+  writeInfo: (call: CcnaviCall, replies: WriteReplies) => ask<WriteInfo>(call, "write-info", { replies }, "info"),
+  /** ホストへ書く計画と書く前の確かめの材料を突き合わせる */
+  precheck: (call: CcnaviCall, plan: HostPlan, info: WriteInfo) => ask<PrecheckAnswer>(call, "precheck", { plan, info }, "precheck"),
+  /** 開いた MR の本文のそれぞれが、repo の issue を閉じるか（bodies と同じ順） */
+  closes: (call: CcnaviCall, body: { host: "github" | "gitlab"; repo: string; issue: number; bodies: readonly string[] }) => ask<boolean[]>(call, "closes", { ...body }, "closes"),
   compat: (call: CcnaviCall, snapshot: Snapshot) => ask<Compat>(call, "compat", { snapshot }, "compat"),
   plan: (
     call: CcnaviCall,

@@ -24,7 +24,7 @@ keywords: [モード, enable, dry-run, disable, ガード状態, 設定]
 
 戻す働きの 2 つ（`CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES`）も同じ 3 値を取る。
 2 値（`enable` / `disable`）なのは `CCNAVI_GUARD_TICKET_APPROVAL` と `CCNAVI_TICKET_CONTROL` の 2 本。
-前者は承認が通れば済んでしまい、済んだものは報告では戻らないので「止めずに報告する」段が持てない。
+前者は承認が通れば済んでしまい、済んだものは報告では戻らないので「止めずに報告する」段階が持てない。
 後者は機能を使うかの二択で、予行に意味が無い。
 
 ## 理由

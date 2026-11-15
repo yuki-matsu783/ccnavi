@@ -109,11 +109,11 @@ func TestLoadsValues(t *testing.T) {
 
 func TestLoadsDepth(t *testing.T) {
 	if _, err := Loads(strings.Repeat("[", maxDepth) + strings.Repeat("]", maxDepth)); err != nil {
-		t.Errorf("%d 段: %v", maxDepth, err)
+		t.Errorf("%d 階層: %v", maxDepth, err)
 	}
 	n := maxDepth + 1
 	if _, err := Loads(strings.Repeat(`{"a":`, n) + "1" + strings.Repeat("}", n)); !errors.Is(err, ErrTooDeep) {
-		t.Errorf("%d 段: %v", n, err)
+		t.Errorf("%d 階層: %v", n, err)
 	}
 }
 

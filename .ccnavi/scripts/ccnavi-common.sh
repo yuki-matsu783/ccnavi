@@ -7,32 +7,40 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
 # 決定には使わない（下の ccnavi_workspace の但し書き）。
 #
-# ここにあるのは 13 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 17 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
 #   ccnavi_sh_quote <文字列>   単引用符で囲んで、そのまま打てる形にする
+#   ccnavi_number_or <値> <既定>  値が 0 以上の整数ならそれを、違えば既定を出す（環境変数の秒数・待ち時間を読む）
 #   ccnavi_phys <パス>         リンクを解いたパス（無ければそのまま）
 #   ccnavi_workspace           ワークスペースルートの絶対パス
 #   ccnavi_bin <ワークスペースルート>  起動する実行ファイルのパス
 #   ccnavi_bin_path <振り分けの sh>  PATH の ccnavi（これ自身へのリンクは飛ばす）
 #   ccnavi_bin_try <パス>      そのパス（または .exe）が実行できれば返す
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
+#   ccnavi_path_under <パス> <基準>  パスが基準の下なら基準からの相対を出す（大文字小文字を区別しない）
+#   ccnavi_path_pick <一覧>    標準入力のパスのうち一覧にあるものを出す（大文字小文字を区別しない）
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
 #   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
+#   ccnavi_is_protected <名前> 名前だけで統合先とみなす保護されたブランチか（終了コードで返す）
 #   ccnavi_branch_to_id <ブランチ>  親のブランチ名から親の識別子を作る（/ を - に置き換える）
 #   ccnavi_load <ファイル名>   呼ぶ側が読む部品を読む（無ければ標準エラーに書いて 1 で終わる）
+#
+# 置き場の名前 4 つ（ccnavi_worktrees_dir・ccnavi_projects_dir・ccnavi_approved_dir・ccnavi_proposals_dir）も
+# ここに置く（下の「置き場」）。
 #
 # 残りの関数は、同じディレクトリの部品 5 本に分けてあり、このファイルの最後で読む。
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
 #
-#   ccnavi-common-state.sh  state の置き場と統合先（ccnavi_state・ccnavi_integration・ccnavi_parent_tree など）、
-#                           親ブランチの push のゲート（ccnavi_push_gate）、
-#                           タイムアウト監視つきの git（ccnavi_git_timed・ccnavi_git_refusal）
+#   ccnavi-common-state.sh  state の置き場、実行ファイルに聞く口（ccnavi_ask・ccnavi_text・ccnavi_integration・
+#                           ccnavi_parent_info・ccnavi_git_refusal など）、実行ファイルの答えを読む口（ccnavi_val・
+#                           ccnavi_val1・ccnavi_has・ccnavi_do）、親ブランチの push のゲートの
+#                           ls-remote（ccnavi_push_gate）、タイムアウト監視つきの git（ccnavi_git_timed）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
 #   ccnavi-common-write-and-push.sh     write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_wap_*）
-#   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）と、時間を区切って実行する ccnavi_run_timed
+#   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）と、時間を区切って実行する ccnavi_run_timed・止めて回収する ccnavi_run_timed_end
 #   ccnavi-common-log.sh    診断ログの 4 つ（log_debug / log_info / log_warn / log_error）。標準出力にも
 #                           標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 #                           決まりは ccnavi のリポジトリの .agents/docs/logging.md
@@ -126,6 +134,14 @@ ccnavi_sh_quote() {
 		esac
 	done
 	printf "'%s%s'\n" "$ccnavi_q_out" "$ccnavi_q_rest"
+}
+
+# 値が 0 以上の整数（数字だけ）ならそのまま、空か数字以外を含めば既定を出す。<値> <既定>
+ccnavi_number_or() {
+	case "${1:-}" in
+	'' | *[!0-9]*) printf '%s\n' "$2" ;;
+	*) printf '%s\n' "$1" ;;
+	esac
 }
 
 # 実在するディレクトリの、リンクを解いたパス。無ければ受けたパスをそのまま返す。
@@ -335,7 +351,7 @@ ccnavi_project() {
 		"$ccnavi_pj_places"/*)
 			ccnavi_pj_name="${ccnavi_pj_orel#"$ccnavi_pj_places"/}"
 			case "$ccnavi_pj_name" in
-			*/*) return 0 ;; # 2 段以上は数えない
+			*/*) return 0 ;; # 2 階層以上は数えない
 			esac
 			printf '%s\n' "$ccnavi_pj_name"
 			;;
@@ -346,19 +362,53 @@ ccnavi_project() {
 	return 0
 }
 
+# 置き場（ワークスペースルートかツリーのルートからの相対、/ 区切り）。実行ファイルを起こさずに動く sh
+# （ccnavi-fetch.sh・ccnavi-user-push-approved.sh）が、どのツリーを見るか・何をコミットするかを決めるのに使う写し。
+# 実行ファイルの既定（tree.WorktreesDir・config.DefaultProjects・DefaultApproved・DefaultTickets）との一致は
+# tests/fixtures/layout.json で確かめる。
+ccnavi_worktrees_dir=.claude/worktrees
+ccnavi_projects_dir=projects
+ccnavi_approved_dir=.ccnavi/approved
+ccnavi_proposals_dir=wip/proposals
+
+# <パス> が <基準> の下（同じを含む）なら、基準からの相対（同じなら .）を元の表記で出して 0。<パス> <基準>
+#
+# どちらも / 区切りの相対パス（改行を含まない）。実行ファイルの pathcase.Under の写しで、区切りごとに大文字小文字を
+# 区別せずに比べる。実行ファイルを起こさずに動く ccnavi-user-push-approved.sh が、渡されたパスがどのツリーのものかを
+# 決めるのに使う。sh で畳むのは ASCII の英字だけで、ASCII の外の字（全角の英字など）の大文字小文字は区別する
+# （そこだけ実行ファイルと違う）。一致は tests/fixtures/approved-carry.json の under で確かめる。
+ccnavi_path_under() {
+	ccnavi_pu_low=$(printf '%s/' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	ccnavi_pu_base=$(printf '%s/' "${2%/}" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_pu_low" in
+	"$ccnavi_pu_base"*) ;;
+	*) return 1 ;;
+	esac
+	# 畳んでもバイトの長さは変わらないので、元の表記の残りを同じバイトの位置から切り出す（${#} はシェルとロケールで
+	# 字とバイトのどちらを数えるかが違うので、wc -c で数える）。
+	ccnavi_pu_skip=$(printf '%s' "$ccnavi_pu_base" | wc -c | tr -d ' ')
+	ccnavi_pu_rest=$(printf '%s/' "$1" | LC_ALL=C cut -b "$((ccnavi_pu_skip + 1))-")
+	ccnavi_pu_rest="${ccnavi_pu_rest%/}"
+	printf '%s\n' "${ccnavi_pu_rest:-.}"
+}
+
+# 標準入力のパスのうち、<一覧のファイル>（1 行 1 つ）のどれかと同じものを 1 行ずつ。大文字小文字を区別せず比べる
+# （pathcase.Fold で畳んで比べるのと同じ。畳むのは ASCII の英字だけ）。一致は tests/fixtures/approved-carry.json の same。
+ccnavi_path_pick() {
+	LC_ALL=C awk 'NR == FNR { want[tolower($0)] = 1; next } tolower($0) in want' "$1" -
+}
+
 # URL に埋まった資格情報を伏せる。
 #
-# `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。
-#
-# 書き方の要点が 3 つ。
-#   - `[^/]*@` で最後の `@` まで消す。解析側（authority の ${##*@}）が最後まで
-#     見ているので、伏せる範囲も合わせる。`[^/@]*@` にすると `glpat-A@B` の後半が残る
-#   - scheme は大文字も `git+ssh` も拾う
-#   - scheme の無い `git@host:path` の形も伏せる
+# `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。伏せ方（scheme の後ろから最後の `@` まで、
+# scheme の無い `user:token@host:path` も）は実行ファイル（`host mask`。redact.URLCredentials）が持つ。使うのは実行ファイルを
+# 要る sh だけ。実行ファイルが答えなければ、漏らさないよう全体を伏せる。
 ccnavi_mask_url() {
-	printf '%s' "${1:-}" | sed -E \
-		-e 's#^([A-Za-z][A-Za-z0-9+.-]*://)[^/]*@#\1<伏せた>@#' \
-		-e 's#^[^/:@]*:[^/]*@#<伏せた>@#'
+	[ -n "${1:-}" ] || return 0
+	ccnavi_mu_root=$(ccnavi_workspace 2>/dev/null) || ccnavi_mu_root=""
+	ccnavi_mu_out=""
+	[ -z "$ccnavi_mu_root" ] || ccnavi_mu_out=$(ccnavi_val1 masked "$(ccnavi_ask "$ccnavi_mu_root" host mask "${1:-}" 2>/dev/null)") || ccnavi_mu_out=""
+	printf '%s' "${ccnavi_mu_out:-<伏せた>}"
 }
 
 # 親や子の識別子として受けてよい書き方なら 0。<語>
@@ -384,10 +434,10 @@ ccnavi_is_ident() {
 #
 # 実行ファイルの `ids.BranchProblem` の複製（ASCII で見分けられる分だけ）。write-and-push の対象決めなど、呼ぶたびに
 # 実行ファイルを起こせない所で使う。名前を受け入れる入口（ccnavi-start.sh・
-# ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
+# ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイル（`ids.IDAnswer`）が確かめる。規則を変えるときは両方を直す。
 #
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
-# （`ids.BranchProblem`）が字と形を確かめたものを受け取る側の 2 段目の確認で、パスや ref で意味を持つ
+# （`ids.BranchProblem`）が字と形を確かめたものを受け取る側の 2 つ目の確認で、パスや ref で意味を持つ
 # 書き方を止める: 空、先頭の `-` `.` `/`、末尾の `/` `.`、`..`、`//`、`/.`（`.` で始まる階層）、`.lock` で終わる
 # 階層、`\`、ASCII の英数字と `.` `_` `-` `/` 以外の ASCII の字（空白・制御文字・記号）、git の ref の名前
 # （refs/・origin/ など）や保護されたブランチの名前を先頭の階層に持つもの、HEAD の階層を持つもの。
@@ -400,15 +450,28 @@ ccnavi_is_branch() {
 	# 末尾の改行が `$( )` で無くならないよう、最後に `\`（上で止めた字なので本文には無い）を足して比べる。
 	ccnavi_ib_rest=$(printf '%s\\' "$1" | LC_ALL=C tr -d 'A-Za-z0-9._/\200-\377-')
 	[ "$ccnavi_ib_rest" = '\' ] || return 1
-	# git の ref の名前・リモートの名前・保護されたブランチの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の
-	# 階層を持つもの（`ids.BranchProblem` と同じ。大文字小文字は区別しない）。
+	# git の ref の名前・リモートの名前を先頭の階層に持つもの、`HEAD`・`*_HEAD` の階層を持つもの、保護された
+	# ブランチの名前を先頭の階層に持つもの（`ids.BranchProblem` と同じ。大文字小文字は区別しない）。
 	ccnavi_ib_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
 	case "$ccnavi_ib_low" in
 	refs | refs/* | heads | heads/* | remotes | remotes/* | tags | tags/* | origin | origin/* | upstream | upstream/*) return 1 ;;
-	main | main/* | master | master/* | develop | develop/* | release | release/* | release-*) return 1 ;;
 	head | head/* | */head | */head/* | *_head | *_head/*) return 1 ;;
 	esac
-	return 0
+	! ccnavi_is_protected "${1%%/*}"
+}
+
+# 名前だけで統合先とみなす保護されたブランチなら 0。<名前>
+#
+# 実行ファイルの `ids.Protected` の写し。実行ファイルを起こさない所（ccnavi_is_branch・ccnavi-user-push-approved.sh）
+# が使う。main・master・develop・release と、release/ か release- で始まる名前で、英字の大文字小文字は区別しない。
+# 一致は tests/fixtures/ident-cases.json の同じ表で、Go（ident_sh_test.go）と Python（tests/sh/test_ident_sh.py）が確かめる。
+# 規則を変えるときは両方を直す。
+ccnavi_is_protected() {
+	ccnavi_ip_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
+	case "$ccnavi_ip_low" in
+	main | master | develop | release | release/* | release-*) return 0 ;;
+	esac
+	return 1
 }
 
 # 親のブランチ名から親の識別子を作る。`/` を `-` に置き換えるだけ。<ブランチ>

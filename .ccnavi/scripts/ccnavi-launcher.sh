@@ -18,7 +18,7 @@
 # 1 回で OS と CPU の両方を取る。
 #
 # bin_dir は `..` を含むまま使い、正規化しない。`${here%/*}` で切る形は here が `.` や
-# 1 段の名前のときに正しいパスにならない。シンボリックリンクは解かない。
+# 1 階層の名前のときに正しいパスにならない。シンボリックリンクは解かない。
 #
 # 語は go/internal/infra/platformtag と scripts/ccnavi-setup.sh の host_target と揃える。
 #

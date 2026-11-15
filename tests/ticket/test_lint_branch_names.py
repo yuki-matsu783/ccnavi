@@ -236,7 +236,7 @@ class LintBranchNamesTest(unittest.TestCase):
         self.assertIn("末尾を `-<2 桁>` にしない", lines[0])
 
     def test_a_parent_ending_in_two_digits_is_still_named(self):
-        # 右から 2 段を剥がすので親の割り出しは誤らないが、別の親の子の途中
+        # 右から 2 階層を剥がすので親の割り出しは誤らないが、別の親の子の途中
         # （`<親>-<フェーズ>`）と紛れる。
         # 古い形の子と同じ綴りなので、今までどおり warn にする。
         self.place("done", "abc-01")

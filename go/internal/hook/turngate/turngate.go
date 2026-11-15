@@ -69,7 +69,7 @@ type cond struct {
 
 // Gate は宣言 1 件。「first を打ったら、ユーザの発言が 1 回はさまるまで second を打てない」。
 //
-// 文は文面ファイルの message（識別子）に書いてある。4 つの段のうち、段 1（what）と次の一手（next）は same_command・
+// 文は文面ファイルの message（識別子）に書いてある。4 つの段階のうち、段階 1（what）と次の一手（next）は same_command・
 // no_user_turn で場合分けし、firstName・secondName・宣言の id とキー（where）・key を埋める。別の組を足すときは、
 // 文面ファイルにも 1 件足す。
 type Gate struct {

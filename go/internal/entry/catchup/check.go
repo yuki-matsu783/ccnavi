@@ -1,4 +1,4 @@
-package cli
+package catchup
 
 import (
 	"cmp"
@@ -17,12 +17,9 @@ import (
 )
 
 const (
-	// syncRetiredHead・syncCheckHead は答えの頭の行。sh はこれが無ければ「検査を実行できなかった」と読み、親子の
-	// チケットを止めない（検査の error と分ける）。
-	syncRetiredHead = "retired 1"
-	syncCheckHead   = "check 1"
-	// selfRepo はワークスペース自身のリポジトリの名前。
-	selfRepo = "self"
+	// retiredHead・checkHead は答えの頭の行。読む側（ボード・テスト）は、これが無ければ「実行できなかった」と読む。
+	retiredHead = "retired 1"
+	checkHead   = "check 1"
 	// noValue は答えの値が無いときの印。
 	noValue = "-"
 )
@@ -44,20 +41,10 @@ func formsOK(stderr io.Writer, verb, kind string, checks ...formCheck) bool {
 	return true
 }
 
-// syncPaths は `ccnavi-sync.sh` が要るパスと名前を 1 行 1 項目（`<キー> <値>`）で返す。sh は jq を使わない。
-// 置き場は固定（設定の既定）で env では動かない。ネットワークにも git にも触らない。
-func syncPaths(stdout io.Writer, conf *config.Settings) int {
-	slashed := func(p string) string { return strings.Trim(ospath.Slashed(p), "/") }
-	fmt.Fprintf(stdout, "approved %s\n", slashed(conf.Approved))
-	fmt.Fprintf(stdout, "proposals %s\n", slashed(conf.Tickets))
-	fmt.Fprintf(stdout, "home %s\n", slashed(cmp.Or(conf.ProjectHome, config.DefaultProjectHome)))
-	return config.ExitOK
-}
-
-// syncRetired は親を閉じた後の片付けの列挙元（`state/retire/<親>.json`）。読めない・mr が無いものは incomplete で、
-// sh は一覧の案内だけを出し、自動では片付けない。
-func syncRetired(stdout io.Writer, conf *config.Settings) int {
-	fmt.Fprintln(stdout, syncRetiredHead)
+// Retired は `sync retired`。親を閉じた後の片付けの列挙元（`state/retire/<親>.json`）。読めない・mr が無いものは
+// incomplete で、読む側は一覧の案内だけを出し、自動では片付けない。
+func Retired(stdout io.Writer, conf *config.Settings) int {
+	fmt.Fprintln(stdout, retiredHead)
 	for _, e := range retire.Entries(conf) {
 		if e.Incomplete != "" {
 			fmt.Fprintf(stdout, "incomplete %s %s\n", e.Parent, ospath.Squeeze(e.Incomplete))
@@ -68,20 +55,21 @@ func syncRetired(stdout io.Writer, conf *config.Settings) int {
 	return config.ExitOK
 }
 
-// syncTidy は親の MR がマージ済みと分かった後の片付け（親のワークツリーと手元のブランチ、残っていた子のブランチ）。
-// headSHA はマージ済みの MR の先頭（sh がホストから取ってきた）。ネットワークには出ない。
-func syncTidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd, family, repo, branchName, headSHA string) int {
+// Tidy は `sync tidy <親> <リポジトリ> <ブランチ> <sha>` と、ccnavi-sync.sh の片付け（merged）。親の MR がマージ済みと
+// 分かった後に、親のワークツリーと手元のブランチなどを片付ける（retire.RunMerged）。headSHA はマージ済みの MR の先頭
+// （sh がホストから取ってきた）。ネットワークには出ない。
+func Tidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd, family, repo, branchName, headSHA string) int {
 	if !formsOK(stderr, "sync tidy", "形式",
 		formCheck{"識別子", family, ids.IsValidID},
 		formCheck{"リポジトリ", repo, ids.IsValidName},
-		formCheck{"sha", headSHA, shaForm.MatchString}) {
+		formCheck{"sha", headSHA, git.IsSHA}) {
 		return config.ExitError
 	}
 	// 片付けは MR のマージの後に走るので、合流と同じ期限で待つ。
 	// ブランチ名は sh から渡る。git の名前の規則に合い、`-` で始まらず（git のオプションと読まれない）、
 	// 親の識別子から作る名前と一致するものだけを扱う。
-	checked := git.Run(root, []string{"check-ref-format", "--branch", branchName}, git.Options{Timeout: git.MergeTimeout})
-	if branchName == "" || strings.HasPrefix(branchName, "-") || !checked.OK() {
+	checkedRef := git.Run(root, []string{"check-ref-format", "--branch", branchName}, git.Options{Timeout: git.MergeTimeout})
+	if branchName == "" || strings.HasPrefix(branchName, "-") || !checkedRef.OK() {
 		fmt.Fprintf(stderr, "ccnavi: sync tidy のブランチ %s はブランチ名の形ではない\n", pyfmt.Repr(branchName))
 		return config.ExitError
 	}
@@ -93,28 +81,45 @@ func syncTidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd,
 	}
 	// sh はワークスペース自身を self と呼ぶが、内部ではプロジェクト名を空で表す。
 	project := repo
-	if repo == selfRepo {
+	if repo == selfKey {
 		project = ""
 	}
 	return retire.RunMerged(stdout, conf, root, family, project, branchName, headSHA, cwd)
 }
 
-// syncCheck は取り込みの後の検査。頭に `check 1`、続けて 1 行 1 件（`error <detail>` か `warn <detail>`）。error が
-// 1 つでもあれば 1。repo は self かプロジェクト名（空なら探す）。
-func syncCheck(stdout, stderr io.Writer, root string, conf *config.Settings, family, repo string) int {
+// selfKey はワークスペース自身のリポジトリの名前。
+const selfKey = "self"
+
+// Check は `sync check <親> [<リポジトリ>]`。取り込みの後の検査で、頭に `check 1`、続けて 1 行 1 件（`error <detail>`
+// か `warn <detail>`）。error が 1 つでもあれば 1。repo は self かプロジェクト名（空なら探す）。
+func Check(stdout, stderr io.Writer, root string, conf *config.Settings, family, repo string) int {
 	if !formsOK(stderr, "sync check", "識別子の形式",
 		formCheck{"識別子", family, ids.IsValidID},
-		formCheck{"リポジトリ", cmp.Or(repo, selfRepo), ids.IsValidName}) {
+		formCheck{"リポジトリ", cmp.Or(repo, selfKey), ids.IsValidName}) {
 		return config.ExitError
 	}
-	problems := lint.FamilyCheck(conf, root, family, repo)
-	fmt.Fprintln(stdout, syncCheckHead)
+	fmt.Fprintln(stdout, checkHead)
 	failed := config.ExitOK
-	for _, p := range problems {
-		fmt.Fprintf(stdout, "%s %s\n", p.Severity, ospath.Squeeze(p.Detail))
-		if p.Severity == rules.Error {
+	for _, p := range checked(conf, root, family, repo) {
+		if p.severity == rules.Error {
 			failed = config.ExitError
 		}
+		fmt.Fprintf(stdout, "%s %s\n", p.severity, p.detail)
 	}
 	return failed
+}
+
+// problem は取り込みの後の検査の 1 件。
+type problem struct {
+	severity rules.Severity
+	detail   string
+}
+
+// checked は取り込みの後の検査（lint.FamilyCheck）の結果を、1 行にした理由で返す。
+func checked(conf *config.Settings, root, family, repo string) []problem {
+	var out []problem
+	for _, p := range lint.FamilyCheck(conf, root, family, repo) {
+		out = append(out, problem{severity: p.Severity, detail: ospath.Squeeze(p.Detail)})
+	}
+	return out
 }

@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/infra/reply"
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/approval"
@@ -271,7 +272,7 @@ func Reviewed(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settin
 }
 
 // Choose は対話の decide の前半（`--choose-out <ファイル>`）。残った指摘を見せて選ばせ、選択とダイジェストを
-// 書くだけ。置くのは sh が write-and-push の中で `--yes` で打つ（ロックを持ったままユーザを待たない）。
+// 書くだけ（1 行 1 項目）。置くのは sh が write-and-push の中で `--yes` で打つ（ロックを持ったままユーザを待たない）。
 func Choose(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings, root, cwd string, number int, resultPath, outPath string) int {
 	d := decision(stderr, conf, root, cwd, number, resultPath, nil)
 	if d == nil {
@@ -287,8 +288,12 @@ func Choose(stdin *bufio.Reader, stdout, stderr io.Writer, conf *config.Settings
 	} else {
 		fmt.Fprintf(stdout, msgNoThreads, number, d.Parent.ID)
 	}
-	chosen := pyjson.NewObject("choices", choices, "digest", Digest(d))
-	if failed := fsio.WriteJSONAs(outPath, chosen, fsio.JSONFormat{FinalNewline: true}); failed != "" {
+	// sh が jq を使わずに読む 1 行 1 項目（`choices <1 行の JSON>`・`digest <ダイジェスト>`）。選択は置く呼び出しへそのまま渡す
+	compact, _ := pyjson.Dumps(choices, pyjson.Options{Compact: true, RawUnicode: true})
+	var chosen reply.Lines
+	chosen.Val("choices", compact)
+	chosen.Val("digest", Digest(d))
+	if failed := fsio.WriteText(outPath, chosen.String(), fsio.LF, fsio.Atomic); failed != "" {
 		fmt.Fprintf(stderr, msgChooseFailed, outPath, failed)
 		return config.ExitError
 	}
@@ -321,8 +326,8 @@ func ask(stdin *bufio.Reader, stdout, stderr io.Writer, d *Decision) (*pyjson.Ob
 	return choices, true
 }
 
-// YesOptions は Yes の計画の段。PlanOut（`--accept-plan`）はホストにも票にも置かず判断と計画を書く段、PlanDone
-// （`--accept-done`）は sh が計画のスレッドに返信して解決したあとに置く段。どちらも空なら一度に置く。
+// YesOptions は Yes の計画の段階。PlanOut（`--accept-plan`）はホストにも票にも置かず判断と計画を書く段階、PlanDone
+// （`--accept-done`）は sh が計画のスレッドに返信して解決したあとに置く段階。どちらも空なら一度に置く。
 type YesOptions struct {
 	PlanOut  string
 	PlanDone string
@@ -578,7 +583,7 @@ func SettledChildren(p *phase.Phase) []*ticket.Ticket {
 	return out
 }
 
-// precheck は置く前に、ローカルで失敗しうることを確かめる。ホストに触る前（PlanOut の段）にも呼ぶ（受け入れの
+// precheck は置く前に、ローカルで失敗しうることを確かめる。ホストに触る前（PlanOut の段階）にも呼ぶ（受け入れの
 // 返信と解決を済ませてから置けないと分かると、解決済みのスレッドだけが残る）。
 func precheck(stderr io.Writer, conf *config.Settings, root string, d *Decision, picked map[Choice][]host.Thread) bool {
 	// issue に回す分は state の置き場に下書きを書いて sh に渡す。置き場が無ければ、何も置く前に断る。

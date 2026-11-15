@@ -21,6 +21,7 @@ import os
 import shutil
 from datetime import UTC, datetime
 
+from tests import treecache
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text
@@ -93,6 +94,7 @@ def _thread(**extra):
 
 
 class ManualSettleTest(PhaseHarness):
+    @treecache.cached
     def requested(self):
         self.family(plan=["design"])
         self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
@@ -287,6 +289,7 @@ class ManualSettleGapsTest(PhaseHarness):
         write(fixture, json.dumps(data))
         return fixture
 
+    @treecache.cached
     def two_children(self):
         """フェーズ 1 に子を 2 つ持たせて依頼まで進める。"""
         self.family(plan=["design"])
@@ -601,6 +604,7 @@ class ManualSettleGapsTest(PhaseHarness):
 
     # ---- AT37
 
+    @treecache.cached
     def two_phases(self):
         """フェーズ 1 を手動移動で確定し、フェーズ 2 の依頼まで進める。返すのは取得結果の見本。"""
         self.family(plan=["design", "acceptance"])

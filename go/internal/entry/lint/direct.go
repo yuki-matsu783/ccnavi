@@ -81,7 +81,7 @@ func directRecords(root string, main tree.Tree, common, label string) []rules.Pr
 		}
 		text, _ := fsio.ReadDiskText(path, fsio.Replace)
 		// 記録の壊れ方を調べる。版が違うか必須の欄が欠けていれば、取り込み先と起点を読めない。
-		fields := tree.ParseDirect(text)
+		fields := tree.ParseRecord(text)
 		where := directWhere(label, name)
 		var missing []string
 		for _, k := range directNeed {

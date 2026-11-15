@@ -271,7 +271,7 @@ export function condProblems(root: CondNode): CondProblem[] {
   walk(root, []);
   const { depth, nodes } = condSize(root);
   if (depth > COND_MAX_DEPTH) {
-    problems.push({ path: [], message: `深さが${depth}段あります（上限${COND_MAX_DEPTH}段）` });
+    problems.push({ path: [], message: `深さが${depth}階層あります（上限${COND_MAX_DEPTH}階層）` });
   }
   if (nodes > COND_MAX_NODES) {
     problems.push({ path: [], message: `条件が${nodes}個あります（上限${COND_MAX_NODES}）` });
@@ -286,7 +286,7 @@ function excerpt(text: string, max: number): string {
 
 /**
  * 組み合わせ条件を1行に縮める（畳んだ行に出す）。最上位の演算子は中身を並べ、その下の演算子は子の数だけ言う。
- * `not`は段に数えない。例: `all(regex ^{root}[\/], not(any(2)))`
+ * `not`は階層に数えない。例: `all(regex ^{root}[\/], not(any(2)))`
  */
 export function condSummary(root: CondNode): string {
   const walk = (node: CondNode, level: number): string => {
@@ -331,7 +331,7 @@ export interface CondLayout {
   readonly edges: readonly { readonly id: string; readonly from: string; readonly to: string }[];
 }
 
-/** 段の間隔（横）と、個別条件1つの高さ（縦） */
+/** 階層の間隔（横）と、個別条件1つの高さ（縦） */
 export const COND_COLUMN = 210;
 export const COND_ROW = 54;
 
@@ -352,7 +352,7 @@ function labelOf(node: CondNode): string {
 }
 
 /**
- * 組み合わせ条件を置く。最上位のノードを左に置き、段ごとに右へ。個別条件は上から順に1行ずつ、演算子は子の真ん中の高さに置く。
+ * 組み合わせ条件を置く。最上位のノードを左に置き、階層ごとに右へ。個別条件は上から順に1行ずつ、演算子は子の真ん中の高さに置く。
  * 置き場所は組み合わせ条件の形だけで決まる（ドラッグで動かした位置は持たない。組み合わせ条件を直すたびに置き直す）。
  */
 export function layoutCond(root: CondNode): CondLayout {

@@ -1,7 +1,9 @@
-"""sh の URL の資格情報の伏せ（`ccnavi_mask_url`・doctor の `doctor_mask`）。
+"""doctor の URL の資格情報の伏せ（`doctor_mask`）。
 
 トークンに `@` が入っても、ホストの手前の最後の `@` まで伏せること。scheme の付いた形と、
-scheme の無い `user:token@host:path` の形の両方を見る。
+scheme の無い `user:token@host:path` の形の両方を見る。`ccnavi_mask_url` は
+実行ファイル（`host mask`）に聞くので、同じ表を go test
+（go/internal/entry/cli/host_mask_test.go）が見る。
 """
 
 from __future__ import annotations
@@ -14,7 +16,6 @@ import unittest
 
 from tests import ROOT
 
-COMMON = os.path.join(ROOT, ".ccnavi", "scripts", "ccnavi-common.sh")
 DOCTOR = os.path.join(ROOT, "scripts", "ccnavi-doctor.sh")
 SH = shutil.which("sh")
 
@@ -29,7 +30,7 @@ def run(script: str, value: str) -> str:
     # 値は引数でなく環境変数で渡す。Windows の引数は、`'` などをそのまま運べない。
     env = {**os.environ, "CCNAVI_PROBE": value}
     done = subprocess.run(
-        [SH, "-c", script, COMMON], env=env, capture_output=True, text=True, check=True
+        [SH, "-c", script, DOCTOR], env=env, capture_output=True, text=True, check=True
     )
     return done.stdout.rstrip("\n")
 
@@ -44,12 +45,6 @@ def doctor_mask_source() -> str:
 
 @unittest.skipUnless(SH, "sh が無い")
 class MaskUrlTest(unittest.TestCase):
-    def test_common_mask_url(self):
-        script = '. "$0"; ccnavi_mask_url "$CCNAVI_PROBE"'
-        for value, want in CASES:
-            with self.subTest(value=value):
-                self.assertEqual(run(script, value), want)
-
     def test_doctor_mask(self):
         script = doctor_mask_source() + 'doctor_mask "$CCNAVI_PROBE"'
         for value, want in CASES:

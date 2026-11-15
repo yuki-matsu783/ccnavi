@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"ccnavi/internal/infra/config"
@@ -21,7 +22,7 @@ import (
 	"ccnavi/internal/records/turn"
 )
 
-// records より上の段（policy・tickets・hook）が書く置き場の名前は、records から import できない（段が逆向きになる）。
+// records より上の層（policy・tickets・hook）が書く置き場の名前は、records から import できない（層が逆向きになる）。
 // そのため名前をここに写す（持ち主は括弧の中）。records の中の名前は、持ち主のパッケージの定数を読む。
 // policy が書く名前（自己防衛のバックアップ・ctxfile の数え）は config の定数を読む。
 const (
@@ -36,33 +37,38 @@ func named(prefix, suffix string) *regexp.Regexp {
 }
 
 // 名前からセッションがそのまま読める記録（括弧の中は書く側）。
-var sessionOnly = []*regexp.Regexp{
-	named("nudged-", fsio.JSONExt),                  // lifecycle の Stop の促し
-	named(tally.DenyPrefix, fsio.JSONExt),           // tally の拒否の数え
-	named(config.StopPrefix, fsio.JSONExt),          // ctxfile
-	named("", ".turn"+fsio.JSONExt),                 // post のターンの基準
-	named("", ".accepted"+fsio.JSONExt),             // post
-	named(turn.BusyPrefix, fsio.JSONExt),            // turn
-	named(turn.TurnPrefix, fsio.JSONExt),            // turn
-	named(turn.UserPromptPrefix, fsio.JSONExt),      // turn
-	named(stopreview.TurnStartPrefix, fsio.JSONExt), // stopreview
-	named(stopreview.RefsPrefix, fsio.JSONExt),      // stopreview
-	named(stopreview.TaintPrefix, fsio.JSONExt),     // hook の stopjudge
-	named(stopreview.LastStopPrefix, fsio.JSONExt),  // stopreview
-	named(config.DirectPrefix, fsio.JSONExt),        // direct_candidates（compact・clear では破棄しない）
-	// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
-	// 同じ置き場の別のファイル（package.json など）を消す。
-	regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),
-}
+// sessionOnly と ownDate は記録を片づける起動でだけ使うので、初めて使うときに 1 回だけ組む。
+var sessionOnly = sync.OnceValue(func() []*regexp.Regexp {
+	return []*regexp.Regexp{
+		named("nudged-", fsio.JSONExt),                  // lifecycle の Stop の促し
+		named(tally.DenyPrefix, fsio.JSONExt),           // tally の拒否の数え
+		named(config.StopPrefix, fsio.JSONExt),          // ctxfile
+		named("", ".turn"+fsio.JSONExt),                 // post のターンの基準
+		named("", ".accepted"+fsio.JSONExt),             // post
+		named(turn.BusyPrefix, fsio.JSONExt),            // turn
+		named(turn.TurnPrefix, fsio.JSONExt),            // turn
+		named(turn.UserPromptPrefix, fsio.JSONExt),      // turn
+		named(stopreview.TurnStartPrefix, fsio.JSONExt), // stopreview
+		named(stopreview.RefsPrefix, fsio.JSONExt),      // stopreview
+		named(stopreview.TaintPrefix, fsio.JSONExt),     // hook の stopjudge
+		named(stopreview.LastStopPrefix, fsio.JSONExt),  // stopreview
+		named(config.DirectPrefix, fsio.JSONExt),        // direct_candidates（compact・clear では破棄しない）
+		// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
+		// 同じ置き場の別のファイル（package.json など）を消す。
+		regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),
+	}
+})
 
 // ownDate はセッションを名前に持たない Stop の AI 判定の記録と、ミラーの指紋（親の識別子ごと）。それ自身の日付で消す。
-var ownDate = regexp.MustCompile(`^(?:` + strings.Join([]string{
-	regexp.QuoteMeta(stopreview.PlanPrefix) + `.+`,
-	regexp.QuoteMeta(stopreview.AttemptPrefix) + `.+`,
-	regexp.QuoteMeta(stopreview.PrePrefix) + `.+`,
-	regexp.QuoteMeta(stopreview.OpPrefix) + `.+`,
-	`mirror-.+`, // promptsync
-}, "|") + `)` + regexp.QuoteMeta(fsio.JSONExt) + `$`)
+var ownDate = sync.OnceValue(func() *regexp.Regexp {
+	return regexp.MustCompile(`^(?:` + strings.Join([]string{
+		regexp.QuoteMeta(stopreview.PlanPrefix) + `.+`,
+		regexp.QuoteMeta(stopreview.AttemptPrefix) + `.+`,
+		regexp.QuoteMeta(stopreview.PrePrefix) + `.+`,
+		regexp.QuoteMeta(stopreview.OpPrefix) + `.+`,
+		`mirror-.+`, // promptsync
+	}, "|") + `)` + regexp.QuoteMeta(fsio.JSONExt) + `$`)
+})
 
 // sessionAndKey は名前の後ろにセッション以外のキーが `-` で続く記録。セッションにも `-` が入るので、
 // 名前だけでは切れ目が決まらない。既に分かっているセッションの表記に当てて決める。
@@ -121,7 +127,7 @@ func Run(root, logPath, stateDir, session string, o Options) *Report {
 	if r.now.IsZero() {
 		r.now = time.Now()
 	}
-	// 0 はその段を止める。読めない値は limit が既定に直して Problems に積む。
+	// 0 はその段階を止める。読めない値は limit が既定に直して Problems に積む。
 	rotate, logDays, stateDays := r.limit(rotateMB), r.limit(logKeepDays), r.limit(stateKeepDays)
 	if logPath != "" {
 		if rotate > 0 {
@@ -313,7 +319,7 @@ func countOps(stateDir string) int {
 	return n
 }
 
-// allSent は段階がすべて送り終えたか（終わった記録はその操作が自分で消す）。段が無い・形が違う記録は未完了として数える。
+// allSent は段階がすべて送り終えたか（終わった記録はその操作が自分で消す）。段階が無い・形が違う記録は未完了として数える。
 func allSent(data *pyjson.Object) bool {
 	stages, ok := data.Value("stages").([]any)
 	if !ok {

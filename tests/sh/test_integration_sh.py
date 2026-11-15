@@ -1,11 +1,9 @@
-"""統合先の名前を決める（ccnavi-common-state.sh の ccnavi_integration）。
+"""統合先を実行ファイルに聞く口（ccnavi-common-state.sh の ccnavi_integration など）。
 
-ccnavi-fetch.sh（ワークツリーの起点を進める）・ccnavi-git.sh（統合先への push の拒否）・
-ccnavi-review.sh（マージリクエストの宛先）が同じ関数を読む。決め方は、そのリポジトリの手元の
-origin/HEAD → origin/main・origin/master だけ。どれも無ければ「分からない」（終了コード 1）。
-
-使い捨てのワークスペースを組み、ccnavi-common.sh を読む sh から関数を呼んで、標準出力と
-終了コードだけを見る。
+決め方（手元の origin/HEAD → origin/main・origin/master）と案内の文は、
+実行ファイル（`git integration`）が持ち、go test（integrate の integration_test.go）が見る。
+ここでは通しで、sh が答えを読めること、ワークツリーとプロジェクトがそれぞれ
+自分のリポジトリで聞くこと、実行ファイルが無いときに「分からない」になることを見る。
 """
 
 from __future__ import annotations
@@ -16,7 +14,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import SH_SCRIPTS, common_sh
+from tests import SH_SCRIPTS, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 
@@ -65,6 +63,7 @@ class IntegrationTest(unittest.TestCase):
         full = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
             "CCNAVI_LEARNING": "disable",
+            "CCNAVI_ENTRY_PATH": exe.path(),
         }
         full.update(env)
         # `$0` に入口のパスを渡す。保護済み sh と同じく、部品は `$0` のディレクトリから読む。
@@ -88,23 +87,14 @@ class IntegrationTest(unittest.TestCase):
 
     def test_nothing_known_is_exit_1(self):
         """origin/HEAD も origin/main・master も無ければ当てずっぽうで宣言しない。
-        ローカルの main・master で代わりにもしない。"""
+
+        実行ファイルが無いときも同じ。"""
         git(self.ws, "branch", "-m", "main")
-        result = self.integration(self.ws)
-        self.assertEqual(1, result.returncode)
-        self.assertEqual("", result.stdout)
-
-    def test_origin_main_then_master(self):
-        remote_ref(self.ws, "master")
-        self.assertIntegration("master")
-        remote_ref(self.ws, "main")
-        self.assertIntegration("main")
-
-    def test_origin_head_wins_over_main(self):
-        """デフォルトブランチが develop-v1.0.0 のように固定のリストに無い名前でも読む。"""
-        remote_ref(self.ws, "main")
-        point_origin_head(self.ws, "develop-v1.0.0")
-        self.assertIntegration("develop-v1.0.0")
+        for env in ({}, {"CCNAVI_ENTRY_PATH": os.path.join(self.ws, "no-such-bin")}):
+            with self.subTest(env=env):
+                result = self.integration(self.ws, **env)
+                self.assertEqual(1, result.returncode)
+                self.assertEqual("", result.stdout)
 
     def test_a_worktree_and_a_project_each_read_their_own_repository(self):
         """ワークツリーは元リポジトリの参照を読む。プロジェクトは自分の origin を読む。"""

@@ -9,8 +9,8 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// NFD のブランチ名（使えない名前）を HEAD にしたツリーは、NFC の識別子と一致としない。sh の
-// ccnavi_head_branch も同じ答え（tests/sh/test_branch_to_id_sh.py）。
+// NFD のブランチ名（使えない名前）を HEAD にしたツリーは、NFC の識別子と一致としない（ccnavi-sync.sh・
+// ccnavi-fetch.sh の親のワークツリーの選び方もこれを使う）。
 func TestHeadBranchDoesNotMatchAnNFDBranch(t *testing.T) {
 	nfc := "feature/が"
 	nfd := pyfmt.NFD(nfc)

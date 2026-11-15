@@ -15,6 +15,7 @@ import json
 import os
 import unittest
 
+from tests import treecache
 from tests.inproc import same_path
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, read_json, write
@@ -63,6 +64,7 @@ def closed_text(name, parent="", phase=None, predecessors=()):
 class ReadyHarness(PhaseHarness):
     """`review ready` が条件を確かめてから閉じた親子のチケットを退避する。"""
 
+    @treecache.cached
     def closable(self, before_close=None):
         """親を閉じて片付け、push 済みにする。fixture（マージリクエストの取得結果）を返す。
 

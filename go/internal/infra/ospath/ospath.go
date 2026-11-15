@@ -270,19 +270,19 @@ func RelOr(path, start string) string {
 	return path
 }
 
-// DiskExists は os.path.exists（リンクは先を見る）。fsio の溜める段は見ない（記録やマーカーは fsio.Exists）。
+// DiskExists は os.path.exists（リンクは先を見る）。fsio の溜める段階は見ない（記録やマーカーは fsio.Exists）。
 func DiskExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
 
-// DiskLexists は os.path.lexists。fsio の溜める段は見ない（記録やマーカーは fsio.Lexists）。
+// DiskLexists は os.path.lexists。fsio の溜める段階は見ない（記録やマーカーは fsio.Lexists）。
 func DiskLexists(p string) bool {
 	_, err := os.Lstat(p)
 	return err == nil
 }
 
-// DiskListdir は os.listdir を名前の順にしたもの。fsio の溜める段は見ない（記録の置き場は fsio.Listdir）。
+// DiskListdir は os.listdir を名前の順にしたもの。fsio の溜める段階は見ない（記録の置き場は fsio.Listdir）。
 func DiskListdir(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir) // 名前の順に返る
 	if err != nil {
@@ -296,7 +296,7 @@ func DiskListdir(dir string) ([]string, error) {
 }
 
 // Stat は os.stat の更新時刻と大きさ（os.path.getmtime・getsize。リンクは先を見る）。無ければ false。
-// fsio の溜める段は見ない。
+// fsio の溜める段階は見ない。
 func Stat(p string) (mtime time.Time, size int64, ok bool) {
 	info, err := os.Stat(p)
 	if err != nil {
@@ -360,7 +360,7 @@ func Rstrip(s string) string {
 var errNotUTF8 = errors.New("UTF-8 として読めない")
 
 // ReadDiskText はディスクの本文を UTF-8 として読む。UTF-8 でなければ errNotUTF8。改行の "\r\n" と "\r" は "\n" にそろえる（テキストモード）。
-// fsio の溜める段は見ない（記録やマーカーは fsio.ReadText）。
+// fsio の溜める段階は見ない（記録やマーカーは fsio.ReadText）。
 func ReadDiskText(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

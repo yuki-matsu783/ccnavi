@@ -41,10 +41,10 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 | 回したもの | 本数 | 時間 |
 |---|---|---|
-| `tests.sh.test_stage_sh` | 22 | 約 20 秒 |
-| `tests.guard`の関連 3 モジュール（`test_handoff_copy`・`test_wrapguard`・`test_selfguard`） | 184 | 約 66 秒 |
+| `tests.sh.test_stage_sh` | 23 | 約 2 秒 |
+| `tests.guard`の関連 3 モジュール（`test_handoff_copy`・`test_wrapguard`・`test_selfguard`） | 159 | 約 23 秒 |
 | `tests/core`・`ticket`・`guard`を同時に | — | 30 分たっても出力が出ず、打ち切った（遅いのか止まったのかは未確認） |
-| `tests.sh.test_write_and_push_merge` | — | 長く止まり、打ち切った |
+| `tests.sh.test_write_and_push_merge` | 6 | 約 28 秒 |
 
 出力が長く出ないときは、待ち続けない。10 分を目安に止めて、範囲を狭めてやり直す。出力が無いままでは、通ったのか止まったのか分からない。通ったと扱わない（下の「待つとき」と同じ）。変更が大きいときや、取り込む前は、関係しそうな範囲を広めに選ぶ。絞ると、関係ないと思った場所への影響を見落とす。
 
@@ -53,6 +53,10 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 `tests/contract/shape.py` と、`tests/contract/gitlab/` の `normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。
 
 `tests/fake_claude.py`（claude -p のスタブ）、`tests/contract/claudeside.py`、`tests/contract/claude/recorded.json` を変えたら、同じく `contract` を回す。本物の `claude -p` から録った形と比べる。仕様と録り直しは [claude-contract.md](claude-contract.md)。
+
+## sh のテストは通しの確認だけにする
+
+sh のテスト 1 本の時間は、sh を 1 回走らせる時間でほぼ決まる。観点ごとに 1 本ずつ書くと、同じ実行を観点の数だけ繰り返すことになる。判断と解釈は Go で実装して表駆動のテストで確かめ、sh のテストは経路ごとに数本にする。1 回の実行で、終了コード・出力・作られた物・ホストへの要求をまとめて確かめる。sh と Go のどちらで実装するかは[実行ファイルの境界](exe-boundary.md)の「sh で実装するものと、Go で実装するもの」にある。
 
 ## sh の試験の実行ファイルのスタブ
 

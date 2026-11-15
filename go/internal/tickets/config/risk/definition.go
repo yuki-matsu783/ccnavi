@@ -144,7 +144,7 @@ func anyMatch(patterns []*pyre.Regexp, paths []string) bool {
 
 // key はレイヤーをまたいで「同じ項目か」を比べる全欄。Source と home は含めない。script: は書かれたパスでは
 // なく、スクリプトの置き場からの相対と指す先の中身で比べる（同期で共通レイヤーをコピーした配点はパスが違い、
-// パスで比べると同じ項目を 2 重に数える。中身まで見るのは、名前だけ同じ別のスクリプトを破棄しないため）。
+// パスで比べると同じ項目を 2 回数える。中身まで見るのは、名前だけ同じ別のスクリプトを破棄しないため）。
 func (f *Factor) key() string {
 	value := fmt.Sprint(f.Limit)
 	switch f.Kind {

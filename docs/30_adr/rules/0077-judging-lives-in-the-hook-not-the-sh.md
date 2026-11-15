@@ -1,12 +1,12 @@
 ---
 type: adr
-title: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする
-description: "止める・通すの判定を hook に集中させ、sh の検査は 2 重目の保護にする"
+title: 止める・通すの判定は hook が持ち、sh の検査は 2 つ目にする
+description: "止める・通すの判定を hook に集中させ、sh の検査は 2 つ目の保護にする"
 tags: [judging, hook, sh-scripts, exe-boundary]
 keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
 ---
 
-# ADR-0077: 止める・通すの判定は hook が持ち、sh の検査は 2 重目にする
+# ADR-0077: 止める・通すの判定は hook が持ち、sh の検査は 2 つ目にする
 
 状態: 採用（sh の中の判定の例外のうち、push のゲートは ADR-0118 の例外を write-and-push と `ccnavi-push-approved.sh` の push の前まで広げた。ADR-0142 が改める）
 
@@ -57,7 +57,7 @@ keywords: [判定, hook, sh, 子ワークツリー, push, 環境変数, 検査]
 | 2 つとも組み込みに置く | ルールは空にできるので、保護の根拠が守られる対象の中に入る（ADR-0021 と同じ理由）。P4 の「ガード自身を守るもの」に数える | rules.yml に書く |
 | sh の検査は残し、symlink の穴だけ直す | hook の登録が壊れた・hook が動かない環境でも、sh が止める | sh の検査を外して 1 か所にする。hook が動かないと何も止めない |
 | hook と sh に同じ見本（`tests/guard/test_wrapguard.py` の `CHILD_CASES`）を渡す | 同じことを 2 つの実装で持つので、ずれは見本で捕まえる | — |
-| 原則 P13 を置く：止める・通すの判定は hook と実行ファイルが持ち、sh の検査は 2 重目 | sh に何を書いてよいかの決まりが無いまま、sh が状態を読んで止める形が増えていた | — |
+| 原則 P13 を置く：止める・通すの判定は hook と実行ファイルが持ち、sh の検査は 2 つ目 | sh に何を書いてよいかの決まりが無いまま、sh が状態を読んで止める形が増えていた | — |
 
 P13 は「push や fetch の対象を決めるためにツリーを数える」ことを判定に数えない。`ccnavi-push-approved.sh` と
 `ccnavi-fetch.sh` は実行ファイルを起動しない（承認の直後、実行ファイルが入れ替え中でも push や fetch ができるように）ので、

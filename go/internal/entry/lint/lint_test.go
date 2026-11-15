@@ -32,7 +32,7 @@ func anyContains(problems []rules.Problem, needle string) bool {
 	return false
 }
 
-// Stop の AI 判定の設定と agent hook の登録の食い違い（tests/core/test_stopreview_more.py の LintTest）。
+// Stop の AI 判定の設定と agent hook の登録の食い違い。
 func TestStopReviewProblems(t *testing.T) {
 	mark := stopreview.HookMark
 	allow := `["` + strings.Join(stopreview.JudgeAllowRules(), `", "`) + `"]`
@@ -133,7 +133,7 @@ func TestDirectRecordsQuietAndSideBySide(t *testing.T) {
 	}
 }
 
-// レイヤーのずれ（tests/core/test_lint_layer_drift.py）。手元のレイヤーを、取得済みの origin/<統合先> と比べる。
+// レイヤーのずれ。手元のレイヤーを、取得済みの origin/<統合先> と比べる。
 const (
 	commonLayer = ".ccnavi/config/common/rules.yml"
 	selfLayer   = ".ccnavi/config/project/rules.yml"

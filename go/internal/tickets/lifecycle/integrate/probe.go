@@ -2,7 +2,6 @@ package integrate
 
 import (
 	"slices"
-	"strings"
 	"time"
 
 	"ccnavi/internal/infra/config"
@@ -301,18 +300,10 @@ func unique(worktree, name string, deadline time.Time) (int, bool) {
 
 // integrationTree は統合先のブランチをチェックアウトしているツリー。見つからなければ空、読めなければ偽。
 func integrationTree(owner, integration string, deadline time.Time) (string, bool) {
-	done := git.Run(owner, []string{"worktree", "list", "--porcelain"}, git.Options{Deadline: deadline})
-	if !done.OK() {
+	list, ok := git.Worktrees(owner, git.Options{Deadline: deadline})
+	if !ok {
 		return "", false
 	}
-	want := "branch refs/heads/" + integration
-	path := ""
-	for _, line := range ospath.Splitlines(done.Out) {
-		if rest, ok := strings.CutPrefix(line, "worktree "); ok {
-			path = rest
-		} else if ospath.Strip(line) == want {
-			return path, true
-		}
-	}
-	return "", true
+	w, _ := git.Holding(list, integration)
+	return w.Path, true
 }

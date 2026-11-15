@@ -107,7 +107,7 @@ func list[T any](xs []T) []T {
 	return xs
 }
 
-// sayElsewhere は正とするツリーの外に在る計画の違う版の案内を標準エラーに出す。--verify のテキストは本文に同じ段を
+// sayElsewhere は正とするツリーの外に在る計画の違う版の案内を標準エラーに出す。--verify のテキストは本文に同じ層を
 // 持つので、そこでは呼ばない。
 func sayElsewhere(stderr io.Writer, g *agree.Gathered) {
 	for _, line := range g.Elsewhere {
@@ -315,7 +315,7 @@ func Verify(stdout, stderr io.Writer, conf *config.Settings, root string, asJSON
 	judged := judge(conf, root, only, nil)
 	io.WriteString(stderr, judged.messages)
 	if asJSON {
-		// テキストの本文には VerifyVerdict が名指しの段を入れる。JSON の本体には無いので標準エラーへ出す。
+		// テキストの本文には VerifyVerdict が名指しの節を入れる。JSON の本体には無いので標準エラーへ出す。
 		sayElsewhere(stderr, judged.gathered)
 	}
 	g := judged.gathered

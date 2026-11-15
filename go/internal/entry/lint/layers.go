@@ -135,7 +135,7 @@ func parentTreesOffBranch(conf *config.Settings, root string) []rules.Problem {
 }
 
 // holdsParent はそのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか（見方は approval.ParentIn で、
-// sh の ccnavi_parent_tree とも同じ）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
+// `tree parent` の parent の行とも同じ）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
 func holdsParent(conf *config.Settings, work tree.Tree, root string) bool {
 	if front, _ := approval.ParentIn(approval.ParentPaths(conf, work.Root, work.Name), work.Name); front != nil {
 		return true
@@ -180,7 +180,7 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 		ref = "refs/remotes/origin/" + branch
 	}
 	// 比べる相手（origin/<統合先>）が手元に無ければ、比べられなかったと返す。
-	if ref == "" || !git.Run(home, []string{"rev-parse", "--verify", "--quiet", ref + "^{commit}"}, git.Options{}).OK() {
+	if ref == "" || git.Commit(home, ref, git.Options{}) == "" {
 		// origin が無いリポジトリ（git でない、リモートを持たない）は、取得で解けないので言わない。
 		return nil, !git.Run(home, []string{"remote", "get-url", "origin"}, git.Options{}).OK()
 	}

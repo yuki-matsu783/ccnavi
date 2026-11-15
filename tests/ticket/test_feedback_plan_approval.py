@@ -33,7 +33,9 @@ def _snapshot(root: str) -> dict[str, bytes]:
     return out
 
 
-class FeedbackPlanApprovalTest(PhaseHarness):
+class FeedbackPlanHarness(PhaseHarness):
+    """フィードバックのフェーズの計画を承認する場面の準備。テストは持たない（継ぐ側で同じテストが重ねて回らないように）。"""
+
     def requested(self):
         """フェーズ 1 の子を閉じて合流し、レビューを依頼したところまで。"""
         self.family(plan=["design"])
@@ -63,6 +65,8 @@ class FeedbackPlanApprovalTest(PhaseHarness):
         path = os.path.join(self.phase_dir(), "1.reviewed")
         return read_json(path) if os.path.exists(path) else None
 
+
+class FeedbackPlanApprovalTest(FeedbackPlanHarness):
     # ---- 1. レビュー済みでなければ拒む
 
     def test_requested_only_is_refused(self):

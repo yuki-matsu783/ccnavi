@@ -16,7 +16,7 @@
 - まれな異常状態のために推測・修復・やり直し・詳しい説明を作り込まず、状態と直し方を言って止める（ユーザに頼む）。データ損失を防ぐ処理、保護の強さ、普段の経路で使う処理は残す。決まりは `.agents/docs/irregular-states.md`
 - 操作を止める条件（ゲート）は 1 か所の関数に置き、同じ意味の条件を操作ごとに書き直さない。承認・レビューを頼む操作（`approval-request`・`review-request`）は、後のゲートで止まる条件を同じ関数で先に拒否する。決まりは `.agents/docs/gate-conditions.md`
 - 実装は一番シンプルになる方法を選ぶ。共通化などで単純にできる部分は、修正範囲が広がっても進める（ユーザと合意が要る変更の扱いは別）。決まりは `.agents/docs/gate-conditions.md`
-- 責務と依存関係を考える。1 つのパッケージは 1 つの責務を持ち、import は段が同じか下へだけ向ける（`go/internal/layers_test.go`）。共通化で置き場を動かすときは、段と責務を先に決める。決まりは `.agents/docs/gate-conditions.md`
+- 責務と依存関係を考える。1 つのパッケージは 1 つの責務を持ち、import は層が同じか下へだけ向ける（`go/internal/layers_test.go`）。共通化で置き場を動かすときは、層と責務を先に決める。決まりは `.agents/docs/gate-conditions.md`
 - 後方互換は考えない。名前・オプション・形式を変えるときは、別名や旧形式を読む処理を作らず、リポジトリ内の旧名を全部置き換える（ADR は履歴なので直さない。利用しない用語の横展開だけは例外。決まりは `.agents/docs/gate-conditions.md` と `.agents/docs/docs-writing.md`）
 - ユーザに聞く前（`AskUserQuestion`・確認が出る操作）は、直前の発言に「前提・背景」と「想定結果」を見出しで書く。見出しが無ければ、hook が確認を止める。決まりは `.agents/docs/stop-patterns.md`
 - AGENTS.md には、常に守る決まりだけを短く書く。理由・手順・例は「詳細」の表が指す文書に書く。新しい決まりは、まずその文書に書き、表に 1 行足す（段階的詳細化）
@@ -39,7 +39,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | 文書（`docs/`・`.ccnavi/docs/`・`.agents/docs/`・`README.md`）を足す・動かす・改名する、どの読み手向けの文書か・どこに置くかを決める、文書から別の文書へリンクを張る（上位から下位へ張ってよいか） | `.agents/docs/docs-structure.md` |
 | 要件書・設計書・ADR（`docs/11_requirements`・`docs/21_design`・`docs/30_adr`）を書く・直す、これらの文書から別の文書を指す | `.agents/docs/docs-writing.md` |
 | sh やスクリプトを書く、パス・名前を比べる、コードのコメントを書く、文書・コメント・ユーザに見える文言で ADR に触れたくなった | `.agents/docs/environment.md` |
-| ccnavi の実行ファイル（`go/`）か `.ccnavi/scripts/` の sh を直す | `.agents/docs/exe-boundary.md` |
+| ccnavi の実行ファイル（`go/`）か `.ccnavi/scripts/` の sh を直す、sh と Go のどちらで実装するかを決める | `.agents/docs/exe-boundary.md`（分担に合っていない所は `.agents/docs/sh-go-gaps.md`） |
 | エージェントを止める・返事を求める仕組みを足す・直す、拒否の文を書く | `.agents/docs/stop-patterns.md` |
 | 異常状態（壊れた記録・書きかけ・手で動かされた状態・一時的な失敗）を扱う処理を足す・直す・削る | `.agents/docs/irregular-states.md` |
 | 操作を止める条件（ゲート）を足す・直す、承認・レビューを頼む操作の拒否条件を決める、名前・オプション・形式を変える（後方互換を残さない） | `.agents/docs/gate-conditions.md` |

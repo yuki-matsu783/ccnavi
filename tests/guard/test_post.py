@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import shutil
@@ -100,6 +101,37 @@ def write(path, text):
         f.write(text)
 
 
+def copy_repo(template, dest):
+    """組んだリポジトリ（ワークツリーと入れ子のリポジトリを含む）を dest に写す。
+
+    git を起こさずに済ませるため、ワークツリーの `.git` と登録（`.git/worktrees/*/gitdir`）に
+    書かれた絶対パスだけを写した先に書き換える。dest は無い場所か空のディレクトリ。
+    """
+    shutil.copytree(template, dest, symlinks=True, dirs_exist_ok=True)
+    for here, _dirs, files in os.walk(dest):
+        links = [os.path.join(here, ".git")] if ".git" in files else []
+        if os.path.basename(os.path.dirname(here)) == "worktrees" and "gitdir" in files:
+            links.append(os.path.join(here, "gitdir"))
+        for link in links:
+            with open(link, encoding="utf-8") as f:
+                text = f.read()
+            with open(link, "w", encoding="utf-8", newline="\n") as f:
+                f.write(text.replace(template, dest))
+
+
+_TEMPLATES: dict[object, str] = {}
+
+
+def template(key, build):
+    """build(dir) で組んだリポジトリを、key ごとにこのプロセスで 1 回だけ作って置き場を返す。"""
+    if key not in _TEMPLATES:
+        made = os.path.realpath(tempfile.mkdtemp(prefix="ccnavi-post-template-"))
+        atexit.register(shutil.rmtree, made, ignore_errors=True)
+        build(made)
+        _TEMPLATES[key] = made
+    return _TEMPLATES[key]
+
+
 class Harness:
     """payload を 1 回渡して、返ってきたものだけを読む。リポジトリは各 setUp が作る。
 
@@ -167,16 +199,19 @@ class Harness:
 class PostToolUseTest(Harness, unittest.TestCase):
     """保護領域を持つリポジトリを 1 つ作り、それを汚しながら見る。"""
 
+    @staticmethod
+    def build(repo):
+        git(repo, "init", "--quiet")
+        write(os.path.join(repo, "protected", "keep.txt"), "committed\n")
+        write(os.path.join(repo, "watched", "deps.txt"), "committed\n")
+        write(os.path.join(repo, "src", "app.py"), "print(1)\n")
+        git(repo, "add", "-A")
+        git(repo, "commit", "--quiet", "-m", "init")
+
     def setUp(self):
         self.repo = tempfile.mkdtemp(prefix="ccnavi-post-")
         self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
-
-        git(self.repo, "init", "--quiet")
-        write(os.path.join(self.repo, "protected", "keep.txt"), "committed\n")
-        write(os.path.join(self.repo, "watched", "deps.txt"), "committed\n")
-        write(os.path.join(self.repo, "src", "app.py"), "print(1)\n")
-        git(self.repo, "add", "-A")
-        git(self.repo, "commit", "--quiet", "-m", "init")
+        copy_repo(template(PostToolUseTest, self.build), self.repo)
 
         # 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
         self.rules = common_path(self.repo, "rules")
@@ -235,7 +270,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("Bash(python build.py)", result.stderr)
         # 戻す手順。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- protected/keep.txt', result.stderr
+            "ccnavi-git.sh restore --staged --worktree -- protected/keep.txt", result.stderr
         )
         # ルールが持つ文面。止めるだけでは足りないという道具の目的そのもの。
         self.assertIn("Ask the user", result.stderr)
@@ -262,7 +297,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("protected/generated.env", result.stderr)
         # 現れたファイルは restore では戻せない。git のラッパーは clean を通さないので、
         # シェルの rm で消す。
-        self.assertIn('rm -- protected/generated.env', result.stderr)
+        self.assertIn("rm -- protected/generated.env", result.stderr)
         self.assertNotIn("git clean", result.stderr)
 
     def test_同じ変更を毎回は言わない(self):
@@ -506,7 +541,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertIn("put it back to its committed content", result.stderr)
         # 誰も戻していないので、戻す手順は省かない。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- protected/keep.txt', result.stderr
+            "ccnavi-git.sh restore --staged --worktree -- protected/keep.txt", result.stderr
         )
         self.assertIn("would-restore 1", self.records()[-1]["detail"])
 
@@ -704,7 +739,7 @@ class PostToolUseTest(Harness, unittest.TestCase):
         self.assertNotIn("restored: ccnavi", result.stderr)
         # 戻していないので、戻す手順は載せたままにする。
         self.assertIn(
-            'ccnavi-git.sh restore --staged --worktree -- watched/deps.txt', result.stderr
+            "ccnavi-git.sh restore --staged --worktree -- watched/deps.txt", result.stderr
         )
         # 手順だけだと「自分で戻せ」としか読めない。戻さなかった理由をつける。
         self.assertIn("not-restored:", result.stderr)
@@ -976,13 +1011,17 @@ DOING = ".ccnavi/approved/doing/i0001.md"
 
 def ticket_repo(committed=True, text=TICKET):
     """承認済みチケットを 1 本持つリポジトリ。`committed` が偽ならコミットを作らない。"""
+
+    def build(made):
+        git(made, "init", "--quiet")
+        write(os.path.join(made, *DOING.split("/")), text)
+        write(os.path.join(made, "src", "app.py"), "print(1)\n")
+        if committed:
+            git(made, "add", "-A")
+            git(made, "commit", "--quiet", "-m", "init")
+
     repo = tempfile.mkdtemp(prefix="ccnavi-place-")
-    git(repo, "init", "--quiet")
-    write(os.path.join(repo, *DOING.split("/")), text)
-    write(os.path.join(repo, "src", "app.py"), "print(1)\n")
-    if committed:
-        git(repo, "add", "-A")
-        git(repo, "commit", "--quiet", "-m", "init")
+    copy_repo(template(("ticket", committed, text), build), repo)
     write(common_path(repo, "rules"), json.dumps(RULES))
     return repo
 
@@ -1324,7 +1363,7 @@ class UndoTextTest(unittest.TestCase):
         result = harness.run_hook(command="python build.py")
         git = script_command(harness.repo, "ccnavi-git.sh")
         self.assertIn(
-            f'undo: {git} restore --staged --worktree -- protected/keep.txt', result.stderr
+            f"undo: {git} restore --staged --worktree -- protected/keep.txt", result.stderr
         )
 
 

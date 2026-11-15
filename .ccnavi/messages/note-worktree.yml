@@ -1,5 +1,5 @@
 # ccnavi-worktree.sh が、親のワークツリーから直接作業へ切り替えたときに出す案内と、切り替えを断るときの案内。
-# 何が残っているか（条件）は sh が実行ファイル（tree leftover）に聞く。取り下げの手順は
+# 何が残っているか（条件）は、ccnavi-worktree.sh の本体（実行ファイルの worktree direct）が見る。取り下げの手順は
 # .ccnavi/docs/ticket-work.md の「拒否される条件と、切り替える前の取り下げ」と同じ。
 version: 1
 messages:

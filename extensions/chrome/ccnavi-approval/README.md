@@ -57,13 +57,15 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 スタブは sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
 `GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。
-ホストの自動判定の表は `src/core/hostclass.ts`（設定画面は種類を手で選ぶので、この表は GHE.com の接続先の組み立てと、sh・実行ファイルとの突き合わせに使う。`github.com`・`ghe.com`・`*.ghe.com` は GitHub、それ以外は GitLab。`tests/fixtures/host-kinds.json` の表で sh・実行ファイルと突き合わせる）。設定画面でユーザが明示した種類は自動判定より優先する。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
+拡張はホストの種類を自動判定しない（設定画面で種類を手で選ぶ）。自動判定の表（`github.com`・`ghe.com`・`*.ghe.com` は GitHub、それ以外は GitLab）は sh と実行ファイルだけが持ち、`tests/fixtures/host-kinds.json` で突き合わせる。拡張が持つのは、GHE.com の接続先を組むための `ghe.com` とそのサブドメインの照合（`src/core/custom-hosts.ts` の `isGheHost`）だけ。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
 依頼コメントへの返信の見本（`replies`・`replies-accepted`）は、system のノートを除いたノートから代表のノートと `own` を決め、返信を指摘として数える。実物の GitLab で返信がスレッドになり resolvable になるかは未検証。
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 
 MR のスレッドとレビューを取ってくる処理は、手元の sh（`.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews`）と
-この拡張（`src/core/github.ts` の `reviewCopy`）の 2 か所にある。判定は ccnavi の同じ関数なので、2 つが同じ結果を組めば同じ結論になる。
-2 つが同じ結果を組むかは、手で組んだホストの応答の見本で確かめる。
+この拡張の service worker が呼ぶ `src/core/github.ts`・`gitlab.ts` の `reviewReplies`（2 か所）は、取ってきた応答を読まずに ccnavi に渡し、
+読み（スレッドの代表・`own`・解決済み・レビューの状態のそろえ方）は ccnavi の同じ `hostreply`（sh は `ccnavi host copy`、拡張は WASM の `copy`）が持つ。
+拡張の service worker は WASM を動かさないので、ボードが `reviewReplies` の答えを受け取り、WASM の Worker の `copy` に渡す（`src/core/reviewed.ts` の `readCopy`）。
+2 つが同じ問い合わせとページの切り方をしているかは、手で組んだホストの応答の見本で確かめる。
 
 - 置き場: `test/fixtures/host/github/<場面>/`。`scene.json`（持ち主・リポジトリ・親のブランチと、場面の説明）、ホストの応答
   （`pulls.json`・`threads.<k>.json`（GraphQL の `reviewThreads` のページ）・`reviews.<N>.json`（REST のページ）・`user.json`）、
@@ -79,7 +81,7 @@ MR のスレッドとレビューを取ってくる処理は、手元の sh（`.
    `expected.json` を書き直す。続けて `go/` で `CCNAVI_HOST_FIXTURE=1 go test ./internal/tickets/model/host -run HostFixture` を回し、
    実行ファイルが出す結論で `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
    読めていなければ `ccnavi-review.sh` を直す
-3. `pnpm test` を回す。CX-T129 が失敗したら `src/core/github.ts` を直して sh と同じ結果にする
+3. `pnpm test` を回す。CX-T129 が失敗したら、問い合わせかページの切り方（`src/core/github.ts`）か、読み（`go/internal/tickets/model/hostreply`）を直して sh と同じ結果にする
 4. 見本・期待値・sh・TS の変更を同じコミットに入れる（片方だけ変えると、もう片方の試験が失敗する）
 
 試験の名前の ID は `CX-T<番号>`。足すときは最後尾の次を採る。

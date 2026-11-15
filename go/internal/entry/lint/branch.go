@@ -294,15 +294,13 @@ func unregisteredWorktrees(root string, worktrees []tree.Tree) []rules.Problem {
 		return nil
 	}
 	// ファイルだけでは登録済みかを決められない候補を、git の一覧と突き合わせる。
-	code, text := git.Output(root, []string{"worktree", "list", "--porcelain"}, git.Options{Timeout: git.ReadTimeout})
-	if code != 0 {
+	list, ok := git.Worktrees(root, git.Options{Timeout: git.ReadTimeout})
+	if !ok {
 		return nil
 	}
 	listed := map[string]bool{}
-	for _, line := range ospath.Splitlines(text) {
-		if rest, ok := strings.CutPrefix(line, "worktree "); ok {
-			listed[pathcase.Real(ospath.Strip(rest))] = true
-		}
+	for _, w := range list {
+		listed[pathcase.Real(ospath.Strip(w.Path))] = true
 	}
 	registry := pathcase.Real(ospath.Join(root, tree.GitWorktrees))
 	var out []rules.Problem

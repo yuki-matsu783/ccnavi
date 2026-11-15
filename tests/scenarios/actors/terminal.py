@@ -1,4 +1,4 @@
-"""人間役の端末操作（human_run。段 4）。"""
+"""人間役の端末操作（human_run。層 4）。"""
 
 import contextlib
 import json

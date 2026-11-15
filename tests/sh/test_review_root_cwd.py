@@ -11,11 +11,10 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 
-from tests import ROOT
+from tests import ROOT, exe
 
 SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
@@ -64,7 +63,8 @@ class RootCwdTest(unittest.TestCase):
             if not k.startswith("CCNAVI_") and k not in ("GITHUB_TOKEN", "GH_TOKEN")
         }
         env["CCNAVI_LEARNING"] = "disable"
-        env["CCNAVI_ENTRY_PATH"] = sys.executable
+        # 統合先は本物の実行ファイル（git integration）に聞く。
+        env["CCNAVI_ENTRY_PATH"] = exe.path()
         env["PATH"] = self.shim + os.pathsep + env.get("PATH", "")
         return subprocess.run(
             [SHELL, SCRIPT, *args],

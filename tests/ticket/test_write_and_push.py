@@ -4,19 +4,14 @@ write-and-push は、親子のチケットで状態を書く操作を
 「ロック → 取り込み → 書く → コミット → push」の 1 操作にする形。
 実行ファイルは対象かの見分けと書いたパスの一覧だけを持ち、git の操作は sh が持つ。
 
-見るのは 4 つ。sh の側（ロック・取り込み・コミット・push・戻し）は
+見るのは 2 つ。sh の側（ロック・取り込み・コミット・push・戻し）は
 tests/sh/test_write_and_push_*.py（道具は tests/sh/write_and_push_harness.py）が見る。
+`ccnavi write-and-push family`（対象かの見分け）と `sort`（置き場の変更の見分け）は、Go の単体テスト
+（`go/internal/tickets/approval/wap/`）が見る。
 
-1. `ccnavi write-and-push family <識別子>`: 親子のチケット（子なら親）と、write-and-push の対象か。
-   origin の無い親のワークツリーと置き場が絶対パスの親子のチケットは対象外、
-   決まらない親子のチケットは stop
-2. `ccnavi write-and-push sort <親> [<版>]`: 置き場の変更の見分け（ccnavi
-が書いたと内容で分かるもの・
-   ユーザがコミットして push するもの・見分けられないもの、数えない一時ファイル、
-   record-risk の記録）。未コミットとコミット済み（`<版>..HEAD`）の両方
-3. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
+1. `--record-tree`: 書いたパスの一覧の基点を親のワークツリーにし、置き場の外に書けば error
    （一覧は書く。例外は無い）
-4. ユーザの判断の入口の sh（`ccnavi-user-close-early.sh`）は
+2. ユーザの判断の入口の sh（`ccnavi-user-close-early.sh`）は
    エージェントから止める
 """
 
@@ -31,204 +26,6 @@ from tests.ticket.test_ticket import git, read_json, write
 from tests.ticketsample import child_text, parent_text
 
 APPROVED = ".ccnavi/approved"
-# `write-and-push` の答えの 1 行目（形の版）。
-HEAD = "write-and-push 1"
-
-
-def lines(out):
-    return dict(
-        (line.split(" ", 1) + [""])[:2] for line in out.splitlines() if line and line != HEAD
-    )
-
-
-class FamilyTest(AuthorityHarness):
-    def ask(self, ident):
-        result = self.ccnavi("write-and-push", "family", ident)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines()[0], HEAD)
-        return lines(result.stdout)
-
-    def test_a_family_without_origin_is_not_a_target(self):
-        answer = self.ask("i0001-01-01")
-        self.assertEqual(answer["family"], "i0001")
-        self.assertEqual(answer["target"], "no")
-        self.assertIn("origin がありません", answer["why"])
-        self.assertNotIn("tree", answer)
-
-    def test_a_family_is_a_target_when_the_tree_has_origin(self):
-        # 対象かは親のワークツリーがあり、origin があるかで決まる
-        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        answer = self.ask("i0001-01-01")
-        self.assertEqual(answer["target"], "yes")
-        self.assertEqual(os.path.realpath(answer["tree"]), os.path.realpath(self.parent_tree))
-        self.assertNotIn("state", answer)
-
-    def test_a_family_without_the_parent_worktree_stops_instead_of_using_another_copy(self):
-        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        git(self.root, "worktree", "remove", "--force", self.parent_tree)
-        answer = self.ask("i0001")
-        self.assertEqual(answer["target"], "stop")
-        self.assertIn("親のワークツリー", answer["why"])
-        self.assertNotIn("tree", answer)
-
-    def test_a_family_is_a_target_with_its_tree(self):
-        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        answer = self.ask("i0001-01-01")
-        self.assertEqual(answer["target"], "yes")
-        self.assertEqual(answer["repo"], "self")
-        self.assertEqual(os.path.realpath(answer["tree"]), os.path.realpath(self.parent_tree))
-        self.assertEqual(answer["approved"], APPROVED)
-        self.assertEqual(answer["review"], "wip/proposals/review")
-        self.assertNotIn("state", answer)
-
-    def test_a_parent_tree_on_another_branch_stops_with_hints(self):
-        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        git(self.parent_tree, "checkout", "--quiet", "-b", "elsewhere")
-        result = self.ccnavi("write-and-push", "family", "i0001")
-        answer = lines(result.stdout)
-        self.assertEqual(answer["target"], "stop")
-        self.assertIn("合わない", answer["why"])
-        self.assertIn("hint ", result.stdout)
-        self.assertNotIn("--forget", result.stdout)
-
-    def test_a_bad_id_is_refused(self):
-        result = self.ccnavi("write-and-push", "family", "../x")
-        self.assertEqual(result.returncode, 1)
-
-
-class WithoutMrFamilyTest(AuthorityHarness):
-    def setUp(self):
-        super(AuthorityHarness, self).setUp()
-        self.family(plan=["research"])
-
-    def test_a_family_without_a_merge_request_phase_is_a_target_too(self):
-        # MR でレビューするフェーズが無くても、write-and-push の対象（外した条件）
-        git(self.root, "remote", "add", "origin", os.path.join(self.root, "nowhere.git"))
-        result = self.ccnavi("write-and-push", "family", "i0001")
-        answer = lines(result.stdout)
-        self.assertEqual(answer["target"], "yes")
-
-
-class SortTest(AuthorityHarness):
-    def setUp(self):
-        super().setUp()
-        self.commit_parent("settle")
-
-    def sort(self, since=""):
-        result = self.ccnavi("write-and-push", "sort", "i0001", *([since] if since else []))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(result.stdout.splitlines()[0], HEAD)
-        self.last_why = [line[4:] for line in result.stdout.splitlines() if line.startswith("why ")]
-        return sorted(
-            tuple(line.split(" ", 1))
-            for line in result.stdout.splitlines()[1:]
-            if not line.startswith("why ")
-        )
-
-    def put(self, rel, text):
-        return write(os.path.join(self.parent_tree, *rel.split("/")), text)
-
-    def test_nothing_changed_lists_nothing(self):
-        self.assertEqual(self.sort(), [])
-
-    def test_hook_marks_are_b(self):
-        pending = f"{APPROVED}/phases/i0001/2.pending"
-        skipped = f"{APPROVED}/phases/i0001/3.skipped"
-        self.put(pending, json.dumps({"review": True, "source": "common", "at": "t"}))
-        self.put(skipped, json.dumps({"deferred_to": 4, "at": "t"}))
-        self.assertEqual(self.sort(), sorted([("b", pending), ("b", skipped)]))
-
-    def test_b_is_only_the_hook_marks_of_this_family(self):
-        """別の親・全角の数字のマーカーは (b) にしない。"""
-        other = f"{APPROVED}/phases/i0099/2.pending"
-        wide = f"{APPROVED}/phases/i0001/２.pending"
-        self.put(other, json.dumps({"review": True, "at": "t"}))
-        self.put(wide, json.dumps({"review": True, "at": "t"}))
-        found = dict((path, kind) for kind, path in self.sort())
-        self.assertEqual(found[other], "d")
-        self.assertEqual(found[wide], "d")
-
-    def test_moves_written_by_a_human_decision_are_c(self):
-        """ユーザのレビュー（review/ から done/）と早めに閉じたときの取り消し（doing/ から done/）、
-        マーカーの消去は (c)。"""
-        review = "wip/proposals/review/i0001-01-01.md"
-        self.put(review, child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
-        mark = f"{APPROVED}/phases/i0001/1.pending"
-        self.put(mark, json.dumps({"review": True, "at": "t"}))
-        self.commit_parent("in review")
-        os.remove(os.path.join(self.parent_tree, *review.split("/")))
-        os.remove(os.path.join(self.parent_tree, *mark.split("/")))
-        done = f"{APPROVED}/done/i0001-01-01.md"
-        self.put(done, child_text("i0001-01-01", "i0001", 1, ["wip/research/*"]))
-        found = dict((path, kind) for kind, path in self.sort())
-        self.assertEqual(found, {review: "c", done: "c", mark: "c"})
-
-    def test_forged_or_human_marks_are_not_b(self):
-        reviewed = f"{APPROVED}/phases/i0001/1.reviewed"
-        early = f"{APPROVED}/phases/i0001/2.skipped"
-        extra = f"{APPROVED}/phases/i0001/3.pending"
-        self.put(reviewed, json.dumps({"by": "decide", "at": "t"}))
-        self.put(early, json.dumps({"by": "close-early", "at": "t"}))
-        self.put(extra, json.dumps({"review": True, "at": "t", "reviewed": True}))
-        found = dict((path, kind) for kind, path in self.sort())
-        self.assertEqual(found[reviewed], "c")
-        self.assertEqual(found[early], "c")
-        self.assertEqual(found[extra], "d")
-
-    def test_a_rewritten_hook_mark_is_not_b(self):
-        rel = f"{APPROVED}/phases/i0001/2.pending"
-        self.put(rel, json.dumps({"review": True, "at": "t"}))
-        self.commit_parent("mark")
-        self.put(rel, json.dumps({"review": True, "at": "u"}))
-        self.assertEqual(self.sort(), [("d", rel)])
-
-    def test_flows_approvals_and_other_files(self):
-        flow = f"{APPROVED}/flows/i0001-01-01.yml"
-        copy = f"{APPROVED}/doing/i0001-01-02.md"
-        other = f"{APPROVED}/notes.txt"
-        review = "wip/proposals/review/i0001-01-01.md"
-        self.put(flow, "steps: []\n")
-        self.put(copy, child_text("i0001-01-02", "i0001", 1, ["wip/research/*"]))
-        self.put(other, "x\n")
-        self.put(review, "x\n")
-        found = dict((path, kind) for kind, path in self.sort())
-        self.assertEqual(found, {flow: "c", copy: "c", other: "d", review: "d"})
-
-    def test_a_workflow_file_is_no_longer_a_user_decision(self):
-        """先行関係は承認済みチケットの計画から都度計算するので、承認は `phases/<親>/workflow.yml`
-        を書かない。置き場に現れたら、ユーザの判断が書くものではなく見分けられないもの（d）。"""
-        held = f"{APPROVED}/phases/i0001/workflow.yml"
-        self.put(held, "order: dag\nwaits:\n  1: []\nreview_at: {}\n")
-        found = dict((path, kind) for kind, path in self.sort())
-        self.assertEqual(found, {held: "d"})
-
-    def test_judge_records_are_kept_and_temp_files_skipped(self):
-        judge = f"{APPROVED}/phases/i0001/i0001-01-01.judge.json"
-        temp = f"{APPROVED}/flows/.i0001-01-01.yml.123.tmp"
-        part = f"{APPROVED}/doing/.i0001.md.abc.part"
-        self.put(judge, "{}")
-        self.put(temp, "x")
-        self.put(part, "x")
-        self.assertEqual(self.sort(), sorted([("keep", judge), ("skip", temp), ("skip", part)]))
-
-    def test_committed_changes_since_a_revision(self):
-        base = git(self.parent_tree, "rev-parse", "HEAD").strip()
-        pending = f"{APPROVED}/phases/i0001/2.pending"
-        reviewed = f"{APPROVED}/phases/i0001/1.reviewed"
-        self.put(pending, json.dumps({"review": True, "at": "t"}))
-        self.put(reviewed, json.dumps({"by": "decide", "at": "t"}))
-        self.put("src/code.py", "x = 1\n")
-        self.commit_parent("unsent")
-        self.assertEqual(self.sort(base), sorted([("b", pending), ("c", reviewed)]))
-        # 未コミットの judge.json は keep だが、コミット済みの未送信なら見分けない（d）。
-        judge = f"{APPROVED}/phases/i0001/i0001-01-01.judge.json"
-        self.put(judge, "{}")
-        self.commit_parent("judge")
-        self.assertIn(("d", judge), self.sort(base))
-
-    def test_a_bad_revision_is_refused(self):
-        result = self.ccnavi("write-and-push", "sort", "i0001", "HEAD --output=/tmp/x")
-        self.assertEqual(result.returncode, 1)
 
 
 class RecordTreeTest(AuthorityHarness):
@@ -420,8 +217,9 @@ class ChooseTest(PhaseHarness):
             "--choose-out", out, "--result", fixture, stdin="k\n",
         )  # fmt: skip
         self.assertEqual(chosen.returncode, 0, chosen.stdout + chosen.stderr)
-        answer = read_json(out)
-        self.assertEqual(answer["choices"], {"u/7#t0": "keep"})
+        with open(out, encoding="utf-8") as f:
+            answer = dict(line.rstrip("\n").split(" ", 1) for line in f)
+        self.assertEqual(json.loads(answer["choices"]), {"u/7#t0": "keep"})
         status = git(self.parent_tree, "status", "--porcelain")
         self.assertEqual(status.strip(), "")
         outside = self.ccnavi(
@@ -431,7 +229,7 @@ class ChooseTest(PhaseHarness):
         self.assertEqual(outside.returncode, 1)
         done = self.ccnavi(
             "--cwd", self.parent_tree, "user", "reviewed", "1", "--accept-unresolved",
-            "--yes", json.dumps(answer["choices"]), "--digest", answer["digest"],
+            "--yes", answer["choices"], "--digest", answer["digest"],
             "--json", "--result", fixture,
         )  # fmt: skip
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
@@ -451,9 +249,11 @@ class BypassTest(AuthorityHarness):
     def test_state_operations_without_record_tree_are_refused(self):
         before = self.ccnavi("write-and-push", "family", "i0001")
         self.assertIn("target yes", before.stdout)
-        refused = self.ccnavi("ticket", "finish", "i0001-01-01")
-        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
-        self.assertIn("write-and-push の対象", refused.stderr)
+        for args in (("finish", "i0001-01-01"), ("start", "i0001"), ("approval-request", "i0001")):
+            refused = self.ccnavi("ticket", *args)
+            self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+            self.assertIn("write-and-push の対象", refused.stderr, args)
+            self.assertIn("ccnavi-ticket.sh", refused.stderr, args)
         fixture = write(os.path.join(self.root, "r.json"), json.dumps({"host": "x"}))
         for args in (
             ("review", "confirm", "--phase", "1", "--result", fixture),

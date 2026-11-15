@@ -203,7 +203,7 @@ type Ticket struct {
 	Plan            []PlanItem
 	Feedback        []PlanItem
 	FeedbackPlanned bool
-	// Workflow は計画の先行関係。上の段が after から計算して入れる。nil は入れていない読み方。
+	// Workflow は計画の先行関係。上の層が after から計算して入れる。nil は入れていない読み方。
 	Workflow *Workflow
 	// PhasesRaw は親の `phases:` を読んだままの値（無い・null なら nil）。形の誤りは blocked の理由になる。
 	PhasesRaw any

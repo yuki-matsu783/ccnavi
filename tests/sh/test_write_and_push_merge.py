@@ -20,7 +20,13 @@ from tests.sh.write_and_push_harness import (
 
 
 class WriteAndPushMergeTest(WriteAndPushMergeHarness):
-    """取り込み（merge）まわりの前半。"""
+    """取り込み（merge）まわりの前半。
+
+    合流の前の検査（置き場・範囲・親で無視されるファイル・戻せない形・子の未コミット）と衝突の文は
+    Go の単体テスト（`go/internal/tickets/lifecycle/wapmerge/`・`phase/scope/`）が見る。ここでは、
+    止まったときに sh が何も変えないことを、範囲の外・置き場の変更（1 本の通し）・戻せない形
+    （改行を含むパス）・衝突で代表して見る。
+    """
 
     # ---- 1. 合流と状態は 1 つのマージコミット
 
@@ -63,6 +69,9 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
         self.assertEqual(len(parents), 2, "合流するものが無いので、ふつうのコミット")
+        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
+        # 親子ごとの取り込み状態は作らない
+        self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
         self.assertIn(
             f'merged_sha: "{self.sha(tree, "HEAD")}"',
             self.read(os.path.join(self.tree, "wip", "proposals", "review", CHILD + ".md")),
@@ -92,46 +101,6 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         )
         self.assertNotIn("合流", prepared.stderr, prepared.stderr)
 
-    def test_a_commit_in_a_review_childs_worktree_stops_the_request(self):
-        """review/ の子のワークツリーで後から積んだコミットは合流されないので、依頼を止める。"""
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "wip/design/a.md", "a\n")
-        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
-        self.assertTrue(os.path.isdir(tree), "review/ の子のワークツリーが残っていない")
-        body = write(os.path.join(self._base, "body.md"), "見てほしい\n")
-        args = ("--cwd", self.tree, "--phase", "1", "--body-file", body, "review", "prepare")
-        self.assertNotIn("合流されていない修正", self.exe(*args).stderr)
-        late = self.work(tree, "wip/design/a.md", "fixed\n", "fix after finish")
-        prepared = self.exe(*args)
-        self.assertNotEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
-        self.assertIn(f"子 {CHILD} の手元のブランチに、合流されていない修正がある", prepared.stderr)
-        self.assertIn(late[:12], prepared.stderr)
-
-    # ---- 3. 止まる
-
-    def test_a_ticket_place_in_the_childs_commits_stops_without_merging(self):
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "wip/proposals/todo/evil.md", "x\n")
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("finish", CHILD)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("置き場の変更", result.stderr)
-        self.assertIn("wip/proposals/todo/evil.md", result.stderr)
-        self.assert_untouched(before)
-
-    def test_a_path_outside_the_scope_stops_without_merging(self):
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "src/x.py", "x = 1\n")
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("finish", CHILD)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("範囲の外のパス", result.stderr)
-        self.assertIn("src/x.py", result.stderr)
-        self.assert_untouched(before)
-
     def test_a_conflict_is_aborted_and_changes_nothing(self):
         self.start_parent()
         tree = self.start_child()
@@ -145,81 +114,30 @@ class WriteAndPushMergeTest(WriteAndPushMergeHarness):
         # 取り込みは済んでいるが、合流は何も残していない
         self.assert_untouched(remote)
 
-    def test_a_conflict_with_a_child_that_merged_first_is_solved_in_the_later_child(self):
-        self.start_parent()
-        self.approve_second_child()
-        first = self.start_child()
-        second = self.start_child(CHILD_B)
-        self.work(first, "wip/design/a.md", "first\n")
-        self.work(second, "wip/design/a.md", "second\n")
-        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("finish", CHILD_B)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("解くのは後から finish した側（この子）", result.stderr)
-        self.assertIn(f"子のワークツリー（.claude/worktrees/{CHILD_B}）", result.stderr)
-        self.assert_untouched(before, CHILD_B)
-
-    def test_a_conflict_on_paths_with_spaces_and_japanese_names_the_paths(self):
-        self.start_parent()
-        self.approve_second_child()
-        first = self.start_child()
-        second = self.start_child(CHILD_B)
-        rels = ("wip/design/a b.md", "wip/design/日本.md")
-        for tree, text in ((first, "first\n"), (second, "second\n")):
-            for rel in rels:
-                write(os.path.join(tree, *rel.split("/")), text)
-            git(tree, "add", "-A")
-            git(tree, "commit", "-q", "-m", "work")
-        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("finish", CHILD_B)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("wip/design/a b.md, wip/design/日本.md", result.stderr)
-        self.assert_untouched(before, CHILD_B)
-
-    def test_a_path_ignored_in_the_parent_stops_without_overwriting_it(self):
+    def test_a_path_outside_the_scope_or_a_ticket_place_stops_without_merging(self):
+        # 子の準備は 1 回にして、子のコミットを差し替えて finish を 2 回回す。
         self.start_parent()
         tree = self.start_child()
-        common = git(self.tree, "rev-parse", "--git-common-dir").stdout.strip()
-        common = common if os.path.isabs(common) else os.path.join(self.tree, common)
-        write(os.path.join(common, "info", "exclude"), "wip/design/secret.md\n")
-        secret = write(os.path.join(self.tree, "wip", "design", "secret.md"), "USER SECRET\n")
-        write(os.path.join(tree, "wip", "design", "secret.md"), "child\n")
-        git(tree, "add", "-f", "wip/design/secret.md")
-        git(tree, "commit", "-q", "-m", "work")
+        start = self.sha(tree, "HEAD")
         before = self.sha(self.tree, "HEAD")
-        result = self.ticket("finish", CHILD)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("git の無視するファイル", result.stderr)
-        self.assertIn("wip/design/secret.md", result.stderr)
-        self.assertEqual(self.read(secret), "USER SECRET\n")
-        self.assert_untouched(before)
+        for rel, kind in (
+            ("src/x.py", "範囲の外のパス"),
+            ("wip/proposals/todo/evil.md", "置き場の変更"),
+        ):
+            with self.subTest(kind=kind):
+                git(tree, "reset", "-q", "--hard", start)
+                self.work(tree, rel, "x\n")
+                result = self.ticket("finish", CHILD)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(kind, result.stderr)
+                self.assertIn(rel, result.stderr)
+                self.assert_untouched(before)
 
     def test_a_path_with_a_newline_stops_without_merging(self):
         self.start_parent()
         tree = self.start_child()
         self.work(tree, "wip/design/a\nb.md", "x\n")
         self.assert_unrestorable_stops("改行を含むパス")
-
-    def test_a_rename_that_only_changes_case_stops_without_merging(self):
-        self.start_parent()
-        self.work(self.tree, "wip/design/Note.md", "x\n")
-        git(self.tree, "push", "-q", "origin", PARENT)
-        tree = self.start_child()
-        git(tree, "mv", "wip/design/Note.md", "wip/design/note.md")
-        git(tree, "commit", "-q", "-m", "rename")
-        self.assert_unrestorable_stops("大文字小文字だけが違うパス")
-
-    def test_adding_a_submodule_stops_without_merging(self):
-        self.start_parent()
-        tree = self.start_child()
-        sha = self.sha(tree, "HEAD")
-        git(tree, "update-index", "--add", "--cacheinfo", f"160000,{sha},wip/design/sub")
-        git(tree, "commit", "-q", "-m", "submodule")
-        # 初期化していない submodule と同じ形（空のディレクトリ）にして、未コミットに見せない
-        os.makedirs(os.path.join(tree, "wip", "design", "sub"))
-        self.assert_unrestorable_stops("submodule の追加・削除")
 
 
 if __name__ == "__main__":

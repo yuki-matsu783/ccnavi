@@ -130,8 +130,8 @@ func leftMessage(left []string) string {
 		"使っているプロセスが終わってから再実行します。"
 }
 
-// cleanGenerated は生成物を消す。消すものを先に決める（途中で止まって半端に消さない）。消し残しがあれば理由。
-func cleanGenerated(top string) string {
+// CleanGenerated は生成物を消す。消すものを先に決める（途中で止まって半端に消さない）。消し残しがあれば理由。
+func CleanGenerated(top string) string {
 	found, why := targets(top, true)
 	if why != "" {
 		return why

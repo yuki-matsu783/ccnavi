@@ -70,17 +70,30 @@ def read(path):
 
 
 class SelfGuardTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # 設定ファイルとルールをコミットしたリポジトリをクラスで 1 回だけ組み、テストごとに写す。
+        cls.template = tempfile.mkdtemp(prefix="ccnavi-selfguard-template-")
+        cls.addClassCleanup(shutil.rmtree, cls.template, ignore_errors=True)
+        git(cls.template, "init", "--quiet")
+        write(
+            os.path.join(cls.template, ".claude", "settings.json"),
+            json.dumps(SETTINGS, indent=2) + "\n",
+        )
+        write(
+            os.path.join(cls.template, ".ccnavi", "config", "common", "rules.yml"),
+            json.dumps(RULES),
+        )
+        git(cls.template, "add", "-A")
+        git(cls.template, "commit", "--quiet", "-m", "init")
+
     def setUp(self):
         self.repo = tempfile.mkdtemp(prefix="ccnavi-selfguard-")
         self.addCleanup(shutil.rmtree, self.repo, ignore_errors=True)
+        shutil.copytree(self.template, self.repo, symlinks=True, dirs_exist_ok=True)
 
-        git(self.repo, "init", "--quiet")
         self.settings = os.path.join(self.repo, ".claude", "settings.json")
         self.rules = os.path.join(self.repo, ".ccnavi", "config", "common", "rules.yml")
-        write(self.settings, json.dumps(SETTINGS, indent=2) + "\n")
-        write(self.rules, json.dumps(RULES))
-        git(self.repo, "add", "-A")
-        git(self.repo, "commit", "--quiet", "-m", "init")
 
         self.state = os.path.join(self.repo, "logs", "state")
         self.log = os.path.join(self.repo, "logs", "decisions.jsonl")
@@ -423,21 +436,6 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin:guard-setting-files", result.stdout)
 
-    def test_cd_で入ってから書く形も止まる(self):
-        # issue #61。保護はパスに適用するので、`cd` で入ると行き先から名前が消える。
-        # hook の登録そのもの（.claude/settings.json と .claude/hooks/）にも及んでいた。
-        for command in [
-            "cd .ccnavi/config/common && echo x > rules.yml",
-            "cd .ccnavi && echo x > common/rules.yml",
-            "cd .claude && echo x > settings.json",
-            "cd .claude/hooks && echo x > lint-py.sh",
-            "cd logs && rm decisions.jsonl",
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-                self.assertIn("deny", result.stdout, command)
-                self.assertIn("builtin:guard-setting-files", result.stdout, command)
-
     def test_cd_で入っても読むだけなら通る(self):
         result = self.run_hook("PreToolUse", command="cd .ccnavi/config/common && cat rules.yml")
 
@@ -451,48 +449,13 @@ class SelfGuardTest(unittest.TestCase):
         self.assertNotIn("deny", result.stdout)
 
     def test_sed_の書き換えの表記は止まる(self):
-        # 緩めたのは語の途中の `-i` だけ。独立したオプションの `-i` は今までどおり止める。
-        rules = self.rules_in_shell()
-        for opt in [
-            "-i",
-            "-i.bak",
-            "-i''",
-            "-iE",
-            "-Ei",
-            "-ni",
-            "--in-place",
-            "--in-place=.bak",
-            "--in",
-            "--i",
-            "--in-pl=.bak",
-            "'-i'",
-            '"-i"',
-        ]:
-            for command in [
-                f"sed {opt} s/a/b/ {rules}",
-                f"sed -e s/a/b/ {opt} {rules}",
-                f"sed {opt} -e s/a/b/ {rules}",
-            ]:
-                with self.subTest(command=command):
-                    result = self.run_hook("PreToolUse", command=command)
+        # 表記ごとの止める・通す（語の途中の `-i`・読むだけの sed・空白や引用の行き先・
+        # cd で入る形・logs/ の下）は Go（hook/judge）の TestSelfGuardShellWrites が見る。
+        # ここでは hook を通した代表だけ。
+        result = self.run_hook("PreToolUse", command=f"sed -i s/a/b/ {self.rules_in_shell()}")
 
-                    self.assertIn("deny", result.stdout)
-                    self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_sed_で読むだけなら語の途中の_i_があっても通る(self):
-        # `feature-id` のようなワークツリー名や式の中の `-i` は、オプションではない。
-        rules = self.rules_in_shell()
-        for command in [
-            f"sed -n 1,20p {rules}",
-            "sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/config/common/rules.yml",
-            "sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/config/common/rules.yml",
-            f"sed -E -e s/a-i/b/ {rules}",
-            f"sed -ne 's/a-i/b/p' {rules}",
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-
-                self.assertNotIn("builtin:guard-setting-files", result.stdout)
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
@@ -500,24 +463,6 @@ class SelfGuardTest(unittest.TestCase):
         )
 
         self.assertNotIn("builtin:guard-setting-files", result.stdout)
-
-    def test_記録と_state_の置き場もシェルからの書き込みで止まる(self):
-        # 記録と state は判定が読むので、ccnavi ディレクトリの外（logs/）にあっても守る。
-        # 閉じたチケットの退避（logs/archive）も、閉じた記録として判定が読むので同じく守る。
-        for command in (
-            "rm logs/decisions.jsonl",
-            "rm -rf logs/state",
-            "mv logs/state /tmp/x",
-            "rm -rf logs/archive",
-            "cp /tmp/x.md logs/archive/self/done/i0001.md",
-            # 退避の置き場を丸ごと別のもので置き換える形
-            "cp -r /tmp/archive logs/",
-            "mv /tmp/x/archive logs/",
-            "cp -t logs /tmp/archive",
-        ):
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-                self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_ローテートした記録もシェルからの書き込みで止まる(self):
         # 消すのはセッションの開始とターミナルから打つ `ccnavi --prune` だけ（prune）。
@@ -534,36 +479,11 @@ class SelfGuardTest(unittest.TestCase):
     def test_記録と_state_の置き場は名指しのツールでも止まる(self):
         # シェルの側の文面は「Write / Edit でも拒否される場所」と言う。名指しのツールで書けると、
         # 拒否の数え（denied-<セッション>.json）や記録を書き換えて自分の足跡を消せる。
-        for tool in ("Write", "Edit", "NotebookEdit"):
-            for path in (
-                os.path.join(self.repo, "logs", "state", "denied-x.json"),
-                os.path.join(self.repo, "logs", "state", "selfguard", "s1", "settings"),
-                os.path.join(self.repo, "logs", "decisions.jsonl"),
-                os.path.join(self.repo, "logs", "decisions.20260927-120000.jsonl"),
-                os.path.join(self.repo, "Logs", "State", "x.json"),
-                os.path.join(self.repo, "logs", "archive", "self", "done", "i0001.md"),
-                os.path.join(self.state, "denied-x.json"),
-                self.log,
-                os.path.join(self.repo, "logs", "decisions.20260927-120000-2.jsonl"),
-            ):
-                with self.subTest(tool=tool, path=path):
-                    key = "notebook_path" if tool == "NotebookEdit" else "file_path"
-                    result = self.run_hook("PreToolUse", tool=tool, **{key: path})
-                    self.assertIn("deny", result.stdout)
-                    self.assertIn("builtin:guard-records", result.stdout)
-
-    def test_記録の隣の別のファイルは名指しのツールで書ける(self):
-        for path in (
-            os.path.join(self.repo, "logs", "git-20260913-000000-1.log"),
-            os.path.join(self.repo, "logs", "notes.md"),
-            os.path.join(self.repo, "logstate", "x.json"),
-            os.path.join(self.repo, "logs", "archived-notes.md"),
-            os.path.join(self.repo, "src", "logs", "catalog.jsonl"),
-            os.path.join(self.repo, "state-notes", "x.md"),
-        ):
-            with self.subTest(path=path):
-                result = self.run_hook("PreToolUse", tool="Write", file_path=path)
-                self.assertNotIn("builtin:guard-records", result.stdout)
+        # ツールと場所ごとの止める・通すは
+        # Go（hook/judge）の TestSelfGuardRecordsByNamedTools が見る。
+        result = self.run_hook("PreToolUse", tool="Write", file_path=self.log)
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin:guard-records", result.stdout)
 
     def test_disable_なら記録の置き場の名指しも止めない(self):
         path = os.path.join(self.repo, "logs", "state", "denied-x.json")
@@ -601,20 +521,6 @@ class SelfGuardTest(unittest.TestCase):
             f'sed -i "s/a b/c/" {rules}',
             f'tee "a b" {rules}',
             f'cp "a b" {rules}',
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-
-                self.assertIn("deny", result.stdout)
-                self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_空白を含むパスへのリダイレクトも止まる(self):
-        # 行き先の引用が空白を含むと、語の中の目印で行き先が途切れて穴になっていた。
-        for command in [
-            'echo x > "projects/has space/.ccnavi/config/project/rules.yml"',
-            'echo x > "a b/.ccnavi/config/common/rules.yml"',
-            'echo x >> "a b/.ccnavi/config/common/rules.yml"',
-            'echo x >"a b/.ccnavi/config/common/rules.yml"',
         ]:
             with self.subTest(command=command):
                 result = self.run_hook("PreToolUse", command=command)
@@ -666,43 +572,6 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin:guard-setting-files", result.stdout)
 
-    def test_空白を含む行き先のほかの書き方も止まったまま(self):
-        for command in [
-            'echo x > "a(1)/.ccnavi/config/common/rules.yml"',
-            'echo x > "R&D/.ccnavi/config/common/rules.yml"',
-            'echo x > "a b /.ccnavi/config/common/rules.yml"',
-            'echo x > "C:\\my dir\\.ccnavi\\config\\common\\rules.yml"',
-            'echo x >| "a b/.ccnavi/config/common/rules.yml"',
-            'echo x &> "a b/.ccnavi/config/common/rules.yml"',
-            'echo x 2> "a b/.ccnavi/config/common/rules.yml"',
-            'echo x >& "a b/.ccnavi/config/common/rules.yml"',
-            "echo x > a\\ b/.ccnavi/config/common/rules.yml",
-            'echo x > "a\tb/.ccnavi/config/common/rules.yml"',
-            'cat <<EOF > "a b/.ccnavi/config/common/rules.yml"\nx\nEOF',
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-
-                self.assertIn("deny", result.stdout)
-                self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_引用の中の大なりは目印が続いても書き込みではない(self):
-        for command in [
-            'echo "a >b c/.ccnavi/config/common/rules.yml"',
-            'echo "a  >  b/.ccnavi/config/common/rules.yml"',
-            'echo "1>2" .ccnavi/config/common/rules.yml',
-            'grep -n "regex: (>" .ccnavi/config/common/rules.yml',
-            'echo x > "a b" .ccnavi/scripts/count.sh',
-            # 行き先の語は目印で終わらない。引用の中の空白のあとに保護対象の名前が続いても、
-            # 行き先は `a .ccnavi` という別のディレクトリの下で、保護対象ではない。
-            'echo x > "a .ccnavi/scripts/count.sh"',
-            'echo x > "a .claude/settings.json"',
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-
-                self.assertNotIn("builtin:guard-setting-files", result.stdout)
-
     def test_大なりを長く並べても後ろの書き込みは止まる(self):
         n = 500
         command = (
@@ -743,26 +612,6 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(record["code"], "DENY_REDIRECT_LIMIT")
         self.assertEqual(record["rules"][0], "builtin:redirect-limit")
         return reason
-
-    def test_上限ちょうどの大なりなら生の文字列にも保護を適用する(self):
-        # 閉じない引用で縮退させ、生の文字列に適用する。`>` は保護対象への 1 個と合わせて 50 個。
-        command = (
-            "echo x > .ccnavi/config/common/rules.yml; echo " + ">a" * (REDIRECT_LIMIT - 1) + ' "'
-        )
-        self.assertEqual(command.count(">"), REDIRECT_LIMIT)
-        self.assertTrue(self.reading(command)["degraded"])
-        unrelated = 'echo "' + ">a" * REDIRECT_LIMIT
-        self.assertEqual(unrelated.count(">"), REDIRECT_LIMIT)
-
-        for mode in self.MODES:
-            with self.subTest(mode=mode):
-                result = self.run_hook("PreToolUse", permission_mode=mode, command=command)
-                decision, reason = self.verdict(result)
-                self.assertEqual(decision, "deny")
-                self.assertIn("builtin:guard-setting-files", reason)
-                self.assertNotIn("REDIRECT_LIMIT", reason)
-                result = self.run_hook("PreToolUse", permission_mode=mode, command=unrelated)
-                self.assertNotIn("REDIRECT_LIMIT", result.stdout)
 
     def test_上限を超える大なりは止めて書き方を案内する(self):
         command = 'echo "' + ">a" * (REDIRECT_LIMIT + 1)
@@ -807,18 +656,17 @@ class SelfGuardTest(unittest.TestCase):
 
     def test_上限を超えるとどの権限モードでも止める(self):
         # 確認できるモードでも確認には回さない。保護を適用していない呼び出しなので止める側に置く。
-        protected = (
+        # 権限モードごとの答えと上限ちょうどの扱いは
+        # Go（hook/judge）の TestSelfGuardRedirectLimitInEveryMode が見る。
+        # ここでは文面を、確認できるモードの代表で見る。
+        command = (
             "echo "
             + ">a" * (REDIRECT_LIMIT + 1)
             + '; echo x > .ccnavi/config/common/rules.yml; echo "'
         )
-        unrelated = 'echo "' + ">a" * (REDIRECT_LIMIT + 1)
-        for mode in self.MODES:
-            for name, command in (("protected", protected), ("unrelated", unrelated)):
-                with self.subTest(mode=mode, command=name):
-                    self.assertTrue(self.reading(command)["degraded"])
-                    result = self.run_hook("PreToolUse", permission_mode=mode, command=command)
-                    self.assert_limit_denied(result, command)
+        self.assertTrue(self.reading(command)["degraded"])
+        result = self.run_hook("PreToolUse", permission_mode="default", command=command)
+        self.assert_limit_denied(result, command)
 
     def test_言及の無い呼び出しを委ねる設定でも上限を超えると止める(self):
         # CCNAVI_GUARD_UNWATCHED=disable でも、保護の照合を終えていないので委ねない。
@@ -965,51 +813,17 @@ class SelfGuardTest(unittest.TestCase):
 
         self.assertNotIn("deny", result.stdout)
 
-    def test_実行ファイルを外へコピーするだけなら止まらない(self):
-        # cp / ln / install は行き先（最後の引数）だけを見る。実行ファイルが元の側に
-        # 出ただけなら読むだけで、差し替えにはならない。
-        path = self.binary()
-
-        for command in (
-            "cp dist/ccnavi/ccnavi.exe /tmp/keep.exe",
-            "ln -s dist/ccnavi/ccnavi.exe /tmp/link",
-            "install dist/ccnavi/ccnavi.exe /tmp/keep.exe",
-            "cp dist/ccnavi/ccnavi.exe /tmp/keep.exe && ls /tmp",
-            "cp -t /tmp dist/ccnavi/ccnavi.exe",
-            "cp dist/ccnavi/ccnavi.exe /tmp/keep.exe -f",
-        ):
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", bin=path, command=command)
-
-                self.assertNotIn("builtin:guard-setting-files", result.stdout)
-
     def test_実行ファイルが行き先ならコピーする形でも止まる(self):
-        # 元の側を通すために行き先の適用の仕方まで緩めていないことを見る。つないだコマンドの
-        # 前後、引用でつないだ語、書き込みの表記（元の側でも止まる）も含める。
+        # 実行ファイルの場所は CCNAVI_ENTRY_PATH から決まる。表記ごとの止める・通す（つないだ形・
+        # ディレクトリを行き先にする形・外へコピーするだけの形）は
+        # Go（hook/judge）の TestSelfGuardBinaryDestination が見る。
         path = self.binary()
+        result = self.run_hook(
+            "PreToolUse", bin=path, command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe"
+        )
 
-        for command in (
-            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe",
-            "ln -sf /tmp/other.exe dist/ccnavi/ccnavi.exe",
-            "install /tmp/other.exe dist/ccnavi/ccnavi.exe",
-            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe && echo done",
-            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe >/dev/null",
-            "echo go; cp /tmp/other.exe dist/ccnavi/ccnavi.exe",
-            'cp "/tmp/a b.exe" dist/ccnavi/ccnavi.exe',
-            'cp /tmp/other.exe "dist/ccnavi/ccnavi.exe"',
-            "cp /tmp/other.exe dist/ccnavi/ccnavi.exe -f",
-            "sudo cp /tmp/other.exe dist/ccnavi/ccnavi.exe",
-            "cp -S -t /tmp/other.exe dist/ccnavi/ccnavi.exe",
-            "mv dist/ccnavi/ccnavi.exe /tmp/keep.exe",
-            "rm dist/ccnavi/ccnavi.exe",
-            "tee dist/ccnavi/ccnavi.exe < /tmp/other.exe",
-            "echo x > dist/ccnavi/ccnavi.exe",
-        ):
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", bin=path, command=command)
-
-                self.assertIn("deny", result.stdout)
-                self.assertIn("builtin:guard-setting-files", result.stdout)
+        self.assertIn("deny", result.stdout)
+        self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_振り分けの実体を外へコピーするだけなら止まらず行き先なら止まる(self):
         # 組み立ての置き場（`bin/<os>-<arch>/`）の書き込み用の表記は空白をまたぐので、
@@ -1040,32 +854,6 @@ class SelfGuardTest(unittest.TestCase):
 
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_実行ファイルの入っているディレクトリを行き先にしても止まる(self):
-        # 行き先をディレクトリだけで書くと、行き先の表記に実行ファイルの名前が出ない
-        # （binary_holders）。元の名前が実行ファイルの名前か、決まらない名前なら止める。
-        path = self.binary()
-
-        for command in (
-            "cp /tmp/x/ccnavi.exe dist/ccnavi/",
-            "cp /tmp/x/ccnavi.exe dist/ccnavi",
-            "mv /tmp/x/ccnavi.exe dist/ccnavi/",
-            "cp -t dist/ccnavi /tmp/x/ccnavi.exe",
-            "cp /tmp/x/* dist/ccnavi/",
-            "cd dist/ccnavi && cp /tmp/x/ccnavi.exe .",
-        ):
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", bin=path, command=command)
-
-                self.assertIn("deny", result.stdout)
-                self.assertIn("builtin:guard-setting-files", result.stdout)
-
-        # 別の名前を置くだけなら組み込みの保護では止めない。
-        for command in ("cp /tmp/notes.txt dist/ccnavi/", "cp -t dist/ccnavi /tmp/notes.txt"):
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", bin=path, command=command)
-
-                self.assertNotIn("builtin:guard-setting-files", result.stdout)
 
     def test_振り分けの置き場をディレクトリで行き先にしても止まる(self):
         # sh の入っているディレクトリ、組み立ての置き場の親（`bin/`）、その親。
@@ -1289,7 +1077,7 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_浅いパスの振り分けでも守る場所とバックアップする場所が揃う(self):
-        # G6。`scripts/ccnavi-launcher.sh` は段が 2 つしかない。段の数で切り替えると、
+        # G6。`scripts/ccnavi-launcher.sh` は階層が 2 つしかない。階層の数で切り替えると、
         # 名前だけで切り替えるバックアップの側と食い違う。
         spelled, _, exe = self.scripts_layout(())
 

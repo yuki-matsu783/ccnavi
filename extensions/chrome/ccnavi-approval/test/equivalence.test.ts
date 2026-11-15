@@ -46,7 +46,7 @@ test("CX-T060 ボード 1 回ぶんの要求すべてに、WASM と手元向け�
   }
 });
 
-test("CX-T061 判定のコアの見本（承認・マーカーの消去・改版・フィードバック計画・多段の先行・レビュー済み）に、WASM と手元向けの ccnavi が手元の書いたとおりのバイト列を返す", async () => {
+test("CX-T061 判定のコアの見本（承認・マーカーの消去・改版・フィードバック計画・多階層の先行・レビュー済み）に、WASM と手元向けの ccnavi が手元の書いたとおりのバイト列を返す", async () => {
   const wasm = await wasmCcnavi();
   const file = path.join(HERE, "test", "fixtures", "core-scenarios.json");
   const scenarios = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, { request: Record<string, unknown>; answer: Record<string, unknown> }>;

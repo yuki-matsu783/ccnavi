@@ -15,7 +15,7 @@ import (
 
 // HiddenUserEntry が見るのは、ユーザがターミナルで打つ入口のうち、引数を読み切れない形。HumanPathForm と
 // TicketApprovalRule の script 節は文字として並んだ表記で見るので、引数を変数・置換・glob で組み立てると外れる。
-// 次の 2 つは 2 段目（実行ファイルのターミナル要求）が無く、hook が唯一の保護なので、止める操作を組み立てうるなら
+// 次の 2 つは 2 つ目（実行ファイルのターミナル要求）が無く、hook が唯一の保護なので、止める操作を組み立てうるなら
 // 止める。組み立てられない形（読むだけの形）は通す。
 //
 //   - `ccnavi-review.sh decide`: `--choices` になりうる語があれば止める。文字どおりの `--preview` があれば通す
@@ -56,7 +56,7 @@ var (
 )
 
 // exeOptions は実行ファイルが受けるオプション（短い形を含む）。ここに無いオプションは実行ファイルが使い方の
-// 誤りとして断り、何も動かさない。オプションを足したらここにも足す（入口の段のテストが引数の読み手と比べる）。
+// 誤りとして断り、何も動かさない。オプションを足したらここにも足す（入口の層のテストが引数の読み手と比べる）。
 var exeOptions = []string{
 	"--abandon", "--accept-check", "--accept-done", "--accept-plan",
 	"--accept-unresolved", "--actor", "--agent-id", "--agree", "--all", "--approved",
@@ -76,7 +76,7 @@ var exeOptions = []string{
 	"--permission-mode", "--phase", "--phases", "--placed-out", "--plan", "--plan-order",
 	"--preview",
 	"--project-home", "--project-phases-file", "--project-risk-file", "--project-rules-file",
-	"--projects", "--prune", "--reason", "--record-tree", "--record-writes",
+	"--projects", "--prune", "--reason", "--record-commit", "--record-merge", "--record-tree", "--record-writes",
 	"--restore-if-deny", "--result", "--reverse", "--reviewed", "--risk", "--root", "--rules",
 	"--scope", "--show", "--signal", "--since", "--sort", "--state", "--suggest", "--tag",
 	"--target",

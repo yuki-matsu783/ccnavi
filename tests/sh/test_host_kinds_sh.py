@@ -1,6 +1,6 @@
 """origin の URL からのホストの分類と接続先。sh（`ccnavi_host_parse`）の読み手。
 
-実行ファイル側（go/internal/tickets/model/host の host_test.go）と Chrome 拡張も、同じ表
+実行ファイル側（go/internal/tickets/model/host の host_test.go）も、同じ表
 （`tests/fixtures/host-kinds.json`）を読む。
 
 `CCNAVI_SH_DIR` で、読む sh の出どころを差し替えられる。既定はこのツリーの `.ccnavi/scripts/`。
@@ -24,8 +24,8 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 PROBE = """. "$1"
 ccnavi_host_parse "$2"
 rc=$?
-printf 'rc=%s\\nkind=%s\\nclass=%s\\npath=%s\\napi=%s\\ngraphql=%s\\nwhy=%s\\n' \\
-  "$rc" "${ccnavi_h_kind:-}" "${ccnavi_h_class_host:-}" "${ccnavi_h_path:-}" \\
+printf 'rc=%s\\nkind=%s\\nclass=%s\\nconnect=%s\\npath=%s\\napi=%s\\ngraphql=%s\\nwhy=%s\\n' \\
+  "$rc" "${ccnavi_h_kind:-}" "${ccnavi_h_class_host:-}" "${ccnavi_h_host:-}" "${ccnavi_h_path:-}" \\
   "${ccnavi_h_api_base:-}" "${ccnavi_h_graphql_base:-}" "${ccnavi_h_parse_why:-}"
 """
 
@@ -45,7 +45,9 @@ def read(origin: str) -> dict[str, str]:
 class HostKindsShTest(unittest.TestCase):
     def test_every_case_in_the_shared_table(self):
         with open(TABLE, encoding="utf-8") as f:
-            table = json.load(f)["cases"]
+            whole = json.load(f)
+        # sh_go_cases は、資格情報の埋まった形などを足した分。
+        table = whole["cases"] + whole["sh_go_cases"]
         for case in table:
             with self.subTest(origin=case["origin"]):
                 got = read(case["origin"])
@@ -56,12 +58,17 @@ class HostKindsShTest(unittest.TestCase):
                 self.assertEqual(got["rc"], "0")
                 self.assertEqual(got["kind"], case["kind"])
                 self.assertEqual(got["class"], case["host"])
+                self.assertEqual(got["connect"], case["connect"])
                 self.assertEqual(got["path"], case["path"])
                 self.assertEqual(got["api"], case["api"])
                 self.assertEqual(got["graphql"], case["graphql"] or "")
 
     def test_unreadable_forms_stop(self):
-        self.assertEqual(read("not a url")["rc"], "1")
+        with open(TABLE, encoding="utf-8") as f:
+            bad = json.load(f)["unreadable"]
+        for origin in bad:
+            with self.subTest(origin=origin):
+                self.assertNotEqual(read(origin)["rc"], "0")
 
 
 if __name__ == "__main__":

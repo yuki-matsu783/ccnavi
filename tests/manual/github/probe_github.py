@@ -30,9 +30,9 @@ GraphQL を直に呼ぶ）で行う。sh と同じ道具を使わないほうが
 ## 一人では確かめられないもの
 
 人間役もトークンの持ち主と同じアカウント。GitHub は自分の PR に approve も変更要求も出させないので、
-`CHANGES_REQUESTED` を実物で読む段は無い（読み方は fixture の試験が見る）。スレッド・COMMENTED の
+`CHANGES_REQUESTED` を実物で読む段階は無い（読み方は fixture の試験が見る）。スレッド・COMMENTED の
 レビュー・投稿・Draft 外しは実物で見る。別のアカウントのトークンを `CCNAVI_PROBE_REVIEWER_TOKEN` に
-置けば、その段も走る。
+置けば、その段階も走る。
 
 ## 分かること
 
@@ -823,7 +823,7 @@ def main() -> int:
             checked.stderr.strip()[:200],
         )
     else:
-        say("自分の PR には変更要求も approve も出せないので、その段は走らない（docstring 参照）")
+        say("自分の PR には変更要求も approve も出せないので、その段階は走らない（docstring 参照）")
 
     # 差分の外へのレビューは 422 で拒まれ、レビューごと作られない
     # （差分外の行に付けた指摘の行き先）
@@ -1002,7 +1002,7 @@ def main() -> int:
 
     # コメントを付けた行を書き換えるコミットを push すると、スレッドは古く（outdated）なり、
     # GraphQL の line は null になる。sh は 0 に読む。
-    # push すると依頼の後に親の HEAD が動くので、依頼・confirm の段が全部済んだ ready の後でやる
+    # push すると依頼の後に親の HEAD が動くので、依頼・confirm の段階が全部済んだ ready の後でやる
     write(os.path.join(parent_tree, "src", "2", "work.py"), "# rewritten\n")
     commit_all(parent_tree, "コメントを付けた行を書き換える")
     moved = sh(GIT_SH, parent_tree, "push")

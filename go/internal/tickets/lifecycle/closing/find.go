@@ -142,7 +142,7 @@ func Find(stderr io.Writer, conf *config.Settings, root, id string) *ticket.Tick
 }
 
 // MisplacedHome は承認済みチケットが識別子と違う名前のワークツリーに在れば、理由を書いて真。
-// ready まで進むと止まるので、start と finish の段で言う。
+// ready まで進むと止まるので、start と finish の段階で言う。
 func MisplacedHome(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	reason := approval.HomeProblem(root, conf, t)
 	if reason != "" {

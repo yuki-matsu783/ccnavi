@@ -33,7 +33,7 @@ test("CB-T1168 基本の案内はプロジェクト管理 → チケット管理
   }
 });
 
-test("CB-T1169 左パネルのウォークスルーが宣言され、各段の本文のファイルがあり、リンクのコマンドが登録されている", () => {
+test("CB-T1169 左パネルのウォークスルーが宣言され、各ステップの本文のファイルがあり、リンクのコマンドが登録されている", () => {
   const walkthrough = manifest.contributes.walkthroughs.find((item) => item.id === SIDEBAR_WALKTHROUGH);
   assert.ok(walkthrough, "ウォークスルーがpackage.jsonに無い");
   const commands = new Set(manifest.contributes.commands.map((item) => item.command));

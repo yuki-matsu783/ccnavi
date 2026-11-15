@@ -110,7 +110,7 @@ func TestRotate(t *testing.T) {
 		t.Errorf("dry-run = %+v", r.rotated)
 	}
 
-	// 0 はその段を止める。
+	// 0 はその段階を止める。
 	t.Setenv(env.LogRotateMB, "0")
 	if r := p.run("", false); len(r.rotated) != 0 {
 		t.Errorf("0 で動かした: %+v", r.rotated)
@@ -149,7 +149,7 @@ func TestLimits(t *testing.T) {
 		t.Errorf("problem = %q", problem)
 	}
 	t.Setenv(env.LogKeepDays, "0.5")
-	if _, problem := logKeepDays.read(); problem != "CCNAVI_LOG_KEEP_DAYS='0.5' は下限の 1 より小さいので既定の 14 で動く（0 はその段を止める）" {
+	if _, problem := logKeepDays.read(); problem != "CCNAVI_LOG_KEEP_DAYS='0.5' は下限の 1 より小さいので既定の 14 で動く（0 はその段階を止める）" {
 		t.Errorf("problem = %q", problem)
 	}
 }

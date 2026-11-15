@@ -115,6 +115,8 @@ func newParser() *argparse.Parser {
 	flag("--version")
 	str("--record-writes")
 	str("--record-tree")
+	str("--record-commit")
+	str("--record-merge")
 	str("--choose-out")
 	str("--accept-plan")
 	str("--accept-done")

@@ -1,6 +1,6 @@
 /**
  * 子のフローの読み書き（`core/flow-doc.ts`）。YAMLの読み書き、知らない欄と知らない種類を失わないこと、雛形、
- * 編集の関数、入れ子の段の数え方を見る。
+ * 編集の関数、入れ子の階層の数え方を見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -260,19 +260,19 @@ function nested(depth: number, cyclic = false): FlowDoc {
   };
 }
 
-test("CB-T223 入れ子の段はsubAgentとsubAgentFlowで1段ずつ数え、子の下2段を超えたときだけ言う", () => {
+test("CB-T223 入れ子の階層はsubAgentとsubAgentFlowで1階層ずつ数え、子の下2階層を超えたときだけ言う", () => {
   const single = patchData(addNode(bareFlow("x", ""), "subAgent", { x: 0, y: 0 }).doc, "subAgent-1", {});
   assert.deepEqual(nesting(single), { depth: 1, cyclic: false });
   assert.deepEqual(flowNotices(single), []);
-  // サブフロー（1段）の中のsubAgent（2段）。子の下2段で、まだ上限の中
+  // サブフロー（1階層）の中のsubAgent（2階層）。子の下2階層で、まだ上限の中
   assert.equal(nesting(nested(1)).depth, 2);
-  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("段重なっています")));
-  // もう1段重ねると3段。既定の上限（メインの下3段、子は1段目）を超える
+  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("階層重なっています")));
+  // もう1階層重ねると3階層。既定の上限（メインの下3階層、子は1階層目）を超える
   assert.equal(nesting(nested(2)).depth, 3);
-  const warned = flowNotices(nested(2)).find((n) => n.includes("段重なっています"));
+  const warned = flowNotices(nested(2)).find((n) => n.includes("階層重なっています"));
   assert.ok(warned !== undefined);
-  assert.match(warned, /子の下に3段重なっています/);
-  assert.match(warned, /メインの下3段/);
+  assert.match(warned, /子の下に3階層重なっています/);
+  assert.match(warned, /メインの下3階層/);
   assert.match(warned, /そのノードで止まってメインへ戻ります/);
   // 巡るサブフローは数えきれないと言う
   const loop = nested(2, true);

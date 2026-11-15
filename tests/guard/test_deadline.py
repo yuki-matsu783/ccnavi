@@ -10,7 +10,7 @@
 
 どの照合の回で期限に達しても応答を出さないこと、期限ちょうどは超えていないことは、時計を差し替えられる
 Go のテスト（go/internal/hook/judge の TestDeadline）が確かめる。
-実時間の代表入力は、期限の 1/3 に収まることを緩い上限で見る。測定は tests/core/bench_deadline.py。
+実時間の代表入力は、期限の 1/3 に収まることを緩い上限で見る。
 """
 
 from __future__ import annotations

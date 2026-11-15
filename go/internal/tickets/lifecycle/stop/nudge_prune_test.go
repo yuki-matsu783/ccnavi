@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/records/prune"
 )
 
-// records/prune はStop の促しの記録を名前の頭（nudgePrefix）で見分けて消す。prune は上の段を読めないので名前を写して
+// records/prune はStop の促しの記録を名前の頭（nudgePrefix）で見分けて消す。prune は上の層を読めないので名前を写して
 // 持っている。写しが持ち主の定数とずれると記録が残り続けるので、古い記録が消えることで確かめる。
 func TestPruneRemovesOldNudgePrefix(t *testing.T) {
 	for _, name := range []string{env.LogRotateMB, env.LogKeepDays, env.StateKeepDays, env.StopReviewKeepDays} {

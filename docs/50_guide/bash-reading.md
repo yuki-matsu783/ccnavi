@@ -157,7 +157,7 @@ Markdown など）、単一引用で包むか、`` \` `` と書くか、`--descr
 |---|---|
 | `$( )`の中の`case`（`"$(case $x in a) echo 1;; esac)"`） | if/elifで書く。`$( )`の外で分岐する |
 | `$((cmd) \| x)` | `$( (cmd) \| x )`と空白を入れる |
-| 16 段を超える`$( )`の入れ子 | 内側を先に打ち、出た値を次のコマンドに書く |
+| 16 階層を超える`$( )`の入れ子 | 内側を先に打ち、出た値を次のコマンドに書く |
 | コマンドの位置の`coproc` | `&`でバックグラウンドにする |
 | コマンドの位置の`select` | `for`で回す |
 
@@ -263,13 +263,13 @@ docs/../.env
 そのため、認証情報の置き場を止める組み込みのルールも`Grep`と`Glob`を受け持たない。
 探すツールが読むファイルを見るのは、下の表の上 2 つ。
 
-| 段 | 何を止めるか |
+| 仕組み | 何を止めるか |
 |---|---|
 | `.gitignore`（ripgrepが読む） | `Grep`が起点から降りていく途中で出会うファイル |
 | `.claude/settings.json`の`permissions.deny`の`Read(...)` | ファイル 1 つ 1 つ。`Grep`のファイル読み取りにも適用される |
 | ccnaviのルール | `Read` `Write` `Edit` `MultiEdit` `NotebookEdit` `Bash`。`Grep`と`Glob`は受け持たない |
 
-`projects/foo/.env`がfooの`.gitignore`に入っている場合に、それぞれの段がどう働くか。
+`projects/foo/.env`がfooの`.gitignore`に入っている場合に、それぞれの仕組みがどう働くか。
 
 | 呼び方 | ccnaviのルール | `.gitignore` | `Read()`の`deny` |
 |---|---|---|---|

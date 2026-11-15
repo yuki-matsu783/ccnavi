@@ -25,7 +25,7 @@ const (
 	// 組み込みの guard-scripts が止めるので、セッションの頭に載る文を条件の側から書き換えられない。
 	scriptFile     = "ccnavimd.sh"
 	functionPrefix = "ccnavi_cond_"
-	// indent は囲みの 1 段ぶんのインデント。載せるときに深さの分だけ取る。
+	// indent は囲みの 1 階層ぶんのインデント。載せるときに深さの分だけ取る。
 	indent = "  "
 	// workspaceRootRule はワークツリーの行を支える deny の id。
 	workspaceRootRule = "workspace-root"
@@ -156,7 +156,7 @@ func known(name string) bool {
 	return false
 }
 
-// dedent は囲みの深さの分だけ、行頭のインデント（indent 1 つにつき 1 段）を取る。
+// dedent は囲みの深さの分だけ、行頭のインデント（indent 1 つにつき 1 階層）を取る。
 func dedent(line string, depth int) string {
 	for range depth {
 		rest, ok := strings.CutPrefix(line, indent)

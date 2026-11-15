@@ -176,12 +176,12 @@ func TestRefusingAliasesStillWrapsBuildErrors(t *testing.T) {
 	}
 }
 
-// 入れ子が深い文書は、少し深いだけなら読み、数万段でも異常終了せずに読めない文書として断る。
+// 入れ子が深い文書は、少し深いだけなら読み、数万階層でも異常終了せずに読めない文書として断る。
 func TestDeepNesting(t *testing.T) {
 	n := 120
 	v, err := Load(strings.Repeat("[", n) + strings.Repeat("]", n))
 	if err != nil {
-		t.Fatalf("%d 段が読めない: %v", n, err)
+		t.Fatalf("%d 階層が読めない: %v", n, err)
 	}
 	for range n - 1 {
 		v = v.([]any)[0]
@@ -193,7 +193,7 @@ func TestDeepNesting(t *testing.T) {
 	for _, load := range []func(string) (any, error){Load, LoadRefusingAliases} {
 		_, err = load(strings.Repeat("[", n) + strings.Repeat("]", n))
 		if !errors.Is(err, errUnreadable) || err.Error() != msgTooDeep {
-			t.Errorf("%d 段: %v", n, err)
+			t.Errorf("%d 階層: %v", n, err)
 		}
 	}
 }

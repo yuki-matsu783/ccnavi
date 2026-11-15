@@ -116,7 +116,7 @@ class Env(unittest.TestCase):
     def fake_git(self) -> None:
         """ふつうの git に委ねるが、通信するものだけ偽物にする。挙動は ctl の値で決める。"""
         leaked = "fatal: https://h/x?private_token=abc12345xyz ghp_abcdefghijkl"
-        leaked += " glrt-abcdefghij12 s3cr3tvalue99"
+        leaked += " glrt-abcdefghij12 s3cr3tvalue99 https://u:tok@host/g/p.git/"
         refused = "fatal: unable to access 'https://u:tok@host/g/p.git/': Could not resolve host"
         body = f"""case "$*" in
 *ls-remote*)

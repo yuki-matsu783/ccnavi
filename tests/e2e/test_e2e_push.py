@@ -1,7 +1,7 @@
 """チケットの作成から承認、承認済みチケットの push までを 1 本に通す受入テスト。
 
 実際の sh（`.ccnavi/scripts/`）と組み立て済みの実行ファイル（`dist/ccnavi`）を、使い捨ての
-ワークスペースと bare のリモートの上で順に呼ぶ。筋書きは次のとおりで、段ごとに前の段の
+ワークスペースと bare のリモートの上で順に呼ぶ。筋書きは次のとおりで、手順ごとに前の手順の
 結果を前提にする。
 
 1. ワークツリーを `ccnavi-git.sh worktree add` で切り、提案（`wip/proposals/todo/`）を書いて
@@ -27,9 +27,9 @@ tests/sh/test_push_approved_sh.py）は、実行ファイルを in-process で�
     sh scripts/ccnavi-build.sh
     uv run python -m unittest tests.e2e.test_e2e_push -v
 
-承認はターミナルからしか通らない（`--agree` の壁）。テストはターミナルを持たないので、段 3 からは
+承認はターミナルからしか通らない（`--agree` の壁）。テストはターミナルを持たないので、手順 3 からは
 `CCNAVI_GUARD_TICKET_APPROVAL=disable` を渡して y を標準入力から送る。単体のテストが
-`--guard-ticket-approval disable` で切るのと同じ扱いで、壁そのものは段 2 で見る。
+`--guard-ticket-approval disable` で切るのと同じ扱いで、壁そのものは手順 2 で見る。
 
 ここで確かめないもの。 モード B（`projects/<名前>/` の下のリポジトリ）と子チケット、
 保護されたブランチ・push の失敗・detached は tests/sh/test_push_approved_sh.py が見る。
@@ -75,7 +75,7 @@ def out(cwd, *args):
 
 @unittest.skipIf(SKIP, SKIP)
 class ApproveAndPushTest(unittest.TestCase):
-    """段は 1 本のテストの中で順に進める。前の段が残したものを次の段が使うので、分けない。"""
+    """手順は 1 本のテストの中で順に進める。前の手順が残したものを次の手順が使うので、分けない。"""
 
     def setUp(self):
         print(f"\n  sh = {SH_DIR}\n  exe = {DIST}", flush=True)
@@ -186,7 +186,7 @@ class ApproveAndPushTest(unittest.TestCase):
         self.ok(preview)
         self.assertEqual([TICKET], [b["ticket"] for b in json.loads(preview.stdout)["batch"]])
 
-        # 同じツリーの書きかけ。承認の段でコミットされてはいけない。
+        # 同じツリーの書きかけ。承認の時点でコミットされてはいけない。
         write(os.path.join(self.tree, "seed.txt"), "書きかけ\n")
         write(os.path.join(self.tree, "src", "draft.py"), "x\n")
 

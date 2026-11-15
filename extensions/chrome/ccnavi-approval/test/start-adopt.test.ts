@@ -21,7 +21,7 @@ import { dispatch, type Deps } from "../src/core/protocol.js";
 import { ccnavi as ccnaviOps, type CcnaviCall } from "../src/core/ccnavi.js";
 import type { RepoConfig } from "../src/core/settings.js";
 import { collectRepo, Reader, readIntegration } from "../src/core/snapshot.js";
-import { closesIssue, startIssue, type StartOutcome } from "../src/core/start.js";
+import { startIssue, type StartOutcome } from "../src/core/start.js";
 import type { WriteDeps } from "../src/core/write.js";
 import { fixture, NOW } from "./fixtures/repo.js";
 import { BOARD, deps, GITLAB_REPO, hostCall, HOSTS, memoryCache, newStats, OPTIONS } from "./helpers/host.js";
@@ -84,38 +84,15 @@ function message(out: StartOutcome): string {
   return out.kind === "refused" || out.kind === "failed" ? out.message : "";
 }
 
-test("CX-T251 issue を閉じる MR は、閉じる語に続くこのリポジトリの #番号 か issues/番号 で見つける。参照だけ・別のリポジトリ・コードや引用の中・否定・番号が長い別の issue は拾わない", () => {
-  const mr = (title: string, body = "") => ({ title, body });
-  const ok = (m: { title: string; body: string }) => closesIssue(m, 20, "acme/widgets");
-  assert.equal(ok(mr("直す Closes #20")), true);
-  assert.equal(ok(mr("直す", "closes #20\n")), true);
-  assert.equal(ok(mr("直す", "Fixes: #20")), true);
-  assert.equal(ok(mr("直す", "Resolved ACME/Widgets#20")), true);
-  assert.equal(ok(mr("直す", "Closes https://github.com/acme/widgets/issues/20")), true);
-  assert.equal(ok(mr("直す", "**Closes** #20")), true);
-  assert.equal(ok(mr("直す", "Closes #20.")), true);
-  assert.equal(ok(mr("直す #20")), false);
-  assert.equal(ok(mr("直す", "See #20")), false);
-  assert.equal(ok(mr("直す", "https://github.com/acme/widgets/issues/20")), false);
-  assert.equal(ok(mr("直す", "Closes #200")), false);
-  assert.equal(ok(mr("直す", "Closes #20abc")), false);
-  assert.equal(ok(mr("直す", "Closes a#20")), false);
-  assert.equal(ok(mr("直す", "Enclosed #20")), false);
-  // 別のリポジトリの issue を閉じる MR は、この issue の MR ではない
-  assert.equal(ok(mr("直す", "Closes other/repo#20")), false);
-  assert.equal(ok(mr("直す", "Closes: other/repo#20")), false);
-  assert.equal(ok(mr("直す", "Closes https://github.com/other/repo/issues/20")), false);
-  // コードブロック・インラインコード・引用の中、否定は閉じない
-  assert.equal(ok(mr("直す", "```\nCloses #20\n```")), false);
-  assert.equal(ok(mr("直す", "`Closes #20`")), false);
-  assert.equal(ok(mr("直す", "> Closes #20")), false);
-  assert.equal(ok(mr("直す", "Does not fix #20")), false);
-  assert.equal(ok(mr("直す", "This doesn't close #20")), false);
-  // 閉じる語 1 つにつき、直後の指定だけ
-  assert.equal(ok(mr("直す", "Closes #21, #20")), false);
-  assert.equal(ok(mr("直す", "Closes #21, closes #20")), true);
-  // GitLab の入れ子のグループ
-  assert.equal(closesIssue(mr("直す", "Closes group/sub/proj#20"), 20, "group/sub/proj"), true);
+test("CX-T251 issue を閉じる MR かは ccnavi（WASM の closes。sh の start と同じ読み）にホストの種類と一緒に聞く。本文の閉じる語に続くこのリポジトリの指定だけを拾う", async () => {
+  // 読み方の細かい表は Go（go/internal/tickets/lifecycle/start/testdata/readers.json の linked-body）が持つ。ここは口の往復だけ
+  const bodies = ["Closes #20", "See #20", "Closes other/repo#20", "Closes https://github.com/acme/widgets/issues/20", "`Closes #20`", "Closes ACME/Widgets#20", "Closes #200"];
+  const got = await ccnaviOps.closes(ccnavi, { host: "github", repo: "acme/widgets", issue: 20, bodies });
+  assert.deepEqual(got, [true, false, false, true, false, true, false]);
+  // 語の形はホストの書き方に従う（Closing・Implements は GitLab だけが閉じる）
+  const lab = ["Closes group/sub/proj#20", "Closing #20", "Implements #20"];
+  assert.deepEqual(await ccnaviOps.closes(ccnavi, { host: "gitlab", repo: "group/sub/proj", issue: 20, bodies: lab }), [true, true, true]);
+  assert.deepEqual(await ccnaviOps.closes(ccnavi, { host: "github", repo: "group/sub/proj", issue: 20, bodies: lab }), [true, false, false]);
 });
 
 test("CX-T251b 参照しているだけの MR（本文が #番号 の言及だけ・元ブランチの名前に番号がある）は採用せず、新しく作る", async () => {

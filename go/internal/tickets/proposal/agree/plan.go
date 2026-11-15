@@ -36,7 +36,7 @@ type Planned struct {
 	Stopped *Stop
 }
 
-// PlanBatch は承認の書き込みを、ディスクに書かずに並べる（書くのは上の段の Writer(FS)。Chrome は同じ結果を
+// PlanBatch は承認の書き込みを、ディスクに書かずに並べる（書くのは上の層の Writer(FS)。Chrome は同じ結果を
 // 1 コミットにする）。時刻は stamp に固定する。承認の対象の順に、改版は承認済みチケットを書き換え、新規は
 // 承認済みチケットを置く。照合のあとで提案ファイルが差し替えられていたら、1 件も並べずに止める（一部だけ
 // 承認しないため）。親のワークツリーが決まらなければ error（*approval.NoParentError）。
@@ -74,7 +74,7 @@ func applySteps(stage *fsio.Stage, conf *config.Settings, root string, batch []*
 	return nil, nil
 }
 
-// applyOne は 1 件の書き込みを並べる。書けなかったときの扱いは fsio の Policy で添える（溜める段では書き込みが
+// applyOne は 1 件の書き込みを並べる。書けなかったときの扱いは fsio の Policy で添える（溜める段階では書き込みが
 // 失敗しないので、扱いは Writer(FS) が書くときに当てる）。
 func applyOne(stage *fsio.Stage, conf *config.Settings, root string, c *candidates.Candidate) (*Stop, error) {
 	t := c.Ticket

@@ -37,7 +37,7 @@ function canSymlink(): boolean {
 
 const NEW = { exists: false, mtimeMs: 0 } as const;
 
-test("CB-T231 ない置き場は1段ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
+test("CB-T231 ない置き場は1階層ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
   const tree = scratch();
   const file = place(tree);
   const written = writeFlowFile(tree, file, '{"nodes":[]}\n', NEW);

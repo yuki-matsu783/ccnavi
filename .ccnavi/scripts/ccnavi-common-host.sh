@@ -2,7 +2,7 @@
 #
 # ホスト（GitHub / GitLab）への接続。
 
-# ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh と ccnavi-branches.sh が使う）
+# ---- ホスト（GitHub / GitLab）への接続（ccnavi-review.sh・ccnavi-branches.sh・ccnavi-start.sh と事前確認が使う）
 #
 # origin の URL でホストを見分け、gh / glab（認証は道具に任せる）か curl とトークン
 # （GITHUB_TOKEN / GITLAB_TOKEN）でホストの API を読み書きする。結果の組み立てには jq が要る。
@@ -21,7 +21,7 @@
 #            GraphQL はその REST の根の /graphql。GHE.com の API の URL の規則は実物では未検証
 #   GitLab : 上のどれにもヒットしないもの全部（gitlab.com、*.aslead.cloud、セルフホスト、未知のホスト）。
 #            接続先は origin の scheme・ホスト・ポートをそのまま保つ（<scheme>://<ホスト[:ポート]>/api/v4）
-# 実行ファイルの host.Classify と、Chrome 拡張の hostclass.ts が同じ規則で、tests/fixtures/host-kinds.json の
+# 実行ファイルの host.classify と、この sh の ccnavi_host_parse が同じ規則で、tests/fixtures/host-kinds.json の
 # 同じ表で突き合わせる。
 #   ccnavi_host_connect         道具を選ぶ。ccnavi_h_jq・ccnavi_h_cli・ccnavi_h_cli_name・ccnavi_h_curl・
 #                               ccnavi_h_token・ccnavi_h_transport（gh / glab / curl）を決める。
@@ -32,11 +32,13 @@
 #   ccnavi_host_encode <文字列> クエリの値に入れる文字列（ブランチ名など）のパーセントエンコード
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドは使わない。時間切れのときは 124 を返す。stdout に `-` を渡すと、呼ぶ側の標準出力を引き継ぐ）
-#   ccnavi_host_fail_status <ホストの返事の文>  curl・gh・glab の失敗の文から HTTP の番号を取り出す
-#   ccnavi_host_graphql_blocked <ホストの返事の文>  GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する（0 なら該当）
+#   ccnavi_run_timed_end        ccnavi_run_timed のコマンドと見張りを止めて回収する（終わりと、呼ぶ側の trap の両方から呼ぶ）
+#   ccnavi_host_fail <ホストの返事の文>  curl・gh・glab の失敗の文を実行ファイル（`ccnavi host fail`）に読ませ、
+#                               HTTP の番号（ccnavi_hf_status）・GraphQL を使えない環境（Claude Code のクラウド）の 403 か
+#                               （ccnavi_hf_blocked が yes）・画面に出せる 1 行の本文（ccnavi_hf_body）に入れる
 #   ccnavi_host_probe           プロジェクトを 1 回読む。結果は ccnavi_h_probe と ccnavi_h_project_json
-#   ccnavi_host_access          書き込みの権限を判定する（0 足りる / 1 足りない / 2 判定できない）
-#   ccnavi_preflight <top>      チケット作業の事前確認（下の説明）
+#   ccnavi_host_access          書き込みの権限を判定する（0 足りる / 1 足りない / 2 判定できない。判定は実行ファイル）
+#   ccnavi_preflight <top>      チケット作業の事前確認（下の説明。判定と文は実行ファイルの ccnavi preflight）
 #
 # 失敗したときの文面は呼ぶ側が決める。ccnavi_host_api が失敗したら、
 # ccnavi_h_on_fail に名前を入れた関数を `<METHOD> <path> <ホストの返事>` で呼んで 1 を返す。
@@ -46,6 +48,24 @@
 ccnavi_h_on_fail=""
 ccnavi_h_tmp=""
 ccnavi_h_max_time=120
+
+# ccnavi_run_timed の途中を止めて回収する。呼ぶ側の trap の後始末（ccnavi_wap_end）と ccnavi_run_timed の終わりが使う。
+# 子（コマンド）を止めて回収してから見張りを止める。この順が要る: 見張りは自分の trap を置く前に届いた TERM を
+# 受け損ねることがあり、子がもういないことでそれを見分ける（ccnavi_run_timed の見張りの説明）。子が先に TERM を
+# 受け損ねて走り続けても、見張りが上限で止める。終わったら変数を空にする（空が「途中ではない」の印）。
+ccnavi_run_timed_end() {
+	if [ -n "${ccnavi_tm_pid:-}" ]; then
+		kill "$ccnavi_tm_pid" 2>/dev/null || :
+		wait "$ccnavi_tm_pid" 2>/dev/null || :
+		ccnavi_tm_pid=""
+	fi
+	if [ -n "${ccnavi_tm_dog:-}" ]; then
+		kill "$ccnavi_tm_dog" 2>/dev/null || :
+		# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
+		wait "$ccnavi_tm_dog" 2>/dev/null || :
+		ccnavi_tm_dog=""
+	fi
+}
 
 # 時間を区切って実行する。<秒> <stdin のファイル> <stdout のファイル> <stderr のファイル> <コマンド>...
 # バックグラウンドで動かし、上限を過ぎたら止めて 124 を返す。時間切れは印のファイルで判定する。
@@ -82,10 +102,15 @@ ccnavi_run_timed() {
 		ccnavi_tm_stop=""
 		# trap は印を立てるだけにし、分かっていれば sleep も止める。抜けるのは本流で、sleep の pid を控えた後に印を見る
 		# （sleep を起動した直後に TERM が来ても、sleep を残さないため）。
-		trap 'ccnavi_tm_stop=1; test -z "$ccnavi_tm_sleep" || kill "$ccnavi_tm_sleep"' TERM
+		# sleep は KILL で止める。sleep は exec するまでこの trap を引き継いだ dash の子で、その間に届いた TERM は
+		# 捨てられ、上限まで ppid 1 で残る（下の見張りと同じ競合）。KILL は捕まえられないので捨てられない。
+		trap 'ccnavi_tm_stop=1; test -z "$ccnavi_tm_sleep" || kill -KILL "$ccnavi_tm_sleep"' TERM
 		sleep "$ccnavi_tm_limit" &
 		ccnavi_tm_sleep=$!
-		test -z "$ccnavi_tm_stop" || { kill "$ccnavi_tm_sleep"; exit 0; }
+		# 呼ぶ側に TERM の trap があると、上の trap を置く前に届いた TERM を dash は捨てる（親の trap を引き継いだ
+		# 子が、trap を消すときに保留の信号も落とす）。呼ぶ側は子を回収してから TERM を送る（ccnavi_run_timed_end）ので、
+		# 子がもういなければ TERM を受け損ねたとみて抜ける。抜けないと sleep の上限まで呼ぶ側の wait が止まる。
+		test -z "$ccnavi_tm_stop" && kill -0 "$ccnavi_tm_pid" 2>/dev/null || { kill -KILL "$ccnavi_tm_sleep"; exit 0; }
 		wait "$ccnavi_tm_sleep"
 		test -z "$ccnavi_tm_stop" || exit 0
 		: >"$ccnavi_tm_flag"
@@ -94,12 +119,9 @@ ccnavi_run_timed() {
 	ccnavi_tm_dog=$!
 	ccnavi_tm_rc=0
 	wait "$ccnavi_tm_pid" 2>/dev/null || ccnavi_tm_rc=$?
-	kill "$ccnavi_tm_dog" 2>/dev/null || :
-	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
-	wait "$ccnavi_tm_dog" 2>/dev/null || :
-	# 終わった印。呼ぶ側の後始末が動いている最中かどうかを、これで見分ける。
-	ccnavi_tm_dog=""
+	# 回収済みの子は kill しない（pid が別のプロセスに使い回されていても当てない）。
 	ccnavi_tm_pid=""
+	ccnavi_run_timed_end
 	if [ -e "$ccnavi_tm_flag" ]; then
 		rm -f "$ccnavi_tm_flag" || :
 		return 124
@@ -354,36 +376,20 @@ ccnavi_host_failed() {
 	"$ccnavi_h_on_fail" "$ccnavi_ha_method" "$ccnavi_ha_rel" "$1"
 }
 
-# 失敗の返事（本文と標準エラー）から HTTP の番号を取り出す。取れなければ何も出さない。
-# 本文の中の数字に引かれないよう、まず形の決まった書き方（curl の returned error・gh の (HTTP nnn)・glab の行）だけを全体から探し、
-# 無ければ最後の行（gh / glab の標準エラー）だけを緩い式で読む。
-ccnavi_host_fail_status() {
-	ccnavi_hs_val=$(printf '%s' "$1" | sed -n -E -e 's/.*returned error: ([0-9]{3}).*/\1/p' -e 's/.*\(HTTP ([0-9]{3})\).*/\1/p' -e 's/^glab: HTTP ([0-9]{3})$/\1/p' -e 's/^[^0-9]*([0-9]{3}) (Not Found|Forbidden|Unauthorized|Gone).*/\1/p' | head -n 1)
-	if [ -z "$ccnavi_hs_val" ]; then
-		ccnavi_hs_val=$(printf '%s\n' "$1" | sed '/^$/d' | tail -n 1 | sed -n -E -e 's/.*HTTP ([0-9]{3}).*/\1/p' -e 's/^[^0-9]*([0-9]{3}) [A-Z][a-z]+.*/\1/p' | head -n 1)
-	fi
-	printf '%s' "$ccnavi_hs_val"
-}
-
-# GraphQL を使えない実行環境（Claude Code のクラウド）で出る 403 かを判定する。失敗の返事（本文と標準エラー）を渡し、そうなら 0 を返す。
-# gh は本文を返すので、「GitHub GraphQL is not available」の文言で見分ける（別の理由の 403・401 は 1）。
-# curl は -f が本文を捨て、403 の番号だけが残る。番号だけの 403 は、認証の失敗と見分けが付かないので 0 とする。
-# 呼び手は REST の道（/ccr/）を試し、それも失敗したら元の GraphQL の失敗を言う（通常の GitHub では /ccr/ は 404 になるだけ）。
-ccnavi_host_graphql_blocked() {
-	case "$1" in
-	*"GraphQL is not available"*) return 0 ;;
-	esac
-	[ "$(ccnavi_host_fail_status "$1")" = 403 ] || return 1
-	case "$1" in
-	*"returned error: 403"*) return 0 ;;
-	esac
-	return 1
-}
-
-# 失敗の返事の本文を、画面に出せる形（1 行・制御文字なし・先頭 200 文字・トークンは伏せる）にして出す。
-# 文字数は jq で数える（cut -c は環境によってバイトで切り、日本語の途中で壊れる）。
-ccnavi_host_fail_body() {
-	printf '%s' "$1" | "$ccnavi_h_jq" -Rjs --arg t "${ccnavi_h_token:-}" '(if $t == "" then . else split($t) | join("***") end) | gsub("[\u0000-\u001f\u007f]+"; " ") | .[0:200]'
+# 失敗の返事（本文と標準エラー）の解析は実行ファイル（`ccnavi host fail`。hostreply.FailStatus・GraphQLBlocked・FailBody）が
+# 行う。sh は返事をファイルに書いて渡し、1 行 1 項目の答えを変数に入れるだけ。実行ファイルが答えなければ全部空にする
+# （番号の分からない失敗として扱う）。本文のトークン（GITHUB_TOKEN・GITLAB_TOKEN）は実行ファイルが環境変数から引いて伏せる。
+ccnavi_host_fail() {
+	ccnavi_hf_status=""
+	ccnavi_hf_blocked=""
+	ccnavi_hf_body=""
+	ccnavi_hf_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-host-fail-$$"
+	printf '%s' "$1" >"$ccnavi_hf_file" 2>/dev/null || return 0
+	ccnavi_hf_out=$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host fail "$ccnavi_hf_file") || ccnavi_hf_out=""
+	rm -f "$ccnavi_hf_file" || :
+	ccnavi_hf_status=$(ccnavi_val status "$ccnavi_hf_out")
+	ccnavi_hf_blocked=$(ccnavi_val blocked "$ccnavi_hf_out")
+	ccnavi_hf_body=$(ccnavi_val body "$ccnavi_hf_out")
 }
 
 ccnavi_host_pages() {
@@ -507,7 +513,7 @@ ccnavi_git_auth() {
 # ---- 事前確認（チケット作業の入口と、子チケットの作業から始める操作が使う）
 #
 # ホストの API と git のリモートが使える状態かを確かめる。ここの関数はユーザ向けの文面を出さず、
-# 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（.agents/docs/script-output.md）。
+# 結果・勧める対処と、実行ファイルが組み立てた行と `次:` の行を変数で返す。出すかどうかは呼ぶ側が決める。
 
 # ccnavi_host_connect の後に呼ぶ。経路によらずプロジェクトを 1 回読む（GitHub は repos/<パス>、GitLab は projects/<パス>）。
 #   ccnavi_h_project_json  応答の JSON
@@ -535,94 +541,69 @@ ccnavi_host_probe() {
 	ccnavi_hq_rc=0
 	ccnavi_host_api GET "$ccnavi_hq_rel" >"$ccnavi_hq_file" || ccnavi_hq_rc=$?
 	ccnavi_h_on_fail="$ccnavi_hq_prev"
+	# 分類（ok / auth / notfound / network / badjson）は実行ファイル（`ccnavi host probe`）が決める。失敗なら返事を渡す
+	ccnavi_hq_how=ok
 	if [ "$ccnavi_hq_rc" -ne 0 ]; then
-		rm -f "$ccnavi_hq_file" || :
-		case "$(ccnavi_host_fail_status "$ccnavi_hq_text")" in
-		401 | 403) ccnavi_h_probe=auth ;;
-		404) ccnavi_h_probe=notfound ;;
-		*) ccnavi_h_probe=network ;;
-		esac
-		return 0
+		ccnavi_hq_how=failed
+		printf '%s' "$ccnavi_hq_text" >"$ccnavi_hq_file"
 	fi
-	ccnavi_h_project_json=$(cat "$ccnavi_hq_file")
+	ccnavi_h_probe=$(ccnavi_val probe "$(ccnavi_ask "${root:-$(ccnavi_workspace 2>/dev/null || printf .)}" host probe "$ccnavi_hq_how" "$ccnavi_hq_file")") ||
+		ccnavi_h_probe=""
+	[ "$ccnavi_h_probe" != ok ] || ccnavi_h_project_json=$(cat "$ccnavi_hq_file")
 	rm -f "$ccnavi_hq_file" || :
-	if printf '%s' "$ccnavi_h_project_json" | "$ccnavi_h_jq" -e 'type == "object"' >/dev/null 2>&1; then
-		ccnavi_h_probe=ok
-	else
-		ccnavi_h_project_json=""
-		ccnavi_h_probe=badjson
-	fi
 	return 0
 }
 
-# ccnavi_h_project_json を受けて、書き込みの権限を判定する。
+# ccnavi_h_project_json を受けて、書き込みの権限を判定する（判定は実行ファイルの `ccnavi preflight access`。sh は応答を取る）。
 #   戻り値  0 足りる / 1 足りない / 2 判定できない。理由は ccnavi_h_access_why
 # 「足りる」は「リポジトリのロール上は書き込める」の意味に限る。トークンの scope・ブランチの保護・
-# API と git が別の資格情報で動いていることは確かめていない。is_admin を見て通す近道は作らない。
+# API と git が別の資格情報で動いていることは確かめていない。
 ccnavi_h_access_why=""
 ccnavi_host_access() {
 	ccnavi_h_access_why=""
+	ccnavi_hc_root="${root:-$(ccnavi_workspace 2>/dev/null || printf .)}"
+	ccnavi_hc_dir="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}"
+	ccnavi_hc_project="$ccnavi_hc_dir/ccnavi-access-project-$$"
+	ccnavi_hc_file="$ccnavi_hc_dir/ccnavi-access-$$"
+	printf '%s' "$ccnavi_h_project_json" >"$ccnavi_hc_project"
 	ccnavi_hc_prev="$ccnavi_h_on_fail"
 	ccnavi_h_on_fail=""
-	ccnavi_hc_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-access-$$"
-	if [ "$ccnavi_h_kind" = github ]; then
-		ccnavi_h_on_fail="$ccnavi_hc_prev"
-		ccnavi_hc_push=$(printf '%s' "$ccnavi_h_project_json" | "$ccnavi_h_jq" -r '.permissions.push | if . == null then "unknown" else tostring end' 2>/dev/null || printf unknown)
-		case "$ccnavi_hc_push" in
-		true) return 0 ;;
-		false)
-			ccnavi_h_access_why="push の権限が無い（permissions.push が false）"
-			return 1
-			;;
-		esac
-		ccnavi_h_access_why="応答に permissions が無い"
-		return 2
+	set -- "$ccnavi_h_kind" "$ccnavi_hc_project"
+	# GitLab: 自分の id → プロジェクトの member の access_level。読めなければ、プロジェクトの permissions で判定する
+	if [ "$ccnavi_h_kind" = gitlab ] && ccnavi_host_api GET user >"$ccnavi_hc_file" 2>/dev/null; then
+		ccnavi_hc_uid=$(ccnavi_val uid "$(ccnavi_ask "$ccnavi_hc_root" preflight uid "$ccnavi_hc_file")")
+		if [ -n "$ccnavi_hc_uid" ] &&
+			ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/members/all/$ccnavi_hc_uid" >"$ccnavi_hc_file" 2>/dev/null; then
+			set -- "$@" "$ccnavi_hc_file"
+		fi
 	fi
-	# GitLab: 自分の id → プロジェクトの member の access_level。読めなければ、プロジェクトの permissions の大きいほう
-	ccnavi_hc_level=""
-	ccnavi_hc_uid=""
-	if ccnavi_host_api GET user >"$ccnavi_hc_file" 2>/dev/null; then
-		ccnavi_hc_uid=$("$ccnavi_h_jq" -r '.id // empty' <"$ccnavi_hc_file" 2>/dev/null || :)
-	fi
-	case "$ccnavi_hc_uid" in
-	'' | *[!0-9]*) ccnavi_hc_uid="" ;;
-	esac
-	if [ -n "$ccnavi_hc_uid" ] &&
-		ccnavi_host_api GET "projects/$(ccnavi_host_encoded_path)/members/all/$ccnavi_hc_uid" >"$ccnavi_hc_file" 2>/dev/null; then
-		ccnavi_hc_level=$("$ccnavi_h_jq" -r '.access_level // empty' <"$ccnavi_hc_file" 2>/dev/null || :)
-	fi
-	case "$ccnavi_hc_level" in
-	'' | *[!0-9]*)
-		ccnavi_hc_level=$(printf '%s' "$ccnavi_h_project_json" | "$ccnavi_h_jq" -r '[.permissions.project_access.access_level, .permissions.group_access.access_level] | map(select(. != null)) | if length == 0 then empty else max end' 2>/dev/null || :)
-		;;
-	esac
-	rm -f "$ccnavi_hc_file" || :
 	ccnavi_h_on_fail="$ccnavi_hc_prev"
-	case "$ccnavi_hc_level" in
-	'' | *[!0-9]*)
-		ccnavi_h_access_why="ロールを読めなかった"
-		return 2
-		;;
+	ccnavi_hc_out=$(ccnavi_ask "$ccnavi_hc_root" preflight access "$@") || ccnavi_hc_out=""
+	rm -f "$ccnavi_hc_project" "$ccnavi_hc_file" || :
+	ccnavi_h_access_why=$(ccnavi_val why "$ccnavi_hc_out")
+	case "$(ccnavi_val access "$ccnavi_hc_out")" in
+	ok) return 0 ;;
+	ng) return 1 ;;
+	unknown) return 2 ;;
 	esac
-	if [ "$ccnavi_hc_level" -ge 30 ]; then
-		return 0
-	fi
-	ccnavi_h_access_why="ロールが書き込みに足りない（access_level ${ccnavi_hc_level}。書き込みは 30 の Developer 以上）"
+	# 実行ファイルが答えない。権限を確かめられないまま進めないよう、足りない側に倒す
+	ccnavi_h_access_why="ccnavi の実行ファイルが権限の判定に答えない"
 	return 1
 }
 
-# 項目ごとの結果の種類: ok / ng（確定した不備。直すにはユーザの対応が要る）/ unverified（通信できない・時間切れ・
-# 応答が読めないので確かめられなかった）/ skipped（前提の項目が ok でないので確かめなかった）。
-# 権限（access）に限り、ok に「判定できない」の印（ccnavi_pf_access_unknown=yes）を付けてよい。
+# 事前確認（ccnavi-start.sh --check と ccnavi-ticket.sh が共有する）。手元で決まる項目（道具・origin・統合先・作成者）と、
+# 項目ごとの結果・勧める対処・行と次の一手は、実行ファイル（`ccnavi preflight plan`・`check`）が決める。sh が行うのは、
+# ホストへの接続・プロジェクトの取得・権限の問い合わせ・ls-remote（ネットワーク）と、時間の枠だけ。
 #
 #   ccnavi_preflight <リポジトリの top>
-#     ccnavi_pf_result       ok / ng / unverified（ng が 1 つでもあれば ng。ng が無く unverified か skipped があれば unverified）
-#     ccnavi_pf_<項目>       項目は tools origin integration api access git ident
-#     ccnavi_pf_<項目>_why   理由
-#     ccnavi_pf_fix          勧める対処の種類（tool origin integration auth notfound access git-auth ident network。無ければ空）
+#     ccnavi_pf_result       ok / ng / unverified
+#     ccnavi_pf_<項目>       項目は tools origin integration api access git ident（ok / ng / unverified / skipped）
+#     ccnavi_pf_fix          勧める対処の種類（無ければ空）
 #     ccnavi_pf_auth_source  認証の出どころの種類（cli / token / none。値は入れない）
-# 1 回の問い合わせは 15 秒、git の確認は 30 秒（どちらも CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。全体を過ぎたら残りは skipped。
-# キャッシュはしない。毎回確かめる。
+#     ccnavi_pf_access_unknown  権限を判定できなかった（ok として続ける）なら yes
+#     ccnavi_pf_continue     確かめきれなくても続けてよい（ホストの API だけを確かめられず、git は通る）なら yes
+# 1 回の問い合わせは 15 秒、git の確認は 30 秒（どちらも CCNAVI_PREFLIGHT_TIMEOUT で変える。テスト用）、全体は 60 秒まで。
+# 全体が 60 秒を過ぎたら残りは skipped。キャッシュはしない。毎回確かめる。
 ccnavi_pf_late() {
 	[ $(($(date +%s) - ccnavi_pf_t0)) -lt "${CCNAVI_PREFLIGHT_TOTAL:-60}" ] && return 1
 	return 0
@@ -630,249 +611,78 @@ ccnavi_pf_late() {
 
 ccnavi_preflight() {
 	ccnavi_pf_top="$1"
+	ccnavi_pf_root="${root:-$(ccnavi_workspace 2>/dev/null || printf .)}"
 	ccnavi_pf_each="${CCNAVI_PREFLIGHT_TIMEOUT:-15}"
 	ccnavi_pf_git_each="${CCNAVI_PREFLIGHT_TIMEOUT:-30}"
 	ccnavi_pf_t0=$(date +%s)
-	ccnavi_pf_tools=skipped ccnavi_pf_tools_why=""
-	ccnavi_pf_origin=skipped ccnavi_pf_origin_why=""
-	ccnavi_pf_integration=skipped ccnavi_pf_integration_why=""
-	ccnavi_pf_api=skipped ccnavi_pf_api_why=""
-	ccnavi_pf_access=skipped ccnavi_pf_access_why=""
-	ccnavi_pf_git=skipped ccnavi_pf_git_why=""
-	ccnavi_pf_ident=skipped ccnavi_pf_ident_why=""
-	ccnavi_pf_result=""
-	ccnavi_pf_fix=""
-	ccnavi_pf_auth_source=""
-	ccnavi_pf_access_unknown=""
-	ccnavi_pf_api_kind=""
 	ccnavi_pf_dir="${TMPDIR:-/tmp}/ccnavi-pf-$$"
 	mkdir -p "$ccnavi_pf_dir" 2>/dev/null || ccnavi_pf_dir="${TMPDIR:-/tmp}"
-
-	# 1. tools
-	ccnavi_pf_have_git="" ccnavi_pf_have_jq=""
-	ccnavi_pf_lack=""
-	command -v git >/dev/null 2>&1 && ccnavi_pf_have_git=1 || ccnavi_pf_lack="git"
-	command -v jq >/dev/null 2>&1 && ccnavi_pf_have_jq=1 || ccnavi_pf_lack="${ccnavi_pf_lack:+$ccnavi_pf_lack と }jq"
-	if [ -n "$ccnavi_pf_lack" ]; then
-		ccnavi_pf_tools=ng
-		ccnavi_pf_tools_why="$ccnavi_pf_lack が見つからない"
-	else
-		ccnavi_pf_tools=ok
-		command -v curl >/dev/null 2>&1 || ccnavi_pf_tools_why="curl は無い（gh / glab が利用できれば足りる）"
+	# origin の URL をホストのものとして読めるか（接続に要るので sh が読む）
+	ccnavi_pf_parse=ng
+	ccnavi_pf_url=$(git -C "$ccnavi_pf_top" remote get-url origin 2>/dev/null || :)
+	if [ -n "$ccnavi_pf_url" ] && ccnavi_host_parse "$ccnavi_pf_url"; then
+		ccnavi_pf_parse=ok
 	fi
-
-	# 2. origin
-	ccnavi_pf_url=""
-	if [ -n "$ccnavi_pf_have_git" ]; then
-		ccnavi_pf_url=$(git -C "$ccnavi_pf_top" remote get-url origin 2>/dev/null || :)
-		if [ -z "$ccnavi_pf_url" ]; then
-			ccnavi_pf_origin=ng
-			ccnavi_pf_origin_why="origin が無い"
-		elif ccnavi_host_parse "$ccnavi_pf_url"; then
-			ccnavi_pf_origin=ok
-		else
-			ccnavi_pf_origin=ng
-			ccnavi_pf_origin_why="origin の URL をホストのものとして読めない（$(ccnavi_mask_url "$ccnavi_pf_url")）${ccnavi_h_parse_why:+。$ccnavi_h_parse_why}"
-		fi
-	fi
-
-	# 3. integration
-	if [ "$ccnavi_pf_origin" = ok ]; then
-		if [ -n "$(ccnavi_integration "$ccnavi_pf_top" 2>/dev/null || :)" ]; then
-			ccnavi_pf_integration=ok
-		else
-			ccnavi_pf_integration=ng
-			ccnavi_pf_integration_why="統合先（origin/HEAD）が決まらない"
-		fi
-	fi
-
-	# 4. api
-	if [ "$ccnavi_pf_origin" = ok ] && [ "$ccnavi_pf_tools" = ok ]; then
-		if ccnavi_pf_late; then
-			:
-		else
-			ccnavi_h_tmp="$ccnavi_pf_dir"
-			ccnavi_h_on_fail=""
-			ccnavi_h_max_time="$ccnavi_pf_each"
-			ccnavi_pf_crc=0
-			ccnavi_host_connect || ccnavi_pf_crc=$?
-			case "$ccnavi_pf_crc" in
-			0)
-				ccnavi_pf_auth_source="$ccnavi_h_transport"
-				case "$ccnavi_pf_auth_source" in
-				gh | glab) ccnavi_pf_auth_source=cli ;;
-				curl) ccnavi_pf_auth_source=token ;;
+	set -- "top=$ccnavi_pf_top" "parse=$ccnavi_pf_parse" "parse-why=${ccnavi_h_parse_why:-}" \
+		"masked=$(ccnavi_mask_url "$ccnavi_pf_url")" "kind=${ccnavi_h_kind:-}" "host=${ccnavi_h_host:-}" "path=${ccnavi_h_path:-}"
+	ccnavi_pf_plan=$(ccnavi_ask "$ccnavi_pf_root" preflight plan "$@") || ccnavi_pf_plan=""
+	# ホストの API（接続とプロジェクトの取得）と権限
+	if [ "$(ccnavi_val api "$ccnavi_pf_plan")" = yes ] && ! ccnavi_pf_late; then
+		ccnavi_h_tmp="$ccnavi_pf_dir"
+		ccnavi_h_on_fail=""
+		ccnavi_h_max_time="$ccnavi_pf_each"
+		ccnavi_pf_crc=0
+		ccnavi_host_connect || ccnavi_pf_crc=$?
+		set -- "$@" "connect=$ccnavi_pf_crc" "transport=${ccnavi_h_transport:-}" "cli=${ccnavi_h_cli_name:-}" \
+			"token=${ccnavi_h_token_name:-}"
+		if [ "$ccnavi_pf_crc" -eq 0 ]; then
+			ccnavi_host_probe
+			set -- "$@" "probe=$ccnavi_h_probe"
+			if [ "$ccnavi_h_probe" = ok ] && ! ccnavi_pf_late; then
+				ccnavi_pf_arc=0
+				ccnavi_host_access || ccnavi_pf_arc=$?
+				case "$ccnavi_pf_arc" in
+				0) set -- "$@" access=ok ;;
+				1) set -- "$@" access=ng "access-why=$ccnavi_h_access_why" ;;
+				*) set -- "$@" access=unknown "access-why=$ccnavi_h_access_why" ;;
 				esac
-				ccnavi_host_probe
-				case "$ccnavi_h_probe" in
-				ok) ccnavi_pf_api=ok ;;
-				auth)
-					ccnavi_pf_api=ng
-					ccnavi_pf_api_kind=auth
-					ccnavi_pf_api_why="ホストが認証を受け付けない（HTTP 401 か 403）"
-					;;
-				notfound)
-					ccnavi_pf_api=ng
-					ccnavi_pf_api_kind=notfound
-					ccnavi_pf_api_why="リポジトリ $ccnavi_h_path が見つからない（HTTP 404）"
-					;;
-				badjson)
-					ccnavi_pf_api=unverified
-					ccnavi_pf_api_kind=network
-					ccnavi_pf_api_why="ホストの応答を JSON として読めない"
-					;;
-				*)
-					ccnavi_pf_api=unverified
-					ccnavi_pf_api_kind=network
-					ccnavi_pf_api_why="ホストに届かない（通信の失敗・時間切れ・5xx）"
-					;;
-				esac
-				;;
-			4)
-				ccnavi_pf_auth_source=none
-				ccnavi_pf_api=unverified
-				ccnavi_pf_api_kind=auth
-				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl に付ける $ccnavi_h_token_name もない"
-				;;
-			*)
-				ccnavi_pf_auth_source=none
-				ccnavi_pf_api=unverified
-				ccnavi_pf_api_kind=tool
-				ccnavi_pf_api_why="$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl もない"
-				;;
-			esac
+			fi
 		fi
 	fi
-
-	# 5. access
-	if [ "$ccnavi_pf_api" = ok ] && ! ccnavi_pf_late; then
-		ccnavi_pf_arc=0
-		ccnavi_host_access || ccnavi_pf_arc=$?
-		case "$ccnavi_pf_arc" in
-		0) ccnavi_pf_access=ok ;;
-		1)
-			ccnavi_pf_access=ng
-			ccnavi_pf_access_why="$ccnavi_h_access_why"
-			;;
-		*)
-			ccnavi_pf_access=ok
-			ccnavi_pf_access_unknown=yes
-			ccnavi_pf_access_why="権限を判定できない（${ccnavi_h_access_why}）"
-			;;
-		esac
-	fi
-
-	# 6. git（api の結果によらず行う）
-	if [ "$ccnavi_pf_origin" = ok ] && ! ccnavi_pf_late; then
+	# リモートの git（API の結果によらず行う）
+	if [ "$(ccnavi_val git "$ccnavi_pf_plan")" = yes ] && ! ccnavi_pf_late; then
 		ccnavi_pf_err="$ccnavi_pf_dir/git-err"
 		ccnavi_git_auth "$ccnavi_pf_top"
 		ccnavi_pf_grc=0
 		ccnavi_git_timed "$ccnavi_pf_git_each" "$ccnavi_pf_err" "$ccnavi_pf_top" ls-remote --heads origin >/dev/null || ccnavi_pf_grc=$?
-		if [ "$ccnavi_pf_grc" -eq 0 ]; then
-			ccnavi_pf_git=ok
-		else
-			ccnavi_pf_gtext=$(tr -d '\r' <"$ccnavi_pf_err" 2>/dev/null | head -n 3 | tr '\n' ' ')
-			case "$ccnavi_pf_gtext" in
-			*"Authentication failed"* | *"could not read Username"* | *"Permission denied"* | *"error: 403"* | *"HTTP 403"* | *"returned error: 403"*)
-				ccnavi_pf_git=ng
-				ccnavi_pf_git_why="git のリモートへの認証が通らない"
-				;;
-			*)
-				ccnavi_pf_git=unverified
-				ccnavi_pf_git_why="git のリモートに届かない（時間切れか通信の失敗）"
-				;;
-			esac
-		fi
+		set -- "$@" "git=$ccnavi_pf_grc" "git-err=$(tr -d '\r' <"$ccnavi_pf_err" 2>/dev/null | head -n 3 | tr '\n' ' ')"
 	fi
 	[ "$ccnavi_pf_dir" = "${TMPDIR:-/tmp}" ] || rm -rf "$ccnavi_pf_dir" || :
-
-	# 7. ident（git の作成者。author と committer の両方。手元の設定だけを見る。ネットワークには出ない）
-	if [ -n "$ccnavi_pf_have_git" ]; then
-		if git -C "$ccnavi_pf_top" var GIT_AUTHOR_IDENT >/dev/null 2>&1 &&
-			git -C "$ccnavi_pf_top" var GIT_COMMITTER_IDENT >/dev/null 2>&1; then
-			ccnavi_pf_ident=ok
-		else
-			ccnavi_pf_ident=ng
-			ccnavi_pf_ident_why="git の作成者情報（user.name と user.email）が無く、コミットできない"
-		fi
-	fi
-
-	# まとめ
-	ccnavi_pf_result=ok
+	ccnavi_pf_out=$(ccnavi_ask "$ccnavi_pf_root" preflight check "$@") || ccnavi_pf_out=""
+	ccnavi_pf_result=$(ccnavi_val result "$ccnavi_pf_out")
+	[ -n "$ccnavi_pf_result" ] || ccnavi_pf_result=unverified
 	for ccnavi_pf_k in tools origin integration api access git ident; do
-		eval "ccnavi_pf_v=\$ccnavi_pf_$ccnavi_pf_k"
-		case "$ccnavi_pf_v" in
-		ng) ccnavi_pf_result=ng ;;
-		unverified | skipped) [ "$ccnavi_pf_result" = ng ] || ccnavi_pf_result=unverified ;;
-		esac
+		ccnavi_pf_v=$(ccnavi_val "item $ccnavi_pf_k" "$ccnavi_pf_out")
+		eval "ccnavi_pf_$ccnavi_pf_k=\${ccnavi_pf_v:-skipped}"
 	done
-	# 勧める対処: ng か unverified の項目のうち、次の順で最初にヒットするもの
-	ccnavi_pf_fix=""
-	if [ "$ccnavi_pf_tools" = ng ]; then
-		ccnavi_pf_fix=tool
-	elif [ "$ccnavi_pf_origin" = ng ]; then
-		ccnavi_pf_fix=origin
-	elif [ "$ccnavi_pf_integration" = ng ]; then
-		ccnavi_pf_fix=integration
-	elif [ "$ccnavi_pf_api_kind" = tool ]; then
-		ccnavi_pf_fix=tool
-	elif [ "$ccnavi_pf_api_kind" = auth ]; then
-		ccnavi_pf_fix=auth
-	elif [ "$ccnavi_pf_api_kind" = notfound ]; then
-		ccnavi_pf_fix=notfound
-	elif [ "$ccnavi_pf_access" = ng ]; then
-		ccnavi_pf_fix=access
-	elif [ "$ccnavi_pf_git" = ng ]; then
-		ccnavi_pf_fix=git-auth
-	elif [ "$ccnavi_pf_ident" = ng ]; then
-		ccnavi_pf_fix=ident
-	elif [ "$ccnavi_pf_result" != ok ]; then
-		ccnavi_pf_fix=network
-	fi
+	ccnavi_pf_fix=$(ccnavi_val fix "$ccnavi_pf_out")
+	ccnavi_pf_auth_source=$(ccnavi_val auth "$ccnavi_pf_out")
+	ccnavi_pf_access_unknown=$(ccnavi_val access-unknown "$ccnavi_pf_out")
+	ccnavi_pf_continue=$(ccnavi_val continue "$ccnavi_pf_out")
 	return 0
 }
 
 # ---- 事前確認の文面（ccnavi-start.sh --check と ccnavi-ticket.sh が共有する。変数に入れるだけで、何も出さない）
 #
 #   ccnavi_pf_line <項目>  1 行の文面を ccnavi_pf_line_text に入れる（`<項目>: OK|NG|未確認|省略|注意 (<理由>)`）
-#   ccnavi_pf_next         ccnavi_pf_fix から `次:` の行（文は文面ファイル。NEXT_PF_*）を ccnavi_pf_next_text に入れる（無ければ空）
+#   ccnavi_pf_next         ccnavi_pf_fix から `次:` の行を ccnavi_pf_next_text に入れる（無ければ空）。文は実行ファイル
+#                          （`ccnavi preflight next`）が組み立てる
 ccnavi_pf_line() {
-	eval "ccnavi_pl_kind=\$ccnavi_pf_$1 ccnavi_pl_why=\$ccnavi_pf_$1_why"
-	case "$ccnavi_pl_kind" in
-	ok) ccnavi_pl_word=OK ;;
-	ng) ccnavi_pl_word=NG ;;
-	unverified) ccnavi_pl_word=未確認 ;;
-	*) ccnavi_pl_word=省略 ;;
-	esac
-	if [ "$1" = access ] && [ -n "$ccnavi_pf_access_unknown" ]; then
-		ccnavi_pf_line_text="access: 注意（${ccnavi_pl_why}。続行する）"
-		return 0
-	fi
-	if [ -n "$ccnavi_pl_why" ]; then
-		ccnavi_pf_line_text="$1: $ccnavi_pl_word ($ccnavi_pl_why)"
-	else
-		ccnavi_pf_line_text="$1: $ccnavi_pl_word"
-	fi
+	ccnavi_pf_line_text=$(ccnavi_val "line $1" "${ccnavi_pf_out:-}")
+	[ -n "$ccnavi_pf_line_text" ] || ccnavi_pf_line_text="$1: 省略"
 }
 
 ccnavi_pf_next() {
-	ccnavi_pf_next_text=""
-	ccnavi_pn_host="${ccnavi_h_host:-?}"
-	ccnavi_pn_path="${ccnavi_h_path:-?}"
-	ccnavi_pn_root="${root:-.}"
-	ccnavi_pn_kind=GITLAB
-	if [ "${ccnavi_h_kind:-}" = github ]; then
-		ccnavi_pn_kind=GITHUB
-	fi
-	case "$ccnavi_pf_fix" in
-	tool) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_TOOL) ;;
-	origin) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_ORIGIN) ;;
-	integration) ccnavi_pf_next_text="次: $(ccnavi_integration_hint "${ccnavi_pf_top:-.}")" ;;
-	auth) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_AUTH__$ccnavi_pn_kind" "host=$ccnavi_pn_host") ;;
-	notfound) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_NOTFOUND "path=$ccnavi_pn_path") ;;
-	access) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_ACCESS "path=$ccnavi_pn_path") ;;
-	git-auth) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_GIT_AUTH__$ccnavi_pn_kind" "host=$ccnavi_pn_host") ;;
-	ident) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" NEXT_PF_IDENT) ;;
-	network) ccnavi_pf_next_text=$(ccnavi_text "$ccnavi_pn_root" "NEXT_PF_NETWORK__$ccnavi_pn_kind") ;;
-	esac
+	ccnavi_pf_next_text=$(ccnavi_val next "$(ccnavi_ask "${root:-.}" preflight next "fix=${ccnavi_pf_fix:-}" "top=${ccnavi_pf_top:-.}" \
+		"kind=${ccnavi_h_kind:-}" "host=${ccnavi_h_host:-}" "path=${ccnavi_h_path:-}")")
 }

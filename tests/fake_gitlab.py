@@ -596,7 +596,10 @@ def start(
     elif not os.path.exists(state_path):
         raise FileNotFoundError(f"状態ファイルが無い: {state_path}")
     server = Server(state_path, as_skew(skew), TOKEN, port, echo)
-    thread = threading.Thread(target=server.serve_forever, name="fake-gitlab", daemon=True)
+    # stop の shutdown は serve_forever の見回りの間隔だけ待つ（既定の 0.5 秒だと止めるたびに待つ）
+    thread = threading.Thread(
+        target=server.serve_forever, args=(0.05,), name="fake-gitlab", daemon=True
+    )
     server._thread = thread
     thread.start()
     try:

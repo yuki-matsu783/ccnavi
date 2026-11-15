@@ -52,7 +52,16 @@ import tempfile
 import time
 import unittest
 
-from tests import ROOT, common_path, config_path, exe, host_stub, oprecord, put_messages
+from tests import (
+    ROOT,
+    common_path,
+    config_path,
+    exe,
+    host_stub,
+    oprecord,
+    put_messages,
+    shrink_repo,
+)
 from tests.ticketsample import PHASES, RULES, child_text, parent_text
 
 SHELL = shutil.which("sh") or shutil.which("bash")
@@ -79,7 +88,9 @@ for a in "$@"; do
   if [ -n "$skip" ]; then skip=""; continue; fi
   case "$a" in
   --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --record-commit | --record-merge) skip=1 ;;
   --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  --record-commit=* | --record-merge=*) ;;
   *) first="$a"; break ;;
   esac
 done
@@ -155,6 +166,8 @@ class WriteAndPushHarness(unittest.TestCase):
         cls.addClassCleanup(shutil.rmtree, cls._base, ignore_errors=True)
         inst = cls("run")
         inst._build(cls._base)
+        shrink_repo(os.path.join(inst.ws, ".git"))
+        shrink_repo(inst.remote)
         cls._pristine = cls._base + "-pristine"
         cls.addClassCleanup(shutil.rmtree, cls._pristine, ignore_errors=True)
         shutil.copytree(cls._base, cls._pristine, symlinks=True)
@@ -427,12 +440,58 @@ ACCEPT_PLAN_CASE = """*" --accept-plan "*)
     spec=ACCEPT_PLAN_SPEC.replace("\\", "/"),
 )
 
+
+# 状態の操作を代わりに書くスタブの頭に置く部分。write-and-push の sh は、書く・コミットするまでを
+# 実行ファイルの 1 回の起動（`--record-commit <文>`。答えは `<一覧>.answer`）に任せる。
+# スタブは書くところだけを代わりにするので、`--record-commit` が来たら、それを外して
+# 自分をもう一度起こし（書く）、書いた一覧を本物の実行ファイルの `write-and-push commit` で
+# コミットして答えを書く。
+def wap_prelude(real):
+    """スタブの頭に置く sh（`#!/bin/sh` の後ろ）。real は本物の実行ファイル。"""
+    return (
+        'if [ -z "${WAP_STUB_INNER:-}" ]; then\n'
+        '  case " $* " in *" --record-commit "*)\n'
+        '    wap_msg=""; wap_list=""; wap_tree=""; wap_root=""; wap_prev=""\n'
+        '    for wap_a in "$@"; do\n'
+        "      shift\n"
+        '      case "$wap_prev" in\n'
+        '      --record-commit) wap_msg="$wap_a"; wap_prev=""; continue ;;\n'
+        '      --record-merge) wap_prev=""; continue ;;\n'
+        '      --record-writes) wap_list="$wap_a" ;;\n'
+        '      --record-tree) wap_tree="$wap_a" ;;\n'
+        '      --root) wap_root="$wap_a" ;;\n'
+        "      esac\n"
+        '      wap_prev="$wap_a"\n'
+        '      case "$wap_a" in --record-commit | --record-merge) continue ;; esac\n'
+        '      set -- "$@" "$wap_a"\n'
+        "    done\n"
+        '    wap_base=$(git -C "$wap_tree" rev-parse HEAD)\n'
+        "    wap_rc=0\n"
+        '    WAP_STUB_INNER=1 "$0" "$@" || wap_rc=$?\n'
+        "    printf 'write-and-push 1\\n' >\"$wap_list.answer\"\n"
+        '    [ "$wap_rc" -eq 0 ] || exit "$wap_rc"\n'
+        '    [ -f "$wap_list" ] || : >"$wap_list"\n'
+        f"    wap_out=$('{real}' --root \"$wap_root\" write-and-push commit \\\n"
+        '      "$wap_tree" "$wap_list" "$wap_msg")\n'
+        "    wap_sha=$(printf '%s\\n' \"$wap_out\" | sed -n 's/^commit //p')\n"
+        '    [ -n "$wap_sha" ] || exit 1\n'
+        "    printf 'push yes\\ntree %s\\nbranch %s\\nbase %s\\n' \\\n"
+        '      "$wap_tree" "$(git -C "$wap_tree" symbolic-ref --short HEAD)" "$wap_base" \\\n'
+        '      >>"$wap_list.answer"\n'
+        "    printf 'commit %s\\nhead %s\\nlist %s\\n' \"$wap_sha\" \\\n"
+        '      "$(git -C "$wap_tree" rev-parse HEAD)" "$wap_list" >>"$wap_list.answer"\n'
+        "    exit 0 ;;\n"
+        "  esac\n"
+        "fi\n"
+    )
+
+
 # 実行ファイルの半分のスタブ。残った指摘の行き先（`user reviewed ... --yes`）だけを代わりに書き
 # （親のワークツリーにレビュー済みマーカーを置き、書いたパスの一覧を出し、
 # 答えの JSON と下書きを書く）、
-# 残り（`write-and-push family`・`write-and-push sort`・`sync paths` など）は実際のものに渡す。
+# 残り（`write-and-push family`・`write-and-push sort` など）は実際のものに渡す。
 HALF = """#!/bin/sh
-case " $* " in
+{prelude}case " $* " in
 {plan_case}*" user reviewed "*" --yes "*)
   list=""; tree=""; root=""; done_plan=""
   while [ "$#" -gt 0 ]; do
@@ -463,7 +522,9 @@ for a in "$@"; do
   if [ -n "$skip" ]; then skip=""; continue; fi
   case "$a" in
   --root | --cwd | --record-writes | --record-tree) skip=1 ;;
+  --record-commit | --record-merge) skip=1 ;;
   --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  --record-commit=* | --record-merge=*) ;;
   *) first="$a"; break ;;
   esac
 done
@@ -488,7 +549,7 @@ exec '{git}' "$@"
 # 実際のものに渡す。
 # HALF_FAIL にファイル名があれば、`review requested` を最初の 1 回だけ失敗させる（打ち直しの試験）。
 HOST_HALF = """#!/bin/sh
-list=""; tree="${{HALF_TREE:-}}"; root=""
+{prelude}list=""; tree="${{HALF_TREE:-}}"; root=""
 for a in "$@"; do :; done
 set -- "$@"
 i=0
@@ -507,7 +568,8 @@ put() {{
 }}
 m=.ccnavi/approved/phases/i0001
 case " $* " in
-*" ops "*) exec '{exe}' "$@" ;;
+*" ops "* | *" host "*) exec '{exe}' "$@" ;;
+*" accept plan "* | *" accept threads "* | *" accept decided "*) exec '{exe}' "$@" ;;
 *" review prepare "*)
   mkdir -p "$root/logs/state"
   printf '<!-- ccnavi:request i0001:1 key=k1 -->\\n見てほしい\\n' >"$root/logs/state/req.md"
@@ -536,7 +598,9 @@ for a in "$@"; do
   if [ -n "$skip" ]; then skip=""; continue; fi
   case "$a" in
   --root | --cwd | --record-writes | --record-tree | --entry) skip=1 ;;
+  --record-commit | --record-merge) skip=1 ;;
   --root=* | --cwd=* | --record-writes=* | --record-tree=*) ;;
+  --record-commit=* | --record-merge=*) ;;
   *) first="$a"; break ;;
   esac
 done
@@ -619,7 +683,9 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
         Host.keep_draft = False
         server = __import__("http.server").server.HTTPServer(("127.0.0.1", 0), Host)
         Host.port = server.server_address[1]
-        threading.Thread(target=server.serve_forever, daemon=True).start()
+        threading.Thread(
+            target=server.serve_forever, args=(0.05,), daemon=True
+        ).start()  # 止めるときの待ちを縮める
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
         shim = os.path.join(self._base, "shim")
@@ -628,7 +694,9 @@ class WriteAndPushHostHarness(WriteAndPushHarness):
         self.path = shim + os.pathsep + os.environ.get("PATH", "")
         self.half = executable(
             os.path.join(self._base, "bin", "hosthalf"),
-            HOST_HALF.format(exe=exe.sh_path(), plan_case=ACCEPT_PLAN_CASE),
+            HOST_HALF.format(
+                exe=exe.sh_path(), plan_case=ACCEPT_PLAN_CASE, prelude=wap_prelude(exe.sh_path())
+            ),
         )
 
     def review(self, *args, stdin="", script="ccnavi-review.sh", cwd=None, **extra):

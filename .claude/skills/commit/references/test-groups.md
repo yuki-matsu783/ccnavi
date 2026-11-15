@@ -14,28 +14,26 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 
 | グループ | 主題 | 時間 |
 |---|---|---|
-| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 6 秒 |
-| `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 60 秒 |
+| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 13 秒 |
+| `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 43 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
-| `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 140 秒 |
-| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 6 本に分けてある）。配布する sh を起動するテストはここに置く | 約 80 秒 |
-| `contract` | 本物の GitLab から録った応答の形（`recorded.json`）と、Python の模擬（`tests/fake_gitlab.py`）・sh の見本（`tests/sh/gitlab_host.py` とフィクスチャ）の応答の形を、`reads` のキーで比べる。比較器・変異・機密・置く分岐の試験を含む。TS 側（Chrome 拡張の `MockGitLab` との比較）は `extensions/chrome/ccnavi-approval` の `pnpm test`（下の表）。録り直しは手動（Docker。`.agents/docs/gitlab-contract.md`）。claude -p のスタブ（`tests/fake_claude.py`）と、本物から録った形（`tests/contract/claude/recorded.json`）の比較も含む（`.agents/docs/claude-contract.md`）。sh を起動しないので `sh` に混ぜない（`sh` は約 80 秒の群） | 約 15 秒 |
-| `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 8 秒 |
+| `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 124 秒 |
+| `sh` | 配布する sh と導入スクリプト（setup・git のラッパー・承認の push の sh・取ってくる sh・ランチャー・clean・レビューの sh・write-and-push。write-and-push は重いため、`test_write_and_push_*.py` の 7 本に分けてある）。配布する sh を起動するテストはここに置く | 約 193 秒 |
+| `contract` | 本物の GitLab から録った応答の形（`recorded.json`）と、Python の模擬（`tests/fake_gitlab.py`）・sh の見本（`tests/sh/gitlab_host.py` とフィクスチャ）の応答の形を、`reads` のキーで比べる。比較器・変異・機密・置く分岐の試験を含む。TS 側（Chrome 拡張の `MockGitLab` との比較）は `extensions/chrome/ccnavi-approval` の `pnpm test`（下の表）。録り直しは手動（Docker。`.agents/docs/gitlab-contract.md`）。claude -p のスタブ（`tests/fake_claude.py`）と、本物から録った形（`tests/contract/claude/recorded.json`）の比較も含む（`.agents/docs/claude-contract.md`）。sh を起動しないので `sh` に混ぜない（`sh` は一番重い群） | 約 4 秒 |
+| `e2e` | 本物のワークスペースを組み立てて sh を外から実行する。組み立て済みの実行ファイル（`dist/ccnavi`）が要り、無ければ skip | 約 4 秒 |
+| `scenarios` | 受入シナリオの通し（`tests/scenarios/`。台本のあるシナリオをスタブで回す `test_stub_scenarios` と、模擬のホストで回す `test_runner`） | 約 29 秒 |
 
 ```sh
 uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複数は 1 つずつ続けて回す。`discover -s` は 1 か所しか取らない）
 ```
 
-全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../.agents/docs/testing.md)。時間の目安は並行セッションがあると数倍になる。
+全件は `uv run python -m tests`（同時実行）で回す。`discover -s tests` の 1 本は使わない。理由と手順は[テストを回す](../../../../.agents/docs/testing.md)。時間の目安は、4 コアの機械でグループだけを `python -m tests tests/<グループ>` で回した値。並行セッションがあると数倍になる。
 
 実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
 `sh scripts/ccnavi-build.sh` で組み立ててから回す。
 
 落ちたら新しいプロセスを起こすのをやめ、落ちた 1 本の出力だけを出す。ターンの終わりの hook はこれを使わない。
 既知の失敗が残っている間は `python -m tests` で全件を見られないので、グループごとに `discover -s tests/<グループ> -t .` で回し、失敗の数を既知と比べる。
-
-`tests/<グループ>/bench_*.py` はテストではなく（`discover` は拾わない）、`uv run python -m tests.core.bench_deadline` のように名指しで回す。
-実ルールを使う bench は `*x*` 形の glob の照合が入力の長さの 2 乗で伸び、小さい入力でも数分かかる。ターンの中で回すならバックグラウンドで回す。
 
 ## 回すグループ
 
@@ -46,22 +44,30 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 | `tests/<グループ>/` の中 | そのグループ |
 | `go/**` | `guard` `config` `ticket` |
 | `go/internal/infra/platformtag/` | 上に加えて `sh` |
+| sh が実行ファイルに聞く判定と操作の部品（`go/internal/infra/git/`・`tree/`・`reply/`、`go/internal/tickets/lifecycle/` の `integrate/`・`branch/`・`refusal/`・`gitlog/`・`treeadd/`・`cut/`、`go/internal/tickets/review/decide/`、`go/internal/tickets/sync/`、`go/internal/tickets/approval/wap/`、`go/internal/tickets/model/` の `ids/`・`oplog/`・`handoffnames/`、`go/internal/records/stopreview/`） | 上に加えて `sh` |
 | `scripts/ccnavi-build.sh` | `core` `sh` `e2e` |
-| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh` | `ticket` `config` `e2e` |
-| `.ccnavi/scripts/ccnavi-git.sh` | `sh` `guard` `config` `e2e` |
+| `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh`、`go/internal/tickets/lifecycle/ticketsh/` | `ticket` `config` `e2e`。`ccnavi-ticket.sh`・`ticketsh/` は `sh`（`test_write_and_push_propose`・`test_write_and_push_ticket`）も |
+| `.ccnavi/scripts/ccnavi-git.sh`・`go/internal/tickets/lifecycle/gitwrap/`・`go/internal/tickets/lifecycle/land/` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-user-push-approved.sh`・`ccnavi-user-handoff.sh`・`ccnavi-user-mirror.sh`・`ccnavi-user-prune.sh`・`ccnavi-clean.sh` | `sh` `config` `e2e` |
-| `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh` | `sh` |
+| `.ccnavi/scripts/ccnavi-common-state.sh`（答えを読む口 `ccnavi_val`・`ccnavi_do` はどの sh も使う）・`go/internal/infra/reply/` | `sh` `ticket` `e2e` |
+| `.ccnavi/scripts/ccnavi-fetch.sh`・`ccnavi-sync.sh`・`ccnavi-dirs.sh`・`ccnavi-idle.sh`・`ccnavi-session-start.sh`、`go/internal/entry/catchup/`・`dirs/` | `sh` |
+| `.ccnavi/scripts/ccnavi-stage.sh`・`ccnavi-branches.sh`・`ccnavi-worktree.sh`・`ccnavi-user-lib-review.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`、`go/internal/entry/shask/`・`go/internal/tickets/lifecycle/gitlog/`・`refusal/`・`cut/`・`treeadd/`・`go/internal/tickets/sync/stage/` | `sh`（`treeadd/` は `test_start_sh`・`test_start_sh_adopt` も） |
+| `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`・`test_start_sh_adopt`） |
+| `go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_start_sh_adopt`・`test_ticket_preflight_sh`・`test_write_and_push_ticket`）。`ccnavi-common-host.sh` は多くの sh が読むため、下の「全件を回すとき」に従う |
+| `.ccnavi/scripts/ccnavi-common-write-and-push.sh`・`go/internal/tickets/lifecycle/wapmerge/`・`go/internal/entry/cli/wapwrite.go` | `sh`（`test_write_and_push_*`・`test_push_approved_sh`）`ticket`（`test_write_and_push`） |
+| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`・`test_branches_sh`・`test_mask_url_sh`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
+| `tests/treecache.py`（チケットの受入テストの木の写しを取る） | `ticket` |
 | `tests/fake_claude.py`・`tests/contract/claudeside.py`・`tests/contract/claude/recorded.json` | `contract` `scenarios`（`scenarios` の `test_runner`・`test_stub_scenarios` はスタブを使う） |
 | `tests/manual/claude/record_hooks.py` | `contract`（`claudeside` を使う。本物を呼ぶので自動テストは回さない） |
 | `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つのスタブと模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
 | `tests/scenarios/*.yml`・`tests/scenarios/sandbox.py` | `scenarios`（`test_stub_scenarios` が、台本のあるシナリオを使い捨てのワークスペースでスタブで回す。ccnavi の判定を変えても結果が変わる） |
 | `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
-| `tests/fixtures/` | `guard` `ticket` |
+| `tests/fixtures/` | `guard` `ticket`（sh の写しとの一致の表 `ident-cases.json`・`sh-quote-cases.json`・`host-kinds.json`・`layout.json`・`no-remote-ref.json`・`approved-carry.json` は、`sh` の `test_ident_sh`・`test_sh_quote_sh`・`test_host_kinds_sh`・`test_sh_copies_sh` と `go test` の両方で確かめる） |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `tests/contract/`（`shape.py`・`*.json`） | `contract`。あわせて `extensions/chrome/ccnavi-approval` の `pnpm test`（TS の比較器が同じ表を読む） |
 | `extensions/chrome/ccnavi-approval/test/helpers/mock-gitlab.ts`・`shape.ts` | `extensions/chrome/ccnavi-approval` の `pnpm test`（契約の試験） |

@@ -45,7 +45,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。`scenarios` は、受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。同じ API を拡張も読む（`approvals`）が、読むキーが違う（`approved` は拡張の `MockGitLab` が返さない）ので、要求を分けてある
+- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`extensions/chrome/ccnavi-approval/src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。`scenarios` は、受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。同じ API を拡張も読む（`approvals`）が、読むキーが違う（`approved` は拡張の `MockGitLab` が返さない）ので、要求を分けてある
   - 録る側（`record_contract.py`）は全要求を送る（`fakeside.load_all_requests()`）。書式・`reads`・状態の検査も全要求を見る
   - `fakeside.load_requests()` は `sh` か `scenarios` を持つ要求だけ返す。`fake_gitlab.py` は拡張だけの要求（`repository/branches` など）に答えないので送らない。`RecordedTest` は `recorded.json` も、この名前に絞って比べる（`compare_all` は `recorded` のキーを回し、`actual` に無ければ `missing` を出すため）
   - TS は `chrome` を持つ要求だけを `MockGitLab` に送る

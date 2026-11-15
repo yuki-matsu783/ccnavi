@@ -4,5 +4,5 @@
 // 比べるときは必ずここを通す。返すのは比べるための文字列で、ファイルを開く表記には使わない。
 //
 // パスでない語の比べ（区切りを変えない casefold）は pyfmt.Casefold で、Fold もそれで組む。
-// Fold が基本で、拡張子の判定は HasExt、リンクを辿った実体の比べは Real と SameReal、表記だけの比べは SameNorm。
+// Fold が基本で、名前の比べ（NFC も畳む）は SameName、拡張子の判定は HasExt、リンクを辿った実体の比べは Real と SameReal、表記だけの比べは SameNorm。
 package pathcase

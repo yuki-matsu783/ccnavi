@@ -8,6 +8,11 @@
 
 `CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
+
+引数だけで決まる拒否と、その文が言うことは、実行ファイルの表が見る
+（go/internal/tickets/lifecycle/gitwrap の TestCheckMatchesTheWrapper・TestJudgeByTheArguments）。
+ここで見るのは、拒否の通し（終了コード 2 で git を動かさない）、git の状態で決まる形、
+通した git の結果と記録。
 """
 
 from __future__ import annotations
@@ -161,168 +166,8 @@ class RejectTest(GitWrapperTest):
             with self.subTest(args=args):
                 self.assertRejected(*args)
 
-    def test_global_config_option_is_rejected_without_reading_its_value(self):
-        # `git -c diff.external=<コマンド>` は分類上ただの diff のまま任意コマンドを
-        # 実行する。危ない設定名の列挙は網羅できないので、値を見ずに形で弾く。
-        self.assertRejected("-c", "diff.external=echo", "diff")
-        self.assertRejected("--config-env=diff.external=X", "diff")
-
-    def test_options_that_turn_reads_into_writes_are_rejected(self):
-        self.assertRejected("diff", "--output=stolen.txt")
-        self.assertRejected("log", "--exec-path=/tmp")
-        self.assertRejected("status", "--git-dir=/elsewhere/.git")
-        self.assertFalse(os.path.exists(os.path.join(self.dir, "stolen.txt")))
-
-    def test_destructive_subcommands_are_rejected(self):
-        for args in (
-            ("reset", "--hard"),
-            ("clean", "-fd"),
-            ("rebase", "main"),
-            ("cherry-pick", "HEAD"),
-            ("config", "--get", "user.email"),
-            ("clone", "https://example.invalid/x.git"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-    def test_commit_checkout_and_pull_pass_but_their_escape_hatches_do_not(self):
-        # commit / checkout / pull は通す。止めるのは、点検を飛ばす形と
-        # ワークツリーの書きかけを破棄する形だけ。
-        for args in (
-            ("commit", "--no-verify", "-m", "x"),
-            ("commit", "-an", "-m", "x"),
-            ("checkout", "--", "tracked.txt"),
-            ("checkout", "-f", "main"),
-            ("switch", "--discard-changes", "main"),
-            ("pull", "--force"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-    def test_dangerous_forms_of_allowed_subcommands_are_rejected(self):
-        for args in (
-            ("branch", "-D", "x"),
-            ("branch", "--force", "x"),
-            ("branch", "-u", "origin/main"),
-            ("tag", "-d", "v1"),
-            ("remote", "add", "o", "u"),
-            ("worktree", "remove", "--force", "p"),
-            ("stash", "drop"),
-            ("stash", "clear"),
-            ("restore", "."),
-            ("merge", "-X", "ours", "other"),
-            ("merge", "-Xtheirs", "other"),
-            ("merge", "-s", "ours", "other"),
-            ("merge", "--no-verify", "other"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-    def test_unknown_subcommand_is_rejected_by_default(self):
-        self.assertRejected("frobnicate")
-
-    def test_rm_passes_but_forcing_it_does_not(self):
-        # git rm は索引や HEAD と食い違うファイルを既定で拒む。-f はその線を
-        # 越えてコミットしていない変更ごと消すので、こちらでも同じ場所で止める。
-        for args in (
-            ("rm",),
-            ("rm", "-f", "tracked.txt"),
-            ("rm", "--force", "tracked.txt"),
-            ("rm", "-rf", "."),
-            ("rm", "."),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertTrue(os.path.exists(os.path.join(self.dir, "tracked.txt")))
-
-    def test_the_alternative_it_names_is_not_a_denied_form(self):
-        # 生の git は PreToolUse で止まる。案内が `git stash push -u` と書くと、
-        # 案内された先でもう 1 度拒否される。代わりの手段が拒否される案内は、
-        # 案内が無いのとほとんど同じ。示すならラッパースクリプトの形で示す。
-        for args in (
-            ("reset", "--hard"),
-            ("clean", "-fd"),
-            ("checkout", "-f", "main"),
-            ("checkout", "--", "tracked.txt"),
-            ("stash", "drop"),
-            ("branch", "-D", "other"),
-            ("restore",),
-            ("pull", "--force"),
-        ):
-            with self.subTest(args=args):
-                result = self.assertRejected(*args)
-                stderr = result.stderr
-                self.assertIn("ccnavi-git.sh", stderr, f"代わりの形を示していない: {stderr}")
-                for form in ("git stash", "git restore", "git branch", "git worktree"):
-                    self.assertNotIn(
-                        form, stderr.replace("ccnavi-git.sh", ""), f"生の git を勧めた: {stderr}"
-                    )
-
-    def test_long_option_values_do_not_trip_the_short_option_scan(self):
-        # `--contains=feature/dev` の f と d を -f -d と読み違えないこと。
-        # 短いオプションをまとめた形 (-rd) を 1 文字ずつ見る判定の巻き添え。
-        result = self.run_wrapper("branch", "--contains=feature/dev")
-        self.assertNotEqual(2, result.returncode, result.stderr)
-
-
-# 拒否の文に代わりの手段を書くと決めた理由の名前。次に何をすればよいかを必ず書く。
-NEEDS_ALTERNATIVE = (
-    "integrate-tmp",
-    "grep-pager",
-    "remote-option",
-    "worktree-no-dest",
-)
-# 代わりの手段を示している印。ラッパーか取り込みの sh の形か、ユーザに頼むこと。
-# 「ユーザに依頼してください」で終わる拒否（remote-write など）も、正しい代わりの手段として数える。
-ALTERNATIVE_MARKS = ("$SELF", "$SYNC", "ユーザに")
-
-
-def reject_texts(reason):
-    """ccnavi-git.sh の中で、この理由の名前で拒否する文（二重引用の中身）をすべて返す。"""
-    with open(SCRIPT, encoding="utf-8") as f:
-        source = f.read()
-    head = f'reject {reason} "'
-    found = []
-    start = source.find(head)
-    while start >= 0:
-        body = start + len(head)
-        found.append(source[body : source.index('"', body)])
-        start = source.find(head, body)
-    return found
-
 
 class RejectAlternativeTest(GitWrapperTest):
-    def test_each_listed_rejection_names_what_to_do_instead(self):
-        for reason in NEEDS_ALTERNATIVE:
-            texts = reject_texts(reason)
-            with self.subTest(reason=reason):
-                self.assertTrue(texts, f"{reason} の拒否が見つからない")
-                for text in texts:
-                    self.assertTrue(
-                        any(mark in text for mark in ALTERNATIVE_MARKS),
-                        f"代わりの手段が無い: {text}",
-                    )
-
-    def test_asking_the_user_counts_as_an_alternative(self):
-        # 検査が「ユーザに依頼」で終わる正しい拒否を落とさないこと。
-        for text in reject_texts("remote-write"):
-            self.assertTrue(any(mark in text for mark in ALTERNATIVE_MARKS), text)
-
-    def test_the_pager_rejection_names_a_wrapper_form_that_passes(self):
-        for args in (("grep", "-O", "line"), ("grep", "-iO", "line"), ("grep", "--open", "line")):
-            with self.subTest(args=args):
-                result = self.assertRejected(*args)
-                self.assertIn("ccnavi-git.sh grep -l", result.stderr)
-        listed = self.run_wrapper("grep", "-l", "line")
-        self.assertEqual(0, listed.returncode, listed.stderr)
-        self.assertIn("tracked.txt", listed.stdout)
-
-    def test_the_remote_option_rejection_names_the_listing_forms(self):
-        result = self.assertRejected("remote", "--frob")
-        self.assertIn("ccnavi-git.sh remote -v", result.stderr)
-        self.assertIn("ccnavi-git.sh remote get-url", result.stderr)
-        self.assertNotEqual(2, self.run_wrapper("remote", "-v").returncode)
-
     def test_the_missing_destination_rejection_names_the_worktree_form(self):
         result = self.assertRejected("worktree", "add")
         self.assertIn(
@@ -480,6 +325,7 @@ class PassTest(GitWrapperTest):
             return subprocess.run(
                 [SHELL, SCRIPT, "push", "-u", "origin", name],
                 cwd=trees[name],
+                env=with_exe(dict(os.environ)),
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -531,27 +377,6 @@ class MergeFileTest(GitWrapperTest):
         with open(os.path.join(self.dir, name), encoding="utf-8") as f:
             return f.read()
 
-    def test_forms_that_write_a_file_are_rejected(self):
-        current, base, other = self.write_versions()
-        for args in (
-            # -p が無いと 1 つめのファイルを書き換える。
-            ("merge-file", current, base, other),
-            ("merge-file", "--union", current, base, other),
-            # -L の値の -p はラベル。-p を付けたことにならず、git はファイルを書く。
-            ("merge-file", "-L", "-p", current, base, other),
-            # `--` の後ろはファイル名。
-            ("merge-file", "--union", "--", "-p", base, other),
-            # 否定の形と略記は git が受け取るので、知らない表記として止める。
-            ("merge-file", "-p", "--no-stdout", current, base, other),
-            ("merge-file", "--std", current, base, other),
-            ("merge-file", "-pq", current, base, other),
-            ("merge-file", "-p", "--obj", current, base, other),
-            ("merge-file", "-p", "--no-object-id", current, base, other),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual("a\nmine\nc\n", self.read(current))
-
     def test_union_to_stdout_goes_through_and_writes_nothing(self):
         current, base, other = self.write_versions()
         labels = ("-L", "ours", "-L", "base", "-L", "theirs")
@@ -575,14 +400,6 @@ class MergeFileTest(GitWrapperTest):
         subprocess.run(["git", "merge", "other"], cwd=self.dir, capture_output=True)
         self.assertIn("UU tracked.txt", git_out(self.dir, "status", "--porcelain"))
         return self.read("tracked.txt")
-
-    def test_object_id_without_p_is_rejected_and_writes_no_object(self):
-        # -p を外した --object-id は、結果をオブジェクトとしてリポジトリに書く。
-        conflicted = self.conflict()
-        before = git_out(self.dir, "count-objects")
-        self.assertRejected("merge-file", "--union", "--object-id", *self.STAGES)
-        self.assertEqual(before, git_out(self.dir, "count-objects"))
-        self.assertEqual(conflicted, self.read("tracked.txt"))
 
     @unittest.skipUnless(
         merge_file_knows_object_id(), "この git の merge-file は --object-id を知らない"
@@ -757,47 +574,10 @@ class ResetGuidanceTest(GitWrapperTest):
         git(self.dir, "commit", "-q", "-m", "local")
         return branch
 
-    def test_reset_names_ccnavi_sync_and_merge_not_checkout_B(self):
-        stderr = self.assertRejected("reset", "--hard", "origin/main").stderr
-        for form in (
-            "ccnavi-sync.sh <P>",
-            "fetch <リモート> <ブランチ>",
-            "merge <リモート>/<ブランチ>",
-            "ユーザ",
-        ):
-            self.assertIn(form, stderr)
-        self.assertNotIn("checkout -B", stderr)
-        # 勧める形はラッパースクリプトの形で示す。生の git を勧めると、勧めた先でもう 1 度止まる。
-        rest = stderr.replace("ccnavi-git.sh", "").replace("ccnavi-sync.sh", "")
-        for raw in ("git checkout", "git merge", "git fetch", "git stash"):
-            self.assertNotIn(raw, rest)
-
     def test_usage_names_ccnavi_sync_not_checkout_B(self):
         usage = self.run_wrapper("--help").stdout
         self.assertIn("ccnavi-sync.sh <P>", usage)
         self.assertNotIn("checkout -B <ブランチ>", usage)
-
-    def test_clean_does_not_mention_checkout_B(self):
-        stderr = self.assertRejected("clean", "-fd").stderr
-        self.assertNotIn("checkout -B", stderr)
-
-    def test_forced_branch_moves_are_rejected(self):
-        branch = self.diverge()
-        before = git_out(self.dir, "rev-parse", branch)
-        for args in (
-            ("checkout", "-B", branch, "upstream"),
-            ("checkout", "-qB", branch, "upstream"),
-            ("switch", "--force-create", branch, "upstream"),
-            ("switch", "--force-create=" + branch, "upstream"),
-        ):
-            with self.subTest(args=args):
-                result = self.assertRejected(*args)
-                self.assertIn("ccnavi-sync.sh", result.stderr)
-                self.assertIn("別のコミットへ移します", result.stderr)
-        # switch -C は、全引数の `-C`（判定の起点を動かす）で前から止まっている。
-        self.assertRejected("switch", "-C", branch, "upstream")
-        self.assertEqual(before, git_out(self.dir, "rev-parse", branch))
-        self.assertTrue(os.path.exists(os.path.join(self.dir, "local.txt")))
 
     def test_creating_a_new_branch_still_passes(self):
         for args in (("checkout", "-b", "fresh", "HEAD"), ("switch", "--create", "fresh2", "HEAD")):
@@ -806,46 +586,12 @@ class ResetGuidanceTest(GitWrapperTest):
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
-class BranchForceMoveTest(GitWrapperTest):
-    """`branch -M`（強制の改名）と `-C`（強制の複製）を止める。
+class BranchUsageTest(GitWrapperTest):
+    """使い方の文が、branch で通さない形（-D・-m・-M・-C・-f・-u）を挙げる。
 
-    短いオプションの検査は小文字の f・m・u だけを見ていたので、大文字の -M は通っていた。
-    ブランチの名前はワークツリーの名前とチケットの識別子に結び付いていて、改名すると引けなくなる。
+    判定そのものは実行ファイル（`ccnavi git check`）が行い、
+    go/internal/tickets/lifecycle/gitwrap の見本が見る。
     """
-
-    def test_force_rename_and_force_copy_are_rejected(self):
-        git(self.dir, "branch", "topic")
-        before = git_out(self.dir, "branch", "--list")
-        for args in (
-            ("branch", "-M", "topic", "renamed"),
-            ("branch", "-M", "renamed"),
-            ("branch", "-rM", "origin/x", "y"),
-            ("branch", "--move", "topic", "renamed"),
-            ("branch", "--move=topic"),
-            ("branch", "-C", "topic", "copied"),
-            ("branch", "-rC", "topic", "copied"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual(before, git_out(self.dir, "branch", "--list"))
-
-    def test_force_rename_names_why_and_the_wrapper(self):
-        stderr = self.assertRejected("branch", "-M", "renamed").stderr
-        self.assertIn("識別子", stderr)
-        self.assertIn("ユーザ", stderr)
-
-    def test_lower_case_move_stays_rejected(self):
-        # -m は以前から止めている。-M を足しても変わらない。
-        for args in (("branch", "-m", "renamed"), ("branch", "-rm", "x")):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-    def test_safe_delete_and_listing_still_pass(self):
-        git(self.dir, "branch", "topic")
-        for args in (("branch", "--list"), ("branch", "-v"), ("branch", "-d", "topic")):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_usage_lists_what_it_rejects(self):
         usage = self.run_wrapper("--help").stdout
@@ -865,32 +611,6 @@ class FetchRefspecTest(GitWrapperTest):
         git(self.dir, "remote", "add", "origin", self.bare)
         self.branch = git_out(self.dir, "branch", "--show-current")
         git(self.dir, "push", "-q", "origin", self.branch)
-
-    def test_refspecs_and_urls_are_rejected(self):
-        before = git_out(self.dir, "for-each-ref")
-        b = self.branch
-        for args in (
-            ("fetch", "origin", f"+refs/heads/{b}:refs/heads/{b}"),
-            ("fetch", "origin", f"{b}:{b}"),
-            ("fetch", "origin", f"{b}:refs/heads/other"),
-            ("fetch", "origin", f"+{b}"),
-            ("fetch", "origin", f":refs/heads/{b}"),
-            ("fetch", "--refmap=+refs/heads/*:refs/remotes/o/*", "origin"),
-            ("fetch", self.bare + ":x"),
-            ("fetch", "https://example.invalid/x.git", b),
-            ("pull", "origin", f"{b}:{b}"),
-            ("pull", "origin", f"+{b}"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual(before, git_out(self.dir, "for-each-ref"))
-
-    def test_the_rejection_names_the_wrapper_form(self):
-        stderr = self.assertRejected("fetch", "origin", "main:main").stderr
-        self.assertIn("ccnavi-git.sh fetch <リモート> <ブランチ>", stderr)
-        self.assertNotIn("git fetch", stderr.replace("ccnavi-git.sh", ""))
-        # 手元の ref を進めるのは ccnavi-sync.sh。
-        self.assertIn("ccnavi-sync.sh <ブランチ> が進めます", stderr)
 
     def test_remote_and_branch_still_pass(self):
         for args in (
@@ -936,57 +656,12 @@ class StoreRewindTest(GitWrapperTest):
         self.assertEqual("new\n", self.read(self.COPY))
         self.assertEqual("new\n", self.read(self.REVIEW))
 
-    def test_checkout_of_a_ref_onto_the_store_is_rejected(self):
-        for args in (
-            ("checkout", "HEAD~1", self.COPY),
-            ("checkout", "HEAD~1", self.REVIEW),
-            ("checkout", "HEAD~1", "tracked.txt", self.COPY),
-            ("checkout", "HEAD~1", ".ccnavi"),
-            ("checkout", "HEAD~1", ".ccnavi/approved/"),
-            ("checkout", "HEAD~1", "wip"),
-            ("checkout", "HEAD~1", "x/../" + self.COPY),
-            ("checkout", "HEAD~1", ".CCNAVI/Approved/doing/i0001.md"),
-            ("checkout", "HEAD~1", ".ccnavi\\approved\\doing\\i0001.md"),
-            ("checkout", "HEAD~1", ".ccnavi/approved/*"),
-            ("checkout", "HEAD~1", ":(glob).ccnavi/**"),
-            ("checkout", "-p", "HEAD~1", self.COPY),
-            ("checkout", "HEAD~1", "--pathspec-from-file=list.txt"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertUntouched()
-
-    def test_restore_from_another_commit_onto_the_store_is_rejected(self):
-        for args in (
-            ("restore", "--source", "HEAD~1", self.COPY),
-            ("restore", "--source=HEAD~1", "--", self.COPY),
-            ("restore", "-s", "HEAD~1", self.COPY),
-            ("restore", "-sHEAD~1", self.COPY),
-            ("restore", "-Ws", "HEAD~1", self.COPY),
-            ("restore", "-SWs", "HEAD~1", "--", self.REVIEW),
-            ("restore", "--source", "HEAD~1", ".ccnavi"),
-            ("restore", "--source", "HEAD~1", "--pathspec-from-file=list.txt"),
-            ("restore", "--source", "HEAD~1", "wip/proposals/review/*"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertUntouched()
-
-    def test_resolving_a_store_conflict_to_one_side_is_rejected(self):
-        for args in (
-            ("restore", "--ours", "--", self.COPY),
-            ("restore", "--theirs", self.REVIEW),
-        ):
-            with self.subTest(args=args):
-                stderr = self.assertRejected(*args).stderr
-                self.assertIn("merge --abort", stderr)
-                self.assertIn("ccnavi-git.sh", stderr)
-
     def test_paths_relative_to_a_subdirectory_are_resolved(self):
         cwd = os.path.join(self.dir, ".ccnavi")
         result = subprocess.run(
             [SHELL, SCRIPT, "checkout", "HEAD~1", "approved/doing/i0001.md"],
             cwd=cwd,
+            env=with_exe(dict(os.environ)),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -1001,7 +676,7 @@ class StoreRewindTest(GitWrapperTest):
 
         env で保護を外せないことを見る。
         `.ccnavi/scripts/` がコピーする版（i0064-10）になる前は失敗する。
-        コピーする前の sh（`ccnavi-git.sh` の `store_hit`）は `CCNAVI_TICKETS_APPROVED` と
+        コピーする前の判定（`ccnavi git check` の `StoreHit`）は `CCNAVI_TICKETS_APPROVED` と
         `CCNAVI_TICKETS_PROPOSAL` のパスを置き場と読み、既定の置き場の restore を止めないため。
         承認済みとレビュー待ちは別々に打つ（一緒に打つと、片方の保護だけで止まって
         もう片方が env で動くのを見逃すため）。
@@ -1069,31 +744,10 @@ class WorktreeNameTest(GitWrapperTest):
     """
 
     def test_mismatched_and_forced_forms_are_rejected(self):
+        """2 つ目の語が在るブランチで、行き先の名前と違えば断る（引数だけの形は Go の表が見る）。"""
         git(self.dir, "branch", "other")
-        for args in (
-            ("worktree", "add", ".claude/worktrees/a", "-b", "b"),
-            ("worktree", "add", ".claude/worktrees/a", "-b", "b", "HEAD"),
-            ("worktree", "add", "-B", "a", ".claude/worktrees/a"),
-            ("worktree", "add", "--detach", ".claude/worktrees/a", "HEAD"),
-            ("worktree", "add", "-d", ".claude/worktrees/a", "HEAD"),
-            ("worktree", "add", "-f", ".claude/worktrees/a", "-b", "a"),
-            ("worktree", "add", "--force", ".claude/worktrees/a", "-b", "a"),
-            # 2 つ目の語がブランチ名と違えば、名前の違う行き先に出すか detached になる。
-            ("worktree", "add", ".claude/worktrees/a", "HEAD"),
-            ("worktree", "add", ".claude/worktrees/a", "other"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
+        self.assertRejected("worktree", "add", ".claude/worktrees/a", "other")
         self.assertFalse(os.path.exists(os.path.join(self.dir, ".claude", "worktrees", "a")))
-
-    def test_the_rejection_says_how_to_write_it(self):
-        stderr = self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "b").stderr
-        self.assertIn("-b b", stderr)
-        self.assertIn("worktree add .claude/worktrees/b -b b", stderr)
-        # 名前を変えると何が止まるのかを、ADR の番号に頼らず中身で言う。
-        self.assertIn("そのブランチをチェックアウトしているものとして探します", stderr)
-        self.assertIn("/ を - に置き換えたもの", stderr)
-        self.assertNotIn("ADR", stderr)
 
     def test_matching_forms_pass(self):
         git(self.dir, "branch", "c")
@@ -1364,16 +1018,12 @@ class ParentPushGateTest(GitWrapperTest):
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertIn("リモートにあるかを確かめられない", result.stderr)
 
-    def test_no_executable_decides_by_the_reference_alone(self):
-        """実行ファイルが無いときは、参照の形跡だけで決める。参照が無ければ初回として通す。"""
-        approved_only = {"CCNAVI_ENTRY_PATH": os.path.join(self.dir, "no-such-ccnavi")}
+    def test_no_executable_stops_the_wrapper(self):
+        """実行ファイルが無ければ、ラッパーは引数の形を確かめられないので、push の前に止める。"""
         self.approve(started=True)
-        result = self.run_in_tree(approved_only)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.delete_on_remote()
-        result = self.run_in_tree(approved_only)
+        result = self.run_in_tree({"CCNAVI_ENTRY_PATH": os.path.join(self.dir, "no-such-ccnavi")})
         self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("リモートに無い", result.stderr)
+        self.assertIn("実行ファイルが見つからない", result.stderr)
 
     def run_in_tree(self, env):
         environment = with_exe(dict(os.environ))
@@ -1402,6 +1052,24 @@ class ParentPushGateTest(GitWrapperTest):
         result = self.push(free, "free")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
+    # 送り先は git と同じ順で解き、origin 以外へ送るときはゲートを掛けない。
+
+    def test_a_push_remote_other_than_origin_is_not_gated(self):
+        self.approve()
+        other = self.make_bare()
+        git(self.dir, "remote", "add", "other", other)
+        git(self.tree, "config", "branch.i0001.pushRemote", "other")
+        result = run_in(self.tree, "push")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_push_default_to_origin_is_gated(self):
+        self.approve(started=True)
+        git(self.tree, "config", "remote.pushDefault", "origin")
+        git(self.tree, "config", "push.default", "current")
+        result = run_in(self.tree, "push")
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("リモートに無い", result.stderr)
+
 
 class AllowListTest(GitWrapperTest):
     """オプションは許可リストで読む。
@@ -1419,56 +1087,6 @@ class AllowListTest(GitWrapperTest):
         git(self.dir, "add", ".ccnavi/approved/doing/i0001.md")
         git(self.dir, "commit", "-q", "-m", "store")
 
-    def test_abbreviated_and_bundled_forms_are_rejected(self):
-        store = ".ccnavi/approved/doing/i0001.md"
-        before = git_out(self.dir, "for-each-ref")
-        for args in (
-            ("switch", "--force-c", "topic", "HEAD"),
-            ("switch", "--force-cr=topic", "HEAD"),
-            ("switch", "--discard-ch", "topic"),
-            ("switch", "--for", "topic"),
-            ("checkout", "--for", "topic"),
-            ("checkout", "-qB", "topic", "HEAD"),
-            ("checkout", "-fq", "topic"),
-            ("branch", "--mov", "topic", "renamed"),
-            ("branch", "--forc", "-d", "topic"),
-            ("branch", "-rM", "a", "b"),
-            ("pull", "--rebas", "origin", "main"),
-            ("pull", "-r", "origin", "main"),
-            ("pull", "-Xours", "origin", "main"),
-            ("fetch", "--prun", "origin"),
-            ("fetch", "-p", "origin"),
-            ("merge", "--strategy-o=ours", "topic"),
-            ("merge", "--strategy-option", "theirs", "topic"),
-            ("merge", "-Xours", "topic"),
-            ("merge", "-sours", "topic"),
-            ("merge", "--no-verif", "topic"),
-            ("commit", "--no-verif", "-m", "x"),
-            ("commit", "-anm", "x"),
-            ("commit", "--amend", "-m", "x"),
-            ("commit", "--amen", "-m", "x"),
-            ("rm", "--forc", "tracked.txt"),
-            ("rm", "-rf", "tracked.txt"),
-            ("worktree", "remove", "--forc", "x"),
-            ("worktree", "remove", "-ff", "x"),
-            ("restore", "--sour=HEAD~1", store),
-            ("restore", "-sHEAD~1", store),
-            ("restore", "-Ss", "HEAD~1", store),
-            ("cat-file", "--textc", "HEAD:tracked.txt"),
-            ("cat-file", "--filters", "HEAD:tracked.txt"),
-            ("grep", "-O", "line"),
-            ("grep", "-iOvim", "line"),
-            ("grep", "--open-f", "line"),
-            ("log", "--outp=out.txt"),
-            ("diff", "--ext"),
-            ("show", "--textc"),
-            ("fetch", "--upload-p=touch x", "origin"),
-            ("checkout", "--unknown-option"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual(before, git_out(self.dir, "for-each-ref"))
-
     def test_plain_forms_still_pass(self):
         for args in (
             ("checkout", "-b", "new1"),
@@ -1476,23 +1094,11 @@ class AllowListTest(GitWrapperTest):
             ("switch", "-cnew3"),
             ("switch", "--create", "new4", self.base),
             ("checkout", self.base),
-            ("branch", "--list"),
-            ("branch", "-vv"),
-            ("branch", "-d", "new1"),
-            ("commit", "--allow-empty", "-qm", "x"),
-            ("cat-file", "-p", "HEAD:tracked.txt"),
-            ("grep", "-e", "line 1", "--", "tracked.txt"),
-            ("grep", "-C3", "line 5", "--", "tracked.txt"),
-            ("diff", "--text", "HEAD"),
             ("restore", "--staged", "tracked.txt"),
         ):
             with self.subTest(args=args):
                 result = self.run_wrapper(*args)
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_the_refusal_says_to_spell_it_out(self):
-        stderr = self.assertRejected("switch", "--force-c", "topic").stderr
-        self.assertIn("略さずに", stderr)
 
 
 class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
@@ -1556,7 +1162,7 @@ class WorktreeDetachTest(GitWrapperTest):
 class WorktreeFreshBaseTest(GitWrapperTest):
     """統合先から切る worktree add は、fetch が新しく、手元の統合先が遅れていないときだけ通す。
 
-    hook は git もネットワークも起こさないので、この 2 重目の確認は sh の中にある。
+    hook は git もネットワークも起こさないので、この 2 つ目の確認は sh の中にある。
     fetch は打たない。拒否のあと案内どおりに fetch すれば（FETCH_HEAD が新しくなって）通る。
     """
 
@@ -1752,26 +1358,6 @@ class SymlinkedWorkspaceTest(GitWrapperTest):
         self.assertFalse(os.path.exists(os.path.join(self.dir, "logs", "state", "sync")))
 
 
-class PushRemoteResolutionTest(ParentPushGateTest):
-    """送り先は git と同じ順で解き、origin 以外へ送るときはゲートを掛けない。"""
-
-    def test_a_push_remote_other_than_origin_is_not_gated(self):
-        self.approve()
-        other = self.make_bare()
-        git(self.dir, "remote", "add", "other", other)
-        git(self.tree, "config", "branch.i0001.pushRemote", "other")
-        result = run_in(self.tree, "push")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_push_default_to_origin_is_gated(self):
-        self.approve(started=True)
-        git(self.tree, "config", "remote.pushDefault", "origin")
-        git(self.tree, "config", "push.default", "current")
-        result = run_in(self.tree, "push")
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("リモートに無い", result.stderr)
-
-
 class IntegrationPushTest(GitWrapperTest):
     """固定のリスト（main など）に無い名前の統合先へも直接は送らない。
 
@@ -1892,106 +1478,16 @@ class IntegrationPushTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
-class SafeAdditionsTest(GitWrapperTest):
-    """許可リストに足した、履歴を書き換えない形。
-
-    足したもの: commit --fixup・--squash、fetch と pull の --depth・--deepen・--shallow-since・
-    --unshallow、merge と pull の --autostash・--no-autostash、fetch の --show-forced-updates・
-    --no-show-forced-updates・--write-fetch-head・--no-write-fetch-head。
-    拒否されない（終了コード 2 にならない）ことを見る。git 自身が断る形（完全な clone への
-    --unshallow など）は 1 で終わってよい。
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.bare = self.make_bare()
-        git(self.dir, "remote", "add", "origin", self.bare)
-        self.branch = git_out(self.dir, "branch", "--show-current")
-        git(self.dir, "push", "-q", "origin", self.branch)
-
-    def test_added_forms_are_not_rejected(self):
-        head = git_out(self.dir, "rev-parse", "HEAD")
-        b = self.branch
-        for args in (
-            ("commit", "--allow-empty", f"--fixup={head}"),
-            ("commit", "--allow-empty", "--fixup", head),
-            ("commit", "--allow-empty", f"--squash={head}", "-m", "x"),
-            ("fetch", "--depth=1", "origin", b),
-            ("fetch", "--depth", "1", "origin", b),
-            ("fetch", "--deepen=1", "origin", b),
-            ("fetch", "--shallow-since=2000-01-01", "origin", b),
-            ("fetch", "--unshallow", "origin", b),
-            ("fetch", "--show-forced-updates", "origin", b),
-            ("fetch", "--no-show-forced-updates", "origin", b),
-            ("fetch", "--no-write-fetch-head", "origin", b),
-            ("fetch", "--write-fetch-head", "origin", b),
-            ("pull", "--depth=1", "origin", b),
-            ("pull", "--autostash", "origin", b),
-            ("pull", "--no-autostash", "origin", b),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertNotEqual(2, result.returncode, result.stdout + result.stderr)
-
-    def test_merge_autostash_forms_are_not_rejected(self):
-        # 統合先をチェックアウトしている間は merge 全体を止めるので、別のブランチで確かめる。
-        git(self.dir, "checkout", "-q", "-b", "topic")
-        for args in (
-            ("merge", "--autostash", "origin/" + self.branch),
-            ("merge", "--no-autostash", "origin/" + self.branch),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertNotEqual(2, result.returncode, result.stdout + result.stderr)
-
-    def test_risky_neighbours_stay_rejected(self):
-        for args in (
-            ("fetch", "--prune", "origin"),
-            ("fetch", "--force", "origin"),
-            ("fetch", "--refmap=x", "origin"),
-            ("fetch", "--depth=1", "origin", "+main:main"),
-            ("pull", "--rebase", "origin", self.branch),
-            ("pull", "--rebase=merges", "origin", self.branch),
-            ("commit", "--amend", "-m", "x"),
-            ("commit", "--fixu=x"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
-
 class TagListOnlyTest(GitWrapperTest):
-    """tag は一覧だけ。位置の引数は -l / --list のときの絞り込みだけ。タグは作らせない。"""
+    """使い方の文が、tag は一覧だけでタグの作成はユーザに頼むと言う。
 
-    def test_creating_a_tag_is_rejected(self):
-        for args in (
-            ("tag", "v1"),
-            ("tag", "v1", "HEAD"),
-            ("tag", "--contains", "HEAD", "v1"),
-            ("tag", "-n", "v1"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-        self.assertEqual("", git_out(self.dir, "tag", "--list"))
+    判定そのものは実行ファイル（`ccnavi git check`）が行い、
+    go/internal/tickets/lifecycle/gitwrap の見本が見る。
+    """
 
     def test_help_says_creation_is_the_users(self):
         result = self.run_wrapper("--help")
         self.assertIn("作成はユーザに依頼", result.stdout + result.stderr)
-
-    def test_listing_still_passes(self):
-        git(self.dir, "tag", "v0")
-        for args in (
-            ("tag",),
-            ("tag", "-l"),
-            ("tag", "-l", "v*"),
-            ("tag", "--list", "v*"),
-            ("tag", "--contains", "HEAD"),
-            ("tag", "--points-at", "HEAD"),
-            ("tag", "--merged=HEAD"),
-            ("tag", "-n", "-l", "v*"),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

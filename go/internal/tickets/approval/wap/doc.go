@@ -1,6 +1,6 @@
 // Package wap は write-and-push で、sh（.ccnavi/scripts/ccnavi-common-write-and-push.sh の ccnavi_wap_*）が
-// 実行ファイルに聞く 2 つの問いに答える。ロック・取り込み・コミット・push は sh が受け持つ。ここはネットワークに出ず、
-// コミットもしない（判定と見分けだけを行う）。git は、ローカルの読み取り（status・diff・ls-tree・cat-file・config）
+// 実行ファイルに聞く 2 つの問いに答える。ロック・取り込み・push は sh、コミットと戻しは lifecycle/wapmerge が
+// 受け持つ。ここはネットワークに出ず、コミットもしない（判定と見分けだけを行う。戻すときに触らない記録は Kept）。git は、ローカルの読み取り（status・diff・ls-tree・cat-file・config）
 // だけに使う。
 //
 //   - `ccnavi write-and-push family <識別子>`（Family）: 親子のチケットの親と、write-and-push の対象か（yes・no・

@@ -6,7 +6,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 )
 
-// Cleared は Clear の答え。Kinds は消せた種類（溜める段では消す種類）。Failed は reviewed を消せなかった理由
+// Cleared は Clear の答え。Kinds は消せた種類（溜める段階では消す種類）。Failed は reviewed を消せなかった理由
 // （空でなければ呼び手は止める）。Warnings はほかの種類を消せなかった知らせ（残っていて判定に使われる）。
 type Cleared struct {
 	Kinds    []Kind
@@ -21,7 +21,7 @@ var clearOrder = []Kind{Reviewed, Requested, Skipped, Pending}
 // reviewed が残ると、フェーズは済んだまま読まれ、足した子を見ずに先へ進んでしまう。そのため、消せなければ止める（Failed）。
 // ほかのマーカーは、消せなくても止めない。
 //
-// 溜める段（承認の plan）では、消す書き込みを溜め、見せる行は Writer(FS) が実際に消せた種類で作る（fsio.Call）。
+// 溜める段階（承認の plan）では、消す書き込みを溜め、見せる行は Writer(FS) が実際に消せた種類で作る（fsio.Call）。
 // announce は、消せた種類から見せる行を作る。nil なら行を出さない。
 func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string) Cleared {
 	// 1. 消す対象は、実際に在るマーカーだけ。消す順は clearOrder（reviewed を含む順）。
@@ -31,7 +31,7 @@ func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string
 			present = append(present, kind)
 		}
 	}
-	// 2. 溜める段（承認の plan）では、書き込みを実行せずに溜める。見せる行は、あとで実際に消せた種類から作る。
+	// 2. 溜める段階（承認の plan）では、書き込みを実行せずに溜める。見せる行は、あとで実際に消せた種類から作る。
 	if stage := fsio.CurrentStage(); stage != nil {
 		group := stage.NewGroup()
 		for _, kind := range present {
@@ -56,7 +56,7 @@ func Clear(approvedDir, parent string, phase int, announce func([]Kind) []string
 		stage.Items = append(stage.Items, fsio.Call{Run: run, Group: group, Lines: say(kinds)})
 		return Cleared{Kinds: kinds}
 	}
-	// 3. 溜めない段では、その場で消す。reviewed が消せなければ、フェーズが済んだまま残るので Failed で止める。他は警告にとどめる。
+	// 3. 溜めない段階では、その場で消す。reviewed が消せなければ、フェーズが済んだまま残るので Failed で止める。他は警告にとどめる。
 	var cleared []Kind
 	out := Cleared{}
 	for _, kind := range present {

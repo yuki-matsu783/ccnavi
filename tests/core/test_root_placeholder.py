@@ -17,7 +17,7 @@ import yaml
 from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
-# このリポジトリの rules.yml と同じ形。先読みを使わずに 1 段目で場合分けする。
+# このリポジトリの rules.yml と同じ形。先読みを使わずに 1 つ目の部分で場合分けする。
 WORKSPACE_ROOT_RULE = (
     r"^{root}[\\/](?:[^.\\/][^\\/]*|\.[^c\\/][^\\/]*|\.c[^l\\/][^\\/]*|\.claude[\\/][^w\\/][^\\/]*)"
 )

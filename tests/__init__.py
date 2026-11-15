@@ -136,6 +136,19 @@ os.environ.update(GIT_ENV)
 os.environ.setdefault("MSYS2_ARG_CONV_EXCL", "refs/;origin/")
 
 
+def shrink_repo(git_dir: str) -> None:
+    """作り置きのリポジトリを、写す前にファイルの数で小さくする。中身と振る舞いは変えない。
+
+    テストごとに作り置きを `shutil.copytree` で写すと、時間はほぼファイルとディレクトリの
+    数で決まる。ばらの object（1 つずつファイルと 2 字のディレクトリ）を 1 つの pack に
+    まとめ、git が `init` で置く使われない見本の hook（`hooks/*.sample`）を消す。
+    `git_dir` は `.git` か bare。
+    """
+    _subprocess.run(["git", "--git-dir", git_dir, "repack", "-a", "-d", "-q"], check=True)
+    for sample in _glob.glob(os.path.join(git_dir, "hooks", "*.sample")):
+        os.remove(sample)
+
+
 _FIXTURE_WORKSPACES: dict[str, str] = {}
 
 
@@ -263,7 +276,7 @@ def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
 
     入口の `ccnavi-common.sh` と、入口が同じディレクトリから読む部品（`ccnavi-common-*.sh`）。
     sh を使い捨ての木へコピーするテストは、名前を並べずにこれで全部を一緒にコピーする。
-    部品は入口が `$0` のディレクトリから読むので、1 本でも欠けると sh は起動の段で失敗する。
+    部品は入口が `$0` のディレクトリから読むので、1 本でも欠けると sh は起動の段階で失敗する。
     共通部が 1 本のままでも、部品に分かれていても同じ書き方で済む。
     """
     names = tuple(

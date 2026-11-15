@@ -14,6 +14,6 @@ func TestFamilyOfAgreesWithTheHook(t *testing.T) {
 		}
 	}
 	if got := familyOf("abc-01-02-03"); got != "abc-01" {
-		t.Errorf("右から 2 段を剥がさない: %q", got)
+		t.Errorf("右から 2 階層を剥がさない: %q", got)
 	}
 }

@@ -28,18 +28,20 @@ dry-run でも渡す。
 1. sh がホストを読む。繋ぎ方は `ccnavi-common-host.sh` の「ホスト（GitHub / GitLab）への接続」で、`ccnavi-review.sh` と同じ
    （gh / glab、無ければ curl と `GITHUB_TOKEN` / `GITLAB_TOKEN`）。MR 指定はその MR の元ブランチ、issue 指定はその issue を
    参照している開いた MR の元ブランチ（GitHub は開いた PR のタイトル・本文・元ブランチ名（名前の読み方は 3 と同じ）、GitLab は `related_merge_requests`）。
-   繋げないときも止めず、理由を書く
-2. 結果を `logs/state/branches-host-<pid>.json` に書き、実行ファイルの `ccnavi branches <issue|mr> <N> --result <json>` に渡す
+   繋げないときも止めず、理由を渡す
+2. 取ってきた応答を整えずに `logs/state/branches-host-<pid>.json` に書き、実行ファイルの
+   `ccnavi branches <issue|mr> <N> checked <github|gitlab> <ホスト> <リポジトリ> <プロジェクトの id> --result <応答>` に渡す
+   （繋げないときは `unchecked <理由>`、API が失敗したら `failed <呼び出し> --result <ホストの返事>`）。どの MR が関係するか・
+   フォークか・マージ済みかは実行ファイルが読む
 3. 実行ファイルが手元を読む（git の ref、ツリーの HEAD、チケット）。issue 指定なら、名前に番号を含むブランチ（手元と origin）。
    名前が `<先頭の語>-<番号>-<slug>`（先頭の語は `CCNAVI_BRANCH_PREFIXES`）の形なら、その番号だけで比べ、slug の中の数字は拾わない。
    形に合わない名前（`fix/152-y`・`claude/…` など）は、番号の前後がそれぞれ区切り（`-` `/` `_` `.`）か文字列の端のものに限る。
-   先頭の語は、実行ファイルでは設定と環境変数から読み、sh の jq は環境変数だけを見る（無ければ既定のリスト）。
    名前だけで見つかった候補は、出力で「弱い根拠」と案内する）と、`issue: <N>` を持つ親の親のブランチ（親の識別子と、変換すると識別子になる手元・origin のブランチ名。無ければ識別子）を足す。どの候補にも、
    チェックアウトしているツリーと結び付くチケットを添えて、1 候補 1 行か JSON で出す。MR 指定なら、`mr: <N>` を持つ親
    （提案も承認済みも）の親のブランチを「チケット」の由来で足す
 
 UserPromptSubmit の「すでにチケットに結び付く」判定（`branch.bound`）は、issue はチケットの `issue:` の一致。
-MR はチケットの `mr:` の一致（`not is_child`、提案も承認済みも）で見る。名前に番号を含むだけのブランチは結び付けない。
+MR はチケットの `mr:` の一致（子でない（`!IsChild()`）チケット。提案も承認済みも）で見る。名前に番号を含むだけのブランチは結び付けない。
 番号が別なら結び付けず、`ccnavi-start.sh` を勧める。
 
 ```text

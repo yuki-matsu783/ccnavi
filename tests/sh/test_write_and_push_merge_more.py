@@ -7,18 +7,13 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
-import time
 import unittest
 
 from tests.sh.write_and_push_harness import (
     APPROVED,
     CHILD,
-    CHILD_B,
     GIT,
-    LOST_REPLY,
     PARENT,
-    SHELL,
     WriteAndPushMergeHarness,
     executable,
     git,
@@ -27,31 +22,13 @@ from tests.sh.write_and_push_harness import (
 
 
 class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
-    """取り込み（merge）まわりの後半。"""
+    """取り込み（merge）まわりの後半。push の失敗・コミットの失敗・シグナルで合流ごと戻すことと、
+    検査のあとに子が積んだコミットを載せないこと。
 
-    def test_an_uncommitted_change_in_the_child_stops(self):
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "wip/design/a.md", "a\n")
-        write(os.path.join(tree, "wip", "design", "late.md"), "not committed\n")
-        before = self.sha(self.tree, "HEAD")
-        result = self.ticket("finish", CHILD)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("サブエージェントの作業がコミットされていません", result.stderr)
-        self.assertIn("wip/design/late.md", result.stderr)
-        self.assert_untouched(before)
-
-    def test_an_uncommitted_change_in_the_parent_stops(self):
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "wip/design/a.md", "a\n")
-        write(os.path.join(self.tree, "src", "keep.py"), "print(2)\n")
-        result = self.ticket("finish", CHILD)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("親のワークツリーに未コミットの変更がある", result.stderr)
-        self.assertIn("src/keep.py", result.stderr)
-        self.assertFalse(self.merging())
-        self.assertTrue(os.path.isfile(self.copy(CHILD)))
+    応答が失われた push と送る途中の TERM は、合流の無い形（`test_write_and_push_ticket.py`）で見る
+    （sh の同じ段取り）。子と親の未コミットは Go（wapmerge・treegate）、リスクを数える起点は Go
+    （git の ChildBase）が見る。
+    """
 
     def test_two_rejected_pushes_undo_the_merge(self):
         self.start_parent()
@@ -103,69 +80,6 @@ class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
         self.assert_rolled_back(before)
         self.assertEqual(self.remote_sha(), before)
 
-    @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
-    def test_a_term_before_the_push_undoes_the_merge(self):
-        import signal
-
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "wip/design/a.md", "a\n")
-        before = self.sha(self.tree, "HEAD")
-        mark = os.path.join(self._base, "pushing")
-        hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
-        hooks = hooks if os.path.isabs(hooks) else os.path.join(self.tree, hooks)
-        executable(os.path.join(hooks, "pre-push"), f"#!/bin/sh\n: >'{mark}'\nsleep 5\nexit 1\n")
-        running = subprocess.Popen(
-            [SHELL, os.path.join(self.scripts, "ccnavi-ticket.sh"), "finish", CHILD],
-            cwd=self.ws,
-            env=self.ticket_env(),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        deadline = time.monotonic() + 60
-        while not os.path.exists(mark) and time.monotonic() < deadline:
-            time.sleep(0.1)
-        running.send_signal(signal.SIGTERM)
-        _, err = running.communicate(timeout=60)
-        self.assertIn("送る前に止められた", err.decode("utf-8", "replace"))
-        self.assert_rolled_back(before)
-
-    def test_a_push_whose_reply_was_lost_counts_as_sent_with_the_merge(self):
-        self.start_parent()
-        tree = self.start_child()
-        child_head = self.work(tree, "wip/design/a.md", "a\n")
-        shim = os.path.join(self._base, "shim")
-        executable(os.path.join(shim, "git"), LOST_REPLY.format(git=GIT))
-        path = shim + os.pathsep + os.environ.get("PATH", "")
-        result = self.ticket("finish", CHILD, PATH=path)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("届いていた", result.stderr)
-        head = self.sha(self.tree, "HEAD")
-        self.assertEqual(self.remote_sha(), head)
-        parents = git(self.tree, "rev-list", "--parents", "-n", "1", "HEAD").stdout.split()
-        self.assertEqual(parents[2], child_head)
-
-    # ---- 5. 親を取り込んだ子でも、ほかの子の変更が混ざらない
-
-    def test_taking_the_parent_into_a_child_does_not_mix_in_the_other_childs_changes(self):
-        self.start_parent()
-        self.approve_second_child()
-        first = self.start_child()
-        second = self.start_child(CHILD_B)
-        self.work(first, "wip/design/a.md", "first\n")
-        self.work(second, "wip/design/b.md", "second\n")
-        self.assertEqual(self.ticket("finish", CHILD).returncode, 0)
-        # 衝突を解くつもりで、子 2 へ親を取り込む
-        git(second, "merge", "-q", "--no-edit", PARENT)
-        result = self.ticket("finish", CHILD_B)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        risk = os.path.join(
-            self.tree, *APPROVED.split("/"), "phases", PARENT, CHILD_B + ".risk.json"
-        )
-        summary = json.loads(self.read(risk))["summary"]
-        self.assertTrue(summary.startswith("1 ファイル、+1 -0 行"), summary)
-
     def test_a_commit_after_the_scope_check_is_not_merged(self):
         """範囲の検査の直後に子がコミットしても、検査していないコミットは合流しない。"""
         self.start_parent()
@@ -214,18 +128,6 @@ class WriteAndPushMergeMoreTest(WriteAndPushMergeHarness):
         risk = os.path.join(self.tree, *APPROVED.split("/"), "phases", PARENT, CHILD + ".risk.json")
         summary = json.loads(self.read(risk))["summary"]
         self.assertTrue(summary.startswith("1 ファイル、+1 -0 行"), summary)
-
-    @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
-    def test_a_term_during_the_merge_undoes_it_and_finish_can_run_again(self):
-        self.start_parent()
-        tree = self.start_child()
-        self.work(tree, "wip/design/a.md", "a\n")
-        before = self.sha(self.tree, "HEAD")
-        err = self.term_after(" merge --no-ff --no-commit ")
-        self.assertIn("合流の途中で止められた", err)
-        self.assert_rolled_back(before)
-        again = self.ticket("finish", CHILD)
-        self.assertEqual(again.returncode, 0, again.stdout + again.stderr)
 
     @unittest.skipUnless(hasattr(os, "killpg"), "TERM を捕まえさせられない（os.killpg が無い）")
     def test_a_term_right_after_the_merge_commit_undoes_it(self):

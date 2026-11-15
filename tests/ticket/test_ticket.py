@@ -27,7 +27,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_path, script_command, userform, write_and_push_flag
+from tests import ROOT, common_path, script_command, treecache, userform, write_and_push_flag
 from tests.inproc import run_ccnavi
 from tests.ticketsample import (
     RULES,
@@ -130,8 +130,12 @@ def ticket_text(
 
 class TicketTest(unittest.TestCase):
     def setUp(self):
-        self.root = tempfile.mkdtemp(prefix="ccnavi-ticket-")
-        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.root = treecache.root(self)
+        self.build_tree()
+
+    @treecache.cached
+    def build_tree(self):
+        """リポジトリと親のワークツリーを組む。2 度目からは写しを戻す（`tests/treecache.py`）。"""
         os.makedirs(os.path.join(self.root, ".claude"))
         git(self.root, "init", "--quiet", "-b", "main")
         write(os.path.join(self.root, "src", "keep.py"), "print(1)\n")
@@ -257,6 +261,7 @@ class TicketTest(unittest.TestCase):
         if started.returncode != 0:
             self.assertIn("着手済み", started.stderr, started.stdout + started.stderr)
 
+    @treecache.cached
     def family(
         self, review=(True, False), plan=1, allow=("src/*", "wip/*"), child_allow=("src/a/*",)
     ):
@@ -509,7 +514,7 @@ class TicketTest(unittest.TestCase):
         self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
         self.propose("i0001-01-01-01-01", parent="i0001-01-01", phase=1, allow=("src/a/*",))
         result = self.approve()
-        self.assertIn("2 段", result.stderr)
+        self.assertIn("2 階層", result.stderr)
         self.assertFalse(
             os.path.exists(os.path.join(self.approved, "doing", "i0001-01-01-01-01.md"))
         )
@@ -845,35 +850,23 @@ class TicketTest(unittest.TestCase):
         `-t` で行き先を前に出した形、行き先のあとに選択肢を回した形、状態の置き場が入っている
         ディレクトリ（提案の置き場）を行き先にして元の名前を状態の名前にした形も止める。
         置き場から外へコピーするだけの形と、todo/ へコピーする形は止めない。
+
+        hook を通した代表だけを見る。動詞・旗・行き先の表記ごとの表は、ここで打っていた形を集めた
+        Go の見本（`go/internal/hook/judge/testdata/captured.jsonl`）が確かめる。
         """
         self.family()
         for command in (
-            "cp -t wip/proposals/review/ .ccnavi/approved/doing/i0001-01-01.md",
             "cp -t wip/proposals/review .ccnavi/approved/doing/i0001-01-01.md",
-            "cp -vt wip/proposals/review /tmp/i0001-01-01.md",
-            "cp --target-directory=wip/proposals/review /tmp/i0001-01-01.md",
-            "ln -st wip/proposals/review /tmp/i0001-01-01.md",
-            "install -t wip/proposals/review /tmp/i0001-01-01.md",
-            "sudo cp -t wip/proposals/review /tmp/i0001-01-01.md",
-            "cp /tmp/i0001-01-01.md wip/proposals/review",
-            "cp /tmp/i0001-01-01.md wip/proposals/review/",
             "cp /tmp/i0001-01-01.md wip/proposals/review -f",
-            "cp /tmp/i0001-01-01.md wip/proposals/review/i0001-01-01.md 2>/dev/null",
             "cp -r /tmp/review wip/proposals/",
-            "cp -r /tmp/review wip/proposals",
-            "mv /tmp/review wip/proposals/",
-            "cd wip/proposals && cp /tmp/i0001-01-01.md review",
             "cd wip/proposals/review && cp /tmp/i0001-01-01.md .",
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
                 self.assertIn("builtin:ticket-state", self.reason(result))
         for command in (
-            "cp wip/proposals/review/i0001-01-01.md /tmp/x",
             "cp -t /tmp/out wip/proposals/review/i0001-01-01.md",
             "cp /tmp/i0001-01-03.md wip/proposals/todo/",
-            "cp -t wip/proposals/todo /tmp/i0001-01-03.md",
-            "cp /tmp/i0001-01-03.md wip/proposals/",
         ):
             with self.subTest(command=command):
                 result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
@@ -1088,6 +1081,7 @@ class TicketTest(unittest.TestCase):
 
     # ---- 4. フェーズの終わりと HITL ポイント
 
+    @treecache.cached
     def close_phase(self):
         for child in ("i0001-01-01", "i0001-01-02"):
             done = self.ccnavi("ticket", "finish", child)
@@ -1276,6 +1270,7 @@ class TicketTest(unittest.TestCase):
 
     # ---- レビュー（sh の代わりに、テストがリモートから取得した結果を渡す）
 
+    @treecache.cached
     def remote(self, merge=("i0001-01-01", "i0001-01-02")):
         """origin と、合流して push した親ブランチ。リモートから取得した結果（JSON）の置き場を返す。
 
@@ -1297,7 +1292,7 @@ class TicketTest(unittest.TestCase):
         return fixture
 
     def request(self, fixture, phase="1"):
-        """sh の request と同じ 3 段。prepare → 投稿（承認済みチケットに書く）→ requested。"""
+        """sh の request と同じ 3 段階。prepare → 投稿（承認済みチケットに書く）→ requested。"""
         body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
         prepared = self.ccnavi(
             "--cwd", self.parent_tree, "--phase", phase, "--body-file", body, "review", "prepare"
@@ -1759,7 +1754,7 @@ class TicketTest(unittest.TestCase):
         self.assertFalse(os.path.exists(plan))
 
     def test_accept_plan_runs_the_placing_prechecks_before_the_host_is_touched(self):
-        """置く側の事前検査（続きの子を起こせるか）を計画の段で適用する。通らなければ計画を書かない。
+        """置く側の事前検査（続きの子を起こせるか）を計画の段階で適用する。通らなければ計画を書かない。
 
         計画を書けば sh がホストに返信と解決を書く。そのあとで「置けない」と分かると、
         解決済みのスレッドだけが残る。
@@ -2203,471 +2198,61 @@ class TicketTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0, args)
             self.assertIn(f"unrecognized arguments: {args[0]}", result.stderr, args)
 
-    def test_cli_paths_are_denied_from_the_shell_unless_disabled(self):
+    def test_user_entries_are_denied_from_the_shell_unless_disabled(self):
+        """ユーザの入口（承認・承認の push・ボードの判断・放棄の記録・ターミナル要求を切る形）は、
+        エージェントのシェルから打たせない。保護を切れば適用しない。
+
+        hook を通した経路の代表と、止めた文の要点だけを見る。どの表記を止め、どれを通すかの表
+        （分け書き・展開・glob・流し込み・実行役・PowerShell・大文字小文字）は、ここで打っていた形を集めた
+        Go の見本（`go/internal/hook/judge/testdata/captured.jsonl`）と `useronly` の表が確かめる。
+        """
         self.family()
-        for command in (
-            "ccnavi --agree",
-            "dist/ccnavi/ccnavi.exe --reviewed 1 --accept-unresolved",
-            "uv run python -m ccnavi ticket start i0001-01-01",
-            "ls && ./ccnavi review confirm --phase 1",
-            "ccnavi --close-early --reason x --result r.json",
-            "ccnavi ticket finish i0001-01-01",
-            "ccnavi ticket record-risk i0001-01-01 untested yes --reason x",
-            # 拡張が打つ形（--yes）は、エージェントが打てば止まる（設計 approve-popup 2.3）。
-            "uv run python -m ccnavi --agree --yes i0001,i0001-01-01 --json",
-            "ccnavi --agree --preview --json; ccnavi --agree --yes i0001",
-            # 同じコマンドに --preview を書き足しても、承認そのものは免除しない。
-            "ccnavi --agree --preview --yes i0001 --json",
-            "ccnavi --agree --yes i0001 --preview",
-            # 承認のスクリプトもユーザの経路。中身は --agree と承認済みチケットの push。
-            "sh .ccnavi/scripts/ccnavi-user-agree.sh",
-            # 承認の push の sh もユーザが打つ。push は外へ出す操作で、時機はユーザが決める
-            # （設計 approve-carry 1.6）。
-            "sh .ccnavi/scripts/ccnavi-user-push-approved.sh",
-            "bash /abs/.ccnavi/scripts/ccnavi-user-push-approved.sh",
-            "ls; sh .ccnavi/scripts/ccnavi-user-push-approved.sh",
-        ):
-            result = self.hook(
-                "PreToolUse",
+        review = ".ccnavi/scripts/ccnavi-review.sh"
+        # (道具, コマンド, 止めた文に出る言葉)
+        denied = (
+            ("Bash", "ccnavi --agree", ""),
+            ("Bash", "uv run python -m ccnavi --agree --yes i0001,i0001-01-01 --json", ""),
+            (
                 "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-            if "push-approved" in command:
-                # 止めた理由に、承認の push の sh もユーザが打つことを書く。
-                self.assertIn("ccnavi-user-push-approved.sh", self.reason(result), command)
-        # 読むだけの形と、スクリプト経由は通る。
+                "sh .ccnavi/scripts/ccnavi-user-push-approved.sh",
+                "ccnavi-user-push-approved.sh",
+            ),
+            ("Bash", "sh .ccnavi/scripts/CCNAVI-USER-AGREE.sh", ""),
+            ("Bash", f"sh {review} decide 1 --choices j --digest d", ""),
+            ("Bash", f'sh {review} decide 3 "$C"', "そのまま書く"),
+            ("Bash", "ccnavi worktree $V --abandon P1", "worktree retire --abandon"),
+            ("Bash", "ccnavi --preview $X", "展開を含む語より前に書けば"),
+            ("Bash", 'echo "ccnavi worktree retire --abandon i1" | sh', "標準入力から読むシェル"),
+            (
+                "Bash",
+                "CCNAVI_GUARD_TICKET_APPROVAL=disable uv run -m ccnavi --agree",
+                "ターミナルからの入力を求めないようにする形",
+            ),
+            ("PowerShell", "ccnavi --agree --yes i0001 | findstr --preview", ""),
+        )
+        for tool, command, needle in denied:
+            with self.subTest(command=command):
+                result = self.hook(
+                    "PreToolUse",
+                    tool,
+                    self.parent_tree,
+                    command=command,
+                    guard_ticket_approval="enable",
+                )
+                reason = self.reason(result)
+                self.assertIn("DENY_TICKET_APPROVAL_CLI", reason)
+                self.assertIn(needle, reason)
+                # ボードは Enter まで送るので、ユーザが確かめる前提の文は合わない。
+                self.assertNotIn("ユーザが確かめて実行します", reason)
+        # 読むだけの形と、スクリプト経由の作業は通る。
         for command in (
             "ccnavi --explain",
-            "ccnavi --lint",
             "sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-            # 一覧を見るだけの形は通る。承認は --yes だけで、それは上で止まる。
             "uv run python -m ccnavi --agree --preview --json",
-            "echo --agree --preview",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # PowerShell も同じ。PowerShell は shellread で読めないので生の文字列にヒットする。
-        # 免除の範囲がコマンドをまたぐと、後ろに --preview を書くだけで前の承認が通る。
-        for command in (
-            "& ccnavi.exe --agree",
-            "ccnavi --agree --yes i0001,i0001-01-01 --json; ccnavi --agree --preview",
-            "ccnavi --agree; echo --preview",
-            "ccnavi --agree --yes i0001 | findstr --preview",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "PowerShell",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        result = self.hook(
-            "PreToolUse",
-            "PowerShell",
-            self.parent_tree,
-            command="ccnavi --agree --preview --json",
-            guard_ticket_approval="enable",
-        )
-        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-        # ccnavi の起動でない --yes は適用しない。
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="apt-get install --yes git",
-            guard_ticket_approval="enable",
-        )
-        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-        # 切ると通る。
-        result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --agree")
-        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-
-    def test_board_decisions_are_denied_from_the_shell(self):
-        """ボードで押す形（sh の decide --choices、実行ファイルの --yes）は打たせない。
-
-        実行ファイルの --yes はターミナルを求めないので、名前を変えたコピーで呼ぶ形も止める。
-        """
-        self.family()
-        for command in (
-            'sh .ccnavi/scripts/ccnavi-review.sh decide 1 --choices \'{"u1":"keep"}\' --digest d',
-            "cd x && bash /abs/.ccnavi/scripts/ccnavi-review.sh decide 1 --digest d --choices j",
-            ".ccnavi/scripts/ccnavi-review.sh decide 2 --choices j --digest d",
-            "env sh .ccnavi/scripts/ccnavi-review.sh decide 1 --choices j --digest d",
-            "/tmp/x --reviewed 1 --accept-unresolved --yes j --digest d --json",
-            "./copy --yes i0001 --agree --digest d",
-            # 敵対的レビューで止められずに通った形。読み取り用の道具に似た名前、
-            # 文字列を実行する道具、引数のリスト、変数に入れたサブコマンド、分け書き
-            "/tmp/cat.bin --reviewed 1 --accept-unresolved --yes j --digest d",
-            "awk 'BEGIN{system(\"ccnavi --agree --yes a --digest X\")}'",
-            "awk 'BEGIN{system(\"sh .ccnavi/scripts/ccnavi-review.sh decide 3 --choices X "
-            "--digest Y\")}'",
-            "perl -e 'system(\"ccnavi --reviewed 3 --accept-unresolved --yes X --digest Y\")'",
-            # 打たれる文字列（読み手の Python の名前に意味は無い）
-            'python3 -c "import '
-            "ccnavi.entry.cli as c; "
-            "c.run(0, 0, 0, ['--reviewed', '1', '--yes', '{}'])\"",
-            "S=decide; sh .ccnavi/scripts/ccnavi-review.sh $S 1 --choices x --digest y",
-            "cp .ccnavi/scripts/ccnavi-review.sh /tmp/r.sh; "
-            "sh /tmp/r.sh decide 1 --choices x --digest y",
-            "/tmp/cc --y\"\"es --ag''ree",
-            # コミットの文面でも、コマンド置換の中は実行される
-            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "$(/tmp/cc --agree --yes x)"',
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 見るだけの形と、
-        # ターミナルでユーザが選ぶ形は止めない（後者は実行ファイルがターミナルを求める）。
-        for command in (
-            "sh .ccnavi/scripts/ccnavi-review.sh decide 1 --preview",
-            "sh .ccnavi/scripts/ccnavi-review.sh decide 1",
-            "apt-get install --yes git",
-            "grep -n -- '--agree --yes' README.md",
-            "echo ccnavi --agree --yes x",
-            # コミットの文面は実行されない
-            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "docs: --agree --yes の説明"',
-            "sh .ccnavi/scripts/ccnavi-git.sh commit -m 'CCNAVI_GUARD_TICKET_APPROVAL=x を止める'",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-
-    def test_user_entries_with_unreadable_arguments_are_denied(self):
-        """2 段目の無いユーザの入口は、引数を読み切れなければ止める（ADR-0122）。
-
-        `ccnavi-review.sh decide`（`--choices`）・実行ファイルの`--yes` と
-        `worktree retire --abandon` はターミナルを求めない。
-        引数を変数・置換・glob で組み立てると表記の検査から外れる。
-        """
-        self.family()
-        sync = ".ccnavi/scripts/ccnavi-sync.sh"
-        review = ".ccnavi/scripts/ccnavi-review.sh"
-        launcher = ".ccnavi/scripts/ccnavi-launcher.sh"
-        for command in (
-            # decide --choices を変数・glob で組み立てる
-            f"C=--cho; sh {review} decide 1 ${{C}}ices j --digest d",
-            f"sh {review} decide 1 --cho${{X}}ices j --digest d",
-            f"sh {review} decide 1 --cho* j --digest d",
-            f"sh {review} decide 1 --ch[o]ices j --dig[e]st d",
-            f"sh -x {review} decide 1 --cho${{X}}ices j --digest d",
-            f"sh {review} decide 1 --cho`echo i`ces j --digest d",
-            f'sh -c "sh {review} decide 1 --cho\\${{X}}ices j --digest d"',
-            f"xargs -a args.txt sh {review} decide 1",
-            # worktree retire --abandon を変数・glob で組み立てる
-            "A=--aban; ccnavi worktree retire ${A}don P1",
-            "ccnavi worktree retire --aban${X} P1",
-            "ccnavi worktree retire --a* P1",
-            "ccnavi worktree retire --?bandon P1",
-            "ccnavi worktree $V --abandon P1",
-            "ccnavi worktree re* --abandon P1",
-            "ccnavi worktree re${X} --abandon P1",
-            f"{launcher} worktree $V --abandon P1",
-            "env ccnavi worktree $V --abandon P1",
-            "bash -c 'ccnavi worktree $V --abandon P1'",
-            "printf '%s\\n' --abandon P1 | xargs ccnavi worktree retire",
-            "xargs -a args.txt ccnavi worktree",
-            # 実行ファイルの --agree / --reviewed と --yes を組み立てる
-            "ccnavi --agr${X}ee --y${X}es i1 --digest d",
-            "ccnavi --agr*ee --y* i1 --digest d",
-            "ccnavi --ag[r]ee --y[e]s i1 --digest d",
-            "ccnavi --rev${X}iewed 1 --accept-unresolved --y${X}es j --digest d",
-            f"{launcher} --rev${{X}}iewed 1 --accept-unresolved --y${{X}}es j --digest d",
-            f"busybox sh {launcher} --agr${{X}}ee --yes i1 --digest d",
-            f"sh < /dev/null {launcher} --agr${{X}}ee --yes i1 --digest d",
-            f"xargs -a a.txt {launcher}",
-            "xargs -a a.txt ccnavi",
-            "ccnavi --guard-ticket-appr*val disable --agree",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 値をそのまま書く形と、読むだけ・文字列として出るだけの形は止めない。
-        for command in (
-            f"sh {sync} feature-1-x",
             f"sh {review} decide 1",
-            f"sh {review} decide 1 --preview --json",
-            f'sh {review} request 1 --body-file "$F"',
-            "grep -n -- '--abandon' go/internal/tickets/lifecycle/retire/retire.go",
-            "echo ccnavi worktree $V --abandon",
-            "ccnavi worktree drop P1",
-            "ccnavi worktree tidy P1 --phase 2",
-            "ccnavi sync retired",
-            "sh .ccnavi/scripts/ccnavi-git.sh log --grep 'worktree retire --abandon'",
-            "sh .ccnavi/scripts/ccnavi-git.sh log --grep ccnavi-sync.sh --oneline",
-            "ccnavi --agree --preview --json",
-            f"{launcher} --docs worktree",
-            "ls /home/user | xargs grep -l ccnavi",
-            'sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: worktree retire --aban${X}"',
+            "echo ccnavi --agree --yes x",
         ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 値を変数で渡す形は止まり、文面がそのまま書く道を案内する。
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command=f'sh {review} decide 3 "$C"',
-            guard_ticket_approval="enable",
-        )
-        self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-        self.assertIn("そのまま書く", self.reason(result))
-        # 放棄した親の記録を消す操作を組み立てうる形は、その操作を名指しして止める。
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="ccnavi worktree $V --abandon P1",
-            guard_ticket_approval="enable",
-        )
-        self.assertIn("worktree retire --abandon", self.reason(result))
-        self.assertNotIn("--forget", self.reason(result))
-        # 保護そのものを切っていれば適用しない。
-        result = self.hook(
-            "PreToolUse", "Bash", self.parent_tree, command="ccnavi worktree $V --abandon P1"
-        )
-        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-
-    def test_user_entries_stop_only_forms_that_can_build_the_operation(self):
-        """ユーザの入口は、止める操作を組み立てうるときだけ止める（ADR-0122）。
-
-        読むだけの形（`--preview`、診断のオプションが展開より前にある形）・リダイレクトの行き先・
-        単引用符の中の文字どおりの値は通す。標準入力から読むシェルへ流し込む文字列に
-        入口の名前があれば止める。
-        """
-        self.family()
-        sync = ".ccnavi/scripts/ccnavi-sync.sh"
-        review = ".ccnavi/scripts/ccnavi-review.sh"
-        launcher = ".ccnavi/scripts/ccnavi-launcher.sh"
-        for command in (
-            f"sh {sync} --preview $X",
-            f"sh {review} decide --preview $X",
-            f"sh {review} decide 1 --preview $X",
-            "ccnavi --agree --preview $X",
-            "python3 -m ccnavi --agree --preview $X",
-            f"sh {sync} 2>$LOG",
-            f"sh {sync} > out-$$.txt",
-            f"sh {sync} feature-1-x 2>$LOG",
-            f"sh {review} decide 1 2>$LOG",
-            'python3 -m ccnavi --docs "$Q"',
-            'python3 -m ccnavi --test Bash "$C"',
-            "python3 -m ccnavi --list $X",
-            "ccnavi --json --docs $X",
-            f"sh {launcher} --docs --text '*'",
-            f"sh {launcher} --test Bash '$X'",
-            f"sh {launcher} --test Read '*'",
-            "echo hi | sh",
-            # パス・コメント・引数として出るだけの名前は、実行される語ではない。
-            "cd /home/user/ccnavi && echo ls | sh",
-            "ls /home/user/ccnavi | sh",
-            "echo hi | bash # ccnavi",
-            "printf 'ls\\n' | sh -s -- ccnavi",
-            "uv run ccnavi --docs $X",
-            # sh で起動する入口に単引用で渡した値は、文字どおりの値（実行役を外した層でも）。
-            f"sh {sync} '$X'",
-            f"sh {sync} '*'",
-            f"sh {sync} '$X' P1",
-            f"sh {review} decide 3 '$C'",
-            f"sh {review} decide '$N'",
-            f"sh {review} decide 1 --note '$X'",
-            f"env sh {sync} '$X'",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        for command in (
-            'echo "ccnavi worktree retire --abandon i1" | sh',
-            f"printf 'sh {review} decide 3 --choices x' | bash",
-            'echo "ccnavi worktree retire --abandon P" | sh -s',
-            f"cat {launcher} | sh /dev/stdin worktree retire --abandon P",
-            'echo "ccnavi --agree --yes i1 --digest d" | sh',
-            "sh <<EOF\nccnavi worktree retire --abandon i1\nEOF",
-            'sh <<< "ccnavi worktree retire --abandon i1"',
-            "bash <<< 'ccnavi --agree --yes i1'",
-            "ccnavi --preview $X",
-            "ccnavi $X --docs",
-            "ccnavi -- --docs $X",
-            "ccnavi $X --agree --preview",
-            "ccnavi worktree $E --abandon P",
-            f"sh {review} decide 1 $X",
-            # Python のツールの実行役（uv run・uvx）越しも入口として読む。
-            "uv run ccnavi --agree 3 $Y",
-            "uvx ccnavi --agree 3 $Y",
-            "uv run ccnavi worktree $E --abandon P",
-            # 二重引用と引用なしの展開は、sh 越しでも止める。
-            f'sh {review} decide 3 "$C"',
-            f"sh -c 'sh {review} decide 3 $X'",
-            # 長い旗・値を取る旗を前に置いたシェルと、`env`・`command` 越しのシェルも
-            # 標準入力から読む。
-            *(
-                f'echo "ccnavi worktree retire --abandon i1" | {sh}'
-                for sh in (
-                    "bash --norc",
-                    "bash --posix",
-                    "bash --noprofile",
-                    "bash --rcfile x",
-                    "bash -o pipefail",
-                    "bash -O extglob",
-                    "bash -euo pipefail",
-                    "env sh",
-                    "command sh",
-                )
-            ),
-            # 実行ファイルが受けるオプション（main の `ticket new` が足したオプションを含む）
-            # の後ろの展開。
-            "ccnavi --title t $A",
-            "ccnavi --plan p $A",
-            "ccnavi --issue 1 $A",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 文面は、止めた語が何になりうるかを言う。
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="ccnavi --preview $X",
-            guard_ticket_approval="enable",
-        )
-        self.assertIn("--guard-ticket-approval になりうる", self.reason(result))
-        self.assertIn("展開を含む語より前に書けば", self.reason(result))
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command='echo "ccnavi worktree retire --abandon i1" | sh',
-            guard_ticket_approval="enable",
-        )
-        self.assertIn("標準入力から読むシェル", self.reason(result))
-
-    def test_turning_off_the_terminal_requirement_is_denied(self):
-        """ターミナル要求を切る形は、実行ファイルをどう呼んでいても止める。
-
-        呼ぶ表記（`uv run -m ccnavi`、名前を変えたコピー）は追い切れない。切れなければ、ターミナルを
-        持たないエージェントは実行ファイルの側で止まる。
-        """
-        self.family()
-        for tool, command in (
-            ("Bash", "CCNAVI_GUARD_TICKET_APPROVAL=disable uv run -m ccnavi --agree"),
-            (
-                "Bash",
-                "env CCNAVI_GUARD_TICKET_APPROVAL=disable python -m ccnavi.__main__ --reviewed 1",
-            ),
-            ("Bash", "export CCNAVI_GUARD_TICKET_APPROVAL=disable; /tmp/x --agree"),
-            ("Bash", "bash -c 'CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --agree'"),
-            ("Bash", ": ${CCNAVI_GUARD_TICKET_APPROVAL:=disable}; /tmp/x --agree"),
-            ("Bash", "read CCNAVI_GUARD_TICKET_APPROVAL <<< disable; /tmp/x --agree"),
-            ("Bash", "printf -v CCNAVI_GUARD_TICKET_APPROVAL disable"),
-            ("Bash", "/tmp/x --guard-ticket-approval disable --close-early --reason r"),
-            ("Bash", "/tmp/x --guard-ticket-approval=$v --agree"),
-            ("PowerShell", "$env:CCNAVI_GUARD_TICKET_APPROVAL = 'disable'; ccnavi.exe --agree"),
-            (
-                "PowerShell",
-                "[Environment]::SetEnvironmentVariable('CCNAVI_GUARD_TICKET_APPROVAL','x')",
-            ),
-            ("PowerShell", "Set-Item env:CCNAVI_GUARD_TICKET_APPROVAL disable"),
-            # 敵対的レビューで止められずに通った形。引用と分け書き、言語の中からの設定、名前の参照
-            ("Bash", '/tmp/cc "--guard-ticket-approval" disable --agree'),
-            ("Bash", "/tmp/cc --guard-ticket-''approval disable --agree"),
-            (
-                "Bash",
-                "python3 -c \"import os;os.environ['CCNAVI_GUARD_TICKET_APPROVAL']='disable'\"",
-            ),
-            ("Bash", "declare -n R=CCNAVI_GUARD_TICKET_APPROVAL; R=disable"),
-            ("PowerShell", '${env:CCNAVI_GUARD_TICKET_APPROVAL} = "disable"'),
-            ("PowerShell", "New-Item -Path Env: -Name CCNAVI_GUARD_TICKET_APPROVAL -Value disable"),
-            ("PowerShell", '$psi.EnvironmentVariables["CCNAVI_GUARD_TICKET_APPROVAL"]="disable"'),
-        ):
-            result = self.hook(
-                "PreToolUse",
-                tool,
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-            self.assertIn(
-                "ターミナルからの入力を求めないようにする形", self.reason(result), command
-            )
-        # 読むだけの形と、守る側の値は止めない。
-        for command in (
-            "echo $CCNAVI_GUARD_TICKET_APPROVAL",
-            "echo ${CCNAVI_GUARD_TICKET_APPROVAL}",
-            "grep -rn CCNAVI_GUARD_TICKET_APPROVAL ccnavi",
-            "grep -n -- '--guard-ticket-approval disable' README.md",
-            "uv run -m ccnavi --guard-ticket-approval enable --lint",
-        ):
-            result = self.hook(
-                "PreToolUse",
-                "Bash",
-                self.parent_tree,
-                command=command,
-                guard_ticket_approval="enable",
-            )
-            self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result), command)
-        # 保護そのものを切っていれば適用しない（テストと CI の設定）。
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="CCNAVI_GUARD_TICKET_APPROVAL=disable /tmp/x --agree",
-        )
-        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
-
-    def test_approval_scripts_are_denied_in_any_letter_case(self):
-        """9・10. 止める表記は大文字小文字を区別しない。文面はユーザが確かめる前提を言わない。
-
-        Windows と macOS の既定のファイルシステムは名前の大小を区別しないので、
-        表記を変えただけの sh も同じものが走る。ボードは Enter まで送るので、
-        「ユーザが確かめて実行します」は実際の動きと合わない。
-        """
-        for command in (
-            "sh .ccnavi/scripts/CCNAVI-USER-PUSH-APPROVED.sh",
-            "SH .ccnavi/scripts/ccnavi-user-push-approved.sh",
-            "sh .ccnavi/scripts/CCNAVI-USER-AGREE.sh",
-        ):
-            with self.subTest(command):
+            with self.subTest(command=command):
                 result = self.hook(
                     "PreToolUse",
                     "Bash",
@@ -2675,9 +2260,10 @@ class TicketTest(unittest.TestCase):
                     command=command,
                     guard_ticket_approval="enable",
                 )
-                reason = self.reason(result)
-                self.assertIn("DENY_TICKET_APPROVAL_CLI", reason)
-                self.assertNotIn("ユーザが確かめて実行します", reason)
+                self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
+        # 保護そのものを切っていれば適用しない（テストと CI の設定）。
+        result = self.hook("PreToolUse", "Bash", self.parent_tree, command="ccnavi --agree")
+        self.assertNotIn("DENY_TICKET_APPROVAL_CLI", self.reason(result))
 
     def test_approve_and_reviewed_need_a_terminal_unless_disabled(self):
         self.propose("i0001", allow=("src/*", "wip/*"))
@@ -2970,10 +2556,9 @@ class TicketTest(unittest.TestCase):
              "request", False, "依頼済み", self.then_nothing_was_posted_again),
             ("置き場の外・push 済み", after, self.move_code_pushed,
              "check", False, moved, None),
+            # sha でない head の形（`@`・`-` で始まる値・空）は Go の表
+            # （TestIsSHA・TestMovedDetail）が見る。
             ("置き場の外・head='HEAD'", after, forged("HEAD"), "check", False, None, None),
-            ("置き場の外・head='@'", after, forged("@"), "check", False, None, None),
-            ("置き場の外・head='-P'", after, forged("-P"), "check", False, None, None),
-            ("置き場の外・head=''", after, forged(""), "check", False, None, None),
             ("置き場の外・head='HEAD' で check が止まった後", after,
              self.move_forged_head_then_request_again, "request", True, None, None),
             ("置き場の外から中へ改名", after, self.move_rename_into_the_store,

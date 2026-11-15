@@ -27,7 +27,7 @@ func writeAnswer(stdout io.Writer, v any) { writeJSON(stdout, v, true, 1) }
 // sidewaysOptions は `--handoff`・`--mirror` と一緒に読むオプション（dest）。ほかが既定でなければ断る。先頭の 4 つは
 // ラッパーが付けるもの、`mode` から後ろは設定に重ねる切り替え。
 var sidewaysOptions = map[string]bool{
-	"root": true, "cwd": true, "record_writes": true, "record_tree": true, "mode": true, "restore_if_deny": true,
+	"root": true, "cwd": true, "record_writes": true, "record_tree": true, "record_commit": true, "record_merge": true, "mode": true, "restore_if_deny": true,
 	"guard_core_files": true, "guard_ticket_approval": true, "ticket_control": true, "command": true, "yes": true,
 	"expect": true, "via": true, "json": true,
 }

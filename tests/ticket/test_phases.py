@@ -20,10 +20,16 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import tempfile
 import unittest
 
-from tests import can_case_sensitive, common_path, config_path, userform, write_and_push_flag
+from tests import (
+    can_case_sensitive,
+    common_path,
+    config_path,
+    treecache,
+    userform,
+    write_and_push_flag,
+)
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import ROOT, git, read_json, write
 from tests.ticketsample import PHASES, RULES, child_text, parent_text, record_merge
@@ -40,8 +46,15 @@ class PhaseHarness(unittest.TestCase):
     mark_write_and_push = True
 
     def setUp(self):
-        self.root = tempfile.mkdtemp(prefix="ccnavi-phase-")
-        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.root = treecache.root(self)
+        self.build_tree()
+
+    @treecache.cached
+    def build_tree(self):
+        """リポジトリと親のワークツリーを組み、クラスの前置き（`prepare`）を足す。
+
+        2 度目からは写しを戻す（`tests/treecache.py`）。
+        """
         os.makedirs(os.path.join(self.root, ".claude"))
         git(self.root, "init", "--quiet", "-b", "main")
         write(os.path.join(self.root, "src", "keep.py"), "print(1)\n")
@@ -57,6 +70,10 @@ class PhaseHarness(unittest.TestCase):
         self.parent_tree = self.worktree("i0001", "main")
         # 承認済みチケットとマーカーは親のツリーに置かれ、親のブランチに乗る。
         self.approved = os.path.join(self.parent_tree, ".ccnavi", "approved")
+        self.prepare()
+
+    def prepare(self):
+        """クラスのどのテストも同じところから始める前置き。継ぐクラスが書く（写しに入る）。"""
 
     # ---- 道具
 
@@ -243,6 +260,7 @@ class PhaseHarness(unittest.TestCase):
         ph = next(p for p in owner["phases"] if p["number"] == number)
         return ph["gate_closed"], ph["review_waiting"], sorted(ph["marks"])
 
+    @treecache.cached
     def family(self, plan=("research", "design"), feedback=None):
         """親を提案して承認する。plan の 1 番目の子もまとめて承認する。"""
         self.propose("i0001", parent_text("i0001", list(plan), feedback, copy=self.phases_text))

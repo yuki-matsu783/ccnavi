@@ -118,3 +118,29 @@ test("CX-T249 許可を外す判断: 同じ許可を組み込みや別の行が�
   assert.deepEqual(releasablePatterns(a, HOSTS), ["https://gitlab.example.com/*"]);
   assert.deepEqual(releasablePatterns(a, [...HOSTS, customHost("github", "https://gitlab.example.com")]), []);
 });
+
+test("CX-T262 登録した GHE.com は API が https://api.<ホスト>（GraphQL は /graphql）で、許可は画面と API の origin の両方。ポート付きは登録できない", () => {
+  const h = customHost("github", "https://nri.ghe.com");
+  assert.deepEqual(h, {
+    id: "nri.ghe.com",
+    kind: "github",
+    api: "https://api.nri.ghe.com",
+    graphql: "https://api.nri.ghe.com/graphql",
+    web: "https://nri.ghe.com",
+  });
+  assert.deepEqual(originPatterns(h), ["https://nri.ghe.com/*", "https://api.nri.ghe.com/*"]);
+  assert.throws(() => customHost("github", "https://nri.ghe.com:8443"), /ポート/);
+  // 同じ api の origin を使う別のホストがあれば、その許可は外さない
+  const other = customHost("github", "https://api.nri.ghe.com");
+  assert.deepEqual(releasablePatterns(h, [other]), ["https://nri.ghe.com/*"]);
+});
+
+test("CX-T263 ユーザが明示した種類は自動判定より優先する: GHE.com を GitLab で登録すれば GitLab、未知のホストを GitHub で登録すれば Enterprise Server（/api/v3）", () => {
+  const asGitlab = customHost("gitlab", "https://nri.ghe.com");
+  assert.deepEqual([asGitlab.kind, asGitlab.api, asGitlab.graphql], ["gitlab", "https://nri.ghe.com/api/v4", "https://nri.ghe.com/api/v4"]);
+  const ghes = customHost("github", "https://git.unknown.example");
+  assert.deepEqual([ghes.kind, ghes.api, ghes.graphql], ["github", "https://git.unknown.example/api/v3", "https://git.unknown.example/api/graphql"]);
+  // GHE.com の照合は `.` の区切りで行う（evil な名前は GHE.com の接続先にならない）
+  for (const name of ["evilghe.com", "ghe.com.evil"]) assert.equal(customHost("github", `https://${name}`).api, `https://${name}/api/v3`, name);
+  assert.deepEqual(originPatterns(ghes), ["https://git.unknown.example/*"]);
+});

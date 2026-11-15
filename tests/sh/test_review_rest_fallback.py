@@ -42,14 +42,15 @@ case " $* " in
   exit 0 ;;
 *" --version "*) printf 'compat: {compat}\\n'; exit 0 ;;
 *" write-and-push family "*) printf 'write-and-push 1\\nfamily i0001\\ntarget no\\n'; exit 0 ;;
-*" ops "*) exec '@EXE@' "$@" ;;
+*" ops "* | *" host "*) exec '@EXE@' "$@" ;;
+*" accept plan "* | *" accept threads "* | *" accept decided "*) exec '@EXE@' "$@" ;;
 esac
 prev=""
 for a in "$@"; do
   case "$prev" in
   --result) cp "$a" '{copy}' ;;
   --accept-plan) cp "$STUB_PLAN" "$a" ;;
-  --choose-out) printf '{{"choices": {{}}, "digest": "d"}}\\n' >"$a" ;;
+  --choose-out) printf 'choices {{}}\\ndigest d\\n' >"$a" ;;
   esac
   prev="$a"
 done
@@ -222,7 +223,7 @@ class RestFallbackTest(unittest.TestCase):
                 "review_exe || review_no_bin",
                 "review_host",
                 'mkdir -p "$state"',
-                "eval \"$(sed -n '/^strip_draft() {/,/^}/p;/^undraft() {/,/^}/p'"
+                "eval \"$(sed -n '/^undraft_ask() {/,/^}/p;/^undraft() {/,/^}/p'"
                 ' .ccnavi/scripts/ccnavi-review.sh)"',
                 body,
             ]
@@ -255,6 +256,19 @@ class RestFallbackTest(unittest.TestCase):
         )
 
     def test_when_graphql_is_blocked_rest_builds_the_same_shape(self):
+        """返信が重なったスレッドの last_* は最後のコメント（EXPECTED の 101）。
+
+        diff_hunk を含むコメントが多い MR でも、引数の上限（128KB）に当たらない（別のスレッドの
+        コメントを多く混ぜて渡す）。
+        """
+        big = [
+            comment(1000 + i, "reviewer", "2026-10-02T00:00:00Z", "x" * 500, diff_hunk="y" * 2000)
+            for i in range(120)
+        ]
+        write(
+            self.rest,
+            json.dumps({"review_threads": THREADS, "comments": [*COMMENTS, *big]}),
+        )
         for transport in ("curl", "gh"):
             with self.subTest(transport=transport):
                 done = self.review("fetch", graphql="blocked", transport=transport)
@@ -273,30 +287,6 @@ class RestFallbackTest(unittest.TestCase):
                 )
                 # 失敗の文面（GraphQL の 403）は出さない
                 self.assertNotIn("が失敗した", done.stderr)
-
-    def test_a_reply_on_a_thread_sets_the_last_fields_to_the_last_comment(self):
-        done = self.review("fetch", graphql="blocked")
-        thread = json.loads(done.stdout)["threads"][0]
-        self.assertEqual(
-            (thread["last_id"], thread["last_at"], thread["last_author"]),
-            ("103", "2026-10-01T02:00:00Z", "reviewer"),
-        )
-        # 最初のコメントは変わらない（url・本文・作成の時刻）
-        self.assertEqual(thread["created_at"], "2026-10-01T00:00:00Z")
-
-    def test_a_large_comment_list_does_not_hit_the_argument_limit(self):
-        """diff_hunk を含むコメントが多い MR でも、引数の上限（128KB）に当たらない。"""
-        big = [
-            comment(1000 + i, "reviewer", "2026-10-02T00:00:00Z", "x" * 500, diff_hunk="y" * 2000)
-            for i in range(120)
-        ]
-        write(
-            self.rest,
-            json.dumps({"review_threads": THREADS, "comments": [*COMMENTS, *big]}),
-        )
-        done = self.review("fetch", graphql="blocked")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(json.loads(done.stdout)["threads"], EXPECTED)
 
     def test_a_response_that_is_not_an_array_stops_with_the_hint(self):
         write(self.rest, json.dumps({"review_threads": {"threads": []}, "comments": COMMENTS}))
@@ -320,19 +310,10 @@ class RestFallbackTest(unittest.TestCase):
         return [t["id"] for t in self.result_copy()["threads"] if not t["resolved"]]
 
     def test_confirm_hands_the_threads_and_one_unresolved_thread_stops_it(self):
+        # 解決済みの読み方は test_when_graphql_is_blocked_rest_builds_the_same_shape（201）が見る
         done = self.review("confirm", "--phase", "1", graphql="blocked")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.unresolved(), ["101"])
-
-    def test_confirm_with_every_thread_resolved_has_nothing_unresolved(self):
-        resolved = [{**t, "resolved": True} for t in THREADS]
-        write(
-            self.rest,
-            json.dumps({"review_threads": resolved, "comments": COMMENTS, "draft": True}),
-        )
-        done = self.review("confirm", "--phase", "1", graphql="blocked")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertEqual(self.unresolved(), [])
 
     # ---- 失敗の分け方
 
@@ -353,8 +334,9 @@ class RestFallbackTest(unittest.TestCase):
         self.assertEqual([c for c in self.calls() if "/ccr/" in c], [])
 
     def test_when_rest_fails_too_the_hint_does_not_ask_for_a_json(self):
-        """GraphQL は 403、/ccr/ は 404。案内に、拒否される手順（JSON を作らせる）を書かない。"""
-        for transport in ("curl", "gh"):
+        """GraphQL は 403、/ccr/ は 404。案内に、拒否される手順（JSON を作らせる）を書かず、
+        元の GraphQL の返事を見せる（curl の経路では本文が捨てられ、番号だけが残る）。"""
+        for transport, reply in (("curl", "403"), ("gh", "GraphQL is not available")):
             with self.subTest(transport=transport):
                 done = self.review(
                     "fetch", graphql="blocked", transport=transport, FAKE_GITHUB_NO_CCR="1"
@@ -362,17 +344,10 @@ class RestFallbackTest(unittest.TestCase):
                 self.assertNotEqual(done.returncode, 0)
                 self.assertIn("REST の代わりの道", done.stderr)
                 self.assertIn("が失敗した", done.stderr)
+                self.assertIn("GraphQL の返事:", done.stderr)
+                self.assertIn(reply, done.stderr)
                 for word in ("--result", "JSON", "MCP"):
                     self.assertNotIn(word, done.stderr)
-
-    def test_the_original_graphql_reply_is_shown_when_rest_fails_too(self):
-        done = self.review("fetch", graphql="blocked", transport="gh", FAKE_GITHUB_NO_CCR="1")
-        self.assertIn("GraphQL の返事:", done.stderr)
-        self.assertIn("GraphQL is not available", done.stderr)
-        # curl の経路では本文が捨てられ、番号だけが残る
-        done = self.review("fetch", graphql="blocked", FAKE_GITHUB_NO_CCR="1")
-        self.assertIn("GraphQL の返事:", done.stderr)
-        self.assertIn("403", done.stderr)
 
     # ---- undraft
 
@@ -426,8 +401,15 @@ class RestFallbackTest(unittest.TestCase):
             phase=1,
             mr=42,
             shown=[
-                {"key": f"k{i}", "id": i, "url": f"k{i}", "path": "a.py", "line": 3,
-                 "version": "v1", "body": "指摘の本文"}
+                {
+                    "key": f"k{i}",
+                    "id": i,
+                    "url": f"k{i}",
+                    "path": "a.py",
+                    "line": 3,
+                    "version": "v1",
+                    "body": "指摘の本文",
+                }
                 for i in ids
             ],
             choices={f"k{i}": "keep" for i in ids},

@@ -11,8 +11,7 @@ import (
 	"testing"
 )
 
-// 出力の行頭の `次: ` を、文字列リテラルで直に組み立てるコードを増やさない（tests/core/test_next_line_literal.py の
-// Go 版）。`次:` の文は文面ファイル（.ccnavi/messages/next-*.yml）に置いて Say で引く（.agents/docs/message-files.md）。
+// 出力の行頭の `次: ` を、文字列リテラルで直に組み立てるコードを増やさない。`次:` の文は文面ファイル（.ccnavi/messages/next-*.yml）に置いて Say で引く（.agents/docs/message-files.md）。
 // 数えるのは、値が `次: ` で始まって続きがあるリテラルと、途中の改行の直後に `次: ` があるリテラル。
 // NextLabel のような見出しだけの値（比較や組み立ての部品）は数えない。_test.go は見ない。
 func TestNoLiteralNextLines(t *testing.T) {

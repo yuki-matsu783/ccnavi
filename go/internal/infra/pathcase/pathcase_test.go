@@ -28,6 +28,21 @@ func TestHasExt(t *testing.T) {
 	}
 }
 
+func TestSameName(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want bool
+	}{
+		{"main", "Main", true},
+		{"i0001-が", "I0001-\u304b\u3099", true}, // NFC と NFD
+		{"main", "mai", false},
+	} {
+		if got := SameName(c.a, c.b); got != c.want {
+			t.Errorf("SameName(%q, %q) = %v", c.a, c.b, got)
+		}
+	}
+}
+
 func TestSameNorm(t *testing.T) {
 	cases := []struct {
 		a, b string
@@ -82,6 +97,11 @@ func TestUnder(t *testing.T) {
 		{filepath.Join(base, "..", "x"), "", false},
 		{base + "x", "", false},
 		{filepath.Join(string(filepath.Separator)+"ws", "STRASSE", "Straße"), "", false},
+		// 綴りのままの "." と ".."（呼び手が組んだままのパス）は解いてから比べる
+		{base + string(filepath.Separator) + "sub" + string(filepath.Separator) + ".." + string(filepath.Separator) + "r.md", "r.md", true},
+		{base + string(filepath.Separator) + "." + string(filepath.Separator) + "r.md", "r.md", true},
+		{base + string(filepath.Separator) + ".." + string(filepath.Separator) + "escaped.md", "", false},
+		{base + string(filepath.Separator) + ".." + string(filepath.Separator) + "Tree" + "X" + string(filepath.Separator) + "r.md", "", false},
 	} {
 		rel, ok := Under(c.path, base)
 		if rel != c.rel || ok != c.ok {

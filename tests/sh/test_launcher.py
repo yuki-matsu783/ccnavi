@@ -119,7 +119,7 @@ class LauncherTest(unittest.TestCase):
         self.assertTrue(result.stdout.startswith("bin/linux-x86_64/"), result.stdout)
 
     def test_finds_the_bin_from_relative_spellings(self):
-        """`$0` にディレクトリの部分が無い（`here=.`）ときも、1 段上の `bin/` を探す。"""
+        """`$0` にディレクトリの部分が無い（`here=.`）ときも、1 つ上の `bin/` を探す。"""
         self.pretend("Linux x86_64")
         self.build("linux-x86_64")
         cases = (

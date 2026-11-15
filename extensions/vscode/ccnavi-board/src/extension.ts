@@ -50,7 +50,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("ccnaviBoard.tourBasics", runBasicTours),
     vscode.commands.registerCommand("ccnaviBoard.tourProjects", () => runScreenTour("projects")),
     vscode.commands.registerCommand("ccnaviBoard.tourBoard", () => runScreenTour("board")),
-    // 親の識別子を引数で受けて開く（キーバインドのargsや、ほかの拡張のexecuteCommandから）。開く親を選ぶ段が
+    // 親の識別子を引数で受けて開く（キーバインドのargsや、ほかの拡張のexecuteCommandから）。開く親を選ぶ段階が
     // 無いので、コマンドパレットには出さない（package.jsonのmenus.commandPaletteでwhen: false）
     vscode.commands.registerCommand("ccnaviBoard.openWorkflow", (ticket: unknown) => void screens().workflow(String(ticket ?? ""))),
     // バグ報告。撮る・終えるは報告の間だけコマンドパレットに出す（package.jsonのwhen）

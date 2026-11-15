@@ -239,19 +239,19 @@ diagrams:
       - id: too-deep
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/の下だが、直下ではなく1段深い。別枠に出る
+        text: projects/の下だが、直下ではなく1階層深い。別枠に出る
         value: |-
           projects/team/api/.git
           projects/ の直下ではなく、その下の階層にあります。…
       - id: second
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/の外でも、2段目までなら別枠に出る
+        text: projects/の外でも、2階層目までなら別枠に出る
         value: tools/vendor/.git
       - id: too-far
         from: ワークスペースのフォルダ
         to: プロジェクト管理画面
-        text: projects/の外の3段目は、探さない。別枠に出ない
+        text: projects/の外の3階層目は、探さない。別枠に出ない
         value: tools/vendor/lib/.git
       - id: skipped
         from: ワークスペースのフォルダ

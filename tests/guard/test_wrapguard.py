@@ -1,12 +1,12 @@
 """保護済みの sh を呼ぶ形のうち、実行前に止める 2 つ（Go の hook/shellguard）。
 
-止める・通すの判定は hook が持ち、sh の検査は 2 重目の確認にする。
+止める・通すの判定は hook が持ち、sh の検査は 2 つ目の確認にする。
 
 1. sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形
 2. 子チケットのワークツリーからの `ccnavi-git.sh push`。親エージェントが打っても止める
 
 見本の表（CHILD_CASES）は、コピーする版の `ccnavi-git.sh` にも同じものを渡して、sh の検査が
-2 重目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
+2 つ目として同じく止めることを確かめる（test_sh_agrees）。hook と sh の検査は同じことを
 別の実装で持つので、食い違いはこの表で見つける。
 """
 
@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh
+from tests import GIT_ENV, ROOT, SH_SCRIPTS, common_path, common_sh, exe
 from tests.inproc import run_ccnavi
 
 GIT = ["sh", "../../../.ccnavi/scripts/ccnavi-git.sh"]
@@ -79,6 +79,8 @@ class EnvHookTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -192,6 +194,8 @@ class ChildPushTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -305,6 +309,8 @@ class SubagentParentTreeTest(unittest.TestCase):
             payload["agent_id"] = agent
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -416,68 +422,27 @@ class SubagentParentTreeTest(unittest.TestCase):
         self.assertFalse(self.denied(reason), reason)
 
     def test_a_subagent_cannot_write_into_the_parent_tree_from_the_shell(self):
-        # Bash からの書き込みも、行き先が親のワークツリーなら止める。
+        # Bash からの書き込みも、行き先が親のワークツリーなら止める。書き込みの形ごとの
+        # 止める・通すは Go（hook/shellguard の TestParentTreeShellTable）が見る。
+        # ここでは hook を通した代表だけ。
         parent = self.trees["i0001"]
         child = self.trees["i0001-01-01"]
         x = os.path.join(parent, "src", "x.py")
-        for command in (
-            f"echo hi > {x}",
-            f"echo hi >> {x}",
-            "cd ../i0001 && echo hi > src/x.py",
-            f"cd {parent} && printf x >src/x.py",
-            f"sed -i s/a/b/ {x}",
-            f"sed -i.bak -e s/a/b/ {x}",
-            f"cp /etc/hosts {x}",
-            f"cp -t {parent}/src /etc/hosts",
-            f"mv {x} /tmp/x.py",
-            f"tee {x} < /dev/null",
-            f"echo x | tee -a {x}",
-            f"touch {x}",
-            f"rm -f {x}",
-            f"dd if=/dev/zero of={x} count=1",
-            f"env -C {parent} touch src/x.py",
-            # インタプリタに渡したコード。親のパスと書き込みを疑う語が並べば止める。
-            f"python3 -c \"open('{x}','w').write('x')\"",
-            f"node -e \"require('fs').writeFileSync('{x}','x')\"",
-            f"perl -e 'open F, \">{x}\"'",
-            "python3 -c \"open('../i0001/src/x.py','w')\"",
-            f"cd {parent} && python3 -c \"open('x','w')\"",
-            f"sh -c 'echo hi > {x}'",
-        ):
-            with self.subTest(command=command):
-                reason = self.hook(child, command)
-                self.assertTrue(self.denied(reason), reason)
-                self.assertNotIn("ccnavi-git.sh write", reason)
+        reason = self.hook(child, f"echo hi > {x}")
+        self.assertTrue(self.denied(reason), reason)
+        self.assertNotIn("ccnavi-git.sh write", reason)
         # 居場所の読めない cd の後の相対の書き込みは、どのツリーか決まらないので止める。
         reason = self.hook(child, 'cd "$X" && echo hi > out.txt')
         self.assertTrue(self.denied(reason), reason)
         self.assertIn("読めない", reason)
 
     def test_shell_writes_that_stay_out_of_the_parent_tree_pass(self):
-        # 誤って止めないこと: 子のワークツリーへの書き込み、fd の複製と /dev/null、下書きの置き場、
-        # 親のパスを読むだけのコード、メインのエージェント。
+        # 子のワークツリーへの書き込みと、メインのエージェント。
         parent = self.trees["i0001"]
         child = self.trees["i0001-01-01"]
         x = os.path.join(parent, "src", "x.py")
-        for command in (
-            "echo hi > src/x.py",
-            f"echo hi > {child}/src/x.py",
-            "cd ../i0001-01-01 && sed -i s/a/b/ src/x.py",
-            f"cat {x} > src/x.py",
-            f"cp {x} src/x.py",
-            "make test 2>&1 | tail -3",
-            "ls >/dev/null 2>&1",
-            f"cd {parent} && cat src/x.py 2>&1",
-            f"cd {parent} && grep -rn a src >/dev/null",
-            f"echo note > {parent}/wip/handoff/n.md",
-            f"cp /tmp/f.yml {parent}/wip/proposals/flows/x.yml",
-            f"python3 -c \"print(open('{x}').read())\"",
-            "python3 -c \"open('out.txt','w').write('x')\"",
-            f"diff {x} src/x.py > /tmp/d.txt",
-        ):
-            with self.subTest(command=command):
-                reason = self.hook(child, command)
-                self.assertFalse(self.denied(reason), reason)
+        reason = self.hook(child, f"cp {x} src/x.py")
+        self.assertFalse(self.denied(reason), reason)
         reason = self.hook(child, f"echo hi > {x}", agent="")
         self.assertFalse(self.denied(reason), reason)
 
@@ -521,7 +486,7 @@ class SubagentParentTreeTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class ShAgreesTest(unittest.TestCase):
-    """同じ見本をコピーする版の sh にも渡し、2 重目として同じく止めることを確かめる。
+    """同じ見本をコピーする版の sh にも渡し、2 つ目として同じく止めることを確かめる。
 
     `CCNAVI_SH_DIR` で sh の置き場を差し替えられる（コピーする版は wip/design/scripts/）。
     """
@@ -567,6 +532,8 @@ class ShAgreesTest(unittest.TestCase):
     def run_sh(self, cwd, sub):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -626,6 +593,8 @@ class ShAgreesTest(unittest.TestCase):
         write(os.path.join(parent, "only-in-parent.txt"), "x\n")
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -736,6 +705,8 @@ class CorePathTest(unittest.TestCase):
         }
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -754,7 +725,10 @@ class CorePathTest(unittest.TestCase):
         return out.get("permissionDecision", ""), out.get("permissionDecisionReason") or ""
 
     def test_table(self):
-        for args, stops in CORE_CASES:
+        # 止める・通すの表（CORE_CASES・居場所の移動・読み切れない形・レビュー待ちの置き場）は
+        # Go（hook/shellguard の TestCorePathsCommandTable）が見る。ここでは、allow のルールより先に
+        # 止めることと、止めない形がルールまで届くことを hook で見る。
+        for args, stops in (("rm .claude/settings.json", True), ("rm src/a.py", False)):
             with self.subTest(args=args):
                 decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh " + args)
                 if stops:
@@ -774,35 +748,13 @@ class CorePathTest(unittest.TestCase):
         self.assertIn(f"{os.path.realpath(self.root)}/.ccnavi/scripts/ccnavi-git.sh", reason)
         self.assertIn("restore --ours", reason)
 
-    def test_follows_cd(self):
-        # 居場所から解いたパスで見る。
-        for command, stops in (
-            ("cd .ccnavi && sh scripts/ccnavi-git.sh rm scripts/ccnavi-git.sh", True),
-            ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- ..", True),
-            ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh rm ../.claude/settings.json", True),
-            ("cd src && sh ../.ccnavi/scripts/ccnavi-git.sh rm a.py", False),
-            # 居場所が読めない。上へ出る語はヒットする先を決められない。
-            ('cd "$X" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm ../a.py', True),
-        ):
-            with self.subTest(command=command):
-                decision, _ = self.hook(command)
-                self.assertEqual(decision == "deny", stops, command)
-
     def test_hook_only_forms(self):
         """sh が別の理由で断る形と、sh が通してユーザに任せる形も、
-        hook はエージェントから止める。
+        hook はエージェントから止める。形ごとの止めは Go の表が見る。ここでは文面の違いを見る。
         """
         for args, kind_text in (
-            # 長いオプションの省略形（sh は省略形を断る）。
-            ("restore --sou=HEAD~1 .claude/settings.json", "ccnavi 自身を守る場所"),
-            ("restore --so HEAD~1 .claude/settings.json", "ccnavi 自身を守る場所"),
-            ("rm --pathspec-from-fi=list.txt", "ccnavi 自身を守る場所"),
             # 索引の中身に戻す checkout（sh は restore を案内して断る）。文面も restore を案内する。
             ("checkout -- .ccnavi/config/common/rules.yml", "restore <パス>"),
-            # `--no-dry-run`（省略形も）が後ろにあれば消す形。git は後に書いたほうを採る
-            # （sh は `--no-dry-run` を許可リストで断る）。
-            ("rm --dry-run --no-dry-run .claude/settings.json", "ccnavi 自身を守る場所"),
-            ("rm -n --no-dry .claude/settings.json", "ccnavi 自身を守る場所"),
             # レビュー済みのマーカーを消すのはユーザがターミナルで打つ手順（sh は通す）。
             ("rm .ccnavi/approved/phases/i0001/1.reviewed", "ユーザに依頼"),
         ):
@@ -828,42 +780,12 @@ class CorePathTest(unittest.TestCase):
 
     def test_review_place(self):
         """レビュー待ちの置き場（wip/proposals/review/）は、承認済みチケットの置き場と同じく
-        エージェントのラッパーの呼び出しを止める。置き場の親を丸ごと消す形もヒットする。"""
-        target = os.path.join(self.root, "wip", "proposals", "review", "i0002.md")
-        for command, stops in (
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/proposals/review/i0002.md", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/proposals/review", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm --cached wip/proposals/review/i0002.md", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/proposals/", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm 'wip/*'", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm WIP/Proposals/Review/i0002.md", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh mv wip/proposals/review/i0002.md wip/x.md", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh restore --source=HEAD~1 wip/proposals/review", True),
-            (
-                "sh .ccnavi/scripts/ccnavi-git.sh checkout HEAD~1 wip/proposals/review/i0002.md",
-                True,
-            ),
-            ("cd wip/proposals && sh ../../.ccnavi/scripts/ccnavi-git.sh rm review/i0002.md", True),
-            ("cd wip && sh ../.ccnavi/scripts/ccnavi-git.sh rm -r proposals", True),
-            (f"sh .ccnavi/scripts/ccnavi-git.sh rm {target}", True),
-            # 下書きの置き場と、何も消さない・索引に戻す形は通す。
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip/handoff", False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm wip/handoff/a.md", False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm -n wip/proposals/review/i0002.md", False),
-            (
-                "sh .ccnavi/scripts/ccnavi-git.sh restore --staged wip/proposals/review/i0002.md",
-                False,
-            ),
-            ("sh .ccnavi/scripts/ccnavi-git.sh add wip/proposals/review/i0002.md", False),
-        ):
-            with self.subTest(command=command):
-                decision, reason = self.hook(command)
-                self.assertEqual(decision == "deny", stops, reason)
-                if stops:
-                    self.assertIn(CODE_CORE_PATH, reason)
-                    self.assertIn("レビュー待ち", reason)
-                    self.assertIn("ユーザに依頼", reason)
+        エージェントのラッパーの呼び出しを止める。形ごとの止める・通すは Go の表が見る。"""
+        decision, reason = self.hook("sh .ccnavi/scripts/ccnavi-git.sh rm -r wip")
+        self.assertEqual(decision, "deny", reason)
+        self.assertIn(CODE_CORE_PATH, reason)
+        self.assertIn("レビュー待ち", reason)
+        self.assertIn("ユーザに依頼", reason)
 
     def test_parent_of_an_empty_review_place(self):
         """親を閉じた後の案内（ops._close_parent の `rm -r wip`）は、レビュー待ちが空なら通す。"""
@@ -893,60 +815,15 @@ class CorePathTest(unittest.TestCase):
         self.assertEqual(decision, "", reason)
 
     def test_unreadable_targets_stop(self):
-        """対象を読み切れない形は、共通ルールの allow に落とさずに止める。"""
-        for command, stops in (
-            ("X=.ccnavi; sh .ccnavi/scripts/ccnavi-git.sh rm -r $X", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh rm $(printf .ccnavi/rules.yml)", True),
-            ("pushd .ccnavi && sh scripts/ccnavi-git.sh rm rules.yml", True),
-            ('cd "$D" && sh /x/.ccnavi/scripts/ccnavi-git.sh rm a.py', True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh restore --source=HEAD -- $P", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B .ccnavi/config/common/rules.yml", True),
-            # 起点だけを変数で渡す形と、索引に戻す形は、対象が読めるので通す。
-            ("sh .ccnavi/scripts/ccnavi-git.sh restore --source $R src/a.py", False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh checkout $B", False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh restore $P", False),
-            # サブコマンドが文字どおりの語でない（変数・置換・glob）。
-            ("S=rm; sh .ccnavi/scripts/ccnavi-git.sh $S .ccnavi/approved/t/r", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh ${S:-rm} .ccnavi/approved/t/r", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh $(echo rm) .ccnavi/approved/t/r", True),
-            ("sh .ccnavi/scripts/ccnavi-git.sh r? .ccnavi/approved/t/r", True),
-            # 標準入力から読むシェルに流す文字列の中の呼び出し。
-            ("echo 'sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/approved/t/r' | sh", True),
-            ("echo 'sh .ccnavi/scripts/ccnavi-git.sh status; rm -rf .ccnavi' | sh", True),
-            # 長いオプション・値を取るオプションを前に置いたシェルと、`env`・`command`
-            # 越しのシェルも読む。
-            *(
-                (
-                    f"echo 'sh .ccnavi/scripts/ccnavi-git.sh rm wip/proposals/review/i0002.md'"
-                    f" | {sh}",
-                    True,
-                )
-                for sh in (
-                    "bash --norc",
-                    "bash --posix",
-                    "bash --noprofile",
-                    "bash --rcfile x",
-                    "bash -o pipefail",
-                    "bash -O extglob",
-                    "bash -euo pipefail",
-                    "env sh",
-                    "env -i FOO=1 bash",
-                    "command sh",
-                )
-            ),
-            # 走査が読み切れず、ラッパーの名前の後ろに文字どおりのサブコマンドが無い。
-            ("echo rm .ccnavi/approved/t/r | xargs sh .ccnavi/scripts/ccnavi-git.sh", True),
-            ("xargs -a f sh .ccnavi/scripts/ccnavi-git.sh", True),
-            # 直接の呼び出しは通す。
-            ('sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: $X"', False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh diff $F", False),
-            ("sh .ccnavi/scripts/ccnavi-git.sh status", False),
-        ):
-            with self.subTest(command=command):
-                decision, reason = self.hook(command)
-                self.assertEqual(decision == "deny", stops, reason)
-                if stops:
-                    self.assertIn(CODE_CORE_PATH, reason)
+        """対象を読み切れない形は、共通ルールの allow に落とさずに止める。
+
+        形ごとの止める・通すは Go の表が見る。
+        """
+        decision, reason = self.hook(
+            "echo 'sh .ccnavi/scripts/ccnavi-git.sh rm .ccnavi/approved/t/r' | sh"
+        )
+        self.assertEqual(decision, "deny", reason)
+        self.assertIn(CODE_CORE_PATH, reason)
 
     def test_restore_from_a_list_without_source(self):
         # 索引の中身に戻すだけなら、パスをファイルから読む形もここでは止めない。
@@ -954,11 +831,6 @@ class CorePathTest(unittest.TestCase):
             "sh .ccnavi/scripts/ccnavi-git.sh restore --pathspec-from-file=list.txt"
         )
         self.assertNotIn(CODE_CORE_PATH, reason)
-
-    def test_absolute_path(self):
-        target = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
-        decision, _ = self.hook(f"sh .ccnavi/scripts/ccnavi-git.sh rm {target}")
-        self.assertEqual(decision, "deny")
 
     def test_turned_off_with_the_core_files_guard(self):
         decision, reason = self.hook(
@@ -970,7 +842,7 @@ class CorePathTest(unittest.TestCase):
 
 @unittest.skipIf(shutil.which("git") is None, "git が無い")
 class CorePathShAgreesTest(unittest.TestCase):
-    """同じ見本を sh にも渡し、2 重目として同じく止めることを確かめる。"""
+    """同じ見本を sh にも渡し、2 つ目として同じく止めることを確かめる。"""
 
     SH_DIR = ShAgreesTest.SH_DIR
 
@@ -1000,6 +872,8 @@ class CorePathShAgreesTest(unittest.TestCase):
     def run_sh(self, args):
         env = {
             **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
+            # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
+            "CCNAVI_ENTRY_PATH": exe.sh_path(),
             "CCNAVI_LEARNING": "disable",
         }
         env.pop("CLAUDE_PROJECT_DIR", None)
@@ -1007,18 +881,19 @@ class CorePathShAgreesTest(unittest.TestCase):
         env["PWD"] = self.root
         script = os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-git.sh")
         # 消した形は試すたびに戻す（--dry-run は自己防衛の検査を通るので、本当に打つ）。
-        try:
-            return subprocess.run(
-                ["sh", script, *args.split()],
-                cwd=self.root,
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-        finally:
+        # sh が断った形（終了コード 2）は git を打つ前に止まるので、戻すものが無い。
+        result = subprocess.run(
+            ["sh", script, *args.split()],
+            cwd=self.root,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 2:
             subprocess.run(
                 ["git", "reset", "-q", "--hard"], cwd=self.root, env=env, capture_output=True
             )
+        return result
 
     def test_sh_agrees(self):
         for args, stops in CORE_CASES:
@@ -1041,7 +916,7 @@ class CorePathShAgreesTest(unittest.TestCase):
     def test_review_place_is_left_to_the_user(self):
         """レビュー待ちの置き場の `rm` は sh では止めない
         （ユーザがターミナルで打つ手順を塞がない）。
-        過去の中身に戻す形は、前からの置き場の検査（store_hit）が止める。"""
+        過去の中身に戻す形は、置き場の検査（ccnavi git check の StoreHit）が止める。"""
         for args in ("rm wip/proposals/review/i0002.md", "rm -r wip"):
             with self.subTest(args=args):
                 result = self.run_sh(args)

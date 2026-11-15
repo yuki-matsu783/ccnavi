@@ -69,7 +69,7 @@ src/
     handoffmodel.ts   user handoff --json の出力（見るだけ・取り込み。対象外の名前と理由 `ignored_paths` は形が正しいときだけ読み、無ければ件数だけ）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・ターミナルのコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
     handoff-import.ts 取り込みの手順（錠を取り直す → 選んだパスを指して見るだけをもう一度呼び expect を取る → entry_sha を見せたものと比べる → 取り込む）と defense のターミナルの案内。実行ファイルの呼び出しは HandoffDeps として受け取る（試験で差し替える）
     handoff-render.ts 取り込み待ちの入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の段の数え方と注意。正しいかは決めない（描けないときだけ断る）
+    flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の階層の数え方と注意。正しいかは決めない（描けないときだけ断る）
     flow-view.ts      フロー編集の拡張ホストと画面の契約（見せる形 FlowPage / FlowData、押した操作 FlowMessage とその形の確認、錠を実行ファイルの答えから引く flowTargetOf、カードのボタンの言葉、エージェントへの依頼のボタンの言葉と依頼の文）
     workflow-view.ts  計画編集の拡張ホストと画面の契約（見せる形 WorkflowPage / WorkflowData、押した操作 WorkflowMessage とその形の確認、--order の形の確認）と、答えを画面の状態に整える純関数（線を元の番号の先行に戻す、未保存、番号の変わるステップ、外で変わった差分、保存できない理由）。パネルの決めごとのうち VS Code に触れないもの（無くなった理由、閉じた後に戻すかを聞くか、保存で覚えるハッシュ）も。番号は振り直さない
     workflow-render.ts 計画編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
@@ -242,7 +242,7 @@ src/
     rules/text.ts     要約の文・絞り込みが適用する文字列・件数の出し方
 media/
   icon.svg            アクティビティバーのアイコン
-  tour/*.md           左パネルの案内（ウォークスルー）の各段の本文（panel・projects・board・basics・more）
+  tour/*.md           左パネルの案内（ウォークスルー）の各ステップの本文（panel・projects・board・basics・more）
 test/
   fixtures/board.json 実行ファイルの出力の実例。Python 側の tests/ticket/test_board.py が書き出す
   fixtures/test.json, expectations.json  --test --json / --test-expectations --json の実例。tests/core/test_test_json.py が書き出す

@@ -8,10 +8,10 @@ import (
 	"ccnavi/internal/infra/pathcase"
 )
 
-// 溜める段（承認の plan）。Staging の間、書き込みの関数はディスクに書かずに Op を溜め、
+// 溜める段階（承認の plan）。Staging の間、書き込みの関数はディスクに書かずに Op を溜め、
 // 読みの関数（ReadText・ReadBytes・ReadJSON・Exists・Lexists・Listdir・LoadSource）は溜めた中身を先に見る。
 // 何をどの順に書くかが値として出るので、手元の Writer(FS) はそれを Apply で書き、Chrome は同じ値を
-// 1 コミットにする。溜める段では書き込みが失敗しないので、失敗したときの扱いは Policy で前もって付ける。
+// 1 コミットにする。溜める段階では書き込みが失敗しないので、失敗したときの扱いは Policy で前もって付ける。
 
 // FailMode は書けなかったときの扱い。
 type FailMode string
@@ -99,7 +99,7 @@ func (op *Op) ItemGroup() int { return op.Policy.Group }
 const moveTargetExists = "移動先に既にある"
 
 // Apply は溜めた書き込みをディスクに書く（Writer(FS)）。書けたら空文字、駄目なら理由。
-// 溜める段の外で呼ぶ。テキストはディスクの改行（NativeNewline なら機械の改行）で書く。
+// 溜める段階の外で呼ぶ。テキストはディスクの改行（NativeNewline なら機械の改行）で書く。
 func (op *Op) Apply() string {
 	switch op.kind {
 	case opRemove:
@@ -241,8 +241,8 @@ var (
 	policy  = DefaultPolicy()
 )
 
-// errNestedStaging は溜める段の中で溜める段を始めようとした。
-var errNestedStaging = errors.New("溜める段は入れ子にしない")
+// errNestedStaging は溜める段階の中で溜める段階を始めようとした。
+var errNestedStaging = errors.New("溜める段階は入れ子にしない")
 
 // Staging は、返した関数を呼ぶまでの書き込みをディスクに書かずに溜める。入れ子にはしない。
 func Staging() (*Stage, func(), error) {
@@ -254,7 +254,7 @@ func Staging() (*Stage, func(), error) {
 	return stage, func() { current = nil }, nil
 }
 
-// CurrentStage は溜めている段。溜めていなければ nil。
+// CurrentStage は溜めている段階。溜めていなければ nil。
 func CurrentStage() *Stage {
 	return current
 }
@@ -270,8 +270,8 @@ func SetPolicy(change func(*Policy)) (restore func()) {
 	return func() { policy = before }
 }
 
-// stagedContent は溜める段で見えるパスの中身。staged が false なら溜める段はそのパスを知らない。
-// ok が false なら溜める段で消したもの。
+// stagedContent は溜める段階で見えるパスの中身。staged が false なら溜める段階はそのパスを知らない。
+// ok が false なら溜める段階で消したもの。
 func stagedContent(path string) (content []byte, staged, ok bool) {
 	if current == nil {
 		return nil, false, false

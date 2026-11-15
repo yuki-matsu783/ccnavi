@@ -107,20 +107,13 @@ class InstallTest(Env):
 
     # ---- 配布元の決め方
 
-    def test_from_directly_and_one_level_down(self):
-        done = self.install("--from", self.src, "--check")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+    def test_from_one_level_down(self):
         parent = os.path.join(self.tmpdir, "parent")
         os.makedirs(parent)
         inner = self.make_src(os.path.join(parent, "pkg"))
-        self.calls_reset()
         done = self.install("--from", parent, "--check")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.setup_calls()[0][:3], [self.ws, "--deploy", inner])
-
-    def calls_reset(self) -> None:
-        if os.path.exists(self.calls):
-            os.remove(self.calls)
 
     def test_two_candidates_one_level_down_is_3(self):
         parent = os.path.join(self.tmpdir, "parent")
@@ -189,17 +182,18 @@ class InstallTest(Env):
 
     # ---- --check と配布元
 
-    def test_check_does_not_change_the_source(self):
+    def test_check_run(self):
+        """--check の通しの代表。配布元を直に指し、enable でも Claude Code の外なら進み、
+        配布元を変えず、資格情報を出さない。"""
+        self.write_settings("settings.json", '{"env":{"CCNAVI_MODE":"enable"}}')
         before = snapshot(self.src)
         done = self.install("--from", self.src, "--check")
-        self.assertEqual(done.returncode, 0)
-        self.assertEqual(snapshot(self.src), before)
-
-    def test_real_run_does_not_change_the_source_either(self):
-        before = snapshot(self.src)
-        done = self.install("--from", self.src, "--force", "--clear-quarantine")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.one_next(done)
+        self.assertIn("すでに揃っている", done.stdout)
+        self.assertEqual(self.setup_calls()[0][:3], [self.ws, "--deploy", self.src])
         self.assertEqual(snapshot(self.src), before)
+        self.assertNotIn("tok", done.stdout + done.stderr)
 
     # ---- doctor との関係
 
@@ -210,14 +204,6 @@ class InstallTest(Env):
         self.assertEqual(self.setup_calls(), [])
         self.one_next(done)
         self.assertIn("check: git ng not-installed", done.stdout)
-
-    def test_todo_only_goes_on(self):
-        done = self.install("--from", self.src)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertIn("check: glab todo not-installed", done.stdout)
-        self.assertEqual(len(self.setup_calls()), 1)
-        self.one_next(done)
-        self.assertIn("案内: glab が todo（not-installed）", done.stdout)
 
     def test_only_five_options_reach_setup(self):
         done = self.install(
@@ -231,31 +217,55 @@ class InstallTest(Env):
         want += ["--force", "--no-vscode", "--no-fetch", "--no-idle", "--check"]
         self.assertEqual(got, want)
 
-    def test_plain_real_run_passes_only_ws_and_deploy(self):
+    def test_plain_real_run(self):
+        """本番の通しの代表。todo だけなら進み、setup には作業場と --deploy だけを渡し、
+        入った実行ファイルだけに実行の権限を付け、lint を打ち、拡張の案内を出し、
+        --force なしではバックアップを取らず、配布元を変えない。"""
+        self.prepare_installed()
+        with open(os.path.join(self.src, "dist", "ccnavi-board-1.0.0.vsix"), "wb") as f:
+            f.write(b"x")
+        chrome = os.path.join(self.src, "extensions", "chrome", "ccnavi-approval", "dist")
+        os.makedirs(chrome)
+        with open(os.path.join(chrome, "manifest.json"), "w", encoding="utf-8") as f:
+            f.write("{}")
+        before = snapshot(self.src)
         done = self.install("--from", self.src)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("check: glab todo not-installed", done.stdout)
+        self.assertIn("案内: glab が todo（not-installed）", done.stdout)
         self.assertEqual(self.setup_calls(), [[self.ws, "--deploy", self.src]])
+        self.one_next(done)
+        exe = os.path.join(self.ws, ".ccnavi", "bin", THIS_MACHINE, "ccnavi")
+        self.assertTrue(os.access(exe, os.X_OK))
+        self.assertFalse(os.path.exists(exe + ".exe"))
+        self.assertIn(f"launcher --lint --root {self.ws} --log  --state ", self.calls_text())
+        self.assertIn("dry-run では lint の warn", done.stdout)
+        self.assertIn("Claude Code を終了して", done.stdout.splitlines()[-1])
+        self.assertIn(self.ws, done.stdout.splitlines()[-1])
+        self.assertIn("code --install-extension", done.stdout)
+        self.assertIn("パッケージ化されていない拡張機能を読み込む", done.stdout)
+        self.assertIn("そろえて更新する決まり", done.stdout)
+        self.assertEqual(self.backups(), [])
+        self.assertEqual(snapshot(self.src), before)
 
     # ---- setup の終了コード
 
-    def test_check_exit_codes(self):
-        for setup_rc, want in (("0", 0), ("1", 1), ("2", 4)):
-            self.ctl_set("check_rc", setup_rc)
-            done = self.install("--from", self.src, "--check")
-            self.assertEqual(done.returncode, want, setup_rc + done.stdout)
-            self.one_next(done)
-
-    def test_check_next_text_per_code(self):
-        self.ctl_set("check_rc", "0")
-        self.assertIn("すでに揃っている", self.install("--from", self.src, "--check").stdout)
+    def test_check_exit_codes_and_next_text(self):
+        # setup --check の 0 は test_check_run が見る
+        self.prepare_installed()
         self.ctl_set("check_rc", "1")
         done = self.install("--from", self.src, "--check", "--force")
+        self.assertEqual(done.returncode, 1, done.stdout)
+        self.one_next(done)
         self.assertIn("了承を得てから、--check を外して打つ", done.stdout)
         self.assertIn("references/update.md", done.stdout)
+        # --check では --force でもバックアップを取らない
+        self.assertEqual(self.backups(), [])
         self.ctl_set("check_rc", "2")
-        self.assertIn(
-            "setup の出力の理由を直してから", self.install("--from", self.src, "--check").stdout
-        )
+        done = self.install("--from", self.src, "--check")
+        self.assertEqual(done.returncode, 4, done.stdout)
+        self.one_next(done)
+        self.assertIn("setup の出力の理由を直してから", done.stdout)
 
     def test_real_run_setup_failure_is_4(self):
         self.ctl_set("setup_rc", "2")
@@ -276,32 +286,24 @@ class InstallTest(Env):
         self.one_next(done)
         self.assertIn("Claude Code の外のターミナルで同じコマンドを打ってもらう", done.stdout)
         self.assertEqual(self.setup_calls(), [])
-        done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
-        self.assertEqual(done.returncode, 3)
 
     def test_anything_but_dry_run_counts_as_enable_inside_claude_code(self):
-        # ccnavi は dry-run 以外の値を enable として扱う
-        for value in ("enable ", "ENABLE", "enabled", "disable", "on"):
-            self.write_settings("settings.json", mode_settings(value))
-            done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
-            self.assertEqual(done.returncode, 3, value)
-        for value in ("dry-run", " dry-run "):
-            self.write_settings("settings.json", mode_settings(value))
-            done = self.install("--from", self.src, "--check", env=self.env(CLAUDECODE="1"))
-            self.assertEqual(done.returncode, 0, value + done.stdout)
+        """ccnavi は dry-run 以外の値を enable として扱う。保存された値も起動した環境の値も、
+        大文字小文字と前後の空白を無視して比べる。"""
+        cc = {"CLAUDECODE": "1"}
+        self.write_settings("settings.json", mode_settings("disable"))
+        done = self.install("--from", self.src, "--check", env=self.env(**cc))
+        self.assertEqual(done.returncode, 3, done.stdout)
+        self.write_settings("settings.json", mode_settings(" DRY-RUN "))
+        env = self.env(**cc, CCNAVI_MODE=" Dry-Run ")
+        done = self.install("--from", self.src, "--check", env=env)
+        self.assertEqual(done.returncode, 0, done.stdout)
 
     def test_no_stored_value_goes_on_but_the_environment_value_counts(self):
         env = self.env(CLAUDECODE="1")
         self.assertEqual(self.install("--from", self.src, "--check", env=env).returncode, 0)
         env = self.env(CLAUDECODE="1", CCNAVI_MODE="enable")
         self.assertEqual(self.install("--from", self.src, "--check", env=env).returncode, 3)
-        env = self.env(CLAUDECODE="1", CCNAVI_MODE="dry-run")
-        self.assertEqual(self.install("--from", self.src, "--check", env=env).returncode, 0)
-
-    def test_enable_outside_claude_code_goes_on(self):
-        self.write_settings("settings.json", '{"env":{"CCNAVI_MODE":"enable"}}')
-        done = self.install("--from", self.src, "--check")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
     def test_local_dry_run_overrides_enable(self):
         self.write_settings("settings.json", '{"env":{"CCNAVI_MODE":"enable"}}')
@@ -349,17 +351,6 @@ class InstallTest(Env):
         )
         self.assertIn("VS Code への拡張機能のインストール", done.stdout)
 
-    def test_build_runs_the_build_sh_and_does_not_call_setup(self):
-        src = self.make_build_src()
-        done = self.run_sh([os.path.join(src, "scripts", "ccnavi-install.sh"), self.ws, "--build"])
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        calls = self.calls_text()
-        self.assertIn("build \n", calls)
-        self.assertNotIn("setup ", calls)
-        self.one_next(done)
-        last = done.stdout.splitlines()[-1]
-        self.assertIn(f"--from '{src}' --check", last)
-
     def test_build_with_extensions_calls_only_build_install(self):
         src = self.make_build_src()
         self.fake("node", "echo v22.0.0")
@@ -374,14 +365,21 @@ class InstallTest(Env):
         self.assertNotIn("build \n", calls)
         self.assertNotIn("pull", calls)
 
-    def test_build_pulls_only_with_a_tracking_branch(self):
+    def test_build_runs_the_build_sh_and_pulls_only_with_a_tracking_branch(self):
         src = self.make_build_src()
         self.git_repo(src, "https://gl.example.com/g/ccnavi.git")
         git = [REAL_GIT, "-C", src]
         cfg = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
         subprocess.run([*git, *cfg, "commit", "--allow-empty", "-q", "-m", "x"], check=True)
         done = self.run_sh([os.path.join(src, "scripts", "ccnavi-install.sh"), self.ws, "--build"])
-        self.assertNotIn("pull", self.calls_text())
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        calls = self.calls_text()
+        self.assertIn("build \n", calls)
+        self.assertNotIn("setup ", calls)
+        self.assertNotIn("pull", calls)
+        self.one_next(done)
+        last = done.stdout.splitlines()[-1]
+        self.assertIn(f"--from '{src}' --check", last)
         branch = subprocess.run(
             [*git, "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True, check=True
         ).stdout.strip()
@@ -427,8 +425,15 @@ class InstallTest(Env):
         return sorted(os.path.join(root, n) for n in os.listdir(root))
 
     def test_force_backs_up_outside_the_workspace_with_mode_700(self):
+        """バックアップは作業場の外に 700 で取り、リンクの先の中身を写す。配布元は変えない。"""
         self.prepare_installed()
-        done = self.install("--from", self.src, "--force")
+        # .ccnavi/scripts をリンクにする（バックアップにはリンクでなく中身を残す）
+        shared = os.path.join(self.tmpdir, "shared-scripts")
+        scripts = os.path.join(self.ws, ".ccnavi", "scripts")
+        shutil.move(scripts, shared)
+        os.symlink(shared, scripts)
+        before = snapshot(self.src)
+        done = self.install("--from", self.src, "--force", "--clear-quarantine")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         found = self.backups()
         self.assertEqual(len(found), 1)
@@ -449,12 +454,8 @@ class InstallTest(Env):
         self.assertIn(found[0], done.stdout)
         self.assertIn("cp -R", done.stdout)
         self.assertEqual(self.setup_calls()[-1][-1], "--force")
-
-    def test_no_backup_without_force_or_with_check(self):
-        self.prepare_installed()
-        self.install("--from", self.src)
-        self.install("--from", self.src, "--force", "--check")
-        self.assertEqual(self.backups(), [])
+        self.assertFalse(os.path.islink(os.path.join(found[0], ".ccnavi", "scripts")))
+        self.assertEqual(snapshot(self.src), before)
 
     def test_two_runs_in_the_same_second_do_not_collide(self):
         self.prepare_installed()
@@ -483,64 +484,20 @@ class InstallTest(Env):
         self.assertFalse(os.path.exists(os.path.join(self.ws, "cache")))
         self.assertEqual(self.setup_calls(), [])
 
-    def test_backup_keeps_the_content_behind_symlinks(self):
-        self.prepare_installed()
-        shared = os.path.join(self.tmpdir, "shared-scripts")
-        os.makedirs(shared)
-        with open(os.path.join(shared, "keep.sh"), "w", encoding="utf-8") as f:
-            f.write("shared\n")
-        scripts = os.path.join(self.ws, ".ccnavi", "scripts")
-        shutil.rmtree(scripts)
-        os.symlink(shared, scripts)
-        done = self.install("--from", self.src, "--force")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        saved = os.path.join(self.backups()[0], ".ccnavi", "scripts")
-        self.assertFalse(os.path.islink(saved))
-        with open(os.path.join(saved, "keep.sh"), encoding="utf-8") as f:
-            self.assertEqual(f.read(), "shared\n")
-
-    # ---- 入れたあと
-
-    def test_chmod_only_the_existing_executable(self):
-        done = self.install("--from", self.src)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        exe = os.path.join(self.ws, ".ccnavi", "bin", THIS_MACHINE, "ccnavi")
-        self.assertTrue(os.access(exe, os.X_OK))
-        self.assertFalse(os.path.exists(exe + ".exe"))
+    # ---- 入れたあと（通る形は test_plain_real_run が見る）
 
     def test_lint_outcomes(self):
-        for launcher_rc, want in (("127", 4), ("126", 4), ("2", 4), ("1", 5), ("0", 0)):
-            self.ctl_set("launcher_rc", launcher_rc)
-            done = self.install("--from", self.src)
-            self.assertEqual(done.returncode, want, launcher_rc + done.stdout + done.stderr)
-            self.one_next(done)
-        self.assertIn(f"launcher --lint --root {self.ws} --log  --state ", self.calls_text())
-
-    def test_lint_error_points_to_ccnavi_config(self):
+        # 0 と 1 のほかは、どれも起動できなかったと読む（同じ分岐なので 1 つだけ打つ）
+        self.ctl_set("launcher_rc", "127")
+        done = self.install("--from", self.src)
+        self.assertEqual(done.returncode, 4, done.stdout + done.stderr)
+        self.one_next(done)
         self.ctl_set("launcher_rc", "1")
         done = self.install("--from", self.src)
+        self.assertEqual(done.returncode, 5, done.stdout + done.stderr)
+        self.one_next(done)
         self.assertIn("ccnavi-config", done.stdout)
         self.assertIn("lint の error を直す", done.stdout.splitlines()[-1])
-
-    def test_dry_run_warn_note_and_restart_next(self):
-        done = self.install("--from", self.src)
-        self.assertIn("dry-run では lint の warn", done.stdout)
-        self.assertIn("Claude Code を終了して", done.stdout.splitlines()[-1])
-        self.assertIn(self.ws, done.stdout.splitlines()[-1])
-
-    def test_extension_guidance_when_present(self):
-        os.makedirs(os.path.join(self.src, "dist"), exist_ok=True)
-        with open(os.path.join(self.src, "dist", "ccnavi-board-1.0.0.vsix"), "wb") as f:
-            f.write(b"x")
-        chrome = os.path.join(self.src, "extensions", "chrome", "ccnavi-approval", "dist")
-        os.makedirs(chrome)
-        with open(os.path.join(chrome, "manifest.json"), "w", encoding="utf-8") as f:
-            f.write("{}")
-        done = self.install("--from", self.src)
-        self.assertIn("code --install-extension", done.stdout)
-        self.assertIn("パッケージ化されていない拡張機能を読み込む", done.stdout)
-        self.assertIn("そろえて更新する決まり", done.stdout)
-        self.one_next(done)
 
     # ---- macOS の隔離の印
 
@@ -580,12 +537,6 @@ class InstallTest(Env):
         self.assertIn("本番では --clear-quarantine が要る", done.stdout)
         self.assertNotIn("-dr", self.calls_text())
         self.assertEqual(snapshot(self.src), before)
-
-    # ---- 出さないもの
-
-    def test_credentials_never_appear(self):
-        done = self.install("--from", self.src, "--check")
-        self.assertNotIn("tok", done.stdout + done.stderr)
 
 
 def mode_settings(value: str) -> str:

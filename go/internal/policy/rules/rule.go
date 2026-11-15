@@ -51,7 +51,7 @@ type Origin string
 const (
 	ExceptKey = "except"
 	WhenKey   = "when"
-	// maxWhenDepth と maxWhenNodes は when の入れ子の段数とノードの数の上限（判定を重くしない）。
+	// maxWhenDepth と maxWhenNodes は when の入れ子の階層数とノードの数の上限（判定を重くしない）。
 	maxWhenDepth = 8
 	maxWhenNodes = 64
 )

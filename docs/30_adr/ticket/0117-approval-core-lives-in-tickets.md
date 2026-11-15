@@ -13,7 +13,7 @@ keywords: [サブパッケージ, tickets, hook, core, core_base, write-and-push
 
 ADR-0099 で `src/ccnavi/` を役割ごとのサブパッケージに分けたとき、判定のコア（`core.py` と
 `core_base.py`・`core_approve.py`・`core_review.py`・`core_withdraw.py`）と write-and-push の見分け（`write_and_push.py`）は
-`hook/` に置いた。名前に「判定」が付き、承認の入口が実行前チェックと同じ深さの段にあったため。
+`hook/` に置いた。名前に「判定」が付き、承認の入口が実行前チェックと同じ深さの層にあったため。
 
 中身は hook の判定ではない。コアが決めるのは、承認の対象・取り下げてよいか・レビュー済みにしてよいかと、
 そのとき置き場に書くもので、write-and-push の見分けが決めるのは、親子のチケットが write-and-push の対象かと、置き場の変更を
@@ -29,7 +29,7 @@ ADR-0099 で `src/ccnavi/` を役割ごとのサブパッケージに分けた�
 | 決めたこと | なぜ | 採らなかった側 |
 |---|---|---|
 | `hook/core*.py` と `tickets/write_and_push.py` を `tickets/` へ、名前を変えずに移す | 中身はチケットの領域の判定で、読むのも `infra` と `tickets` だけ。名前は `tickets` の既存のモジュール（`approval*`・`review*` など）とぶつからない | `hook/` に残す。役割の線（サブパッケージ）と中身が食い違ったままになる |
-| モジュールの段は今のまま（判定と操作の段）にする | `tickets.review`・`tickets.ops` と同じ段を読むので、段は動かない | 段を新しく足す。依存の深さは変わらないので要らない |
+| モジュールの層は今のまま（判定と操作の層）にする | `tickets.review`・`tickets.ops` と同じ層を読むので、層は動かない | 層を新しく足す。依存の深さは変わらないので要らない |
 | Chrome 拡張の Pyodide の入口は `ccnavi.tickets.core` を引く | 拡張は組み立てのたびに `src/ccnavi/` をサブパッケージの階層ごと同梱するので、入口と同梱の ccnavi は同じ版にそろう | 互換のために `hook/core.py` を残して再輸出する。読み手が 2 つになり、片方だけを直す食い違いを生む |
 
 ## 得たもの・失ったもの

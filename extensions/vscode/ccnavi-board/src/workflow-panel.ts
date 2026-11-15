@@ -6,7 +6,7 @@
  * 図で引き直す。**タブは親ごとに1枚**（同じ親をもう1度開けば前面に出す）。作りはフロー編集（`flow-panel.ts`）と
  * 同じで、違いは3つ。
  *
- * 1. 取り込む段が無い。開いたときの提案の中身（`--plan-order <親> --json`の答え）がそのまま初期値
+ * 1. 取り込む段階が無い。開いたときの提案の中身（`--plan-order <親> --json`の答え）がそのまま初期値
  * 2. 書くのは実行ファイル（`--plan-order <親> --order <JSON> --expect <ハッシュ> --write`）
  * 3. 保存先はエージェントも書ける提案（親の提案と、番号の変わるステップを指す子の提案）。なので開いたときのハッシュ
  *    （`source_sha`）を`--expect`に渡し、外で変わっていれば実行ファイルが何も書かない
@@ -110,7 +110,7 @@ function binSetting(): string {
 
 /**
  * 親の識別子を受けてタブを開く（コマンド`ccnaviBoard.openWorkflow`と、画面の帳面の`workflow`）。
- * コマンドパレットには出さない（開く親を選ぶ段が無いため）。識別子の形でなければ開かない
+ * コマンドパレットには出さない（開く親を選ぶ段階が無いため）。識別子の形でなければ開かない
  */
 export async function openWorkflow(ticket: unknown): Promise<void> {
   const parent = workflowTicketOf(ticket);

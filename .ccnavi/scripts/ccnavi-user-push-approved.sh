@@ -44,9 +44,28 @@
 # - シンボリックリンクは辿らない。置き場（projects/ や .claude/worktrees/）そのものも、その下の
 #   1 件ずつも。辿るとワークスペースの外のリポジトリにコミットして push する
 # - ブランチの上に居ない（detached）ツリーは名指しして処理しない。失敗には数えない
-# - main / master / develop / release / release/* と、そのリポジトリの統合先（ccnavi-common-state.sh の
+# - 保護されたブランチ（ccnavi_is_protected。main / master / develop / release / release/* / release-*）と、そのリポジトリの統合先（ccnavi-common-state.sh の
 #   ccnavi_integration。決まらなければ固定のリストだけ）はコミットだけして push しない
 # - 1 本のツリーで add・commit・push が失敗しても、他のツリーはコミットして push する
+#
+# 実行ファイルを起こさずに動く作り（承認の直後、実行ファイルの入れ替え中でも push できるように）。実行ファイルが
+# 答えないときに省くもの:
+# - 取り込み済みの親子のチケット（write-and-push の対象）のワークツリーは、取り込めないので書かずに止める（今までどおり）
+# - 統合先（ccnavi_integration）は決まらないので、固定の保護されたブランチ（ccnavi_is_protected）だけで送らないと決める
+# - push のゲートは親かを確かめられないので、手元に origin の参照があるブランチだけ ls-remote で確かめる
+# - git が断った理由（ccnavi_git_refusal）は読み分けず、git の 1 行目だけを添える
+# - push に失敗したツリーの未送信のパスの一覧（unsent_paths。実行ファイルの write-and-push unsent）は出さない
+#
+# 実行ファイルに任せるのは、実行ファイルが無いときに省いても push が止まらないものだけ。取り込み済みの親子のチケットの
+# 途中の操作の確かめとコミット（write-and-push busy・commit）は、実行ファイルが取り込み済みと答えたときだけ通る道なので
+# 実行ファイルに任せる。ツリーの列挙とリンクの検査、置き場の変更のパス（carry_paths・given_in）、親子のチケットでない
+# ツリーのコミットは、実行ファイルが無くても承認を送れるようにここに残す（sh で実装するもののうち「実行ファイルを
+# 起こさずに動くもの」）。そのために持つ規則の写しと、実行ファイルとの一致を確かめる表:
+# - 置き場の名前（ccnavi-common.sh の ccnavi_*_dir。tests/fixtures/layout.json）
+# - status の読みと書きかけの一時ファイル（ccnavi_porcelain_paths・ccnavi_drop_temp）と、--path のパスの大文字小文字を
+#   区別しない比べ（ccnavi_path_under・ccnavi_path_pick）。tests/fixtures/approved-carry.json
+# - 識別子の形と保護されたブランチ（ccnavi_is_ident・ccnavi_is_protected。tests/fixtures/ident-cases.json）
+# - push の資格情報を選ぶための origin の読み（ccnavi_git_auth の ccnavi_host_parse。tests/fixtures/host-kinds.json）
 #
 # 終了コード: 0 コミットするものが無い・全部コミットした（push しなかったブランチ、処理しなかったツリーを含む） /
 #           1 ステージかコミットできなかったツリーか、push が失敗したツリーが 1 つ以上ある /
@@ -122,28 +141,11 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-approved=.ccnavi/approved # 固定
-proposals=wip/proposals   # 固定
-projects=projects         # 固定
-# 末尾の / を除く。`[ -L "projects/" ]` はリンクを辿って偽になる。
-approved="${approved%/}"
-proposals="${proposals%/}"
-projects="${projects%/}"
-# 除いて空になるパス（`/`）と `.` は、ワークスペースルートそのものを指す。置き場なら
-# ルートの直下を全部ツリーとして数え、承認済みチケットの置き場ならツリー全体をコミットする。
-# どちらも頼まれた置き場ではないので、既定に戻す。
-case "$approved" in
-"" | .) approved=".ccnavi/approved" ;;
-esac
-case "$proposals" in
-"" | .) proposals="wip/proposals" ;;
-esac
-case "$projects" in
-"" | .) projects="projects" ;;
-esac
-# ボードのフロー編集画面が保存の途中で置く一時ファイル（flows/ の下の `.<名前>.<番号>.tmp`）。
-# 失敗して残ってもコミットしない。書きかけの中身をユーザの手順書としてコミットしないため。
-skip_temp=":(exclude)$approved/flows/.*.tmp"
+# 置き場の名前は ccnavi-common.sh の写し（実行ファイルとの一致は tests/fixtures/layout.json）。
+approved="$ccnavi_approved_dir"
+proposals="$ccnavi_proposals_dir"
+projects="$ccnavi_projects_dir"
+worktrees="$ccnavi_worktrees_dir"
 
 # ツリーごとの結果を subshell (while はパイプの右側なので別プロセス) の外へ持ち出すための一時ファイル。
 state=$(mktemp "${TMPDIR:-/tmp}/ccnavi-user-push-approved.XXXXXX") || {
@@ -162,24 +164,26 @@ ccnavi_wap_sh="$(dirname "$0")"
 ccnavi_wap_use_exe "$root" || :
 tab=$(printf '\t')
 
-# 置き場の変更のパス（承認済み、レビュー待ちの review/、承認で消えた todo/ の提案、取り込んで消えた
-# flows/ の下書き）を ccnavi_wap_tmp/carry に。
-# 書きかけの一時ファイル（fsio の `.<名前>.<一意>.part*`、フローの保存の `flows/.*.tmp`、設定の同期（tickets/sync/mirror）の
-# `*.ccnavi-sync`）はコミットしない。
+# 置き場の変更のパス（承認済み、yes ならレビュー待ちの review/ も、承認で消えた todo/ の提案、取り込んで消えた
+# flows/ の下書き）を ccnavi_wap_tmp/carry に。<ツリー> <yes|no（review/ を含めるか）>
+# 書きかけの一時ファイル（ccnavi_drop_temp）はコミットしない。
+#
+# 実行ファイルを起こさずに動くための写し（status の読みは ccnavi_porcelain_paths、一時ファイルは ccnavi_drop_temp。
+# どちらも ccnavi-common-write-and-push.sh）。親子のチケットでないツリーの承認を、実行ファイルの入れ替え中でも送るため。
 carry_paths() {
 	: >"$ccnavi_wap_tmp/carry"
+	cp_review=""
+	[ "$2" = yes ] && cp_review="$proposals/review"
 	git -C "$1" -c core.quotepath=false status --porcelain -z --untracked-files=all --no-renames \
-		-- "$approved" "$proposals/review" 2>/dev/null | tr '\000' '\n' |
-		sed -n 's/^...//p' >"$ccnavi_wap_tmp/carry-all" || :
+		-- "$approved" ${cp_review:+"$cp_review"} 2>/dev/null | ccnavi_porcelain_paths >"$ccnavi_wap_tmp/carry-all" || :
 	git -C "$1" ls-files --deleted -z -- "$proposals/todo" "$proposals/flows" 2>/dev/null | tr '\000' '\n' \
 		>>"$ccnavi_wap_tmp/carry-all" || :
-	grep -v -E '(^|/)\.[^/]*\.part(\.[^/]*)?$|(^|/)flows/\.[^/]*\.tmp$|\.ccnavi-sync$' \
-		"$ccnavi_wap_tmp/carry-all" >"$ccnavi_wap_tmp/carry" || :
+	ccnavi_drop_temp <"$ccnavi_wap_tmp/carry-all" >"$ccnavi_wap_tmp/carry"
 	# --path で渡したときは、そのうち渡したパスだけ。
 	if [ -n "$given" ]; then
 		given_in "$1" >"$ccnavi_wap_tmp/given"
 		if [ -s "$ccnavi_wap_tmp/given" ]; then
-			grep -F -x -f "$ccnavi_wap_tmp/given" "$ccnavi_wap_tmp/carry" >"$ccnavi_wap_tmp/carry-given" || :
+			ccnavi_path_pick "$ccnavi_wap_tmp/given" <"$ccnavi_wap_tmp/carry" >"$ccnavi_wap_tmp/carry-given" || :
 			mv "$ccnavi_wap_tmp/carry-given" "$ccnavi_wap_tmp/carry"
 		else
 			: >"$ccnavi_wap_tmp/carry"
@@ -187,37 +191,26 @@ carry_paths() {
 	fi
 }
 
-# --path で渡したパスのうち、ツリー $1 の中のものを、そのツリーからの相対で 1 行ずつ。
-# ワークスペースルートのツリーには、projects/ と .claude/worktrees/ の下（別のツリー）を入れない。
+# --path で渡したパスのうち、ツリー $1 の中のものを、そのツリーからの相対で 1 行ずつ。大文字小文字を区別せず比べる
+# （ccnavi_path_under）。ワークスペースルートのツリーには、projects/ と .claude/worktrees/ の下（別のツリー）を入れない。
 given_in() {
-	case "$1" in
-	"$root") gi_pre="" ;;
-	*) gi_pre="${1#"$root"/}/" ;;
-	esac
 	printf '%s' "$given" | while IFS= read -r gi_path; do
 		[ -n "$gi_path" ] || continue
-		case "$gi_path" in
-		"$gi_pre"*) ;;
-		*) continue ;;
-		esac
-		gi_rel="${gi_path#"$gi_pre"}"
-		if [ -z "$gi_pre" ]; then
-			case "$gi_rel" in
-			"$projects"/* | .claude/worktrees/*) continue ;;
-			esac
+		if [ "$1" = "$root" ]; then
+			ccnavi_path_under "$gi_path" "$projects" >/dev/null && continue
+			ccnavi_path_under "$gi_path" "$worktrees" >/dev/null && continue
+			printf '%s\n' "$gi_path"
+		elif gi_rel=$(ccnavi_path_under "$gi_path" "${1#"$root"/}") && [ "$gi_rel" != . ]; then
+			printf '%s\n' "$gi_rel"
 		fi
-		printf '%s\n' "$gi_rel"
 	done
 }
 
 # まだ送れていないパス（リモートの先頭との差。リモートの先頭が無ければ直近のコミットの分）を 1 行ずつ。
-# push に失敗したとき、何が未送信かを言うため。$1 ツリー $2 ブランチ
+# push に失敗したとき、何が未送信かを言うため。差は実行ファイル（write-and-push unsent）が読む。実行ファイルが
+# 答えないときは言わない（送れなかったことは呼ぶ側が言っている）。$1 ツリー $2 ブランチ
 unsent_paths() {
-	if git -C "$1" rev-parse --verify -q "refs/remotes/origin/$2" >/dev/null 2>&1; then
-		git -C "$1" -c core.quotepath=false diff --name-only "refs/remotes/origin/$2" HEAD 2>/dev/null
-	else
-		git -C "$1" -c core.quotepath=false show --name-only --format= HEAD 2>/dev/null
-	fi | sed 's/^/  未送信: /' >&2 || :
+	ccnavi_val unsent "$(ccnavi_wap_exe write-and-push unsent "$1" "$2" </dev/null 2>/dev/null)" | sed 's/^/  未送信: /' >&2 || :
 }
 
 # 取り込み済みの親子のチケット 1 つをコミットして push する。ccnavi_wap_family を済ませた後に呼ぶ。0 送った（push するものが無いを含む）/ 1 失敗した
@@ -229,7 +222,7 @@ carry_family() {
 	cf_b="$ccnavi_wap_branch"
 	cf_tree="$ccnavi_wap_tree"
 	cf_rc=0
-	ccnavi_lock_take "$root" "$ccnavi_wap_repo" "$cf_p" "$(ccnavi_wap_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
+	ccnavi_lock_take "$root" "$ccnavi_wap_repo" "$cf_p" "$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		if ccnavi_lock_long "$(ccnavi_state "$root")/locks/$ccnavi_wap_repo/$cf_p"; then
 			printf 'ccnavi-user-push-approved: %s のロックが 10 分を超えて取られたままです。持ち主はまだ動いているため、強制取得はしません。終わるのを待つか、持ち主をユーザが確かめてください。%s\n' \
@@ -256,28 +249,19 @@ carry_family() {
 	fi
 	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push のゲート。write-and-push・ccnavi-git.sh push と同じ）。
 	cf_rc=0
-	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
+	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		printf 'ccnavi-user-push-approved: %s。ユーザの判断はまだ送っていません。\n' "$ccnavi_pg_why" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
-	carry_paths "$cf_tree"
+	carry_paths "$cf_tree" yes
 	if [ -s "$ccnavi_wap_tmp/carry" ]; then
-		cf_base=$(git -C "$cf_tree" rev-parse HEAD)
-		while IFS= read -r cf_path; do
-			[ -n "$cf_path" ] || continue
-			git -C "$cf_tree" add -A -- ":(literal)$cf_path" 2>/dev/null || :
-		done <"$ccnavi_wap_tmp/carry"
-		sed 's/^/:(literal)/' "$ccnavi_wap_tmp/carry" | tr '\n' '\000' >"$ccnavi_wap_tmp/pathspec"
-		# write-and-push と同じく、署名などで止まらないようタイムアウトで切る。
-		if ! ccnavi_git_timed "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_COMMIT_TIMEOUT:-}" 60)" "$ccnavi_wap_tmp/err" "$cf_tree" \
-			commit --quiet --only --no-verify -m "ccnavi: 承認済みチケットを更新" \
-			--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul >"$ccnavi_wap_tmp/out"; then
-			cat "$ccnavi_wap_tmp/out" >>"$ccnavi_wap_tmp/err"
-			printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$(ccnavi_git_refusal "$ccnavi_wap_tmp/err")" >&2
-			ccnavi_wap_tree="$cf_tree"
-			ccnavi_wap_unstage "$ccnavi_wap_tmp/carry" "$cf_base"
+		# コミットは write-and-push と同じ実行ファイルの口（パスを限る・タイムアウト・失敗したら索引を戻す）。
+		# ここに来るのは実行ファイルが取り込み済みと答えた親子のチケットだけなので、実行ファイルはある。
+		if ! ccnavi_wap_commit "$ccnavi_wap_tmp/carry" "ccnavi: 承認済みチケットを更新"; then
+			[ -z "$ccnavi_wap_refused" ] ||
+				printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない（%s）。\n' "$cf_p" "$ccnavi_wap_refused" >&2
 			ccnavi_lock_drop
 			return 1
 		fi
@@ -288,7 +272,7 @@ carry_family() {
 		ccnavi_lock_drop
 		return 0
 	fi
-	cf_timeout=$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
+	cf_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
 	if ccnavi_git_timed "$cf_timeout" "$ccnavi_wap_tmp/push-err" "$cf_tree" \
 		push --quiet origin "refs/heads/$cf_b:refs/heads/$cf_b" >/dev/null ||
 		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_wap_tmp/ls-err" "$cf_tree" \
@@ -326,8 +310,8 @@ if [ "$#" -gt 0 ]; then
 	exit "$named_rc"
 fi
 
-# ワークスペースルートから rel を 1 段ずつ下り、シンボリックリンクの段があれば 0。
-# その段（ルートからのパス）を linked に残す。`.claude` だけがリンクでも見逃さない。
+# ワークスペースルートから rel を 1 階層ずつ下り、シンボリックリンクの階層があれば 0。
+# その階層（ルートからのパス）を linked に残す。`.claude` だけがリンクでも見逃さない。
 linked=""
 linked_segment() {
 	linked=""
@@ -350,9 +334,9 @@ linked_segment() {
 	return 1
 }
 
-# 数えるのは 置き場 → その下の 1 件ずつ、の二段。どちらの段でもリンクは辿らない。
+# 数えるのは 置き場 → その下の 1 件ずつ、の 2 階層。どちらの階層でもリンクは辿らない。
 trees="$root"
-for place in "$projects" ".claude/worktrees"; do
+for place in "$projects" "$worktrees"; do
 	if linked_segment "$place"; then
 		printf 'ccnavi-user-push-approved: %s はシンボリックリンクなので、その下を辿りません。\n' "$linked" >&2
 		continue
@@ -380,14 +364,14 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	[ -n "$tree" ] || continue
 	[ -d "$tree/$approved" ] || continue
 	git -C "$tree" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+	# 置き場の変更（--path で渡したときは、そのうちこのツリーのもの）。無ければこのツリーは見ない。
+	# 渡さないときは review/ を含めない（ユーザの判断の途中のものを巻き込まない）。
 	if [ -n "$given" ]; then
-		# 渡したパスのうち、このツリーの置き場の変更。無ければこのツリーは見ない。
-		carry_paths "$tree"
-		[ -s "$ccnavi_wap_tmp/carry" ] || continue
+		carry_paths "$tree" yes
 	else
-		changed=$(git -C "$tree" status --porcelain -- "$approved" "$skip_temp" 2>/dev/null || :)
-		[ -n "$changed" ] || continue
+		carry_paths "$tree" no
 	fi
+	[ -s "$ccnavi_wap_tmp/carry" ] || continue
 
 	# 何か 1 つでもコミットする対象があったことの記録。detached で処理しなくても「無い」とは言わない。
 	printf 'seen\n' >>"$state"
@@ -403,7 +387,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	# 取り込み済みの親子のチケットの親のワークツリー（ディレクトリ名 = 識別子。ブランチは HEAD のブランチで、
 	# その / を - に置き換えたものが識別子）は、取り込んでから送る。
 	case "$tree" in
-	"$root/.claude/worktrees/"*)
+	"$root/$worktrees/"*)
 		ccnavi_wap_family "$name"
 		if [ "$ccnavi_wap_target" != no ] && [ "$ccnavi_wap_family_id" != "$name" ]; then
 			# 取り込み済みの親子のチケットの子のワークツリー。チケットとマーカーは親のワークツリーに置くので、
@@ -431,62 +415,23 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 		;;
 	esac
 
-	if [ -n "$given" ]; then
-		# 渡したパスだけ。1 件ずつステージして、そのパスだけをコミットする（ほかのステージ済みを巻き込まない）。
-		while IFS= read -r one; do
-			[ -n "$one" ] || continue
-			git -C "$tree" add -A -- ":(literal)$one" 2>/dev/null || :
-		done <"$ccnavi_wap_tmp/carry"
-		sed 's/^/:(literal)/' "$ccnavi_wap_tmp/carry" | tr '\n' '\000' >"$ccnavi_wap_tmp/pathspec"
-		git -C "$tree" commit --quiet --only -m "ccnavi: 承認済みチケットを更新" \
-			--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul || {
-			printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない。\n' "$name" >&2
-			printf 'fail\n' >>"$state"
-			continue
-		}
-	else
-		git -C "$tree" add -- "$approved" "$skip_temp" || {
-			printf 'ccnavi-user-push-approved: %s で承認済みチケットをステージできない。\n' "$name" >&2
-			printf 'fail\n' >>"$state"
-			continue
-		}
-		# 承認で todo/ から消えた提案。追跡されていたものの削除だけを入れる（`ls-files --deleted`）。
-		# 未追跡の下書きも、編集中の提案も入れない。消えたものが無ければ pathspec にも足さない
-		# （git に知られていないパスを pathspec に並べると commit が失敗する）。
-		gone=$(git -C "$tree" ls-files --deleted -z -- "$proposals/todo" 2>/dev/null | tr '\000' '\n' || :)
-		scope="$approved"
-		if [ -n "$gone" ]; then
-			printf '%s\n' "$gone" | while IFS= read -r removed; do
-				[ -n "$removed" ] || continue
-				git -C "$tree" add -u -- "$removed" 2>/dev/null || :
-			done
-			scope="$approved
-$proposals/todo"
-		fi
-		# 取り込んで消えたフローとテンプレートの下書き。追跡されていたものの削除だけを、1 件ずつのパスで入れる。
-		# 置き場ごと pathspec に並べると、書き直されて残っている下書きまでコミットに入るため。
-		drafts=$(git -C "$tree" ls-files --deleted -z -- "$proposals/flows" 2>/dev/null | tr '\000' '\n' || :)
-		if [ -n "$drafts" ]; then
-			printf '%s\n' "$drafts" | while IFS= read -r removed; do
-				[ -n "$removed" ] || continue
-				git -C "$tree" add -u -- ":(literal)$removed" 2>/dev/null || :
-			done
-			scope="$scope
-$(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
-		fi
-		printf '%s\n' "$scope" | tr '\n' '\000' | xargs -0 git -C "$tree" commit --quiet -m "ccnavi: 承認済みチケットを更新" -- || {
-			printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない。\n' "$name" >&2
-			printf 'fail\n' >>"$state"
-			continue
-		}
-	fi
-	case "$branch" in
-	main | master | develop | release | release/*)
+	# 置き場の変更だけ。1 件ずつステージして、そのパスだけをコミットする（ほかのステージ済みを巻き込まない）。
+	while IFS= read -r one; do
+		[ -n "$one" ] || continue
+		git -C "$tree" add -A -- ":(literal)$one" 2>/dev/null || :
+	done <"$ccnavi_wap_tmp/carry"
+	sed 's/^/:(literal)/' "$ccnavi_wap_tmp/carry" | tr '\n' '\000' >"$ccnavi_wap_tmp/pathspec"
+	git -C "$tree" commit --quiet --only -m "ccnavi: 承認済みチケットを更新" \
+		--pathspec-from-file="$ccnavi_wap_tmp/pathspec" --pathspec-file-nul || {
+		printf 'ccnavi-user-push-approved: %s で承認済みチケットをコミットできない。\n' "$name" >&2
+		printf 'fail\n' >>"$state"
+		continue
+	}
+	if ccnavi_is_protected "$branch"; then
 		printf 'ccnavi-user-push-approved: %s では保護対象のブランチ %s を使用しているため、pushしません。送るかどうかはユーザが決めます。\n' \
 			"$name" "$branch" >&2
 		continue
-		;;
-	esac
+	fi
 	# 固定のリストに無い名前の統合先（develop-v1.0.0 など）も送らない。名前は ccnavi-fetch.sh・
 	# ccnavi-git.sh と同じ決め方（origin/HEAD → origin/main・master）で、そのツリーが属する
 	# リポジトリについて決める。決まらなければ固定のリストだけ。
@@ -500,7 +445,7 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	# 親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push のゲート）。
 	# 親でないツリー・初回の push はゲートが通す。
 	gate_rc=0
-	ccnavi_push_gate "$tree" "$branch" "$name" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || gate_rc=$?
+	ccnavi_push_gate "$tree" "$branch" "$name" "$root" "$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || gate_rc=$?
 	if [ "$gate_rc" -ne 0 ]; then
 		printf 'ccnavi-user-push-approved: %s。コミットはローカルに残っている。\n' "$ccnavi_pg_why" >&2
 		unsent_paths "$tree" "$branch"

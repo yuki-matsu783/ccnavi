@@ -57,30 +57,6 @@ func TestAnswersMatchGolden(t *testing.T) {
 		{"tree", "parent", w("i0001"), "../x"},
 		{"tree", "parent", nope, "i0001"},
 		{"tree", "parent", w("i0001")},
-		{"tree", "bound", w("fix-a"), "fix-a"},
-		{"tree", "bound", w("i0001"), "i0001"},
-		{"tree", "bound", nope, "fix-a"},
-		{"tree", "leftover", w("i0001"), "i0001"},
-		{"tree", "leftover", w("i0001"), "I0001"},
-		{"tree", "leftover", w("i0002"), "i0002"},
-		{"tree", "leftover", w("i0004"), "i0004"},
-		{"tree", "leftover", w("fix-a"), "fix-a"},
-		{"tree", "leftover", w("fix-a"), "a b"},
-		{"tree", "base-bound", root, "main"},
-		{"tree", "base-bound", root, "i0001"},
-		{"tree", "base-bound", root, "a\nb"},
-		{"tree", "base-bound", root, ""},
-		{"tree", "base-bound", nope, "main"},
-		{"tree", "guarded", root, ".ccnavi/config/common/rules.yml", "", "src/a.py", ".CCNAVI/config/common/RULES.yml"},
-		{"tree", "guarded", root, "src/a.py"},
-		{"tree", "guarded", nope, "a"},
-		{"tree", "guarded", root},
-		{"tree", "handoff-pending", w("fix-a")},
-		{"tree", "handoff-pending", w("fix-a"), "HEAD"},
-		{"tree", "handoff-pending", w("fix-a"), "no-such-rev"},
-		{"tree", "handoff-pending", w("i0001")},
-		{"tree", "handoff-pending", nope},
-		{"tree", "handoff-pending", w("fix-a"), "HEAD", "extra"},
 		{"tree", "other", root, "x"},
 	}
 	want := golden.Load[[][3]any](t, "answers")
@@ -94,6 +70,28 @@ func TestAnswersMatchGolden(t *testing.T) {
 		got := [3]any{float64(code), testkit.Rel(root, out.String()), testkit.Rel(root, errOut.String())}
 		if i >= len(want) || got != want[i] {
 			t.Errorf("%q:\n got %q\nwant %q", cmd, got, want[i])
+		}
+	}
+}
+
+// 親のワークツリーに残っているもの（ccnavi-worktree.sh が切り替えの前後に見る）。
+func TestLeftover(t *testing.T) {
+	root := shaskWorkspace(t)
+	w := func(name string) string { return testkit.Worktree(root, name) }
+	conf := testkit.Settings(t, root)
+	for _, c := range []struct {
+		path, name string
+		want       LeftoverFacts
+	}{
+		{w("i0001"), "i0001", LeftoverFacts{Leftover: true, Proposal: true, Doing: 2, MR: "7", Stage: "doing"}},
+		{w("i0001"), "I0001", LeftoverFacts{}},
+		{w("i0002"), "i0002", LeftoverFacts{}},
+		{w("i0004"), "i0004", LeftoverFacts{Leftover: true, Proposal: true, MR: "１２", Stage: "review"}},
+		{w("fix-a"), "fix-a", LeftoverFacts{}},
+		{w("fix-a"), "a b", LeftoverFacts{}},
+	} {
+		if got := Leftover(root, conf, c.path, c.name); got != c.want {
+			t.Errorf("%s %s: %+v, want %+v", c.path, c.name, got, c.want)
 		}
 	}
 }
