@@ -63,18 +63,11 @@ SYNC="sh $(dirname "$0")/ccnavi-sync.sh"
 START="sh $(dirname "$0")/ccnavi-start.sh"
 
 # reject <識別子> <文面>。文面は標準エラーへ出す契約。識別子は拒否の種類を表す短い語で、
-# 診断ログにだけ残す。文面にはユーザの引数（URL など）が入るので、ログにはコピーしない。
+# 診断ログにだけ残す（実行ファイルの `ccnavi git check` が拒否したときは、実行ファイルが決めた識別子）。
+# 文面にはユーザの引数（URL など）が入るので、ログにはコピーしない。
 reject() {
 	printf 'ccnavi-git: %s\n' "$2" >&2
 	# 診断ログ。上の文面は契約として決まっている出力で、診断ログはそれとは別に残すだけ。
-	log_info 拒否した -- "sub=${sub:-}" "reason=$1"
-	exit 2
-}
-
-# exe_reject <識別子> <文面>。実行ファイル（`ccnavi git check`）が拒否したとき。識別子は実行ファイルが決めるので、
-# reject と違って文字のまま書けない。出し方と記録の仕方は reject と同じ。
-exe_reject() {
-	printf 'ccnavi-git: %s\n' "$2" >&2
 	log_info 拒否した -- "sub=${sub:-}" "reason=$1"
 	exit 2
 }
@@ -199,7 +192,7 @@ case "$(printf '%s\n' "$gc_out" | head -n 1)" in
 allow | pass) ;;
 deny\ *)
 	gc_id=$(ccnavi_val1 deny "$gc_out")
-	exe_reject "$gc_id" "$(printf '%s\n' "$gc_out" | sed -n '2,$p')"
+	reject "$gc_id" "$(printf '%s\n' "$gc_out" | sed -n '2,$p')"
 	;;
 *) reject no-exe "ccnavi の実行ファイルが git の引数の形に答えませんでした。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、直せなければユーザに伝えてください。" ;;
 esac

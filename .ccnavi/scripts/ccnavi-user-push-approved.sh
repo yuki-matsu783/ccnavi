@@ -240,7 +240,7 @@ carry_family() {
 	cf_b="$ccnavi_wap_branch"
 	cf_tree="$ccnavi_wap_tree"
 	cf_rc=0
-	ccnavi_lock_take "$root" "$ccnavi_wap_repo" "$cf_p" "$(ccnavi_wap_number "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
+	ccnavi_lock_take "$root" "$ccnavi_wap_repo" "$cf_p" "$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 120)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		if ccnavi_lock_long "$(ccnavi_state "$root")/locks/$ccnavi_wap_repo/$cf_p"; then
 			printf 'ccnavi-user-push-approved: %s のロックが 10 分を超えて取られたままです。持ち主はまだ動いているため、強制取得はしません。終わるのを待つか、持ち主をユーザが確かめてください。%s\n' \
@@ -267,7 +267,7 @@ carry_family() {
 	fi
 	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push のゲート。write-and-push・ccnavi-git.sh push と同じ）。
 	cf_rc=0
-	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
+	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
 	if [ "$cf_rc" -ne 0 ]; then
 		printf 'ccnavi-user-push-approved: %s。ユーザの判断はまだ送っていません。\n' "$ccnavi_pg_why" >&2
 		ccnavi_lock_drop
@@ -290,7 +290,7 @@ carry_family() {
 		ccnavi_lock_drop
 		return 0
 	fi
-	cf_timeout=$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
+	cf_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
 	if ccnavi_git_timed "$cf_timeout" "$ccnavi_wap_tmp/push-err" "$cf_tree" \
 		push --quiet origin "refs/heads/$cf_b:refs/heads/$cf_b" >/dev/null ||
 		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_wap_tmp/ls-err" "$cf_tree" \
@@ -500,7 +500,7 @@ $(printf '%s\n' "$drafts" | sed '/^$/d; s/^/:(literal)/')"
 	# 親のワークツリーのブランチは、リモートから消えていないことを確かめてから送る（push のゲート）。
 	# 親でないツリー・初回の push はゲートが通す。
 	gate_rc=0
-	ccnavi_push_gate "$tree" "$branch" "$name" "$root" "$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || gate_rc=$?
+	ccnavi_push_gate "$tree" "$branch" "$name" "$root" "$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || gate_rc=$?
 	if [ "$gate_rc" -ne 0 ]; then
 		printf 'ccnavi-user-push-approved: %s。コミットはローカルに残っている。\n' "$ccnavi_pg_why" >&2
 		unsent_paths "$tree" "$branch"

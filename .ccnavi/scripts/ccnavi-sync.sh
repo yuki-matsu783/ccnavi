@@ -111,14 +111,8 @@ here_sh="$(dirname "$0")"
 # 打った場所。手元の片付けが、自分の居るワークツリーを消さないために渡す。
 sync_cwd="$(pwd -W 2>/dev/null || pwd)"
 
-number_or() {
-	case "${1:-}" in
-	'' | *[!0-9]*) printf '%s\n' "$2" ;;
-	*) printf '%s\n' "$1" ;;
-	esac
-}
-lock_wait=$(number_or "${CCNAVI_LOCK_WAIT:-}" 120)
-timeout=$(number_or "${CCNAVI_SYNC_TIMEOUT:-}" 60)
+lock_wait=$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 120)
+timeout=$(ccnavi_number_or "${CCNAVI_SYNC_TIMEOUT:-}" 60)
 
 scratch=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-sync) || {
 	printf 'ccnavi-sync: 一時ディレクトリが作れません。\n' >&2

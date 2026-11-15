@@ -73,13 +73,6 @@ ccnavi_wap_scratch() {
 	ccnavi_wap_tmp=$(mktemp -d 2>/dev/null || mktemp -d -t ccnavi-write-and-push) || return 1
 }
 
-ccnavi_wap_number() {
-	case "${1:-}" in
-	'' | *[!0-9]*) printf '%s\n' "$2" ;;
-	*) printf '%s\n' "$1" ;;
-	esac
-}
-
 # ccnavi_wap_exe を決める。<ワークスペースルート>
 #
 # 実行ファイル（ccnavi_bin）を `--root <ルート>` つきで起こす。無ければ、ccnavi_wap_exe は 1 を返すだけの
@@ -192,7 +185,7 @@ ccnavi_wap_busy() {
 
 # 1〜5。0 なら書いてよい（ロックを持ったまま返る）。1 なら止めた（ロックは外した）。
 ccnavi_wap_begin() {
-	ccnavi_cb_wait=$(ccnavi_wap_number "${CCNAVI_LOCK_WAIT:-}" 120)
+	ccnavi_cb_wait=$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 120)
 	ccnavi_cb_rc=0
 	ccnavi_lock_take "$ccnavi_wap_root" "$ccnavi_wap_repo" "$ccnavi_wap_family_id" "$ccnavi_cb_wait" || ccnavi_cb_rc=$?
 	case "$ccnavi_cb_rc" in
@@ -284,7 +277,7 @@ ccnavi_wap_prepare() {
 	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push のゲート。3 経路で同じ）。
 	ccnavi_cp_gate=0
 	ccnavi_push_gate "$ccnavi_wap_tree" "$ccnavi_wap_branch" "$ccnavi_wap_family_id" "$ccnavi_wap_root" \
-		"$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || ccnavi_cp_gate=$?
+		"$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || ccnavi_cp_gate=$?
 	if [ "$ccnavi_cp_gate" -ne 0 ]; then
 		ccnavi_wap_say "${ccnavi_pg_why}。何も反映していません"
 		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=push-gate" "gate=$ccnavi_cp_gate"
@@ -390,7 +383,7 @@ ccnavi_wap_write() {
 	mkdir -p "$ccnavi_cw_dir" 2>/dev/null || :
 	ccnavi_cw_list="$ccnavi_cw_dir/$ccnavi_wap_family_id.$$.writes"
 	ccnavi_cw_answer="$ccnavi_cw_list.answer"
-	ccnavi_cw_timeout=$(ccnavi_wap_number "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
+	ccnavi_cw_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
 	ccnavi_cw_try=0
 	while :; do
 		ccnavi_cw_try=$((ccnavi_cw_try + 1))
