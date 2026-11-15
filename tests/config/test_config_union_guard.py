@@ -15,9 +15,11 @@ Write / Edit の拒否、シェルからの書き込みの拒否、バックア�
 
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import shutil
+import tempfile
 import unittest
 
 from tests import ROOT
@@ -54,20 +56,90 @@ OPEN_RULES = {
 BROKEN_RULES = "version: 1\ndeny: [\n"
 
 
+_DERIVED: dict[str, str] = {}
+
+
+def from_template(case, key, prepare):
+    """setUp が写したワークスペース（case.ws）を、prepare(ws) を済ませた形に差し替える。
+
+    prepare を済ませた形は key ごとにこのプロセスで 1 回だけ組み、以後は写す（テストごとに
+    git のコミットを打たない）。prepare は渡した ws の下だけを書く。
+    """
+    if key not in _DERIVED:
+        holder = tempfile.mkdtemp(prefix="ccnavi-union-derived-")
+        atexit.register(shutil.rmtree, holder, ignore_errors=True)
+        made = os.path.join(holder, "ws")
+        shutil.copytree(case.ws, made, symlinks=True)
+        prepare(made)
+        _DERIVED[key] = made
+    shutil.rmtree(case.ws)
+    shutil.copytree(_DERIVED[key], case.ws, symlinks=True)
+
+
 class GuardHarness(ConfigUnionHarness):
     """設定ファイルの保護を enable にして動かす道具。"""
 
-    def setUp(self):
-        super().setUp()
-        write(self.rules, json.dumps(OPEN_RULES))
+    @staticmethod
+    def prepare(ws):
+        common = os.path.join(ws, ".ccnavi", "config", "common")
+        write(os.path.join(common, "rules.yml"), json.dumps(OPEN_RULES))
         # 共通レイヤーの phases.yml も守る対象。守ることを見るために置き、ワークツリー側の設定が
         # できるようコミットしておく。
-        write(self.phases, COMMON_PHASES)
-        git(self.ws, "add", "-A")
-        git(self.ws, "commit", "--quiet", "-m", "common phases")
+        write(os.path.join(common, "phases.yml"), COMMON_PHASES)
+        git(ws, "add", "-A")
+        git(ws, "commit", "--quiet", "-m", "common phases")
+
+    def setUp(self):
+        super().setUp()
+        from_template(self, "guard", self.prepare)
 
     def guarded_hook(self, tool, cwd, *, event="PreToolUse", **tool_input):
         return self.hook(tool, cwd, event=event, guard="enable", **tool_input)
+
+    def judge_many(self, commands, *flags):
+        """シェルのコマンドを何本も 1 回の起動で判定し、1 本ごとにヒットしたルールの id を返す。
+
+        `--test-expectations` に渡す。判定は hook の実行前と同じ関数（TryOne）を通り、居場所は
+        ワークスペースルート（hook に `cwd` をルートで渡したのと同じ）。止めたかどうかも見るので、
+        決定（`verdict`）と id の組を返す。
+        """
+        commands = list(commands)
+        with tempfile.TemporaryDirectory(prefix="ccnavi-union-expect-") as scratch:
+            path = os.path.join(scratch, "expectations.yml")
+            # 期待のタイプは判定に効かない。JSON は YAML としても読める。
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"ask": [{"tool": "Bash", "subject": c} for c in commands]}, f)
+            done = self.ccnavi(*flags, "--test-expectations", path, "--json", guard="enable")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        bodies = json.loads(done.stdout)["expectations"]
+        self.assertEqual(len(bodies), len(commands))
+        return [(b["verdict"], [hit["id"] for hit in b["rules"]]) for b in bodies]
+
+    def assert_all_guarded(self, commands, *flags):
+        """どれも設定ファイルの保護で止まる。何本も 1 回の起動で判定する。"""
+        commands = list(commands)
+        for command, (verdict, ids) in zip(
+            commands, self.judge_many(commands, *flags), strict=True
+        ):
+            with self.subTest(command=command):
+                self.assertEqual(verdict, "deny", ids)
+                self.assertIn("builtin:guard-setting-files", ids)
+
+    def assert_none_denied(self, commands, *flags):
+        """どれも止まらない。何本も 1 回の起動で判定する。"""
+        commands = list(commands)
+        for command, (verdict, ids) in zip(
+            commands, self.judge_many(commands, *flags), strict=True
+        ):
+            with self.subTest(command=command):
+                self.assertNotEqual(verdict, "deny", ids)
+
+    def assert_none_guarded(self, commands, *flags):
+        """どれも設定ファイルの保護にヒットしない。何本も 1 回の起動で判定する。"""
+        commands = list(commands)
+        for command, (_, ids) in zip(commands, self.judge_many(commands, *flags), strict=True):
+            with self.subTest(command=command):
+                self.assertNotIn("builtin:guard-setting-files", ids)
 
     def run_hook(self, event, command="ls"):
         """Bash 1 回。実行前でバックアップを取り、実行後で戻す。"""
@@ -290,25 +362,24 @@ class DenyTest(GuardHarness):
 
     def test_shell_writes_into_project_home_are_denied(self):
         """シェルからの書き込みは `builtin:guard-setting-files` の 1 本で止まる。"""
-        for command in (
-            "echo x > projects/lib/.ccnavi/scripts/count.sh",
-            "echo x >> .ccnavi/config/project/rules.yml",
-            "sed -i s/deny/allow/ projects/lib/.ccnavi/config/project/rules.yml",
-            "cp /tmp/x .ccnavi/config/project/phases.yml",
-            "cd projects/lib && echo x > .ccnavi/config/project/risks.yml",
-        ):
-            with self.subTest(command=command):
-                result = self.guarded_hook("Bash", self.ws, command=command)
-                self.assert_denied(result, "builtin:guard-setting-files")
+        self.assert_all_guarded(
+            (
+                "echo x > projects/lib/.ccnavi/scripts/count.sh",
+                "echo x >> .ccnavi/config/project/rules.yml",
+                "sed -i s/deny/allow/ projects/lib/.ccnavi/config/project/rules.yml",
+                "cp /tmp/x .ccnavi/config/project/phases.yml",
+                "cd projects/lib && echo x > .ccnavi/config/project/risks.yml",
+            ),
+        )
 
     def test_reading_project_home_is_allowed(self):
         """読むだけなら通る。名前が出ただけでは止めない。"""
-        for command in (
-            "cat projects/lib/.ccnavi/config/project/rules.yml",
-            "grep -n deny .ccnavi/config/project/rules.yml",
-        ):
-            with self.subTest(command=command):
-                self.assert_not_denied(self.guarded_hook("Bash", self.ws, command=command))
+        self.assert_none_denied(
+            (
+                "cat projects/lib/.ccnavi/config/project/rules.yml",
+                "grep -n deny .ccnavi/config/project/rules.yml",
+            ),
+        )
         self.assert_not_denied(
             self.guarded_hook("Read", self.ws, file_path=layer_path(self.lib, "rules"))
         )
@@ -363,14 +434,13 @@ class DenyTest(GuardHarness):
         （`_PLACES` の `\\.ccnavi`）が適用する。動かした置き場は
         `test_shell_writes_into_a_moved_common_layer_are_denied` が見る。
         """
-        for command in (
-            "echo x > .ccnavi/config/common/rules.yml",
-            "sed -i s/deny/allow/ .ccnavi/config/common/phases.yml",
-            "cp /tmp/x .ccnavi/config/common/risks.yml",
-        ):
-            with self.subTest(command=command):
-                result = self.hook("Bash", self.ws, guard="enable", command=command)
-                self.assert_denied(result, "builtin:guard-setting-files")
+        self.assert_all_guarded(
+            (
+                "echo x > .ccnavi/config/common/rules.yml",
+                "sed -i s/deny/allow/ .ccnavi/config/common/phases.yml",
+                "cp /tmp/x .ccnavi/config/common/risks.yml",
+            ),
+        )
         # 名前の途中でヒットしたものは別のファイル。
         result = self.hook(
             "Bash", self.ws, guard="enable", command="echo x > myccnavi/common/rules.yml"
@@ -408,37 +478,35 @@ class DenyTest(GuardHarness):
         """
         absolute = os.path.dirname(self.rules).replace(os.sep, "/")
         for name in ("rules.yml", "phases.yml", "risks.yml"):
-            for command in (
-                f"cp /tmp/x .ccnavi/config/common/{name}",
-                f"cp /tmp/x {absolute}/{name}",
-                f"ln -sf /tmp/x .ccnavi/config/common/{name}",
-                f"install /tmp/x .ccnavi/config/common/{name}",
-                f"cp .ccnavi/config/common/{name} .ccnavi/config/common/{name}",
-                f"cp /tmp/x .ccnavi/config/common/{name} && echo done",
-                f"cp /tmp/x .ccnavi/config/common/{name}; echo done",
-                f"cp /tmp/x .ccnavi/config/common/{name} > /dev/null 2>&1",
-                f"echo go && cp /tmp/x .ccnavi/config/common/{name}",
-                f'cp "/tmp/a b" .ccnavi/config/common/{name}',
-                f'cp /tmp/x ".ccnavi/config/common/{name}"',
-                f"cd .ccnavi && cp /tmp/x common/{name}",
-            ):
-                with self.subTest(command=command):
-                    result = self.hook("Bash", self.ws, guard="enable", command=command)
-                    self.assert_denied(result, "builtin:guard-setting-files")
+            self.assert_all_guarded(
+                (
+                    f"cp /tmp/x .ccnavi/config/common/{name}",
+                    f"cp /tmp/x {absolute}/{name}",
+                    f"ln -sf /tmp/x .ccnavi/config/common/{name}",
+                    f"install /tmp/x .ccnavi/config/common/{name}",
+                    f"cp .ccnavi/config/common/{name} .ccnavi/config/common/{name}",
+                    f"cp /tmp/x .ccnavi/config/common/{name} && echo done",
+                    f"cp /tmp/x .ccnavi/config/common/{name}; echo done",
+                    f"cp /tmp/x .ccnavi/config/common/{name} > /dev/null 2>&1",
+                    f"echo go && cp /tmp/x .ccnavi/config/common/{name}",
+                    f'cp "/tmp/a b" .ccnavi/config/common/{name}',
+                    f'cp /tmp/x ".ccnavi/config/common/{name}"',
+                    f"cd .ccnavi && cp /tmp/x common/{name}",
+                ),
+            )
         # 行き先をディレクトリにした形。
-        for command in (
-            "cp /tmp/rules.yml .ccnavi/config/common",
-            "cp /tmp/rules.yml .ccnavi/config/common/",
-            f"cp /tmp/rules.yml {absolute}",
-            "cp /tmp/rules.yml .ccnavi/config/common && echo done",
-            "cp -t .ccnavi/config/common /tmp/rules.yml",
-            "cp --target-directory=.ccnavi/config/common /tmp/rules.yml",
-            "install -Dt .ccnavi/config/common /tmp/rules.yml",
-            "ln -st .ccnavi/config/common /tmp/rules.yml",
-        ):
-            with self.subTest(command=command):
-                result = self.hook("Bash", self.ws, guard="enable", command=command)
-                self.assert_denied(result, "builtin:guard-setting-files")
+        self.assert_all_guarded(
+            (
+                "cp /tmp/rules.yml .ccnavi/config/common",
+                "cp /tmp/rules.yml .ccnavi/config/common/",
+                f"cp /tmp/rules.yml {absolute}",
+                "cp /tmp/rules.yml .ccnavi/config/common && echo done",
+                "cp -t .ccnavi/config/common /tmp/rules.yml",
+                "cp --target-directory=.ccnavi/config/common /tmp/rules.yml",
+                "install -Dt .ccnavi/config/common /tmp/rules.yml",
+                "ln -st .ccnavi/config/common /tmp/rules.yml",
+            ),
+        )
 
     def test_writing_from_the_common_layer_side_is_still_denied(self):
         """書き込みの表記は、共通レイヤーの 3 本が前に出た形でも今までどおり止まる。
@@ -447,17 +515,16 @@ class DenyTest(GuardHarness):
         sed -i / リダイレクトは名指ししたところを書く。
         """
         for name in ("rules.yml", "phases.yml", "risks.yml"):
-            for command in (
-                f"mv .ccnavi/config/common/{name} /tmp/x",
-                f"rm .ccnavi/config/common/{name}",
-                f"tee .ccnavi/config/common/{name} < /tmp/x",
-                f"sed -i s/deny/allow/ .ccnavi/config/common/{name}",
-                f"echo x > .ccnavi/config/common/{name}",
-                f"cp .ccnavi/config/common/{name} /tmp/x && rm .ccnavi/config/common/{name}",
-            ):
-                with self.subTest(command=command):
-                    result = self.hook("Bash", self.ws, guard="enable", command=command)
-                    self.assert_denied(result, "builtin:guard-setting-files")
+            self.assert_all_guarded(
+                (
+                    f"mv .ccnavi/config/common/{name} /tmp/x",
+                    f"rm .ccnavi/config/common/{name}",
+                    f"tee .ccnavi/config/common/{name} < /tmp/x",
+                    f"sed -i s/deny/allow/ .ccnavi/config/common/{name}",
+                    f"echo x > .ccnavi/config/common/{name}",
+                    f"cp .ccnavi/config/common/{name} /tmp/x && rm .ccnavi/config/common/{name}",
+                ),
+            )
 
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、ヒットしたルールの id を返す。
@@ -491,21 +558,23 @@ class DenyTest(GuardHarness):
         moved = ("--rules", policy)
         # 絶対パスは `/` で書く。bash は引用されない `\` を消すので、`\` の表記のままでは
         # そのコマンドは設定ファイルに書かない。
-        for command in (
-            "echo x > policy/rules.yml",
-            "sed -i s/deny/allow/ policy/rules.yml",
-            "cp /tmp/x policy/rules.yml",
-            f"echo x > {policy.replace(os.sep, '/')}",
-        ):
-            with self.subTest(command=command):
-                self.assertIn("builtin:guard-setting-files", self.judged(command, *moved))
+        self.assert_all_guarded(
+            (
+                "echo x > policy/rules.yml",
+                "sed -i s/deny/allow/ policy/rules.yml",
+                "cp /tmp/x policy/rules.yml",
+                f"echo x > {policy.replace(os.sep, '/')}",
+            ),
+            *moved,
+        )
         # 名前の途中でヒットしたものは別のファイル。前と後ろの両方を見る。
-        for command in (
-            "echo x > otherpolicy/rules.yml",
-            "echo x > policy/rules.yml.bak",
-        ):
-            with self.subTest(command=command):
-                self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved))
+        self.assert_none_guarded(
+            (
+                "echo x > otherpolicy/rules.yml",
+                "echo x > policy/rules.yml.bak",
+            ),
+            *moved,
+        )
 
     def test_copies_of_a_moved_common_layer_look_only_at_the_destination(self):
         """動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで適用する。
@@ -524,49 +593,50 @@ class DenyTest(GuardHarness):
             moved_flags.extend((flag, path))
             moved_paths.append((f"policy/{name}", path.replace(os.sep, "/")))
         for rel, absolute in moved_paths:
-            for command in (
-                f"cp {rel} /tmp/backup.yml",
-                f"cp {absolute} /tmp/backup.yml",
-                f"ln -s {rel} /tmp/link.yml",
-                f"install {rel} /tmp/x.yml",
-                f"cp {rel} /tmp/a.yml && cat /tmp/a.yml",
-                f"cp -t /tmp/out {rel}",
-                f"cp --target-directory=/tmp/out {absolute}",
-                f"cp -v {rel} /tmp/out -f",
-            ):
-                with self.subTest(command=command):
-                    self.assertNotIn(
-                        "builtin:guard-setting-files", self.judged(command, *moved_flags)
-                    )
-            for command in (
-                f"cp /tmp/x {rel}",
-                f"cp /tmp/x {absolute}",
-                f"ln -sf /tmp/x {rel}",
-                f"install /tmp/x {rel}",
-                f"cp /tmp/x {rel} && echo done",
-                f"cp /tmp/x {rel}; echo done",
-                f"cp /tmp/x {rel} -f",
-                f"cp -S -t /tmp/x {rel}",
-                f"sudo cp /tmp/x {absolute}",
-                f"echo go && cp /tmp/x {rel}",
-                f'cp "/tmp/a b" {rel}',
-                f'cp /tmp/x "{rel}"',
-                f"cd policy && cp /tmp/x {rel.split('/')[-1]}",
-                f"mv {rel} /tmp/x",
-                f"rm {rel}",
-                f"tee {rel} < /tmp/x",
-                f"sed -i s/deny/allow/ {rel}",
-                f"echo x > {rel}",
-            ):
-                with self.subTest(command=command):
-                    self.assertIn("builtin:guard-setting-files", self.judged(command, *moved_flags))
+            self.assert_none_guarded(
+                (
+                    f"cp {rel} /tmp/backup.yml",
+                    f"cp {absolute} /tmp/backup.yml",
+                    f"ln -s {rel} /tmp/link.yml",
+                    f"install {rel} /tmp/x.yml",
+                    f"cp {rel} /tmp/a.yml && cat /tmp/a.yml",
+                    f"cp -t /tmp/out {rel}",
+                    f"cp --target-directory=/tmp/out {absolute}",
+                    f"cp -v {rel} /tmp/out -f",
+                ),
+                *moved_flags,
+            )
+            self.assert_all_guarded(
+                (
+                    f"cp /tmp/x {rel}",
+                    f"cp /tmp/x {absolute}",
+                    f"ln -sf /tmp/x {rel}",
+                    f"install /tmp/x {rel}",
+                    f"cp /tmp/x {rel} && echo done",
+                    f"cp /tmp/x {rel}; echo done",
+                    f"cp /tmp/x {rel} -f",
+                    f"cp -S -t /tmp/x {rel}",
+                    f"sudo cp /tmp/x {absolute}",
+                    f"echo go && cp /tmp/x {rel}",
+                    f'cp "/tmp/a b" {rel}',
+                    f'cp /tmp/x "{rel}"',
+                    f"cd policy && cp /tmp/x {rel.split('/')[-1]}",
+                    f"mv {rel} /tmp/x",
+                    f"rm {rel}",
+                    f"tee {rel} < /tmp/x",
+                    f"sed -i s/deny/allow/ {rel}",
+                    f"echo x > {rel}",
+                ),
+                *moved_flags,
+            )
         # 名前の途中や続きでヒットしたものは別のファイル。
-        for command in (
-            "cp /tmp/x otherpolicy/rules.yml",
-            "cp /tmp/x policy/rules.yml.bak",
-        ):
-            with self.subTest(command=command):
-                self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved_flags))
+        self.assert_none_guarded(
+            (
+                "cp /tmp/x otherpolicy/rules.yml",
+                "cp /tmp/x policy/rules.yml.bak",
+            ),
+            *moved_flags,
+        )
 
     def test_a_directory_holding_a_moved_common_layer_is_guarded_by_name(self):
         """動かした共通レイヤーの入っているディレクトリを行き先にした形（`_moved_holders`）。
@@ -577,26 +647,28 @@ class DenyTest(GuardHarness):
         policy = write(os.path.join(self.ws, "policy", "rules.yml"), read(self.rules))
         moved = ("--rules", policy)
         absolute = os.path.dirname(policy).replace(os.sep, "/")
-        for command in (
-            "cp /tmp/rules.yml policy/",
-            "cp /tmp/rules.yml policy",
-            "mv /tmp/rules.yml policy/",
-            "cp -t policy /tmp/rules.yml",
-            f"cp /tmp/rules.yml {absolute}/",
-            "cp /tmp/*.yml policy/",
-            "cd policy && cp /tmp/rules.yml .",
-            "cp -r /tmp/policy .",
-        ):
-            with self.subTest(command=command):
-                self.assertIn("builtin:guard-setting-files", self.judged(command, *moved))
-        for command in (
-            "cp /tmp/notes.txt policy/",
-            "cp -t policy /tmp/notes.txt",
-            "cp policy/rules.yml /tmp/",
-            "cp /tmp/rules.yml otherpolicy/",
-        ):
-            with self.subTest(command=command):
-                self.assertNotIn("builtin:guard-setting-files", self.judged(command, *moved))
+        self.assert_all_guarded(
+            (
+                "cp /tmp/rules.yml policy/",
+                "cp /tmp/rules.yml policy",
+                "mv /tmp/rules.yml policy/",
+                "cp -t policy /tmp/rules.yml",
+                f"cp /tmp/rules.yml {absolute}/",
+                "cp /tmp/*.yml policy/",
+                "cd policy && cp /tmp/rules.yml .",
+                "cp -r /tmp/policy .",
+            ),
+            *moved,
+        )
+        self.assert_none_guarded(
+            (
+                "cp /tmp/notes.txt policy/",
+                "cp -t policy /tmp/notes.txt",
+                "cp policy/rules.yml /tmp/",
+                "cp /tmp/rules.yml otherpolicy/",
+            ),
+            *moved,
+        )
 
     def test_lint_warns_about_new_files_in_a_worktree_project_home(self):
         """ワークツリーの `.ccnavi/` に元リポジトリに無いファイルがあれば --lint warn。"""

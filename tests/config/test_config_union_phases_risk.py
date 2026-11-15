@@ -32,6 +32,7 @@ from tests.config.test_config_union import (
     write,
     write_layer,
 )
+from tests.config.test_config_union_guard import from_template
 
 # 共通レイヤーに足す項目。どれも `factors:` の続きなので、COMMON_RISK の後ろに繋げる。
 COMMON_SCRIPT_FACTOR = (
@@ -460,11 +461,16 @@ class PhaseUnionTest(ConfigUnionHarness):
 class RiskUnionHarness(ConfigUnionHarness):
     """risk を見るテストの土台。テストを持たない（継いだクラスで同じテストを重ねて回さない）。"""
 
+    @staticmethod
+    def prepare(ws):
+        lib = os.path.join(ws, "projects", "lib")
+        write_layer(lib, phases=LIB_PHASES_WORK)
+        git(lib, "add", "-A")
+        git(lib, "commit", "--quiet", "-m", "phases")
+
     def setUp(self):
         super().setUp()
-        write_layer(self.lib, phases=LIB_PHASES_WORK)
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "--quiet", "-m", "phases")
+        from_template(self, "risk", self.prepare)
 
     def risk_problems(self, severity, layer=""):
         """risk の Problem。
