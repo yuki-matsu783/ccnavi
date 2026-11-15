@@ -37,6 +37,7 @@ func init() {
 		"start":     opStart,
 		"adopt":     opAdopt,
 		"version":   opVersion,
+		"copy":      opCopy,
 	}
 }
 
