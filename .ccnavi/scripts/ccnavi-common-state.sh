@@ -43,21 +43,6 @@ ccnavi_branch_ok() {
 	fi
 }
 
-# ワークツリーの HEAD が指すブランチ名。<ワークツリー> <識別子>
-#
-# HEAD のブランチ名を変換（ccnavi_branch_to_id。/ を - に置き換え）
-# したものがフォルダ名の識別子と一致し、ブランチ名として受けてよいときだけ出す。
-# ワークツリーが無い・ブランチの外（detached HEAD）なら 1、一致しない・使えない名前なら 2。
-# git は読み取りの 1 回だけ。
-ccnavi_head_branch() {
-	{ [ -d "$1" ] && [ ! -L "$1" ]; } || return 1
-	ccnavi_hb_name=$(git -C "$1" symbolic-ref --quiet --short HEAD 2>/dev/null) || ccnavi_hb_name=""
-	[ -n "$ccnavi_hb_name" ] || return 1
-	[ "$(ccnavi_branch_to_id "$ccnavi_hb_name")" = "$2" ] || return 2
-	ccnavi_branch_ok "$ccnavi_hb_name" "$2" || return 2
-	printf '%s\n' "$ccnavi_hb_name"
-}
-
 # 実行ファイルに聞く。答え（標準出力）を、Windows の実行ファイルの CR を除いて出す。<ワークスペースルート> <引数>...
 #
 # 実行ファイルが無ければ 1。実行ファイルが
@@ -178,26 +163,6 @@ ccnavi_integration_hint() {
 	else
 		printf '統合先が決まらない（実行ファイルが答えない）。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。'
 	fi
-}
-
-# そのツリーが、名前の親子のチケットの親のワークツリーか。<ツリー> <名前>
-#
-# 置き場（承認済みの doing/・done/、提案の todo/・review/）に `ticket: <名前>` の親チケットか提案が
-# あれば 0（SessionStart で早送りする対象の条件の 1 つ）。ready が退避した後は、手元の退避の親チケットも見る。
-# 子チケット（`parent:` を持つ）は数えない。
-#
-# sh はチケットを読まない。読むのは実行ファイル（`tree parent <ツリー> <名前>`）で、sh は答えの 1 行を見る。
-# 親でなければ 1。ツリーが無ければ聞かずに 1。決められなければ 2（実行ファイルが無い・答えない・古くて
-# サブコマンドを知らない、置き場に名前のファイルが在るのに frontmatter を読めない）。2 をどちらに倒すかは
-# 呼ぶ側が決める。止める側の検査は親として扱い、ツリーを動かす側は親でないとして扱う。
-# 実行ファイルの --root に渡すワークスペースルートは `.claude/worktrees/<名前>` の 2 つ上。
-ccnavi_parent_tree() {
-	ccnavi_parent_info "$1" "$2" || return 2
-	case "$ccnavi_pi_parent" in
-	yes) return 0 ;;
-	no) return 1 ;;
-	esac
-	return 2
 }
 
 # `tree parent` の答えを変数に入れる。ツリーが無ければ 1、答えを得られなければ 2。<ツリー> <名前> [<ブランチ>]

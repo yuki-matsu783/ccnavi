@@ -77,7 +77,7 @@
          チケットの parent: でもその親の子であることを確かめます。取り消した子は confirmed が
          要ります。ユーザが ! を付けて打つコマンドで、エージェントからは打てません）
     ccnavi sync tidy <parent> <repo> <branch> <sha>
-        （ccnavi-sync.sh 用。親の MR がマージ済みと分かった後に、親のワークツリーと
+        （親の MR がマージ済みと分かった後に、親のワークツリーと
          手元のブランチを、<branch> が親のブランチで、手元の先頭が push 済みの先頭
          （origin/<branch>）と <sha>（MR の先頭）の両方に含まれるときだけ削除します。
          エージェントからは打てません。
@@ -87,18 +87,24 @@
     ccnavi worktree name <name>
         （直接作業するワークツリーの名前が <prefix>-<number>-<slug> の形式でない場合に、
          "warn: ..." を1行表示します。形式どおりなら何も表示しません。拒否はしません）
-    ccnavi sync paths
-        （.ccnavi/scripts/ccnavi-sync.sh 用。1行に "<key> <value>" を1組ずつ出力します。
-         対象は、承認済みと提案の置き場、ccnaviのディレクトリです。統合先ブランチは返しません
-         （sh が各リポジトリの origin/HEAD で決めます））
+    ccnavi sync plan|integ|fetched|family|pull|merged|recheck <scripts> <args>...
+        （.ccnavi/scripts/ccnavi-sync.sh 用。sh が ls-remote・fetch・ccnavi-review.sh merged を
+         打つ間の判定と、早送り・merge（失敗したら取りやめ）・origin/HEAD の向け直し・片付けを行います。
+         "sync 1" の行に続いて、表示する "out <行>"、止めたことを表す "failed"、次の一手の
+         "next <語>"（fetch・ask・skip・go）を出力します。merged は片付けでブランチを消すので、
+         エージェントからは打てません。ネットワークには出ません）
     ccnavi sync check <parent> [<repo>]
-        （ccnavi-sync.sh が <parent> を取り込んだ後に使用します。ファミリーの承認済みチケットと
+        （<parent> を取り込んだ後の検査です（ccnavi-sync.sh は sync recheck で同じ判定をします）。ファミリーの承認済みチケットと
          その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を
          1行ずつ出力します（warn には、手元のレイヤーが取得済みの origin/<統合先> のレイヤーと
          違うことを含みます。git show でローカルの参照を読むだけで、ネットワークには出ません）。
          error がある場合は終了コード1になります）
+    ccnavi fetch plan|forward|track|retarget|base|advance <args>...
+        （.ccnavi/scripts/ccnavi-fetch.sh 用。sh が fetch・ls-remote を打つ間の判定と、早送り・
+         update-ref・origin/HEAD の向け直しを行います。"fetch 1" の行に続いて、表示する "out <行>" と
+         次の一手の "next <語>"（fetch・lock）を出力します。ネットワークには出ません）
     ccnavi sync retired
-        （ccnavi-sync.sh 用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
+        （ボード用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
          （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
          形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
          です。ネットワークにも git にも触れません）

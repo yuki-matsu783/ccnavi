@@ -135,7 +135,7 @@ func parentTreesOffBranch(conf *config.Settings, root string) []rules.Problem {
 }
 
 // holdsParent はそのツリーに `ticket: <ツリーの名前>` の親の承認済みチケットか提案があるか（見方は approval.ParentIn で、
-// sh の ccnavi_parent_tree とも同じ）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
+// `tree parent` の parent の行とも同じ）。ready の後は親が手元の退避へ移るので、そこに親が在っても親のワークツリーとして扱う。
 func holdsParent(conf *config.Settings, work tree.Tree, root string) bool {
 	if front, _ := approval.ParentIn(approval.ParentPaths(conf, work.Root, work.Name), work.Name); front != nil {
 		return true

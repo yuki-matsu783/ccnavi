@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"ccnavi/internal/entry/catchup"
 	"ccnavi/internal/entry/diagnose"
 	"ccnavi/internal/entry/lint"
 	"ccnavi/internal/entry/shask"
@@ -422,16 +423,17 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	case cmd[0] == "ops":
 		// 操作記録の読み書き。チケット制御の有無に依らない。
 		return opsCommand(stdout, stderr, conf, cmd[1:]), true
-	case slices.Equal(cmd, []string{"sync", "paths"}):
-		return okIf(syncPaths(stdout, conf) == 0), true
 	case slices.Equal(cmd, []string{"sync", "retired"}):
-		return okIf(syncRetired(stdout, conf) == 0), true
+		return okIf(catchup.Retired(stdout, conf) == 0), true
 	case (len(cmd) == 3 || len(cmd) == 4) && a.head("sync", "check"):
 		repo := ""
 		if len(cmd) == 4 {
 			repo = cmd[3]
 		}
-		return okIf(syncCheck(stdout, stderr, root, conf, cmd[2], repo) == 0), true
+		return okIf(catchup.Check(stdout, stderr, root, conf, cmd[2], repo) == 0), true
+	case len(cmd) >= 2 && cmd[0] == "fetch":
+		// ccnavi-fetch.sh の段取りの間の判定と早送り。チケット制御の有無に依らない。
+		return catchup.Fetch(stdout, stderr, root, conf, cmd[1:]), true
 	case cmd[0] == "text":
 		return runText(stdout, stderr, root, cmd[1:]), true
 	case len(cmd) >= 2 && cmd[0] == "git" && cmd[1] == "integrate":
@@ -464,7 +466,10 @@ func asked(in *input, stdout, stderr io.Writer, conf *config.Settings, root stri
 	}
 	switch {
 	case len(cmd) == 6 && a.head("sync", "tidy"):
-		return okIf(syncTidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5]) == 0), true
+		return okIf(catchup.Tidy(stdout, stderr, root, conf, cwdOf(a), cmd[2], cmd[3], cmd[4], cmd[5]) == 0), true
+	case len(cmd) >= 3 && cmd[0] == "sync":
+		// ccnavi-sync.sh の段取りの間の判定・取り込み・片付け。
+		return catchup.Sync(stdout, stderr, root, conf, cwdOf(a), cmd[1:]), true
 	case len(cmd) == 3 && a.head("write-and-push", "family"):
 		if !ids.IsValidFamily(cmd[2]) {
 			fmt.Fprintf(stderr, "ccnavi: write-and-push family の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(cmd[2]))

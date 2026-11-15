@@ -74,7 +74,7 @@ ccnavi ディレクトリの組み込みルール（`builtin:guard-project-home`
 親のブランチの確かめ（閉じたかは MR がマージ済みかで決める。ホストに聞けなければ推定せず止まる）は、ユーザが打つ
 `ccnavi-sync.sh` が持つ。統合先は、ホストに聞いた名前（`ls-remote --symref origin HEAD`）、聞けなければ手元の `origin/HEAD`、`main`・`master` の順で、
 リモートにある最初の名前にする。どれも無ければ止める。親のブランチ名は、実行ファイルの `ccnavi write-and-push family <P>` の `branch` の行（親のワークツリーの HEAD から読んだ名前）で知る。
-`ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
+`ccnavi-sync.sh` は取り込んだ後に `ccnavi sync check <P>` と同じ判定（`sync recheck`）でその親子のチケットを判定し直し、error があれば表示して終了コード 1 にする
 （理由を直して打ち直せば通る）。MR がマージ済みと分かったら、手元の片付け（`ccnavi sync tidy`。9.11）を行う。
 
 **`ccnavi-git.sh` の判定は実行ファイルが持つ。** git の入口は `ccnavi-git.sh` 1 本に寄せてあり（生の
