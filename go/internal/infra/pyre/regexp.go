@@ -5,14 +5,23 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"ccnavi/internal/infra/pyfmt"
 )
 
 // inst は照合に使う形。旗（大文字小文字・改行・ASCII）はここで解いておく。
+// 式の大半は 1 字を読むもの（test だけを使う）なので、それ以外の欄は instBody に分け、1 字を読む inst には持たせない。
+// 1 字ごとに全部の欄を割り当てると、長い組み込みの式を組むたびに数 MB を割り当てることになる。照合は test が
+// nil でない inst を先に処理し、instBody の欄は test が nil の inst でだけ読む。
 type inst struct {
-	op      opcode
-	test    func(rune) bool // 1 字を読むもの（LITERAL・NOT_LITERAL・ANY・IN）
+	op   opcode
+	test func(rune) bool // 1 字を読むもの（LITERAL・NOT_LITERAL・ANY・IN）
+	*instBody
+}
+
+// instBody は 1 字を読むもの以外の inst の欄。
+type instBody struct {
 	alts    [][]*inst
 	group   int
 	sub     []*inst
@@ -31,14 +40,54 @@ type inst struct {
 // Regexp は組み立てた式。並行に使ってよい。
 type Regexp struct {
 	pattern string
-	prog    []*inst
-	groups  int
-	names   map[string]int
-	anchor  bool // 先頭でしか当たらない（\A か、複数行でない ^ で始まる）
+	// built は照合に使う形。Compile は組んだ形を返すだけの関数を置き、MustCompile は初めて呼ばれたときに組む関数を置く。
+	built func() *program
 }
 
-// Compile は Python の re.compile(pattern, flags)。
+// program は照合に使う形。組んだあと変えない。
+type program struct {
+	prog   []*inst
+	groups int
+	names  map[string]int
+	anchor bool // 先頭でしか当たらない（\A か、複数行でない ^ で始まる）
+}
+
+// compileKey は組んだ式を覚えておく鍵。同じ文字列でも旗が違えば別の式になる。
+type compileKey struct {
+	pattern string
+	flags   Flag
+}
+
+// compileResult は 1 つの鍵を組んだ結果。組めなかった式も、同じ苦情を返すように覚える。
+type compileResult struct {
+	re  *Regexp
+	err error
+}
+
+// compiled は、この起動で組んだ式を鍵ごとに覚える。1 回の起動でも、診断（`--test-expectations`）は期待ごとに判定を
+// 回し直し、組み込みのルールとルールファイルの同じ式を毎回組む。組むのは照合より重いので、2 回目からは覚えた結果を
+// 返す。Regexp は組んだあと変えないので、同じものを並行に渡してよい。実行ファイルは 1 回の起動で 1 つの操作をして
+// 終わるので、覚える数はその操作が読む式の数で止まる。
+var compiled sync.Map
+
+// Compile は Python の re.compile(pattern, flags)。同じ式と旗には、同じ起動の中で同じ結果を返す。
 func Compile(pattern string, flags Flag) (*Regexp, error) {
+	key := compileKey{pattern, flags}
+	if v, ok := compiled.Load(key); ok {
+		r := v.(compileResult)
+		return r.re, r.err
+	}
+	var re *Regexp
+	p, err := compile(pattern, flags)
+	if err == nil {
+		re = &Regexp{pattern: pattern, built: func() *program { return p }}
+	}
+	v, _ := compiled.LoadOrStore(key, compileResult{re, err})
+	r := v.(compileResult)
+	return r.re, r.err
+}
+
+func compile(pattern string, flags Flag) (*program, error) {
 	s, st, err := parsePattern(pattern, flags)
 	if err != nil {
 		return nil, err
@@ -47,21 +96,25 @@ func Compile(pattern string, flags Flag) (*Regexp, error) {
 	if err != nil {
 		return nil, err
 	}
-	re := &Regexp{pattern: pattern, prog: prog, groups: st.groups(), names: st.groupdict}
+	p := &program{prog: prog, groups: st.groups(), names: st.groupdict}
 	if len(prog) > 0 && prog[0].op == opAt && (prog[0].at == atBeginningString || prog[0].at == atBeginning && !prog[0].multi) {
-		re.anchor = true
+		p.anchor = true
 	}
-	return re, nil
+	return p, nil
 }
 
-// MustCompile は Compile と同じだが、組めなければ panic する。起動時に組む、このビルドに書いた固定の式だけに使う
-// （組めないのはビルドの不備で、テストが起動の時点で落ちる）。利用者が書いた式は Compile で読む。
+// MustCompile は、このビルドに書いた固定の式を、初めて使うときに組む Regexp を返す。組めなければそのとき panic する
+// （組めないのはビルドの不備で、その式を使うテストが落ちる）。利用者が書いた式は Compile で読む。
+// 固定の式はパッケージの変数に置くので、起動の時点で組むと、その起動で使わない式まで全部組むことになる。hook は
+// 1 回の起動で 1 件を判定して終わり、使う式は一部なので、組むのを使うときまで遅らせて起動を軽くする。
 func MustCompile(pattern string, flags Flag) *Regexp {
-	re, err := Compile(pattern, flags)
-	if err != nil {
-		panic("pyre: 固定の式 " + strconv.Quote(pattern) + " を組めない: " + err.Error())
-	}
-	return re
+	return &Regexp{pattern: pattern, built: sync.OnceValue(func() *program {
+		re, err := Compile(pattern, flags)
+		if err != nil {
+			panic("pyre: 固定の式 " + strconv.Quote(pattern) + " を組めない: " + err.Error())
+		}
+		return re.built()
+	})}
 }
 
 func combine(flags, add, del Flag) Flag {
@@ -117,7 +170,7 @@ func compileNode(n *node, fl Flag, st *parseState) (*inst, error) {
 	if t := unitTest(n, fl); t != nil {
 		return &inst{op: n.op, test: t}, nil
 	}
-	in := &inst{op: n.op, group: n.group}
+	in := &inst{op: n.op, instBody: &instBody{group: n.group}}
 	var err error
 	switch n.op {
 	case opBranch:
@@ -172,7 +225,7 @@ func (re *Regexp) Pattern() string { return re.pattern }
 
 // Group は名前の付いたグループの番号と、その名前があるか（Python の groupindex）。
 func (re *Regexp) Group(name string) (int, bool) {
-	g, ok := re.names[name]
+	g, ok := re.built().names[name]
 	return g, ok
 }
 
@@ -198,7 +251,7 @@ func (re *Regexp) Match(s string) bool {
 // FullMatch は文字列全体に当たるか（Python の fullmatch）。
 func (re *Regexp) FullMatch(s string) bool {
 	m := re.newMatcher([]rune(s), true, false, 0)
-	_, ok := m.try(re.prog, 0)
+	_, ok := m.try(re.built().prog, 0)
 	return ok
 }
 
@@ -218,7 +271,7 @@ func (f Found) Text() string { return string(f.text[f.Start:f.End]) }
 
 // Named は名前の付いたグループが捕えた文字列と、捕えたか（Python の m.group(name) が None でないか）。
 func (f Found) Named(name string) (string, bool) {
-	g, ok := f.re.names[name]
+	g, ok := f.re.built().names[name]
 	if !ok {
 		return "", false
 	}
@@ -265,7 +318,7 @@ func (re *Regexp) MatchIn(s string, pos, endpos int) (Found, bool) {
 		return Found{}, false
 	}
 	m := re.newMatcher(text, false, false, pos)
-	end, ok := m.try(re.prog, pos)
+	end, ok := m.try(re.built().prog, pos)
 	if !ok {
 		return Found{}, false
 	}
@@ -321,8 +374,9 @@ type span struct {
 }
 
 func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool, error) {
+	p := re.built()
 	last := len(text)
-	if re.anchor {
+	if p.anchor {
 		last = min(pos, last)
 		if pos > 0 {
 			return span{}, false, nil
@@ -332,7 +386,7 @@ func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool, error)
 	for start := pos; start <= last; start++ {
 		// 当たらなかった試しは捕えた位置を元に戻して終わるので、同じ matcher を使い回せる。
 		m.advance, m.start = advance && start == pos, start
-		if end, ok := m.try(re.prog, start); ok {
+		if end, ok := m.try(p.prog, start); ok {
 			return span{start: start, end: end, marks: m.marks}, true, nil
 		}
 		if m.aborted {
@@ -365,7 +419,7 @@ type matcher struct {
 }
 
 func (re *Regexp) newMatcher(s []rune, matchAll, advance bool, start int) *matcher {
-	marks := make([]int, 2*re.groups)
+	marks := make([]int, 2*re.built().groups)
 	for i := range marks {
 		marks[i] = -1
 	}

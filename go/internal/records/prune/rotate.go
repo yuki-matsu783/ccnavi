@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"ccnavi/internal/infra/fsio"
@@ -56,7 +57,7 @@ func rotatedPattern(stem, ext string) *regexp.Regexp {
 }
 
 // diagRotated はローテートした診断ログ（`<出どころ>.<日時>.log`）。出どころは問わない。
-var diagRotated = rotatedPattern(`.*`, diaglog.FileExt)
+var diagRotated = sync.OnceValue(func() *regexp.Regexp { return rotatedPattern(`.*`, diaglog.FileExt) })
 
 // rotate は大きさが上限を超えていたら名前を変える。変えた（dry-run なら変える）とき真。
 // 名前を変えるだけでコピーしない。同じ時に追記している hook は開いたハンドルのままローテート先へ書き、
@@ -151,7 +152,7 @@ func (r *run) pruneDiag(rotateMB, logDays float64) {
 			continue
 		}
 		// ローテート済みの名前（日時が付いたもの）は、さらにローテートせず保持日数だけで見る。
-		if rotateMB > 0 && !diagRotated.MatchString(name) && r.rotate(path, bytesOf(rotateMB)) {
+		if rotateMB > 0 && !diagRotated().MatchString(name) && r.rotate(path, bytesOf(rotateMB)) {
 			continue
 		}
 		if logDays <= 0 {

@@ -64,7 +64,7 @@ func TestKinds(t *testing.T) {
 		}
 	}
 	board, fresh := map[KindID]bool{}, map[KindID]bool{}
-	for _, k := range kinds {
+	for _, k := range kinds() {
 		board[k.ID], fresh[k.ID] = k.onBoard, k.creatable
 	}
 	wantBoard := map[KindID]bool{Template: true, messages: false, layerConfig: true, docs: true, defense: false}
@@ -88,7 +88,7 @@ func TestKindsAgreeWithDesign(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, k := range kinds {
+	for _, k := range kinds() {
 		for _, shown := range k.shown {
 			if !strings.Contains(string(raw), "`"+shown+"`") {
 				t.Errorf("設計書に `%s` \u304c無い", shown)

@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/rules"
 )
 
@@ -102,8 +104,33 @@ func Find(root, id string) *Entry {
 		if !ok || !strings.Contains(text, id) {
 			continue
 		}
-		if entries, _ := CheckText(text, path); entries[id] != nil {
-			return entries[id]
+		if entry := entryIn(text, path, id); entry != nil {
+			return entry
+		}
+	}
+	return nil
+}
+
+// fileKey は読んだファイルを覚えておく鍵。中身ごと鍵にするので、ファイルが書き換わったら読み直す。
+type fileKey struct{ text, path string }
+
+// parsedFiles は、この起動で YAML として読んだ文面ファイルの表（messages の欄）を覚える。1 回の判定でも文を
+// 何本も引き（Say）、そのたびに同じファイルを YAML として読んでいた。読んだ表は変えないので、並行に渡してよい。
+var parsedFiles sync.Map
+
+// entryIn はファイルの中身から識別子の 1 件を検査して返す。検査は 1 件ずつ単独なので（CheckText と同じ）、
+// 引く 1 件だけを検査すれば、全件を検査して引いたのと同じ答えになる。通らなければ nil。
+func entryIn(text, path, id string) *Entry {
+	key := fileKey{text, path}
+	v, ok := parsedFiles.Load(key)
+	if !ok {
+		body, _ := parseFile(text, path)
+		v, _ = parsedFiles.LoadOrStore(key, body)
+	}
+	for k, raw := range v.(*yaml.Map).All() {
+		if pyfmt.Str(k) == id {
+			entry, _ := checkEntry(id, raw, path)
+			return entry
 		}
 	}
 	return nil

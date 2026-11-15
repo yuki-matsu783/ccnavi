@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"ccnavi/internal/infra/pyfmt"
@@ -22,7 +24,8 @@ const (
 
 const msgStringIndex = "string index out of range"
 
-var timestampRe = fullMatch(timestampPattern)
+// timestampRe は日時の欄を取り出す式。日時を読む起動でだけ組む。
+var timestampRe = sync.OnceValue(func() *regexp.Regexp { return fullMatch(timestampPattern) })
 
 // seqBox と setBox は組み立て中の列と集合。子は後から詰める（PyYAML と同じく、親を先に作って
 // 子を順番待ちに積む。同じ順で組むので、誤りが複数あっても同じものを先に返す）。
@@ -520,11 +523,12 @@ func (c *constructor) timestamp(n *node) (any, error) {
 	if n.kind != nScalar {
 		return nil, buildError(excType, "expected string or bytes-like object, got 'list'")
 	}
-	m := timestampRe.FindStringSubmatch(n.value)
+	re := timestampRe()
+	m := re.FindStringSubmatch(n.value)
 	if m == nil {
 		return nil, buildError(excAttribute, "'NoneType' object has no attribute 'groupdict'")
 	}
-	group := func(name string) string { return m[timestampRe.SubexpIndex(name)] }
+	group := func(name string) string { return m[re.SubexpIndex(name)] }
 	atoi := func(name string) int { v, _ := strconv.Atoi(group(name)); return v }
 	date := Date{atoi("year"), atoi("month"), atoi("day")}
 	if group("hour") == "" {
