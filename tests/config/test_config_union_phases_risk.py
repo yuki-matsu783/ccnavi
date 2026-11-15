@@ -457,8 +457,8 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertNotEqual(refused.returncode, 0)
 
 
-class RiskUnionTest(ConfigUnionHarness):
-    """risk の合成。lib の子を 1 本閉じて点と記録を見る。"""
+class RiskUnionHarness(ConfigUnionHarness):
+    """risk を見るテストの土台。テストを持たない（継いだクラスで同じテストを重ねて回さない）。"""
 
     def setUp(self):
         super().setUp()
@@ -516,6 +516,10 @@ class RiskUnionTest(ConfigUnionHarness):
     def record(self):
         path = self.approved_path("phases", "i0001", "i0001-01-01.risk.json")
         return json.loads(read(path))
+
+
+class RiskUnionTest(RiskUnionHarness):
+    """risk の合成。lib の子を 1 本閉じて点と記録を見る。"""
 
     def test_factors_concatenate_and_levels_take_the_minimum(self):
         """factors は連結、levels はキーごとに min。記録の hit に source。"""
@@ -777,7 +781,7 @@ class RiskUnionTest(ConfigUnionHarness):
         self.assertEqual(mark.get("source"), explained["work"], mark)
 
 
-class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionTest):
+class LayerPlaceFlagsAreDiagnosisOnlyTest(RiskUnionHarness):
     """レイヤーを探す先を動かすフラグも、診断の外では有効でない（issue #65）。
 
     `--projects` と `--project-home` は、共通レイヤーの中身を差し替えるのと結果が同じ。
