@@ -97,6 +97,11 @@ func TestUnder(t *testing.T) {
 		{filepath.Join(base, "..", "x"), "", false},
 		{base + "x", "", false},
 		{filepath.Join(string(filepath.Separator)+"ws", "STRASSE", "Straße"), "", false},
+		// 綴りのままの "." と ".."（呼び手が組んだままのパス）は解いてから比べる
+		{base + string(filepath.Separator) + "sub" + string(filepath.Separator) + ".." + string(filepath.Separator) + "r.md", "r.md", true},
+		{base + string(filepath.Separator) + "." + string(filepath.Separator) + "r.md", "r.md", true},
+		{base + string(filepath.Separator) + ".." + string(filepath.Separator) + "escaped.md", "", false},
+		{base + string(filepath.Separator) + ".." + string(filepath.Separator) + "Tree" + "X" + string(filepath.Separator) + "r.md", "", false},
 	} {
 		rel, ok := Under(c.path, base)
 		if rel != c.rel || ok != c.ok {

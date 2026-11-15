@@ -21,7 +21,8 @@ ccnavi-ticket.sh・ccnavi-fetch.sh）を外から呼ぶ。実行ファイルは 
 7. HEAD が合わない・`branch:` の欄が残る（エラー）場合の動き。古い取り込み状態が残っていても
    判定に使わない
 8. リモートから消えた親のブランチへは、記録が無くても送れない（push のゲート）。一度も送っていない
-   親の最初の push は通す
+   親の最初の push は通す（承認しただけ・着手済みなどの形跡の読み分けは Go の
+   shask.TestPushTraceWithoutTheRemoteReference が見る）
 """
 
 from __future__ import annotations
@@ -463,16 +464,6 @@ class ParentBranchShTest(unittest.TestCase):
         self.ok(self.sh("ccnavi-git.sh", "fetch", "origin", BRANCH))
         self.ok(self.sh("ccnavi-git.sh", "worktree", "add", f".claude/worktrees/{PARENT}", BRANCH))
         self.propose()
-        self.delete_remote_branch()
-        git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
-        self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))
-        self.assertEqual(self.remote_sha(), self.sha(self.tree, "HEAD"))
-
-    def test_an_approved_parent_never_started_is_pushed_once_without_a_reference(self):
-        """承認しただけで一度も送っていない親（着手していない）は、参照もリモートのブランチも無くても、
-        最初の push を通す。"""
-        self.add_parent_tree()
-        self.approve()
         self.delete_remote_branch()
         git(self.ws, "update-ref", "-d", f"refs/remotes/origin/{BRANCH}")
         self.ok(self.sh("ccnavi-git.sh", "push", "-u", "origin", BRANCH, cwd=self.tree))

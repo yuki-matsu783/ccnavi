@@ -33,3 +33,25 @@ func TestPushGate(t *testing.T) {
 		}
 	}
 }
+
+// 送った形跡（pushTrace）。リモートの参照が無いとき（fetch.prune で消えた・一度も送っていない）は、依頼した・
+// 片付けた・着手したのどれかで形跡ありとする。承認しただけでは形跡にしない（最初の push を通す）。
+func TestPushTraceWithoutTheRemoteReference(t *testing.T) {
+	path := t.TempDir()
+	cases := []struct {
+		name string
+		f    parentFacts
+		want bool
+	}{
+		{"一度も送っていない", parentFacts{approved: no, requested: no, archived: no, started: no}, false},
+		{"承認しただけ", parentFacts{approved: yes, requested: no, archived: no, started: no}, false},
+		{"着手した（参照は消えた）", parentFacts{approved: yes, requested: no, archived: no, started: yes}, true},
+		{"依頼した", parentFacts{approved: yes, requested: yes, archived: no, started: no}, true},
+		{"片付けた", parentFacts{approved: no, requested: no, archived: yes, started: no}, true},
+	}
+	for _, c := range cases {
+		if got := pushTrace(path, "feature/123-login", c.f); got != c.want {
+			t.Errorf("%s: %v、want %v", c.name, got, c.want)
+		}
+	}
+}

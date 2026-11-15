@@ -4,6 +4,8 @@
 
 1. 受け入れの計画が持つ操作ID で、返信・issue・コメントの段階を記録し、投稿の本文の末尾に
    目印 `<!-- ccnavi:op=<操作ID> stage=<段階ID> -->` を足す。すべて送れたら記録を消す
+   （すべて送れる通しは test_review_decide の
+   test_choices_create_the_issue_and_post_the_decision が見る）
 2. 送れなかった段階は記録に残る。決めたことは戻さず、「引き継ぎ未完了」と `--resume` を言う
 3. `--resume` は、保存した判断から続きを送る。送り終えた段階は繰り返さない
 4. 送ったか確定できないときは、ホストの一覧を目印とアカウントで照合する。1 件あれば送り済みとし、
@@ -106,25 +108,17 @@ class DecideOpsShTest(unittest.TestCase):
                 self.assertTrue(os.path.lexists(os.path.join(tools, name)), name)
         self.assertIn("awk", base.STANDARD_TOOLS)
 
-    def test_every_post_carries_the_marker_and_the_record_is_removed(self):
-        done = self.choose()
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual([kind for kind, _ in GitLab.posted], ["reply", "resolve", "issue", "note"])
-        issue = next(d for k, d in GitLab.posted if k == "issue")
-        note = next(d for k, d in GitLab.posted if k == "note")
-        self.assertRegex(issue["description"], r"<!-- ccnavi:op=[0-9a-f]{32} stage=issue -->\s*$")
-        self.assertRegex(note["body"], r"<!-- ccnavi:op=[0-9a-f]{32} stage=note -->\s*$")
-        # 先頭の目印は変えない
-        self.assertTrue(note["body"].startswith("<!-- ccnavi:decide -->"))
-        # 本文は保存した判断から作り直し、全文をフェンスで囲んでいる
-        self.assertIn("````text", issue["description"])
-        self.assertIn("指摘の本文", issue["description"])
-        self.assertIn("issue に回した分: #1", note["body"])
-        self.assertIsNone(self.record(), "すべて送れたら記録を消す")
+    # ---- 2・3・4. 送れなかった段階から --resume で続きを送るまで
 
-    # ---- 2. 送れなかった段階
+    def test_a_failed_note_is_resumed_only_when_it_is_safe(self):
+        """コメントだけ送れなかった判断を、--resume で続ける一連の流れ。
 
-    def test_a_failed_note_leaves_the_record_and_names_resume(self):
+        1. 送れなかった段階は記録に残り、答えは「引き継ぎ未完了」と --resume を言う
+        2. --resume は先に聞き、n なら何も送らない
+        3. 送ってすぐは、ホストに 0 件でも反映待ちかもしれないので確定しない
+        4. 前に送ったアカウントと今のトークンの持ち主が違えば、0 件でも確定しない
+        5. 時間が経ち、同じアカウントなら、残った段階（コメント）だけを送り、記録を消す
+        """
         STORE["reject"].add("note")
         done = self.choose()
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -136,16 +130,39 @@ class DecideOpsShTest(unittest.TestCase):
         states = {s["id"]: s["state"] for s in record["stages"]}
         self.assertEqual(states, {"reply": "sent", "issue": "sent", "note": "unknown"})
         self.assertTrue(record["applied"]["local"])
-
-    # ---- 3. --resume
-
-    def test_resume_sends_only_the_missing_stage(self):
-        STORE["reject"].add("note")
-        self.choose()
-        record = self.record()
         STORE["reject"].clear()
-        self.age(record["id"], "note")
         issues_before = len(STORE["issues"])
+
+        stopped = self.run_decide("--resume", stdin="n\n")
+        self.assertNotEqual(stopped.returncode, 0)
+        self.assertEqual(STORE["notes"], [])
+        self.assertIsNotNone(self.record())
+
+        done = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(STORE["notes"], [], "送ってすぐは反映待ちかもしれない。自動では送らない")
+        self.assertIn("確定できない", done.stderr)
+        self.assertIsNotNone(self.record())
+
+        def note_account(account=None):
+            loaded = oprecord.load(self.state, record["id"])
+            for row in loaded["stages"]:
+                if row["id"] == "note":
+                    before = row.get("account")
+                    if account is not None:
+                        row.update(state="unknown", account=account)
+            oprecord.save(self.state, loaded)
+            return before
+
+        mine = note_account("someone-else")
+        self.assertIsNotNone(mine)
+        self.age(record["id"], "note")
+        done = self.run_decide("--resume", stdin="y\n")
+        self.assertEqual(STORE["notes"], [])
+        self.assertIn("確定できない", done.stderr)
+        self.assertIsNotNone(self.record())
+
+        note_account(mine)
+        self.age(record["id"], "note")
         done = self.run_decide("--resume", stdin="y\n")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertIn("続きを送った", done.stdout)
@@ -183,15 +200,6 @@ class DecideOpsShTest(unittest.TestCase):
         self.assertEqual(kinds.count("reply"), 1, "返信済みのスレッドに重ねない")
         self.assertIn("resolve", kinds)
 
-    def test_resume_asks_first_and_stops_on_no(self):
-        STORE["reject"].add("note")
-        self.choose()
-        STORE["reject"].clear()
-        stopped = self.run_decide("--resume", stdin="n\n")
-        self.assertNotEqual(stopped.returncode, 0)
-        self.assertEqual(STORE["notes"], [])
-        self.assertIsNotNone(self.record())
-
     def test_resume_without_a_pending_decision_says_so(self):
         done = self.run_decide("--resume", stdin="y\n")
         self.assertEqual(done.returncode, 0, done.stderr)
@@ -209,32 +217,6 @@ class DecideOpsShTest(unittest.TestCase):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(len(STORE["notes"]), 1, "ホストに在るので、送り直さない")
         self.assertIsNone(self.record())
-
-    def test_right_after_a_failure_zero_matches_is_not_confirmed(self):
-        STORE["reject"].add("note")
-        self.choose()
-        STORE["reject"].clear()
-        done = self.run_decide("--resume", stdin="y\n")
-        self.assertEqual(STORE["notes"], [], "送ってすぐは反映待ちかもしれない。自動では送らない")
-        self.assertIn("確定できない", done.stderr)
-        self.assertIsNotNone(self.record())
-
-    def test_a_different_account_cannot_confirm_that_nothing_was_sent(self):
-        STORE["reject"].add("note")
-        self.choose()
-        record = self.record()
-        # 前に送ったアカウントを記録しておき、今のトークンの持ち主を変える
-        record = oprecord.load(self.state, record["id"])
-        for row in record["stages"]:
-            if row["id"] == "note":
-                row.update(state="unknown", account="someone-else")
-        oprecord.save(self.state, record)
-        self.age(record["id"], "note")
-        STORE["reject"].clear()
-        done = self.run_decide("--resume", stdin="y\n")
-        self.assertEqual(STORE["notes"], [])
-        self.assertIn("確定できない", done.stderr)
-        self.assertIsNotNone(self.record())
 
 
 if __name__ == "__main__":

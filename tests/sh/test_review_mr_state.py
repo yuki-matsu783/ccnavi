@@ -10,6 +10,10 @@
 
 終了コードは、状態が分かれば 0、unknown は 1、引数の誤りは 2（標準出力は空）。
 読むだけで、何も書き残さない。
+応答の読み（4 つの状態・失敗の種類の分け方・URL の組み方）は実行ファイル
+（`ccnavi host mr-state`）にあり、Go の hostreply.TestMRState が表で見る。ここで見るのは
+sh の仕事（引数・origin・道具・トークンの有無・ホストに聞く道・返事を渡して答えを出すこと・
+何も残さないこと）。
 理由には資格情報を入れない。ホストへの道具（curl）は PATH の先頭に置いたスタブに差し替える
 （gh / glab はスタブで必ず失敗させ、実際のホストに触れない）。
 
@@ -105,10 +109,11 @@ def path_without(root, *names):
     return out
 
 
-@unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
-@unittest.skipUnless(_has_mr_state(), SKIP_UNTIL_IMPORTED)
-class MrStateTest(unittest.TestCase):
-    """GitHub の形。GitLab は下の継承が、origin と答えの形だけを入れ替えて同じ約束を見る。"""
+class MrStateCases:
+    """GitHub と GitLab の両方で見る約束（ホストの種類で sh の動きが変わるところ）と道具。
+
+    GitHub の形を既定にする。GitLab は下のクラスが、origin と答えの形だけを入れ替える。
+    """
 
     origin = "https://github.com/o/r.git"
     token_name = "GITHUB_TOKEN"
@@ -132,9 +137,6 @@ class MrStateTest(unittest.TestCase):
 
     def merged_answer(self):
         return self.answer(state="closed", merged=True)
-
-    def closed_answer(self):
-        return self.answer(state="closed")
 
     def setUp(self):
         global _told
@@ -221,39 +223,31 @@ class MrStateTest(unittest.TestCase):
         if reason is not None:
             self.assertIn(reason, why)
 
-    # ---- 4 つの状態
+    # ---- ホストの種類ごと
 
-    def test_an_open_request_says_whether_it_is_a_draft(self):
-        self.says(self.answer())
-        self.assert_known(self.run_sh("9"), f"open 9 no {self.url}")
+    def test_an_open_request_asks_only_that_request_of_the_host(self):
         self.says(self.answer(draft=True))
         self.assert_known(self.run_sh("9"), f"open 9 yes {self.url}")
-
-    def test_a_merged_request(self):
-        self.says(self.merged_answer())
-        self.assert_known(self.run_sh("9"), f"merged 9 {self.url}")
-
-    def test_a_request_closed_without_merging(self):
-        self.says(self.closed_answer())
-        self.assert_known(self.run_sh("9"), f"closed 9 {self.url}")
-
-    def test_it_asks_only_that_request_of_the_host(self):
-        self.says(self.answer())
-        self.run_sh("9")
         with open(os.path.join(self.bin, "curl.url"), encoding="utf-8") as f:
             asked = f.read().split()
         self.assertEqual(1, len(asked), asked)
         self.assertTrue(asked[0].endswith(self.request), asked)
 
-    def test_a_missing_or_unusable_url_is_built_from_the_host_and_path(self):
-        for url in ("", "https://example.com/a b", "https://example.com/a\tb"):
-            with self.subTest(url=url):
-                self.says(self.answer(url=url) if url else self.answer(url=""))
-                self.assert_known(self.run_sh("9"), f"open 9 no {self.fallback}")
+    def test_without_a_token_it_is_auth(self):
+        self.says(self.answer())
+        done = self.run_sh("9", token="")
+        self.assert_unknown(done, "auth", self.token_name)
 
-    def test_the_answer_for_another_number_is_unknown(self):
-        self.says(self.answer(number=10))
-        self.assert_unknown(self.run_sh("9"), "api", "別の MR")
+
+@unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
+@unittest.skipUnless(_has_mr_state(), SKIP_UNTIL_IMPORTED)
+class MrStateTest(MrStateCases, unittest.TestCase):
+    """GitHub の形。ホストの種類で変わらない sh の仕事もここで見る。"""
+
+    def test_a_merged_request(self):
+        """open のほかの状態も、実行ファイルの答えをそのまま出して 0 で終わる。"""
+        self.says(self.merged_answer())
+        self.assert_known(self.run_sh("9"), f"merged 9 {self.url}")
 
     def test_it_writes_nothing_behind(self):
         self.says(self.answer())
@@ -268,51 +262,10 @@ class MrStateTest(unittest.TestCase):
         )
         self.assertEqual("", tracked.stdout)
 
-    # ---- unknown の種類
-
-    def test_without_a_token_it_is_auth(self):
-        self.says(self.answer())
-        done = self.run_sh("9", token="")
-        self.assert_unknown(done, "auth", self.token_name)
-
-    def test_a_refused_token_is_auth(self):
-        for code, err in (
-            (22, "curl: (22) The requested URL returned error: 401"),
-            (22, "curl: (22) The requested URL returned error: 403"),
-        ):
-            with self.subTest(err=err):
-                self.says("", code, err)
-                self.assert_unknown(self.run_sh("9"), "auth")
-
-    def test_a_missing_request_is_not_found(self):
-        self.says("", 22, "curl: (22) The requested URL returned error: 404")
-        self.assert_unknown(self.run_sh("9"), "not-found", "#9")
-
-    def test_an_unreachable_host_is_network(self):
-        for code, err in (
-            (6, "curl: (6) Could not resolve host: api.github.com"),
-            (7, "curl: (7) Failed to connect to api.github.com port 443"),
-            (28, "curl: (28) Operation timed out after 30001 milliseconds"),
-        ):
-            with self.subTest(err=err):
-                self.says("", code, err)
-                self.assert_unknown(self.run_sh("9"), "network")
-
-    def test_a_host_failure_is_api_with_its_status(self):
-        self.says("", 22, "curl: (22) The requested URL returned error: 500")
-        self.assert_unknown(self.run_sh("9"), "api", "HTTP 500")
-
-    def test_an_unreadable_answer_is_api(self):
-        for body in ("not json", "[]", '"x"', "{}"):
-            with self.subTest(body=body):
-                self.says(body)
-                self.assert_unknown(self.run_sh("9"), "api")
-
-    def test_an_unexpected_state_is_api(self):
-        self.says(self.answer(state="weird"))
-        self.assert_unknown(self.run_sh("9"), "api", "weird")
+    # ---- unknown の種類（sh が決めるもの。返事の分け方は Go）
 
     def test_the_reason_never_carries_the_host_body_or_the_token(self):
+        """失敗の返事は実行ファイルに渡して分けてもらう。理由に本文とトークンを載せない。"""
         self.says(
             "", 22, f"curl: (22) The requested URL returned error: 500\n{TOKEN} secret\n\x07bell"
         )
@@ -387,7 +340,7 @@ class MrStateTest(unittest.TestCase):
 
 @unittest.skipIf(SHELL is None or not NEEDED, "sh・git・jq のどれかが無い")
 @unittest.skipUnless(_has_mr_state(), SKIP_UNTIL_IMPORTED)
-class MrStateGitLabTest(MrStateTest):
+class MrStateGitLabTest(MrStateCases, unittest.TestCase):
     """GitLab の形。答えの欄（iid・state・web_url・draft）とパスだけが違う。"""
 
     origin = "https://gitlab.com/o/r.git"
@@ -403,16 +356,6 @@ class MrStateGitLabTest(MrStateTest):
         if shown:
             body["web_url"] = shown
         return json.dumps(body)
-
-    def test_a_request_in_the_middle_of_merging_is_unknown(self):
-        self.says(self.answer(state="locked"))
-        self.assert_unknown(self.run_sh("9"), "api", "locked")
-
-    def test_the_old_draft_flag_is_read(self):
-        self.says(
-            json.dumps({"iid": 9, "state": "opened", "work_in_progress": True, "web_url": self.url})
-        )
-        self.assert_known(self.run_sh("9"), f"open 9 yes {self.url}")
 
     def test_a_self_hosted_host_with_a_port_keeps_its_scheme_and_port(self):
         local = "http://localhost:8929/g/p.git"

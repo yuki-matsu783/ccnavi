@@ -75,13 +75,6 @@ class TicketPreflightTest(WriteAndPushHarness):
         self.untouched(head, remote)
         self.assertNotIn("POST", " ".join(self.requests()))
 
-    def test_all_ok_prints_nothing(self):
-        self.set_routes(GOOD)
-        result = self.ticket("start", PARENT, token="t0k")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn("確認:", result.stderr)
-        self.assertNotIn("注意:", result.stderr)
-
     def test_unverified_api_with_a_working_git_continues_with_a_note(self):
         # ホストの API を確かめられなくても、git のリモートは確かめる（ls-remote を打つ）
         shim, log = self.git_shim("  :")
@@ -108,22 +101,24 @@ class TicketPreflightTest(WriteAndPushHarness):
         self.untouched(head, remote)
 
     def test_propose_keeps_its_first_line_and_asks_the_host_once(self):
+        """全部 ok なら何も出さない。事前確認だけが `GET user` を読む（外側と内側の 2 回起動しても、
+        確かめるのは内側の 1 回）。"""
         self.set_routes(GOOD)
         result = self.ticket("approval-request", PARENT, token="t0k")
-        # 事前確認だけが `GET user` を読む（外側と内側の 2 回起動しても、確かめるのは内側の 1 回）
         asked = [line for line in self.requests() if line == f"GET {host_stub.API}/user"]
         self.assertEqual(len(asked), 1, self.requests())
-        self.assertNotIn("確認:", result.stdout)
+        self.assertNotIn("確認:", result.stdout + result.stderr)
+        self.assertNotIn("注意:", result.stderr)
 
-    def test_child_start_finish_and_consolidate_are_checked_but_cancel_is_not(self):
+    def test_child_finish_is_checked_but_cancel_is_not(self):
+        """取り消しのほかの動詞（start・finish・approval-request・consolidate）は、sh の同じ 1 行で
+        事前確認する。ここでは子の finish を代表に見る。"""
         self.set_routes(
             {**GOOD, f"GET {host_stub.PROJECT}/members/all/5": [200, {"access_level": 20}]}
         )
-        for verb, ident in (("start", CHILD), ("finish", CHILD), ("consolidate", PARENT)):
-            with self.subTest(verb=verb):
-                result = self.ticket(verb, ident, token="t0k")
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn("確認: access: NG", result.stderr)
+        result = self.ticket("finish", CHILD, token="t0k")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("確認: access: NG", result.stderr)
         # 取り消しは、権限が足りないときでも事前確認で止めない
         cancel = self.ticket("cancel", PARENT, "--reason", "やめた", token="t0k")
         self.assertNotIn("確認:", cancel.stderr)

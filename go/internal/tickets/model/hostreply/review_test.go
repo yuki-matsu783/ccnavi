@@ -74,3 +74,29 @@ func TestReaders(t *testing.T) {
 		t.Errorf("UndraftDone = %q", got)
 	}
 }
+
+// MR がマージ済みか（`ccnavi-review.sh merged`）。一覧と 1 本の応答、GitLab はこのプロジェクト（42）から出たものだけ。
+func TestMergedTable(t *testing.T) {
+	cases := []struct {
+		kind, number, pid, data, want string
+	}{
+		{"github", "", "", `[{"number": 7, "merged_at": null}, {"number": 9, "merged_at": "x", "head": {"sha": "abc123"}}]`, "merged 9 abc123 \n"},
+		{"github", "", "", `[]`, "none\n"},
+		{"github", "9", "", `{"number": 9, "merged_at": "x", "head": {"sha": "abc123", "ref": "feature/12-x"}}`, "merged 9 abc123 feature/12-x\n"},
+		{"github", "9", "", `{"number": 9, "merged_at": null, "head": {"sha": "abc123"}}`, "none\n"},
+		{"gitlab", "", "42", `[{"iid": 9, "source_project_id": 42, "sha": "abc123"}]`, "merged 9 abc123 \n"},
+		{"gitlab", "", "42", `[{"iid": 5, "source_project_id": 99}]`, "none\n"},
+		{"gitlab", "9", "42", `{"iid": 9, "state": "merged", "source_project_id": 42, "sha": "abc123", "source_branch": "feature/12-x"}`, "merged 9 abc123 feature/12-x\n"},
+		{"gitlab", "9", "42", `{"iid": 9, "state": "opened", "source_project_id": 42, "sha": "abc123"}`, "none\n"},
+		{"gitlab", "9", "42", `{"iid": 9, "state": "merged", "source_project_id": 99, "sha": "abc123"}`, "none\n"},
+	}
+	for _, c := range cases {
+		got, err := Merged(c.kind, c.number, c.pid, []byte(c.data))
+		if err != nil || got != c.want {
+			t.Errorf("Merged(%s, %q, %s) = %q, %v; want %q", c.kind, c.number, c.data, got, err, c.want)
+		}
+	}
+	if _, err := Merged("github", "", "", []byte(`not json`)); err == nil {
+		t.Error("読めない応答は error")
+	}
+}
