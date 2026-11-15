@@ -36,7 +36,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
 - sh は、取ってきた応答を整えずにファイルへ書き、そのパスを実行ファイルに渡す（`--result`。応答が複数のときは引数で並べる。例: `ccnavi start list-open <github|gitlab> <issue の一覧> <MR の一覧>`）。引数もそのまま渡す。応答の意味を読み取るのは実行ファイル
 - 実行ファイルは 1 行 1 項目で答える（Go は `go/internal/infra/reply` で組む）。判断は次の一手の語で返す（`create <branch>`・`stop <終了コード>`・`fetch <何を>` など）。sh は行の先頭の語で分ける。読むときは `ccnavi-common-state.sh` の `ccnavi_val`・`ccnavi_val1`・`ccnavi_has`（値を引く）か `ccnavi_do`（`out`・`err`・`fail`・`exit` を実行する）を使い、sh ごとに `sed` で写さない
 - sh は JSON（実行ファイルの答えを含む）もチケットの YAML も読まない。例外は、段取りの最小の読みと、実行ファイルを起こさずに動く検査だけ
-- 規則の写しを sh に置かない。保護するブランチ・識別子・ホストの種類などは実行ファイルに聞く。実行ファイルを起こさずに動く sh が写しを持つのは、実行ファイルが無いときに省くと本来の仕事（fetch・承認の push）が止まるものだけにする。省いても止まらないものは、実行ファイルが無いときは省く。写しを持つときは、`tests/fixtures/` の共通の JSON の表で、Go と Python（sh を起動）の両方から一致を確かめる（今の写しと表は [sh と Go の分担に合っていない所](sh-go-gaps.md) の「規則の写し」の行）
+- 規則の写しを sh に置かない。保護するブランチ・識別子・ホストの種類などは実行ファイルに聞く。実行ファイルを起こさずに動く sh が写しを持つのは、実行ファイルが無いと本来の仕事（fetch・承認の push）が止まるものだけにする。写しを持たなくても止まらないものは、実行ファイルが無いときに省く。写しを持つときは、`tests/fixtures/` の共通の JSON の表を使い、Go と Python（sh を起動）の両方で一致を確かめる（今の写しと表は [sh と Go の分担に合っていない所](sh-go-gaps.md) の「規則の写し」の行）
 - 信号を受けたときの戻しは、その操作を始めた側が持つ。Go で実装する一続きのローカルの書き込みは 1 回の起動の中で完結させ、戻しもその中で持つ。sh の trap は子を止めて待つだけ
 - Go で実装するローカルの git の書き込みは、ラッパー（`ccnavi-git.sh`）が通すかを決めるのと同じ検査の関数を通す。ワークツリーを出す（`git worktree add`）口は `treeadd.Add`（`go/internal/tickets/lifecycle/treeadd`）だけで、新しい親（start）・直接作業（cut）・子の着手（ticketsh）がこれを共有する
 - 実行ファイルを起こさずに動く sh は、実行ファイルが無いときに何を省くかを、sh の先頭の説明に書く
@@ -64,7 +64,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
   実行ファイルが行うのは、そのJSONを読んでチケットを状態ごとの置き場へ移すことと、マーカーを置くことだけ
 - 例外が1つある。リスクの配点の`script:`は、ユーザが置いたスクリプトを実行ファイルが`sh`で起動し、標準出力の点を受け取る
   （設計 9.9）。起動するのはプロジェクトの中のユーザのスクリプトだけで、実行ファイル自身はネットワークに出ない
-- ホストへ出るのは、shと、Chrome 拡張の TypeScript（service worker）だけ。Chrome 拡張は、取得した結果を、実行ファイルと同じ判定のコア（Go を WASM に組んだもの。`go/cmd/ccnavi-chrome`）へ渡して判定させ、ホストへの書き込み（issue・返信・解決・コミット）は、拡張自身が行う。MR のスレッドとレビューの応答は、service worker が読まずに返し、ボードが WASM の `copy` へ渡して sh と同じ `hostreply` に読ませる（service worker は WASM を動かさない）
+- ホストへ出るのは、shと、Chrome 拡張の TypeScript（service worker）だけ。Chrome 拡張は、取得した結果を実行ファイルと同じ判定のコア（Go を WASM に組んだもの。`go/cmd/ccnavi-chrome`）へ渡して判定させる。ホストへの書き込み（issue・返信・解決・コミット）は拡張自身が行う。MR のスレッドとレビューの応答は、service worker が読まずに返し、ボードが WASM の `copy` に渡して、sh と同じ `hostreply` で読ませる（service worker は WASM を動かさない）
 - メッセージ送信（UserPromptSubmit）のhookも実行ファイルの側にあり、ホストに問い合わせない。ホストへの問い合わせは
   sh（`ccnavi-start.sh`・`ccnavi-branches.sh`）が受け持ち、hookは記録（承認済みチケット・マーカーなど）を読むだけ。
   hookのtimeoutは10秒で、ネットワークを待てないため

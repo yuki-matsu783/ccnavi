@@ -62,7 +62,7 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 
 MR のスレッドとレビューを取ってくる処理は、手元の sh（`.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews`）と
-この拡張（service worker が呼ぶ `src/core/github.ts`・`gitlab.ts` の `reviewReplies`）の 2 か所にある。どちらも取ってきた応答を読まずに ccnavi に渡し、
+この拡張の service worker が呼ぶ `src/core/github.ts`・`gitlab.ts` の `reviewReplies`（2 か所）は、取ってきた応答を読まずに ccnavi に渡し、
 読み（スレッドの代表・`own`・解決済み・レビューの状態のそろえ方）は ccnavi の同じ `hostreply`（sh は `ccnavi host copy`、拡張は WASM の `copy`）が持つ。
 拡張の service worker は WASM を動かさないので、ボードが `reviewReplies` の答えを受け取り、WASM の Worker の `copy` に渡す（`src/core/reviewed.ts` の `readCopy`）。
 2 つが同じ問い合わせとページの切り方をしているかは、手で組んだホストの応答の見本で確かめる。

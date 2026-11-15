@@ -105,7 +105,7 @@
          error がある場合は終了コード1になります）
     ccnavi fetch plan|forward|track|retarget|base|advance|auth <args>...
         （.ccnavi/scripts/ccnavi-fetch.sh 用。sh が fetch・ls-remote を打つ間の判定と、早送り・
-         update-ref・origin/HEAD の向け直し、取ってこられなかったときの認証の失敗の案内を行います。"fetch 1" の行に続いて、表示する "out <行>" と
+         update-ref・origin/HEAD の向け直し、認証に失敗して取ってこられなかったときの案内を行います。"fetch 1" の行に続いて、表示する "out <行>" と
          次の一手の "next <語>"（fetch・lock）を出力します。ネットワークには出ません）
     ccnavi sync retired
         （ボード用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
