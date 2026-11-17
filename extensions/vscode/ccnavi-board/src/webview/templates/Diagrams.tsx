@@ -4,7 +4,7 @@
  */
 import type { JSX } from "react";
 
-import type { FlowDoc } from "../../core/flow-doc.js";
+import { type FlowDoc, sideBySide } from "../../core/flow-doc.js";
 import { fromData } from "../../core/template-edit.js";
 import type { TemplateCheck } from "../../core/templates-view.js";
 import { Canvas } from "../flow/Canvas.js";
@@ -28,7 +28,7 @@ export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Elem
           <h3>{`子のフロー（${index}番${typeof doc.name === "string" && doc.name !== "" ? `: ${doc.name}` : ""}）`}</h3>
           <div className="flow-body tpl-flow-view" data-palette-folded="1" data-side-folded="1">
             <Canvas
-              doc={doc as FlowDoc}
+              doc={sideBySide(doc as FlowDoc)}
               readOnly
               selected={undefined}
               onSelect={NOOP}

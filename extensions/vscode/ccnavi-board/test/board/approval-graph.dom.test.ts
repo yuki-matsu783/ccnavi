@@ -111,7 +111,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
 
     // 図の下。すぐ始まるステップ・終端に届かないステップ・順序の検査の理由
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
-    assert.match(plain, /すぐ始まる: 1/);
+    assert.doesNotMatch(plain, /すぐ始まる/); // 1つだけなら出さない（実行ファイルの一覧と同じ）
     assert.match(plain, /延期したレビュー: 2は4と一緒に/);
     assert.doesNotMatch(plain, /最後のステップの先行になっていない/);
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";

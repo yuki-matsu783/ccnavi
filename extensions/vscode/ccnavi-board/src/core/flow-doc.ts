@@ -1173,3 +1173,16 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   }
   return out;
 }
+
+/** 横に並べるときの、ノードの左端どうしの間隔。ステップのノードの幅（`Canvas.css`の190px）に余白を足した値 */
+export const SIDE_BY_SIDE_GAP = 260;
+
+/**
+ * 子のフローは保存された位置が縦1列に並んでおり、間隔がノードの高さより狭いため重なって見える。
+ * 読み取り専用の図では、グループがないときに限り、並び順どおりに左から右へ置き直す（保存されている位置は変えない）。
+ * グループの中のノードの位置はグループからの相対なので、グループがあるフローは保存された位置のまま返す。
+ */
+export function sideBySide(doc: FlowDoc): FlowDoc {
+  if (doc.nodes.some((node) => isGroup(node) || groupOf(doc, node) !== undefined)) return doc;
+  return { ...doc, nodes: doc.nodes.map((node, index) => ({ ...node, position: { x: index * SIDE_BY_SIDE_GAP, y: 0 } })) };
+}
