@@ -6,7 +6,7 @@ plan:
 feedback: []
 flows:
   1:
-    id: dev-sweep-review
+    id: task-sweep-review
     name: タスク実施→横展開漏れ調査→敵対的レビュー
     version: 1.0.0
     nodes:
@@ -17,7 +17,7 @@ flows:
         x: 0
         y: 0
       data: {}
-    - id: develop
+    - id: task
       type: prompt
       name: タスク実施
       position:
@@ -73,11 +73,11 @@ flows:
     connections:
     - id: c1
       from: start
-      to: develop
+      to: task
       fromPort: output
       toPort: input
     - id: c2
-      from: develop
+      from: task
       to: sweep
       fromPort: output
       toPort: input

@@ -1,5 +1,5 @@
 name: full-phases
-description: 調査・設計・受入テスト作成・実装・文書を、番号順に直列で実行する。ccnavi 自身の実装とユーザがコピーする版の作成は、フィードバックの中で行う。
+description: 調査・設計・受入テスト作成・実装・文書を、番号順に直列で実行する。ccnavi 自身の実装とユーザがコピーする版の作成は全体計画に含めず、要るときにフィードバックの計画へ足す。
 when: 調査・設計・受入テスト・実装・文書まで省かずに通したいとき。小さい作業なら quick-work を単独で提案する
 plan:
 - research
@@ -63,7 +63,7 @@ flows:
       fromPort: output
       toPort: input
   2:
-    id: dev-sweep-review
+    id: task-sweep-review
     name: タスク実施→横展開漏れ調査→敵対的レビュー
     version: 1.0.0
     nodes:
@@ -74,7 +74,7 @@ flows:
         x: 0
         y: 0
       data: {}
-    - id: develop
+    - id: task
       type: prompt
       name: タスク実施
       position:
@@ -130,11 +130,11 @@ flows:
     connections:
     - id: c1
       from: start
-      to: develop
+      to: task
       fromPort: output
       toPort: input
     - id: c2
-      from: develop
+      from: task
       to: sweep
       fromPort: output
       toPort: input
@@ -159,7 +159,7 @@ flows:
       fromPort: output
       toPort: input
   3:
-    id: dev-sweep-review
+    id: task-sweep-review
     name: タスク実施→横展開漏れ調査→敵対的レビュー
     version: 1.0.0
     nodes:
@@ -170,7 +170,7 @@ flows:
         x: 0
         y: 0
       data: {}
-    - id: develop
+    - id: task
       type: prompt
       name: タスク実施
       position:
@@ -226,11 +226,11 @@ flows:
     connections:
     - id: c1
       from: start
-      to: develop
+      to: task
       fromPort: output
       toPort: input
     - id: c2
-      from: develop
+      from: task
       to: sweep
       fromPort: output
       toPort: input
@@ -255,7 +255,7 @@ flows:
       fromPort: output
       toPort: input
   4:
-    id: dev-sweep-review
+    id: task-sweep-review
     name: タスク実施→横展開漏れ調査→敵対的レビュー
     version: 1.0.0
     nodes:
@@ -266,7 +266,7 @@ flows:
         x: 0
         y: 0
       data: {}
-    - id: develop
+    - id: task
       type: prompt
       name: タスク実施
       position:
@@ -322,11 +322,11 @@ flows:
     connections:
     - id: c1
       from: start
-      to: develop
+      to: task
       fromPort: output
       toPort: input
     - id: c2
-      from: develop
+      from: task
       to: sweep
       fromPort: output
       toPort: input
@@ -351,7 +351,7 @@ flows:
       fromPort: output
       toPort: input
   5:
-    id: dev-sweep-review
+    id: task-sweep-review
     name: タスク実施→横展開漏れ調査→敵対的レビュー
     version: 1.0.0
     nodes:
@@ -362,7 +362,7 @@ flows:
         x: 0
         y: 0
       data: {}
-    - id: develop
+    - id: task
       type: prompt
       name: タスク実施
       position:
@@ -418,11 +418,11 @@ flows:
     connections:
     - id: c1
       from: start
-      to: develop
+      to: task
       fromPort: output
       toPort: input
     - id: c2
-      from: develop
+      from: task
       to: sweep
       fromPort: output
       toPort: input
