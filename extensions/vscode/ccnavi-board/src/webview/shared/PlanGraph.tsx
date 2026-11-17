@@ -263,7 +263,7 @@ function headingOf(plan: ApprovePlan): string {
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
   const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number}はレビューを受け持つステップがありません` : `${item.number}は${item.review_at}と一緒に`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
-  if (plan.ready.length > 0) {
+  if (plan.ready.length >= 2) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });
   }
   if (deferred.length > 0) {
