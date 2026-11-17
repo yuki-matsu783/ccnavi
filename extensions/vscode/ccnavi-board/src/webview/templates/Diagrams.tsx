@@ -12,6 +12,13 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 
 const NOOP = (): void => undefined;
 
+/** 子のフローの見出し。「1:調査 のフロー」の形で、フローの中身（名前）は書かない */
+function flowHeading(check: TemplateCheck, index: string): string {
+  const item = check.plans.find((plan) => plan.part === "plan")?.items.find((it) => String(it.number) === index);
+  const label = item === undefined ? "" : item.title !== "" ? item.title : item.type;
+  return `${index}:${label} のフロー`;
+}
+
 export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Element {
   const template = fromData(check.data);
   const flows = template === undefined ? [] : Object.entries(template.flows).sort(([a], [b]) => Number(a) - Number(b));
@@ -25,7 +32,7 @@ export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Elem
       ))}
       {flows.map(([index, doc]) => (
         <div key={index} className="tpl-diagram" data-role="flow-diagram" data-index={index}>
-          <h3>{`子のフロー（${index}番${typeof doc.name === "string" && doc.name !== "" ? `: ${doc.name}` : ""}）`}</h3>
+          <h3>{flowHeading(check, index)}</h3>
           <div className="flow-body tpl-flow-view" data-palette-folded="1" data-side-folded="1">
             <Canvas
               doc={sideBySide(doc as FlowDoc)}
