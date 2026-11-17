@@ -6,6 +6,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   absolutePosition,
+  SIDE_BY_SIDE_GAP,
+  sideBySide,
   addBranch,
   addNode,
   connect,
@@ -570,4 +572,16 @@ test("CB-T326 項目のid（body / done）で書いた線は、branch-<番号> �
   // 片方ずつ別の表記なら、それぞれの出口になる。
   const mixed = [byId[0], { ...byId[1], fromPort: "branch-0" }];
   assert.deepEqual(portsOf(node, mixed).outputs.map((p) => p.id), ["branch-0", "done"]);
+});
+
+test("CB-T1264 sideBySide: グループがなければ並び順どおり左から右へ置き直し、元の doc は変えない", () => {
+  const doc = { nodes: [{ id: "a", position: { x: 0, y: 0 } }, { id: "b", position: { x: 0, y: 95 } }, { id: "c", position: { x: 0, y: 190 } }] } as FlowDoc;
+  const out = sideBySide(doc);
+  assert.deepEqual(out.nodes.map((n) => n.position), [0, 1, 2].map((i) => ({ x: i * SIDE_BY_SIDE_GAP, y: 0 })));
+  assert.deepEqual(doc.nodes[1]?.position, { x: 0, y: 95 });
+});
+
+test("CB-T1265 sideBySide: グループか、グループの中のノードがあれば保存された位置のまま返す", () => {
+  const doc = { nodes: [{ id: "g", type: "group" }, { id: "a", parentId: "g" }] } as FlowDoc;
+  assert.equal(sideBySide(doc), doc);
 });

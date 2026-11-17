@@ -4,25 +4,13 @@
  */
 import type { JSX } from "react";
 
-import type { FlowDoc } from "../../core/flow-doc.js";
+import { type FlowDoc, sideBySide } from "../../core/flow-doc.js";
 import { fromData } from "../../core/template-edit.js";
 import type { TemplateCheck } from "../../core/templates-view.js";
 import { Canvas } from "../flow/Canvas.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 
 const NOOP = (): void => undefined;
-
-/** ノードの横幅（約180）に余白を足した、横に並べるときの間隔 */
-const COLUMN_GAP = 260;
-
-/**
- * 子のフローは保存された位置が縦1列に並んでおり、間隔がノードの高さより狭いため重なって見える。
- * 読み取り専用の図では、グループがないときに限り、並び順どおりに左から右へ置き直す（保存されている位置は変えない）。
- */
-function sideBySide(doc: FlowDoc): FlowDoc {
-  if (doc.nodes.some((node) => node.type === "group" || node.parentId !== undefined)) return doc;
-  return { ...doc, nodes: doc.nodes.map((node, index) => ({ ...node, position: { x: index * COLUMN_GAP, y: 0 } })) };
-}
 
 export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Element {
   const template = fromData(check.data);
