@@ -12,7 +12,7 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 
 const NOOP = (): void => undefined;
 
-/** 子のフローの見出し。「1:調査 のフロー」の形で、フローの中身（名前）は書かない。番号に当たる計画の段が無ければ「1番のフロー」 */
+/** 子のフローの見出し。「1:調査 のフロー」の形にし、フローの名前は書かない。番号に当たる計画の段がなければ「1番のフロー」にする */
 function flowHeading(check: TemplateCheck, index: string): string {
   const item = check.plans.find((plan) => plan.part === "plan")?.items.find((it) => String(it.number) === index);
   return item === undefined ? `${index}番のフロー` : `${index}:${item.title !== "" ? item.title : item.type} のフロー`;
