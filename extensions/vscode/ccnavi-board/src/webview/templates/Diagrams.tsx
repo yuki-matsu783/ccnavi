@@ -12,6 +12,18 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 
 const NOOP = (): void => undefined;
 
+/** ノードの横幅（約180）に余白を足した、横並びの間隔 */
+const COLUMN_GAP = 260;
+
+/**
+ * 子のフローは保存された位置が縦1列で、ノードの高さより間隔が狭く重なって見える。
+ * 読むだけの図では、グループが無いときに限り、並び順どおり左から右へ置き直す（保存する位置は変えない）。
+ */
+function sideBySide(doc: FlowDoc): FlowDoc {
+  if (doc.nodes.some((node) => node.type === "group" || node.parentId !== undefined)) return doc;
+  return { ...doc, nodes: doc.nodes.map((node, index) => ({ ...node, position: { x: index * COLUMN_GAP, y: 0 } })) };
+}
+
 export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Element {
   const template = fromData(check.data);
   const flows = template === undefined ? [] : Object.entries(template.flows).sort(([a], [b]) => Number(a) - Number(b));
@@ -28,7 +40,7 @@ export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Elem
           <h3>{`子のフロー（${index}番${typeof doc.name === "string" && doc.name !== "" ? `: ${doc.name}` : ""}）`}</h3>
           <div className="flow-body tpl-flow-view" data-palette-folded="1" data-side-folded="1">
             <Canvas
-              doc={doc as FlowDoc}
+              doc={sideBySide(doc as FlowDoc)}
               readOnly
               selected={undefined}
               onSelect={NOOP}
