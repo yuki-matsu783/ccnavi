@@ -399,6 +399,8 @@ test("CB-D739 一覧の行は最初から開き、図の中身を求める（pre
     assert.equal(dom.all(`${row} .plan-graph`).length >= 1, true, "計画の図が出る");
     assert.equal(dom.all(`${row} .plan-graph[data-editable="1"]`).length, 0, "一覧の図は読むだけ");
     assert.equal(dom.all(`${row} [data-role="flow-diagram"] .react-flow__node`).length >= 2, true, "子のフローの図が出る");
+    const heading = dom.one(`${row} [data-role="flow-diagram"] h3`).textContent ?? "";
+    assert.equal(heading, "2:実装とテスト のフロー", "子のフローの見出しは「番号:フェーズ名 のフロー」の形で、フローの名前（実装の手順）は出さない");
     assert.equal(dom.all(`${row} table.tpl-plan`).length, 0, "図が出たら表は出さない");
     // 畳むと消え、押し直すと戻る。求め直さない
     dom.click(dom.one(`${row} .row-head`));
