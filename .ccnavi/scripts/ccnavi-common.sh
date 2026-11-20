@@ -4,8 +4,8 @@
 #
 # 呼ぶ側の `set -eu` の直後に置く。`$0` は呼ばれたときのパスそのままなので、
 # `sh .ccnavi/scripts/ccnavi-git.sh` でも `sh ../../../.ccnavi/scripts/ccnavi-git.sh` でも
-# 同じディレクトリを指す。この読み込みと、下の部品の読み込みにだけ `$0` を使い、ワークスペースルートの
-# 決定には使わない（下の ccnavi_workspace の但し書き）。
+# 同じディレクトリを指す。この読み込みと、下の部品の読み込みと、cwd からワークスペースルートを
+# 探せないときの起点（下の ccnavi_workspace の但し書き）に `$0` を使う。
 #
 # ここにあるのは 17 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
@@ -160,6 +160,12 @@ ccnavi_phys() {
 # `cwd` がプロジェクトの中にあると git はプロジェクトを答える。それは git として
 # 正しい答えで、ここで欲しいものとは違う。
 #
+# 探す順は、CCNAVI_WORKSPACE（上書き用）→ cwd から上へ → このスクリプトの置き場から上へ。
+# cwd から探せないのは、cwd が消えたディレクトリのとき（`ready` は操作の途中で親のワークツリーを消すので、
+# ユーザのターミナルの cwd はそこに残りやすい）と、ワークスペースの外のとき。そこから絶対パスで
+# スクリプトを打っても動くように、スクリプトの置き場から探し直す。
+# cwd を先にするのは、別の置き場のスクリプトを、cwd のワークスペースに向けて打つ使い方を変えないため。
+#
 # 目印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
 # 置き場として同じパスがあり、プロジェクトの中から打つとそのプロジェクトを根と取り違える。
@@ -169,7 +175,7 @@ ccnavi_phys() {
 # ワークツリーでないディレクトリのうち、最初にヒットしたものを返す。
 #
 # `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにもコピーがある。
-# 単純に「最初にヒットしたもの」にすると、ワークツリーの中から打ったときワークツリー自身が
+# 単純に「最初にヒットしたもの」にすると、ワークツリーの中のコピーを打ったときワークツリー自身が
 # 根になる。ところが `logs/state/`（state の置き場）は追跡外でワークツリーには無く、承認済みチケットも
 # ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。ccnavi が使うもののうち
 # git でワークツリーに届くものと届かないものがあり、根は届かないほうに合わせる必要がある。
@@ -179,8 +185,6 @@ ccnavi_phys() {
 #
 # 最外を取る形にはしない。ワークスペースがユーザのホームの下にあり、そこに
 # `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを選ぶ。近いほうから決める。
-#
-# `cd` は使わない。`set -e` の下で戻り忘れが問題になる。パスを削って登る。
 ccnavi_workspace() {
 	if [ -n "${CCNAVI_WORKSPACE:-}" ]; then
 		ccnavi_ws_named=$(ccnavi_abs "$CCNAVI_WORKSPACE") || return 1
@@ -188,7 +192,17 @@ ccnavi_workspace() {
 		printf '%s\n' "$ccnavi_ws_named"
 		return 0
 	fi
-	ccnavi_ws_here=$(ccnavi_abs .) || return 1
+	if ccnavi_ws_start=$(ccnavi_abs . 2>/dev/null) && ccnavi_ws_climb "$ccnavi_ws_start"; then
+		return 0
+	fi
+	[ -n "$ccnavi_self_dir" ] || return 1
+	ccnavi_ws_climb "$ccnavi_self_dir"
+}
+
+# <ディレクトリ> から上へ、ワークスペースルートを探して出す。見つからなければ 1。
+# `cd` は使わない。`set -e` の下で戻り忘れが問題になる。パスを削って登る。
+ccnavi_ws_climb() {
+	ccnavi_ws_here="$1"
 	while :; do
 		if [ -f "$ccnavi_ws_here/.ccnavi/scripts/ccnavi-common.sh" ]; then
 			case "$ccnavi_ws_here" in
@@ -490,6 +504,12 @@ ccnavi_branch_to_id() {
 # 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
 ccnavi_lib_dir=$(dirname "$0")
+# このスクリプトの置き場の絶対パス（ccnavi_workspace が cwd から探せないときの起点）。呼ぶ側が cd する前に、読んだ時点で解いておく。
+# `$0` がこの置き場のスクリプトでない（`sh -c` で読んだ）ときと、解けない（cwd が消えていて `$0` が相対）ときは空。
+ccnavi_self_dir=""
+if [ -f "$ccnavi_lib_dir/ccnavi-common.sh" ]; then
+	ccnavi_self_dir=$(ccnavi_abs "$ccnavi_lib_dir" 2>/dev/null) || ccnavi_self_dir=""
+fi
 
 # 部品のうち、ここでは読まず呼ぶ側が読むもの（ccnavi-common-review.sh など）を読む。<ファイル名>
 # 置き場は上の部品と同じ（呼んだ sh のディレクトリ）。無ければ配り直しを言って 1 で終わる

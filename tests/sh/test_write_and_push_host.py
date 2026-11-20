@@ -317,9 +317,41 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
 
     def test_close_early_hands_over_to_the_carrier(self):
-        closed = self.review("--reason", "r", "--no-issue", script="ccnavi-user-close-early.sh")
+        # 親は --parent で受ける。統合先のブランチの上（ワークスペースルート）から打っても、
+        # その親を閉じる。
+        closed = self.review(
+            "--parent",
+            PARENT,
+            "--reason",
+            "r",
+            "--no-issue",
+            script="ccnavi-user-close-early.sh",
+            cwd=self.ws,
+        )
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
+
+    def test_close_early_without_a_parent_stops_before_the_host(self):
+        log = os.path.join(self._base, "calls.log")
+        logging = executable(
+            os.path.join(self._base, "bin", "logging"),
+            f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\nexec '{self.half}' \"$@\"\n",
+        )
+        before = self.committed()
+        closed = self.review(
+            "--reason", "r", script="ccnavi-user-close-early.sh", CCNAVI_ENTRY_PATH=logging
+        )
+        self.assertEqual(closed.returncode, 2, closed.stdout + closed.stderr)
+        self.assertIn("--parent <親の識別子> が必要です", closed.stderr)
+        # 親のワークツリーの中なら、案内の 1 本に親の識別子を埋める
+        self.assertIn(f"--parent {PARENT} --reason 'r'", closed.stderr)
+        calls = ""
+        if os.path.exists(log):
+            with open(log, encoding="utf-8") as f:
+                calls = f.read()
+        self.assertNotIn("close-early", calls)
+        self.assertEqual([], Host.notes)
+        self.assertEqual(before, self.committed())
 
     def test_close_early_refuses_first_when_the_family_cannot_be_written(self):
         log = os.path.join(self._base, "calls.log")
@@ -334,6 +366,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         )
         before = self.committed()
         closed = self.review(
+            "--parent",
+            PARENT,
             "--reason",
             "r",
             script="ccnavi-user-close-early.sh",

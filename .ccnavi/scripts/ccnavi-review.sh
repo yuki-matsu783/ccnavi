@@ -14,7 +14,7 @@
 # ユーザだけが打つ操作は、ユーザ専用の sh（ccnavi-user-*.sh）に分けた。エージェントからは hook が名前で止める。
 #
 #   ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイジェスト>]   残った指摘の対応方針を決めて置く
-#   ccnavi-user-close-early.sh --reason <理由> [--no-issue]               まだ残っているが早めに閉じる
+#   ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue] まだ残っているが早めに閉じる
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのはワークツリーの中（フェーズ・ブランチ・マーカー）
@@ -89,7 +89,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready
 
 ユーザがターミナルで実行する操作は別の sh:
   ccnavi-user-decide.sh <N>          指摘の対応方針を選んで置く（対応しない・このフェーズで直す・issue に回す）
-  ccnavi-user-close-early.sh --reason <理由> [--no-issue]
+  ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
                                      まだ残っているが早めに閉じる。残りを issue に書き出す。Draft は親が ready で外す
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
@@ -287,39 +287,11 @@ ready_need_parent() {
 ready_parent=""
 ready_from=""
 if [ "$sub" = ready ]; then
-	# `--parent` は 1 度だけ、値は空でないこと。`--parent=`（空）や `--parent X --parent` を黙って読み飛ばさない。
-	rp_prev=""
-	rp_count=0
-	for rp_arg in "$@"; do
-		if [ "$rp_prev" = --parent ]; then
-			ready_parent="$rp_arg"
-			[ -n "$rp_arg" ] || fail ready-parent-missing "ready の --parent には親の識別子が必要です。" 2
-			rp_prev=""
-			continue
-		fi
-		case "$rp_arg" in
-		--parent=*)
-			rp_count=$((rp_count + 1))
-			ready_parent="${rp_arg#--parent=}"
-			[ -n "$ready_parent" ] || fail ready-parent-missing "ready の --parent には親の識別子が必要です。" 2
-			;;
-		--parent) rp_count=$((rp_count + 1)) ;;
-		esac
-		rp_prev="$rp_arg"
-	done
-	if [ "$rp_prev" = --parent ]; then
-		fail ready-parent-missing "ready の --parent には親の識別子が必要です。" 2
-	fi
-	[ "$rp_count" -le 1 ] || fail ready-parent-twice "ready の --parent は 1 度だけ渡せる。" 2
+	review_parent_arg "$@"
+	ready_parent="$review_parent"
 	[ -n "$ready_parent" ] || ready_need_parent
-	ccnavi_is_ident "$ready_parent" ||
-		fail ready-parent-ident "ready の --parent の値（${ready_parent}）は有効な識別子の形式ではありません。" 2
-	ready_dir="$root/.claude/worktrees/$ready_parent"
-	[ -d "$ready_dir" ] && [ ! -L "$ready_dir" ] && [ -e "$ready_dir/.git" ] ||
-		fail ready-parent-tree "親 ${ready_parent} のワークツリー（${ready_dir}）がありません。ready は親のワークツリーで行う。" 2
-	ready_from="$(pwd)"
-	cd "$ready_dir" || fail ready-parent-cd "親 ${ready_parent} のワークツリー（${ready_dir}）に移れない。" 2
-	exe_cwd="$(pwd -W 2>/dev/null || pwd)"
+	review_enter_parent "$ready_parent"
+	ready_from="$review_from"
 fi
 
 # ---- 実行ファイル。merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。

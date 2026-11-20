@@ -82,6 +82,20 @@ class WorkspaceRootIsNotAProjectCopy(unittest.TestCase):
         put_scripts(other)
         self.assertEqual(self.root_from(self.script, other), os.path.realpath(other))
 
+    def test_a_removed_cwd_falls_back_to_the_script(self):
+        # ready が親のワークツリーを消したあと、ターミナルが消えたディレクトリに残る形。
+        # 消えた場所はワークスペースの外に置き、cwd からは探せないようにする。
+        gone = os.path.join(os.path.dirname(self.ws), "gone")
+        os.makedirs(gone)
+        self.addCleanup(shutil.rmtree, gone, ignore_errors=True)
+        env = {k: v for k, v in os.environ.items() if k != "CCNAVI_WORKSPACE"}
+        probe = f"cd '{gone}' && rmdir '{gone}' && exec '{SHELL}' '{self.script}'"
+        result = subprocess.run(
+            [SHELL, "-c", probe], env=env, capture_output=True, text=True, check=False
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(os.path.realpath(result.stdout.strip()), self.ws)
+
 
 if __name__ == "__main__":
     unittest.main()

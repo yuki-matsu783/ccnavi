@@ -85,7 +85,7 @@ TICKET_SH_Q="sh $(ccnavi_sh_quote "$(dirname "$0")/ccnavi-ticket.sh")"
 # モード B（projects/ の下に別リポジトリを clone する形）では一致しない。
 # 上へたどって `.ccnavi/scripts/ccnavi-common.sh` を探す（保護済みスクリプトはワークスペースルートの .ccnavi/scripts/ に置くため）。
 WS=$(ccnavi_workspace) ||
-	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
+	reject no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を、cwd とこのスクリプトの置き場から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。"
 # 解いたルートを logger に渡し、書くたびに探し直させない。
 ccnavi_log_root="$WS"
 # git が返すパス（リンクを解いたもの）と比べるための、リンクを解いたルート。

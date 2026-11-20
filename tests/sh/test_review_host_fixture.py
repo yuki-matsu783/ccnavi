@@ -280,7 +280,10 @@ class HostFixtureTest(unittest.TestCase):
 
     def test_usage_lists_parent_only_on_ready(self):
         done = self.review("resolved", "--help")
-        lines = [ln for ln in done.stdout.splitlines() if "--parent" in ln]
+        # 並べて案内する別の sh（ccnavi-user-*.sh）の行は数えない
+        lines = [
+            ln for ln in done.stdout.splitlines() if "--parent" in ln and "ccnavi-user-" not in ln
+        ]
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("ready", lines[0])
 
