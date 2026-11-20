@@ -57,7 +57,7 @@ review_place() {
 	# このスクリプトの置き場（絶対パス）。`ready --parent` は親のワークツリーへ cd するので、相対の `$0`
 	# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中のコピーを指すか、見失う。
 	# cd の前に解いておき、以降はこれを使う。
-	script_dir=$(cd "$(dirname "$0")" && pwd)
+	script_dir="$ccnavi_self_dir"
 	# 実行ファイルに渡す cwd（どの親かを引く場所）。ふつうは打った場所で、`ready --parent <親>` のときだけ
 	# 親のワークツリーにする。
 	exe_cwd="$here"

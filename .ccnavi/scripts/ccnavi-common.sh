@@ -7,7 +7,7 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みと、cwd からワークスペースルートを
 # 探せないときの起点（下の ccnavi_workspace の但し書き）に `$0` を使う。
 #
-# ここにあるのは 17 個。`ccnavi_load` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# ここにあるのは 17 個。`ccnavi_load` と、cwd が消えたときの `ccnavi_workspace` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
@@ -161,10 +161,13 @@ ccnavi_phys() {
 # 正しい答えで、ここで欲しいものとは違う。
 #
 # 探す順は、CCNAVI_WORKSPACE（上書き用）→ cwd から上へ → このスクリプトの置き場から上へ。
-# cwd から探せないのは、cwd が消えたディレクトリのとき（`ready` は操作の途中で親のワークツリーを消すので、
-# ユーザのターミナルの cwd はそこに残りやすい）と、ワークスペースの外のとき。そこから絶対パスで
-# スクリプトを打っても動くように、スクリプトの置き場から探し直す。
+# cwd がワークスペースの外でも、絶対パスで打ったスクリプトが動くように、置き場から探し直す。
 # cwd を先にするのは、別の置き場のスクリプトを、cwd のワークスペースに向けて打つ使い方を変えないため。
+#
+# cwd が消えたディレクトリのとき（`ready` は親のワークツリーを消すので、ユーザのターミナルの cwd は
+# そこに残りやすい）は、根を返さずに止める。git も実行ファイルも消えた cwd では動かず、後の段で原因と
+# 違う文面で落ちるため。標準エラーに状態と `cd <根>` の 1 行を出して 1 を返す（この関数で唯一の出力）。
+# 消えたかは `$PWD` で見る（dash は空にし、bash は消えたパスのまま残す。dash の `pwd -P` は成功を返す）。
 #
 # 目印は `.ccnavi/scripts/ccnavi-common.sh`。自分自身なので、無ければそもそも sh が呼べていない。
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
@@ -192,9 +195,16 @@ ccnavi_workspace() {
 		printf '%s\n' "$ccnavi_ws_named"
 		return 0
 	fi
-	if ccnavi_ws_start=$(ccnavi_abs . 2>/dev/null) && ccnavi_ws_climb "$ccnavi_ws_start"; then
-		return 0
+	if [ -z "${PWD:-}" ] || [ ! -d "$PWD" ]; then
+		ccnavi_ws_gone="<ワークスペースルート>"
+		if [ -n "$ccnavi_self_dir" ] && ccnavi_ws_gone=$(ccnavi_ws_climb "$ccnavi_self_dir"); then
+			ccnavi_ws_gone=$(ccnavi_sh_quote "$ccnavi_ws_gone")
+		fi
+		printf 'ccnavi: いまの作業ディレクトリ（%s）は消えています（片付けたワークツリーの中に居るなど）。cd %s で移ってから打ち直してください。\n' \
+			"${PWD:-不明}" "$ccnavi_ws_gone" >&2
+		return 1
 	fi
+	ccnavi_ws_start=$(ccnavi_abs .) && ccnavi_ws_climb "$ccnavi_ws_start" && return 0
 	[ -n "$ccnavi_self_dir" ] || return 1
 	ccnavi_ws_climb "$ccnavi_self_dir"
 }

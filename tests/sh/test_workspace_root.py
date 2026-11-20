@@ -82,10 +82,10 @@ class WorkspaceRootIsNotAProjectCopy(unittest.TestCase):
         put_scripts(other)
         self.assertEqual(self.root_from(self.script, other), os.path.realpath(other))
 
-    def test_a_removed_cwd_falls_back_to_the_script(self):
+    def test_a_removed_cwd_stops_with_the_cd_to_the_root(self):
         # ready が親のワークツリーを消したあと、ターミナルが消えたディレクトリに残る形。
-        # 消えた場所はワークスペースの外に置き、cwd からは探せないようにする。
-        gone = os.path.join(os.path.dirname(self.ws), "gone")
+        # 根は返さず、スクリプトの置き場から見つけた根へ cd する 1 行を出して止まる。
+        gone = os.path.join(self.ws, "gone")
         os.makedirs(gone)
         self.addCleanup(shutil.rmtree, gone, ignore_errors=True)
         env = {k: v for k, v in os.environ.items() if k != "CCNAVI_WORKSPACE"}
@@ -93,8 +93,10 @@ class WorkspaceRootIsNotAProjectCopy(unittest.TestCase):
         result = subprocess.run(
             [SHELL, "-c", probe], env=env, capture_output=True, text=True, check=False
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(os.path.realpath(result.stdout.strip()), self.ws)
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("消えています", result.stderr)
+        self.assertIn(f"cd '{self.ws}'", result.stderr)
 
 
 if __name__ == "__main__":

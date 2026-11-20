@@ -35,7 +35,7 @@ if [ $# -eq 1 ]; then
 fi
 
 # ワークスペースの外で開いた端末からも動くように、cwd から見つからなければ、この sh のある場所からルートを決める。
-root=$(ccnavi_workspace) || root=$(ccnavi_abs "$(dirname "$0")/../..") || {
+root=$(ccnavi_workspace) || {
 	printf 'ccnavi-user-mirror: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を、cwd とこのスクリプトの置き場から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
 	exit 2
 }
