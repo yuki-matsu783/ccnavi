@@ -317,7 +317,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
 
     def test_close_early_hands_over_to_the_carrier(self):
-        # 親は --parent で受ける。統合先のブランチの上（ワークスペースルート）から打っても、
+        # 親は --parent で受ける。ワークスペースルート（統合先のブランチ）から打っても、
         # その親を閉じる。
         closed = self.review(
             "--parent",
@@ -343,7 +343,7 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         )
         self.assertEqual(closed.returncode, 2, closed.stdout + closed.stderr)
         self.assertIn("--parent <親の識別子> が必要です", closed.stderr)
-        # 親のワークツリーの中なら、案内の 1 本に親の識別子を埋める
+        # 親のワークツリーの中なら、案内に親の識別子を埋める
         self.assertIn(f"--parent {PARENT} --reason 'r'", closed.stderr)
         calls = ""
         if os.path.exists(log):

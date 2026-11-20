@@ -66,7 +66,7 @@ review_place() {
 # ---- 親を引数で受ける（ready・close-early）。親を cwd・居るブランチから推定しないため。
 #
 # review_parent_arg "$@"  引数から `--parent <親>`（`--parent=<親>` も）を読み、review_parent に入れる（無ければ空）。
-# 1 度だけ、値は空でないこと。`--parent=`（空）や `--parent X --parent` を黙って読み飛ばさない。
+# `--parent` は 1 度だけ渡し、値は空でないものにする。`--parent=`（空）や `--parent X --parent` は読み飛ばさず止める。
 review_parent_arg() {
 	review_parent=""
 	rpa_prev=""
@@ -91,7 +91,7 @@ review_parent_arg() {
 	if [ "$rpa_prev" = --parent ]; then
 		fail "$sub-parent-missing" "$sub の --parent には親の識別子が必要です。" 2
 	fi
-	[ "$rpa_count" -le 1 ] || fail "$sub-parent-twice" "$sub の --parent は 1 度だけ渡せる。" 2
+	[ "$rpa_count" -le 1 ] || fail "$sub-parent-twice" "$sub の --parent は 1 度だけ指定できます。" 2
 }
 
 # review_enter_parent <親>  親のワークツリー（<根>/.claude/worktrees/<親>）へ移り、実行ファイルの cwd もそこにする。

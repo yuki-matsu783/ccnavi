@@ -200,7 +200,7 @@ ccnavi_workspace() {
 }
 
 # <ディレクトリ> から上へ、ワークスペースルートを探して出す。見つからなければ 1。
-# `cd` は使わない。`set -e` の下で戻り忘れが問題になる。パスを削って登る。
+# `cd` は使わない。`set -e` の下で戻し忘れると後の処理が狂うため、パスの末尾を削って上へ進む。
 ccnavi_ws_climb() {
 	ccnavi_ws_here="$1"
 	while :; do
@@ -504,8 +504,8 @@ ccnavi_branch_to_id() {
 # 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
 ccnavi_lib_dir=$(dirname "$0")
-# このスクリプトの置き場の絶対パス（ccnavi_workspace が cwd から探せないときの起点）。呼ぶ側が cd する前に、読んだ時点で解いておく。
-# `$0` がこの置き場のスクリプトでない（`sh -c` で読んだ）ときと、解けない（cwd が消えていて `$0` が相対）ときは空。
+# このスクリプトの置き場の絶対パス（ccnavi_workspace が cwd から探せないときの起点）。呼ぶ側が cd する前に、読んだ時点で解決しておく。
+# `$0` がこの置き場のスクリプトでない（`sh -c` で読んだ）ときと、解決できない（cwd が消えていて `$0` が相対）ときは空。
 ccnavi_self_dir=""
 if [ -f "$ccnavi_lib_dir/ccnavi-common.sh" ]; then
 	ccnavi_self_dir=$(ccnavi_abs "$ccnavi_lib_dir" 2>/dev/null) || ccnavi_self_dir=""

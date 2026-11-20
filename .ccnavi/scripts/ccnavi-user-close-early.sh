@@ -44,7 +44,7 @@ case "${1:-}" in
 esac
 # 診断ログに残す引数の数（読む前の数）。
 args_n=$#
-# 親は引数で受ける（cwd・居るブランチから推定しない）。`--parent` の重なりや値の抜けはここで断る。
+# 親は引数で受ける（cwd・居るブランチから推定しない）。`--parent` の重複や値の欠落はここで止める。
 review_parent_arg "$@"
 reason=""
 make_issue=1
@@ -65,7 +65,7 @@ done
 [ -n "$reason" ] || fail close-early-no-reason "--reason <理由> が必要です。" 2
 
 review_place
-# --parent が無ければ、ホストへ繋ぐ前に止め、どこからでも打てる 1 本を案内する（何も変えない）。
+# --parent が無ければ、ホストへ繋ぐ前に止め、どこからでも打てる 1 行の案内を出す（何も変えない）。
 if [ -z "$review_parent" ]; then
 	review_tree
 	ce_parent="<親の識別子>"
