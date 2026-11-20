@@ -21,7 +21,7 @@ const feedbackNone = "feedback: []"
 // stripped は承認済みチケットのコピーから、改版に残さない欄（スクリプトだけが書く欄と続きの子の目印）と、finish が
 // 書く「参照したファイル」の節を外した本文。
 func stripped(text string) string {
-	drop := append(append([]string{}, ticket.ScriptFields()...), approval.FollowupKey, fields.ReadFilesSection)
+	drop := append(fields.ScriptDrops(), approval.FollowupKey)
 	if kept, ok := fields.ScriptShape(text, drop); ok {
 		text = kept
 	}

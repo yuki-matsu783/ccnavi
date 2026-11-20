@@ -1,10 +1,12 @@
 package fields
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/tickets/model/ticket"
 )
 
 // ReadFilesSection は、finish が本文の末尾に書く「参照したファイル」の節を、ScriptShape で除く対象に入れるときの名前。
@@ -20,6 +22,16 @@ const (
 	sessionTail      = "`"
 	readFilesItem    = "- "
 )
+
+// sessionLine と itemLine は、節と認める小見出しと項目の行の形。finish が書く形だけに絞り、照合で除かれる節に
+// 本文の代わりの文を書けないようにする。
+var (
+	sessionLine = regexp.MustCompile("^" + regexp.QuoteMeta(sessionHead) + "[A-Za-z0-9._-]+" + regexp.QuoteMeta(sessionTail) + "$")
+	itemLine    = regexp.MustCompile("^" + regexp.QuoteMeta(readFilesItem) + "(`[^`]+`（[A-Za-z]+ [0-9]+(・[A-Za-z]+ [0-9]+)*）|ほか [0-9]+ 件)$")
+)
+
+// ScriptDrops は照合で除いてよいものの全部（スクリプトだけが書く欄と「参照したファイル」の節）。
+func ScriptDrops() []string { return append(ticket.ScriptFields(), ReadFilesSection) }
 
 // readFilesPart は節の中の 1 セッションぶん。
 type readFilesPart struct {
@@ -47,9 +59,9 @@ func readFilesOf(lines []string, end int) (int, []readFilesPart) {
 		case ospath.Strip(line) == "":
 		case line == ReadFilesHeading && !headed:
 			headed = true
-		case headed && strings.HasPrefix(line, sessionHead) && strings.HasSuffix(line, sessionTail) && len(line) > len(sessionHead+sessionTail):
+		case headed && sessionLine.MatchString(line):
 			parts = append(parts, readFilesPart{session: strings.TrimSuffix(strings.TrimPrefix(line, sessionHead), sessionTail)})
-		case len(parts) > 0 && strings.HasPrefix(line, readFilesItem):
+		case len(parts) > 0 && itemLine.MatchString(line):
 			last := &parts[len(parts)-1]
 			last.items = append(last.items, strings.TrimPrefix(line, readFilesItem))
 		default:

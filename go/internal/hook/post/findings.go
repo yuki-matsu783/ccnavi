@@ -366,7 +366,7 @@ func droppable(before version) []string {
 		held = fields.ScriptFieldsSet(before.text)
 	}
 	var out []string
-	for _, f := range append(ticket.ScriptFields(), fields.ReadFilesSection) {
+	for _, f := range fields.ScriptDrops() {
 		if !slices.Contains(held, f) {
 			out = append(out, f)
 		}

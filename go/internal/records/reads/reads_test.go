@@ -94,7 +94,8 @@ func TestSameFileAcrossTreesIsMerged(t *testing.T) {
 // Bash は引数（`cd` の先からの相対を含む）と、grep -n の形の出力・パスだけの行から、実在するファイルを拾う。
 func TestBashArgumentsAndOutputAreRecorded(t *testing.T) {
 	f := newFixture(t)
-	f.note(t, config.ToolBash, f.root, pyjson.NewObject("command", "cd docs && sed -n 1,20p b.md missing.txt"), nil)
+	f.note(t, config.ToolBash, f.root, pyjson.NewObject("command", "cd docs && sed -n 1,20p b.md missing.txt"),
+		pyjson.NewObject("stdout", "b.md:1:x\n"))
 	if got, want := f.rels(t), []string{"docs/b.md"}; !slices.Equal(got, want) {
 		t.Fatalf("args: got %v, want %v", got, want)
 	}
@@ -116,13 +117,17 @@ func TestGrepAndGlobResultsAreRecorded(t *testing.T) {
 	}
 }
 
-// ワークスペースルートの外と `.git` の中、ほかのセッションの記録は載らない。
+// ワークスペースルートの外・`.git` の中・logs/・秘密を置く名前、ほかのセッションの記録は載らない。
 func TestOutsideAndGitAndOtherSessionsAreLeftOut(t *testing.T) {
 	f := newFixture(t)
 	outside := filepath.Join(t.TempDir(), "o.txt")
 	write(t, outside)
 	f.note(t, config.ToolRead, f.root, pyjson.NewObject("file_path", outside), nil)
 	f.note(t, config.ToolRead, f.root, pyjson.NewObject("file_path", filepath.Join(f.root, ".git", "HEAD")), nil)
+	for _, rel := range []string{".env.local", "logs/git-1.log", "secrets/a.txt", "certs/x.PEM"} {
+		write(t, filepath.Join(f.root, rel))
+		f.note(t, config.ToolRead, f.root, pyjson.NewObject("file_path", filepath.Join(f.root, rel)), nil)
+	}
 	if got := Load(f.state, "s1"); len(got) != 0 {
 		t.Fatalf("got %+v", got)
 	}

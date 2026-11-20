@@ -38,6 +38,7 @@ const (
 	fieldFilenames = "filenames"
 	fieldContent   = "content"
 	dotGit         = ".git"
+	logsDir        = "logs"
 )
 
 // Entry は記録の 1 件。Tools はツール名ごとの回数。
@@ -45,15 +46,6 @@ type Entry struct {
 	Path  string
 	Tools map[string]int
 	Seen  float64
-}
-
-// Count はツールをまたいだ回数。
-func (e Entry) Count() int {
-	n := 0
-	for _, c := range e.Tools {
-		n += c
-	}
-	return n
 }
 
 // Item はチケットに載せる 1 件。Rel はツリーのルートからの相対（プロジェクトのツリーなら `<プロジェクト>:` を頭に付ける）。
@@ -79,7 +71,7 @@ func Note(state, root string, in hookio.Input, now time.Time) {
 		if len(paths) >= maxPerCall {
 			break
 		}
-		if !inside(p) || underGit(p) || seen[key(p)] {
+		if !inside(p) || leftOut(root, p) || seen[key(p)] {
 			continue
 		}
 		seen[key(p)] = true
@@ -138,7 +130,7 @@ func Sessions(state, dir string) []string {
 		}
 		session, _ := data.Value("session").(string)
 		hit, last := false, 0.0
-		for _, e := range read(state, session) {
+		for _, e := range entriesOf(data) {
 			hit = hit || inside(e.Path)
 			last = max(last, e.Seen)
 		}
@@ -233,9 +225,9 @@ func touched(in hookio.Input) []string {
 		}
 		return out
 	case config.ToolBash:
-		out := fromCommand(base, in.Field(fieldCommand))
+		out, here := fromCommand(base, in.Field(fieldCommand))
 		if in.ToolResponse != nil {
-			out = append(out, fromOutput(base, in.ToolResponse.String(fieldStdout))...)
+			out = append(out, fromOutput(here, in.ToolResponse.String(fieldStdout))...)
 		}
 		return out
 	}
@@ -243,14 +235,18 @@ func touched(in hookio.Input) []string {
 }
 
 // fromCommand はコマンドの語のうち、実在するファイルを指すもの。`cd <ディレクトリ>` のあとの語はその場所から読む。
-// 字面の推測なので、変数・置換・ヒアドキュメントの中は追わない。
-func fromCommand(base, command string) []string {
+// 字面の推測なので、変数・置換・ヒアドキュメントの中は追わない。語は maxLines 個まで見る。最後の `cd` の先も返す
+// （出力のパスはそこから読む）。
+func fromCommand(base, command string) ([]string, string) {
 	if command == "" {
-		return nil
+		return nil, base
 	}
 	words, err := shell.Split(command)
 	if err != nil {
 		words = ospath.Fields(command)
+	}
+	if len(words) > maxLines {
+		words = words[:maxLines]
 	}
 	var out []string
 	for i := 0; i < len(words); i++ {
@@ -266,7 +262,7 @@ func fromCommand(base, command string) []string {
 			out = append(out, full)
 		}
 	}
-	return out
+	return out, base
 }
 
 // wordPath は語からパスらしい部分を取り出す。`--file=x` の値、`x:12`（grep・sed の位置）の頭。
@@ -297,8 +293,13 @@ func fromOutput(base, text string) []string {
 			continue
 		}
 		candidates := []string{line}
-		if head, _, ok := strings.Cut(line, ":"); ok {
-			candidates = append(candidates, head)
+		// Windows のドライブ（`C:\x.go:12:`）の `:` では切らない。
+		skip := 0
+		if ospath.HasDrive(line, true) {
+			skip = 2
+		}
+		if at := strings.Index(line[skip:], ":"); at >= 0 {
+			candidates = append(candidates, line[:skip+at])
 		}
 		if words := ospath.Fields(line); len(words) > 1 && len(words) <= maxFieldsPerLine {
 			candidates = append(candidates, words...)
@@ -353,11 +354,30 @@ func insideOf(root string) func(string) bool {
 	}
 }
 
-func underGit(full string) bool {
-	return slices.ContainsFunc(strings.Split(ospath.Slashed(full), "/"), func(part string) bool {
-		return pathcase.Fold(part) == dotGit
-	})
+// leftOut は記録しないパスか。`.git` の中、ワークスペースルート直下の logs/（ccnavi の記録）、秘密を置く名前
+// （.claude/settings.json の deny が読ませない場所と同じ）。チケットは親のブランチへ push されるので、名前も載せない。
+func leftOut(root, full string) bool {
+	rel, ok := ospath.Relpath(full, root)
+	if !ok {
+		rel = full
+	}
+	parts := strings.Split(pathcase.Fold(ospath.Slashed(rel)), "/")
+	if parts[0] == logsDir {
+		return true
+	}
+	if slices.ContainsFunc(parts, func(p string) bool { return slices.Contains(secretDirs, p) }) {
+		return true
+	}
+	base := parts[len(parts)-1]
+	return slices.ContainsFunc(secretPrefixes, func(p string) bool { return strings.HasPrefix(base, p) }) ||
+		slices.ContainsFunc(secretSuffixes, func(s string) bool { return strings.HasSuffix(base, s) })
 }
+
+var (
+	secretDirs     = []string{dotGit, "secrets", "credentials", ".ssh", ".aws"}
+	secretPrefixes = []string{".env", ".dev.vars", ".npmrc", ".pypirc", "credentials.json"}
+	secretSuffixes = []string{".pem", ".key"}
+)
 
 func key(s string) string { return pathcase.Fold(pyfmt.NFC(s)) }
 
@@ -365,12 +385,17 @@ func pathOf(state, session string) string {
 	return fsio.RecordPath(state, Prefix, fsio.SafeNameOr(session, unknownSession, fsio.SafeNameLimit), fsio.JSONExt)
 }
 
-// read は記録の項目（形の検査だけ済んだもの）。別のセッションの記録・読めない記録は空。
+// read はこのセッションの記録の項目。別のセッションの記録・読めない記録は空。
 func read(state, session string) []Entry {
 	data, ok := fsio.ReadObject(pathOf(state, session))
 	if !ok || data.Value("session") != session {
 		return nil
 	}
+	return entriesOf(data)
+}
+
+// entriesOf は読んだ記録の項目（形の検査だけ済んだもの）。
+func entriesOf(data *pyjson.Object) []Entry {
 	items, _ := data.Value("entries").([]any)
 	var out []Entry
 	for _, raw := range items {

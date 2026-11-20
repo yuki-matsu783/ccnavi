@@ -47,7 +47,9 @@ func TestMalformedReadFilesIsNotDropped(t *testing.T) {
 	for name, tail := range map[string]string{
 		"本文が続く":     "\n<!-- ccnavi:read-files -->\n## 参照したファイル\n\n### セッション `s1`\n\n- `a.go`\n\n書き換えた本文\n",
 		"見出しが無い":    "\n<!-- ccnavi:read-files -->\n### セッション `s1`\n- `a.go`\n",
-		"小見出しの前の項目": "\n<!-- ccnavi:read-files -->\n## 参照したファイル\n- `a.go`\n",
+		"小見出しの前の項目": "\n<!-- ccnavi:read-files -->\n## 参照したファイル\n- `a.go`（Read 1）\n",
+		"任意の文の項目":   "\n<!-- ccnavi:read-files -->\n## 参照したファイル\n\n### セッション `s1`\n\n- [x] 受入条件を満たした\n",
+		"セッション名に空白": "\n<!-- ccnavi:read-files -->\n## 参照したファイル\n\n### セッション `次は push`\n\n- `a.go`（Read 1）\n",
 	} {
 		text := readFilesTicket + tail
 		if HasReadFiles(text) || strings.Contains(strings.Join(ScriptFieldsSet(text), ","), ReadFilesSection) {
