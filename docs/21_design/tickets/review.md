@@ -32,7 +32,7 @@ sh が取得して JSON ファイルに書き、そのパスを `--result` で�
 | `ccnavi-user-decide.sh <N>` | ユーザが打つ。`ccnavi-review.sh` には無い。`--entry sh user reviewed N --check --accept-unresolved`（ロック・取り込みの前に断る）→ sh が取ってくる → `user reviewed N --accept-unresolved` → sh が投稿。途中で失敗した送信は `ccnavi-user-decide.sh --resume <操作ID>` で続きを送る（操作記録は `logs/state/ops/`） |
 | `comment --body-file <本文>` | sh が投稿する。実行ファイルは関わらず、レビューの状態も変えない |
 | `ready` | `review ready --check`（ロック・取り込みの前に断る。前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）→ `review ready`（条件を確かめ、マーカーを置き、閉じた親子のチケットを `logs/archive/` へ退避する。`wip/` の追跡済みのファイルを消す。標準出力は 1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`、続けて消したものがあれば `wip-from <消す前の HEAD>` と `wip <パス>`）→ write-and-push が退避と `wip/` の削除をコミットして push する（write-and-push の外なら、sh が 2 行目のツリーの置き場と `wip/` に未コミットの変更が無いことを確かめ、あれば止める）→ sh が Draft を外し、コメントを投稿する → sh が実行ファイルの `worktree retire <親>` で子と親のワークツリーを消す。`ready` は `--parent <親>` を付けて親のワークツリーの外から打つ形だけ（sh が親のワークツリーへ移って同じ処理を回し、消す前に打った場所へ戻る） |
-| `ccnavi-user-close-early.sh --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
+| `ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]` | ユーザがターミナルで打つ。親は `--parent` で受け（無ければホストへ繋ぐ前に止める）、sh が親のワークツリーへ移る。`ccnavi-review.sh` には無い。`user close-early` → sh が残りを issue に書き出し、コメントを投稿する |
 | `fetch` / `origin` | 取得した JSON を標準出力へ / origin をどう読んだか |
 
 **`review-request` の処理**。次の順に進む。

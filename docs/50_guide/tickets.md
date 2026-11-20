@@ -234,7 +234,7 @@ Write / Edit の対象が `.claude/worktrees/<名前>/` の中なら、その名
 
 ### まだ残っているが早めに閉じたいとき
 
-ユーザがターミナルで `ccnavi-user-close-early.sh --reason <理由>` を打つ。作業中の子がいる間は打てない。残っているものを全部見せてから y/N を取る。
+ユーザがターミナルで `ccnavi-user-close-early.sh --parent <親> --reason <理由>` を打つ。親は引数で受け、cwd からは推定しない。作業中の子がいる間は打てない。残っているものを全部見せてから y/N を取る。
 承認のあとで着手していない子は、自動で取り消される（`cancel` と同じ扱いで、理由に `close-early` が付く）。残りは issue に書き出される（`--no-issue` で書き出さない）。
 Draft は親が片付けて push したあとの `ready` で外す。
 

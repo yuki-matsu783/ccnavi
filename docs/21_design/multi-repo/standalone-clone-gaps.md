@@ -25,7 +25,7 @@ keywords: [単体 clone, ワークスペース内 clone, 根, ルート, 統合�
 
 ## 根の決め方
 
-- sh の根は、`CCNAVI_WORKSPACE` があればそれ。無ければ作業ディレクトリから上へ辿り、`.ccnavi/scripts/ccnavi-common.sh` を持つ最初のディレクトリ。ただし `.claude/worktrees/<名前>` の位置のコピーは飛ばす。そのディレクトリが `<親>/projects/<名前>` の形で、親も `ccnavi-common.sh` を持つなら、親を根にする
+- sh の根は、`CCNAVI_WORKSPACE` があればそれ。無ければ作業ディレクトリから上へ辿り（作業ディレクトリが消えている・ワークスペースの外なら sh 自身の置き場から上へ辿り）、`.ccnavi/scripts/ccnavi-common.sh` を持つ最初のディレクトリ。ただし `.claude/worktrees/<名前>` の位置のコピーは飛ばす。そのディレクトリが `<親>/projects/<名前>` の形で、親も `ccnavi-common.sh` を持つなら、親を根にする
 - 実行ファイルの根は、`--root`、環境変数 `CLAUDE_PROJECT_DIR`、作業ディレクトリから上へ辿って `.claude/` を持つ最初のディレクトリ（`.claude/worktrees/<名前>` の位置は飛ばす）の順で決める。`CLAUDE_PROJECT_DIR` があればそのまま採り、その中身は調べない
 - 単体 clone では、どちらもプロジェクト自身が根になる。食い違わない
 - ワークスペース内 clone のプロジェクトで Claude Code を起動すると、hook の根はそのプロジェクト（`CLAUDE_PROJECT_DIR`）、sh の根はワークスペースになる。ログと state の置き場が割れ、ワークツリーを切る場所も sh と hook で違う
