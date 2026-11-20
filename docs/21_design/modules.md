@@ -22,7 +22,7 @@ keywords: [モジュール, パッケージ, 構成, infra, records, policy, tic
 | `go/cmd/ccnavi/` | 実行ファイルの入口。標準入出力と引数を `entry/cli` の `Run` に渡すだけ | `entry` |
 | `go/cmd/ccnavi-chrome/` | Chrome 拡張が読む WASM の入口。要求の JSON を `entry/chrome` に渡す | `entry` |
 | `go/internal/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー | どれも読まない |
-| `go/internal/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・ターン中の印・学びの蓄積・放置セッションの引き継ぎ促し | `infra` |
+| `go/internal/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・ターン中の印・学びの蓄積・放置セッションの引き継ぎ促し・コンテキストに乗ったファイル | `infra` |
 | `go/internal/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル | `infra`、`records` |
 | `go/internal/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作、ユーザの発言のときの共通レイヤー・工程スキルのミラー | `infra`、`records`、`policy` |
 | `go/internal/catalog/` | 目録。文書の索引と `--docs` の引き方、プロジェクトのスキルの目録 | `infra`、`records`、`policy`、`tickets` |

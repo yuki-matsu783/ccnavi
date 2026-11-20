@@ -67,6 +67,8 @@ var subTiers = map[string]map[string]int{
 		// 0: セッションごとのターンの状態と、放置したセッションの引き継ぎ
 		"turn":    0,
 		"handoff": 0,
+		// 0: セッションのコンテキストに乗ったファイルの記録
+		"reads": 0,
 		// 1: 伏せ字を通して書く（判定の記録・診断ログ）
 		"audit":   1,
 		"diaglog": 1,

@@ -42,6 +42,7 @@ func ReadyCommand(root, parentID string) string {
 }
 
 // Finish は doing/ から review/（レビューが要る）か done/（要らない）へ動かし、完了の時刻を書く。子は閉じる前に実績のリスクを数える。定性の判定がそろわなければ閉じない。
+// 動かす前に、打ったセッションのコンテキストに乗ったファイルを本文の最後に書く（records/reads の記録。無ければ書かない）。
 // 成果物の追跡と親の学びの置き場は、子の合流のあとでないと分からないので、finishGate のあとに見る。
 func Finish(stdout, stderr io.Writer, conf *config.Settings, root, id string) int {
 	found := finishGate(stderr, conf, root, id)
@@ -71,6 +72,7 @@ func Finish(stdout, stderr io.Writer, conf *config.Settings, root, id string) in
 	// 置き場の状態だけでは、あとから「review 行きだったか」は求まらない（review_required は実績のリスクなどで
 	// 変わる）。置いた先を残し、手で動かしたかどうかの判定（settled_by の有無）の根拠にする。
 	fields = append(fields, [2]string{"finished_to", string(state)})
+	noteReadFiles(conf, root, found)
 	code := move(stdout, stderr, conf, root, found, state, fields, "完了 "+completed, true)
 	if code != 0 {
 		return code

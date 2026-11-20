@@ -8,6 +8,9 @@ const (
 	ClaudeProjectDir      = "CLAUDE_PROJECT_DIR"
 	ClaudeCodeEntrypoint  = "CLAUDE_CODE_ENTRYPOINT"
 	ClaudeSessionAttended = "CLAUDE_CODE_SESSION_ATTENDED"
+	// ClaudeSessionID は Claude Code が Bash のコマンドに渡すセッションの識別子（hook の session_id と同じ値）。
+	// サブコマンドが、打ったセッションの記録を引くのに使う。
+	ClaudeSessionID = "CLAUDE_CODE_SESSION_ID"
 )
 
 // 起動の場所と、hook・sh が実行ファイルへ渡す文脈。

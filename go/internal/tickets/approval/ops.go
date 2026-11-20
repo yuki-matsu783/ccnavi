@@ -96,6 +96,20 @@ func UpdateFields(path string, values [][2]string) string {
 	return marks.WriteTicket(path, fields.SetFields(text, values))
 }
 
+// NoteReadFiles は承認済みチケットの本文の最後の「参照したファイル」の節に、セッションのぶんを書く（ほかのセッションの
+// ぶんは残す）。答えは書けなかった理由（空なら無し）。
+func NoteReadFiles(path, session string, items []string) string {
+	text, err := fsio.ReadDiskText(path, fsio.Strict)
+	if err != nil {
+		return "読めない (" + err.Error() + ")"
+	}
+	updated := fields.SetReadFiles(text, session, items)
+	if updated == text {
+		return ""
+	}
+	return marks.WriteTicket(path, updated)
+}
+
 // NoteMR は承認済みチケットの mr: が空のときだけ番号を書き足す。答えは失敗の理由（空なら無し）と結果。
 // 書くのは欄の 1 行だけで、ユーザの書いたコメントや本文は保つ。
 func NoteMR(path string, number int) (string, fields.MRResult) {

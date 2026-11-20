@@ -16,6 +16,7 @@ import (
 	"ccnavi/internal/policy/selfguard"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/records/audit"
+	"ccnavi/internal/records/reads"
 	"ccnavi/internal/records/tally"
 	"ccnavi/internal/records/turn"
 	"ccnavi/internal/tickets/model/directcand"
@@ -27,10 +28,15 @@ import (
 var dryRunPushback = config.DryRunWould("sent this back as a correction:\n")
 
 // after は PostToolUse。実行後チェックを 1 回動かし、言うことがあれば返す。差し戻すかどうかに関わらず、最後に直接作業の
-// 候補を登録する。書き込みは起きているので、git は呼ばず、失敗しても何も言わない。
+// 候補を登録し、コンテキストに乗ったファイルを記録する（finish がチケットに載せる）。書き込みは起きているので、git は
+// 呼ばず、失敗しても何も言わない。
 func after(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, root string, in hookio.Input,
 	record *audit.Record) (int, error) {
-	defer func() { directcand.Touch(conf, root, in, time.Now()) }()
+	defer func() {
+		now := time.Now()
+		directcand.Touch(conf, root, in, now)
+		reads.Note(conf.State, root, in, now)
+	}()
 	return check(stdout, stderr, mode, conf, root, in, record)
 }
 
