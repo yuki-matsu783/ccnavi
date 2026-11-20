@@ -22,11 +22,11 @@ const Prefix = "reads-"
 const (
 	// maxEntries は 1 セッションの記録の上限。
 	maxEntries = 2000
-	// maxPerCall は 1 回の呼び出しで足す件数の上限。大きな出力 1 回で記録が埋まらないようにする。
+	// maxPerCall は 1 回の呼び出しで足す件数の上限。1 回の大きな出力で記録が埋まらないようにする。
 	maxPerCall = 300
 	// maxLines は Bash・Grep の出力から読む行数の上限。hook の待ち時間を抑える。
 	maxLines = 3000
-	// maxFieldsPerLine は、行を空白で切ってパスを探す行の語数の上限。長い文の語を 1 つずつ確かめない。
+	// maxFieldsPerLine は、行を空白で切って語ごとにパスを探す行の語数の上限。長い文の語を 1 つずつ確かめない。
 	maxFieldsPerLine = 8
 
 	unknownSession = "unknown"
@@ -281,7 +281,7 @@ func wordPath(w string) string {
 }
 
 // fromOutput は出力の行から、実在するファイルを指すもの。行全体（find・ls -1）、最初の `:` の前（grep -n・rg）、
-// 語の少ない行の各語を当てる。
+// 語の少ない行の各語を試す。
 func fromOutput(base, text string) []string {
 	if text == "" {
 		return nil

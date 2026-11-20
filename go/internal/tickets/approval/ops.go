@@ -97,7 +97,7 @@ func UpdateFields(path string, values [][2]string) string {
 }
 
 // NoteReadFiles は承認済みチケットの本文の最後の「参照したファイル」の節に、セッションのぶんを書く（ほかのセッションの
-// ぶんは残す）。書けなければ理由。
+// ぶんは残す）。答えは書けなかった理由（空なら無し）。
 func NoteReadFiles(path, session string, items []string) string {
 	text, err := fsio.ReadDiskText(path, fsio.Strict)
 	if err != nil {

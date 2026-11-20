@@ -7,12 +7,12 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// ReadFilesSection は、finish が本文の末尾に書く「参照したファイル」の節を、ScriptShape の drop に入れるときの名前。
+// ReadFilesSection は、finish が本文の末尾に書く「参照したファイル」の節を、ScriptShape で除く対象に入れるときの名前。
 // 欄と同じく、コミット済みの版にまだ節が無いときだけ除いてよい（ScriptFieldsSet が、節があればこの名前を返す）。
 const ReadFilesSection = "read_files"
 
 const (
-	// readFilesMarker は節の始まりの印。印から末尾までが節で、節は本文の最後に置く。
+	// readFilesMarker は節の始まりの印。印から末尾までが節になり、節は本文の最後に置く。
 	readFilesMarker = "<!-- ccnavi:read-files -->"
 	// ReadFilesHeading は節の見出し。その下にセッションごとの小見出しと項目の行が並ぶ。
 	ReadFilesHeading = "## 参照したファイル"
@@ -27,7 +27,7 @@ type readFilesPart struct {
 	items   []string
 }
 
-// readFilesOf は本文の最後の節の印の行の番号と、セッションごとの中身。節は、印のあとが見出し 1 つ・小見出し・項目の行・
+// readFilesOf は本文の最後の節の印の行の番号（無ければ -1）と、セッションごとの中身を返す。節は、印のあとが見出し 1 つ・小見出し・項目の行・
 // 空行だけのもの。ほかの行があれば節と認めず -1（照合で除く範囲を狭く保つ）。
 func readFilesOf(lines []string, end int) (int, []readFilesPart) {
 	at := -1

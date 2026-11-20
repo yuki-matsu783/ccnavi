@@ -1,4 +1,4 @@
-// Package reads は、セッションのコンテキストに乗ったファイルを記録し、チケットの本文に載せる一覧にする。
+// Package reads は、セッションのコンテキストに乗ったファイルを記録し、チケットの本文に載せる形にする。
 //
 // PostToolUse ごとに、ツールが読んだ・書いた・結果に出したファイルを `<state>/reads-<セッション>.json` に足す。拾うのは
 // Read・Write・Edit・MultiEdit・NotebookEdit の対象、Grep・Glob の結果に出たファイル、Bash のコマンドの引数と標準出力に
