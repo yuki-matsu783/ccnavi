@@ -16,6 +16,10 @@ var parentHeadings = []string{"目的", "範囲", "対象外", "完了の確か�
 // ParentHeadings は parentHeadings の写しを返す（呼び手が書き換えても元は変わらない）。
 func ParentHeadings() []string { return slices.Clone(parentHeadings) }
 
+// childHeadings は子の必須の見出し。子は承認のあと新しいセッションで始まり、本文が担当のサブエージェントへの
+// 引き継ぎになるので、Stop の判定（R2）が子に求める内容を見出しにする。子には雛形が無いので、空欄の目印は持たない。
+var childHeadings = []string{"担当範囲", "親の要求との対応", "確認の手順"}
+
 // RationaleTodo は rationale の空欄の目印。
 const RationaleTodo = "（ここにこの作業をする理由を書く）"
 
@@ -92,7 +96,7 @@ func headings(body string) map[string]bool {
 }
 
 // Problems は提案の形式の苦情。目印の残りは新規の提案なら error、改版（revision）なら warn（承認済みチケットの
-// コピーなので、残りで止めない）。見出しの欠けは親の新規の提案だけを warn で言う。
+// コピーなので、残りで止めない）。見出しの欠けは新規の提案（親と子）だけを warn で言う。
 func Problems(t *ticket.Ticket, revision bool) []rules.Problem {
 	var out []rules.Problem
 	severity := rules.Error
@@ -113,20 +117,24 @@ func Problems(t *ticket.Ticket, revision bool) []rules.Problem {
 			Detail: part.place + "に雛形の空欄の目印が残っている: " + strings.Join(left, "、") + "。" +
 				"実際の内容に書き換えてから承認を頼みます"})
 	}
-	if revision || t.IsChild() {
+	if revision {
 		return out
+	}
+	who, want, why := "親", parentHeadings, "Stop の判定は親の提案に目的・範囲・対象外・完了の確かめ方を求める"
+	if t.IsChild() {
+		who, want, why = "子", childHeadings,
+			"子は承認のあと新しいセッションで始まり、本文が担当への引き継ぎになる。Stop の判定も子の提案に担当範囲・親の要求との対応・確認の手順を求める"
 	}
 	present := headings(t.Body)
 	var missing []string
-	for _, name := range parentHeadings {
+	for _, name := range want {
 		if !present[name] {
 			missing = append(missing, "`## "+name+"`")
 		}
 	}
 	if len(missing) > 0 {
 		out = append(out, rules.Problem{Severity: rules.Warn, Rule: t.ID,
-			Detail: "親の提案の本文に見出しが欠けている: " + strings.Join(missing, "、") + "。" +
-				"Stop の判定は親の提案に目的・範囲・対象外・完了の確かめ方を求める"})
+			Detail: who + "の提案の本文に見出しが欠けている: " + strings.Join(missing, "、") + "。" + why})
 	}
 	return out
 }

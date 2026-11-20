@@ -24,6 +24,14 @@ func without(names ...string) string {
 
 var filled = without()
 
+var childFilled = func() string {
+	var b strings.Builder
+	for _, name := range childHeadings {
+		b.WriteString("## " + name + "\n\n書いた内容\n\n")
+	}
+	return b.String()
+}()
+
 func proposal(body, rationale string, child bool) *ticket.Ticket {
 	t := &ticket.Ticket{ID: "feature-1-demo", Rationale: rationale, Body: body}
 	if child {
@@ -63,8 +71,9 @@ func TestProblems(t *testing.T) {
 		{"4 字の字下げはフェンスでない", proposal("    ```\n"+filled, "理由", false), false, "", nil},
 		{"CRLF を読む", proposal(strings.ReplaceAll(filled, "\n", "\r\n"), "理由", false), false, "", nil},
 		{"深さの違う見出しは数えない", proposal(without("目的")+"### 目的\n\n書いた内容\n", "理由", false), false, "warn", []string{"## 目的"}},
-		{"子は見出しを言わない", proposal("", "理由", true), false, "", nil},
-		{"子でも目印は言う", proposal("", RationaleTodo, true), false, "error", nil},
+		{"子の見出しの欠けは 1 件にまとめる", proposal("## 担当範囲\n\n書いた内容\n", "理由", true), false, "warn", []string{"子の提案", "## 親の要求との対応", "## 確認の手順"}},
+		{"子に親の見出しは求めない", proposal(childFilled, "理由", true), false, "", nil},
+		{"子でも目印は言う", proposal(childFilled, RationaleTodo, true), false, "error", nil},
 		{"改版は見出しを言わない", proposal("", "理由", false), true, "", nil},
 		{"そろった親は何も言わない", proposal(filled, "理由", false), false, "", nil},
 		{"見出しの名前は前後の空白を除く", proposal(strings.Replace(filled, "## 目的", "## 目的  ", 1), "理由", false), false, "", nil},
