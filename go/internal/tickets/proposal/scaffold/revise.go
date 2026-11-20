@@ -18,9 +18,10 @@ import (
 // feedbackNone は「フィードバック計画は見たうえで対応なし」の行。
 const feedbackNone = "feedback: []"
 
-// stripped は承認済みチケットのコピーから、改版に残さない欄（スクリプトだけが書く欄と続きの子の目印）を外した本文。
+// stripped は承認済みチケットのコピーから、改版に残さない欄（スクリプトだけが書く欄と続きの子の目印）と、finish が
+// 書く「参照したファイル」の節を外した本文。
 func stripped(text string) string {
-	drop := append(append([]string{}, ticket.ScriptFields()...), approval.FollowupKey)
+	drop := append(append([]string{}, ticket.ScriptFields()...), approval.FollowupKey, fields.ReadFilesSection)
 	if kept, ok := fields.ScriptShape(text, drop); ok {
 		text = kept
 	}

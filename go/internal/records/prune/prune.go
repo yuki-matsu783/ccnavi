@@ -17,6 +17,7 @@ import (
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/records/diaglog"
+	"ccnavi/internal/records/reads"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/records/tally"
 	"ccnavi/internal/records/turn"
@@ -53,6 +54,7 @@ var sessionOnly = sync.OnceValue(func() []*regexp.Regexp {
 		named(stopreview.TaintPrefix, fsio.JSONExt),     // hook の stopjudge
 		named(stopreview.LastStopPrefix, fsio.JSONExt),  // stopreview
 		named(config.DirectPrefix, fsio.JSONExt),        // direct_candidates（compact・clear では破棄しない）
+		named(reads.Prefix, fsio.JSONExt),               // reads（コンテキストに乗ったファイル）
 		// `<セッション>.reported.json`（post）。Claude Code のセッションは UUID なので、その形に限る。広く読むと
 		// 同じ置き場の別のファイル（package.json など）を消す。
 		regexp.MustCompile(`^(?P<s>[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\.reported\.json$`),

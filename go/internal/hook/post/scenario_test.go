@@ -21,6 +21,7 @@ import (
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/records/audit"
 	"ccnavi/internal/tickets/approval"
+	"ccnavi/internal/tickets/model/fields"
 	"ccnavi/internal/tickets/testkit"
 )
 
@@ -275,9 +276,9 @@ func TestMainTreeMatchesGolden(t *testing.T) {
 		bash("ccnavi ticket start t1", "enable", true),
 		write(".ccnavi/approved/doing/t1.md", strings.Replace(testkit.ParentText("t1", nil), `glob: "src/*"`, `glob: "**"`, 1)),
 		bash("sed -i s/src/x/ t1.md", "enable", true),
-		// finish の移動（doing から review へ、着手の時刻と完了の時刻を足しただけ）は外す。
+		// finish の移動（doing から review へ、着手の時刻と完了の時刻と「参照したファイル」の節を足しただけ）は外す。
 		{Op: "remove", Path: ".ccnavi/approved/doing/t2.md"},
-		write("wip/proposals/review/t2.md", strings.Replace(testkit.ParentText("t2", nil), `completed_at: ""`, `completed_at: "2026-01-02T00:00:00+0900"`, 1)),
+		write("wip/proposals/review/t2.md", fields.SetReadFiles(strings.Replace(testkit.ParentText("t2", nil), `completed_at: ""`, `completed_at: "2026-01-02T00:00:00+0900"`, 1), "s1", []string{"`src/app.py`（Read 1）"})),
 		bash("ccnavi ticket finish t2", "enable", true),
 		write("protected/committed.txt", "c\n"),
 		gitStep("", "add", "protected/committed.txt"),

@@ -359,14 +359,14 @@ func (s scan) archivedRemovals(here []placed) map[string]bool {
 	return out
 }
 
-// droppable は正規化で省いてよいスクリプトの欄。コミット済みの版がまだ持っていない欄だけ。
+// droppable は正規化で省いてよいスクリプトの欄（finish が書く「参照したファイル」の節を含む）。コミット済みの版がまだ持っていない欄だけ。
 func droppable(before version) []string {
 	var held []string
 	if before.present {
 		held = fields.ScriptFieldsSet(before.text)
 	}
 	var out []string
-	for _, f := range ticket.ScriptFields() {
+	for _, f := range append(ticket.ScriptFields(), fields.ReadFilesSection) {
 		if !slices.Contains(held, f) {
 			out = append(out, f)
 		}

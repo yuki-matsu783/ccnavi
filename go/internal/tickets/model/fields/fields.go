@@ -216,6 +216,9 @@ func ScriptFieldsSet(text string) []string {
 			held = append(held, key)
 		}
 	}
+	if at, _ := readFilesOf(lines, end); at >= 0 {
+		held = append(held, ReadFilesSection)
+	}
 	return held
 }
 
@@ -238,11 +241,14 @@ func hasValue(raw string) bool {
 // ScriptShape は frontmatter があるチケットなら、drop の欄（ticket.ScriptFields の部分集合）とその値として続く
 // 字下げの行を除いて正規化した内容と真。無ければ偽。台帳ではなく内容で見るのは、承認とマーカーが親のブランチに
 // 乗って別の機械へ届くため。切り出し方は SetFields と揃える（揃えないと、書いた直後の内容が「スクリプトが書いて
-// いない形」に見える）。
+// いない形」に見える）。drop に ReadFilesSection があれば、本文の最後の「参照したファイル」の節と末尾の空行も除く。
 func ScriptShape(text string, drop []string) (string, bool) {
 	lines, end, ok := split(text)
 	if !ok {
 		return "", false
+	}
+	if slices.Contains(drop, ReadFilesSection) {
+		lines = withoutReadFiles(lines, end)
 	}
 	var kept []string
 	dropping := false
