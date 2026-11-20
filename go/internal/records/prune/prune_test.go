@@ -204,7 +204,7 @@ func sessionFiles(t *testing.T, state, s string, ageDays float64) []string {
 	var paths []string
 	for _, name := range []string{
 		s + ".reported.json", s + ".turn.json", "nudged-" + s + ".json", "denied-" + s + ".json",
-		"direct-" + s + ".json", "userprompt-" + s + ".json",
+		"direct-" + s + ".json", "reads-" + s + ".json", "userprompt-" + s + ".json",
 		"turngate-" + s + "-integrate-user-turn-0123456789-t1.json",
 		"once-" + s + "-main.json", "once-" + s + "-peers-agent-1.json", "failstreak-" + s + "-main.json",
 		"subagent-" + s + "-guard-records.bounced", "subagent-" + s + "-agent-1.running",
