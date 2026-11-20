@@ -181,8 +181,14 @@ func TestCompileCondition(t *testing.T) {
 	if re, why := CompileCondition("{root}/x", "", "gate"); re != nil || !strings.Contains(why, "ワークスペースルートが必要") {
 		t.Error(why)
 	}
-	if re, why := CompileCondition("", "a(?=b)", "gate"); re != nil || why != "先読みは利用できない" {
-		t.Error(why)
+	for regex, want := range map[string]string{
+		"a(?=b)":         "先読みは利用できない",
+		`(a)\1`:          "後方参照は利用できない",
+		"(?P<n>a)(?P=n)": "後方参照は利用できない",
+	} {
+		if re, why := CompileCondition("", regex, "gate"); re != nil || why != want {
+			t.Errorf("%q: %q", regex, why)
+		}
 	}
 }
 

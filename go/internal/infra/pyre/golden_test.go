@@ -179,7 +179,8 @@ func TestAgainstGoldenValid(t *testing.T) {
 	compare(t, "valid", cases)
 }
 
-func TestTranslateGlobAgainstGolden(t *testing.T) {
+// globSamples は fnmatch の翻訳を突き合わせる glob。
+func globSamples() []string {
 	r := rand.New(rand.NewPCG(5, 6))
 	chars := []rune("*?[]!-^\\/a.bz &~|é")
 	globs := []string{"*", "*git push*", "*/.ccnavi/*", "*.pem", "[a/b]", "[]", "[!]", "[z-a]", "[a-c-e]"}
@@ -190,14 +191,31 @@ func TestTranslateGlobAgainstGolden(t *testing.T) {
 		}
 		globs = append(globs, b.String())
 	}
+	return globs
+}
+
+// TranslateFnmatch を Python の fnmatch.translate の答えと突き合わせる。
+func TestTranslateFnmatchAgainstGolden(t *testing.T) {
 	want := golden.Load[[]string](t, "glob")
-	for i, g := range globs {
-		if strings.HasPrefix(want[i], "!") {
-			t.Logf("Python が翻訳できない glob %q: %s", g, want[i])
-			continue
+	for i, g := range globSamples() {
+		if got := TranslateFnmatch(g); got != want[i] {
+			t.Errorf("TranslateFnmatch(%q) = %q, want %q", g, got, want[i])
 		}
-		if got := TranslateGlob(g); got != want[i] {
-			t.Errorf("TranslateGlob(%q) = %q, want %q", g, got, want[i])
+	}
+}
+
+// TranslateGlob は、文字クラスを含まない glob なら fnmatch の翻訳の "/" を AnySeparator に置き換えたものと同じで、
+// どの glob でも組める式になる。
+func TestTranslateGlobFollowsFnmatch(t *testing.T) {
+	for _, g := range globSamples() {
+		got := TranslateGlob(g)
+		if !strings.Contains(g, "[") {
+			if want := strings.ReplaceAll(TranslateFnmatch(g), "/", AnySeparator); got != want {
+				t.Errorf("TranslateGlob(%q) = %q, want %q", g, got, want)
+			}
+		}
+		if _, err := Compile(got, 0); err != nil {
+			t.Errorf("TranslateGlob(%q) = %q: %v", g, got, err)
 		}
 	}
 }

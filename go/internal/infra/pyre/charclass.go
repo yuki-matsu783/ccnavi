@@ -42,7 +42,8 @@ func (c caser) cased(r rune) bool {
 	if c.ascii {
 		return r < 0x80 && (r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z')
 	}
-	return unicode.ToLower(r) != r || unicode.ToUpper(r) != r
+	// 大文字は Python の 1 字の大文字（ß → S）で見る。ß は別がある字になり、(?i)ß が ẞ に当たる。
+	return unicode.ToLower(r) != r || pyfmt.UpperRune(r) != r
 }
 
 func (c caser) fixes(r rune) []rune {
@@ -187,7 +188,7 @@ func setTest(items []setItem, negate bool, fl Flag) func(rune) bool {
 						if r >= lo && r <= hi {
 							return true
 						}
-						u := unicode.ToUpper(r)
+						u := pyfmt.UpperRune(r)
 						return u >= lo && u <= hi
 					})
 				}
@@ -200,7 +201,7 @@ func setTest(items []setItem, negate bool, fl Flag) func(rune) bool {
 		}
 	}
 	lowerFirst := ignore && hascased
-	return func(r rune) bool {
+	slow := func(r rune) bool {
 		if lowerFirst {
 			r = c.lower(r)
 		}
@@ -210,6 +211,14 @@ func setTest(items []setItem, negate bool, fl Flag) func(rune) bool {
 			}
 		}
 		return negate
+	}
+	// 照らす字の大半は U+00FF までなので、そこまでの答えは組むときに表にしておく（Python の charmap と同じ考え方）。
+	table := tableOf(slow)
+	return func(r rune) bool {
+		if r < latin1End {
+			return table.has(r)
+		}
+		return slow(r)
 	}
 }
 
