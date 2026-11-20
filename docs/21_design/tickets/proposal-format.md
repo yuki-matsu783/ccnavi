@@ -113,7 +113,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）にはヒットしない
 - `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが
   承認済みチケットの行を書き換える（本文とユーザの書いた行は保つ）。`merged_sha` は `finish` が親のブランチへ合流した
-  子の先頭で、子にだけ付く
+  子の先頭で、子にだけ付く。`finish` は本文の最後に「参照したファイル」の節も書く（REQ-TKT-63）
 - `mr` は親の欄で、仕事を載せるマージリクエストの番号（正の整数。`"!12"`・`"#12"` も可）。同じリポジトリのものだけで、
   `owner/repo` の形や 0・数でないものは error、子に書くと warn で無視する。`issue` と並べて検索に使い、
   UserPromptSubmit の hook（`lifecycle/branch`）が依頼文の MR の番号を「すでにあるチケットに結び付く」と判定する
