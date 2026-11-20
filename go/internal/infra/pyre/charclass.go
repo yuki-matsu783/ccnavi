@@ -42,7 +42,7 @@ func (c caser) cased(r rune) bool {
 	if c.ascii {
 		return r < 0x80 && (r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z')
 	}
-	// 大文字は Python の 1 字の大文字（ß → S）で見る。ß は別がある字になり、(?i)ß が ẞ に当たる。
+	// 大文字は Python の 1 字の大文字で見る（ß は SS でなく S）。そうすると ß に大文字小文字の別があり、(?i)ß は ẞ に当たる。
 	return unicode.ToLower(r) != r || pyfmt.UpperRune(r) != r
 }
 
@@ -212,7 +212,7 @@ func setTest(items []setItem, negate bool, fl Flag) func(rune) bool {
 		}
 		return negate
 	}
-	// 照らす字の大半は U+00FF までなので、そこまでの答えは組むときに表にしておく（Python の charmap と同じ考え方）。
+	// 照合される字の大半は U+00FF までなので、その範囲の答えは組むときに表にしておく（Python の charmap と同じ考え方）。
 	table := tableOf(slow)
 	return func(r rune) bool {
 		if r < latin1End {

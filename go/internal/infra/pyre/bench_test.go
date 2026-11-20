@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 照合の速さを測る。式はルールと組み込みの保護に近い形で、長いパイプライン（区切りは shell.Sep と同じ \x00）に当てる。
+// 照合の速さを測る。式は、ルールと組み込みの保護に近い形にし、長いパイプライン（区切りは shell.Sep と同じ \x00）に当てる。
 var benchCases = []struct{ name, pattern, subject string }{
 	{"launcher", `(?i)(^|\x00|[;&|]\s*)(&\s*)?((?:\S*[\\/])?(?:uv|poetry|pipenv)(?:\.exe)?\s+run\b(?:\s+[^\s\x00;&|]+)*?\s+)?((sh|bash)(\s+-\S+)*\s+)?(\S*[\\/])?(ccnavi(\.exe)?|ccnavi-launcher\.sh)\s+[^\x00]*\-\-yes\b`,
 		strings.Repeat("ls\x00", 999) + "ls"},

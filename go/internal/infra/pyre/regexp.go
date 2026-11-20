@@ -35,7 +35,7 @@ type instBody struct {
 	ignore  bool
 	behind  int // 後読みの幅。-1 なら先読み
 	yes, no []*inst
-	// next は、1 字を読む中身の繰り返し（simple）のあとに同じ並びで続く部分が、どの位置から当たりうるか。
+	// next は、1 字を読む中身の繰り返し（simple）のあとに続く並びが、どの位置から当たりうるかの見積もり。
 	// 続きが空に当たりうるなら nil。repeatOne は、ここで外れる位置では続きを試さない。
 	next *startFilter
 }
@@ -52,7 +52,7 @@ type program struct {
 	prog   []*inst
 	groups int
 	names  map[string]int
-	// first は、照合をどの位置から始めれば当たりうるか。search は、ここで外れる開始位置を試さない。
+	// first は、照合をどの位置から始めれば当たりうるかの見積もり。search は、ここで外れる開始位置を試さない。
 	first startFilter
 }
 
@@ -412,7 +412,7 @@ var errDepthLimit = errors.New("pyre: 照合の入れ子が上限を越えたの
 type matcher struct {
 	s        []rune
 	end      int  // try が最後に受け取った終わりの位置
-	done     cont // try の最後の続き。開始位置ごとに作らないよう、matcher に 1 つ持つ
+	done     cont // try の最後の続き。開始位置ごとに作り直さないよう、matcher に 1 つ持つ
 	marks    []int
 	stack    []int
 	matchAll bool
@@ -433,7 +433,7 @@ func (re *Regexp) newMatcher(s []rune, matchAll, advance bool, start int) *match
 	return m
 }
 
-// finish は照合の最後の続き。fullmatch なら末尾に、finditer の空の一致のすぐ後ろなら空でない一致にだけ当てる。
+// finish は照合の最後の続き。fullmatch なら末尾まで当たったときだけ、finditer で空の一致の直後なら空でない一致のときだけ受け入れる。
 func (m *matcher) finish(j int) bool {
 	if m.matchAll && j != len(m.s) || m.advance && j == m.start {
 		return false

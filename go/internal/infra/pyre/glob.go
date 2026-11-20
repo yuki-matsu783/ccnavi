@@ -6,9 +6,9 @@ import "strings"
 // これで区切りをつなぐ（ルールは 1 回書いて、どの機械でも同じ意味にする）。
 const AnySeparator = `[\\/]`
 
-// TranslateGlob は glob を Python 3.13 の fnmatch.translate と同じ式にし、"/" を両方の区切りに当てる。
+// TranslateGlob は glob を Python 3.13 の fnmatch.translate をもとにした式にし、"/" を両方の区切りに当てる。
 // 文字列全体に当たる形（末尾は `\Z`）で、先頭の `^` は呼び手が付ける。
-// 文字クラスの外の "/" は AnySeparator に、"/" を含む文字クラス（`[a/b]`・`[!/]`）は "\" も含む文字クラスにする。
+// 文字クラスの外の "/" は AnySeparator に置き換え、"/" を含む文字クラス（`[a/b]`・`[!/]`）には "\" も加える。
 func TranslateGlob(glob string) string { return fnmatchTranslate([]rune(glob), true) }
 
 // TranslateFnmatch は Python 3.13 の fnmatch.translate そのもの（"/" は "/" にだけ当たる）。区切りを "/" に

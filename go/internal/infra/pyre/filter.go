@@ -1,15 +1,15 @@
 package pyre
 
-// startFilter は、式（か、その一部の並び）がどの位置から当たりうるかの見積もり。当たりうる位置を必ず含む
-// （外れと言った位置からは決して当たらない）ので、外れの位置を飛ばしても答えは変わらない。照合の前に開始位置を
-// 絞り（Python の sre が INFO の接頭辞と文字の集まりで開始位置を飛ばすのと同じ考え方）、1 字の繰り返しの後戻りで
-// 続きの試しを絞る（sre の REPEAT_ONE が、続きの 1 字が合う位置でだけ続きを試すのと同じ考え方）。
+// startFilter は、式（か、その一部の並び）がどの位置から当たりうるかの見積もり。当たりうる位置は必ず含む。
+// 外れとした位置では当たらないので、そこを飛ばしても答えは変わらない。照合の前に開始位置を絞る。
+// Python の sre が INFO の接頭辞と文字の集合で開始位置を飛ばすのと同じ考え方である。1 字の繰り返しの後戻りでも、
+// 続きを試す位置を絞る（sre の REPEAT_ONE が、続きの 1 字が合う位置でだけ続きを試すのと同じ考え方）。
 type startFilter struct {
-	// any は、位置を絞れない（空に当たりうる・後方参照で始まる）こと。
+	// any が真なら、位置を絞れない（空に当たりうる・後方参照で始まる）。
 	any bool
-	// atStart は文字列の先頭で、lineStart は行の頭（先頭か、改行の直後）で当たりうること。
+	// atStart が真なら、文字列の先頭でも当たりうる。lineStart が真なら、行の頭（先頭か、改行の直後）でも当たりうる。
 	atStart, lineStart bool
-	// tests は、その位置の字がどれかに当たれば当たりうる、1 字の照合。latin1 は U+00FF までの字の答えの表。
+	// tests は、その位置の字がどれか 1 つに当たれば当たりうる 1 字の照合の一覧。latin1 は U+00FF までの字の答えの表。
 	tests  []func(rune) bool
 	latin1 charTable
 }
@@ -33,7 +33,7 @@ func tableOf(f func(rune) bool) charTable {
 // latin1End は charTable が持つ範囲の終わり。
 const latin1End = 0x100
 
-// ok は位置 i から当たりうるか。nil は絞らない（どこからでも当たりうる）。
+// ok は位置 i から当たりうるかを返す。f が nil なら絞らず、どの位置からも当たりうるとみなす。
 func (f *startFilter) ok(s []rune, i int) bool {
 	if f == nil || f.any || f.atStart && i == 0 || f.lineStart && (i == 0 || s[i-1] == '\n') {
 		return true
@@ -72,8 +72,8 @@ func filterOf(prog []*inst) startFilter {
 	return f
 }
 
-// add は並び prog の始まりに来うる字と位置を f に足し、prog が字を読まずに通り抜けうるか（空に当たりうるか）を返す。
-// 幅のない判定（\b・$・先読み・後読み）は、続きと同じ位置を見るので通り抜けとして扱う。
+// add は並び prog の先頭に来る字と位置を f に足す。戻り値は、prog が字を読まずに通り抜けられるか（空に当たりうるか）。
+// 幅を読まない判定（\b・$・先読み・後読み）は、続きと同じ位置を見るので通り抜けとして扱う。
 func (f *startFilter) add(prog []*inst) bool {
 	for _, n := range prog {
 		if n.test != nil {
@@ -121,7 +121,7 @@ func (f *startFilter) add(prog []*inst) bool {
 			if !yes && !no {
 				return false
 			}
-		default: // 後方参照は、捕えた字が分からず、空にも当たりうる
+		default: // 後方参照は、捕えた字が分からず空にも当たりうるので、位置を絞らない
 			f.any = true
 			return false
 		}

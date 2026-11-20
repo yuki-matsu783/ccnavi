@@ -26,8 +26,8 @@ var unsupported = []struct{ literal, label string }{
 	{"(?P=", "後方参照"},
 }
 
-// unsupportedIn は書けない形の名前を返す。無ければ空。名前で指す後方参照（`(?P=name)`）のほかに、`\` に 1〜9 が
-// 続けば番号の後方参照と数える（`\1` も含む）。
+// unsupportedIn は、使えない書き方を見つけて、その名前を返す。見つからなければ空。名前で指す後方参照（`(?P=name)`）のほか、
+// `\` に 1〜9 が続く番号の後方参照（`\1` も含む）も数える。
 func unsupportedIn(expression string) string {
 	for _, u := range unsupported {
 		if strings.Contains(expression, u.literal) {

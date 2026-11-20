@@ -179,7 +179,7 @@ func TestAgainstGoldenValid(t *testing.T) {
 	compare(t, "valid", cases)
 }
 
-// globSamples は fnmatch の翻訳を突き合わせる glob。
+// globSamples は、fnmatch の翻訳と突き合わせる glob を返す。
 func globSamples() []string {
 	r := rand.New(rand.NewPCG(5, 6))
 	chars := []rune("*?[]!-^\\/a.bz &~|é")
@@ -204,8 +204,8 @@ func TestTranslateFnmatchAgainstGolden(t *testing.T) {
 	}
 }
 
-// TranslateGlob は、文字クラスを含まない glob なら fnmatch の翻訳の "/" を AnySeparator に置き換えたものと同じで、
-// どの glob でも組める式になる。
+// TranslateGlob は、文字クラスを含まない glob では fnmatch の翻訳の "/" を AnySeparator に置き換えたものと同じになる。
+// どの glob についても、組める式になることを確かめる。
 func TestTranslateGlobFollowsFnmatch(t *testing.T) {
 	for _, g := range globSamples() {
 		got := TranslateGlob(g)
