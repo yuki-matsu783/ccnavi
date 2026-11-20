@@ -261,7 +261,7 @@ Draft は親が片付けて push したあとの `ready` で外す。
 
 issue・MR を指定された実装は、直接作業にせずチケット作業で進める。例外は、ユーザが「直接作業で」「承認は要らない」のように直接作業を明示したときだけで、その指示に従う。
 指定しただけで明示が無いときは、チケット作業のままである。直接作業へ切り替えたあとの承認待ちの提案と MR の扱いは、[.ccnavi/docs/ticket-work.md](../../.ccnavi/docs/ticket-work.md) にある。
-親ごと早めに閉じるときは、ユーザが `ccnavi-user-close-early.sh` を打つ。MR を閉じる操作は ccnavi に無く、ユーザがホストで決める。
+親ごと早めに閉じるときは、ユーザが `ccnavi-user-close-early.sh --parent <親> --reason <理由>` を打つ。MR を閉じる操作は ccnavi に無く、ユーザがホストで決める。
 
 チケット作業は必ず issue と MR のセットで進める。エージェントは着手の前に、ホストの API と git のリモートが使える状態かを確かめ、`ccnavi-start.sh --issue 152`（MR なら `--mr 5`）で Draft MR・ワークツリー・ブランチを作る。
 提案には、その MR と、MR が閉じる issue を書く。どちらかが無い親の提案は、`ccnavi ticket new`・承認・`--lint` が止める。
