@@ -46,7 +46,7 @@ sh .ccnavi/scripts/ccnavi-launcher.sh ticket new <識別子> --title <タイト�
 sh .ccnavi/scripts/ccnavi-launcher.sh ticket revise <識別子> [--feedback]
 ```
 
-- 承認済みの置き場の `doing/<識別子>.md` をコピーし、スクリプトだけが書く欄（`started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason`・`finished_to`・`settled_by`）と続きの子の目印を外して、`todo/<識別子>.md` に書く
+- 承認済みの置き場の `doing/<識別子>.md` をコピーし、スクリプトだけが書く欄（`started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason`・`finished_to`・`settled_by`）、続きの子の目印、本文の最後の「参照したファイル」の節を外して、`todo/<識別子>.md` に書く
 - `--feedback` は `feedback: []`（対応なし）を足す。全体計画のフェーズが全部閉じてレビューが済んだあと（局面が「フィードバック計画待ち」）だけ。フィードバック計画が既にあれば止まる。対応のフェーズを並べるときは、雛形の `feedback:` を直す
 - `--feedback` を付けないときは、写しだけを作る。`plan`・`phases`・`allow`・`ask`・`deny` を直す（範囲を変えるときは、作業中の子を先に取り消す。[decisions.md](decisions.md)）
 - `todo/` に同じ識別子の提案が既にあるときは、上書きせず止まる
@@ -88,7 +88,7 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 - `glob` は 1 項目に 1 パターン。空白は区切りにならず、空白を含む `glob` は error（`--lint`・`approval-request` が止める）。複数のパスは項目を分けて書く。空白を含むファイル名は `?` で置き換える（`regex` は対象外）。`phases.yml` の `scope` と `sh .ccnavi/scripts/ccnavi-launcher.sh ticket new --scope` も同じ規則
 - `human_review: {required: true, reason: …}` は子ごとの欄。省くと宣言なしで、フェーズのレビューの要否は計画のステップの `review` とフェーズ定義（型）に従う。`required: true` は「要る」を足すだけで、要らないことは言えない。`required: false` にするときは `reason` に理由を書く
 - 計画のステップに `review: true`（要る）か `review: false`（要らない）を書くと、型の `review` より優先する（例 `{type: research, review: false}`）。レビューの要否をチケットで決めたいときは、ここに書く
-- `started_at` `completed_at` `base_sha` などの欄はスクリプトが書く。提案には書かない
+- `started_at` `completed_at` `base_sha` などの欄と、本文の最後の「参照したファイル」の節は `finish` などのスクリプトが書く。提案には書かない
 - `branch:` は書けない（使えない欄としてエラーになる）。本文は自由で、MR の下書きの本文に使われる
 
 ## plan / after / phases
