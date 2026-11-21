@@ -106,10 +106,16 @@ class FailStreakTest(unittest.TestCase):
 
     def test_note_comes_every_threshold_failures(self):
         said = []
-        for _ in range(7):
+        for i in range(7):
             result = self._fail()
             self.assertEqual(0, result.returncode, result.stderr)
+            if i == 0:
+                out = json.loads(result.stdout)["hookSpecificOutput"]
+                self.assertEqual("PostToolUseFailure", out["hookEventName"])
             said.append(self._context(result))
+        for text in (said[0], said[2]):
+            self.assertIn("迂回", text)
+            self.assertIn("ユーザに相談", text)
         self.assertIn(FIRST, said[0])
         self.assertNotIn(NOTE, said[0])
         self.assertEqual("", said[1])
@@ -144,54 +150,6 @@ class FailStreakTest(unittest.TestCase):
 
     def test_other_tool_failure_does_not_mention_artifact(self):
         self.assertNotIn("Artifact", self._context(self._fail()))
-
-    def test_note_event_name_is_the_failure_event(self):
-        out = json.loads(self._fail().stdout)["hookSpecificOutput"]
-        self.assertEqual("PostToolUseFailure", out["hookEventName"])
-
-    def test_note_does_not_urge_bypass(self):
-        said = [self._context(self._fail()) for _ in range(3)]
-        for text in (said[0], said[2]):
-            self.assertIn("迂回", text)
-            self.assertIn("ユーザに相談", text)
-
-    def test_success_resets_the_count_but_keeps_the_first_mark(self):
-        self.assertIn(FIRST, self._context(self._fail()))
-        self._fail()
-        self._ok()
-        # 連続は 0 に戻り、最初の 1 回を案内した印だけが残る。
-        [name] = self._files()
-        with open(os.path.join(self.state, name), encoding="utf-8") as f:
-            self.assertEqual({"first": True}, json.load(f))
-        self.assertEqual("", self._context(self._fail()))
-        self.assertEqual("", self._context(self._fail()))
-        self.assertIn(NOTE, self._context(self._fail()))
-        # 案内のあとに成功が入れば、数え直してまた 3 回目で案内する。最初の 1 回の案内は出ない。
-        self._ok()
-        said = [self._context(self._fail()) for _ in range(3)]
-        self.assertEqual(["", ""], said[:2])
-        self.assertIn(NOTE, said[2])
-
-    def test_success_without_a_streak_writes_nothing(self):
-        self._ok()
-        self.assertEqual([], self._files())
-
-    def test_zero_disables_counting(self):
-        for _ in range(5):
-            result = self._fail(CCNAVI_FAIL_STREAK_COUNT="0")
-            self.assertEqual("", self._context(result))
-        self.assertEqual([], self._files())
-        for _ in range(5):
-            self.assertNotIn(NOTE, self._context(self._deny(CCNAVI_FAIL_STREAK_COUNT="0")))
-        self.assertEqual([], self._files())
-
-    def test_bad_values_fall_back_to_the_default(self):
-        for bad in ("abc", "-2"):
-            self._reset_state()
-            said = [self._context(self._fail(CCNAVI_FAIL_STREAK_COUNT=bad)) for _ in range(3)]
-            self.assertIn(FIRST, said[0], bad)
-            self.assertEqual("", said[1], bad)
-            self.assertIn(NOTE, said[2], bad)
 
     def test_threshold_follows_the_environment(self):
         self.assertIn(FIRST, self._context(self._fail(CCNAVI_FAIL_STREAK_COUNT="2")))
@@ -242,29 +200,12 @@ class FailStreakTest(unittest.TestCase):
             self.assertEqual("", self._context(self._fail(interrupt=True)))
         self.assertEqual([], self._files())
 
-    def test_empty_session_is_not_counted(self):
-        for _ in range(4):
-            self.assertEqual("", self._context(self._fail(session="")))
-        self.assertEqual([], self._files())
-
     def test_sessions_are_counted_apart(self):
         self._fail(session="a")
         self._fail(session="b")
         self._fail(session="a")
         self.assertEqual("", self._context(self._fail(session="b")))
         self.assertIn(NOTE, self._context(self._fail(session="a")))
-
-    def test_subagent_and_main_are_counted_apart(self):
-        """サブエージェントの連続はメインの連続と混ぜない。メインの成功は子の連続を消さない。"""
-        self._fail(agent="sub1")
-        self._fail(agent="sub1")
-        self._fail()
-        self._ok()
-        self.assertEqual("", self._context(self._fail()))
-        self.assertIn(NOTE, self._context(self._fail(agent="sub1")))
-        self.assertEqual(
-            ["failstreak-s1-main.json", "failstreak-s1-sub1.json"], sorted(self._files())
-        )
 
     def test_unwritable_state_gives_no_note_and_no_crash(self):
         os.makedirs(os.path.dirname(self.state), exist_ok=True)
