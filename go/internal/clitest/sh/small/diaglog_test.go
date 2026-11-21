@@ -245,6 +245,47 @@ func TestShLoggerWithoutAWorkspaceDropsQuietly(t *testing.T) {
 	}
 }
 
+// 出さないレベルでは date を起動しない。書く行では date を起動し、時刻は +09:00 の形になる。
+// date は目印を残すスタブに替え、固定の時刻を出させる。
+func TestShLoggerStartsDateOnlyForAWrittenLine(t *testing.T) {
+	t.Parallel()
+	ws := newWorkspace(t)
+	marker := filepath.Join(ws, "date-ran")
+	stub := filepath.Join(ws, "bin", "date")
+	writeFile(t, stub, "#!/bin/sh\n: > "+shQuote(marker)+"\nprintf '2026-09-27T10:15:03+0900\\n'\n")
+	if err := os.Chmod(stub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	extra := map[string]string{
+		"CCNAVI_LOG_LEVEL": "WARN",
+		"PATH":             filepath.Join(ws, "bin") + pathSep + os.Getenv("PATH"),
+	}
+	wantDone(t, runLogScript(t, ws, "probe.sh", "log_debug x\nlog_info x", extra))
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("出さないレベルで date が起きた: %v", err)
+	}
+	if n := len(diagLines(t, ws, "probe")); n != 0 {
+		t.Fatalf("出さないレベルで行が出た: %d 行", n)
+	}
+
+	wantDone(t, runLogScript(t, ws, "probe.sh", "log_warn x", extra))
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("書く行で date が起きない: %v", err)
+	}
+	lines := diagLines(t, ws, "probe")
+	if len(lines) != 1 || !strings.HasPrefix(lines[0], "2026-09-27T10:15:03+09:00 WARN  probe[") {
+		t.Errorf("行 = %q, want 2026-09-27T10:15:03+09:00 WARN  probe[ で始まる 1 行", lines)
+	}
+}
+
+// logs が通常のファイルで、ログの場所を作れないときも、set -eu の下で呼び手を止めず、何も出さない。
+func TestShLoggerReturnsUnderSetEuWhereNoPlaceCanBeMade(t *testing.T) {
+	t.Parallel()
+	ws := newWorkspace(t)
+	writeFile(t, filepath.Join(ws, "logs"), "通常のファイル\n")
+	wantDone(t, runLogScript(t, ws, "probe.sh", "log_error x -- a=1", nil))
+}
+
 func TestShLoggerNeverWritesToStdoutOrStderr(t *testing.T) {
 	t.Parallel()
 	ws := newWorkspace(t)
