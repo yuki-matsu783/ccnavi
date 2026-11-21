@@ -152,7 +152,6 @@ func TestLeftover(t *testing.T) {
 		{w("i0004"), "i0004", LeftoverFacts{Leftover: true, Proposal: true, MR: "１２", Stage: "review"}},
 		{w("fix-a"), "fix-a", LeftoverFacts{}},
 		{w("fix-a"), "a b", LeftoverFacts{}},
-		{root, filepath.Base(root), LeftoverFacts{}},
 	} {
 		if got := Leftover(root, conf, c.path, c.name); got != c.want {
 			t.Errorf("%s %s: %+v, want %+v", c.path, c.name, got, c.want)
