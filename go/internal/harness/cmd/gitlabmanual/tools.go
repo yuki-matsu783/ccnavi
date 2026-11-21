@@ -156,6 +156,10 @@ func (t tools) leak() int {
 			values[k] = v
 		}
 	}
+	if len(values) == 0 {
+		fmt.Fprintf(t.stderr, "トークンのファイル %s から値を読めない。gitlabmanual up で作る\n", t.tool.TokensPath())
+		return 2
+	}
 	targets := []string{t.out, filepath.Join(t.root, "logs"), filepath.Join(t.root, "projects", "test-repo", ".git", "config")}
 	hits := map[string][]string{}
 	for _, target := range targets {

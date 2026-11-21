@@ -181,6 +181,18 @@ func TestToolsLeakNamesTheFilesWithoutPrintingTheValues(t *testing.T) {
 	}
 }
 
+func TestToolsLeakRefusesWhenTheTokensAreMissing(t *testing.T) {
+	t.Parallel()
+	r := newToolsRig(t)
+	if err := os.Remove(r.tokens); err != nil {
+		t.Fatal(err)
+	}
+	rc, out, errw := r.call(t, "leak", r.out, "--root", r.root)
+	if rc != 2 || !strings.Contains(errw, r.tokens) || strings.Contains(out, "件") {
+		t.Errorf("rc = %d、%q %q", rc, out, errw)
+	}
+}
+
 // 承認の代行は、擬似端末から y を送り、出力に混ざるトークンを伏せる。
 func TestToolsAgreeSendsYThroughATerminalAndMasksTokens(t *testing.T) {
 	t.Parallel()
