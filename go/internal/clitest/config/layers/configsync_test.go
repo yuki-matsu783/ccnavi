@@ -47,41 +47,9 @@ func configOf(tree, kind string) string {
 	return configws.LayerPath(tree, kind)
 }
 
-type syncWS struct {
-	*configws.WS
-	began map[string]bool
-}
+type syncWS struct{ *configws.WS }
 
-func newSyncWS(t *testing.T) *syncWS {
-	return &syncWS{WS: configws.NewWS(t, "base"), began: map[string]bool{}}
-}
-
-// prompt はユーザの発言を 1 件渡す（ミラーをコピーする）。モデルの文脈に足された文も返す。
-// セッションの始まりを先に渡し、実行後チェックの基準を取る。
-func (w *syncWS) prompt(session, guard string) (reason string) {
-	w.T.Helper()
-	w.Session = session
-	defer func() { w.Session = "" }()
-	if !w.began[session] {
-		w.began[session] = true
-		start := configws.Body(configws.Obj{"hook_event_name": "SessionStart", "session_id": session, "source": "startup", "cwd": w.Root})
-		if done := w.Exec("disable", start, "--mode", "enable"); done.Code != 0 {
-			w.T.Fatalf("SessionStart: %s%s", done.Stdout, done.Stderr)
-		}
-	}
-	done := w.HookAs("UserPromptSubmit", guard, "", w.Root, nil)
-	if done.Code != 0 {
-		w.T.Fatalf("UserPromptSubmit: %s%s", done.Stdout, done.Stderr)
-	}
-	return w.Reason(done)
-}
-
-// startTicket は親の `ticket start` を打ち、続けてユーザの発言を渡す。出力は start と発言の分をまとめたもの。
-func (w *syncWS) startTicket(name string) (code int, out string) {
-	w.T.Helper()
-	started := w.Ccnavi("ticket", "start", name)
-	return started.Code, started.Stdout + started.Stderr + w.prompt("s1", "disable")
-}
+func newSyncWS(t *testing.T) *syncWS { return &syncWS{configws.NewWS(t, configws.KindBase)} }
 
 func ticketFor(name, project, plan string) string {
 	return configws.TicketText(name, configws.TicketOpts{Project: project, Plan: []string{plan}, Allow: []string{"src/*"}})
@@ -117,7 +85,7 @@ func (w *syncWS) startParent(project string) (tree, out string) {
 		w.T.Fatalf("approve: %s%s", done.Stdout, done.Stderr)
 	}
 	tree = w.Worktree(owner, "i0001")
-	code, out := w.startTicket("i0001")
+	code, out := w.StartTicket("i0001")
 	if code != 0 {
 		w.T.Fatalf("ticket start: %d\n%s", code, out)
 	}
@@ -227,7 +195,7 @@ func TestTheStartDoesNotWriteTheMirror(t *testing.T) {
 	}
 	assertGone(t, mirrorOf(tree, "rules.yml"))
 	assertHas(t, started.Stdout, "次のユーザの発言")
-	w.prompt("s1", "disable")
+	w.Prompt("s1", "disable")
 	if !configws.Exists(mirrorOf(tree, "rules.yml")) {
 		t.Error("次の発言でコピーされない")
 	}
@@ -340,7 +308,7 @@ func TestChildStartDoesNotMirror(t *testing.T) {
 	child := w.Worktree(w.Lib, "i0001-01-01")
 
 	started := w.Ccnavi("ticket", "start", "i0001-01-01")
-	w.prompt("s1", "disable")
+	w.Prompt("s1", "disable")
 
 	if started.Code != 0 {
 		t.Fatalf("%s%s", started.Stdout, started.Stderr)
@@ -356,7 +324,7 @@ func TestAWorktreeWithoutAnApprovedParentIsNotMirrored(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
 	tree := w.Worktree(w.Lib, "scratchy")
-	w.prompt("s1", "disable")
+	w.Prompt("s1", "disable")
 	assertGone(t, mirrorOf(tree, "rules.yml"))
 }
 
@@ -367,7 +335,7 @@ func TestUncommittedEditsInTheMirrorAreOverwritten(t *testing.T) {
 	tree := w.approveLib()
 	configws.Write(t, mirrorOf(tree, "rules.yml"), "# 書きかけ\n")
 
-	code, out := w.startTicket("i0001")
+	code, out := w.StartTicket("i0001")
 
 	if code != 0 {
 		t.Fatalf("%s", out)
@@ -429,7 +397,7 @@ func TestACommonLayerTheMirrorCannotHoldIsReportedAndTheStartGoesOn(t *testing.T
 			tc.setup(w)
 			tree := w.approveLib()
 
-			code, out := w.startTicket("i0001")
+			code, out := w.StartTicket("i0001")
 
 			if code != 0 {
 				t.Fatalf("着手が止まった: %s", out)
@@ -448,7 +416,7 @@ func TestWithoutACommonPhasesFileTheMirrorHasNone(t *testing.T) {
 	tree := w.approveLib()
 	configws.Write(t, mirrorOf(tree, "phases.yml"), configws.CommonPhasesText)
 
-	code, out := w.startTicket("i0001")
+	code, out := w.StartTicket("i0001")
 
 	if code != 0 {
 		t.Fatalf("%s", out)
@@ -467,7 +435,7 @@ func TestACommonPhasesFileIsMirrored(t *testing.T) {
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	tree := w.approveLib()
 
-	code, out := w.startTicket("i0001")
+	code, out := w.StartTicket("i0001")
 
 	if code != 0 {
 		t.Fatalf("%s", out)
@@ -539,7 +507,7 @@ func TestCoreFileGuardKeepsTheMirror(t *testing.T) {
 	w.post(tree, startCommand, "enable")
 	assertGone(t, mirrorOf(tree, "risks.yml"))
 
-	w.prompt("s1", "enable")
+	w.Prompt("s1", "enable")
 	assertRead(t, mirrorOf(tree, "risks.yml"), configws.CommonRiskText)
 	w.pre(tree, "echo y", "enable")
 	w.post(tree, "echo y", "enable")
@@ -566,7 +534,7 @@ func TestCoreFileGuardKeepsARemovedMirrorFile(t *testing.T) {
 		t.Fatalf("%s%s", started.Stdout, started.Stderr)
 	}
 	w.post(tree, startCommand, "enable")
-	w.prompt("s1", "enable")
+	w.Prompt("s1", "enable")
 	assertGone(t, mirrorOf(tree, "phases.yml"))
 
 	w.pre(tree, "echo x", "enable")
@@ -623,11 +591,11 @@ func TestAChangeInTheCommonLayerReachesTheMirrorAtTheNextPrompt(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
 	tree, _ := w.startParent("lib")
-	w.prompt("s1", "enable")
+	w.Prompt("s1", "enable")
 	edited := configws.CommonRiskText + "# 直した\n"
 	configws.Write(t, w.Risk, edited)
 
-	said := w.prompt("s1", "enable")
+	said := w.Prompt("s1", "enable")
 
 	assertRead(t, mirrorOf(tree, "risks.yml"), edited)
 	assertHas(t, said, "risks.yml")
@@ -643,7 +611,7 @@ func TestAnEditOfTheMirrorBetweenTurnsIsOverwrittenAtTheNextPrompt(t *testing.T)
 	tree, _ := w.startParent("lib")
 	configws.Write(t, mirrorOf(tree, "risks.yml"), "version: 1\n")
 
-	w.prompt("s1", "disable")
+	w.Prompt("s1", "disable")
 
 	assertRead(t, mirrorOf(tree, "risks.yml"), configws.CommonRiskText)
 }
@@ -666,7 +634,7 @@ func TestARewriteWithTheSameSizeAndTimeIsStillNoticed(t *testing.T) {
 		t.Fatalf("大きさが変わった: %d → %d", info.Size(), after.Size())
 	}
 
-	w.prompt("s1", "disable")
+	w.Prompt("s1", "disable")
 
 	got := configws.Read(t, mirrorOf(tree, "risks.yml"))
 	if got == text || got != configws.Read(t, w.Risk) {
@@ -682,8 +650,8 @@ func TestParallelSessionsDoNotDisturbEachOther(t *testing.T) {
 	edited := configws.CommonRiskText + "# 直した\n"
 	configws.Write(t, w.Risk, edited)
 
-	w.prompt("s2", "disable")
-	again := w.prompt("s1", "disable")
+	w.Prompt("s2", "disable")
+	again := w.Prompt("s1", "disable")
 
 	assertRead(t, mirrorOf(tree, "risks.yml"), edited)
 	assertNoText(t, again, "risks.yml")

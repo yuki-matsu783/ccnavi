@@ -48,7 +48,7 @@ type placeWS struct {
 
 func newPlaceWS(t *testing.T) *placeWS {
 	t.Helper()
-	w := &placeWS{WS: configws.NewWS(t, "base")}
+	w := &placeWS{WS: configws.NewWS(t, configws.KindBase)}
 	elsewhere := filepath.Join(w.Root, "elsewhere")
 	w.other = map[string]string{
 		"rules":  configws.Write(t, filepath.Join(elsewhere, "rules.yml"), configws.Body(otherRules)),

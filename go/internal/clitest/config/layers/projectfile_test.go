@@ -38,14 +38,14 @@ const (
 
 type fileWS struct{ *configws.WS }
 
-func newFileWS(t *testing.T) fileWS { return fileWS{configws.NewWS(t, "base")} }
+func newFileWS(t *testing.T) fileWS { return fileWS{configws.NewWS(t, configws.KindBase)} }
 
 // layerProblems は、その深刻度・出どころ・種類（`(phases)` / `(risk)`）の Problem。
 func (w fileWS) layerProblems(kind, severity, where string, args ...string) []configws.Problem {
 	w.T.Helper()
 	var out []configws.Problem
-	for _, p := range w.LintProblems(args...) {
-		if p.Severity == severity && strings.HasPrefix(p.Where, where) && strings.Contains(p.Where, "("+kind+")") {
+	for _, p := range w.Problems(severity, where, args...) {
+		if strings.Contains(p.Where, "("+kind+")") {
 			out = append(out, p)
 		}
 	}

@@ -53,8 +53,12 @@ func TestDistributedLintHasNoProblem(t *testing.T) {
 	root := base.TempDir(t)
 	dest := filepath.Join(root, ".ccnavi")
 	// 保護対象（共通の設定・スクリプト・CCNAVI.md）は、下書きがあれば下書きの、できあがりの姿を配る。
-	for _, name := range []string{"phases.yml", "risks.yml", "rule-expectations.yml", "rules.yml"} {
-		copyFile(t, base.Final(".ccnavi/config/common/"+name), filepath.Join(dest, "config", "common", name))
+	commons, err := os.ReadDir(filepath.Join(base.Root(), ".ccnavi", "config", "common"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range commons {
+		copyFile(t, base.Final(".ccnavi/config/common/"+e.Name()), filepath.Join(dest, "config", "common", e.Name()))
 	}
 	copyDir(t, filepath.Join(base.Root(), ".ccnavi", "docs"), filepath.Join(dest, "docs"))
 	copyDir(t, base.ScriptsDir(), filepath.Join(dest, "scripts"))

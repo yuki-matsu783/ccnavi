@@ -33,35 +33,9 @@ func libTicket(name string) string {
 }
 
 // skillWS は工程スキルの同期を見る 1 本のワークスペース。
-type skillWS struct {
-	*configws.WS
-	began bool
-}
+type skillWS struct{ *configws.WS }
 
-func newSkillWS(t *testing.T) *skillWS { return &skillWS{WS: configws.NewWS(t, "base")} }
-
-// prompt はユーザの発言を 1 件渡す（工程スキルをコピーする）。実行後チェックの基準も取る。
-func (w *skillWS) prompt() string {
-	w.T.Helper()
-	if !w.began {
-		w.began = true
-		start := configws.Body(configws.Obj{"hook_event_name": "SessionStart", "session_id": "s1", "source": "startup", "cwd": w.Root})
-		w.Exec("disable", start, "--mode", "enable")
-	}
-	done := w.HookAs("UserPromptSubmit", "disable", "", w.Root, nil)
-	if done.Code != 0 {
-		w.T.Fatalf("code = %d\n%s%s", done.Code, done.Stdout, done.Stderr)
-	}
-	return w.Reason(done)
-}
-
-// startTicket は親の `ticket start` を打ち、続けてユーザの発言を渡す。出力は start と発言の分をまとめたもの。
-func (w *skillWS) startTicket(name string) (code int, out string) {
-	w.T.Helper()
-	started := w.Ccnavi("ticket", "start", name)
-	said := w.prompt()
-	return started.Code, started.Stdout + said
-}
+func newSkillWS(t *testing.T) *skillWS { return &skillWS{configws.NewWS(t, configws.KindBase)} }
 
 func (w *skillWS) source(parts ...string) string {
 	return filepath.Join(append([]string{w.Root, ".claude", "skills"}, parts...)...)
@@ -74,7 +48,7 @@ func (w *skillWS) startParent(name string) (tree, out string) {
 		w.T.Fatalf("approve: %d\n%s%s", approved.Code, approved.Stdout, approved.Stderr)
 	}
 	tree = w.Worktree(w.Lib, name)
-	code, out := w.startTicket(name)
+	code, out := w.StartTicket(name)
 	if code != 0 {
 		w.T.Fatalf("ticket start: %d\n%s", code, out)
 	}
@@ -149,7 +123,7 @@ func TestSameContentIsNotReported(t *testing.T) {
 	if done := w.Approve(); done.Code != 0 {
 		t.Fatalf("approve: %s%s", done.Stdout, done.Stderr)
 	}
-	code, second := w.startTicket("i0002")
+	code, second := w.StartTicket("i0002")
 	if code != 0 {
 		t.Fatalf("ticket start: %d\n%s", code, second)
 	}
@@ -180,7 +154,7 @@ func TestTheStartDoesNotCopyTheSkills(t *testing.T) {
 	if configws.Exists(target) && strings.Contains(configws.Read(t, target), "skills/") {
 		t.Error("ticket start の書き込みの記録にスキルがある")
 	}
-	w.prompt()
+	w.Prompt("s1", "disable")
 	if !configws.Exists(filepath.Join(tree, "skills", "process-test", "SKILL.md")) {
 		t.Error("次の発言でコピーされない")
 	}

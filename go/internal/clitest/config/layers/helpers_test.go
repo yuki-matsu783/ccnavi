@@ -9,12 +9,15 @@ import (
 func hookContext(t testing.TB, stdout string) string {
 	t.Helper()
 	var out struct {
-		HookSpecificOutput struct {
+		HookSpecificOutput *struct {
 			Context string `json:"additionalContext"`
 		} `json:"hookSpecificOutput"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
 		t.Fatalf("標準出力が期待した JSON ではない: %v\nstdout: %q", err, stdout)
+	}
+	if out.HookSpecificOutput == nil {
+		t.Fatalf("hookSpecificOutput が無い: %q", stdout)
 	}
 	return out.HookSpecificOutput.Context
 }

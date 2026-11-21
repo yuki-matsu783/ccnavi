@@ -30,7 +30,7 @@ const (
 // absentWS は雛形のワークスペースに、共通レイヤーなどを取り除く道具を足したもの。
 type absentWS struct{ *configws.WS }
 
-func newAbsentWS(t testing.TB) absentWS { return absentWS{configws.NewWS(t, "base")} }
+func newAbsentWS(t testing.TB) absentWS { return absentWS{configws.NewWS(t, configws.KindBase)} }
 
 func (w absentWS) removeCommonRules() {
 	w.T.Helper()
@@ -50,59 +50,12 @@ func (w absentWS) removeOwnLayer() {
 	}
 }
 
-func (w absentWS) hookWrite(path string) { w.Hook("Write", w.Root, configws.Obj{"file_path": path}) }
-
-func (w absentWS) bash(command string) (denied bool, ids []string) {
-	r := w.Hook("Bash", w.Root, configws.Obj{"command": command})
-	return w.Decision(r) == "deny", w.LastRecord().Names()
-}
-
 // recordHas は直近の決定ログの rules に、その名前（組み込みは `builtin:…`）があるか。
 func (w absentWS) recordHas(name string) bool {
 	return slices.Contains(w.LastRecord().Names(), name)
 }
 
 func (w absentWS) fallback() string { return w.LastRecord().Str("fallback") }
-
-// judged は 1 件の判定。
-type judged struct {
-	verdict string
-	ids     []string
-}
-
-// judgeCalls は (ツール, 対象) を何件も 1 回の起動で判定し、1 件ごとに決定とヒットしたルールの id を返す。
-// `--test-expectations` に渡す。判定は hook の実行前と同じ関数を通り、居場所はワークスペースルート。
-// 期待のタイプは判定に効かない。JSON は YAML としても読める。
-func (w absentWS) judgeCalls(calls [][2]string) []judged {
-	w.T.Helper()
-	var asks []configws.Obj
-	for _, c := range calls {
-		asks = append(asks, configws.Obj{"tool": c[0], "subject": c[1]})
-	}
-	path := configws.Write(w.T, filepath.Join(base.TempDir(w.T), "expectations.yml"), configws.Body(configws.Obj{"ask": asks}))
-	r := w.Ccnavi("--test-expectations", path, "--json")
-	w.MustOK(r, "--test-expectations")
-	var out struct {
-		Expectations []struct {
-			Verdict string `json:"verdict"`
-			Rules   []struct {
-				ID string `json:"id"`
-			} `json:"rules"`
-		} `json:"expectations"`
-	}
-	if err := json.Unmarshal([]byte(r.Stdout), &out); err != nil || len(out.Expectations) != len(calls) {
-		w.T.Fatalf("判定が %d 件のはず: %v\n%s", len(calls), err, r.Stdout)
-	}
-	var res []judged
-	for _, e := range out.Expectations {
-		j := judged{verdict: e.Verdict}
-		for _, r := range e.Rules {
-			j.ids = append(j.ids, r.ID)
-		}
-		res = append(res, j)
-	}
-	return res
-}
 
 func TestAMissingCommonLayerIsEmptyAndIsNotAFallback(t *testing.T) {
 	t.Parallel()
@@ -385,17 +338,17 @@ func TestBuiltinFormsAreDeniedWhateverTheStateOfTheCommonLayer(t *testing.T) {
 			for _, p := range builtinPassed {
 				calls = append(calls, [2]string{"Bash", p})
 			}
-			answers := w.judgeCalls(calls)
+			answers := w.Judge("disable", calls)
 			for i, d := range builtinDenied {
-				if answers[i].verdict != "deny" || !slices.Contains(answers[i].ids, d[1]) {
-					t.Errorf("止まらない: %q → %s %v (want %s)", d[0], answers[i].verdict, answers[i].ids, d[1])
+				if answers[i].Verdict != "deny" || !slices.Contains(answers[i].IDs, d[1]) {
+					t.Errorf("止まらない: %q → %s %v (want %s)", d[0], answers[i].Verdict, answers[i].IDs, d[1])
 				}
 			}
 			for i, p := range builtinPassed {
 				a := answers[len(builtinDenied)+i]
 				// 生の git は組み込みで常に止まる。ほかの土台の deny にヒットしていないことを見る。
-				if a.verdict == "deny" && !slices.Contains(a.ids, rawGitBuiltin) {
-					t.Errorf("止めた: %q → %v", p, a.ids)
+				if a.Verdict == "deny" && !slices.Contains(a.IDs, rawGitBuiltin) {
+					t.Errorf("止めた: %q → %v", p, a.IDs)
 				}
 			}
 		})
@@ -620,13 +573,13 @@ func TestGitDirWritesAreDeniedWhateverTheStateOfTheCommonLayer(t *testing.T) {
 			for _, c := range cases {
 				calls = append(calls, [2]string{c.tool, c.subject})
 			}
-			for i, a := range w.judgeCalls(calls) {
+			for i, a := range w.Judge("disable", calls) {
 				c := cases[i]
 				switch {
-				case c.stops && (a.verdict != "deny" || !slices.Contains(a.ids, c.rule)):
-					t.Errorf("止まらない: %s %q → %s %v", c.tool, c.subject, a.verdict, a.ids)
-				case !c.stops && slices.Contains(a.ids, c.rule):
-					t.Errorf("止めた: %s %q → %v", c.tool, c.subject, a.ids)
+				case c.stops && (a.Verdict != "deny" || !slices.Contains(a.IDs, c.rule)):
+					t.Errorf("止まらない: %s %q → %s %v", c.tool, c.subject, a.Verdict, a.IDs)
+				case !c.stops && slices.Contains(a.IDs, c.rule):
+					t.Errorf("止めた: %s %q → %v", c.tool, c.subject, a.IDs)
 				}
 			}
 		})

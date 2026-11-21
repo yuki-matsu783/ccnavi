@@ -65,7 +65,7 @@ func (w mirrorWS) syncAll() {
 
 func TestTheMirrorViewPrintsJSONWithTheAgreedShape(t *testing.T) {
 	t.Parallel()
-	w := mirrorWS{configws.NewWS(t, "base")}
+	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
 	answer := w.view()
 	if answer["version"] != float64(1) || answer["ok"] != true || answer["error"] != "" || answer["common_empty"] != false {
 		t.Errorf("答えの頭が違う: %v", answer)
@@ -106,7 +106,7 @@ func TestTheMirrorViewPrintsJSONWithTheAgreedShape(t *testing.T) {
 
 func TestTheMirrorViewInTextNamesTheCommandToRun(t *testing.T) {
 	t.Parallel()
-	w := mirrorWS{configws.NewWS(t, "base")}
+	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
 	code, out, errText := w.userMirror()
 	if code != 0 {
 		t.Fatalf("code = %d\n%s%s", code, out, errText)
@@ -131,7 +131,7 @@ func TestTheMirrorViewInTextNamesTheCommandToRun(t *testing.T) {
 
 func TestTheTextViewWarnsWhenAnUpdateOverwritesTheMirror(t *testing.T) {
 	t.Parallel()
-	w := mirrorWS{configws.NewWS(t, "base")}
+	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
 	w.syncAll()
 	configws.Write(t, mirrorOf(w.Lib, "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
 	if _, out, _ := w.userMirror(); !strings.Contains(out, "上書き・削除します") {
@@ -144,7 +144,7 @@ func TestTheTextViewWarnsWhenAnUpdateOverwritesTheMirror(t *testing.T) {
 
 func TestTheBoardRouteSyncsOnlyWithAMatchingExpect(t *testing.T) {
 	t.Parallel()
-	w := mirrorWS{configws.NewWS(t, "base")}
+	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
 	code, out, _ := w.userMirror("--yes", "--expect", strings.Repeat("0", 64), "--via", "board", "--json")
 	refused := decodeObject(t, out)
 	if code == 0 || refused["ok"] != false || !strings.Contains(refused["error"].(string), "内容が更新されました") {
@@ -173,7 +173,7 @@ func TestTheBoardRouteSyncsOnlyWithAMatchingExpect(t *testing.T) {
 
 func TestMirrorCombinationsThatMakeNoSenseAreRefused(t *testing.T) {
 	t.Parallel()
-	w := mirrorWS{configws.NewWS(t, "base")}
+	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
 	for _, args := range [][]string{
 		{"--expect", "x"},
 		{"--yes"},

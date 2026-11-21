@@ -137,7 +137,7 @@ func templateDir(t testing.TB, kind string) string {
 	}
 	templatesMu.Unlock()
 	tpl.once.Do(func() {
-		holder, err := os.MkdirTemp(base.TempBase(), "ccnavi-union-")
+		holder, err := os.MkdirTemp(base.TempBase(), "ccnavi-configws-")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -260,6 +260,8 @@ type WS struct {
 	Env map[string]string
 	// Session は hook の session_id。空なら s1。
 	Session string
+	// began は SessionStart を渡したセッション。As で写した WS と共有する。
+	began *sync.Map
 }
 
 func NewWS(t testing.TB, kind string) *WS {
@@ -274,8 +276,36 @@ func NewWS(t testing.TB, kind string) *WS {
 		T: t, Root: root, Projects: projects,
 		Lib: filepath.Join(projects, "lib"), App: filepath.Join(projects, "app"),
 		Rules: base.CommonPath(root, "rules"), Phases: base.CommonPath(root, "phases"), Risk: base.CommonPath(root, "risk"),
-		Log: filepath.Join(root, "logs", "decisions.jsonl"),
+		Log:   filepath.Join(root, "logs", "decisions.jsonl"),
+		began: &sync.Map{},
 	}
+}
+
+// Prompt はユーザの発言を 1 件渡す（ミラーや工程スキルをコピーする）。モデルの文脈に足された文も返す。
+// そのセッションの始まりを先に 1 度だけ渡し、実行後チェックの基準を取る。
+func (w *WS) Prompt(session, guard string) (reason string) {
+	w.T.Helper()
+	saved := w.Session
+	w.Session = session
+	defer func() { w.Session = saved }()
+	if _, began := w.began.LoadOrStore(session, true); !began {
+		start := Body(Obj{"hook_event_name": "SessionStart", "session_id": session, "source": "startup", "cwd": w.Root})
+		if done := w.Exec("disable", start, "--mode", "enable"); done.Code != 0 {
+			w.T.Fatalf("SessionStart: %s%s", done.Stdout, done.Stderr)
+		}
+	}
+	done := w.HookAs("UserPromptSubmit", guard, "", w.Root, nil)
+	if done.Code != 0 {
+		w.T.Fatalf("UserPromptSubmit: %s%s", done.Stdout, done.Stderr)
+	}
+	return w.Reason(done)
+}
+
+// StartTicket は親の `ticket start` を打ち、続けてユーザの発言を渡す。出力は start と発言の分をまとめたもの。
+func (w *WS) StartTicket(name string) (code int, out string) {
+	w.T.Helper()
+	started := w.Ccnavi("ticket", "start", name)
+	return started.Code, started.Stdout + started.Stderr + w.Prompt("s1", "disable")
 }
 
 // as はサブテストの t で動く写し。
@@ -459,10 +489,10 @@ func (w *WS) LintProblems(args ...string) []Problem {
 // problems はその深刻度の Problem。where を渡すと、その出どころで先に絞る。
 // detail の部分一致だけで見ると、`self` や `lib` のようなありふれた語が別の苦情の文面に紛れていても通ってしまう。
 // どのレイヤーの話かは where が持つ。
-func (w *WS) Problems(severity, where string) []Problem {
+func (w *WS) Problems(severity, where string, args ...string) []Problem {
 	w.T.Helper()
 	var out []Problem
-	for _, p := range w.LintProblems() {
+	for _, p := range w.LintProblems(args...) {
 		if p.Severity == severity && (where == "" || strings.HasPrefix(p.Where, where)) {
 			out = append(out, p)
 		}
@@ -664,7 +694,6 @@ type TicketOpts struct {
 	Phase   int
 	Plan    []string
 	Allow   []string
-	review  bool
 }
 
 // ticketText は提案の本文。親は plan を、子は parent と phase を持つ。project は行き先のレイヤーを決める。
@@ -690,11 +719,7 @@ func TicketText(name string, o TicketOpts) string {
 			}
 		}
 	}
-	required := "false"
-	if o.review {
-		required = "true"
-	}
-	lines = append(lines, "human_review:", "  required: "+required, "  reason: テスト", "title: 作業", "rationale: |", "  理由")
+	lines = append(lines, "human_review:", "  required: false", "  reason: テスト", "title: 作業", "rationale: |", "  理由")
 	if len(o.Allow) > 0 {
 		lines = append(lines, "allow:")
 		for _, g := range o.Allow {
@@ -767,18 +792,24 @@ func (w *WS) BreakAllAndRestore(paths []string) run.Result {
 	return result
 }
 
-// judgeMany はシェルのコマンドを何本も 1 回の起動で判定し、1 本ごとにヒットしたルールの id を返す。
+// Judged は 1 件の判定。決定（Verdict）とヒットしたルールの id。
+type Judged struct {
+	Verdict string
+	IDs     []string
+}
+
+// Judge は (ツール, 対象) を何件も 1 回の起動で判定し、1 件ごとに決定とヒットしたルールの id を返す。
 // `--test-expectations` に渡す。判定は hook の実行前と同じ関数を通り、居場所はワークスペースルート
-// （hook に cwd をルートで渡したのと同じ）。止めたかどうかも見るので、決定（verdict）と id の組を返す。
-func (w *WS) judgeMany(commands []string, flags ...string) []judged {
+// （hook に cwd をルートで渡したのと同じ）。guard は設定ファイルの保護（enable / disable）。
+func (w *WS) Judge(guard string, calls [][2]string, flags ...string) []Judged {
 	w.T.Helper()
 	var asks []Obj
-	for _, c := range commands {
-		asks = append(asks, Obj{"tool": "Bash", "subject": c})
+	for _, c := range calls {
+		asks = append(asks, Obj{"tool": c[0], "subject": c[1]})
 	}
 	// 期待のタイプは判定に効かない。JSON は YAML としても読める。
 	path := Write(w.T, filepath.Join(base.TempDir(w.T), "expectations.yml"), Body(Obj{"ask": asks}))
-	r := w.Exec("enable", "", append(slices.Clone(flags), "--test-expectations", path, "--json")...)
+	r := w.Exec(guard, "", append(slices.Clone(flags), "--test-expectations", path, "--json")...)
 	w.MustOK(r, "--test-expectations")
 	var out struct {
 		Expectations []struct {
@@ -788,26 +819,28 @@ func (w *WS) judgeMany(commands []string, flags ...string) []judged {
 			} `json:"rules"`
 		} `json:"expectations"`
 	}
-	if err := json.Unmarshal([]byte(r.Stdout), &out); err != nil {
-		w.T.Fatalf("%v\n%s", err, r.Stdout)
+	if err := json.Unmarshal([]byte(r.Stdout), &out); err != nil || len(out.Expectations) != len(calls) {
+		w.T.Fatalf("判定が %d 件のはず: %v\n%s", len(calls), err, r.Stdout)
 	}
-	if len(out.Expectations) != len(commands) {
-		w.T.Fatalf("判定が %d 件、コマンドが %d 件", len(out.Expectations), len(commands))
-	}
-	var res []judged
+	var res []Judged
 	for _, e := range out.Expectations {
-		j := judged{verdict: e.Verdict}
+		j := Judged{Verdict: e.Verdict}
 		for _, r := range e.Rules {
-			j.ids = append(j.ids, r.ID)
+			j.IDs = append(j.IDs, r.ID)
 		}
 		res = append(res, j)
 	}
 	return res
 }
 
-type judged struct {
-	verdict string
-	ids     []string
+// judgeMany はシェルのコマンドを何本も 1 回の起動で判定する。
+func (w *WS) judgeMany(commands []string, flags ...string) []Judged {
+	w.T.Helper()
+	calls := make([][2]string, len(commands))
+	for i, c := range commands {
+		calls[i] = [2]string{"Bash", c}
+	}
+	return w.Judge("enable", calls, flags...)
 }
 
 const SettingFilesGuard = "builtin:guard-setting-files"
@@ -816,8 +849,8 @@ const SettingFilesGuard = "builtin:guard-setting-files"
 func (w *WS) AssertAllGuarded(commands []string, flags ...string) {
 	w.T.Helper()
 	for i, j := range w.judgeMany(commands, flags...) {
-		if j.verdict != "deny" || !slices.Contains(j.ids, SettingFilesGuard) {
-			w.T.Errorf("止まらない: %q → %s %v", commands[i], j.verdict, j.ids)
+		if j.Verdict != "deny" || !slices.Contains(j.IDs, SettingFilesGuard) {
+			w.T.Errorf("止まらない: %q → %s %v", commands[i], j.Verdict, j.IDs)
 		}
 	}
 }
@@ -826,8 +859,8 @@ func (w *WS) AssertAllGuarded(commands []string, flags ...string) {
 func (w *WS) AssertNoneDenied(commands []string, flags ...string) {
 	w.T.Helper()
 	for i, j := range w.judgeMany(commands, flags...) {
-		if j.verdict == "deny" {
-			w.T.Errorf("止まった: %q → %v", commands[i], j.ids)
+		if j.Verdict == "deny" {
+			w.T.Errorf("止まった: %q → %v", commands[i], j.IDs)
 		}
 	}
 }
@@ -836,8 +869,8 @@ func (w *WS) AssertNoneDenied(commands []string, flags ...string) {
 func (w *WS) AssertNoneGuarded(commands []string, flags ...string) {
 	w.T.Helper()
 	for i, j := range w.judgeMany(commands, flags...) {
-		if slices.Contains(j.ids, SettingFilesGuard) {
-			w.T.Errorf("設定ファイルの保護にヒットした: %q → %v", commands[i], j.ids)
+		if slices.Contains(j.IDs, SettingFilesGuard) {
+			w.T.Errorf("設定ファイルの保護にヒットした: %q → %v", commands[i], j.IDs)
 		}
 	}
 }
