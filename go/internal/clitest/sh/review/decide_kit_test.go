@@ -400,7 +400,13 @@ func (d *decideSite) putTools() {
 			continue
 		}
 		found, err := exec.LookPath(name)
-		if err != nil || exists(filepath.Join(d.tools, name)) {
+		if err != nil {
+			if name != "find" {
+				d.t.Fatalf("標準の道具 %s が PATH に無い", name)
+			}
+			continue
+		}
+		if exists(filepath.Join(d.tools, name)) {
 			continue
 		}
 		putTool(d.t, found, filepath.Join(d.tools, name))
