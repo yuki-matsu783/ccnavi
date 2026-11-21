@@ -132,5 +132,5 @@ pnpm test:e2e    # 拡張を読み込んだ Chromium での試験。Chromium が
 
 配布する sh を起動するテストは `sh` に置く。例外は 1 つで、実行ファイル（判定）と sh が同じことを
 別の実装で持ち、同じ見本の表で両方を突き合わせるテストは、表の主題のグループに 1 ファイルで置く
-（`guard` の `test_wrapguard.py` の `ShAgreesTest`）。表を 2 つのグループに分けると、
+（例: `go/internal/clitest/guard/self/wrapguard_test.go` の `TestShAgreesOnChildPush`）。表を 2 つのグループに分けると、
 片方だけ直したときに食い違いに気づけないため。

@@ -11,7 +11,7 @@ import (
 )
 
 // 守る場所（設定ファイル・記録と state・実行ファイル）への書き込みを、hook の判定の本体（Before）で止める・通すの表。
-// 受入テスト（tests/guard/test_selfguard.py）が hook を 1 件ずつ起こして見ていた命令を、ここで 1 行ずつ見る。
+// 受入テスト（clitest/guard/self の selfguard 系）が hook を 1 件ずつ起こして見ていた命令を、ここで 1 行ずつ見る。
 
 const (
 	settingFiles = "builtin:guard-setting-files"
