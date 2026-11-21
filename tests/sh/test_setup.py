@@ -437,7 +437,7 @@ class SetupTest(unittest.TestCase):
 
 
 class WritesTheExpectedShape(SetupTest):
-    def test_writes_env_and_all_seven_hooks(self):
+    def test_writes_env_and_all_hooks(self):
         """設定ファイルが無いところに、引数なしで 1 回入れて、env と hook の値そのものを見る。
 
         「ccnavi という字が入っている」だけでは取り違えを見つけられないので、hook に

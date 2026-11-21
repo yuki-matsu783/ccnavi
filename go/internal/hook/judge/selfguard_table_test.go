@@ -68,6 +68,7 @@ func TestSelfGuardShellWrites(t *testing.T) {
 	}
 	rows = append(rows, bashRows(false, settingFiles,
 		"sed -n 1,20p "+rules,
+		"cd .ccnavi/config/common && cat rules.yml",
 		"sed -n 1,20p /x/.claude/worktrees/feature-id/.ccnavi/config/common/rules.yml",
 		"sed -n 1,20p /x/.claude/worktrees/feature-12-improve/.ccnavi/config/common/rules.yml",
 		"sed -E -e s/a-i/b/ "+rules, "sed -ne 's/a-i/b/p' "+rules)...)

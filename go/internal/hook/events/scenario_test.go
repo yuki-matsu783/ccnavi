@@ -210,6 +210,12 @@ func TestMainSessionMatchesGolden(t *testing.T) {
 				"error", "exit 2"), Env: plain},
 			{Name: "failure again", Payload: tool("PostToolUseFailure", config.ToolBash, ws, "t11", map[string]any{"command": "make"},
 				"error", "exit 2"), Env: with("CCNAVI_FAIL_STREAK_COUNT", "2")},
+		},
+		// 成功を挟むと連続が戻り、しきい値 2 でも次の失敗 1 回では案内が出ない。
+		bashPair("ok between", "make ok", ws, "t11a", plain, nil),
+		[]step{
+			{Name: "failure after success", Payload: tool("PostToolUseFailure", config.ToolBash, ws, "t11b", map[string]any{"command": "make"},
+				"error", "exit 2"), Env: with("CCNAVI_FAIL_STREAK_COUNT", "2")},
 			{Name: "artifact failure", Payload: tool("PostToolUseFailure", "Artifact", ws, "t12", map[string]any{"file_path": "x.html"},
 				"error", "x"), Env: plain},
 			{Name: "interrupt", Payload: tool("PostToolUseFailure", config.ToolBash, ws, "t13", map[string]any{"command": "sleep 9"},

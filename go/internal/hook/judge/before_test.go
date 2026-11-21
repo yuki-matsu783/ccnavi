@@ -174,6 +174,7 @@ func TestUndeclaredVerdict(t *testing.T) {
 		{"default", "", "", Handover},
 		{"auto", "", "", Handover},
 		{"plan", "x", "", rules.Ask},
+		{"auto", "x", "", rules.Ask},
 		{"dontAsk", "", "", rules.Deny},
 		{"bypassPermissions", "", "disable", Handover},
 		{"bypassPermissions", "x", "disable", rules.Deny},
