@@ -1,4 +1,4 @@
-// fakegitlab は GitLab API v4 の模擬を手で起こす入口である（tests/manual/gitlab/fake_gitlab.py の写し）。
+// fakegitlab は GitLab API v4 の模擬を手で起こす入口である。
 // `.ccnavi/scripts/ccnavi-review.sh` を実物なしで通すための的で、分かるのは sh が動くことだけ（返す形が実物と同じかは契約テストが見る）。
 //
 //	cd go && go run ./internal/harness/cmd/fakegitlab <state.json> <port>

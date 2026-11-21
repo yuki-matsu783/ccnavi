@@ -50,7 +50,7 @@ func TestLoadRejectsMalformedScenarios(t *testing.T) {
 		{"thread に body が無い", dockerHead + "steps:\n  - human: true\n    human_api: [{op: thread}]\n", "body"},
 		{"resolve が名前の無い thread を指す", dockerHead + "steps:\n  - human: true\n    human_api: [{op: resolve, thread: t9}]\n", "as で名前を付けたものだけ"},
 		{"resolve が thread より前", dockerHead + "steps:\n  - human: true\n    human_api:\n      - {op: resolve, thread: t1}\n      - {op: thread, body: x, as: t1}\n", "as で名前を付けたものだけ"},
-		// human_run（schema.py の _check_human_run の 4 つの検査と、残りの形）
+		// human_run（schema.go の human_run の 4 つの検査と、残りの形）
 		{"human_run が human でない step", "id: T\ntest_repo: true\nsteps:\n  - prompt: a\n    human_run: {script: agree}\n", "human: true の step にだけ"},
 		{"human_run と human_api の併記", dockerHead + "steps:\n  - human: true\n    instruction: i\n    human_api: [{op: approve}]\n    human_run: {script: agree}\n", "human_api と同じ step には書けません"},
 		{"human_run が test_repo でないシナリオ", "id: T\nsteps:\n  - human: true\n    instruction: i\n    human_run: {script: agree}\n", "test_repo: true のシナリオにだけ"},

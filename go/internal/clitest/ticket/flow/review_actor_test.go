@@ -1,6 +1,6 @@
 package flow
 
-// レビュー済みのマーカーの actor と、依頼の後に動いたかの判定の受入テスト。元: tests/ticket/test_review_actor.py。
+// レビュー済みのマーカーの actor と、依頼の後に動いたかの判定の受入テスト。
 //
 //  1. 手元の review confirm --actor <アカウント> は、マーカーに actor と via: cli を書く。--actor が無ければマーカーは前と同じ中身
 //  2. --actor の形と、review confirm の外で渡されたときは断る

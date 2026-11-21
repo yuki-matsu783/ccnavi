@@ -11,7 +11,7 @@ import (
 )
 
 // ccnavi-stage.sh の本体（Run）を、使い捨てのワークスペースで確かめる。下書きの置き場所・断るパス・取り込みの手順の出し方。
-// sh を通す確認は tests/sh/test_stage_sh.py に数本だけ残す。
+// sh を通す確認は clitest/sh/git に数本だけ残す。
 
 const (
 	rulesRel = ".ccnavi/config/common/rules.yml"

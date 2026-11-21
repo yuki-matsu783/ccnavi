@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 設定 3 本の和の受入テスト（tests/config/test_config_union.py の写し）。rules の合成。
+// 設定 3 本の和の受入テスト。rules の合成。
 //
 // レイヤーは 3 種。共通レイヤー（`.ccnavi/config/common/`）、ワークスペース自身のレイヤー、プロジェクトのレイヤー。
 // lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無いレイヤー = 空）。

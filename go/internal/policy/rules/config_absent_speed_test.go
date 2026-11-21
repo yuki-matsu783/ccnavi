@@ -11,8 +11,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// 共通ルールの regex（組み合わせ条件と except の中も）は、長い入力ですぐ返る（tests/config/test_config_absent.py の
-// BuiltinSpeedTest から移した）。判定の期限はルールの合間でしか見ないので、1 本の照合が後戻りで長引くと、hook の
+// 共通ルールの regex（組み合わせ条件と except の中も）は、長い入力ですぐ返る。判定の期限はルールの合間でしか見ないので、1 本の照合が後戻りで長引くと、hook の
 // timeout に達して呼び出しが止められずに通る。
 func TestCommonRegexesReturnQuickly(t *testing.T) {
 	const limit = 100 * time.Millisecond

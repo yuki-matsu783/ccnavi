@@ -12,7 +12,7 @@ import (
 )
 
 // sync plan（取り込む親子のチケットとリポジトリを選ぶ）と、retire の記録（ワークツリーを片付けた後の親）の選び方を、
-// 使い捨てのワークスペースで確かめる。sh は起こさない。sh を通す確認は tests/sh/test_sync_sh.py に数本だけ残す。
+// 使い捨てのワークスペースで確かめる。sh は起こさない。sh を通す確認は clitest/sh/start の試験に数本だけ残す。
 
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()

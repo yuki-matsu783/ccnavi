@@ -1,6 +1,6 @@
 package flow
 
-// 子チケットのフローのテストが共有する道具（元: tests/ticket/test_flow.py の FlowHarness）。
+// 子チケットのフローのテストが共有する道具（ の FlowHarness）。
 
 import (
 	"crypto/sha256"

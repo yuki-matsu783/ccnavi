@@ -13,7 +13,7 @@ import (
 )
 
 // 範囲の上限（設計 wip/design/approve-carry.md 3・4、6.1〜6.2）と、サブコマンドに足した診断のオプション
-// （tests/ticket/test_phases.py の後半）。
+// 。
 // 承認は範囲の超過を拒まず「編集対象としているが」として見せる。判定は子 → 親 → 定義の厳しい側で切り詰め、外へ出した上限を
 // `limit:` 行で名指しする。親の範囲は既定で src/*・wip/*・tests/*、フェーズ 1 の定義 research は wip/research/*。
 

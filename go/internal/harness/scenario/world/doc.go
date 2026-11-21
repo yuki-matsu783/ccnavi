@@ -1,4 +1,4 @@
-// Package world は、受入シナリオが触る外の世界である（tests/scenarios/workspace.py・issues.py・repo.py・sandbox.py の写し）。
+// Package world は、受入シナリオが触る外の世界である。
 //
 //   - workspace.go: ccnavi 本体（ワークスペース）の事実（HEAD・ブランチの記録、確認に出す git の状態、判定のモード）
 //   - issues.go: setup.issue の issue を gh / glab で作って閉じる
@@ -7,5 +7,5 @@
 //
 // 子のプロセス（git・gh・glab・sh）を起こす。testing に依存しない（入口の実行ファイルからも使う）。
 //
-// 簡素にした所（Python から）: 対象のロックは、あれば止めて、使っている回が無いなら消すよう言う（PID の生死を調べて奪わない）。
+// 簡素にした所: 対象のロックは、あれば止めて、使っている回が無いなら消すよう言う（PID の生死を調べて奪わない）。
 package world

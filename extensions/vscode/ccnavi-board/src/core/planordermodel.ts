@@ -1,7 +1,7 @@
 /**
  * `--plan-order <親> --json [--order <JSON>]`と、保存の`--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`
  * の答え（実行ファイルとの契約）と読み取り。形はリポジトリの設計（`docs/21_design/tickets/approval.md`の
- * 計画の順序の振り直しの表）と、Python側が書き出す実例`test/fixtures/plan-order.json`。
+ * 計画の順序の振り直しの表）と、実行ファイル側が書き出す実例`test/fixtures/plan-order.json`。
  *
  * 計画編集タブ（`workflow-panel.ts`）が読む。**番号の振り直し・順序の検査・書けるか（`writable`）は
  * 実行ファイルが答え、拡張は読むだけ**。計画ごとの図の中身（`plans`）は承認のpreviewと同じ関数で作られるので、

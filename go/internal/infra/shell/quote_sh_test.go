@@ -8,7 +8,7 @@ import (
 )
 
 // sh の ccnavi_sh_quote と同じ表（tests/fixtures/sh-quote-cases.json）で、SingleQuote の答えを確かめる。
-// sh の答えは tests/sh/test_sh_quote_sh.py が同じ表で見る。
+// sh の答えは clitest/sh/small が同じ表で見る。
 func TestSingleQuoteMatchesSh(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "tests", "fixtures", "sh-quote-cases.json"))
 	if err != nil {

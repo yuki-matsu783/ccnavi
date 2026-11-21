@@ -1,4 +1,4 @@
-// Package prepare は、受入シナリオを回す前の準備と後片付けである（tests/scenarios/prepare.py の写し）。
+// Package prepare は、受入シナリオを回す前の準備と後片付けである。
 // setup のファイルを作る・追記する・戻す、回す前の検査、setup.host の相手の用意と step ごとの記録を扱う。
 //
 // シナリオの読み込み（schema）・使い捨てのリポジトリの扱い（repo）は実行器の芯の持ち主のもので、ここは読まない。

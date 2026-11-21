@@ -2,7 +2,7 @@ package flow
 
 // VS Code 拡張（ccnavi-board）のフィクスチャと、実行ファイルの JSON が同じ形・同じ値であることを見る道具。
 // 形を変えたら `go test ./internal/clitest/ticket/flow -run <テスト> -update-board-fixtures` でフィクスチャを書き直す
-// （Python の CCNAVI_BOARD_FIXTURE=1 に当たる。clitest/core の boardfixture_test.go と同じフラグ名）。
+// （clitest/core の boardfixture_test.go と同じフラグ名）。
 import (
 	"encoding/json"
 	"flag"

@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// ルールの `every`（渡す回の刻み）の受入テスト（tests/config/test_rule_every.py の写し）。
+// ルールの `every`（渡す回の刻み）の受入テスト。
 //
 // `every: N` が刻むのは「渡す回」で、ヒットした回数が N の倍数になった回だけが渡す回になる。`every` が無ければヒットするたびが渡す回。
 //

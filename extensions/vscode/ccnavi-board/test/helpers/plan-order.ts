@@ -1,5 +1,5 @@
 /**
- * `--plan-order <親> --json`の答えの実例（`test/fixtures/plan-order.json`）を読む。Python側の
+ * `--plan-order <親> --json`の答えの実例（`test/fixtures/plan-order.json`）を読む。Go の試験
  * `go/internal/clitest/ticket/phases/planorder_test.go`（`TestShapesMatchTheExtensionFixture`）が書き出したもので、ここでは書き換えない。
  *
  * 並んでいる答えは6つ。開いたとき（`open`。全体計画1〜4とフィードバック計画5〜6、子の提案2本）、

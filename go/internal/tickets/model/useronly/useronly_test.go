@@ -289,7 +289,7 @@ func TestPruneForm(t *testing.T) {
 	}
 }
 
-// エージェントが打てる形は組み込みの止めに当たらない（tests/ticket の plan-order・fill-phases）。
+// エージェントが打てる形は組み込みの止めに当たらない。
 func TestPlanOrderIsNotStopped(t *testing.T) {
 	rule, err := TicketApprovalRule("", "/w")
 	if err != nil {

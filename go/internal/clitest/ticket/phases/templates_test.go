@@ -18,7 +18,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 作業・レビュー計画のテンプレート（読む側）の受入テスト（tests/ticket/test_plan_templates.py）。
+// 作業・レビュー計画のテンプレート（読む側）の受入テスト。
 //
 // 読み込み・2 層の統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
 // go/internal/tickets/proposal/templates の見本（TestMatchesGolden）が 1 字単位で見る。リンク・ハードリンクを読まない保護は

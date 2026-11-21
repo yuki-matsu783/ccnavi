@@ -12,7 +12,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 全体計画の順序を計画のステップの `after` で決めることの受入テスト（tests/ticket/test_phases_dag.py）。
+// 全体計画の順序を計画のステップの `after` で決めることの受入テスト。
 // 先行関係のファイルは無い。承認済みチケットの計画から都度計算し、手で動かした承認も `after` で読む。
 // フェーズ定義の読み方・`after` の読み方・先行関係の計算（見本の表 tests/fixtures/plan-waits.json）・計画の検査・
 // 改版の見つけ方と錠・次の案内は go/internal/tickets の config/phases・model/ticket・proposal/candidates・phase が見る。

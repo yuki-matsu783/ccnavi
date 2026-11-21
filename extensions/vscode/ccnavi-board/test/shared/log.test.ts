@@ -1,7 +1,7 @@
 /**
  * 診断ログ（`src/log.ts`）。行の形・logfmtのエスケープのしかた・レベルの絞り込み・置き場・書けないときに何も出さないこと・
  * リンクをたどらないこと・出どころの名前・0600・URLとscp形式の資格情報の伏せ方。
- * shとPythonが同じ行を出すことはPythonのテスト（tests/sh/test_diaglog_sh.py）が見る。
+ * shとGoが同じ行を出すことは clitest/sh/small の試験が見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

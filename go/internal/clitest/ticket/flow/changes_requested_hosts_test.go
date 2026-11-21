@@ -3,7 +3,6 @@ package flow
 // 変更要求の案内は、ホストごとに出し分ける。判定は変えない。
 // 同じ結果（変更要求のレビューが 1 件）でホストだけ変えて、confirm・decide・close-early・手で動かした子の確定の
 // 拒否の文面が GitLab と GitHub で分かれることを見る。ホストは取得した結果の host。
-// 元: tests/ticket/test_changes_requested_hosts.py。
 
 import (
 	"ccnavi/internal/harness/ticketkit"

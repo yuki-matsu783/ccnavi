@@ -15,7 +15,7 @@ import (
 	"ccnavi/internal/harness/samples"
 )
 
-// ユーザの発言のたびに、共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする（tests/config/test_config_sync.py の写し）。
+// ユーザの発言のたびに、共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。
 //
 // 共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあり、プロジェクトだけを clone したユーザからは
 // 見えない。ユーザの発言（UserPromptSubmit）で、共通レイヤーの中身を、着手済みの親のワークツリーにあるプロジェクトの

@@ -16,7 +16,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// フィードバック計画・Draft を外す（ready）・早めに閉じる（close-early）（tests/ticket/test_phases.py の中盤）。
+// フィードバック計画・Draft を外す（ready）・早めに閉じる（close-early）。
 
 // reviewedFamily は設計 1 つの親を、フェーズ 1 のレビューが済み、フィードバック計画だけが残る所まで進める。
 // レビューの取得結果の見本を返す。

@@ -1,6 +1,4 @@
 // Package start は、ワークツリーを切る・親のブランチを取り込む・取ってくる・片付ける sh を、sh を起こして外から確かめるテストの置き場である。
-// tests/sh の test_start_sh・test_start_sh_adopt・test_worktree_sh・test_sync_sh・test_fetch_sh・test_clean_sh・test_idle_sh・
-// test_session_start_sh・test_ticket_preflight_sh・test_workspace_root を移した。
 //
 // 判断と解釈（ホストの応答の読み方・止める文・識別子の決まり・引数の誤り）は Go の本体の表が見る。ここは経路ごとの通し
 // （終了コード・出力・作られた物・ホストへの要求）と、sh の仕事（ホストとの出入り・段取りの順・打ち直し・片付け・時間の枠・ロック）だけを見る。

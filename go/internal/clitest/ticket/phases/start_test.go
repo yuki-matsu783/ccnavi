@@ -10,9 +10,9 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 親の finish のテンプレート化の案内（tests/ticket/test_template_notice.py）、親の `ticket start` と計画
-// （test_start_plan.py・issue #317）、手で動かした承認に仕込まれた着手の欄（test_start_planted.py）、
-// 親の改版で範囲を変える規則（test_scope_revision.py）。
+// 親の finish のテンプレート化の案内、親の `ticket start` と計画
+// 、手で動かした承認に仕込まれた着手の欄、
+// 親の改版で範囲を変える規則。
 
 // ---- テンプレート化の案内
 

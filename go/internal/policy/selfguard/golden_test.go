@@ -145,7 +145,7 @@ func compareGuards(t *testing.T, name string, cases []guardCase) {
 // fixedRoot は写しを機械に依らせないための、無い場所のルート（realpath が綴りを変えない）。
 const fixedRoot = "/nonexistent/ws"
 
-// guardCommands は保護の表（go/internal/hook/judge/testdata/shell_guard.json・tests/guard/test_selfguard.py の命令）と、
+// guardCommands は保護の表と、
 // 読むだけで止めない命令。shell.Read で読んでから当てる。
 var guardCommands = []string{
 	// ディレクトリごと消す・退かす

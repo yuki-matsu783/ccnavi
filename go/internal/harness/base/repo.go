@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// ShrinkRepo は作り置きのリポジトリを、写す前にファイルの数で小さくする。中身と振る舞いは変えない（tests/__init__.py の shrink_repo の写し）。
+// ShrinkRepo は作り置きのリポジトリを、写す前にファイルの数で小さくする。中身と振る舞いは変えない。
 //
 // 作り置きを木ごと写すと、時間はほぼファイルとディレクトリの数で決まる。ばらの object（1 つずつファイルと 2 字のディレクトリ）を
 // 1 つの pack にまとめ、git が init で置く使われない見本の hook（hooks/*.sample）を消す。gitDir は `.git` か bare。

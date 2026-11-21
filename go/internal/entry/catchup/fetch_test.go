@@ -12,7 +12,7 @@ import (
 
 // fetch の判定（早送り・統合先を進める・origin/HEAD の向け直し）を、使い捨てのリポジトリと bare の origin で確かめる。
 // 取ってくる（fetch・ls-remote）のは sh なので、ここでは origin/<ブランチ> を取り終えた状態から始める。
-// sh を通す確認は tests/sh/test_fetch_sh.py に数本だけ残す。
+// sh を通す確認は clitest/sh/start の試験に数本だけ残す。
 
 type fetchFixture struct {
 	t      *testing.T

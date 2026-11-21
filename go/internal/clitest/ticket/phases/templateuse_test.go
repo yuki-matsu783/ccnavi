@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// テンプレートを使う側（`ccnavi ticket new <識別子> --template <名前>`）の受入テスト（tests/ticket/test_template_use.py）。
+// テンプレートを使う側（`ccnavi ticket new <識別子> --template <名前>`）の受入テスト。
 //
 //  1. 親の提案: テンプレートのステップを `plan:` / `feedback:` にコピーする。`after` は計画の中の添字から提案の絶対番号に
 //     付け直す（フィードバック計画は全体のステップ数を足す）。`phases:` のコピーが入り、`--lint` と承認の確認が error にならない

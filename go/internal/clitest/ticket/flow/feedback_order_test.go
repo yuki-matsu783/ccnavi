@@ -1,7 +1,7 @@
 package flow
 
 // フィードバック計画の順序。フィードバック計画も全体計画と同じく、ステップの after で先行関係が決まる。
-// ターミナルの承認で、並行と合流を通す。元: tests/ticket/test_feedback_order.py。
+// ターミナルの承認で、並行と合流を通す。
 
 import (
 	"testing"

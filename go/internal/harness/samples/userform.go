@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/tickets/model/useronly"
 )
 
-// テストが実行ファイルへ渡す引数に、`user` の入口の形を置く（tests/userform.py の写し）。
+// テストが実行ファイルへ渡す引数に、`user` の入口の形を置く。
 //
 // 実行ファイルの `user` は、--root・--cwd・--record-writes・--record-tree・--record-commit・--record-merge・--entry を
 // 読み飛ばした後の最初の語でなければならない。テストの道具は、--guard-ticket-approval など読み飛ばされないオプションを
@@ -76,7 +76,7 @@ func splitWrapper(prefix []string) (wrapper, other []string) {
 	return wrapper, other
 }
 
-// UserformMain は sh のスタブが `teststub userform <引数>…` で起こす口の本体（Python の `python userform.py <引数>…`）。
+// UserformMain は sh のスタブが `teststub userform <引数>…` で起こす口の本体。
 // 引数は実行ファイルの `--entry` の並び（先頭のラッパーのオプション）で、実行ファイルと同じに検べる（useronly.TakeEntry）。
 // 断る並びなら、文を stderr に出して終了コード 2 を返す。通れば何も出さず 0 を返す（標準出力は使わない）。
 func UserformMain(args []string, stderr io.Writer) int {

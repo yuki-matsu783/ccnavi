@@ -1,4 +1,4 @@
-// Package hoststub は、ホスト（GitHub / GitLab）のスタブを PATH の先頭に置く（tests/host_stub.py の写し）。
+// Package hoststub は、ホスト（GitHub / GitLab）のスタブを PATH の先頭に置く。
 //
 // write-and-push・ticket の sh・受入シナリオの setup.host が使う。置くのは次の 4 本。
 //   - git: `git remote get-url origin` だけホストの形の URL（OriginURL）を答え、あとは本物の git へ渡す（自分の置き場は PATH から外す）。

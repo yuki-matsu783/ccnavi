@@ -1,6 +1,5 @@
 // Package review は、レビューの sh（ccnavi-review.sh・ccnavi-user-decide.sh・ccnavi-user-lib-review.sh と、共通部の
-// ccnavi-common-review.sh）を外から起こして確かめるテストである（tests/sh/test_review_*.py・test_decide_*.py・
-// test_comment_staged.py の移し）。
+// ccnavi-common-review.sh）を外から起こして確かめるテストである。
 //
 // 見るのは sh の仕事だけ。ホストの応答の読み（マージ済みか・MR の状態・未解決の数え方）は実行ファイル側にあり、
 // go/internal/tickets/model/host の表が見る。

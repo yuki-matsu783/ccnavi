@@ -1,7 +1,7 @@
 package flow
 
 // decide の適用（実行ファイル側）の取りこぼしを、sh のスタブでなく本物の `ccnavi user reviewed --accept-unresolved` と
-// 操作記録で見る。元: tests/ticket/test_decide_exe.py。
+// 操作記録で見る。
 //
 //  1. AT43: ホストに返信・解決を書いたあとの取り直しで、選んだ指摘の本文が変わっていたら、続きの子もマーカーも置かず、
 //     解決した分を操作記録の applied に残して止まる（ボードは mismatch で見せ直す）

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// 設定ファイルの保護の受入テスト（tests/config/test_config_union_guard.py の写し）。
+// 設定ファイルの保護の受入テスト。
 //
 // selfguard のコアに、各レイヤーの `.ccnavi/config/project/` の 3 本と共通レイヤーの phases / risks が入る。
 // Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、共通レイヤーの rules.yml に掛けているものを

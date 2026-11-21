@@ -20,7 +20,7 @@ import (
 )
 
 // 親 i0001 のワークツリーを持つリポジトリを組み、承認・着手・レビュー依頼を実行ファイルで動かす土台
-// （tests/ticket/test_phases.py の PhaseHarness の写し）。
+// 。
 
 const parentName = "i0001"
 

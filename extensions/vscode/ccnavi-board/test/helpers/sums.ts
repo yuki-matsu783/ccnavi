@@ -1,5 +1,5 @@
 /**
- * 統合結果（`--explain --json`の`sums[]`）の見本。実行ファイルの出力の形（tests/config/test_config_absent.pyが見る形）で、
+ * 統合結果（`--explain --json`の`sums[]`）の見本。実行ファイルの出力の形で、
  * ワークスペースの統合結果（共通 + 自身）とプロジェクトlibの統合結果（共通 + lib）を持つ。
  */
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";

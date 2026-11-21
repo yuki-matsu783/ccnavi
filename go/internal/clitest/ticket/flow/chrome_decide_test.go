@@ -1,7 +1,6 @@
 package flow
 
 // Chrome の decide（残った指摘の対応方針を決める）の入口（go/cmd/ccnavi-chrome）の受入テスト。
-// 元: tests/ticket/test_chrome_decide.py。
 //
 //  1. 見せる指摘とダイジェストが、手元の --preview --json と同じ（版 2 の形）
 //  2. keep・issue・fix が混ざった選択、全部 keep、全部 fix、指摘が 0 件の書くものとホストの計画

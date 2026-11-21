@@ -14,7 +14,7 @@ import (
 
 // ccnavi-worktree.sh が起こす 2 回（Plan のあと、fetch と ls-remote を済ませて Cut）を、使い捨てのワークスペースと bare の origin
 // で通す。sh は起こさない。ずれ（C4〜C7）の報告・確認コードが縛るもの・書きかけの扱い・切る前に止まる判断を確かめる。
-// sh を通す確認は tests/sh/test_worktree_sh.py に、経路ごとに数本だけ残す。
+// sh を通す確認は clitest/sh/start に、経路ごとに数本だけ残す。
 
 type flowFixture struct {
 	t        *testing.T

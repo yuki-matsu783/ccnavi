@@ -1,4 +1,4 @@
-// Package gitlabprobe は、実物の GitLab に sh 5 本と実行ファイルを適用して 1 周する（消した tests/manual/gitlab/probe_gitlab.py の写し）。
+// Package gitlabprobe は、実物の GitLab に sh 5 本と実行ファイルを適用して 1 周する。
 // ユーザが手で走らせる道具で、自動テストは本物の GitLab を立てない（組み立ての純粋な部分と引数の扱いだけを見る）。
 //
 //	gitlabmanual probe

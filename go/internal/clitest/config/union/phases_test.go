@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 設定の受入テスト（tests/config/test_config_union_phases_risk.py の前半）。phases は共通 + 1 レイヤーの和。
+// 設定の受入テスト。phases は共通 + 1 レイヤーの和。
 //
 // 土台の共通レイヤーは phases を持たない（統合結果を見るテストが自分で置く）。自身のレイヤーに `docs`、lib のレイヤーに
 // `design` / `build` / `release` がある。使うフェーズ定義は、親の承認済みチケットの `project:` で決まる。

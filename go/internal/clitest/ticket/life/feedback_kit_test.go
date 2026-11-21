@@ -8,7 +8,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// フィードバックのフェーズの計画を承認する場面の準備（tests/ticket の FeedbackPlanHarness）。フィードバック計画待ちの Stop の促しと、
+// フィードバックのフェーズの計画を承認する場面の準備。フィードバック計画待ちの Stop の促しと、
 // 改版の雛形（ticket revise）が使う。
 
 // feedbackStep はフィードバック計画（implement-feedback の 1 ステップ）。

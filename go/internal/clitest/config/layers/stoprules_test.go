@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// `match: Stop` のルールを、hook を通して確かめる数本（tests/config/test_stop_rules.py の写し）。
+// `match: Stop` のルールを、hook を通して確かめる数本。
 //
 // 数えの規則・止めた文・記録は go/internal/hook/events/stoprules_test.go、lint の苦情は go/internal/policy/rulelint の見本、
 // `--test Stop` と期待する判定は go/internal/entry/diagnose が見る。ここに残すのは、実行ファイルと hook を通した次の経路だけ。

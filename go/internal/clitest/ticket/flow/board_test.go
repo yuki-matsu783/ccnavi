@@ -1,6 +1,6 @@
 package flow
 
-// `--explain --json`（ボードの JSON）の受入テスト。元: tests/ticket/test_board.py。
+// `--explain --json`（ボードの JSON）の受入テスト。
 //
 // VS Code のボード拡張が読む形を、判定と同じ関数で組んでいることを確かめる。見るのは次のとおり。
 //

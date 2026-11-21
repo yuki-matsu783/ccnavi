@@ -1,7 +1,7 @@
 package flow
 
 // このパッケージのテストが共有する道具のうち、ticketkitに無いもの。
-// tests/ticket/test_phases.py の PhaseHarness の続き（フェーズ定義つきの親子・Chrome の要求・JSON の読み）。
+// 道具の続き（フェーズ定義つきの親子・Chrome の要求・JSON の読み）。
 
 import (
 	"encoding/json"

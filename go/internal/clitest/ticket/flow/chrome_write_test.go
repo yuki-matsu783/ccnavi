@@ -1,6 +1,6 @@
 package flow
 
-// Chrome の承認の入口（go/cmd/ccnavi-chrome）の受入テスト。元: tests/ticket/test_chrome_write.py。
+// Chrome の承認の入口（go/cmd/ccnavi-chrome）の受入テスト。
 //
 //  1. 親のワークツリー相当: ホストに無い親子のチケットは仮のワークツリーが組まれず、その親子のチケットは
 //     「親のワークツリーがありません」で決まらない。判定の入力に読めない（バイナリの）ファイルがあれば止める

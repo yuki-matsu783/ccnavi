@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// 保護対象（`rules.yml`・`.ccnavi/scripts/*`・CCNAVI.md）の「できあがりの姿」を引く道具（tests/draft.py の写し）。
+// 保護対象（`rules.yml`・`.ccnavi/scripts/*`・CCNAVI.md）の「できあがりの姿」を引く道具。
 //
 // 保護対象はエージェントが直接直せず、`wip/handoff/` に下書きを置いて、ユーザが `ccnavi user handoff` で取り込む。
 // 取り込む前は、できあがりの姿は下書きにあり、取り込んだ後は本物にある。テストは、どちらの状態でも同じ中身を読めるよう、

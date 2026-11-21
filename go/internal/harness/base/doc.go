@@ -1,5 +1,4 @@
-// Package base は、CLI を通すテスト（internal/clitest）の土台である。tests/__init__.py と tests/draft.py の写しで、
-// ほかの道具（exe・run など）と clitest が読む。
+// Package base は、CLI を通すテスト（internal/clitest）の土台である。ほかの道具（exe・run など）と clitest が読む。
 //
 // 置くもの
 //   - Main: TestMain の共通。プロセスの環境から子の答えを変える変数（GIT_*・CLAUDE_*・CCNAVI_*・GITHUB_TOKEN・GITLAB_TOKEN）を外し、

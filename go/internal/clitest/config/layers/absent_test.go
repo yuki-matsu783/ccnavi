@@ -14,7 +14,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// 共通レイヤーと config が無いとき・不正なときの受入テスト（tests/config/test_config_absent.py の写し）。
+// 共通レイヤーと config が無いとき・不正なときの受入テスト。
 //
 // ファイルが無いのは「設定が無い」正常で、ルール・リスクの配点・フェーズ定義のすべてで空として扱う。記録の `fallback` にも `--lint` にも出さない。
 // 不正なときだけ `fallback` を残す。組み込みの deny は、共通レイヤーと config の有無・状態によらず常にヒットする。

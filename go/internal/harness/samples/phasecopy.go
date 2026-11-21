@@ -7,7 +7,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// 親チケットの見本に phases:（計画が使うフェーズ定義のコピー）を差し込む道具（tests/phasecopy.py の写し）。
+// 親チケットの見本に phases:（計画が使うフェーズ定義のコピー）を差し込む道具。
 //
 // 計画を持つ親は、計画が使う定義だけを phases.yml からコピーした phases: を持つ。コピーするのは計画（plan: / feedback:）の
 // ステップが使う定義だけで、順序の欄（order・after・overlap・requires）はコピーしない。実行ファイルの

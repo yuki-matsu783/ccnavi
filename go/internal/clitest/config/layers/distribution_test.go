@@ -16,7 +16,7 @@ import (
 )
 
 // 配布物（.ccnavi/ の設定・文書・スクリプト）を置いたプロジェクトの `--lint` は問題 0 件になる
-// （tests/config/test_distribution_lint.py の写し）。
+// 。
 //
 // ccnavi が配るルールと文書が自身の検査に引っかかると、配布直後のプロジェクトでエージェントが `--lint` を打つたびに警告を見ることになる。
 // たとえば `additionalContextFile` の文書が上限（maxChars 文字）を超えると、先頭までしか渡らず、残りは渡らない。

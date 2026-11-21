@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/harness/configws"
 )
 
-// 共通レイヤーのミラーを調べ、ずれを同期する `ccnavi user mirror` の入口（tests/config/test_mirror_sync.py の写し）。
+// 共通レイヤーのミラーを調べ、ずれを同期する `ccnavi user mirror` の入口。
 //
 // 着手済みの親のワークツリーのミラーは発言のたびに揃うが、ユーザのチェックアウトは対象外なので、間が空くとミラーが古いまま残る。
 // `user mirror` は、プロジェクトのユーザのチェックアウトのミラーを、見たいときに調べ（書かない）、押したときに揃える

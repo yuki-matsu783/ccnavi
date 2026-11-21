@@ -2,7 +2,6 @@ package flow
 
 // 承認の時刻。承認は承認済みチケットに時刻を書かないので、表示（ボードの JSON と --explain）は
 // doing/ に足したコミット → 「未コミット（手で置いた）」の順で引く。判定の拒否文には時刻を出さない。
-// 元: tests/ticket/test_approved_time.py。
 
 import (
 	"ccnavi/internal/harness/ticketkit"

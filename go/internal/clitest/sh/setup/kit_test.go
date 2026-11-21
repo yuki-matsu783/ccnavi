@@ -1,6 +1,5 @@
 // Package setup は、導入・配布の sh（scripts/ccnavi-{setup,install,doctor,package}.sh）と、配る振り分けの sh・ユーザ専用の sh の
-// 置き場と起動の形を、外から起こして確かめる（tests/sh/test_setup*.py・test_install_sh.py・test_doctor_sh.py・test_package_sh.py・
-// test_launcher.py・test_bin_lookup.py・test_user_scripts_sh.py の移し）。
+// 置き場と起動の形を、外から起こして確かめる。
 //
 // 道具: kit_test.go（書く・読む・起こす）、iso_test.go（PATH を隔離した偽物つきの環境）、source_test.go（setup が配る偽の配布元）。
 package setup
