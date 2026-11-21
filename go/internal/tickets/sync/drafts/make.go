@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathmatch"
 	"ccnavi/internal/infra/pyfmt"
+	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/yaml"
 	"ccnavi/internal/policy/ruleload"
 	"ccnavi/internal/policy/rules"
@@ -294,6 +295,25 @@ type Made struct {
 	Template                                      *templates.Template
 	Notes                                         []string
 	Problems                                      []rules.Problem
+}
+
+// AnswerJSON は `--templates --draft --json` の答え。made が nil（止まった）のときは理由 why を error に入れる。
+func AnswerJSON(made *Made, why string) *pyjson.Object {
+	shown := made
+	if shown == nil {
+		shown = &Made{}
+	}
+	notes := make([]any, len(shown.Notes))
+	for i, n := range shown.Notes {
+		notes[i] = n
+	}
+	problems := []any{}
+	for _, p := range shown.Problems {
+		problems = append(problems, pyjson.NewObject("severity", string(p.Severity), "detail", p.Detail))
+	}
+	return pyjson.NewObject("version", templates.JSONVersion, "ok", made != nil, "error", why,
+		"name", shown.Name, "path", shown.Rel, "target", shown.Target, "layer", shown.Layer, "sha", shown.SHA,
+		"tree", shown.Tree, "notes", notes, "problems", problems)
 }
 
 // Make は完了した親から下書きを作って、親のツリーの wip/handoff/ に書く。上書きはしない。止まったら (nil, 理由)。
