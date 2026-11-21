@@ -329,7 +329,8 @@ def _set_field(text: str, key: str, value: str) -> str:
 
 
 def set_fields(text: str, fields: dict[str, str]) -> str:
-    """frontmatter の欄を、行単位で書き換える（`_set_field` を欄ごとに）。手で動かした形を作る準備に使う。"""
+    """frontmatter の欄を、行単位で書き換える（`_set_field` を欄ごとに）。
+    手で動かした形を作る準備に使う。"""
     for key, value in fields.items():
         text = _set_field(text, key, value)
     return text

@@ -182,7 +182,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "  printf 'tree %s\\n' \"$tree\"\n"
             f"  printf 'wip-from {head}\\nwip {WIP_NOTE}\\n'\n"
             # 報告の文は実行ファイルが組み、sh は成功のあとにそのまま出す
-            f"  printf 'say wip/ の追跡済みのファイルを削除しました（1 件。削除する前のコミット {head[:12]} から戻せる）:\\n'\n"
+            "  printf 'say wip/ の追跡済みのファイルを削除しました（1 件。"
+            f"削除する前のコミット {head[:12]} から戻せる）:\\n'\n"
             f"  printf 'say   {WIP_NOTE}\\n'\n"
             "  exit 0 ;;\n"
             "esac\n"
@@ -258,8 +259,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         first = self.review("review-request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
         self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertEqual(len(Host.notes), 1)
-        # 投稿の後、送れたかを書く前に落ちた形にする（段階を unknown に戻す）。打ち直しは、目印で見つけた投稿を
-        # `ops mark-sent` で送り済みに直す。
+        # 投稿の後、送れたかを書く前に落ちた形にする（段階を unknown に戻す）。
+        # 打ち直しは、目印で見つけた投稿を `ops mark-sent` で送り済みに直す。
         pending = self.exe("ops", "pending")
         self.assertEqual(pending.returncode, 0, pending.stderr)
         self.assertEqual(pending.stdout, "")
@@ -303,7 +304,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "  printf '{}' >\"$tree/.ccnavi/approved/phases/i0001/1.reviewed\"\n"
             "  printf '.ccnavi/approved/phases/i0001/1.reviewed\\n' >\"$list\"\n"
             '  prev=""; for a in "$@"; do\n'
-            '    [ "$prev" = --accept-done ] && dp="$a"; [ "$prev" = --root ] && r="$a"; prev="$a"; done\n'
+            '    [ "$prev" = --accept-done ] && dp="$a"; '
+            '[ "$prev" = --root ] && r="$a"; prev="$a"; done\n'
             '  op=$(sed -n \'s/.*"op": "\\([0-9a-f]*\\)".*/\\1/p\' "$dp")\n'
             f'  [ -z "$op" ] || \'{exe.sh_path()}\' --root "$r" ops applied "$op" local true\n'
             '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'

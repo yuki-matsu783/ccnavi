@@ -131,12 +131,16 @@ class GitAuthShTest(unittest.TestCase):
         probe = (
             '. "$1"\ncd "$2"\n'
             "ccnavi_h_kind=gitlab ccnavi_h_host=h ccnavi_h_path=g/p ccnavi_h_max_time=5\n"
-            "ccnavi_host_connect\nprintf 'rc=%s cli=%s\\n' \"$?\" \"$ccnavi_h_cli\"\n"
+            'ccnavi_host_connect\nprintf \'rc=%s cli=%s\\n\' "$?" "$ccnavi_h_cli"\n'
         )
         env = dict(os.environ, PATH=f"bin:{self.bin}:/usr/bin:/bin")
         done = subprocess.run(
             [SHELL, "-c", probe, "probe", HOST_SH, self.repo],
-            capture_output=True, text=True, encoding="utf-8", env=env, check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=env,
+            check=False,
         )
         self.assertIn(f"cli={self.bin}/glab", done.stdout, done.stdout + done.stderr)
         self.assertFalse(os.path.exists(marker))

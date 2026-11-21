@@ -2,7 +2,8 @@
 
 見るのは次のとおり。
 
-1. 計画を持つ親が閉じると、`ready` の前に起動の sh で `--templates --draft <親>` を打つ案内が 1 行出る
+1. 計画を持つ親が閉じると、`ready` の前に起動の sh で `--templates --draft <親>` を
+   打つ案内が 1 行出る
 2. 出さない: その親の識別子の下書きが在る、同じ計画の形のテンプレートが取り込み済み、
    子の `finish`、`ready` 済み（材料が退避されて拾えない。
    go/internal/tickets/sync/drafts が見る）

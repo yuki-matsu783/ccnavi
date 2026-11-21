@@ -3485,7 +3485,11 @@ class FakeGitlabHostTest(unittest.TestCase):
         git(self.ws.target, "switch", "-q", "-c", "i0001")
         exe = write(
             os.path.join(self._tmp.name, "exe", "ccnavi"),
-            EXE_STUB.format(compat=built.compat(), log=os.path.join(self._tmp.name, "args.txt"), exe=built.sh_path()),
+            EXE_STUB.format(
+                compat=built.compat(),
+                log=os.path.join(self._tmp.name, "args.txt"),
+                exe=built.sh_path(),
+            ),
         )
         os.chmod(exe, 0o755)
         env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})

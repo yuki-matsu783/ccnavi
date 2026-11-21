@@ -6,9 +6,11 @@
    複数候補（終了コード 3）はユーザに確かめ、ホストに届かない（4）ときは MCP で代行させる指示が
    `additionalContext` に載る。表記はワークスペースルートの絶対パスから書く。
    指定が無い・外れ・チケット制御が disable のときは載らない。判定（止める・聞く）は返さない
-2. サブコマンド `ccnavi branches <issue|mr> <番号> checked <github|gitlab> <ホスト> <リポジトリ> <id> --result <応答>`:
-   手元の候補（名前に番号を含むブランチ・ワークツリー・`issue:` を持つチケット）を集め、sh が取ってきたホストの
-   応答（のまま）と合わせて出す。
+2. サブコマンド
+   `ccnavi branches <issue|mr> <番号> checked <github|gitlab> <ホスト> <リポジトリ> <id>
+   --result <応答>`:
+   手元の候補（名前に番号を含むブランチ・ワークツリー・`issue:` を持つチケット）を集め、
+   sh が取ってきたホストの応答（のまま）と合わせて出す。
    ホストの結果が無いときは「ホストは見ていない」と言う。チケットは識別子になるブランチ
    （`/` を `-` に置き換えて識別子と一致するもの）に結び付ける
 """
@@ -175,7 +177,8 @@ class BranchesCommandTest(PhaseHarness):
         git(self.root, "worktree", "add", "--quiet", self.login_tree, "feature-152-login")
 
     def branches(self, kind, number, result=(), *extra, cwd=None):
-        """result はホストの結果の渡し方（`checked ...`・`unchecked <理由>` と `--result <ファイル>`）。"""
+        """result はホストの結果の渡し方
+        （`checked ...`・`unchecked <理由>` と `--result <ファイル>`）。"""
         args = ["branches", kind, str(number), *result, "--cwd", cwd or self.root]
         return self.ccnavi(*args, *extra)
 
@@ -260,7 +263,8 @@ class BranchesCommandTest(PhaseHarness):
         self.assertIn("チケット feature-153-slash", text)
 
     def test_host_merge_requests_join_the_candidates(self):
-        # GitHub の開いた PR の一覧。issue を参照する PR だけが候補になり、番号が数でないものは使わない
+        # GitHub の開いた PR の一覧。
+        # issue を参照する PR だけが候補になり、番号が数でないものは使わない
         result = self.host(
             "github",
             "github.com",

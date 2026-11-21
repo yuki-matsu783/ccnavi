@@ -379,7 +379,8 @@ class GuardScriptTest(_Workspace):
             self.assertTrue(calls, name)
             for line in calls:
                 with self.subTest(script=name, line=line.strip()[:60]):
-                    # 識別子は文字どおりに書く。例外は実行ファイルが決めた識別子（`ccnavi git check` の答えの `$gc_id`）で、
+                    # 識別子は文字どおりに書く。例外は実行ファイルが決めた識別子
+                    # （`ccnavi git check` の答えの `$gc_id`）で、
                     # その識別子の名前は実行ファイルの側が持つ。
                     self.assertRegex(line, rf"(^|[\s;|&(]){word} ([a-z][a-z-]*|\"\$gc_id\") \"")
 

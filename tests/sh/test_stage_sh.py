@@ -2,7 +2,8 @@
 
 確かめるのは 4 つ。元ファイルが wip/handoff/ の同じ階層へ cp されること。既にある下書きを
 上書きしないこと。ワークスペースの外や下書きの置き場の中を断ること。--commands が、元と違う
-下書きだけに、取り込みの手順（ccnavi-user-handoff.sh。defense を含む全種類）を出し、mv を出さないこと。
+下書きだけに、取り込みの手順（ccnavi-user-handoff.sh。defense を含む全種類）を出し、
+mv を出さないこと。
 """
 
 from __future__ import annotations
@@ -194,8 +195,7 @@ class StageShTest(unittest.TestCase):
         self.assertNotIn("<パス>", nexts[0])
         self.assertTrue(
             nexts[0].endswith(
-                f"--commands {self.rules} {self.hook} を打つ"
-                "（取り込みの手順が出る）"
+                f"--commands {self.rules} {self.hook} を打つ（取り込みの手順が出る）"
             ),
             result.stdout,
         )
