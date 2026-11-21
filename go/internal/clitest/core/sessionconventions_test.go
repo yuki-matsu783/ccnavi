@@ -191,7 +191,7 @@ func TestConventionsCdAndDocsLinesNeedProjectsAndAnIndex(t *testing.T) {
 	mkdir(t, filepath.Join(e.root, "projects", "lib", ".git"))
 	mustContain(t, "プロジェクトあり", e.block(), "cd してから作業する")
 
-	git(t, e.root, "init", "-q")
+	run.Git(t, e.root, "init", "-q")
 	writeFile(t, e.root, ".gitignore", "**/ccnavi-index.jsonl\n")
 	writeFile(t, e.root, "README.md", "---\ntype: guide\n---\n# x\n")
 	text := e.start([]string{"--mode", "enable"}, nil)
@@ -248,7 +248,7 @@ func TestConventionsAreShort(t *testing.T) {
 	}
 	// 索引の案内と dry-run の注記が重なる、いちばん長い回。注記が何本も重なる分の余地として 4300 字未満にする。
 	// 注記が重ならない回の上限は上げない。
-	git(t, e.root, "init", "-q")
+	run.Git(t, e.root, "init", "-q")
 	writeFile(t, e.root, ".gitignore", "**/ccnavi-index.jsonl\n")
 	writeFile(t, e.root, "README.md", "---\ntype: guide\n---\n# x\n")
 	body := shorten(block(e.start([]string{"--mode", "dry-run"}, nil)))

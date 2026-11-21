@@ -159,7 +159,7 @@ func (e *iso) gitRepo(path, origin string) string {
 	e.t.Helper()
 	gitInit(e.t, path)
 	if origin != "" {
-		git(e.t, path, "remote", "add", "origin", origin)
+		run.Git(e.t, path, "remote", "add", "origin", origin)
 	}
 	return path
 }
@@ -168,7 +168,7 @@ func (e *iso) gitRepo(path, origin string) string {
 func (e *iso) sh(args []string, o run.Opts, dir string) run.Result {
 	e.t.Helper()
 	o.Dir = dir
-	return runCmd(e.t, filepath.Join(e.bin, "sh"), args, o)
+	return run.Command(e.t, filepath.Join(e.bin, "sh"), args, o)
 }
 
 func (e *iso) callsText() string {

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
 	"ccnavi/internal/infra/env"
 )
@@ -26,17 +27,17 @@ func originRepo(t *testing.T) string {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	git(t, root, "init", "--quiet", "-b", "main")
+	run.Git(t, root, "init", "--quiet", "-b", "main")
 	write(t, filepath.Join(root, "README"), "x\n")
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "--quiet", "-m", "init")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "--quiet", "-m", "init")
 	if out, err := exec.Command("git", "init", "--quiet", "--bare", origin).CombinedOutput(); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	git(t, root, "remote", "add", "origin", origin)
-	git(t, root, "push", "--quiet", "origin", "main")
-	git(t, root, "fetch", "--quiet", "origin")
-	git(t, root, "remote", "set-head", "origin", "main")
+	run.Git(t, root, "remote", "add", "origin", origin)
+	run.Git(t, root, "push", "--quiet", "origin", "main")
+	run.Git(t, root, "fetch", "--quiet", "origin")
+	run.Git(t, root, "remote", "set-head", "origin", "main")
 	return root
 }
 
@@ -46,10 +47,10 @@ func patterns(t *testing.T, root string, n int) {
 	for i := range n {
 		write(t, filepath.Join(root, "docs", "wiki", "patterns", fmt.Sprintf("p%d.md", i)), samples.Pattern([]string{"s0"}, "docs"))
 	}
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "--quiet", "-m", "wiki")
-	git(t, root, "push", "--quiet", "origin", "main")
-	git(t, root, "fetch", "--quiet", "origin")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "--quiet", "-m", "wiki")
+	run.Git(t, root, "push", "--quiet", "origin", "main")
+	run.Git(t, root, "fetch", "--quiet", "origin")
 }
 
 // sessionStart は SessionStart の hook を 1 回打ち、応答の JSON を返す。
@@ -89,9 +90,9 @@ func TestTheLearningNoticeCountsFromTheIntegrationRefEvenOnAnotherBranch(t *test
 	t.Parallel()
 	root := originRepo(t)
 	patterns(t, root, 5)
-	git(t, root, "checkout", "--quiet", "-b", "other")
-	git(t, root, "rm", "-q", "-r", "docs/wiki")
-	git(t, root, "commit", "--quiet", "-m", "other")
+	run.Git(t, root, "checkout", "--quiet", "-b", "other")
+	run.Git(t, root, "rm", "-q", "-r", "docs/wiki")
+	run.Git(t, root, "commit", "--quiet", "-m", "other")
 
 	mustHave(t, str(sessionStart(t, root), "systemMessage"), "5 件")
 }

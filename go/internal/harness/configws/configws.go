@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -28,22 +27,6 @@ var fileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", 
 // layerPath はその git プロジェクトルートのレイヤーのファイル（rules / phases / risk）のパス。
 func LayerPath(root, kind string) string {
 	return filepath.Join(root, Home, "config", "project", fileNames[kind])
-}
-
-func gitIn(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	return string(out), err
-}
-
-func Git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	out, err := gitIn(dir, args...)
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return out
 }
 
 func Write(t testing.TB, path, text string) string {
@@ -94,7 +77,7 @@ func buildProject(t testing.TB, root string, rules any, phases, risk string) str
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	Git(t, root, "init", "--quiet", "-b", "main")
+	run.Git(t, root, "init", "--quiet", "-b", "main")
 	for _, rel := range keepFiles {
 		Write(t, filepath.Join(root, filepath.FromSlash(rel)), "keep\n")
 	}
@@ -107,8 +90,8 @@ func buildProject(t testing.TB, root string, rules any, phases, risk string) str
 	if risk != "" {
 		WriteRisk(t, root, risk)
 	}
-	Git(t, root, "add", "-A")
-	Git(t, root, "commit", "--quiet", "-m", "init")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "--quiet", "-m", "init")
 	return root
 }
 
@@ -197,7 +180,7 @@ func baseTemplate(t testing.TB, ws string) {
 	if err := os.MkdirAll(filepath.Join(ws, ".claude"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	Git(t, ws, "init", "--quiet", "-b", "main")
+	run.Git(t, ws, "init", "--quiet", "-b", "main")
 	Write(t, filepath.Join(ws, ".gitignore"), gitignoreText)
 	for _, rel := range keepFiles {
 		Write(t, filepath.Join(ws, filepath.FromSlash(rel)), "keep\n")
@@ -206,8 +189,8 @@ func baseTemplate(t testing.TB, ws string) {
 	WritePhases(t, ws, OwnPhasesText)
 	Write(t, base.CommonPath(ws, "rules"), Body(CommonRules))
 	Write(t, base.CommonPath(ws, "risk"), CommonRiskText)
-	Git(t, ws, "add", "-A")
-	Git(t, ws, "commit", "--quiet", "-m", "init")
+	run.Git(t, ws, "add", "-A")
+	run.Git(t, ws, "commit", "--quiet", "-m", "init")
 	buildProject(t, filepath.Join(ws, "projects", "lib"), LibRules, LibPhasesText, LibRiskText)
 	buildProject(t, filepath.Join(ws, "projects", "app"), nil, "", "")
 }
@@ -236,15 +219,15 @@ func prepareGuard(t testing.TB, ws string) {
 	Write(t, base.CommonPath(ws, "rules"), Body(OpenRules))
 	// 共通レイヤーの phases.yml も守る対象。守ることを見るために置き、ワークツリー側の設定ができるようコミットしておく。
 	Write(t, base.CommonPath(ws, "phases"), CommonPhasesText)
-	Git(t, ws, "add", "-A")
-	Git(t, ws, "commit", "--quiet", "-m", "common phases")
+	run.Git(t, ws, "add", "-A")
+	run.Git(t, ws, "commit", "--quiet", "-m", "common phases")
 }
 
 func prepareRisk(t testing.TB, ws string) {
 	lib := filepath.Join(ws, "projects", "lib")
 	WritePhases(t, lib, LibPhasesWork)
-	Git(t, lib, "add", "-A")
-	Git(t, lib, "commit", "--quiet", "-m", "phases")
+	run.Git(t, lib, "add", "-A")
+	run.Git(t, lib, "commit", "--quiet", "-m", "phases")
 }
 
 // ---- ワークスペース
@@ -327,7 +310,7 @@ func (w *WS) Worktree(owner, name string) string {
 	w.T.Helper()
 	path := filepath.Join(w.Root, ".claude", "worktrees", name)
 	if info, err := os.Stat(path); err != nil || !info.IsDir() {
-		Git(w.T, owner, "worktree", "add", "--quiet", path, "-b", name)
+		run.Git(w.T, owner, "worktree", "add", "--quiet", path, "-b", name)
 	}
 	return path
 }
@@ -453,8 +436,8 @@ func (w *WS) Approve() run.Result {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		path := filepath.Join(dir, e.Name())
-		Git(w.T, path, "add", "-A")
-		Git(w.T, path, "commit", "--quiet", "--allow-empty", "-m", "approve")
+		run.Git(w.T, path, "add", "-A")
+		run.Git(w.T, path, "commit", "--quiet", "--allow-empty", "-m", "approve")
 	}
 	return done
 }

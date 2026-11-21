@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ccnavi/internal/harness/run"
 )
 
 // 元のプロジェクトが無いワークツリーを --lint と --explain が名指しすることの受入テスト。
@@ -30,10 +32,10 @@ const (
 func initRepo(t *testing.T, path string) {
 	t.Helper()
 	mkdir(t, path)
-	git(t, path, "init", "--quiet")
+	run.Git(t, path, "init", "--quiet")
 	writeFile(t, path, "README.md", "x\n")
-	git(t, path, "add", "-A")
-	git(t, path, "commit", "--quiet", "-m", "init")
+	run.Git(t, path, "add", "-A")
+	run.Git(t, path, "commit", "--quiet", "-m", "init")
 }
 
 // gitdirOf はワークツリーの `.git` ファイルに書かれた gitdir（書かれたとおり）。
@@ -74,7 +76,7 @@ func TestWorktreeWithoutProject(t *testing.T) {
 	goneProject := filepath.Join(projects, "gone")
 	initRepo(t, goneProject)
 	gonePath := filepath.Join(wt, wtGone)
-	git(t, goneProject, "worktree", "add", "--quiet", gonePath, "-b", wtGone)
+	run.Git(t, goneProject, "worktree", "add", "--quiet", gonePath, "-b", wtGone)
 	goneGitdir := gitdirOf(t, gonePath)
 	if err := os.RemoveAll(goneProject); err != nil {
 		t.Fatal(err)
@@ -84,12 +86,12 @@ func TestWorktreeWithoutProject(t *testing.T) {
 	brokenProject := filepath.Join(projects, "broken")
 	initRepo(t, brokenProject)
 	brokenPath := filepath.Join(wt, wtBroken)
-	git(t, brokenProject, "worktree", "add", "--quiet", brokenPath, "-b", wtBroken)
+	run.Git(t, brokenProject, "worktree", "add", "--quiet", brokenPath, "-b", wtBroken)
 	brokenGitdir := gitdirOf(t, brokenPath)
 	writeFile(t, brokenGitdir, "gitdir", filepath.Join(base, "elsewhere", ".git")+"\n")
 
 	// 正常なワークツリーと、ふつうのディレクトリ。
-	git(t, root, "worktree", "add", "--quiet", filepath.Join(wt, wtNormal), "-b", wtNormal)
+	run.Git(t, root, "worktree", "add", "--quiet", filepath.Join(wt, wtNormal), "-b", wtNormal)
 	mkdir(t, filepath.Join(wt, wtPlain, "src"))
 
 	// 直接作業の記録の検査（`(direct/…)`）は、元のプロジェクトの有無とは別の話なので数えない。
@@ -171,7 +173,7 @@ func TestWorktreeWithoutProject(t *testing.T) {
 	t.Run("該当が無ければ lint も explain も何も出さない", func(t *testing.T) {
 		root := filepath.Join(emptyRoot(t), "ws")
 		initRepo(t, root)
-		git(t, root, "worktree", "add", "--quiet", filepath.Join(root, ".claude", "worktrees", "ok"))
+		run.Git(t, root, "worktree", "add", "--quiet", filepath.Join(root, ".claude", "worktrees", "ok"))
 		mkdir(t, filepath.Join(root, ".claude", "worktrees", "plain"))
 		lintOut := ccnavi(t, root, nil, "--lint", "--json", "--mode", "enable").Stdout
 		explained := ccnavi(t, root, nil, "--explain", "--mode", "enable").Stdout

@@ -81,6 +81,27 @@ func Sh(t testing.TB, script string, args []string, opts ...Opts) Result {
 	return start(t, "sh", append([]string{script}, args...), o, Environment(o))
 }
 
+// Command は `program <args…>` を 1 回起こす（sh -c・bash・node・git など、ccnavi と sh 以外）。環境の決まりと結果は Ccnavi・Sh と同じで、
+// 文面ファイルは置かない。program は PATH で探す名前か、パス。
+func Command(t testing.TB, program string, args []string, opts ...Opts) Result {
+	t.Helper()
+	o := first(opts)
+	return start(t, program, args, o, Environment(o))
+}
+
+// Git は dir で git を 1 回起こし、標準出力の前後の空白を落として返す。作者（user.name=t・user.email=t@example.com）とコミットの署名なしを
+// `-c` で与えるので、リポジトリごとに作者を決めなくてよい。環境は Command と同じ（走った機械の git の設定は締め出してある）。
+// 0 で終わらなければテストを止める。結果の終了コードを見たいときは Command を使う。
+func Git(t testing.TB, dir string, args ...string) string {
+	t.Helper()
+	full := append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"}, args...)
+	r := Command(t, "git", full, Opts{Dir: dir})
+	if r.Code != 0 {
+		t.Fatalf("git %v (%s): exit %d\n%s%s", args, dir, r.Code, r.Stdout, r.Stderr)
+	}
+	return strings.TrimSpace(r.Stdout)
+}
+
 func first(opts []Opts) Opts {
 	if len(opts) == 0 {
 		return Opts{}

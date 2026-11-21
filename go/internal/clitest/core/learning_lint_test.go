@@ -26,7 +26,7 @@ func TestLintWarnsAMistypedLearningSwitch(t *testing.T) {
 			t.Parallel()
 			ws := emptyRoot(t)
 			writeFile(t, ws, ".claude/.keep", "")
-			git(t, ws, "init", "--quiet", "-b", "main")
+			run.Git(t, ws, "init", "--quiet", "-b", "main")
 			o := run.Opts{Dir: ws}
 			if c.value == nil {
 				o.Unset = []string{"CCNAVI_LEARNING"}

@@ -211,7 +211,7 @@ func newUserEntry(t *testing.T) *userEntry {
 
 func (u *userEntry) sh(name string, args ...string) run.Result {
 	u.t.Helper()
-	return runCmd(u.t, "sh", append([]string{filepath.Join(u.scripts, name)}, args...),
+	return run.Command(u.t, "sh", append([]string{filepath.Join(u.scripts, name)}, args...),
 		run.Opts{Dir: u.ws, Env: map[string]string{"CCNAVI_WORKSPACE": u.ws, env.EntryPath: u.bin}})
 }
 

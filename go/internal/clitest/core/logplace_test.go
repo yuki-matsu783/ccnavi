@@ -20,7 +20,7 @@ func TestAnEmptyLogEnvStillWritesToTheDefaultPlace(t *testing.T) {
 	t.Parallel()
 	ws := emptyRoot(t)
 	writeFile(t, ws, ".ccnavi/config/common/rules.yml", `{"version": 1}`)
-	git(t, ws, "init", "-q") // 実行後の監視の控えは git のツリーに対して取る。
+	run.Git(t, ws, "init", "-q") // 実行後の監視の控えは git のツリーに対して取る。
 	payload := map[string]any{
 		"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": ws, "session_id": "s1",
 		"tool_input": map[string]any{"command": "ls"},

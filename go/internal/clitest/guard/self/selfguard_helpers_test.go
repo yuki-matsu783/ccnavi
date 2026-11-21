@@ -107,8 +107,8 @@ func newSG(t *testing.T) *sg {
 	s := &sg{t: t, repo: repo}
 	s.settings = write(t, filepath.Join(repo, ".claude", "settings.json"), ruleBlob(t, selfSettings())+"\n")
 	s.rules = write(t, base.CommonPath(repo, "rules"), ruleBlob(t, selfRules()))
-	git(t, repo, "add", "-A")
-	git(t, repo, "commit", "--quiet", "-m", "init")
+	run.Git(t, repo, "add", "-A")
+	run.Git(t, repo, "commit", "--quiet", "-m", "init")
 	s.state = filepath.Join(repo, "logs", "state")
 	s.log = filepath.Join(repo, "logs", "decisions.jsonl")
 	return s
@@ -188,7 +188,7 @@ func (s *sg) binary(text ...string) string {
 func (s *sg) worktree(name string) string {
 	s.t.Helper()
 	path := s.at(".claude/worktrees/" + name)
-	git(s.t, s.repo, "worktree", "add", "--quiet", "-b", name, path)
+	run.Git(s.t, s.repo, "worktree", "add", "--quiet", "-b", name, path)
 	return path
 }
 

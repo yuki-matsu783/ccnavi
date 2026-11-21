@@ -89,19 +89,19 @@ func (w *target) setup(args ...string) run.Result {
 
 func (w *target) setupEnv(extra map[string]string, args ...string) run.Result {
 	w.t.Helper()
-	return runCmd(w.t, "sh", append([]string{scriptPath("ccnavi-setup.sh"), w.dir}, quietDeploy(args)...), run.Opts{Env: extra})
+	return run.Command(w.t, "sh", append([]string{scriptPath("ccnavi-setup.sh"), w.dir}, quietDeploy(args)...), run.Opts{Env: extra})
 }
 
 // raw は対象ディレクトリを自分で並べる形。引数の扱いを試すときに使う。
 func (w *target) raw(args ...string) run.Result {
 	w.t.Helper()
-	return runCmd(w.t, "sh", append([]string{scriptPath("ccnavi-setup.sh")}, quietDeploy(args)...), run.Opts{})
+	return run.Command(w.t, "sh", append([]string{scriptPath("ccnavi-setup.sh")}, quietDeploy(args)...), run.Opts{})
 }
 
 // copied は配布を既定のまま走らせる（quietDeploy を通さない）。
 func (w *target) copied(script string, args ...string) run.Result {
 	w.t.Helper()
-	return runCmd(w.t, "sh", append([]string{script, w.dir}, args...), run.Opts{})
+	return run.Command(w.t, "sh", append([]string{script, w.dir}, args...), run.Opts{})
 }
 
 func (w *target) settingsPath() string { return w.path(".claude", "settings.json") }

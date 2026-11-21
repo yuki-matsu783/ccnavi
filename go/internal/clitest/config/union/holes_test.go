@@ -2,6 +2,7 @@ package union
 
 import (
 	"ccnavi/internal/harness/configws"
+	"ccnavi/internal/harness/run"
 	"slices"
 	"strings"
 	"testing"
@@ -407,8 +408,8 @@ func scriptTamperWS(t testing.TB) (w *ws, script string) {
 	w = newWS(t, configws.KindGuard)
 	script = configws.Write(t, p(w.Lib, configws.Home, "scripts", "count.sh"), countScript)
 	configws.WriteRisk(t, w.Lib, countRisk)
-	configws.Git(t, w.Lib, "add", "-A")
-	configws.Git(t, w.Lib, "commit", "--quiet", "-m", "script")
+	run.Git(t, w.Lib, "add", "-A")
+	run.Git(t, w.Lib, "commit", "--quiet", "-m", "script")
 	return w, script
 }
 

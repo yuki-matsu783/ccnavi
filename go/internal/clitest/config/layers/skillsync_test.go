@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/configws"
+	"ccnavi/internal/harness/run"
 )
 
 // ユーザの発言のたびに、共通の工程スキルをプロジェクトの `skills/` へコピーする（tests/config/test_skill_sync.py の写し）。
@@ -71,8 +72,8 @@ func TestStartCopiesTheCommonFilesAndLeavesTheProjectFiles(t *testing.T) {
 	configws.Write(t, filepath.Join(seeded, "common", "old", "gone.md"), "消える\n")
 	configws.Write(t, filepath.Join(seeded, "common", "note.txt"), "md でないものは触れない\n")
 	configws.Write(t, filepath.Join(seeded, "project", "own.md"), "プロジェクト固有\n")
-	configws.Git(t, w.Lib, "add", "-A")
-	configws.Git(t, w.Lib, "commit", "-m", "seed")
+	run.Git(t, w.Lib, "add", "-A")
+	run.Git(t, w.Lib, "commit", "-m", "seed")
 
 	tree, out := w.startParent("i0001")
 

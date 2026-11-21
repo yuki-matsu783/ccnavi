@@ -75,12 +75,12 @@ func (r *repo) keep(t testing.TB) string { return read(t, r.path("protected/keep
 func newRepo(t testing.TB) *repo {
 	t.Helper()
 	root := copyOf(t, "post", func(dir string) {
-		git(t, dir, "init", "--quiet")
+		run.Git(t, dir, "init", "--quiet")
 		write(t, filepath.Join(dir, "protected", "keep.txt"), "committed\n")
 		write(t, filepath.Join(dir, "watched", "deps.txt"), "committed\n")
 		write(t, filepath.Join(dir, "src", "app.py"), "print(1)\n")
-		git(t, dir, "add", "-A")
-		git(t, dir, "commit", "--quiet", "-m", "init")
+		run.Git(t, dir, "add", "-A")
+		run.Git(t, dir, "commit", "--quiet", "-m", "init")
 	})
 	write(t, base.CommonPath(root, "rules"), postRules)
 	write(t, filepath.Join(root, ".ccnavi", "scripts", "ccnavi-git.sh"), "exit 0\n")
@@ -542,8 +542,8 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 	t.Parallel()
 	commit := func(t *testing.T, r *repo, rel, text, message string) {
 		write(t, r.path(rel), text)
-		git(t, r.root, "add", "--", rel)
-		git(t, r.root, "commit", "--quiet", "-m", message)
+		run.Git(t, r.root, "add", "--", rel)
+		run.Git(t, r.root, "commit", "--quiet", "-m", message)
 	}
 	prompt := func(t *testing.T, r *repo) { r.hook(t, call{Event: "UserPromptSubmit"}) }
 	stop := func(t *testing.T, r *repo) run.Result { return r.hook(t, call{Event: "Stop"}) }
@@ -575,8 +575,8 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 		prompt(t, r)
 		write(t, r.path(".ccnavi/approved/doing/i0001.md"), "x\n")
 		r.dirty(t)
-		git(t, r.root, "add", "--", ".ccnavi/approved/doing/i0001.md", "protected/keep.txt")
-		git(t, r.root, "commit", "--quiet", "-m", "承認済みチケットと、保護領域の変更")
+		run.Git(t, r.root, "add", "--", ".ccnavi/approved/doing/i0001.md", "protected/keep.txt")
+		run.Git(t, r.root, "commit", "--quiet", "-m", "承認済みチケットと、保護領域の変更")
 		message := systemMessage(t, stop(t, r))
 		mustHave(t, message, "protected/keep.txt")
 		mustNotHave(t, message, ".ccnavi/approved")
@@ -585,13 +585,13 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 		t.Parallel()
 		// 二点の差分で数えると、ユーザが統合先で直した保護領域が `merge <統合先>` のたびに並ぶ。
 		r := newRepo(t)
-		git(t, r.root, "checkout", "--quiet", "-b", "feature")
+		run.Git(t, r.root, "checkout", "--quiet", "-b", "feature")
 		prompt(t, r)
 		commit(t, r, "src/app.py", "print(2)\n", "自分の作業")
-		git(t, r.root, "checkout", "--quiet", "master")
+		run.Git(t, r.root, "checkout", "--quiet", "master")
 		commit(t, r, "protected/keep.txt", "ユーザが統合先で直した\n", "統合先の変更")
-		git(t, r.root, "checkout", "--quiet", "feature")
-		git(t, r.root, "merge", "--quiet", "--no-edit", "master")
+		run.Git(t, r.root, "checkout", "--quiet", "feature")
+		run.Git(t, r.root, "merge", "--quiet", "--no-edit", "master")
 		if got := stop(t, r); got.Stdout != "" {
 			t.Errorf("取り込んだぶんを自分のターンの成果にしない: %q", got.Stdout)
 		}
@@ -601,18 +601,18 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 // integrate と integrate-done の後の形（squash のコミット、片付け、記録のコピー）を作る。
 func integrateAndFinish(t *testing.T, r *repo) {
 	t.Helper()
-	home := strings.TrimSpace(git(t, r.root, "rev-parse", "--abbrev-ref", "HEAD"))
-	git(t, r.root, "checkout", "--quiet", "-b", "feat")
+	home := strings.TrimSpace(run.Git(t, r.root, "rev-parse", "--abbrev-ref", "HEAD"))
+	run.Git(t, r.root, "checkout", "--quiet", "-b", "feat")
 	r.dirty(t, "ワークツリーで直した\n")
-	git(t, r.root, "add", "--", "protected/keep.txt")
-	git(t, r.root, "commit", "--quiet", "-m", "ワークツリーの作業")
-	tip := strings.TrimSpace(git(t, r.root, "rev-parse", "HEAD"))
-	git(t, r.root, "checkout", "--quiet", home)
-	baseSha := strings.TrimSpace(git(t, r.root, "rev-parse", "HEAD"))
-	git(t, r.root, "merge", "--quiet", "--squash", "feat")
-	tree := strings.TrimSpace(git(t, r.root, "write-tree"))
-	git(t, r.root, "commit", "--quiet", "-m", "取り込み")
-	git(t, r.root, "branch", "--quiet", "-D", "feat")
+	run.Git(t, r.root, "add", "--", "protected/keep.txt")
+	run.Git(t, r.root, "commit", "--quiet", "-m", "ワークツリーの作業")
+	tip := strings.TrimSpace(run.Git(t, r.root, "rev-parse", "HEAD"))
+	run.Git(t, r.root, "checkout", "--quiet", home)
+	baseSha := strings.TrimSpace(run.Git(t, r.root, "rev-parse", "HEAD"))
+	run.Git(t, r.root, "merge", "--quiet", "--squash", "feat")
+	tree := strings.TrimSpace(run.Git(t, r.root, "write-tree"))
+	run.Git(t, r.root, "commit", "--quiet", "-m", "取り込み")
+	run.Git(t, r.root, "branch", "--quiet", "-D", "feat")
 	write(t, filepath.Join(r.root, ".git", "ccnavi-integrate-done", "feat"),
 		"state staged\nbranch feat\nbranch_sha "+tip+"\nbase "+baseSha+"\ntree "+tree+"\n")
 }
@@ -641,8 +641,8 @@ func TestAnIntegrationIsLeftOutOfTheTurnReportOnlyWhenItCanBeVerified(t *testing
 		r.hook(t, call{Event: "UserPromptSubmit"})
 		integrateAndFinish(t, r)
 		write(t, r.path("protected/later.txt"), "直接書いた\n")
-		git(t, r.root, "add", "--", "protected/later.txt")
-		git(t, r.root, "commit", "--quiet", "-m", "直接のコミット")
+		run.Git(t, r.root, "add", "--", "protected/later.txt")
+		run.Git(t, r.root, "commit", "--quiet", "-m", "直接のコミット")
 		message := systemMessage(t, r.hook(t, call{Event: "Stop"}))
 		mustHave(t, message, "protected/later.txt")
 		mustNotHave(t, message, "protected/keep.txt")
@@ -678,8 +678,8 @@ func TestAWorktreeCutDuringTheTurnIsCountedOrSaidToBeUncounted(t *testing.T) {
 		// 切ったあとの 1 回で基準が付く（この呼び出しの行き先がそのツリー）。
 		r.hook(t, call{Tool: "Write", Input: map[string]any{"file_path": filepath.Join(later, "src", "app.py")}})
 		write(t, filepath.Join(later, "protected", "keep.txt"), "切ったあとに汚してコミット\n")
-		git(t, later, "add", "--", "protected/keep.txt")
-		git(t, later, "commit", "--quiet", "-m", "切ったあとのコミット")
+		run.Git(t, later, "add", "--", "protected/keep.txt")
+		run.Git(t, later, "commit", "--quiet", "-m", "切ったあとのコミット")
 		message := systemMessage(t, r.hook(t, call{Event: "Stop"}))
 		mustHave(t, message, "protected/keep.txt", "wt1")
 		mustNotHave(t, message, uncounted)
@@ -690,8 +690,8 @@ func TestAWorktreeCutDuringTheTurnIsCountedOrSaidToBeUncounted(t *testing.T) {
 		r.hook(t, call{Event: "UserPromptSubmit"})
 		later := cut(t, r)
 		write(t, filepath.Join(later, "protected", "keep.txt"), "切ったあとに汚してコミット\n")
-		git(t, later, "add", "--", "protected/keep.txt")
-		git(t, later, "commit", "--quiet", "-m", "切ったあとのコミット")
+		run.Git(t, later, "add", "--", "protected/keep.txt")
+		run.Git(t, later, "commit", "--quiet", "-m", "切ったあとのコミット")
 		message := systemMessage(t, r.hook(t, call{Event: "Stop"}))
 		mustHave(t, message, "protected/keep.txt")
 		mustNotHave(t, message, uncounted)
@@ -728,11 +728,11 @@ func TestTicketPlaceChangesAreToldApartByWhatChanged(t *testing.T) {
 	t.Parallel()
 	newTicketRepo := func(t *testing.T) *repo {
 		root := copyOf(t, "post-ticket", func(dir string) {
-			git(t, dir, "init", "--quiet")
+			run.Git(t, dir, "init", "--quiet")
 			write(t, filepath.Join(dir, filepath.FromSlash(doing)), ticket)
 			write(t, filepath.Join(dir, "src", "app.py"), "print(1)\n")
-			git(t, dir, "add", "-A")
-			git(t, dir, "commit", "--quiet", "-m", "init")
+			run.Git(t, dir, "add", "-A")
+			run.Git(t, dir, "commit", "--quiet", "-m", "init")
 		})
 		write(t, base.CommonPath(root, "rules"), postRules)
 		r := &repo{root}

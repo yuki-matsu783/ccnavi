@@ -246,35 +246,6 @@ func sameSnapshot(a, b map[string]string) bool {
 	return true
 }
 
-// runCmd は program を 1 回起こす（run.Sh と同じ環境の決まり。sh 以外・相対のスクリプトを起こすときに使う）。
-func runCmd(t testing.TB, program string, args []string, o run.Opts) run.Result {
-	t.Helper()
-	out, err := start(program, args, o)
-	if err != nil {
-		t.Fatalf("%s を起こせない: %v", program, err)
-	}
-	return out
-}
-
-// start は子を起こして結果を返す。起こせなかったら err。
-func start(program string, args []string, o run.Opts) (run.Result, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), base.ExecTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, program, args...)
-	cmd.Env = run.Environment(o)
-	cmd.Dir = o.Dir
-	cmd.WaitDelay = 5 * time.Second
-	cmd.Stdin = strings.NewReader(o.Input)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
-	var exit *exec.ExitError
-	if err != nil && !errors.As(err, &exit) {
-		return run.Result{}, err
-	}
-	return run.Result{Code: cmd.ProcessState.ExitCode(), Stdout: lf(stdout.String()), Stderr: lf(stderr.String())}, nil
-}
-
 func lf(s string) string { return strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(s) }
 
 // pathWith は dirs を、いまのプロセスの PATH の前に並べた値。
@@ -282,21 +253,10 @@ func pathWith(dirs ...string) string {
 	return strings.Join(append(append([]string{}, dirs...), os.Getenv(env.Path)), string(os.PathListSeparator))
 }
 
-// git は dir で本物の git を起こす（締め出した環境・名前と宛先つき）。
-func git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	cfg := []string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"}
-	r := runCmd(t, "git", append(append([]string{"-C", dir}, cfg...), args...), run.Opts{})
-	if r.Code != 0 {
-		t.Fatalf("git %v: %s%s", args, r.Stdout, r.Stderr)
-	}
-	return strings.TrimSpace(r.Stdout)
-}
-
 func gitInit(t testing.TB, dir string) {
 	t.Helper()
 	mkdir(t, dir)
-	r := runCmd(t, "git", []string{"init", "-q", dir}, run.Opts{})
+	r := run.Command(t, "git", []string{"init", "-q", dir}, run.Opts{})
 	if r.Code != 0 {
 		t.Fatalf("git init: %s", r.Stderr)
 	}
@@ -395,7 +355,7 @@ func lookPath(t testing.TB, name string) string {
 // runCmdArgs は script を `sh script args…` で起こす。
 func runCmdArgs(t testing.TB, script string, args ...string) run.Result {
 	t.Helper()
-	return runCmd(t, "sh", append([]string{script}, args...), run.Opts{})
+	return run.Command(t, "sh", append([]string{script}, args...), run.Opts{})
 }
 
 // runTTY は argv を疑似ターミナルの中で起こし、answer を入力する。疑似ターミナルは `script` で与える（Linux は `script -qec`、

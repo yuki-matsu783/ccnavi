@@ -249,8 +249,8 @@ func TestATemplateGoneFromTheCommonLayerIsRemovedFromTheMirror(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
 	configws.Write(t, mirrorOf(w.Lib, "templates/old.yml"), strings.ReplaceAll(featureTemplate, "feature", "old"))
-	configws.Git(t, w.Lib, "add", "-A")
-	configws.Git(t, w.Lib, "commit", "--quiet", "-m", "old mirror")
+	run.Git(t, w.Lib, "add", "-A")
+	run.Git(t, w.Lib, "commit", "--quiet", "-m", "old mirror")
 
 	tree, out := w.startParent("lib")
 
@@ -498,7 +498,7 @@ func TestCoreFileGuardKeepsTheMirror(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
 	tree := w.approveLib()
-	configws.Git(t, tree, "add", "-A")
+	run.Git(t, tree, "add", "-A")
 
 	w.pre(tree, startCommand, "enable")
 	if started := w.Ccnavi("ticket", "start", "i0001"); started.Code != 0 {
@@ -525,8 +525,8 @@ func TestCoreFileGuardKeepsARemovedMirrorFile(t *testing.T) {
 	w := newSyncWS(t)
 	configws.Write(t, mirrorOf(w.Lib, "rules.yml"), commonRulesJSON())
 	configws.Write(t, mirrorOf(w.Lib, "phases.yml"), configws.CommonPhasesText)
-	configws.Git(t, w.Lib, "add", "-A")
-	configws.Git(t, w.Lib, "commit", "--quiet", "-m", "old mirror")
+	run.Git(t, w.Lib, "add", "-A")
+	run.Git(t, w.Lib, "commit", "--quiet", "-m", "old mirror")
 	tree := w.approveLib()
 
 	w.pre(tree, startCommand, "enable")
@@ -675,8 +675,8 @@ func TestTheMirrorInTheOriginalProjectIsRestored(t *testing.T) {
 	w := newSyncWS(t)
 	mirror := mirrorOf(w.Lib, "rules.yml")
 	configws.Write(t, mirror, commonRulesJSON())
-	configws.Git(t, w.Lib, "add", "-A")
-	configws.Git(t, w.Lib, "commit", "--quiet", "-m", "mirror")
+	run.Git(t, w.Lib, "add", "-A")
+	run.Git(t, w.Lib, "commit", "--quiet", "-m", "mirror")
 
 	w.pre(w.Root, "echo x", "enable")
 	configws.Write(t, mirror, "version: 1\n")

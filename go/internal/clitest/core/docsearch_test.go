@@ -66,7 +66,7 @@ type docsRepo struct {
 func newDocsRepo(t *testing.T) *docsRepo {
 	t.Helper()
 	root := emptyRoot(t)
-	git(t, root, "init", "-q")
+	run.Git(t, root, "init", "-q")
 	writeFile(t, root, ".gitignore", ignoreLine)
 	return &docsRepo{t, root}
 }
@@ -280,7 +280,7 @@ func (r *docsRepo) project(name, ignore string) string {
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		r.t.Fatal(err)
 	}
-	git(r.t, home, "init", "-q")
+	run.Git(r.t, home, "init", "-q")
 	if ignore == "" {
 		if err := os.MkdirAll(filepath.Join(home, ".gitignore"), 0o755); err != nil {
 			r.t.Fatal(err)

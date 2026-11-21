@@ -88,7 +88,7 @@ func (w *target) userBin(home string, answer *string, extra map[string]string, a
 	extra = withHome(home, extra)
 	argv := append([]string{scriptPath("ccnavi-setup.sh"), w.dir}, args...)
 	if answer == nil {
-		return runCmd(w.t, "sh", argv, runOpts(extra))
+		return run.Command(w.t, "sh", argv, runOpts(extra))
 	}
 	return runTTY(w.t, append([]string{"sh"}, argv...), runOpts(extra), *answer+"\n")
 }

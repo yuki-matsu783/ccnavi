@@ -5,7 +5,6 @@ package rules
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -57,19 +56,6 @@ func jsonText(t testing.TB, v any) string {
 		t.Fatal(err)
 	}
 	return string(b)
-}
-
-// git は dir で git を 1 回打つ。環境は run が整える（走った機械の git の設定を締め出す）。
-func git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = run.Environment(run.Opts{})
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
 }
 
 // withRules は tests/fixtures の見本のルールを共通レイヤーに据えた、テストごとの作業場所。

@@ -49,7 +49,7 @@ func TestScratchpadSizeNoticeOnSessionStart(t *testing.T) {
 	const notice = "しきい値"
 	newRepo := func(t *testing.T) string {
 		root := emptyRoot(t)
-		git(t, root, "init", "-q")
+		run.Git(t, root, "init", "-q")
 		return root
 	}
 	t.Run("知らせは文脈に届く", func(t *testing.T) {

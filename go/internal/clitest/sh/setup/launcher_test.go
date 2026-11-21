@@ -78,9 +78,9 @@ func (l *launcherEnv) run(o launch) run.Result {
 	}
 	opts := run.Opts{Input: stdin, Dir: o.dir, Env: map[string]string{env.Path: path}}
 	if o.argv != nil {
-		return runCmd(l.t, o.argv[0], append(o.argv[1:], o.args...), opts)
+		return run.Command(l.t, o.argv[0], append(o.argv[1:], o.args...), opts)
 	}
-	return runCmd(l.t, l.launcher, o.args, opts)
+	return run.Command(l.t, l.launcher, o.args, opts)
 }
 
 func startsWith(t testing.TB, got, prefix string) {
@@ -150,9 +150,9 @@ func TestLauncherInAWorktreeWithoutBinStartsTheBuildInTheMainRoot(t *testing.T) 
 	l.pretend("Linux x86_64")
 	l.build("linux-x86_64")
 	gitInit(t, l.dir)
-	git(t, l.dir, "add", ".ccnavi/scripts")
-	git(t, l.dir, "commit", "-q", "-m", "i")
-	git(t, l.dir, "worktree", "add", "-q", filepath.Join(l.dir, "wt"))
+	run.Git(t, l.dir, "add", ".ccnavi/scripts")
+	run.Git(t, l.dir, "commit", "-q", "-m", "i")
+	run.Git(t, l.dir, "worktree", "add", "-q", filepath.Join(l.dir, "wt"))
 	if exists(filepath.Join(l.dir, "wt", ".ccnavi", "bin")) {
 		t.Fatal("ワークツリーに bin/ がある")
 	}
@@ -308,7 +308,7 @@ func TestLauncherSkipsACcnaviThatIsTheLauncherItself(t *testing.T) {
 	l.pretend("Linux x86_64")
 	place := filepath.Join(l.dir, "on-path")
 	symlink(t, l.launcher, filepath.Join(place, "ccnavi"))
-	r := runCmd(t, filepath.Join(place, "ccnavi"), nil,
+	r := run.Command(t, filepath.Join(place, "ccnavi"), nil,
 		run.Opts{Input: "{}", Env: map[string]string{env.Path: pathWith(l.fake, place)}})
 	code(t, r, 127)
 }

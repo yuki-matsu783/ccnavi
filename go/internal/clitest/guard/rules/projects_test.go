@@ -112,11 +112,11 @@ func newProjects(t *testing.T) *projects {
 	t.Helper()
 	ws := base.TempDir(t)
 	mkdirs(t, filepath.Join(ws, ".claude"))
-	git(t, ws, "init", "--quiet", "-b", "main")
+	run.Git(t, ws, "init", "--quiet", "-b", "main")
 	write(t, filepath.Join(ws, ".gitignore"), "/projects/\n/.claude/\n")
 	write(t, filepath.Join(ws, "src", "keep.py"), "print(1)\n")
-	git(t, ws, "add", "-A")
-	git(t, ws, "commit", "--quiet", "-m", "init")
+	run.Git(t, ws, "add", "-A")
+	run.Git(t, ws, "commit", "--quiet", "-m", "init")
 	// 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
 	write(t, base.CommonPath(ws, "rules"), jsonText(t, wsRules))
 	p := &projects{t: t, ws: ws}
@@ -132,12 +132,12 @@ func (p *projects) project(name string, rules payload) string {
 	p.t.Helper()
 	root := filepath.Join(p.ws, "projects", name)
 	mkdirs(p.t, root)
-	git(p.t, root, "init", "--quiet", "-b", "main")
+	run.Git(p.t, root, "init", "--quiet", "-b", "main")
 	write(p.t, base.ConfigPath(root, "rules"), jsonText(p.t, rules))
 	write(p.t, filepath.Join(root, "src", "keep.py"), "print(1)\n")
 	write(p.t, filepath.Join(root, "schema", "keep.sql"), "-- keep\n")
-	git(p.t, root, "add", "-A")
-	git(p.t, root, "commit", "--quiet", "-m", "init")
+	run.Git(p.t, root, "add", "-A")
+	run.Git(p.t, root, "commit", "--quiet", "-m", "init")
 	return root
 }
 
@@ -146,7 +146,7 @@ func (p *projects) worktree(owner, name string) string {
 	p.t.Helper()
 	path := filepath.Join(p.ws, ".claude", "worktrees", name)
 	if _, err := os.Stat(path); err != nil {
-		git(p.t, owner, "worktree", "add", "--quiet", path, "-b", name)
+		run.Git(p.t, owner, "worktree", "add", "--quiet", path, "-b", name)
 	}
 	return path
 }
@@ -608,15 +608,15 @@ func TestAnUndecidedProjectFamilyStopsTheHookAndTheState(t *testing.T) {
 	write(t, p.proposalFile(p.lib, "i0007"), ticketText("i0007", "", "", []string{"src/*"}, 0))
 	p.mustAgree()
 	tree := p.worktree(p.lib, "i0007")
-	git(t, tree, "add", "-A")
-	git(t, tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
+	run.Git(t, tree, "add", "-A")
+	run.Git(t, tree, "commit", "--quiet", "--allow-empty", "-m", "approve")
 	// 親のワークツリーに書けるのは置き場だけ（実装は子のワークツリーで書く）。
 	before := p.write(p.ws, filepath.Join(tree, "wip", "handoff", "a.py"))
 	if parse(t, before).Decision == "deny" {
 		t.Errorf("置き場には書ける: %s", before.Stdout)
 	}
 	// 親のワークツリーの HEAD がブランチ名と合わなくなれば、決まらない。
-	git(t, tree, "checkout", "--quiet", "-b", "elsewhere")
+	run.Git(t, tree, "checkout", "--quiet", "-b", "elsewhere")
 	// 親のワークツリーは範囲の中でも置き場以外に書けない。決まらなくなっても止まる側は同じ。
 	mustDeny(t, p.write(p.ws, filepath.Join(tree, "src", "a.py")))
 	cancelled := p.ccnavi("", "ticket", "cancel", "i0007", "--reason", "やめる")

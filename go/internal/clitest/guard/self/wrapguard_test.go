@@ -450,14 +450,14 @@ func TestShAgreesOnChildPush(t *testing.T) {
 	root := base.TempDir(t)
 	script := copyWrapper(t, root)
 	initRepo(t, root)
-	git(t, root, "checkout", "-q", "-b", "main")
+	run.Git(t, root, "checkout", "-q", "-b", "main")
 	write(t, filepath.Join(root, ".gitignore"), ".claude/\nlogs/\n")
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "--quiet", "-m", "init")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "--quiet", "-m", "init")
 	tr := trees{root: root}
 	for _, name := range []string{"i0001", "i0001-01-01", "plain"} {
 		path := filepath.Join(root, ".claude", "worktrees", name)
-		git(t, root, "worktree", "add", "--quiet", path, "-b", name, "main")
+		run.Git(t, root, "worktree", "add", "--quiet", path, "-b", name, "main")
 		switch name {
 		case "i0001":
 			tr.parent = path
@@ -504,14 +504,14 @@ func TestShIgnoresGitLocationVariables(t *testing.T) {
 	root := base.TempDir(t)
 	script := copyWrapper(t, root)
 	initRepo(t, root)
-	git(t, root, "checkout", "-q", "-b", "main")
+	run.Git(t, root, "checkout", "-q", "-b", "main")
 	write(t, filepath.Join(root, ".gitignore"), ".claude/\nlogs/\n")
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "--quiet", "-m", "init")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "--quiet", "-m", "init")
 	parent := filepath.Join(root, ".claude", "worktrees", "i0001")
 	child := filepath.Join(root, ".claude", "worktrees", "i0001-01-01")
-	git(t, root, "worktree", "add", "--quiet", parent, "-b", "i0001", "main")
-	git(t, root, "worktree", "add", "--quiet", child, "-b", "i0001-01-01", "main")
+	run.Git(t, root, "worktree", "add", "--quiet", parent, "-b", "i0001", "main")
+	run.Git(t, root, "worktree", "add", "--quiet", child, "-b", "i0001-01-01", "main")
 	write(t, filepath.Join(parent, "only-in-parent.txt"), "x\n")
 	result := run.Sh(t, script, []string{"status", "--short"}, run.Opts{Dir: child, Env: wrapEnv(t, map[string]string{
 		"PWD":           child,
@@ -739,9 +739,9 @@ func newCoreSh(t *testing.T) coreSh {
 	}
 	write(t, filepath.Join(root, ".gitignore"), "/logs/\n")
 	initRepo(t, root)
-	git(t, root, "checkout", "-q", "-b", "main")
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "-qm", "i")
+	run.Git(t, root, "checkout", "-q", "-b", "main")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "-qm", "i")
 	return coreSh{t, root, script}
 }
 
@@ -751,7 +751,7 @@ func (c coreSh) run(args string) run.Result {
 	c.t.Helper()
 	r := runWrapper(c.t, c.script, c.root, strings.Fields(args)...)
 	if r.Code != 2 {
-		git(c.t, c.root, "reset", "-q", "--hard")
+		run.Git(c.t, c.root, "reset", "-q", "--hard")
 	}
 	return r
 }

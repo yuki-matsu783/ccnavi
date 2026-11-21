@@ -84,14 +84,14 @@ func (p *packageEnv) buildRepo(root string, realCcnavi bool) {
 	for _, top := range []string{"logs", "wip", "tests"} {
 		write(t, filepath.Join(root, top, "keep.txt"), "x\n")
 	}
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "-q", "-m", "init")
+	run.Git(t, root, "add", "-A")
+	run.Git(t, root, "commit", "-q", "-m", "init")
 	p.buildDist(root)
 }
 
 func (p *packageEnv) buildDist(root string) {
 	t := p.t
-	head := git(t, root, "rev-parse", "HEAD")
+	head := run.Git(t, root, "rev-parse", "HEAD")
 	dist := filepath.Join(root, "dist")
 	remove(t, dist)
 	write(t, filepath.Join(dist, "ccnavi.target"), thisMachine()+"\n")
@@ -106,7 +106,7 @@ func (p *packageEnv) buildDist(root string) {
 func (p *packageEnv) packageSh(o run.Opts, dir string, args ...string) run.Result {
 	p.t.Helper()
 	o.Dir = dir
-	return runCmd(p.t, "sh", append([]string{filepath.Join(p.root, "scripts", "ccnavi-package.sh"), "--out", p.out}, args...), o)
+	return run.Command(p.t, "sh", append([]string{filepath.Join(p.root, "scripts", "ccnavi-package.sh"), "--out", p.out}, args...), o)
 }
 
 func (p *packageEnv) pack(args ...string) run.Result { return p.packageSh(run.Opts{}, "", args...) }
@@ -226,7 +226,7 @@ func TestPackageVersionAndInstallMd(t *testing.T) {
 	p.pack()
 	top, version := p.member("VERSION")
 	_, installMd := p.member("INSTALL.md")
-	head := git(t, p.root, "rev-parse", "HEAD")
+	head := run.Git(t, p.root, "rev-parse", "HEAD")
 	in(t, version, "commit: "+head, "target: "+thisMachine(), "compat: 18")
 	in(t, installMd, "shasum -a 256", "sha256sum", "certutil -hashfile", "すべて展開", "unzip", "--check", "~/.claude/skills/")
 	if !strings.HasPrefix(top, "ccnavi-"+head[:7]+"-"+thisMachine()) {
@@ -312,7 +312,7 @@ func TestPackageSecretsAndRuntimeJunkInCopiedDirsAreLeftOut(t *testing.T) {
 func TestPackageADashNamedOutIsTakenAsAPath(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
-	r := runCmd(t, "sh", []string{filepath.Join(p.root, "scripts", "ccnavi-package.sh"), "--out", "-dd"}, run.Opts{Dir: p.base})
+	r := run.Command(t, "sh", []string{filepath.Join(p.root, "scripts", "ccnavi-package.sh"), "--out", "-dd"}, run.Opts{Dir: p.base})
 	code(t, r, 0)
 	if !exists(filepath.Join(p.base, "-dd")) {
 		t.Error("-dd を作っていない")
@@ -342,8 +342,8 @@ func TestPackageCommitMismatchIs2(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
 	write(t, filepath.Join(p.root, "newfile.txt"), "x\n")
-	git(t, p.root, "add", "-A")
-	git(t, p.root, "commit", "-q", "-m", "next")
+	run.Git(t, p.root, "add", "-A")
+	run.Git(t, p.root, "commit", "-q", "-m", "next")
 	r := p.pack()
 	code(t, r, 2)
 	in(t, r.Stderr, "--build")
@@ -382,7 +382,7 @@ func TestPackageSha256IsWrittenAndMatches(t *testing.T) {
 	if !exists(zipped + ".sha256") {
 		t.Fatal(".sha256 が無い")
 	}
-	r := runCmd(t, "sha256sum", []string{"-c", filepath.Base(zipped) + ".sha256"}, run.Opts{Dir: p.out})
+	r := run.Command(t, "sha256sum", []string{"-c", filepath.Base(zipped) + ".sha256"}, run.Opts{Dir: p.out})
 	code(t, r, 0)
 }
 
@@ -443,7 +443,7 @@ func TestPackageZipUnzipInstallAndLaunch(t *testing.T) {
 	r := p.pack()
 	code(t, r, 0)
 	unpacked := mkdir(t, filepath.Join(p.base, "unpacked"))
-	if u := runCmd(t, "unzip", []string{"-q", p.zipPath(), "-d", unpacked}, run.Opts{}); u.Code != 0 {
+	if u := run.Command(t, "unzip", []string{"-q", p.zipPath(), "-d", unpacked}, run.Opts{}); u.Code != 0 {
 		t.Fatalf("unzip: %s", u.Stderr)
 	}
 	folder := filepath.Join(unpacked, names(t, unpacked)[0])
@@ -456,12 +456,12 @@ func TestPackageZipUnzipInstallAndLaunch(t *testing.T) {
 	home := mkdir(t, filepath.Join(p.base, "home"))
 	o := run.Opts{Env: map[string]string{env.Home: home}, Unset: []string{"CLAUDECODE"}}
 	installer := filepath.Join(folder, "scripts", "ccnavi-install.sh")
-	checked := runCmd(t, "sh", []string{installer, ws, "--from", folder, "--check"}, o)
+	checked := run.Command(t, "sh", []string{installer, ws, "--from", folder, "--check"}, o)
 	code(t, checked, 1)
-	real := runCmd(t, "sh", []string{installer, ws, "--from", folder}, o)
+	real := run.Command(t, "sh", []string{installer, ws, "--from", folder}, o)
 	code(t, real, 0)
 	eq(t, "次: の数", countNext(real.Stdout), 1)
 	launcher := filepath.Join(ws, ".ccnavi", "scripts", "ccnavi-launcher.sh")
-	version := runCmd(t, "sh", []string{launcher, "--version"}, run.Opts{})
-	in(t, version.Stdout, "commit: "+git(t, p.root, "rev-parse", "HEAD"))
+	version := run.Command(t, "sh", []string{launcher, "--version"}, run.Opts{})
+	in(t, version.Stdout, "commit: "+run.Git(t, p.root, "rev-parse", "HEAD"))
 }

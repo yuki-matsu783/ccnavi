@@ -19,18 +19,6 @@ import (
 	"ccnavi/internal/infra/env"
 )
 
-// git は repo で git を打ち、標準出力を返す。失敗したら落とす。
-func git(t testing.TB, repo string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
-	cmd.Dir = repo
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
-}
-
 func write(t testing.TB, path, text string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

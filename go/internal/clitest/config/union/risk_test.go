@@ -2,6 +2,7 @@ package union
 
 import (
 	"ccnavi/internal/harness/configws"
+	"ccnavi/internal/harness/run"
 	"encoding/json"
 	"path/filepath"
 	"slices"
@@ -66,8 +67,8 @@ func (w *ws) oneChild() (tree, parentTree string) {
 func (w *ws) commit(tree, rel, text string) {
 	w.T.Helper()
 	configws.Write(w.T, filepath.Join(tree, filepath.FromSlash(rel)), text)
-	configws.Git(w.T, tree, "add", "-A")
-	configws.Git(w.T, tree, "commit", "--quiet", "-m", rel)
+	run.Git(w.T, tree, "add", "-A")
+	run.Git(w.T, tree, "commit", "--quiet", "-m", rel)
 }
 
 type riskHit struct {
@@ -280,8 +281,8 @@ func TestAScriptInTheProjectLayerRunsFromTheProjectRoot(t *testing.T) {
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, p(w.Lib, ".ccnavi", "scripts", "count.sh"), "printf '{\"points\": 30, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
 	configws.WriteRisk(t, w.Lib, "version: 1\nfactors:\n  - {id: counted, points: 5, script: .ccnavi/scripts/count.sh, message: 数えた}\n")
-	configws.Git(t, w.Lib, "add", "-A")
-	configws.Git(t, w.Lib, "commit", "--quiet", "-m", "script")
+	run.Git(t, w.Lib, "add", "-A")
+	run.Git(t, w.Lib, "commit", "--quiet", "-m", "script")
 	if got := w.riskProblems("error", ""); len(got) != 0 {
 		t.Fatalf("error が出る: %+v", got)
 	}

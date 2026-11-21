@@ -3,7 +3,6 @@ package self
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -54,19 +53,6 @@ func mkdirs(t testing.TB, dir string) string {
 		t.Fatal(err)
 	}
 	return dir
-}
-
-// git は dir で git を 1 回打つ。環境は run が整える（走った機械の git の設定を締め出す）。
-func git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
-	cmd.Dir = dir
-	cmd.Env = run.Environment(run.Opts{})
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
 }
 
 // payload は PreToolUse などの入力。欄を足したいときは map にそのまま書く。
@@ -130,5 +116,5 @@ func mustLink(t testing.TB, from, to string) {
 // initRepo は dir を空の git リポジトリにする。
 func initRepo(t testing.TB, dir string) {
 	t.Helper()
-	git(t, dir, "init", "--quiet")
+	run.Git(t, dir, "init", "--quiet")
 }

@@ -135,12 +135,12 @@ func TestHitsRuleHitIsNamedByFileAndID(t *testing.T) {
 func TestHitsSameDefinitionInTwoProjectsShowsTheOneThatHit(t *testing.T) {
 	t.Parallel()
 	root := filepath.ToSlash(emptyRoot(t))
-	git(t, root, "init", "--quiet", "-b", "main")
+	run.Git(t, root, "init", "--quiet", "-b", "main")
 	writeFile(t, root, ".gitignore", "/projects/\n")
 	writeFile(t, root, base.CommonRelpath("rules"), `{"version": 1}`)
 	for _, name := range []string{"app", "lib"} {
 		project := filepath.Join(root, "projects", name)
-		git(t, mkdir(t, project), "init", "--quiet", "-b", "main")
+		run.Git(t, mkdir(t, project), "init", "--quiet", "-b", "main")
 		writeFile(t, project, ".ccnavi/config/project/rules.yml", mustJSON(t, schemaRules))
 	}
 	for _, name := range []string{"app", "lib"} {

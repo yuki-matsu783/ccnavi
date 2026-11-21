@@ -135,10 +135,10 @@ func TestBuildStampsTheSourceCommit(t *testing.T) {
 	const stamp = "-X ccnavi/internal/entry/version.commit="
 	mustContain(t, "リポジトリでない", b.built(), stamp+"unknown")
 
-	git(t, b.root, "init", "-q")
-	git(t, b.root, "add", "-A")
-	git(t, b.root, "commit", "-q", "-m", "init")
-	head := strings.TrimSpace(git(t, b.root, "rev-parse", "HEAD"))
+	run.Git(t, b.root, "init", "-q")
+	run.Git(t, b.root, "add", "-A")
+	run.Git(t, b.root, "commit", "-q", "-m", "init")
+	head := strings.TrimSpace(run.Git(t, b.root, "rev-parse", "HEAD"))
 	b.build(nil)
 	mustContain(t, "コミット済み", b.built(), stamp+head+" ")
 

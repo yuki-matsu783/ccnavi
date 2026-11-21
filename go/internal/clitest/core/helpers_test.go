@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -90,18 +89,6 @@ func mustNotContain(t testing.TB, what, text string, unwanted ...string) {
 			t.Errorf("%s に %q がある: %q", what, w, text)
 		}
 	}
-}
-
-// git は dir で `git <args…>`（名前とメールは固定）を回し、出力を返す。走った機械の git の設定は base.Main が締め出してある。
-func git(t testing.TB, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com"}, args...)...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return string(out)
 }
 
 // emptyRoot は空の使い捨ての木（設定ファイルの有無まで自分で決めたいテスト用）。

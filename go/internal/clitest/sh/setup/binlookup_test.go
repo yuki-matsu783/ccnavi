@@ -40,7 +40,7 @@ func newBinLookup(t *testing.T) *binLookup {
 // ticket は `sh .ccnavi/scripts/ccnavi-ticket.sh status x` を ENTRY_PATH なしで起こす（extra は足す環境）。
 func (b *binLookup) ticket(extra map[string]string) run.Result {
 	b.t.Helper()
-	return runCmd(b.t, "sh", []string{filepath.Join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "status", "x"},
+	return run.Command(b.t, "sh", []string{filepath.Join(".ccnavi", "scripts", "ccnavi-ticket.sh"), "status", "x"},
 		run.Opts{Dir: b.ws, Env: extra})
 }
 

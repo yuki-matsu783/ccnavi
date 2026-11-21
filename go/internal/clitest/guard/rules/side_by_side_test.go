@@ -35,27 +35,27 @@ type sbs struct {
 func newSBS(t *testing.T) *sbs {
 	t.Helper()
 	ws := base.TempDir(t)
-	git(t, ws, "init", "--quiet", "-b", "main")
+	run.Git(t, ws, "init", "--quiet", "-b", "main")
 	write(t, filepath.Join(ws, ".gitignore"), "/projects/\n/.claude/\n/logs/\n")
 	write(t, filepath.Join(ws, "schema", "keep.sql"), "-- keep\n")
 	write(t, base.CommonPath(ws, "rules"), jsonText(t, schemaRules("ws-schema")))
-	git(t, ws, "add", "-A")
-	git(t, ws, "commit", "--quiet", "-m", "init")
+	run.Git(t, ws, "add", "-A")
+	run.Git(t, ws, "commit", "--quiet", "-m", "init")
 	s := &sbs{t: t, ws: ws}
 	s.p, s.q = s.project("p"), s.project("q")
 	s.wt = filepath.Join(ws, ".claude", "worktrees", sbsName)
-	git(t, s.p, "worktree", "add", "--quiet", s.wt, "-b", sbsName)
+	run.Git(t, s.p, "worktree", "add", "--quiet", s.wt, "-b", sbsName)
 	return s
 }
 
 func (s *sbs) project(name string) string {
 	root := filepath.Join(s.ws, "projects", name)
 	mkdirs(s.t, root)
-	git(s.t, root, "init", "--quiet", "-b", "main")
+	run.Git(s.t, root, "init", "--quiet", "-b", "main")
 	write(s.t, base.ConfigPath(root, "rules"), jsonText(s.t, schemaRules("schema")))
 	write(s.t, filepath.Join(root, "schema", "keep.sql"), "-- keep\n")
-	git(s.t, root, "add", "-A")
-	git(s.t, root, "commit", "--quiet", "-m", "init")
+	run.Git(s.t, root, "add", "-A")
+	run.Git(s.t, root, "commit", "--quiet", "-m", "init")
 	return root
 }
 
@@ -160,7 +160,7 @@ func TestARemovedWorktreeLeavesTheRecordInvalid(t *testing.T) {
 	t.Parallel()
 	s := newSBS(t)
 	s.record("yes")
-	git(t, s.p, "worktree", "remove", "--force", s.wt)
+	run.Git(t, s.p, "worktree", "remove", "--force", s.wt)
 	s.hook(s.p)
 	path := s.dirty(s.p)
 	s.hook(s.p)
@@ -185,7 +185,7 @@ func TestATwinNamedTreeDoesNotSplitTheReportFromTheRestoreDecision(t *testing.T)
 	s := newSBS(t)
 	s.record("yes")
 	twin := filepath.Join(s.ws, ".claude", "worktrees", "p")
-	git(t, s.q, "worktree", "add", "--quiet", twin, "-b", "p")
+	run.Git(t, s.q, "worktree", "add", "--quiet", twin, "-b", "p")
 	s.hook(s.wt)
 	pPath := s.dirty(s.p)
 	s.dirty(twin)

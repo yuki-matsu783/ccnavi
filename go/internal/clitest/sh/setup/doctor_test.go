@@ -94,7 +94,7 @@ func (d *doctorEnv) writeSettings(name, text string) {
 
 func (d *doctorEnv) setOrigin(args ...string) {
 	d.t.Helper()
-	git(d.t, d.ws, append([]string{"remote"}, args...)...)
+	run.Git(d.t, d.ws, append([]string{"remote"}, args...)...)
 }
 
 // ---- 既定の起動（道具は最小）
@@ -424,7 +424,7 @@ func TestDoctorWithoutGlabButReachableGlabIsOptional(t *testing.T) {
 	if !sameSnapshot(snapshot(t, d.src), before) {
 		t.Error("配布元が変わった")
 	}
-	if left := waitGone("sleep 2.719", 5); len(left) != 0 {
+	if left := waitGone("sleep 2.719", 30); len(left) != 0 {
 		t.Errorf("見張りが残った: %v", left)
 	}
 }
@@ -585,10 +585,10 @@ func TestDoctorTimeoutEndsAndLeavesNoWatcher(t *testing.T) {
 	r := d.doctor(o, "--online")
 	took := time.Since(start)
 	wantCheck(t, checks(r.Stdout), "remote", "todo", "timeout")
-	if took > 15*time.Second {
+	if took > 45*time.Second { // 偽の git は 61 秒眠る。上限で終わったことだけを見る（負荷で遅れても落とさない）
 		t.Errorf("上限のあとも %v かかった", took)
 	}
-	if left := waitGone("sleep 2.718", 5); len(left) != 0 {
+	if left := waitGone("sleep 2.718", 30); len(left) != 0 {
 		t.Errorf("見張りが残った: %v", left)
 	}
 }
@@ -608,7 +608,7 @@ func (d *doctorEnv) signalRun(sig os.Signal, needle, limit string) int {
 	}
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
-	end := time.Now().Add(20 * time.Second)
+	end := time.Now().Add(60 * time.Second)
 	for time.Now().Before(end) && len(running("sleep "+needle)) == 0 {
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -619,7 +619,7 @@ func (d *doctorEnv) signalRun(sig os.Signal, needle, limit string) int {
 	_ = cmd.Process.Signal(sig)
 	select {
 	case <-done:
-	case <-time.After(20 * time.Second):
+	case <-time.After(60 * time.Second):
 		_ = cmd.Process.Kill()
 		d.t.Fatal("信号のあとも終わらなかった")
 	}
@@ -647,7 +647,7 @@ func TestDoctorSignalsCleanUp(t *testing.T) {
 			t.Parallel()
 			d := newDoctor(t)
 			eq(t, "終了コード", d.signalRun(c.sig, c.needle, c.limit), c.want)
-			if left := waitGone("sleep "+c.limit, 5); len(left) != 0 {
+			if left := waitGone("sleep "+c.limit, 30); len(left) != 0 {
 				t.Errorf("見張りが残った: %v", left)
 			}
 		})

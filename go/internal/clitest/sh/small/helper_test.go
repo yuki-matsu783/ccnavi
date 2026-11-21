@@ -1,8 +1,6 @@
 package small
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -11,16 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/infra/shell"
 )
 
-// このファイルは、このパッケージの sh の試験だけが使う道具。run.Sh は sh の 1 本の script しか起こせず、
-// `sh -c` と bash と node は起こせないので、同じ決まり（環境は run.Opts で明示する・base.Uncache でキャッシュを避ける）
-// を守って自分で起こす。
+// このファイルは、このパッケージの sh の試験だけが使う道具。`sh -c`・bash・node は run.Command で起こす。
 
 // pathSep は PATH の項目の区切り（Windows は `;`、ほかは `:`。Python の os.pathsep と同じ）。
 var pathSep = string(filepath.ListSeparator)
@@ -46,35 +41,10 @@ func firstShell(t *testing.T) string {
 	return names[0]
 }
 
-var lfReplacer = strings.NewReplacer("\r\n", "\n", "\r", "\n")
-
-// runProgram は program を 1 回起こす。環境は run.Environment（Main が整えた環境に o.Env の差分を足したもの）で組む。
-// 標準出力・標準エラーは改行を LF に揃える。
+// runProgram は program を 1 回起こす（run.Command。引数を並べて渡せる形）。
 func runProgram(t *testing.T, program string, o run.Opts, args ...string) run.Result {
 	t.Helper()
-	base.Uncache()
-	ctx, cancel := context.WithTimeout(context.Background(), base.ExecTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, program, args...)
-	cmd.Env = run.Environment(o)
-	cmd.Dir = o.Dir
-	cmd.Stdin = strings.NewReader(o.Input)
-	cmd.WaitDelay = 5 * time.Second
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	err := cmd.Run()
-	var exit *exec.ExitError
-	if err != nil && !errors.As(err, &exit) {
-		t.Fatalf("%s を起こせない: %v", program, err)
-	}
-	if ctx.Err() != nil {
-		t.Fatalf("%s が %v で終わらない", program, base.ExecTimeout)
-	}
-	return run.Result{
-		Code:   cmd.ProcessState.ExitCode(),
-		Stdout: lfReplacer.Replace(stdout.String()),
-		Stderr: lfReplacer.Replace(stderr.String()),
-	}
+	return run.Command(t, program, args, o)
 }
 
 // commonSh は、できあがりの姿の ccnavi-common.sh の場所。
