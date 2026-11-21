@@ -22,6 +22,9 @@ import (
 // `sh -c` と bash と node は起こせないので、同じ決まり（環境は run.Opts で明示する・base.Uncache でキャッシュを避ける）
 // を守って自分で起こす。
 
+// pathSep は PATH の項目の区切り（Windows は `;`、ほかは `:`。Python の os.pathsep と同じ）。
+var pathSep = string(filepath.ListSeparator)
+
 // shellNames は、この機械にある sh と bash（sh が先）。
 func shellNames() []string {
 	var out []string

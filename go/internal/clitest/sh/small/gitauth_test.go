@@ -83,7 +83,7 @@ func (g gitAuth) authRun(t *testing.T, shell, origin string, parent bool, path s
 	t.Helper()
 	g.addRemote(t, origin)
 	if path == "" {
-		path = g.bin + ":/usr/bin:/bin"
+		path = g.bin + pathSep + "/usr/bin" + pathSep + "/bin"
 	}
 	env := map[string]string{"PATH": path}
 	if parent {
@@ -170,7 +170,7 @@ func TestGitAuthRefusesARelativeToolPath(t *testing.T) {
 	t.Parallel()
 	g := newGitAuth(t)
 	writeExe(t, filepath.Join(g.repo, "bin", "gh"))
-	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, "bin:/usr/bin:/bin")
+	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, "bin"+pathSep+"/usr/bin"+pathSep+"/bin")
 	if len(got.keys) != 0 {
 		t.Errorf("相対の道具を使った: keys = %q", got.keys)
 	}
@@ -182,7 +182,7 @@ func TestGitAuthSkipsARelativeEntryAndUsesTheAbsoluteOne(t *testing.T) {
 	g := newGitAuth(t)
 	writeExe(t, filepath.Join(g.repo, "bin", "gh"))
 	gh := g.tool(t, "gh")
-	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, "bin:"+g.bin+":/usr/bin:/bin")
+	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, "bin"+pathSep+g.bin+pathSep+"/usr/bin"+pathSep+"/bin")
 	if want := `!"` + gh + `" auth git-credential`; strings.Join(got.values, ",") != want {
 		t.Errorf("values = %q, want %q", got.values, want)
 	}
@@ -193,7 +193,7 @@ func TestGitAuthEmptyPathEntryDoesNotPickTheCurrentDirectory(t *testing.T) {
 	t.Parallel()
 	g := newGitAuth(t)
 	writeExe(t, filepath.Join(g.repo, "gh"))
-	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, "::/usr/bin:/bin:")
+	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, pathSep+pathSep+"/usr/bin"+pathSep+"/bin"+pathSep)
 	for _, v := range got.values {
 		if strings.Contains(v, g.repo) {
 			t.Errorf("カレントの道具を選んだ: %q", v)
@@ -218,7 +218,7 @@ ccnavi_host_connect
 printf 'rc=%s cli=%s\n' "$?" "$ccnavi_h_cli"
 `
 	res := runProgram(t, firstShell(t), run.Opts{
-		Env: map[string]string{"PATH": "bin:" + g.bin + ":/usr/bin:/bin"},
+		Env: map[string]string{"PATH": "bin" + pathSep + g.bin + pathSep + "/usr/bin" + pathSep + "/bin"},
 	}, "-c", probe, "probe", hostScript(), g.repo)
 	if want := "cli=" + g.bin + "/glab"; !strings.Contains(res.Stdout, want) {
 		t.Errorf("stdout = %q, want %q を含む（stderr %q）", res.Stdout, want, res.Stderr)
@@ -234,7 +234,7 @@ func TestGitAuthRefusesAToolPathWithDollar(t *testing.T) {
 	g := newGitAuth(t)
 	bad := filepath.Join(g.tmp, "d$(touch pwned)")
 	writeExe(t, filepath.Join(bad, "gh"))
-	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, bad+":/usr/bin:/bin")
+	got := g.authRun(t, firstShell(t), "https://github.com/o/r.git", false, bad+pathSep+"/usr/bin"+pathSep+"/bin")
 	if len(got.keys) != 0 {
 		t.Errorf("道具を使った: keys = %q", got.keys)
 	}
