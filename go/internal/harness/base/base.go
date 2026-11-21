@@ -71,7 +71,10 @@ func realpath(path string) string { return ospath.Realpath(path) }
 
 // TempBase は使い捨ての置き場の親。リンクを解いた実パスにそろえる。macOS の一時置き場は `/var/...` だが実体は
 // `/private/var/...` で、git や realpath は後者を返す。文字列をそのまま比べるテストが機械の違いで食い違わないようにする。
-func TempBase() string { return realpath(os.TempDir()) }
+func TempBase() string {
+	requireMain()
+	return realpath(os.TempDir())
+}
 
 // TempDir は使い捨ての置き場を作り、テストの終わりに消す。名前は短い（Windows の MAX_PATH）。
 // t.TempDir は使わない（テスト名が長く、後片付けの失敗でテストを落とすため）。後片付けの失敗は無視する。

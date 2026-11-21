@@ -2,7 +2,7 @@
 // ほかの道具（exe・run など）と clitest が読む。
 //
 // 置くもの
-//   - Main: TestMain の共通。プロセスの環境から子の答えを変える変数（GIT_*・CLAUDE_PROJECT_DIR・CCNAVI_*）を外し、
+//   - Main: TestMain の共通。プロセスの環境から子の答えを変える変数（GIT_*・CLAUDE_*・CCNAVI_*・GITHUB_TOKEN・GITLAB_TOKEN）を外し、
 //     走った機械の git の設定を締め出し、PATH から ccnavi を外し、MSYS の引数の書き換えを止め、go test に結果を保存させない
 //     ようにする。使い捨ての置き場の後片付けもする。clitest の各パッケージは必ずこれで始める。呼び忘れは最初の 1 本で panic する
 //   - TestVar: Main が外す前の CCNAVI_TEST_*（組まずに使う実行ファイルのパス）
@@ -18,6 +18,7 @@
 //
 // 環境の決まり: プロセスの環境は Main が 1 度だけ書く。テストの中では t.Setenv も os.Chdir も使わず（t.Parallel と一緒に
 // 使えない）、子に渡す環境は exec.Cmd の Env に明示する（run.Opts.Env は Main が整えた環境への差分、run.Opts.Unset は外す名前）。
+// トークンがほしいテストは、GITHUB_TOKEN・GITLAB_TOKEN を run.Opts.Env で渡す。
 // 一時置き場は TempDir（base.TempDir）。t.TempDir は使わない。
 //
 // go test のキャッシュ: sh・文面・見本は子のプロセスが読み、リポジトリの根はモジュールの根（go/）の外なので、

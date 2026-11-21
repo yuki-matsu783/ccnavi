@@ -99,16 +99,6 @@ func TestTempDirEnvironmentIsARealPath(t *testing.T) {
 	}
 }
 
-// Main は、走らせた人の環境が子の答えを変える変数を外す（外した結果は run の起動のテストが見る）。
-func TestMainScrubsTheProcessEnvironment(t *testing.T) {
-	t.Parallel()
-	for _, name := range []string{env.ClaudeProjectDir, env.GitDir, env.GitWorkTree, env.GitIndexFile, env.GitCommonDir, env.TestExe} {
-		if v, ok := os.LookupEnv(name); ok {
-			t.Errorf("%s=%q が残っている", name, v)
-		}
-	}
-}
-
 // go test は、更新時刻が 2 秒より新しいモジュールの中のファイルを開いたテストの結果を保存しない。
 // Uncache（目印を未来の時刻で書き、相対パスで開く）はこれに頼るので、Go を上げたときに 2 回目に (cached) が出ないことを見張る。
 func TestGoDoesNotCacheATestThatOpensAFutureFile(t *testing.T) {
@@ -137,7 +127,7 @@ func TestOpen(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := markFor(mod); err != nil {
+	if err := markFor(mod); err != nil {
 		t.Fatal(err)
 	}
 	goTest := func() string {
@@ -153,5 +143,14 @@ func TestOpen(t *testing.T) {
 	goTest()
 	if out := goTest(); strings.Contains(out, "(cached)") {
 		t.Errorf("2 回目が保存された結果で返った。Uncache の仕掛けが効いていない:\n%s", out)
+	}
+}
+
+// Uncache が開く目印の相対パスは、このパッケージの作業ディレクトリから実在する。壊れると Uncache は開けずに黙って返り、
+// go test が保存された結果を返す（偽の合格）。
+func TestUncacheMarkPathExists(t *testing.T) {
+	t.Parallel()
+	if _, err := os.Stat(relMark); err != nil {
+		t.Errorf("目印の相対パス %q が開けない: %v", relMark, err)
 	}
 }

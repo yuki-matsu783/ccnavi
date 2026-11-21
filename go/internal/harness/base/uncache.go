@@ -3,7 +3,6 @@ package base
 import (
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 )
 
@@ -16,19 +15,17 @@ const uncacheMark = ".clitest-uncached"
 // 開く物は相対パスで渡す。go コマンドが自分のパッケージの場所と継ぐので、Windows でパスの字の大小が食い違っても
 // 「モジュールの中」と判定される。本体の単体テストのキャッシュには触れない。
 
-var (
-	relOnce sync.Once
-	relMark string
-)
+// relMark は作業ディレクトリから見た目印の相対パス。writeUncacheMark（Main の setup）だけが決める。
+var relMark string
 
-// markFor は dir の下の目印のパスを、未来の更新時刻で書く。
-func markFor(dir string) (string, error) {
+// markFor は dir の下の目印を、未来の更新時刻で書く。
+func markFor(dir string) error {
 	path := filepath.Join(dir, uncacheMark)
 	if err := os.WriteFile(path, nil, 0o644); err != nil {
-		return "", err
+		return err
 	}
 	future := time.Now().Add(24 * time.Hour)
-	return path, os.Chtimes(path, future, future)
+	return os.Chtimes(path, future, future)
 }
 
 func writeUncacheMark() error {
@@ -36,10 +33,10 @@ func writeUncacheMark() error {
 	if err != nil {
 		return err
 	}
-	if _, err := markFor(filepath.Join(dir, "go")); err != nil {
+	if err := markFor(filepath.Join(dir, "go")); err != nil {
 		return err
 	}
-	relOnce.Do(func() { relMark = filepath.Join(rel, "go", uncacheMark) })
+	relMark = filepath.Join(rel, "go", uncacheMark)
 	return nil
 }
 

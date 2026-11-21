@@ -20,7 +20,7 @@
 // 守ること:
 //   - 回すのは `cd go && go test ./...`（-count=1 は要らない）。Root か run を使うパッケージは go test が結果を保存せず毎回走る（理由は harness/base の doc）
 //   - テストの中で t.Setenv・os.Chdir を使わない（t.Parallel と一緒に使えない）。環境は run.Opts.Env、作業ディレクトリは run.Opts.Dir で渡す
-//   - 起こす子の環境は、Main が整えたプロセスの環境（GIT_*・CLAUDE_PROJECT_DIR・CCNAVI_* は外してある）に run.Opts.Env の差分を足したもの。
+//   - 起こす子の環境は、Main が整えたプロセスの環境（GIT_*・CLAUDE_*・CCNAVI_*・GITHUB_TOKEN・GITLAB_TOKEN は外してある）に run.Opts.Env の差分を足したもの。
 //     何も渡さなければ素の環境。外したい名前だけ run.Opts.Unset に書く
 //   - 同じ約束を入力だけ変えて何本も書かず、表駆動の 1 本にまとめる（t.Run で並行にする）。テスト名は約束を言う
 //   - OS・機械の差で成り立たないものは、base.CanSymlink・base.CanCaseSensitive・base.CanPassArgument で飛ばす

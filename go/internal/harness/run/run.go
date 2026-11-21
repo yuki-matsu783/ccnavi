@@ -33,7 +33,7 @@ type Opts struct {
 	Input string
 	// Env は、テストのプロセスの環境（base.Main が整えたもの）に足す・上書きする分。呼び手の値が既定より優先される。
 	// 子の環境は、プロセスの環境 + 既定（走った機械の git の締め出し base.GitEnv と、学びの蓄積を切る CCNAVI_LEARNING=disable）
-	// + Unset の除去 + Env の順に重ねる。Main がプロセスの環境から GIT_*・CLAUDE_PROJECT_DIR・CCNAVI_* を外してあるので、
+	// + Unset の除去 + Env の順に重ねる。Main がプロセスの環境から GIT_*・CLAUDE_*・CCNAVI_*・GITHUB_TOKEN・GITLAB_TOKEN を外してあるので、
 	// 走らせた人の設定や、Claude Code の中で回したことは答えを変えない。
 	Env map[string]string
 	// Unset は、子の環境から外す名前（プロセスの環境と既定の分）。まれに「その変数が無い」姿を試すときだけ使う。
@@ -84,7 +84,7 @@ func first(opts []Opts) Opts {
 	return opts[0]
 }
 
-// Environment は 1 回の起動の子に渡す環境（`NAME=value` の並び。名前順）。
+// Environment は 1 回の起動の子に渡す環境（`NAME=value` の並び。文字列順）。
 func Environment(o Opts) []string {
 	defaults := base.GitEnv()
 	defaults[env.Learning] = "disable"

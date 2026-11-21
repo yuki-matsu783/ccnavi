@@ -17,7 +17,10 @@ func TestMain(m *testing.M) {
 	for name, value := range map[string]string{
 		env.Prefix + "RUN_TEST_LEAK": "1",
 		env.ClaudeProjectDir:         "/dev/null/leak",
+		env.ClaudeSessionID:          "/dev/null/leak",
 		env.GitDir:                   "/dev/null/leak",
+		env.GitHubToken:              "/dev/null/leak",
+		env.GitLabToken:              "/dev/null/leak",
 		"X_KEEP":                     "1",
 	} {
 		if err := os.Setenv(name, value); err != nil {
@@ -55,7 +58,7 @@ func TestChildEnvironmentIsTheProcessEnvironmentPlusTheDiff(t *testing.T) {
 		}
 	}
 	for line := range got {
-		for _, leaked := range []string{env.Prefix + "RUN_TEST_LEAK=", env.ClaudeProjectDir + "=", env.GitDir + "="} {
+		for _, leaked := range []string{env.Prefix + "RUN_TEST_LEAK=", env.ClaudeProjectDir + "=", env.ClaudeSessionID + "=", env.GitDir + "=", env.GitHubToken + "=", env.GitLabToken + "="} {
 			if strings.HasPrefix(line, leaked) {
 				t.Errorf("Main が外すはずの変数が見える: %s", line)
 			}

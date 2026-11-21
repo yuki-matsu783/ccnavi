@@ -24,21 +24,22 @@ func atExit(path string) {
 // Main は clitest の TestMain の共通。`func TestMain(m *testing.M) { base.Main(m) }` と書く。
 //
 // プロセスの環境を 1 度だけ整えてからテストを回し、使い捨ての置き場を消して終わる。
-//   - 走った機械・走らせた人の環境が子の答えを変えないよう、外す（GIT_*・CLAUDE_PROJECT_DIR など・CCNAVI_*）。
-//     CCNAVI_TEST_* は先に覚える（TestVar）
+//   - 走った機械・走らせた人の環境が子の答えを変えないよう、外す（GIT_*・CLAUDE_*・CCNAVI_*・GITHUB_TOKEN・GITLAB_TOKEN）。
+//     CCNAVI_TEST_* は先に覚える（TestVar）。トークンがほしいテストは run.Opts.Env で渡す
 //   - 走った機械の git の設定を締め出す（GitEnv）
 //   - PATH から ccnavi を外す
 //   - MSYS の引数の書き換えを止める
 //   - 一時置き場（TMPDIR）を実パスにする（macOS）
 //   - go test がこのパッケージの結果を保存しないようにする（Uncache。パッケージの doc を参照）
 //
-// 呼び忘れは、Root・GitEnv・run の起動が最初の 1 本で panic して知らせる。
+// 呼び忘れは、Root・TempDir・GitEnv・run の起動が最初の 1 本で panic して知らせる。
 func Main(m *testing.M) {
+	// setup は TempBase を使うので、先に立てる。setup が失敗すれば下で止まり、テストは走らない。
+	mainDone.Store(true)
 	if err := setup(); err != nil {
 		fmt.Fprintln(os.Stderr, "テストの環境を整えられない:", err)
 		os.Exit(1)
 	}
-	mainDone.Store(true)
 	code := m.Run()
 	exitMu.Lock()
 	for _, path := range exitPaths {
@@ -89,14 +90,11 @@ func GitEnv() map[string]string {
 
 // scrubEnvironment はプロセスの環境から、子の答えを変える変数を外す。
 // git の変数（GIT_DIR・GIT_WORK_TREE・GIT_INDEX_FILE など、git の hook の中で回すと入る）は、子の git を別の木に向ける。
-// CLAUDE_PROJECT_DIR は実行ファイルのルートを最優先で決め、Claude Code の中で回すと本物のリポジトリを根にする。
-// CCNAVI_* は走らせた人の設定。CCNAVI_TEST_* だけは先に覚える。
+// CLAUDE_* は Claude Code の変数。CLAUDE_PROJECT_DIR は実行ファイルのルートを最優先で決め、Claude Code の中で回すと本物のリポジトリを根にする。
+// CCNAVI_* は走らせた人の設定。CCNAVI_TEST_* だけは先に覚える。GITHUB_TOKEN・GITLAB_TOKEN は走らせた人のトークン。
 // 子の環境（run.Opts.Env）はここで整った環境への差分だけを足す。
 func scrubEnvironment() {
-	drop := map[string]bool{
-		fold(env.ClaudeProjectDir): true, fold(env.ClaudeCodeEntrypoint): true,
-		fold(env.ClaudeSessionAttended): true, fold(env.ClaudeSessionID): true,
-	}
+	drop := map[string]bool{fold(env.GitHubToken): true, fold(env.GitLabToken): true}
 	for _, kv := range os.Environ() {
 		name, value, _ := strings.Cut(kv, "=")
 		folded := fold(name)
@@ -104,7 +102,7 @@ func scrubEnvironment() {
 		case strings.HasPrefix(folded, env.Prefix+"TEST_"):
 			testVars[folded] = value
 			_ = os.Unsetenv(name)
-		case strings.HasPrefix(folded, env.Prefix), strings.HasPrefix(folded, gitVarHead), drop[folded]:
+		case strings.HasPrefix(folded, env.Prefix), strings.HasPrefix(folded, env.ClaudePrefix), strings.HasPrefix(folded, gitVarHead), drop[folded]:
 			_ = os.Unsetenv(name)
 		}
 	}
