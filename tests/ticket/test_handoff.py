@@ -1,15 +1,13 @@
 """保護対象の下書きの取り込み（`ccnavi user handoff`。go/internal/tickets/sync/handoff）。
 
 取り込みの判断（取り込み先の表・断る形・`--expect` のハッシュ・差分の見え方・テンプレートと
-`defense` の検査・防御の記述を動かす変更）は、go の handoff の見本（`golden_test.go`・
-`parts_test.go`・`handoff_test.go`）が見る。ここで見るのは、見本が持たない次の 3 つ。
+`defense` の検査・防御の記述を動かす変更・読めない rules.yml の修復・同じ回に取り込む対象の
+検査し直し）は、go の handoff の見本（`golden_test.go`・`parts_test.go`・`handoff_test.go`）と
+`scenes_test.go` の表が見る。ここで見るのは、sh から起こす通しの次の 2 つ。
 
 1. 入口: 組み合わせの拒否と終了コード、見る JSON の形（拡張と共有）、テキストの案内、
    書いたら下書きを消し、取り込み先の綴りを保つ
-2. 経路: 書くにはターミナルか `--via board`。`defense` と、防御の記述を動かす rules.yml、
-   読めない rules.yml の修復はボードから断る
-3. 同じ回に取り込む対象を、取り込んだあとの状態で検査する（テンプレートと phases.yml、
-   共通と self の同名テンプレート）
+2. 経路: 書くにはターミナルか `--via board`。`defense` はボードから断る
 """
 
 from __future__ import annotations
@@ -21,7 +19,7 @@ import tempfile
 import textwrap
 import unittest
 
-from tests import ROOT, can_case_sensitive, common_path, config_path
+from tests import ROOT, can_case_sensitive, common_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import write
 from tests.ticketsample import PHASES, RULES
@@ -265,116 +263,6 @@ class RouteTest(HandoffCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(slurp(self.target(DOCS)), b"new\n")
         self.assertEqual(slurp(self.target(SCRIPT)), b"#!/bin/sh\necho old\n")
-
-
-class BrokenRulesRepairTest(HandoffCase):
-    """共通の rules.yml が読めない間の修復。
-
-    エージェントは直接直せず（`builtin:guard-ccnavi-config` が Write / Edit を止める）、
-    `wip/handoff/` に下書きを置いて、ユーザがターミナルの `ccnavi user handoff` で取り込む。
-    今の中身が読めない rules.yml の取り込みは、確かめられないのでターミナルに限る。"""
-
-    RULES_REL = ".ccnavi/config/common/rules.yml"
-
-    def test_the_draft_is_terminal_only_and_the_terminal_takes_it(self):
-        broken = b"deny:\n  - id: [unclosed\n<<<<<<< HEAD\n"
-        write(common_path(self.root, "rules"), broken.decode())
-        fixed = json.dumps(RULES).encode()
-        self.stage(self.RULES_REL, fixed)
-        answer = self.view()
-        row = self.entry(answer, self.RULES_REL)
-        self.assertEqual(row["kind"], "layer-config")
-        self.assertFalse(row["board"], row)
-        result = self.board(answer["expect"])
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("ターミナル", json.loads(result.stdout)["error"])
-        self.assertEqual(slurp(self.target(self.RULES_REL)), broken)
-        result = self.take()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(slurp(self.target(self.RULES_REL)), fixed)
-        self.assertFalse(os.path.exists(self.draft_path(self.RULES_REL)))
-
-
-class BoardDefenseRulesTest(HandoffCase):
-    """`rules.yml` の取り込みのうち、防御の記述（`guard-*` と今ある deny）を動かすものは
-    ターミナルに限る（どの変更が動かすかは go の handoff の見本が見る）。"""
-
-    RULES_REL = ".ccnavi/config/common/rules.yml"
-
-    def test_removing_a_deny_is_terminal_only(self):
-        rules = {
-            **RULES,
-            "deny": [*RULES["deny"], {**RULES["deny"][0], "id": "keep-out", "glob": "*/x/*"}],
-        }
-        write(common_path(self.root, "rules"), json.dumps(rules))
-        before = slurp(self.target(self.RULES_REL))
-        rules["deny"] = rules["deny"][:1]
-        self.stage(self.RULES_REL, json.dumps(rules).encode())
-        answer = self.view()
-        row = self.entry(answer, self.RULES_REL)
-        self.assertFalse(row["board"], row)
-        self.assertEqual(row["kind"], "layer-config")
-        text = self.run_handoff()
-        self.assertIn("ターミナルのみ", text.stdout)
-        self.assertIn("keep-out", text.stdout)
-        result = self.board(answer["expect"])
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        error = json.loads(result.stdout)["error"]
-        self.assertIn("防御の記述", error)
-        self.assertIn("ターミナル", error)
-        self.assertEqual(slurp(self.target(self.RULES_REL)), before)
-        # ターミナルの前のユーザなら取り込める。
-        self.assertEqual(self.take().returncode, 0)
-
-
-class LayerConfigTest(HandoffCase):
-    RULES_REL = ".ccnavi/config/common/rules.yml"
-    PHASES_REL = ".ccnavi/config/common/phases.yml"
-
-    def test_broken_layer_files_are_errors(self):
-        phases = ".ccnavi/config/project/phases.yml"
-        write(config_path(self.root, "phases"), "version: 1\nphases: {}\n")
-        self.stage(self.RULES_REL, b"version: 1\ndeny: [\n")
-        self.stage(phases, b"version: 1\nphases:\n  design:\n    kind: nope\n")
-        answer = self.view()
-        row = self.entry(answer, self.RULES_REL)
-        self.assertEqual(row["kind"], "layer-config")
-        self.assertEqual(row["state"], "rejected")
-        self.assertIn("ルールを読めない", " ".join(row["errors"]))
-        self.assertEqual(self.entry(answer, phases)["state"], "rejected", answer)
-
-    def test_a_template_taken_with_the_phases_is_checked_against_the_new_phases(self):
-        rel = ".ccnavi/config/project/templates/feature.yml"
-        text = TEMPLATE.replace("{type: implement, after: [1]}", "{type: brand-new, after: [1]}")
-        write(self.draft_path(rel), text)
-        alone = self.entry(self.view(rel), rel)
-        self.assertIn("brand-new", " ".join(alone["warnings"]))
-        new_phases = PHASES + (
-            "  brand-new:\n"
-            "    kind: work\n"
-            "    title: 新しい型\n"
-            "    review: true\n"
-            '    scope: ["src/*"]\n'
-        )
-        self.stage(self.PHASES_REL, new_phases.encode())
-        together = self.view(rel, self.PHASES_REL)
-        self.assertNotIn("brand-new", " ".join(self.entry(together, rel)["warnings"]))
-        self.assertTrue(together["ok"], together)
-
-
-class TemplateTest(HandoffCase):
-    REL = ".ccnavi/config/project/templates/feature.yml"
-    COMMON = ".ccnavi/config/common/templates/feature.yml"
-
-    def test_the_collision_is_judged_after_the_import(self):
-        write(self.target(self.COMMON), TEMPLATE.replace("新しい機能", "別の"))
-        write(self.draft_path(self.REL), TEMPLATE)
-        errors = " ".join(self.entry(self.view(), self.REL)["errors"])
-        self.assertIn("共通に同名で中身の違う", errors)
-        # 共通の同名も同じ回に同じ中身へ直すなら、衝突しない。
-        write(self.draft_path(self.COMMON), TEMPLATE)
-        answer = self.view()
-        self.assertTrue(answer["ok"], answer)
 
 
 if __name__ == "__main__":
