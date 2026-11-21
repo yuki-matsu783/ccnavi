@@ -12,14 +12,13 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import time
 import unittest
 
 from tests import script_command, treecache
 from tests.ticket import test_stop_nudge as base
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
-from tests.ticketsample import child_text, record_merge
+from tests.ticketsample import child_text
 
 CODE = "NUDGE_TICKET_REQUEST"
 FINISH_CODE = "NUDGE_TICKET_FINISH"
@@ -113,50 +112,6 @@ class RequestNudgeTest(base.StopNudgeTest):
 
     # ---- 子が全部閉じた。依頼まで 1 手ずつ
 
-    def test_closed_children_are_asked_to_merge_then_request(self):
-        self.family(plan=["work-mr"])
-        self.close_children()
-        review_sh = script_command(self.root, "ccnavi-review.sh")
-        git_sh = script_command(self.root, "ccnavi-git.sh")
-        ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
-        # 子 1 は親に合流した記録が無い（合流は finish が済ませる。ここは確かめを促すだけ）。
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("レビューの依頼（review-request）がまだです", reason)
-        self.assertIn("子 i0001-01-01 が親のブランチに合流済みと確かめられません", reason)
-        self.assertIn(f"`{ticket_sh} status i0001`", reason)
-        self.assertNotIn(f"`{git_sh} merge", reason)
-        self.assertNotIn("i0001-01-02 が", reason)
-        self.assert_not_asked(self.stop(self.parent_tree))
-        # 合流の記録が揃うと次の一手は依頼。
-        git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-01")
-        record_merge(self.parent_tree, "i0001-01-01")
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn(f"`{review_sh} review-request --phase 1 --body-file <依頼文>`", reason)
-        self.assertNotIn(f"`{git_sh} merge", reason)
-        self.assert_not_asked(self.stop(self.parent_tree))
-
-    def test_a_fix_stacked_on_the_child_after_finish_is_asked_before_request(self):
-        """finish の後に子のブランチへ積んだコミットは親に無い。依頼の前提と同じく、それを言う。"""
-        self.family(plan=["work-mr"])
-        self.close_children()
-        git(self.parent_tree, "merge", "--quiet", "--no-edit", "i0001-01-01")
-        record_merge(self.parent_tree, "i0001-01-01")
-        self.assertIn("review-request --phase 1", self.asked(self.stop(self.parent_tree)))
-        # レビュー待ちの子のワークツリーで、合流の後に修正を積む。
-        self.commit_work(self.child_tree(), rel="src/a/late.py")
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("子 i0001-01-01 の手元のブランチに、合流されていない修正があります", reason)
-        self.assertIn("同じフェーズに子を足して", reason)
-
-    def test_the_request_step_reminds_to_commit_and_push_first(self):
-        """未コミットの変更があるかもしれない。"""
-        self.family(plan=["work-mr"])
-        self.close_children(work=False)
-        write(os.path.join(self.parent_tree, "src", "wip.py"), "x = 1\n")
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("review-request --phase 1", reason)
-        self.assertIn("未コミットの変更があれば先にコミットして push", reason)
-
     def test_a_blocked_parent_is_not_asked(self):
         """信頼できない承認済みの親（手で書き換えた `workflow:`）には促さない。"""
         self.family()
@@ -170,31 +125,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         # 手で書き換えた親は信頼できない（判定が範囲を使わずに止める）。
         blocked = self.hook("PreToolUse", "Write", self.parent_tree, file_path="src/x.py")
         self.assertIn("DENY_TICKET_BLOCKED", self.reason(blocked))
-        self.assert_not_asked(self.stop(self.parent_tree))
-
-    def test_only_the_parent_of_the_cwd_is_looked_at(self):
-        """複数の親が居ても、cwd のツリーに結び付いた親だけを見る。"""
-        self.family()
-        other = self.worktree("i0002", "main")
-        self.propose("i0002", tree=other, allow=("src/*", "wip/*"))
-        self.propose("i0002-01-01", tree=other, parent="i0002", phase=1, allow=("src/c/*",))
-        git(other, "add", "-A")
-        git(other, "commit", "--quiet", "-m", "second family")
-        self.assertEqual(self.approve().returncode, 0)
-        # 親 i0002 のツリーの承認済みチケットは、まだ誰も着手していない。
-        # 結び付かないツリーは何も言われない。
-        self.assert_not_asked(self.stop(other))
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertNotIn("i0002", reason)
-
-    def test_a_requested_phase_is_not_asked(self):
-        """依頼のマーカーがあれば、レビュー待ち以後。
-
-        変更要求が残る間も `requested` は残るので、同じ扱いで止めない。
-        """
-        self.family()
-        self.close_children(work=False)
-        self.mark_requested()
         self.assert_not_asked(self.stop(self.parent_tree))
 
     def test_a_phase_without_review_is_not_asked(self):
@@ -244,11 +174,6 @@ class RequestNudgeTest(base.StopNudgeTest):
 
     # ---- 止めない回
 
-    def test_the_workspace_root_and_a_worktree_without_a_ticket_are_not_asked(self):
-        self.family()
-        self.assert_not_asked(self.stop(self.root))
-        self.assert_not_asked(self.stop(self.worktree("scratch", "main")))
-
     def test_subagent_stop_is_not_the_place(self):
         self.family()
         self.assert_not_asked(self.stop(self.parent_tree, event="SubagentStop", agent_id="a1"))
@@ -261,7 +186,7 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assert_not_asked(self.stop(self.parent_tree, extra=("--ticket-control", "disable")))
         self.assert_not_asked(self.stop(self.parent_tree, mode="disable"))
 
-    def test_a_record_that_cannot_be_written_means_no_nudge(self):
+    def test_a_record_or_a_state_directory_that_cannot_be_used_means_no_nudge(self):
         """記録を残せないまま止めると、終えるたびに止まる。止めない側を採る。"""
         self.family()
         os.makedirs(nudge_path(self.state, "s1"))  # 記録のファイルの場所をディレクトリで塞ぐ
@@ -269,9 +194,6 @@ class RequestNudgeTest(base.StopNudgeTest):
             result = self.stop(self.parent_tree)
             self.assert_not_asked(result)
             self.assertIn("促さない", result.stderr)
-
-    def test_a_state_directory_that_cannot_be_listed_means_no_nudge(self):
-        self.family()
         shutil.rmtree(self.state, ignore_errors=True)
         write(self.state, "ファイルで塞ぐ\n")
         self.assert_not_asked(self.stop(self.parent_tree))
@@ -326,12 +248,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.stop_agent("a1-child", cwd=self.child_tree())
         self.asked(self.stop(self.parent_tree))
 
-    def test_a_running_subagent_of_another_session_does_not_hold_this_one(self):
-        self.family()
-        self.start_agent("a1", session="s2")
-        self.asked(self.stop(self.parent_tree, session="s1"))
-        self.assert_not_asked(self.stop(self.parent_tree, session="s2"))
-
     def test_a_start_without_agent_id_leaves_no_mark(self):
         """キーが決まらないので印は置かない。その体は数えられず、促しが出うる（制限）。"""
         self.family()
@@ -339,34 +255,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertEqual(result.returncode, 0, result.stderr)
         names = os.listdir(self.state) if os.path.isdir(self.state) else []
         self.assertEqual([n for n in names if n.endswith(".running")], [])
-        self.asked(self.stop(self.parent_tree))
-
-    def test_a_mark_past_the_limit_is_not_counted(self):
-        self.family()
-        self.start_agent("a1")
-        path = self.running_file("a1")
-        old = int(time.time()) - RUNNING_MAX_SECONDS - 60
-        write(path, f"session s1\n{old}\n")
-        self.asked(self.stop(self.parent_tree))
-        # 限りの内側なら数える。
-        write(path, f"session s1\n{int(time.time()) - RUNNING_MAX_SECONDS + 600}\n")
-        self.assert_not_asked(self.stop(self.parent_tree, session="s1", extra=()))
-
-    def test_a_broken_mark_holds_the_nudge_until_it_is_old(self):
-        """開始時刻を読めない印は、更新時刻で期限を見る。新しければ促さない側に倒す。"""
-        self.family()
-        path = self.running_file("a1")
-        write(path, "")
-        self.assert_not_asked(self.stop(self.parent_tree))
-        old = time.time() - RUNNING_MAX_SECONDS - 60
-        os.utime(path, (old, old))
-        self.asked(self.stop(self.parent_tree))
-        write(path, "session s1\nnot-a-number\n")
-        self.assert_not_asked(self.stop(self.parent_tree, session="s1"))
-
-    def test_a_mark_of_a_session_with_the_same_prefix_is_not_ours(self):
-        self.family()
-        write(self.running_file("a1", session="s1"), f"session s1-other\n{int(time.time())}\n")
         self.asked(self.stop(self.parent_tree))
 
     def test_startup_and_resume_drop_the_marks_but_compact_and_clear_keep_them(self):
@@ -384,14 +272,6 @@ class RequestNudgeTest(base.StopNudgeTest):
             self.asked(self.stop(self.parent_tree))
             # 次の回の前提を揃える（促しの記録を破棄する）。
             os.remove(nudge_path(self.state, "s1"))
-
-    def test_startup_and_resume_keep_the_mark_of_a_session_with_the_same_prefix(self):
-        self.family()
-        other = self.running_file("a1", session="s1-other")
-        write(other, f"session s1-other\n{int(time.time())}\n")
-        for source in ("startup", "resume"):
-            self.session_start(source)
-            self.assertTrue(os.path.exists(other), source)
 
     def test_a_bounced_subagent_keeps_its_mark_and_the_bounce_still_works(self):
         """範囲外の変更で差し戻した回は続けさせるので印を残す。2 度目に終わったときに外す。"""

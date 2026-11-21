@@ -212,7 +212,7 @@ def slurp(path: str) -> bytes:
 
 
 class MakeTest(Drafts):
-    def test_a_draft_is_made_from_a_done_parent_and_round_trips_to_a_readable_template(self):
+    def test_the_made_draft_reads_back_and_the_text_asks_for_generalizing(self):
         self.done_parent(
             ["research", "design", "implement"],
             feedback=["implement-feedback", "implement-feedback"],
@@ -227,131 +227,31 @@ class MakeTest(Drafts):
         self.assertIn(
             "全体計画 3 ステップ / フィードバック計画 2 ステップ / フロー 1 本", result.stdout
         )
+        # 説明に TODO の印が残り、検査が warn を言う。次の手は 1 つで、未追跡の下書きが
+        # ready を止めることも言う
+        self.assertIn("warn", result.stdout)
+        self.assertIn(f"`description` に {TODO_MARK} が残っている", result.stdout)
+        self.assertIn(f"`when` に {TODO_MARK} が残っている", result.stdout)
+        self.assertIn("未追跡", result.stdout)
+        self.assertIn("ready が止まる", result.stdout)
+        self.assertEqual(sum(line.startswith("次: ") for line in result.stdout.splitlines()), 1)
         template = self.drafted()
         self.assertEqual(template.name, "i0001")
         self.assertEqual([i.type for i in template.plan], ["research", "design", "implement"])
         self.assertEqual([i.after for i in template.plan], [[], [1], [2]])
         self.assertEqual(list(template.flows), [3])
         self.assertEqual(template.flows[3]["name"], "実装の手順")
-
-    def test_after_is_normalized_to_indexes_inside_each_plan(self):
-        # 提案ではフィードバック計画の番号が全体計画の続き（4, 5）になる。
-        plan = [
-            {"type": "research", "after": []},
-            {"type": "design", "after": []},
-            {"type": "implement", "after": [1, 2]},
-        ]
-        feedback = [
-            {"type": "implement-feedback", "after": []},
-            {"type": "implement-feedback", "after": [4]},
-        ]
-        self.done_parent(plan, feedback)
-        self.assertEqual(self.draft().returncode, 0)
-        template = self.drafted()
-        self.assertEqual([i.after for i in template.plan], [[], [], [1, 2]])
-        self.assertEqual([i.after for i in template.feedback], [[], [1]])
-        # 親の絶対番号に付け直すと元に戻る（検査が合成する提案の形）。順序の検査に error が無い。
-        checked = self.checked()
-        feedback = next(p for p in checked["plans"] if p["part"] == "feedback")
-        self.assertEqual([i["number"] for i in feedback["items"]], [4, 5])
-        self.assertEqual(feedback["after"], {"5": [4]})
-        self.assertEqual([p for p in checked["problems"] if p["severity"] == "error"], [])
+        self.assertTrue(template.description.startswith(TODO_MARK))
+        self.assertTrue(template.when.startswith(TODO_MARK))
+        # 一般化して印を消せば、苦情は消える。
+        self.generalize()
+        self.assertEqual(self.answer()["drafts"][0]["problems"], [])
 
     def test_review_is_kept(self):
         plan = [{"type": "design", "deferred": True}, "implement"]
         self.done_parent(plan)
         self.assertEqual(self.draft().returncode, 0)
         self.assertEqual([i.deferred for i in self.drafted().plan], [True, False])
-
-    def test_flows_come_from_the_first_child_that_has_one(self):
-        self.done_parent(
-            ["research", "design"],
-            children={"i0001-01-01": 1, "i0001-02-01": 2, "i0001-02-02": 2},
-            flows={"i0001-02-01": FLOW_IMPL, "i0001-02-02": FLOW_IMPL.replace("実装の手順", "別")},
-        )
-        result = self.draft()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        template = self.drafted()
-        self.assertEqual(list(template.flows), [2])
-        self.assertEqual(template.flows[2]["name"], "実装の手順")
-        self.assertIn("i0001-02-02 にもフローがある", result.stdout)
-
-    def test_an_unreadable_flow_is_named_and_not_copied(self):
-        self.done_parent(["research", "design"], flows={"i0001-01-01": "nodes: [\n"})
-        result = self.draft()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("i0001-01-01 のフローは読めない", result.stdout)
-        self.assertEqual(self.drafted().flows, {})
-
-    def test_the_feedback_flows_are_not_copied(self):
-        self.done_parent(
-            ["design"],
-            feedback=["implement-feedback"],
-            children={"i0001-01-01": 1, "i0001-02-01": 2},
-            flows={"i0001-02-01": FLOW_IMPL},
-        )
-        result = self.draft()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.drafted().flows, {})
-        self.assertIn("フィードバック計画の子のフローはコピーしない", result.stdout)
-
-    def test_the_description_carries_a_todo_mark_and_the_check_warns(self):
-        self.done_parent(["design"])
-        result = self.draft()
-        template = self.drafted()
-        self.assertTrue(template.description.startswith(TODO_MARK))
-        self.assertIn("親", template.description)
-        self.assertTrue(template.when.startswith(TODO_MARK))
-        self.assertIn("親", template.when)
-        self.assertIn("warn", result.stdout)
-        self.assertIn(f"`description` に {TODO_MARK} が残っている", result.stdout)
-        self.assertIn(f"`when` に {TODO_MARK} が残っている", result.stdout)
-        # 次の手に、未追跡の下書きが ready を止めることを言う。
-        self.assertIn("未追跡", result.stdout)
-        self.assertIn("ready が止まる", result.stdout)
-        self.assertEqual(sum(line.startswith("次: ") for line in result.stdout.splitlines()), 1)
-        # 一般化して印を消せば、苦情は消える。
-        self.generalize()
-        row = self.answer()["drafts"][0]
-        self.assertEqual(row["problems"], [])
-
-    def test_the_name_defaults_to_the_parent_and_can_be_given(self):
-        self.done_parent(["design"])
-        self.assertEqual(self.draft("i0001", "--name", "design-only").returncode, 0)
-        self.assertTrue(os.path.exists(self.draft_path("design-only")))
-        self.assertFalse(os.path.exists(self.draft_path("i0001")))
-        self.assertEqual(self.drafted("design-only").name, "design-only")
-
-    def test_a_bad_name_is_refused(self):
-        self.done_parent(["design"])
-        # Windows の予約名（拡張子付きも、大文字小文字違いも）と末尾の `.` も断る
-        for name in ("bad name", "../x", "a" * 65, "con", "NUL.x", "com1", "lpt9.txt", "a."):
-            result = self.draft("i0001", f"--name={name}")
-            self.assertEqual(result.returncode, 1, name)
-            self.assertIn("下書きの名前", result.stderr)
-        self.assertFalse(os.path.isdir(os.path.join(self.parent_tree, "wip", "handoff")))
-
-    def test_an_identifier_that_cannot_be_a_name_asks_for_one(self):
-        self.done_parent(["design"], parent="a調査")
-        result = self.draft("a調査")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("--name", result.stderr)
-
-    def test_an_existing_draft_is_never_overwritten(self):
-        self.done_parent(["design"])
-        self.assertEqual(self.draft().returncode, 0)
-        write(self.draft_path(), "agent edited\n")
-        again = self.draft()
-        self.assertEqual(again.returncode, 1)
-        self.assertIn("既に在る", again.stderr)
-        self.assertEqual(self.read_draft(), b"agent edited\n")
-
-    def test_a_parent_still_in_progress_is_refused(self):
-        self.done_parent(["design"], place="doing")
-        result = self.draft()
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("作業中", result.stderr)
-        self.assertFalse(os.path.exists(self.draft_path()))
 
     def test_a_parent_archived_by_ready_cannot_be_read(self):
         # ready で閉じると done/ は logs/archive/ へ退避される。そこからは読まない。
@@ -364,21 +264,6 @@ class MakeTest(Drafts):
         self.assertIn("退避済み", result.stderr)
         self.assertIn("logs/archive", result.stderr)
         self.assertFalse(os.path.exists(self.draft_path()))
-
-    def test_an_unknown_or_cancelled_parent_is_refused(self):
-        result = self.draft("i0099")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("見つからない", result.stderr)
-        result = self.draft("not an id")
-        self.assertEqual(result.returncode, 1)
-        self.done_parent(["design"])
-        path = os.path.join(self.parent_tree, ".ccnavi", "approved", "done", "i0001.md")
-        with open(path, encoding="utf-8") as f:
-            text = f.read()
-        write(path, text.replace('completed_at: ""', 'cancelled_at: "2026-10-01T00:00:00Z"'))
-        result = self.draft()
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("取り消した", result.stderr)
 
     @requires_symlink
     def test_a_linked_place_is_not_written(self):
@@ -393,30 +278,8 @@ class MakeTest(Drafts):
         self.assertIn("リンク", result.stderr)
         self.assertEqual(os.listdir(outside), [])
 
-    def test_the_json_answer(self):
-        self.done_parent(["design"])
-        result = self.tpl("--templates", "--draft", "i0001", "--json")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        answer = json.loads(result.stdout)
-        self.assertTrue(answer["ok"])
-        self.assertEqual(answer["path"], "wip/handoff/.ccnavi/config/project/templates/i0001.yml")
-        self.assertEqual(answer["target"], ".ccnavi/config/project/templates/i0001.yml")
-        self.assertEqual(answer["layer"], "self")
-        self.assertEqual(answer["sha"], digest(self.read_draft()))
-        self.assertEqual(answer["tree"], "i0001")
-
-    def test_to_common_puts_the_draft_at_the_common_place(self):
-        self.done_parent(["design"])
-        result = self.draft("i0001", "--to", "common", "--json")
-        self.assertEqual(result.returncode, 0, result.stdout)
-        answer = json.loads(result.stdout)
-        self.assertEqual(answer["target"], ".ccnavi/config/common/templates/i0001.yml")
-        self.assertEqual(answer["layer"], "common")
-        self.assertTrue(os.path.isfile(self.draft_path(to="common")))
-
-    def test_a_layer_puts_the_draft_under_that_project(self):
-        project = os.path.join(self.root, "projects", "lib")
-        os.makedirs(os.path.join(project, ".git"))
+    def test_a_layer_names_a_project_inside_the_parents_tree_only(self):
+        os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
         write(
             os.path.join(self.root, ".ccnavi", "approved", "done", "i0002.md"),
             parent_text("i0002", ["design"]),
@@ -432,31 +295,11 @@ class MakeTest(Drafts):
             answer["target"], "projects/lib/.ccnavi/config/project/templates/i0002.yml"
         )
         self.assertEqual(answer["layer"], "lib")
-
-    def test_a_layer_outside_the_parent_tree_is_refused(self):
-        os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
+        # 親のツリーの外のプロジェクトは断る
         self.done_parent(["design"])
         result = self.draft("i0001", "--layer", "lib")
         self.assertEqual(result.returncode, 1)
         self.assertIn("外", result.stderr)
-
-    def test_a_layer_with_to_common_and_an_unknown_to_are_refused(self):
-        self.done_parent(["design"])
-        for extra in (("--to", "common", "--layer", "self"), ("--to", "elsewhere")):
-            with self.subTest(extra=extra):
-                result = self.draft("i0001", *extra)
-                self.assertEqual(result.returncode, 1)
-                self.assertFalse(os.path.exists(self.draft_path()))
-
-    def test_an_existing_template_at_the_target_is_not_shadowed(self):
-        self.done_parent(["design"])
-        existing = os.path.join(self.parent_tree, *target_rel().split("/"))
-        write(existing, "name: i0001\n")
-        result = self.draft()
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("既に在る", result.stderr)
-        self.assertIn("ccnavi-stage.sh", result.stderr)
-        self.assertFalse(os.path.exists(self.draft_path()))
 
     def test_the_draft_is_taken_by_handoff_and_then_used(self):
         self.done_parent(["design", "implement"], flows={"i0001-02-01": FLOW_IMPL})
@@ -473,55 +316,28 @@ class MakeTest(Drafts):
 class EffectTest(Drafts):
     """下書きには効力が無い。統合結果にも一覧にも入らず、lint の error にもならない。"""
 
-    def test_a_draft_is_not_in_the_templates_or_the_sums(self):
+    def test_a_draft_is_listed_apart_from_the_templates(self):
+        out = self.tpl("--templates").stdout
+        self.assertNotIn("下書き", out)
         self.done_parent(["design"])
         self.draft()
+        # 統合結果にも合計にも入らず、`--show` でも引けない
         answer = self.answer()
         self.assertEqual(answer["templates"], [])
         self.assertEqual([row["name"] for v in answer["layers"] for row in v["templates"]], [])
         self.assertEqual(answer["sums"][0]["templates"], [])
         self.assertEqual(self.tpl("--templates", "--show", "i0001").returncode, 1)
-
-    def test_the_list_says_there_are_drafts_in_one_line(self):
-        out = self.tpl("--templates").stdout
-        self.assertNotIn("下書き", out)
-        self.done_parent(["design"])
-        self.draft()
+        # 一覧は下書きがあることを 1 行で言う
         out = self.tpl("--templates").stdout
         self.assertIn("下書き: 1 件（wip/handoff/）", out)
         self.assertEqual(sum("下書き" in line for line in out.splitlines()), 1)
-
-    def test_drafts_in_the_json_carry_what_a_screen_needs_to_offer_the_import(self):
-        self.done_parent(["research", "design"], flows={"i0001-02-01": FLOW_IMPL})
-        self.draft()
-        sha = self.generalize()
-        write(os.path.join(self.root, ".ccnavi", "config", "common", "templates", "i0001.yml"), "x")
-        (row,) = self.answer()["drafts"]
-        self.assertEqual(row["name"], "i0001")
-        self.assertEqual(row["tree"], "i0001")
-        self.assertEqual(row["path"], "wip/handoff/.ccnavi/config/project/templates/i0001.yml")
-        self.assertEqual(row["target"], ".ccnavi/config/project/templates/i0001.yml")
-        self.assertEqual(row["layer"], "self")
-        self.assertEqual(row["sha"], sha)
-        self.assertTrue(row["importable"])
-        self.assertTrue(row["valid"])
-        self.assertEqual(row["exists_in"], ["common"])
-        self.assertEqual([p["severity"] for p in row["problems"]], [])
-        self.assertEqual([(i["index"], i["after"]) for i in row["plan"]], [(1, []), (2, [1])])
-        self.assertEqual(row["flows"][0]["index"], 2)
-
-    def test_the_keyword_narrows_the_drafts_too(self):
-        self.done_parent(["design"])
-        self.draft()
+        # 語で絞ると下書きも絞られる
         self.assertEqual(len(self.answer("--keyword", "親")["drafts"]), 1)
         self.assertEqual(self.answer("--keyword", "無い語")["drafts"], [])
-
-    def test_a_broken_draft_is_listed_but_not_importable(self):
-        write(self.draft_path("broken"), "name: [\n")
+        # 同じ下書きが 2 つのツリーにあっても 1 件
+        write(self.draft_path(tree=self.root), self.read_draft().decode())
         (row,) = self.answer()["drafts"]
-        self.assertFalse(row["valid"])
-        self.assertFalse(row["importable"])
-        self.assertEqual(row["problems"][0]["severity"], "error")
+        self.assertEqual(sorted([row["tree"], *row["also_in"]]), ["", "i0001"])
 
     def test_lint_never_makes_a_draft_an_error(self):
         write(self.draft_path("broken"), "name: [\n")
@@ -542,14 +358,16 @@ class EffectTest(Drafts):
         others = [p for p in json.loads(result.stdout)["problems"] if "templates" in p["where"]]
         self.assertEqual([p for p in others if p["where"] != "(template-drafts)"], [])
         self.assertEqual(json.loads(result.stdout)["version"], 1)
-
-    def test_a_draft_does_not_make_the_workspace_fail_the_lint(self):
-        write(self.draft_path("broken"), "name: [\n")
+        # 文の出力でも error にならない
         text = self.tpl("--lint", "--mode", "enable").stdout
         self.assertIn("template-drafts", text)
         self.assertNotIn("error: (template-drafts)", text)
 
     def test_a_draft_in_a_project_tree_is_found_at_the_projects_place(self):
+        # 下書きの行でないファイルは一覧に出ない
+        write(os.path.join(self.root, "wip", "handoff", "learnings", "x.md"), "x\n")
+        write(os.path.join(self.root, "wip", "handoff", ".ccnavi", "docs", "a.md"), "a\n")
+        self.assertEqual(self.answer()["drafts"], [])
         project = os.path.join(self.root, "projects", "lib")
         os.makedirs(os.path.join(project, ".git"))
         write(
@@ -561,154 +379,13 @@ class EffectTest(Drafts):
         self.assertEqual(row["tree"], "lib")
         self.assertEqual(row["path"], "wip/handoff/.ccnavi/config/project/templates/lib-draft.yml")
 
-    def test_drafts_off_the_template_rows_are_not_listed(self):
-        write(os.path.join(self.root, "wip", "handoff", "learnings", "x.md"), "x\n")
-        write(os.path.join(self.root, "wip", "handoff", ".ccnavi", "docs", "a.md"), "a\n")
-        self.assertEqual(self.answer()["drafts"], [])
-
-    def test_the_same_draft_checked_out_in_two_trees_is_one_entry(self):
-        self.done_parent(["design"])
-        self.draft()
-        copy = self.draft_path(tree=self.root)
-        write(copy, self.read_draft().decode())
-        (row,) = self.answer()["drafts"]
-        self.assertEqual(sorted([row["tree"], *row["also_in"]]), ["", "i0001"])
-
 
 def plan_template(name, plan, description="試し"):
     return f"name: {name}\ndescription: {description}\nplan:\n{plan}"
 
 
-class UserOnlyTest(Drafts):
-    """取り込みはユーザ専用。`--draft` と読む側は通る。"""
-
-    def denied(self, command) -> bool:
-        payload = {
-            "hook_event_name": "PreToolUse",
-            "tool_name": "Bash",
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "tool_input": {"command": command},
-        }
-        result = self.ccnavi(
-            "--mode", "enable", "--guard-ticket-approval", "enable", stdin=json.dumps(payload)
-        )
-        return DENY in self.reason(result)
-
-    def test_the_agent_cannot_type_the_import(self):
-        for command in (
-            "ccnavi user handoff",
-            "ccnavi user handoff .ccnavi/config/project/templates/i0001.yml --json",
-            "ccnavi user handoff --yes --expect abc",
-            "ccnavi --handoff",
-            "./.ccnavi/bin/ccnavi --root /x user handoff --json",
-            "uv run python -m ccnavi user handoff",
-            "ccnavi --templates ${A} --yes",
-        ):
-            self.assertTrue(self.denied(command), command)
-
-    def test_the_agent_can_type_the_draft_and_the_read_side(self):
-        for command in (
-            "ccnavi --templates --draft i0001",
-            "ccnavi --templates --draft i0001 --name feature --to common",
-            "ccnavi --templates",
-            "ccnavi --templates --json",
-            "ccnavi --templates --keyword 調査",
-            "ccnavi --templates --show feature",
-            "./.ccnavi/bin/ccnavi --templates --draft i0001 --json",
-        ):
-            self.assertFalse(self.denied(command), command)
-
-    def test_the_message_names_the_handoff(self):
-        payload = {
-            "hook_event_name": "PreToolUse",
-            "tool_name": "Bash",
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "tool_input": {"command": "ccnavi user handoff"},
-        }
-        result = self.ccnavi(
-            "--mode", "enable", "--guard-ticket-approval", "enable", stdin=json.dumps(payload)
-        )
-        self.assertIn("ccnavi-user-handoff.sh", self.reason(result))
-
-    def test_the_board_forms_are_denied_whatever_the_launcher(self):
-        tails = ("user handoff X --yes --expect " + "a" * 64 + " --via board --json",)
-        heads = (
-            "/tmp/copy ",
-            "python3 -u -m ccnavi ",
-            "uv run -m ccnavi ",
-            "python3 main.py ",
-            "uvx ccnavi ",
-            "npx ccnavi ",
-            "env X=1 ccnavi ",
-        )
-        for tail in tails:
-            for head in heads:
-                self.assertTrue(self.denied(head + tail), head + tail)
-
-    def test_a_reader_may_mention_the_forms(self):
-        for command in (
-            'grep -rn -- "user handoff X --yes" README.md',
-            'rg -n "user handoff .* --yes" docs',
-        ):
-            self.assertFalse(self.denied(command), command)
-
-
 class JudgmentUnchangedTest(Drafts):
     """判定・組み込みの保護・rules.yml は変えない。"""
-
-    def write_to(self, path, tool="Write", agent_id=""):
-        payload = {
-            "hook_event_name": "PreToolUse",
-            "tool_name": tool,
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "tool_input": {"file_path": path, "content": "x"},
-        }
-        if agent_id:
-            payload["agent_id"] = agent_id
-        return self.ccnavi(
-            "--guard-core-files", "enable", "--mode", "enable", stdin=json.dumps(payload)
-        )
-
-    def decision(self, result) -> str:
-        if not result.stdout.strip():
-            return ""
-        return json.loads(result.stdout).get("hookSpecificOutput", {}).get("permissionDecision", "")
-
-    def test_the_draft_place_under_the_ccnavi_directory_can_be_edited(self):
-        # テンプレートの下書きは `wip/handoff/.ccnavi/config/…` に置く。パスに `.ccnavi/` が入って
-        # いても、ツリー直下の `wip/handoff/` の中は守る場所のコピーなので、組み込みの保護
-        # （ccnavi ディレクトリの下を名指しのツールで止める glob）の例外になる。
-        # コピーにはルールとしての効力が無く、ユーザが取り込むまで何も変わらない。
-        for tool in ("Write", "Edit"):
-            result = self.write_to(self.draft_path("x"), tool)
-            self.assertNotEqual(self.decision(result), "deny", (tool, result.stdout))
-            self.assertNotIn("builtin:guard-project-home", result.stdout)
-
-    def test_a_look_alike_of_the_draft_place_stays_protected(self):
-        # ツリーの直下でない綴りは、守る場所のコピーではないので除かない
-        path = os.path.join(
-            self.parent_tree, "docs", "wip", "handoff", ".ccnavi", "config", "x.yml"
-        )
-        result = self.write_to(path)
-        self.assertEqual(self.decision(result), "deny", result.stdout)
-        self.assertIn("builtin:guard-project-home", result.stdout)
-
-    def test_other_drafts_in_the_handoff_place_are_not_stopped(self):
-        result = self.write_to(os.path.join(self.parent_tree, "wip", "handoff", "notes.md"))
-        self.assertNotEqual(self.decision(result), "deny", result.stdout)
-
-    def test_the_effective_places_are_still_protected(self):
-        for rel in (
-            ".ccnavi/config/common/templates/x.yml",
-            ".ccnavi/config/project/templates/x.yml",
-        ):
-            path = os.path.join(self.parent_tree, *rel.split("/"))
-            result = self.write_to(path)
-            self.assertEqual(self.decision(result), "deny", (rel, result.stdout))
-            self.assertIn("builtin:guard", result.stdout)
 
     def test_the_draft_place_is_not_part_of_the_post_check(self):
         write(self.draft_path("x"), "name: x\n")

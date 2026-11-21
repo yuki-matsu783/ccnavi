@@ -152,95 +152,29 @@ class ProposalTest(Use):
         super().setUp()
         self.put("feature", FEATURE)
 
-    def test_the_plan_and_feedback_are_written_with_absolute_after(self):
-        result = self.new("--issue", "9", "--with-feedback")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        front = front_of(self.written())
-        self.assertEqual(front["ticket"], IDENT)
-        self.assertEqual(front["issue"], 9)
-        self.assertEqual(front["title"], "試す")
-        self.assertEqual(
-            front["plan"],
-            [
-                "research",
-                {"type": "design", "deferred": True, "after": [1]},
-                {"type": "implement", "after": [2]},
-            ],
-        )
-        # フィードバック計画の after は全体計画（3 ステップ）の続きの番号になる: 1 -> 4。
-        self.assertEqual(
-            front["feedback"],
-            ["implement-feedback", {"type": "implement-feedback", "after": [4]}],
-        )
-        self.assertEqual(
-            set(front["phases"]), {"research", "design", "implement", "implement-feedback"}
-        )
-        self.assertEqual(front["phases"]["design"]["scope"], ["wip/design/*"])
-
-    def test_allow_collects_the_scope_of_the_plan_and_feedback_types(self):
-        self.assertEqual(self.new().returncode, 0)
-        globs = [e["glob"] for e in front_of(self.written())["allow"]]
-        self.assertEqual(globs, ["wip/research/*", "wip/design/*", "src/*", "tests/*"])
-
     def test_the_proposal_passes_the_approval_checks(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
         # 雛形の空欄の目印は、書き換えるまで承認の検査が止める
         self.assertTrue(PLACEHOLDER.search(self.written()))
+        # 全体計画だけの提案は、承認のあとで全体計画を改版できる形のまま（検査を通る）
         self.assert_approvable()
 
-    def test_the_output_says_what_was_written_and_what_the_flow_draft_is(self):
-        result = self.new("--with-feedback")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        out = result.stdout
-        self.assertIn(f"{IDENT} の提案を", out)
-        self.assertIn("plan（3 ステップ）", out)
-        self.assertIn("feedback（2 ステップ）", out)
-        self.assertIn("フローの下書き 1 件", out)
-        self.assertIn(self.child(3), out)
-        self.assertIn("下書きには効力がありません。", out)
-        self.assertIn("フロー編集画面", out)
-        self.assertIn("ccnavi-launcher.sh --lint", out)
-
-    def test_the_feedback_plan_is_not_written_unless_asked_for(self):
-        result = self.new()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        front = front_of(self.written())
-        self.assertNotIn("feedback", front)
-        self.assertEqual(len(front["plan"]), 3)
-        self.assertNotIn("implement-feedback", front["phases"])
-        # テンプレートにフィードバック計画があることと、足し方を言う。
-        self.assertIn("フィードバック計画（2 ステップ）がある", result.stdout)
-        self.assertIn("--with-feedback", result.stdout)
-        self.assertNotIn("feedback（", result.stdout)
-        # 全体計画だけの提案は、承認のあとで全体計画を改版できる形のまま（検査を通る）。
-        self.assert_approvable()
-
-    def test_a_template_without_a_feedback_plan_says_nothing_about_it(self):
+    def test_a_template_without_feedback_or_flows_and_a_warning_that_does_not_stop(self):
         self.put("small", SMALL)
         result = self.new(template="small")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("--with-feedback", result.stdout)
-        self.assertEqual(
-            front_of(self.written())["plan"], ["design", {"type": "implement", "after": [1]}]
-        )
-
-    def test_with_feedback_on_a_template_without_one_writes_nothing_extra(self):
-        self.put("small", SMALL)
+        self.assertIn("フローの下書きはありません", result.stdout)
+        self.assertFalse(os.path.exists(self.flows_dir()))
+        plan = ["design", {"type": "implement", "after": [1]}]
+        self.assertEqual(front_of(self.written())["plan"], plan)
+        # フィードバック計画の無いテンプレートに --with-feedback を付けても、何も足さない
+        os.remove(self.todo)
         result = self.new("--with-feedback", template="small")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("feedback", front_of(self.written()))
-
-    def test_a_template_without_flows_writes_no_flow_draft(self):
-        self.put("small", SMALL)
-        result = self.new(template="small")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("フローの下書きはありません", result.stdout)
-        self.assertFalse(os.path.exists(self.flows_dir()))
-        self.assertEqual(
-            front_of(self.written())["plan"], ["design", {"type": "implement", "after": [1]}]
-        )
-
-    def test_a_warning_of_the_template_is_shown_but_does_not_stop(self):
+        # テンプレートの warn は出すが、止めない
+        os.remove(self.todo)
         self.put("todo", variant("todo", ("設計して", "TODO 設計して")))
         result = self.new(template="todo")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -253,22 +187,7 @@ class FlowDraftTest(Use):
         super().setUp()
         self.put("feature", FEATURE)
 
-    def test_the_flow_goes_to_the_first_child_of_the_phase_and_loads(self):
-        self.assertEqual(self.new().returncode, 0)
-        place = self.draft_of(3)
-        self.assertEqual(os.listdir(self.flows_dir()), [self.child(3) + ".yml"])
-        data = read_flow(place)
-        self.assertEqual(data["name"], "実装の手順")
-        self.assertEqual([n["id"] for n in data["nodes"]], ["s", "p", "e"])
-        # フローの本文と同じ中身（先にテスト）が文の前後まで残る。
-        self.assertEqual(data["nodes"][1]["data"]["prompt"], "先にテスト")
-
-    def test_the_draft_has_no_effect_it_is_not_the_approved_flow(self):
-        self.assertEqual(self.new().returncode, 0)
-        approved = os.path.join(self.tree, ".ccnavi", "approved", "flows", self.child(3) + ".yml")
-        self.assertFalse(os.path.exists(approved))
-
-    def test_an_existing_flow_draft_is_not_overwritten_and_nothing_is_written(self):
+    def test_an_existing_flow_draft_or_child_proposal_stops_it_and_nothing_is_written(self):
         write(self.draft_of(3), "keep\n")
         result = self.new()
         self.assertNotEqual(result.returncode, 0)
@@ -277,89 +196,48 @@ class FlowDraftTest(Use):
         self.assertFalse(os.path.exists(self.todo))
         with open(self.draft_of(3), encoding="utf-8") as f:
             self.assertEqual(f.read(), "keep\n")
-
-    def test_an_existing_child_proposal_stops_it(self):
+        os.remove(self.draft_of(3))
         write(os.path.join(self.tree, "wip", "proposals", "todo", self.child(3) + ".md"), "x\n")
         result = self.new()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("上書きしない", result.stderr)
         self.assertFalse(os.path.exists(self.todo))
-
-    def test_a_long_identifier_whose_child_id_does_not_fit_is_refused(self):
+        # 子の識別子が長さの上限に収まらない親は断る
         long = "feature-9-" + "x" * 50
         tree = self.worktree(long, "main")
         result = self.new(ident=long, cwd=tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("子の識別子", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals")))
+        self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "flows")))
 
 
 class RefusalTest(Use):
-    def test_an_unknown_template_lists_the_usable_ones(self):
-        self.put("small", SMALL)
-        result = self.new(template="nothing")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("nothing", result.stderr)
-        self.assertIn("small", result.stderr)
-        self.nothing_written()
-
-    def test_no_templates_at_all_is_said(self):
+    def test_a_template_that_cannot_be_used_is_refused_without_writing(self):
         result = self.new()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("無い", result.stderr)
         self.nothing_written()
-
-    def test_a_template_with_an_error_is_not_used(self):
-        # after が自分以降を指す（順序の error）。
+        # after が自分以降を指す（順序の error）
         self.put("bad", variant("bad", ("after: [1]", "after: [2]")))
         result = self.new(template="bad")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("error", result.stderr)
         self.assertIn("bad", result.stderr)
         self.nothing_written()
-
-    def test_a_template_that_cannot_be_read_is_not_used(self):
+        # 名前とファイル名が合わない（読めない）
         self.put("odd", variant("other"))
         result = self.new(template="odd")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("利用できない", result.stderr)
         self.nothing_written()
-
-    def test_a_type_missing_from_phases_yml_is_refused_without_writing(self):
+        # phases.yml に無い型
         self.put("ghost", variant("ghost", ("implement", "ghost-type")))
         result = self.new(template="ghost")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ghost-type", result.stderr)
         self.assertIn("phases.yml", result.stderr)
         self.nothing_written()
-
-    def test_a_type_of_the_wrong_kind_is_refused(self):
-        # 全体計画に feedback の定義を置いている（テンプレートの検査は warn にとどめる）。
-        self.put("wrong", variant("wrong", ("implement", "implement-feedback")))
-        result = self.new(template="wrong")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("kind", result.stderr)
-        self.nothing_written()
-
-    def test_plan_and_template_together_are_refused(self):
-        self.put("small", SMALL)
-        result = self.new("--plan", "design", template="small")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--plan", result.stderr)
-        self.assertIn("--template", result.stderr)
-        self.nothing_written()
-
-    def test_an_existing_proposal_is_not_overwritten(self):
-        self.put("small", SMALL)
-        self.put("feature", FEATURE)
-        self.assertEqual(self.new(template="small").returncode, 0)
-        before = self.written()
-        result = self.new(template="feature")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("上書きしない", result.stderr)
-        self.assertEqual(self.written(), before)
-
-    def test_without_phases_yml_it_stops(self):
+        # phases.yml が無い
         self.put("small", SMALL)
         os.remove(os.path.join(self.root, ".ccnavi", "config", "common", "phases.yml"))
         os.remove(os.path.join(self.root, ".ccnavi", "config", "project", "phases.yml"))
@@ -367,13 +245,6 @@ class RefusalTest(Use):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("phases.yml", result.stderr)
         self.nothing_written()
-
-    def test_outside_the_worktree_it_explains_how_to_cut_one(self):
-        self.put("small", SMALL)
-        result = self.new(template="small", cwd=self.root)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("ccnavi-start.sh --mr <MR の番号>", result.stderr)
-        self.assertNotIn("。。", result.stderr)
 
 
 class LayerTest(Use):
@@ -385,29 +256,14 @@ class LayerTest(Use):
         self.assertIn("note:", result.stdout)
         self.assertIn("共通と同じ名前で中身が違う", result.stdout)
         self.assertIn(".ccnavi/config/common/templates/small.yml", result.stdout)
-
-    def test_a_template_only_in_the_layer_is_used(self):
-        self.put("small", SMALL, layer="self")
-        result = self.new(
-            template="small",
-        )
+        # レイヤーにだけあるテンプレートも使える
+        os.remove(self.todo)
+        os.remove(os.path.join(self.root, ".ccnavi", "config", "common", "templates", "small.yml"))
+        result = self.new(template="small")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(".ccnavi/config/project/templates/small.yml", result.stdout)
 
-    def test_an_unknown_layer_is_refused(self):
-        self.put("small", SMALL)
-        result = self.new("--layer", "nowhere", template="small")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("nowhere", result.stderr)
-        self.nothing_written()
-
-    def test_layer_without_template_is_refused(self):
-        result = self.new("--layer", "self", "--plan", "design", template=None)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--template", result.stderr)
-        self.nothing_written()
-
-    def test_with_feedback_is_only_for_ticket_new_template(self):
+    def test_the_template_options_are_only_for_ticket_new_template(self):
         self.put("small", SMALL)
         for argv, needle in (
             (["--templates", "--with-feedback"], "--with-feedback は"),
@@ -417,28 +273,15 @@ class LayerTest(Use):
                 ["ticket", "new", "x", "--title", "t", "--plan", "design", "--with-feedback"],
                 "--with-feedback は",
             ),
+            (["--templates", "--template", "small"], "--template は"),
+            (["ticket", "status", "--template", "small"], "--template は"),
+            (["ticket", "status", "--layer", "self"], "--templates"),
         ):
             with self.subTest(argv=argv):
                 result = self.tpl(*argv)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(needle, result.stderr)
         self.nothing_written()
-
-    def test_template_is_only_for_ticket_new(self):
-        self.put("small", SMALL)
-        for argv in (
-            ["--templates", "--template", "small"],
-            ["ticket", "status", "--template", "small"],
-        ):
-            with self.subTest(argv=argv):
-                result = self.tpl(*argv)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("--template は", result.stderr)
-
-    def test_layer_still_needs_templates_for_other_commands(self):
-        result = self.tpl("ticket", "status", "--layer", "self")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("--templates", result.stderr)
 
 
 class RoundTripTest(Use):

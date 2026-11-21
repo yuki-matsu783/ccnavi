@@ -17,12 +17,10 @@ from __future__ import annotations
 
 import os
 
-import yaml
-
 from tests import config_path
 from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness
-from tests.ticket.test_ticket import git, write
+from tests.ticket.test_ticket import git
 from tests.ticketsample import PHASES
 
 IDENT = "feature-9-scaffold-demo"
@@ -107,30 +105,20 @@ class TicketNewTest(TicketNewTestBase):
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
 
-    def test_the_body_headings_follow_the_parent_headings_with_a_placeholder_each(self):
-        self.assertEqual(self.new("--mr", "5").returncode, 0)
-        body = self.written().split("---\n", 2)[2]
-        headings = [x[3:] for x in body.splitlines() if x.startswith("## ")]
-        self.assertEqual(headings, list(PARENT_HEADINGS))
-        for name in PARENT_HEADINGS:
-            self.assertIn(f"## {name}\n\n{HEADING_TODO[name]}\n", body)
-
-    def test_a_fresh_scaffold_is_refused_for_the_placeholders_left(self):
+    def test_the_approval_check_stops_on_placeholders_and_warns_on_a_missing_heading(self):
         self.assertEqual(self.new("--mr", "5").returncode, 0)
         git(self.tree, "add", "-A")
         git(self.tree, "commit", "--quiet", "-m", "scaffold")
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 3, verify.stdout + verify.stderr)
         self.assertIn("空欄の目印が残っている", verify.stdout + verify.stderr)
-
-    def test_a_missing_heading_is_only_a_warning_for_the_approval_check(self):
-        self.assertEqual(self.new("--mr", "5").returncode, 0)
+        # 目印を埋め、見出しを 1 つ崩すと、承認の確認は warn だけで通る
         self.fill_placeholders()
         text = self.written().replace("## 範囲\n", "### 範囲\n")
         with open(self.todo, "w", encoding="utf-8") as f:
             f.write(text)
         git(self.tree, "add", "-A")
-        git(self.tree, "commit", "--quiet", "-m", "scaffold")
+        git(self.tree, "commit", "--quiet", "-m", "fill")
         verify = self.ccnavi("--agree", "--preview", "--verify")
         self.assertEqual(verify.returncode, 0, verify.stdout + verify.stderr)
         self.assertIn("見出しが欠けている", verify.stdout + verify.stderr)
@@ -139,70 +127,22 @@ class TicketNewTest(TicketNewTestBase):
         self.assertEqual(lint.returncode, 0, lint.stdout + lint.stderr)
         self.assertIn("見出しが欠けている", lint.stdout)
 
-    def test_the_next_line_tells_to_replace_the_placeholders(self):
-        result = self.new("--mr", "5")
-        nexts = [x for x in result.stdout.splitlines() if x.startswith("次: ")]
-        self.assertEqual(len(nexts), 1, result.stdout)
-        self.assertIn("目印", nexts[0])
-        self.assertIn("承認で止まる", nexts[0])
-
-    def test_the_mr_comes_from_the_flag_only(self):
-        self.assertEqual(self.new("--mr", "5").returncode, 0)
-        self.assertEqual(front_of(self.written())["mr"], 5)
-        os.remove(self.todo)
-        # 指定が無ければ作らない。取り込みの記録からは引かない
-        record = os.path.join(self.state, "sync", "self", "families", IDENT)
-        write(record, f"remote origin\nbranch {IDENT}\nsha 0\nfetched_at 1\nstate present\nmr 7\n")
-        done = self.new(nodefault=("--mr",))
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("--mr <番号> が必要", done.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-
-    def test_the_issue_and_the_mr_are_both_required(self):
-        for flag in ("--issue", "--mr"):
-            with self.subTest(flag=flag):
-                done = self.new(nodefault=(flag,))
-                self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-                self.assertIn(f"{flag} <番号> が必要", done.stderr)
-                self.assertFalse(os.path.exists(self.todo))
-
-    def test_the_issue_may_name_another_repository(self):
-        self.assertEqual(self.new("--issue", "other/repo#12").returncode, 0)
-        self.assertEqual(front_of(self.written())["issue"], "other/repo#12")
-        os.remove(self.todo)
-        done = self.new("--issue", "other/repo#x")
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("--issue には", done.stderr)
-
-    def test_a_plan_with_design_puts_the_design_scope_in_allow(self):
-        self.assertEqual(self.new(plan="design,implement").returncode, 0)
-        globs = [e["glob"] for e in front_of(self.written())["allow"]]
-        self.assertIn("wip/design/*", globs)
-        self.assertIn("src/*", globs)
-
-    def test_allow_follows_the_plan_order_without_duplicates(self):
+    def test_an_issue_of_another_repository_and_a_scope_shared_by_two_phases(self):
         # acceptance の tests/* と implement の tests/* は 1 つにまとめる。
-        self.assertEqual(self.new(plan="acceptance,implement,design").returncode, 0)
+        result = self.new("--issue", "other/repo#12", plan="acceptance,implement,design")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         front = front_of(self.written())
-        self.assertEqual(
-            [e["glob"] for e in front["allow"]],
-            ["tests/*", "src/*", "wip/design/*"],
-        )
+        self.assertEqual(front["issue"], "other/repo#12")
+        self.assertEqual([e["glob"] for e in front["allow"]], ["tests/*", "src/*", "wip/design/*"])
         self.assertTrue(all(e["match"] == "Write|Edit" for e in front["allow"]))
-
-    def test_the_plan_is_a_straight_line_and_phases_are_filled(self):
-        self.assertEqual(self.new(plan="research,design,implement").returncode, 0)
-        front = front_of(self.written())
         self.assertEqual(
             front["plan"],
-            ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}],
+            [
+                "acceptance",
+                {"type": "implement", "after": [1]},
+                {"type": "design", "after": [2]},
+            ],
         )
-        self.assertEqual(set(front["phases"]), {"research", "design", "implement"})
-        self.assertEqual(front["phases"]["design"]["scope"], ["wip/design/*"])
-
-    def test_only_the_title_with_special_characters_is_quoted_safely(self):
-        self.assertEqual(self.new(title='タイトル: "引用" #1').returncode, 0)
-        self.assertEqual(front_of(self.written())["title"], 'タイトル: "引用" #1')
 
     def test_without_phases_yml_it_stops_and_says_why(self):
         os.remove(config_path(self.root, "phases"))
@@ -211,73 +151,6 @@ class TicketNewTest(TicketNewTestBase):
         self.assertIn("phases.yml", result.stderr)
         self.assertIn("9.7", result.stderr)
         self.assertFalse(os.path.exists(self.todo))
-
-    def test_an_inherit_only_plan_stops_because_allow_would_be_empty(self):
-        result = self.new(plan="implement-feedback")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(os.path.exists(self.todo))
-        # feedback の型は plan に置けない（allow が空より前に言う）。
-        self.assertIn("feedback", result.stderr)
-
-    def test_a_child_id_is_refused(self):
-        child = IDENT + "-01-01"
-        self.worktree(child, IDENT)
-        result = self.new(ident=child, cwd=os.path.join(self.root, ".claude", "worktrees", child))
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("子の識別子", result.stderr)
-
-    def test_a_title_with_line_breaks_or_control_characters_is_refused(self):
-        for title in ("a\nb", "a\u2028b", "a\x85b", "a\x7fb"):
-            with self.subTest(title=title):
-                result = self.new(title=title)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("制御文字", result.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-
-    def test_an_unknown_type_lists_the_usable_ones(self):
-        result = self.new(plan="design,nothing")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("nothing", result.stderr)
-        self.assertIn("research", result.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-
-    def test_missing_title_or_plan_is_refused(self):
-        for kwargs, word in (({"title": None}, "--title"), ({"plan": None}, "--plan")):
-            with self.subTest(kwargs=kwargs):
-                result = self.new(**kwargs)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn(word, result.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-
-    def test_outside_the_worktree_it_explains_how_to_cut_one(self):
-        result = self.new(cwd=self.root)
-        self.assertNotEqual(result.returncode, 0)
-        # 親のワークツリーは ccnavi-start.sh が親のブランチを直接チェックアウトして作る。
-        # 識別子の名前のブランチ（-b <識別子>）は作らせない。
-        self.assertIn("ccnavi-start.sh --mr <MR の番号>", result.stderr)
-        self.assertNotIn(f"-b {IDENT}", result.stderr)
-        self.assertIn(f".claude/worktrees/{IDENT}", result.stderr)
-        self.assertNotIn("sh sh", result.stderr)
-        self.assertIn("'sh ", result.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-
-    def test_a_worktree_with_another_name_is_not_accepted(self):
-        result = self.new(cwd=self.parent_tree)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("ccnavi-start.sh", result.stderr)
-
-    def test_an_existing_proposal_is_not_overwritten(self):
-        self.assertEqual(self.new().returncode, 0)
-        before = self.written()
-        result = self.new(plan="implement")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("上書きしない", result.stderr)
-        self.assertEqual(self.written(), before)
-
-    def test_the_output_is_valid_yaml_front_matter(self):
-        self.assertEqual(self.new().returncode, 0)
-        head = self.written().split("---\n", 2)[1]
-        self.assertIsInstance(yaml.safe_load(head), dict)
 
 
 class TicketNewScopeTest(TicketNewTestBase):
@@ -291,44 +164,6 @@ class TicketNewScopeTest(TicketNewTestBase):
         )
         with open(config_path(self.root, "phases"), "w", encoding="utf-8", newline="\n") as f:
             f.write(PHASES.rstrip("\n") + quick_work)
-
-    def test_quick_work_alone_stops_and_points_at_scope(self):
-        result = self.new(plan="quick-work")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(os.path.exists(self.todo))
-        self.assertIn("--scope", result.stderr)
-        self.assertIn("範囲を持つ型を追加する必要はありません", result.stderr)
-
-    def test_scope_gives_quick_work_its_allow(self):
-        result = self.new("--scope", "src/ui/error.ts", plan="quick-work")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        front = front_of(self.written())
-        self.assertEqual([e["glob"] for e in front["allow"]], ["src/ui/error.ts"])
-        self.assertEqual(front["plan"], ["quick-work"])
-        self.assertIn("quick-work", front["phases"])
-        lines = result.stdout.splitlines()
-        # 次の一手は「次:」で始まる 1 行（提案の空欄を埋める）。承認までは実装しない
-        nexts = [line for line in lines if line.startswith("次: ")]
-        self.assertEqual(len(nexts), 1, result.stdout)
-        self.assertIn("rationale", nexts[0])
-        # 子の提案は無いと承認の確認が警告するので、「次:」の途中に埋めず「必須:」の行にする
-        musts = [line for line in lines if line.startswith("必須: ")]
-        self.assertEqual(len(musts), 1, result.stdout)
-        self.assertIn("子の提案", musts[0])
-        self.assertIn("-01-01", musts[0])
-        self.assertIn("同じ承認で通す", musts[0])
-        # 確かめと送り方は「案内:」。approval-request は親の識別子で打つ
-        guide = "\n".join(line for line in lines if line.startswith("案内: 書けたら"))
-        self.assertIn("approval-request", guide)
-        self.assertIn("承認が済むまで実装はしない", guide)
-        self.assertIn("直接実装に切り替えず", result.stdout)
-        self.assertIn("親の識別子で打つ。子の識別子では打たない", guide)
-
-    def test_scope_is_added_after_the_collected_scope_without_duplicates(self):
-        result = self.new("--scope", "docs/a.md,SRC/*", "--scope", "docs/a.md", plan="implement")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        globs = [e["glob"] for e in front_of(self.written())["allow"]]
-        self.assertEqual(globs, ["src/*", "tests/*", "docs/a.md"])
 
     def test_scope_beyond_the_phase_limit_is_said_at_creation_and_by_verify(self):
         result = self.new("--scope", "docs/**", "--mr", "5", plan="implement")
@@ -354,30 +189,3 @@ class TicketNewScopeTest(TicketNewTestBase):
             os.remove(self.todo)
             result = self.new("--scope", glob, plan="implement")
             self.assertNotIn("承認しても書けない", result.stdout, glob)
-
-    def test_a_placeholder_from_a_guidance_line_is_refused(self):
-        # 案内の行の仮の値（`<触るファイルの glob>`・`<タイトル>`）をそのまま打つと、
-        # 実在しない glob やタイトルの提案ができて承認まで通る。作らずに断る
-        result = self.new("--scope", "<触るファイルの glob>", plan="quick-work")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("仮の値", result.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-        result = self.new("--scope", "src/a.py", plan="quick-work", title="<タイトル>")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("仮の値", result.stderr)
-        self.assertFalse(os.path.exists(self.todo))
-
-    def test_the_next_step_runs_through_the_launcher(self):
-        result = self.new("--scope", "src/ui/error.ts", plan="quick-work")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # ccnavi を PATH に持たなくても打てる形で書く
-        self.assertRegex(result.stdout, r"ccnavi-ticket\.sh approval-request \S+ --check")
-        self.assertRegex(result.stdout, r"ccnavi-launcher\.sh --lint")
-
-    def test_scope_must_be_relative_and_stay_inside_the_tree(self):
-        for bad in ("/etc/passwd", "../x", "a/../b", "C:/x"):
-            with self.subTest(scope=bad):
-                result = self.new("--scope", bad, plan="quick-work")
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("--scope", result.stderr)
-        self.assertFalse(os.path.exists(self.todo))

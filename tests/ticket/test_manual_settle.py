@@ -140,18 +140,32 @@ class ManualSettleTest(PhaseHarness):
         self.commit_parent("move by hand")
         git(self.parent_tree, "push", "--quiet", "origin", "i0001")
 
-    def test_an_uncommitted_move_is_not_shared_and_is_not_settled(self):
+    def test_a_move_is_settled_by_confirm_only_when_shared_and_without_later_threads(self):
         self.requested()
         self.move_by_hand()
+        # 動かしただけ（未コミット）は確定しない
         self.assertIn("移動が未共有", self.status())
         refused = self.confirm(self.result([_thread()]), 1)
         self.assertNotEqual(refused.returncode, 0)
-
-    def test_a_shared_move_is_settled_by_confirm_with_a_versioned_ledger(self):
-        self.requested()
-        self.move_by_hand()
         self.share()
         self.assertIn("レビュー完了確認待ち", self.status())
+        # 移動の後に付いた指摘・移動の後の返信・時刻を読めない指摘は受け入れない
+        for label, thread, word in (
+            ("移動の後の指摘", _thread(created_at=FUTURE), "移動の後に付いた指摘"),
+            ("移動の後の返信", _thread(last_at=FUTURE, last_id="c9"), "移動の後に付いた指摘"),
+            ("時刻を読めない指摘", _thread(created_at=""), ""),
+        ):
+            with self.subTest(label):
+                refused = self.confirm(self.result([thread]), 1)
+                self.assertNotEqual(refused.returncode, 0)
+                self.assertIn(word, refused.stderr)
+                self.assertIsNone(read_mark(self.approved, "i0001", 1, "reviewed"))
+        # 変更要求があれば保留する
+        review = {"state": "CHANGES_REQUESTED", "url": "u", "submitted_at": OLD, "author": "r"}
+        refused = self.confirm(self.result([], [review]), 1)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn("変更要求", refused.stderr)
+        # 受け入れられる指摘なら、版つきの台帳に残してレビュー済みにする
         done = self.confirm(self.result([_thread()]), 1)
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         mark = read_mark(self.approved, "i0001", 1, "reviewed")
@@ -162,39 +176,6 @@ class ManualSettleTest(PhaseHarness):
         self.assertEqual(entries[0]["accepted_by"], "manual")
         self.assertEqual(entries[0]["last_comment_id"], "c1")
         self.assertTrue(entries[0]["version"])
-
-    def test_a_thread_made_after_the_move_is_not_accepted(self):
-        self.requested()
-        self.move_by_hand()
-        self.share()
-        refused = self.confirm(self.result([_thread(created_at=FUTURE)]), 1)
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("移動の後に付いた指摘", refused.stderr)
-        self.assertIsNone(read_mark(self.approved, "i0001", 1, "reviewed"))
-
-    def test_a_reply_added_after_the_move_is_not_accepted(self):
-        self.requested()
-        self.move_by_hand()
-        self.share()
-        refused = self.confirm(self.result([_thread(last_at=FUTURE, last_id="c9")]), 1)
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("移動の後に付いた指摘", refused.stderr)
-
-    def test_a_thread_with_an_unreadable_time_is_not_accepted(self):
-        self.requested()
-        self.move_by_hand()
-        self.share()
-        refused = self.confirm(self.result([_thread(created_at="")]), 1)
-        self.assertNotEqual(refused.returncode, 0)
-
-    def test_a_changes_requested_review_holds_the_move(self):
-        self.requested()
-        self.move_by_hand()
-        self.share()
-        review = {"state": "CHANGES_REQUESTED", "url": "u", "submitted_at": OLD, "author": "r"}
-        refused = self.confirm(self.result([], [review]), 1)
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("変更要求", refused.stderr)
 
     def test_stop_nudges_to_confirm_once_when_the_move_is_shared(self):
         self.requested()

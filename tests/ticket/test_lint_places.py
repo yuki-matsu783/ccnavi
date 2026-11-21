@@ -246,149 +246,55 @@ class ProjectsCollisionTest(unittest.TestCase):
         """`(projects)` の名前で出す苦情。プロジェクトごとの `(projects/<名前>)` は含めない。"""
         return [p for p in self.lint() if p["where"] == "(projects)"]
 
-    # ---- A5. 追跡があるとき
+    # 追跡があるときのぶつかりの warn 1 件・「無視されていない」を出さないこと・プロジェクトごとの
+    # 検査が続くこと・追跡が無くてプロジェクトがあり無視されていないときの案内は、Go の見本
+    # （go/internal/entry/lint/testdata/projects*.json）が見る。
 
-    def test_a_tracked_file_under_projects_is_named_once_with_the_lead_phrase(self):
-        """追跡があれば、先頭の句つきの warn を 1 件だけ出す。例のファイルも添える。"""
+    def test_a_tracked_file_is_named_without_a_project_and_even_when_ignored(self):
+        """プロジェクトが 0 件でも、`.gitignore` に入っていても出す（追跡が先に決まる）。"""
         self.track()
-        self.project()
-
         found = self.about_projects()
-
         self.assertEqual(len(found), 1, found)
-        self.assertEqual(found[0]["severity"], "warn")
         self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
-        self.assertIn("projects/foo.txt", found[0]["detail"])
-
-    def test_the_collision_replaces_the_not_ignored_warning(self):
-        """「無視されていない」は出さない。この場合、その案内（`.gitignore` に入れる）は誤り。"""
-        self.track()
-        self.project()
-
-        details = [p["detail"] for p in self.lint()]
-
-        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
-
-    def test_the_collision_is_named_even_without_any_project(self):
-        """プロジェクトが 0 件でも出す。これからプロジェクトを置こうとした人に要る知らせ。"""
-        self.track()
-
+        write(os.path.join(self.ws, ".gitignore"), "/.claude/\n/projects/\n")
         found = self.about_projects()
-
         self.assertEqual(len(found), 1, found)
         self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
 
-    def test_the_collision_is_named_when_projects_is_ignored_too(self):
-        """追跡されているものは `.gitignore` に入っていても追跡のまま。無視の有無は問わない。"""
-        self.track(ignore="/projects/\n")
-
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
-
-    def test_the_other_project_checks_still_run_beside_the_collision(self):
-        """予約名とワークツリーの誤配置の検査（各プロジェクトごと）は、衝突があっても出す。"""
-        self.track()
-        lib = self.project("lib")
-        os.makedirs(os.path.join(lib, ".claude", "worktrees", "feature-1-memo"))
-
-        details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
-
-        self.assertTrue(any("プロジェクトの中にワークツリーがある" in d for d in details), details)
-
-    # ---- A6. 追跡が無いとき（今どおり）
-
-    def test_no_tracking_and_not_ignored_still_says_not_ignored(self):
-        """追跡が無く、プロジェクトがあり、無視されていなければ、今どおり「無視されていない」。"""
-        self.no_tracking()
-        self.project()
-
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        self.assertEqual(found[0]["severity"], "warn")
-        self.assertIn(NOT_IGNORED, found[0]["detail"])
-        self.assertFalse(found[0]["detail"].startswith(TRACKED_LEAD), found[0]["detail"])
-
-    def test_no_tracking_and_ignored_says_nothing_about_projects(self):
-        self.no_tracking(ignore="/projects/\n")
-        self.project()
-
-        self.assertEqual(self.about_projects(), [])
-
-    def test_no_tracking_and_no_project_but_ignored_says_nothing_about_projects(self):
-        self.no_tracking(ignore="/projects/\n")
-
-        self.assertEqual(self.about_projects(), [])
-
-    def test_no_projects_dir_says_nothing_about_projects(self):
-        """`projects/` が無い（プロジェクトを使わない）ワークスペースには何も言わない。"""
+    def test_what_is_said_about_a_projects_place_nothing_tracks(self):
+        """追跡が無いとき。`projects/` の有無・空・リンクと無視の有無で、言うかが決まる。"""
         self.no_tracking()
         self.assertFalse(os.path.exists(self.projects))
-
         self.assertEqual(self.about_projects(), [])
-
-    def test_empty_projects_dir_and_ignored_says_nothing_about_projects(self):
-        self.no_tracking(ignore="/projects/\n")
+        # 在るが空で、無視されていなければ言う
         os.makedirs(self.projects)
-
-        self.assertEqual(self.about_projects(), [])
-
-    def test_empty_projects_dir_and_not_ignored_says_not_ignored(self):
-        """`projects/` は在るがプロジェクトが 0 件でも、無視されていなければ言う。"""
-        self.no_tracking()
-        os.makedirs(self.projects)
-
         found = self.about_projects()
-
         self.assertEqual(len(found), 1, found)
         self.assertEqual(found[0]["severity"], "warn")
         self.assertIn(NOT_IGNORED, found[0]["detail"])
-
-    def test_symlinked_projects_dir_not_ignored_still_says_not_ignored(self):
-        """`projects` がシンボリックリンクでも言う。`projects/` で問うと git が rc=128 で断る。"""
-        self.no_tracking()
+        # シンボリックリンクでも言う（`projects/` で問うと git が rc=128 で断る）
+        os.rmdir(self.projects)
         target = tempfile.mkdtemp(prefix="ccnavi-linked-")
         self.addCleanup(shutil.rmtree, target, ignore_errors=True)
         try:
             os.symlink(target, self.projects, target_is_directory=True)
         except (OSError, NotImplementedError):
-            self.skipTest("シンボリックリンクを作れない")
+            os.makedirs(self.projects)
+        else:
+            found = self.about_projects()
+            self.assertEqual(len(found), 1, found)
+            self.assertIn(NOT_IGNORED, found[0]["detail"])
+            os.remove(self.projects)
+            os.makedirs(self.projects)
+        # 無視されていれば、空でもプロジェクトがあっても何も言わない
+        write(os.path.join(self.ws, ".gitignore"), "/.claude/\n/projects/\n")
+        self.assertEqual(self.about_projects(), [])
+        self.project()
+        self.assertEqual(self.about_projects(), [])
 
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        self.assertIn(NOT_IGNORED, found[0]["detail"])
-
-    def test_empty_projects_flag_does_not_crash_the_lint(self):
-        """`--projects ""`（診断のフラグ）でも `--lint` は失敗せず、置き場の苦情は出さない。"""
-        self.no_tracking()
-        environment = {
-            **{k: v for k, v in os.environ.items() if not k.startswith("CCNAVI_")},
-            "CCNAVI_LEARNING": "disable",
-        }
-        environment.pop("CLAUDE_PROJECT_DIR", None)
-
-        result = run_ccnavi(
-            ["--root", self.ws, "--projects", "", "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=environment,
-        )
-
-        # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
-        # 失敗したなら JSON の報告が無い。
-        try:
-            problems = json.loads(result.stdout)["problems"]
-        except (ValueError, KeyError) as exc:
-            self.fail(
-                f"--lint が報告を出さずに異常終了した: {exc}\n{result.stdout}\n{result.stderr}"
-            )
-        self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
-
-    def test_projects_outside_the_workspace_does_not_crash_the_lint(self):
-        """`--projects` がワークスペースの外（Windows では別のドライブもありうる）を指しても
-        `--lint` は失敗しない。"""
+    def test_odd_projects_flags_do_not_crash_the_lint(self):
+        """`--projects ""` と、ワークスペースの外を指す `--projects`（Windows では別のドライブも
+        ありうる）でも、`--lint` は報告を出し、置き場の苦情は出さない。"""
         self.no_tracking()
         elsewhere = tempfile.mkdtemp(prefix="ccnavi-drive-")
         self.addCleanup(shutil.rmtree, elsewhere, ignore_errors=True)
@@ -397,20 +303,20 @@ class ProjectsCollisionTest(unittest.TestCase):
             "CCNAVI_LEARNING": "disable",
         }
         environment.pop("CLAUDE_PROJECT_DIR", None)
-
-        result = run_ccnavi(
-            ["--root", self.ws, "--projects", elsewhere, "--lint", "--json", "--mode", "enable"],
-            input="",
-            env=environment,
-        )
-
-        try:
-            problems = json.loads(result.stdout)["problems"]
-        except (ValueError, KeyError) as exc:
-            self.fail(
-                f"--lint が報告を出さずに異常終了した: {exc}\n{result.stdout}\n{result.stderr}"
+        for value in ("", elsewhere):
+            result = run_ccnavi(
+                ["--root", self.ws, "--projects", value, "--lint", "--json", "--mode", "enable"],
+                input="",
+                env=environment,
             )
-        self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
+            # 終了コードは見ない（この部屋の rules.yml は空で、`deny` が空の error が出る）。
+            try:
+                problems = json.loads(result.stdout)["problems"]
+            except (ValueError, KeyError) as exc:
+                self.fail(
+                    f"--lint が報告を出さずに異常終了した: {exc}\n{result.stdout}\n{result.stderr}"
+                )
+            self.assertEqual([p for p in problems if p["where"] == "(projects)"], [])
 
 
 # 載せ忘れの文面で、先頭の句の直後に来る句。ぶつかりとの見分けに使う（設計 §4.2）。
@@ -454,84 +360,46 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
 
     # ---- A5b. gitlink だけ
 
-    def test_a_gitlink_alone_is_named_once_as_added_by_mistake(self):
-        self.forget()
+    def test_a_gitlink_alone_is_named_as_added_by_mistake(self):
+        # コミット前でも言う。名前に空白があっても、`git rm -r --cached projects` は囲まない
+        self.forget("my lib", commit=False)
         self.assertIn("160000", self.indexed())
-
         found = self.about_projects()
-
         self.assertEqual(len(found), 1, found)
         self.assertEqual(found[0]["severity"], "warn")
         detail = found[0]["detail"]
         self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
-        self.assertIn("`projects/lib`", detail)
-        self.assertIn("git rm -r --cached projects", detail)
+        self.assertIn("`projects/my lib`", detail)
+        self.assertIn("`git rm -r --cached projects`", detail)
+        self.assertIn("git reset -- projects", detail)
         self.assertIn("/projects/", detail)
         self.assertNotIn("git mv", detail)
         self.assertNotIn("ほか", detail)
-
-    def test_added_by_mistake_replaces_the_not_ignored_warning(self):
-        self.forget()
-
+        # 「無視されていない」は出さない（その案内は誤り）
         details = [p["detail"] for p in self.lint()]
-
         self.assertFalse(any(NOT_IGNORED in d for d in details), details)
-
-    def test_added_by_mistake_is_named_when_projects_is_ignored_afterwards(self):
-        """`.gitignore` に `/projects/` があっても、索引に載っている限り言う。"""
-        self.forget(ignore_after=True)
-
+        # 2 つめの gitlink は、最初のものを名指しして残りを数える
+        self.project("app")
+        git(self.ws, "add", "-A")
         found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
-
-    def test_added_by_mistake_is_named_before_the_commit(self):
-        """索引に載せただけでコミット前でも言う。直し方に `git reset -- projects` も並ぶ。"""
-        self.forget(commit=False)
-
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
-        self.assertIn("git reset -- projects", found[0]["detail"])
-
-    def test_two_gitlinks_name_the_first_and_count_the_rest(self):
-        self.forget("app", "lib")
-
-        found = self.about_projects()
-
         self.assertEqual(len(found), 1, found)
         self.assertIn("`projects/app` ほか 1 件", found[0]["detail"])
+        git(self.ws, "commit", "--quiet", "-m", "init")
+        # 後から `.gitignore` に足しても、入れ子のリポジトリが消えても、索引に載っている限り言う
+        write(os.path.join(self.ws, ".gitignore"), "/.claude/\n/projects/\n")
+        for name in ("my lib", "app"):
+            os.replace(os.path.join(self.projects, name), os.path.join(self.ws, "moved-" + name))
+            found = self.about_projects()
+            self.assertEqual(len(found), 1, found)
+            self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
 
-    def test_added_by_mistake_is_named_even_after_the_project_is_gone(self):
-        """入れ子のリポジトリが消えて gitlink だけが索引に残っていても言う。"""
-        self.forget()
-        # 消す代わりに `projects/` の外へ動かす（Windows では `.git/objects` が読み取り専用で
-        # rmtree が断る。後始末はワークスペースごと消す setUp の側に任せる）。
-        os.replace(os.path.join(self.projects, "lib"), os.path.join(self.ws, "moved-lib"))
-
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        self.assertTrue(found[0]["detail"].startswith(TRACKED_LEAD + FORGOT_NEXT))
-
-    def test_a_project_with_a_claude_dir_is_not_warned(self):
-        """プロジェクトが `.claude/` を持つのは通常の形。それだけでは何も言わない。"""
+    def test_a_project_with_a_claude_dir_is_not_warned_but_a_worktree_inside_is(self):
         self.forget()
         os.makedirs(os.path.join(self.projects, "lib", ".claude"))
-
         details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
-
         self.assertEqual(details, [])
-
-    def test_a_worktree_inside_a_project_is_named(self):
-        """プロジェクトの中の `.claude/worktrees/` のワークツリーは、走査の対象外なので言う。"""
-        self.forget()
         os.makedirs(os.path.join(self.projects, "lib", ".claude", "worktrees", "feature-1-memo"))
-
         details = [p["detail"] for p in self.lint() if p["where"] == "(projects/lib)"]
-
         self.assertTrue(
             any("プロジェクトの中にワークツリーがある（feature-1-memo）" in d for d in details),
             details,
@@ -539,54 +407,23 @@ class ProjectsAddedByMistakeTest(unittest.TestCase):
 
     # ---- A5c. 通常のファイルと gitlink の両方
 
-    def test_a_file_and_a_gitlink_are_named_once_as_a_collision(self):
+    def test_a_file_and_gitlinks_are_named_once_as_a_collision(self):
         write(os.path.join(self.ws, "projects", "foo.txt"), "ワークスペース自身のソース\n")
-        self.forget()
+        self.forget("my lib", "app")
         self.assertIn("160000", self.indexed())
         self.assertIn("projects/foo.txt", self.indexed())
-
         found = self.about_projects()
-
         self.assertEqual(len(found), 1, found)
         detail = found[0]["detail"]
         self.assertTrue(detail.startswith(TRACKED_LEAD), detail)
         self.assertFalse(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
         self.assertIn("git mv projects apps", detail)
-        self.assertIn("git rm --cached projects/lib", detail)
         self.assertNotIn("git rm -r --cached projects", detail)
-        details = [p["detail"] for p in self.lint()]
-        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
-
-    # ---- 空白を含む gitlink
-
-    def test_a_gitlink_with_a_space_is_quoted_in_the_rm_cached_command(self):
-        """`git rm --cached` に載せるパスは、sh で割れる文字を含むときだけ `'…'` で囲む。
-
-        囲まないと `git rm --cached projects/my lib` になり、`projects/my` と `lib` の 2 つを
-        指すコマンドを案内してしまう。名指し（`、` 区切りのほう）は囲まない。
-        """
-        write(os.path.join(self.ws, "projects", "foo.txt"), "ワークスペース自身のソース\n")
-        self.forget("my lib", "app")
-        self.assertIn("projects/my lib", self.indexed())
-
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        detail = found[0]["detail"]
+        # `git rm --cached` に載せるパスは、空白を含むときだけ囲む。名指しのほうは囲まない
         self.assertIn("`projects/app`、`projects/my lib`", detail)
         self.assertIn("`git rm --cached projects/app 'projects/my lib'`", detail)
-
-    def test_added_by_mistake_with_a_space_still_names_the_whole_place(self):
-        """gitlink だけのときの `git rm -r --cached projects` はパスを並べないので囲まない。"""
-        self.forget("my lib")
-
-        found = self.about_projects()
-
-        self.assertEqual(len(found), 1, found)
-        detail = found[0]["detail"]
-        self.assertTrue(detail.startswith(TRACKED_LEAD + FORGOT_NEXT), detail)
-        self.assertIn("`projects/my lib`", detail)
-        self.assertIn("`git rm -r --cached projects`", detail)
+        details = [p["detail"] for p in self.lint()]
+        self.assertFalse(any(NOT_IGNORED in d for d in details), details)
 
 
 if __name__ == "__main__":

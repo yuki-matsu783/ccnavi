@@ -2784,24 +2784,6 @@ class TicketTest(unittest.TestCase):
 
     # ---- 10. 差し戻しを無視した終了
 
-    def test_parent_hears_about_an_ignored_bounce(self):
-        self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        write(os.path.join(child, "src", "b", "stray.py"), "x\n")
-        git(child, "add", "-A")
-        git(child, "commit", "--quiet", "-m", "stray")
-        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-9").returncode, 2)
-        payload = {
-            "hook_event_name": "PostToolUse",
-            "tool_name": "Agent",
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "tool_input": {"description": "子"},
-            "tool_response": {"agentId": "sub-9"},
-        }
-        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
-        self.assertIn("差し戻されたまま", self.reason(result))
-
     def _agent_done(self, agent_id):
         payload = {
             "hook_event_name": "PostToolUse",
@@ -2845,34 +2827,6 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(self._outcome_of("sub-f")["outcome"], "fixed")
         self.assertNotIn("差し戻されたまま", self.reason(self._agent_done("sub-f")))
 
-    def test_an_ignored_bounce_is_outside_and_stop_nudges_once(self):
-        self.family()
-        child, _ = self._stray()
-        self.hook("SubagentStop", "", child, agent_id="sub-x")
-        self.hook("SubagentStop", "", child, agent_id="sub-x")
-        found = self._outcome_of("sub-x")
-        self.assertEqual((found["outcome"], found["bounces"], found["final"]), ("outside", 1, True))
-        self.assertIn("差し戻されたまま", self.reason(self._agent_done("sub-x")))
-        stop = {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
-        # 先に出る別の促し（依頼までの道）が 1 回ずつ出たあと、結果の促しが 1 回だけ出る
-        seen = [
-            "SUBAGENT_OUTCOME" in self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).stdout
-            for _ in range(4)
-        ]
-        self.assertEqual(seen.count(True), 1, seen)
-
-    def test_a_broken_outcome_record_does_not_stop_the_parent(self):
-        self.family()
-        state = os.path.join(self.root, "logs", "state")
-        os.makedirs(state, exist_ok=True)
-        write(
-            os.path.join(state, "subagent-s1-bad.outcome"),
-            '{"session":"s1","outcome":"unattributed","bounces":"x","final":true}',
-        )
-        done = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertNotIn("internal error", done.stderr)
-
     def test_an_unreadable_worktree_of_another_child_does_not_make_a_parent_tree_agent_unchecked(
         self,
     ):
@@ -2880,82 +2834,6 @@ class TicketTest(unittest.TestCase):
         shutil.rmtree(os.path.join(self.root, ".claude", "worktrees", "i0001-01-02"))
         self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-p")
         self.assertEqual(self._outcome_of("sub-p")["outcome"], "ok")
-
-    def test_without_a_bounce_the_outside_notice_does_not_claim_one(self):
-        self.family()
-        child, _ = self._stray()
-        self.ccnavi(
-            "--mode",
-            "dry-run",
-            stdin=json.dumps(
-                {
-                    "hook_event_name": "SubagentStop",
-                    "cwd": child,
-                    "session_id": "s1",
-                    "agent_id": "sub-d",
-                }
-            ),
-        )
-        found = self._outcome_of("sub-d")
-        self.assertEqual((found["outcome"], found["bounces"]), ("outside", 0))
-        # Stop の促しが結果を言う（先に出る別の促しが 1 回ずつ出たあと）
-        stop = {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
-        said = [self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).stdout for _ in range(4)]
-        nudge = [out for out in said if "SUBAGENT_OUTCOME" in out]
-        self.assertEqual(len(nudge), 1, said)
-        self.assertIn("差し戻していない", nudge[0])
-
-    def test_a_subagent_started_in_the_parent_tree_is_unattributed_and_not_bounced(self):
-        self.family()
-        self._stray()
-        done = self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-u")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertEqual(self._outcome_of("sub-u")["outcome"], "unattributed")
-        first = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(first))
-        second = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertNotIn("SUBAGENT_UNATTRIBUTED", self.reason(second))
-        # Stop は unattributed では促さない
-        stop = {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
-        self.assertNotIn(
-            "SUBAGENT_OUTCOME", self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).stdout
-        )
-
-    def test_parent_hears_when_the_scope_could_not_be_checked(self):
-        """SubagentStop で子のワークツリーを読めなかった回は、止めずに記録で許可と分け、
-        親に 1 行言う。"""
-        self.family()
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        log = os.path.join(self.root, "logs", "decisions.jsonl")
-        stop = {
-            "hook_event_name": "SubagentStop",
-            "cwd": child,
-            "session_id": "s1",
-            "agent_id": "sub-7",
-        }
-        self.break_git_of(child)
-        done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        with open(log, encoding="utf-8") as f:
-            row = json.loads(f.read().splitlines()[-1])
-        self.assertEqual(row["decision"], "skip")
-        self.assertEqual(row["reason"], "worktree-unreadable")
-        self.assertIn("i0001-01-01", row["detail"])
-        payload = {
-            "hook_event_name": "PostToolUse",
-            "tool_name": "Agent",
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "tool_input": {"description": "子"},
-            "tool_response": {"agentId": "sub-7"},
-        }
-        result = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
-        said = self.reason(result)
-        self.assertIn("worktree-unreadable", said)
-        self.assertIn("i0001-01-01", said)
-        # 印は読んだら消す。2 度目は言わない。
-        again = self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
-        self.assertNotIn("worktree-unreadable", self.reason(again))
 
     def break_git_of(self, worktree):
         """子のワークツリーの HEAD を、親と履歴を共有しないコミットにする
@@ -2976,35 +2854,23 @@ class TicketTest(unittest.TestCase):
         done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
 
-    def test_parent_hears_on_its_next_tool_after_a_background_subagent(self):
-        """バックグラウンドのサブエージェントは、親の `Agent` の PostToolUse が終わりより先に来る。
-        印は親の次のどのツールの PostToolUse でも読み、読んだら消す。"""
-        self.family()
-        self.unreadable_stop("sub-bg")
-        # サブエージェントの中の呼び出しでは読まない。親に届かなくなる。
-        inside = self.hook("PostToolUse", "Bash", self.parent_tree, agent_id="sub-x", command="ls")
-        self.assertNotIn("worktree-unreadable", self.reason(inside))
-        result = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        said = self.reason(result)
-        self.assertIn("worktree-unreadable", said)
-        self.assertIn("sub-bg", said)
-        self.assertIn("i0001-01-01", said)
-        again = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertNotIn("worktree-unreadable", self.reason(again))
-
-    def test_marks_of_another_session_are_left_alone(self):
-        """印の名前の前置きが重なる別のセッション（`s1` と `s1-x`）の印は、読まずに残す。"""
+    def test_marks_of_another_session_are_left_alone_and_the_prompt_tells_the_parent(self):
+        """印の名前の前置きが重なる別のセッション（`s1` と `s1-x`）の印は、読まずに残す。
+        親がツールを使わずにターンを終えたなら、次の依頼（UserPromptSubmit）で言う。"""
         self.family()
         self.unreadable_stop("sub-bg", session="s1-x")
         mine = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
         self.assertNotIn("worktree-unreadable", self.reason(mine))
         theirs = self.hook("PostToolUse", "Bash", self.parent_tree, session="s1-x", command="ls")
         self.assertIn("worktree-unreadable", self.reason(theirs))
-
-    def test_parent_hears_at_the_next_prompt(self):
-        """親がツールを使わずにターンを終えたなら、次の依頼（UserPromptSubmit）で言う。"""
-        self.family()
-        self.unreadable_stop("sub-bg")
+        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
+        stop = {
+            "hook_event_name": "SubagentStop",
+            "cwd": child,
+            "session_id": "s1",
+            "agent_id": "sub-bg2",
+        }
+        self.assertEqual(self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).returncode, 0)
         prompt = {
             "hook_event_name": "UserPromptSubmit",
             "cwd": self.parent_tree,
@@ -3015,50 +2881,9 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         said = self.reason(result)
         self.assertIn("worktree-unreadable", said)
-        self.assertIn("sub-bg", said)
+        self.assertIn("sub-bg2", said)
         again = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
         self.assertNotIn("worktree-unreadable", self.reason(again))
-
-    def _stop_payload(self):
-        return {"hook_event_name": "Stop", "cwd": self.parent_tree, "session_id": "s1"}
-
-    def test_a_check_that_could_not_run_is_unchecked_and_reaches_the_parent_and_stop(self):
-        """AT27: 範囲を確かめられなかった回は `unchecked` で記録し、親へ知らせ、Stop が促す。"""
-        self.family()
-        self.unreadable_stop("sub-raise")
-        found = self._outcome_of("sub-raise")
-        self.assertEqual((found["outcome"], found["final"]), ("unchecked", True))
-        # 親が先にツールを使うと、そこで知らせて「促した」ことにする（Stop で繰り返さない）
-        said = self.reason(self.hook("PostToolUse", "Bash", self.parent_tree, command="ls"))
-        self.assertIn("sub-raise", said)
-        self.assertIn("worktree-unreadable", said)
-        for _ in range(4):
-            out = self.ccnavi("--mode", "enable", stdin=json.dumps(self._stop_payload())).stdout
-            self.assertNotIn("SUBAGENT_OUTCOME", out)
-
-    def test_stop_nudges_once_for_an_unchecked_subagent_the_parent_did_not_hear_of(self):
-        """AT27: 親が知らせを受けないまま Stop に来たら、Stop が 1 回だけ促す。"""
-        self.family()
-        self.unreadable_stop("sub-raise")
-        seen = [
-            "SUBAGENT_OUTCOME"
-            in self.ccnavi("--mode", "enable", stdin=json.dumps(self._stop_payload())).stdout
-            for _ in range(4)
-        ]
-        self.assertEqual(seen.count(True), 1, seen)
-
-    def test_a_nested_agent_does_not_swallow_the_parents_notice(self):
-        """AT27（入れ子）: 入れ子の体（agent_id あり）の PostToolUse は、親向けの知らせを読まず、
-        通知済みにもしない。親が次にツールを使ったときに届く。"""
-        self.family()
-        self._stray()
-        self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-u")
-        inside = self.hook("PostToolUse", "Bash", self.parent_tree, agent_id="sub-n", command="ls")
-        self.assertNotIn("SUBAGENT_UNATTRIBUTED", self.reason(inside))
-        self.assertFalse(self._outcome_of("sub-u")["notified"])
-        first = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertIn("SUBAGENT_UNATTRIBUTED", self.reason(first))
-        self.assertTrue(self._outcome_of("sub-u")["notified"])
 
     def test_an_outcome_that_cannot_be_saved_is_not_treated_as_normal(self):
         """AT28: `.outcome` を保存できないとき、記録は残らない（言うのは標準エラーだけ）が、

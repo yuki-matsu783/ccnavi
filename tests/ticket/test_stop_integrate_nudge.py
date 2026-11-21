@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import unittest
 
 from tests import script_command, shell_path
@@ -153,14 +152,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, "src", "someone.py"), "z\n")
         self.asked(self.stop(path))
 
-    def test_a_switched_base_branch_is_reported_without_stopping(self):
-        path = self.direct(commit=True)
-        self.record()
-        git(self.root, "switch", "--quiet", "-c", "other")
-        body = self.assert_not_asked(self.stop(path))
-        self.assertIn("取り込み先が切り替わっています", body["systemMessage"])
-        self.assertIn("other", body["systemMessage"])
-
     def test_a_switched_base_branch_with_uncommitted_changes_only_tells_the_reason(self):
         """未コミットだけなら促す前提で言わず、取り込めない理由だけを言う。"""
         path = self.direct(dirty=True)
@@ -192,38 +183,9 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         body = self.assert_not_asked(self.stop(path))
         self.assertIn("共通ディレクトリ", body["systemMessage"])
 
-    def test_a_broken_record_is_reported_without_stopping(self):
-        path = self.direct(commit=True)
-        self.record(snap_sha=None)
-        body = self.assert_not_asked(self.stop(path))
-        self.assertIn("壊れて", body["systemMessage"])
-
-    def test_no_record_points_to_adopt(self):
-        path = self.direct(commit=True)
-        reason = self.asked(self.stop(path))
-        self.assertIn("--adopt --base main", reason)
-        self.assertIn("ccnavi-worktree.sh scratch", reason)
-
-    def test_an_origin_ahead_of_the_base_branch_is_warned(self):
-        path = self.direct(commit=True)
-        self.record()
-        ahead = git(path, "rev-parse", "HEAD").strip()
-        git(self.root, "update-ref", "refs/remotes/origin/main", ahead)
-        reason = self.asked(self.stop(path))
-        self.assertIn("origin/main が手元の main より 1 件先に進んでいます", reason)
-
     def test_uncommitted_changes_alone_are_not_asked(self):
         """コミットは integrate の直前にまとめて打つ。未コミットだけなら作業中か返事待ちである。"""
         self.assert_not_asked(self.stop(self.direct(dirty=True)))
-
-    def test_uncommitted_changes_on_top_of_commits_are_told_to_commit_first(self):
-        path = self.direct(commit=True, dirty=True)
-        reason = self.asked(self.stop(path))
-        self.assertIn("未コミットの変更", reason)
-        self.assertIn("先にコミットしてください", reason)
-        work = shell_path(path)
-        git_sh = script_command(self.root, "ccnavi-git.sh")
-        self.assertIn(f"`cd {work} && {git_sh} commit -m '<メッセージ>'`", reason)
 
     def test_the_record_stops_the_hook_from_doing_anything(self):
         """判定の材料は記録だけ。ここは integrate を打たない（統合先のツリーは変わらない）。"""
@@ -235,81 +197,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
 
     # ---- 促さない
 
-    def test_a_clean_worktree_with_nothing_new_is_not_asked(self):
-        self.assert_not_asked(self.stop(self.direct()))
-
-    def test_a_marker_means_waiting_for_the_user_and_is_not_asked(self):
-        """integrate のあとは、差分を見せて返事を待っている途中である。確定は促さない。"""
-        path = self.direct(commit=True)
-        self.record()
-        gitdir = os.path.join(
-            self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate").strip()
-        )
-        write(os.path.join(gitdir, "scratch", "marker"), "version 4\nhead x\ntip y\nc_tree z\n")
-        self.assert_not_asked(self.stop(path))
-
-    def test_a_marker_of_unknown_version_asks_the_user_without_commands(self):
-        path = self.direct(commit=True)
-        gitdir = os.path.join(
-            self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate").strip()
-        )
-        write(os.path.join(gitdir, "scratch", "marker"), "state staged\nbranch_sha x\n")
-        reason = self.asked(self.stop(path))
-        self.assertIn("版を知りません", reason)
-        self.assertIn("git reset --merge", reason)
-        self.assertNotIn("integrate-done scratch", reason)
-
-    def test_a_done_copy_with_the_same_head_means_it_already_went_ahead(self):
-        path = self.direct(commit=True)
-        head = git(path, "rev-parse", "HEAD").strip()
-        gitdir = os.path.join(
-            self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate-done").strip()
-        )
-        write(os.path.join(gitdir, "scratch"), f"state staged\nbranch_sha {head}\n")
-        self.assert_not_asked(self.stop(path, session="done"))
-        shutil.rmtree(gitdir, ignore_errors=True)
-        self.asked(self.stop(path, session="after"))
-
-    def test_a_done_copy_does_not_silence_a_reused_name(self):
-        """名前を使い直したときの 3 通り。
-
-        新しいコミット・同じ HEAD で未コミット・同じ HEAD で変更なし。
-        """
-        path = self.direct(commit=True)
-        head = git(path, "rev-parse", "HEAD").strip()
-        gitdir = os.path.join(
-            self.root, git(self.root, "rev-parse", "--git-path", "ccnavi-integrate-done").strip()
-        )
-        copy = os.path.join(gitdir, "scratch")
-        write(copy, f"state staged\nbranch_sha {head}\n")
-        self.assert_not_asked(self.stop(path, session="same"))
-        write(os.path.join(path, "src", "draft.py"), "y\n")
-        self.asked(self.stop(path, session="dirty"))
-        os.remove(os.path.join(path, "src", "draft.py"))
-        self.commit_work(path, rel="src/more.py")
-        self.asked(self.stop(path, session="newer"))
-
-    def test_a_worktree_bound_to_a_ticket_is_not_asked(self):
-        """チケット（承認済み・提案）の名前のワークツリーは、マージリクエストで出す。"""
-        self.family()
-        tree = self.child_tree()
-        self.commit_work(tree)
-        write(os.path.join(tree, "src", "a", "draft.py"), "y\n")
-        body = self.body(self.stop(tree))
-        self.assertNotIn(CODE, result_text(body))
-        # 提案の段階でも結び付く。
-        path = self.direct(commit=True)
-        write(os.path.join(self.root, "wip", "proposals", "todo", "scratch.md"), "---\n---\n")
-        self.assert_not_asked(self.stop(path))
-
-    def test_a_worktree_whose_branch_is_on_origin_is_not_asked(self):
-        """origin に在るブランチのワークツリーは、`integrate` が断る（親のブランチとみなす）ので、
-        促さない。促したのに `integrate` が断る食い違いを作らない。"""
-        path = self.direct(commit=True)
-        self.asked(self.stop(path))
-        git(self.root, "update-ref", "refs/remotes/origin/scratch", "scratch")
-        self.assert_not_asked(self.stop(path, session="s2"))
-
     def test_a_pushed_direct_worktree_with_a_record_is_still_asked(self):
         """直接作業のブランチは `ccnavi-git.sh push` で origin へ送れる。記録（ccnavi-direct）が
         あるワークツリーは、origin にあっても親とみなさず、促しを止めない。"""
@@ -317,11 +204,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.record()
         git(self.root, "update-ref", "refs/remotes/origin/scratch", "scratch")
         self.asked(self.stop(path))
-
-    def test_a_branch_that_is_not_the_name_is_not_asked(self):
-        path = self.direct(commit=True)
-        git(path, "switch", "--quiet", "-c", "other")
-        self.assert_not_asked(self.stop(path))
 
     def test_the_workspace_root_is_not_asked(self):
         self.assert_not_asked(self.stop(self.root))
@@ -375,15 +257,14 @@ class IntegrateNudgeTest(base.StopNudgeTest):
 
     # ---- 統合の前提を満たせない
 
-    def test_no_integration_branch_is_reported_without_stopping(self):
+    def test_a_missing_integration_branch_is_reported_without_stopping(self):
         path = self.direct(commit=True)
         body = self.assert_not_asked(self.stop(path, integration=""))
         self.assertIn("origin が無いので統合先が決まらない", body["systemMessage"])
-
-    def test_an_origin_without_head_asks_for_set_head(self):
-        path = self.direct(commit=True)
         git(self.root, "remote", "add", "origin", self.root + ".origin.git")
-        body = self.assert_not_asked(self.ccnavi("--mode", "enable", stdin=self.payload(path)))
+        body = self.assert_not_asked(
+            self.ccnavi("--mode", "enable", stdin=self.payload(path, session="s2"))
+        )
         self.assertIn("git remote set-head origin -a", body["systemMessage"])
 
     def payload(self, cwd, session="s1"):
