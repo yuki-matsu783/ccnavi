@@ -43,9 +43,7 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         exclude = git(self.root, "rev-parse", "--git-path", "info/exclude").strip()
         write(os.path.join(self.root, exclude), "/logs/\n/.ccnavi/config/\n")
 
-    def stop(
-        self, cwd, *, active=False, event="Stop", agent_id="", integration="main", session="s1"
-    ):
+    def stop(self, cwd, *, active=False, event="Stop", agent_id="", session="s1"):
         payload = {
             "hook_event_name": event,
             "cwd": cwd,
@@ -54,40 +52,34 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         }
         if agent_id:
             payload["agent_id"] = agent_id
-        self.point_origin_head(integration)
+        self.point_origin_head()
         return self.ccnavi("--mode", "enable", stdin=json.dumps(payload))
 
-    def point_origin_head(self, integration):
-        """統合先は手元の origin/HEAD で決まる。空なら origin の無いリポジトリにする。"""
+    def point_origin_head(self):
+        """統合先は手元の origin/HEAD で決まる。origin が無ければ足して main に向ける。"""
         remotes = git(self.root, "remote").split()
-        if not integration:
-            if "origin" in remotes:
-                git(self.root, "remote", "remove", "origin")
-            return
         if "origin" not in remotes:
             git(self.root, "remote", "add", "origin", self.root + ".origin.git")
         git(
             self.root,
             "symbolic-ref",
             "refs/remotes/origin/HEAD",
-            f"refs/remotes/origin/{integration}",
+            "refs/remotes/origin/main",
         )
 
-    def direct(self, name="scratch", commit=False, dirty=False):
+    def direct(self, name="scratch", commit=False):
         """チケットに結び付かない直接作業のワークツリー。"""
         path = self.worktree(name, "main")
         if commit:
             self.commit_work(path)
-        if dirty:
-            write(os.path.join(path, "src", "draft.py"), "y\n")
         return path
 
-    def record(self, name="scratch", base="main", snap=None, **extra):
+    def record(self, name="scratch", base="main"):
         """`ccnavi-worktree.sh` が置く直接作業の記録（version 4）。起点 S は既定で main の先頭。"""
         common = os.path.realpath(
             os.path.join(self.root, git(self.root, "rev-parse", "--git-common-dir").strip())
         )
-        snap = snap or git(self.root, "rev-parse", base).strip()
+        snap = git(self.root, "rev-parse", base).strip()
         fields = {
             "version": "4",
             "base_branch": base,
@@ -100,7 +92,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
             "confirm": "-",
             "created": "1",
         }
-        fields.update(extra)
         text = "".join(f"{k} {v}\n" for k, v in fields.items() if v is not None)
         write(os.path.join(common, "ccnavi-direct", name), text)
         return common

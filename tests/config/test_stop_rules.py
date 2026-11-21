@@ -54,7 +54,6 @@ class StopRulesTest(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.root = os.path.realpath(self.dir.name)
-        self.state = os.path.join(self.root, "logs", "state")
         self.addCleanup(self.dir.cleanup)
 
     def env(self) -> dict:
@@ -107,14 +106,6 @@ class StopRulesTest(unittest.TestCase):
             self.assertNotIn(CODE, json.dumps(body, ensure_ascii=False))
             return ""
         return body.get("reason", "")
-
-    def lint(self) -> str:
-        done = run_ccnavi(
-            ["--root", self.root, "--lint"],
-            cwd=ROOT,
-            env=self.env(),
-        )
-        return done.stdout
 
     def test_every_counts_stops(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=3)))
