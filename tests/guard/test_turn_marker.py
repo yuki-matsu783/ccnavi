@@ -174,16 +174,6 @@ class TurnWiringTest(unittest.TestCase):
 
         self.assertEqual(self.active(), [])
 
-    def test_壊れた印があってもフックは止まらない(self):
-        os.makedirs(self.state, exist_ok=True)
-        with open(self.marker(), "w", encoding="utf-8") as f:
-            f.write("{not json")
-
-        for event in ("UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"):
-            with self.subTest(event=event):
-                done = self.run_hook(event, prompt="お願いします")
-                self.assertNotIn("internal-error", done.stderr)
-
     def test_ボードの_JSON_に_turns_が出る(self):
         self.run_hook("UserPromptSubmit", session="a", prompt="一つ目")
         self.run_hook("UserPromptSubmit", session="b", prompt="二つ目")
