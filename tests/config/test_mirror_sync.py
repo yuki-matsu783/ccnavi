@@ -70,9 +70,7 @@ class MirrorSyncTest(ConfigUnionHarness):
         )
         self.assertTrue(lib["expect"])
         self.assertEqual(answer["expect"], self.view()["expect"])
-
-    def test_the_view_writes_nothing(self):
-        self.user_mirror("--json")
+        # 見るだけで、何も書かない。
         self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
 
     def test_the_view_in_text_names_the_command_to_run(self):
@@ -82,13 +80,12 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertIn(
             f"ccnavi-user-mirror.sh --yes --expect {self.view()['expect']}", result.stdout
         )
-
-    def test_the_text_view_quotes_names_and_shows_how_to_see_the_diff(self):
+        # 名前は引用し、差分の見方を添える。
         self.project("odd name")
-        result = self.user_mirror("odd name")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("ccnavi-user-mirror.sh 'odd name' --yes --expect", result.stdout)
-        self.assertIn("diff -ru", result.stdout)
+        odd = self.user_mirror("odd name")
+        self.assertEqual(odd.returncode, 0, odd.stdout + odd.stderr)
+        self.assertIn("ccnavi-user-mirror.sh 'odd name' --yes --expect", odd.stdout)
+        self.assertIn("diff -ru", odd.stdout)
 
     def test_the_text_view_warns_when_an_update_overwrites_the_mirror(self):
         self.sync_all()
@@ -98,7 +95,13 @@ class MirrorSyncTest(ConfigUnionHarness):
         fresh = self.user_mirror("app")
         self.assertNotIn("上書き・削除します", fresh.stdout)
 
-    def test_the_board_route_syncs_with_a_matching_expect(self):
+    def test_the_board_route_syncs_only_with_a_matching_expect(self):
+        stale = self.user_mirror("--yes", "--expect", "0" * 64, "--via", "board", "--json")
+        self.assertNotEqual(stale.returncode, 0)
+        refused = json.loads(stale.stdout)
+        self.assertFalse(refused["ok"])
+        self.assertIn("内容が更新されました", refused["error"])
+        self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
         expect = self.view("lib")["expect"]
         result = self.user_mirror("lib", "--yes", "--expect", expect, "--via", "board", "--json")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -107,14 +110,6 @@ class MirrorSyncTest(ConfigUnionHarness):
         self.assertEqual(answer["synced"][0]["name"], "lib")
         self.assertIn(".ccnavi/config/common/rules.yml", answer["synced"][0]["files"])
         self.assertTrue(os.path.exists(mirror_of(self.lib, "rules.yml")))
-
-    def test_the_board_route_with_a_stale_expect_writes_nothing(self):
-        result = self.user_mirror("--yes", "--expect", "0" * 64, "--via", "board", "--json")
-        self.assertNotEqual(result.returncode, 0)
-        answer = json.loads(result.stdout)
-        self.assertFalse(answer["ok"])
-        self.assertIn("内容が更新されました", answer["error"])
-        self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
 
     def test_combinations_that_make_no_sense_are_refused(self):
         for args in (
@@ -128,7 +123,5 @@ class MirrorSyncTest(ConfigUnionHarness):
                 result = self.user_mirror(*args)
                 self.assertNotEqual(result.returncode, 0, result.stdout)
                 self.assertFalse(os.path.exists(mirror_of(self.lib, "rules.yml")))
-
-    def test_the_internal_flag_is_not_accepted_without_the_user_entry(self):
-        result = self.ccnavi("--mirror", "--json")
-        self.assertNotEqual(result.returncode, 0)
+        # 内部の旗は、ユーザの入口を通さずには受け付けない。
+        self.assertNotEqual(self.ccnavi("--mirror", "--json").returncode, 0)

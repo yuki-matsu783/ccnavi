@@ -155,11 +155,13 @@ class LintTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(counts(result.stdout)[0], 1)
 
-    def test_承認の切り替えの環境変数にdry_runと書いたらerrorになる(self):
-        # この切り替えの環境変数は enable か disable しか取らない。dry-run と書いたユーザは
-        # 止まらないつもりでいるのに、実際は enable と同じに止める。設定ファイルを読んだ
-        # だけでは、その食い違いがどこにも現れない。
-        result = ccnavi(
+    def test_切り替えの環境変数の誤りは_errorで切った状態はwarnで言う(self):
+        # 値ごとの文面は go/internal/entry/lint の見本（TestReportSwitches）が見る。ここは
+        # 終了コードと `--json` の problems に出るところだけを通しで見る。
+        # 承認の切り替えは enable か disable しか取らない。dry-run と書いたユーザは止まらない
+        # つもりでいるのに、実際は enable と同じに止める。実際の値も言わないと、止まっている
+        # のか通っているのかが分からない。
+        wrong = ccnavi(
             self.root,
             "--lint",
             "--rules",
@@ -168,70 +170,16 @@ class LintTest(unittest.TestCase):
             "enable",
             "--guard-ticket-approval",
             "dry-run",
+            "--ticket-control",
+            "off",
         )
-
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("error:", result.stdout)
-        self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=dry-run", result.stdout)
-        # 実際の値も言う。言わないと、止まっているのか通っているのかが分からない。
-        self.assertIn("enable として動いている", result.stdout)
-
-    def test_確認できない側の切り替えの環境変数を切ったらwarnで言う(self):
-        # 切ってあること自体は設定として正しいので error にはしない。それでも
-        # 言うのは、切れている状態が外から見て「ルールが揃っている状態」と
-        # 区別が付かないため。
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            env={"CCNAVI_GUARD_UNWATCHED": "disable"},
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("CCNAVI_GUARD_UNWATCHED=disable", result.stdout)
-        self.assertIn("確認できる者が居ないモードで守る: disable", result.stdout)
-
-    def test_戻す働きを切ったらwarnで言う(self):
-        # ユーザ向けの本文には値が 1 行ずつ出るが、`problems` に入らないと
-        # `--json` を読む CI と拡張からは「揃っている」と見える。
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            env={"CCNAVI_GUARD_CORE_FILES": "disable", "CCNAVI_RESTORE_IF_DENY": "disable"},
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("CCNAVI_GUARD_CORE_FILES=disable", result.stdout)
-        self.assertIn("CCNAVI_RESTORE_IF_DENY=disable", result.stdout)
-
-    def test_戻す働きの予行もwarnで言う(self):
-        # 予行は導入の途中では正しい状態だが、外から見ると守られている状態と
-        # 区別が付かない。モードの dry-run に warn を出すのと同じ理由。
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            env={"CCNAVI_GUARD_CORE_FILES": "dry-run", "CCNAVI_RESTORE_IF_DENY": "dry-run"},
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("CCNAVI_GUARD_CORE_FILES=dry-run", result.stdout)
-        self.assertIn("CCNAVI_RESTORE_IF_DENY=dry-run", result.stdout)
-
-    def test_切った切り替えの環境変数はJSONのproblemsにも出る(self):
-        # 読み手は CI と VS Code の拡張。ユーザ向けの本文しか持たない苦情は、
-        # そこからは無いのと同じ。
-        result = ccnavi(
+        self.assertEqual(wrong.returncode, 1, wrong.stdout + wrong.stderr)
+        self.assertIn("CCNAVI_GUARD_TICKET_APPROVAL=dry-run", wrong.stdout)
+        self.assertIn("CCNAVI_TICKET_CONTROL=off", wrong.stdout)
+        self.assertIn("enable として動いている", wrong.stdout)
+        # 切ってあること自体は設定として正しいので error にはしない。warn で言う。読み手は
+        # CI と VS Code の拡張なので、`--json` の problems にも載せる。
+        switched = ccnavi(
             self.root,
             "--lint",
             "--json",
@@ -239,30 +187,24 @@ class LintTest(unittest.TestCase):
             rules_file(self.root, SOUND),
             "--mode",
             "enable",
-            env={"CCNAVI_GUARD_CORE_FILES": "disable", "CCNAVI_RESTORE_IF_DENY": "disable"},
+            env={"CCNAVI_GUARD_CORE_FILES": "disable", "CCNAVI_RESTORE_IF_DENY": "dry-run"},
         )
-
-        payload = json.loads(result.stdout)
+        self.assertEqual(switched.returncode, 0, switched.stdout + switched.stderr)
+        payload = json.loads(switched.stdout)
         details = [p["detail"] for p in payload["problems"]]
         self.assertEqual(payload["errors"], 0, details)
         self.assertEqual(payload["warns"], 2, details)
         self.assertTrue(any("CCNAVI_GUARD_CORE_FILES=disable" in d for d in details), details)
-        self.assertTrue(any("CCNAVI_RESTORE_IF_DENY=disable" in d for d in details), details)
+        self.assertTrue(any("CCNAVI_RESTORE_IF_DENY=dry-run" in d for d in details), details)
 
-    def test_戻す働きが既定なら何も言わない(self):
+    def test_切り替えの環境変数が既定か_enableなら何も言わない(self):
         result = lint(self.root, rules_file(self.root, SOUND))
 
         self.assertNotIn("CCNAVI_GUARD_CORE_FILES", result.stdout)
         self.assertNotIn("CCNAVI_RESTORE_IF_DENY", result.stdout)
         self.assertIn("error 0 件、warn 0 件", result.stdout)
-
-    def test_確認できない側の切り替えの環境変数は既定でenableと出る(self):
-        result = lint(self.root, rules_file(self.root, SOUND))
-
         self.assertIn("確認できる者が居ないモードで守る: enable", result.stdout)
-
-    def test_承認の切り替えの環境変数にenableと書いてもerrorにならない(self):
-        result = ccnavi(
+        explicit = ccnavi(
             self.root,
             "--lint",
             "--rules",
@@ -272,44 +214,8 @@ class LintTest(unittest.TestCase):
             "--guard-ticket-approval",
             "enable",
         )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(counts(result.stdout)[0], 0)
-
-    def test_チケット制御に読めない値を書いたらerrorになる(self):
-        # 切ったつもりの書き誤りは enable として動く。保護は消えないが、
-        # 書いたユーザは切れていると思い続けるので、直すまで error で名指しする。
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            "--ticket-control",
-            "off",
-        )
-
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("CCNAVI_TICKET_CONTROL=off", result.stdout)
-        self.assertIn("enable として動いている", result.stdout)
-
-    def test_チケット制御をdisableにするとwarnで0のまま(self):
-        result = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            "--ticket-control",
-            "disable",
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("チケット制御: disable", result.stdout)
-        self.assertIn("CCNAVI_TICKET_CONTROL=disable", result.stdout)
-        self.assertEqual(counts(result.stdout)[0], 0)
+        self.assertEqual(explicit.returncode, 0, explicit.stdout + explicit.stderr)
+        self.assertEqual(counts(explicit.stdout)[0], 0)
 
     def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
         # 動かす途中で止まった形跡（コピーできたが消せなかった）。状態の操作は「複数の場所にある」で

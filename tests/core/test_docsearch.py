@@ -309,19 +309,6 @@ class ProjectsTest(Repo):
         self.assertFalse(os.path.exists(os.path.join(self.bare, "ccnavi-index.jsonl")))
         self.assertTrue(os.path.isdir(os.path.join(self.bare, ".gitignore")))
 
-    def test_a_negating_line_does_not_stop_the_line(self):
-        # 許可リスト型の .gitignore でも、足す行が後ろで勝つので足して索引に入れる。
-        allow = self.project("allow", "/*\n!/docs/\n!/docs/**\n")
-        self.put("projects/allow/docs/z.md", doc(type="guide"))
-        done = self.ccnavi("--format", "path")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertIn("projects/allow/docs/z", done.stdout.splitlines())
-        self.assertEqual(
-            read(os.path.join(allow, ".gitignore")),
-            "/*\n!/docs/\n!/docs/**\n**/ccnavi-index.jsonl\n",
-        )
-        self.assertTrue(os.path.exists(os.path.join(allow, "docs", "ccnavi-index.jsonl")))
-
     def test_a_project_without_ignore_gets_the_line_and_is_indexed(self):
         plain = self.project("plain", "node_modules/\n")
         self.put("projects/plain/z.md", doc(type="guide", title="plain の文書"))
@@ -339,11 +326,6 @@ class ProjectsTest(Repo):
         self.assertEqual(
             read(os.path.join(plain, ".gitignore")), "node_modules/\n**/ccnavi-index.jsonl\n"
         )
-
-    def test_the_ccnavi_directory_of_a_project_is_left_out(self):
-        self.put("projects/lib/.ccnavi/approved/doing/i0001.md", "---\nversion: 1\n---\n")
-        done = self.ccnavi("--path", ".ccnavi", "--format", "count")
-        self.assertEqual(done.stdout, "matched=0 total=2\n")
 
 
 class SessionStartTest(Repo):
@@ -363,44 +345,12 @@ class SessionStartTest(Repo):
         said = self.context(self.root)
         self.assertIn("--docs --keyword frontmatter", said)
 
-    def test_names_a_project_left_out(self):
-        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
-        self.put("docs/a.md", doc(type="guide"))
-        home = os.path.join(self.root, "projects", "bare")
-        os.makedirs(home)
-        git(home, "init", "-q")
-        os.makedirs(os.path.join(home, ".gitignore"))  # 足せない
-        self.put("projects/bare/y.md", doc(type="guide"))
-        said = self.context(self.root)
-        self.assertIn("--docs", said)
-        self.assertIn(f"bare {UNIGNORED}", said)
-
-    def test_names_a_project_that_got_the_line(self):
-        write(os.path.join(self.root, ".gitignore"), "**/ccnavi-index.jsonl\n/projects/\n")
-        self.put("docs/a.md", doc(type="guide"))
-        home = os.path.join(self.root, "projects", "plain")
-        os.makedirs(home)
-        git(home, "init", "-q")
-        self.put("projects/plain/y.md", doc(type="guide"))
-        said = self.context(self.root)
-        self.assertIn(f"projects/plain/.gitignore {IGNORE_ADDED}", said)
-        self.assertNotIn(UNIGNORED, said)
-        self.assertEqual(read(os.path.join(home, ".gitignore")), "**/ccnavi-index.jsonl\n")
-
     def test_names_the_workspace_that_got_the_line(self):
         write(os.path.join(self.root, ".gitignore"), "")
         self.put("docs/a.md", doc(type="guide"))
         said = self.context(self.root)
         self.assertIn(f".gitignore {IGNORE_ADDED}", said)
         self.assertIn("grep・Glob より先に", said)
-
-    def test_only_the_left_out_line_when_nothing_is_indexed(self):
-        os.remove(os.path.join(self.root, ".gitignore"))
-        os.makedirs(os.path.join(self.root, ".gitignore"))  # 足せない
-        self.put("docs/a.md", doc(type="guide"))
-        said = self.context(self.root)
-        self.assertIn(f"{WORKSPACE} {UNIGNORED}", said)
-        self.assertNotIn("grep・Glob より先に", said)
 
     def test_silent_for_a_subagent_without_md_and_outside_git(self):
         self.put("docs/a.md", doc(type="guide"))

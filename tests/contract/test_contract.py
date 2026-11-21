@@ -146,103 +146,95 @@ class MutationTest(unittest.TestCase):
         actual = fakeside.run(fakeside.load_requests(), tamper)
         return shape.compare_all(recorded or sample_requests(), actual, read_keys or reads())
 
-    def test_fake_loses_a_key(self):
-        def tamper(name, body):
-            if name == "mr_get":
-                body = {k: v for k, v in body.items() if k != "title"}
-            return body
+    def test_each_mutation_is_reported_as_exactly_one_difference(self):
+        def fake(name, change):
+            def tamper(n, body):
+                return change(body) if n == name else body
 
-        self.assertEqual({"mr_get": [("title", "missing")]}, self.run_with(tamper))
+            return tamper
 
-    def test_fake_gains_a_key(self):
-        def tamper(name, body):
-            if name == "mr_get":
-                body = {**body, "extra_key": 1}
-            return body
+        def drop_from_first(body):
+            return [{k: v for k, v in body[0].items() if k != "body"}, *body[1:]]
 
-        self.assertEqual({"mr_get": [("extra_key", "extra")]}, self.run_with(tamper))
+        def drop(shape_name, key):
+            return set_shape(sample_requests(), shape_name, lambda s: s["keys"].pop(key))
 
-    def test_fake_changes_a_type(self):
-        def tamper(name, body):
-            if name == "mr_get":
-                body = {**body, "iid": str(body["iid"])}
-            return body
+        def put(shape_name, **keys):
+            return set_shape(sample_requests(), shape_name, lambda s: s["keys"].update(keys))
 
-        self.assertEqual({"mr_get": [("iid", "type")]}, self.run_with(tamper))
-
-    def test_fake_drops_a_key_from_one_element_only(self):
-        def tamper(name, body):
-            if name == "notes_get":
-                body = [{k: v for k, v in body[0].items() if k != "body"}, *body[1:]]
-            return body
-
-        self.assertEqual({"notes_get": [("[].body", "presence")]}, self.run_with(tamper))
-
-    def test_sample_loses_a_key(self):
-        doc = set_shape(sample_requests(), "mr_get", lambda s: s["keys"].pop("title"))
-        self.assertEqual({"mr_get": [("title", "extra")]}, self.run_with(None, doc))
-
-    def test_sample_gains_a_read_key(self):
-        doc = set_shape(
-            sample_requests(), "mr_get", lambda s: s["keys"].update(more={"t": ["string"]})
+        status = copy.deepcopy(sample_requests())
+        status["error_404"]["status"] = 403
+        optional = set_shape(
+            sample_requests(), "notes_get", lambda s: s["items"].update(opt=["body"])
         )
-        read_keys = {**reads(), "mr_get": [*reads()["mr_get"], "more"]}
-        self.assertEqual({"mr_get": [("more", "missing")]}, self.run_with(None, doc, read_keys))
-
-    def test_sample_has_another_type(self):
-        doc = set_shape(
-            sample_requests(), "mr_get", lambda s: s["keys"].update(iid={"t": ["string"]})
-        )
-        self.assertEqual({"mr_get": [("iid", "type")]}, self.run_with(None, doc))
-
-    def test_sample_says_optional(self):
-        doc = set_shape(sample_requests(), "notes_get", lambda s: s["items"].update(opt=["body"]))
-        self.assertEqual({"notes_get": [("[].body", "presence")]}, self.run_with(None, doc))
-
-    def test_status_differs(self):
-        doc = copy.deepcopy(sample_requests())
-        doc["error_404"]["status"] = 403
-        self.assertEqual({"error_404": [("$status", "status")]}, self.run_with(None, doc))
+        more = {"more": {"t": ["string"]}}
+        read_more = {**reads(), "mr_get": [*reads()["mr_get"], "more"]}
+        cases = [
+            (
+                "fake loses a key",
+                fake("mr_get", lambda b: {k: v for k, v in b.items() if k != "title"}),
+                None,
+                None,
+                {"mr_get": [("title", "missing")]},
+            ),
+            (
+                "fake gains a key",
+                fake("mr_get", lambda b: {**b, "extra_key": 1}),
+                None,
+                None,
+                {"mr_get": [("extra_key", "extra")]},
+            ),
+            (
+                "fake changes a type",
+                fake("mr_get", lambda b: {**b, "iid": str(b["iid"])}),
+                None,
+                None,
+                {"mr_get": [("iid", "type")]},
+            ),
+            (
+                "fake drops a key in one element",
+                fake("notes_get", drop_from_first),
+                None,
+                None,
+                {"notes_get": [("[].body", "presence")]},
+            ),
+            (
+                "sample loses a key",
+                None,
+                drop("mr_get", "title"),
+                None,
+                {"mr_get": [("title", "extra")]},
+            ),
+            (
+                "sample gains a read key",
+                None,
+                put("mr_get", **more),
+                read_more,
+                {"mr_get": [("more", "missing")]},
+            ),
+            (
+                "sample has another type",
+                None,
+                put("mr_get", iid={"t": ["string"]}),
+                None,
+                {"mr_get": [("iid", "type")]},
+            ),
+            (
+                "sample says optional",
+                None,
+                optional,
+                None,
+                {"notes_get": [("[].body", "presence")]},
+            ),
+            ("status differs", None, status, None, {"error_404": [("$status", "status")]}),
+        ]
+        for name, tamper, doc, read_keys, want in cases:
+            with self.subTest(name):
+                self.assertEqual(want, self.run_with(tamper, doc, read_keys))
 
 
 class ReadsMutationTest(unittest.TestCase):
-    """`reads` の三つの扱い（読むキーは比べる・読まない本物だけは比べない・模擬だけは出す）。"""
-
-    def run_with(self, doc, read_keys=None):
-        actual = fakeside.run(fakeside.load_requests())
-        return shape.compare_all(doc, actual, read_keys or reads())
-
-    def test_a_read_key_that_the_fake_lacks_is_reported(self):
-        doc = set_shape(
-            sample_requests(), "mr_get", lambda s: s["keys"].update(more={"t": ["string"]})
-        )
-        read_keys = {**reads(), "mr_get": [*reads()["mr_get"], "more"]}
-        self.assertEqual({"mr_get": [("more", "missing")]}, self.run_with(doc, read_keys))
-
-    def test_a_real_only_key_that_is_not_read_is_not_compared(self):
-        doc = set_shape(
-            sample_requests(), "mr_get", lambda s: s["keys"].update(more={"t": ["string"]})
-        )
-        self.assertEqual({}, self.run_with(doc))
-
-    def test_a_real_only_key_is_reported_when_reads_is_not_used(self):
-        doc = set_shape(
-            sample_requests(), "mr_get", lambda s: s["keys"].update(more={"t": ["string"]})
-        )
-        found = shape.compare_all(doc, fakeside.run(fakeside.load_requests()))
-        self.assertEqual({"mr_get": [("more", "missing")]}, found)
-
-    def test_a_fake_only_key_is_reported_even_if_it_is_not_read(self):
-        doc = set_shape(sample_requests(), "mr_get", lambda s: s["keys"].pop("web_url", None))
-        doc = set_shape(doc, "mr_get", lambda s: s["keys"].pop("created_at"))
-        self.assertEqual({"mr_get": [("created_at", "extra")]}, self.run_with(doc))
-
-    def test_a_read_key_missing_from_the_recording_is_a_problem(self):
-        doc = set_shape(sample_requests(), "mr_get", lambda s: s["keys"].pop("title"))
-        self.assertEqual(
-            ["mr_get: reads の title が記録に無い"],
-            shape.reads_problems(fakeside.load_requests(), doc),
-        )
+    """`reads` の比べ方は test_shape.ReadsTest が見る。ここは記録との食い違いを見る。"""
 
     def test_a_read_key_below_a_missing_parent_is_a_problem(self):
         doc = set_shape(sample_requests(), "reviewers", lambda s: s["items"]["keys"].pop("user"))

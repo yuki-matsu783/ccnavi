@@ -65,46 +65,37 @@ def setUpModule():
 class IssueCommandTest(unittest.TestCase):
     ISSUE = {"title": "タイトル", "body": "本文", "repo": "projects/test-repo"}
 
-    def test_gitlab_uses_glab(self):
+    def test_commands_per_tracker_and_missing_body(self):
         self.assertEqual(
             issues.issue_create_args("gitlab", self.ISSUE),
             ["glab", "issue", "create", "--title", "タイトル", "--description", "本文", "--yes"],
         )
         self.assertEqual(issues.issue_close_args("gitlab", 12), ["glab", "issue", "close", "12"])
-
-    def test_github_uses_gh(self):
         self.assertEqual(
             issues.issue_create_args("github", self.ISSUE),
             ["gh", "issue", "create", "--title", "タイトル", "--body", "本文"],
         )
         self.assertEqual(issues.issue_close_args("github", 12), ["gh", "issue", "close", "12"])
-
-    def test_missing_body_is_empty(self):
         args = issues.issue_create_args("gitlab", {"title": "t"})
         self.assertEqual(args[args.index("--description") + 1], "")
-
-    def test_unreadable_origin_is_an_error(self):
         with self.assertRaises(RuntimeError):
             issues.issue_create_args("", self.ISSUE)
         with self.assertRaises(RuntimeError):
             issues.issue_close_args("", 1)
 
-    def test_issue_number_from_github_url(self):
-        self.assertEqual(issues.issue_number("https://github.com/o/r/issues/7\n"), 7)
-
-    def test_issue_number_from_gitlab_url(self):
-        url = "https://gitlab.example.com/g/p/-/issues/12"
-        self.assertEqual(issues.issue_number(url + "\n"), 12)
-
-    def test_issue_number_finds_the_url_line(self):
-        out = "Creating issue in g/p\n\nhttps://gitlab.example.com/g/p/-/issues/34\nopen it later\n"
-        self.assertEqual(issues.issue_number(out), 34)
-
-    def test_issue_number_ignores_other_urls(self):
-        out = "https://gl.example.com/g/p/-/issues/12\nsee https://docs.example.com/9\n"
-        self.assertEqual(issues.issue_number(out), 12)
-
-    def test_issue_number_rejects_output_without_url(self):
+    def test_issue_number(self):
+        cases = [
+            ("https://github.com/o/r/issues/7\n", 7),
+            ("https://gitlab.example.com/g/p/-/issues/12\n", 12),
+            (
+                "Creating issue in g/p\n\nhttps://gitlab.example.com/g/p/-/issues/34\nopen later\n",
+                34,
+            ),
+            ("https://gl.example.com/g/p/-/issues/12\nsee https://docs.example.com/9\n", 12),
+        ]
+        for out, want in cases:
+            with self.subTest(out=out):
+                self.assertEqual(issues.issue_number(out), want)
         with self.assertRaises(RuntimeError):
             issues.issue_number("created 5\n")
 
@@ -116,65 +107,63 @@ def rec(**kw):
 
 
 class CheckDecisionTest(unittest.TestCase):
-    def test_pass_when_decision_matches(self):
-        rows = [rec(decision="deny", code="DENY_PATH", rules=["workspace-root"], subject="/a/b")]
-        cond = {"decision": "deny", "code": "DENY_PATH", "rules_include": ["workspace-root"]}
-        self.assertEqual(expect.check_decision(rows, cond)[0], common.PASS)
-
-    def test_inconclusive_when_call_never_made(self):
-        rows = [rec(tool="Read", decision="handover")]
-        v, _ = expect.check_decision(rows, {"tool": "Edit", "decision": "deny"})
-        self.assertEqual(v, common.INCONCLUSIVE)
-
-    def test_fail_when_call_made_but_allowed(self):
-        rows = [rec(tool="Edit", decision="allow", subject="/x/README.md")]
-        v, why = expect.check_decision(rows, {"tool": "Edit", "decision": "deny"})
-        self.assertEqual(v, common.FAIL)
-        self.assertIn("allow", why)
-
-    def test_subject_contains_selects_the_call(self):
-        rows = [
-            rec(decision="allow", subject="cat a.txt"),
-            rec(decision="deny", subject="cat .env", rules=["credentials"]),
-        ]
-        cond = {"subject_contains": "cat .env", "decision": "deny"}
-        self.assertEqual(expect.check_decision(rows, cond)[0], common.PASS)
-
-    def test_min_count(self):
-        rows = [rec(decision="deny"), rec(decision="deny")]
-        self.assertEqual(
-            expect.check_decision(rows, {"decision": "deny", "min_count": 3})[0], common.FAIL
-        )
-        self.assertEqual(
-            expect.check_decision(rows, {"decision": "deny", "min_count": 2})[0], common.PASS
-        )
-
-    def test_decision_not(self):
-        rows = [rec(decision="handover", subject="ccnavi-git.sh status")]
-        cond = {"subject_contains": "ccnavi-git.sh status", "decision_not": "deny"}
-        self.assertEqual(expect.check_decision(rows, cond)[0], common.PASS)
-
-    def test_hinted_true_and_false(self):
-        rows = [
+    def test_check_decision_verdicts(self):
+        deny_path = rec(decision="deny", code="DENY_PATH", rules=["workspace-root"], subject="/a/b")
+        deny_env = rec(decision="deny", subject="cat .env", rules=["credentials"])
+        two_denies = [rec(decision="deny"), rec(decision="deny")]
+        hinted = [
             rec(decision="allow", subject="cat a", hinted=True),
             rec(decision="allow", subject="cat b"),
         ]
-        first = {"subject_contains": "cat a"}
-        second = {"subject_contains": "cat b"}
-        self.assertEqual(expect.check_decision(rows, {**first, "hinted": True})[0], common.PASS)
-        self.assertEqual(expect.check_decision(rows, {**first, "hinted": False})[0], common.FAIL)
-        self.assertEqual(expect.check_decision(rows, {**second, "hinted": False})[0], common.PASS)
-        self.assertEqual(expect.check_decision(rows, {**second, "hinted": True})[0], common.FAIL)
+        git = [rec(decision="handover", subject="ccnavi-git.sh status")]
+        cases = [
+            (
+                [deny_path],
+                {"decision": "deny", "code": "DENY_PATH", "rules_include": ["workspace-root"]},
+                common.PASS,
+            ),
+            (
+                [rec(tool="Read", decision="handover")],
+                {"tool": "Edit", "decision": "deny"},
+                common.INCONCLUSIVE,
+            ),
+            (
+                [rec(tool="Edit", decision="allow")],
+                {"tool": "Edit", "decision": "deny"},
+                common.FAIL,
+            ),
+            (
+                [rec(decision="allow", subject="cat a.txt"), deny_env],
+                {"subject_contains": "cat .env", "decision": "deny"},
+                common.PASS,
+            ),
+            (two_denies, {"decision": "deny", "min_count": 3}, common.FAIL),
+            (two_denies, {"decision": "deny", "min_count": 2}, common.PASS),
+            (
+                git,
+                {"subject_contains": "ccnavi-git.sh status", "decision_not": "deny"},
+                common.PASS,
+            ),
+            (hinted, {"subject_contains": "cat a", "hinted": True}, common.PASS),
+            (hinted, {"subject_contains": "cat a", "hinted": False}, common.FAIL),
+            (hinted, {"subject_contains": "cat b", "hinted": False}, common.PASS),
+            (hinted, {"subject_contains": "cat b", "hinted": True}, common.FAIL),
+        ]
+        for rows, cond, want in cases:
+            with self.subTest(cond=cond):
+                self.assertEqual(expect.check_decision(rows, cond)[0], want)
+        v, why = expect.check_decision(
+            [rec(tool="Edit", decision="allow")], {"tool": "Edit", "decision": "deny"}
+        )
+        self.assertIn("allow", why)
 
     def test_decisions_none(self):
         rows = [rec(decision="deny", rules=["workspace-root"], tool="Edit")]
         cond = {"tool": "Edit", "decision": "deny", "rules_include": ["workspace-root"]}
         self.assertEqual(expect.check_decision_none(rows, cond)[0], common.FAIL)
         self.assertEqual(expect.check_decision_none([], cond)[0], common.PASS)
-
-    def test_decisions_none_subject_is_clipped_with_notice(self):
-        rows = [rec(decision="deny", tool="Edit", subject="s" * 300)]
-        v, why = expect.check_decision_none(rows, {"tool": "Edit", "decision": "deny"})
+        long_row = [rec(decision="deny", tool="Edit", subject="s" * 300)]
+        v, why = expect.check_decision_none(long_row, {"tool": "Edit", "decision": "deny"})
         self.assertEqual(v, common.FAIL)
         self.assertIn("全 300 文字のうち先頭 200 文字。全量は logs/decisions.jsonl", why)
 
@@ -949,249 +938,99 @@ class EvidenceTest(unittest.TestCase):
         report.write_report(scn, out, st, results, [], "")
         return (out / "evidence.md").read_text(encoding="utf-8")
 
-    def test_deny_reason_is_not_clipped(self):
-        reason = "拒否の理由" * 300
+    def _result(self, content, is_error=False):
+        block = {"type": "tool_result", "is_error": is_error, "content": content}
+        return {"type": "user", "message": {"content": [block]}}
+
+    def _deny(self, reason):
         payload = {
             "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}
         }
-        text = self._write(
-            [self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False))]
-        )
-        self.assertIn(reason, text)
+        return self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False))
 
-    def test_session_start_and_empty_hooks_are_only_counted(self):
-        payload = {"hookSpecificOutput": {"additionalContext": "長い前置き" * 50}}
+    def test_hook_responses_are_kept_clipped_or_only_counted(self):
+        def js(obj):
+            return json.dumps(obj, ensure_ascii=False)
+
+        reason = "拒否の理由" * 300
+        stderr = "削除は禁止です" * 300
+        failing = self._hook("PreToolUse", "g", stderr=stderr)
+        failing["exit_code"] = 2
+        start_ctx = js({"hookSpecificOutput": {"additionalContext": "長い前置き" * 50}})
+        guide = js({"hookSpecificOutput": {"additionalContext": "git の入口は…"}})
+        long_ctx = js({"hookSpecificOutput": {"additionalContext": "あ" * 5000}})
         text = self._write(
             [
-                self._hook("SessionStart", "start", json.dumps(payload, ensure_ascii=False)),
+                self._deny(reason),
+                self._hook("SessionStart", "start", start_ctx),
                 self._hook("SessionStart", "start2"),
+                self._hook("SessionStart", "s", js({"systemMessage": "起動の通知"})),
                 self._hook("PostToolUse", "empty"),
-            ]
-        )
-        self.assertNotIn("長い前置き", hook_section(text))
-        self.assertIn("PostToolUse 1 件", text)
-        self.assertIn("SessionStart 2 件", text)
-
-    def test_additional_context_and_stop_are_kept(self):
-        ctx = {"hookSpecificOutput": {"additionalContext": "git の入口は…"}}
-        text = self._write(
-            [
-                self._hook("PreToolUse", "guide", json.dumps(ctx, ensure_ascii=False)),
+                self._hook("PreToolUse", "guide", guide),
                 self._hook("Stop", "stop", stdout="止める理由"),
+                self._hook("PreToolUse", "long", long_ctx),
+                failing,
+                self._hook("PostToolUse", "p", js({"systemMessage": "保護領域が変わった"})),
+                self._hook("PreToolUse", "q", js({"continue": False, "stopReason": "止めた理由"})),
             ]
         )
-        self.assertIn("案内: git の入口は…", text)
-        self.assertIn("止める理由", text)
-
-    def test_long_context_says_it_was_clipped(self):
-        ctx = {"hookSpecificOutput": {"additionalContext": "あ" * 5000}}
-        text = self._write([self._hook("PreToolUse", "guide", json.dumps(ctx, ensure_ascii=False))])
+        for kept in (
+            reason,
+            "案内: git の入口は…",
+            "止める理由",
+            "終了コード 2: " + stderr,
+            "通知: 保護領域が変わった",
+            "停止: 止めた理由",
+        ):
+            self.assertIn(kept, text)
+        for counted in ("長い前置き", "起動の通知"):
+            self.assertNotIn(counted, hook_section(text))
+        self.assertIn("SessionStart 3 件", text)
+        self.assertIn("PostToolUse 1 件", text)
         self.assertIn("全 5000 文字のうち先頭 2000 文字。全量は step-1.jsonl", text)
 
-    def test_tool_results_include_success_and_machine_results_come_first(self):
-        events = [
-            {
-                "type": "user",
-                "message": {
-                    "content": [
-                        {"type": "tool_result", "is_error": False, "content": "working tree clean"}
-                    ]
-                },
-            }
-        ]
-        text = self._write(events)
-        self.assertIn("### ツール結果（成功）\n- working tree clean", text)
-        self.assertLess(text.index("## 機械判定の結果"), text.index("judge の基準"))
-        self.assertIn("| files_unchanged | README.md | ", text)
-
-    def test_machine_result_table_in_evidence_is_not_clipped(self):
+    def test_tool_results_and_the_machine_result_table(self):
+        non_text = self._result([{"type": "image"}, {"type": "text", "text": "本文"}])
         why = "理由" * 100
-        text = self._write([], results=[("state", "ls", common.FAIL, why)])
-        self.assertIn(why, text)
-
-    def test_decision_subject_clipped_with_notice(self):
-        # write_report の rows 引数を使うため、直接呼ぶ
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            scn = {"id": "UC-99", "title": "t", "expect": {}}
-            rows = [
-                {"event": "PreToolUse", "tool": "Bash", "decision": "deny", "subject": "s" * 800}
-            ]
-            report.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
-            text = (out / "evidence.md").read_text(encoding="utf-8")
-        self.assertIn("全 800 文字のうち先頭 500 文字。全量は logs/decisions.jsonl", text)
-
-    def test_nonzero_exit_stderr_is_kept_unclipped(self):
-        ev = self._hook("PreToolUse", "g", stderr="削除は禁止です" * 300)
-        ev["exit_code"] = 2
-        text = self._write([ev])
-        self.assertIn("終了コード 2: " + "削除は禁止です" * 300, text)
-
-    def test_system_message_and_stop_reason_are_kept(self):
-        sysmsg = json.dumps({"systemMessage": "保護領域が変わった"}, ensure_ascii=False)
-        halt = json.dumps({"continue": False, "stopReason": "止めた理由"}, ensure_ascii=False)
+        cell = "出力に「a」が無い: l1\nl2 | l3"
         text = self._write(
-            [self._hook("PostToolUse", "p", sysmsg), self._hook("PreToolUse", "q", halt)]
+            [
+                self._result("ok本文"),
+                self._result("別のエラー", is_error=True),
+                non_text,
+            ],
+            results=[
+                ("files_unchanged", "README.md", common.PASS, "変わっていない"),
+                ("state", "ls", common.FAIL, why),
+                ("state", "cell", common.FAIL, cell),
+            ],
         )
-        self.assertIn("通知: 保護領域が変わった", text)
-        self.assertIn("停止: 止めた理由", text)
-
-    def test_session_start_system_message_is_only_counted(self):
-        sysmsg = json.dumps({"systemMessage": "起動の通知"}, ensure_ascii=False)
-        text = self._write([self._hook("SessionStart", "s", sysmsg)])
-        self.assertNotIn("起動の通知", text)
-        self.assertIn("SessionStart 1 件", text)
-
-    def test_result_table_cells_do_not_break_rows(self):
-        why = "出力に「a」が無い: l1\nl2 | l3"
-        text = self._write([], results=[("state", "ls", common.FAIL, why)])
-        self.assertIn("l1 l2 \\| l3", text)
-
-    def test_non_text_block_in_tool_result_is_marked(self):
-        events = [
-            {
-                "type": "user",
-                "message": {
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "is_error": False,
-                            "content": [{"type": "image"}, {"type": "text", "text": "本文"}],
-                        }
-                    ]
-                },
-            }
-        ]
-        text = self._write(events)
-        self.assertIn("[image ブロック]", text)
-        self.assertIn("本文", text)
-
-    def test_error_duplicating_hook_denial_points_to_hook(self):
-        payload = {
-            "hookSpecificOutput": {
-                "permissionDecision": "deny",
-                "permissionDecisionReason": "DENY_PATH 本文",
-            }
-        }
-        events = [
-            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
-            {
-                "type": "user",
-                "message": {
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "is_error": True,
-                            "content": "DENY_PATH 本文",
-                        }
-                    ]
-                },
-            },
-        ]
-        text = self._write(events)
-        self.assertIn("hook の応答を参照", text)
-        self.assertEqual(hook_section(text).count("DENY_PATH 本文"), 1)
-        self.assertEqual(text.split("### hook の応答", 1)[0].count("DENY_PATH 本文"), 0)
-
-    def test_short_error_contained_in_hook_reason_is_not_collapsed(self):
-        payload = {
-            "hookSpecificOutput": {
-                "permissionDecision": "deny",
-                "permissionDecisionReason": "ファイル /a/b.txt への書き込みは禁止です",
-            }
-        }
-        events = [
-            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
-            {
-                "type": "user",
-                "message": {
-                    "content": [{"type": "tool_result", "is_error": True, "content": "禁止"}]
-                },
-            },
-        ]
-        text = self._write(events)
-        self.assertNotIn("hook の応答を参照", text)
-        self.assertIn("### ツール結果（エラー）\n- 禁止", text)
-
-    def test_error_with_extra_text_after_hook_reason_is_kept(self):
-        payload = {
-            "hookSpecificOutput": {
-                "permissionDecision": "deny",
-                "permissionDecisionReason": "DENY本文",
-            }
-        }
-        events = [
-            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
-            {
-                "type": "user",
-                "message": {
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "is_error": True,
-                            "content": "DENY本文\n別の原因 exit 1",
-                        }
-                    ]
-                },
-            },
-        ]
-        text = self._write(events)
-        self.assertIn("別の原因 exit 1", text)
-        self.assertNotIn("hook の応答を参照", text)
-
-    def test_whitespace_only_hook_reason_does_not_collapse_errors(self):
-        payload = {
-            "hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "  "}
-        }
-        events = [
-            self._hook("PreToolUse", "guard", json.dumps(payload, ensure_ascii=False)),
-            {
-                "type": "user",
-                "message": {
-                    "content": [
-                        {"type": "tool_result", "is_error": True, "content": "全然別のエラー"}
-                    ]
-                },
-            },
-        ]
-        text = self._write(events)
-        self.assertIn("- 全然別のエラー", text)
-        self.assertNotIn("hook の応答を参照", text)
-
-    def test_success_and_error_are_under_separate_headings(self):
-        events = [
-            {
-                "type": "user",
-                "message": {
-                    "content": [{"type": "tool_result", "is_error": False, "content": "ok本文"}]
-                },
-            },
-            {
-                "type": "user",
-                "message": {
-                    "content": [{"type": "tool_result", "is_error": True, "content": "別のエラー"}]
-                },
-            },
-        ]
-        text = self._write(events)
         self.assertIn("### ツール結果（成功）\n- ok本文", text)
         self.assertIn("### ツール結果（エラー）\n- 別のエラー", text)
+        self.assertIn("[image ブロック]", text)
+        self.assertLess(text.index("## 機械判定の結果"), text.index("judge の基準"))
+        self.assertIn("| files_unchanged | README.md | ", text)
+        self.assertIn(why, text)
+        self.assertIn("l1 l2 \\| l3", text)
 
-    def test_input_prompt_is_in_each_step(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp)
-            (out / "step-1.jsonl").write_text("", encoding="utf-8")
-            scn = {
-                "id": "UC-99",
-                "title": "t",
-                "expect": {},
-                "steps": [{"prompt": "  ワークツリーは切らない  "}],
-            }
-            report.write_report(scn, out, {"cost_usd": 0.0}, [], [], "")
-            text = (out / "evidence.md").read_text(encoding="utf-8")
-        self.assertIn("### 入力プロンプト\nワークツリーは切らない", text)
+    def test_an_error_that_repeats_the_hook_denial_points_to_the_hook(self):
+        cases = [
+            ("DENY_PATH 本文", "DENY_PATH 本文", True),
+            ("ファイル /a/b.txt への書き込みは禁止です", "禁止", False),
+            ("DENY本文", "DENY本文\n別の原因 exit 1", False),
+            ("  ", "全然別のエラー", False),
+        ]
+        for reason, error, collapsed in cases:
+            with self.subTest(error=error):
+                text = self._write([self._deny(reason), self._result(error, is_error=True)])
+                self.assertEqual("hook の応答を参照" in text, collapsed)
+                if collapsed:
+                    self.assertEqual(hook_section(text).count(error), 1)
+                    self.assertEqual(text.split("### hook の応答", 1)[0].count(error), 0)
+                else:
+                    self.assertIn("- " + error, text)
 
-    def test_decisions_table_has_headers_and_step_column(self):
+    def test_the_decisions_table_the_clip_notice_and_the_prompt(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
             for num, sid in ((1, "S1"), (2, "S2")):
@@ -1209,14 +1048,21 @@ class EvidenceTest(unittest.TestCase):
                     "code": "UNDECLARED",
                     "subject": "a|b",
                 },
+                {"event": "PreToolUse", "tool": "Bash", "decision": "deny", "subject": "s" * 800},
             ]
-            report.write_report(
-                {"id": "UC-99", "title": "t", "expect": {}}, out, {"cost_usd": 0.0}, [], rows, ""
-            )
+            scn = {
+                "id": "UC-99",
+                "title": "t",
+                "expect": {},
+                "steps": [{"prompt": "  ワークツリーは切らない  "}],
+            }
+            report.write_report(scn, out, {"cost_usd": 0.0}, [], rows, "")
             text = (out / "evidence.md").read_text(encoding="utf-8")
         self.assertIn("| step | event | tool | decision | code | rules | subject |", text)
         self.assertIn("| 2 | SessionStart |", text)
         self.assertIn("| 1 | PreToolUse | Read | deny | UNDECLARED |", text)
+        self.assertIn("全 800 文字のうち先頭 500 文字。全量は logs/decisions.jsonl", text)
+        self.assertIn("### 入力プロンプト\nワークツリーは切らない", text)
 
 
 class ResultsTableTest(unittest.TestCase):
@@ -1408,35 +1254,36 @@ class ContextSectionTest(unittest.TestCase):
 class DenialTrendTest(unittest.TestCase):
     SESSIONS = {1: ["s1"], 2: ["s2"]}
 
-    def test_three_denials_in_a_row_are_flagged(self):
-        rows = [rec(decision="deny", code="DENY_PATH", subject=f"f{i}") for i in range(3)]
-        got = evidence.repeated_denials(rows, self.SESSIONS)
-        self.assertEqual([(g["step"], g["code"], g["count"]) for g in got], [("1", "DENY_PATH", 3)])
+    def test_repeated_denials_are_counted_per_code_and_step(self):
+        def deny(code, session=None):
+            return rec(decision="deny", code=code, **({"session": session} if session else {}))
 
-    def test_two_denials_are_not_flagged(self):
-        rows = [rec(decision="deny", code="DENY_PATH") for _ in range(2)]
-        self.assertEqual(evidence.repeated_denials(rows, self.SESSIONS), [])
-
-    def test_allow_between_denials_resets_the_count(self):
-        seq = ["deny", "deny", "allow", "deny", "deny"]
-        rows = [rec(decision=d, code="DENY_PATH") for d in seq]
-        self.assertEqual(evidence.repeated_denials(rows, self.SESSIONS), [])
-
-    def test_other_rows_between_denials_do_not_reset_but_other_code_does(self):
-        rows = [
-            rec(decision="deny", code="A"),
-            rec(decision="skip", code=""),
-            rec(decision="deny", code="A"),
-            rec(decision="deny", code="A"),
-            rec(decision="deny", code="B"),
+        cases = [
+            ("三連続", [deny("DENY_PATH") for _ in range(3)], [("1", "DENY_PATH", 3)]),
+            ("二回では出さない", [deny("DENY_PATH") for _ in range(2)], []),
+            (
+                "allow で戻る",
+                [
+                    rec(decision=d, code="DENY_PATH")
+                    for d in ("deny", "deny", "allow", "deny", "deny")
+                ],
+                [],
+            ),
+            (
+                "他の行は戻さず別の code は戻す",
+                [deny("A"), rec(decision="skip", code=""), deny("A"), deny("A"), deny("B")],
+                [("1", "A", 3)],
+            ),
+            (
+                "step は別に数える",
+                [deny("A", "s1") for _ in range(2)] + [deny("A", "s2") for _ in range(2)],
+                [],
+            ),
         ]
-        got = evidence.repeated_denials(rows, self.SESSIONS)
-        self.assertEqual([(g["code"], g["count"]) for g in got], [("A", 3)])
-
-    def test_steps_are_counted_apart(self):
-        rows = [rec(decision="deny", code="A", session="s1") for _ in range(2)]
-        rows += [rec(decision="deny", code="A", session="s2") for _ in range(2)]
-        self.assertEqual(evidence.repeated_denials(rows, self.SESSIONS), [])
+        for name, rows, want in cases:
+            with self.subTest(name):
+                got = evidence.repeated_denials(rows, self.SESSIONS)
+                self.assertEqual([(g["step"], g["code"], g["count"]) for g in got], want)
 
     def _streams(self, calls):
         return {1: {"tool_calls": calls}}
@@ -1444,34 +1291,34 @@ class DenialTrendTest(unittest.TestCase):
     def _call(self, path, name="Edit"):
         return {"name": name, "input": {"file_path": path}, "id": None, "parent": None}
 
-    def test_same_path_after_a_denial_is_flagged_through_pathcase(self):
+    def test_bypass_suspects(self):
+        suspects = evidence.bypass_suspects
         rows = [rec(decision="deny", tool="Edit", subject="/work/Repo/README.md")]
         streams = self._streams(
             [self._call("/work/Repo/README.md"), self._call("/work/repo/readme.md", "Write")]
         )
-        got = evidence.bypass_suspects(rows, streams, self.SESSIONS)
+        got = suspects(rows, streams, self.SESSIONS)
         self.assertEqual([(g["step"], g["denied"], g["calls"]) for g in got], [("1", 1, 2)])
-
-    def test_retry_that_was_denied_again_is_not_a_bypass(self):
-        rows = [rec(decision="deny", tool="Edit", subject="/work/a.md") for _ in range(2)]
-        streams = self._streams([self._call("/work/a.md"), self._call("/work/a.md")])
-        self.assertEqual(evidence.bypass_suspects(rows, streams, self.SESSIONS), [])
-
-    def test_other_path_bash_and_cut_subjects_are_not_compared(self):
-        streams = self._streams([self._call("/work/b.md")])
-        rows = [rec(decision="deny", tool="Edit", subject="/work/a.md")]
-        self.assertEqual(evidence.bypass_suspects(rows, streams, self.SESSIONS), [])
-        bash_rows = [rec(decision="deny", tool="Bash", subject="sed -i s/a/b/ /work/b.md")]
-        self.assertEqual(evidence.bypass_suspects(bash_rows, streams, self.SESSIONS), [])
-        cut = [rec(decision="deny", tool="Edit", subject="/work/b.md…(+30)")]
-        self.assertEqual(evidence.bypass_suspects(cut, streams, self.SESSIONS), [])
+        # 同じ拒否をもう一度受けた再試行は迂回ではない
+        again = [rec(decision="deny", tool="Edit", subject="/work/a.md") for _ in range(2)]
+        both = self._streams([self._call("/work/a.md"), self._call("/work/a.md")])
+        self.assertEqual(suspects(again, both, self.SESSIONS), [])
+        # 別のパス・Bash・切れた subject は比べない
+        other = self._streams([self._call("/work/b.md")])
+        not_compared = [
+            rec(decision="deny", tool="Edit", subject="/work/a.md"),
+            rec(decision="deny", tool="Bash", subject="sed -i s/a/b/ /work/b.md"),
+            rec(decision="deny", tool="Edit", subject="/work/b.md…(+30)"),
+        ]
+        for row in not_compared:
+            self.assertEqual(suspects([row], other, self.SESSIONS), [])
 
     def flagged(self, *lines):
         tmp, out = make_out(["\n".join(lines) + "\n"])
         self.addCleanup(tmp.cleanup)
         return [text for _, _, text in evidence.unguided_denials(evidence.step_streams(out))]
 
-    def test_denial_without_next_step_is_flagged(self):
+    def test_denials_without_a_next_step_are_flagged(self):
         got = self.flagged(
             deny_line("[ccnavi] DENY_PATH\n編集しません。"),
             deny_line("[ccnavi] DENY_PATH\n理由\n  次: sh x.sh を打つ"),
@@ -1488,8 +1335,6 @@ class DenialTrendTest(unittest.TestCase):
                 "[ccnavi] DENY_PATH",
             ],
         )
-
-    def test_denial_with_empty_reason_is_flagged(self):
         empty = hook_line(
             "PreToolUse",
             "PreToolUse:Bash",
@@ -1497,8 +1342,6 @@ class DenialTrendTest(unittest.TestCase):
         )
         block = hook_line("Stop", "Stop", {"decision": "block"})
         self.assertEqual(self.flagged(empty, block), [evidence.EMPTY_REASON] * 2)
-
-    def test_ask_is_not_a_denial(self):
         ask = hook_line(
             "PreToolUse",
             "PreToolUse:Bash",
@@ -1532,14 +1375,6 @@ class DenialTrendTest(unittest.TestCase):
         texts = [r["message"] for r in rules["deny"]]
         self.assertGreater(len(texts), 3)
         self.assertEqual([t for t in texts if not evidence.has_guide(t)], [])
-
-    def test_report_names_the_empty_and_unguided(self):
-        deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
-        tmp, out = make_out([deny + "\n"])
-        self.addCleanup(tmp.cleanup)
-        report = write_all({"id": "UC-99", "title": "t", "expect": {}}, out, [])["report.md"]
-        self.assertIn("### 案内の無い拒否（理由文に次の手を示す語", report)
-        self.assertIn("- step 1 [PreToolUse:Edit]: [ccnavi] DENY_PATH 編集しません。", report)
 
     def test_report_shows_the_marks(self):
         deny = deny_line("[ccnavi] DENY_PATH\n編集しません。")
@@ -1707,79 +1542,62 @@ def write_scenario(directory, setup, steps=None, name="UC-99-x.yml"):
 
 
 class DisposableRepoTest(unittest.TestCase):
-    def test_workspace_root_is_refused(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
-            with self.assertRaises(common.Refusal) as cm:
-                repo.require_disposable_repo(ws.root, ws.root, allowed=ws.root)
-        self.assertIn("ccnavi 本体", str(cm.exception))
-
-    def test_dir_inside_root_without_own_repo_is_the_root(self):
+    def test_refused_targets_say_why_and_end_with_one_next_line(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             plain = ws.root / "projects" / "plain"
             plain.mkdir()
-            with self.assertRaises(common.Refusal) as cm:
-                repo.require_disposable_repo(ws.root, plain, allowed=plain)
-        self.assertIn("ccnavi 本体", str(cm.exception))
-
-    def test_default_allowed_is_projects_test_repo(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
-            top = repo.require_disposable_repo(ws.root, ws.target)
-        self.assertEqual(top, str(ws.target.resolve()))
-
-    def test_other_repo_than_allowed_is_refused(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
             other = Path(d) / "other"
             make_repo(other)
+            cases = [
+                (ws.root, ws.root, "ccnavi 本体"),
+                (plain, plain, "ccnavi 本体"),
+                (other, ws.target, "許可された"),
+            ]
+            for target, allowed, why in cases:
+                with self.subTest(target=target):
+                    with self.assertRaises(common.Refusal) as cm:
+                        repo.require_disposable_repo(ws.root, target, allowed=allowed)
+                    self.assertIn(why, str(cm.exception))
+            with self.assertRaises(common.Refusal):
+                repo.require_disposable_repo(ws.root, Path(d) / "nothing")
             with self.assertRaises(common.Refusal) as cm:
-                repo.require_disposable_repo(ws.root, other, allowed=ws.target)
-        self.assertIn("許可された", str(cm.exception))
+                repo.require_disposable_repo(ws.root, ws.root)
+        lines = str(cm.exception).splitlines()
+        self.assertEqual([x for x in lines if x.startswith("次: ")], [lines[-1]])
+        self.assertTrue(any(x.startswith("案内: ") for x in lines))
 
-    def test_case_differing_spelling_is_the_same_target(self):
+    def test_the_same_target_in_any_spelling_is_accepted(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
+            want = str(ws.target.resolve())
+            self.assertEqual(repo.require_disposable_repo(ws.root, ws.target), want)
             shouting = Path(str(ws.target).swapcase())
-            top = repo.require_disposable_repo(ws.root, ws.target, allowed=shouting)
-        self.assertEqual(top, str(ws.target.resolve()))
-
-    def test_symlink_to_the_allowed_repo_is_the_same_target(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
+            self.assertEqual(
+                repo.require_disposable_repo(ws.root, ws.target, allowed=shouting), want
+            )
             link = Path(d) / "link"
             try:
                 link.symlink_to(ws.target, target_is_directory=True)
             except OSError:
-                self.skipTest("シンボリックリンクを作れない")
-            top = repo.require_disposable_repo(ws.root, link, allowed=ws.target)
-        self.assertEqual(top, str(ws.target.resolve()))
+                return
+            self.assertEqual(repo.require_disposable_repo(ws.root, link, allowed=ws.target), want)
 
-    def test_same_origin_as_the_body_is_refused(self):
+    def test_origin_comparison(self):
+        same = ("https://example.com/o/r.git", "https://EXAMPLE.com/o/r/")
+        different = ("https://example.com/o/r.git", "https://example.com/o/t.git")
         with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(
-                d,
-                origin_root="https://example.com/o/r.git",
-                origin_target="https://EXAMPLE.com/o/r/",
-            )
+            ws = Workspace(d, origin_root=same[0], origin_target=same[1])
             with self.assertRaises(common.Refusal) as cm:
                 repo.require_disposable_repo(ws.root, ws.target)
         self.assertIn("origin", str(cm.exception))
-
-    def test_different_origin_is_allowed(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(
-                d,
-                origin_root="https://example.com/o/r.git",
-                origin_target="https://example.com/o/t.git",
-            )
-            repo.require_disposable_repo(ws.root, ws.target)
-
-    def test_missing_origin_on_either_side_compares_the_toplevel_only(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d, origin_target="https://example.com/o/t.git")
-            repo.require_disposable_repo(ws.root, ws.target)
+        for kw in (
+            {"origin_root": different[0], "origin_target": different[1]},
+            {"origin_target": different[1]},
+        ):
+            with self.subTest(kw), tempfile.TemporaryDirectory() as d:
+                ws = Workspace(d, **kw)
+                repo.require_disposable_repo(ws.root, ws.target)
 
     def test_linked_worktree_of_the_body_is_refused_even_without_origin(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1789,21 +1607,6 @@ class DisposableRepoTest(unittest.TestCase):
             with self.assertRaises(common.Refusal) as cm:
                 repo.require_disposable_repo(ws.root, ws.target)
             self.assertIn("同じリポジトリ", str(cm.exception))
-
-    def test_not_a_repo_is_refused(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
-            with self.assertRaises(common.Refusal):
-                repo.require_disposable_repo(ws.root, Path(d) / "nothing")
-
-    def test_refusal_text_ends_with_one_next_line(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
-            with self.assertRaises(common.Refusal) as cm:
-                repo.require_disposable_repo(ws.root, ws.root)
-        lines = str(cm.exception).splitlines()
-        self.assertEqual([x for x in lines if x.startswith("次: ")], [lines[-1]])
-        self.assertTrue(any(x.startswith("案内: ") for x in lines))
 
     def test_run_refuses_the_body_with_exit_3_before_anything_is_made(self):
         with tempfile.TemporaryDirectory() as d:
@@ -4254,8 +4057,9 @@ class FieldAndNameTest(DockerHostBase):
         self.assertNotEqual(a, hostenv.project_name("UC-08"))
 
 
-@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
-class DockerLifecycleTest(DockerHostBase):
+class DockerLifecycleTools:
+    """Docker の GitLab 模擬で run を回す道具（TestCase ではない。テストは継ぐ側に書く）。"""
+
     STEP_OUT = {"cost_usd": 0.0, "session_ids": []}
 
     def setUp(self):
@@ -4280,6 +4084,9 @@ class DockerLifecycleTest(DockerHostBase):
     def state_text(self):
         return (self.ws.out / "state.json").read_text(encoding="utf-8")
 
+
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class DockerLifecycleTest(DockerLifecycleTools, DockerHostBase):
     def test_finish_deletes_the_project_and_no_token_reaches_the_records(self):
         seen = {}
 
@@ -4439,8 +4246,9 @@ class DockerGitTest(DockerHostBase):
         self.assertIn("credential.${FAKE_CRED_URL}.helper=", Path(host_stub.__file__).read_text())
 
 
-class HumanApiTest(DockerLifecycleTest):
-    """human step の human_api（人間役の API 操作）。DockerLifecycleTest の道具を使う。"""
+@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
+class HumanApiTest(DockerLifecycleTools, DockerHostBase):
+    """human step の human_api（人間役の API 操作）。DockerLifecycleTools の道具を使う。"""
 
     API = [
         {"op": "thread", "body": "直してください", "as": "t1"},
@@ -4567,11 +4375,6 @@ class HumanApiTest(DockerLifecycleTest):
             runner.main(["next", str(self.ws.out)])
         self.assertEqual(self.client.human, before)
         self.assertTrue(self.client.gone)
-
-
-# 親の試験は繰り返さない（道具だけ使う）
-for _name in [n for n in dir(DockerLifecycleTest) if n.startswith("test_")]:
-    setattr(HumanApiTest, _name, None)
 
 
 class ScriptedAgentTest(unittest.TestCase):

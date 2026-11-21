@@ -256,29 +256,22 @@ class WorkspaceTest(unittest.TestCase):
 class LogPlacementTest(WorkspaceTest):
     """記録はワークスペースの logs/<プロジェクト>/ に出る。"""
 
-    def test_inside_a_project(self):
+    def test_the_log_goes_to_the_workspace_wherever_the_command_runs(self):
         p1 = os.path.join(self.ws, "projects", "p1")
-        result = self.run_sh("ccnavi-git.sh", "status", cwd=p1)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertLogsIn("logs/p1", result)
-        self.assertNoLogsIn(p1)
-
-    def test_inside_a_worktree_cut_from_a_project(self):
-        result = self.run_sh("ccnavi-git.sh", "status", cwd=self.wp1)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertLogsIn("logs/p1", result)
-        self.assertNoLogsIn(self.wp1)
-
-    def test_inside_a_worktree_cut_from_the_workspace(self):
-        result = self.run_sh("ccnavi-git.sh", "status", cwd=self.w0)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertLogsIn("logs", result)
-        self.assertNoLogsIn(self.w0)
-
-    def test_at_the_workspace_root(self):
-        result = self.run_sh("ccnavi-git.sh", "status", cwd=self.ws)
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertLogsIn("logs", result)
+        # （cwd, 記録の置き場, 記録が出てはいけない所）
+        cases = [
+            ("project", p1, "logs/p1", p1),
+            ("worktree cut from a project", self.wp1, "logs/p1", self.wp1),
+            ("worktree cut from the workspace", self.w0, "logs", self.w0),
+            ("workspace root", self.ws, "logs", None),
+        ]
+        for name, cwd, placed, forbidden in cases:
+            with self.subTest(name):
+                result = self.run_sh("ccnavi-git.sh", "status", cwd=cwd)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertLogsIn(placed, result)
+                if forbidden:
+                    self.assertNoLogsIn(forbidden)
 
     def test_the_returned_path_can_be_opened_from_anywhere(self):
         """返すパスは、cwd がプロジェクトでも開ける形であること。"""

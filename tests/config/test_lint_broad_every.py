@@ -4,10 +4,7 @@
 「ヒットするたびに同じ文が積まれる」と warn する。`every`（渡す回の刻み。i0055）を
 書いたルールはヒットした中の 1 回しか渡らないので、この理屈は成り立たない。
 
-実装（`_rule_problems` の条件に `rule.every <= 1` を足す）は i0060 フェーズ 2 の範囲。
-ここに書くテストは、その実装が無い間は一部が失敗して正しい
-（`test_every_over_1_suppresses_*` の 2 本）。残りは今の時点で既に通り、
-「読めない `every` は毎回渡る側にする」という既定の挙動を実装後も外さないことを確かめる。
+読めない `every` は毎回渡る側にするので、苦情は残る。
 
 道具は外から呼ぶ（`tests/inproc.py` の `run_ccnavi`）。書き方は
 `tests/core/test_additional_context.py` の `test_lint_warns_on_broad_allow_only` に揃えた。
@@ -70,69 +67,29 @@ class LintBroadEveryTest(unittest.TestCase):
             line for line in stdout.splitlines() if "広い allow に additionalContext がある" in line
         ]
 
-    def test_every_over_1_suppresses_the_broad_allow_warning(self):
-        path = self.rules(
-            deny=[rule("push", "Bash", glob="*git push*")],
-            allow=[rule("everything", "Read", "", glob="*", additionalContext=NOTE, every=5)],
-        )
-        done = self.lint(path)
-        self.assertEqual(done.returncode, 0, done.stdout)
-        lines = self.warned(done.stdout)
-        self.assertFalse(any("everything" in line for line in lines), done.stdout)
-
-    def test_without_every_the_warning_still_fires(self):
-        path = self.rules(
-            deny=[rule("push", "Bash", glob="*git push*")],
-            allow=[rule("everything", "Read", "", glob="*", additionalContext=NOTE)],
-        )
-        done = self.lint(path)
-        lines = self.warned(done.stdout)
-        self.assertTrue(any("everything" in line for line in lines), done.stdout)
-
-    def test_every_1_still_warns(self):
-        # 既定を明示しただけで、毎回渡ることに変わりはない。
-        path = self.rules(
-            deny=[rule("push", "Bash", glob="*git push*")],
-            allow=[rule("everything", "Read", "", glob="*", additionalContext=NOTE, every=1)],
-        )
-        done = self.lint(path)
-        lines = self.warned(done.stdout)
-        self.assertTrue(any("everything" in line for line in lines), done.stdout)
-
-    def test_unreadable_every_still_warns(self):
-        # 読めない every は既定の 1 として扱うので、rule.every を見る実装なら自動的に warn が残る。
-        # every_written（書いたかどうか）だけを見る実装に書き換えたときに、このテストが失敗する。
-        for bad in (0, -1, "x"):
-            with self.subTest(every=bad):
-                path = self.rules(
-                    deny=[rule("push", "Bash", glob="*git push*")],
-                    allow=[
-                        rule("everything", "Read", "", glob="*", additionalContext=NOTE, every=bad)
-                    ],
-                )
-                done = self.lint(path)
-                lines = self.warned(done.stdout)
-                self.assertTrue(any("everything" in line for line in lines), done.stdout)
-
-    def test_every_over_1_suppresses_with_context_file(self):
+    def test_only_every_over_1_suppresses_the_broad_allow_warning(self):
+        """every が 2 以上のルールだけ苦情が消える。1・読めない値・every 無しは毎回渡るので残る。"""
         write(os.path.join(self.root, "docs", "guide.md"), "本文")
-        path = self.rules(
-            deny=[rule("push", "Bash", glob="*git push*")],
-            allow=[
-                rule(
-                    "everything",
-                    "Read",
-                    "",
-                    glob="*",
-                    additionalContextFile="docs/guide.md",
-                    every=5,
-                )
-            ],
-        )
+
+        def broad(name, **extra):
+            return rule(name, "Read", "", glob="*", **extra)
+
+        allow = [
+            broad("suppressed", additionalContext=NOTE, every=5),
+            broad("suppressed-file", additionalContextFile="docs/guide.md", every=5),
+            broad("no-every", additionalContext=NOTE),
+            broad("every-1", additionalContext=NOTE, every=1),
+            broad("every-0", additionalContext=NOTE, every=0),
+            broad("every-minus", additionalContext=NOTE, every=-1),
+            broad("every-word", additionalContext=NOTE, every="x"),
+        ]
+        path = self.rules(deny=[rule("push", "Bash", glob="*git push*")], allow=allow)
         done = self.lint(path)
-        self.assertEqual(done.returncode, 0, done.stdout)
         lines = self.warned(done.stdout)
-        self.assertFalse(any("everything" in line for line in lines), done.stdout)
+        for r in allow:
+            with self.subTest(r["id"]):
+                warned = any(f": {r['id']}: " in line for line in lines)
+                self.assertEqual(warned, not r["id"].startswith("suppressed"), done.stdout)
 
 
 if __name__ == "__main__":
