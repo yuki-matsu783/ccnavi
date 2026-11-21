@@ -52,14 +52,12 @@ Python のファイルが変わっているなら、すべて通してからコ�
 ```sh
 uv run --with ruff ruff format --check .
 uv run --with ruff ruff check .
-uv run python -m unittest discover -s tests/<グループ> -t .
 ```
 
-回すグループは、変えたファイルを [references/test-groups.md](references/test-groups.md) の表に適用して決める。
-表にヒットしない変更や、統合先に取り込む前・MR に出す前は全件（`uv run python -m tests`。[テストを回す](../../../.agents/docs/testing.md)）を回す。
+Python のテストは `tests/core` と `tests/scenarios` だけ。Python かその補助（`tests/` の下）を変えたら `uv run python -m tests` を回す（[テストを回す](../../../.agents/docs/testing.md)）。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
-`go/`・`.ccnavi/`・`tests/` のどれかのファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。sh・文面・見本だけの変更も、Go に移したテスト（`go/internal/clitest/`）が読むので回す。`-count=1` は要らない（clitest は go test が結果を保存しない）。Python のテストは Go の実行ファイルを組んで起こすので、上の表のグループも回す。
+`go/`・`.ccnavi/`・`tests/` のどれかのファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。sh・文面・見本だけの変更も、Go に移したテスト（`go/internal/clitest/`）が読むので回す。`-count=1` は要らない（clitest は go test が結果を保存しない）。
 
 拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
 
