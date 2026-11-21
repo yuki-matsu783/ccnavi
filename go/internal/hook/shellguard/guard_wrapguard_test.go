@@ -6,8 +6,8 @@ import (
 	"ccnavi/internal/infra/shell"
 )
 
-// sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形（tests/guard/test_wrapguard.py の
-// EnvTest から移した）。止める・通すの約束をここで見る。
+// sh の検査の材料を変える環境変数を、同じコマンド行で置いて保護済みの sh を呼ぶ形（clitest/guard/self の wrapguard_test.go の
+// TestEnvAssignmentStopsBeforeAnAllowRule へ代表を残した）。止める・通すの約束をここで見る。
 func TestCheckEnvTable(t *testing.T) {
 	for command, stops := range map[string]bool{
 		"CCNAVI_TICKETS_APPROVED=/x sh .ccnavi/scripts/ccnavi-git.sh push":             true,
