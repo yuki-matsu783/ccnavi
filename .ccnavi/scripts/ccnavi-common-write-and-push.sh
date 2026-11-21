@@ -243,9 +243,8 @@ ccnavi_wap_take_in() {
 	sed "s/^/  /" "$ccnavi_wap_tmp/sync" >&2
 	if [ "$ccnavi_cp_rc" -ne 0 ]; then
 		# 3 と 4 の間に hook が書いた（取り込みが書きかけと重なった。sync の終了コード 3）。やり直さずに止める。
-		# 再実行すれば 3 でコミットされる。
 		if [ "$ccnavi_cp_rc" -eq 3 ]; then
-			ccnavi_wap_say "取り込みが書きかけ（変更の見分けの後に hook が書いたもの）と重なった。何も反映していません。再実行してください（書きかけを先にコミットしてから取り込みます）"
+			ccnavi_wap_say "取り込みが書きかけ（変更の見分けの後に hook が書いたもの）と重なった。何も反映していません。再実行してください"
 			return 1
 		fi
 		ccnavi_wap_say "取り込めなかった（上の ccnavi-sync.sh の文面）。何も反映していません。接続と、上に出た原因を直してから再実行してください"
