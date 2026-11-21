@@ -33,8 +33,9 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
 12. Chrome のレビュー済み: 同じ状態から Chrome の入口が出す書くものと、write-and-push の confirm が
     書いて送ったものが、経路・時刻のほかは同じ
 
-`CCNAVI_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` をコピーしたあと、その上に `CCNAVI_SH_DIR` の
-`.sh` を重ねる。コピーする前の版（`wip/design/scripts/` など）を確かめるときに使う。
+`CCNAVI_TEST_SH_DIR` があれば、`.ccnavi/scripts/` の `.sh` をコピーしたあと、その上に
+`CCNAVI_TEST_SH_DIR` の `.sh` を重ねる。コピーする前の版
+（`wip/design/scripts/` など）を確かめるときに使う。
 コピーする版は一部の sh
 だけを持ち、`ccnavi-ticket.sh` などは持たないので、差し替えではなく重ねる。
 """
@@ -68,7 +69,7 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 # コピーする前の版の sh（`wip/design/scripts/` など）。`.ccnavi/scripts/` の上に重ねる。
-OVERLAY_DIR = os.environ.get("CCNAVI_SH_DIR", "")
+OVERLAY_DIR = os.environ.get("CCNAVI_TEST_SH_DIR", "")
 CONFIG = (
     ("user.email", "t@example.invalid"),
     ("user.name", "t"),

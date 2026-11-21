@@ -9,7 +9,7 @@ import (
 
 // 配る判定（scripts/ccnavi-setup.sh）と、親チケットの着手がコピーする判定（processFlag）は同じ答えを返す。
 // 食い違うと、着手がコピーする元の SKILL.md が配布先に届かないまま、何の知らせも出ない。sh の側は
-// tests/sh/test_setup.py の test_reads_the_process_flag_like_the_ticket_start_does が同じ表で見る。
+// go/internal/clitest/sh/setup の TestDeployReadsTheFlagsLikeTheTicketStartDoes が同じ表で見る。
 func TestProcessFlagAgreesWithTheSetupSh(t *testing.T) {
 	cases := map[string]struct {
 		text string

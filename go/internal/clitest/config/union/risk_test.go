@@ -1,6 +1,7 @@
 package union
 
 import (
+	"ccnavi/internal/harness/configws"
 	"encoding/json"
 	"path/filepath"
 	"slices"
@@ -24,14 +25,14 @@ const (
 const tenLines = "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n"
 
 // riskProblems は risk の Problem。layer を渡すと、そのレイヤーのものだけ。
-func (w *ws) riskProblems(severity, layer string) []problem {
-	w.t.Helper()
+func (w *ws) riskProblems(severity, layer string) []configws.Problem {
+	w.T.Helper()
 	where := ""
 	if layer != "" {
-		where = projectWhere(layer)
+		where = configws.ProjectWhere(layer)
 	}
-	var out []problem
-	for _, pr := range w.problems(severity, where) {
+	var out []configws.Problem
+	for _, pr := range w.Problems(severity, where) {
 		if strings.Contains(pr.Where, "risk") {
 			out = append(out, pr)
 		}
@@ -41,32 +42,32 @@ func (w *ws) riskProblems(severity, layer string) []problem {
 
 // startParent は親を着手する（済んでいれば何もしない）。子の着手は親が着手済みであることを前提にする。
 func (w *ws) startParent(name string) {
-	w.t.Helper()
-	r := w.ccnavi("ticket", "start", name)
+	w.T.Helper()
+	r := w.Ccnavi("ticket", "start", name)
 	if r.Code != 0 && !strings.Contains(r.Stderr, "着手済み") {
-		w.t.Fatalf("親の着手: code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
+		w.T.Fatalf("親の着手: code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
 }
 
 // oneChild は lib の親と子を承認し、子のワークツリーを lib から切って着手する。子のツリーと親のツリーを返す。
 func (w *ws) oneChild() (tree, parentTree string) {
-	w.t.Helper()
+	w.T.Helper()
 	scope := []string{"src/*", "schema/*", "wip/*"}
-	w.propose("i0001", ticketText("i0001", ticketOpts{project: "lib", plan: []string{"work"}, allow: scope}), "lib")
-	w.propose("i0001-01-01", ticketText("i0001-01-01", ticketOpts{project: "lib", parent: "i0001", phase: 1, allow: scope}), "lib")
+	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Project: "lib", Plan: []string{"work"}, Allow: scope}), "lib")
+	w.Propose("i0001-01-01", configws.TicketText("i0001-01-01", configws.TicketOpts{Project: "lib", Parent: "i0001", Phase: 1, Allow: scope}), "lib")
 	w.mustApprove()
-	parentTree = w.worktree(w.lib, "i0001")
+	parentTree = w.Worktree(w.Lib, "i0001")
 	w.startParent("i0001")
-	tree = w.worktree(w.lib, "i0001-01-01")
-	w.mustOK(w.ccnavi("ticket", "start", "i0001-01-01"), "子の着手")
+	tree = w.Worktree(w.Lib, "i0001-01-01")
+	w.MustOK(w.Ccnavi("ticket", "start", "i0001-01-01"), "子の着手")
 	return tree, parentTree
 }
 
 func (w *ws) commit(tree, rel, text string) {
-	w.t.Helper()
-	write(w.t, filepath.Join(tree, filepath.FromSlash(rel)), text)
-	git(w.t, tree, "add", "-A")
-	git(w.t, tree, "commit", "--quiet", "-m", rel)
+	w.T.Helper()
+	configws.Write(w.T, filepath.Join(tree, filepath.FromSlash(rel)), text)
+	configws.Git(w.T, tree, "add", "-A")
+	configws.Git(w.T, tree, "commit", "--quiet", "-m", rel)
 }
 
 type riskHit struct {
@@ -91,22 +92,22 @@ func (r riskRecord) byID() map[string]riskHit {
 }
 
 func (w *ws) riskRecord() riskRecord {
-	w.t.Helper()
+	w.T.Helper()
 	var rec riskRecord
-	if err := json.Unmarshal([]byte(read(w.t, w.approvedPath("phases", "i0001", "i0001-01-01.risk.json"))), &rec); err != nil {
-		w.t.Fatal(err)
+	if err := json.Unmarshal([]byte(configws.Read(w.T, w.ApprovedPath("phases", "i0001", "i0001-01-01.risk.json"))), &rec); err != nil {
+		w.T.Fatal(err)
 	}
 	return rec
 }
 
 // judgeSources は `<子>.judge.json` の項目名 → その項目のレイヤー（source）。
 func (w *ws) judgeSources() map[string]string {
-	w.t.Helper()
+	w.T.Helper()
 	var rec map[string]struct {
 		Source string `json:"source"`
 	}
-	if err := json.Unmarshal([]byte(read(w.t, w.approvedPath("phases", "i0001", "i0001-01-01.judge.json"))), &rec); err != nil {
-		w.t.Fatal(err)
+	if err := json.Unmarshal([]byte(configws.Read(w.T, w.ApprovedPath("phases", "i0001", "i0001-01-01.judge.json"))), &rec); err != nil {
+		w.T.Fatal(err)
 	}
 	out := map[string]string{}
 	for k, v := range rec {
@@ -117,16 +118,16 @@ func (w *ws) judgeSources() map[string]string {
 
 // finish は子を閉じる。
 func (w *ws) finish(extra ...string) (code int, stdout, stderr string) {
-	w.t.Helper()
-	r := w.ccnavi(append([]string{"ticket", "finish", "i0001-01-01"}, extra...)...)
+	w.T.Helper()
+	r := w.Ccnavi(append([]string{"ticket", "finish", "i0001-01-01"}, extra...)...)
 	return r.Code, r.Stdout, r.Stderr
 }
 
 func (w *ws) mustFinish() string {
-	w.t.Helper()
+	w.T.Helper()
 	code, out, errOut := w.finish()
 	if code != 0 {
-		w.t.Fatalf("finish: code %d\n%s%s", code, out, errOut)
+		w.T.Fatalf("finish: code %d\n%s%s", code, out, errOut)
 	}
 	return out + errOut
 }
@@ -134,7 +135,7 @@ func (w *ws) mustFinish() string {
 func TestFactorsConcatenateAndLevelsTakeTheMinimum(t *testing.T) {
 	t.Parallel()
 	// factors は連結、levels はキーごとに min。記録の hit に source。
-	w := newWS(t, kindRisk)
+	w := newWS(t, configws.KindRisk)
 	tree, _ := w.oneChild()
 	w.commit(tree, "schema/x.sql", tenLines)
 
@@ -144,7 +145,7 @@ func TestFactorsConcatenateAndLevelsTakeTheMinimum(t *testing.T) {
 		t.Errorf("points = %d, want 55", rec.Points)
 	}
 	by := rec.byID()
-	if got := sortedKeys(by); !slices.Equal(got, []string{"big-diff", "schema"}) {
+	if got := configws.SortedKeys(by); !slices.Equal(got, []string{"big-diff", "schema"}) {
 		t.Errorf("hits = %v", got)
 	}
 	if by["big-diff"].Source != "common" || by["schema"].Source != "lib" {
@@ -159,7 +160,7 @@ func TestFactorsConcatenateAndLevelsTakeTheMinimum(t *testing.T) {
 func TestUnwrittenLevelKeysDoNotTakePart(t *testing.T) {
 	t.Parallel()
 	// 書かれていないキーは参加しない。lib が書かない medium / high は共通レイヤーの値。
-	w := newWS(t, kindRisk)
+	w := newWS(t, configws.KindRisk)
 	tree, _ := w.oneChild()
 	w.commit(tree, "src/a.py", tenLines)
 
@@ -178,21 +179,21 @@ func TestSameFactorIdAcrossLayersCountsBothUnderTheLayerName(t *testing.T) {
 	// 同 id で中身が違えば両方を数え、後ろのレイヤーは `<レイヤー>:<id>`。--lint は warn。
 	// レイヤーを空にすると、プロジェクトが共通レイヤーと同じ名前の項目を 1 本書くだけで、そのレイヤーの項目と閾値が全部消えて
 	// 点が下がる。両方を数えれば、衝突しても点は増える向きにしか変わらない。
-	w := newWS(t, kindRisk)
-	writeRisk(t, w.lib, "version: 1\nlevels: {critical: 50}\nfactors:\n"+
+	w := newWS(t, configws.KindRisk)
+	configws.WriteRisk(t, w.Lib, "version: 1\nlevels: {critical: 50}\nfactors:\n"+
 		"  - {id: big-diff, points: 5, files_over: 0, message: x}\n"+
 		"  - {id: schema, points: 30, glob: \"schema/**\", message: スキーマに触った}\n")
 	if got := w.riskProblems("error", ""); len(got) != 0 {
 		t.Errorf("error が出る: %+v", got)
 	}
-	w.mustHaveDetail(w.riskProblems("warn", "lib"), "lib:big-diff")
+	w.MustHaveDetail(w.riskProblems("warn", "lib"), "lib:big-diff")
 
 	tree, _ := w.oneChild()
 	w.commit(tree, "schema/x.sql", tenLines)
 	out := w.mustFinish()
 	rec := w.riskRecord()
 	by := rec.byID()
-	if got := sortedKeys(by); !slices.Equal(got, []string{"big-diff", "lib:big-diff", "schema"}) {
+	if got := configws.SortedKeys(by); !slices.Equal(got, []string{"big-diff", "lib:big-diff", "schema"}) {
 		t.Errorf("hits = %v", got)
 	}
 	if by["big-diff"].Source != "common" || by["lib:big-diff"].Source != "lib" {
@@ -207,9 +208,9 @@ func TestSameFactorIdAcrossLayersCountsBothUnderTheLayerName(t *testing.T) {
 func TestACollidingJudgeItemIsRecordedUnderTheLayerName(t *testing.T) {
 	t.Parallel()
 	// 同 id の定性項目は、後ろのレイヤーの側を `<レイヤー>:<id>` で record-risk する。
-	w := newWS(t, kindRisk)
-	write(t, w.risk, commonRiskText+commonJudgeFactor)
-	writeRisk(t, w.lib, libRiskText+"  - {id: outward, points: 15, judge: 公開の API を変えるか, message: 外向き（lib）}\n")
+	w := newWS(t, configws.KindRisk)
+	configws.Write(t, w.Risk, configws.CommonRiskText+commonJudgeFactor)
+	configws.WriteRisk(t, w.Lib, configws.LibRiskText+"  - {id: outward, points: 15, judge: 公開の API を変えるか, message: 外向き（lib）}\n")
 
 	tree, _ := w.oneChild()
 	w.commit(tree, "src/a.py", "1\n")
@@ -218,7 +219,7 @@ func TestACollidingJudgeItemIsRecordedUnderTheLayerName(t *testing.T) {
 		t.Fatalf("判定が済むまで閉じられず、lib:outward を言う: code %d\n%s%s", code, out, errOut)
 	}
 	for _, factor := range []string{"outward", "lib:outward"} {
-		w.mustOK(w.ccnavi("ticket", "record-risk", "i0001-01-01", factor, "yes", "--reason", "そう"), "record-risk "+factor)
+		w.MustOK(w.Ccnavi("ticket", "record-risk", "i0001-01-01", factor, "yes", "--reason", "そう"), "record-risk "+factor)
 	}
 	w.mustFinish()
 	got := w.judgeSources()
@@ -241,34 +242,34 @@ func TestRiskLintRefusesWhatTheLayersMustNotSay(t *testing.T) {
 		noError  bool   // true なら error が無いことも見る
 	}{
 		{"identical factor in a later layer is dropped with info", func(t testing.TB, w *ws) {
-			writeRisk(t, w.lib, strings.Replace(commonRiskText, "levels: {medium: 20, high: 40, critical: 70}\n", "", 1))
+			configws.WriteRisk(t, w.Lib, strings.Replace(configws.CommonRiskText, "levels: {medium: 20, high: 40, critical: 70}\n", "", 1))
 		}, "info", "lib", "big-diff", true},
 		{"inverted levels after merge", func(t testing.TB, w *ws) {
-			writeRisk(t, w.lib, "version: 1\nlevels: {high: 10}\n")
+			configws.WriteRisk(t, w.Lib, "version: 1\nlevels: {high: 10}\n")
 		}, "error", "lib", "high", false},
 		{"a layer cannot point at the common scripts", func(t testing.TB, w *ws) {
-			writeRisk(t, w.lib, "version: 1\nfactors:\n  - {id: x, points: 5, script: .ccnavi/config/common/scripts/x.sh, message: x}\n")
+			configws.WriteRisk(t, w.Lib, "version: 1\nfactors:\n  - {id: x, points: 5, script: .ccnavi/config/common/scripts/x.sh, message: x}\n")
 		}, "error", "lib", ".ccnavi/config/common/scripts/x.sh", false},
 		{"the common layer cannot point at the project scripts", func(t testing.TB, w *ws) {
-			write(t, w.risk, "version: 1\nfactors:\n  - {id: y, points: 5, script: .ccnavi/scripts/y.sh, message: y}\n")
+			configws.Write(t, w.Risk, "version: 1\nfactors:\n  - {id: y, points: 5, script: .ccnavi/scripts/y.sh, message: y}\n")
 		}, "error", "", ".ccnavi/scripts/y.sh", false},
 		{"a script missing from the project root", func(t testing.TB, w *ws) {
-			writeRisk(t, w.lib, "version: 1\nfactors:\n  - {id: gone, points: 5, script: .ccnavi/scripts/gone.sh, message: x}\n")
+			configws.WriteRisk(t, w.Lib, "version: 1\nfactors:\n  - {id: gone, points: 5, script: .ccnavi/scripts/gone.sh, message: x}\n")
 		}, "error", "lib", "gone.sh", false},
 		{"a script missing from the workspace root", func(t testing.TB, w *ws) {
-			write(t, w.risk, commonRiskText+commonMissingScriptFactor)
+			configws.Write(t, w.Risk, configws.CommonRiskText+commonMissingScriptFactor)
 		}, "error", "", "gone.sh", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			w := newWS(t, kindRisk)
+			w := newWS(t, configws.KindRisk)
 			c.setup(t, w)
 			if c.noError {
 				if got := w.riskProblems("error", ""); len(got) != 0 {
 					t.Errorf("error が出る: %+v", got)
 				}
 			}
-			w.mustHaveDetail(w.riskProblems(c.severity, c.layer), c.detail)
+			w.MustHaveDetail(w.riskProblems(c.severity, c.layer), c.detail)
 		})
 	}
 }
@@ -276,11 +277,11 @@ func TestRiskLintRefusesWhatTheLayersMustNotSay(t *testing.T) {
 func TestAScriptInTheProjectLayerRunsFromTheProjectRoot(t *testing.T) {
 	t.Parallel()
 	// レイヤーの `script:` はそのプロジェクトの git プロジェクトルートから解く。
-	w := newWS(t, kindRisk)
-	write(t, p(w.lib, ".ccnavi", "scripts", "count.sh"), "printf '{\"points\": 30, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
-	writeRisk(t, w.lib, "version: 1\nfactors:\n  - {id: counted, points: 5, script: .ccnavi/scripts/count.sh, message: 数えた}\n")
-	git(t, w.lib, "add", "-A")
-	git(t, w.lib, "commit", "--quiet", "-m", "script")
+	w := newWS(t, configws.KindRisk)
+	configws.Write(t, p(w.Lib, ".ccnavi", "scripts", "count.sh"), "printf '{\"points\": 30, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
+	configws.WriteRisk(t, w.Lib, "version: 1\nfactors:\n  - {id: counted, points: 5, script: .ccnavi/scripts/count.sh, message: 数えた}\n")
+	configws.Git(t, w.Lib, "add", "-A")
+	configws.Git(t, w.Lib, "commit", "--quiet", "-m", "script")
 	if got := w.riskProblems("error", ""); len(got) != 0 {
 		t.Fatalf("error が出る: %+v", got)
 	}
@@ -296,9 +297,9 @@ func TestAScriptInTheProjectLayerRunsFromTheProjectRoot(t *testing.T) {
 func TestAScriptInTheCommonLayerRunsThroughTheMerge(t *testing.T) {
 	t.Parallel()
 	// 合成を通しても、共通レイヤーの `script:` はワークスペースルートから解いて走る。
-	w := newWS(t, kindRisk)
-	write(t, p(w.root, ".ccnavi", "config", "common", "scripts", "count.sh"), "printf '{\"points\": 7, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
-	write(t, w.risk, commonRiskText+commonScriptFactor)
+	w := newWS(t, configws.KindRisk)
+	configws.Write(t, p(w.Root, ".ccnavi", "config", "common", "scripts", "count.sh"), "printf '{\"points\": 7, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
+	configws.Write(t, w.Risk, configws.CommonRiskText+commonScriptFactor)
 	if got := w.riskProblems("error", ""); len(got) != 0 {
 		t.Fatalf("error が出る: %+v", got)
 	}
@@ -314,10 +315,10 @@ func TestAScriptInTheCommonLayerRunsThroughTheMerge(t *testing.T) {
 func TestABrokenProjectRiskIsEmptyAndNamedInTheFallback(t *testing.T) {
 	t.Parallel()
 	// 不正な risk のレイヤーは空 + `fallback` にレイヤーの名前 + --lint error。
-	w := newWS(t, kindRisk)
-	write(t, layerPath(w.lib, "risk"), "version: 1\nfactors: [\n")
+	w := newWS(t, configws.KindRisk)
+	configws.Write(t, configws.LayerPath(w.Lib, "risk"), "version: 1\nfactors: [\n")
 	if len(w.riskProblems("error", "lib")) == 0 {
-		t.Fatalf("不正な risk を error で言わない: %+v", w.problems("error", ""))
+		t.Fatalf("不正な risk を error で言わない: %+v", w.Problems("error", ""))
 	}
 
 	tree, _ := w.oneChild()
@@ -336,9 +337,9 @@ func TestABrokenProjectRiskIsEmptyAndNamedInTheFallback(t *testing.T) {
 func TestTheJudgeRecordNamesTheLayerOfEachItem(t *testing.T) {
 	t.Parallel()
 	// `<子>.judge.json` の各項目に、その項目のレイヤーの `source`。
-	w := newWS(t, kindRisk)
-	write(t, w.risk, commonRiskText+commonJudgeFactor)
-	writeRisk(t, w.lib, libRiskText+libJudgeFactor)
+	w := newWS(t, configws.KindRisk)
+	configws.Write(t, w.Risk, configws.CommonRiskText+commonJudgeFactor)
+	configws.WriteRisk(t, w.Lib, configws.LibRiskText+libJudgeFactor)
 
 	tree, _ := w.oneChild()
 	w.commit(tree, "src/a.py", "1\n")
@@ -346,7 +347,7 @@ func TestTheJudgeRecordNamesTheLayerOfEachItem(t *testing.T) {
 		t.Fatalf("判定が済むまで閉じられない: %s", out)
 	}
 	for _, factor := range []string{"outward", "untested"} {
-		w.mustOK(w.ccnavi("ticket", "record-risk", "i0001-01-01", factor, "yes", "--reason", "そう"), "record-risk "+factor)
+		w.MustOK(w.Ccnavi("ticket", "record-risk", "i0001-01-01", factor, "yes", "--reason", "そう"), "record-risk "+factor)
 	}
 	w.mustFinish()
 	got := w.judgeSources()
@@ -357,16 +358,16 @@ func TestTheJudgeRecordNamesTheLayerOfEachItem(t *testing.T) {
 
 // skippedMark は親の `1.skipped`（定義を根拠に置くマーカー）の source。
 func (w *ws) skippedMark(parentTree string) string {
-	w.t.Helper()
-	said := w.post("Bash", parentTree, obj{"command": "ls"})
-	if !strings.Contains(w.reason(said), "省略") {
-		w.t.Fatalf("省略を言わない: %s%s", said.Stdout, said.Stderr)
+	w.T.Helper()
+	said := w.Post("Bash", parentTree, configws.Obj{"command": "ls"})
+	if !strings.Contains(w.Reason(said), "省略") {
+		w.T.Fatalf("省略を言わない: %s%s", said.Stdout, said.Stderr)
 	}
 	var mark struct {
 		Source string `json:"source"`
 	}
-	if err := json.Unmarshal([]byte(read(w.t, w.approvedPath("phases", "i0001", "1.skipped"))), &mark); err != nil {
-		w.t.Fatal(err)
+	if err := json.Unmarshal([]byte(configws.Read(w.T, w.ApprovedPath("phases", "i0001", "1.skipped"))), &mark); err != nil {
+		w.T.Fatal(err)
 	}
 	return mark.Source
 }
@@ -374,7 +375,7 @@ func (w *ws) skippedMark(parentTree string) string {
 func TestTheMarkThatRestsOnATypeNamesItsLayer(t *testing.T) {
 	t.Parallel()
 	// 定義を根拠に置くマーカー（`review: false` の skipped）には、その定義のレイヤー。
-	w := newWS(t, kindRisk)
+	w := newWS(t, configws.KindRisk)
 	tree, parentTree := w.oneChild()
 	w.commit(tree, "src/a.py", "1\n")
 	w.mustFinish()
@@ -388,8 +389,8 @@ func TestTheMarkNamesCommonWhenTheTypeComesFromCommon(t *testing.T) {
 	// 共通レイヤーの定義をコピーした親のマーカーは、source が common。`--explain --json` の和と同じ。lib の `work` は共通レイヤーの
 	// `work` と全欄が同じなので、和では共通の側が残る。コピーは出どころを持たないが、共通レイヤーの定義と中身が同じなら
 	// 共通の定義として記す。
-	w := newWS(t, kindRisk)
-	write(t, w.phases, libPhasesWork)
+	w := newWS(t, configws.KindRisk)
+	configws.Write(t, w.Phases, configws.LibPhasesWork)
 	tree, parentTree := w.oneChild()
 	w.commit(tree, "src/a.py", "1\n")
 	w.mustFinish()
@@ -412,13 +413,13 @@ func TestLayerPlaceFlagsAreDiagnosisOnly(t *testing.T) {
 	for _, flag := range []string{"--project-home", "--projects"} {
 		t.Run(flag, func(t *testing.T) {
 			t.Parallel()
-			w := newWS(t, kindRisk)
+			w := newWS(t, configws.KindRisk)
 			tree, _ := w.oneChild()
 			w.commit(tree, "schema/x.sql", tenLines)
 
 			value := ".nothere"
 			if flag == "--projects" {
-				value = filepath.Join(w.root, "x")
+				value = filepath.Join(w.Root, "x")
 			}
 			code, out, errOut := w.finish(flag, value)
 
@@ -438,7 +439,7 @@ func TestLayerPlaceFlagsAreDiagnosisOnly(t *testing.T) {
 			if !strings.Contains(out, "(CRITICAL)") {
 				t.Errorf("CRITICAL でない: %s", out)
 			}
-			if w.proposalPath("i0001-01-01", "review") == "" {
+			if w.ProposalPath("i0001-01-01", "review") == "" {
 				t.Error("レビュー待ちへ動いていない")
 			}
 		})

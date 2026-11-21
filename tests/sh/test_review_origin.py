@@ -7,7 +7,7 @@ URL にトークンを埋めた形（`https://oauth2:<token>@host/g/p.git`）は
 ホストにユーザ情報が入り込むと API の URL が不正になり、`origin` の出力にトークンが漏れる。
 実物の GitLab で実際に起きた穴なので、sh と実行ファイルの両方で固定する。
 
-`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_TEST_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -21,7 +21,7 @@ import unittest
 
 from tests import ROOT, exe
 
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")

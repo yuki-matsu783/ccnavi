@@ -11,7 +11,8 @@ MR がマージ済みかで「閉じた」か「消えた」かを言う。親�
 読み返すのは終了コード・標準出力と、git に残った ref、片付けの記録（logs/state/retire/）の有無だけ。
 MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めたスタブの sh に差し替える。
 
-`CCNAVI_SH_DIR` で、コピーする sh（`SCRIPTS` の 3 本）の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_TEST_SH_DIR` で、コピーする sh（`SCRIPTS` の 3 本）の出どころを
+差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。`.ccnavi/scripts/` にコピーする前の版
 （`wip/design/scripts/` など）を確かめるときに使う（`tests/sh/test_gitwrap.py` と同じ）。
 """
@@ -35,7 +36,7 @@ from tests import ROOT, common_sh, exe, live_sh_pid
 SHELL = shutil.which("sh") or shutil.which("bash")
 DASH = shutil.which("dash")
 GIT = shutil.which("git")
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPTS = (
     "ccnavi-sync.sh",
     *common_sh(SH_DIR),
