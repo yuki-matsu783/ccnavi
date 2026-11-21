@@ -302,11 +302,6 @@ func (k *kit) ticketWith(env map[string]string, args ...string) run.Result {
 	return k.sh("ccnavi-ticket.sh", opts{env: env}, args...)
 }
 
-func (k *kit) ticketAt(dir string, args ...string) run.Result {
-	k.t.Helper()
-	return k.sh("ccnavi-ticket.sh", opts{dir: dir}, args...)
-}
-
 // ticketEnv は ccnavi-ticket.sh を直に起こす（非同期など）ときの環境。
 func (k *kit) ticketEnv(extra map[string]string) map[string]string { return k.env(k.hostEnv(extra)) }
 

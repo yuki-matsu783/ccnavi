@@ -150,8 +150,6 @@ exec '@EXE@' --guard-ticket-approval disable "$@"
 // HALF_FAIL にファイル名があれば、review requested を最初の 1 回だけ失敗させる（打ち直しの試験）。
 var hostHalf = `#!/bin/sh
 @PRELUDE@list=""; tree="${HALF_TREE:-}"; root=""
-for a in "$@"; do :; done
-set -- "$@"
 i=0
 for a in "$@"; do
   case "$prev" in
