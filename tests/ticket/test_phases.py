@@ -1719,7 +1719,7 @@ class ScopeLimitTest(PhaseHarness):
     def test_regex_child_can_keep_the_distinction_with_an_inline_flag(self):
         """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた表記のとおりにヒットする。
 
-        ルールの側（tests/config/test_config_union_holes.py）と同じ書き方が、
+        ルールの側（go/internal/hook/judge/testdata/shell_guard.json）と同じ書き方が、
         チケットの範囲でも書けることを見る。
         """
         tree = self.approved_child(
