@@ -125,25 +125,7 @@ class EveryTest(unittest.TestCase):
     def hits(self, times: int, **kw) -> list[str]:
         return [self.hit(**kw) for _ in range(times)]
 
-    def saved(self) -> str:
-        """記録に残った本文を全部つないだもの。何も残っていなければ空。"""
-        if not os.path.isdir(self.state):
-            return ""
-        bodies = []
-        for name in sorted(os.listdir(self.state)):
-            # 記録は once-<session>-<agent>.json。同じ置き場に selfguard/ などもある。
-            if not name.startswith("once-") or not name.endswith(".json"):
-                continue
-            with open(os.path.join(self.state, name), encoding="utf-8") as f:
-                bodies.append(f.read())
-        return "\n".join(bodies)
-
     # --- 渡す回の刻み -------------------------------------------------------
-
-    def test_every_delivers_on_the_multiples_only(self):
-        """`every: 5` は 5 回目と 10 回目に渡し、その間は渡さない。"""
-        self.rules(rule("src", additionalContext=EVERY, every=5))
-        self.assertEqual(self.hits(10), ["", "", "", "", EVERY, "", "", "", "", EVERY])
 
     def test_once_comes_on_the_first_delivering_hit_and_not_again(self):
         """`additionalContextOnce` は渡す回の最初の 1 回（5 回目）だけ。10 回目には出ない。"""
@@ -154,18 +136,14 @@ class EveryTest(unittest.TestCase):
         self.assertEqual(got[5:9], ["", "", "", ""])
         self.assertEqual(got[9], EVERY)
 
-    def test_rules_without_every_keep_the_old_timing(self):
-        """`every` を書かないルールは今までどおり。毎回渡し、`Once` は 1 回目。"""
-        self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE))
-        self.assertEqual(self.hits(3), [f"{EVERY}\n\n{ONCE}", EVERY, EVERY])
-
     def test_every_one_is_the_same_as_no_every(self):
-        """`every: 1` と `every` 無しは同じ結果になる。"""
+        """`every: 1` と `every` 無しは同じ結果になる。毎回渡し、`Once` は 1 回目。"""
         # 2 本を同じ場所に置くので、先に片方を回してから置き換える。
         self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE, every=1))
         one = self.hits(3, session="one")
         self.rules(rule("src", additionalContext=EVERY, additionalContextOnce=ONCE))
         self.assertEqual(one, self.hits(3, session="plain"))
+        self.assertEqual(one, [f"{EVERY}\n\n{ONCE}", EVERY, EVERY])
 
     def test_once_alone_with_every_speaks_once_at_the_nth(self):
         """`additionalContextOnce` だけを持つ `every: 5` は、5 回目に 1 度だけ渡す。"""
@@ -194,6 +172,7 @@ class EveryTest(unittest.TestCase):
         self.assertEqual([g for i, g in enumerate(got) if i not in (4, 9)], [""] * 8)
 
     # --- 記録 ---------------------------------------------------------------
+    # 刻みと数えの置き場の細部は go/internal/policy/ctxfile の単体テスト（TestEveryAndOnce）が見る。
 
     def test_the_count_is_split_by_session_and_agent(self):
         """数えはセッションと `agent_id` で分かれる。サブエージェントは自分の数えを持つ。"""
@@ -205,12 +184,6 @@ class EveryTest(unittest.TestCase):
         self.assertEqual(self.hits(3, session="s1", agent="a1"), ["", "", ONCE])
         # 子の 3 回は親の数えを進めていない（親の 4 回目は渡す回ではない）。
         self.assertEqual(self.hit(session="s1"), "")
-
-    def test_rules_with_neither_every_nor_once_leave_no_count(self):
-        """`every` も `Once` も持たないルールは、記録に数えを書かない。"""
-        self.rules(rule("plain", additionalContext=EVERY))
-        self.assertEqual(self.hits(3), [EVERY] * 3)
-        self.assertNotIn("plain", self.saved())
 
 
 if __name__ == "__main__":
