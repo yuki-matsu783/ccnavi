@@ -107,6 +107,16 @@ func TestStepEnv(t *testing.T) {
 			t.Errorf("FAKE_ORIGIN_URL = %q", env["FAKE_ORIGIN_URL"])
 		}
 	})
+	t.Run("Path の綴りでも PATH は 1 本で、スタブが先頭", func(t *testing.T) {
+		t.Parallel()
+		env := h.StepEnv([]string{"Path=/usr/bin"}, "")
+		if _, ok := env["Path"]; ok {
+			t.Error("Path が残っている")
+		}
+		if want := "/stub/bin" + string(os.PathListSeparator) + "/usr/bin"; env["PATH"] != want {
+			t.Errorf("PATH = %q, want %q", env["PATH"], want)
+		}
+	})
 	t.Run("fake-gitlab は偽のトークンとローカルの origin だけ", func(t *testing.T) {
 		t.Parallel()
 		f := *h

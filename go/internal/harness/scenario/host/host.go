@@ -169,6 +169,9 @@ func (h *Host) StepEnv(parent []string, dockerToken string) map[string]string {
 	out := map[string]string{}
 	for _, kv := range parent {
 		name, value, _ := strings.Cut(kv, "=")
+		if pathcase.SameName(name, "PATH") {
+			name = "PATH" // Windows は Path。綴り違いを残すと PATH が 2 本になる
+		}
 		if !tokenVar.MatchString(name) {
 			out[name] = value
 		}

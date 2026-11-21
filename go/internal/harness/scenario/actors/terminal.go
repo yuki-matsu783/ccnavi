@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,9 +12,12 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"ccnavi/internal/harness/scenario/prepare"
+	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 )
 
@@ -50,7 +54,7 @@ func (b Board) pending() []prepare.Proposal {
 		waiting[id] = true
 	}
 	seen := map[prepare.Proposal]bool{}
-	var out []prepare.Proposal
+	out := []prepare.Proposal{}
 	for _, t := range b.Tickets {
 		p := prepare.Proposal{t.ID, t.Project}
 		if waiting[t.ID] && !seen[p] {
@@ -84,13 +88,26 @@ type RunSpec struct {
 	Answers []string
 }
 
+// humanEnv は人間役の既定の環境。親の環境から承認の保護（CCNAVI_GUARD_TICKET_APPROVAL）を外し、ワークスペースを root にする。
+// 保護が残ると、端末から打つ承認が通らない。
+func humanEnv(root string) []string {
+	out := []string{}
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		if name != env.GuardTicketApproval && name != env.Workspace {
+			out = append(out, kv)
+		}
+	}
+	return append(out, env.Workspace+"="+root)
+}
+
 // Terminal は human_run を打つ。欄を差し替えられる（nil は既定）。
 type Terminal struct {
 	// Board は ccnavi のボードを読む（`ccnavi --explain --json --root <root>`）。必須。
 	Board func(root string) (Board, error)
 	// Exec は argv を端末に付けて起動し、（終了コード, 出力）を返す。nil なら RunOnTerminal。
 	Exec func(argv []string, dir string, env []string, answers []string, timeout time.Duration) (int, string, error)
-	// Env は人間役の環境（模擬のホストでは、push 先を模擬に向けるため claude と同じ環境）。
+	// Env は人間役の環境（模擬のホストでは、push 先を模擬に向けるため claude と同じ環境）。nil なら humanEnv。
 	Env func(root string) []string
 	// Timeout は 1 回の上限。0 なら RunTimeout。
 	Timeout time.Duration
@@ -187,7 +204,7 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 	if run == nil {
 		run = RunOnTerminal
 	}
-	var env []string
+	env := humanEnv(root)
 	if tm.Env != nil {
 		env = tm.Env(root)
 	}
@@ -247,9 +264,6 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 	}
 	rec.Status = "done"
 	st.ProposalsBefore = nowPending
-	if st.ProposalsBefore == nil {
-		st.ProposalsBefore = []prepare.Proposal{}
-	}
 	st.NextStep = num
 	_ = save()
 	return Done
@@ -257,10 +271,10 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 
 // RunOnTerminal は argv を擬似端末に付けて起動し、（終了コード, 出力）を返す。出力の CR は落とす。
 // 擬似端末は `script` で包む（Linux は `script -qec <コマンド> /dev/null`、macOS は `script -q /dev/null <argv…>`）。
-// 答えは標準入力から送る（端末は行単位の入力で、sh が読むまで溜まる）。時間切れは ErrTimeout で、孫（ccnavi・git）も残さないよう
-// プロセスグループごと止める。env が nil なら親の環境。
+// 答えは標準入力から送る（端末は行単位の入力で、sh が読むまで溜まる）。時間切れは ErrTimeout で、script だけを殺す。
+// 子（sh）と孫は、擬似端末の master が閉じて SIGHUP を受けて終わる。env が nil なら親の環境。
 func RunOnTerminal(argv []string, dir string, env []string, answers []string, timeout time.Duration) (int, string, error) {
-	args, err := scriptArgs(argv)
+	args, err := scriptArgs(argv, exec.LookPath)
 	if err != nil {
 		return 0, "", err
 	}
@@ -294,11 +308,11 @@ func RunOnTerminal(argv []string, dir string, env []string, answers []string, ti
 }
 
 // scriptArgs は `script` で包んだ起動の組み立て。
-func scriptArgs(argv []string) ([]string, error) {
-	if runtime.GOOS == "windows" {
+func scriptArgs(argv []string, lookPath func(string) (string, error)) ([]string, error) {
+	if ospath.Windows {
 		return nil, ErrNoTerminal
 	}
-	script, err := exec.LookPath("script")
+	script, err := lookPath("script")
 	if err != nil {
 		return nil, ErrNoTerminal
 	}
@@ -332,4 +346,22 @@ func ParseBoard(data []byte) (Board, error) {
 		b.Tickets = append(b.Tickets, Ticket{ID: t.Ticket, Project: t.Project, Open: t.Copy.Status == "open"})
 	}
 	return b, nil
+}
+
+// lockedBuffer は標準出力と標準エラーを 1 本に集める（exec が別々の goroutine で書く）。
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }

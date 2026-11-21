@@ -1,7 +1,11 @@
 package actors
 
 import (
+	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +13,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/scenario/prepare"
+	"ccnavi/internal/infra/env"
 )
 
 // 端末が付き、答えが届き、終了コードが返る。
@@ -24,16 +29,75 @@ func TestTerminalIsAttachedAndAnswersArrive(t *testing.T) {
 	}
 }
 
-// 時間切れはグループごと止める（孫の sleep を残さない）。
-func TestTerminalTimeoutStopsTheWholeGroup(t *testing.T) {
+// 時間切れのあと、孫の sleep も実行中でない（擬似端末が閉じて SIGHUP で終わる）。
+// 生死は kill -0 でなく ps の状態で見る（PID 1 が回収しない機械では死んだ子が zombie（Z）で残る）。
+func TestTerminalTimeoutStopsTheGrandchild(t *testing.T) {
 	t.Parallel()
+	if _, err := exec.LookPath("ps"); err != nil {
+		t.Skip("ps が無い（Windows など）")
+	}
+	pidFile := filepath.Join(base.TempDir(t), "pid")
 	start := time.Now()
-	_, _, err := RunOnTerminal([]string{"sh", "-c", "sleep 30 & wait"}, "", nil, nil, time.Second)
+	_, _, err := RunOnTerminal([]string{"sh", "-c", "sleep 30 & echo $! > '" + pidFile + "'; wait"}, "", nil, nil, 2*time.Second)
 	if errors.Is(err, ErrNoTerminal) {
 		t.Skip("script が無い")
 	}
 	if !errors.Is(err, ErrTimeout) || time.Since(start) > 15*time.Second {
-		t.Errorf("err = %v, 経過 = %v", err, time.Since(start))
+		t.Fatalf("err = %v, 経過 = %v", err, time.Since(start))
+	}
+	data, rerr := os.ReadFile(pidFile)
+	if rerr != nil {
+		t.Fatalf("孫の pid を読めない: %v", rerr)
+	}
+	pid := strings.TrimSpace(string(data))
+	time.Sleep(time.Second)
+	out, _ := exec.Command("ps", "-o", "stat=", "-p", pid).Output()
+	if stat := strings.TrimSpace(string(out)); stat != "" && !strings.HasPrefix(stat, "Z") {
+		t.Errorf("孫 %s が実行中のまま残っている（状態 %s）", pid, stat)
+	}
+}
+
+// script が無い機械は ErrNoTerminal（手で打つ経路に落ちる）。
+func TestScriptArgsWithoutScriptIsNoTerminal(t *testing.T) {
+	t.Parallel()
+	_, err := scriptArgs([]string{"sh"}, func(string) (string, error) { return "", exec.ErrNotFound })
+	if !errors.Is(err, ErrNoTerminal) {
+		t.Errorf("err = %v", err)
+	}
+}
+
+// 既定の人間役の環境は、承認の保護を外し、ワークスペースを root にする。
+func TestHumanEnvDropsGuardAndSetsWorkspace(t *testing.T) {
+	t.Parallel()
+	got := humanEnv("/ws")
+	var workspace []string
+	for _, kv := range got {
+		if strings.HasPrefix(kv, env.GuardTicketApproval+"=") {
+			t.Errorf("保護が残っている: %s", kv)
+		}
+		if strings.HasPrefix(kv, env.Workspace+"=") {
+			workspace = append(workspace, kv)
+		}
+	}
+	if len(workspace) != 1 || workspace[0] != env.Workspace+"=/ws" {
+		t.Errorf("workspace = %v", workspace)
+	}
+}
+
+// 承認待ちが無いとき、基準は nil でなく空で、JSON を経ても nil に戻らない。
+func TestEmptyPendingSurvivesJSON(t *testing.T) {
+	t.Parallel()
+	p := Board{}.pending()
+	if p == nil {
+		t.Fatal("pending が nil")
+	}
+	data, err := json.Marshal(prepare.State{ProposalsBefore: p})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back prepare.State
+	if err := json.Unmarshal(data, &back); err != nil || back.ProposalsBefore == nil {
+		t.Errorf("back = %+v, err = %v", back, err)
 	}
 }
 
