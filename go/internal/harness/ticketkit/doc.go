@@ -7,6 +7,7 @@
 //   - tree.go: git のリポジトリと親のワークツリー i0001 を組み、承認・着手・hook の呼び出しをたどる Tree
 //     （New・Family・ClosePhase・Ccnavi・Hook・Judge・Propose・Approve・StartParent・Worktree・CommitParent）と、
 //     組んだ木の写しを戻す Cached（FamilyTree・ClosedTree・RequestedTree）
+//   - fixture.go: 見本（拡張のフィクスチャ）を書き直す道具（PortableText・WriteFixture）。見本を書くのはここだけ
 //   - review.go: リモートの代わりの結果ファイル（Fixture）と、sh の request と同じ 3 段階（Remote・Request・Confirm・Decide）
 //
 // 木の置き場は 2 通りある。

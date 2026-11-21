@@ -12,6 +12,7 @@ package flow
 // 拡張側のフィクスチャ（extensions/vscode/ccnavi-board/test/fixtures/board.json）と同じ形であることも見る。形を変えたら
 // `go test ./internal/clitest/ticket/flow -run BoardShape -update-board-fixtures` でフィクスチャを書き直す。
 import (
+	"ccnavi/internal/harness/ticketkit"
 	"cmp"
 	"encoding/json"
 	"path/filepath"
@@ -29,14 +30,14 @@ func boardSceneBuild(t *testing.T) *Tree {
 		tr.FamilyPlan(planOf("research", "design"), nil)
 		tr.Propose("i0001-01-01", childNoReview("i0001-01-01", 1, "wip/research/*"), "")
 		tr.CommitParent("tickets")
-		OK(tr.T, tr.Approve())
-		tr.RunChild("i0001-01-01", File{"wip/research/summary.md", "まとめ\n"})
-		OK(tr.T, tr.CloseChild("i0001-01-01"))
+		ticketkit.OK(tr.T, tr.Approve())
+		tr.RunChild("i0001-01-01", ticketkit.File{Path: "wip/research/summary.md", Text: "まとめ\n"})
+		ticketkit.OK(tr.T, tr.CloseChild("i0001-01-01"))
 		tr.Merge("i0001-01-01")
 
 		tr.Propose("i0001-02-02", child("i0001-02-02", 2, "wip/design/*"), "")
 		tr.CommitParent("tickets")
-		OK(tr.T, tr.Approve())
+		ticketkit.OK(tr.T, tr.Approve())
 		// 承認の後、ワークツリーを切る前に次の子を提案する。切ったワークツリーは親のブランチの承認済みチケットなので、
 		// この提案がそこにも見える。
 		tr.Propose("i0001-02-03", child("i0001-02-03", 2, "wip/design/*"), "")
@@ -47,7 +48,7 @@ func boardSceneBuild(t *testing.T) *Tree {
 
 func (tr *Tree) board(extra ...string) map[string]any {
 	tr.T.Helper()
-	return ParseJSON(tr.T, OK(tr.T, tr.Ccnavi(append([]string{"--explain", "--json"}, extra...)...)).Stdout)
+	return ticketkit.ParseJSON(tr.T, ticketkit.OK(tr.T, tr.Ccnavi(append([]string{"--explain", "--json"}, extra...)...)).Stdout)
 }
 
 func (tr *Tree) boardByID(extra ...string) map[string]map[string]any {
@@ -162,9 +163,9 @@ func TestScatteredIsEmptyWhileTheHomeTreeHoldsOneCopy(t *testing.T) {
 func (tr *Tree) moveProposal(id, sourceTree, targetTree string) {
 	tr.T.Helper()
 	source := filepath.Join(sourceTree, "wip", "proposals", "todo", id+".md")
-	text := Read(tr.T, source)
+	text := ticketkit.Read(tr.T, source)
 	removeFile(tr.T, source)
-	Write(tr.T, filepath.Join(targetTree, "wip", "proposals", "todo", id+".md"), text)
+	ticketkit.Write(tr.T, filepath.Join(targetTree, "wip", "proposals", "todo", id+".md"), text)
 }
 
 func TestScatteredListsTheCopiesWhenTheHomeTreeHoldsNone(t *testing.T) {
@@ -207,12 +208,12 @@ func TestScatteredListsTheCopiesWhenTheHomeTreeHoldsNone(t *testing.T) {
 func TestScatteredSaysTheSameTreeHoldingTwoPlaces(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	Write(t, tr.ApprovedPath("done", "i0001-02-02"), Read(t, tr.ApprovedPath("doing", "i0001-02-02")))
+	ticketkit.Write(t, tr.ApprovedPath("done", "i0001-02-02"), ticketkit.Read(t, tr.ApprovedPath("doing", "i0001-02-02")))
 	by := tr.boardByID()
 	if got := seen(by["i0001-02-02"], "scattered"); !slices.Equal(got, []treeState{{"i0001", "doing"}, {"i0001", "done"}}) {
 		t.Errorf("scattered = %v", got)
 	}
-	Has(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-02-02 が複数の場所にある")
+	ticketkit.Has(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-02-02 が複数の場所にある")
 }
 
 // review/ は提案の置き場でもあり承認済みチケットでもある。同じ実体を 2 つと数えない。
@@ -224,7 +225,7 @@ func TestATicketWaitingForReviewIsNotScattered(t *testing.T) {
 			t.Errorf("閉じる前にレビュー待ちがある: %v", js(tk, "ticket"))
 		}
 	}
-	OK(t, tr.CloseChild("i0001-02-02"))
+	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	waiting := tr.boardByID()["i0001-02-02"]
 	if js(waiting, "copy", "status") != "review" || jb(waiting, "in_progress") || len(jl(waiting, "scattered")) != 0 {
 		t.Errorf("waiting = %v", waiting)
@@ -240,9 +241,9 @@ func TestATicketWaitingForReviewIsNotScattered(t *testing.T) {
 func TestAStaleTodoCopyLeftInAWorktreeIsNotWaitingAfterApproval(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	OK(t, tr.Approve())
+	ticketkit.OK(t, tr.Approve())
 	stale := filepath.Join(tr.Root, ".claude", "worktrees", "i0001-02-02", "wip", "proposals", "todo", "i0001-02-03.md")
-	if !Exists(stale) {
+	if !ticketkit.Exists(stale) {
 		t.Fatal("古い提案が残っていない")
 	}
 	board := tr.board()
@@ -259,40 +260,40 @@ func TestAStaleTodoCopyLeftInAWorktreeIsNotWaitingAfterApproval(t *testing.T) {
 		t.Errorf("seen_in = %v", seen(one, "seen_in"))
 	}
 	// 計画の同じ古い提案は --lint も言わない（承認の前に切ったワークツリーに残る普通の形）。
-	Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-02-02/wip/proposals/todo/i0001-02-03.md")
+	ticketkit.Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-02-02/wip/proposals/todo/i0001-02-03.md")
 }
 
 // 場面 B。review/ の古いチケットが残ったワークツリーがあっても、閉じたものは閉じたまま。
 func TestAStaleReviewCopyLeftInAWorktreeIsNotInProgressAfterClosing(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	OK(t, tr.CloseChild("i0001-02-02"))
+	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	tr.CommitParent("close")
 	tr.Worktree("i0001-01-09", "i0001") // review/i0001-02-02 を持ったまま切る
 	// 親のツリーで閉じる（レビューを終えて done/ へ）。
 	review := tr.childPath("i0001-02-02", "review")
-	text := Read(t, review)
+	text := ticketkit.Read(t, review)
 	removeFile(t, review)
-	Write(t, tr.ApprovedPath("done", "i0001-02-02"), text)
+	ticketkit.Write(t, tr.ApprovedPath("done", "i0001-02-02"), text)
 	one := tr.boardByID()["i0001-02-02"]
 	if one["proposal"] != nil || js(one, "copy", "status") != "closed" {
 		t.Errorf("one = %v", one)
 	}
 	// review/ の古いチケットは --lint も言わない（ボードと承認待ちからは外す）。
-	Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-01-09/wip/proposals/review/i0001-02-02.md")
+	ticketkit.Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-01-09/wip/proposals/review/i0001-02-02.md")
 }
 
 // 正とするツリーと同じ置き場のチケットは、子のワークツリーに入っているだけ。名指ししない。
 func TestAReviewCopyInAWorktreeMatchingTheHomeTreeIsNotNamed(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	OK(t, tr.CloseChild("i0001-02-02"))
+	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	tr.CommitParent("close")
 	tr.Worktree("i0001-01-09", "i0001")
 	if got := js(tr.boardByID()["i0001-02-02"], "copy", "status"); got != "review" {
 		t.Errorf("status = %q", got)
 	}
-	Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-01-09/wip/proposals/review/i0001-02-02.md")
+	ticketkit.Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-01-09/wip/proposals/review/i0001-02-02.md")
 }
 
 func TestPendingApprovalListsProposalsWithoutACopy(t *testing.T) {
@@ -367,11 +368,11 @@ func (tr *Tree) hookSettings(settingsEnv, localEnv, env map[string]string, extra
 	for name, values := range map[string]map[string]string{"settings.json": settingsEnv, "settings.local.json": localEnv} {
 		if values != nil {
 			raw, _ := json.Marshal(map[string]any{"env": values})
-			Write(tr.T, filepath.Join(tr.Root, ".claude", name), string(raw))
+			ticketkit.Write(tr.T, filepath.Join(tr.Root, ".claude", name), string(raw))
 		}
 	}
-	r := OK(tr.T, tr.Call(Call{Env: env}, append([]string{"--explain", "--json"}, extra...)...))
-	return jm(ParseJSON(tr.T, r.Stdout), "settings"), r.Stderr
+	r := ticketkit.OK(tr.T, tr.Call(ticketkit.Call{Env: env}, append([]string{"--explain", "--json"}, extra...)...))
+	return jm(ticketkit.ParseJSON(tr.T, r.Stdout), "settings"), r.Stderr
 }
 
 // mode は settings ファイルを Claude Code が重ねるとおりに答える（local が settings.json より強い。settings の env が
@@ -404,7 +405,7 @@ func TestSettingsFollowTheSettingsFilesAsClaudeCodeLayersThem(t *testing.T) {
 				t.Errorf("%s = %q, want %q", c.key, js(got, c.key), c.want)
 			}
 			if c.stderr != "" {
-				Has(t, stderr, c.stderr)
+				ticketkit.Has(t, stderr, c.stderr)
 			}
 		})
 	}
@@ -414,7 +415,7 @@ func TestSettingsFollowTheSettingsFilesAsClaudeCodeLayersThem(t *testing.T) {
 func TestTicketControlFromTheSettingsFilesEmptiesTheBoard(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	Write(t, filepath.Join(tr.Root, ".claude", "settings.json"), `{"env": {"CCNAVI_TICKET_CONTROL": "disable"}}`)
+	ticketkit.Write(t, filepath.Join(tr.Root, ".claude", "settings.json"), `{"env": {"CCNAVI_TICKET_CONTROL": "disable"}}`)
 	board := tr.board()
 	if js(board, "settings", "ticket_control") != "disable" || len(jl(board, "tickets")) != 0 {
 		t.Errorf("board = %v", board)
@@ -435,7 +436,7 @@ func TestAttentionAndIssuesFollowTheScene(t *testing.T) {
 			t.Errorf("%s の issues = %v", id, tk["issues"])
 		}
 	}
-	OK(t, tr.CloseChild("i0001-02-02"))
+	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	by = tr.boardByID()
 	if !jb(by["i0001-02-02"], "attention") || !jb(by["i0001"], "attention") || jb(by["i0001-01-01"], "attention") {
 		t.Errorf("閉じた後の attention: %v %v %v", by["i0001-02-02"]["attention"], by["i0001"]["attention"], by["i0001-01-01"]["attention"])
@@ -446,16 +447,16 @@ func TestAttentionAndIssuesFollowTheScene(t *testing.T) {
 func TestTheMergedHeadOfAChildIsShown(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	OK(t, tr.CloseChild("i0001-02-02"))
+	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	found := tr.childPath("i0001-02-02", "review")
 	for _, state := range []string{"done", "doing"} {
-		if p := tr.ApprovedPath(state, "i0001-02-02"); Exists(p) {
+		if p := tr.ApprovedPath(state, "i0001-02-02"); ticketkit.Exists(p) {
 			found = p
 		}
 	}
-	head, rest, _ := strings.Cut(Read(t, found), "\n---\n")
+	head, rest, _ := strings.Cut(ticketkit.Read(t, found), "\n---\n")
 	head = regexp.MustCompile(`\nmerged_sha:[^\n]*`).ReplaceAllString(head, "")
-	Write(t, found, head+"\nmerged_sha: \""+strings.Repeat("a", 40)+"\"\n---\n"+rest)
+	ticketkit.Write(t, found, head+"\nmerged_sha: \""+strings.Repeat("a", 40)+"\"\n---\n"+rest)
 	by := tr.boardByID()
 	if js(by["i0001-02-02"], "merged_sha") != strings.Repeat("a", 40) {
 		t.Errorf("merged_sha = %v", by["i0001-02-02"]["merged_sha"])
@@ -470,12 +471,12 @@ func TestTheMergedHeadOfAChildIsShown(t *testing.T) {
 func TestBoardShapeMatchesTheExtensionFixture(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
-	out := OK(t, tr.Ccnavi("--explain", "--json")).Stdout
+	out := ticketkit.OK(t, tr.Ccnavi("--explain", "--json")).Stdout
 	if *updateBoardFixtures {
 		rewriteFixture(t, "board.json", out, tr.Root)
 	}
 	fixture := readFixture(t, "board.json")
-	board := ParseJSON(t, out)
+	board := ticketkit.ParseJSON(t, out)
 	sameKeys := func(what string, a, b any) {
 		t.Helper()
 		if !slices.Equal(sortedKeys(jm(a)), sortedKeys(jm(b))) {

@@ -20,6 +20,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // mirrorRules はミラー（プロジェクトの .ccnavi/config/common/）。ワークスペースの中では共通レイヤーとして読まれない。
@@ -68,7 +69,7 @@ func (c chromeRaw) handle(request map[string]any, memfs string) map[string]any {
 	if err != nil {
 		c.t.Fatal(err)
 	}
-	return ParseJSON(c.t, samples.ChromeHandle(c.t, exe.ChromePath(c.t), string(raw), memfs))
+	return ticketkit.ParseJSON(c.t, samples.ChromeHandle(c.t, exe.ChromePath(c.t), string(raw), memfs))
 }
 
 type projectAsk struct {
@@ -120,7 +121,7 @@ func TestTheBoardOfAProjectFamilyListsItsProposals(t *testing.T) {
 		t.Errorf("board = %v", board)
 	}
 	// 画面の本文はプロジェクトの置き場を名指しする（仮のツリーのパスは出さない）。
-	Lacks(t, js(board, "text"), filepath.Join(tmp, "memfs"))
+	ticketkit.Lacks(t, js(board, "text"), filepath.Join(tmp, "memfs"))
 }
 
 func TestApprovingAProjectFamilyWritesOnlyItsBranch(t *testing.T) {
@@ -145,7 +146,7 @@ func TestApprovingAProjectFamilyWritesOnlyItsBranch(t *testing.T) {
 		t.Errorf("提案が消えない: %v", paths)
 	}
 	// 承認は提案の中身を変えない。
-	Lacks(t, js(paths[".ccnavi/approved/doing/web-i0012.md"], "content"), "ccnavi_approved")
+	ticketkit.Lacks(t, js(paths[".ccnavi/approved/doing/web-i0012.md"], "content"), "ccnavi_approved")
 }
 
 // フェーズ定義は共通レイヤー（ワークスペースの統合先）と、親の project: が指す config の和。ミラーは足さない。
@@ -195,7 +196,7 @@ func TestAProjectRepositoryNeedsTheWorkspace(t *testing.T) {
 		"branches":    map[string]any{"trunk": projectIntegration(nil)}, "absent": []any{}, "project": "web",
 	}}
 	body := chromeRaw{t}.handle(request, filepath.Join(base.TempDir(t), "m"))
-	Has(t, js(body, "error"), "ワークスペースの統合先")
+	ticketkit.Has(t, js(body, "error"), "ワークスペースの統合先")
 }
 
 func TestADifferentCompatInTheWorkspaceRefusesWriting(t *testing.T) {
@@ -204,7 +205,7 @@ func TestADifferentCompatInTheWorkspaceRefusesWriting(t *testing.T) {
 	if jb(board, "write", "allowed") {
 		t.Error("互換が違うのに書ける")
 	}
-	Has(t, js(board, "write", "reason"), "拡張を更新してください。")
+	ticketkit.Has(t, js(board, "write", "reason"), "拡張を更新してください。")
 }
 
 // ---- 「始める」。識別子は issue_identifier の 1 つだけから決める（手元の CLI と拡張の WASM が同じ関数を使う）。
@@ -306,7 +307,7 @@ func TestAClosedIdentifierIsRefused(t *testing.T) {
 		t.Errorf("body = %v", body)
 	}
 	problems := jl(body, "problems")
-	Has(t, problems[len(problems)-1].(string), "フォールバック")
+	ticketkit.Has(t, problems[len(problems)-1].(string), "フォールバック")
 	if !hasProblem(startBody(t, startOpts{issue: 55, done: []string{"Feature-55-Login-Form"}}), "done/ でクローズ済み") {
 		t.Error("大文字小文字違いで閉じた名前を通した")
 	}

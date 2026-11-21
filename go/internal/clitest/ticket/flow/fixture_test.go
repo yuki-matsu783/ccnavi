@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/pyjson"
 )
 
@@ -37,21 +38,6 @@ func readFixture(t testing.TB, name string) map[string]any {
 	return m
 }
 
-// spellings は root の書き方（解いたパスと、渡したパス）。ワークツリーの根の表記は機械で変わりうる（Windows は小文字）ので、
-// 表記を問わず置き換える。ccnavi は根を行き着く先まで解いたパスで出す（macOS の /var → /private/var）ので、
-// 解いたパスを先に置き換える（後にすると、中に含まれる元のパスだけが先に置き換わって /private<root> が残る）。
-func spellings(root string) []string {
-	var out []string
-	real, err := filepath.EvalSymlinks(root)
-	if err == nil {
-		out = append(out, real)
-	}
-	if !slices.Contains(out, root) {
-		out = append(out, root)
-	}
-	return out
-}
-
 // portable は絶対パスを <root> に置き換えた JSON の値。フィクスチャに書く分だけ。
 func portable(v any, root string) any {
 	switch x := v.(type) {
@@ -68,17 +54,9 @@ func portable(v any, root string) any {
 		}
 		return out
 	case string:
-		return portableText(x, root)
+		return ticketkit.PortableText(x, root)
 	}
 	return v
-}
-
-func portableText(text, root string) string {
-	text = strings.ReplaceAll(text, `\`, "/")
-	for _, s := range spellings(root) {
-		text = regexp.MustCompile(`(?i)`+regexp.QuoteMeta(strings.ReplaceAll(s, `\`, "/"))).ReplaceAllString(text, "<root>")
-	}
-	return text
 }
 
 var digestRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -147,7 +125,7 @@ func portableValue(v any, root string) any {
 		}
 		return x
 	case string:
-		return portableText(x, root)
+		return ticketkit.PortableText(x, root)
 	}
 	return v
 }
@@ -159,9 +137,7 @@ func rewriteFixture(t testing.TB, name, stdout, root string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(fixturePath(name), []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	ticketkit.WriteFixture(t, fixturePath(name), text)
 }
 
 // checkApproveFixture は承認の JSON（body）が拡張のフィクスチャ name と、キーだけでなく値まで同じことを見る

@@ -15,6 +15,7 @@ import (
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 const (
@@ -37,7 +38,7 @@ func compatBump(t testing.TB) string {
 // putCompat は統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）を置く。
 func (tr *Tree) putCompat(value string) {
 	tr.T.Helper()
-	Write(tr.T, filepath.Join(tr.Root, filepath.FromSlash(samples.CompatFile)), "#!/bin/sh\nCCNAVI_COMPAT="+value+"\n")
+	ticketkit.Write(tr.T, filepath.Join(tr.Root, filepath.FromSlash(samples.CompatFile)), "#!/bin/sh\nCCNAVI_COMPAT="+value+"\n")
 }
 
 // treeFiles はツリーの置き場のファイル（相対パス → 中身）。
@@ -187,7 +188,7 @@ func (tr *Tree) answer(request map[string]any) map[string]any {
 	if err != nil {
 		tr.T.Fatal(err)
 	}
-	return ParseJSON(tr.T, samples.ChromeHandle(tr.T, exe.ChromePath(tr.T), string(raw), filepath.Join(tr.Root, "memfs")))
+	return ticketkit.ParseJSON(tr.T, samples.ChromeHandle(tr.T, exe.ChromePath(tr.T), string(raw), filepath.Join(tr.Root, "memfs")))
 }
 
 // askChrome は error の無い答えを返す。
@@ -207,7 +208,7 @@ func isNull(m map[string]any, key string) bool {
 }
 
 // reviewedPhaseOne はフェーズ 1（MR で見る設計）の子を閉じて合流し、レビューを依頼したところまで進める。
-func (tr *Tree) reviewedPhaseOne() Fixture { return tr.Phase1Requested() }
+func (tr *Tree) reviewedPhaseOne() ticketkit.Fixture { return tr.Phase1Requested() }
 
 // applyChanges は Chrome の Changes を 1 コミットとしてツリーに書く（拡張の書き込みの代わり）。
 func (tr *Tree) applyChanges(rows []any, treeRoot string) {
@@ -217,11 +218,11 @@ func (tr *Tree) applyChanges(rows []any, treeRoot string) {
 		if js(row, "op") == "delete" {
 			removeFile(tr.T, path)
 		} else {
-			Write(tr.T, path, js(row, "content"))
+			ticketkit.Write(tr.T, path, js(row, "content"))
 		}
 	}
-	Git(tr.T, treeRoot, "add", "-A")
-	Git(tr.T, treeRoot, "commit", "--quiet", "-m", "ccnavi: 承認（Chrome 拡張）")
+	ticketkit.Git(tr.T, treeRoot, "add", "-A")
+	ticketkit.Git(tr.T, treeRoot, "commit", "--quiet", "-m", "ccnavi: 承認（Chrome 拡張）")
 }
 
 // changeRow は Changes の行から、末尾が suffix の path を探す。

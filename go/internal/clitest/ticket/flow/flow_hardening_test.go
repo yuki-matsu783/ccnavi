@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 const (
@@ -32,11 +33,11 @@ func TestTheChildWorktreeCopyOfTheFlowIsNotRead(t *testing.T) {
 	tr.CommitParent("no flow in the parent tree")
 	childTree := tr.RunChild(flowChild)
 	// 子のワークツリーの版に、エージェントがシェルから書いた版。
-	Write(t, tr.flowIn(childTree, flowChild), workflowYAML)
-	text := Reason(t, tr.subagentStart(childTree))
-	Has(t, text, flowChild)
-	Lacks(t, text, "フロー:")
-	Lacks(t, text, "[askUserQuestion]")
+	ticketkit.Write(t, tr.flowIn(childTree, flowChild), workflowYAML)
+	text := ticketkit.Reason(t, tr.subagentStart(childTree))
+	ticketkit.Has(t, text, flowChild)
+	ticketkit.Lacks(t, text, "フロー:")
+	ticketkit.Lacks(t, text, "[askUserQuestion]")
 	shown := tr.boardFlow(flowChild)
 	if jb(shown, "exists") || !samePath(t, js(shown, "tree"), tr.ParentTree) {
 		t.Errorf("flow = %v", shown)
@@ -47,9 +48,9 @@ func TestTheBriefingSaysTheFlowIsHumanOwnedNotUnwritable(t *testing.T) {
 	t.Parallel()
 	tr := flowTree(t)
 	childTree := tr.RunChild(flowChild)
-	text := Reason(t, tr.subagentStart(childTree))
-	Has(t, text, "合意済みの手順。編集しない")
-	Lacks(t, text, "エージェントは書けない")
+	text := ticketkit.Reason(t, tr.subagentStart(childTree))
+	ticketkit.Has(t, text, "合意済みの手順。編集しない")
+	ticketkit.Lacks(t, text, "エージェントは書けない")
 }
 
 // ---- 着手のときにハッシュを記録し、着手のあとに書き換わったら知らせる（M-2b）。止めない。
@@ -58,7 +59,7 @@ func TestStartRecordsTheDigestOfTheFlow(t *testing.T) {
 	t.Parallel()
 	tr := flowTree(t)
 	tr.RunChild(flowChild)
-	record := ReadJSON(t, filepath.Join(tr.Approved, "phases", "i0001", flowChild+".flow.json"))
+	record := ticketkit.ReadJSON(t, filepath.Join(tr.Approved, "phases", "i0001", flowChild+".flow.json"))
 	if !strings.HasPrefix(js(record, "fingerprint"), "sha256:") || js(record, "fingerprint") != fingerprint(t, tr.flowPath()) ||
 		js(record, "path") != ".ccnavi/approved/flows/"+flowChild+".yml" || js(record, "at") == "" {
 		t.Errorf("record = %v", record)
@@ -70,8 +71,8 @@ func TestAnUnchangedFlowSaysNothing(t *testing.T) {
 	tr := flowTree(t)
 	childTree := tr.RunChild(flowChild)
 	start, stop := tr.subagentStart(childTree), tr.subagentStop(childTree)
-	Lacks(t, start.Stdout, changedNote)
-	Lacks(t, start.Stdout, "systemMessage")
+	ticketkit.Lacks(t, start.Stdout, changedNote)
+	ticketkit.Lacks(t, start.Stdout, "systemMessage")
 	if strings.TrimSpace(stop.Stdout) != "" {
 		t.Errorf("stop = %q", stop.Stdout)
 	}
@@ -82,13 +83,13 @@ func TestAFlowRewrittenAfterTheStartIsReported(t *testing.T) {
 	t.Parallel()
 	tr := flowTree(t)
 	childTree := tr.RunChild(flowChild)
-	Write(t, tr.flowPath(), "nodes:\n  - {id: s, type: prompt, name: x}\n")
+	ticketkit.Write(t, tr.flowPath(), "nodes:\n  - {id: s, type: prompt, name: x}\n")
 	for _, r := range []struct{ out, name string }{{tr.subagentStart(childTree).Stdout, "start"}, {tr.subagentStop(childTree).Stdout, "stop"}} {
-		o := ParseJSON(t, r.out)
-		Has(t, js(o, "hookSpecificOutput", "additionalContext"), changedNote)
-		Has(t, js(o, "systemMessage"), changedNote)
-		Has(t, js(o, "systemMessage"), codeChanged)
-		Has(t, js(o, "systemMessage"), flowChild)
+		o := ticketkit.ParseJSON(t, r.out)
+		ticketkit.Has(t, js(o, "hookSpecificOutput", "additionalContext"), changedNote)
+		ticketkit.Has(t, js(o, "systemMessage"), changedNote)
+		ticketkit.Has(t, js(o, "systemMessage"), codeChanged)
+		ticketkit.Has(t, js(o, "systemMessage"), flowChild)
 	}
 }
 
@@ -97,9 +98,9 @@ func TestARemovedFlowIsReported(t *testing.T) {
 	tr := flowTree(t)
 	childTree := tr.RunChild(flowChild)
 	removeFile(t, tr.flowPath())
-	msg := js(ParseJSON(t, tr.subagentStart(childTree).Stdout), "systemMessage")
-	Has(t, msg, changedNote)
-	Has(t, msg, "いま 無い")
+	msg := js(ticketkit.ParseJSON(t, tr.subagentStart(childTree).Stdout), "systemMessage")
+	ticketkit.Has(t, msg, changedNote)
+	ticketkit.Has(t, msg, "いま 無い")
 }
 
 func TestAFlowThatAppearsAfterTheStartIsReported(t *testing.T) {
@@ -108,11 +109,11 @@ func TestAFlowThatAppearsAfterTheStartIsReported(t *testing.T) {
 	removeFile(t, tr.flowPath())
 	tr.CommitParent("no flow")
 	childTree := tr.RunChild(flowChild)
-	if got := js(ReadJSON(t, filepath.Join(tr.Approved, "phases", "i0001", flowChild+".flow.json")), "fingerprint"); got != "absent" {
+	if got := js(ticketkit.ReadJSON(t, filepath.Join(tr.Approved, "phases", "i0001", flowChild+".flow.json")), "fingerprint"); got != "absent" {
 		t.Errorf("fingerprint = %q", got)
 	}
-	Write(t, tr.flowPath(), workflowYAML)
-	Has(t, js(ParseJSON(t, tr.subagentStart(childTree).Stdout), "systemMessage"), changedNote)
+	ticketkit.Write(t, tr.flowPath(), workflowYAML)
+	ticketkit.Has(t, js(ticketkit.ParseJSON(t, tr.subagentStart(childTree).Stdout), "systemMessage"), changedNote)
 }
 
 // 範囲外の変更で差し戻すときも、同じ文に知らせを載せる。
@@ -120,11 +121,11 @@ func TestTheNoticeRidesWithABounceOnStop(t *testing.T) {
 	t.Parallel()
 	tr := flowTree(t)
 	childTree := tr.RunChild(flowChild)
-	Write(t, filepath.Join(childTree, "src", "stray.py"), "x\n")
-	Write(t, tr.flowPath(), "{}")
+	ticketkit.Write(t, filepath.Join(childTree, "src", "stray.py"), "x\n")
+	ticketkit.Write(t, tr.flowPath(), "{}")
 	stop := tr.subagentStop(childTree)
 	wantCode(t, stop, 2)
-	Has(t, stop.Stderr, changedNote)
+	ticketkit.Has(t, stop.Stderr, changedNote)
 }
 
 // 着手のあとにフローを名前付きパイプに差し替えても、SubagentStart は固まらない。
@@ -144,9 +145,9 @@ func TestAFifoSweptInAfterTheStartDoesNotHangSubagentStart(t *testing.T) {
 	if fired {
 		t.Fatal("FIFO を開いて固まった")
 	}
-	o := ParseJSON(t, string(out))
-	Has(t, js(o, "hookSpecificOutput", "additionalContext"), notRegular)
-	Has(t, js(o, "systemMessage"), changedNote)
+	o := ticketkit.ParseJSON(t, string(out))
+	ticketkit.Has(t, js(o, "hookSpecificOutput", "additionalContext"), notRegular)
+	ticketkit.Has(t, js(o, "systemMessage"), changedNote)
 }
 
 // ハードリンクの別名への書き込みもロックが止める。
@@ -166,11 +167,11 @@ func TestAHardLinkAliasIsLockedWhileInProgress(t *testing.T) {
 	tr.assertLocked(tr.writeTo(alias, writeOpts{}))
 	tr.assertLocked(tr.writeTo(alias, writeOpts{Tool: "Edit"}))
 	// 読まずに、そう言う。
-	text := Reason(t, tr.subagentStart(childTree))
-	Has(t, text, "ハードリンク")
-	Lacks(t, text, fenceOpen)
+	text := ticketkit.Reason(t, tr.subagentStart(childTree))
+	ticketkit.Has(t, text, "ハードリンク")
+	ticketkit.Lacks(t, text, fenceOpen)
 	// 名前が 1 つのふつうのファイルは、ロックの走査もしない。
-	tr.assertNotLocked(tr.writeTo(Write(t, filepath.Join(tr.ParentTree, "wip", "plain.yml"), "{}"), writeOpts{}))
+	tr.assertNotLocked(tr.writeTo(ticketkit.Write(t, filepath.Join(tr.ParentTree, "wip", "plain.yml"), "{}"), writeOpts{}))
 }
 
 // 親のツリーからの起動では、手順を並べずパスだけを言う。
@@ -182,26 +183,26 @@ func TestParentCwdListsPathsOnlyAndTheChildCwdGetsTheSteps(t *testing.T) {
 			tr.Propose(kid, child(kid, 1, "wip/research/r"+string(rune('1'+i))+"/*"), "")
 		}
 		tr.CommitParent("tickets")
-		OK(tr.T, tr.Approve())
+		ticketkit.OK(tr.T, tr.Approve())
 		for _, kid := range []string{"i0001-01-01", "i0001-01-02"} {
-			Write(tr.T, filepath.Join(tr.Approved, "flows", kid+".yml"), workflowYAML)
+			ticketkit.Write(tr.T, filepath.Join(tr.Approved, "flows", kid+".yml"), workflowYAML)
 		}
 		tr.CommitParent("flows")
 		tr.StartParent()
 	})
-	text := Reason(t, tr.subagentStart(tr.ParentTree))
-	Lacks(t, text, fenceOpen)
-	Lacks(t, text, "[askUserQuestion]")
+	text := ticketkit.Reason(t, tr.subagentStart(tr.ParentTree))
+	ticketkit.Lacks(t, text, fenceOpen)
+	ticketkit.Lacks(t, text, "[askUserQuestion]")
 	for _, kid := range []string{"i0001-01-01", "i0001-01-02"} {
 		want := "フロー: " + filepath.Join(tr.Approved, "flows", kid+".yml")
-		Has(t, strings.ToLower(text), strings.ToLower(want))
+		ticketkit.Has(t, strings.ToLower(text), strings.ToLower(want))
 	}
-	Has(t, text, "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない")
+	ticketkit.Has(t, text, "自分の担当の子チケットのフローだけを読んで従ってください。他の子のフローには従わない")
 	childTree := tr.RunChild("i0001-01-01")
-	own := Reason(t, tr.subagentStart(childTree))
-	Has(t, own, fenceOpen)
-	Has(t, own, "3. [askUserQuestion] 方針")
-	Lacks(t, own, "i0001-01-02")
+	own := ticketkit.Reason(t, tr.subagentStart(childTree))
+	ticketkit.Has(t, own, fenceOpen)
+	ticketkit.Has(t, own, "3. [askUserQuestion] 方針")
+	ticketkit.Lacks(t, own, "i0001-01-02")
 }
 
 // 子の提案は親のワークツリーに書く。フローも同じツリーに保存し、承認で動かさない。
@@ -210,22 +211,22 @@ func TestTheFlowStaysInTheParentTreeAndIsReadByTheChild(t *testing.T) {
 	tr := newTree(t)
 	tr.Propose("i0001", samples.ParentText("i0001", samples.Plan("research"), samples.ParentOpts{Allow: []string{"src/*", "wip/*", "tests/*"}}), "")
 	tr.CommitParent("tickets")
-	OK(t, tr.Approve())
+	ticketkit.OK(t, tr.Approve())
 	tr.Propose(flowChild, child(flowChild, 1, "wip/research/*"), "")
 	before := tr.boardFlow(flowChild)
 	if !samePath(t, js(before, "tree"), tr.ParentTree) {
 		t.Fatalf("flow = %v", before)
 	}
-	Write(t, js(before, "path"), workflowYAML)
-	r := OK(t, tr.Approve())
-	Lacks(t, r.Stdout, "フロー")
+	ticketkit.Write(t, js(before, "path"), workflowYAML)
+	r := ticketkit.OK(t, tr.Approve())
+	ticketkit.Lacks(t, r.Stdout, "フロー")
 	after := tr.boardFlow(flowChild)
 	if !samePath(t, js(after, "tree"), tr.ParentTree) || js(after, "path") != js(before, "path") || !jb(after, "exists") {
 		t.Errorf("flow = %v", after)
 	}
-	Has(t, Read(t, js(after, "path")), "name: 調査の手順")
+	ticketkit.Has(t, ticketkit.Read(t, js(after, "path")), "name: 調査の手順")
 	childTree := tr.RunChild(flowChild)
-	Has(t, Reason(t, tr.subagentStart(childTree)), "3. [askUserQuestion] 方針")
+	ticketkit.Has(t, ticketkit.Reason(t, tr.subagentStart(childTree)), "3. [askUserQuestion] 方針")
 }
 
 func TestNoFlowMeansNothingIsSaid(t *testing.T) {
@@ -233,21 +234,21 @@ func TestNoFlowMeansNothingIsSaid(t *testing.T) {
 	tr := newTree(t)
 	tr.Propose("i0001", samples.ParentText("i0001", samples.Plan("research"), samples.ParentOpts{Allow: []string{"src/*", "wip/*", "tests/*"}}), "")
 	tr.CommitParent("tickets")
-	OK(t, tr.Approve())
+	ticketkit.OK(t, tr.Approve())
 	tr.Propose(flowChild, child(flowChild, 1, "wip/research/*"), "")
-	Lacks(t, OK(t, tr.Approve()).Stdout, "フロー")
+	ticketkit.Lacks(t, ticketkit.OK(t, tr.Approve()).Stdout, "フロー")
 }
 
 // 承認済みの領域のファイルは「ワークツリーにしかない」と言わない（ユーザの決定）。ほかの置き場の物は言う。
 func TestApprovedFilesInAWorktreeAreNotWarnedButOtherLayerFilesAre(t *testing.T) {
 	t.Parallel()
 	tr := flowTree(t)
-	Write(t, filepath.Join(tr.ParentTree, ".ccnavi", "notes", "memo.txt"), "x\n")
-	if !Exists(tr.flowPath()) {
+	ticketkit.Write(t, filepath.Join(tr.ParentTree, ".ccnavi", "notes", "memo.txt"), "x\n")
+	if !ticketkit.Exists(tr.flowPath()) {
 		t.Fatal("フローが無い")
 	}
 	var lines []string
-	for _, l := range Lines(tr.Ccnavi("--lint").Stdout) {
+	for _, l := range ticketkit.Lines(tr.Ccnavi("--lint").Stdout) {
 		if strings.Contains(l, "ワークツリーにしかない") {
 			lines = append(lines, l)
 		}

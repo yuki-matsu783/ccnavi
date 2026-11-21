@@ -6,6 +6,7 @@ package flow
 // 元: tests/ticket/test_changes_requested_hosts.py。
 
 import (
+	"ccnavi/internal/harness/ticketkit"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -27,12 +28,12 @@ func requestedOn(t *testing.T, host string) *Tree {
 	return cachedTree(t, "changes-requested-"+host, func(tr *Tree) {
 		tr.Phase1Requested()
 		mark := tr.RequestedMark()
-		body := ReadJSON(tr.T, mark)
+		body := ticketkit.ReadJSON(tr.T, mark)
 		body["host"] = host
 		raw, _ := json.Marshal(body)
-		Write(tr.T, mark, string(raw))
+		ticketkit.Write(tr.T, mark, string(raw))
 		tr.CommitParent("request")
-		tr.Parent("push", "--quiet", "origin", ParentName)
+		tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
 	})
 }
 
@@ -42,7 +43,7 @@ func changesRequestedResult(t *testing.T, tr *Tree, host string) string {
 		"host": host, "mr": map[string]any{"number": 7, "url": "u/7", "draft": true}, "threads": []any{},
 		"reviews": []any{map[string]any{"state": "CHANGES_REQUESTED", "url": "u/7#review", "submitted_at": "2026-01-01T00:00:00Z", "author": "rev"}},
 	})
-	return Write(t, filepath.Join(tr.Root, "result-"+host+".json"), string(raw))
+	return ticketkit.Write(t, filepath.Join(tr.Root, "result-"+host+".json"), string(raw))
 }
 
 func saidByHost(t *testing.T, host, text string) {
@@ -51,12 +52,12 @@ func saidByHost(t *testing.T, host, text string) {
 	if host == "github" {
 		want, other = githubNote, gitlabNote
 	}
-	Has(t, text, want)
-	Lacks(t, text, other)
+	ticketkit.Has(t, text, want)
+	ticketkit.Lacks(t, text, other)
 	if host == "gitlab" {
-		Has(t, text, gitlabUnverified)
+		ticketkit.Has(t, text, gitlabUnverified)
 	} else {
-		Lacks(t, text, "Re-request")
+		ticketkit.Lacks(t, text, "Re-request")
 	}
 }
 
@@ -66,15 +67,15 @@ func TestConfirmDecideAndCloseEarlySayItByHost(t *testing.T) {
 			t.Parallel()
 			tr := requestedOn(t, host)
 			result := changesRequestedResult(t, tr, host)
-			f := Fixture{T: t, Path: result}
-			confirm := Fails(t, tr.ConfirmFor(f, "1"))
+			f := ticketkit.Fixture{T: t, Path: result}
+			confirm := ticketkit.Fails(t, tr.ConfirmFor(f, "1"))
 			saidByHost(t, host, confirm.Stderr)
-			decide := Fails(t, tr.Ccnavi("--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--preview", "--json", "--result", result))
+			decide := ticketkit.Fails(t, tr.Ccnavi("--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--preview", "--json", "--result", result))
 			saidByHost(t, host, decide.Stderr)
-			closed := Fails(t, tr.Call(Call{Stdin: "y\n"}, "--cwd", tr.ParentTree, "user", "close-early", "--reason", "ここまでで十分", "--result", result))
+			closed := ticketkit.Fails(t, tr.Call(ticketkit.Call{Stdin: "y\n"}, "--cwd", tr.ParentTree, "user", "close-early", "--reason", "ここまでで十分", "--result", result))
 			saidByHost(t, host, closed.Stderr)
 			// 判定は変えない: どのホストでもレビュー済みにならない。
-			if Exists(tr.PhaseMark("1.reviewed")) {
+			if ticketkit.Exists(tr.PhaseMark("1.reviewed")) {
 				t.Error("変更要求があるのにレビュー済みになった")
 			}
 		})
@@ -95,10 +96,10 @@ func TestAManuallyMovedChildIsHeldWithTheHostNote(t *testing.T) {
 				t.Fatal(err)
 			}
 			tr.CommitParent("move by hand")
-			tr.Parent("push", "--quiet", "origin", ParentName)
-			held := Fails(t, tr.ConfirmFor(Fixture{T: t, Path: changesRequestedResult(t, tr, host)}, "1"))
+			tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
+			held := ticketkit.Fails(t, tr.ConfirmFor(ticketkit.Fixture{T: t, Path: changesRequestedResult(t, tr, host)}, "1"))
 			saidByHost(t, host, held.Stderr)
-			Has(t, held.Stderr, "保留")
+			ticketkit.Has(t, held.Stderr, "保留")
 		})
 	}
 }
