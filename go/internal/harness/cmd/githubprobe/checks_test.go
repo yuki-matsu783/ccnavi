@@ -168,6 +168,19 @@ func TestWithoutGhHidesOnlyGh(t *testing.T) {
 	}
 }
 
+func TestLookPathFindsWindowsExe(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "gh.exe")
+	if err := os.WriteFile(exe, []byte("MZ"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := map[string]string{"PATH": dir}
+	if got := lookPath("gh", env); got != exe {
+		t.Errorf("lookPath(gh) = %q, want %q", got, exe)
+	}
+}
+
 // 提案の本文の形（親と子）。ccnavi が読む見出しの並びと、allow の字下げ。
 func TestTicketTextKeepsTheHeadingOrder(t *testing.T) {
 	t.Parallel()

@@ -114,9 +114,11 @@ func lookPath(name string, env map[string]string) string {
 		return name
 	}
 	for _, dir := range filepath.SplitList(env[pathKey(env)]) {
-		candidate := filepath.Join(dir, name)
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate
+		for _, c := range []string{name, name + ".exe"} {
+			candidate := filepath.Join(dir, c)
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				return candidate
+			}
 		}
 	}
 	return name
