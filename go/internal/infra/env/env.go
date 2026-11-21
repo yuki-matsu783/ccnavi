@@ -130,6 +130,14 @@ const (
 	ProbeReviewerID    = "CCNAVI_PROBE_REVIEWER_ID"
 )
 
+// 手動の GitHub の道具（harness/cmd/githubprobe）が読む、実験場と出力の場所。
+const (
+	ProbeRepo      = "CCNAVI_PROBE_REPO"
+	ProbeRepoOK    = "CCNAVI_PROBE_REPO_OK"
+	ProbeOut       = "CCNAVI_PROBE_OUT"
+	ProbeStrictExe = "CCNAVI_PROBE_STRICT_EXE"
+)
+
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所・端末の幅。
 const (
 	GitHubToken = "GITHUB_TOKEN"
