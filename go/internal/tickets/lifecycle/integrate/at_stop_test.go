@@ -164,7 +164,7 @@ func TestDirectAtStopScenes(t *testing.T) {
 
 // integrate が断る名前（release 系・master・develop）の直接作業は、コミットも未コミットも促さない。
 func TestDirectAtStopLeavesOutNamesThatIntegrateRefuses(t *testing.T) {
-	for _, name := range []string{"release-x", "master", "develop", "release"} {
+	for _, name := range []string{"release-x", "Release-x", "master", "Master", "develop", "RELEASE"} {
 		s := newScene(t, name)
 		s.commit("a")
 		testkit.Put(t, filepath.Join(s.tree, "src", "draft.go"), "y\n")

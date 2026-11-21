@@ -138,7 +138,7 @@ func TestRecordIsCappedAndKeepsNumberTypes(t *testing.T) {
 func TestIntegrableName(t *testing.T) {
 	for name, want := range map[string]bool{
 		"scratch": true, "fix-1.2_a": true, "作業": false, "a作業": true, "": false,
-		"main": false, "release": false, "release-1": false, "-x": false, ".x": false,
+		"main": false, "release": false, "release-1": false, "Master": false, "RELEASE": false, "Release-1": false, "-x": false, ".x": false,
 		"a..b": false, "a/b": false, `a\b`: false, "a b": false, "a@b": false,
 	} {
 		if got := IntegrableName(name); got != want {
