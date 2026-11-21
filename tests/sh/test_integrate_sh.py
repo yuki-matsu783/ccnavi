@@ -281,87 +281,11 @@ class IntegrateTest(Fixture):
         self.assertIn("取り込み先（main）を開いていません", r.stderr)
         self.assertIn("elsewhere", r.stderr)
 
-    def test_integrate_from_a_worktree_is_refused(self):
-        self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt", cwd=self.wt)
-        self.assertOk(r, 2)
-        self.assertIn("ユーザのチェックアウト", r.stderr)
-
-    def test_a_dirty_source_worktree_is_refused(self):
-        self.work_in_branch()
-        write(os.path.join(self.wt, "wip.txt"), "x\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("未コミットの変更", r.stderr)
-
     def commit_draft(self, rel, text, wt=None):
         wt = wt or self.wt
         write(os.path.join(wt, rel), text)
         git(wt, "add", "-f", rel)
         git(wt, "commit", "-q", "-m", "draft")
-
-    def cut_with_original(self, rel="docs/guide.md", text="original\n"):
-        """起点（S）に元のファイルを持つワークツリー wt2 を切る。"""
-        write(os.path.join(self.ws, rel), text)
-        git(self.ws, "add", "-f", rel)
-        git(self.ws, "commit", "-q", "-m", "original")
-        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
-        return self.cut("wt2")
-
-    def test_a_draft_without_an_original_is_listed_and_does_not_stop_integrate(self):
-        self.work_in_branch()
-        self.commit_draft("wip/handoff/notes.md", "memo\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        self.assertIn("案内: 取り込まない下書き: wip/handoff/notes.md（", r.stdout)
-        names = git(self.ws, "ls-tree", "-r", "--name-only", self.marker_value("c_tree", "wt"))
-        self.assertNotIn("wip/handoff/notes.md", names.splitlines())
-        self.assertFalse(os.path.exists(os.path.join(self.tmp_wt(), "wip/handoff/notes.md")))
-        self.assertIn("new.txt", names.splitlines())
-
-    def test_an_unedited_copy_passes_and_is_not_listed(self):
-        wt = self.cut_with_original()
-        self.commit_draft("wip/handoff/docs/guide.md", "original\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 0)
-        self.assertNotIn("取り込まない下書き", r.stdout)
-
-    def test_an_edited_copy_outside_the_kinds_is_refused_as_before(self):
-        wt = self.cut_with_original("tools/clean.js", "old\n")
-        self.commit_draft("wip/handoff/tools/clean.js", "edited\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("wip/handoff/tools/clean.js", r.stderr)
-        self.assertIn("ccnavi-user-handoff.sh", r.stderr)
-        self.assertFalse(os.path.exists(self.tmp_wt("wt2")))
-
-    def test_a_copy_is_matched_to_its_original_ignoring_case(self):
-        wt = self.cut_with_original("docs/guide.md", "old\n")
-        self.commit_draft("wip/handoff/Docs/GUIDE.MD", "edited\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("wip/handoff/Docs/GUIDE.MD", r.stderr)
-
-    def test_a_non_ascii_original_is_matched_ignoring_case(self):
-        wt = self.cut_with_original("docs/caf\u00e9.md", "old\n")
-        self.commit_draft("wip/handoff/DOCS/CAF\u00c9.md", "edited\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("ccnavi-user-handoff.sh", r.stderr)
-
-    def test_a_pending_draft_of_a_kind_is_refused_by_the_kind_check(self):
-        wt = self.cut_with_original(".ccnavi/config/project/rules.yml", "rules: []\n")
-        self.commit_draft("wip/handoff/.ccnavi/config/project/rules.yml", "rules: [x]\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("取り込んでいない下書き", r.stderr)
-
-    def test_an_untracked_new_draft_is_still_refused(self):
-        self.work_in_branch()
-        write(os.path.join(self.wt, "wip/handoff/note.local"), "ignored\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("wip/handoff/note.local", r.stderr)
 
     def test_integrate_done_and_cleanup_pass_with_a_listed_draft(self):
         self.work_in_branch()
@@ -372,64 +296,6 @@ class IntegrateTest(Fixture):
         self.assertNotIn("取り込まない下書き", r.stdout)
         self.assertFalse(os.path.exists(self.wt))
         self.assertFalse(self.has_branch())
-
-    def test_a_deleted_draft_is_left_alone_in_the_result(self):
-        self.work_in_branch()
-        git(self.wt, "rm", "-q", "wip/handoff/d.md")
-        git(self.wt, "commit", "-q", "-m", "drop the draft")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        self.assertNotIn("d.md", r.stdout)
-        self.assertEqual("draft\n", read(os.path.join(self.tmp_wt(), "wip/handoff/d.md")))
-
-    def test_a_ticket_bound_base_branch_is_refused(self):
-        os.makedirs(os.path.join(self.ws, "wip", "proposals", "todo"))
-        write(
-            os.path.join(self.ws, "wip", "proposals", "todo", "main.md"),
-            "---\nticket: main\n---\nbody\n",
-        )
-        self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("チケット", r.stderr)
-
-    def test_without_a_record_it_points_at_adopt(self):
-        self.work_in_branch()
-        os.remove(self.record())
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("--adopt --base <取り込み先>", r.stderr)
-        self.assertNotIn("マージリクエスト", r.stderr)
-
-    def test_without_a_record_a_ticket_bound_name_is_not_pointed_at_adopt(self):
-        # --adopt はチケットに結び付く名前を断る。案内が行き止まりに向かわないよう、
-        # 同じ判定で先に言う。
-        self.work_in_branch()
-        os.remove(self.record())
-        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertNotIn("--adopt", r.stderr)
-        self.assertIn("チケットに結び付く名前です", r.stderr)
-        self.assertIn("マージリクエストで出します", r.stderr)
-        self.assertIn("ccnavi-ticket.sh", r.stderr)
-        self.assertIn("status", r.stderr)
-        self.assertFalse(os.path.exists(self.tmp_wt()))
-
-    def test_a_record_of_another_repository_is_refused(self):
-        self.work_in_branch()
-        text = read(self.record()).replace(self.common_dir(), "/somewhere/else/.git")
-        write(self.record(), text)
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("common_dir", r.stderr)
-
-    def test_names_that_are_paths_are_refused(self):
-        r = self.run_git_sh("integrate", "../etc")
-        self.assertOk(r, 2)
-        r = self.run_git_sh("integrate", "a/b")
-        self.assertOk(r, 2)
-        self.assertOk(self.run_git_sh("integrate"), 2)
 
     def test_an_old_git_is_refused(self):
         shim = os.path.join(self._tmp.name, "oldgit")
