@@ -14,7 +14,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 
 | グループ | 主題 | 時間 |
 |---|---|---|
-| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 13 秒 |
+| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形など） | 約 13 秒 |
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 43 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 124 秒 |
@@ -39,7 +39,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 
 `core` はいつも回す。そのうえで、変えたファイルを下の表に適用して、ヒットした行のグループを足す。
 
-Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/` のどれかを変えたら必ず回す（表とは別。Python のテストを Go に移していくので、表のグループが空になっても sh・文面・見本の変更は Go のテストが守る）。`-count=1` は要らない。
+Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/` のどれかを変えたら必ず回す（表とは別。Python のテストを Go に移していくので、表のグループが空になっても sh・文面・見本の変更は Go のテストが守る）。`docs/30_adr/`・`.claude/hooks/`・`scripts/` を変えたときも `cd go && go test ./internal/clitest/repo/` を回す（ADR の番号・配る sh の書き方・期待する判定・Stop の場面を見る）。`-count=1` は要らない。
 
 | 変えたもの | 足すグループ |
 |---|---|
@@ -74,7 +74,7 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `tests/contract/`（`shape.py`・`*.json`） | `contract`。あわせて `extensions/chrome/ccnavi-approval` の `pnpm test`（TS の比較器が同じ表を読む） |
 | `extensions/chrome/ccnavi-approval/test/helpers/mock-gitlab.ts`・`shape.ts` | `extensions/chrome/ccnavi-approval` の `pnpm test`（契約の試験） |
 | `extensions/chrome/ccnavi-approval/`（`test/fixtures/`）と `go/internal/entry/chrome/`・`go/cmd/ccnavi-chrome/` | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる）。`test/fixtures/host/gitlab/` と `tests/sh/gitlab_host.py` は `contract` も（見本の応答の形を比べる） |
-| `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
+| `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `go test ./internal/clitest/repo/`（`adr_numbers_test.go`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:
