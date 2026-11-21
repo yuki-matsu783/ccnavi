@@ -17,7 +17,7 @@ keywords: [lint, 期待する判定, テスト, deny, allow, ask, 検証]
 sh .ccnavi/scripts/ccnavi-launcher.sh --lint --log "" --state ""
 ```
 
-3 本まとめて読む。error が 1 件でもあればそこで止めて報告する。warn は読んで
+設定ファイルをまとめて読む。error が 1 件でもあればそこで止めて報告する。warn は読んで
 「意図した防御が効いていない」箇所として拾う。
 
 | 出どころ | error（防御が消える・全部止まる） | warn（判定は動くが意図とずれる） |
