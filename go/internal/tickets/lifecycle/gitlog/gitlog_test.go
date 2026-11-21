@@ -57,3 +57,57 @@ func TestReport(t *testing.T) {
 		t.Errorf("残った記録 %d 本", len(logs))
 	}
 }
+
+// worktree remove が Permission denied で止まったときだけ、立て直し方の案内を足す（Windows で cwd がワークツリーの中にあるとき）。
+// ほかの失敗（無いパス・未追跡のファイル・ほかのサブコマンド）には足さない。案内はラッパーの形で書き、打ったパスを rmdir に入れる。
+func TestReportNotesTheWorktreeRemoveHintOnlyForPermissionDenied(t *testing.T) {
+	root := t.TempDir()
+	repo, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, err := os.Stat(filepath.Join(repo, ".ccnavi", "messages")); err != nil; _, err = os.Stat(filepath.Join(repo, ".ccnavi", "messages")) {
+		if parent := filepath.Dir(repo); parent != repo {
+			repo = parent
+			continue
+		}
+		t.Fatal("文面ファイルの置き場（.ccnavi/messages）が上に無い")
+	}
+	for _, c := range []struct {
+		name string
+		sub  string
+		args []string
+		body string
+		hint bool
+	}{
+		{"permission denied", "worktree", []string{"remove", "/ws/.claude/worktrees/held"}, "error: failed to delete '/ws/.claude/worktrees/held': Permission denied\n", true},
+		{"missing path", "worktree", []string{"remove", "/ws/no-such"}, "fatal: '/ws/no-such' is not a working tree\n", false},
+		{"untracked files", "worktree", []string{"remove", "/ws/dirty"}, "fatal: '/ws/dirty' contains modified or untracked files, use --force to delete it\n", false},
+		{"other subcommand", "show", []string{"no-such-ref"}, "fatal: Permission denied\n", false},
+	} {
+		in := Input{Root: repo, Cwd: root, LogDir: filepath.Join(root, "logs"), Sub: c.sub, Args: c.args, Output: []byte(c.body),
+			Status: 1, MaxLines: 10, FailLines: 10, Keep: 5, SelfQ: "sh .ccnavi/scripts/ccnavi-git.sh"}
+		var out strings.Builder
+		if _, _, err := Report(&out, in); err != nil {
+			t.Fatal(err)
+		}
+		var hints []string
+		for _, line := range strings.Split(out.String(), "\n") {
+			if strings.HasPrefix(line, "案内:") {
+				hints = append(hints, line)
+			}
+		}
+		if (len(hints) == 1) != c.hint || len(hints) > 1 {
+			t.Errorf("%s: 案内 %d 行\n%s", c.name, len(hints), out.String())
+			continue
+		}
+		if !c.hint {
+			continue
+		}
+		for _, word := range []string{"cwd", "サブシェル", "ccnavi-git.sh worktree list", "rmdir '/ws/.claude/worktrees/held'", "ユーザ"} {
+			if !strings.Contains(hints[0], word) {
+				t.Errorf("%s: 案内に %q が無い: %s", c.name, word, hints[0])
+			}
+		}
+	}
+}

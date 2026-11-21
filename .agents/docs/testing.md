@@ -41,7 +41,6 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 | 回したもの | 本数 | 時間 |
 |---|---|---|
-| `tests.sh.test_stage_sh` | 23 | 約 2 秒 |
 | `tests.guard`の関連 3 モジュール（`test_handoff_copy`・`test_wrapguard`・`test_selfguard`） | 159 | 約 23 秒 |
 | `tests/core`・`ticket`・`guard`を同時に | — | 30 分たっても出力が出ず、打ち切った（遅いのか止まったのかは未確認） |
 | `tests.sh.test_write_and_push_merge` | 6 | 約 28 秒 |

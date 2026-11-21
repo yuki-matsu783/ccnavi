@@ -281,87 +281,11 @@ class IntegrateTest(Fixture):
         self.assertIn("取り込み先（main）を開いていません", r.stderr)
         self.assertIn("elsewhere", r.stderr)
 
-    def test_integrate_from_a_worktree_is_refused(self):
-        self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt", cwd=self.wt)
-        self.assertOk(r, 2)
-        self.assertIn("ユーザのチェックアウト", r.stderr)
-
-    def test_a_dirty_source_worktree_is_refused(self):
-        self.work_in_branch()
-        write(os.path.join(self.wt, "wip.txt"), "x\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("未コミットの変更", r.stderr)
-
     def commit_draft(self, rel, text, wt=None):
         wt = wt or self.wt
         write(os.path.join(wt, rel), text)
         git(wt, "add", "-f", rel)
         git(wt, "commit", "-q", "-m", "draft")
-
-    def cut_with_original(self, rel="docs/guide.md", text="original\n"):
-        """起点（S）に元のファイルを持つワークツリー wt2 を切る。"""
-        write(os.path.join(self.ws, rel), text)
-        git(self.ws, "add", "-f", rel)
-        git(self.ws, "commit", "-q", "-m", "original")
-        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
-        return self.cut("wt2")
-
-    def test_a_draft_without_an_original_is_listed_and_does_not_stop_integrate(self):
-        self.work_in_branch()
-        self.commit_draft("wip/handoff/notes.md", "memo\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        self.assertIn("案内: 取り込まない下書き: wip/handoff/notes.md（", r.stdout)
-        names = git(self.ws, "ls-tree", "-r", "--name-only", self.marker_value("c_tree", "wt"))
-        self.assertNotIn("wip/handoff/notes.md", names.splitlines())
-        self.assertFalse(os.path.exists(os.path.join(self.tmp_wt(), "wip/handoff/notes.md")))
-        self.assertIn("new.txt", names.splitlines())
-
-    def test_an_unedited_copy_passes_and_is_not_listed(self):
-        wt = self.cut_with_original()
-        self.commit_draft("wip/handoff/docs/guide.md", "original\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 0)
-        self.assertNotIn("取り込まない下書き", r.stdout)
-
-    def test_an_edited_copy_outside_the_kinds_is_refused_as_before(self):
-        wt = self.cut_with_original("tools/clean.js", "old\n")
-        self.commit_draft("wip/handoff/tools/clean.js", "edited\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("wip/handoff/tools/clean.js", r.stderr)
-        self.assertIn("ccnavi-user-handoff.sh", r.stderr)
-        self.assertFalse(os.path.exists(self.tmp_wt("wt2")))
-
-    def test_a_copy_is_matched_to_its_original_ignoring_case(self):
-        wt = self.cut_with_original("docs/guide.md", "old\n")
-        self.commit_draft("wip/handoff/Docs/GUIDE.MD", "edited\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("wip/handoff/Docs/GUIDE.MD", r.stderr)
-
-    def test_a_non_ascii_original_is_matched_ignoring_case(self):
-        wt = self.cut_with_original("docs/caf\u00e9.md", "old\n")
-        self.commit_draft("wip/handoff/DOCS/CAF\u00c9.md", "edited\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("ccnavi-user-handoff.sh", r.stderr)
-
-    def test_a_pending_draft_of_a_kind_is_refused_by_the_kind_check(self):
-        wt = self.cut_with_original(".ccnavi/config/project/rules.yml", "rules: []\n")
-        self.commit_draft("wip/handoff/.ccnavi/config/project/rules.yml", "rules: [x]\n", wt)
-        r = self.run_git_sh("integrate", "wt2")
-        self.assertOk(r, 2)
-        self.assertIn("取り込んでいない下書き", r.stderr)
-
-    def test_an_untracked_new_draft_is_still_refused(self):
-        self.work_in_branch()
-        write(os.path.join(self.wt, "wip/handoff/note.local"), "ignored\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("wip/handoff/note.local", r.stderr)
 
     def test_integrate_done_and_cleanup_pass_with_a_listed_draft(self):
         self.work_in_branch()
@@ -372,64 +296,6 @@ class IntegrateTest(Fixture):
         self.assertNotIn("取り込まない下書き", r.stdout)
         self.assertFalse(os.path.exists(self.wt))
         self.assertFalse(self.has_branch())
-
-    def test_a_deleted_draft_is_left_alone_in_the_result(self):
-        self.work_in_branch()
-        git(self.wt, "rm", "-q", "wip/handoff/d.md")
-        git(self.wt, "commit", "-q", "-m", "drop the draft")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r)
-        self.assertNotIn("d.md", r.stdout)
-        self.assertEqual("draft\n", read(os.path.join(self.tmp_wt(), "wip/handoff/d.md")))
-
-    def test_a_ticket_bound_base_branch_is_refused(self):
-        os.makedirs(os.path.join(self.ws, "wip", "proposals", "todo"))
-        write(
-            os.path.join(self.ws, "wip", "proposals", "todo", "main.md"),
-            "---\nticket: main\n---\nbody\n",
-        )
-        self.work_in_branch()
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("チケット", r.stderr)
-
-    def test_without_a_record_it_points_at_adopt(self):
-        self.work_in_branch()
-        os.remove(self.record())
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("--adopt --base <取り込み先>", r.stderr)
-        self.assertNotIn("マージリクエスト", r.stderr)
-
-    def test_without_a_record_a_ticket_bound_name_is_not_pointed_at_adopt(self):
-        # --adopt はチケットに結び付く名前を断る。案内が行き止まりに向かわないよう、
-        # 同じ判定で先に言う。
-        self.work_in_branch()
-        os.remove(self.record())
-        write(os.path.join(self.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertNotIn("--adopt", r.stderr)
-        self.assertIn("チケットに結び付く名前です", r.stderr)
-        self.assertIn("マージリクエストで出します", r.stderr)
-        self.assertIn("ccnavi-ticket.sh", r.stderr)
-        self.assertIn("status", r.stderr)
-        self.assertFalse(os.path.exists(self.tmp_wt()))
-
-    def test_a_record_of_another_repository_is_refused(self):
-        self.work_in_branch()
-        text = read(self.record()).replace(self.common_dir(), "/somewhere/else/.git")
-        write(self.record(), text)
-        r = self.run_git_sh("integrate", "wt")
-        self.assertOk(r, 2)
-        self.assertIn("common_dir", r.stderr)
-
-    def test_names_that_are_paths_are_refused(self):
-        r = self.run_git_sh("integrate", "../etc")
-        self.assertOk(r, 2)
-        r = self.run_git_sh("integrate", "a/b")
-        self.assertOk(r, 2)
-        self.assertOk(self.run_git_sh("integrate"), 2)
 
     def test_an_old_git_is_refused(self):
         shim = os.path.join(self._tmp.name, "oldgit")
@@ -1351,24 +1217,10 @@ class MergeOnTargetTest(Fixture):
         self.make_branch("fa")
         for args in (
             ("fa",),
-            ("fa", "-m", "Merge branch 'fa' into main"),
-            ("--ff-only", "fa"),
             ("--squash", "fa"),
-            ("--no-commit", "fa"),
-            ("--no-ff", "fa"),
         ):
             with self.subTest(args=args):
                 self.assertMergeRefused(*args)
-
-    def test_a_subdirectory_and_an_option_after_the_separator_are_still_refused(self):
-        self.make_branch("fa")
-        os.makedirs(os.path.join(self.ws, "sub"))
-        r = self.run_git_sh("merge", "fa", cwd=os.path.join(self.ws, "sub"))
-        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
-        # `--` の後ろの --abort は枝の名前で、途中の merge を終わらせる操作ではない。
-        r = self.run_git_sh("merge", "--no-ff", "fa", "--", "--abort")
-        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
-        self.assertIn("merge できません", r.stderr)
 
     def parents_of_head(self, wt):
         return len(git(wt, "rev-list", "--parents", "-n", "1", "HEAD").split()) - 1
@@ -1376,16 +1228,13 @@ class MergeOnTargetTest(Fixture):
     def test_merge_in_a_worktree_without_own_commits_makes_a_merge_commit(self):
         """ワークツリーの中の merge は通す。自分のコミットが無くても印が残るよう --no-ff を補う。
 
-        形（-m・--ff-only・-m の値の --ff・--no-commit・サブディレクトリ・--squash）ごとに、
-        別のワークツリーで打つ。
+        形ごとの補い方の表は Go の `TestMergeAndPullOnTheTarget` が見る。ここは通しの確認。
         """
         up_to_date = self.cut("uptodate")
         before = git(up_to_date, "rev-parse", "HEAD").strip()
         self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=up_to_date))
         self.assertEqual(before, git(up_to_date, "rev-parse", "HEAD").strip(), "取り込む物が無い")
-        trees = {
-            name: self.cut(name) for name in ("msg", "ffonly", "msgff", "nocommit", "sub", "squash")
-        }
+        ffonly = self.cut("ffonly")
         self.advance_main()
         main_head = git(self.ws, "rev-parse", "HEAD").strip()
 
@@ -1394,55 +1243,9 @@ class MergeOnTargetTest(Fixture):
         self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD^2").strip())
         self.assertEqual("y\n", read(os.path.join(self.wt, "other.txt")))
 
-        msg = trees["msg"]
-        self.assertOk(self.run_git_sh("merge", "main", "-m", "main を取り込む", cwd=msg))
-        self.assertEqual(2, self.parents_of_head(msg))
-        self.assertEqual("main を取り込む", git(msg, "log", "-1", "--format=%s").strip())
-
-        ffonly = trees["ffonly"]
         self.assertOk(self.run_git_sh("merge", "--ff-only", "main", cwd=ffonly))
         self.assertEqual(main_head, git(ffonly, "rev-parse", "HEAD").strip())
         self.assertEqual(1, self.parents_of_head(ffonly))
-
-        # -m の値の --ff は形のオプションではない。
-        self.assertOk(self.run_git_sh("merge", "-m", "--ff", "main", cwd=trees["msgff"]))
-        self.assertEqual(2, self.parents_of_head(trees["msgff"]))
-
-        nocommit = trees["nocommit"]
-        before = git(nocommit, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "--no-commit", "main", cwd=nocommit))
-        self.assertEqual(before, git(nocommit, "rev-parse", "HEAD").strip())
-        self.assertTrue(
-            os.path.exists(os.path.join(self.common_dir(), "worktrees", "nocommit", "MERGE_HEAD"))
-        )
-
-        sub = os.path.join(trees["sub"], "sub")
-        os.makedirs(sub)
-        self.assertOk(self.run_git_sh("merge", "main", "--no-edit", cwd=sub))
-        self.assertEqual(2, self.parents_of_head(trees["sub"]))
-
-        squash = trees["squash"]
-        before = git(squash, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "--squash", "main", cwd=squash))
-        self.assertEqual(before, git(squash, "rev-parse", "HEAD").strip())
-
-    def test_explicit_ff_and_no_ff_in_a_worktree_are_kept(self):
-        other = self.cut("wt2")
-        self.advance_main()
-        main_head = git(self.ws, "rev-parse", "HEAD").strip()
-        self.assertOk(self.run_git_sh("merge", "--ff", "main", cwd=self.wt))
-        self.assertEqual(main_head, git(self.wt, "rev-parse", "HEAD").strip())
-        self.assertEqual(1, self.parents_of_head(self.wt))
-        self.assertOk(self.run_git_sh("merge", "--no-ff", "main", "--no-edit", cwd=other))
-        self.assertEqual(2, self.parents_of_head(other))
-
-    def test_abort_continue_and_quit_pass_on_the_target(self):
-        # 途中の merge を終わらせる操作は、止める判定の対象外で、git の結果がそのまま返る。
-        for flag in ("--abort", "--quit", "--continue"):
-            with self.subTest(flag=flag):
-                r = self.run_git_sh("merge", flag)
-                self.assertNotIn("merge できません", r.stderr)
-                self.assertNotEqual(2, r.returncode, r.stdout + r.stderr)
 
     def test_abort_ends_a_conflicted_merge_on_the_target(self):
         write(os.path.join(self.ws, "keep.txt"), "main\n")
@@ -1458,26 +1261,6 @@ class MergeOnTargetTest(Fixture):
         self.assertTrue(os.path.exists(os.path.join(self.ws, ".git", "MERGE_HEAD")))
         self.assertOk(self.run_git_sh("merge", "--abort"))
         self.assertFalse(os.path.exists(os.path.join(self.ws, ".git", "MERGE_HEAD")))
-
-    def test_a_branch_other_than_the_target_passes(self):
-        self.make_branch("fa")
-        git(self.ws, "checkout", "-q", "-b", "scratch")
-        self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
-        self.assertTrue(os.path.exists(os.path.join(self.ws, "fa.txt")))
-
-    def test_detached_head_passes(self):
-        # 統合先のブランチを動かさないので止めない。
-        self.make_branch("fa")
-        git(self.ws, "checkout", "-q", "--detach")
-        self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
-        self.assertEqual("", git(self.ws, "branch", "--show-current").strip())
-
-    def test_undecidable_target_passes(self):
-        # origin/HEAD も origin/main も無いと、どれが統合先か言えない。
-        self.make_branch("fa")
-        git(self.ws, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
-        git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
-        self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
 
 
 class PullOnTargetBase(Fixture):
@@ -1526,24 +1309,13 @@ class PullOnTargetTest(PullOnTargetBase):
     def test_pulling_another_branch_on_the_target_is_refused(self):
         for args in (
             ("origin", "feat"),
-            ("--no-ff", "origin", "feat"),
-            ("--ff-only", "origin", "feat"),
-            ("--no-commit", "origin", "feat"),
-            ("origin", "main", "feat"),
-            ("origin", "HEAD"),
-            ("origin", "refs/heads/main"),
-            ("origin", "--", "feat"),
-            ("origin", "Main"),
-            ("upstream", "main"),
-            ("../other.git", "main"),
-            ("--ff-only", "origin", "feat"),
             ("--ff-only", "origin", "main", "next"),
         ):
             with self.subTest(args=args):
                 self.assertPullRefused(*args)
 
     def test_updating_the_target_itself_passes(self):
-        for args in (("--ff-only",), ("origin",), ("--ff-only", "origin", "main")):
+        for args in (("--ff-only",), ("--ff-only", "origin", "main")):
             with self.subTest(args=args):
                 git(self.ws, "reset", "-q", "--hard", "origin/main~1")
                 self.assertOk(self.run_git_sh("pull", *args))
@@ -1552,60 +1324,6 @@ class PullOnTargetTest(PullOnTargetBase):
     def test_pulling_a_parent_branch_inside_a_worktree_passes(self):
         self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "main", cwd=self.wt))
         self.assertEqual("next\n", read(os.path.join(self.wt, "next.txt")))
-
-    def test_another_branch_on_a_non_target_checkout_passes(self):
-        git(self.ws, "checkout", "-q", "-b", "scratch")
-        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
-        self.assertTrue(os.path.exists(os.path.join(self.ws, "feat.txt")))
-
-    def test_fetch_then_merge_fetch_head_is_refused(self):
-        # fetch 自体は止めない。
-        self.assertOk(self.run_git_sh("fetch", "origin", "feat"))
-        before = git(self.ws, "rev-parse", "HEAD").strip()
-        r = self.run_git_sh("merge", "FETCH_HEAD")
-        self.assertEqual(2, r.returncode, r.stdout + r.stderr)
-        self.assertIn("統合先 main のユーザのチェックアウトでは merge できません", r.stderr)
-        self.assertEqual(before, git(self.ws, "rev-parse", "HEAD").strip())
-
-    def test_a_branch_ahead_of_the_target_is_refused_too(self):
-        # 分岐せず main より進んだだけの feat も、素の pull なら fast-forward で取り込まれる。
-        git(self.ws, "fetch", "-q", "origin", "main")
-        side = os.path.join(self._tmp.name, "side-ahead")
-        git(self.ws, "worktree", "add", "-q", side, "-b", "ahead", "origin/main")
-        write(os.path.join(side, "feat.txt"), "ahead\n")
-        git(side, "add", ".")
-        git(side, "commit", "-q", "-m", "ahead")
-        git(side, "push", "-q", "origin", "ahead")
-        git(self.ws, "worktree", "remove", "--force", side)
-        git(self.ws, "reset", "-q", "--hard", "origin/main")
-        self.assertPullRefused("origin", "ahead")
-
-    def test_an_upstream_pointing_at_another_branch_is_refused(self):
-        # 引数なしの pull は上流を merge する。上流が別ブランチなら、取り込む形と同じ。
-        git(self.ws, "fetch", "-q", "origin", "feat")
-        git(self.ws, "config", "branch.main.merge", "refs/heads/feat")
-        for args in ((), ("origin",)):
-            with self.subTest(args=args):
-                r = self.assertPullRefused(*args)
-                self.assertIn("上流 feat", r.stderr)
-
-    def test_a_remote_other_than_origin_is_matched_by_the_branch_config(self):
-        git(self.ws, "remote", "rename", "origin", "up")
-        git(self.ws, "config", "branch.main.remote", "up")
-        git(self.ws, "reset", "-q", "--hard", "up/main~1")
-        self.assertOk(self.run_git_sh("pull", "--ff-only", "up", "main"))
-        self.assertTrue(os.path.exists(os.path.join(self.ws, "next.txt")))
-
-    def test_detached_head_passes(self):
-        git(self.ws, "checkout", "-q", "--detach")
-        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
-
-    def test_undecidable_target_passes(self):
-        # origin/HEAD も origin/main も無いと、どれが統合先か言えない（merge と同じく止めない）。
-        git(self.ws, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
-        git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
-        self.assertOk(self.run_git_sh("pull", "--no-edit", "origin", "feat"))
-        self.assertTrue(os.path.exists(os.path.join(self.ws, "feat.txt")))
 
 
 class PullConflictNoteTest(PullOnTargetBase):

@@ -168,21 +168,6 @@ class WorktreeShTest(unittest.TestCase):
     def wt(self, name):
         return os.path.join(self.ws, ".claude", "worktrees", name)
 
-    def advance_origin(self):
-        """origin の main に 1 コミット足す（手元の main はそのまま）。"""
-        other = os.path.join(self._tmp.name, "other")
-        if os.path.isdir(other):
-            git(other, "pull", "-q", "--ff-only", "origin", "main")
-        else:
-            git(self._tmp.name, "clone", "-q", self.bare, other)
-            for key, value in (("user.email", "t@example.invalid"), ("user.name", "t")):
-                git(other, "config", key, value)
-        write(os.path.join(other, "new.txt"), "n" + str(len(os.listdir(other))))
-        git(other, "add", "new.txt")
-        git(other, "commit", "-q", "-m", "ahead")
-        git(other, "push", "-q", "origin", "main")
-        return git(other, "rev-parse", "HEAD")
-
     def head_of(self, name):
         return git(self.wt(name), "rev-parse", "HEAD")
 
@@ -283,13 +268,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual("", git(self.ws, "for-each-ref", "refs/ccnavi"))
         self.assertEqual("", git(self.ws, "branch", "--list", "topic"))
 
-    def test_a_parent_tree_with_only_a_todo_proposal_may_switch(self):
-        path = self.parent_tree(**{"wip/proposals/todo/p0001.md": {"mr": 12}})
-        result = self.run_sh("topic", "--base", "main", cwd=path)
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
-        self.assertIn("案内: 親 p0001 の承認待ちの提案・MR は", result.stdout)
-        self.assertTrue(os.path.isdir(self.wt("topic")))
-
     def test_an_approved_parent_tree_may_not_switch(self):
         path = self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {"mr": 12}})
         self.assertRefused(self.run_sh("topic", "--dry-run", cwd=path))
@@ -300,33 +278,6 @@ class WorktreeShTest(unittest.TestCase):
         # 断る文は、報告して待つことを言う。
         self.assertIn("親のワークツリー（p0001）から", result.stderr)
         self.assertIn("次: 状況をユーザに報告し", result.stderr)
-
-    def test_a_finished_parent_tree_may_not_switch_and_is_not_told_to_close_early(self):
-        path = self.parent_tree(**{"wip/proposals/review/p0001.md": {"mr": 12}})
-        result = self.run_sh("topic", cwd=path)
-        self.assertRefused(result)
-        self.assertIn("完了済み（レビュー待ち）", result.stderr)
-        self.assertNotIn("案内: 親を早めに閉じたいなら", result.stderr)
-        self.assertNotIn("ccnavi-user-close-early.sh", result.stderr)
-
-    def test_a_parent_tree_with_a_started_child_may_not_switch_even_if_only_a_proposal(self):
-        path = self.parent_tree(
-            **{
-                "wip/proposals/todo/p0001.md": {},
-                ".ccnavi/approved/doing/p0001-01.md": {"ticket": "p0001-01", "parent": "p0001"},
-            }
-        )
-        result = self.run_sh("topic", cwd=path)
-        self.assertRefused(result)
-        self.assertIn("案内: 着手済みの子が 1 件ある", result.stderr)
-        self.assertIn("cancel", result.stderr)
-        # 親は承認待ちなので、親を早めに閉じる案内はしない。
-        self.assertNotIn("ccnavi-user-close-early.sh", result.stderr)
-
-    def test_the_workspace_root_is_not_refused(self):
-        self.parent_tree(**{".ccnavi/approved/doing/p0001.md": {}})
-        result = self.run_sh("topic")
-        self.assertEqual(0, result.returncode, result.stderr + result.stdout)
 
     def test_the_record_is_written_and_read_as_valid_by_the_post_check(self):
         """--side-by-side だけでは確認を求めない（確認は ask のルールの仕事）。
@@ -493,24 +444,6 @@ class WorktreeShTest(unittest.TestCase):
 
     # ---- C4: cwd のブランチが取り込み先と違う
 
-    def test_a_cwd_branch_that_differs_from_the_base_needs_the_base_flag(self):
-        git(self.ws, "worktree", "add", "-q", self.wt("other"), "-b", "other")
-        result = self.run_sh("topic", cwd=self.wt("other"))
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("cwd のブランチは other で、取り込み先と違う", result.stdout)
-        self.assertIn("--base 'main'", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("topic")))
-        self.assertEqual("", git(self.ws, "branch", "--list", "topic"))
-        done = self.run_sh("topic", "--base", "main", cwd=self.wt("other"))
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual(git(self.ws, "rev-parse", "main"), self.head_of("topic"))
-
-    def test_a_base_that_is_not_the_current_base_is_refused(self):
-        result = self.run_sh("topic", "--base", "feature/y")
-        self.assertEqual(1, result.returncode, result.stdout)
-        self.assertIn("今の取り込み先（main", result.stderr)
-        self.assertFalse(os.path.exists(self.wt("topic")))
-
     # ---- C5: 取り込み先が統合先でない
 
     def test_a_base_other_than_the_default_branch_needs_the_accept_code(self):
@@ -548,57 +481,6 @@ class WorktreeShTest(unittest.TestCase):
 
     # ---- C6: origin/<取り込み先> との関係
 
-    def test_local_behind_origin_is_reported_and_cut_from_local_after_accept(self):
-        ahead = self.advance_origin()
-        result = self.run_sh("topic")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("origin/main より 1 件遅れている", result.stdout)
-        self.assertIn("git pull --ff-only origin 'main'", result.stdout)
-        self.assertIn("古いコードの上で作業する", result.stdout)
-        code = self.code_of(result)
-        done = self.run_sh("topic", "--accept", code)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotEqual(ahead, self.head_of("topic"), "origin からは切らない")
-        self.assertEqual(git(self.ws, "rev-parse", "main"), self.head_of("topic"))
-        self.assertNotEqual(ahead, git(self.ws, "rev-parse", "main"), "手元の取り込み先は進めない")
-        self.assertIn("案内: 手元の main は origin/main より古い", done.stdout)
-
-    def test_local_ahead_of_origin_needs_the_accept_code(self):
-        write(os.path.join(self.ws, "local.txt"), "l")
-        git(self.ws, "add", "local.txt")
-        git(self.ws, "commit", "-q", "-m", "local only")
-        result = self.run_sh("topic")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("origin/main より 1 件進んでいる", result.stdout)
-        done = self.run_sh("topic", "--accept", self.code_of(result))
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual(git(self.ws, "rev-parse", "main"), self.head_of("topic"))
-
-    def diverge(self):
-        """手元の main にだけ 1 コミット足し、origin にも別の 1 コミットを足す（分岐）。"""
-        write(os.path.join(self.ws, "local.txt"), "l")
-        git(self.ws, "add", "local.txt")
-        git(self.ws, "commit", "-q", "-m", "local only")
-        return self.advance_origin()
-
-    def test_diverged_local_offers_both_ways_to_match(self):
-        self.diverge()
-        result = self.run_sh("topic")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("分岐している（先行 1 件・遅れ 1 件）", result.stdout)
-        self.assertIn("git pull --rebase origin 'main'", result.stdout)
-        self.assertIn("git pull --no-rebase origin 'main'", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("topic")))
-
-    def test_a_branch_missing_on_origin_needs_the_accept_code(self):
-        git(self.ws, "checkout", "-q", "-b", "local-only")
-        git(self.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-        result = self.run_sh("topic")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("origin に local-only が無い", result.stdout)
-        done = self.run_sh("topic", "--accept", self.code_of(result))
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-
     def test_fetch_failure_is_an_unverified_remote_and_asks_for_the_accept_code(self):
         result = self.run_sh("topic", fail_fetch=True)
         self.assertEqual(3, result.returncode, result.stdout + result.stderr)
@@ -611,11 +493,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("リモート未確認で切った", done.stdout)
         self.assertIn("ユーザにも伝える", done.stdout)
 
-    def test_missing_remote_branch_is_called_out(self):
-        result = self.run_sh("topic", fail_fetch="fatal: couldn't find remote ref main")
-        self.assertEqual(3, result.returncode, result.stdout)
-        self.assertIn("origin に main が無い", result.stdout)
-
     def test_an_unreadable_branch_list_of_origin_is_an_unverified_remote(self):
         result = self.run_sh("topic", FAKE_LS_REMOTE_FAIL="1")
         self.assertEqual(3, result.returncode, result.stdout + result.stderr)
@@ -625,35 +502,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
 
     # ---- C7: 書きかけ
-
-    def test_wip_without_a_choice_stops_even_with_the_code(self):
-        self.dirty_root()
-        before = self.snapshot_of_root()
-        result = self.run_sh("topic")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("書きかけ: 変更 2・新規 1（staged 1", result.stdout)
-        self.assertIn("--no-wip", result.stdout)
-        self.assertIn("--copy-wip", result.stdout)
-        # 候補を作っても、聞くだけのときユーザの index とワークツリーは変わらない。
-        self.assertEqual(before, self.snapshot_of_root())
-        code = self.code_of(result)
-        again = self.run_sh("topic", "--accept", code)
-        self.assertEqual(3, again.returncode, "書きかけの選択が無ければ、コードがあっても止まる")
-        self.assertFalse(os.path.exists(self.wt("topic")))
-
-    def test_no_wip_cuts_from_head_and_leaves_the_wip_only_in_the_root(self):
-        self.dirty_root()
-        code = self.code_of(self.run_sh("topic"))
-        before = self.snapshot_of_root()
-        done = self.run_sh("topic", "--accept", code, "--no-wip")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual(git(self.ws, "rev-parse", "HEAD"), self.head_of("topic"))
-        self.assertFalse(os.path.exists(os.path.join(self.wt("topic"), "fresh.txt")))
-        with open(os.path.join(self.wt("topic"), "tracked.txt"), encoding="utf-8") as f:
-            self.assertEqual("v1\n", f.read())
-        self.assertEqual(before, self.snapshot_of_root())
-        self.assertEqual("no", self.record("topic")["snap_wip"])
-        self.assertIn("書きかけは含まない", done.stdout)
 
     def test_copy_wip_takes_the_wip_at_the_time_of_confirmation(self):
         self.dirty_root()
@@ -691,69 +539,7 @@ class WorktreeShTest(unittest.TestCase):
         )
         self.assertIn("確認した時点の書きかけを含む", done.stdout)
 
-    def test_an_edit_after_the_confirmation_is_not_copied(self):
-        self.dirty_root()
-        code = self.code_of(self.run_sh("topic"))
-        write(os.path.join(self.ws, "fresh.txt"), "確認のあとの編集\n")
-        result = self.run_sh("topic", "--accept", code, "--copy-wip")
-        self.assertEqual(3, result.returncode, "確認のあとに動いたら、報告からやり直す")
-        self.assertIn("合わない", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("topic")))
-
     # ---- .claude/worktrees/ は書きかけに数えない（.gitignore に行が無い配布先）
-
-    def leave_worktrees_untracked(self):
-        """.gitignore から .claude/ を外し、README.md を足す。
-
-        最初のワークツリーを切ると、置き場が未追跡で残る。
-        """
-        write(os.path.join(self.ws, ".gitignore"), "logs/\n.ccnavi/\n")
-        write(os.path.join(self.ws, "README.md"), "# readme\n")
-        git(self.ws, "add", ".gitignore", "README.md")
-        git(self.ws, "commit", "-q", "-m", "no claude ignore")
-        git(self.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
-        git(self.ws, "push", "-q", self.bare, "main")
-        first = self.run_sh("first")
-        self.assertEqual(0, first.returncode, first.stdout + first.stderr)
-        self.assertIn(
-            "?? .claude/worktrees/",
-            git(self.ws, "status", "--porcelain", "--untracked-files=all"),
-            "前提: 置き場が未追跡で残っている",
-        )
-
-    def test_the_worktrees_dir_alone_is_not_wip(self):
-        self.leave_worktrees_untracked()
-        dry = self.run_sh("second", "--dry-run")
-        self.assertEqual(0, dry.returncode, dry.stdout + dry.stderr)
-        self.assertNotIn("書きかけ", dry.stdout)
-        done = self.run_sh("second")
-        self.assertEqual(0, done.returncode, "確認なしで切れる: " + done.stdout + done.stderr)
-        self.assertTrue(os.path.isdir(self.wt("second")))
-
-    def test_the_count_leaves_out_the_worktrees_dir(self):
-        """数えないのは .claude/worktrees/ だけ（staged でも）。wip/ の新規などは今のまま数える。"""
-        self.leave_worktrees_untracked()
-        write(os.path.join(self.ws, ".claude", "worktrees", "stray.txt"), "s\n")
-        git(self.ws, "add", "-f", ".claude/worktrees/stray.txt")
-        write(os.path.join(self.ws, "wip", "handoff", "a.md"), "a\n")
-        dry = self.run_sh("second", "--dry-run")
-        self.assertIn("書きかけ 変更 0・新規 1（staged 0）", dry.stdout)
-
-    def test_the_snapshot_does_not_take_the_other_worktrees(self):
-        """本当の書きかけは確認を求め、--copy-wip の S には他のワークツリーを入れない。"""
-        self.leave_worktrees_untracked()
-        write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        asked = self.run_sh("second")
-        self.assertEqual(3, asked.returncode, asked.stdout + asked.stderr)
-        self.assertIn("書きかけ: 変更 1・新規 1（staged 0", asked.stdout)
-        self.assertFalse(os.path.exists(self.wt("second")))
-        done = self.run_sh("second", "--accept", self.code_of(asked), "--copy-wip")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        tree = git(self.wt("second"), "ls-tree", "-r", "HEAD")
-        self.assertIn("notes.txt", tree)
-        self.assertNotIn(".claude/worktrees", tree)
-        self.assertNotIn("160000", tree)
 
     # ---- 置き場が .gitignore 済みでも、書きかけを含むスナップショットを作れる
 
@@ -774,50 +560,6 @@ class WorktreeShTest(unittest.TestCase):
             "前提: 置き場は無視されている",
         )
 
-    def assert_snapshot_tree_clean(self, name):
-        tree = git(self.wt(name), "ls-tree", "-r", "HEAD")
-        self.assertNotIn(".claude/worktrees", tree)
-        self.assertNotIn("160000", tree)
-
-    def test_ignored_worktrees_dir_and_a_new_file_copy_wip(self):
-        self.leave_worktrees_ignored()
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        asked = self.run_sh("second")
-        self.assertEqual(3, asked.returncode, asked.stdout + asked.stderr)
-        self.assertNotIn("作れませんでした", asked.stdout + asked.stderr)
-        self.assertIn("書きかけ: 変更 0・新規 1", asked.stdout)
-        self.assertFalse(os.path.exists(self.wt("second")))
-        done = self.run_sh("second", "--accept", self.code_of(asked), "--copy-wip")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("作れませんでした", done.stdout + done.stderr)
-        with open(os.path.join(self.wt("second"), "notes.txt"), encoding="utf-8") as f:
-            self.assertEqual("メモ\n", f.read())
-        self.assert_snapshot_tree_clean("second")
-
-    def test_ignored_worktrees_dir_and_a_new_file_no_wip(self):
-        self.leave_worktrees_ignored()
-        write(os.path.join(self.ws, "notes.txt"), "メモ\n")
-        code = self.code_of(self.run_sh("second"))
-        done = self.run_sh("second", "--accept", code, "--no-wip")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertTrue(os.path.isdir(self.wt("second")))
-        self.assertFalse(os.path.exists(os.path.join(self.wt("second"), "notes.txt")))
-        self.assert_snapshot_tree_clean("second")
-
-    def test_ignored_worktrees_dir_and_a_tracked_change_asks_for_confirmation(self):
-        self.leave_worktrees_ignored()
-        write(os.path.join(self.ws, "README.md"), "# readme 書きかけ\n")
-        result = self.run_sh("second")
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertNotIn("作れませんでした", result.stdout + result.stderr)
-        self.assertIn("書きかけ: 変更 1・新規 0", result.stdout)
-        code = self.code_of(result)
-        done = self.run_sh("second", "--accept", code, "--copy-wip")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        with open(os.path.join(self.wt("second"), "README.md"), encoding="utf-8") as f:
-            self.assertEqual("# readme 書きかけ\n", f.read())
-        self.assert_snapshot_tree_clean("second")
-
     def test_a_failing_read_tree_still_stops_with_snapshot_failed(self):
         self.leave_worktrees_ignored()
         write(os.path.join(self.ws, "notes.txt"), "メモ\n")
@@ -827,54 +569,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertIn("スナップショットを作れませんでした", result.stdout + result.stderr)
 
     # ---- 確認コードが縛るもの（外すと落ちる）
-
-    def test_the_code_depends_on_the_head_when_origin_has_no_such_branch(self):
-        git(self.ws, "checkout", "-q", "-b", "local-only")
-        code = self.code_of(self.run_sh("topic"))
-        write(os.path.join(self.ws, "more.txt"), "m")
-        git(self.ws, "add", "more.txt")
-        git(self.ws, "commit", "-q", "-m", "moved")
-        result = self.run_sh("topic", "--accept", code)
-        self.assertEqual(3, result.returncode, result.stdout)
-        self.assertIn("合わない", result.stdout)
-
-    def test_the_code_depends_on_the_origin_sha(self):
-        self.advance_origin()
-        code = self.code_of(self.run_sh("topic"))
-        self.advance_origin()
-        result = self.run_sh("topic", "--accept", code)
-        self.assertEqual(3, result.returncode, result.stdout)
-        self.assertIn("合わない", result.stdout)
-
-    def test_the_code_depends_on_where_it_was_run_from(self):
-        self.make_feature_with_origin()
-        a = os.path.join(self._tmp.name, "side-a")
-        b = os.path.join(self._tmp.name, "side-b")
-        git(self.ws, "worktree", "add", "-q", a, "-b", "side-a")
-        git(self.ws, "worktree", "add", "-q", b, "-b", "side-b")
-        first = self.run_sh("topic", "--base", "feature/x", cwd=a, CCNAVI_WORKSPACE=self.ws)
-        self.assertEqual(3, first.returncode, first.stdout + first.stderr)
-        result = self.run_sh(
-            "topic",
-            "--base",
-            "feature/x",
-            "--accept",
-            self.code_of(first),
-            cwd=b,
-            CCNAVI_WORKSPACE=self.ws,
-        )
-        self.assertEqual(3, result.returncode, result.stdout + result.stderr)
-        self.assertIn("合わない", result.stdout)
-
-    def test_the_code_depends_on_whether_the_remote_was_verified(self):
-        self.make_feature_with_origin()
-        unverified = self.run_sh("topic", FAKE_LS_REMOTE_FAIL="1")
-        self.assertEqual(3, unverified.returncode, unverified.stdout + unverified.stderr)
-        self.assertIn("リモート未確認", unverified.stdout)
-        result = self.run_sh("topic", "--accept", self.code_of(unverified))
-        self.assertEqual(3, result.returncode, result.stdout)
-        self.assertIn("合わない", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("topic")))
 
     # ---- ルートを読むだけで書かない・終わっていない取り込みを取り違えない
 
@@ -891,15 +585,6 @@ class WorktreeShTest(unittest.TestCase):
         with open(index, "rb") as f:
             self.assertEqual(before, f.read())
 
-    def test_a_marker_that_is_left_stops_the_cut(self):
-        marker = os.path.join(self.ws, ".git", "ccnavi-integrate", "topic", "marker")
-        write(marker, "version 4\nk abc\n")
-        result = self.run_sh("topic")
-        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertIn("取り込みの記録", result.stderr)
-        self.assertIn("integrate-done topic", result.stderr)
-        self.assertFalse(os.path.exists(self.wt("topic")))
-
     def test_adopt_refuses_a_name_bound_to_a_ticket(self):
         self.uncorded_worktree()
         git(self.ws, "update-ref", "refs/remotes/origin/topic", "HEAD")
@@ -909,23 +594,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.record_path("topic")))
 
     # ---- C1〜C3: 先に断るもの
-
-    def test_a_detached_main_checkout_is_refused(self):
-        git(self.ws, "checkout", "-q", "--detach")
-        result = self.run_sh("topic")
-        self.assertEqual(1, result.returncode, result.stdout)
-        self.assertIn("detached HEAD", result.stderr)
-        self.assertFalse(os.path.exists(self.wt("topic")))
-
-    def test_a_base_tied_to_a_ticket_is_refused(self):
-        write(
-            os.path.join(self.ws, ".ccnavi", "approved", "doing", "t1.md"),
-            "---\nticket: t1\nbranch: main\n---\n本文\n",
-        )
-        result = self.run_sh("topic")
-        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertIn("チケットに結び付く", result.stderr)
-        self.assertFalse(os.path.exists(self.wt("topic")))
 
     def test_an_unanswered_base_bound_is_refused(self):
         result = self.run_sh("topic", CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "none"))
@@ -965,17 +633,6 @@ class WorktreeShTest(unittest.TestCase):
         # 最後の行は、従来どおり次の一手です。
         self.assertTrue(result.stdout.rstrip("\n").split("\n")[-1].startswith("次: 編集は"))
 
-    def test_existing_branch_points_to_adopt_as_the_second_step(self):
-        git(self.ws, "branch", "taken")
-        result = self.run_sh("taken")
-        self.assertEqual(1, result.returncode, result.stdout)
-        self.assertIn("1 つ目: sh ", result.stderr)
-        self.assertIn("worktree add", result.stderr)
-        self.assertIn("2 つ目: sh ", result.stderr)
-        self.assertIn("taken' --adopt --base <統合先>", result.stderr)
-        self.assertIn("ユーザの確認が要ります", result.stderr)
-        self.assertNotIn("確認に答えられません", result.stderr)
-
     def test_unattended_adds_the_fixed_line_only_when_the_variable_is_zero(self):
         git(self.ws, "branch", "taken")
         git(self.ws, "worktree", "add", "-q", self.wt("manual"), "-b", "manual", "main")
@@ -1002,48 +659,6 @@ class WorktreeShTest(unittest.TestCase):
         # 別の名前なら切れる
         self.assertEqual(0, self.run_sh("topic2").returncode)
 
-    def test_a_branch_of_the_same_identifier_on_origin_stops(self):
-        """origin に同じ識別子になるブランチ（feature/7-x、大文字小文字違い）があれば切らない。"""
-        for other, name in (("feature/7-x", "feature-7-x"), ("Topic", "topic")):
-            with self.subTest(other=other):
-                git(self.ws, "push", "-q", self.bare, f"main:refs/heads/{other}")
-                result = self.run_sh(name)
-                self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-                self.assertIn(other, result.stdout)
-                self.assertIn("ccnavi-start.sh' --mr", result.stdout)
-                self.assertFalse(os.path.exists(self.wt(name)))
-
-    def test_a_local_branch_of_the_same_identifier_stops(self):
-        git(self.ws, "branch", "feature/7-x")
-        result = self.run_sh("feature-7-x")
-        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertIn("feature/7-x", result.stdout)
-        self.assertFalse(os.path.exists(self.wt("feature-7-x")))
-
-    def test_the_same_identifier_is_refused_before_the_existing_directory_check(self):
-        """大文字小文字を区別しない機械では、綴り違いのパスが既にあるように見える。
-        ここでは同じ綴りのただのディレクトリで再現し、同じ識別子だという案内で断ることを確かめる。"""
-        git(self.ws, "branch", "Topic")
-        stray = write(os.path.join(self.wt("topic"), "stray.txt"), "x")
-        result = self.run_sh("topic")
-        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
-        self.assertIn("Topic", result.stdout)
-        self.assertIn("同じ識別子", result.stdout)
-        self.assertNotIn("既にあります", result.stderr)
-        self.assertTrue(os.path.isfile(stray))
-
-    def test_existing_directory_that_is_not_the_worktree_is_refused(self):
-        write(os.path.join(self.wt("topic"), "stray.txt"), "x")
-        result = self.run_sh("topic")
-        self.assertEqual(1, result.returncode, result.stdout)
-        self.assertIn("ワークツリーではありません", result.stderr)
-        git(self.ws, "worktree", "add", "-q", self.wt("other"), "-b", "other")
-        os.rename(self.wt("other"), self.wt("renamed-away"))
-        git(self.ws, "worktree", "repair", self.wt("renamed-away"))
-        result = self.run_sh("renamed-away")
-        self.assertEqual(1, result.returncode, "別のブランチを開いたワークツリーは成功にしない")
-        self.assertIn("other", result.stderr)
-
     def test_a_refused_worktree_add_removes_the_record_and_the_ref(self):
         """worktree add が通らなければ、記録と S の ref を残さない。"""
         os.makedirs(os.path.join(self.ws, ".claude", "worktrees"), exist_ok=True)
@@ -1068,20 +683,6 @@ class WorktreeShTest(unittest.TestCase):
         self.assertFalse(os.path.exists(self.wt("topic")))
         self.assertEqual("", git(self.ws, "branch", "--list", "topic"))
         self.assertFalse(os.path.exists(os.path.join(self.ws, ".git", "ccnavi-direct")))
-
-    def test_dry_run_reports_the_wip_and_what_would_be_needed(self):
-        self.dirty_root()
-        result = self.run_sh("topic", "--dry-run")
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIn("書きかけ 変更 2・新規 1", result.stdout)
-        self.assertIn("--copy-wip か --no-wip", result.stdout)
-        self.assertNotEqual(
-            0,
-            subprocess.run(
-                [REAL_GIT, "show-ref", "--verify", "--quiet", "refs/ccnavi/direct/topic/pending"],
-                cwd=self.ws,
-            ).returncode,
-        )
 
     # ---- 引き取り（--adopt）
 

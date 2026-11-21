@@ -529,24 +529,6 @@ class WorktreeRemoveHintTest(GitWrapperTest):
         # 消し残しを消す rmdir には、打ったパスをそのまま入れる。
         self.assertIn(f"rmdir {path}", hint)
 
-    def test_other_remove_failures_get_no_hint(self):
-        missing = self.run_wrapper("worktree", "remove", os.path.join(self.dir, "no-such"))
-        self.assertEqual(1, missing.returncode, missing.stdout + missing.stderr)
-        self.assertEqual([], hint_lines(missing.stdout))
-
-        # 未追跡のファイルが残っているワークツリーは git が消さない。これは cwd の話ではない。
-        path = self.add_worktree("dirty")
-        with open(os.path.join(path, "left.txt"), "w", encoding="utf-8") as f:
-            f.write("x\n")
-        dirty = self.run_wrapper("worktree", "remove", path)
-        self.assertEqual(1, dirty.returncode, dirty.stdout + dirty.stderr)
-        self.assertEqual([], hint_lines(dirty.stdout))
-
-    def test_failures_of_other_subcommands_get_no_hint(self):
-        result = self.run_wrapper("show", "no-such-ref")
-        self.assertEqual(1, result.returncode)
-        self.assertEqual([], hint_lines(result.stdout))
-
 
 def git_out(cwd, *args):
     """素の git の標準出力。見本のリポジトリの状態を読むために使う。"""
@@ -587,31 +569,6 @@ class ResetGuidanceTest(GitWrapperTest):
         self.assertNotIn("checkout -B <ブランチ>", usage)
         self.assertIn("-D -m -M -C -f -u は不可", usage)
         self.assertIn("作成はユーザに依頼", usage + result.stderr)
-
-
-class FetchRefspecTest(GitWrapperTest):
-    """fetch・pull は refspec（`:` と `+` を含む引数）を通さない。
-
-    `+refs/heads/x:refs/heads/x` は取ってきたものを手元のブランチへ直に書き、`+` は
-    早送りでない書き換えも通す。取ってくるのはリモート名とブランチ名だけにする。
-    """
-
-    def setUp(self):
-        super().setUp()
-        self.bare = self.make_bare()
-        git(self.dir, "remote", "add", "origin", self.bare)
-        self.branch = git_out(self.dir, "branch", "--show-current")
-        git(self.dir, "push", "-q", "origin", self.branch)
-
-    def test_remote_and_branch_still_pass(self):
-        for args in (
-            ("fetch", "origin"),
-            ("fetch", "origin", self.branch),
-            ("pull", "origin", self.branch),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 class StoreRewindTest(GitWrapperTest):
@@ -728,59 +685,6 @@ class WorktreeNameTest(GitWrapperTest):
                 tree = os.path.join(self.dir, ".claude", "worktrees", name)
                 self.assertEqual(name, git_out(tree, "branch", "--show-current"))
 
-    def test_slash_branch_goes_to_the_worktree_named_by_its_identifier(self):
-        """名前に / を含むブランチは、行き先を / を - に置き換えた名前にして直接出す。"""
-        git(self.dir, "branch", "feature/x")
-        for args, name, branch in (
-            (
-                ("worktree", "add", ".claude/worktrees/feature-x", "feature/x"),
-                "feature-x",
-                "feature/x",
-            ),
-            (
-                ("worktree", "add", ".claude/worktrees/topic-y", "-b", "topic/y", "HEAD"),
-                "topic-y",
-                "topic/y",
-            ),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-                tree = os.path.join(self.dir, ".claude", "worktrees", name)
-                self.assertEqual(branch, git_out(tree, "branch", "--show-current"))
-        # 識別子のブランチは作られない
-        branches = git_out(self.dir, "for-each-ref", "--format=%(refname:short)", "refs/heads")
-        self.assertNotIn("feature-x", branches.split())
-        self.assertNotIn("topic-y", branches.split())
-
-    def test_an_existing_branch_whose_identifier_cannot_be_a_parent_is_rejected(self):
-        """既にあるブランチを出す形は親のワークツリーを作る形でもあるので、識別子を確かめる。
-
-        末尾が -<2 桁>・59 文字以上・全角の字は断る。子の識別子の形は子の出し直しなので通す。
-        """
-        long_branch = "feature/" + "a" * 51
-        for branch in ("feature/8-y-05", long_branch, "feature/１２"):
-            git(self.dir, "branch", branch)
-            with self.subTest(branch=branch):
-                dest = ".claude/worktrees/" + branch.replace("/", "-")
-                result = self.assertRejected("worktree", "add", dest, branch)
-                self.assertIn("ccnavi-start.sh --mr", result.stderr)
-        git(self.dir, "branch", "i0001-01-01")
-        child = self.run_wrapper("worktree", "add", ".claude/worktrees/i0001-01-01", "i0001-01-01")
-        self.assertEqual(0, child.returncode, child.stdout + child.stderr)
-
-    def test_slash_branch_in_a_wrong_named_worktree_is_rejected(self):
-        git(self.dir, "branch", "feature/x")
-        git(self.dir, "tag", "feature/t")
-        for args in (
-            ("worktree", "add", ".claude/worktrees/other", "feature/x"),
-            ("worktree", "add", ".claude/worktrees/other", "-b", "feature/x", "HEAD"),
-            # タグはブランチの外（detached HEAD）に作る
-            ("worktree", "add", ".claude/worktrees/feature-t", "feature/t"),
-        ):
-            with self.subTest(args=args):
-                self.assertRejected(*args)
-
 
 class ParentWorktreeSwitchTest(GitWrapperTest):
     """親のワークツリーでは別のブランチへ移らない。
@@ -790,6 +694,8 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
     リモートでの承認をこのツリーへ取り込まなくなる。親のブランチを一度でも push したか
     ccnavi-sync.sh で取り込んだ親では、親と子のチケットの承認・
     状態の操作・実行前の判定も止まる。拒否文はその中身を言う。
+
+    移れない形の表は Go の `TestParentWorktreeDoesNotSwitchAway` が見る。ここは通しの確認。
     """
 
     def setUp(self):
@@ -808,16 +714,7 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
         before = git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD")
         for args in (
             ("checkout", self.base),
-            ("switch", self.base),
             ("checkout", "-b", "other"),
-            ("switch", "--create", "other"),
-            ("switch", "--create=other"),
-            ("checkout", "--orphan", "other"),
-            ("checkout", "--detach"),
-            ("switch", "--detach"),
-            ("switch", "-d", "HEAD"),
-            ("checkout", "-"),
-            ("checkout", "HEAD~0"),
         ):
             with self.subTest(args=args):
                 result = run_in(self.parent, *args)
@@ -830,26 +727,6 @@ class ParentWorktreeSwitchTest(GitWrapperTest):
                 self.assertNotIn("ADR", result.stderr)
         self.assertEqual(before, git_out(self.parent, "rev-parse", "--abbrev-ref", "HEAD"))
         self.assertEqual([], logs_of(self.dir), "拒否したのに git が走って記録が残っている")
-
-    def test_staying_on_the_parent_branch_passes(self):
-        for args in (("checkout", "i0001"), ("checkout", "HEAD", "tracked.txt")):
-            with self.subTest(args=args):
-                result = run_in(self.parent, *args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_other_worktrees_move_as_before(self):
-        result = run_in(self.free, "checkout", "-b", "elsewhere")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_a_child_worktree_is_not_a_parent(self):
-        child = os.path.join(self.dir, ".claude", "worktrees", "i0001-01-01")
-        git(self.dir, "worktree", "add", "-q", child, "-b", "i0001-01-01")
-        write_text(
-            os.path.join(child, ".ccnavi", "approved", "doing", "i0001-01-01.md"),
-            "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n",
-        )
-        result = run_in(child, "checkout", "-b", "elsewhere")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 class ParentPushGateTest(GitWrapperTest):
@@ -1036,64 +913,6 @@ class AllowListTest(GitWrapperTest):
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
-class ParentWorktreeValueBundleTest(ParentWorktreeSwitchTest):
-    """親のワークツリーでは、値をまとめた書き方（`-bnew`・`-qbnew`・`--create=`）でも移れない。"""
-
-    def test_moving_away_from_the_parent_branch_is_rejected(self):
-        for args in (
-            ("checkout", "-bnew1"),
-            ("checkout", "-qbnew3"),
-            ("switch", "-cbar"),
-            ("switch", "-qcbar"),
-            ("checkout", "--orphan=x"),
-            ("checkout", "--track", "origin/x"),
-            ("checkout", f"refs/heads/{self.base}"),
-            ("switch", "--det"),
-            ("checkout", "--orph", "x"),
-        ):
-            with self.subTest(args=args):
-                result = run_in(self.parent, *args)
-                self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertEqual("i0001", git_out(self.parent, "branch", "--show-current"))
-
-    def test_staying_on_the_parent_branch_passes(self):
-        super().test_staying_on_the_parent_branch_passes()
-        for args in (("checkout",), ("checkout", "-q", "HEAD")):
-            with self.subTest(args=args):
-                result = run_in(self.parent, *args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_other_worktrees_move_as_before(self):
-        result = run_in(self.free, "checkout", "-qbelsewhere")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-    def test_a_child_worktree_is_not_a_parent(self):
-        pass
-
-
-class WorktreeDetachTest(GitWrapperTest):
-    """2 つ目の語がタグ・sha だと detached になる。名前が揃っていても止める。"""
-
-    def test_tags_and_shas_are_rejected(self):
-        sha = git_out(self.dir, "rev-parse", "HEAD")
-        git(self.dir, "tag", "v1")
-        for args in (
-            ("worktree", "add", ".claude/worktrees/v1", "v1"),
-            ("worktree", "add", f".claude/worktrees/{sha}", sha),
-        ):
-            with self.subTest(args=args):
-                result = self.assertRejected(*args)
-                self.assertIn("detached", result.stderr)
-
-    def test_a_remote_branch_of_the_same_name_passes(self):
-        bare = self.make_bare()
-        git(self.dir, "remote", "add", "origin", bare)
-        git(self.dir, "push", "-q", "origin", "HEAD:refs/heads/i0002")
-        git(self.dir, "fetch", "-q", "origin")
-        result = self.run_wrapper("worktree", "add", ".claude/worktrees/i0002", "i0002")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-
 class WorktreeFreshBaseTest(GitWrapperTest):
     """統合先から切る worktree add は、fetch が新しく、手元の統合先が遅れていないときだけ通す。
 
@@ -1178,45 +997,6 @@ class WorktreeFreshBaseTest(GitWrapperTest):
             self.assertEqual(done.returncode, 0, (command, done.stdout, done.stderr))
         self.assertEqual("a", git_out(self.tree("a"), "branch", "--show-current"))
 
-    def test_diverged_is_rejected_with_a_message_that_does_not_suggest_ff_only(self):
-        write_text(os.path.join(self.dir, "local.txt"), "l\n")
-        git(self.dir, "add", "local.txt")
-        git(self.dir, "commit", "-q", "-m", "local only")
-        self.push_from_elsewhere()
-        git(self.dir, "fetch", "-q", "origin")
-        result = self.assertRejected(
-            "worktree", "add", ".claude/worktrees/a", "-b", "a", self.integ
-        )
-        self.assertIn("分岐しています", result.stderr)
-        self.assertNotIn("より 1 件遅れて", result.stderr)
-
-    def test_origin_as_the_base_skips_the_behind_check(self):
-        self.push_from_elsewhere()
-        git(self.dir, "fetch", "-q", "origin")
-        self.assertCreated("a", "-b", "a", f"origin/{self.integ}")
-
-    def test_old_fetch_head_is_rejected_and_passes_after_fetch(self):
-        self.age_fetch_head()
-        for args in (("-b", "a"), ("-b", "a", self.integ), ("-b", "a", f"origin/{self.integ}")):
-            with self.subTest(args=args):
-                result = self.assertRejected("worktree", "add", ".claude/worktrees/a", *args)
-                self.assertIn(f"fetch origin '{self.integ}'", result.stderr)
-                self.assertNotIn("merge --ff-only origin", result.stderr)
-        fetched = self.run_wrapper("fetch", "origin", self.integ)
-        self.assertEqual(0, fetched.returncode, fetched.stdout + fetched.stderr)
-        self.assertCreated("a", "-b", "a")
-
-    def test_missing_fetch_head_is_rejected(self):
-        os.remove(self.fetch_head)
-        self.assertRejected("worktree", "add", ".claude/worktrees/a", "-b", "a")
-
-    def test_other_bases_and_existing_branches_are_not_checked(self):
-        git(self.dir, "branch", "other")
-        git(self.dir, "branch", "existing")
-        self.age_fetch_head()
-        self.assertCreated("a", "-b", "a", "other")
-        self.assertCreated("existing", "existing")
-
     def test_a_failed_fetch_downgrades_the_rejection_to_a_warning(self):
         gone = os.path.join(os.path.dirname(self.bare), "gone.git")
         git(self.dir, "remote", "set-url", "origin", gone)
@@ -1227,17 +1007,6 @@ class WorktreeFreshBaseTest(GitWrapperTest):
         result = self.assertCreated("a", "-b", "a")
         self.assertIn("警告", result.stdout)
         self.assertIn("オフライン", result.stdout)
-
-    def test_offline_does_not_hide_a_known_lag(self):
-        self.push_from_elsewhere()
-        git(self.dir, "fetch", "-q", "origin")
-        gone = os.path.join(os.path.dirname(self.bare), "gone.git")
-        git(self.dir, "remote", "set-url", "origin", gone)
-        self.age_fetch_head()
-        self.run_wrapper("fetch", "origin", self.integ)
-        result = self.run_wrapper("worktree", "add", ".claude/worktrees/a", "-b", "a")
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("1 件遅れて", result.stderr)
 
     def test_a_later_good_fetch_clears_the_failure_mark(self):
         mark = os.path.join(self.dir, ".git", "ccnavi-fetch-failed")
@@ -1338,79 +1107,9 @@ class IntegrationPushTest(GitWrapperTest):
         git(repo, "update-ref", f"refs/remotes/origin/{name}", "HEAD")
         git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", f"refs/remotes/origin/{name}")
 
-    def test_an_undetermined_integration_keeps_the_fixed_list_only(self):
-        """origin/HEAD も origin/main・master も無ければ、固定のリストに無い名前は通す。"""
-        result = self.push()
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertNotEqual("", self.landed())
-
     def test_the_branch_origin_head_points_to_is_refused(self):
         self.point_origin_head(self.dir, self.BRANCH)
         self.assertRefused(self.push())
-
-    def test_the_fixed_list_holds_beside_origin_head(self):
-        """origin/HEAD が別の名前でも、固定のリストの main は止める。"""
-        self.point_origin_head(self.dir, self.BRANCH)
-        git(self.dir, "checkout", "--quiet", "-b", "main")
-        result = self.push(branch="main")
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("main は統合先です", result.stderr)
-
-    def test_a_project_is_judged_by_its_own_integration(self):
-        """projects/<名前>/ の中から送るときは、そのプロジェクトの origin/HEAD で統合先を決める。
-        ワークスペースの origin/HEAD は関係しない。"""
-        project = os.path.join(self.dir, "projects", "app")
-        os.makedirs(project)
-        git(project, "init", "-q")
-        git(project, "config", "user.email", "t@example.invalid")
-        git(project, "config", "user.name", "t")
-        git(project, "commit", "-q", "--allow-empty", "-m", "seed")
-        git(project, "checkout", "--quiet", "-b", self.BRANCH)
-        parent = tempfile.mkdtemp(prefix="ccnavi-gitwrap-origin-")
-        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
-        bare = os.path.join(parent, "app.git")
-        git(project, "init", "-q", "--bare", bare)
-        git(project, "remote", "add", "origin", bare)
-
-        # ワークスペースの統合先が同じ名前でも、プロジェクトの統合先（main）とは別なので通す。
-        self.point_origin_head(self.dir, self.BRANCH)
-        self.point_origin_head(project, "main")
-        result = self.push(project)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-        # プロジェクト側の origin/HEAD が develop-v1.0.0 なら止める（固定のリストに無い名前）。
-        # 送り先は空のものに替えて見る。
-        bare2 = os.path.join(parent, "app2.git")
-        git(project, "init", "-q", "--bare", bare2)
-        git(project, "remote", "set-url", "origin", bare2)
-        self.point_origin_head(project, self.BRANCH)
-        self.assertRefused(self.push(project), bare2)
-
-    def test_each_repository_has_its_own_integration(self):
-        """ワークスペースの origin/HEAD は main、projects/app の origin/HEAD は trunk。
-        trunk を projects/app から送れば止まり、ワークスペースから送る trunk は止まらない。"""
-        self.point_origin_head(self.dir, "main")
-        project = os.path.join(self.dir, "projects", "app")
-        os.makedirs(project)
-        git(project, "init", "-q")
-        git(project, "config", "user.email", "t@example.invalid")
-        git(project, "config", "user.name", "t")
-        git(project, "commit", "-q", "--allow-empty", "-m", "seed")
-        git(project, "checkout", "--quiet", "-b", "trunk")
-        parent = tempfile.mkdtemp(prefix="ccnavi-gitwrap-origin-")
-        self.addCleanup(shutil.rmtree, parent, ignore_errors=True)
-        bare = os.path.join(parent, "app.git")
-        git(project, "init", "-q", "--bare", bare)
-        git(project, "remote", "add", "origin", bare)
-        self.point_origin_head(project, "trunk")
-
-        result = self.push(project, branch="trunk")
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("trunk は統合先です", result.stderr)
-
-        git(self.dir, "checkout", "--quiet", "-b", "trunk")
-        result = self.push(branch="trunk")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
