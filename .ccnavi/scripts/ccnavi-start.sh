@@ -161,14 +161,6 @@ stop() {
 	start_do stop "$@"
 }
 
-# 打ち直しの案内に使う。引数ごとに ' で包み（中の ' は '\''）、そのまま打てば同じ引数になるようにする。
-sh_quote() {
-	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
-}
-lower() {
-	printf '%s' "$1" | tr 'A-Z' 'a-z'
-}
-
 # ---- 引数の検査と、依頼のリポジトリ（--repo）と実行した場所の origin の照合は実行ファイル（`ccnavi start args`）が行う。
 # --repo が違えば、ホストに問い合わせる前に止める。
 start_do args -- "$@"
@@ -211,7 +203,7 @@ own_url=$(git remote get-url origin 2>/dev/null || :)
 if [ -n "$own_url" ] && ccnavi_host_parse "$own_url" >/dev/null 2>&1; then
 	own_path="$ccnavi_h_path"
 fi
-if [ "$what" = issue ] && [ -n "$issue_r" ] && [ -n "$own_path" ] && [ "$(lower "$issue_r")" != "$(lower "$own_path")" ]; then
+if [ "$what" = issue ] && [ -n "$issue_r" ] && [ -n "$own_path" ] && ! ccnavi_same_name "$issue_r" "$own_path"; then
 	stop issue-other-repo "issue_arg=${issue_arg}"
 fi
 
@@ -910,10 +902,10 @@ if [ -n "$new_issue_title" ]; then
 	number="$issue_n"
 	# 打ち直しの案内が、作成済みの issue の番号を使うようにする（--new-issue のままだと重複を作る）
 	orig_args="'--issue' '$issue_n'"
-	[ -z "$opt_slug" ] || orig_args="$orig_args '--slug' $(sh_quote "$opt_slug")"
-	[ "$opt_prefix" = feature ] || orig_args="$orig_args '--prefix' $(sh_quote "$opt_prefix")"
-	[ -z "$opt_title" ] || orig_args="$orig_args '--title' $(sh_quote "$opt_title")"
-	[ -z "$opt_repo" ] || orig_args="$orig_args '--repo' $(sh_quote "$opt_repo")"
+	[ -z "$opt_slug" ] || orig_args="$orig_args '--slug' $(ccnavi_sh_quote "$opt_slug")"
+	[ "$opt_prefix" = feature ] || orig_args="$orig_args '--prefix' $(ccnavi_sh_quote "$opt_prefix")"
+	[ -z "$opt_title" ] || orig_args="$orig_args '--title' $(ccnavi_sh_quote "$opt_title")"
+	[ -z "$opt_repo" ] || orig_args="$orig_args '--repo' $(ccnavi_sh_quote "$opt_repo")"
 	real_args="$orig_args"
 	if [ -z "$opt_title" ]; then
 		issue_title_read="$new_issue_title"

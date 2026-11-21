@@ -25,6 +25,7 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_path_under <パス> <基準>  パスが基準の下なら基準からの相対を出す（大文字小文字を区別しない）
 #   ccnavi_path_pick <一覧>    標準入力のパスのうち一覧にあるものを出す（大文字小文字を区別しない）
+#   ccnavi_same_name <名前> <名前>  2 つの名前が、大文字小文字を区別しなければ同じなら 0
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
 #   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
@@ -453,6 +454,12 @@ ccnavi_path_under() {
 # （pathcase.Fold で畳んで比べるのと同じ。畳むのは ASCII の英字だけ）。一致は tests/fixtures/approved-carry.json の same。
 ccnavi_path_pick() {
 	LC_ALL=C awk 'NR == FNR { want[tolower($0)] = 1; next } tolower($0) in want' "$1" -
+}
+
+# 2 つの名前（リポジトリのパスなど）が、大文字小文字を区別せず同じなら 0。畳むのは ASCII の英字だけ（ccnavi_path_pick と同じ）。
+# <名前> <名前>
+ccnavi_same_name() {
+	ccnavi_sn_a=$1 ccnavi_sn_b=$2 LC_ALL=C awk 'BEGIN { exit !(tolower(ENVIRON["ccnavi_sn_a"]) == tolower(ENVIRON["ccnavi_sn_b"])) }'
 }
 
 # URL に埋まった資格情報を伏せる。
