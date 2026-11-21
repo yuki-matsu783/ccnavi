@@ -350,7 +350,7 @@ func TestTheCheckFileAnswerMatchesTheFixture(t *testing.T) {
 	}
 	fixture := jsonOf(t, read(t, filepath.Join(base.Root(), "tests", "fixtures", "templates-check-json.json")))
 	sameJSON(t, "答え", got, fixture["expect"])
-	if fixture["about"] == "" {
+	if s, _ := fixture["about"].(string); s == "" {
 		t.Error("見本に about が無い")
 	}
 }
@@ -418,7 +418,7 @@ func TestTheTemplatesJSONAnswerMatchesTheFixture(t *testing.T) {
 	answer := jsonOf(t, strings.ReplaceAll(res.Stdout, string(quoted[1:len(quoted)-1]), "<root>"))
 	fixture := jsonOf(t, read(t, filepath.Join(base.Root(), "tests", "fixtures", "templates-json.json")))
 	sameJSON(t, "答え", plainShape(answer), plainShape(fixture["expect"]))
-	if fixture["about"] == "" {
+	if s, _ := fixture["about"].(string); s == "" {
 		t.Error("見本に about が無い")
 	}
 }

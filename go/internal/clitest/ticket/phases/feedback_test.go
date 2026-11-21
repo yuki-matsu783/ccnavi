@@ -80,7 +80,7 @@ func TestTheFeedbackPlanComesAfterTheLastReviewAndOnlyOnce(t *testing.T) {
 		t.Error("改版の提案が承認で todo/ から消えない")
 	}
 	// 2 度目は拒む。
-	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: feedbackOf("implement-feedback")}))
+	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: planOf("implement-feedback")}))
 	again := w.approve()
 	if again.Code == 0 || !strings.Contains(again.Stderr, "1 回だけ") {
 		t.Errorf("2 度目のフィードバック計画が止まらない: code %d\n%s", again.Code, again.Stderr)
@@ -103,7 +103,7 @@ func TestAFeedbackWorkPhaseRunsAndDecideSendsTheRestToAnIssue(t *testing.T) {
 	contains(t, "hook", w.reason(spawn), "DENY_PHASE_REVIEW")
 	// フィードバック計画の承認ではレビューの状態を変えない。レビューが済む前は拒む。
 	w.startParent()
-	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: feedbackOf("implement-feedback")}))
+	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: planOf("implement-feedback")}))
 	early := w.approve()
 	if early.Code == 0 || !strings.Contains(early.Stderr, "レビューが済んでから") {
 		t.Errorf("レビュー前のフィードバック計画が止まらない: code %d\n%s", early.Code, early.Stderr)

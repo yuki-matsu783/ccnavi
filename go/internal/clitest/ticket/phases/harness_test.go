@@ -481,8 +481,6 @@ func after(name string, prev ...int) samples.Step {
 
 var noFeedback = []samples.Step{}
 
-func feedbackOf(names ...string) []samples.Step { return samples.Plan(names...) }
-
 // ---- 小さな道具
 
 func jsonOf(t testing.TB, text string) map[string]any {
@@ -586,7 +584,3 @@ func stepsOf(front *yaml.Map, key string) []step {
 	}
 	return out
 }
-
-func jsonString(v any) string { return fmt.Sprint(v) }
-
-func jsonUnmarshal(text string, v any) error { return json.Unmarshal([]byte(text), v) }

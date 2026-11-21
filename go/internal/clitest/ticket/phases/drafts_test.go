@@ -3,6 +3,7 @@ package phases
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -203,7 +204,7 @@ func (d *drafts) answer(args ...string) map[string]any {
 func TestTheMadeDraftReadsBackAndTheTextAsksForGeneralizing(t *testing.T) {
 	t.Parallel()
 	d := newDrafts(t)
-	d.doneParent(planOf("research", "design", "implement"), feedbackOf("implement-feedback", "implement-feedback"), map[string]string{"i0001-03-01": flowImpl})
+	d.doneParent(planOf("research", "design", "implement"), planOf("implement-feedback", "implement-feedback"), map[string]string{"i0001-03-01": flowImpl})
 	r := d.draft()
 	if r.Code != 0 {
 		t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
@@ -234,7 +235,7 @@ func TestTheMadeDraftReadsBackAndTheTextAsksForGeneralizing(t *testing.T) {
 		afters = append(afters, s.After)
 	}
 	equalStrings(t, "計画の型", types, []string{"research", "design", "implement"})
-	if got := jsonString(afters); got != "[[] [1] [2]]" {
+	if got := fmt.Sprint(afters); got != "[[] [1] [2]]" {
 		t.Errorf("after = %s", got)
 	}
 	flows := data["flows"].(map[string]any)

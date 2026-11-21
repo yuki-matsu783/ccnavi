@@ -1,6 +1,8 @@
 package phases
 
 import (
+	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -219,7 +221,7 @@ func TestPhasesTitlesAndReviewsComeFromTheCopyAfterApproval(t *testing.T) {
 		}
 		for _, ph := range owner["phases"].([]any) {
 			m := ph.(map[string]any)
-			shown = append(shown, strings.Join([]string{jsonString(m["number"]), jsonString(m["review_required"]), m["title"].(string)}, "|"))
+			shown = append(shown, strings.Join([]string{fmt.Sprint(m["number"]), fmt.Sprint(m["review_required"]), m["title"].(string)}, "|"))
 		}
 	}
 	equalStrings(t, "フェーズ", shown, []string{"1|false|調査", "2|true|設計"})
@@ -313,7 +315,7 @@ func TestLintSaysALostPhasesYmlOnlyAsAWarningForAnApprovedParent(t *testing.T) {
 			Detail   string `json:"detail"`
 		} `json:"problems"`
 	}{}
-	if err := jsonUnmarshal(lint.Stdout, &body); err != nil {
+	if err := json.Unmarshal([]byte(lint.Stdout), &body); err != nil {
 		t.Fatal(err)
 	}
 	found := 0

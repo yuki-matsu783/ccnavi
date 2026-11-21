@@ -79,7 +79,11 @@ func TestTheNoticeIsSilencedOrKept(t *testing.T) {
 			t.Parallel()
 			w := newWS(t)
 			_, closed := w.closedFamilyWith(func() { c.before(w) })
-			if got := len(noticeLines(closed)); (got == 1) != c.notice || got > 1 {
+			want := 0
+			if c.notice {
+				want = 1
+			}
+			if got := len(noticeLines(closed)); got != want {
 				t.Errorf("案内が %d 行（出すべき: %v）\n%s", got, c.notice, closed.Stdout)
 			}
 			if !c.notice {

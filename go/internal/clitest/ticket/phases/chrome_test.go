@@ -3,12 +3,15 @@ package phases
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -101,7 +104,7 @@ func (w *ws) diffDisk(before, after map[string]map[string]string) map[string]any
 	for name := range union(before, after) {
 		old, cur := before[name], after[name]
 		var rows []any
-		for _, p := range sortedKeys(union(old, cur)) {
+		for _, p := range slices.Sorted(maps.Keys(union(old, cur))) {
 			o, inOld := old[p]
 			n, inNew := cur[p]
 			switch {
@@ -129,15 +132,6 @@ func union[V any](a, b map[string]V) map[string]struct{} {
 		out[k] = struct{}{}
 	}
 	return out
-}
-
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 // ---- Chrome の要求
@@ -171,7 +165,7 @@ func (w *ws) chromeRequest(op, family string, heads map[string]string, extra map
 		if name == "main" {
 			integrationFiles := strs(place["integration_files"])
 			for rel, body := range filesUnder(w.t, path, ".ccnavi", ".claude") {
-				if hasAnyPrefix(rel, strs(place["integration_paths"])) || contains1(integrationFiles, rel) {
+				if hasAnyPrefix(rel, strs(place["integration_paths"])) || slices.Contains(integrationFiles, rel) {
 					files[rel] = body
 				}
 			}
@@ -199,15 +193,6 @@ func (w *ws) chromeRequest(op, family string, heads map[string]string, extra map
 		request[k] = v
 	}
 	return request
-}
-
-func contains1(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // handle は要求 1 件を入口に渡す。
@@ -402,20 +387,14 @@ func TestTheFixtureAnswersAreWhatTheEntrySays(t *testing.T) {
 	if err := json.Unmarshal([]byte(read(t, scenariosPath())), &held); err != nil {
 		t.Fatal(err)
 	}
-	names := sortedKeys(held)
-	equalStrings(t, "見本の場面", names, sortedCopy(scenarioNames))
+	names := slices.Sorted(maps.Keys(held))
+	equalStrings(t, "見本の場面", names, slices.Sorted(slices.Values(scenarioNames)))
 	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			answer := w.as(t).handle(held[name].Request, filepath.Join("replay", name))
 			sameJSON(t, name+" の答え（-update-chrome-fixture を付けて見本を書き直す）", answer, held[name].Answer)
 		})
 	}
-}
-
-func sortedCopy(in []string) []string {
-	out := append([]string{}, in...)
-	sort.Strings(out)
-	return out
 }
 
 // sameAsCLI は同じ状態で、Chrome の plan と手元の CLI（preview → --yes）を比べる。
@@ -495,7 +474,7 @@ func TestChromeRevision(t *testing.T) {
 	w.propose(parentName, samples.ParentText(parentName, planOf("research", "design", "acceptance"), samples.ParentOpts{}))
 	w.commitParent()
 	answer := w.sameAsCLI("revise", parentName)
-	if !contains1(strs(answer["lines"]), "  i0001 の全体計画を改版した") {
+	if !slices.Contains(strs(answer["lines"]), "  i0001 の全体計画を改版した") {
 		t.Errorf("lines = %v", answer["lines"])
 	}
 }
@@ -512,7 +491,7 @@ func TestChromeFeedbackPlan(t *testing.T) {
 	// 古い承認済みチケットを読み、判定が読んだ中身で作るダイジェストが Chrome（統合先と P だけを読む）と食い違う。
 	w.git(w.root, "worktree", "remove", "--force", filepath.Join(w.root, ".claude", "worktrees", "i0001-01-01"))
 	answer := w.sameAsCLI("feedback-plan", parentName)
-	if !contains1(strs(answer["lines"]), "  i0001 のフィードバック計画を改版した") {
+	if !slices.Contains(strs(answer["lines"]), "  i0001 のフィードバック計画を改版した") {
 		t.Errorf("lines = %v", answer["lines"])
 	}
 }
@@ -726,7 +705,7 @@ func TestChromeConfirmAHandMovedChildAsksForTheTimeAndAcceptsOldThreads(t *testi
 			t.Errorf("via = %v", m["content"])
 		}
 	}
-	if !contains1(paths, ".ccnavi/approved/phases/i0001/accepted.json") {
+	if !slices.Contains(paths, ".ccnavi/approved/phases/i0001/accepted.json") {
 		t.Errorf("accepted.json が無い: %v", paths)
 	}
 	// 移動の時刻を読めなければ確かめられないので、未解決の指摘は受け入れない
@@ -743,12 +722,17 @@ func TestChromeAnUnreadableStampIsAnErrorNotAnException(t *testing.T) {
 	w.commitParent()
 	request := w.chromeRequest("plan", parentName, nil, map[string]any{"stamp": "2026-09-29 12:00"})
 	answer := w.handle(request, "m")
-	contains(t, "error", jsonString(answer["error"]), "時刻の形が違う")
+	contains(t, "error", fmt.Sprint(answer["error"]), "時刻の形が違う")
 }
 
 // ---- 4. 置き場は既定に固定する
 
 var movedEnvNames = []string{"CCNAVI_TICKETS_PROPOSAL", "CCNAVI_TICKETS_APPROVED", "CCNAVI_PROJECT_HOME"}
+
+// movedPlacementEnv は既定の置き場を動かす環境（答えに効かないことを見る）。
+func movedPlacementEnv() map[string]string {
+	return map[string]string{"CCNAVI_TICKETS_PROPOSAL": "moved/proposals", "CCNAVI_TICKETS_APPROVED": "moved/approved", "CCNAVI_PROJECT_HOME": "moved/home"}
+}
 
 var placementKeys = []string{"tickets", "approved", "layer_dir", "integration_paths", "integration_files", "branch_paths", "workspace_paths", "workspace_files", "project_paths"}
 
@@ -756,7 +740,7 @@ func defaultPlacement() map[string]any {
 	const tickets, approved, layer, messages = "wip/proposals", ".ccnavi/approved", ".ccnavi/config/project", ".ccnavi/messages"
 	done := approved + "/done"
 	list := func(items ...string) []any {
-		s := sortedCopy(items)
+		s := slices.Sorted(slices.Values(items))
 		out := make([]any, len(s))
 		for i, v := range s {
 			out[i] = v
@@ -851,7 +835,7 @@ func (w *ws) boardRequest() (map[string]any, map[string]any) {
 func TestChromePlacementIgnoresEnvInTheIntegrationSettings(t *testing.T) {
 	t.Parallel()
 	w := newChromeWS(t)
-	moved := map[string]string{"CCNAVI_TICKETS_PROPOSAL": "moved/proposals", "CCNAVI_TICKETS_APPROVED": "moved/approved", "CCNAVI_PROJECT_HOME": "moved/home"}
+	moved := movedPlacementEnv()
 	w.assertDefaultPlacement(w.askPlacement(map[string]any{"settings": settingsText(moved)}, nil))
 	// 絶対パスの形も断らず、既定の置き場を使う。
 	for _, form := range []string{"/x", "C:/x", "~/x"} {
@@ -867,7 +851,7 @@ func TestChromeTheBoardAnswerDoesNotChangeWithTheEnv(t *testing.T) {
 	t.Parallel()
 	w := newChromeWS(t)
 	request, plain := w.boardRequest()
-	moved := map[string]string{"CCNAVI_TICKETS_PROPOSAL": "moved/proposals", "CCNAVI_TICKETS_APPROVED": "moved/approved", "CCNAVI_PROJECT_HOME": "moved/home"}
+	moved := movedPlacementEnv()
 	withEnv := map[string]any{}
 	for k, v := range request {
 		withEnv[k] = v
