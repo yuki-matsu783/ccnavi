@@ -95,7 +95,7 @@ cd "$UC" && git remote remove origin        # 承認の操作が push するの�
 sh "$CCNAVI/scripts/ccnavi-setup.sh" "$UC" --mode enable --force
 ```
 
-コピーなので`--force`を付けてよい。`--force`は、配布先にある配布物（設定3本の`rules.yml`・`risks.yml`・共通の`phases.yml`、`.ccnavi/`の文書・スクリプト・テンプレート、スキル、`settings.json`のenv）を、配布元の内容で置き換える。
+コピーなので`--force`を付けてよい。`--force`は、配布先にある配布物（設定ファイルの`rules.yml`・`risks.yml`・`ticket-sections.yml`・共通の`phases.yml`、`.ccnavi/`の文書・スクリプト・テンプレート、スキル、`settings.json`のenv）を、配布元の内容で置き換える。
 test-repo本体に反映するときは`--force`を付けない（付けると検証用の設定が消える）。付けて置き換えてしまったら、`git diff --stat -- .ccnavi .claude`で差分を見て、残したいものだけ`git checkout -- <ファイル>`で戻す。
 
 ### 1.3チケットを並べる（親2・子4）

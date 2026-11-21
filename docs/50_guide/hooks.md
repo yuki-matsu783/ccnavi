@@ -103,7 +103,7 @@ undo: rm -- .ccnavi/config/common/probe.json
 | 対象 | 何が懸かっているか |
 |---|---|
 | `.claude/settings.json`・`.claude/settings.local.json` | hookの登録そのもの |
-| `.ccnavi/config/common/`と`.ccnavi/config/project/`の`rules.yml`・`phases.yml`・`risks.yml`（ワークスペースと各プロジェクトの分も） | 判定の中身そのもの |
+| `.ccnavi/config/common/`と`.ccnavi/config/project/`の`rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml`（ワークスペースと各プロジェクトの分も） | 判定の中身そのもの |
 | `CCNAVI_ENTRY_PATH`が指すファイルと、この機械のccnaviの実行ファイル | 判定器の実体 |
 
 - 設定ファイルは、ツール実行前と、ユーザの発言時にバックアップを取る。実行後に変わっていればバックアップから戻す（未コミットの編集は残る）

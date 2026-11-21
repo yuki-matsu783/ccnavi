@@ -75,7 +75,7 @@ allow:
 | ワークスペース自身のレイヤー | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
 | プロジェクトのレイヤー | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
-作業・レビュー計画のテンプレートは、共通のもの（ある場合）を`.ccnavi/config/common/templates/`、そのワークスペース（またはプロジェクト）のものを`.ccnavi/config/project/templates/`に置く。この表の 3 本には入らず、`*/.ccnavi/*`の一般の保護で守られる。
+作業・レビュー計画のテンプレートは、共通のもの（ある場合）を`.ccnavi/config/common/templates/`、そのワークスペース（またはプロジェクト）のものを`.ccnavi/config/project/templates/`に置く。この表の設定ファイルには入らず、`*/.ccnavi/*`の一般の保護で守られる。
 
 3 レイヤーとも置き場は固定で、環境変数では動かない（[設定](settings.md)の「置き場は固定」）。
 自身のレイヤーとプロジェクトのレイヤーは形が同じで、どちらもgitプロジェクトルートの直下に置く。

@@ -21,7 +21,7 @@ keywords: [テンプレート, 作業・レビュー計画, plan, feedback, フ�
 `flows` は全体計画のステップの添字をキーにする。子の識別子は使うたびに変わるので、位置で指す。
 
 **置き場と統合結果。** 共通は `.ccnavi/config/common/templates/`、プロジェクトは `.ccnavi/config/project/templates/`
-（`config.Settings.CommonTemplatesDir` / `config.Settings.LayerTemplatesDir`）。ルール・フェーズ定義・配点の 3 本を回す
+（`config.Settings.CommonTemplatesDir` / `config.Settings.LayerTemplatesDir`）。設定ファイルの種類を回す
 `config.LayerKinds` には入れない。使うのは共通と 1 つのレイヤー
 （自身のレイヤーか、プロジェクト）の和。
 
@@ -225,7 +225,7 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 
 案内は、`ready` の案内（Draft を外す手順）の後ろに足す。Draft を外し済みの親には出さない（`ready` で `done/` を退避済みのため、材料が拾えない）。
 
-**共通レイヤーのミラー（`mirror`）。** `mirror.commonSources` が、設定 3 本・期待する判定・配点のスクリプトに加えて、共通のテンプレート
+**共通レイヤーのミラー（`mirror`）。** `mirror.commonSources` が、設定ファイル・期待する判定・配点のスクリプトに加えて、共通のテンプレート
 `.ccnavi/config/common/templates/*.yml` を、ミラーの置き場からの相対（`templates/<名前>.yml`）で集める。`plan` は共通に無いファイルをミラーから
 消すので、集めないとミラーに置いたテンプレートが次の同期で消える。コピーする前に、各テンプレートを共通として読めるか確かめる
 （`templates.ReadLayer` で置き場を読み、`check` を共通のフェーズ定義で適用する。error のあるテンプレートはコピーせずに飛ばし、着手は止めない。warn は止めない。
@@ -234,11 +234,11 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 1 本もコピーしない**だけで、ほかの設定のミラーと発言は止めない。置き場がリンクなのを知らせるのは `--lint` の側。
 
 ミラー先の `.ccnavi/config/common/templates/` は、単体 clone では `--templates` の共通として読まれる（共通の置き場は `config.Settings.CommonTemplatesDir`
-で、ワークスペースルートでもミラーでも同じ形）。ワークスペースの中では読まれず、ワークスペースルートの共通だけを読む（設定 3 本と同じ）。
+で、ワークスペースルートでもミラーでも同じ形）。ワークスペースの中では読まれず、ワークスペースルートの共通だけを読む（設定ファイルと同じ）。
 ミラーのサブディレクトリ（`templates/`）も、他のファイルと同じように比べてコピーする。空になった `templates/`
 は、消したあとに片付ける。
 
-**導入 sh の配布。** `scripts/ccnavi-setup.sh` は設定 3 本（rules・risks・phases）とスクリプトと使い方の文書を配るが、`config/common/` のそれ以外は配らない
+**導入 sh の配布。** `scripts/ccnavi-setup.sh` は設定ファイル（rules・risks・phases・ticket-sections）とスクリプトと使い方の文書を配るが、`config/common/` のそれ以外は配らない
 （期待する判定、配点のスクリプトも配らない）。共通のテンプレートを配布先へ届けるには、配布元の `.ccnavi/config/common/templates/*.yml` を配布先の同じ場所へ
 コピーする手順を足す必要がある。使い方の文書（`.ccnavi/docs/*.md`）と同じ形で、配布元の `*.yml` を 1 本ずつ見て、配布先に無ければコピーし、在れば `--force` のときだけ入れ替える。
 配布元に置き場が無い、または `*.yml` が 1 本も無いのは正常で、何も言わずに飛ばす（文書と違って「配布元に無くて配れないもの」には挙げない）。
