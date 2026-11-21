@@ -17,13 +17,19 @@ from __future__ import annotations
 
 import os
 
+import yaml
+
 from tests import config_path
-from tests.ticket.test_parent_phases import front_of
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git
 from tests.ticketsample import PHASES
 
 IDENT = "feature-9-scaffold-demo"
+
+
+def front_of(text: str) -> dict:
+    """本文の frontmatter を読む。"""
+    return yaml.safe_load(text.split("---\n", 2)[1])
 
 
 # 雛形が置く空欄の目印。
