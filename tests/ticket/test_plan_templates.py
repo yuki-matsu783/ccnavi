@@ -1,16 +1,14 @@
 """作業・レビュー計画のテンプレート（読む側）の受入テスト。
 
-見るのは次のとおり。
+読み込み・2 層の統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
+go/internal/tickets/proposal/templates の見本（`TestMatchesGolden`）が 1 字単位で見る。
+ここで見るのは見本が持たない次の 4 つ。
 
-1. 読み込み: フローと同じ読み手の保護（リンク・ハードリンク・大きさ）。書式・往復・別名・UTF-8 と
-   新しく作る名前の検査は go/internal/tickets/proposal/templates が見る
-2. 2 層の統合結果: 全欄が同じなら info でレイヤーの側を破棄する、中身が違えば error で
-   レイヤーの側だけを使わない、壊れた共通は空にしてレイヤーを使う
-3. 検査: 順序（終端・延期の引き受け手・`after` の範囲）は error、型 id・kind の食い違いは warn、
-   `flows` の添字とフローの形
-4. `ccnavi --templates` の一覧・検索・表示・`--json`。答えの形は
-   tests/fixtures/templates-json.json で固定する
-5. `ccnavi --lint` への出方
+1. 読み込み: フローと同じ読み手の保護（リンク・ハードリンク）
+2. `ccnavi --templates` のテキストの出方、`--json` の答えの形（tests/fixtures/templates-json.json と
+   templates-check-json.json。拡張と共有する）、使い方の誤りの拒否
+3. `ccnavi --lint` への出方（レイヤーの名前と重さ）
+4. 型の定義が変わったときの扱い
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from tests import ROOT, common_path, config_path, requires_symlink
+from tests import ROOT, can_symlink, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import write
 from tests.ticketsample import PHASES
@@ -121,236 +119,44 @@ class LayerTest(Harness):
         self.assertEqual(answer["templates"], [])
         self.assertFalse(answer["layers"][0]["exists"])
 
-    def test_common_and_layer_templates_are_added(self):
-        self.common("research", RESEARCH)
-        self.own("feature", FEATURE)
-        rows = {(r["layer"], r["name"]): r for r in self.answer()["templates"]}
-        self.assertEqual(set(rows), {("common", "research"), ("self", "feature")})
-        self.assertTrue(all(r["effective"] and r["usable"] for r in rows.values()))
-        mine = rows[("self", "feature")]
-        self.assertEqual(mine["path"], ".ccnavi/config/project/templates/feature.yml")
-        self.assertEqual(
-            rows[("common", "research")]["path"], ".ccnavi/config/common/templates/research.yml"
-        )
-
-    def test_the_same_template_in_both_layers_drops_the_layer_side_with_info(self):
-        self.common("research", RESEARCH)
-        self.own("research", RESEARCH)
-        mine = self.entry("self", "research")
-        self.assertFalse(mine["effective"])
-        self.assertEqual(mine["dropped"]["reason"], "duplicate")
-        self.assertEqual(len(self.problems(mine, "info")), 1)
-        self.assertEqual(self.problems(mine, "error"), [])
-        self.assertTrue(self.entry("common", "research")["effective"])
-
-    def test_a_different_template_with_the_same_name_is_an_error_and_not_used(self):
-        self.common("research", RESEARCH)
-        self.own("research", RESEARCH.replace("調べてから", "調べずに"))
-        mine = self.entry("self", "research")
-        self.assertFalse(mine["effective"])
-        self.assertEqual(mine["dropped"]["reason"], "conflict")
-        self.assertIn("description", self.problems(mine, "error")[0])
-        self.assertTrue(self.entry("common", "research")["effective"])
-        # 衝突したのはこの 1 本だけ。ほかのレイヤーのテンプレートは使う。
-        self.own("feature", FEATURE)
-        self.assertTrue(self.entry("self", "feature")["effective"])
-
-    def test_a_broken_common_template_is_empty_and_the_layer_one_is_used(self):
-        self.common("research", "name: [\n")
-        self.own("research", RESEARCH)
-        common = self.entry("common", "research")
-        self.assertFalse(common["valid"])
-        self.assertFalse(common["effective"])
-        self.assertEqual(common["dropped"]["reason"], "invalid")
-        mine = self.entry("self", "research")
-        self.assertTrue(mine["effective"])
-        self.assertEqual(self.problems(mine, "error"), [])
-
-    def test_a_project_layer_is_added_to_the_common_layer_only(self):
-        self.common("research", RESEARCH)
-        write(self.path("lib", "feature"), FEATURE)
-        self.own("local", template("local", "  - design\n"))
-        rows = {(r["layer"], r["name"]) for r in self.answer("--layer", "lib")["templates"]}
-        self.assertEqual(rows, {("common", "research"), ("lib", "feature")})
-        sums = {s["name"]: s for s in self.answer()["sums"]}
-        self.assertEqual(set(sums), {"self", "lib"})
-        self.assertEqual(sums["lib"]["layers"], ["common", "lib"])
-        refused = self.ccnavi("--templates", "--layer", "nothing")
-        self.assertEqual(refused.returncode, 1)
-
-    def test_other_files_and_dot_files_in_the_place(self):
-        self.own("feature", FEATURE)
-        write(os.path.join(os.path.dirname(self.path("self", "x")), "notes.txt"), "x")
-        write(os.path.join(os.path.dirname(self.path("self", "x")), ".feature.yml.swp"), "x")
-        layer = self.answer()["layers"][1]
-        self.assertEqual([p["severity"] for p in layer["problems"]], ["warn"])
-        self.assertIn("notes.txt", layer["problems"][0]["detail"])
-        self.assertEqual([r["name"] for r in layer["templates"]], ["feature"])
-
-    def test_a_bad_file_name_is_an_error(self):
-        write(self.path("self", "bad name"), RESEARCH)
-        row = self.answer()["layers"][1]["templates"][0]
-        self.assertFalse(row["valid"])
-        self.assertIn("ファイル名", self.problems(row, "error")[0])
-
-    def test_a_big_file_is_not_read(self):
-        self.own("big", RESEARCH.replace("name: research", "name: big") + "# " + "x" * 300000)
-        row = self.entry("self", "big")
-        self.assertFalse(row["valid"])
-        self.assertIn("大きすぎる", self.problems(row, "error")[0])
-
-    @requires_symlink
-    def test_a_linked_file_is_not_read(self):
-        outside = write(os.path.join(self.root, "outside.yml"), RESEARCH)
+    def test_linked_files_and_a_linked_place_are_not_read(self):
         place = self.path("self", "research")
-        os.makedirs(os.path.dirname(place), exist_ok=True)
-        os.symlink(outside, place)
-        row = self.entry("self", "research")
-        self.assertFalse(row["valid"])
-        self.assertIn("シンボリックリンク", self.problems(row, "error")[0])
-
-    @requires_symlink
-    def test_a_linked_place_is_not_read(self):
-        write(os.path.join(self.root, "elsewhere", "research.yml"), RESEARCH)
-        place = os.path.dirname(self.path("self", "x"))
-        os.makedirs(os.path.dirname(place), exist_ok=True)
-        os.symlink(os.path.join(self.root, "elsewhere"), place)
-        layer = self.answer()["layers"][1]
-        self.assertEqual(layer["templates"], [])
-        self.assertIn("シンボリックリンク", layer["unreadable"])
-
-    def test_a_hard_linked_file_is_not_read(self):
+        directory = os.path.dirname(place)
+        os.makedirs(directory)
         outside = write(os.path.join(self.root, "outside.yml"), RESEARCH)
-        place = self.path("self", "research")
-        os.makedirs(os.path.dirname(place), exist_ok=True)
+        if can_symlink():
+            os.symlink(outside, place)
+            row = self.entry("self", "research")
+            self.assertFalse(row["valid"])
+            self.assertIn("シンボリックリンク", self.problems(row, "error")[0])
+            os.remove(place)
+            write(os.path.join(self.root, "elsewhere", "research.yml"), RESEARCH)
+            os.rmdir(directory)
+            os.symlink(os.path.join(self.root, "elsewhere"), directory)
+            layer = self.answer()["layers"][1]
+            self.assertEqual(layer["templates"], [])
+            self.assertIn("シンボリックリンク", layer["unreadable"])
+            os.remove(directory)
+            os.makedirs(directory)
         try:
             os.link(outside, place)
         except OSError:
-            self.skipTest("ハードリンクを作れない")
+            return
         row = self.entry("self", "research")
         self.assertFalse(row["valid"])
         self.assertIn("ハードリンク", self.problems(row, "error")[0])
 
 
 class CheckTest(Harness):
-    def check(self, text: str, name: str = "t") -> dict:
-        self.own(name, text)
-        return self.entry("self", name)
-
-    def test_a_good_template_has_no_problem(self):
-        self.own("feature", FEATURE)
-        row = self.entry("self", "feature")
-        self.assertEqual(row["problems"], [])
-        self.assertTrue(row["usable"])
-        self.assertEqual(
-            [(i["index"], i["number"], i["type"], i["after"]) for i in row["plan"]],
-            [(1, 1, "design", []), (2, 2, "implement", [1])],
-        )
-        self.assertEqual([(i["index"], i["number"]) for i in row["feedback"]], [(1, 3)])
-        self.assertEqual(row["flows"][0]["index"], 2)
-        self.assertEqual(row["flows"][0]["nodes"], 3)
-
-    def test_two_ends_are_an_error(self):
-        row = self.check(template("t", "  - design\n  - acceptance\n"))
-        self.assertTrue(any("終端は 1 つ" in d for d in self.problems(row, "error")))
-        self.assertFalse(row["usable"])
-
-    def test_an_after_out_of_range_is_an_error(self):
-        for after in ("[2]", "[0]", "[5]"):
-            plan = f"  - design\n  - {{type: implement, after: {after}}}\n"
-            row = self.check(template("t", plan))
-            self.assertTrue(
-                any("`plan[2]` の `after`" in d for d in self.problems(row, "error")), after
-            )
-
-    def test_the_feedback_after_counts_inside_the_feedback_plan(self):
-        text = template(
-            "t",
-            "  - design\n",
-            extra="",
-        ) + ("feedback:\n  - implement-feedback\n  - {type: implement-feedback, after: [1]}\n")
-        row = self.check(text)
-        self.assertEqual(self.problems(row, "error"), [])
-        # 全体計画の番号は指せない（フィードバック計画の中の添字で書く）。
-        bad = text.replace("after: [1]", "after: [2]")
-        self.assertTrue(self.problems(self.check(bad), "error"))
-
-    def test_a_deferral_without_a_taker_is_an_error(self):
-        row = self.check(template("t", "  - {type: design, deferred: true}\n  - implement\n"))
-        self.assertTrue(any("延期を引き受ける" in d for d in self.problems(row, "error")))
-
-    def test_a_deferral_to_a_phase_without_review_is_a_warning(self):
-        text = template(
-            "t", "  - {type: design, deferred: true}\n  - {type: research, after: [1]}\n"
-        )
-        row = self.check(text)
-        self.assertEqual(self.problems(row, "error"), [])
-        self.assertTrue(any("レビューがありません" in d for d in self.problems(row, "warn")))
-
-    def test_the_last_item_cannot_be_deferred(self):
-        plan = "  - design\n  - {type: implement, after: [1], deferred: true}\n"
-        row = self.check(template("t", plan))
-        self.assertTrue(any("延期できない" in d for d in self.problems(row, "error")))
-
-    def test_a_review_false_is_allowed_and_overrides_the_definition(self):
-        row = self.check(template("t", "  - {type: design, review: false}\n"))
-        self.assertEqual(self.problems(row, "error"), [])
-
-    def test_a_review_with_deferred_is_an_error(self):
-        plan = "  - {type: design, review: false, deferred: true}\n  - {type: implement}\n"
-        row = self.check(template("t", plan))
-        self.assertTrue(any("同時に書けない" in d for d in self.problems(row, "error")))
-
-    def test_an_unknown_type_is_only_a_warning(self):
-        row = self.check(template("t", "  - docs\n"))
-        self.assertEqual(self.problems(row, "error"), [])
-        warns = self.problems(row, "warn")
-        self.assertTrue(any("`docs`" in d and "phases.yml にありません" in d for d in warns))
-        self.assertTrue(row["usable"])
-
-    def test_a_kind_that_does_not_match_the_place_is_only_a_warning(self):
-        row = self.check(template("t", "  - implement-feedback\n"))
-        self.assertEqual(self.problems(row, "error"), [])
-        self.assertTrue(any("kind" in d for d in self.problems(row, "warn")))
-        row = self.check(template("t2", "  - design\n") + "feedback:\n  - design\n", "t2")
-        self.assertTrue(any("kind" in d for d in self.problems(row, "warn")))
-
-    def test_without_phases_the_types_are_not_checked_with_one_warning(self):
-        os.remove(common_path(self.root, "phases"))
-        row = self.check(template("t", "  - design\n  - {type: implement, after: [1]}\n"))
-        self.assertEqual(self.problems(row, "error"), [])
-        self.assertEqual(len(self.problems(row, "warn")), 1)
-
-    def test_a_changed_definition_only_warns(self):
+    def test_a_review_false_is_allowed_and_a_changed_definition_only_warns(self):
+        self.own("t", template("t", "  - {type: design, review: false}\n"))
+        self.assertEqual(self.problems(self.entry("self", "t"), "error"), [])
         # 型が phases.yml から消えても、読むのも一覧も止まらない（使うときの承認で error になる）。
         self.own("feature", FEATURE)
         write(common_path(self.root, "phases"), PHASES.replace("  design:", "  design2:"))
         row = self.entry("self", "feature")
         self.assertEqual(self.problems(row, "error"), [])
         self.assertTrue(self.problems(row, "warn"))
-
-    def test_the_flows_index_must_be_in_the_plan(self):
-        text = FEATURE.replace("\n  2:\n", "\n  3:\n")
-        row = self.check(text, "feature")
-        self.assertTrue(any("添字 3" in d for d in self.problems(row, "error")))
-        row = self.check(FEATURE.replace("\n  2:\n", "\n  0:\n"), "feature")
-        self.assertTrue(any("添字 0" in d for d in self.problems(row, "error")))
-
-    def test_a_flow_that_cannot_be_read_is_an_error(self):
-        text = template("t", "  - design\n") + "flows:\n  1:\n    id: x\n    name: y\n"
-        row = self.check(text)
-        errors = self.problems(row, "error")
-        self.assertTrue(any("`flows[1]`" in d and "nodes" in d for d in errors))
-
-    def test_the_flow_is_linted_like_a_flow_file(self):
-        # 終了が無いフローは、フローのファイルと同じ警告になる。
-        text = template("t", "  - design\n") + (
-            "flows:\n  1:\n    id: x\n    name: y\n    nodes:\n"
-            "      - {id: s, type: start, name: a, position: {x: 0, y: 0}, data: {}}\n"
-        )
-        row = self.check(text)
-        self.assertEqual(self.problems(row, "error"), [])
-        self.assertTrue(any("`flows[1]`" in d for d in self.problems(row, "warn")))
 
 
 class CliTest(Harness):
@@ -359,29 +165,18 @@ class CliTest(Harness):
         self.common("research", RESEARCH)
         self.own("feature", FEATURE)
 
-    def test_the_list_shows_name_layer_description_and_when(self):
+    def test_the_text_outputs(self):
         out = self.ccnavi("--templates")
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("research  [common]  調べてから設計する", out.stdout)
         self.assertIn("feature  [self]  機能を設計から実装まで進める", out.stdout)
         self.assertIn("いつ: 新しい機能を足すとき", out.stdout)
-
-    def test_the_keyword_searches_name_description_and_when(self):
-        for word, names in (
-            ("feat", ["feature"]),
-            ("調べ", ["research"]),
-            ("機能を足す", ["feature"]),
-            ("FEATURE", ["feature"]),
-            ("無い語", []),
-        ):
-            rows = self.answer("--keyword", word)["templates"]
-            self.assertEqual([r["name"] for r in rows], names, word)
+        # 複数の --keyword は和。ヒットしないときの文。
         both = self.answer("--keyword", "調べ", "--keyword", "feat")["templates"]
         self.assertEqual(sorted(r["name"] for r in both), ["feature", "research"])
         text = self.ccnavi("--templates", "--keyword", "無い語")
         self.assertIn("該当するテンプレートはありません。", text.stdout)
-
-    def test_show_prints_the_content(self):
+        # --show は中身を出す。
         out = self.ccnavi("--templates", "--show", "feature")
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("テンプレート: feature（self）", out.stdout)
@@ -391,13 +186,26 @@ class CliTest(Harness):
         self.assertEqual(shown["template"]["name"], "feature")
         self.assertEqual(shown["template"]["text"], FEATURE)
         self.assertEqual(shown["template"]["sha"], hashlib.sha256(FEATURE.encode()).hexdigest())
+        # 使わない理由を言う。統合結果の相手でないレイヤーの置き場の苦情は混ぜない。
+        self.common("broken", "name: [\n")
+        write(os.path.join(os.path.dirname(self.path("self", "x")), "notes.txt"), "x")
+        write(self.path("lib", "lib"), template("lib", "  - design\n"))
+        out = self.ccnavi("--templates").stdout
+        self.assertIn("broken  [common]（使わない: invalid）  YAML として読めない", out)
+        self.assertIn("notes.txt", out)
+        other = self.ccnavi("--templates", "--layer", "lib").stdout
+        self.assertNotIn("notes.txt", other)
+        self.assertIn("lib  [lib]", other)
+        # 書かずに検査する --check-file のテキスト。
+        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
+        out = self.ccnavi("--templates", "--check-file", path)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("読めた: はい", out.stdout)
 
-    def test_show_of_an_unknown_name_fails(self):
+    def test_failures_and_wrong_combinations_are_refused(self):
         out = self.ccnavi("--templates", "--show", "nothing")
         self.assertEqual(out.returncode, 1)
         self.assertIn("nothing", out.stderr)
-
-    def test_failures_are_json_on_stdout_when_json_is_asked(self):
         for args in (
             ["--templates", "--show", "nothing", "--json"],
             ["--templates", "--layer", "nowhere", "--json"],
@@ -411,31 +219,6 @@ class CliTest(Harness):
                 self.assertTrue(answer["error"])
                 self.assertEqual(answer["version"], JSON_VERSION)
                 self.assertEqual(out.stderr, "")
-
-    def test_sums_use_the_same_dropped_shape_as_the_templates(self):
-        self.own("research", RESEARCH.replace("調べてから", "調べずに"))
-        self.own("feature", FEATURE.replace("機能を", "別の機能を"))
-        self.common("broken", "name: [\n")
-        answer = self.answer()
-        dropped = {
-            (row["layer"], row["name"]): row["dropped"]
-            for sums in answer["sums"]
-            for row in sums["templates"]
-            if row["dropped"] is not None
-        }
-        self.assertEqual(dropped[("self", "research")]["reason"], "conflict")
-        self.assertEqual(dropped[("common", "broken")]["reason"], "invalid")
-        for value in dropped.values():
-            self.assertEqual(set(value), {"reason", "detail"})
-        kept = [r for s in answer["sums"] for r in s["templates"] if r["name"] == "feature"]
-        self.assertTrue(any(r["dropped"] is None for r in kept))
-
-    def test_show_prefers_the_effective_one(self):
-        self.own("research", RESEARCH.replace("調べてから", "調べずに"))
-        shown = json.loads(self.ccnavi("--templates", "--show", "research", "--json").stdout)
-        self.assertEqual(shown["template"]["layer"], "common")
-
-    def test_wrong_combinations_are_refused(self):
         for args, needle in (
             (["--show", "feature"], "--templates"),
             (["--layer", "self"], "--templates"),
@@ -445,28 +228,23 @@ class CliTest(Harness):
             (["--templates", "--show", "a", "--keyword", "b"], "--keyword"),
             (["--templates", "ticket"], "フラグ以外の語"),
             (["--templates", "--show", " "], "名前"),
+            (["--lint", "--keyword", "x"], "--docs でだけ"),
         ):
             out = self.ccnavi(*args)
             self.assertEqual(out.returncode, 1, args)
             self.assertIn(needle, out.stderr, args)
             self.assertEqual(out.stdout, "", args)
-
-    def test_the_list_says_why_a_broken_template_is_not_used(self):
-        self.common("broken", "name: [\n")
-        write(os.path.join(os.path.dirname(self.path("self", "x")), "notes.txt"), "x")
-        write(self.path("lib", "lib"), template("lib", "  - design\n"))
-        out = self.ccnavi("--templates").stdout
-        self.assertIn("broken  [common]（使わない: invalid）  YAML として読めない", out)
-        self.assertIn("notes.txt", out)
-        # 統合結果の相手でないレイヤーの置き場の苦情は、一覧に混ぜない。
-        other = self.ccnavi("--templates", "--layer", "lib").stdout
-        self.assertNotIn("notes.txt", other)
-        self.assertIn("lib  [lib]", other)
-
-    def test_the_keyword_is_still_docs_only_elsewhere(self):
-        out = self.ccnavi("--lint", "--keyword", "x")
-        self.assertEqual(out.returncode, 1)
-        self.assertIn("--docs でだけ", out.stderr)
+        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
+        for extra in (["--show", "x"], ["--draft", "p"], ["--keyword", "k"]):
+            out = self.ccnavi("--templates", "--check-file", path, *extra)
+            self.assertNotEqual(out.returncode, 0, extra)
+            self.assertIn("--check-file", out.stderr)
+        alone = self.ccnavi("--check-file", path)
+        self.assertNotEqual(alone.returncode, 0)
+        self.assertIn("--templates と一緒に使う", alone.stderr)
+        result = self.ccnavi("--templates", "--check-file", path, "--layer", "nothing", "--json")
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(json.loads(result.stdout)["ok"])
 
 
 class LintTest(Harness):
@@ -474,16 +252,11 @@ class LintTest(Harness):
         result = self.ccnavi("--lint", "--json", "--mode", "enable")
         return [p for p in json.loads(result.stdout)["problems"] if "templates" in p["where"]]
 
-    def test_no_templates_say_nothing(self):
+    def test_problems_are_reported_with_their_layer(self):
         self.assertEqual(self.lint(), [])
-
-    def test_a_good_template_says_nothing(self):
         self.common("research", RESEARCH)
         self.own("feature", FEATURE)
         self.assertEqual(self.lint(), [])
-
-    def test_problems_are_reported_with_their_layer(self):
-        self.common("research", RESEARCH)
         self.own("research", RESEARCH.replace("調べてから", "調べずに"))
         self.own("ends", template("ends", "  - design\n  - acceptance\n"))
         self.own("unknown", template("unknown", "  - docs\n"))
@@ -500,17 +273,9 @@ class LintTest(Harness):
         details = " ".join(p["detail"] for p in self.lint())
         self.assertIn("research: ", details)
         self.assertIn("ends: ", details)
-
-    def test_the_text_report_counts_the_errors(self):
-        self.own("ends", template("ends", "  - design\n  - acceptance\n"))
         result = self.ccnavi("--lint", "--mode", "enable")
         self.assertEqual(result.returncode, 1)
         self.assertTrue(any("templates/self" in line for line in result.stdout.splitlines()))
-
-    def test_the_lint_version_is_unchanged(self):
-        # 欄を足さないので、`--lint --json` の形の版は上げない。
-        result = self.ccnavi("--lint", "--json", "--mode", "enable")
-        self.assertEqual(json.loads(result.stdout)["version"], 1)
 
 
 def showcase(root: str) -> None:
@@ -557,90 +322,15 @@ class CheckFileTest(Harness):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
-    def test_a_plan_with_feedback_and_flows_is_read(self):
-        got = self.check(FEATURE)
-        self.assertTrue(got["ok"])
-        self.assertTrue(got["valid"])
-        self.assertEqual(got["name"], "feature")
-        self.assertEqual(got["sha"], hashlib.sha256(FEATURE.encode()).hexdigest())
-        self.assertEqual(got["problems"], [])
-        self.assertEqual(got["data"]["plan"], ["design", {"type": "implement", "after": [1]}])
-        self.assertEqual(list(got["data"]["flows"]), ["2"])
-        plan, feedback = got["plans"]
-        self.assertEqual((plan["part"], feedback["part"]), ("plan", "feedback"))
-        self.assertEqual([i["number"] for i in plan["items"]], [1, 2])
-        self.assertEqual([i["number"] for i in feedback["items"]], [3])
-        self.assertEqual(plan["items"][0]["title"], "設計")
-        self.assertEqual(plan["after"], {"2": [1]})
-        self.assertEqual(plan["ready"], [1])
-        self.assertEqual(plan["problems"], [])
-        self.assertEqual(plan["source_sha"], got["sha"])
-        self.assertIn("implement", [t["id"] for t in got["types"]])
-
-    def test_a_plan_only_template_has_one_graph(self):
+    def test_a_plan_only_template_has_one_graph_and_unreadable_yaml_is_invalid(self):
         got = self.check(RESEARCH, "research")
         self.assertEqual([p["part"] for p in got["plans"]], ["plan"])
         self.assertFalse(got["plans"][0]["items"][0]["review"])
-
-    def test_unreadable_yaml_is_invalid(self):
         got = self.check("name: [\n")
         self.assertFalse(got["valid"])
         self.assertIsNone(got["data"])
         self.assertEqual(got["plans"], [])
-        self.assertEqual(self.problems(got, "error")[:1] != [], True)
-
-    def test_a_bad_after_is_an_error_and_the_graph_still_comes(self):
-        got = self.check(template("feature", "  - design\n  - {type: implement, after: [2]}\n"))
-        self.assertTrue(got["valid"])
         self.assertTrue(self.problems(got, "error"))
-        plan = got["plans"][0]
-        self.assertEqual(plan["after"], {"2": [2]})
-        self.assertEqual(plan["loose"], [])
-        self.assertEqual(plan["ready"], [])
-        self.assertTrue(plan["problems"])
-
-    def test_an_unknown_type_is_a_warn_and_the_graph_comes(self):
-        got = self.check(template("feature", "  - nothing\n"))
-        self.assertTrue(got["valid"])
-        self.assertTrue(self.problems(got, "warn"))
-        self.assertFalse(self.problems(got, "error"))
-        self.assertEqual(got["plans"][0]["items"][0]["title"], "(定義なし) nothing")
-
-    def test_the_layer_is_checked_with_its_own_types(self):
-        for layer in ("common", "self"):
-            got = self.check(RESEARCH, "research", "--layer", layer)
-            self.assertEqual(got["layer"], layer)
-            self.assertIn("research", [t["id"] for t in got["types"]])
-
-    def test_an_unknown_layer_fails(self):
-        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
-        result = self.ccnavi("--templates", "--check-file", path, "--layer", "nothing", "--json")
-        self.assertEqual(result.returncode, 1)
-        self.assertFalse(json.loads(result.stdout)["ok"])
-
-    def test_a_missing_file_is_an_error_problem(self):
-        result = self.ccnavi(
-            "--templates", "--check-file", os.path.join(self.root, "none.yml"), "--json"
-        )
-        got = json.loads(result.stdout)
-        self.assertFalse(got["valid"])
-        self.assertTrue(self.problems(got, "error"))
-
-    def test_the_text_form_prints_a_summary(self):
-        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
-        out = self.ccnavi("--templates", "--check-file", path)
-        self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertIn("読めた: はい", out.stdout)
-
-    def test_it_does_not_combine_with_other_modes(self):
-        path = write(os.path.join(self.root, "tmp-check", "feature.yml"), FEATURE)
-        for extra in (["--show", "x"], ["--draft", "p"], ["--keyword", "k"]):
-            out = self.ccnavi("--templates", "--check-file", path, *extra)
-            self.assertNotEqual(out.returncode, 0, extra)
-            self.assertIn("--check-file", out.stderr)
-        alone = self.ccnavi("--check-file", path)
-        self.assertNotEqual(alone.returncode, 0)
-        self.assertIn("--templates と一緒に使う", alone.stderr)
 
     def test_the_answer_matches_the_fixture(self):
         got = self.check(FEATURE)
