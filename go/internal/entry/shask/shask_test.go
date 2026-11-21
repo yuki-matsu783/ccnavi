@@ -1,6 +1,7 @@
 package shask
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -42,8 +43,65 @@ func shaskWorkspace(t *testing.T) string {
 	return root
 }
 
+// shapeCase は親の見分け方を、ファイルの形ごとに 1 つずつ見る場面。親のワークツリーは名前だけで、置くのは files（ワークツリー
+// からの相対。"archive/" で始まるものはワークスペースの logs/archive/self/done に置く）。
+type shapeCase struct {
+	name  string
+	files map[string]string
+}
+
+const approvedDoing = ".ccnavi/approved/doing/"
+
+func front(fields ...string) string {
+	return "---\n" + strings.Join(fields, "\n") + "\n---\n本文\n"
+}
+
+var shapeCases = []shapeCase{
+	{"s-done", map[string]string{".ccnavi/approved/done/s-done.md": front("ticket: s-done")}},
+	{"s-review", map[string]string{"wip/proposals/review/s-review.md": front("ticket: s-review")}},
+	{"s-child", map[string]string{approvedDoing + "s-child.md": front("ticket: s-child", "parent: x", `started_at: "2026-10-18T00:00:00Z"`)}},
+	{"s-other", map[string]string{approvedDoing + "s-other.md": front("ticket: s-other-2")}},
+	{"s-quoted", map[string]string{approvedDoing + "s-quoted.md": front(`ticket: "s-quoted"`)}},
+	{"s-body", map[string]string{approvedDoing + "s-body.md": "---\nticket: s-body\n---\nparent: これは本文\n"}},
+	{"s-archived-child", map[string]string{"archive/s-archived-child.md": front("ticket: s-archived-child", "parent: x")}},
+	{"s-nostart", map[string]string{approvedDoing + "s-nostart.md": front("ticket: s-nostart")}},
+	{"s-emptystart", map[string]string{approvedDoing + "s-emptystart.md": front("ticket: s-emptystart", `started_at: ""`)}},
+	{"s-started", map[string]string{approvedDoing + "s-started.md": front("ticket: s-started", "started_at: 2026-10-18T00:00:00Z")}},
+	{"s-todostart", map[string]string{"wip/proposals/todo/s-todostart.md": front("ticket: s-todostart", "started_at: 2026-10-18T00:00:00Z")}},
+	{"s-marks", map[string]string{
+		".ccnavi/approved/phases/s-marks/1.reviewed": "{}\n", ".ccnavi/approved/phases/s-marks/x.requested": "{}\n",
+		".ccnavi/approved/phases/s-other/1.requested": "{}\n"}},
+	{"s-marked", map[string]string{".ccnavi/approved/phases/s-marked/2.requested": "{}\n"}},
+	{"s-mr", map[string]string{approvedDoing + "s-mr.md": front("ticket: s-mr", "mr: 430")}},
+	{"s-mr0", map[string]string{approvedDoing + "s-mr0.md": front("ticket: s-mr0", "mr: 0")}},
+	{"s-mr-neg", map[string]string{approvedDoing + "s-mr-neg.md": front("ticket: s-mr-neg", "mr: -3")}},
+	{"s-mr-abc", map[string]string{approvedDoing + "s-mr-abc.md": front("ticket: s-mr-abc", "mr: abc")}},
+	{"s-mr-list", map[string]string{approvedDoing + "s-mr-list.md": front("ticket: s-mr-list", "mr: [1]")}},
+	{"s-mr-empty", map[string]string{approvedDoing + "s-mr-empty.md": front("ticket: s-mr-empty", `mr: ""`)}},
+	{"s-mr-todo", map[string]string{"wip/proposals/todo/s-mr-todo.md": front("ticket: s-mr-todo", "mr: 5")}},
+}
+
+// putShapes は shapeCases を置く（ワークツリーは git を起こさずディレクトリだけ）。
+func putShapes(t *testing.T, root string) {
+	t.Helper()
+	for _, c := range shapeCases {
+		dir := testkit.Worktree(root, c.name)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for rel, text := range c.files {
+			if name, ok := strings.CutPrefix(rel, "archive/"); ok {
+				testkit.Put(t, filepath.Join(root, "logs", "archive", "self", "done", name), text)
+				continue
+			}
+			testkit.Put(t, filepath.Join(dir, filepath.FromSlash(rel)), text)
+		}
+	}
+}
+
 func TestAnswersMatchGolden(t *testing.T) {
 	root := shaskWorkspace(t)
+	putShapes(t, root)
 	w := func(name string) string { return testkit.Worktree(root, name) }
 	nope := filepath.Join(root, "nope")
 	cmds := [][]string{
@@ -59,6 +117,9 @@ func TestAnswersMatchGolden(t *testing.T) {
 		{"tree", "parent", w("i0001")},
 		{"tree", "other", root, "x"},
 	}
+	for _, c := range shapeCases {
+		cmds = append(cmds, []string{"tree", "parent", w(c.name), c.name})
+	}
 	want := golden.Load[[][3]any](t, "answers")
 	conf := testkit.Settings(t, root)
 	for i, cmd := range cmds {
@@ -68,7 +129,9 @@ func TestAnswersMatchGolden(t *testing.T) {
 			code = -1
 		}
 		got := [3]any{float64(code), testkit.Rel(root, out.String()), testkit.Rel(root, errOut.String())}
-		if i >= len(want) || got != want[i] {
+		if i >= len(want) {
+			t.Errorf("%q: 見本に行が無い。答え %q", cmd, got)
+		} else if got != want[i] {
 			t.Errorf("%q:\n got %q\nwant %q", cmd, got, want[i])
 		}
 	}
