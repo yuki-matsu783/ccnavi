@@ -2,13 +2,13 @@
 
 読み込み・2 層の統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
 go/internal/tickets/proposal/templates の見本（`TestMatchesGolden`）が 1 字単位で見る。
-ここで見るのは見本が持たない次の 4 つ。
+リンク・ハードリンクを読まない保護は `links_test.go`（`TestLinksAreNotRead`）が見る。
+ここで見るのは見本が持たない次の 3 つ。
 
-1. 読み込み: フローと同じ読み手の保護（リンク・ハードリンク）
-2. `ccnavi --templates` のテキストの出方、`--json` の答えの形（tests/fixtures/templates-json.json と
+1. `ccnavi --templates` のテキストの出方、`--json` の答えの形（tests/fixtures/templates-json.json と
    templates-check-json.json。拡張と共有する）、使い方の誤りの拒否
-3. `ccnavi --lint` への出方（レイヤーの名前と重さ）
-4. 型の定義が変わったときの扱い
+2. `ccnavi --lint` への出方（レイヤーの名前と重さ）
+3. 型の定義が変わったときの扱い
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import shutil
 import tempfile
 import unittest
 
-from tests import ROOT, can_symlink, common_path, config_path
+from tests import ROOT, common_path, config_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_ticket import write
 from tests.ticketsample import PHASES
@@ -118,33 +118,6 @@ class LayerTest(Harness):
         answer = self.answer()
         self.assertEqual(answer["templates"], [])
         self.assertFalse(answer["layers"][0]["exists"])
-
-    def test_linked_files_and_a_linked_place_are_not_read(self):
-        place = self.path("self", "research")
-        directory = os.path.dirname(place)
-        os.makedirs(directory)
-        outside = write(os.path.join(self.root, "outside.yml"), RESEARCH)
-        if can_symlink():
-            os.symlink(outside, place)
-            row = self.entry("self", "research")
-            self.assertFalse(row["valid"])
-            self.assertIn("シンボリックリンク", self.problems(row, "error")[0])
-            os.remove(place)
-            write(os.path.join(self.root, "elsewhere", "research.yml"), RESEARCH)
-            os.rmdir(directory)
-            os.symlink(os.path.join(self.root, "elsewhere"), directory)
-            layer = self.answer()["layers"][1]
-            self.assertEqual(layer["templates"], [])
-            self.assertIn("シンボリックリンク", layer["unreadable"])
-            os.remove(directory)
-            os.makedirs(directory)
-        try:
-            os.link(outside, place)
-        except OSError:
-            return
-        row = self.entry("self", "research")
-        self.assertFalse(row["valid"])
-        self.assertIn("ハードリンク", self.problems(row, "error")[0])
 
 
 class CheckTest(Harness):
