@@ -250,7 +250,7 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 `agree.Gather`・`candidates.Candidates` が持ち、`user agree` が外さないもの（範囲の超過と、読めない提案）では外さない。
 走査は絞る前の全ツリーを見るので、他のセッションの書きかけ 1 本で「いいえ」になることがある。承認で外れる
 ものは `--lint` も名指しする。新規の提案に雛形の空欄の目印が残っているのも、外れる条件の 1 つ
-（改版は warn で外さない。親の必須の見出しの欠けも warn。提案の書式 9.3）。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
+（改版は warn で外さない。`ticket-sections.yml` が求める見出しの欠けも warn。提案の書式 9.3）。ただし「まだ承認できない」もの（前のフェーズが閉じていない子。
 `rules.KindNotYet`）は `--lint` では warn。
 
 エージェントは、同じ検査を `ccnavi-ticket.sh approval-request <親> --check` で通す。`--check` は承認の画面と同じ `agree.Gather` に加えて、親の状態（`lifecycle/treegate` の `ApprovalRequest`）を見る。置き場の外の未コミットの変更は、承認の後に子の `finish` を止める。未 push のコードは、送る提案と一緒に公開される。ホスト・git のリモートの事前確認もして、何も送らない。判定は `core.checkReadiness` の 1 か所にあり、本番の `approval-request` の gate（`core.ApprovalRequestGate`）と `--agree --preview --verify` が同じ関数を通す。sh は親の状態を判定しない。`--verify` の `verify.reason` には、この理由が `dirty_parent`・`unpushed_code` として出る。承認そのもの（`--yes`）は、親の未コミットの変更を警告にとどめ、拒否しない。`approval-request` の本体も、sh がロック・取り込みをする前に、同じ検査（`--check`）を先に通して断る。

@@ -50,7 +50,7 @@ allow:
 
 - `id`は必須。書かないルールは読み込まず、`--lint`がerrorで名指しする（記録と文面にこの名前が出るため、名前の無いルールは記録も報告も指せない）
 - `id`にコロンは書けない（レイヤーの名前を添えた`self:id` / `<プロジェクト名>:id`と見分けが付かないため）。
-  `--lint`がerrorにし、その 1 件は読み込まれない。ルール・フェーズ定義・リスクの配点の 3 本とも同じ
+  `--lint`がerrorにし、その 1 件は読み込まれない。ルール・フェーズ定義・リスクの配点・提案の見出しの 4 本とも同じ
 - `glob`も`regex`も、どの機械でも大文字小文字を区別せずに適用する。`*/.ccnavi/*`は`.Ccnavi/`にもヒットする。
   `allow`も表記違いにまでヒットするので、既存のルールを持ち込むときは`--test-expectations`で、通したくないものが
   通っていないことを確かめる
@@ -71,9 +71,9 @@ allow:
 
 | レイヤー | 置き場 | 何を置くか |
 |---|---|---|
-| 共通レイヤー | `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定） | どのツリーにも適用するもの |
-| ワークスペース自身のレイヤー | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ適用するもの |
-| プロジェクトのレイヤー | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ適用するもの |
+| 共通レイヤー | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml`（置き場は固定） | どのツリーにも適用するもの |
+| ワークスペース自身のレイヤー | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
+| プロジェクトのレイヤー | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
 作業・レビュー計画のテンプレートは、共通のもの（ある場合）を`.ccnavi/config/common/templates/`、そのワークスペース（またはプロジェクト）のものを`.ccnavi/config/project/templates/`に置く。この表の 3 本には入らず、`*/.ccnavi/*`の一般の保護で守られる。
 

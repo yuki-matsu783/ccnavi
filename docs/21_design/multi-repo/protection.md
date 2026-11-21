@@ -15,20 +15,20 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 | 対象 | 場所 |
 |---|---|
 | hook の登録 | `.claude/settings.json`、`.claude/settings.local.json` |
-| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks}.yml` |
-| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
-| 自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` |
-| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` |
+| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml` |
+| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
+| 自身のレイヤーの 4 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` |
+| プロジェクトのレイヤーの 4 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` |
 | 実行ファイル | `CCNAVI_ENTRY_PATH`（振り分けの sh）と、sh が起動する実体（8.2） |
 | ワークツリー側の設定 | 上の各ファイルのうち追跡されているものについて、**その元リポジトリから切った**ワークツリーが持つ同じファイル |
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/<名前>.yml`）は、`*/.ccnavi/*` の一般の保護で、Write / Edit もシェルからの書き込みも止める。
 
 ファイル単位で、無いものは対象から外れる（REQ-SLF-03）。Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、
-`rules.yml` と同じものを掛ける。3 本とも判定の中身そのもので、書けるとエージェントが自分の判定を緩められる。
+`rules.yml` と同じものを掛ける。4 本とも判定の中身そのもので、書けるとエージェントが自分の判定を緩められる。
 
-予約名のプロジェクトの 3 本も守る。ファイルはバックアップして戻す。バックアップの名前はレイヤーの種別で決め、レイヤーの名前の表記では決めない
-（レイヤーの名前で比べると `projects/common/` の 3 本が共通レイヤーと同じ名前になり、バックアップと復元の対象から外れる）。
+予約名のプロジェクトの 4 本も守る。ファイルはバックアップして戻す。バックアップの名前はレイヤーの種別で決め、レイヤーの名前の表記では決めない
+（レイヤーの名前で比べると `projects/common/` の 4 本が共通レイヤーと同じ名前になり、バックアップと復元の対象から外れる）。
 
 共通レイヤーのファイルは、フェーズ定義と配点もコアに入れる。シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通レイヤーのファイルを守るぶんも組み込み
 （`builtin:guard-common-layer`）で持つ（ルールの 1 行に任せると、書き換えたルールファイルのもとで通る）。組み込みで名指しのツールを止めるのは、
