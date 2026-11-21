@@ -39,12 +39,13 @@ func sourcesFor(t *testing.T) sources {
 	if srcSkip != "" {
 		t.Skip(srcSkip)
 	}
+	t.Logf("sh = %s\ndist = %s", src.shDir, src.dist)
 	return src
 }
 
 func loadSources() {
-	if !hasProgram("sh") && !hasProgram("bash") {
-		srcSkip = "sh も bash も見つからない"
+	if !hasProgram("sh") {
+		srcSkip = "sh が見つからない"
 		return
 	}
 	if !hasProgram("git") {
@@ -75,7 +76,7 @@ func walkUp(rel string, skipWorktrees bool) string {
 	here := root
 	for {
 		candidate := filepath.Join(here, rel)
-		inside := skipWorktrees && strings.Contains(here, filepath.Join(".claude", "worktrees"))
+		inside := skipWorktrees && inWorktree(here)
 		if isDirPath(candidate) && !inside {
 			return candidate
 		}
@@ -84,6 +85,20 @@ func walkUp(rel string, skipWorktrees bool) string {
 			return filepath.Join(root, rel)
 		}
 		here = parent
+	}
+}
+
+// inWorktree は dir が `<ワークスペースルート>/.claude/worktrees/<名前>` か、その下か。
+func inWorktree(dir string) bool {
+	for d := dir; ; {
+		if run.IsWorktreeDir(d) {
+			return true
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return false
+		}
+		d = parent
 	}
 }
 
