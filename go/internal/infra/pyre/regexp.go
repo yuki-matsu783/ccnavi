@@ -35,6 +35,9 @@ type instBody struct {
 	ignore  bool
 	behind  int // 後読みの幅。-1 なら先読み
 	yes, no []*inst
+	// next は、1 字を読む中身の繰り返し（simple）のあとに続く並びが、どの位置から当たりうるかの見積もり。
+	// 続きが空に当たりうるなら nil。repeatOne は、ここで外れる位置では続きを試さない。
+	next *startFilter
 }
 
 // Regexp は組み立てた式。並行に使ってよい。
@@ -49,7 +52,8 @@ type program struct {
 	prog   []*inst
 	groups int
 	names  map[string]int
-	anchor bool // 先頭でしか当たらない（\A か、複数行でない ^ で始まる）
+	// first は、照合をどの位置から始めれば当たりうるかの見積もり。search は、ここで外れる開始位置を試さない。
+	first startFilter
 }
 
 // compileKey は組んだ式を覚えておく鍵。同じ文字列でも旗が違えば別の式になる。
@@ -96,11 +100,7 @@ func compile(pattern string, flags Flag) (*program, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &program{prog: prog, groups: st.groups(), names: st.groupdict}
-	if len(prog) > 0 && prog[0].op == opAt && (prog[0].at == atBeginningString || prog[0].at == atBeginning && !prog[0].multi) {
-		p.anchor = true
-	}
-	return p, nil
+	return &program{prog: prog, groups: st.groups(), names: st.groupdict, first: filterOf(prog)}, nil
 }
 
 // MustCompile は、このビルドに書いた固定の式を、初めて使うときに組む Regexp を返す。組めなければそのとき panic する
@@ -132,6 +132,13 @@ func compileSeq(s seq, fl Flag, st *parseState) ([]*inst, error) {
 			return nil, err
 		}
 		out = append(out, in)
+	}
+	for i, in := range out {
+		if in.test == nil && in.op == opRepeat && in.simple != nil {
+			if f := filterOf(out[i+1:]); !f.any {
+				in.next = &f
+			}
+		}
 	}
 	return out, nil
 }
@@ -375,15 +382,11 @@ type span struct {
 
 func (re *Regexp) search(text []rune, pos int, advance bool) (span, bool, error) {
 	p := re.built()
-	last := len(text)
-	if p.anchor {
-		last = min(pos, last)
-		if pos > 0 {
-			return span{}, false, nil
-		}
-	}
 	m := re.newMatcher(text, false, false, 0)
-	for start := pos; start <= last; start++ {
+	for start := pos; start <= len(text); start++ {
+		if !p.first.ok(text, start) {
+			continue
+		}
 		// 当たらなかった試しは捕えた位置を元に戻して終わるので、同じ matcher を使い回せる。
 		m.advance, m.start = advance && start == pos, start
 		if end, ok := m.try(p.prog, start); ok {
@@ -408,6 +411,8 @@ var errDepthLimit = errors.New("pyre: 照合の入れ子が上限を越えたの
 
 type matcher struct {
 	s        []rune
+	end      int  // try が最後に受け取った終わりの位置
+	done     cont // try の最後の続き。開始位置ごとに作り直さないよう、matcher に 1 つ持つ
 	marks    []int
 	stack    []int
 	matchAll bool
@@ -423,19 +428,24 @@ func (re *Regexp) newMatcher(s []rune, matchAll, advance bool, start int) *match
 	for i := range marks {
 		marks[i] = -1
 	}
-	return &matcher{s: s, marks: marks, matchAll: matchAll, advance: advance, start: start}
+	m := &matcher{s: s, marks: marks, matchAll: matchAll, advance: advance, start: start}
+	m.done = m.finish
+	return m
+}
+
+// finish は照合の最後の続き。fullmatch なら末尾まで当たったときだけ、finditer で空の一致の直後なら空でない一致のときだけ受け入れる。
+func (m *matcher) finish(j int) bool {
+	if m.matchAll && j != len(m.s) || m.advance && j == m.start {
+		return false
+	}
+	m.end = j
+	return true
 }
 
 func (m *matcher) try(prog []*inst, start int) (int, bool) {
-	end := -1
-	ok := m.run(prog, start, func(j int) bool {
-		if m.matchAll && j != len(m.s) || m.advance && j == m.start {
-			return false
-		}
-		end = j
-		return true
-	})
-	return end, ok
+	m.end = -1
+	ok := m.run(prog, start, m.done)
+	return m.end, ok
 }
 
 type cont func(int) bool
@@ -658,7 +668,7 @@ func (m *matcher) repeatOne(n *inst, i int, k cont) bool {
 			}
 		}
 		for {
-			if k(i + c) {
+			if n.next.ok(m.s, i+c) && k(i+c) {
 				return true
 			}
 			if !unlimited(n, c) || i+c >= len(m.s) || !n.simple(m.s[i+c]) {
@@ -675,10 +685,10 @@ func (m *matcher) repeatOne(n *inst, i int, k cont) bool {
 		return false
 	}
 	if n.kind == possessive {
-		return k(i + c)
+		return n.next.ok(m.s, i+c) && k(i+c)
 	}
 	for ; c >= n.min; c-- {
-		if k(i + c) {
+		if n.next.ok(m.s, i+c) && k(i+c) {
 			return true
 		}
 	}

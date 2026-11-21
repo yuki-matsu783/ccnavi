@@ -3,6 +3,7 @@ package pyfmt
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // Upper は Python の str.upper()。strings.ToUpper は 1 字を 1 字にしか写さないので、Python が 2 字以上に
@@ -19,6 +20,16 @@ func Upper(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// UpperRune は、Python が 1 字の大文字として使う字を返す（C の _PyUnicode_ToUppercase）。2 字以上に写す字は、その 1 字目を返す（ß は S）。
+// 正規表現の大文字小文字の無視（re の sre）は、字に大文字小文字の別があるかをこれで決める。
+func UpperRune(r rune) rune {
+	if u, ok := upperSpecial[r]; ok {
+		first, _ := utf8.DecodeRuneInString(u)
+		return first
+	}
+	return unicode.ToUpper(r)
 }
 
 // upperSpecial は Python の str.upper() が 2 字以上に写す字（Python 3.13 の unicodedata から作った）。

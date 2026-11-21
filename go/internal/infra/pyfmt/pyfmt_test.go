@@ -99,6 +99,15 @@ func TestUpper(t *testing.T) {
 	}
 }
 
+// 期待は Python の C 実装の _PyUnicode_ToUppercase（re の大文字小文字の無視が使う 1 字の大文字）。
+func TestUpperRune(t *testing.T) {
+	for in, want := range map[rune]rune{'a': 'A', 'ß': 'S', 'ﬁ': 'F', 'ᾀ': 'Ἀ', 'ı': 'I', 'A': 'A', '日': '日'} {
+		if got := UpperRune(in); got != want {
+			t.Errorf("UpperRune(%U) = %U, want %U", in, got, want)
+		}
+	}
+}
+
 // 期待は Python の format(x, "g")。
 func TestFormatG(t *testing.T) {
 	for in, want := range map[float64]string{

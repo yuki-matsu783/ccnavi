@@ -23,18 +23,39 @@ var unsupported = []struct{ literal, label string }{
 	{"(?!", "否定先読み"},
 	{"(?<=", "後読み"},
 	{"(?<!", "否定後読み"},
+	{"(?P=", "後方参照"},
 }
 
-// unsupportedIn は書けない形の名前を返す。無ければ空。`\` に 1〜9 が続けば後方参照と数える（`\1` も含む）。
+// unsupportedIn は、使えない書き方を見つけて、その名前を返す。見つからなければ空。名前で指す後方参照（`(?P=name)`）のほか、
+// `\` に 1〜9 が続く番号の後方参照（`\1`）も数える。逃がした字（`\\1` の `1`、`\(?=` の `(`）と文字クラスの中
+// （`[\1]` は 8 進の字、`[(?=]` はただの字）は書き方として数えない。
 func unsupportedIn(expression string) string {
-	for _, u := range unsupported {
-		if strings.Contains(expression, u.literal) {
-			return u.label
-		}
-	}
-	for i := 0; i+1 < len(expression); i++ {
-		if expression[i] == '\\' && expression[i+1] >= '1' && expression[i+1] <= '9' {
-			return "後方参照"
+	inClass := false
+	for i := 0; i < len(expression); i++ {
+		c := expression[i]
+		switch {
+		case c == '\\':
+			if !inClass && i+1 < len(expression) && expression[i+1] >= '1' && expression[i+1] <= '9' {
+				return "後方参照"
+			}
+			i++ // 逃がした字は読み飛ばす
+		case inClass:
+			inClass = c != ']'
+		case c == '[':
+			inClass = true
+			// 文字クラスの頭の `]`（`^` のあとも）は閉じ括弧でなく字。
+			if i+1 < len(expression) && expression[i+1] == '^' {
+				i++
+			}
+			if i+1 < len(expression) && expression[i+1] == ']' {
+				i++
+			}
+		case c == '(':
+			for _, u := range unsupported {
+				if strings.HasPrefix(expression[i:], u.literal) {
+					return u.label
+				}
+			}
 		}
 	}
 	return ""
