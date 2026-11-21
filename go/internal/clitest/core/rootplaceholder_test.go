@@ -112,7 +112,9 @@ func TestRootGlobFormAndSpellingOfTheRoot(t *testing.T) {
 	out := e.judge("Write", filepath.Join(e.root, "wip", "a.md"))
 	mustContain(t, "wip の理由", str(out, "permissionDecisionReason"), "wip")
 	// 表記を変えても行き着く先でヒットする。`..` と、大文字小文字。
-	if d := str(e.judge("Write", filepath.Join(e.root, "docs", "..", "README.md")), "permissionDecision"); d != "deny" {
+	// Join は `..` を消すので文字列で組む。置き場（.claude/worktrees）の外へ出る形で、迂回を止める処理を試す。
+	escape := e.root + "/.claude/worktrees/x/../../../README.md"
+	if d := str(e.judge("Write", escape), "permissionDecision"); d != "deny" {
 		t.Errorf("`..` の迂回 = %s", d)
 	}
 	// ワークスペースルートのパスも、どの機械でも区別せずに適用する。区別する機械では別の場所を指すパスだが、

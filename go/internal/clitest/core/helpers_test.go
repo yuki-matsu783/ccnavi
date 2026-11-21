@@ -140,6 +140,9 @@ func judge(t testing.TB, root string, payload map[string]any, extra ...string) m
 		args = append(args, "--mode", "enable")
 	}
 	done := run.Ccnavi(t, append(args, extra...), run.Opts{Input: mustJSON(t, p), Dir: base.Root()})
+	if done.Code != 0 {
+		t.Fatalf("code = %d: %s", done.Code, done.Stderr)
+	}
 	if strings.TrimSpace(done.Stdout) == "" {
 		return map[string]any{}
 	}

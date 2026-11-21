@@ -15,6 +15,7 @@ import (
 
 // VS Code 拡張（ccnavi-board）のフィクスチャと、実行ファイルの JSON の形（キーの集合）が同じことを見る道具。
 // 形を変えたら `go test ./internal/clitest/core -run <テスト> -update-board-fixtures` でフィクスチャを書き直す。
+// tests/ticket の Python は環境変数 `CCNAVI_BOARD_FIXTURE=1` を使う。ticket 側を Go に移したら、このフラグに寄せる。
 
 var updateBoardFixtures = flag.Bool("update-board-fixtures", false, "VS Code 拡張のフィクスチャを、実行ファイルの出力で書き直す")
 

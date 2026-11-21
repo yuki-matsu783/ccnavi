@@ -6,7 +6,7 @@ import (
 )
 
 // `--lint` が `every`（渡す回の刻み）と、message の中の `.ccnavi/scripts/` について言うこと。
-// 渡す回の刻みそのものは go/internal/config の見本が見る。
+// 渡す回の刻みそのものは tests/config/test_rule_every.py が見る。
 
 const note = "ルールと突き合わせること。"
 

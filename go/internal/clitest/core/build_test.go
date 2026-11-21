@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -113,8 +114,12 @@ func TestBuildForThisMachineCopiesIntoItsPlace(t *testing.T) {
 	if readFile(t, live) != built {
 		t.Error("置き場の実行ファイルが組んだ物と違う")
 	}
-	if info, err := os.Stat(live); err != nil || info.Mode()&0o111 == 0 {
+	// 存在は Windows でも見る。実行ビットは Windows の Go が立てないので、Windows では見ない。
+	info, err := os.Stat(live)
+	if err != nil {
 		t.Errorf("実行できない: %v", err)
+	} else if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
+		t.Errorf("実行できない: 実行ビットが無い")
 	}
 	// コピーであって移すのではない。dist/ は導入スクリプトの配布元。
 	if !exists(filepath.Join(b.dist, "ccnavi", "ccnavi")) {
