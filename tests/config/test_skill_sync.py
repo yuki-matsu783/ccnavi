@@ -114,6 +114,7 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(read(os.path.join(skill_dir, "SKILL.md")), process_skill("process-test"))
         self.assertEqual(read(os.path.join(out, "common", "unit", "basics.md")), "# 基本\n")
         self.assertEqual(read(os.path.join(out, "common", "shared.md")), "共通の新しい中身\n")
+        self.assertEqual(read(os.path.join(seeded, "common", "shared.md")), "古い中身\n")
         self.assertFalse(os.path.exists(os.path.join(out, "common", "old")))
         self.assertTrue(os.path.exists(os.path.join(out, "common", "note.txt")))
         self.assertFalse(os.path.exists(os.path.join(out, "common", "ccnavi-index.jsonl")))
