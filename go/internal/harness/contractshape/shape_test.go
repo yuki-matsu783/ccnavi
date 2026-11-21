@@ -280,3 +280,25 @@ func listNames(t testing.TB, dir string) []string {
 	}
 	return names
 }
+
+func TestRequestResolveBuildsPathQueryAndBody(t *testing.T) {
+	context := map[string]string{"project.id": "7", "title": "a&b"}
+	req := Request{Path: "/projects/${project.id}/x", Query: map[string]string{"q": "${title}"}, Body: map[string]any{"t": "<${title}>"}}
+	path, body, err := req.Resolve(context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/projects/7/x?q=a%26b" {
+		t.Errorf("path = %s", path)
+	}
+	if string(body) != `{"t":"<a&b>"}` {
+		t.Errorf("body = %s", body)
+	}
+	_, body, err = Request{Path: "/p"}.Resolve(context)
+	if err != nil || body != nil {
+		t.Errorf("本文なし: body=%s err=%v", body, err)
+	}
+	if _, _, err := (Request{Path: "/${nope}"}).Resolve(context); err == nil {
+		t.Error("知らない名前がエラーにならない")
+	}
+}

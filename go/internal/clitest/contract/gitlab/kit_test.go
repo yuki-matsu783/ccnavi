@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -91,3 +92,20 @@ func dataTexts(t testing.TB) map[string]string {
 }
 
 func diff(key, kind string) cs.Diff { return cs.Diff{Key: key, Kind: kind} }
+
+func keysOf[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
+// sameNames は名前の集合が一致するか（並びは問わない）。
+func sameNames(t testing.TB, what string, want, got []string) {
+	t.Helper()
+	want, got = slices.Sorted(slices.Values(want)), slices.Sorted(slices.Values(got))
+	if !slices.Equal(want, got) {
+		t.Errorf("%s = %v, want %v", what, got, want)
+	}
+}

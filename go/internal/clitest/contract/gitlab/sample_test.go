@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -40,7 +39,7 @@ func TestSampleIsRegeneratedWithoutChange(t *testing.T) {
 		if err := enc.Encode(fresh); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(cs.DataDir(), "recorded.sample.json"), buf.Bytes(), 0o644); err != nil {
+		if err := cs.WriteAtomic(filepath.Join(cs.DataDir(), "recorded.sample.json"), buf.String()); err != nil {
 			t.Fatal(err)
 		}
 		return
@@ -61,15 +60,7 @@ func TestSampleSaysWhatItIsAndCoversEveryRequest(t *testing.T) {
 	for _, r := range fake {
 		names = append(names, r.Name)
 	}
-	var recorded []string
-	for n := range doc.Requests {
-		recorded = append(recorded, n)
-	}
-	slices.Sort(names)
-	slices.Sort(recorded)
-	if !slices.Equal(names, recorded) {
-		t.Errorf("サンプルの要求 = %v, want %v", recorded, names)
-	}
+	sameNames(t, "サンプルの要求", names, keysOf(doc.Requests))
 	if problems := cs.ReadsProblems(fake, doc.Requests); len(problems) != 0 {
 		t.Errorf("reads のキーがサンプルに無い: %v", problems)
 	}
@@ -224,15 +215,7 @@ func TestEachForbiddenStringIsCaughtWhenMixedIntoTheSample(t *testing.T) {
 	for _, f := range forbidden {
 		names = append(names, f.Name)
 	}
-	var covered []string
-	for n := range samples {
-		covered = append(covered, n)
-	}
-	slices.Sort(names)
-	slices.Sort(covered)
-	if !slices.Equal(names, covered) {
-		t.Fatalf("forbidden.json の名前 = %v, 試す名前 = %v", names, covered)
-	}
+	sameNames(t, "forbidden.json の名前", names, keysOf(samples))
 	base := dataTexts(t)["recorded.sample.json"]
 	for name, word := range samples {
 		t.Run(name, func(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -620,6 +621,45 @@ func Substitute(value any, context map[string]string) (any, error) {
 		return out, nil
 	}
 	return value, nil
+}
+
+// Resolve は要求の `${名前}` を場面の実体に置き、送る先（query を付けた path）と本文の JSON を返す。本文が無ければ nil。
+func (r Request) Resolve(context map[string]string) (string, []byte, error) {
+	path, err := substituteString(r.Path, context)
+	if err != nil {
+		return "", nil, err
+	}
+	if len(r.Query) > 0 {
+		query := url.Values{}
+		for k, v := range r.Query {
+			s, err := substituteString(v, context)
+			if err != nil {
+				return "", nil, err
+			}
+			query.Set(k, s)
+		}
+		path += "?" + query.Encode()
+	}
+	if r.Body == nil {
+		return path, nil, nil
+	}
+	body, err := Substitute(r.Body, context)
+	if err != nil {
+		return "", nil, err
+	}
+	raw, err := marshal(body, "")
+	if err != nil {
+		return "", nil, err
+	}
+	return path, raw, nil
+}
+
+func substituteString(text string, context map[string]string) (string, error) {
+	out, err := Substitute(text, context)
+	if err != nil {
+		return "", err
+	}
+	return out.(string), nil
 }
 
 // Placeholders は文字列に含まれる `${名前}` の名前。

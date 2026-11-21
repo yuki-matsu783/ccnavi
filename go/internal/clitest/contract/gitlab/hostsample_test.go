@@ -96,38 +96,18 @@ func requestsByName(t testing.TB, names []string) []cs.Request {
 // ask は見本に 1 件の要求を送り、(状態, 本文) を返す。
 func ask(t testing.TB, scene string, req cs.Request, context map[string]string, state string) (int, any) {
 	t.Helper()
-	path, err := cs.Substitute(req.Path, context)
+	rel, raw, err := req.Resolve(context)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rel := path.(string)
-	if len(req.Query) > 0 {
-		query := url.Values{}
-		for k, v := range req.Query {
-			s, err := cs.Substitute(v, context)
-			if err != nil {
-				t.Fatal(err)
-			}
-			query.Set(k, s.(string))
-		}
-		rel += "?" + query.Encode()
-	}
-	body := ""
-	if req.Body != nil {
-		b, err := cs.Substitute(req.Body, context)
-		if err != nil {
-			t.Fatal(err)
-		}
-		raw, _ := json.Marshal(b)
-		body = string(raw)
-	}
+	body := string(raw)
 	status, answer := hostfixture.GitlabAnswer(func(string) string { return "" }, base.Root(), scene, req.Method, rel, body, state)
-	raw, err := json.Marshal(answer)
+	rawAnswer, err := json.Marshal(answer)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var decoded any
-	if err := cs.DecodeJSON(raw, &decoded); err != nil {
+	if err := cs.DecodeJSON(rawAnswer, &decoded); err != nil {
 		t.Fatal(err)
 	}
 	return status, decoded
@@ -194,7 +174,12 @@ func hostProblems(t testing.TB, recorded map[string]cs.Entry, ran map[string]map
 		want := map[string]cs.Entry{}
 		reads := map[string][]string{}
 		for name := range answers {
-			want[name] = recorded[name]
+			entry, ok := recorded[name]
+			if !ok {
+				out = append(out, fmt.Sprintf("%s/%s: 記録に無い要求", scene, name))
+				continue
+			}
+			want[name] = entry
 			reads[name] = readKeys[name]
 			if n := comparedCount(readKeys[name], recorded[name], answers[name]); n == 0 {
 				out = append(out, fmt.Sprintf("%s/%s: 比べたキーが 0 件", scene, name))

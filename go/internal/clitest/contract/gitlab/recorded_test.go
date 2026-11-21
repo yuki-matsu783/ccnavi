@@ -65,15 +65,7 @@ func TestEveryRequestIsRecordedWithOnlyStatusAndShapeAndTheExpectedStatus(t *tes
 			t.Errorf("%s: 記録のステータス %d, 期待 %d", r.Name, got.Status, r.ExpectStatus)
 		}
 	}
-	var recorded []string
-	for n := range doc.Requests {
-		recorded = append(recorded, n)
-	}
-	slices.Sort(names)
-	slices.Sort(recorded)
-	if !slices.Equal(names, recorded) {
-		t.Errorf("記録の要求 = %v, want %v", recorded, names)
-	}
+	sameNames(t, "記録の要求", names, keysOf(doc.Requests))
 	// 記録には status と shape だけを置く（本文の値を持ち込まない）。
 	data, err := os.ReadFile(filepath.Join(cs.DataDir(), "recorded.json"))
 	if err != nil {
@@ -118,7 +110,12 @@ func TestRecordedAgreesWithTheFakeExceptForTheAllowList(t *testing.T) {
 	fake := loadFake(t)
 	want := map[string]cs.Entry{}
 	for _, r := range fake {
-		want[r.Name] = doc.Requests[r.Name]
+		entry, ok := doc.Requests[r.Name]
+		if !ok {
+			t.Errorf("記録に無い要求 %s", r.Name)
+			continue
+		}
+		want[r.Name] = entry
 	}
 	found := cs.CompareAll(want, run(t, fake, nil), cs.ReadsOf(fake))
 	allow := load[struct {

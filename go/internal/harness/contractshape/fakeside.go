@@ -137,35 +137,15 @@ func Run(requests []Request, tamper func(name string, body any) any) (map[string
 }
 
 func send(server *fakegitlab.Server, req Request, context map[string]string) (int, any, error) {
-	path, err := Substitute(req.Path, context)
+	path, raw, err := req.Resolve(context)
 	if err != nil {
 		return 0, nil, err
 	}
-	target := "/api/v4" + path.(string)
-	if len(req.Query) > 0 {
-		query := url.Values{}
-		for k, v := range req.Query {
-			s, err := Substitute(v, context)
-			if err != nil {
-				return 0, nil, err
-			}
-			query.Set(k, s.(string))
-		}
-		target += "?" + query.Encode()
-	}
 	var reader io.Reader
-	if req.Body != nil {
-		body, err := Substitute(req.Body, context)
-		if err != nil {
-			return 0, nil, err
-		}
-		raw, err := marshal(body, "")
-		if err != nil {
-			return 0, nil, err
-		}
+	if raw != nil {
 		reader = bytes.NewReader(raw)
 	}
-	httpReq, err := http.NewRequest(req.Method, server.URL+target, reader)
+	httpReq, err := http.NewRequest(req.Method, server.URL+"/api/v4"+path, reader)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -180,7 +160,7 @@ func send(server *fakegitlab.Server, req Request, context map[string]string) (in
 		return 0, nil, err
 	}
 	defer res.Body.Close()
-	raw, err := io.ReadAll(res.Body)
+	raw, err = io.ReadAll(res.Body)
 	if err != nil {
 		return 0, nil, err
 	}

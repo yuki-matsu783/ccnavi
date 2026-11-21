@@ -28,5 +28,9 @@
   {"name": "depth is cut at 5", "input": {"a": {"b": {"c": {"d": {"e": {"f": 1}}}}}},
    "expect": {"t": ["object"], "keys": {"a": {"t": ["object"], "keys": {"b": {"t": ["object"], "keys": {"c": {"t": ["object"], "keys": {"d": {"t": ["object"], "keys": {"e": {"t": ["object"]}}}}}}}}}}}},
   {"name": "depth cut for arrays", "input": [[[[[[1]]]]]],
-   "expect": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"]}}}}}}}
+   "expect": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"], "items": {"t": ["array"]}}}}}}},
+  {"name": "lowercase z datetime", "input": {"at": "2026-01-02T03:04:05z"},
+   "expect": {"t": ["object"], "keys": {"at": {"t": ["string"]}}}},
+  {"name": "datetime without seconds", "input": {"at": "2026-01-02T03:04Z"},
+   "expect": {"t": ["object"], "keys": {"at": {"t": ["string"]}}}}
 ]
