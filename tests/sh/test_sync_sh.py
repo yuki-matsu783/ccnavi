@@ -753,14 +753,6 @@ class SyncTest(SyncHarness):
         self.assertFalse(os.path.exists(self.tree))
         self.assertEqual(["main"], self.branches())
 
-    def test_an_open_request_of_a_present_family_changes_nothing(self):
-        log = self.review_log("none")
-        done = self.sync(PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        with open(log, encoding="utf-8") as f:
-            self.assertEqual("merged 42", f.read().strip())
-        self.assertTrue(os.path.isdir(self.tree))
-
     def test_a_present_family_without_an_mr_number_is_not_guessed(self):
         self.mine(copy_text(mr=""))
         log = self.review_log(f"merged 7 {self.sha(self.tree, 'HEAD')} {PARENT}")

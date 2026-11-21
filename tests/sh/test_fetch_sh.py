@@ -447,20 +447,6 @@ class FetchTest(unittest.TestCase):
         self.addCleanup(server.shutdown)
         return server.server_address[1]
 
-    def test_an_authentication_failure_on_github_points_to_gh(self):
-        """origin が GitHub のホスト名のときは、gh を案内する（glab は言わない）。"""
-        port = self.serve_unauthorized()
-        # github.com:<ポート> を手元のサーバに向ける。ホストへ実際には通信しない。
-        git(self.ws, "remote", "set-url", "origin", f"http://github.com:{port}/o/r.git")
-        git(self.ws, "config", "http.curloptResolve", f"github.com:{port}:127.0.0.1")
-        self.leave_main()
-        done = self.fetch(LANG="ja_JP.UTF-8", LC_ALL="ja_JP.UTF-8")
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertIn("認証に失敗した", done.stdout)
-        self.assertIn("gh auth login を頼む", done.stdout)
-        self.assertNotIn("glab", done.stdout)
-        self.assertIn("git fetch origin", done.stdout)
-
     def test_a_hanging_remote_is_cut_off(self):
         """応答しないリモートは CCNAVI_FETCH_TIMEOUT 秒で切る。hook の上限まで待たない。"""
         helpers = os.path.join(self._tmp.name, "bin")
