@@ -13,13 +13,19 @@ import (
 
 // 出力の行頭の `次: ` を、文字列リテラルで直に組み立てるコードを増やさない。`次:` の文は文面ファイル（.ccnavi/messages/next-*.yml）に置いて Say で引く（.agents/docs/message-files.md）。
 // 数えるのは、値が `次: ` で始まって続きがあるリテラルと、途中の改行の直後に `次: ` があるリテラル。
-// NextLabel のような見出しだけの値（比較や組み立ての部品）は数えない。_test.go は見ない。
+// NextLabel のような見出しだけの値（比較や組み立ての部品）は数えない。_test.go と、開発者だけが使うテストの道具（internal/harness）は見ない。
 func TestNoLiteralNextLines(t *testing.T) {
 	goDir := filepath.Join(repoRoot(t), "go")
 	var found []string
 	err := filepath.WalkDir(goDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if err != nil {
 			return err
+		}
+		if d.IsDir() && path == filepath.Join(goDir, "internal", "harness") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
 		}
 		files := token.NewFileSet()
 		file, err := parser.ParseFile(files, path, nil, 0)
