@@ -244,28 +244,12 @@ func (r *run) land(m marker) {
 	r.tidy(m)
 }
 
-// stop は片付けを途中で止める（済んだこと・残したものを言う）。
+// stop は片付けを途中で止める（理由と済んだことを言う。打ち直しは NOTE_GIT_DONE_STOPPED が言う）。
 func (r *run) stop(reason, id string) {
 	r.say("fail  git integrate-done  %s の片付けを途中で止めた", r.name)
 	r.say("理由: %s", reason)
 	if r.did != "" {
 		r.say("済んだこと: %s", r.did)
-	}
-	var kept []string
-	if exists(r.wt) {
-		kept = append(kept, "ワークツリー .claude/worktrees/"+r.name)
-	}
-	if exists(r.tmp) {
-		kept = append(kept, "一時ワークツリー")
-	}
-	if r.hasBranch() {
-		kept = append(kept, "ブランチ "+r.name)
-	}
-	if ospath.IsFile(r.mark) {
-		kept = append(kept, "取り込みの記録")
-	}
-	if len(kept) > 0 {
-		r.say("残したもの: %s", strings.Join(kept, "、"))
 	}
 	r.print(texts.Say(r.Root, "NOTE_GIT_DONE_STOPPED", texts.Values{"self_q": r.SelfQ, "name": r.name}, nil))
 	r.log.Info("片付けを止めた", "name", r.name, "reason", id)
