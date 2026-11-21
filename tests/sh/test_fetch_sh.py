@@ -727,6 +727,10 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(before, self.sha(self.ws, "HEAD"))
         self.assertEqual("refs/remotes/origin/main", self.origin_head())
         self.assertFalse(os.path.exists(log))
+        # ブランチを名指しせず、リポジトリごとに `fetch --quiet origin` を 1 回だけ打つ。
+        calls = self.fetch_calls(log)
+        self.assertEqual(1, len(calls), calls)
+        self.assertTrue(calls[0].endswith(" fetch --quiet origin"), calls)
 
     def test_quiet_without_a_remote(self):
         git(self.ws, "remote", "remove", "origin")

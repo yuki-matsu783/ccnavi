@@ -4,8 +4,6 @@
 取ってくる・送るために、次の写しを sh に持つ。実行ファイルの側は go test が同じ表で見る。
 
 - 置き場の名前（`ccnavi-common.sh` の `ccnavi_worktrees_dir` など。`tests/fixtures/layout.json`）
-- 「origin にその ref が無い」の見分け（`ccnavi_no_remote_ref`。
-  `tests/fixtures/no-remote-ref.json`）
 - 置き場の変更のパスの読みと、書きかけの一時ファイル（`ccnavi_porcelain_paths`・
   `ccnavi_drop_temp`）、パスの比べ（`ccnavi_path_under`・`ccnavi_path_pick`）。
   `tests/fixtures/approved-carry.json`
@@ -53,18 +51,6 @@ class ShCopiesTest(unittest.TestCase):
         self.assertEqual(
             [want["worktrees"], want["projects"], want["approved"], want["proposals"]], got
         )
-
-    def test_no_remote_ref(self):
-        cases = table("no-remote-ref.json")["cases"]
-        self.assertTrue(cases)
-        with tempfile.TemporaryDirectory() as d:
-            err = os.path.join(d, "err")
-            for case in cases:
-                with self.subTest(err=case["err"]):
-                    with open(err, "w", encoding="utf-8", newline="") as f:
-                        f.write(case["err"])
-                    done = run('ccnavi_no_remote_ref "$1"', err)
-                    self.assertEqual(case["no_ref"], done.returncode == 0)
 
     def test_porcelain_paths(self):
         cases = table("approved-carry.json")["porcelain"]

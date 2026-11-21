@@ -1,6 +1,9 @@
 package catchup
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -141,6 +144,24 @@ func TestAuthFailedOnly(t *testing.T) {
 	authNote(&a, t.TempDir(), "fatal: unable to access 'http://x/': Could not resolve host: x\n")
 	if a.String() != "" {
 		t.Errorf("届かないだけなのに案内した: %q", a.String())
+	}
+}
+
+// 「origin にその ref が無い」の見分けは実行ファイルに聞く。届かないだけの失敗は見分けない。
+func TestFetchNoref(t *testing.T) {
+	dir := t.TempDir()
+	for said, want := range map[string]string{
+		"fatal: couldn't find remote ref refs/heads/x\n": "fetch 1\nnext noref\n",
+		"fatal: Could not resolve host: x\n":             "fetch 1\n",
+	} {
+		path := filepath.Join(dir, "err")
+		if err := os.WriteFile(path, []byte(said), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		var out, errw bytes.Buffer
+		if code := Fetch(&out, &errw, dir, nil, []string{"noref", path}); code != 0 || out.String() != want {
+			t.Errorf("%q: code=%d out=%q", said, code, out.String())
+		}
 	}
 }
 

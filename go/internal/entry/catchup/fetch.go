@@ -20,7 +20,7 @@ import (
 const fetchHead = "fetch 1"
 
 // fetchUsage は `ccnavi fetch <段取り>` の使い方。
-const fetchUsage = "ccnavi: fetch plan|forward|track|retarget|base|advance|auth <引数>...（ccnavi-fetch.sh 用）"
+const fetchUsage = "ccnavi: fetch plan|forward|track|retarget|base|advance|auth|noref <引数>...（ccnavi-fetch.sh 用）"
 
 // Fetch は `ccnavi fetch <段取り> <引数>...`（ccnavi-fetch.sh 用）。fetch・ls-remote・時間の枠・ロックは sh が持ち、
 // ここは何を進めるかの判定と、早送り・update-ref・origin/HEAD の向け直しと、その文を持つ。動いたときだけ out を出す
@@ -38,6 +38,7 @@ const fetchUsage = "ccnavi: fetch plan|forward|track|retarget|base|advance|auth 
 //	                                     ツリーを第 1 周が見た（<見たツリー> のファイルに並ぶ）なら、そこで済んでいる
 //	advance <リポジトリ> <統合先>          統合先を origin/<統合先> まで進める（取ってきた後）
 //	auth <ツリー> <標準エラー>             取ってこられなかった fetch が認証の失敗なら、origin のホストに合わせた案内を 1 行
+//	noref <標準エラー>                    取ってこられなかった fetch が「origin にその ref が無い」なら `next noref`
 func Fetch(stdout, stderr io.Writer, root string, conf *config.Settings, args []string) int {
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, fetchUsage)
@@ -68,6 +69,10 @@ func Fetch(stdout, stderr io.Writer, root string, conf *config.Settings, args []
 		advance(&a, args[1], args[2])
 	case len(args) == 3 && args[0] == "auth":
 		authNote(&a, args[1], readText(args[2]))
+	case len(args) == 2 && args[0] == "noref":
+		if refusal.NoRemoteRef(readText(args[1])) {
+			a.next("noref")
+		}
 	default:
 		fmt.Fprintln(stderr, fetchUsage)
 		return config.ExitError
