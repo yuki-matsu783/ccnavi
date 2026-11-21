@@ -51,7 +51,7 @@ uv run python -m tests --plan          # 何をどの順で回すかだけ出す
 
 `tests/contract/shape.py` と、`tests/contract/gitlab/` の `normalize-cases.json`・`requests.json`・`recorded.json` を直したら、`extensions/chrome/ccnavi-approval` の `pnpm test` も回す（TS の比較器が同じ表を読む）。Chrome 拡張の `MockGitLab` を直したときも `pnpm test` を回す。拡張だけの要求（`used_by` が `["chrome"]`）は `python -m tests tests/contract` では `fake_gitlab.py` に送らず、`pnpm test` でだけ `MockGitLab` と比べる。`python -m tests tests/contract` は TS を回さないので、食い違いは `pnpm test` を回すまで見つからない。
 
-`tests/fake_claude.py`（claude -p のスタブ）、`tests/contract/claudeside.py`、`tests/contract/claude/recorded.json` を変えたら、同じく `contract` を回す。本物の `claude -p` から録った形と比べる。仕様と録り直しは [claude-contract.md](claude-contract.md)。
+`go/internal/harness/fakeclaude`（claude -p のスタブ）、`tests/contract/claudeside.py`、`tests/contract/claude/recorded.json` を変えたら、同じく `contract` を回す。本物の `claude -p` から録った形と比べる。仕様と録り直しは [claude-contract.md](claude-contract.md)。
 
 ## sh のテストは通しの確認だけにする
 

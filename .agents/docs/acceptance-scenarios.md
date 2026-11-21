@@ -123,14 +123,14 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
-   uv run python -m tests.scenarios.runner preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・ユーザ確認事項）だけを出す（終了コード 3）
-   uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
-   uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
+   cd go && go run ./internal/harness/cmd/scenarios preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・ユーザ確認事項）だけを出す（終了コード 3）
+   cd go && go run ./internal/harness/cmd/scenarios run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
+   cd go && go run ./internal/harness/cmd/scenarios run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```
 
-   台本のあるシナリオを確認を取らずに回すなら、使い捨てのワークスペースでスタブで回す `run-stub` を使う（`uv run python -m tests.scenarios.runner run-stub tests/scenarios`。出力は `logs/scenarios/<ID>-stub-<日時>/`。[claude-contract.md](claude-contract.md) の「使い捨てのワークスペースで回す」）。
+   台本のあるシナリオを確認を取らずに回すなら、使い捨てのワークスペースでスタブで回す `run-stub` を使う（`cd go && go run ./internal/harness/cmd/scenarios run-stub tests/scenarios`。出力は `logs/scenarios/<ID>-stub-<日時>/`。[claude-contract.md](claude-contract.md) の「使い捨てのワークスペースで回す」）。
 
-   `--agent script` を付けると、`claude -p` の代わりにスタブ（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、スタブが真似る範囲は [claude-contract.md](claude-contract.md)。
+   `--agent script` を付けると、`claude -p` の代わりにスタブ（`go/internal/harness/fakeclaude`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、スタブが真似る範囲は [claude-contract.md](claude-contract.md)。
 
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
@@ -141,12 +141,12 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    - issue を作る（人間役のトークンで 1 件）: `uv run python tests/manual/gitlab/scenario_tools.py issue <出力の置き場> [--title 題]`
    - 承認を代行する（スタブの git の環境で擬似端末から y を送る）: `uv run python tests/manual/gitlab/scenario_tools.py agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
    - 記録にトークンの値が出ていないかを確かめる: `uv run python tests/manual/gitlab/scenario_tools.py leak <出力の置き場>`
-   人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
-   続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
+   人間が「次へ」と言ったら `cd go && go run ./internal/harness/cmd/scenarios next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
+   続けずにやめるときは `cd go && go run ./internal/harness/cmd/scenarios restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
 5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない
 6. **判定を読む。** `report.md` に期待ごとの判定が出る（下の「判定の 3 つ」）。`judge` がある場合は、`evidence.md` を別のエージェントに読ませる。
    - 別のエージェントは、判定の表（`| 基準 | 判定 | 理由 |`。判定は pass か fail）を、ヒアドキュメントを使わず、編集ツールで `scratchpad/` に書く
-   - その表を `uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル>` で報告に足す。足すのは一度だけ
+   - その表を `cd go && go run ./internal/harness/cmd/scenarios judge <出力の置き場> <判定の表のファイル>` で報告に足す。足すのは一度だけ
    - ユーザが判定を受け入れたら、同じ `judge` に `--accept` を付けて打つ。判定の表は変えず、「ユーザの受け入れ」と全体の判定だけを書き直す（受け入れは一度だけ記す）
    - 受け入れまで、全体の判定は「受け入れ待ち」のまま。シナリオの `status` を `verified` にするのは、受け入れのあと
 7. **後片付けをする。** 実行器が `setup.files`（作る形）を消し、`setup.reset` があれば対象を `base` へ戻す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
@@ -158,8 +158,8 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 使い捨てのリポジトリ（`projects/test-repo`）を対象にするシナリオを何本も回すときは、確認を 1 回にして直列に回す。
 
 ```sh
-uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5      # 確認文と目印を出して止まる（終了コード 3）
-uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5 --confirmed <目印>
+cd go && go run ./internal/harness/cmd/scenarios run-all tests/scenarios --max-total-usd 5      # 確認文と目印を出して止まる（終了コード 3）
+cd go && go run ./internal/harness/cmd/scenarios run-all tests/scenarios --max-total-usd 5 --confirmed <目印>
 ```
 
 引数はディレクトリ（`*.yml`）・glob・ファイルを複数書ける。`--max-total-usd` は必須。`--out` は要約の置き場（既定は `logs/scenarios/run-all-<日時>/`。各シナリオの出力は、その下の `<ID>/`）。
@@ -415,14 +415,14 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 ## 全量テストに入らない仕組み
 
-「全量テストを回して」（`uv run python -m tests`）で、本物の claude でシナリオが回らないようにしてある（スタブで回る分は下の 1 つ目）。
+「全量テストを回して」（`cd go && go test ./...`）で、本物の claude でシナリオが回らないようにしてある（スタブで回る分は下の 1 つ目）。
 
-- **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と実行器のモジュール（`runner.py`・`drive.py`・`commands.py` など）は拾われない。
-  `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）と `test_stub_scenarios.py`（台本のあるシナリオを、使い捨てのワークスペースでスタブで回す。[claude-contract.md](claude-contract.md)）だけで、どちらも `claude` を呼ばない
-- **実行器がゲートを持つ。** `claude` を呼ぶ道（`drive.run_step`・`commands.cmd_run`。ゲートは `common.require_entry`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。スタブで回す step はゲートを通らない（claude を呼ばない）。
-  ほかのモジュールが import して呼ぶと `RuntimeError` で止まる。後で誰かが、実行器を呼ぶテストを足しても動かない
-- **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が上の 2 つのモジュールしか拾わないこと、
-  `tests/scenarios/` にほかの `test_*.py` が無いことを確かめる。本物の `claude` でシナリオを回す道を `test_` のモジュールに置かない
+- **拾われる範囲が違う。** 実行器の部品は `go/internal/harness/scenario/`（core・prepare・judge・world・actors・report・runner）、入口は `go/internal/harness/cmd/scenarios`。
+  シナリオの YAML と見本（`tests/scenarios/`）は `tests/` に置いたまま。テストは各部品の `_test.go` と `go/internal/clitest/scenarios` で、
+  台本のあるシナリオを使い捨てのワークスペースでスタブ（`teststub claude`）で回す分（TestEveryScriptedScenarioPassesInAThrowawayWorkspace。[claude-contract.md](claude-contract.md)）だけが実際に動かし、`claude` は呼ばない
+- **実行器がゲートを持つ。** `claude` を呼ぶ道（`runner.Runner.RunStep`・`Run`・`RunAll`）は、`Runner.Entry` が真のとき（入口の実行ファイル `cmd/scenarios` だけが立てる）だけ開く。
+  差し替え口（`Runner.Step`）かスタブ（`--agent script`）で回す step はゲートを通らない。テストが入口を立てることはなく、後で誰かが実行器を呼ぶテストを足しても本物の claude は動かない
+- **テストが見張る。** `clitest/scenarios` の TestRealClaudeIsNotCalledWithoutTheEntry が、入口が無ければ `run`・`run-all`・`RunStep` が断ることを確かめる
 
 ## 人間の操作
 
