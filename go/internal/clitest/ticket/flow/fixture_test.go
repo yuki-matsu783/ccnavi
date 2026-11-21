@@ -108,22 +108,58 @@ func maskDigests(t testing.TB, v any) any {
 	return v
 }
 
-// rewriteFixture は -update-board-fixtures のとき、stdout（実行ファイルの JSON。キーの順を保つ）を name へ書く。
-// 走らせた場所は <root>、時刻は <time>、ダイジェストは <digest> に置き換える。
-func rewriteFixture(t testing.TB, name, stdout, root string) {
-	t.Helper()
+// portableJSON は実行ファイルの JSON（stdout）を、フィクスチャに書く形の JSON テキストにする。
+// 値に対して、走らせた場所は <root>、時刻（generated_at）は <time>、ダイジェスト（digest・expected・current）は <digest> に置き換える。
+// テキストではなく値を置き換えるので、JSON のエスケープ（\n・\"・\\）は壊れない。
+func portableJSON(stdout, root string) (string, error) {
 	decoded, err := pyjson.Loads(stdout)
 	if err != nil {
-		t.Fatal(err)
+		return "", err
 	}
-	text, err := pyjson.Dumps(decoded, pyjson.Options{RawUnicode: true, Indent: 1})
+	text, err := pyjson.Dumps(portableValue(decoded, root), pyjson.Options{RawUnicode: true, Indent: 1})
+	if err != nil {
+		return "", err
+	}
+	return text + "\n", nil
+}
+
+func portableValue(v any, root string) any {
+	switch x := v.(type) {
+	case *pyjson.Object:
+		for _, k := range x.Keys() {
+			e := x.Value(k)
+			if s, ok := e.(string); ok {
+				if k == "generated_at" {
+					x.Set(k, "<time>")
+					continue
+				}
+				if (k == "digest" || k == "expected" || k == "current") && digestRe.MatchString(s) {
+					x.Set(k, "<digest>")
+					continue
+				}
+			}
+			x.Set(k, portableValue(e, root))
+		}
+		return x
+	case []any:
+		for i, e := range x {
+			x[i] = portableValue(e, root)
+		}
+		return x
+	case string:
+		return portableText(x, root)
+	}
+	return v
+}
+
+// rewriteFixture は -update-board-fixtures のとき、stdout（実行ファイルの JSON。キーの順を保つ）を name へ書く。
+func rewriteFixture(t testing.TB, name, stdout, root string) {
+	t.Helper()
+	text, err := portableJSON(stdout, root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	text = portableText(text, root)
-	text = regexp.MustCompile(`"generated_at": "[^"]*"`).ReplaceAllString(text, `"generated_at": "<time>"`)
-	text = regexp.MustCompile(`"[0-9a-f]{64}"`).ReplaceAllString(text, `"<digest>"`)
-	if err := os.WriteFile(fixturePath(name), []byte(text+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(fixturePath(name), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -161,4 +197,31 @@ func sortedKeys(m map[string]any) []string {
 	}
 	slices.Sort(keys)
 	return keys
+}
+
+// 見本の書き直しは、本文のエスケープ（改行・引用符・バックスラッシュ）を壊さず、パス・時刻・ダイジェストだけを置き換える。
+func TestPortableJSONKeepsEscapes(t *testing.T) {
+	t.Parallel()
+	digest := strings.Repeat("ab", 32)
+	in := `{"generated_at": "2026-01-01T00:00:00", "body": "a\nb \"q\" c\\d /r/x", "list": ["/r/y\\z", "` + digest + `"], "digest": "` + digest + `"}`
+	got, err := portableJSON(in, "/r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(got), &m); err != nil {
+		t.Fatalf("JSON として読めない: %v\n%s", err, got)
+	}
+	if m["generated_at"] != "<time>" {
+		t.Errorf("generated_at = %v", m["generated_at"])
+	}
+	if want := "a\nb \"q\" c/d <root>/x"; m["body"] != want {
+		t.Errorf("body = %q, want %q", m["body"], want)
+	}
+	if want := []any{"<root>/y/z", digest}; !reflect.DeepEqual(m["list"], want) {
+		t.Errorf("list = %v, want %v", m["list"], want)
+	}
+	if m["digest"] != "<digest>" {
+		t.Errorf("digest = %v", m["digest"])
+	}
 }

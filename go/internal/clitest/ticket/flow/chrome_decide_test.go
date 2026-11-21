@@ -160,6 +160,9 @@ func choiceCode(t testing.TB, a map[string]any, code string) {
 	if !isNull(a, "changes") {
 		t.Errorf("changes = %v", a["changes"])
 	}
+	if !isNull(a, "host_plan") {
+		t.Errorf("host_plan = %v", a["host_plan"])
+	}
 }
 
 var threeThreads = []map[string]any{dthread("t1", "命名"), dthread("t2", "テスト"), dthread("t3", "性能")}

@@ -351,8 +351,8 @@ func TestTheNoticeStaysInsideTheWorkspaceAndPlaces(t *testing.T) {
 	// ワークスペースの外に同じ構成を掘っても、提案を書いたことにはしない。
 	elsewhere := filepath.Join(base.TempDir(t), "wip", "proposals", "todo", "evil.sh")
 	r := tr.Hook("PreToolUse", "Write", tr.ParentTree, map[string]any{"file_path": elsewhere})
-	Lacks(t, contextOf(t, r), "--agree --preview --verify")
+	Lacks(t, contextOf(t, r), verifyNotice)
 	// ほかの場所にも届かない。
 	other := tr.Hook("PreToolUse", "Write", tr.ParentTree, map[string]any{"file_path": filepath.Join(tr.ParentTree, "src", "keep.py")})
-	Lacks(t, contextOf(t, other), "--agree --preview --verify")
+	Lacks(t, contextOf(t, other), verifyNotice)
 }

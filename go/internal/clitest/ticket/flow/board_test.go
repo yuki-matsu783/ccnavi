@@ -14,14 +14,11 @@ package flow
 import (
 	"cmp"
 	"encoding/json"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
-
-	"ccnavi/internal/infra/pyjson"
 )
 
 // boardSceneBuild は親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、同じフェーズに未承認の子が 1 枚ある。
@@ -475,17 +472,7 @@ func TestBoardShapeMatchesTheExtensionFixture(t *testing.T) {
 	tr := boardSceneBuild(t)
 	out := OK(t, tr.Ccnavi("--explain", "--json")).Stdout
 	if *updateBoardFixtures {
-		decoded, err := pyjson.Loads(out)
-		if err != nil {
-			t.Fatal(err)
-		}
-		text, err := pyjson.Dumps(decoded, pyjson.Options{RawUnicode: true, Indent: 1})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(fixturePath("board.json"), []byte(portableText(text, tr.Root)), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		rewriteFixture(t, "board.json", out, tr.Root)
 	}
 	fixture := readFixture(t, "board.json")
 	board := ParseJSON(t, out)
