@@ -29,6 +29,9 @@ var topTiers = map[string]int{
 	"catalog": 4,
 	"hook":    5,
 	"entry":   6,
+	// テストの道具（harness）と、それを使う CLI を通すテスト（clitest。_test.go だけ）。道具は本体より上に置き、本体から読めないようにする。
+	"harness": 7,
+	"clitest": 8,
 }
 
 var subTiers = map[string]map[string]int{
@@ -143,6 +146,19 @@ var subTiers = map[string]map[string]int{
 	"tickets/proposal": {"internal": 0, "candidates": 0, "propose": 0, "templates": 1, "planedit": 1, "agree": 2, "scaffold": 2},
 	"tickets/review":   {"request": 0, "closeout": 1, "decide": 1},
 	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1, "stage": 1},
+	// テストの道具。本体のコードは tickets/testkit と同じく、ここを読まない。
+	"harness": {
+		// 0: 走った機械から締め出した環境・一時置き場・見本の置き場（ほかの道具が読む土台）
+		"base": 0,
+		// 1: 実行ファイルの組み立て・GitLab の模擬・見本の組み立て
+		"exe": 1, "fakegitlab": 1, "samples": 1,
+		// 2: 実行ファイルを起こす・PATH のスタブ・ホストの fixture・claude の台本スタブ・契約の形
+		"run": 2, "hoststub": 2, "hostfixture": 2, "fakeclaude": 2, "contractshape": 2,
+		// 3: 組み立ての写し・受入シナリオの実行器の部品
+		"treecache": 3, "scenario": 3,
+		// 4: 入口（main）
+		"cmd": 4,
+	},
 	// 目録。1 つのツリーの索引（docindex）の上に、ツリーを合わせて引く docs が立つ。
 	"catalog": {"docindex": 0, "skills": 0, "docs": 1},
 	// hook の中。
