@@ -159,3 +159,48 @@ func TestFileProblemsMatchGolden(t *testing.T) {
 		t.Errorf("%d / %d 件が見本と違う", bad, len(cases))
 	}
 }
+
+// 広い allow に additionalContext があれば、ヒットするたびに同じ文が積まれると warn する。every が 2 以上のルールは
+// ヒットした中の 1 回しか渡らないので、この苦情を掛けない。1・0・負・読めない every は毎回渡る側なので苦情が残る。
+func TestBroadAllowWarnsUnlessEveryIsOverOne(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(root, "docs", "guide.md"), "本文")
+	broad := func(id string, kv ...any) map[string]any {
+		return rule(append([]any{"id", id, "match", "Read", "glob", "*"}, kv...)...)
+	}
+	cases := []struct {
+		rule   map[string]any
+		warned bool
+	}{
+		{broad("every-5", "additionalContext", "文", "every", 5), false},
+		{broad("every-5-file", "additionalContextFile", "docs/guide.md", "every", 5), false},
+		{broad("no-every", "additionalContext", "文"), true},
+		{broad("every-1", "additionalContext", "文", "every", 1), true},
+		{broad("every-0", "additionalContext", "文", "every", 0), true},
+		{broad("every-minus", "additionalContext", "文", "every", -1), true},
+		{broad("every-word", "additionalContext", "文", "every", "x"), true},
+	}
+	var allow []any
+	for _, c := range cases {
+		allow = append(allow, c.rule)
+	}
+	doc, _ := json.Marshal(map[string]any{"version": 1, "deny": []any{rule("id", "push", "match", "Bash", "glob", "*git push*", "message", "m")}, "allow": allow})
+	path := filepath.Join(root, "rules", "broad.yml")
+	write(t, path, string(doc))
+	problems := FileProblems(path, root, Options{})
+	for _, c := range cases {
+		id := c.rule["id"].(string)
+		got := false
+		for _, p := range problems {
+			if s := p.String(); strings.Contains(s, ": "+id+": ") && strings.Contains(s, "広い allow に additionalContext がある") {
+				got = true
+			}
+		}
+		if got != c.warned {
+			t.Errorf("%s: 広い allow の苦情=%v、want %v\n%v", id, got, c.warned, problems)
+		}
+	}
+}
