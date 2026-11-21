@@ -80,7 +80,12 @@ func hook(t testing.TB, root string, args []string, body payload, env map[string
 	if err != nil {
 		t.Fatal(err)
 	}
-	return run.Ccnavi(t, append([]string{"--root", root}, args...), run.Opts{Input: string(b), Env: env, Dir: base.Root()})
+	r := run.Ccnavi(t, append([]string{"--root", root}, args...), run.Opts{Input: string(b), Env: env, Dir: base.Root()})
+	// 壊れた入力などで hook が落ちると、標準出力が空のまま「通した」と読まれて、止めたかの確かめが空振りする。
+	if r.Code != 0 {
+		t.Fatalf("hook が異常終了: %d\n%s", r.Code, r.Stderr)
+	}
+	return r
 }
 
 // verdict は hook の答えの判定と理由。何も出さない呼び出し（通した・保護が黙った）は空。
