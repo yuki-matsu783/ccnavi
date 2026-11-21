@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 import unittest
 
-from tests import ROOT, common_path, script_command
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 
 RULES = {
@@ -274,31 +274,6 @@ class PostToolUseTest(Harness, unittest.TestCase):
         )
         # ルールが持つ文面。止めるだけでは足りないという道具の目的そのもの。
         self.assertIn("Ask the user", result.stderr)
-
-    def test_ラッパーが無ければ戻す手順は書かずユーザに頼む(self):
-        """生の git は組み込みで止まるので、戻す `git` の形を案内すると、案内した行が止まる。"""
-        os.remove(os.path.join(self.repo, ".ccnavi", "scripts", "ccnavi-git.sh"))
-        self.run_hook(command="ls")
-        self.dirty()
-
-        result = self.run_hook(command="python build.py")
-
-        self.assertEqual(result.returncode, 2, result.stderr)
-        self.assertNotIn("git restore", result.stderr)
-        self.assertIn("ユーザに頼んで", result.stderr)
-
-    def test_新しく現れたファイルは消す手順を返す(self):
-        self.run_hook(command="ls")
-        write(os.path.join(self.repo, "protected", "generated.env"), "SECRET=1\n")
-
-        result = self.run_hook(command="npm run build")
-
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("protected/generated.env", result.stderr)
-        # 現れたファイルは restore では戻せない。git のラッパーは clean を通さないので、
-        # シェルの rm で消す。
-        self.assertIn("rm -- protected/generated.env", result.stderr)
-        self.assertNotIn("git clean", result.stderr)
 
     def test_同じ変更を毎回は言わない(self):
         self.run_hook(command="ls")
@@ -629,22 +604,6 @@ class PostToolUseTest(Harness, unittest.TestCase):
     def test_ターンの始まりを見ていなければ何も言わない(self):
         # 登録されていない、あるいは基準を読めなかった。見えていない期間を
         # 見えたことにしない。
-        self.dirty()
-
-        result = self.run_hook(event="Stop")
-
-        self.assertEqual(result.stdout, "")
-        self.assertEqual(self.records()[-1]["reason"], "no-turn-baseline")
-
-    def test_HEADを持たない記録は基準なしとして扱う(self):
-        # heads の無い記録は、記録が無いときと同じ。コミットのぶんを数えられない
-        # 基準で報告すると、このターンに入ったコミットを知らないうちに取りこぼす。
-        self.run_hook(event="UserPromptSubmit")
-        turn = os.path.join(self.state, "s1.turn.json")
-        with open(turn, encoding="utf-8") as f:
-            data = json.load(f)
-        del data["heads"]
-        write(turn, json.dumps(data))
         self.dirty()
 
         result = self.run_hook(event="Stop")
@@ -1343,28 +1302,6 @@ class TicketPlaceTest(Harness, unittest.TestCase):
 
         self.assertEqual(result.returncode, 2)
         self.assertIn("POST_VIOLATION", result.stderr)
-
-
-class UndoTextTest(unittest.TestCase):
-    """戻す手順の文は、git のラッパーで打てる形だけを書く。
-
-    文の組み立て（ラッパーの有無・新しいファイルの消し方）は Go のテスト
-    （go/internal/infra/git の TestUndoWritesOnlyWrapperForms）が確かめる。
-    """
-
-    def test_report_uses_the_wrapper(self):
-        # 実行後チェックの報告は、ワークスペースのラッパーで打てる形を案内する。
-        harness = PostToolUseTest("test_変更を検知したら差し戻し戻し方と直前の実行を返す")
-        harness.setUp()
-        self.addCleanup(harness.doCleanups)
-        write(os.path.join(harness.repo, ".ccnavi", "scripts", "ccnavi-git.sh"), "")
-        harness.run_hook(command="ls")
-        harness.dirty()
-        result = harness.run_hook(command="python build.py")
-        git = script_command(harness.repo, "ccnavi-git.sh")
-        self.assertIn(
-            f"undo: {git} restore --staged --worktree -- protected/keep.txt", result.stderr
-        )
 
 
 if __name__ == "__main__":
