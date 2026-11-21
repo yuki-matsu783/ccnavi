@@ -59,7 +59,7 @@ uv run python -m unittest discover -s tests/<グループ> -t .
 表にヒットしない変更や、統合先に取り込む前・MR に出す前は全件（`uv run python -m tests`。[テストを回す](../../../.agents/docs/testing.md)）を回す。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
-実行ファイル（`go/`）のファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。Python のテストは Go の実行ファイルを組んで起こすので、上の表のグループも回す。
+`go/`・`.ccnavi/`・`tests/` のどれかのファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。sh・文面・見本だけの変更も、Go に移したテスト（`go/internal/clitest/`）が読むので回す。`-count=1` は要らない（clitest は go test が結果を保存しない）。Python のテストは Go の実行ファイルを組んで起こすので、上の表のグループも回す。
 
 拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
 
