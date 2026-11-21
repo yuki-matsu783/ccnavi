@@ -76,7 +76,7 @@ func TestTheRepoExpectationsMatchTheRules(t *testing.T) {
 		wrong = append(wrong, fmt.Sprintf("%s のはずが %s: %s  %s\n    なぜ: %s\n    ヒットしたルール: %s",
 			e.Expected, e.Verdict, e.Tool, e.Subject, e.Why, hit))
 	}
-	if body.Mismatches != 0 {
+	if body.Mismatches != 0 || len(wrong) > 0 {
 		t.Errorf("期待する判定と判定が食い違った（期待する判定とルールのどちらを直すかはユーザが決める。/ccnavi-config）:\n%s",
 			strings.Join(wrong, "\n"))
 	}

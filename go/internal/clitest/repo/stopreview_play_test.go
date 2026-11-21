@@ -16,6 +16,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/pathcase"
 )
 
 // 場面（tests/fixtures/stop_review/scenarios/<名前>/）を最初から再生する道具。Stop ごとに hook の足跡を作り、
@@ -129,7 +130,7 @@ func stopFolders(t *testing.T, dir string) []string {
 	}
 	var out []string
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), "stop-") {
+		if strings.HasPrefix(pathcase.Fold(e.Name()), "stop-") {
 			out = append(out, filepath.Join(dir, e.Name()))
 		}
 	}

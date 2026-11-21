@@ -51,9 +51,6 @@ const (
 // 不備の基準（R1・R2・R4）が直す手順。
 var fixes = map[string]string{"R1": "write_proposal", "R2": "revise_proposal", "R4": "send_proposal"}
 
-// flawCriteria は不備の基準。fixes を書くのはこの基準だけ。
-var flawCriteria = map[string]bool{"R1": true, "R2": true, "R4": true}
-
 var finals = map[string]bool{"ok": true, "flawed": true, "unchecked": true, "out_of_scope": true}
 
 // scene は場面の expected.json。
@@ -242,8 +239,12 @@ func checkPlan(t *testing.T, rec record, label string) {
 	if plan.Rejudge != want.IsRejudge {
 		t.Errorf("%s: rejudge = %v, want %v", label, plan.Rejudge, want.IsRejudge)
 	}
-	if plan.Rejudge && rec.original != nil && rec.original.State != want.OriginalState {
-		t.Errorf("%s: 元の試行の state = %q, want %q", label, rec.original.State, want.OriginalState)
+	if plan.Rejudge {
+		if rec.original == nil {
+			t.Errorf("%s: 再判定なのに元の試行の state が無い", label)
+		} else if rec.original.State != want.OriginalState {
+			t.Errorf("%s: 元の試行の state = %q, want %q", label, rec.original.State, want.OriginalState)
+		}
 	}
 	for _, needle := range want.MustContain {
 		if !strings.Contains(rec.material, needle) {
@@ -417,6 +418,10 @@ func TestTheJudgeResultFilesAgreeWithTheExpectedCriteria(t *testing.T) {
 			path := filepath.Join(folder, "judge_result.json")
 			if !fileExists(path) {
 				continue
+			}
+			if i >= len(e.Stops) {
+				t.Errorf("%s: Stop の数 %d に対し結果が %d 本", name, len(e.Stops), len(folders))
+				break
 			}
 			want := e.Stops[i]
 			t.Run(name+"/"+filepath.Base(folder), func(t *testing.T) {

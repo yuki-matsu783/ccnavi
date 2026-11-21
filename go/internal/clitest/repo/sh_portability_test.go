@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/infra/pathcase"
 )
 
 // 配る sh が macOS の bash 3.2 と BSD の sed・grep でも読めることの検査。書かれた文面を読むだけで、
@@ -67,12 +68,12 @@ func shellScripts(t *testing.T, root string) []string {
 			return err
 		}
 		if d.IsDir() {
-			if path != root && skipDirs[d.Name()] {
+			if path != root && skipDirs[pathcase.Fold(d.Name())] {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if strings.HasSuffix(d.Name(), ".sh") {
+		if strings.HasSuffix(pathcase.Fold(d.Name()), ".sh") {
 			rel, err := filepath.Rel(root, path)
 			if err != nil {
 				return err
