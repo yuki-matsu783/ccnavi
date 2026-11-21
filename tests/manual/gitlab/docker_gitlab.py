@@ -6,7 +6,7 @@
 
 - 版は `GITLAB_IMAGE` の 1 か所で固定する（ダイジェスト指定）。上げるときはここを書き換える。
 - ポートは `CCNAVI_GITLAB_PORT`（既定 8929）の 1 か所で決める。compose の external_url と
-  公開ポート、probe_gitlab.py の既定の接続先（`CCNAVI_PROBE_GITLAB`）は、この値から作られる。
+  公開ポート、gitlabmanual probe の既定の接続先（`CCNAVI_PROBE_GITLAB`）は、この値から作られる。
 - `up`: イメージが無いときは取得せず止まる（`--pull` を付けたときだけ取得する）。動いていれば
   起動しない。健康になり、`/api/v4/version` が応答するまで待つ
   （上限 15 分。実測の再起動は約 2 分）。

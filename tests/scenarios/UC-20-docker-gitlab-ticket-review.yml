@@ -74,7 +74,7 @@ steps:
   - human: true
     instruction: >-
       step 3 と同じ要領で、スタブの git の環境の中で、擬似 tty を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子>` を代行して打つ
-      （フィードバック計画の改版の承認。`scenario_tools.py agree <出力の置き場> <親>`）。素の shell で打たない。
+      （フィードバック計画の改版の承認。`gitlabmanual tools agree <出力の置き場> <親>`）。素の shell で打たない。
       `human_run` は使えない: 親の改版は識別子が承認済みと同じなので「新しく承認済みになった」と数えられず、打っても halt する（4 回目の次の回で確認）。
     check:
       - "承認画面が、フィードバック計画（feedback: []）の改版であることを示している"

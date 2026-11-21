@@ -1,4 +1,4 @@
-"""GitLab API v4 のスタブの本体。手で使う入口は `tests/manual/gitlab/fake_gitlab.py`。
+"""GitLab API v4 のスタブの本体。手で使う入口は `go/internal/harness/cmd/fakegitlab`。
 
 説明（何のためか、状態ファイルの形、時計のずらし、関数としての使い方）は入口の docstring にある。
 自動テストは、ここの `start` を import して起こす。
