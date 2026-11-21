@@ -260,31 +260,31 @@ func TestChangesThatWereThereBeforeAreSaidOnceAndNeverReverted(t *testing.T) {
 // （その間に動いたプロセスの変更はユーザの変更と区別できない）。
 func TestTheUsersEditsAreAcceptedAfterAPromptButTheAgentsAreNot(t *testing.T) {
 	t.Parallel()
-	prompt := func(r *repo, text string) {
+	prompt := func(t *testing.T, r *repo, text string) {
 		r.hook(t, call{Event: "UserPromptSubmit", Prompt: text})
 	}
-	start := func(r *repo) { r.hook(t, call{Event: "SessionStart", Source: "startup"}) }
-	enforce := func(r *repo, command string) run.Result {
+	start := func(t *testing.T, r *repo) { r.hook(t, call{Event: "SessionStart", Source: "startup"}) }
+	enforce := func(t *testing.T, r *repo, command string) run.Result {
 		return r.hook(t, call{Restore: "enable", Input: map[string]any{"command": command}})
 	}
 	t.Run("edited between turns is not reverted", func(t *testing.T) {
 		t.Parallel()
 		r := newRepo(t)
-		start(r)
+		start(t, r)
 		r.dirty(t, "edited by the user\n")
-		prompt(r, "続きをお願いします")
-		if got := enforce(r, "ls"); got.Code != 0 || r.keep(t) != "edited by the user\n" {
+		prompt(t, r, "続きをお願いします")
+		if got := enforce(t, r, "ls"); got.Code != 0 || r.keep(t) != "edited by the user\n" {
 			t.Errorf("ユーザの編集を戻してはいけない: code=%d keep=%q", got.Code, r.keep(t))
 		}
 	})
 	t.Run("a call after accepting reverts only its own change", func(t *testing.T) {
 		t.Parallel()
 		r := newRepo(t)
-		start(r)
+		start(t, r)
 		r.dirty(t, "edited by the user\n")
-		prompt(r, "続きをお願いします")
+		prompt(t, r, "続きをお願いします")
 		write(t, r.path("protected/new.txt"), "built\n")
-		got := enforce(r, "python build.py")
+		got := enforce(t, r, "python build.py")
 		if !strings.Contains(got.Stderr, "protected/new.txt") || exists(r.path("protected/new.txt")) || r.keep(t) != "edited by the user\n" {
 			t.Errorf("stderr=%q keep=%q", got.Stderr, r.keep(t))
 		}
@@ -292,10 +292,10 @@ func TestTheUsersEditsAreAcceptedAfterAPromptButTheAgentsAreNot(t *testing.T) {
 	t.Run("a background completion notice is not the user", func(t *testing.T) {
 		t.Parallel()
 		r := newRepo(t)
-		start(r)
+		start(t, r)
 		r.dirty(t, "written by a background process\n")
-		prompt(r, "<task-notification>\n<status>completed</status>\n</task-notification>")
-		if got := enforce(r, "ls"); got.Code != 2 || r.keep(t) != "committed\n" {
+		prompt(t, r, "<task-notification>\n<status>completed</status>\n</task-notification>")
+		if got := enforce(t, r, "ls"); got.Code != 2 || r.keep(t) != "committed\n" {
 			t.Errorf("code=%d keep=%q", got.Code, r.keep(t))
 		}
 	})
@@ -303,11 +303,11 @@ func TestTheUsersEditsAreAcceptedAfterAPromptButTheAgentsAreNot(t *testing.T) {
 		t.Parallel()
 		// 戻す先のコミット済みの内容はユーザの編集より古いので、戻すとその編集まで消える。だから言うだけにする。
 		r := newRepo(t)
-		start(r)
+		start(t, r)
 		r.dirty(t, "edited by the user\n")
-		prompt(r, "続きをお願いします")
+		prompt(t, r, "続きをお願いします")
 		r.dirty(t, "overwritten by the agent\n")
-		got := enforce(r, "python build.py")
+		got := enforce(t, r, "python build.py")
 		if got.Code != 2 {
 			t.Errorf("code=%d", got.Code)
 		}
@@ -315,7 +315,7 @@ func TestTheUsersEditsAreAcceptedAfterAPromptButTheAgentsAreNot(t *testing.T) {
 		if r.keep(t) != "overwritten by the agent\n" {
 			t.Error("ユーザの編集まで消さない")
 		}
-		if again := enforce(r, "ls"); again.Code != 0 || again.Stdout != "" {
+		if again := enforce(t, r, "ls"); again.Code != 0 || again.Stdout != "" {
 			t.Errorf("1 度言えば繰り返さない: code=%d stdout=%q", again.Code, again.Stdout)
 		}
 	})
@@ -476,35 +476,35 @@ func TestAnAskPlaceIsReportedButNeverReverted(t *testing.T) {
 // ターンの終わり（Stop）は、ユーザへ報告するだけで、ターンを続けさせず、戻さない。基準はターンの始まり。
 func TestTheTurnEndReportsWhatHappenedDuringTheTurn(t *testing.T) {
 	t.Parallel()
-	prompt := func(r *repo, mode string) { r.hook(t, call{Event: "UserPromptSubmit", Mode: mode}) }
+	prompt := func(t *testing.T, r *repo, mode string) { r.hook(t, call{Event: "UserPromptSubmit", Mode: mode}) }
 	cases := []struct {
 		name string
-		do   func(r *repo)
+		do   func(t *testing.T, r *repo)
 		mode string
 		want []string // 空ならターンの終わりは何も言わない
 		why  string   // 何も言わないときの記録の reason
 	}{
-		{"a change in a protected place", func(r *repo) { prompt(r, ""); r.dirty(t) }, "",
+		{"a change in a protected place", func(t *testing.T, r *repo) { prompt(t, r, ""); r.dirty(t) }, "",
 			[]string{"protected/keep.txt", "protected", "ccnavi-git.sh restore"}, ""},
-		{"nothing changed", func(r *repo) { prompt(r, "") }, "", nil, ""},
+		{"nothing changed", func(t *testing.T, r *repo) { prompt(t, r, "") }, "", nil, ""},
 		// ユーザの書きかけ、他のセッションが置いたもの、前のターンで片付けなかったもの。全部並べると、次から読まれなくなる。
-		{"changes from before the turn began", func(r *repo) { r.dirty(t); prompt(r, "") }, "", nil, ""},
+		{"changes from before the turn began", func(t *testing.T, r *repo) { r.dirty(t); prompt(t, r, "") }, "", nil, ""},
 		// 登録されていない、あるいは基準を読めなかった。見えていない期間を見えたことにしない。
-		{"a turn whose start was never seen", func(r *repo) { r.dirty(t) }, "", nil, "no-turn-baseline"},
+		{"a turn whose start was never seen", func(t *testing.T, r *repo) { r.dirty(t) }, "", nil, "no-turn-baseline"},
 		// 呼び出しごとの報告は記録を見て繰り返さないが、ユーザはまだ 1 度も見ていないことがある。宛先が違うので記録を共有しない。
-		{"a change that was already said per call", func(r *repo) {
-			prompt(r, "")
+		{"a change that was already said per call", func(t *testing.T, r *repo) {
+			prompt(t, r, "")
 			r.bash(t, "ls")
 			r.dirty(t)
 			r.bash(t, "python build.py")
 		}, "", []string{"protected/keep.txt"}, ""},
-		{"a global dry-run still reports", func(r *repo) { prompt(r, "dry-run"); r.dirty(t) }, "dry-run", []string{"protected/keep.txt"}, ""},
+		{"a global dry-run still reports", func(t *testing.T, r *repo) { prompt(t, r, "dry-run"); r.dirty(t) }, "dry-run", []string{"protected/keep.txt"}, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			r := newRepo(t)
-			c.do(r)
+			c.do(t, r)
 
 			got := r.hook(t, call{Event: "Stop", Mode: c.mode})
 
@@ -526,7 +526,7 @@ func TestTheTurnEndReportsWhatHappenedDuringTheTurn(t *testing.T) {
 	t.Run("the record names the event and the code", func(t *testing.T) {
 		t.Parallel()
 		r := newRepo(t)
-		prompt(r, "")
+		prompt(t, r, "")
 		r.dirty(t)
 		r.hook(t, call{Event: "Stop"})
 		row := last(t, r.root)
@@ -540,20 +540,20 @@ func TestTheTurnEndReportsWhatHappenedDuringTheTurn(t *testing.T) {
 // 同じ見た目になる。数えるのは、ターンの始まりに記録した HEAD から、このツリーが積んだコミットだけ。
 func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 	t.Parallel()
-	commit := func(r *repo, rel, text, message string) {
+	commit := func(t *testing.T, r *repo, rel, text, message string) {
 		write(t, r.path(rel), text)
 		git(t, r.root, "add", "--", rel)
 		git(t, r.root, "commit", "--quiet", "-m", message)
 	}
-	prompt := func(r *repo) { r.hook(t, call{Event: "UserPromptSubmit"}) }
-	stop := func(r *repo) run.Result { return r.hook(t, call{Event: "Stop"}) }
+	prompt := func(t *testing.T, r *repo) { r.hook(t, call{Event: "UserPromptSubmit"}) }
+	stop := func(t *testing.T, r *repo) run.Result { return r.hook(t, call{Event: "Stop"}) }
 
 	t.Run("a commit made in the turn", func(t *testing.T) {
 		t.Parallel()
 		r := newRepo(t)
-		prompt(r)
-		commit(r, "protected/keep.txt", "changed by a build\n", "汚してからコミットする")
-		message := systemMessage(t, stop(r))
+		prompt(t, r)
+		commit(t, r, "protected/keep.txt", "changed by a build\n", "汚してからコミットする")
+		message := systemMessage(t, stop(t, r))
 		mustHave(t, message, "protected/keep.txt", "コミット済み", "はすでにコミット済みなので", "不要な変更なら取り消してください")
 		mustNotHave(t, message, "git restore") // 履歴は書き換えないので、案内できる 1 つが無い
 	})
@@ -561,10 +561,10 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 		t.Parallel()
 		// 「何も出ない」だけを見ると、コミットを一切見ない実装でも通る。同じターンで 1 件だけ積み、そちらは出ることも見る。
 		r := newRepo(t)
-		commit(r, "protected/keep.txt", "changed by a build\n", "前のターンのコミット")
-		prompt(r)
-		commit(r, "protected/later.txt", "このターンのコミット\n", "このターンのコミット")
-		message := systemMessage(t, stop(r))
+		commit(t, r, "protected/keep.txt", "changed by a build\n", "前のターンのコミット")
+		prompt(t, r)
+		commit(t, r, "protected/later.txt", "このターンのコミット\n", "このターンのコミット")
+		message := systemMessage(t, stop(t, r))
 		mustHave(t, message, "protected/later.txt")
 		mustNotHave(t, message, "protected/keep.txt")
 	})
@@ -572,12 +572,12 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 		t.Parallel()
 		// 承認はユーザが提案を .ccnavi/approved/ へ動かしてコミットする進め方。そこは deny でもあるので、外さないと毎回並ぶ。
 		r := newRepo(t)
-		prompt(r)
+		prompt(t, r)
 		write(t, r.path(".ccnavi/approved/doing/i0001.md"), "x\n")
 		r.dirty(t)
 		git(t, r.root, "add", "--", ".ccnavi/approved/doing/i0001.md", "protected/keep.txt")
 		git(t, r.root, "commit", "--quiet", "-m", "承認済みチケットと、保護領域の変更")
-		message := systemMessage(t, stop(r))
+		message := systemMessage(t, stop(t, r))
 		mustHave(t, message, "protected/keep.txt")
 		mustNotHave(t, message, ".ccnavi/approved")
 	})
@@ -586,13 +586,13 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 		// 二点の差分で数えると、ユーザが統合先で直した保護領域が `merge <統合先>` のたびに並ぶ。
 		r := newRepo(t)
 		git(t, r.root, "checkout", "--quiet", "-b", "feature")
-		prompt(r)
-		commit(r, "src/app.py", "print(2)\n", "自分の作業")
+		prompt(t, r)
+		commit(t, r, "src/app.py", "print(2)\n", "自分の作業")
 		git(t, r.root, "checkout", "--quiet", "master")
-		commit(r, "protected/keep.txt", "ユーザが統合先で直した\n", "統合先の変更")
+		commit(t, r, "protected/keep.txt", "ユーザが統合先で直した\n", "統合先の変更")
 		git(t, r.root, "checkout", "--quiet", "feature")
 		git(t, r.root, "merge", "--quiet", "--no-edit", "master")
-		if got := stop(r); got.Stdout != "" {
+		if got := stop(t, r); got.Stdout != "" {
 			t.Errorf("取り込んだぶんを自分のターンの成果にしない: %q", got.Stdout)
 		}
 	})
@@ -739,14 +739,14 @@ func TestTicketPlaceChangesAreToldApartByWhatChanged(t *testing.T) {
 		r.bash(t, "ls") // 基準を取る。以降に現れたものが、この呼び出しの結果として見られる。
 		return r
 	}
-	script := func(r *repo, restore string) run.Result {
+	script := func(t *testing.T, r *repo, restore string) run.Result {
 		return r.hook(t, call{Restore: restore, Input: map[string]any{"command": "sh .ccnavi/scripts/ccnavi-ticket.sh start i0001"}})
 	}
 	t.Run("a field only the script writes is neither said nor reverted", func(t *testing.T) {
 		t.Parallel()
 		r := newTicketRepo(t)
 		write(t, r.path(doing), strings.Replace(ticket, "---\nbody", "started_at: \"2026-09-22T00:00:00Z\"\n---\nbody", 1))
-		got := script(r, "enable")
+		got := script(t, r, "enable")
 		if got.Code != 0 || said(got) != "" || !strings.Contains(read(t, r.path(doing)), "started_at") {
 			t.Errorf("戻されると着手の時刻が消え、手順が進まない: code=%d %q", got.Code, said(got))
 		}
@@ -757,7 +757,7 @@ func TestTicketPlaceChangesAreToldApartByWhatChanged(t *testing.T) {
 		r := newTicketRepo(t)
 		remove(t, r.path(doing))
 		write(t, r.path("wip/proposals/review/i0001.md"), strings.Replace(ticket, "---\nbody", "completed_at: \"2026-09-22T01:00:00Z\"\n---\nbody", 1))
-		if got := script(r, ""); got.Code != 0 {
+		if got := script(t, r, ""); got.Code != 0 {
 			t.Errorf("code=%d %s", got.Code, said(got))
 		}
 	})
@@ -765,7 +765,7 @@ func TestTicketPlaceChangesAreToldApartByWhatChanged(t *testing.T) {
 		t.Parallel()
 		r := newTicketRepo(t)
 		write(t, r.path(doing), strings.Replace(ticket, `glob: "src/*"`, `glob: "*"`, 1))
-		got := script(r, "")
+		got := script(t, r, "")
 		if got.Code != 2 {
 			t.Fatalf("code=%d %s", got.Code, said(got))
 		}

@@ -1,9 +1,9 @@
 package post
 
 // ターンの分離（発言のあとにしか進めない手順のゲート）と、ターン中の印を、hook の入口から実際の呼び出しの順で確かめる。
-// ゲートの細かい場合分け（発言の形ごとの数え方・付き添いの有無・サブエージェント・失敗や拒否された依頼）は、Go の
-// hook/events の TestTurnGateMatchesGolden と hookio の TestIsUserPrompt が見る。ここでは入口（標準入出力・終了コード・記録・
-// 置き場のファイル）に届くところだけを見る。
+// ゲートの細かい場合分け（発言の形ごとの数え方・付き添いの有無・サブエージェント）は、Go の hook/events の
+// TestTurnGateMatchesGolden と hookio の TestIsUserPrompt が見る。失敗・拒否・サブエージェントの A を数えない配線は
+// 本ファイルが見る。ここでは入口（標準入出力・終了コード・記録・置き場のファイル）に届くところを見る。
 
 import (
 	"encoding/json"
@@ -48,12 +48,7 @@ func newGate(t *testing.T, attended string) *gate {
 
 func (g *gate) hook(t *testing.T, event string, c call) run.Result {
 	t.Helper()
-	c.Event = event
-	c.Env = map[string]string{env.Mode: "enable"}
-	if g.attended != "" {
-		c.Env[env.ClaudeSessionAttended] = g.attended
-	}
-	return fire(t, g.root, c)
+	return g.mode(t, "enable", event, c)
 }
 
 func (g *gate) mode(t *testing.T, mode, event string, c call) run.Result {
@@ -73,12 +68,17 @@ func (g *gate) say(t *testing.T, text string) run.Result {
 
 func (g *gate) run(t *testing.T, command string, extra map[string]any) run.Result {
 	t.Helper()
+	return g.runIn(t, "enable", command, extra)
+}
+
+func (g *gate) runIn(t *testing.T, mode, command string, extra map[string]any) run.Result {
+	t.Helper()
 	g.calls++
 	body := map[string]any{"tool_use_id": "toolu_" + strconv.Itoa(g.calls)}
 	for k, v := range extra {
 		body[k] = v
 	}
-	return g.hook(t, "PreToolUse", call{Input: map[string]any{"command": command}, Extra: body})
+	return g.mode(t, mode, "PreToolUse", call{Input: map[string]any{"command": command}, Extra: body})
 }
 
 func stopped(r run.Result) bool { return strings.Contains(r.Stdout, needTurn) }
@@ -151,6 +151,51 @@ func TestAStepThatNeedsAUserTurnIsStoppedUntilTheUserSpeaks(t *testing.T) {
 	}
 }
 
+// A（integrate・review-request）が実際には走らなかったとき（失敗した・ルールの deny で止めた・サブエージェントが拒否された）は、
+// A の記録を残さない。残すと、同じ発言の中の B を誤って止める。
+func TestACallThatDidNotRunIsNotCountedAsA(t *testing.T) {
+	t.Parallel()
+	denyRule := `{"version": 1, "deny": [{"id": "no-integrate", "match": "Bash", "glob": "*integrate foo*", "message": "止めた。"}]}`
+	failed := func(t *testing.T, g *gate, first string) {
+		g.run(t, first, map[string]any{"tool_use_id": "toolu_a"})
+		g.hook(t, "PostToolUseFailure", call{Input: map[string]any{"command": first},
+			Extra: map[string]any{"tool_use_id": "toolu_a", "error": "rejected"}})
+	}
+	for _, c := range []struct {
+		name  string
+		first string
+		then  string
+		a     func(t *testing.T, g *gate, first string)
+	}{
+		{"a failed integrate", integr, integDo, failed},
+		{"a failed review-request", request, confirm, failed},
+		{"an integrate stopped by a rule", integr, integDo, func(t *testing.T, g *gate, first string) {
+			write(t, base.CommonPath(g.root, "rules"), denyRule)
+			if got := g.run(t, first, nil); !strings.Contains(got.Stdout, "no-integrate") {
+				t.Fatalf("ルールで止まる: %s", got.Stdout)
+			}
+		}},
+		{"an integrate refused to a subagent", integr, integDo, func(t *testing.T, g *gate, first string) {
+			if got := g.run(t, first, map[string]any{"agent_id": "sub1", "agent_type": "x"}); !strings.Contains(got.Stdout, "DENY_SUBAGENT_TICKET_OP") {
+				t.Fatalf("サブエージェントは拒否される: %s", got.Stdout)
+			}
+		}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			g := newGate(t, "0")
+			g.say(t, "お願いします")
+			c.a(t, g, c.first)
+			if len(g.entries()) != 0 {
+				t.Errorf("A の記録が残っている: %v", g.entries())
+			}
+			if got := g.run(t, c.then, nil); stopped(got) {
+				t.Errorf("走らなかった A を数えて B を止めた: %s", got.Stdout)
+			}
+		})
+	}
+}
+
 // 付き添いのあるセッションでは、`integrate-done` は発言を待たず確認（ask）に出る。同じコマンドに並べた呼び出しだけは確認でなく
 // 止まる。`confirm` は付き添いがあっても確認に出さず止める。サブエージェントは確認に出さず発言を待つ。
 func TestAnAttendedSessionIsAskedNotStoppedExceptForChainsConfirmsAndSubagents(t *testing.T) {
@@ -175,6 +220,19 @@ func TestAnAttendedSessionIsAskedNotStoppedExceptForChainsConfirmsAndSubagents(t
 		}
 		if len(rows) != 1 || str(rows[0], "code") != "RULE_ASK" || strings.Join(strs(rows[0], "rules"), "|") != "builtin:turn-gate:integrate-user-turn" {
 			t.Errorf("record = %v", rows)
+		}
+	})
+	t.Run("dry-run asks too", func(t *testing.T) {
+		t.Parallel()
+		g := newGate(t, "1")
+		g.mode(t, "dry-run", "UserPromptSubmit", call{Prompt: "お願いします"})
+		g.runIn(t, "dry-run", integr, nil)
+		done := g.runIn(t, "dry-run", integDo, nil)
+		if !asked(done) {
+			t.Fatalf("dry-run でも確認に出る: %s", done.Stdout)
+		}
+		if got := g.decisions(t, "ask"); str(got[len(got)-1], "code") != "RULE_ASK" {
+			t.Errorf("record = %v", got)
 		}
 	})
 	t.Run("a chain in one command is stopped", func(t *testing.T) {

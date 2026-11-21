@@ -117,13 +117,13 @@ func mapValues(m map[string]any) []string {
 func TestRepresentativeLargeInputsFinishWellWithinTheDeadline(t *testing.T) {
 	exe.Path(t) // 実行ファイルの組み立てを測りに入れない
 	root := freshWorkspace(t, "rules.yml")
-	for name, command := range map[string]string{
-		"a long command":     "echo " + strings.Repeat("a", 3000),
-		"many substitutions": "echo " + strings.Repeat("$(:) ", 500),
+	for _, c := range []struct{ name, command string }{
+		{"a long command", "echo " + strings.Repeat("a", 3000)},
+		{"many substitutions", "echo " + strings.Repeat("$(:) ", 500)},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			start := time.Now()
-			got := deadlineRun(t, root, "enable", "Bash", bashInput(command), "")
+			got := deadlineRun(t, root, "enable", "Bash", bashInput(c.command), "")
 			took := time.Since(start).Seconds()
 			mustNotHave(t, got.Stderr, "deadline-exceeded")
 			if took >= deadlineSeconds {
@@ -315,6 +315,17 @@ func TestOnlyFailuresAndDeniesOfTheSameSessionAreCounted(t *testing.T) {
 		for _, n := range names {
 			if strings.HasPrefix(n.Name(), "failstreak-") {
 				t.Errorf("記録を作らない: %s", n.Name())
+			}
+		}
+	})
+	t.Run("a state place that cannot be written", func(t *testing.T) {
+		t.Parallel()
+		// 数えを書けなくても、落ちず（終了 0）、案内も出さない。state の置き場をファイルで塞ぐ。
+		s := newStreak(t, nil)
+		write(t, filepath.Join(s.root, "logs", "state"), "x")
+		for range 4 {
+			if got := s.fail(t, "", false); got.Code != 0 || text(t, got) != "" {
+				t.Errorf("code=%d stdout=%q stderr=%q", got.Code, got.Stdout, got.Stderr)
 			}
 		}
 	})

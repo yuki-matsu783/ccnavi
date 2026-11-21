@@ -551,9 +551,7 @@ func TestSwitchingTheSelfGuardOffDropsTheFour(t *testing.T) {
 		f.hook(t, call{Event: "UserPromptSubmit", Prompt: "続き", Guard: "disable"})
 		f.dirtyAll(t, "ws")
 		got := f.hook(t, call{Event: "Stop", Guard: "disable"})
-		if got.Stdout != "" {
-			mustNotHave(t, got.Stdout, "systemMessage")
-		}
+		mustNotHave(t, got.Stdout, "systemMessage")
 	})
 }
 

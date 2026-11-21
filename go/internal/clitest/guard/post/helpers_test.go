@@ -79,6 +79,8 @@ type template struct {
 // copyOf は build で組んだリポジトリを、鍵ごとにこのプロセスで 1 回だけ作り、使い捨ての置き場へ写して返す。
 // 組んだ木は git のワークツリーと入れ子のリポジトリを含む。git を起こさずに済ませるため、ワークツリーの `.git` と
 // 登録（`.git/worktrees/*/gitdir`）に書かれた絶対パスだけを、写した先に書き換える。
+// harness/treecache は同じ鍵のテストを並行に動かせない（同じ絶対パスへ戻すため）。ここは同じ鍵の写しを並行のテストが
+// 同時に使うので、別のパスへ写す別の方式にしている。
 func copyOf(t testing.TB, key string, build func(dir string)) string {
 	t.Helper()
 	templatesMu.Lock()
@@ -143,6 +145,9 @@ func copyTree(t testing.TB, from, to string) {
 			}
 			if isGitLink(path) {
 				b = []byte(strings.NewReplacer(from, to, slash(from), slash(to)).Replace(string(b)))
+				if strings.Contains(string(b), from) || strings.Contains(string(b), slash(from)) {
+					t.Fatalf("%s が見本の絶対パスを指したまま", path)
+				}
 			}
 			return os.WriteFile(target, b, info.Mode().Perm())
 		}
@@ -276,7 +281,7 @@ func strs(row map[string]any, key string) []string {
 	return out
 }
 
-// output は応答の標準出力 JSON の入れ子の欄。
+// hookOutput は応答の標準出力を JSON として読んだもの。
 func hookOutput(t testing.TB, r run.Result) map[string]any {
 	t.Helper()
 	out := map[string]any{}
