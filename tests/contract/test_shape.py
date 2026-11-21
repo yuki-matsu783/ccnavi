@@ -26,31 +26,26 @@ class CompareTest(unittest.TestCase):
     def diff(self, old, new):
         return shape.compare(shape.normalize(old), shape.normalize(new))
 
-    def test_equal_shapes_have_no_difference(self):
-        self.assertEqual([], self.diff({"a": 1, "l": [{"b": "x"}]}, {"a": 2, "l": [{"b": "y"}]}))
-
-    def test_missing(self):
-        self.assertEqual([("b", "missing")], self.diff({"a": 1, "b": 1}, {"a": 1}))
-
-    def test_extra(self):
-        self.assertEqual([("b", "extra")], self.diff({"a": 1}, {"a": 1, "b": 1}))
-
-    def test_type(self):
-        self.assertEqual([("a", "type")], self.diff({"a": 1}, {"a": "1"}))
-        self.assertEqual([("a", "type")], self.diff({"a": 1}, {"a": 1.5}))
-
-    def test_presence(self):
+    def test_differences_are_named_by_kind(self):
         always = [{"a": 1}, {"a": 2}]
         sometimes = [{"a": 1}, {}]
-        self.assertEqual([("[].a", "presence")], self.diff(always, sometimes))
+        cases = [
+            ({"a": 1, "l": [{"b": "x"}]}, {"a": 2, "l": [{"b": "y"}]}, []),
+            ({"a": 1, "b": 1}, {"a": 1}, [("b", "missing")]),
+            ({"a": 1}, {"a": 1, "b": 1}, [("b", "extra")]),
+            ({"a": 1}, {"a": "1"}, [("a", "type")]),
+            ({"a": 1}, {"a": 1.5}, [("a", "type")]),
+            (always, sometimes, [("[].a", "presence")]),
+        ]
+        for old, new, want in cases:
+            with self.subTest(old=old, new=new):
+                self.assertEqual(want, self.diff(old, new))
 
-    def test_nested_key_is_named_with_its_path(self):
+    def test_nested_key_is_named_with_its_path_and_an_empty_array_is_not_compared(self):
         self.assertEqual(
             [("n[].author.id", "type")],
             self.diff({"n": [{"author": {"id": 1}}]}, {"n": [{"author": {"id": "1"}}]}),
         )
-
-    def test_empty_array_on_one_side_is_not_compared(self):
         self.assertEqual([], self.diff({"l": []}, {"l": [{"a": 1}]}))
 
     def test_status_and_missing_request(self):
@@ -72,24 +67,19 @@ class AllowTest(unittest.TestCase):
         self.assertEqual({"mr": [("b", "extra")]}, left)
         self.assertEqual([], problems)
 
-    def test_empty_reason_is_a_problem(self):
-        _, problems = shape.apply_allow(self.FOUND, [self.entry(reason=" ")])
-        self.assertTrue(any("理由が空" in p for p in problems))
-
-    def test_unknown_kind_is_a_problem(self):
-        _, problems = shape.apply_allow({}, [self.entry(kind="other")])
-        self.assertTrue(any("違いの種類" in p for p in problems))
-
-    def test_stale_entry_is_a_problem(self):
-        _, problems = shape.apply_allow(self.FOUND, [self.entry(key="zzz")])
-        self.assertTrue(any("古い許可" in p for p in problems))
-
-    def test_star_is_not_a_wildcard(self):
-        left, problems = shape.apply_allow(self.FOUND, [self.entry(key="*")])
+    def test_bad_allow_entries_are_problems(self):
+        cases = [
+            (self.FOUND, self.entry(reason=" "), "理由が空"),
+            ({}, self.entry(kind="other"), "違いの種類"),
+            (self.FOUND, self.entry(key="zzz"), "古い許可"),
+            (self.FOUND, self.entry(key="*"), "古い許可"),
+        ]
+        for found, entry, text in cases:
+            with self.subTest(text=text, entry=entry):
+                self.assertTrue(any(text in p for p in shape.apply_allow(found, [entry])[1]))
+        # `*` はワイルドカードではなく、kind が違えば差は残る
+        left, _ = shape.apply_allow(self.FOUND, [self.entry(key="*")])
         self.assertEqual(self.FOUND, left)
-        self.assertTrue(any("古い許可" in p for p in problems))
-
-    def test_the_kind_must_match(self):
         left, _ = shape.apply_allow(self.FOUND, [self.entry(kind="extra")])
         self.assertIn(("a", "missing"), left["mr"])
 
@@ -102,23 +92,18 @@ class ReadsTest(unittest.TestCase):
         actual = {"x": {"status": 200, "shape": shape.normalize(fake)}}
         return shape.compare_all(recorded, actual, {"x": reads} if reads is not None else None)
 
-    def test_a_read_key_the_fake_lacks_is_reported(self):
-        self.assertEqual({"x": [("a", "missing")]}, self.found({"a": 1, "b": 1}, {"b": 1}, ["a"]))
-
-    def test_a_read_key_of_another_type_is_reported(self):
-        self.assertEqual({"x": [("a", "type")]}, self.found({"a": 1}, {"a": "1"}, ["a"]))
-
-    def test_a_real_only_key_that_is_not_read_is_dropped(self):
-        self.assertEqual({}, self.found({"a": 1, "b": 1}, {"a": 1}, ["a"]))
-
-    def test_a_fake_only_key_is_reported_even_if_not_read(self):
-        self.assertEqual({"x": [("b", "extra")]}, self.found({"a": 1}, {"a": 1, "b": 1}, ["a"]))
-
-    def test_without_reads_everything_is_compared(self):
-        self.assertEqual({"x": [("b", "missing")]}, self.found({"a": 1, "b": 1}, {"a": 1}, None))
-
-    def test_a_read_key_below_a_missing_parent_is_reported(self):
-        self.assertEqual({"x": [("o", "missing")]}, self.found({"o": {"q": 1}}, {}, ["o.q"]))
+    def test_which_keys_are_compared(self):
+        cases = [
+            ({"a": 1, "b": 1}, {"b": 1}, ["a"], {"x": [("a", "missing")]}),
+            ({"a": 1}, {"a": "1"}, ["a"], {"x": [("a", "type")]}),
+            ({"a": 1, "b": 1}, {"a": 1}, ["a"], {}),
+            ({"a": 1}, {"a": 1, "b": 1}, ["a"], {"x": [("b", "extra")]}),
+            ({"a": 1, "b": 1}, {"a": 1}, None, {"x": [("b", "missing")]}),
+            ({"o": {"q": 1}}, {}, ["o.q"], {"x": [("o", "missing")]}),
+        ]
+        for real, fake, reads, want in cases:
+            with self.subTest(real=real, fake=fake, reads=reads):
+                self.assertEqual(want, self.found(real, fake, reads))
 
     def test_a_read_array_does_not_cover_the_keys_of_its_elements(self):
         real, fake = {"l": [{"q": 1}]}, {"l": [{"z": 1}]}
