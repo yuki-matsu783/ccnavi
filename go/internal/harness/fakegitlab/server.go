@@ -88,6 +88,8 @@ func New(cfg Config) (*Server, error) {
 	s := &Server{Token: Token, StatePath: cfg.StatePath, skew: cfg.Skew, echo: cfg.Echo}
 	s.http = httptest.NewUnstartedServer(http.HandlerFunc(s.serve))
 	if cfg.Port != 0 {
+		// NewUnstartedServer が先に作った待ち受けは使わないので閉じる（閉じないと、止めても残る）。
+		_ = s.http.Listener.Close()
 		ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", cfg.Port))
 		if err != nil {
 			return nil, err

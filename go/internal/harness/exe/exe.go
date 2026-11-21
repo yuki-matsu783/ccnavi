@@ -59,6 +59,13 @@ func ChromePath(t testing.TB) string { t.Helper(); return ready(t, chrome) }
 // TeststubPath は sh の中から起こすスタブ（curl・userform など）と claude の台本スタブを 1 本にまとめた実行ファイルのパス。
 func TeststubPath(t testing.TB) string { t.Helper(); return ready(t, stub) }
 
+// ToolPath は go/ の下のパッケージ pkg（`./internal/harness/cmd/gitlabmanual` など）を name の実行ファイルに組んだパス。
+// 環境変数で差し替えられる実行ファイル（Path など）と違い、いつも組む（指紋で取っておく）。手で使う入口の `go run` の代わりに、テストが起こす。
+func ToolPath(t testing.TB, pkg, name string) string {
+	t.Helper()
+	return ready(t, target{pkg, pkg, name})
+}
+
 // ShPath は sh に書くための ccnavi の実行ファイルのパス。`'…'` で囲んで使う。
 // 区切りを `/` にそろえる。Git Bash は `C:/…` をそのまま起こせるが、`\` は sh が食う。
 func ShPath(t testing.TB) string {
