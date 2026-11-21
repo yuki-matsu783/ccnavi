@@ -55,17 +55,18 @@
 # その失敗の報せ、時間の枠、ロック、段取り。実行ファイルの入れ替え中も fetch できるよう、実行ファイルが無くても fetch は
 # 止まらない作りにしてある。
 #
-# 実行ファイルが無い・答えないときは、取ってくる（fetch）だけにして、次を省く: 親の早送り（親子のチケットも、承認済み
-# チケットを持つツリーのブランチも）、origin/HEAD の向け直し（ホストに聞く ls-remote ごと）、統合先の取得と早送り、
-# 認証に失敗したときの案内（「取ってこられなかった」の 1 行だけにする）。省いたことは言わない（毎回同じ行を返さない）。
+# 実行ファイルが無い・答えないときは、ブランチを名指しせずに取ってくる（fetch）だけにする。ワークスペースルートと
+# `projects/` の下のリポジトリで、それぞれ `git fetch --quiet origin` を 1 回打つ（`.claude/worktrees` の下はルートと
+# 参照を共有するので打たない）。次を省く: 親の早送り（親子のチケットも、承認済みチケットを持つツリーのブランチも）、
+# origin/HEAD の向け直し（ホストに聞く ls-remote ごと）、統合先の取得と早送り、認証に失敗したときの案内（「取ってこられ
+# なかった」の 1 行だけにする）。省いたことは言わない（毎回同じ行を返さない）。
 #
-# 実行ファイルが無くても取ってくるために、sh が写しを持つものは 2 つ。どちらも実行ファイルとの一致をテストで確かめる。
-# - 見るツリーの置き場（ccnavi-common.sh の ccnavi_worktrees_dir・ccnavi_projects_dir・ccnavi_approved_dir。
-#   tests/fixtures/layout.json）
-# - 「リモートにその ref が無い」の見分け（ccnavi-common-state.sh の ccnavi_no_remote_ref。tests/fixtures/no-remote-ref.json）
+# 実行ファイルが無くても取ってくるために、sh が写しを持つのは、見るリポジトリの置き場（ccnavi-common.sh の
+# ccnavi_projects_dir。tests/fixtures/layout.json で実行ファイルとの一致をテストで確かめる）だけ。
 #
-# 「リモートにその ref が無い」で失敗した fetch は、その origin を失敗したものに数えない。 数えると、
-# 同じ origin の残りの取得まで行われなくなる。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
+# 「リモートにその ref が無い」で失敗した fetch（名指しで取るのは実行ファイルが答えるときだけ）は、その origin を
+# 失敗したものに数えない。 数えると、同じ origin の残りの取得まで行われなくなる。見分けは実行ファイル
+# （`fetch noref`。refusal.NoRemoteRef）に聞く。消えたかどうかはここでは決めず、ccnavi-sync.sh に回す。
 #
 # 終了コード: 常に 0。取ってこられないことは失敗ではない（オフラインでも作業は続く）。
 
@@ -129,8 +130,8 @@ ccnavi_fetch_left() {
 # 時間の枠（CCNAVI_FETCH_BUDGET、既定 45 秒）を過ぎていたら取りに行かずに 5。
 #
 # タイムアウト監視（ccnavi_git_timed）が limit 秒か枠の残りの短い方で切る。hook の上限（60 秒）を超えないため。
-# 単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る（sh の中の git。
-# ccnavi-git.sh の入口の refspec の拒否とは別の話）。
+# <ブランチ> を渡したときは、単一ブランチの clone でも origin/<ブランチ> が進むよう、行き先を書いて取る（sh の中の git。
+# ccnavi-git.sh の入口の refspec の拒否とは別の話）。空なら名指しせずに `fetch --quiet origin`（実行ファイルが無いとき）。
 ccnavi_fetch_git() {
 	ccnavi_fg_url=$(git -C "$1" remote get-url origin 2>/dev/null || :)
 	if [ -n "$ccnavi_fg_url" ] && grep -qxF -- "$ccnavi_fg_url" "$scratch/failed"; then
@@ -146,18 +147,23 @@ ccnavi_fetch_git() {
 	[ "$ccnavi_fg_left" -gt 0 ] || return 5
 	ccnavi_fg_limit="$limit"
 	[ "$ccnavi_fg_left" -lt "$ccnavi_fg_limit" ] && ccnavi_fg_limit="$ccnavi_fg_left"
+	ccnavi_fg_spec=""
+	[ -z "$2" ] || ccnavi_fg_spec="+refs/heads/$2:refs/remotes/origin/$2"
 	ccnavi_fg_rc=0
+	# 空の refspec は渡さない（引数ごと省く）。
 	ccnavi_git_timed "$ccnavi_fg_limit" "$scratch/err" "$1" \
-		fetch --quiet origin "+refs/heads/$2:refs/remotes/origin/$2" >/dev/null || ccnavi_fg_rc=$?
+		fetch --quiet origin ${ccnavi_fg_spec:+"$ccnavi_fg_spec"} >/dev/null || ccnavi_fg_rc=$?
 	if [ "$ccnavi_fg_rc" -ne 0 ]; then
-		ccnavi_no_remote_ref "$scratch/err" && return 4
+		if [ -n "$ccnavi_fg_spec" ] && ccnavi_fetch_ask noref "$scratch/err" && [ "$ccnavi_fx_next" = noref ]; then
+			return 4
+		fi
 		printf '%s\n' "$ccnavi_fg_url" >>"$scratch/failed"
 		return 1
 	fi
 	return 0
 }
 
-# 取りに行く。取れたら 0。<ツリー> <ブランチ> <失敗したときの 1 行> [<リモートに無いときの 1 行>]
+# 取りに行く。取れたら 0。<ツリー> <ブランチ（空なら名指しせず）> <失敗したときの 1 行> [<リモートに無いときの 1 行>]
 #
 # 失敗したときの 1 行は、その origin で初めて失敗したときだけ出す。同じ origin の 2 件目は
 # 取りに行かず、何も出さない。分け方に要る判定を、報せの `$( )` の外に置くための関数。
@@ -168,7 +174,7 @@ ccnavi_fetch_or_note() {
 	[ "$ccnavi_fn_rc" -eq 2 ] && return 1
 	if [ "$ccnavi_fn_rc" -eq 5 ]; then
 		printf '%s: 時間の枠（%s 秒）を過ぎたので %s を取得しませんでした。後で sh %s/.ccnavi/scripts/ccnavi-sync.sh を実行するか、もう一度セッションを始めてください\n' \
-			"$(basename "$1")" "$budget" "$2" "$root"
+			"$(basename "$1")" "$budget" "${2:-origin}" "$root"
 		return 1
 	fi
 	if [ "$ccnavi_fn_rc" -eq 4 ]; then
@@ -288,11 +294,14 @@ done
 #
 # `.ccnavi/approved/` は問わない。 第 1 周が見るのは「承認済みチケットを持つツリー」だが、
 # ここで欲しいのは「これから切るワークツリーの起点」で、いま何を持っているかとは別。
-repos="$root"
-for dir in "$root/$projects"/*; do
-	[ -e "$dir/.git" ] || continue
-	repos="$repos
-$dir"
+# 作業ツリーで origin があるものだけを入れる（3 つのループが同じ確かめを繰り返さない）。
+repos=""
+for dir in "$root" "$root/$projects"/*; do
+	[ "$dir" = "$root" ] || [ -e "$dir/.git" ] || continue
+	git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+	git -C "$dir" remote get-url origin >/dev/null 2>&1 || continue
+	repos="${repos:+$repos
+}$dir"
 done
 
 # 実行ファイル。無ければ（入れ替え中など）fetch だけにする（先頭の説明）。
@@ -317,7 +326,17 @@ ccnavi_fetch_family() {
 # 第 1 周が承認済みチケットを持つツリーとして見たツリー（第 2 周は、統合先をチェックアウトしているのがこれなら見ない）。
 : >"$scratch/seen"
 
-report=$(
+# 実行ファイルが無い・答えない。ブランチを名指しせず、リポジトリごとに 1 回取るだけ（先頭の説明）。
+ccnavi_fetch_plain() {
+	printf '%s\n' "$repos" | while IFS= read -r repo; do
+		[ -n "$repo" ] || continue
+		ccnavi_fetch_or_note "$repo" "" \
+			"$(basename "$repo"): リモートを取ってこられなかった。ローカルの版で判定する" || :
+	done
+}
+
+# 実行ファイルが答えるとき。
+ccnavi_fetch_full() {
 	# 第 1 周。そのツリーがチェックアウトしているブランチを upstream まで進める。
 	printf '%s\n' "$trees" | while read -r place tree; do
 		[ -n "$tree" ] || continue
@@ -345,16 +364,12 @@ report=$(
 	# 第 2 周は向け直した後の名前で進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
-		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
 		ccnavi_fetch_retarget "$repo"
 	done
 
 	# 第 2 周。リポジトリごとに、ワークツリーの起点になる統合先ブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
-		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
 		ccnavi_fetch_ask base "$repo" "$scratch/seen" || continue
 		# 次の一手が fetch <統合先> のときだけ進める（`$( )` の中なので case は使わない）。
 		default="${ccnavi_fx_next#fetch }"
@@ -366,7 +381,13 @@ report=$(
 			continue
 		ccnavi_fetch_ask advance "$repo" "$default" || :
 	done
-)
+}
+
+if [ -z "$fetch_bin" ]; then
+	report=$(ccnavi_fetch_plain)
+else
+	report=$(ccnavi_fetch_full)
+fi
 
 [ -n "$report" ] || exit 0
 printf '[ccnavi] セッション開始時に、統合先ブランチと親ブランチをリモートの最新に合わせようとした結果です。\n'
