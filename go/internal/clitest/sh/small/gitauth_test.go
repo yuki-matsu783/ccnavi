@@ -2,7 +2,6 @@ package small
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,22 +29,14 @@ func newGitAuth(t *testing.T) gitAuth {
 	if err := os.MkdirAll(g.bin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("git", "init", "-q", g.repo)
-	cmd.Env = run.Environment(run.Opts{})
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v: %s", err, out)
-	}
+	run.Git(t, "", "init", "-q", g.repo)
 	return g
 }
 
 // addRemote は repo に origin を足す。
 func (g gitAuth) addRemote(t *testing.T, origin string) {
 	t.Helper()
-	cmd := exec.Command("git", "-C", g.repo, "remote", "add", "origin", origin)
-	cmd.Env = run.Environment(run.Opts{})
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git remote add: %v: %s", err, out)
-	}
+	run.Git(t, g.repo, "remote", "add", "origin", origin)
 }
 
 // tool は bin に道具（何もしないスタブ）を置き、その絶対パスを返す。

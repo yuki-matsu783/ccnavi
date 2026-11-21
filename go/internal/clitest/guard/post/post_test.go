@@ -601,16 +601,16 @@ func TestTheTurnEndAlsoReportsCommittedChanges(t *testing.T) {
 // integrate と integrate-done の後の形（squash のコミット、片付け、記録のコピー）を作る。
 func integrateAndFinish(t *testing.T, r *repo) {
 	t.Helper()
-	home := strings.TrimSpace(run.Git(t, r.root, "rev-parse", "--abbrev-ref", "HEAD"))
+	home := run.Git(t, r.root, "rev-parse", "--abbrev-ref", "HEAD")
 	run.Git(t, r.root, "checkout", "--quiet", "-b", "feat")
 	r.dirty(t, "ワークツリーで直した\n")
 	run.Git(t, r.root, "add", "--", "protected/keep.txt")
 	run.Git(t, r.root, "commit", "--quiet", "-m", "ワークツリーの作業")
-	tip := strings.TrimSpace(run.Git(t, r.root, "rev-parse", "HEAD"))
+	tip := run.Git(t, r.root, "rev-parse", "HEAD")
 	run.Git(t, r.root, "checkout", "--quiet", home)
-	baseSha := strings.TrimSpace(run.Git(t, r.root, "rev-parse", "HEAD"))
+	baseSha := run.Git(t, r.root, "rev-parse", "HEAD")
 	run.Git(t, r.root, "merge", "--quiet", "--squash", "feat")
-	tree := strings.TrimSpace(run.Git(t, r.root, "write-tree"))
+	tree := run.Git(t, r.root, "write-tree")
 	run.Git(t, r.root, "commit", "--quiet", "-m", "取り込み")
 	run.Git(t, r.root, "branch", "--quiet", "-D", "feat")
 	write(t, filepath.Join(r.root, ".git", "ccnavi-integrate-done", "feat"),

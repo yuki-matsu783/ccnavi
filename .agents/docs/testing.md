@@ -8,7 +8,7 @@ keywords: [テスト, スタブ, STUB, 操作記録, 全件, discover, グルー
 
 # ccnaviのPythonのテストを回す
 
-Go のテストの回し方は[実行ファイルをGoに書き直す](go-rewrite.md)の「回す」にある。clitest の待ちが主のテストの並行の数は、`base.Main` が CPU の数（GOMAXPROCS）の 2 倍に上げる（`-parallel` を渡せばそちらが優先）。
+Go のテストの回し方は[実行ファイルをGoに書き直す](go-rewrite.md)の「回す」にある。clitest の待ちが主のテストの並行の数は、`base.Main` が CPU の数（GOMAXPROCS）の 2 倍に上げる（`-parallel` を渡せばそちらが優先。`m.Run` の中の flag の解析が後から上書きする）。
 
 ## 全件を1本で回さない
 

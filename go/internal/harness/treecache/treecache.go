@@ -90,8 +90,9 @@ var (
 	entries = map[string]*entry{}
 )
 
-// lockWait は、別のテストが持つ鍵を待つ上限（持ち主が替わるたびに数え直す）。1 本のテストが長引く負荷の下（他の go test と重なる）でも詰まりとみなさないよう、子のプロセスの上限（base.ExecTimeout）と同じにする。超えたら詰まりとみなして落とす（永久に待たない）。
-var lockWait = 120 * time.Second
+// lockWait は、別のテストが持つ鍵を待つ上限（持ち主が替わるたびに数え直す）。1 本のテストが長引く負荷の下（他の go test と重なる）でも
+// 詰まりとみなさないよう、子のプロセスの上限と同じにする。超えたら詰まりとみなして落とす（永久に待たない）。
+var lockWait = base.ExecTimeout
 
 func entryFor(t testing.TB, key, site string) *entry {
 	homeMu.Lock()

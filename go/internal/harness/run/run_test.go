@@ -92,6 +92,19 @@ func TestComposeFoldsCaseWhenCaseless(t *testing.T) {
 }
 
 // 出力の CRLF は LF に揃う。
+func TestGitIsAuthoredAndTrimmed(t *testing.T) {
+	dir := base.TempDir(t)
+	Git(t, "", "init", "-q", dir)
+	Git(t, dir, "commit", "-q", "--allow-empty", "-m", "x")
+	sha := Git(t, dir, "rev-parse", "HEAD")
+	if len(sha) != 40 || sha != strings.TrimSpace(sha) {
+		t.Errorf("rev-parse HEAD = %q", sha)
+	}
+	if got := Git(t, dir, "log", "-1", "--format=%an"); got != "t" {
+		t.Errorf("author = %q", got)
+	}
+}
+
 func TestOutputIsLFNormalized(t *testing.T) {
 	t.Parallel()
 	r := Sh(t, printEnvScript(t), nil)

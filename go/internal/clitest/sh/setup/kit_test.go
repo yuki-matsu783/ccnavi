@@ -256,10 +256,7 @@ func pathWith(dirs ...string) string {
 func gitInit(t testing.TB, dir string) {
 	t.Helper()
 	mkdir(t, dir)
-	r := run.Command(t, "git", []string{"init", "-q", dir}, run.Opts{})
-	if r.Code != 0 {
-		t.Fatalf("git init: %s", r.Stderr)
-	}
+	run.Git(t, "", "init", "-q", dir)
 }
 
 // haveCommands は commands が全部あるかを見る。無ければ skip。

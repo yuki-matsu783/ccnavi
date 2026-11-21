@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strings"
 	"testing"
 
 	"ccnavi/internal/harness/base"
@@ -138,7 +137,7 @@ func TestBuildStampsTheSourceCommit(t *testing.T) {
 	run.Git(t, b.root, "init", "-q")
 	run.Git(t, b.root, "add", "-A")
 	run.Git(t, b.root, "commit", "-q", "-m", "init")
-	head := strings.TrimSpace(run.Git(t, b.root, "rev-parse", "HEAD"))
+	head := run.Git(t, b.root, "rev-parse", "HEAD")
 	b.build(nil)
 	mustContain(t, "コミット済み", b.built(), stamp+head+" ")
 

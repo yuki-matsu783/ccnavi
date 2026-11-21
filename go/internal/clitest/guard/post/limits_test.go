@@ -109,8 +109,8 @@ func mapValues(m map[string]any) []string {
 }
 
 // 代表入力は、判定が期限（既定）に収まる大きさにする。期限の判定は hook 自身が時計で行い、超えれば deadline-exceeded を出すので、
-// 試験は実時間を測らずにそれが出ないことだけを見る（子の起動を含めた壁時計の上限を置くと、ほかの go test と重なったときに揺れる）。
-func TestRepresentativeLargeInputsFinishWellWithinTheDeadline(t *testing.T) {
+// 試験は実時間を測らずにそれが出ないことだけを見る（子の起動時間は見ない。子の起動を含めた壁時計の上限を置くと、ほかの go test と重なったときに揺れる）。
+func TestRepresentativeLargeInputsDoNotHitTheDeadline(t *testing.T) {
 	exe.Path(t) // 実行ファイルの組み立てを測りに入れない
 	root := freshWorkspace(t, "rules.yml")
 	for _, c := range []struct{ name, command string }{
