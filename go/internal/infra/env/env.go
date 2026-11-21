@@ -128,6 +128,16 @@ const (
 const (
 	ProbeReviewerToken = "CCNAVI_PROBE_REVIEWER_TOKEN"
 	ProbeReviewerID    = "CCNAVI_PROBE_REVIEWER_ID"
+	ProbeRootID        = "CCNAVI_PROBE_ROOT_ID"
+	// GitLabPort は Docker の GitLab の公開ポート（既定 8929）。ProbeGitLab は probe・契約の録りの接続先（既定はこのポートの 127.0.0.1）。
+	GitLabPort  = "CCNAVI_GITLAB_PORT"
+	ProbeGitLab = "CCNAVI_PROBE_GITLAB"
+	// ProbePrefix は probe が作るプロジェクト名の前置き、ProbeOut は結果の置き場、ProbeKeep が空でなければ作ったプロジェクトを消さない。
+	ProbePrefix = "CCNAVI_PROBE_PREFIX"
+	ProbeOut    = "CCNAVI_PROBE_OUT"
+	ProbeKeep   = "CCNAVI_PROBE_KEEP"
+	// XdgCacheHome があれば、手動の GitLab の状態のファイルはその下に置く。
+	XdgCacheHome = "XDG_CACHE_HOME"
 )
 
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所・端末の幅。
