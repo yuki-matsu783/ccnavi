@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -191,5 +192,59 @@ func TestIsWorktreeDir(t *testing.T) {
 		if got := IsWorktreeDir(c.dir); got != c.want {
 			t.Errorf("IsWorktreeDir(%q) = %v, want %v", c.dir, got, c.want)
 		}
+	}
+}
+
+// fatalTB は Fatalf（Fatal）を記録して、そこで止める TB。Ccnavi が検査で落とすのを、テストの外から見るために使う。
+type fatalTB struct {
+	testing.TB
+	msg string
+}
+
+type fatalStop struct{}
+
+func (f *fatalTB) Fatalf(format string, args ...any) {
+	f.msg = fmt.Sprintf(format, args...)
+	panic(fatalStop{})
+}
+
+func (f *fatalTB) Fatal(args ...any) {
+	f.msg = fmt.Sprint(args...)
+	panic(fatalStop{})
+}
+
+// 使い捨て置き場の上に `.claude` を持つ祖先（利用者のホーム）がある機械で、--root なしの起動が祖先の根へ文面を書かない。
+func TestWithoutRootOutsideTheTempBaseIsRefusedAndWritesNothing(t *testing.T) {
+	home := base.TempDir(t)
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	tmp := filepath.Join(home, "tmp")
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", tmp)
+	t.Setenv("TEMP", tmp)
+	t.Setenv("TMP", tmp)
+	dir := base.TempDir(t)
+	f := &fatalTB{TB: t}
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if _, ok := r.(fatalStop); !ok {
+					panic(r)
+				}
+			}
+		}()
+		Ccnavi(f, []string{"--version"}, Opts{Dir: dir})
+	}()
+	if f.msg != "" && !strings.Contains(f.msg, "使い捨て置き場の外") {
+		t.Fatalf("別の理由で落ちた: %s", f.msg)
+	}
+	if _, err := os.Lstat(filepath.Join(home, ".ccnavi")); err == nil {
+		t.Errorf("祖先の根 %s に .ccnavi を書いた", home)
+	}
+	if f.msg == "" {
+		t.Error("根が使い捨て置き場の外なのに落ちなかった")
 	}
 }

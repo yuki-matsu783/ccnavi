@@ -60,8 +60,12 @@ func Ccnavi(t testing.TB, args []string, opts ...Opts) Result {
 	t.Helper()
 	o := first(opts)
 	environ := Environment(o)
+	root := rootOf(args, environ, o.Dir)
+	if root != "" && !under(root, base.TempBase()) && !insideRepo(root) {
+		t.Fatalf("根 %s が使い捨て置き場の外。--root に base.TempDir を渡す", root)
+	}
 	if !o.NoMessages {
-		putMessagesWhenAbsent(t, rootOf(args, environ, o.Dir))
+		putMessagesWhenAbsent(t, root)
 	}
 	return start(t, exe.Path(t), args, o, environ)
 }
@@ -204,11 +208,14 @@ func isDir(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// insideRepo はこのリポジトリ（base.Root）か、その下か。
-func insideRepo(path string) bool {
-	_, ok := pathcase.Under(path, base.Root())
+// under は path が dir と同じか、その下か。
+func under(path, dir string) bool {
+	_, ok := pathcase.Under(path, dir)
 	return ok
 }
+
+// insideRepo はこのリポジトリ（base.Root）か、その下か。
+func insideRepo(path string) bool { return under(path, base.Root()) }
 
 // messagesOnce は根ごとに 1 回だけ文面を置く。表の副テストが同じ根へ並行に起こしても、書きかけの文面を子が読まない。
 var messagesOnce sync.Map
@@ -224,8 +231,8 @@ func putMessagesWhenAbsent(t testing.TB, root string) {
 
 func putMessages(t testing.TB, root string) {
 	t.Helper()
-	// リポジトリの中（tests/fixtures など）に写すと、作業ツリーに追跡されないファイルが残る。
-	if root == "" || !isDir(root) || insideRepo(root) {
+	// 書くのは使い捨て置き場の下だけ。リポジトリの中（tests/fixtures など）に写すと、作業ツリーに追跡されないファイルが残る。
+	if root == "" || !isDir(root) || !under(root, base.TempBase()) {
 		return
 	}
 	if _, err := os.Lstat(filepath.Join(root, ".ccnavi", "messages")); err == nil {

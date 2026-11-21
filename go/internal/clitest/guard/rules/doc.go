@@ -1,0 +1,8 @@
+// Package rules は、ルールの判定・読めないルールの縮退・確認（ask）・権限モード・プロジェクトごとのレイヤー・
+// 横で作業する指定・ユーザ専用の入口を、hook の入口（と診断の入口）から外へ向けて確かめるテストの置き場である。
+// tests/guard の acceptance・repo_rules・fallback・permission_mode・internal_error・gate_kinds・ask_context・
+// ask_hint_adopt・user_entry・projects・side_by_side・suggest を移したもの。
+//
+// 判定とヒットしたルールの名前の表は本体の単体テスト（hook/judge など）が持つので、ここでは「入口に payload を渡して、
+// 応答の JSON・終了コード・記録・本物のファイルがどうなったか」を見る。
+package rules
