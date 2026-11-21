@@ -213,7 +213,7 @@ ccnavi の動作に依存する決まりと考え方なので、ワークスペ�
 | `CCNAVI_GIT_MAX_LINES` | `ccnavi-git.sh` が返す本文の行数の上限。既定は `40`。超えたぶんは `logs/` にだけ残る |
 | `CCNAVI_GIT_FAIL_LINES` | `ccnavi-git.sh` が、失敗したときに返す末尾の行数。既定は `30` |
 | `CCNAVI_GIT_KEEP_LOGS` | `ccnavi-git.sh` が残す記録の本数。既定は `50` |
-| `CCNAVI_WORKSPACE` | ワークスペースルートの絶対パス。hook の外（ターミナルなど）から ccnavi の sh を打つとき、sh がルートを探せなければ渡す（sh は cwd から上へ、見つからなければ sh 自身の置き場から上へ探す）。ワークスペースルートの `.ccnavi/scripts/ccnavi-common.sh` が在るパスでなければ使われない |
+| `CCNAVI_WORKSPACE` | ワークスペースルートの絶対パス。hook の外（ターミナルなど）から ccnavi の sh を打つとき、sh がルートを探せなければ渡す（sh は cwd から上へ探す。cwd が消えていれば、ルートへ `cd` する 1 行を出して止まる）。ワークスペースルートの `.ccnavi/scripts/ccnavi-common.sh` が在るパスでなければ使われない |
 | `CCNAVI_BRANCH_PREFIXES` | 親の識別子の先頭の語のリスト（カンマ区切り）。既定は `feature,hotfix,fix,bugfix,chore,refactor,docs`。`main` `master` `develop` `release` は使えない（[チケット](tickets.md)の「識別子とブランチ名」） |
 | `CCNAVI_LOG_LEVEL` | 診断ログ（`logs/diag/`）に出すレベル。`DEBUG` `INFO` `WARN` `ERROR`（大文字小文字は問わない）。既定と読めない値は `INFO` |
 
