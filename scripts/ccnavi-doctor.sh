@@ -34,7 +34,7 @@
 #
 # 通信する確認（git・glab・curl）はすべて時間の上限を付ける。時間を測るのは host 部品の ccnavi_run_timed
 # （ほかの sh と同じ部品）。時間切れと INT・TERM で止めるのは、起こしたコマンド（直接の子）だけ。
-# ssh などの孫が残っても、doctor は上限どおりに終わる。
+# ssh などの孫が残っても、TERM で止まるコマンドなら doctor は上限どおりに終わる。TERM を無視するコマンドは上限で止まらない（KILL は送らない）。
 
 set -eu
 
@@ -864,7 +864,7 @@ main() {
 		die "--with-extensions は --mode build のときだけ指定できます。"
 	fi
 
-	doctor_tmp=$(umask 077 && mktemp -d "${TMPDIR:-/tmp}/ccnavi-doctor.XXXXXX" 2>/dev/null) || die "作業用のディレクトリを作れません。" 1
+	doctor_tmp=$(mktemp -d "${TMPDIR:-/tmp}/ccnavi-doctor.XXXXXX" 2>/dev/null) || die "作業用のディレクトリを作れません。" 1
 	trap doctor_cleanup EXIT
 	trap 'exit 130' INT
 	trap 'exit 143' TERM
