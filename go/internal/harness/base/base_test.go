@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -165,5 +166,29 @@ func TestUncacheMarkPathExists(t *testing.T) {
 	t.Parallel()
 	if _, err := os.Stat(relMark); err != nil {
 		t.Errorf("目印の相対パス %q が開けない: %v", relMark, err)
+	}
+}
+
+// Final は、下書きがあれば .claude を handoff-.claude に読み替えた下書きを、無ければ本物を指す。
+func TestFinalPointsToTheDraftOnlyWhenItExists(t *testing.T) {
+	t.Parallel()
+	name := "final-test-" + strconv.Itoa(os.Getpid()) + ".sh"
+	rel := ".claude/hooks/" + name
+	if got, want := Final(rel), filepath.Join(Root(), ".claude", "hooks", name); got != want {
+		t.Errorf("下書きが無いとき: %q, 期待 %q", got, want)
+	}
+	draft := filepath.Join(Root(), "wip", "handoff", "handoff-.claude", "hooks", name)
+	if err := os.MkdirAll(filepath.Dir(draft), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(draft, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Remove(draft) })
+	if got := Final(rel); got != draft {
+		t.Errorf("下書きがあるとき: %q, 期待 %q", got, draft)
+	}
+	if got, want := Final(".ccnavi/x/"+name), filepath.Join(Root(), ".ccnavi", "x", name); got != want {
+		t.Errorf("表に無い階層は変えない: %q, 期待 %q", got, want)
 	}
 }

@@ -334,7 +334,7 @@ func TestEitherPathFormSelectsTheDraft(t *testing.T) {
 func TestHooksUnderTheHiddenDirectoryAreTakenToo(t *testing.T) {
 	t.Parallel()
 	w := newHoWS(t)
-	hook := ".claude/hooks/lint-py.sh"
+	hook := ".claude/hooks/lint-go.sh"
 	ticketkit.Write(t, w.target(hook), "#!/bin/sh\necho old\n")
 	w.stage(hook, []byte("#!/bin/sh\necho new\n"))
 	ticketkit.OK(t, w.take())

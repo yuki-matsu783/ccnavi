@@ -220,20 +220,17 @@ func TestWorkspaceRootDiscovery(t *testing.T) {
 	})
 }
 
-// TestHookSkipsTreeWithoutTests は、tests/ を持たないツリーでターンを止めないことを見る。
-func TestHookSkipsTreeWithoutTests(t *testing.T) {
+// TestHookSkipsTreeWithoutGoRecord は、Go を触っていないターン（記録が無い）で、ターンを止めないことを見る。
+func TestHookSkipsTreeWithoutGoRecord(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t)
-	hook := filepath.Join(f.root, ".claude", "hooks", "test-py.sh")
+	hook := filepath.Join(f.root, ".claude", "hooks", "test-go.sh")
 	if !isFilePath(hook) {
-		t.Skip("test-py.sh がコピーされていない")
+		t.Skip("test-go.sh がコピーされていない（取り込み前）")
 	}
 	r := run.Sh(t, hook, nil, run.Opts{Dir: f.p1, Input: "{}"})
 	if r.Code != 0 {
-		t.Fatalf("tests/ の無いツリーで止まった: stdout=%q stderr=%q", r.Stdout, r.Stderr)
-	}
-	if strings.Contains(r.Stdout+r.Stderr, "Start directory is not importable") {
-		t.Fatal("tests/ の無いツリーを探しに行っている")
+		t.Fatalf("記録の無いターンで止まった: stdout=%q stderr=%q", r.Stdout, r.Stderr)
 	}
 }
 

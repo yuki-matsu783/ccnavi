@@ -11,7 +11,7 @@ type NamePair struct{ From, To string }
 var NameSamples = []NamePair{
 	{".claude/settings.json", "handoff-.claude/settings.json"},
 	{".claude/settings.local.json", "handoff-.claude/settings.local.json"},
-	{".claude/hooks/lint-py.sh", "handoff-.claude/hooks/lint-py.sh"},
+	{".claude/hooks/lint-go.sh", "handoff-.claude/hooks/lint-go.sh"},
 	{".claude/skills/x/SKILL.md", "handoff-.claude/skills/x/SKILL.md"},
 	{"projects/web/.claude/settings.json", "projects/web/handoff-.claude/settings.json"},
 	{"a/.claude/b/.claude/c.json", "a/handoff-.claude/b/handoff-.claude/c.json"},

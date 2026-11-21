@@ -43,7 +43,7 @@ func (s *stageWS) path(rel string) string { return filepath.Join(s.ws, filepath.
 
 const (
 	rulesRel = ".ccnavi/config/common/rules.yml"
-	hookRel  = ".claude/hooks/lint-py.sh"
+	hookRel  = ".claude/hooks/lint-go.sh"
 )
 
 func newStageFixture(t *testing.T) *stageWS {
@@ -63,7 +63,7 @@ func TestStageCopiesWithTheSameLayoutAndLeavesTheOriginal(t *testing.T) {
 	}
 	for _, c := range []struct{ got, want string }{
 		{shkit.Read(t, s.path("wip/handoff/"+rulesRel)), "version: 1\n"},
-		{shkit.Read(t, s.path("wip/handoff/handoff-.claude/hooks/lint-py.sh")), "echo lint\n"},
+		{shkit.Read(t, s.path("wip/handoff/handoff-.claude/hooks/lint-go.sh")), "echo lint\n"},
 		{shkit.Read(t, s.path(rulesRel)), "version: 1\n"},
 	} {
 		if c.got != c.want {
@@ -133,7 +133,7 @@ func TestStageCommandsPrintTheHandoffForEditedDraftsNotMv(t *testing.T) {
 	t.Parallel()
 	s := newStageFixture(t)
 	s.stage("", rulesRel, hookRel)
-	shkit.Write(t, s.path("wip/handoff/handoff-.claude/hooks/lint-py.sh"), "echo lint2\n")
+	shkit.Write(t, s.path("wip/handoff/handoff-.claude/hooks/lint-go.sh"), "echo lint2\n")
 	r := s.stage("", "--commands", rulesRel, hookRel)
 	handoff := "sh '" + shkit.Slash(s.ws) + "/.ccnavi/scripts/ccnavi-user-handoff.sh'"
 	for _, want := range []string{handoff + " '" + hookRel + "'\n", "--yes --expect <上のハッシュ>"} {

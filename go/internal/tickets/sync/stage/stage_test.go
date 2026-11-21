@@ -15,7 +15,7 @@ import (
 
 const (
 	rulesRel = ".ccnavi/config/common/rules.yml"
-	hookRel  = ".claude/hooks/lint-py.sh"
+	hookRel  = ".claude/hooks/lint-go.sh"
 )
 
 type fixture struct {
@@ -44,7 +44,7 @@ func (f *fixture) draftRules() string {
 }
 
 func (f *fixture) draftHook() string {
-	return filepath.Join(f.ws, "wip", "handoff", "handoff-.claude", "hooks", "lint-py.sh")
+	return filepath.Join(f.ws, "wip", "handoff", "handoff-.claude", "hooks", "lint-go.sh")
 }
 
 func (f *fixture) read(path string) string {
