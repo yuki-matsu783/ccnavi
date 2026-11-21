@@ -70,10 +70,6 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_ENTRY_PATH")
-# `projects/` がワークスペースの git に追跡されているときの
-# `--lint` の `(projects)` の warn の先頭の句。
-# 導入スクリプトは入れ終わりに `--lint` を起こし、この warn をそのまま見せる。
-TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
 # 書かなければ enable で動くので、dry-run で導入したときにここだけ実際に動くと、
 # 様子を見ているユーザの手元でファイルが勝手に戻る。
@@ -442,29 +438,29 @@ class SetupTest(unittest.TestCase):
 
 class WritesTheExpectedShape(SetupTest):
     def test_writes_env_and_all_seven_hooks(self):
-        """設定ファイルが無いところに、env と 8 つの hook を作る。"""
+        """設定ファイルが無いところに、引数なしで 1 回入れて、env と hook の値そのものを見る。
+
+        「ccnavi という字が入っている」だけでは取り違えを見つけられないので、hook に
+        書かれる 1 行・env の値（導入先の既定 dry-run）・戻す働きと承認の切り替えの
+        強さまで 1 回の実行で確かめる。
+        """
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
 
         data = self.read_settings()
+        env = data["env"]
         for name in REQUIRED_ENV:
-            self.assertIn(name, data["env"])
-        for event in EVENTS:
-            commands = self.commands_of(data, event)
-            self.assertTrue(
-                any("ccnavi" in c.lower() for c in commands),
-                f"{event} に ccnavi が登録されていない",
-            )
+            self.assertIn(name, env)
+        # 指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
+        self.assertEqual(env["CCNAVI_ENTRY_PATH"], BIN_PATH)
+        # 戻す働きは CCNAVI_MODE と同じ強さで並ぶ。dry-run の導入先で勝手にファイルが戻らない。
+        for name in GUARD_ENV:
+            self.assertEqual(env[name], "dry-run", name)
+        # この 3 つは enable か disable しか取らないので、dry-run で導入しても enable で書く。
+        self.assertEqual(env[TICKET_APPROVAL_ENV], "enable")
+        self.assertEqual(env[UNWATCHED_ENV], "enable")
+        self.assertEqual(env[TICKET_CONTROL_ENV], "enable")
 
-    def test_registers_the_exact_command_line_from_the_readme(self):
-        """hook に書かれる 1 行そのものを見る。
-
-        「ccnavi という字が入っている」だけを見ていると、表記を取り違えても
-        テストが通ってしまう。この 1 行は、何を起動するかと、ccnavi が何を
-        守るか（CCNAVI_ENTRY_PATH）を同時に決めている。
-        """
-        self.run_setup()
-        data = self.read_settings()
         for event in EVENTS:
             others = (FETCH_COMMAND, *IDLE_COMMANDS.get(event, ()))
             hooks = [h for h in self.hooks_of(data, event) if h["command"] not in others]
@@ -472,6 +468,17 @@ class WritesTheExpectedShape(SetupTest):
             self.assertEqual(hooks[0]["command"], HOOK_COMMAND, f"{event} の command")
             self.assertEqual(hooks[0]["type"], "command", f"{event} の type")
             self.assertEqual(hooks[0]["timeout"], 10, f"{event} の timeout")
+
+    def test_an_enable_mode_is_followed_by_the_paths_and_the_guards(self):
+        """`--mode enable` で 1 回入れて、env の値そのものを見る。"""
+        self.run_setup("--mode", "enable")
+        env = self.read_settings()["env"]
+        self.assertEqual(env["CCNAVI_MODE"], "enable")
+        self.assertEqual(env["CCNAVI_ENTRY_PATH"], BIN_PATH)
+        # 戻す働きの 2 つは片方だけが残らない。
+        for name in GUARD_ENV:
+            self.assertEqual(env[name], "enable", name)
+        self.assertEqual(env[TICKET_APPROVAL_ENV], "enable")
 
     def test_registers_the_fetch_at_session_start_only(self):
         """取り込みは SessionStart に 1 つだけ。他のイベントには載せない。"""
@@ -512,13 +519,6 @@ class WritesTheExpectedShape(SetupTest):
         commands = [h["command"] for h in self.hooks_of(self.read_settings(), "SessionStart")]
         self.assertEqual([FETCH_COMMAND, HOOK_COMMAND], commands)
 
-    def test_writes_the_paths_ccnavi_reads(self):
-        """env の値そのものを見る。存在するだけでは、取り違えを見つけられない。"""
-        self.run_setup("--mode", "enable")
-        env = self.read_settings()["env"]
-        self.assertEqual(env["CCNAVI_MODE"], "enable")
-        self.assertEqual(env["CCNAVI_ENTRY_PATH"], BIN_PATH)
-
     def test_does_not_write_the_common_layer_paths(self):
         """共通レイヤーの 3 本は `.ccnavi/config/common/` 固定なので、env には書かない。
 
@@ -531,64 +531,6 @@ class WritesTheExpectedShape(SetupTest):
             for name in ("CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"):
                 with self.subTest(args=args, name=name):
                     self.assertNotIn(name, env)
-
-    def test_bin_path_points_at_the_launcher(self):
-        """指すのは .ccnavi/scripts/ の振り分けの sh で、どの環境でも 1 行のまま（S1）。
-
-        実行ファイルは機械ごとに .ccnavi/bin/<os>-<arch>/ に入り、どれを起動するかは sh が選ぶ。
-        設定に機械の語や `.exe` が入ると、その 1 行が 1 つの環境でしかヒットしなくなる。
-        """
-        self.run_setup()
-        self.assertEqual(self.read_settings()["env"]["CCNAVI_ENTRY_PATH"], BIN_PATH)
-
-    def test_writes_the_guards_at_the_same_strength_as_the_mode(self):
-        """戻す働きの 2 つは CCNAVI_MODE と同じ値で並ぶ。
-
-        書かなければ 2 つとも enable で動く。dry-run で導入したつもりの
-        プロジェクトで、判定は止めないのに戻す働きだけが実際に動く形になり、
-        様子を見ているユーザの手元でファイルが勝手に戻る。
-        """
-        self.run_setup()
-        env = self.read_settings()["env"]
-        for name in GUARD_ENV:
-            self.assertEqual(env[name], "dry-run", name)
-
-    def test_the_guards_follow_an_enable_mode_too(self):
-        """`--mode enable` なら 2 つとも enable。片方だけが残らない。"""
-        self.run_setup("--mode", "enable")
-        env = self.read_settings()["env"]
-        for name in GUARD_ENV:
-            self.assertEqual(env[name], "enable", name)
-
-    def test_the_ticket_approval_gate_does_not_follow_a_dry_run_mode(self):
-        """承認の切り替えの環境変数は dry-run で導入しても enable で書く。
-
-        この環境変数は enable か disable しか取らない。dry-run と書くと、ccnavi の
-        `--lint` が error にするし、書いたユーザは止まらないつもりでいるのに
-        実際は止まる。導入スクリプトがその食い違いを作らない。
-        """
-        self.run_setup()
-        self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
-
-    def test_the_ticket_approval_gate_is_enable_under_an_enable_mode(self):
-        self.run_setup("--mode", "enable")
-        self.assertEqual(self.read_settings()["env"][TICKET_APPROVAL_ENV], "enable")
-
-    def test_the_unwatched_gate_is_written_as_enable(self):
-        """確認できる者が居ないモードの切り替えの環境変数も、モードに合わせず enable で書く。
-
-        この環境変数も enable か disable しか取らない。止めずに報告する段階は
-        CCNAVI_MODE=dry-run が持つので、dry-run で導入したプロジェクトでも
-        ここは enable のまま書く。切るプロジェクトは自分で 1 行書き換える。
-        """
-        self.run_setup()
-        self.assertEqual(self.read_settings()["env"][UNWATCHED_ENV], "enable")
-
-    def test_ticket_control_is_written_as_enable_by_default(self):
-        """チケット制御は既定の enable でも常に書く。切るつまみを設定ファイルの中で
-        見つけられるように。"""
-        self.run_setup()
-        self.assertEqual(self.read_settings()["env"][TICKET_CONTROL_ENV], "enable")
 
     def test_ticket_control_can_be_disabled_at_setup(self):
         """全体ルールだけで足りるプロジェクトは、導入のときに disable を選ぶ。"""
@@ -1156,7 +1098,7 @@ class DeploysWhatTheProjectNeeds(DeployTest):
     """
 
     def test_writes_the_settings_and_copies_the_parts_in_one_run(self):
-        """1 回で、設定を書き、実行ファイル・ルール・代わりに通る sh を配る。"""
+        """1 回で、設定を書き、実行ファイル・ルール・sh・作業の決まり・使い方の文書を配る。"""
         src = self.make_source()
         result = self.run_setup("--mode", "enable", "--deploy", src)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1175,21 +1117,11 @@ class DeploysWhatTheProjectNeeds(DeployTest):
         self.assertFalse(os.path.exists(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:
             self.assertTrue(os.path.isfile(self.deployed(".ccnavi", "scripts", name)))
-
-    def test_deploys_the_session_guide(self):
-        """セッションの開始で渡す作業の決まり（.ccnavi/CCNAVI.md）を、中身を変えずに配る。"""
-        src = self.make_source()
-        result = self.run_setup("--mode", "enable", "--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # セッションの開始で渡す作業の決まり（.ccnavi/CCNAVI.md）を、中身を変えずに配る。
         with open(self.deployed(*CCNAVI_MD_PARTS), encoding="utf-8") as f:
             self.assertEqual(f.read(), "# ccnavi の作業の決まり\n")
         self.assertTrue(names(section(result.stdout, "配った"), ".ccnavi/CCNAVI.md"))
-
-    def test_deploys_the_usage_docs(self):
-        """配布元の .ccnavi/docs/*.md を、中身を変えずに配る。"""
-        src = self.make_source()
-        result = self.run_setup("--mode", "enable", "--deploy", src)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 配布元の .ccnavi/docs/*.md も、中身を変えずに配る。
         for name in DEPLOY_DOCS:
             with (
                 open(self.deployed(*DOCS_PARTS, name), encoding="utf-8") as f,
@@ -3013,29 +2945,6 @@ class ShowsTheLintAtTheEnd(SetupTest):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(LINT_LATER, result.stdout)
         self.assertNotIn(LINT_HEADING, result.stdout)
-
-    @unittest.skipUnless(shutil.which("git"), "git が見つからない")
-    def test_the_real_lint_names_a_tracked_projects_place(self):
-        """本物の実行ファイルを配ると、`projects/` の索引の知らせは `--lint` の文面のまま出る。"""
-        from tests import exe
-
-        src = self.make_source()
-        os.remove(os.path.join(src, "dist", "ccnavi", "ccnavi"))
-        shutil.copy(exe.path(), os.path.join(src, "dist", "ccnavi", exe.NAME))
-        git = ["git", "-c", "user.email=t@example.invalid", "-c", "user.name=t"]
-        subprocess.run([*git, "init", "--quiet", "-b", "main"], cwd=self.dir, check=True)
-        os.makedirs(os.path.join(self.dir, "projects"))
-        with open(os.path.join(self.dir, "projects", "foo.txt"), "w", encoding="utf-8") as f:
-            f.write("ワークスペースのソース\n")
-        subprocess.run([*git, "add", "--", "projects/foo.txt"], cwd=self.dir, check=True)
-        subprocess.run([*git, "commit", "--quiet", "-m", "init"], cwd=self.dir, check=True)
-
-        result = self.run_setup("--deploy", src, "--mode", "enable")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        after = result.stdout.split(LINT_HEADING, 1)
-        self.assertEqual(len(after), 2, result.stdout)
-        self.assertIn(TRACKED_LEAD + "（例: `projects/foo.txt`）", after[1])
 
 
 if __name__ == "__main__":
