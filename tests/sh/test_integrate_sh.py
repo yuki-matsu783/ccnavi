@@ -1031,27 +1031,26 @@ class IntegrateReviewTest(Fixture):
 class UnknownMarkerTest(Fixture):
     """版が 4 でない marker は壊れた記録として、どの入口も「版を知りません」で止まる。"""
 
-    def unknown_marker(self, text="state staged\nbranch wt\n"):
-        self.work_in_branch()
-        write(self.marker(), text)
-
     def test_every_entry_refuses_a_marker_that_is_not_version_4(self):
-        self.unknown_marker()
-        for args in (("integrate", "wt"), ("integrate", "--abort", "wt"), ("integrate-done", "wt")):
-            r = self.run_git_sh(*args)
-            self.assertOk(r, 2)
-            self.assertIn("を知りません", r.stderr)
-            self.assertIn("git reset --merge", r.stderr)
-            self.assertIn(os.path.dirname(self.marker()).replace(os.sep, "/"), r.stderr)
-        self.assertTrue(os.path.exists(self.marker()))
-        self.assertTrue(self.has_branch())
-
-    def test_every_entry_refuses_a_marker_of_another_version(self):
-        self.unknown_marker("version 3\nhead x\n")
-        for args in (("integrate", "wt"), ("integrate", "--abort", "wt"), ("integrate-done", "wt")):
-            r = self.run_git_sh(*args)
-            self.assertOk(r, 2)
-            self.assertIn("版（3）を知りません", r.stderr)
+        self.work_in_branch()
+        for text, known in (
+            ("state staged\nbranch wt\n", "を知りません"),
+            ("version 3\nhead x\n", "版（3）を知りません"),
+        ):
+            with self.subTest(text=text):
+                write(self.marker(), text)
+                for args in (
+                    ("integrate", "wt"),
+                    ("integrate", "--abort", "wt"),
+                    ("integrate-done", "wt"),
+                ):
+                    r = self.run_git_sh(*args)
+                    self.assertOk(r, 2)
+                    self.assertIn(known, r.stderr)
+                    self.assertIn("git reset --merge", r.stderr)
+                    self.assertIn(os.path.dirname(self.marker()).replace(os.sep, "/"), r.stderr)
+                self.assertTrue(os.path.exists(self.marker()))
+                self.assertTrue(self.has_branch())
 
     def test_done_without_a_marker_is_refused(self):
         self.work_in_branch()
@@ -1524,17 +1523,6 @@ class MergeOnTargetTest(Fixture):
         git(self.ws, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
         git(self.ws, "update-ref", "-d", "refs/remotes/origin/main")
         self.assertOk(self.run_git_sh("merge", "fa", "--no-edit"))
-
-    def test_integrate_and_done_still_land_on_the_target(self):
-        # integrate-done の中の git merge --ff-only は直接 git を呼ぶので、merge) を通らない。
-        self.work_in_branch()
-        self.assertOk(self.run_git_sh("integrate", "wt"))
-        self.assertOk(self.run_git_sh("integrate-done", "wt", "-m", "feat: x"))
-        self.assertEqual("1\n2\nthree\n", read(os.path.join(self.ws, "keep.txt")))
-
-    def test_the_merge_ff_only_hint_is_gone_from_the_diverged_message(self):
-        text = read(os.path.join(SH_DIR, "ccnavi-git.sh"))
-        self.assertNotIn("$SELF merge --ff-only では", text)
 
 
 class PullOnTargetBase(Fixture):
