@@ -106,6 +106,7 @@ var subagentStopped = []string{
 	"sh .ccnavi/scripts/ccnavi-sync.sh", "sh .ccnavi/scripts/ccnavi-worktree.sh add x",
 	"sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01", "sh .ccnavi/scripts/ccnavi-launcher.sh worktree add x",
 	"sh .ccnavi/scripts/ccnavi-launcher.sh review comment 3", "sh .ccnavi/scripts/ccnavi-launcher.sh",
+	"/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01", "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1'",
 }
 
 var subagentPassed = []string{

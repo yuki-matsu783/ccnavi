@@ -223,7 +223,7 @@ class TidyAfterMergeTest(RetireHarness):
             "未 push のコミットがある",
             "origin/i0001",
         )
-        # 同じ名前のブランチを作り直した親のワークツリーは、ブランチの確認を通るまで消さない。
+        # 未 push の先頭を持つ親は、push 済みの先頭を渡してもワークツリーを消さない。
         done = self.tidy(head)
         kept(
             done,
