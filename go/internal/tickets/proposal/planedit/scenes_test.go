@@ -3,7 +3,6 @@ package planedit
 import (
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -17,9 +16,6 @@ import (
 // 元からある after の誤り・書かずに止まる形（アンカー・終端・循環）・付け替えを止める 5 つの事情・書く途中で落ちたときの
 // 書き戻し・計画に無い番号の子・ダイジェスト（source_sha）が子の提案を覆うこと。場面ごとに答えと、書いたあとの提案の置き場を
 // 見本（testdata/plan-scenes.json）と比べる。
-
-// partName は書きかけのファイルの名前（毎回ランダム）。
-var partName = regexp.MustCompile(`\.([^./]+\.(?:md|yml))\.[0-9A-Za-z_]+\.part`)
 
 type sceneStep struct {
 	Name string `json:"name"`
@@ -62,7 +58,7 @@ func (e *sceneEnv) source(name string) *Source {
 }
 
 func (e *sceneEnv) say(name, out string) {
-	out = partName.ReplaceAllString(strings.ReplaceAll(out, e.root, "<root>"), ".$1.<tmp>.part")
+	out = testkit.Scrub(e.root, out)
 	e.rec.Steps = append(e.rec.Steps, sceneStep{name, out})
 }
 
@@ -141,12 +137,12 @@ func sameFiles(a, b map[string]string) bool {
 }
 
 const (
-	reverse = `{"plan": {"1": [2], "2": [], "3": [1]}}`
-	// planThree は research → design・implement（どちらも 1 の後）。
+	reverse      = `{"plan": {"1": [2], "2": [], "3": [1]}}`
 	feedbackDefs = "  implement-feedback:\n    kind: feedback\n    title: 実装の指摘\n    review: true\n    scope: inherit\n" +
 		"  chores-feedback:\n    kind: feedback\n    title: 雑務の指摘\n    review: true\n    scope: inherit\n"
 )
 
+// planThree は research → design・implement（どちらも 1 の後）。
 var planThree = []string{"  - research", "  - {type: design, after: [1]}", "  - {type: implement, after: [1]}"}
 
 func withFeedbackDefs(text string) string {

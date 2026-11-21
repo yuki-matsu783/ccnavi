@@ -150,6 +150,8 @@ func TestEntryErrorIsSaidFromTheMessageFile(t *testing.T) {
 }
 
 func TestUsageRefusals(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
 	for _, c := range []struct {
 		args []string
 		code int
@@ -205,5 +207,8 @@ func TestUsageRefusals(t *testing.T) {
 		if code != c.code || !strings.Contains(errOut.String(), c.said) {
 			t.Errorf("%v: code %d: %s", c.args, code, errOut.String())
 		}
+	}
+	if left, _ := os.ReadDir(dir); len(left) != 0 {
+		t.Errorf("断りのあとに書かれた: %v", left)
 	}
 }

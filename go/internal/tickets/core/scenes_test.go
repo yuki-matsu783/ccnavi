@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -22,13 +21,11 @@ import (
 const feedbackPhases = phasesCopy +
 	"  design-feedback:\n    kind: feedback\n    title: 設計の指摘\n    review: true\n    scope: inherit\n"
 
-// partName は書きかけのファイルの名前（毎回ランダム）。
-var partName = regexp.MustCompile(`\.([^./]+\.md)\.[0-9A-Za-z_]+\.part`)
-
-// scene は 1 つのワークスペースで打った手の答え（名前・終了コード・標準出力・標準エラー）。
+// scene は 1 つのワークスペースで打った手の答え（名前・終了コード・標準出力・標準エラー）と、終わったあとの承認済みの置き場。
 type scene struct {
-	Name  string `json:"name"`
-	Steps []step `json:"steps"`
+	Name  string            `json:"name"`
+	Steps []step            `json:"steps"`
+	Files map[string]string `json:"files"`
 }
 
 type sceneRun struct {
@@ -38,7 +35,7 @@ type sceneRun struct {
 	steps []step
 }
 
-func newScene(t *testing.T, parents ...string) *sceneRun {
+func newScene(t *testing.T) *sceneRun {
 	t.Helper()
 	root := workspace(t, "i0001")
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), "version: 1\n"+phasesCopy)
@@ -57,10 +54,7 @@ func (s *sceneRun) run(name string, f func(o, e *bytes.Buffer) int) string {
 	s.t.Helper()
 	var o, e bytes.Buffer
 	code := f(&o, &e)
-	rel := func(text string) string {
-		return partName.ReplaceAllString(strings.ReplaceAll(text, s.root, "<root>"), ".$1.<tmp>.part")
-	}
-	s.steps = append(s.steps, step{name, float64(code), rel(o.String()), rel(e.String())})
+	s.steps = append(s.steps, step{name, float64(code), testkit.Scrub(s.root, o.String()), testkit.Scrub(s.root, e.String())})
 	return o.String()
 }
 
@@ -87,7 +81,9 @@ func digestOf(t *testing.T, shown string) string {
 	return v.(*pyjson.Object).String("digest")
 }
 
-func (s *sceneRun) done(name string) scene { return scene{name, s.steps} }
+func (s *sceneRun) done(name string) scene {
+	return scene{name, s.steps, filesUnder(s.root, testkit.ApprovedDir(s.root, "i0001"))}
+}
 
 func withGlob(text, glob string) string {
 	return strings.Replace(text, `glob: "wip/design/*"`, `glob: "`+glob+`"`, 1)
@@ -150,7 +146,7 @@ func TestApproveScenesMatchGolden(t *testing.T) {
 	s.todo("i0001", parentText("i0001"))
 	s.todo("i0001-01-01", childText("i0001-01-01", "i0001"))
 	shown = s.preview("preview-json", true)
-	testkit.Put(t, filepath.Join(testkit.Worktree(s.root, "i0001"), ".ccnavi", "approved", "doing", "i0001.md", "x"), "x\n")
+	testkit.Put(t, filepath.Join(testkit.Worktree(s.root, "i0001"), ".ccnavi", "approved", "doing"), "x\n")
 	s.yes("yes-first-fails", []string{"i0001", "i0001-01-01"}, digestOf(t, shown))
 	got = append(got, s.done("1 件目で止まる承認"))
 
@@ -167,6 +163,24 @@ func TestApproveScenesMatchGolden(t *testing.T) {
 	after := s.preview("preview-after", true)
 	s.steps = append(s.steps, step{"same-digest", float64(0), digestOf(t, before) == digestOf(t, after), ""})
 	got = append(got, s.done("超過が増えてもダイジェストは同じ"))
+
+	// ターミナルの承認は、親を置けて子だけ失敗したら、終了コード 4 と、置けたもの・失敗・書けなかったものを placed-out に返す。
+	terminal := via.Session(via.Terminal, "")
+	s = newScene(t)
+	s.todo("i0001", parentText("i0001"))
+	s.todo("i0001-01-01", childText("i0001-01-01", "i0001"))
+	testkit.Put(t, filepath.Join(testkit.ApprovedDir(s.root, "i0001"), "doing", "i0001-01-01.md", "x"), "x\n")
+	placed := filepath.Join(s.root, "placed.json")
+	s.run("agree-partial", func(o, e *bytes.Buffer) int {
+		code, err := Approve(strings.NewReader("y\n"), o, e, s.conf, s.root, nil, placed)
+		if err != nil {
+			s.t.Fatal(err)
+		}
+		return code
+	})
+	s.steps = append(s.steps, step{"placed-out", float64(0), testkit.Scrub(s.root, readRel(t, s.root, placed)), ""})
+	got = append(got, s.done("ターミナル承認の部分失敗"))
+	terminal()
 
 	golden.Check(t, "approve-scenes", got)
 }

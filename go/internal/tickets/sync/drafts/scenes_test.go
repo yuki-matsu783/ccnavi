@@ -67,6 +67,27 @@ func written(t *testing.T, root string) map[string]string {
 	return out
 }
 
+// 置き場（wip/handoff/）がリンクのとき、リンクの先へ書かない。リンクを作れない機械（Windows の開発者モード無し）ではこの 1 本だけ飛ばす。
+func TestLinkedHandoffNotFollowed(t *testing.T) {
+	root, conf := sceneRoot(t)
+	outside := filepath.Join(root, "outside")
+	if err := os.MkdirAll(outside, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	putDone(t, root, "i0011", "plan:\n  - design\n")
+	if err := os.MkdirAll(filepath.Join(root, "wip"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "wip", "handoff")); err != nil {
+		t.Skip("リンクを作れない:", err)
+	}
+	m, why := Make(conf, root, Request{Parent: "i0011"})
+	golden.Check(t, "scenes-link", plain(t, AnswerJSON(m, why), root))
+	if entries, _ := os.ReadDir(outside); len(entries) != 0 {
+		t.Errorf("リンクの先に書いた: %v", entries)
+	}
+}
+
 func TestScenesMatchGolden(t *testing.T) {
 	const plan = "plan:\n  - {type: design, deferred: true}\n  - {type: implement, after: [1], review: true}\n"
 	var got []scene
@@ -86,23 +107,6 @@ func TestScenesMatchGolden(t *testing.T) {
 	root, conf := sceneRoot(t)
 	testkit.Put(t, filepath.Join(root, "logs", "archive", "self", "done", "i0010.md"), parent("i0010", ""))
 	add("退避済みの親", root, make1(t, conf, root, Request{Parent: "i0010"}))
-
-	// 置き場（wip/handoff/）がリンクのとき、リンクの先へ書かない。
-	root, conf = sceneRoot(t)
-	outside := filepath.Join(root, "outside")
-	if err := os.MkdirAll(outside, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	putDone(t, root, "i0011", "plan:\n  - design\n")
-	if err := os.MkdirAll(filepath.Join(root, "wip"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Symlink(outside, filepath.Join(root, "wip", "handoff")); err != nil {
-		t.Skip("リンクを作れない:", err)
-	}
-	out := make1(t, conf, root, Request{Parent: "i0011"})
-	entries, _ := os.ReadDir(outside)
-	got = append(got, scene{Name: "リンクの置き場", Out: out, Written: map[string]string{"outside の数": string(rune('0' + len(entries)))}})
 
 	// deferred と review は下書きに残る。
 	root, conf = sceneRoot(t)
