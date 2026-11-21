@@ -10,6 +10,8 @@
 #
 #   ccnavi_wap_family <識別子>   親子のチケットと、write-and-push の対象か（ccnavi_wap_target に yes / no / stop）
 #   ccnavi_wap_begin             1 ロック 2 途中の操作 3 write-and-push の外の変更の見分けとコミット 4 取り込み 5 未送信の確かめ
+#   ccnavi_wap_take_in           4 取り込みと、取り込みの後の確かめ（承認の push も使う）
+#   ccnavi_wap_push <先頭>       push と、届いたかの確かめ（ls-remote。承認の push も使う）
 #   ccnavi_wap_write <文> -- <実行ファイルの引数>...
 #                               6〜8 元の先頭・書く・コミット（実行ファイルの 1 回の起動） 9 push 10 届いたか
 #                               11 戻して 1 回だけやり直す
@@ -91,6 +93,20 @@ ccnavi_wap_use_exe() {
 	return 1
 }
 
+# 実行ファイルの write-and-push <名前> を起こし、答えを <出力> に書く（Windows の実行ファイルの CRLF の CR は除く）。
+# <名前> <出力> <引数>...。1 行目が `write-and-push 1` でなければ（答えない・古い実行ファイル）、言う文を
+# ccnavi_wap_noans に入れて 1。後に続ける文（何も反映していません など）は呼ぶ側が付ける。
+ccnavi_wap_noans=""
+ccnavi_wap_ask() {
+	ccnavi_ak_name="$1"
+	ccnavi_ak_out="$2"
+	shift 2
+	ccnavi_wap_exe write-and-push "$ccnavi_ak_name" "$@" 2>"$ccnavi_wap_tmp/$ccnavi_ak_name-err" </dev/null | tr -d '\r' >"$ccnavi_ak_out" || :
+	[ "$(head -n 1 "$ccnavi_ak_out" 2>/dev/null)" = "write-and-push 1" ] && return 0
+	ccnavi_wap_noans="実行ファイルが write-and-push $ccnavi_ak_name に答えない（$(head -n 1 "$ccnavi_wap_tmp/$ccnavi_ak_name-err" 2>/dev/null)）"
+	return 1
+}
+
 # 親子のチケットと、write-and-push の対象か。<識別子>
 #
 # ccnavi_wap_target: yes（write-and-push で回す）/ no（origin が無い。今の手元の動きのまま）/ stop（止める理由がある）。
@@ -113,12 +129,10 @@ ccnavi_wap_family() {
 		return 0
 	}
 	: >"$ccnavi_wap_tmp/hints"
-	# Windows の実行ファイルの CRLF の CR を除いて読む（1 行 1 項目の値の末尾に CR を残さない）。
-	ccnavi_wap_exe write-and-push family "$1" 2>"$ccnavi_wap_tmp/family-err" </dev/null | tr -d '\r' >"$ccnavi_wap_tmp/family" || :
-	if [ "$(head -n 1 "$ccnavi_wap_tmp/family" 2>/dev/null)" != "write-and-push 1" ]; then
+	if ! ccnavi_wap_ask family "$ccnavi_wap_tmp/family" "$1"; then
 		ccnavi_wap_family_id="$ccnavi_cf_p"
 		ccnavi_wap_target=stop
-		ccnavi_wap_why="実行ファイルが write-and-push の問い合わせ（write-and-push family）に応答しない（$(head -n 1 "$ccnavi_wap_tmp/family-err" 2>/dev/null)）。書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_wap_why="$ccnavi_wap_noans。書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_cf_ans=$(cat "$ccnavi_wap_tmp/family")
@@ -171,15 +185,11 @@ ccnavi_wap_said() {
 
 # 途中の操作の名前（無ければ空）。<ツリー>。実行ファイルが答えなければ、止める側に倒して、答えないことを名前の代わりに言う。
 ccnavi_wap_busy() {
-	ccnavi_bz_out=$(ccnavi_wap_exe write-and-push busy "$1" </dev/null 2>/dev/null | tr -d '\r') || :
-	case "$ccnavi_bz_out" in
-	"write-and-push 1"*) ;;
-	*)
-		printf '%s\n' "実行ファイルが write-and-push busy に答えない"
+	if ! ccnavi_wap_ask busy "$ccnavi_wap_tmp/busy" "$1"; then
+		printf '%s\n' "$ccnavi_wap_noans"
 		return 0
-		;;
-	esac
-	ccnavi_val1 busy "$ccnavi_bz_out"
+	fi
+	ccnavi_val1 busy "$(cat "$ccnavi_wap_tmp/busy")"
 	return 0
 }
 
@@ -219,12 +229,9 @@ ccnavi_wap_begin() {
 
 # 置き場の変更を見分ける。<出力> [<版>]。答えられなければ 1。
 ccnavi_wap_sort() {
-	ccnavi_wap_exe write-and-push sort "$ccnavi_wap_family_id" ${2:+"$2"} 2>"$ccnavi_wap_tmp/sort-err" </dev/null | tr -d '\r' >"$1" || :
-	if [ "$(head -n 1 "$1" 2>/dev/null)" != "write-and-push 1" ]; then
-		ccnavi_wap_say "置き場の変更を見分けられなかった（$(head -n 1 "$ccnavi_wap_tmp/sort-err" 2>/dev/null)）。何も反映していません"
-		return 1
-	fi
-	return 0
+	ccnavi_wap_ask sort "$1" "$ccnavi_wap_family_id" ${2:+"$2"} && return 0
+	ccnavi_wap_say "$ccnavi_wap_noans。置き場の変更を見分けられなかった。何も反映していません"
+	return 1
 }
 
 # 見分けで止めるものがあれば言って 1。<見分けの出力> <c の前置き> <c の後書き> <d の前置き> <d の後書き>
@@ -240,22 +247,9 @@ ccnavi_wap_stops() {
 	return 1
 }
 
-# 3〜5。0 なら続けてよい。
-ccnavi_wap_prepare() {
-	# 3. write-and-push の外の変更を見分け、(b) を取り込みの前にコミットする。
-	ccnavi_wap_sort "$ccnavi_wap_tmp/sort" || return 1
-	ccnavi_wap_stops "$ccnavi_wap_tmp/sort" "ユーザの判断が未送信" \
-		"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
-		"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
-	ccnavi_val b "$(cat "$ccnavi_wap_tmp/sort")" >"$ccnavi_wap_tmp/b"
-	if [ -s "$ccnavi_wap_tmp/b" ]; then
-		ccnavi_wap_commit "$ccnavi_wap_tmp/b" "ccnavi: $ccnavi_wap_family_id の hook のマーカーをコミットする" || {
-			[ -z "$ccnavi_wap_refused" ] ||
-				ccnavi_wap_say "コミットできなかった（制限時間で打ち切った場合を含む）。$ccnavi_wap_refused"
-			return 1
-		}
-	fi
-	# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）。
+# 4. 取り込み（ccnavi-sync.sh。ロックは入れ子で渡る）と、取り込みの後の親のワークツリーの確かめ・push のゲート。
+# 承認の push（ccnavi-user-push-approved.sh）も使う。0 なら続けてよい。1 なら言って止めた（ロックは呼ぶ側が外す）。
+ccnavi_wap_take_in() {
 	ccnavi_cp_rc=0
 	sh "$ccnavi_wap_sh/ccnavi-sync.sh" "$ccnavi_wap_family_id" </dev/null >"$ccnavi_wap_tmp/sync" 2>&1 || ccnavi_cp_rc=$?
 	sed "s/^/  /" "$ccnavi_wap_tmp/sync" >&2
@@ -284,6 +278,25 @@ ccnavi_wap_prepare() {
 		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=push-gate" "gate=$ccnavi_cp_gate"
 		return 1
 	fi
+	return 0
+}
+
+# 3〜5。0 なら続けてよい。
+ccnavi_wap_prepare() {
+	# 3. write-and-push の外の変更を見分け、(b) を取り込みの前にコミットする。
+	ccnavi_wap_sort "$ccnavi_wap_tmp/sort" || return 1
+	ccnavi_wap_stops "$ccnavi_wap_tmp/sort" "ユーザの判断が未送信" \
+		"。承認の push（sh $ccnavi_wap_sh/ccnavi-user-push-approved.sh ${ccnavi_wap_family_id}）をユーザが実行します。何も反映していません" \
+		"置き場に ccnavi が把握していない変更があります" "。ユーザが確かめてください。何も反映していません" || return 1
+	ccnavi_val b "$(cat "$ccnavi_wap_tmp/sort")" >"$ccnavi_wap_tmp/b"
+	if [ -s "$ccnavi_wap_tmp/b" ]; then
+		ccnavi_wap_commit "$ccnavi_wap_tmp/b" "ccnavi: $ccnavi_wap_family_id の hook のマーカーをコミットする" || {
+			[ -z "$ccnavi_wap_refused" ] ||
+				ccnavi_wap_say "コミットできなかった（制限時間で打ち切った場合を含む）。$ccnavi_wap_refused"
+			return 1
+		}
+	fi
+	ccnavi_wap_take_in || return 1
 	# 親のブランチが一度も送られていない（ccnavi-start.sh を通さずに手で切った親）。5 の見分けは
 	# origin の参照を基点にするので、参照が無いと差分を読めずに内部のエラーで終わる。先に事実を言って止める。
 	# 送った形跡があるのに参照が無い親は、上の push のゲートと ccnavi-sync.sh の判定に任せる。
@@ -313,10 +326,8 @@ ccnavi_wap_refused=""
 ccnavi_wap_commit() {
 	ccnavi_wap_committed=""
 	ccnavi_wap_refused=""
-	ccnavi_wap_exe write-and-push commit "$ccnavi_wap_tree" "$1" "$2" </dev/null 2>"$ccnavi_wap_tmp/commit-err" |
-		tr -d '\r' >"$ccnavi_wap_tmp/commit" || :
-	if [ "$(head -n 1 "$ccnavi_wap_tmp/commit" 2>/dev/null)" != "write-and-push 1" ]; then
-		ccnavi_wap_say "実行ファイルが write-and-push commit に答えない（$(head -n 1 "$ccnavi_wap_tmp/commit-err" 2>/dev/null)）。コミットしない"
+	if ! ccnavi_wap_ask commit "$ccnavi_wap_tmp/commit" "$ccnavi_wap_tree" "$1" "$2"; then
+		ccnavi_wap_say "$ccnavi_wap_noans。コミットしない"
 		return 1
 	fi
 	ccnavi_wap_said "$ccnavi_wap_tmp/commit"
@@ -349,9 +360,8 @@ ccnavi_wap_run() {
 # 1 なら止めた（何も変えていない。ロックは外した）。答えられなければ止める側。
 ccnavi_wap_merge_plan() {
 	ccnavi_wap_merge_sha=""
-	ccnavi_wap_exe write-and-push merge "$1" 2>"$ccnavi_wap_tmp/merge-err" </dev/null | tr -d '\r' >"$ccnavi_wap_tmp/merge" || :
-	if [ "$(head -n 1 "$ccnavi_wap_tmp/merge" 2>/dev/null)" != "write-and-push 1" ]; then
-		ccnavi_wap_say "合流の前の検査（write-and-push merge）に実行ファイルが応答しない（$(head -n 1 "$ccnavi_wap_tmp/merge-err" 2>/dev/null)）。何も反映していません。実行ファイルを新しくしてください"
+	if ! ccnavi_wap_ask merge "$ccnavi_wap_tmp/merge" "$1"; then
+		ccnavi_wap_say "$ccnavi_wap_noans。何も反映していません。実行ファイルを新しくしてください"
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -375,6 +385,23 @@ ccnavi_wap_merge_plan() {
 	return 0
 }
 
+# 親のブランチを push する（--force なし）。失敗したように見えても、ls-remote で <送る先頭> が届いていれば成功。
+# <送る先頭>。0 なら届いた。ccnavi_wap_via に push（push が通った）か ls（応答は失ったが届いていた）を入れる。
+# 失敗の 1 行目は ccnavi_wap_tmp/push-err にある。
+ccnavi_wap_via=""
+ccnavi_wap_push() {
+	ccnavi_pu_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
+	ccnavi_wap_via=push
+	if ccnavi_git_timed "$ccnavi_pu_timeout" "$ccnavi_wap_tmp/push-err" "$ccnavi_wap_tree" \
+		push --quiet origin "refs/heads/$ccnavi_wap_branch:refs/heads/$ccnavi_wap_branch" >/dev/null; then
+		return 0
+	fi
+	ccnavi_wap_via=ls
+	ccnavi_git_timed "$ccnavi_pu_timeout" "$ccnavi_wap_tmp/ls-err" "$ccnavi_wap_tree" \
+		ls-remote origin "refs/heads/$ccnavi_wap_branch" >"$ccnavi_wap_tmp/ls" &&
+		grep -F -x -q -- "$1${ccnavi_wap_tab}refs/heads/$ccnavi_wap_branch" "$ccnavi_wap_tmp/ls"
+}
+
 # 6〜11。<文> -- <実行ファイルの引数>...。終了コードは実行ファイルのもの（write-and-push で失敗したら 1）。
 ccnavi_wap_write() {
 	ccnavi_cw_message="$1"
@@ -384,7 +411,6 @@ ccnavi_wap_write() {
 	mkdir -p "$ccnavi_cw_dir" 2>/dev/null || :
 	ccnavi_cw_list="$ccnavi_cw_dir/$ccnavi_wap_family_id.$$.writes"
 	ccnavi_cw_answer="$ccnavi_cw_list.answer"
-	ccnavi_cw_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
 	ccnavi_cw_try=0
 	while :; do
 		ccnavi_cw_try=$((ccnavi_cw_try + 1))
@@ -418,19 +444,10 @@ ccnavi_wap_write() {
 		ccnavi_cw_c=$(ccnavi_val1 commit "$ccnavi_cw_ans")
 		ccnavi_cw_head=$(ccnavi_val1 head "$ccnavi_cw_ans")
 		[ "$ccnavi_cw_c" != none ] || ccnavi_wap_inflight=""
-		# 9. push（--force なし）。
-		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_wap_tmp/push-err" "$ccnavi_wap_tree" \
-			push --quiet origin "refs/heads/$ccnavi_wap_branch:refs/heads/$ccnavi_wap_branch" >/dev/null; then
-			ccnavi_wap_inflight=""
-			ccnavi_wap_sent "$ccnavi_cw_head" "$ccnavi_cw_answer"
-			rm -f "$ccnavi_cw_list" "$ccnavi_cw_answer"
-			return 0
-		fi
-		# 10. 失敗したように見えても、届いていれば成功。
-		if ccnavi_git_timed "$ccnavi_cw_timeout" "$ccnavi_wap_tmp/ls-err" "$ccnavi_wap_tree" \
-			ls-remote origin "refs/heads/$ccnavi_wap_branch" >"$ccnavi_wap_tmp/ls" &&
-			grep -F -x -q -- "$ccnavi_cw_head${ccnavi_wap_tab}refs/heads/$ccnavi_wap_branch" "$ccnavi_wap_tmp/ls"; then
-			ccnavi_wap_say "push の応答を受け取れなかったが、リモートには届いていた（${ccnavi_cw_head}）"
+		# 9. push（--force なし）。10. 失敗したように見えても、届いていれば成功。
+		if ccnavi_wap_push "$ccnavi_cw_head"; then
+			[ "$ccnavi_wap_via" = push ] ||
+				ccnavi_wap_say "push の応答を受け取れなかったが、リモートには届いていた（${ccnavi_cw_head}）"
 			ccnavi_wap_inflight=""
 			ccnavi_wap_sent "$ccnavi_cw_head" "$ccnavi_cw_answer"
 			rm -f "$ccnavi_cw_list" "$ccnavi_cw_answer"
@@ -475,9 +492,8 @@ ccnavi_wap_write() {
 
 # 自分のコミットを比較つきで戻す（実行ファイルの write-and-push undo）。<6〜8 の答えのファイル>。戻せたら 0。
 ccnavi_wap_undo() {
-	ccnavi_wap_exe write-and-push undo "$1" </dev/null 2>"$ccnavi_wap_tmp/undo-err" | tr -d '\r' >"$ccnavi_wap_tmp/undo" || :
-	if [ "$(head -n 1 "$ccnavi_wap_tmp/undo" 2>/dev/null)" != "write-and-push 1" ]; then
-		ccnavi_wap_say "実行ファイルが write-and-push undo に答えない（$(head -n 1 "$ccnavi_wap_tmp/undo-err" 2>/dev/null)）。コミットを戻せなかった。ユーザが確かめてください"
+	if ! ccnavi_wap_ask undo "$ccnavi_wap_tmp/undo" "$1"; then
+		ccnavi_wap_say "$ccnavi_wap_noans。コミットを戻せなかった。ユーザが確かめてください"
 		return 1
 	fi
 	ccnavi_wap_said "$ccnavi_wap_tmp/undo"
