@@ -263,26 +263,6 @@ class LayerTest(Use):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(".ccnavi/config/project/templates/small.yml", result.stdout)
 
-    def test_the_template_options_are_only_for_ticket_new_template(self):
-        self.put("small", SMALL)
-        for argv, needle in (
-            (["--templates", "--with-feedback"], "--with-feedback は"),
-            (["--templates", "--template", "small", "--with-feedback"], "--template は"),
-            (["ticket", "status", "--with-feedback"], "--with-feedback は"),
-            (
-                ["ticket", "new", "x", "--title", "t", "--plan", "design", "--with-feedback"],
-                "--with-feedback は",
-            ),
-            (["--templates", "--template", "small"], "--template は"),
-            (["ticket", "status", "--template", "small"], "--template は"),
-            (["ticket", "status", "--layer", "self"], "--templates"),
-        ):
-            with self.subTest(argv=argv):
-                result = self.tpl(*argv)
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn(needle, result.stderr)
-        self.nothing_written()
-
 
 class RoundTripTest(Use):
     """完了した親 -> `--draft` -> `user handoff` -> `--template` で、元の計画とフローに戻る。

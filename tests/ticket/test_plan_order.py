@@ -116,24 +116,6 @@ class PlanOrderJsonTest(PlanOrderHarness):
         )
         self.assertEqual(feedback["after"], {"3": [2], "4": [2, 3]})
 
-    def test_flags_that_go_together(self):
-        self.propose("i0001", parent_text("i0001", PLAN3, copy=None))
-        for args, word in (
-            (("--plan-order", "i0001"), "--json"),
-            (("--plan-order", "i0001", "--order", "{}"), "--json"),
-            (("--plan-order", "i0001", "--expect", "x", "--json"), "--write"),
-            (("--plan-order", "i0001", "--write", "--expect", "x"), "--order"),
-            (("--plan-order", "i0001", "--write", "--order", "{}"), "--expect"),
-            (("--plan-order", "i0001", "--fill-phases", "--json"), "--fill-phases"),
-            (("--order", "{}", "--json"), "--plan-order"),
-            (("--write",), "--plan-order"),
-            (("user", "agree", "--plan-order", "i0001", "--json"), "--agree"),
-        ):
-            with self.subTest(args=args):
-                result = self.ccnavi(*args)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn(word, result.stderr)
-
     def test_the_source_sha_covers_the_pending_children(self):
         result = self.order("--json", name="i0009")
         self.assertEqual(result.returncode, 1)

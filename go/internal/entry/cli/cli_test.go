@@ -169,6 +169,26 @@ func TestUsageRefusals(t *testing.T) {
 		{[]string{"--root", "a", "--root", "b", "ticket", "status"}, 1, "--root は 1 度しか渡せない（2 度渡された）"},
 		{[]string{"--entry", "sh", "ticket"}, 2, "--entry は user の入口と一緒に渡す"},
 		{[]string{"--entry", "sh", "user", "agree", "--preview", "--yes", "i0001", "--json"}, 1, "--preview と --yes は同時に指定できません。"},
+		{[]string{"--agre", "--yes", "i0001"}, 1, "unrecognized arguments: --agre"},
+		{[]string{"--review", "1", "--chat"}, 1, "unrecognized arguments: --review"},
+		// 計画の並べ替え（--plan-order）の旗の組み合わせ。
+		{[]string{"--plan-order", "i0001"}, 1, "--json"},
+		{[]string{"--plan-order", "i0001", "--order", "{}"}, 1, "--json"},
+		{[]string{"--plan-order", "i0001", "--expect", "x", "--json"}, 1, "--write"},
+		{[]string{"--plan-order", "i0001", "--write", "--expect", "x"}, 1, "--order"},
+		{[]string{"--plan-order", "i0001", "--write", "--order", "{}"}, 1, "--expect"},
+		{[]string{"--plan-order", "i0001", "--fill-phases", "--json"}, 1, "--fill-phases"},
+		{[]string{"--order", "{}", "--json"}, 1, "--plan-order"},
+		{[]string{"--write"}, 1, "--plan-order"},
+		{[]string{"--entry", "sh", "user", "agree", "--plan-order", "i0001", "--json"}, 1, "--agree"},
+		// テンプレートの旗は ticket new --template と --templates の中だけ。
+		{[]string{"--templates", "--with-feedback"}, 1, "--with-feedback は"},
+		{[]string{"--templates", "--template", "small", "--with-feedback"}, 1, "--template は"},
+		{[]string{"ticket", "status", "--with-feedback"}, 1, "--with-feedback は"},
+		{[]string{"ticket", "new", "x", "--title", "t", "--plan", "design", "--with-feedback"}, 1, "--with-feedback は"},
+		{[]string{"--templates", "--template", "small"}, 1, "--template は"},
+		{[]string{"ticket", "status", "--template", "small"}, 1, "--template は"},
+		{[]string{"ticket", "status", "--layer", "self"}, 1, "--templates"},
 	} {
 		var out, errOut bytes.Buffer
 		code := Run(strings.NewReader(""), &out, &errOut, c.args)
