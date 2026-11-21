@@ -10,6 +10,9 @@ tests/fixtures/ のルールではなく、運用に使っている rules.yml �
 中で実行するコマンドを止める側のルールに適用すること（wip/design/launcher-scripts.md
 3.4・3.5 節、12 節の A1〜A4・W1〜W3・W6・W7）。
 
+判定とヒットしたルールの名前だけを見る表は Go（go/internal/hook/judge の `TestRepoRulesTable`、testdata/repo_rules.json）に移した。
+ここに残すのは、文面・縮退の理由・unwrapped・quoted・環境の切り替えを見るもの。
+
 道具は外から動かす。`--test <tool> <subject> --json` の `verdict` と `rules[].id` を読む
 （形は docs/11_requirements/json-shapes.md「試験の JSON」）。
 期待する判定の `/repo` は `--root` に渡したルートに読み替える。
@@ -34,17 +37,11 @@ PLACEHOLDER = "/repo"
 # 配布先の hook が起動する振り分けの sh（launcher-scripts 1 節）。
 LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
 APPROVAL = "builtin:guard-ticket-approval"
-APPROVAL_CODE = "DENY_TICKET_APPROVAL_CLI"
 SETTING_FILES = "builtin:guard-setting-files"
 # 書き直しを求める形で止めたときの、記録のルール名。読み分けずに止め、書き直し方を案内する。
 NAME = "builtin:command-name-expansion"
 BACKQUOTE = "builtin:backquote"
-AMBIGUOUS = "builtin:ambiguous-form"
 TICKET_STATE = "builtin:ticket-state-shell"
-# 承認の形の末尾。
-YES = " --agree --yes x"
-# shellread が語の中に置く目印（入力に混ざったら取り除く）。
-WORD_SEP = "\x01"
 # 読み切れなかった理由（試験の JSON の degraded）。
 REASON_UNTERMINATED = "unterminated-quote"
 REASON_UNTERMINATED_SUBST = "unterminated-substitution"
@@ -134,12 +131,6 @@ def hit(body: dict) -> list[str]:
     return [written_id(rule["id"]) for rule in body["rules"]]
 
 
-def blocking(body: dict) -> set[str]:
-    """deny / ask の側でヒットしたルール。組み込みは `section` が空で返るので、
-    allow 以外を数える。"""
-    return {written_id(rule["id"]) for rule in body["rules"] if rule.get("section") != "allow"}
-
-
 class RepoRulesTest(unittest.TestCase):
     """4「見本 → 判定」の表。"""
 
@@ -160,29 +151,6 @@ class RepoRulesTest(unittest.TestCase):
         else:
             self.assertEqual(hit(body), [], body["rules"])
         return body
-
-    def test_直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない(self):
-        script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
-        flags = (
-            "--base feature/x",
-            "--accept 7f3a9c21",
-            "--side-by-side",
-            "--adopt --base feature/x",
-            "--base=feature/x --accept=7f3a9c21 --copy-wip",
-        )
-        self.assert_verdicts([f"{script} x {f}" for f in flags], "ask", "direct-worktree-confirm")
-        plains = (
-            f"{script} x",
-            f"{script} x --dry-run",
-            f"{script} x --no-wip",
-            # 何も書かない確認は、ほかの指定があっても対象から外します。
-            f"{script} x --adopt --base feature/x --dry-run",
-            f"{script} x --dry-run --adopt --base feature/x",
-            f"{script} x --base feature/x --accept 7f3a9c21 --dry-run",
-        )
-        for plain, body in zip(plains, judge_many("Bash", list(plains)), strict=True):
-            with self.subTest(plain=plain):
-                self.assertNotIn("direct-worktree-confirm", hit(body))
 
     def test_確認の理由の固定文は非対話のときだけ出る(self):
         from unittest import mock
@@ -217,35 +185,7 @@ class RepoRulesTest(unittest.TestCase):
         self.assertIn("prefer-webfetch", hit(body))
         self.assertNotIn("確認に答えられません", json.dumps(body["response"], ensure_ascii=False))
 
-    def test_別のコマンドの_dry_run_では確認の対象から外れない(self):
-        script = "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh"
-        self.assert_verdicts(
-            [
-                f"{script} x --adopt --base feature/x && sh /repo/other.sh y --dry-run",
-                f"sh /repo/other.sh y --dry-run; {script} x --adopt --base feature/x",
-                f"sh /repo/other.sh y --dry-run | {script} x --base feature/x",
-            ],
-            "ask",
-            "direct-worktree-confirm",
-        )
-
     # 変わるべきもの
-
-    def test_引用付きの_grep_は_allow_にヒットする(self):
-        # 課題そのもの。`[^\x00]*$` が引用の空白で止まって外れていた。
-        self.assert_verdicts(
-            [
-                'grep -n "git push" README.md',
-                'grep -n "rm -rf" /repo/.ccnavi/config/common/rules.yml',
-                """grep -n "regex: '(>" /repo/.ccnavi/config/common/rules.yml""",
-                'grep -n "<<EOF" /repo/README.md',
-                # 引用の中の `> 場所` は grep の引数。selfguard の行き先の式が語の中の目印まで
-                # 一致しなくなって、はじめて allow にヒットする。
-                'grep -n "> /repo/.ccnavi/config/common/rules.yml" f',
-            ],
-            "allow",
-            "prefer-read-grep",
-        )
 
     def test_worktree_add_は通して_fetch_の案内を添える(self):
         # 止めない。遅れの判定で止めるのは ccnavi-git.sh の中（hook はネットワークに出ない）。
@@ -293,74 +233,7 @@ class RepoRulesTest(unittest.TestCase):
             with self.subTest(subject=subject):
                 self.assertNotIn("integrate-report-first", hit(body))
 
-    def test_ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める(self):
-        # 止めるのは組み込みの builtin:guard-ccnavi-config。ヒットしたルールの id で見る。
-        names = ("rules", "phases", "risks")
-        paths = [f"/repo/.claude/worktrees/x/.ccnavi/config/common/{n}.yml" for n in names]
-        for name, body in zip(names, judge_many("Edit", paths), strict=True):
-            with self.subTest(name=name):
-                self.assertEqual(body["verdict"], "deny", body["response"])
-                self.assertIn("builtin:guard-ccnavi-config", hit(body), body["rules"])
-
-    def test_テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる(self):
-        # 共通・プロジェクトのテンプレートは 3 本の個別の保護には入れず、
-        # `*/.ccnavi/*` の deny で止める。
-        tree = "/repo/.claude/worktrees/x"
-        places = [f"{tree}/.ccnavi/config/{n}/templates/feature.yml" for n in ("common", "project")]
-        for tool in ("Write", "Edit"):
-            for place, body in zip(places, judge_many(tool, places), strict=True):
-                with self.subTest(place=place, tool=tool):
-                    self.assertEqual(body["verdict"], "deny", body["response"])
-                    self.assertIn("builtin:guard-project-home", hit(body), body["rules"])
-        draft = f"{tree}/wip/handoff/.ccnavi/config/common/templates/feature.yml"
-        commands = [
-            command
-            for place in places
-            for command in (f"cp {draft} {place}", f"tee {place}", f"echo x > {place}")
-        ]
-        for command, body in zip(commands, judge_many("Bash", commands), strict=True):
-            with self.subTest(command=command):
-                self.assertEqual(body["verdict"], "deny", body["response"])
-                self.assertIn(SETTING_FILES, hit(body), body["rules"])
-
-    def test_テンプレートの下書きの_write_は止まらない(self):
-        # 下書きの置き場（`wip/handoff/`）は、ワークツリーの中なら通る。
-        body = judge(
-            "Write",
-            "/repo/.claude/worktrees/x/wip/handoff/.ccnavi/config/common/templates/feature.yml",
-        )
-        self.assertEqual(body["verdict"], "allow", body["response"])
-        self.assertNotIn("builtin:guard-project-home", hit(body), body["rules"])
-
-    def test_引用付きの_find_は_allow_にヒットする(self):
-        self.assert_verdict('find /repo -name "a b"', "allow", "prefer-glob")
-
-    def test_引用の空白をまたいだ書き換えは_deny_に届く(self):
-        # 今まで穴だった側。`[^\x00]*` が引用の空白をまたげるようになる。
-        cases = [
-            ('find /repo -name "a b" -delete', "find-writes"),
-            (
-                'sed -i "s/a b/c/" /repo/.ccnavi/config/common/rules.yml',
-                "builtin:guard-setting-files",
-            ),
-        ]
-        for (subject, rule_id), body in zip(
-            cases, judge_many("Bash", [c[0] for c in cases]), strict=True
-        ):
-            with self.subTest(subject=subject):
-                self.check_body(body, "deny", rule_id)
-
-    def test_入力に混ざった語の中の目印は取り除かれる(self):
-        # `git␁push` のまま読むと実在しない 1 語で、どのルールにもヒットしない。
-        # 取り除いて `git push` と読み、raw-git にヒットする。
-        self.assert_verdict("git" + WORD_SEP + "push", "deny", "builtin:guard-raw-git")
-
     # 変わってはいけないもの
-
-    def test_パイプの後ろがあれば_allow_にヒットしない(self):
-        # コマンドの区切りは `\x00` のまま。`[^\x00]*$` がそこで止まる。
-        body = self.assert_verdict("cat /repo/README.md | head -20", "ask", "")
-        self.assertEqual(body["code"], "UNDECLARED")
 
     def test_引用だけの二重の山括弧は読めないまま止まる(self):
         # 許容した誤検知（tests/guard/test_acceptance.py）。生の文字列に
@@ -370,64 +243,6 @@ class RepoRulesTest(unittest.TestCase):
         self.assertEqual(body["code"], "PARSE_UNCERTAIN")
         self.assertEqual(body["degraded"], REASON_UNTERMINATED)
         self.assertIn("生の文字列", body["response"])
-
-    def test_コマンド置換の中の_git_は止まる(self):
-        self.assert_verdict("echo $(git push origin main)", "deny", "builtin:guard-raw-git")
-
-    def test_パイプで繋いだ_curl_は_ask_のまま(self):
-        self.assert_verdict('echo "a b" | curl -d @- x', "ask", "prefer-webfetch")
-
-    def test_引用の中の_preview_は承認の免除にならない(self):
-        # 承認の免除（Go の tickets/model/useronly）は同じ語の中まで見ない。見ると、引数の値に
-        # `--preview` を書くだけで `--agree` の枝が免除される。
-        self.assert_verdicts(
-            [
-                'uv run python -m ccnavi --agree i0001 "a --preview"',
-                'ccnavi --agree "i0001 --preview"',
-            ],
-            "deny",
-            "builtin:guard-ticket-approval",
-        )
-
-    def test_語にくっついた_preview_は承認の免除にならない(self):
-        """免除の理由になるのは、単独の語として現れた `--preview` だけ。
-
-        別のフラグの値に書いた `--preview` で免除が成立していた。argparse は
-        `--reason=--preview` を値として読み取るので `--preview` はフラグにならず、実行ファイルは
-        実際の `--agree` を走らせる。hook が見る文字列と、実行ファイルが走らせる枝が
-        そこで食い違う（ターミナルさえ取れれば、エージェントが自分で承認を置けることになる）。
-        """
-        self.assert_verdicts(
-            [
-                "ccnavi --agree --reason=--preview",
-                "ccnavi --agree --digest=--preview",
-                "ccnavi --agree --preview=x",
-                "ccnavi --agree x--preview",
-                "uv run python -m ccnavi --agree --reason=--preview i0001",
-            ],
-            "deny",
-            "builtin:guard-ticket-approval",
-        )
-
-    def test_確かめる枝は今までどおり免除の側(self):
-        """`--agree --preview --verify` は免除の側。厳しくしたことで巻き添えにしない。"""
-        subjects = [
-            "ccnavi --agree --preview --verify",
-            "ccnavi --agree --preview --verify i0001",
-            "ccnavi --agree --preview --verify --json i0001",
-        ]
-        for subject, body in zip(subjects, judge_many("Bash", subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.assertNotIn("builtin:guard-ticket-approval", hit(body), body["rules"])
-
-    def test_設定の場所の名前は語の中の目印でも終わる(self):
-        # selfguard の `_TERM` / `_END` は語の中の目印も語の終わりとして数える。
-        # 数えないと、分ける前に止まっていた表記が通るようになる。
-        self.assert_verdicts(
-            ['rm ".ccnavi x"', 'rm ".claude x"', 'mv ".ccnavi;x" y'],
-            "deny",
-            "builtin:guard-setting-files",
-        )
 
 
 class LauncherJudgeTest(unittest.TestCase):
@@ -466,82 +281,6 @@ class LauncherJudgeTest(unittest.TestCase):
 
 class TicketApprovalPathTest(LauncherJudgeTest):
     """承認の経路（launcher-scripts 3.4 節、12 節 A1〜A4）。"""
-
-    def test_振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる(self):
-        # A1。今は `<sh>` を先頭に書いた形だけが止まり、残りは確認になっている。
-        self.assert_all_denied_by(
-            [
-                LAUNCHER + YES,
-                PLACEHOLDER + "/" + LAUNCHER + YES,
-                "sh " + LAUNCHER + YES,
-                "bash " + LAUNCHER + YES,
-                "/bin/sh " + LAUNCHER + YES,
-                "env sh " + LAUNCHER + YES,
-                "env FOO=1 sh " + LAUNCHER + YES,
-                "command sh " + LAUNCHER + YES,
-                "exec sh " + LAUNCHER + YES,
-                "nohup sh " + LAUNCHER + YES,
-                "zsh " + LAUNCHER + YES,
-                "dash " + LAUNCHER + YES,
-                "sh -x " + LAUNCHER + YES,
-                "cd /tmp && sh " + LAUNCHER + YES,
-                "sh " + LAUNCHER + " ticket start x",
-                # 別の名前の sh と、実体を直に指す形。
-                "sh .ccnavi/bin/ccnavi" + YES,
-                "sh .ccnavi/bin/linux-x86_64/ccnavi" + YES,
-                "sh ccnavi" + YES,
-            ],
-            APPROVAL,
-        )
-
-    def test_読み切れない形の承認も承認のルールで止まる(self):
-        # A2。今は PARSE_UNCERTAIN の確認になる。止めた理由が承認のルールだと読めること。
-        self.assert_all_denied_by(
-            [
-                "sh -c '" + LAUNCHER + YES + "'",
-                'bash -lc "' + LAUNCHER + YES + '"',
-                ". " + LAUNCHER + YES,
-                "source " + LAUNCHER + YES,
-            ],
-            APPROVAL,
-            code=APPROVAL_CODE,
-        )
-
-    def test_承認でない形は承認のルールにヒットしない(self):
-        # A3。止めすぎの候補。中で実行されるコマンドを見ても、ここは広がらない。
-        subjects = [
-            LAUNCHER + " --agree --preview x",
-            "sh " + LAUNCHER + " --agree --preview x",
-            "cat " + LAUNCHER,
-            "grep -n 'ccnavi --agree --yes' README.md",
-            "sed -n 1,20p " + LAUNCHER,
-            "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
-            "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file x.md",
-            "echo " + LAUNCHER,
-            # 引用しない形。`echo` や `grep` は実行役のコマンドではないので、中を見ない。
-            "echo ccnavi --agree --yes x",
-            "grep -rn ccnavi --yes docs",
-            "git log --grep ccnavi --yes",
-        ]
-        for subject, body in zip(subjects, self.judge_all(subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.assertNotIn(APPROVAL, hit(body), f"{subject!r}: {body['response']}")
-
-    def test_コミットの文面に書いた承認の形は_raw_git_だけにヒットする(self):
-        # A3 の続き。git を直に打ったことでは止まるが、承認のルールにはヒットしない。
-        body = self.judge("git commit -m 'docs: ccnavi --agree --yes の説明'")
-        self.assertIn("builtin:guard-raw-git", hit(body), body["rules"])
-        self.assertNotIn(APPROVAL, hit(body), body["rules"])
-
-    def test_sudo_の_sh_c_と_find_exec_の中の承認も止まる(self):
-        # A4。実行役のコマンドの並べ方を正規表現に持たせる案（B）で残っていた 2 形。
-        self.assert_all_denied_by(
-            [
-                "sudo -u me sh -c 'ccnavi --agree --yes x'",
-                "find . -name x -exec ccnavi --agree --yes {} \\;",
-            ],
-            APPROVAL,
-        )
 
 
 # 実行役のコマンド。`{}` に中で実行されるコマンドが入る。
@@ -585,88 +324,6 @@ GUARDED = [
 class RunnerTest(LauncherJudgeTest):
     """実行役のコマンドが中で実行するコマンドを、止める側のルールに適用する（3.5 節）。"""
 
-    def test_中で実行されるコマンドそのものは今も止まる(self):
-        # W1 の見本が正しいことの確かめ。実行役のコマンドを付けない形で、同じルールにヒットする。
-        for (inner, rule_id), body in zip(
-            GUARDED, self.judge_all(c[0] for c in GUARDED), strict=True
-        ):
-            with self.subTest(subject=inner):
-                self.check_denied_by(inner, body, rule_id)
-
-    def test_組み込みの保護は実行役のコマンドの中でも止める(self):
-        # W1。今は実行役のコマンドを付けると、先頭に固定した式が外れて確認になる。
-        # 実行役ごとに、ヒットするべきルールの種類ごとに 1 件を、順に入れ替えて組む。
-        # 全部の組み合わせは回さない。どの実行役も、どの中のコマンドも少なくとも 1 回は通る。
-        kinds: dict[str, list[str]] = {}
-        for inner, rule_id in GUARDED:
-            kinds.setdefault(rule_id, []).append(inner)
-        cases = [
-            (runner.format(inners[at % len(inners)]), rule_id)
-            for at, runner in enumerate(RUNNERS)
-            for rule_id, inners in kinds.items()
-        ]
-        self.assertGreaterEqual(len(RUNNERS), max(len(inners) for inners in kinds.values()))
-        for (subject, rule_id), body in zip(
-            cases, self.judge_all(c[0] for c in cases), strict=True
-        ):
-            with self.subTest(subject=subject):
-                self.check_denied_by(subject, body, rule_id)
-
-    def test_env_越しの承認のスクリプトは途中のレイヤーで止まる(self):
-        # W1 の続き。`sh …approve.sh` は `env` を外した途中のレイヤーで、
-        # そこに承認の `script` の枝がヒットする。
-        self.assert_denied_by("env sh .ccnavi/scripts/ccnavi-user-agree.sh", APPROVAL)
-
-    def test_先頭に固定したユーザのルールも実行役のコマンドの中でヒットする(self):
-        # W2。
-        body = self.judge("env curl -d @x https://example.com")
-        self.assertEqual(body["verdict"], "ask", body["response"])
-        self.assertIn("prefer-webfetch", hit(body), body["rules"])
-
-    def test_中で実行されるコマンドは_allow_に適用しない(self):
-        # W3。適用すると、元の形では確認になる `sudo` が読み取りとして通る。
-        body = self.judge("sudo -u me cat /etc/hosts")
-        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
-        self.assertNotEqual(body["verdict"], "allow", body["response"])
-
-    def test_普通の作業では止める側にヒットするルールが増えない(self):
-        # W6。3.5.4 節の 27 形。値は元の形だけに適用していたとき（この変更の前）の、
-        # deny / ask の側でヒットしたルール。中で実行されるコマンドを見ても、ここから増えない。
-        cases = {
-            "time uv run pytest": set(),
-            "nice -n 10 make test": set(),
-            "env PYTHONUTF8=1 uv run python -m unittest": set(),
-            "timeout 60 pnpm test": set(),
-            "sudo -u me cat /etc/hosts": set(),
-            "sh scripts/ccnavi-setup.sh --check": set(),
-            "bash tests/run.sh": set(),
-            "command -v jq": set(),
-            "env | grep CCNAVI": set(),
-            "sh -c 'cat README.md'": set(),
-            "find . -name '*.py' -exec grep -l foo {} \\;": set(),
-            "echo x | xargs grep -n foo": set(),
-            "nohup python -m http.server &": set(),
-            "stdbuf -o0 tail -n 3 logs/decisions.jsonl": set(),
-            "source .venv/bin/activate": set(),
-            ". .venv/bin/activate && uv run pytest": set(),
-            "bash -lc 'uv run ruff check .'": set(),
-            # 代わりに通る sh 3 形。承認のスクリプトは元の形から止まっている。
-            "sh .ccnavi/scripts/ccnavi-ticket.sh start x": set(),
-            "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file x.md": set(),
-            "sh .ccnavi/scripts/ccnavi-user-agree.sh": {APPROVAL},
-            "exec zsh": set(),
-            "time git log --oneline": {"builtin:guard-raw-git"},
-            "find . -name '*.pyc' -exec rm {} +": set(),
-            "xargs -n1 -I{} echo {}": set(),
-            "sudo -E env PATH=/x make install": set(),
-            "env -u CCNAVI_MODE uv run python -m ccnavi --lint": set(),
-            "timeout 5 sh -c 'cat logs/decisions.jsonl | tail -n 3'": set(),
-        }
-        self.assertEqual(len(cases), 27)
-        for (subject, want), body in zip(cases.items(), self.judge_all(cases), strict=True):
-            with self.subTest(subject=subject):
-                self.assertEqual(blocking(body), want, body["response"])
-
     def test_中で実行されるコマンドにヒットしたことが_unwrapped_と文面に出る(self):
         # W7。元の形のどこが問題なのかを、読み手が辿れるように。
         for subject, runner, layer in [
@@ -701,64 +358,11 @@ class RunnerTest(LauncherJudgeTest):
 class MovedJudgeTest(LauncherJudgeTest):
     """`cd` で移った先から見たパスに、止める側のルールを適用する（issue #61）。"""
 
-    def test_守られた場所へ入ってから書く形は止まる(self):
-        # issue #61 の表。どれも表記からディレクトリの名前が消えて止められずに通っていた。
-        self.assert_all_denied_by(
-            [
-                "cd .ccnavi/config/common && echo x > rules.yml",
-                "cd .ccnavi && echo x > common/rules.yml",
-                "cd .ccnavi/config/common; echo x > rules.yml",
-                "(cd .ccnavi/config/common && echo x > rules.yml)",
-                "cd .claude && echo x > settings.json",
-                "cd .claude/hooks && echo x > lint-py.sh",
-                "cd .claude && rm -rf hooks",
-                "cd .claude && cp /tmp/x settings.json",
-                "cd .ccnavi && sed -i s/deny/allow/ common/rules.yml",
-                "cd .ccnavi/scripts && mv ccnavi-git.sh /tmp/x",
-                # 元から止まっていた形（行き先のパスに名前が残る）も、そのまま止まる。
-                "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
-            ],
-            SETTING_FILES,
-        )
-
     def test_文面は移った先から見たパスを示す(self):
         body = self.judge("cd .claude && echo x > settings.json")
 
         self.assertIn("`cd` で移った先から見ると", body["response"])
         self.assertIn(".claude/settings.json", body["response"])
-
-    def test_移った先から見たパスに_allow_は適用しない(self):
-        # 中で実行されるコマンドと同じ線引き（W3）。適用すると、`cd` を 1 つ挟むだけで
-        # 読み取りの allow が付いて通る形ができる。
-        body = self.judge("cd .ccnavi && cat common/rules.yml")
-
-        self.assertNotIn("prefer-read-grep", hit(body), body["rules"])
-        self.assertNotEqual(body["verdict"], "allow", body["response"])
-
-    def test_書かれた表記のヒットの仕方は変わらない(self):
-        # `cd` した先で打つラッパースクリプトは、今までどおり allow にヒットする。
-        # 書かれた表記に継ぎ足していたら、`status` が `projects/lib/status` になって外れる。
-        subjects = [
-            "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
-            "sh .ccnavi/scripts/ccnavi-git.sh status",
-        ]
-        for subject, body in zip(subjects, self.judge_all(subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.assertEqual(body["verdict"], "allow", body["response"])
-                self.assertIn("ccnavi-git", hit(body), body["rules"])
-
-    def test_普通の作業では止める側にヒットするルールが増えない(self):
-        # W6 と同じ形。`cd` を挟んだだけの普通の作業が、確認や拒否に回らないこと。
-        subjects = [
-            "cd projects/lib && pnpm test",
-            "cd docs && cat adr/README.md",
-            "cd .claude/worktrees/w && uv run python -m unittest",
-            "cd /tmp && rm -f x.log",
-            "cd .. && ls",
-        ]
-        for subject, body in zip(subjects, self.judge_all(subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.assertEqual(blocking(body), set(), subject)
 
     def test_行き先を読めない_cd_は読みを変えない(self):
         # 縮退させない。縮退すると生の文字列で見るので、コマンドの頭に固定して書かれた
@@ -779,39 +383,6 @@ class MovedJudgeTest(LauncherJudgeTest):
 
         self.assertEqual(body["degraded"], "", body["response"])
         self.assertEqual(body["code"], "UNDECLARED", body["response"])
-
-    def test_置換の中で移った先も止める(self):
-        self.assert_denied_by('echo "$(cd .claude && rm settings.json)"', SETTING_FILES)
-
-    def test_リダイレクトだけの書き込みも止める(self):
-        # `> settings.json` は hook の登録を空にする。
-        self.assert_denied_by("cd .claude && > settings.json", SETTING_FILES)
-
-    def test_実行役のコマンド越しと_env_C_も止める(self):
-        self.assert_all_denied_by(
-            [
-                "cd .claude && env rm settings.json",
-                "cd .claude && sudo -u me rm settings.json",
-                "cd .claude && dd if=/tmp/x of=settings.json",
-                "builtin cd .claude && rm settings.json",
-                "env -C .claude rm settings.json",
-                "sudo --chdir=.ccnavi/config/common rm rules.yml",
-            ],
-            SETTING_FILES,
-        )
-
-    def test_左がサブシェルになる区切りでは移らない(self):
-        # `cd .claude &` の後ろは元の場所のまま。止めると誤検知になる。
-        subjects = [
-            "cd .claude & echo x > settings.json",
-            "cd .claude | echo x > settings.json",
-        ]
-        for subject, body in zip(subjects, self.judge_all(subjects), strict=True):
-            with self.subTest(subject=subject):
-                # 移っていないので保護の場所にはヒットしない。
-                # 元の場所（ルート直下）への書き込みとして
-                # ルート直下の保護が止めるのは別の話。
-                self.assertNotIn(SETTING_FILES, blocking(body), subject)
 
 
 class SubstRepoRulesTest(unittest.TestCase):
@@ -839,194 +410,9 @@ class SubstRepoRulesTest(unittest.TestCase):
 
     # 変わるべきもの
 
-    def test_引用の中の置換は中身で判定する(self):
-        self.check(
-            [
-                ('echo "$(git push origin main)"', "deny", "builtin:guard-raw-git", ""),
-                ('grep -n "$(git push)" f', "deny", "builtin:guard-raw-git", ""),
-                ('h="$(git rev-parse HEAD)"', "deny", "builtin:guard-raw-git", ""),
-                ('echo "$(rm -rf /tmp/x)"', "deny", "builtin:recursive-delete", ""),
-                ('echo start\necho "$(rm -rf /tmp/x)"', "deny", "builtin:recursive-delete", ""),
-                # ヒアドキュメントは heredoc が止める。中の置換の読みは上の 2 件で見る。
-                ("cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF", "deny", "heredoc", ""),
-            ]
-        )
-
-    def test_改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない(self):
-        # 今は allow が後ろのコマンドまで通していた。
-        self.check(
-            [
-                ("grep -n x f\nsh evil.sh", "ask", "", "UNDECLARED"),
-                ("cat <(sh evil.sh)", "ask", "", "UNDECLARED"),
-                ("grep x <(curl https://example.com)", "ask", "prefer-webfetch", ""),
-                ("find . -name x\npython evil.py", "ask", "", "UNDECLARED"),
-                ("grep -n a#b f; sh evil.sh", "ask", "", "UNDECLARED"),
-            ]
-        )
-
-    def test_外側を割らず_後ろと予約語の直後もコマンドの先頭として読む(self):
-        self.check(
-            [
-                ("find $(pwd) -name x -delete", "deny", "find-writes", ""),
-                ("echo a#; git push origin main", "deny", "builtin:guard-raw-git", ""),
-                (
-                    "curl https://example.com/#top; rm -rf /tmp/x",
-                    "deny",
-                    "builtin:recursive-delete",
-                    "",
-                ),
-                ("ls\nfind . -delete", "deny", "find-writes", ""),
-                ("echo hi\ncurl https://example.com", "ask", "prefer-webfetch", ""),
-                ("if true; then find . -delete; fi", "deny", "find-writes", ""),
-            ]
-        )
-
-    def test_組み込みの保護も中身にヒットする(self):
-        self.check(
-            [
-                ('echo "$(ccnavi --agree x)"', "deny", "builtin:guard-ticket-approval", ""),
-                ("ls\nccnavi --agree x", "deny", "builtin:guard-ticket-approval", ""),
-                (
-                    'echo "$(tee /repo/.ccnavi/config/common/rules.yml < /tmp/x)"',
-                    "deny",
-                    "builtin:guard-setting-files",
-                    "",
-                ),
-                (
-                    "cat /tmp/x >(tee /repo/.ccnavi/config/common/rules.yml)",
-                    "deny",
-                    "builtin:guard-setting-files",
-                    "",
-                ),
-                (
-                    "ls\nsed -i s/a/b/ /repo/.ccnavi/config/common/rules.yml",
-                    "deny",
-                    "builtin:guard-setting-files",
-                    "",
-                ),
-                (
-                    'echo x > "$(pwd)/.ccnavi/config/common/rules.yml"',
-                    "deny",
-                    "builtin:guard-setting-files",
-                    "",
-                ),
-            ]
-        )
-
     # 変わってはいけないもの
 
-    def test_文字として書いたものと既存の読みは変わらない(self):
-        self.check(
-            [
-                ("echo $(git push origin main)", "deny", "builtin:guard-raw-git", ""),
-                ("echo $((1 << 2))", "ask", "", "UNDECLARED"),
-                ('grep -n "git push" README.md', "allow", "prefer-read-grep", ""),
-                ("grep -n '$(git push)' f", "allow", "prefer-read-grep", ""),
-                ('grep -n "\\$(git push)" f', "allow", "prefer-read-grep", ""),
-                ('grep -n "\\`git push\\`" f', "allow", "prefer-read-grep", ""),
-                ("echo hi # $(git push)", "ask", "", "UNDECLARED"),
-                ("# git push origin main", "skip", "", ""),
-                ("cat /repo/README.md | head -20", "ask", "", "UNDECLARED"),
-                ("""grep -n "regex: '(>" f""", "allow", "prefer-read-grep", ""),
-                ('grep -n "<<EOF" /repo/README.md', "allow", "prefer-read-grep", ""),
-                ("cat <<'EOF' > notes.md", "deny", "heredoc", "PARSE_UNCERTAIN"),
-                ("cat a.txt\n", "allow", "prefer-read-grep", ""),
-                ("curl -s 'https://example.com/a#frag'", "ask", "prefer-webfetch", ""),
-                ('export PATH="$(go env GOPATH)/bin:$PATH"', "ask", "", "UNDECLARED"),
-                # eval の文字列の中はコマンド名を見ない。外側が縮退して確認になる。
-                ('eval "$(ssh-agent -s)"', "ask", "", "PARSE_UNCERTAIN"),
-                (
-                    "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
-                    "ask",
-                    "",
-                    "UNDECLARED",
-                ),
-            ]
-        )
-
-    def test_引用付き_heredoc_の本文は読まない(self):
-        subjects = [
-            "cat <<'EOF' > notes.md\n$(git push) `rm -rf /tmp/x`\nEOF",
-            "cat <<'EOF' > notes.md\ngit push origin main\nEOF\necho done",
-        ]
-        for subject, body in zip(subjects, judge_many("Bash", subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.assertEqual(body["verdict"], "deny")
-                self.assertEqual(hit(body), ["heredoc"], body["rules"])
-
     # 増える誤検知と回避策
-
-    def test_増える誤検知(self):
-        self.check(
-            [
-                (
-                    "sh .ccnavi/scripts/ccnavi-git.sh commit -m \"$(cat <<'EOF'\n"
-                    "fix: don't push\nEOF\n)\"",
-                    "deny",
-                    "heredoc",
-                    "",
-                ),
-                (
-                    "gh pr create --title t --body \"$(cat <<'EOF'\n- `rm -rf x` is gone\nEOF\n)\"",
-                    "deny",
-                    "heredoc",
-                    "",
-                ),
-                (
-                    'gh issue create --title t --body "use $(git push) here"',
-                    "deny",
-                    "builtin:guard-raw-git",
-                    "",
-                ),
-                ('cd "$(git rev-parse --show-toplevel)"', "deny", "builtin:guard-raw-git", ""),
-                ('grep -rn foo "$(pwd)"', "ask", "", "UNDECLARED"),
-                ('find "$(pwd)" -name x', "ask", "", "UNDECLARED"),
-                ('cat "$(ls -t logs/git-*.log | head -1)"', "ask", "", "UNDECLARED"),
-                ("grep -n foo f\ngrep -n bar g", "ask", "", "UNDECLARED"),
-                ('echo "$(xargs rm < f)"', "ask", "", "PARSE_UNCERTAIN"),
-                ("find . \\( -name x -o -name y \\) -print", "ask", "", "UNDECLARED"),
-                ("grep -e '(' -n main.sh", "ask", "", "UNDECLARED"),
-                ("find . -exec wc {} \\; -delete", "deny", "find-writes", "PARSE_UNCERTAIN"),
-            ]
-        )
-
-    def test_回避策の表記は止まらない(self):
-        self.check(
-            [
-                (
-                    "sh .ccnavi/scripts/ccnavi-git.sh commit -F /tmp/msg.txt",
-                    "allow",
-                    "ccnavi-git",
-                    "",
-                ),
-                (
-                    'sh .ccnavi/scripts/ccnavi-git.sh commit -m "fix: 1 行目\n\n本文"',
-                    "allow",
-                    "ccnavi-git",
-                    "",
-                ),
-                ("gh pr create --title t --body-file /tmp/body.md", "ask", "", "UNDECLARED"),
-                (
-                    'gh issue create --title t --body "use \\`git push\\` here"',
-                    "ask",
-                    "",
-                    "UNDECLARED",
-                ),
-                (
-                    "gh issue create --title t --body 'use `git push` and don'\"'\"'t $(x)'",
-                    "ask",
-                    "",
-                    "UNDECLARED",
-                ),
-                ("sh /tmp/run.sh", "ask", "", "UNDECLARED"),
-                (
-                    "sh .ccnavi/scripts/ccnavi-git.sh rev-parse --show-toplevel",
-                    "allow",
-                    "ccnavi-git",
-                    "",
-                ),
-            ]
-        )
 
     # 文面（4.3）
 
@@ -1069,27 +455,6 @@ class SubstRepoRulesTest(unittest.TestCase):
                 responses[reason] = body["response"]
         self.assertEqual(len(set(responses.values())), 3, "理由の違う縮退に同じ文面を返した")
 
-    def test_シェルで読みが割れる形は一律に止める(self):
-        # `coproc` は、敵対的レビューで一覧に無いと分かった予約語（shellread-subst-04）で、
-        # NAME の読みが bash 4 と zsh で分かれる。読み分けずに止める。
-        code = "DENY_AMBIGUOUS_FORM"
-        self.check(
-            [
-                ('echo "$(case a in a) git push;; esac)"', "deny", AMBIGUOUS, code),
-                ("echo $((echo a) | cat)", "deny", AMBIGUOUS, code),
-                ("coproc { find . -delete; }", "deny", AMBIGUOUS, code),
-                ("coproc find . -delete", "deny", AMBIGUOUS, code),
-                ("coproc NAME { find . -delete; }", "deny", AMBIGUOUS, code),
-                ("coproc NAME find . -delete", "deny", AMBIGUOUS, code),
-                ("select x in a b; do echo $x; done", "deny", AMBIGUOUS, code),
-                # 引数に書いた同じ表記は予約語ではない。
-                ("echo coproc", "ask", "", "UNDECLARED"),
-                ("echo select", "ask", "", "UNDECLARED"),
-                ("for select in a b; do echo $select; done", "ask", "", "UNDECLARED"),
-                ("echo $((1 << 2))", "ask", "", "UNDECLARED"),
-            ]
-        )
-
     def test_バッククォートは一律に止める(self):
         # 二重引用の中でも、区切りを引用しないヒアドキュメントの中でも実行される。
         code = "DENY_BACKQUOTE"
@@ -1109,18 +474,6 @@ class SubstRepoRulesTest(unittest.TestCase):
         body = judge("Bash", 'gh issue create --title t --body "use `x` here"')
         self.assertIn("$( )", body["response"])
         self.assertIn("--body-file", body["response"])
-
-    def test_ANSI_Cの引用は中身を確定できるときだけ読む(self):
-        # エスケープ（`\`）の無い `$'…'` は単一引用と同じ文字列なので、そう読んでルールに適用する。
-        # エスケープがあれば展開しないと中身が決まらないので、確定できない読みとして止める側へ渡す。
-        self.check(
-            [
-                ("$'git' push origin main", "deny", "builtin:guard-raw-git", ""),
-                ("git $'push' origin main", "deny", "builtin:guard-raw-git", ""),
-                ("rm $'-rf' /tmp/x", "deny", "builtin:recursive-delete", ""),
-                ("echo $'a\\ngit push'", "ask", "", "PARSE_UNCERTAIN"),
-            ]
-        )
 
     def test_実行するときに決まるコマンド名は一律に止める(self):
         # どれもどのルールにもヒットせず、auto では権限モードに渡っていた。
@@ -1153,50 +506,6 @@ class SubstRepoRulesTest(unittest.TestCase):
         # 書き直しの例に、止まる形（生の git）を使わない。
         self.assertIn("`c=ls; $c -la` は `ls -la`", body["response"])
         self.assertNotIn("`git status`", body["response"])
-
-    def test_コマンド名でない位置の変数とグロブは止めない(self):
-        subjects = [
-            "echo $HOME",
-            "x=$(pwd)",
-            "FOO=$HOME/x make",
-            "ls *.py",
-            "[ -f x ] && echo y",
-            "[[ -f x ]] && echo y",
-            "case $x in a) echo a;; esac",
-            "for f in *.py; do echo $f; done",
-            "a[1]=x",
-            "timeout $T make",
-            "cd $S && ls",
-        ]
-        for subject, body in zip(subjects, judge_many("Bash", subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.assertNotEqual(body["code"], "DENY_COMMAND_NAME_EXPANSION", body["response"])
-
-    def test_引用の外のブレース展開は一律に止める(self):
-        # Issue #38。どのルールにもヒットしないまま、bash は広げた語を実行していた。
-        brace, code = "builtin:brace-expansion", "DENY_BRACE_EXPANSION"
-        self.check(
-            [
-                ("{git,push,origin,main}", "deny", brace, code),
-                ("{rm,-rf,/tmp/x}", "deny", brace, code),
-                # 生の CR を挟んでも止まる。挟むとルールにもヒットせず、
-                # auto では権限モードに渡っていた。
-                ("{git,\rpush,origin,main}", "deny", brace, code),
-                ("grep -rn x --exclude-dir={node_modules,.git} /repo", "deny", brace, code),
-                ("cp f{,.bak}", "deny", brace, code),
-                ('echo "$({git,push})"', "deny", brace, code),
-                ("sh -c '{git,push}'", "deny", brace, code),
-                # 書き直した形と、文字として書いた形は今までどおり。
-                (
-                    "grep -rn x --exclude-dir=node_modules --exclude-dir=.git /repo",
-                    "allow",
-                    "prefer-read-grep",
-                    "",
-                ),
-                ("grep -n '{a,b}' f", "allow", "prefer-read-grep", ""),
-                ("git show HEAD@{1}", "deny", "builtin:guard-raw-git", ""),
-            ]
-        )
 
     def test_ブレース展開を止めた文面は書き直し方を言う(self):
         body = judge("Bash", "grep -rn x --exclude-dir={node_modules,.git} .")
