@@ -1005,29 +1005,6 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(read(exe), "ELF fake on path\n")
         self.assertIn("restored", result.stdout)
 
-    def test_PATH_の実体への書き込みは名指しのツールから止まる(self):
-        spelled, exe, env = self.path_layout()
-
-        result = self.run_hook(
-            "PreToolUse", bin=spelled, extra_env=env, tool="Write", file_path=exe
-        )
-
-        self.assertIn("deny", result.stdout)
-
-    def test_PATH_の実体を差し替えるシェルの書き込みは止まり_別の_bin_ccnavi_は止まらない(self):
-        spelled, exe, env = self.path_layout()
-        exe_dir = os.path.dirname(exe).replace("\\", "/")
-
-        denied = self.run_hook(
-            "PreToolUse", bin=spelled, extra_env=env, command=f"cp /tmp/x {exe_dir}/ccnavi"
-        )
-        other = self.run_hook(
-            "PreToolUse", bin=spelled, extra_env=env, command="cp /tmp/x ./bin/ccnavi"
-        )
-
-        self.assertIn("deny", denied.stdout)
-        self.assertNotIn("deny", other.stdout)
-
     def test_PATH_の先頭が_launcher_へのリンクでも_実際に走る実体を守る(self):
         # sh は自分と同じファイルを飛ばして次の項目の実体を起動する。守る対象も同じ実体にする。
         spelled, exe, env = self.path_layout()
@@ -1055,13 +1032,6 @@ class SelfGuardTest(unittest.TestCase):
         self.run_hook("PostToolUse", bin=spelled, extra_env=env)
 
         self.assertEqual(read(exe), "ELF fake on path\n")
-
-    def test_PATH_に_ccnavi_が無ければ守る対象も増えない(self):
-        spelled, _, _ = self.path_layout()
-
-        result = self.run_hook("PreToolUse", bin=spelled, command="cp /tmp/x ./bin/ccnavi")
-
-        self.assertNotIn("deny", result.stdout)
 
     def test_ツールを呼ぶ前に外で作り直された実行ファイルは新しい版として取り直す(self):
         # ccnavi の外での再ビルドは、次のツール呼び出しの前に基準になる。

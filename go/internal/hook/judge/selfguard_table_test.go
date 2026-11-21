@@ -1,6 +1,7 @@
 package judge
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -164,5 +165,50 @@ func TestSelfGuardRedirectLimitInEveryMode(t *testing.T) {
 		}
 		checkGuardRows(t, root, baseEnv, pm, bashRows(true, settingFiles, exact))
 		checkGuardRows(t, root, baseEnv, pm, bashRows(false, limitCode, exact, exactUnrelated))
+	}
+}
+
+// bin/ に実体が無く、PATH の ccnavi が起動される形。振り分けの sh だけを置き、実体は PATH の置き場（ワークスペースの外）に置く。
+// 守る対象は PATH の実体になる。別の bin/ccnavi は守らず、PATH に ccnavi が無ければ守る対象も増えない。
+func TestSelfGuardPathExecutable(t *testing.T) {
+	root := fixtureWorkspace(t, "")
+	launcher := filepath.Join(root, ".ccnavi", "scripts", "ccnavi-launcher.sh")
+	testkit.Put(t, launcher, "#!/bin/sh\n")
+	if err := os.Chmod(launcher, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(testkit.TempRoot(t), "local", "bin", "ccnavi")
+	testkit.Put(t, exe, "ELF fake on path\n")
+	if err := os.Chmod(exe, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	onPath := with("CCNAVI_ENTRY_PATH", launcher, "PATH", filepath.Dir(exe)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	exeDir := filepath.ToSlash(filepath.Dir(exe))
+	checkGuardRows(t, root, onPath, "default", []guardRow{
+		// 名指しのツールは、どの組み込みが当たったかではなく止まることを見る。
+		{config.ToolWrite, exe, true, `"permissionDecision": "deny"`},
+		{config.ToolEdit, exe, true, `"permissionDecision": "deny"`},
+		{config.ToolBash, "cp /tmp/x " + exeDir + "/ccnavi", true, settingFiles},
+		{config.ToolBash, "cp /tmp/x ./bin/ccnavi", false, settingFiles},
+	})
+	// PATH に ccnavi が無ければ、守る対象も増えない。
+	noPath := with("CCNAVI_ENTRY_PATH", launcher, "PATH", "/nonexistent/path")
+	checkGuardRows(t, root, noPath, "default", []guardRow{
+		{config.ToolBash, "cp /tmp/x ./bin/ccnavi", false, settingFiles},
+		{config.ToolBash, "cp /tmp/x " + exeDir + "/ccnavi", false, settingFiles},
+	})
+	// 通す行は、checkGuardRows（当たったかだけを見る）と違い、止まらないことも見る。
+	for _, p := range []struct {
+		env     map[string]string
+		command string
+	}{
+		{onPath, "cp /tmp/x ./bin/ccnavi"},
+		{noPath, "cp /tmp/x ./bin/ccnavi"},
+		{noPath, "cp /tmp/x " + exeDir + "/ccnavi"},
+	} {
+		a := runGo(t, root, judgeCase{Payload: call(config.ToolBash, root, map[string]any{"command": p.command}, "permission_mode", "default"), Env: p.env})
+		if a.Record["decision"] == "deny" {
+			t.Errorf("%q: 止まった: %.300s", p.command, a.Stdout)
+		}
 	}
 }

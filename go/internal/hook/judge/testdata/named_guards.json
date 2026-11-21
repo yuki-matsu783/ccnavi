@@ -1,0 +1,1468 @@
+[
+{
+"case": "a_global_dry_run_still_denies_as_a_gate",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-project-home",
+"builtin:ticket-approved"
+],
+"mode": "dry-run",
+"tickets": "enable"
+},
+{
+"case": "a_global_dry_run_still_denies_as_a_gate",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:ticket-approved"
+],
+"guard": "disable",
+"mode": "dry-run",
+"tickets": "enable"
+},
+{
+"case": "a_handoff_copy_in_the_approved_place_is_not_exempt",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:ticket-approved"
+],
+"tickets": "enable"
+},
+{
+"case": "disabled_tickets_leave_it_to_the_project_home_rule",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-project-home"
+],
+"tickets": "disable"
+},
+{
+"case": "disabled_tickets_leave_it_to_the_project_home_rule",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable",
+"tickets": "disable"
+},
+{
+"case": "enabled_tickets_deny_whatever_the_self_guard",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-project-home",
+"builtin:ticket-approved"
+],
+"tickets": "enable"
+},
+{
+"case": "enabled_tickets_deny_whatever_the_self_guard",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/approved/doing/i0001.md",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:ticket-approved"
+],
+"guard": "disable",
+"tickets": "enable"
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.claude/settings.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.claude/settings.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/wip/handoff/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.claude/settings.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/wip/handoff/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.claude/settings.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "a_plain_copy_in_the_handoff_place_is_written_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/wip/handoff/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "each_place_is_stopped_by_its_builtin_in_every_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "reading_is_not_stopped",
+"state": "normal",
+"tool": "Read",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "reading_is_not_stopped",
+"state": "normal",
+"tool": "Grep",
+"input": {
+"path": "{ROOT}/.claude/hooks/guard.sh"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "reading_is_not_stopped",
+"state": "normal",
+"tool": "Glob",
+"input": {
+"path": "{ROOT}/.claude/hooks/guard.sh"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/settings.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/settings.local.json",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "switching_the_self_guard_off_drops_the_four",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "the_dedicated_ids_come_before_the_general_ones",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_dedicated_ids_come_before_the_general_ones",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_dedicated_ids_come_before_the_general_ones",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_dedicated_ids_come_before_the_general_ones",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_handoff_exception_is_only_for_the_place_right_under_a_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/docs/wip/handoff/.claude/hooks/x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_handoff_exception_is_only_for_the_place_right_under_a_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoffx/.claude/hooks/x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_handoff_exception_is_only_for_the_place_right_under_a_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/../.claude/hooks/x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_handoff_exception_is_only_for_the_place_right_under_a_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/docs/wip/handoff/.ccnavi/scripts/x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_handoff_exception_is_only_for_the_place_right_under_a_tree",
+"state": "normal",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/docs/wip/handoff/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "the_other_tools_are_stopped_too",
+"state": "normal",
+"tool": "Edit",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_other_tools_are_stopped_too",
+"state": "normal",
+"tool": "NotebookEdit",
+"input": {
+"notebook_path": "{ROOT}/.claude/hooks/guard.sh"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_draft_can_be_written_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/wip/handoff/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": false,
+"rules": []
+},
+{
+"case": "the_four_are_off_with_the_self_guard_off_even_when_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": false,
+"rules": [],
+"guard": "disable"
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/worktrees/w/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/scripts/ccnavi-x.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-scripts"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_while_the_rules_are_broken",
+"state": "broken",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/projects/lib/.claude/worktrees/w/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config"
+]
+},
+{
+"case": "the_four_hold_without_the_common_rules",
+"state": "absent",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/hooks/guard.sh",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-hooks"
+]
+},
+{
+"case": "the_four_hold_without_the_common_rules",
+"state": "absent",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.claude/settings.json",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-settings"
+]
+},
+{
+"case": "the_four_hold_without_the_common_rules",
+"state": "absent",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/rules.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_four_hold_without_the_common_rules",
+"state": "absent",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/phases.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+},
+{
+"case": "the_four_hold_without_the_common_rules",
+"state": "absent",
+"tool": "Write",
+"input": {
+"file_path": "{ROOT}/.ccnavi/config/common/risks.yml",
+"content": "x\n"
+},
+"deny": true,
+"rules": [
+"builtin:guard-ccnavi-config",
+"builtin:guard-common-layer",
+"builtin:guard-project-home"
+]
+}
+]

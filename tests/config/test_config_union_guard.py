@@ -343,18 +343,6 @@ class DenyTest(GuardHarness):
                     result = self.guarded_hook(tool, self.ws, file_path=path)
                     self.assert_denied(result, "builtin:guard-project-home")
 
-    def test_shell_writes_into_project_home_are_denied(self):
-        """シェルからの書き込みは `builtin:guard-setting-files` の 1 本で止まる。"""
-        self.assert_all_guarded(
-            (
-                "echo x > projects/lib/.ccnavi/scripts/count.sh",
-                "echo x >> .ccnavi/config/project/rules.yml",
-                "sed -i s/deny/allow/ projects/lib/.ccnavi/config/project/rules.yml",
-                "cp /tmp/x .ccnavi/config/project/phases.yml",
-                "cd projects/lib && echo x > .ccnavi/config/project/risks.yml",
-            ),
-        )
-
     def test_reading_project_home_is_allowed(self):
         """読むだけなら通る。名前が出ただけでは止めない。"""
         self.assert_none_denied(
@@ -451,63 +439,6 @@ class DenyTest(GuardHarness):
                 with self.subTest(command=command):
                     result = self.hook("Bash", self.ws, guard="enable", command=command)
                     self.assertNotIn("builtin:guard-setting-files", self.reason(result))
-
-    def test_copying_into_the_common_layer_is_denied(self):
-        """行き先が共通レイヤーの 3 本（かその置き場）になる cp / ln / install は止まる。
-
-        後ろに別のコマンドをつないだ形、前につないだ形、引用でつないだ語、
-        `-t` で行き先を前に出した形も同じ。元の側に出ただけの形を通すために、
-        行き先の適用の仕方まで緩んでいないことを見る。
-        """
-        absolute = os.path.dirname(self.rules).replace(os.sep, "/")
-        for name in ("rules.yml", "phases.yml", "risks.yml"):
-            self.assert_all_guarded(
-                (
-                    f"cp /tmp/x .ccnavi/config/common/{name}",
-                    f"cp /tmp/x {absolute}/{name}",
-                    f"ln -sf /tmp/x .ccnavi/config/common/{name}",
-                    f"install /tmp/x .ccnavi/config/common/{name}",
-                    f"cp .ccnavi/config/common/{name} .ccnavi/config/common/{name}",
-                    f"cp /tmp/x .ccnavi/config/common/{name} && echo done",
-                    f"cp /tmp/x .ccnavi/config/common/{name}; echo done",
-                    f"cp /tmp/x .ccnavi/config/common/{name} > /dev/null 2>&1",
-                    f"echo go && cp /tmp/x .ccnavi/config/common/{name}",
-                    f'cp "/tmp/a b" .ccnavi/config/common/{name}',
-                    f'cp /tmp/x ".ccnavi/config/common/{name}"',
-                    f"cd .ccnavi && cp /tmp/x common/{name}",
-                ),
-            )
-        # 行き先をディレクトリにした形。
-        self.assert_all_guarded(
-            (
-                "cp /tmp/rules.yml .ccnavi/config/common",
-                "cp /tmp/rules.yml .ccnavi/config/common/",
-                f"cp /tmp/rules.yml {absolute}",
-                "cp /tmp/rules.yml .ccnavi/config/common && echo done",
-                "cp -t .ccnavi/config/common /tmp/rules.yml",
-                "cp --target-directory=.ccnavi/config/common /tmp/rules.yml",
-                "install -Dt .ccnavi/config/common /tmp/rules.yml",
-                "ln -st .ccnavi/config/common /tmp/rules.yml",
-            ),
-        )
-
-    def test_writing_from_the_common_layer_side_is_still_denied(self):
-        """書き込みの表記は、共通レイヤーの 3 本が前に出た形でも今までどおり止まる。
-
-        元と行き先の区別をするのは cp / ln / install だけ。mv は元を消し、rm / tee /
-        sed -i / リダイレクトは名指ししたところを書く。
-        """
-        for name in ("rules.yml", "phases.yml", "risks.yml"):
-            self.assert_all_guarded(
-                (
-                    f"mv .ccnavi/config/common/{name} /tmp/x",
-                    f"rm .ccnavi/config/common/{name}",
-                    f"tee .ccnavi/config/common/{name} < /tmp/x",
-                    f"sed -i s/deny/allow/ .ccnavi/config/common/{name}",
-                    f"echo x > .ccnavi/config/common/{name}",
-                    f"cp .ccnavi/config/common/{name} /tmp/x && rm .ccnavi/config/common/{name}",
-                ),
-            )
 
     def judged(self, command, *flags, guard="enable"):
         """`--test --json` で 1 本判定し、ヒットしたルールの id を返す。
