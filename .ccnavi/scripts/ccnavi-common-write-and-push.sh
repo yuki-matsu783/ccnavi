@@ -132,7 +132,7 @@ ccnavi_wap_family() {
 	if ! ccnavi_wap_ask family "$ccnavi_wap_tmp/family" "$1"; then
 		ccnavi_wap_family_id="$ccnavi_cf_p"
 		ccnavi_wap_target=stop
-		ccnavi_wap_why="$ccnavi_wap_noans。書かずに止める。実行ファイルを新しくしてください"
+		ccnavi_wap_why="${ccnavi_wap_noans}。書かずに止める。実行ファイルを新しくしてください"
 		return 0
 	fi
 	ccnavi_cf_ans=$(cat "$ccnavi_wap_tmp/family")
@@ -218,7 +218,7 @@ ccnavi_wap_begin() {
 # 置き場の変更を見分ける。<出力> [<版>]。答えられなければ 1。
 ccnavi_wap_sort() {
 	ccnavi_wap_ask sort "$1" "$ccnavi_wap_family_id" ${2:+"$2"} && return 0
-	ccnavi_wap_say "$ccnavi_wap_noans。置き場の変更を見分けられなかった。何も反映していません"
+	ccnavi_wap_say "${ccnavi_wap_noans}。置き場の変更を見分けられなかった。何も反映していません"
 	return 1
 }
 
@@ -314,7 +314,7 @@ ccnavi_wap_commit() {
 	ccnavi_wap_committed=""
 	ccnavi_wap_refused=""
 	if ! ccnavi_wap_ask commit "$ccnavi_wap_tmp/commit" "$ccnavi_wap_tree" "$1" "$2"; then
-		ccnavi_wap_say "$ccnavi_wap_noans。コミットしない"
+		ccnavi_wap_say "${ccnavi_wap_noans}。コミットしない"
 		return 1
 	fi
 	ccnavi_wap_said "$ccnavi_wap_tmp/commit"
@@ -348,7 +348,7 @@ ccnavi_wap_run() {
 ccnavi_wap_merge_plan() {
 	ccnavi_wap_merge_sha=""
 	if ! ccnavi_wap_ask merge "$ccnavi_wap_tmp/merge" "$1"; then
-		ccnavi_wap_say "$ccnavi_wap_noans。何も反映していません。実行ファイルを新しくしてください"
+		ccnavi_wap_say "${ccnavi_wap_noans}。何も反映していません。実行ファイルを新しくしてください"
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -480,7 +480,7 @@ ccnavi_wap_write() {
 # 自分のコミットを比較つきで戻す（実行ファイルの write-and-push undo）。<6〜8 の答えのファイル>。戻せたら 0。
 ccnavi_wap_undo() {
 	if ! ccnavi_wap_ask undo "$ccnavi_wap_tmp/undo" "$1"; then
-		ccnavi_wap_say "$ccnavi_wap_noans。コミットを戻せなかった。ユーザが確かめてください"
+		ccnavi_wap_say "${ccnavi_wap_noans}。コミットを戻せなかった。ユーザが確かめてください"
 		return 1
 	fi
 	ccnavi_wap_said "$ccnavi_wap_tmp/undo"
