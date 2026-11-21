@@ -1,5 +1,5 @@
 """ホスト（GitHub / GitLab）のスタブ。write-and-push と `ccnavi-ticket.sh` のテストと、
-受入シナリオの `setup.host`（tests/scenarios/hostenv.py）が使う。
+受入シナリオの `setup.host`（go/internal/harness/scenario/host）が使う。
 
 `git remote get-url origin` だけがホストの形の URL（`https://gitlab.com/acme/widgets.git`）を答える。
 origin が手元の bare ならそのまま fetch・push・ls-remote が動く。origin が本物のホストのときは、
