@@ -189,6 +189,16 @@ func TestUsageRefusals(t *testing.T) {
 		{[]string{"--templates", "--template", "small"}, 1, "--template は"},
 		{[]string{"ticket", "status", "--template", "small"}, 1, "--template は"},
 		{[]string{"ticket", "status", "--layer", "self"}, 1, "--templates"},
+		// handoff の旗の組み合わせ（ユーザ専用の入口は --entry sh）。
+		{[]string{"--entry", "sh", "user", "handoff", "--yes", "--json"}, 1, "ターミナル"},
+		{[]string{"--entry", "sh", "user", "handoff", "--lint"}, 1, "--lint は user handoff と同時には指定できません"},
+		{[]string{"--entry", "sh", "user", "handoff", "--docs"}, 1, "--docs は --handoff と同時に指定できない"},
+		{[]string{"--entry", "sh", "user", "handoff", "--yes", "i1"}, 1, "--yes には値を付けられません"},
+		{[]string{"--entry", "sh", "user", "handoff", "--templates"}, 1, "--templates は --handoff と同時に指定できない"},
+		{[]string{"--entry", "board", "user", "handoff", "--yes", "--expect", "x", "--via", "board"}, 1, "--via board は --yes --expect <ハッシュ> --json と一緒に指定してください"},
+		// retire の --abandon は retire だけ。名前は親の識別子の形。
+		{[]string{"worktree", "drop", "--abandon", "i0001"}, 1, "worktree retire --abandon <親> の形で指定してください"},
+		{[]string{"worktree", "retire", "--abandon", "../x"}, 1, "worktree retire --abandon <親> の形で指定してください"},
 	} {
 		var out, errOut bytes.Buffer
 		code := Run(strings.NewReader(""), &out, &errOut, c.args)
