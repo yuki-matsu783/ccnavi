@@ -88,7 +88,7 @@ func (p *probe) buildEnv() []string {
 	var out []string
 	for _, kv := range p.cfg.Environ {
 		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(name, "CCNAVI_") || name == "CLAUDE_PROJECT_DIR" {
+		if strings.HasPrefix(name, "CCNAVI_") || name == env.ClaudeProjectDir {
 			continue
 		}
 		out = append(out, kv)
