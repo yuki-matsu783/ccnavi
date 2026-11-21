@@ -8,6 +8,8 @@
 //	curl         routes.json で答える curl（hoststub.Curl）
 //	gitlab-host  見本を返す GitLab のスタブ。`gitlab-host curl <引数…>`（hostfixture.GitlabCurl）
 //	github-host  見本を返す GitHub のスタブ。`github-host curl|gh <引数…>`（hostfixture.GithubCurl・GithubGh）
+//	userform     `user` の入口の並びを実行ファイルと同じに検べる（samples.UserformMain）
+//	oprecord     操作記録と、その操作ID を入れた計画を書く（samples.OprecordMain）
 package main
 
 import (
@@ -19,6 +21,7 @@ import (
 
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/hoststub"
+	"ccnavi/internal/harness/samples"
 )
 
 // command は 1 つのサブコマンド。args はサブコマンドの名前より後ろ。
@@ -31,6 +34,12 @@ var commands = map[string]command{
 	},
 	"gitlab-host": hostCommand("gitlab-host", map[string]hostFunc{"curl": hostfixture.GitlabCurl}),
 	"github-host": hostCommand("github-host", map[string]hostFunc{"curl": hostfixture.GithubCurl, "gh": hostfixture.GithubGh}),
+	"userform": func(a []string, _ io.Reader, _, errw io.Writer) int {
+		return samples.UserformMain(a, errw)
+	},
+	"oprecord": func(a []string, _ io.Reader, _, errw io.Writer) int {
+		return samples.OprecordMain(a, errw)
+	},
 }
 
 type hostFunc func(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv hostfixture.Getenv) int
