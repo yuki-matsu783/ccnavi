@@ -118,3 +118,44 @@ func TestFixtureUpdateKeepsTheOtherFields(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// PortableText は大文字小文字と区切り（\ と /）の違いを同じものとして <root> にそろえる。
+func TestPortableTextMatchesTheRootIgnoringCaseAndSeparators(t *testing.T) {
+	t.Parallel()
+	got := PortableText("C:\\Ws\\x and c:/ws/y", "c:/WS")
+	if want := "<root>/x and <root>/y"; got != want {
+		t.Errorf("PortableText = %q, want %q", got, want)
+	}
+}
+
+// 解いたパスと、張った symlink の両方が <root> になる（張れない機械では飛ばす）。
+func TestPortableTextReplacesASymlinkAndItsTarget(t *testing.T) {
+	t.Parallel()
+	target := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink を張れない: %v", err)
+	}
+	resolved, err := filepath.EvalSymlinks(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := PortableText(filepath.Join(link, "x")+" and "+filepath.Join(resolved, "y"), link)
+	if want := "<root>/x and <root>/y"; got != want {
+		t.Errorf("PortableText = %q, want %q", got, want)
+	}
+}
+
+// WriteFixture は末尾の改行を 1 つにそろえて書く。
+func TestWriteFixtureEndsWithOneNewline(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(base.TempDir(t), "fixture.json")
+	WriteFixture(t, path, "a\n\n")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "a\n" {
+		t.Errorf("WriteFixture の中身 = %q, want %q", data, "a\n")
+	}
+}
