@@ -69,6 +69,7 @@ ccnavi_run_timed_end() {
 
 # 時間を区切って実行する。<秒> <stdin のファイル> <stdout のファイル> <stderr のファイル> <コマンド>...
 # バックグラウンドで動かし、上限を過ぎたら止めて 124 を返す。時間切れは印のファイルで判定する。
+# 止めるのは子に TERM を 1 回送るだけ。TERM を無視する子は止まらず、上限も INT も効かない（KILL は送らない）。
 # <stdout のファイル> に `-` を渡すと、標準出力は呼ぶ側のものを引き継ぐ。ccnavi_git_timed がこの形で使う。
 # 印のファイルは `<stdout のファイル>.timeout`。stdout が `-` か /dev/null のときは `<stderr のファイル>.timeout` に置く。
 # stderr も /dev/null なら、TMPDIR の一時名に置く（特殊ファイルに `.timeout` を付けないため）。
