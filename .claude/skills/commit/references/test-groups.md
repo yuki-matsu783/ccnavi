@@ -14,7 +14,7 @@ keywords: [テストグループ, tests, core, guard, config, ticket, sh, contra
 
 | グループ | 主題 | 時間 |
 |---|---|---|
-| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形・sh の書き方、リポジトリの期待する判定 `rule-expectations.yml` といまのルールの突き合わせなど） | 約 13 秒 |
+| `core` | 部品の単体と、速い受入テスト（shellread・glob・lint・組み立ての sh の形など） | 約 13 秒 |
 | `guard` | 判定とルール（受入テスト、自己防衛、運用のルール、縮退、実行後チェック、プロジェクト） | 約 43 秒 |
 | `config` | 設定のレイヤーの合成（rules / phases / risk） | 約 33 秒 |
 | `ticket` | チケット・フェーズ・承認・ボード・リスク・ブランチ名と識別子の変換・issue/MR のブランチ探索・学びの蓄積 | 約 124 秒 |
@@ -39,7 +39,7 @@ uv run python -m unittest discover -s tests/core -t .    # 1 グループ（複�
 
 `core` はいつも回す。そのうえで、変えたファイルを下の表に適用して、ヒットした行のグループを足す。
 
-Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/` のどれかを変えたら必ず回す（表とは別。Python のテストを Go に移していくので、表のグループが空になっても sh・文面・見本の変更は Go のテストが守る）。`-count=1` は要らない。
+Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/` のどれかを変えたら必ず回す（表とは別。Python のテストを Go に移していくので、表のグループが空になっても sh・文面・見本の変更は Go のテストが守る）。`docs/30_adr/`・`.claude/hooks/`・`scripts/` を変えたときも `cd go && go test ./internal/clitest/repo/` を回す（ADR の番号・配る sh の書き方・期待する判定・Stop の場面を見る）。`-count=1` は要らない。
 
 | 変えたもの | 足すグループ |
 |---|---|
@@ -47,7 +47,7 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `go/**` | `guard` `config` `ticket` |
 | `go/internal/infra/platformtag/` | 上に加えて `sh` |
 | sh が実行ファイルに聞く判定と操作の部品（`go/internal/infra/git/`・`tree/`・`reply/`、`go/internal/tickets/lifecycle/` の `integrate/`・`branch/`・`refusal/`・`gitlog/`・`treeadd/`・`cut/`、`go/internal/tickets/review/decide/`、`go/internal/tickets/sync/`、`go/internal/tickets/approval/wap/`、`go/internal/tickets/model/` の `ids/`・`oplog/`・`handoffnames/`、`go/internal/records/stopreview/`） | 上に加えて `sh` |
-| `scripts/ccnavi-build.sh` | `core` `sh` `e2e` |
+| `scripts/ccnavi-build.sh` | `go test ./internal/clitest/core/`（`build_test.go`）`sh` `e2e` |
 | `.ccnavi/scripts/ccnavi-ticket.sh`・`ccnavi-user-agree.sh`・`ccnavi-review.sh`、`go/internal/tickets/lifecycle/ticketsh/` | `ticket` `config` `e2e`。`ccnavi-ticket.sh`・`ticketsh/` は `sh`（`test_write_and_push_propose`・`test_write_and_push_ticket`）も |
 | `.ccnavi/scripts/ccnavi-git.sh`・`go/internal/tickets/lifecycle/gitwrap/`・`go/internal/tickets/lifecycle/land/` | `sh` `guard` `config` `e2e` |
 | `.ccnavi/scripts/ccnavi-launcher.sh`・`scripts/ccnavi-setup.sh` | `sh` `guard` `config` `e2e` |
@@ -58,9 +58,9 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`・`test_start_sh_adopt`） |
 | `go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_start_sh_adopt`・`test_ticket_preflight_sh`・`test_write_and_push_ticket`）。`ccnavi-common-host.sh` は多くの sh が読むため、下の「全件を回すとき」に従う |
 | `.ccnavi/scripts/ccnavi-common-write-and-push.sh`・`go/internal/tickets/lifecycle/wapmerge/`・`go/internal/entry/cli/wapwrite.go` | `sh`（`test_write_and_push_*`・`test_push_approved_sh`）`ticket`（`test_write_and_push`） |
-| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`・`test_branches_sh`・`test_mask_url_sh`） |
+| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
-| `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
+| `.claude/hooks/check-adr.sh` | `go test ./internal/clitest/core/`（`checkadrhook_test.go`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
 | `tests/ticketsample.py` | `ticket` `sh` |
 | `tests/treecache.py`（チケットの受入テストの木の写しを取る） | `ticket` |
@@ -69,12 +69,12 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つのスタブと模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
 | `tests/scenarios/*.yml`・`tests/scenarios/sandbox.py` | `scenarios`（`test_stub_scenarios` が、台本のあるシナリオを使い捨てのワークスペースでスタブで回す。ccnavi の判定を変えても結果が変わる） |
 | `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
-| `tests/fixtures/` | `guard` `ticket`（sh の写しとの一致の表 `ident-cases.json`・`sh-quote-cases.json`・`host-kinds.json`・`layout.json`・`approved-carry.json` は、`sh` の `test_ident_sh`・`test_sh_quote_sh`・`test_host_kinds_sh`・`test_sh_copies_sh` と `go test` の両方で確かめる） |
-| `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
+| `tests/fixtures/` | `guard` `ticket`（sh の写しとの一致の表 `ident-cases.json`・`sh-quote-cases.json`・`host-kinds.json`・`layout.json`・`approved-carry.json` は、`go test`（`go/internal/clitest/sh/small/` を含む）で確かめる） |
+| `extensions/vscode/` | `ticket`（`go test ./internal/clitest/core/`（`testjson_test.go`）と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `tests/contract/`（`shape.py`・`*.json`） | `contract`。あわせて `extensions/chrome/ccnavi-approval` の `pnpm test`（TS の比較器が同じ表を読む） |
 | `extensions/chrome/ccnavi-approval/test/helpers/mock-gitlab.ts`・`shape.ts` | `extensions/chrome/ccnavi-approval` の `pnpm test`（契約の試験） |
 | `extensions/chrome/ccnavi-approval/`（`test/fixtures/`）と `go/internal/entry/chrome/`・`go/cmd/ccnavi-chrome/` | `ticket` `sh`（Chrome の入口を手元のコアと突き合わせる）。`test/fixtures/host/gitlab/` と `tests/sh/gitlab_host.py` は `contract` も（見本の応答の形を比べる） |
-| `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `core`（`test_adr_numbers`） |
+| `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `go test ./internal/clitest/repo/`（`adr_numbers_test.go`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
 
 自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:
@@ -90,8 +90,8 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 - 統合先に取り込む前、MR に出す前（親の最後のフェーズの子を finish する前に済ませる。レビュー準備中はシェルの実行が止まるため）
 - どの行にヒットするか迷った
 
-`src/` の `--json` 出力のキーや CLI のオプションを変えるときは、`core` と `guard` の両方を回す。`extensions/vscode/ccnavi-board/test/fixtures/` を
-Python のテスト（`tests/core/test_test_json.py`・`tests/guard/test_suggest.py`）も読むので、fixtures の旧キーのままだと落ちる。
+`src/` の `--json` 出力のキーや CLI のオプションを変えるときは、`go test ./internal/clitest/core/` と `guard` の両方を回す。`extensions/vscode/ccnavi-board/test/fixtures/` を
+テスト（`go/internal/clitest/core/testjson_test.go`・`tests/guard/test_suggest.py`）も読むので、fixtures の旧キーのままだと落ちる。
 拡張を別のフェーズに分けて計画するなら、前のフェーズでこの 2 本が落ちると分かったうえで分ける（直すのは fixtures を持つフェーズ）。
 
 `go/**` を変えたとき `e2e` は足さない（e2e は組み立て済みの実行ファイルを試す）。組み立て直したなら足す。
@@ -132,5 +132,5 @@ pnpm test:e2e    # 拡張を読み込んだ Chromium での試験。Chromium が
 
 配布する sh を起動するテストは `sh` に置く。例外は 1 つで、実行ファイル（判定）と sh が同じことを
 別の実装で持ち、同じ見本の表で両方を突き合わせるテストは、表の主題のグループに 1 ファイルで置く
-（`guard` の `test_wrapguard.py` の `ShAgreesTest`）。表を 2 つのグループに分けると、
+（例: `go/internal/clitest/guard/self/wrapguard_test.go` の `TestShAgreesOnChildPush`）。表を 2 つのグループに分けると、
 片方だけ直したときに食い違いに気づけないため。
