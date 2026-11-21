@@ -197,4 +197,18 @@ func TestSelfGuardPathExecutable(t *testing.T) {
 		{config.ToolBash, "cp /tmp/x ./bin/ccnavi", false, settingFiles},
 		{config.ToolBash, "cp /tmp/x " + exeDir + "/ccnavi", false, settingFiles},
 	})
+	// 通す行は、checkGuardRows（当たったかだけを見る）と違い、止まらないことも見る。
+	for _, p := range []struct {
+		env     map[string]string
+		command string
+	}{
+		{onPath, "cp /tmp/x ./bin/ccnavi"},
+		{noPath, "cp /tmp/x ./bin/ccnavi"},
+		{noPath, "cp /tmp/x " + exeDir + "/ccnavi"},
+	} {
+		a := runGo(t, root, judgeCase{Payload: call(config.ToolBash, root, map[string]any{"command": p.command}, "permission_mode", "default"), Env: p.env})
+		if a.Record["decision"] == "deny" {
+			t.Errorf("%q: 止まった: %.300s", p.command, a.Stdout)
+		}
+	}
 }
