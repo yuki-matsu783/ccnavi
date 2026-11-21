@@ -1,16 +1,14 @@
 /**
  * 模擬の GitLab（`MockGitLab`）が内部の状態から答える応答を、本物の GitLab から録った形（tests/contract/gitlab/recorded.json）と、
- * `reads` のキーで比べる契約テスト。Python の `tests/contract` の TypeScript 版で、規則は同じ（test/helpers/shape.ts）。
+ * `reads` のキーで比べる契約テスト。Go の `contractshape`（go/internal/harness/contractshape）の TypeScript 版で、規則は同じ（test/helpers/shape.ts）。
  *
- * - 規則の表（normalize-cases.json）を Python と同じように読む。同じ生の入力を Python と TS で正規化し、結果が一致することを確かめる（uv が無ければ飛ばす）
+ * - 規則の表（normalize-cases.json）を Go と同じように読む（Go 側は `contractshape` の `TestNormalizeEveryCaseInTheTable`）。同じ表の全件が両方の正規化で通ることで、2 つの正規化を揃える。表に無い形の差は見つからないので、形の規則を足すときは表に件を足す
  * - 比べるのは、`used_by` に `chrome` を持つ要求だけ（`MockGitLab` が 200/201 で答えるもの。見本由来の応答は比べない）
  * - 変異テスト: 模擬の応答を 1 か所変えると、どのキーがどう違うかが出て落ちる
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 
-import { REPO } from "./helpers/ccnavi.js";
 import { MockGitLab } from "./helpers/mock-gitlab.js";
 import { TOKEN, blobSha } from "./helpers/mock-github.js";
 import {
@@ -100,34 +98,6 @@ test("CX-T386 契約: 規則の表（normalize-cases.json）の全件が、期�
   const cases = loadData("normalize-cases.json") as { name: string; input: unknown; expect: Shape }[];
   assert.ok(cases.length > 0);
   for (const c of cases) assert.deepEqual(normalize(c.input), c.expect, c.name);
-});
-
-const uv = spawnSync("uv", ["--version"], { stdio: "ignore" }).status === 0;
-test("CX-T387 契約: 同じ生の入力を Python と TS で正規化して一致する", { skip: uv ? false : "uv が無いので飛ばす（Python と突き合わせていない）" }, () => {
-  const answers = send();
-  const input = JSON.stringify(Object.fromEntries(Object.entries(answers).map(([n, [, body]]) => [n, body])));
-  const script = [
-    "import json, sys",
-    "from tests.contract import fakeside, shape",
-    "raw = {}",
-    "def tamper(name, body):",
-    "    raw[name] = body",
-    "    return body",
-    "fake = fakeside.run(fakeside.load_requests(), tamper)",
-    "mock = json.load(sys.stdin)",
-    "print(json.dumps({'mock': {n: shape.normalize(b) for n, b in mock.items()}, 'raw': raw, 'fake': {n: v['shape'] for n, v in fake.items()}}))",
-  ].join("\n");
-  const r = spawnSync("uv", ["run", "--project", REPO, "--quiet", "python", "-c", script], {
-    input,
-    cwd: REPO,
-    encoding: "utf8",
-    env: { ...process.env, PYTHONPATH: REPO, PYTHONUTF8: "1" },
-  });
-  assert.equal(r.status, 0, r.stderr);
-  const py = JSON.parse(r.stdout.trim().split("\n").pop() as string) as { mock: Record<string, Shape>; raw: Record<string, unknown>; fake: Record<string, Shape> };
-  assert.ok(Object.keys(py.raw).length > 0 && Object.keys(py.mock).length > 0);
-  for (const [name, body] of Object.entries(JSON.parse(input))) assert.deepEqual(normalize(body), py.mock[name], `MockGitLab ${name}`);
-  for (const [name, body] of Object.entries(py.raw)) assert.deepEqual(normalize(body), py.fake[name], `fakeside ${name}`);
 });
 
 test("CX-T388 契約: MockGitLab が内部の状態から答える応答は、本物の記録と reads の範囲で形が合う", () => {
