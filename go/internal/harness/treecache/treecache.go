@@ -19,9 +19,10 @@
 //   - 返す値は JSON に直して取っておく。写しからは、取っておいた JSON を新しく読んで返す（呼び手が書き換えても次に響かない）
 //   - 同じ鍵を同じパスへ戻すので、同じ鍵を使うテストどうしは並行に動けない。Build は鍵ごとにテストの終わりまで待たせる
 //     （t.Parallel のテストでも取り合わず、順に並ぶ）。t.Parallel() は Build より前に呼ぶ。親が持つ鍵を t.Run の子で
-//     使わない（どちらも lockWait 待って落ちる）
+//     使わない（落ちる。鍵は子の側で取る）。待ちの上限（lockWait）は、持ち主が替わるたびに数え直す（順番待ちの長さでは落ちない）
 //   - 鍵は最初に使った呼び出し点（file:line）を覚える。同じ鍵が別の呼び出し点から来たら落ちる（別の組み立てに鍵を
-//     コピペした間違いを拾う）。呼び出し点を共通の関数に包むなら、その関数が変わる引数を鍵に入れる
+//     コピペした間違いを拾う）。呼び出し点を共通の関数に包むなら、その関数が変わる引数を鍵に入れる。包みが呼び手の
+//     点で拾わせたいときは BuildAt に Site(1) を渡す
 //   - 戻すときは、いまの木と写しの違うファイルだけを消す・写す（木を丸ごと写し直さない）。違うファイルは写しの内容と
 //     時刻に戻る。前のテストが木に残したものは、写しと同じ中身へ戻る（テストどうしで状態を持ち越さない）
 //   - 写しはプロセスの終わりに消える（base.AtExit）
@@ -38,7 +39,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -71,9 +74,14 @@ type entry struct {
 	site  string     // 最初に使った呼び出し点
 	saved bool
 	work  string
-	snap  string
-	want  listing
-	value []byte
+	// owner は鍵を取っているテストの名前（取っていなければ空）。祖先のテストが持つ鍵を子で使う形を、待たずに落とすため。
+	ownerMu sync.Mutex
+	owner   string
+	// handovers は鍵が手放された回数。待つ側は、手放しが進んでいる間は詰まりとみなさない。
+	handovers atomic.Int64
+	snap      string
+	want      listing
+	value     []byte
 }
 
 var (
@@ -82,7 +90,7 @@ var (
 	entries = map[string]*entry{}
 )
 
-// lockWait は、別のテストが持つ鍵を待つ上限。超えたら詰まりとみなして落とす（永久に待たない）。
+// lockWait は、別のテストが持つ鍵を待つ上限（持ち主が替わるたびに数え直す）。超えたら詰まりとみなして落とす（永久に待たない）。
 var lockWait = 30 * time.Second
 
 func entryFor(t testing.TB, key, site string) *entry {
@@ -109,20 +117,56 @@ func entryFor(t testing.TB, key, site string) *entry {
 	return e
 }
 
+func (e *entry) currentOwner() string {
+	e.ownerMu.Lock()
+	defer e.ownerMu.Unlock()
+	return e.owner
+}
+
+func (e *entry) setOwner(name string) {
+	e.ownerMu.Lock()
+	defer e.ownerMu.Unlock()
+	e.owner = name
+}
+
 // Build は鍵の木を dir に用意し、手順の返した値（写しからは JSON で復元した値）と一緒に返す。1 度目は build を走らせて
 // 写しを取り、2 度目からは dir を写しの中身へ戻す。
 func Build[T any](t testing.TB, key string, build func(dir string) T) (string, T) {
 	t.Helper()
-	_, file, line, _ := runtime.Caller(1)
-	e := entryFor(t, key, fmt.Sprintf("%s:%d", file, line))
-	deadline := time.Now().Add(lockWait)
+	return BuildAt(t, key, Site(1), build)
+}
+
+// Site は呼び出し点（file:line）。skip は呼び出し元から数えて何段上か（0 なら Site を呼んだ行、1 ならその呼び手の行）。
+// Build の外に包みの関数を置く側が、包みの呼び手を site に渡すのに使う。
+func Site(skip int) string {
+	_, file, line, _ := runtime.Caller(skip + 1)
+	return fmt.Sprintf("%s:%d", file, line)
+}
+
+// BuildAt は Build の本体で、呼び出し点を呼び手が決める。同じ鍵が別の site から来たら落ちる。
+func BuildAt[T any](t testing.TB, key, site string, build func(dir string) T) (string, T) {
+	t.Helper()
+	e := entryFor(t, key, site)
+	if owner := e.currentOwner(); owner != "" && strings.HasPrefix(t.Name(), owner+"/") {
+		t.Fatalf("treecache: 親のテスト %s が持つ鍵 %q を子 %s で使えない。鍵は t.Run の子の側で取る", owner, key, t.Name())
+	}
+	deadline, seen := time.Now().Add(lockWait), e.handovers.Load()
 	for !e.mu.TryLock() {
+		if now := e.handovers.Load(); now != seen {
+			// 持ち主が替わっている（順番待ちが進んでいる）。待ちの長さは鍵を使うテストの数で決まるので、詰まりの上限は進みが止まってから数える。
+			deadline, seen = time.Now().Add(lockWait), now
+		}
 		if time.Now().After(deadline) {
 			t.Fatalf("treecache: 鍵 %q を使う別のテストが %v 終わらない。t.Parallel() より前に Build していないか、親テストが同じ鍵を持ったまま t.Run の中で Build していないかを見る", key, lockWait)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Cleanup(e.mu.Unlock)
+	e.setOwner(t.Name())
+	t.Cleanup(func() {
+		e.setOwner("")
+		e.handovers.Add(1)
+		e.mu.Unlock()
+	})
 
 	var zero T
 	if e.saved {

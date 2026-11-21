@@ -46,27 +46,59 @@ func TestFamilyApprovesAndStartsTheChildren(t *testing.T) {
 	}
 }
 
-// Cached は同じ鍵なら、前のテストが木に残したものを写しへ戻して返す（同じパスで）。
+// Cached は同じ鍵なら、前のテストが木に残したものを写しへ戻して返す（同じパスで）。子の名前に依存しない。
 func TestCachedRestoresTheTreeToTheSavedCopy(t *testing.T) {
-	var first string
-	for i := range 2 {
-		t.Run("use", func(t *testing.T) {
-			tr := Cached(t, "kit-test-restore", Options{}, func(tr *Tree) {
-				Write(tr.T, filepath.Join(tr.Root, "built.txt"), "built\n")
+	for _, names := range [][2]string{{"use", "use"}, {"first", "second"}} {
+		key := "kit-test-restore-" + names[0] + names[1]
+		var first string
+		for i, name := range names {
+			t.Run(name, func(t *testing.T) {
+				tr := Cached(t, key, Options{}, func(tr *Tree) {
+					Write(tr.T, filepath.Join(tr.Root, "built.txt"), "built\n")
+				})
+				if i == 0 {
+					first = tr.Root
+					Write(t, filepath.Join(tr.Root, "junk.txt"), "x\n")
+					return
+				}
+				if tr.Root != first {
+					t.Errorf("パスが変わった: %s → %s", first, tr.Root)
+				}
+				if Exists(filepath.Join(tr.Root, "junk.txt")) {
+					t.Error("前のテストの残りが戻らない")
+				}
+				if !Exists(filepath.Join(tr.Root, "built.txt")) {
+					t.Error("手順の結果が戻らない")
+				}
 			})
-			if i == 0 {
-				first = tr.Root
-				Write(t, filepath.Join(tr.Root, "junk.txt"), "x\n")
-				return
-			}
-			if tr.Root != first {
-				t.Errorf("パスが変わった: %s → %s", first, tr.Root)
-			}
-			if Exists(filepath.Join(tr.Root, "junk.txt")) {
-				t.Error("前のテストの残りが戻らない")
-			}
-			if !Exists(filepath.Join(tr.Root, "built.txt")) {
-				t.Error("手順の結果が戻らない")
+		}
+	}
+}
+
+// 子の間に、別の（並行の）親テストが同じ鍵を使っても詰まらずに通る。
+func TestCachedKeyIsSharedWithAnotherParallelTest(t *testing.T) {
+	use := func(t *testing.T) *Tree {
+		return Cached(t, "kit-test-shared", Options{}, func(tr *Tree) {
+			Write(tr.T, filepath.Join(tr.Root, "built.txt"), "built\n")
+		})
+	}
+	t.Run("group", func(t *testing.T) {
+		t.Run("a", func(t *testing.T) { use(t) })
+		t.Run("other", func(t *testing.T) {
+			t.Parallel()
+			use(t)
+		})
+		t.Run("b", func(t *testing.T) { use(t) })
+	})
+}
+
+// 同じ鍵でも Options が違えば別の木になる（先着の木に引きずられない）。
+func TestCachedKeyIncludesTheOptions(t *testing.T) {
+	for _, tc := range []string{"a: 1\n", "", "b: 2\n"} {
+		t.Run("phases", func(t *testing.T) {
+			tr := Cached(t, "kit-test-options", Options{Phases: tc}, func(tr *Tree) {})
+			if tr.Phases != tc {
+				t.Errorf("Phases = %q, want %q", tr.Phases, tc)
 			}
 		})
 	}

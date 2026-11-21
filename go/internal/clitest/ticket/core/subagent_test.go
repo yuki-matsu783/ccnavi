@@ -178,3 +178,17 @@ func TestOutcomeOKIsRecordedAndSaysNothing(t *testing.T) {
 		ticketkit.HookOpts{Extra: map[string]any{"tool_response": map[string]any{"agentId": "sub-o"}}})
 	ticketkit.Lacks(t, ticketkit.Reason(t, done), "SUBAGENT")
 }
+
+// 兄弟のワークツリーが消えていても、親のツリーのサブエージェントの終わりは ok と記録される（未確認にならない）。
+func TestAnUnreadableSiblingWorktreeDoesNotMakeAParentTreeAgentUnchecked(t *testing.T) {
+	t.Parallel()
+	tr := ticketkit.FamilyTree(t, ticketkit.FamilyOpts{})
+	if err := os.RemoveAll(tr.ChildTree("i0001-01-02")); err != nil {
+		t.Fatal(err)
+	}
+	ticketkit.OK(t, tr.Hook("SubagentStop", "", tr.ParentTree, nil, ticketkit.HookOpts{AgentID: "sub-p"}))
+	outcome := ticketkit.ReadJSON(t, filepath.Join(tr.State, "subagent-s1-sub-p.outcome"))
+	if outcome["outcome"] != "ok" {
+		t.Errorf("outcome = %v", outcome)
+	}
+}

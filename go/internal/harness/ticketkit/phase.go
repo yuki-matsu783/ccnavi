@@ -8,7 +8,7 @@ import (
 )
 
 // PhaseFamily は、フェーズ定義の見本（samples.Phases）を持つ木（Options{Phases: samples.Phases}）で、親を提案して承認する。
-// plan の 1 番目の子もまとめて承認する。親の本文は samples.ParentText（plan が使う定義のコピーを持つ）。
+// 承認するのは親だけ（子は RunChild が提案・承認する）。親の本文は samples.ParentText（plan が使う定義のコピーを持つ）。
 func (tr *Tree) PhaseFamily(plan []samples.Step) {
 	tr.T.Helper()
 	tr.Propose(ParentName, samples.ParentText(ParentName, plan, samples.ParentOpts{Copy: tr.Phases}), "")

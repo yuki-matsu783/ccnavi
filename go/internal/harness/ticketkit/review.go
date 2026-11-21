@@ -63,7 +63,7 @@ func (f Fixture) SetReviews(reviews ...Review) {
 	f.Update(func(d map[string]any) { d["reviews"] = toAny(f.T, reviews) })
 }
 
-// Comments は投稿されたコメントの数。
+// Comments は投稿されたコメントの一覧。
 func (f Fixture) Comments() []map[string]any {
 	f.T.Helper()
 	list, _ := f.Data()["comments"].([]any)
@@ -141,11 +141,19 @@ func (tr *Tree) RequestPhase(f Fixture, phase string) run.Result {
 		return prepared
 	}
 	// 出力は依頼の本文のパス 1 行だけ。
-	text := Read(tr.T, Lines(prepared.Stdout)[0])
+	out := Lines(prepared.Stdout)
+	if len(out) == 0 {
+		tr.T.Fatalf("review prepare の出力が空（依頼の本文のパスが 1 行ほしい）:\n%s", prepared.Stderr)
+	}
+	text := Read(tr.T, out[0])
 	data := f.Data()
 	mr, _ := data["mr"].(map[string]any)
 	posted, _ := data["comments"].([]any)
-	url := mr["url"].(string) + "#note-" + strconv.Itoa(len(posted)+1)
+	mrURL, ok := mr["url"].(string)
+	if !ok {
+		tr.T.Fatalf("結果ファイルの mr.url が文字列でない: %v", mr["url"])
+	}
+	url := mrURL + "#note-" + strconv.Itoa(len(posted)+1)
 	f.Update(func(d map[string]any) {
 		d["comments"] = append(posted, map[string]any{"body": text, "url": url, "created_at": "2026-01-01T00:00:00Z"})
 	})

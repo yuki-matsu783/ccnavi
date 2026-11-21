@@ -3,7 +3,6 @@ package ticketkit
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,11 +85,13 @@ func initTree(t testing.TB, root string, o Options) *Tree {
 }
 
 // Cached は、組む手順（build）の結果を鍵ごとに取っておき、2 度目からは写しへ戻した木を返す（プロセスを起こさない）。
-// 木の根は鍵ごとの固定のパス。同じ鍵を使うテストは順に並ぶ（t.Parallel() は Cached より前に呼ぶ。決まりは treecache の doc）。
-// 鍵は組み方を言い、手順が引数で変わるなら引数を鍵に入れる。
+// 木の根は鍵と Options ごとの固定のパス。同じ鍵・Options を使うテストは順に並ぶ（決まりは treecache の doc）。
+// t.Parallel() は Cached より前に呼ぶ。親のテストが持つ鍵を t.Run の子で使わない（落ちる）。
+// 鍵は組み方を言う。Options は自動で鍵に入るので、build が引数で変わるときだけ、その引数を鍵に入れる。
+// 同じ鍵を別の組み立てに使うと、Cached の呼び手の行が違うので落ちる。
 func Cached(t testing.TB, key string, o Options, build func(tr *Tree)) *Tree {
 	t.Helper()
-	dir, _ := treecache.Build(t, key+shardOf(t), func(dir string) struct{} {
+	dir, _ := treecache.BuildAt(t, fmt.Sprintf("%s %#v", key, o), treecache.Site(1), func(dir string) struct{} {
 		tr := initTree(t, dir, o)
 		build(tr)
 		return struct{}{}
@@ -98,27 +99,16 @@ func Cached(t testing.TB, key string, o Options, build func(tr *Tree)) *Tree {
 	return attach(t, dir, o)
 }
 
-// shards は同じ組み方の木の写しを何組持つか。同じ鍵を使うテストは順に並ぶので、写しを分けて並行に回す
-// （1 組だと、鍵を使うテスト全部の時間が足し算になり、鍵を待つ上限（treecache の lockWait）も超えうる）。
-const shards = 4
-
-// shardOf はテスト名から決める写しの組の印（同じテストはいつも同じ組を使う）。
-func shardOf(t testing.TB) string {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(t.Name()))
-	return fmt.Sprintf("#%d", h.Sum32()%shards)
-}
-
 // FamilyTree は Family まで組んだ木（Cached）。
 func FamilyTree(t testing.TB, o FamilyOpts) *Tree {
 	t.Helper()
-	return Cached(t, fmt.Sprintf("family %+v", o), Options{}, func(tr *Tree) { tr.Family(o) })
+	return Cached(t, fmt.Sprintf("family %#v", o), Options{}, func(tr *Tree) { tr.Family(o) })
 }
 
 // ClosedPhaseTree は Family のフェーズ 1 を閉じるまで組んだ木（Cached）。
 func ClosedPhaseTree(t testing.TB, o FamilyOpts) *Tree {
 	t.Helper()
-	return Cached(t, fmt.Sprintf("closed-phase %+v", o), Options{}, func(tr *Tree) { tr.Family(o); tr.ClosePhase() })
+	return Cached(t, fmt.Sprintf("closed-phase %#v", o), Options{}, func(tr *Tree) { tr.Family(o); tr.ClosePhase() })
 }
 
 // ClosedTree は Family のフェーズ 1 を閉じ、origin と合流・push した親のブランチ（と結果ファイル）まで組んだ木（Cached）。
@@ -269,6 +259,9 @@ func (tr *Tree) Spawn(cwd, description string) string {
 func (tr *Tree) LastRules() []string {
 	tr.T.Helper()
 	lines := Lines(Read(tr.T, filepath.Join(tr.Root, "logs", "decisions.jsonl")))
+	if len(lines) == 0 {
+		tr.T.Fatal("判定の記録（logs/decisions.jsonl）が空")
+	}
 	var last struct {
 		Rules []string `json:"rules"`
 	}
