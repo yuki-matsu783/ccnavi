@@ -203,7 +203,7 @@ func baseTemplate(t testing.TB, ws string) {
 		Write(t, filepath.Join(ws, filepath.FromSlash(rel)), "keep\n")
 	}
 	WriteRules(t, ws, OwnRules)
-	WritePhases(t, ws, ownPhasesText)
+	WritePhases(t, ws, OwnPhasesText)
 	Write(t, base.CommonPath(ws, "rules"), Body(CommonRules))
 	Write(t, base.CommonPath(ws, "risk"), CommonRiskText)
 	Git(t, ws, "add", "-A")
@@ -255,7 +255,11 @@ type WS struct {
 	Root, Projects, Lib, App string
 	// 共通レイヤーの 3 本
 	Rules, Phases, Risk string
-	log                 string
+	Log                 string
+	// Env は子の環境に足す分（run.Opts.Env）。ワークスペースの写しごとに持つ。
+	Env map[string]string
+	// Session は hook の session_id。空なら s1。
+	Session string
 }
 
 func NewWS(t testing.TB, kind string) *WS {
@@ -270,7 +274,7 @@ func NewWS(t testing.TB, kind string) *WS {
 		T: t, Root: root, Projects: projects,
 		Lib: filepath.Join(projects, "lib"), App: filepath.Join(projects, "app"),
 		Rules: base.CommonPath(root, "rules"), Phases: base.CommonPath(root, "phases"), Risk: base.CommonPath(root, "risk"),
-		log: filepath.Join(root, "logs", "decisions.jsonl"),
+		Log: filepath.Join(root, "logs", "decisions.jsonl"),
 	}
 }
 
@@ -368,16 +372,16 @@ func (w *WS) ApprovedCopy(name string) string { return w.ApprovedPath("doing", n
 
 // ---- 起動
 
-// exec は実行ファイルを 1 回起動する。レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本（--rules / --phases / --risk）も
+// Exec は実行ファイルを 1 回起動する。レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本（--rules / --phases / --risk）も
 // レイヤーを探す先の 2 本（--projects / --project-home）も、診断（--lint / --test / --explain）でだけ有効で、
 // hook の判定とチケットのサブコマンドでは無視する。差し替えたいテストは w.rules / w.phases / w.risk に書く。
-func (w *WS) exec(guard, input string, args ...string) run.Result {
+func (w *WS) Exec(guard, input string, args ...string) run.Result {
 	w.T.Helper()
 	prefix := []string{"--root", w.Root, "--guard-core-files", guard, "--restore-if-deny", "disable", "--guard-ticket-approval", "disable"}
-	return run.Ccnavi(w.T, samples.Place(prefix, args), run.Opts{Input: input, Dir: base.Root()})
+	return run.Ccnavi(w.T, samples.Place(prefix, args), run.Opts{Input: input, Dir: base.Root(), Env: w.Env})
 }
 
-func (w *WS) Ccnavi(args ...string) run.Result { return w.exec("disable", "", args...) }
+func (w *WS) Ccnavi(args ...string) run.Result { return w.Exec("disable", "", args...) }
 
 // hookAs は hook の payload を 1 件渡す。
 func (w *WS) HookAs(event, guard, tool, cwd string, input Obj) run.Result {
@@ -385,8 +389,12 @@ func (w *WS) HookAs(event, guard, tool, cwd string, input Obj) run.Result {
 	if input == nil {
 		input = Obj{}
 	}
-	payload := Body(Obj{"hook_event_name": event, "tool_name": tool, "cwd": cwd, "session_id": "s1", "tool_input": input})
-	return w.exec(guard, payload, "--mode", "enable")
+	session := w.Session
+	if session == "" {
+		session = "s1"
+	}
+	payload := Body(Obj{"hook_event_name": event, "tool_name": tool, "cwd": cwd, "session_id": session, "tool_input": input})
+	return w.Exec(guard, payload, "--mode", "enable")
 }
 
 // hook は設定ファイルの保護を切った PreToolUse。
@@ -410,7 +418,7 @@ func (w *WS) Post(tool, cwd string, input Obj) run.Result {
 // approve は承認して、承認済みチケットを各ワークツリーにコミットする（本番は write-and-push が行う）。
 func (w *WS) Approve() run.Result {
 	w.T.Helper()
-	done := w.exec("disable", "y\n", "user", "agree")
+	done := w.Exec("disable", "y\n", "user", "agree")
 	dir := filepath.Join(w.Root, ".claude", "worktrees")
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
@@ -518,16 +526,16 @@ func (w *WS) Reason(r run.Result) string {
 	return out.Context
 }
 
-// record は決定ログの 1 件。
-type record map[string]any
+// Record は決定ログの 1 件。
+type Record map[string]any
 
-func (r record) Str(key string) string {
+func (r Record) Str(key string) string {
 	s, _ := r[key].(string)
 	return s
 }
 
 // names は記録の rules の記録名（`<相対パス>:<id>`）。
-func (r record) Names() []string {
+func (r Record) Names() []string {
 	var out []string
 	items, _ := r["rules"].([]any)
 	for _, v := range items {
@@ -537,7 +545,7 @@ func (r record) Names() []string {
 }
 
 // ids は記録の rules を、書いた表記（レイヤーの前置きつき）にしたもの。
-func (r record) Ids() []string {
+func (r Record) Ids() []string {
 	var out []string
 	for _, n := range r.Names() {
 		out = append(out, layerID(n))
@@ -547,7 +555,7 @@ func (r record) Ids() []string {
 
 // hits は記録の rules のうち、レイヤーのルール。組み込みの deny（`builtin:` で始まる id。共通レイヤーと config の有無によらず
 // 常にヒットする）は数えない。
-func (r record) Hits() []string {
+func (r Record) Hits() []string {
 	var out []string
 	for _, n := range r.Names() {
 		if !strings.HasPrefix(n, "builtin:") {
@@ -557,10 +565,10 @@ func (r record) Hits() []string {
 	return out
 }
 
-func (w *WS) LastRecord() record {
+func (w *WS) LastRecord() Record {
 	w.T.Helper()
 	var lines []string
-	for _, line := range strings.Split(Read(w.T, w.log), "\n") {
+	for _, line := range strings.Split(Read(w.T, w.Log), "\n") {
 		if strings.TrimSpace(line) != "" {
 			lines = append(lines, line)
 		}
@@ -568,7 +576,7 @@ func (w *WS) LastRecord() record {
 	if len(lines) == 0 {
 		w.T.Fatal("決定ログが空")
 	}
-	var rec record
+	var rec Record
 	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &rec); err != nil {
 		w.T.Fatal(err)
 	}
@@ -770,7 +778,7 @@ func (w *WS) judgeMany(commands []string, flags ...string) []judged {
 	}
 	// 期待のタイプは判定に効かない。JSON は YAML としても読める。
 	path := Write(w.T, filepath.Join(base.TempDir(w.T), "expectations.yml"), Body(Obj{"ask": asks}))
-	r := w.exec("enable", "", append(slices.Clone(flags), "--test-expectations", path, "--json")...)
+	r := w.Exec("enable", "", append(slices.Clone(flags), "--test-expectations", path, "--json")...)
 	w.MustOK(r, "--test-expectations")
 	var out struct {
 		Expectations []struct {

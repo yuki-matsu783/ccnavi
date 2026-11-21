@@ -110,7 +110,7 @@ phases:
     scope: ["wip/design/*"]
 `
 
-const ownPhasesText = `version: 1
+const OwnPhasesText = `version: 1
 phases:
   docs:
     kind: work
