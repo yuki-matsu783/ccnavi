@@ -126,7 +126,7 @@ func TestTheDefaultsStopShellWritesInAnySpelling(t *testing.T) {
 	t.Parallel()
 	root, _ := brokenRoot(t)
 	for _, command := range []string{
-		"echo x >> .claude/hooks/lint-py.sh",
+		"echo x >> .claude/hooks/lint-go.sh",
 		"sed -i s/deny/allow/ .ccnavi/config/common/rules.yml",
 		"cp /tmp/x .ccnavi/scripts/ccnavi-git.sh",
 		"echo {} > .claude/settings.json",
@@ -134,7 +134,7 @@ func TestTheDefaultsStopShellWritesInAnySpelling(t *testing.T) {
 		// `cd` で入ってから書く形（issue #61）。行き先のパスから場所の名前が消えるので、移った先から見たパスにも適用しないと通る。
 		"cd .ccnavi/config/common && echo x > rules.yml",
 		"cd .claude && echo x > settings.json",
-		"cd .claude/hooks && echo x > lint-py.sh",
+		"cd .claude/hooks && echo x > lint-go.sh",
 		"cd .claude && rm -rf hooks",
 	} {
 		t.Run(command, func(t *testing.T) {

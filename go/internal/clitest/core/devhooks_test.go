@@ -112,7 +112,7 @@ func (e *devHookEnv) goTree(name string) string {
 func TestGoTestHook(t *testing.T) {
 	t.Parallel()
 	record := func(e *devHookEnv, session string, trees ...string) {
-		writeFile(t, filepath.Dir(e.session("x")), session+".go-trees", strings.Join(trees, "\n")+"\n")
+		writeFile(e.t, filepath.Dir(e.session("x")), session+".go-trees", strings.Join(trees, "\n")+"\n")
 	}
 	t.Run("記録した木ごとに 1 回、go/ で書式・vet・テストを回す", func(t *testing.T) {
 		t.Parallel()
@@ -233,7 +233,7 @@ func TestLintGoHook(t *testing.T) {
 		if r := edit(e, filepath.Join(tree, "go", "x", "y.go"), nil); r.Code != 0 {
 			t.Fatalf("code = %d: %s", r.Code, r.Stderr)
 		}
-		if got := e.lines(e.session("s1.go-trees")); len(got) != 1 || got[0] != tree {
+		if got := e.lines(e.session("s1.go-trees")); len(got) != 1 || !run.SamePath(got[0], tree) {
 			t.Errorf("go-trees = %v", got)
 		}
 	})
@@ -246,19 +246,19 @@ func TestLintGoHook(t *testing.T) {
 		if r.Code != 2 {
 			t.Errorf("code = %d", r.Code)
 		}
-		mustContain(t, "stderr", r.Stderr, "gofmt -w", file)
+		mustContain(t, "stderr", r.Stderr, "gofmt -w", filepath.ToSlash(file))
 	})
-	t.Run(".ccnavi と docs の編集は書き残すだけで整形は見ない。それ以外と go.mod の無い所は何もしない", func(t *testing.T) {
+	t.Run(".ccnavi・docs・wip・.claude・scripts の編集は書き残すだけで整形は見ない。それ以外と go.mod の無い所は何もしない", func(t *testing.T) {
 		t.Parallel()
 		e := newDevHookEnv(t)
 		e.goStubs()
 		tree := e.goTree("a")
-		for _, rel := range []string{".ccnavi/docs/x.md", "docs/y.md"} {
+		for _, rel := range []string{".ccnavi/docs/x.md", "docs/y.md", "wip/handoff/x", "scripts/y.sh", ".claude/hooks/z.sh"} {
 			if r := edit(e, filepath.Join(tree, filepath.FromSlash(rel)), map[string]string{"STUB_GOFMT": "bad"}); r.Code != 0 {
 				t.Errorf("%s: code = %d", rel, r.Code)
 			}
 		}
-		if got := e.lines(e.session("s1.go-trees")); len(got) != 2 {
+		if got := e.lines(e.session("s1.go-trees")); len(got) != 5 {
 			t.Errorf("go-trees = %v", got)
 		}
 		before := len(e.lines(e.session("s1.go-trees")))

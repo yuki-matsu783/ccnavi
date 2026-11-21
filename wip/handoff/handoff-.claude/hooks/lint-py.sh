@@ -43,11 +43,11 @@ while [ ! -f "$tree/go/go.mod" ]; do
 	tree=$parent
 done
 
-# go/・.ccnavi/・docs のどれかを触ったら、そのツリーを書き残す。ターンの終わりに test-go.sh が、
+# go/・.ccnavi/・docs/・wip/・.claude/・scripts/ のどれかを触ったら、そのツリーを書き残す。ターンの終わりに test-go.sh が、
 # ここに挙がったツリーだけをテストする。触っていないツリーを巻き込むと、他セッションの書きかけで
 # こちらが差し戻される
 case "${file#"$tree"/}" in
-go/* | .ccnavi/* | docs/*)
+go/* | .ccnavi/* | docs/* | wip/* | .claude/* | scripts/*)
 	mkdir -p "$main/logs/session"
 	printf '%s\n' "$tree" >>"$main/logs/session/$session.go-trees"
 	;;

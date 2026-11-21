@@ -3,8 +3,9 @@ package base
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
+
+	"ccnavi/internal/tickets/model/handoffnames"
 )
 
 // 保護対象（`rules.yml`・`.ccnavi/scripts/*`・CCNAVI.md）の「できあがりの姿」を引く道具（tests/draft.py の写し）。
@@ -15,20 +16,16 @@ import (
 
 // Final はリポジトリからの相対パス（`/` 区切り）のファイルの、できあがりの姿のパス。
 func Final(rel string) string {
-	parts := strings.Split(rel, "/")
-	draftParts := make([]string, len(parts))
-	for i, p := range parts {
-		// 下書きの置き場では .claude の階層を handoff-.claude に読み替えて置く（ccnavi-stage.sh）。
-		draftParts[i] = p
-		if strings.EqualFold(p, ".claude") {
-			draftParts[i] = "handoff-.claude"
-		}
+	// 下書きの置き場での読み替えは、ccnavi-handoff-names.txt の表（唯一の元）に従う。
+	table, err := handoffnames.Default()
+	if err != nil {
+		panic(err) // 埋め込みの写しは handoffnames のテストが確かめている。壊れたらテストの道具の誤り
 	}
-	draft := filepath.Join(append([]string{Root(), "wip", "handoff"}, draftParts...)...)
+	draft := filepath.Join(Root(), "wip", "handoff", filepath.FromSlash(table.ToDraft(rel)))
 	if info, err := os.Stat(draft); err == nil && !info.IsDir() {
 		return draft
 	}
-	return filepath.Join(append([]string{Root()}, parts...)...)
+	return filepath.Join(Root(), filepath.FromSlash(rel))
 }
 
 var (

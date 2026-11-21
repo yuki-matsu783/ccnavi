@@ -13,7 +13,7 @@ ccnavi のリポジトリ自身の開発に使う hook は `.claude/hooks/` に�
 
 | hook | 契機 | 役割 | `.claude/settings.json` |
 |---|---|---|---|
-| `lint-go.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | 編集した `.go` のファイルの整形（gofmt）と、`go/`・`.ccnavi/`・`docs/` を触った木の書き残し | 登録済み |
+| `lint-go.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | 編集した `.go` のファイルの整形（gofmt）と、`go/`・`.ccnavi/`・`docs/`・`wip/`・`.claude/`・`scripts/` を触った木の書き残し | 登録済み |
 | `check-adr.sh` | `PostToolUse`（`Write\|Edit\|MultiEdit\|NotebookEdit`） | ADR の番号の重なりと置き場の間違いを、書いた直後に止める | 登録済み |
 | `test-go.sh` | `Stop` | ターンの終わりに、触った木の Go の検査とテストを 1 回回す | 未登録 |
 | `mark-ext.sh` | `PostToolUse`（`Write\|Edit`） | 拡張のファイルを触ったことの書き残し | 未登録 |
@@ -26,7 +26,7 @@ hook の振る舞いは `go/internal/clitest/core/devhooks_test.go`（`check-adr
 
 `lint-go.sh` は、編集した `.go` のファイルを `gofmt -l` で見る。テストは走らせない。
 編集していないファイルの指摘は出ない。他のファイルを壊す変更（定義の削除で別ファイルの参照が壊れる等）はその場では出ず、ターンの終わりの `test-go.sh` が失敗すれば、そこで見つかる。
-あわせて、`go/`・`.ccnavi/`・`docs/` のどれかを触ったら、そのファイルから上へ辿って `go/go.mod` を持つ木（ワークツリーかリポジトリの根）を `logs/session/<セッション>.go-trees` に書き残す。ターンで触ったのが Go と文書の定義だけでも、試験が決まりを見張っているため。
+あわせて、`go/`・`.ccnavi/`・`docs/`・`wip/`・`.claude/`・`scripts/` のどれかを触ったら、そのファイルから上へ辿って `go/go.mod` を持つ木（ワークツリーかリポジトリの根）を `logs/session/<セッション>.go-trees` に書き残す。ターンで触ったのが Go と文書の定義だけでも、試験が決まりを見張っているため。
 
 `test-go.sh` は、ターンの終わりに 1 回だけ、書き残した木の `go/` で次を順に回す。
 

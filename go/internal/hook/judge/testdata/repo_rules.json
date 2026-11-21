@@ -68,7 +68,7 @@
  {
   "case": "守られた場所へ入ってから書く形は止まる",
   "tool": "Bash",
-  "subject": "cd .claude/hooks && echo x > lint-py.sh",
+  "subject": "cd .claude/hooks && echo x > lint-go.sh",
   "verdict": "deny",
   "rules": [
    "builtin:guard-setting-files"

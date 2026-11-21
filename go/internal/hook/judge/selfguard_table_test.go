@@ -93,7 +93,7 @@ func TestSelfGuardShellWrites(t *testing.T) {
 		"rm logs/decisions.jsonl", "rm -rf logs/state", "mv logs/state /tmp/x", "rm -rf logs/archive",
 		"cp /tmp/x.md logs/archive/self/done/i0001.md", "cp -r /tmp/archive logs/", "mv /tmp/x/archive logs/", "cp -t logs /tmp/archive",
 		"cd .ccnavi/config/common && echo x > rules.yml", "cd .ccnavi && echo x > common/rules.yml",
-		"cd .claude && echo x > settings.json", "cd .claude/hooks && echo x > lint-py.sh", "cd logs && rm decisions.jsonl")...)
+		"cd .claude && echo x > settings.json", "cd .claude/hooks && echo x > lint-go.sh", "cd logs && rm decisions.jsonl")...)
 	checkGuardRows(t, root, baseEnv, "default", rows)
 }
 

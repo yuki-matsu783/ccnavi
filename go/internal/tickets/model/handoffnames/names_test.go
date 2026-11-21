@@ -11,7 +11,7 @@ import (
 // 見本は tests/handoff_names_samples.py と同じ（sh の試験も同じ見本を通る）。
 var samples = [][2]string{
 	{".claude/settings.json", "handoff-.claude/settings.json"},
-	{".claude/hooks/lint-py.sh", "handoff-.claude/hooks/lint-py.sh"},
+	{".claude/hooks/lint-go.sh", "handoff-.claude/hooks/lint-go.sh"},
 	{"projects/web/.claude/settings.json", "projects/web/handoff-.claude/settings.json"},
 	{"a/.claude/b/.claude/c.json", "a/handoff-.claude/b/handoff-.claude/c.json"},
 	{"日本語/.claude/x.md", "日本語/handoff-.claude/x.md"},
