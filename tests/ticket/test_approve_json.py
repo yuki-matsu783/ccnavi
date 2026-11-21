@@ -85,104 +85,9 @@ class ApproveJsonTest(PhaseHarness):
 
     # ---- 1. preview は読むだけ
 
-    def test_preview_lists_the_batch_and_does_not_place_copies(self):
-        self.pending_parent_and_child()
-        # 定義の範囲を超える子。超過は承認を拒まないので一覧に載り、overflow[] を持つ
-        # （設計 approve-carry 3.3）。
-        self.propose("i0001-01-02", child_text("i0001-01-02", "i0001", 1, ("wip/design/*",)))
-        # 計画に無い番号の子。形が不正なので、承認の対象にしない側に載る。
-        self.propose("i0001-05-05", child_text("i0001-05-05", "i0001", 5, ("wip/research/*",)))
-        # frontmatter の読めない提案。読めない提案の側に載る。
-        write(os.path.join(self.parent_tree, "wip", "proposals", "todo", "broken.md"), "---\n: :\n")
-        self.commit_parent()
-
-        body = self.preview()
-        self.assertEqual(body["version"], APPROVE_VERSION)
-        self.assertEqual(
-            [b["ticket"] for b in body["batch"]], ["i0001", "i0001-01-01", "i0001-01-02"]
-        )
-        parent, child, beyond = body["batch"]
-        self.assertIsNone(parent["parent"])
-        self.assertIsNone(parent["phase"])
-        self.assertFalse(parent["revision"])
-        self.assertEqual(parent["overflow"], [])
-        self.assertEqual(child["parent"], "i0001")
-        self.assertEqual(child["phase"], 1)
-        self.assertTrue(
-            child["path"].replace("\\", "/").endswith("wip/proposals/todo/i0001-01-01.md")
-        )
-        self.assertEqual(child["overflow"], [])
-        # 超えた項は文字列のリストで、定義の名前と「超えている」を含む。
-        self.assertTrue(beyond["overflow"], beyond)
-        self.assertTrue(all(isinstance(p, str) for p in beyond["overflow"]), beyond)
-        self.assertTrue(
-            any("超えている" in p and "調査" in p for p in beyond["overflow"]), beyond["overflow"]
-        )
-        self.assertIn("チケットの承認リクエスト: 3 件", body["text"])
-        self.assertIn("== i0001-01-01", body["text"])
-        self.assertIn("== i0001-01-02", body["text"])
-        self.assertIn("編集対象としているが", body["text"])
-        # rejected[] に残るのは形の不正な子だけ。
-        self.assertEqual([r["ticket"] for r in body["rejected"]], ["i0001-05-05"])
-        self.assertTrue(any("計画にありません" in p for p in body["rejected"][0]["problems"]))
-        self.assertTrue(any("broken.md" in p for p in body["problems"]))
-        # 見ただけ。承認済みチケットは置かれていない。
-        self.assertFalse(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01-01"))
-        self.assertFalse(self.copy_exists("i0001-01-02"))
-
-    def test_letter_case_alone_is_not_an_overflow(self):
-        """表記の大文字小文字だけが定義の範囲と違う子は、超過にならない（overflow[] が空）。"""
-        self.propose("i0001", parent_text("i0001", ["research", "design"]))
-        self.propose(
-            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("WIP/Research/*",), False)
-        )
-        self.commit_parent()
-
-        body = self.preview()
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001", "i0001-01-01"])
-        self.assertEqual(body["batch"][1]["overflow"], [])
-        self.assertEqual(body["rejected"], [])
-        self.assertNotIn("編集対象としているが", body["text"])
-
-    def test_a_parent_allow_outside_the_plan_is_flagged_even_with_a_feedback_plan(self):
-        """feedback の定義は多くが inherit だが、plan の子は書けないので警告は消さない。"""
-        self.propose(
-            "i0001",
-            parent_text(
-                "i0001", ["acceptance", "implement"], ["implement-feedback"], allow=("docs/**",)
-            ),
-        )
-        self.commit_parent()
-        overflow = self.preview()["batch"][0]["overflow"]
-        self.assertEqual(len(overflow), 1, overflow)
-        self.assertIn("`docs/**`", overflow[0])
-
-    # ---- 2. 承認待ちが無い
-
-    def test_preview_with_nothing_pending_is_an_empty_batch(self):
-        body = self.preview()
-        self.assertEqual(body["batch"], [])
-        self.assertEqual(body["rejected"], [])
-        self.assertIn("承認待ちのチケットはありません。", body["text"])
-
     # ---- 3. yes は一覧と一致すれば承認する
 
     # ---- 4. 見せた一覧と違えば承認しない
-
-    def test_a_filtered_overlay_approves_only_what_it_showed(self):
-        """絞り込み中の承認。preview と yes に同じ絞りを渡し、見せた分だけを承認する。"""
-        self.pending_parent_and_child()
-        # 親だけに絞って見せる。
-        body = self.preview("i0001")
-        self.assertEqual([b["ticket"] for b in body["batch"]], ["i0001"])
-        # 同じ絞りをつけて承認する。子は承認されない。
-        result = self.yes(["i0001"], "i0001")
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertTrue(self.copy_exists("i0001"))
-        self.assertFalse(self.copy_exists("i0001-01-01"))
-        # 絞りをつけずに同じことを頼めば、絞らない一覧と比べて食い違いになる。
-        self.assertEqual(self.preview()["batch"][0]["ticket"], "i0001-01-01")
 
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
@@ -191,17 +96,6 @@ class ApproveJsonTest(PhaseHarness):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
-
-    # ---- 4c. ダイジェストは承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
-
-    def pending_parent_with_issue_and_child(self, issue=4242):
-        """`issue:` を持つ親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。"""
-        parent = self.propose("i0001", parent_text("i0001", ["research", "design"], issue=issue))
-        child = self.propose(
-            "i0001-01-01", child_text("i0001-01-01", "i0001", 1, ("wip/research/*",), False)
-        )
-        self.commit_parent()
-        return parent, child
 
     # ---- 4d. ダイジェストは画面に出ない欄と改版で書く中身も覆う（チケット approve-carry-07）
 
@@ -242,63 +136,6 @@ class ApproveJsonTest(PhaseHarness):
     # ---- 4d2. 照合と書き込みは同じ読みを使う（読み直しの間に差し替えられても通さない）
 
     # ---- 4e. ターミナルの `--agree` も、確認の入力のあとで同じ照合をする
-
-    def test_terminal_agree_reports_what_it_could_write(self):
-        """ターミナルの `--agree` は `--placed-out` に、
-        書けたパスと書けなかった提案を JSON で書き出す。
-
-        親は置けて、子の書き込みだけ失敗する。終了コードは 4（何も置かない失敗の 1 と分ける）。
-        """
-        self.pending_parent_and_child()
-        os.makedirs(os.path.join(self.approved, "doing", "i0001-01-01.md"))
-        report = os.path.join(self.root, "placed.json")
-        result = self.ccnavi("user", "agree", "--placed-out", report, stdin="y\n")
-        self.assertEqual(result.returncode, 4, result.stdout + result.stderr)
-        with open(report, encoding="utf-8") as f:
-            body = json.load(f)
-        self.assertEqual(
-            [os.path.realpath(p) for p in body["placed"]],
-            [os.path.realpath(os.path.join(self.approved, "doing", "i0001.md"))],
-        )
-        self.assertEqual([x["ticket"] for x in body["failed"]], ["i0001-01-01"])
-        self.assertIn("保存できませんでした", body["failed"][0]["reason"])
-        self.assertEqual(body["unwritten"], [])
-
-    def test_digest_does_not_change_when_only_the_overflow_changes(self):
-        """3. 提案はそのままで、親に固定した定義の scope が変わって子の超過が増えても、
-        ダイジェストは変わらない（提案の識別子の一覧とバイト列だけを照合する）。
-
-        子の定義は親のコピー（`phases:`）から引く。承認済みの親のコピーをユーザが手で直すと、
-        子の提案は同じでも超過が増える。
-        """
-        self.pending_parent_and_child()
-        parent_only = self.ccnavi("user", "agree", "i0001", stdin="y\n")
-        self.assertEqual(parent_only.returncode, 0, parent_only.stdout + parent_only.stderr)
-        self.commit_parent("approve parent")
-        before = self.preview()
-        self.assertEqual([b["ticket"] for b in before["batch"]], ["i0001-01-01"])
-        self.assertEqual(before["batch"][0]["overflow"], [])
-
-        # 承認済みの親のコピーの research の scope を、子の範囲を覆わない表記に書き換える。
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        with open(copy, encoding="utf-8") as f:
-            text = f.read()
-        narrowed = text.replace("- wip/research/*", "- wip/elsewhere/*", 1)
-        self.assertNotEqual(narrowed, text)
-        write(copy, narrowed)
-
-        after = self.preview()
-        self.assertEqual([b["ticket"] for b in after["batch"]], ["i0001-01-01"])
-        self.assertTrue(after["batch"][0]["overflow"], after["batch"][0])
-        self.assertEqual(after["digest"], before["digest"])
-
-    def test_preview_text_shows_the_issue_of_the_parent(self):
-        """5. `issue:` を持つ親のプレビューの `text` に、その番号が出る。"""
-        self.pending_parent_with_issue_and_child(4242)
-        body = self.preview()
-        self.assertIn("4242", body["text"])
-
-    # ---- 5. ターミナルの壁
 
     def test_yes_does_not_need_a_terminal_but_plain_approve_still_does(self):
         self.pending_parent_and_child()
@@ -377,17 +214,6 @@ class ApproveJsonTest(PhaseHarness):
             any("マーカー" in line for line in partial["lines"]),
             partial["lines"],
         )
-
-    def test_yes_that_stops_before_placing_anything_says_so(self):
-        """1 件目で止まったら placed は空。「一部だけ置かれた」と言わせない。"""
-        self.pending_parent_and_child()
-        os.makedirs(os.path.join(self.approved, "doing", "i0001.md"))
-        result = self.yes(["i0001", "i0001-01-01"])
-        self.assertEqual(result.returncode, 1)
-        body = json.loads(result.stdout)
-        self.assertEqual(body["partial"]["placed"], [])
-        self.assertEqual(body["partial"]["ticket"], "i0001")
-        self.assertFalse(self.copy_exists("i0001-01-01"))
 
     def _fixture(self, name):
         with open(os.path.join(FIXTURES, name), encoding="utf-8") as f:

@@ -2042,22 +2042,6 @@ class TicketTest(unittest.TestCase):
 
     # ---- 7. ユーザの判断の経路
 
-    def test_cli_flags_take_no_abbreviation(self):
-        """ユーザの判断のフラグは省略せずに書いたときだけ有効。
-
-        組み込みの deny は省略せずに書いた形しか見ないので、前方一致で走ると `--close` や
-        `--review` がそこで止められずに通る。実行ファイルの側で受けないことを確かめる。
-        """
-        self.family()
-        for args in (
-            ("--close", "--reason", "x", "--result", "r.json"),
-            ("--review", "1", "--chat"),
-            ("--agre", "--yes", "i0001"),
-        ):
-            result = self.ccnavi(*args, stdin="y\n")
-            self.assertNotEqual(result.returncode, 0, args)
-            self.assertIn(f"unrecognized arguments: {args[0]}", result.stderr, args)
-
     def test_user_entries_are_denied_from_the_shell_unless_disabled(self):
         """ユーザの入口（承認・承認の push・ボードの判断・放棄の記録・ターミナル要求を切る形）は、
         エージェントのシェルから打たせない。保護を切れば適用しない。

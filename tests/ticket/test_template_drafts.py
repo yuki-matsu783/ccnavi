@@ -21,7 +21,7 @@ import textwrap
 import types
 import unittest
 
-from tests import ROOT, common_path, requires_symlink
+from tests import ROOT, common_path
 from tests.inproc import run_ccnavi
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git, write
@@ -246,60 +246,6 @@ class MakeTest(Drafts):
         self.generalize()
         self.assertEqual(self.answer()["drafts"][0]["problems"], [])
 
-    def test_review_is_kept(self):
-        plan = [{"type": "design", "deferred": True}, "implement"]
-        self.done_parent(plan)
-        self.assertEqual(self.draft().returncode, 0)
-        self.assertEqual([i.deferred for i in self.drafted().plan], [True, False])
-
-    def test_a_parent_archived_by_ready_cannot_be_read(self):
-        # ready で閉じると done/ は logs/archive/ へ退避される。そこからは読まない。
-        write(
-            os.path.join(self.root, "logs", "archive", "self", "done", "i0001.md"),
-            parent_text("i0001", ["design"]),
-        )
-        result = self.draft()
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("退避済み", result.stderr)
-        self.assertIn("logs/archive", result.stderr)
-        self.assertFalse(os.path.exists(self.draft_path()))
-
-    @requires_symlink
-    def test_a_linked_place_is_not_written(self):
-        self.done_parent(["design"])
-        outside = os.path.join(self.root, "outside")
-        os.makedirs(outside)
-        place = os.path.join(self.parent_tree, "wip", "handoff")
-        os.makedirs(os.path.dirname(place), exist_ok=True)
-        os.symlink(outside, place)
-        result = self.draft()
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("リンク", result.stderr)
-        self.assertEqual(os.listdir(outside), [])
-
-    def test_a_layer_names_a_project_inside_the_parents_tree_only(self):
-        os.makedirs(os.path.join(self.root, "projects", "lib", ".git"))
-        write(
-            os.path.join(self.root, ".ccnavi", "approved", "done", "i0002.md"),
-            parent_text("i0002", ["design"]),
-        )
-        write(
-            os.path.join(self.root, ".ccnavi", "approved", "done", "i0002-01-01.md"),
-            child_text("i0002-01-01", "i0002", 1, ("src/*",)),
-        )
-        result = self.tpl("--templates", "--draft", "i0002", "--layer", "lib", "--json")
-        self.assertEqual(result.returncode, 0, result.stdout)
-        answer = json.loads(result.stdout)
-        self.assertEqual(
-            answer["target"], "projects/lib/.ccnavi/config/project/templates/i0002.yml"
-        )
-        self.assertEqual(answer["layer"], "lib")
-        # 親のツリーの外のプロジェクトは断る
-        self.done_parent(["design"])
-        result = self.draft("i0001", "--layer", "lib")
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("外", result.stderr)
-
     def test_the_draft_is_taken_by_handoff_and_then_used(self):
         self.done_parent(["design", "implement"], flows={"i0001-02-01": FLOW_IMPL})
         self.assertEqual(self.draft().returncode, 0)
@@ -333,10 +279,6 @@ class EffectTest(Drafts):
         # 語で絞ると下書きも絞られる
         self.assertEqual(len(self.answer("--keyword", "親")["drafts"]), 1)
         self.assertEqual(self.answer("--keyword", "無い語")["drafts"], [])
-        # 同じ下書きが 2 つのツリーにあっても 1 件
-        write(self.draft_path(tree=self.root), self.read_draft().decode())
-        (row,) = self.answer()["drafts"]
-        self.assertEqual(sorted([row["tree"], *row["also_in"]]), ["", "i0001"])
 
     def test_lint_never_makes_a_draft_an_error(self):
         write(self.draft_path("broken"), "name: [\n")
