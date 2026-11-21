@@ -294,11 +294,14 @@ done
 #
 # `.ccnavi/approved/` は問わない。 第 1 周が見るのは「承認済みチケットを持つツリー」だが、
 # ここで欲しいのは「これから切るワークツリーの起点」で、いま何を持っているかとは別。
-repos="$root"
-for dir in "$root/$projects"/*; do
-	[ -e "$dir/.git" ] || continue
-	repos="$repos
-$dir"
+# 作業ツリーで origin があるものだけを入れる（3 つのループが同じ確かめを繰り返さない）。
+repos=""
+for dir in "$root" "$root/$projects"/*; do
+	[ "$dir" = "$root" ] || [ -e "$dir/.git" ] || continue
+	git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
+	git -C "$dir" remote get-url origin >/dev/null 2>&1 || continue
+	repos="${repos:+$repos
+}$dir"
 done
 
 # 実行ファイル。無ければ（入れ替え中など）fetch だけにする（先頭の説明）。
@@ -327,8 +330,6 @@ ccnavi_fetch_family() {
 ccnavi_fetch_plain() {
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
-		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
 		ccnavi_fetch_or_note "$repo" "" \
 			"$(basename "$repo"): リモートを取ってこられなかった。ローカルの版で判定する" || :
 	done
@@ -363,16 +364,12 @@ ccnavi_fetch_full() {
 	# 第 2 周は向け直した後の名前で進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
-		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
 		ccnavi_fetch_retarget "$repo"
 	done
 
 	# 第 2 周。リポジトリごとに、ワークツリーの起点になる統合先ブランチを進める。
 	printf '%s\n' "$repos" | while IFS= read -r repo; do
 		[ -n "$repo" ] || continue
-		git -C "$repo" rev-parse --is-inside-work-tree >/dev/null 2>&1 || continue
-		git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
 		ccnavi_fetch_ask base "$repo" "$scratch/seen" || continue
 		# 次の一手が fetch <統合先> のときだけ進める（`$( )` の中なので case は使わない）。
 		default="${ccnavi_fx_next#fetch }"

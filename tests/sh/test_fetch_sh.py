@@ -732,6 +732,23 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(1, len(calls), calls)
         self.assertTrue(calls[0].endswith(" fetch --quiet origin"), calls)
 
+    def test_without_the_executable_it_reports_an_unreachable_origin(self):
+        # projects/ のリポジトリも取りに行く。届かない origin は 1 行だけ言い、2 件目は黙る。
+        broken = os.path.join(self._tmp.name, "nowhere.git")
+        for name in ("p", "p2"):
+            project = os.path.join(self.ws, "projects", name)
+            self.repository(project)
+            git(project, "remote", "set-url", "origin", broken)
+        path, log = self.spy_on_ls_remote()
+        done = self.fetch(PATH=path, CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "nowhere"))
+        self.assertEqual(0, done.returncode, done.stderr)
+        self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
+        self.assertIn("p: リモートを取ってこられなかった", done.stdout)
+        self.assertNotIn("ws:", done.stdout)
+        calls = self.fetch_calls(log)
+        self.assertEqual(2, len(calls), calls)
+        self.assertTrue(all(c.endswith(" fetch --quiet origin") for c in calls), calls)
+
     def test_quiet_without_a_remote(self):
         git(self.ws, "remote", "remove", "origin")
         self.leave_main()
