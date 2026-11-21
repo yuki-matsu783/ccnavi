@@ -116,7 +116,7 @@ error がある間は配点もフェーズ定義も保存できない。
   本体のパッケージを動かすときは `entry/chrome` だけを直す。拡張は同じ版の本体と一緒に組むので、別の版の本体と拡張は組み合わさらない。
   互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
 - 互換の版の書き方: 実行ファイル側は `go/internal/entry/version/version.go` の行頭から始まる 1 行 `const Compat = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
-  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/core/test_version.py` が見る
+  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `go/internal/entry/version` の go test が見る
 
 ### 10.1 `--docs` の索引
 

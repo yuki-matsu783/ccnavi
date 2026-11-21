@@ -11,6 +11,8 @@ knowledge
 # Go の組み立ての出力（go/ で go build したもの）。
 /go/ccnavi
 /go/ccnavi.exe
+# CLI テストが go test に結果を保存させない目印（go/internal/harness/base が書く）。
+/go/.clitest-uncached
 
 # Python の中間物。
 __pycache__/

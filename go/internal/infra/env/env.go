@@ -3,6 +3,9 @@ package env
 // Prefix は ccnavi の変数の名前の頭。sh はワークスペースルートと実行ファイルをこの頭の変数から読む。
 const Prefix = "CCNAVI_"
 
+// ClaudePrefix は Claude Code の変数の名前の頭。テストの子の環境から外すのに使う。
+const ClaudePrefix = "CLAUDE_"
+
 // Claude Code が hook に渡す変数。
 const (
 	ClaudeProjectDir      = "CLAUDE_PROJECT_DIR"
@@ -44,6 +47,13 @@ const (
 	LearningNoticeCount  = "CCNAVI_LEARNING_NOTICE_COUNT"
 	LearningSources      = "CCNAVI_LEARNING_SOURCES"
 	ScratchpadWarnMB     = "CCNAVI_SCRATCHPAD_WARN_MB"
+)
+
+// テストの道具（harness/exe）が読む。組まずに使う実行ファイルのパス。
+const (
+	TestExe       = "CCNAVI_TEST_EXE"
+	TestChromeExe = "CCNAVI_TEST_CHROME_EXE"
+	TestStubExe   = "CCNAVI_TEST_STUB_EXE"
 )
 
 // Compat は sh（ccnavi-common.sh）が互換の版を宣言する変数。環境からは読まず、`--lint` が sh の中の代入を読む。
@@ -94,6 +104,12 @@ const (
 	GitWorkTree  = "GIT_WORK_TREE"
 	GitIndexFile = "GIT_INDEX_FILE"
 	GitCommonDir = "GIT_COMMON_DIR"
+	// 設定ファイル（~/.gitconfig と /etc/gitconfig）の置き場。テストが走った機械の設定を締め出すのに使う。
+	GitConfigGlobal   = "GIT_CONFIG_GLOBAL"
+	GitConfigSystem   = "GIT_CONFIG_SYSTEM"
+	GitConfigNoSystem = "GIT_CONFIG_NOSYSTEM"
+	// Msys2ArgConvExcl は Git for Windows の sh（MSYS）が、ネイティブの exe に渡す引数を Windows のパスに書き換えるのを止める接頭辞の並び。
+	Msys2ArgConvExcl = "MSYS2_ARG_CONV_EXCL"
 )
 
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所・端末の幅。
@@ -101,6 +117,8 @@ const (
 	GitHubToken = "GITHUB_TOKEN"
 	GitLabToken = "GITLAB_TOKEN"
 	Path        = "PATH"
+	// Tmpdir は POSIX の一時置き場（Windows は TMP・TEMP）。
+	Tmpdir      = "TMPDIR"
 	Home        = "HOME"
 	UserProfile = "USERPROFILE"
 	HomeDrive   = "HOMEDRIVE"
