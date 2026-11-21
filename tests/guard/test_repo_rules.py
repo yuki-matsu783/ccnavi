@@ -10,7 +10,8 @@ tests/fixtures/ のルールではなく、運用に使っている rules.yml �
 中で実行するコマンドを止める側のルールに適用すること（wip/design/launcher-scripts.md
 3.4・3.5 節、12 節の A1〜A4・W1〜W3・W6・W7）。
 
-判定とヒットしたルールの名前だけを見る表は Go（go/internal/hook/judge の `TestRepoRulesTable`、testdata/repo_rules.json）に移した。
+判定とヒットしたルールの名前だけを見る表は Go（go/internal/hook/judge の
+`TestRepoRulesTable`、testdata/repo_rules.json）に移した。
 ここに残すのは、文面・縮退の理由・unwrapped・quoted・環境の切り替えを見るもの。
 
 道具は外から動かす。`--test <tool> <subject> --json` の `verdict` と `rules[].id` を読む
@@ -36,12 +37,10 @@ PLACEHOLDER = "/repo"
 
 # 配布先の hook が起動する振り分けの sh（launcher-scripts 1 節）。
 LAUNCHER = ".ccnavi/scripts/ccnavi-launcher.sh"
-APPROVAL = "builtin:guard-ticket-approval"
 SETTING_FILES = "builtin:guard-setting-files"
 # 書き直しを求める形で止めたときの、記録のルール名。読み分けずに止め、書き直し方を案内する。
 NAME = "builtin:command-name-expansion"
 BACKQUOTE = "builtin:backquote"
-TICKET_STATE = "builtin:ticket-state-shell"
 # 読み切れなかった理由（試験の JSON の degraded）。
 REASON_UNTERMINATED = "unterminated-quote"
 REASON_UNTERMINATED_SUBST = "unterminated-substitution"
@@ -136,12 +135,6 @@ class RepoRulesTest(unittest.TestCase):
 
     def assert_verdict(self, subject, want, rule_id):
         return self.check_body(judge("Bash", subject), want, rule_id)
-
-    def assert_verdicts(self, subjects, want, rule_id):
-        """何件もを 1 回の起動で判定し、どれも want で rule_id にヒットすることを見る。"""
-        for subject, body in zip(subjects, judge_many("Bash", subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.check_body(body, want, rule_id)
 
     def check_body(self, body, want, rule_id):
         self.assertTrue(body["known"])
@@ -253,19 +246,6 @@ class LauncherJudgeTest(unittest.TestCase):
         self.assertTrue(body["known"])
         return body
 
-    def judge_all(self, subjects) -> list[dict]:
-        bodies = judge_many("Bash", list(subjects), bin_path=LAUNCHER)
-        for body in bodies:
-            self.assertTrue(body["known"])
-        return bodies
-
-    def assert_all_denied_by(self, subjects, rule_id: str, code: str = "") -> None:
-        """何件もを 1 回の起動で判定し、どれも rule_id で止まることを見る。"""
-        subjects = list(subjects)
-        for subject, body in zip(subjects, self.judge_all(subjects), strict=True):
-            with self.subTest(subject=subject):
-                self.check_denied_by(subject, body, rule_id, code)
-
     def assert_denied_by(self, subject: str, rule_id: str, code: str = "") -> dict:
         return self.check_denied_by(subject, self.judge(subject), rule_id, code)
 
@@ -277,48 +257,6 @@ class LauncherJudgeTest(unittest.TestCase):
         if code:
             self.assertEqual(body["code"], code, f"{subject!r}: {body['response']}")
         return body
-
-
-class TicketApprovalPathTest(LauncherJudgeTest):
-    """承認の経路（launcher-scripts 3.4 節、12 節 A1〜A4）。"""
-
-
-# 実行役のコマンド。`{}` に中で実行されるコマンドが入る。
-RUNNERS = [
-    "env {}",
-    "FOO=1 {}",
-    "command {}",
-    "exec {}",
-    "nohup {}",
-    "time {}",
-    "sudo {}",
-    "sudo -u me {}",
-    "timeout 5 {}",
-    "nice -n 5 {}",
-    "stdbuf -o0 {}",
-    "/usr/bin/env {}",
-    "doas {}",
-    # 読み切れない形。
-    "sh -c '{}'",
-    "eval '{}'",
-    "echo x | xargs {}",
-    "find . -name x -exec {} \\;",
-]
-
-# 組み込みの保護にヒットする、中で実行されるコマンドと、ヒットするべきルール。
-GUARDED = [
-    ("rm -f .ccnavi/config/common/rules.yml", SETTING_FILES),
-    ("mv .claude/settings.json /tmp/settings.json", SETTING_FILES),
-    ("tee .ccnavi/config/common/rules.yml", SETTING_FILES),
-    ("sed -i s/a/b/ .claude/settings.json", SETTING_FILES),
-    ("cp /tmp/rules.yml .ccnavi/config/common/rules.yml", SETTING_FILES),
-    ("truncate -s 0 .claude/settings.json", SETTING_FILES),
-    ("mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md", TICKET_STATE),
-    ("ccnavi --agree --yes x", APPROVAL),
-    ("sh .ccnavi/scripts/ccnavi-user-agree.sh", APPROVAL),
-    # 識別子を並べた形（#31）。引数が付いても承認の経路として止める。
-    ("sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04", APPROVAL),
-]
 
 
 class RunnerTest(LauncherJudgeTest):

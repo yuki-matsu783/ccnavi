@@ -20,10 +20,7 @@ from tests import ROOT, common_path, script_command
 from tests.inproc import run_ccnavi
 
 HOOKS = "builtin:guard-hooks"
-SCRIPTS = "builtin:guard-scripts"
 CONFIG = "builtin:guard-ccnavi-config"
-HOME = "builtin:guard-project-home"
-COMMON = "builtin:guard-common-layer"
 LINKS = "builtin:guard-handoff-links"
 
 # テスト用の最小の共通ルール。ここにある deny は、この検査のどの入力にもヒットしない。
@@ -123,16 +120,13 @@ class NamedGuardsTest(Workspace):
 
 
 class UnreadableRulesTest(Workspace):
-    """共通のルールファイルが読めない間と、無い間。4 本は外れず、直し方は下書きになる。"""
+    """共通のルールファイルが読めない間。4 本は外れず、直し方は下書きになる。"""
 
     prefix = "ccnavi-named-broken-"
     DRAFT = "wip/handoff/.ccnavi/config/common/rules.yml"
 
     def broken(self):
         write(common_path(self.root, "rules"), "deny:\n  - id: [unclosed\n<<<<<<< HEAD\n")
-
-    def absent(self):
-        os.remove(common_path(self.root, "rules"))
 
     def test_the_common_rules_cannot_be_repaired_by_write_or_edit(self):
         self.broken()
