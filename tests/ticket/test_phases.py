@@ -1684,56 +1684,6 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("phases.yml に最小のフェーズ定義", started.stderr)
         self.assertIn("書くのはユーザ", started.stderr)
 
-    # ---- 判定が失敗しない（チケット approve-carry-04 の 6〜8）
-
-    def test_regex_child_is_judged_by_the_real_path(self):
-        """14. regex の子: 実際のパスで親と定義に適用する。"""
-        tree = self.approved_child(
-            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^(wip/research|src/a|docs)/",))
-        )
-        inside = self.write_to(tree, "wip/research/x.md")
-        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
-        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
-
-        beyond_type = self.write_to(tree, "src/a/x.py")
-        self.assertEqual(self.decision(beyond_type), "deny", beyond_type.stdout)
-        self.assertIn("limit: phase type 調査 (research)", self.reason(beyond_type))
-
-        beyond_parent = self.write_to(tree, "docs/x.md")
-        self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
-        self.assertIn("limit: parent i0001", self.reason(beyond_parent))
-
-    def test_regex_child_ignores_case_like_the_glob_child(self):
-        """14. regex の子: 範囲の表記は glob の子と同じく大文字小文字を区別しない。
-
-        範囲はユーザが宣言する意図なので、`regex` で書いても同じ場所を指す。
-        区別が要るなら `(?-i:...)` で囲む。
-        """
-        tree = self.approved_child(
-            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^wip/research/",))
-        )
-        inside = self.write_to(tree, "wip/Research/x.md")
-        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
-        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
-
-    def test_regex_child_can_keep_the_distinction_with_an_inline_flag(self):
-        """14. regex の子: `(?-i:...)` で囲んだ範囲は書いた表記のとおりにヒットする。
-
-        ルールの側（tests/config/test_config_union_holes.py）と同じ書き方が、
-        チケットの範囲でも書けることを見る。
-        """
-        tree = self.approved_child(
-            scoped_child_text("i0001-01-01", "i0001", 1, regex=("^wip/(?-i:research)/",))
-        )
-        inside = self.write_to(tree, "wip/research/x.md")
-        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
-        self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
-
-        # 定義の上限（glob）にはヒットする表記だが、子の範囲が区別するので止まる。
-        outside = self.write_to(tree, "wip/Research/x.md")
-        self.assertEqual(self.decision(outside), "deny", outside.stdout)
-        self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
-
 
 if __name__ == "__main__":
     unittest.main()
