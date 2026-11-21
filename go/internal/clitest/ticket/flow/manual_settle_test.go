@@ -202,10 +202,10 @@ func TestTheNextPromptSaysToConfirmOnceAndStopDoesNotRepeatIt(t *testing.T) {
 	tr, _ := requestedTree(t)
 	tr.hand("i0001-01-01")
 	tr.share()
-	raw, _ := json.Marshal(map[string]any{"hook_event_name": "UserPromptSubmit", "cwd": tr.ParentTree, "session_id": "s1", "prompt": "続けて"})
-	first := tr.Call(ticketkit.Call{Stdin: string(raw)}, "--mode", "enable")
+	payload := map[string]any{"hook_event_name": "UserPromptSubmit", "cwd": tr.ParentTree, "session_id": "s1", "prompt": "続けて"}
+	first := tr.CallJSON(payload, "--mode", "enable")
 	ticketkit.Has(t, first.Stdout, "confirm --phase 1")
-	ticketkit.Lacks(t, tr.Call(ticketkit.Call{Stdin: string(raw)}, "--mode", "enable").Stdout, "confirm --phase 1")
+	ticketkit.Lacks(t, tr.CallJSON(payload, "--mode", "enable").Stdout, "confirm --phase 1")
 	ticketkit.Lacks(t, tr.Hook("Stop", "", tr.ParentTree, nil).Stdout, "confirm --phase 1")
 }
 

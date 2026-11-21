@@ -2,13 +2,13 @@
 // Python のテストの土台（TicketTest・PhaseHarness）から、Go のテストに要る部分を移したもの。
 //
 // 置くもの
-//   - kit.go: git・ファイルの読み書き・終了コードと文面の確かめ（Git・Write・Read・ReadJSON・OK・Fails・Has・Lacks）
+//   - kit.go: git・ファイルの読み書き（Write・Read・Exists は shkit の写し）・終了コードと文面の確かめ（Git・ReadJSON・OK・Fails・Has・Lacks）
 //   - text.go: 提案の本文（TicketText。親は最小の計画とフェーズ定義のコピーを持つ）
 //   - tree.go: git のリポジトリと親のワークツリー i0001 を組み、承認・着手・hook の呼び出しをたどる Tree
-//     （New・Family・ClosePhase・Ccnavi・Hook・Judge・Propose・Approve・StartParent・Worktree・CommitParent）と、
+//     （New・Family・ClosePhase・Ccnavi・Call・CallJSON・Hook・Judge・Propose・Approve・StartParent・Worktree・CommitParent）と、
 //     組んだ木の写しを戻す Cached（FamilyTree・ClosedTree・RequestedTree）
 //   - fixture.go: 見本（拡張のフィクスチャ）を書き直す道具（PortableText・WriteFixture）。見本を書くのはここだけ
-//   - review.go: リモートの代わりの結果ファイル（Fixture）と、sh の request と同じ 3 段階（Remote・Request・Confirm・Decide）
+//   - review.go: リモートの代わりの結果ファイル（Fixture）と、sh の request と同じ 3 段階（AddOrigin・Origin・Remote・Request・Confirm・Decide）
 //
 // 木の置き場は 2 通りある。
 //   - New: テストごとの自分の置き場（base.TempDir）。並行に回せる。

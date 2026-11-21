@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // find_marked（ccnavi-common-review.sh）。目印で自分の投稿を探す、送信の照合の読み取り。
@@ -49,7 +50,7 @@ type obj = map[string]any
 
 func TestFindMarked(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "jq")
+	shkit.Need(t, "sh", "jq")
 	jq, _ := exec.LookPath("jq")
 	otherOp := strings.Repeat("b", 32)
 	mark := func(stage string) string { return marker(stage, markedOp) }
@@ -93,13 +94,13 @@ func TestFindMarked(t *testing.T) {
 			t.Parallel()
 			dir := base.TempDir(t)
 			scripts := filepath.Join(dir, "scripts")
-			copyInto(t, scripts, "ccnavi-common-review.sh")
-			harness := write(t, filepath.Join(scripts, "harness.sh"), findMarkedHarness)
+			shkit.CopyScriptsTo(t, scripts, "ccnavi-common-review.sh")
+			harness := shkit.Write(t, filepath.Join(scripts, "harness.sh"), findMarkedHarness)
 			data, err := json.Marshal(tc.items)
 			if err != nil {
 				t.Fatal(err)
 			}
-			listing := write(t, filepath.Join(dir, "list.json"), string(data))
+			listing := shkit.Write(t, filepath.Join(dir, "list.json"), string(data))
 			r := run.Sh(t, harness, tc.args, run.Opts{Env: map[string]string{
 				"JQ_BIN": jq, "STATE": dir, "CCNAVI_EXE": exe.Path(t), "KIND": tc.kind, "LIST": listing, "LIST_RC": strconv.Itoa(tc.rc),
 			}})

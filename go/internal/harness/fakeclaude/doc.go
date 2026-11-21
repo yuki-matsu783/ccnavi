@@ -1,4 +1,4 @@
-// Package fakeclaude は `claude -p` のスタブである（tests/fake_claude.py と tests/contract/claudeside.py の写し）。
+// Package fakeclaude は `claude -p` のスタブである。
 //
 // 受入シナリオを台本（`--agent script`）で回すとき、実行器が `claude` の代わりに `teststub claude <引数>` を起こす。
 // 台本どおりにツールを呼び、Claude Code と同じ形で hook を呼び、stream-json を出す。仕様は `.agents/docs/claude-contract.md`。
@@ -9,7 +9,7 @@
 //   - RecordHook: 契約の場面で使う hook（`teststub claude-hook <記録の置き場> <目印>`）。受けた JSON と環境を log.jsonl に足し、
 //     tool_input の目印に合わせて止め方を変える
 //   - scene.go: 本物とスタブで共有する契約の場面（使い捨ての木・打つ手・禁止する文字列）と、hook の入力と stream-json を
-//     形（Node）と振る舞い（Observe）にまとめる Collect。本物の側（M2 の claudrecord）もこれを使う
+//     形（Node）と振る舞い（Observe）にまとめる Collect。本物の claude -p から録る道具（cmd/claudrecord）もこれを使う
 //
 // 形が本物と合っていることは clitest/contract/claude が、本物から録った tests/contract/claude/recorded.json と比べて確かめる。
 // 形の表（Node・Normalize・Merge）は契約の形の器（contractshape）のものを使う。

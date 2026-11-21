@@ -52,11 +52,8 @@ func prompt(tr *ticketkit.Tree, text, session string, extra ...string) string {
 	if session == "" {
 		session = "s1"
 	}
-	raw, err := json.Marshal(map[string]any{"hook_event_name": "UserPromptSubmit", "cwd": tr.ParentTree, "session_id": session, "prompt": text})
-	if err != nil {
-		tr.T.Fatal(err)
-	}
-	r := ticketkit.OK(tr.T, tr.Call(ticketkit.Call{Stdin: string(raw)}, append([]string{"--mode", "enable"}, extra...)...))
+	r := ticketkit.OK(tr.T, tr.CallJSON(map[string]any{"hook_event_name": "UserPromptSubmit", "cwd": tr.ParentTree, "session_id": session, "prompt": text},
+		append([]string{"--mode", "enable"}, extra...)...))
 	if strings.TrimSpace(r.Stdout) == "" {
 		return ""
 	}

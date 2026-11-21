@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi_workspace が、プロジェクトのコピーではなくワークスペースルートを選ぶこと。
@@ -18,14 +19,14 @@ import (
 // putScripts は root の `.ccnavi/scripts/` に共通部と、ワークスペースルートを出す probe.sh を置いて、probe.sh のパスを返す。
 func putScripts(t testing.TB, root string) string {
 	t.Helper()
-	dest := copyScripts(t, root)
-	return write(t, filepath.Join(dest, "probe.sh"), ". \"$(dirname \"$0\")/ccnavi-common.sh\"\nccnavi_workspace || ccnavi_no_workspace probe\n")
+	dest := shkit.CopyScripts(t, root)
+	return shkit.Write(t, filepath.Join(dest, "probe.sh"), ". \"$(dirname \"$0\")/ccnavi-common.sh\"\nccnavi_workspace || ccnavi_no_workspace probe\n")
 }
 
 // rootFrom は script を cwd から起こして、出したルートの実パス。
 func rootFrom(t testing.TB, script, cwd string) string {
 	t.Helper()
-	r := run.Sh(t, slash(script), nil, run.Opts{Dir: cwd})
+	r := run.Sh(t, shkit.Slash(script), nil, run.Opts{Dir: cwd})
 	got := strings.TrimSpace(r.Stdout)
 	if real, err := filepath.EvalSymlinks(got); err == nil {
 		return real
@@ -35,12 +36,12 @@ func rootFrom(t testing.TB, script, cwd string) string {
 
 func TestWorkspaceRootIsNotAProjectCopy(t *testing.T) {
 	t.Parallel()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	type env struct{ ws, project, script string }
 	build := func(t *testing.T) env {
 		ws := base.TempDir(t)
 		project := filepath.Join(ws, "projects", "p")
-		mkdir(t, filepath.Join(project, "src"))
+		shkit.Mkdir(t, filepath.Join(project, "src"))
 		return env{ws, project, putScripts(t, ws)}
 	}
 	cases := []struct {
@@ -64,18 +65,18 @@ func TestWorkspaceRootIsNotAProjectCopy(t *testing.T) {
 		}},
 		{"a project outside any workspace is its own root", func(t *testing.T, e env) (string, string) {
 			lone := filepath.Join(base.TempDir(t), "projects", "p")
-			mkdir(t, lone)
+			shkit.Mkdir(t, lone)
 			return rootFrom(t, putScripts(t, lone), lone), lone
 		}},
 		{"a copy in a worktree is not a root", func(t *testing.T, e env) (string, string) {
 			tree := filepath.Join(e.ws, ".claude", "worktrees", "x")
-			mkdir(t, tree)
+			shkit.Mkdir(t, tree)
 			return rootFrom(t, putScripts(t, tree), tree), e.ws
 		}},
 		// `projects/` の下でも、親にワークスペースが無ければ、最初にヒットしたコピーが根のまま。
 		{"a directory that merely has projects in its path", func(t *testing.T, e env) (string, string) {
 			other := filepath.Join(e.ws, "projects", "p", "projects", "q")
-			mkdir(t, other)
+			shkit.Mkdir(t, other)
 			putScripts(t, other)
 			return rootFrom(t, e.script, other), other
 		}},
@@ -93,14 +94,14 @@ func TestWorkspaceRootIsNotAProjectCopy(t *testing.T) {
 // 1 行を出して止まる。
 func TestWorkspaceRootARemovedCwdStopsWithTheCdToTheRoot(t *testing.T) {
 	t.Parallel()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	ws := base.TempDir(t)
 	script := putScripts(t, ws)
 	gone := filepath.Join(ws, "gone")
-	mkdir(t, gone)
-	probe := "cd '" + slash(gone) + "' && rmdir '" + slash(gone) + "' && exec sh '" + slash(script) + "'"
+	shkit.Mkdir(t, gone)
+	probe := "cd '" + shkit.Slash(gone) + "' && rmdir '" + shkit.Slash(gone) + "' && exec sh '" + shkit.Slash(script) + "'"
 	r := run.Command(t, "sh", []string{"-c", probe})
 	truth(t, r.Code != 0, "終了コードが 0: "+r.Stdout)
 	eq(t, r.Stdout, "", "標準出力")
-	has(t, r.Stderr, "消えています", "cd '"+slash(ws)+"'")
+	has(t, r.Stderr, "消えています", "cd '"+shkit.Slash(ws)+"'")
 }

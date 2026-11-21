@@ -12,13 +12,14 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 )
 
 // started はチケットのコピーに着手の時刻が書かれたか（書かれていれば write-and-push が書いた）。
 func (k *kit) started(ident string) bool {
-	return strings.Contains(read(k.t, k.copyPath(ident, "doing")), "started_at: 20")
+	return strings.Contains(shkit.Read(k.t, k.copyPath(ident, "doing")), "started_at: 20")
 }
 
 // 順序: hook のマーカーを先にコミット → 取り込み → 書く → 書いたパスだけ commit --only → push。
@@ -38,10 +39,10 @@ func TestStartCommitsOnlyWhatItWroteAndPushes(t *testing.T) {
 	eqList(t, "件名", k.subjects(1), []string{"ccnavi: " + parentID + " に着手"})
 	eq(t, "未コミット", k.dirty(), "")
 	// 親子ごとの取り込み状態も、統合先のコピーも書かない。
-	if exists(filepath.Join(k.state, "sync")) {
+	if shkit.Exists(filepath.Join(k.state, "sync")) {
 		t.Error("取り込み状態を作った")
 	}
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		t.Error("ロックが残っている")
 	}
 }
@@ -60,15 +61,15 @@ func TestHookMarksAreCommittedBeforeTheTakeIn(t *testing.T) {
 func TestAHumanDecisionNotYetSentStopsWithoutWriting(t *testing.T) {
 	k := newKit(t)
 	k.mark(1, "reviewed", `{"by": "decide", "at": "t"}`)
-	copyBefore := read(t, k.copyPath(parentID, "doing"))
+	copyBefore := shkit.Read(t, k.copyPath(parentID, "doing"))
 	head := k.head()
 	r := k.ticket("start", parentID)
 	code(t, r, 1)
 	has(t, r.Stderr, "ユーザの判断が未送信")
 	has(t, r.Stderr, "ccnavi-user-push-approved.sh "+parentID)
-	eq(t, "コピー", read(t, k.copyPath(parentID, "doing")), copyBefore)
+	eq(t, "コピー", shkit.Read(t, k.copyPath(parentID, "doing")), copyBefore)
 	eq(t, "HEAD", k.head(), head)
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		t.Error("ロックが残っている")
 	}
 }
@@ -82,7 +83,7 @@ func TestAHeldLockStopsWithoutWriting(t *testing.T) {
 	host := strings.TrimSpace(run.Command(t, "hostname", nil).Stdout)
 	now := time.Now().Unix()
 	pid := base.LiveShPid(t)
-	write(t, filepath.Join(k.lockDir(), "owner"),
+	shkit.Write(t, filepath.Join(k.lockDir(), "owner"),
 		host+" "+strconv.Itoa(pid)+" "+strconv.FormatInt(now, 10)+" "+strconv.Itoa(pid)+"-"+strconv.FormatInt(now, 10)+"\n")
 	r := k.ticket("start", parentID)
 	code(t, r, 1)
@@ -90,7 +91,7 @@ func TestAHeldLockStopsWithoutWriting(t *testing.T) {
 	if k.started(parentID) {
 		t.Error("着手を書いた")
 	}
-	if !isDir(k.lockDir()) {
+	if !shkit.IsDir(k.lockDir()) {
 		t.Error("他の操作のロックを消した")
 	}
 }
@@ -102,7 +103,7 @@ func TestARemoteAheadIsTakenInBeforeWriting(t *testing.T) {
 	rel := approved + "/doing/" + childBID + ".md"
 	remote := k.remoteCommit(rel, samples.ChildText(childBID, parentID, 1, []string{"wip/design/*"}))
 	code(t, k.ticket("start", parentID), 0)
-	if !isFile(filepath.Join(k.tree, parts(rel))) {
+	if !shkit.IsFile(filepath.Join(k.tree, parts(rel))) {
 		t.Error("取り込めていない")
 	}
 	eq(t, "取り込んだ先頭", k.sha(k.tree, "HEAD~1"), remote)
@@ -117,13 +118,13 @@ func TestATakeInThatFindsAnErrorWritesNothing(t *testing.T) {
 	code(t, r, 1)
 	has(t, r.Stderr, "取り込みの後の検査で止める理由がある")
 	has(t, r.Stderr, "取り込めなかった")
-	if exists(filepath.Join(k.state, "sync")) {
+	if shkit.Exists(filepath.Join(k.state, "sync")) {
 		t.Error("取り込み状態を作った")
 	}
 	if k.started(parentID) {
 		t.Error("着手を書いた")
 	}
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		t.Error("ロックが残っている")
 	}
 }
@@ -133,7 +134,7 @@ func TestADivergedParentIsMergedBeforeWriting(t *testing.T) {
 	k.mark(1, "pending", `{"review": true, "at": "t"}`)
 	k.remoteCommit("src/remote.py", "y = 2\n")
 	code(t, k.ticket("start", parentID), 0)
-	if !isFile(filepath.Join(k.tree, "src", "remote.py")) {
+	if !shkit.IsFile(filepath.Join(k.tree, "src", "remote.py")) {
 		t.Error("取り込めていない")
 	}
 	eq(t, "リモート", k.remoteParent(), k.head())
@@ -156,7 +157,7 @@ func TestAConflictingTakeInWritesNothing(t *testing.T) {
 	if k.started(parentID) {
 		t.Error("着手を書いた")
 	}
-	if exists(k.mergeHead()) {
+	if shkit.Exists(k.mergeHead()) {
 		t.Error("取り込みの途中で止まっている")
 	}
 }
@@ -170,8 +171,8 @@ func TestAHookWritingBetweenSortingAndTakingInStopsAndARerunPasses(t *testing.T)
 	once := filepath.Join(k.base, "once")
 	target := filepath.Join(k.tree, parts(rel))
 	path := k.rawShim("hookshim", "#!/bin/sh\ncase \" $* \" in\n*\" fetch \"*\"refs/heads/"+parentID+":\"*)\n"+
-		"  if [ ! -e '"+slash(once)+"' ]; then : >'"+slash(once)+"'; mkdir -p '"+slash(filepath.Dir(target))+"';"+
-		" printf '%s' '"+body+"' >'"+slash(target)+"'; fi ;;\nesac\nexec '"+k.gitPath+"' \"$@\"\n")
+		"  if [ ! -e '"+shkit.Slash(once)+"' ]; then : >'"+shkit.Slash(once)+"'; mkdir -p '"+shkit.Slash(filepath.Dir(target))+"';"+
+		" printf '%s' '"+body+"' >'"+shkit.Slash(target)+"'; fi ;;\nesac\nexec '"+k.gitPath+"' \"$@\"\n")
 	before := k.head()
 	env := map[string]string{"PATH": path}
 	r := k.ticketWith(env, "start", parentID)
@@ -190,7 +191,7 @@ func TestAHookWritingBetweenSortingAndTakingInStopsAndARerunPasses(t *testing.T)
 // 途中の操作（merge など）があれば始めない。
 func TestAnOperationInProgressStopsBeforeAnything(t *testing.T) {
 	k := newKit(t)
-	write(t, k.mergeHead(), k.head()+"\n")
+	shkit.Write(t, k.mergeHead(), k.head()+"\n")
 	r := k.ticket("start", parentID)
 	if r.Code == 0 {
 		t.Error("途中の操作があるのに 0")
@@ -219,12 +220,12 @@ func TestTwoRejectedPushesLeaveNothingWritten(t *testing.T) {
 	k := newKit(t)
 	k.rejectPushes(-1)
 	before := k.head()
-	copyBefore := read(t, k.copyPath(parentID, "doing"))
+	copyBefore := shkit.Read(t, k.copyPath(parentID, "doing"))
 	r := k.ticket("start", parentID)
 	code(t, r, 1)
 	has(t, r.Stderr, "ccnavi-sync.sh")
 	eq(t, "HEAD", k.head(), before)
-	eq(t, "コピー", read(t, k.copyPath(parentID, "doing")), copyBefore)
+	eq(t, "コピー", shkit.Read(t, k.copyPath(parentID, "doing")), copyBefore)
 	eq(t, "未コミット", k.dirty(), "")
 }
 
@@ -239,14 +240,14 @@ func TestATermBeforeThePushEndsUndoesTheCommit(t *testing.T) {
 	if !filepath.IsAbs(hooks) {
 		hooks = filepath.Join(k.tree, hooks)
 	}
-	writeExec(t, filepath.Join(hooks, "pre-push"), "#!/bin/sh\n: >'"+slash(mark)+"'\nsleep 5\nexit 1\n")
+	shkit.WriteExec(t, filepath.Join(hooks, "pre-push"), "#!/bin/sh\n: >'"+shkit.Slash(mark)+"'\nsleep 5\nexit 1\n")
 	before := k.head()
 	p := k.spawn("ccnavi-ticket.sh", nil, "start", parentID)
 	err := p.termWhen(t, mark)
 	has(t, err, "送る前に止められた")
 	eq(t, "HEAD", k.head(), before)
 	eq(t, "未コミット", k.dirty(), "")
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		t.Error("ロックが残っている")
 	}
 }
@@ -266,12 +267,12 @@ func TestAPushWhoseReplyWasLostCountsAsSent(t *testing.T) {
 // push のゲートの ls-remote（push の前）は数えない。push のあとの 1 回目だけ失敗させる。
 func TestADeliveredPushWhoseCheckAlsoFailedIsNotWrittenTwice(t *testing.T) {
 	k := newKit(t)
-	count := write(t, filepath.Join(k.base, "ls-count"), "0\n")
+	count := shkit.Write(t, filepath.Join(k.base, "ls-count"), "0\n")
 	pushed := filepath.Join(k.base, "pushed")
-	path := k.rawShim("shim2", "#!/bin/sh\nfor a in \"$@\"; do\n  if [ \"$a\" = push ]; then\n    : > '"+slash(pushed)+"'\n"+
+	path := k.rawShim("shim2", "#!/bin/sh\nfor a in \"$@\"; do\n  if [ \"$a\" = push ]; then\n    : > '"+shkit.Slash(pushed)+"'\n"+
 		"    '"+k.gitPath+"' \"$@\" >/dev/null 2>&1; echo 'fatal: hung up' >&2; exit 128\n  fi\n"+
-		"  if [ \"$a\" = refs/heads/"+parentID+" ] && [ -e '"+slash(pushed)+"' ]; then\n"+
-		"    n=$(cat '"+slash(count)+"'); echo $((n + 1)) > '"+slash(count)+"'\n"+
+		"  if [ \"$a\" = refs/heads/"+parentID+" ] && [ -e '"+shkit.Slash(pushed)+"' ]; then\n"+
+		"    n=$(cat '"+shkit.Slash(count)+"'); echo $((n + 1)) > '"+shkit.Slash(count)+"'\n"+
 		"    if [ \"$n\" = 0 ]; then echo 'fatal: unable to access' >&2; exit 128; fi\n  fi\ndone\n"+
 		"exec '"+k.gitPath+"' \"$@\"\n")
 	r := k.ticketWith(map[string]string{"PATH": path}, "start", parentID)
@@ -306,9 +307,9 @@ func TestAFailedCommitLeavesNothingStaged(t *testing.T) {
 
 func TestAHangingSignerIsCutOff(t *testing.T) {
 	k := newKit(t)
-	signer := writeExec(t, filepath.Join(k.base, "slow-gpg"), "#!/bin/sh\nsleep 30\n")
+	signer := shkit.WriteExec(t, filepath.Join(k.base, "slow-gpg"), "#!/bin/sh\nsleep 30\n")
 	k.git(k.ws, "config", "commit.gpgsign", "true")
-	k.git(k.ws, "config", "gpg.program", slash(signer))
+	k.git(k.ws, "config", "gpg.program", shkit.Slash(signer))
 	r := k.ticketWith(map[string]string{env.WriteAndPushCommitTimeout: "2"}, "start", parentID)
 	code(t, r, 1)
 	has(t, r.Stderr, "制限時間")
@@ -321,7 +322,7 @@ func (k *kit) assertNothingChanged(before, pending string) {
 	eq(k.t, "HEAD", k.head(), before)
 	eq(k.t, "リモート", k.remoteParent(), before)
 	has(k.t, k.dirty(), pending)
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		k.t.Error("ロックが残っている")
 	}
 }
@@ -339,7 +340,7 @@ func TestStartRefusedUpFrontLeavesNoChildWorktreeOrCommit(t *testing.T) {
 		t.Fatalf("次の一手 %d 行\n%s", len(next), r.Stderr)
 	}
 	has(t, next[0], "ccnavi-ticket.sh start "+childID)
-	if exists(filepath.Join(k.ws, ".claude", "worktrees", childID)) {
+	if shkit.Exists(filepath.Join(k.ws, ".claude", "worktrees", childID)) {
 		t.Error("子のワークツリーを作った")
 	}
 	eq(t, "子のブランチ", k.git(k.ws, "branch", "--list", childID), "")
@@ -356,7 +357,7 @@ func TestFinishOfAnUnstartedChildIsRefusedBeforeTheMerge(t *testing.T) {
 	code(t, r, 1)
 	has(t, r.Stderr, "未着手")
 	eq(t, "次の一手の行", len(linesWith(r.Stderr, "次: ")), 1)
-	if exists(filepath.Join(k.tree, ".git", "MERGE_HEAD")) {
+	if shkit.Exists(filepath.Join(k.tree, ".git", "MERGE_HEAD")) {
 		t.Error("合流を始めた")
 	}
 	eq(t, "子の HEAD", k.sha(tree, "HEAD"), before)
@@ -375,11 +376,11 @@ func TestCheckFlagRunsOnlyTheGate(t *testing.T) {
 		t.Error("着手を書いた")
 	}
 	done := k.copyPath(childID, "done")
-	write(t, done, read(t, k.copyPath(childID, "doing")))
+	shkit.Write(t, done, shkit.Read(t, k.copyPath(childID, "doing")))
 	refused := k.ticket("start", childID, "--check")
 	code(t, refused, 1)
 	has(t, refused.Stderr, "複数の場所")
-	if exists(filepath.Join(k.ws, ".claude", "worktrees", childID)) {
+	if shkit.Exists(filepath.Join(k.ws, ".claude", "worktrees", childID)) {
 		t.Error("子のワークツリーを作った")
 	}
 	eq(t, "HEAD", k.head(), before)
@@ -408,7 +409,7 @@ func TestALinkedWorkspaceStillCarries(t *testing.T) {
 // リモートから消えた親（マージされていない）は、取り込み（ccnavi-sync.sh）が終了コード 1 で止める。何も書かない。
 func TestAParentGoneFromTheRemoteStopsAtTheTakeIn(t *testing.T) {
 	k := newKit(t)
-	write(t, filepath.Join(k.scripts, "ccnavi-review.sh"), "#!/bin/sh\n[ \"$1\" = merged ] && echo none\nexit 0\n")
+	shkit.Write(t, filepath.Join(k.scripts, "ccnavi-review.sh"), "#!/bin/sh\n[ \"$1\" = merged ] && echo none\nexit 0\n")
 	k.git(k.ws, "--git-dir", k.remote, "update-ref", "-d", "refs/heads/"+parentID)
 	r := k.ticket("start", parentID)
 	code(t, r, 1)
@@ -423,7 +424,7 @@ func TestAParentGoneFromTheRemoteStopsAtTheTakeIn(t *testing.T) {
 // 取り込みが通っても（スタブが 0 で終わる）、リモートに無い親のブランチは作り直さない。write-and-push の push の前のゲートが止める。
 func TestAParentGoneFromTheRemoteIsRefusedByThePushGate(t *testing.T) {
 	k := newKit(t)
-	write(t, filepath.Join(k.scripts, "ccnavi-sync.sh"), "#!/bin/sh\nexit 0\n")
+	shkit.Write(t, filepath.Join(k.scripts, "ccnavi-sync.sh"), "#!/bin/sh\nexit 0\n")
 	k.git(k.ws, "--git-dir", k.remote, "update-ref", "-d", "refs/heads/"+parentID)
 	r := k.ticket("start", parentID)
 	code(t, r, 1)
@@ -438,8 +439,8 @@ func TestAParentGoneFromTheRemoteIsRefusedByThePushGate(t *testing.T) {
 // 取り込み（ccnavi-sync.sh）が、マージ済みの親のワークツリーを片付けて 0 で終わっても、存在しないツリーには書かずに止まる。
 func TestATakeInThatTidiedTheParentAwayWritesNothing(t *testing.T) {
 	k := newKit(t)
-	write(t, filepath.Join(k.scripts, "ccnavi-sync.sh"),
-		"#!/bin/sh\ngit -C \""+slash(k.ws)+"\" worktree remove --force \""+slash(k.tree)+"\"\nexit 0\n")
+	shkit.Write(t, filepath.Join(k.scripts, "ccnavi-sync.sh"),
+		"#!/bin/sh\ngit -C \""+shkit.Slash(k.ws)+"\" worktree remove --force \""+shkit.Slash(k.tree)+"\"\nexit 0\n")
 	before := k.remoteParent()
 	r := k.ticket("start", parentID)
 	if r.Code == 0 {
@@ -447,7 +448,7 @@ func TestATakeInThatTidiedTheParentAwayWritesNothing(t *testing.T) {
 	}
 	has(t, r.Stderr, "閉じた（マージ済み）か、ワークツリーが無い")
 	has(t, r.Stderr, "何も反映していません")
-	if exists(k.tree) {
+	if shkit.Exists(k.tree) {
 		t.Error("親のワークツリーが残っている")
 	}
 	eq(t, "リモート", k.remoteParent(), before)
@@ -459,13 +460,13 @@ func TestRecordRiskIsNotWriteAndPushAndRidesOnTheFinish(t *testing.T) {
 	okRun(t, k.ticket("start", parentID))
 	tree := k.childTree()
 	okRun(t, k.ticket("start", childID))
-	write(t, filepath.Join(tree, "wip", "design", "a.md"), "a\n")
+	shkit.Write(t, filepath.Join(tree, "wip", "design", "a.md"), "a\n")
 	k.git(tree, "add", "-A")
 	k.git(tree, "commit", "-q", "-m", "work")
 	head := k.head()
 	judge := filepath.Join(k.tree, parts(approved), "phases", parentID, childID+".judge.json")
 	data, _ := json.Marshal(map[string]any{"x": map[string]any{"hit": false, "reason": "r", "head": "h", "at": "t"}})
-	write(t, judge, string(data))
+	shkit.Write(t, judge, string(data))
 	okRun(t, k.ticket("finish", childID))
 	if k.head() == head {
 		t.Error("コミットが増えていない")

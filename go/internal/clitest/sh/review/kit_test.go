@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 )
 
 // このファイルは、このパッケージの試験が共有する道具。
@@ -29,63 +30,10 @@ var reviewScripts = []string{reviewSh, userDecideSh, userLibSh}
 
 var updateHostFixture = flag.Bool("update-host-fixture", false, "ホストの応答の見本の expected.json を、sh が組んだ結果で書き直す")
 
-// need は、無い道具があればテストを飛ばす。
-func need(t testing.TB, tools ...string) {
-	t.Helper()
-	for _, tool := range tools {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s が無い", tool)
-		}
-	}
-}
-
-// write は親ディレクトリごと作って、LF のまま書く。
-func write(t testing.TB, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-// writeExec は write して実行できるようにする。
-func writeExec(t testing.TB, path, text string) string {
-	t.Helper()
-	write(t, path, text)
-	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func read(t testing.TB, path string) string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
-}
-
 // readIf は、無いファイルを空として読む。
 func readIf(path string) string {
 	data, _ := os.ReadFile(path)
 	return string(data)
-}
-
-func exists(path string) bool {
-	_, err := os.Lstat(path)
-	return err == nil
-}
-
-func remove(t testing.TB, path string) {
-	t.Helper()
-	if err := os.RemoveAll(path); err != nil {
-		t.Fatal(err)
-	}
 }
 
 // shq は sh の単引用符で包んだパス（区切りは `/` にそろえる。Git Bash は `\` を食う）。
@@ -157,12 +105,12 @@ type site struct {
 // newBareSite は、試す sh と共通部のコピーだけを置いた木（git のリポジトリにはしない）。
 func newBareSite(t *testing.T, names ...string) *site {
 	t.Helper()
-	need(t, "sh", "git", "jq")
+	shkit.Need(t, "sh", "git", "jq")
 	tmp := base.TempDir(t)
 	s := &site{t: t, tmp: tmp, ws: filepath.Join(tmp, "ws"), scripts: filepath.Join(tmp, "ws", ".ccnavi", "scripts")}
 	src := base.ScriptsDir()
 	for _, name := range append(append([]string{}, names...), base.CommonSh(t, src)...) {
-		writeExec(t, filepath.Join(s.scripts, name), read(t, filepath.Join(src, name)))
+		shkit.WriteExec(t, filepath.Join(s.scripts, name), shkit.Read(t, filepath.Join(src, name)))
 	}
 	return s
 }
@@ -201,10 +149,10 @@ func setOriginHead(t testing.TB, repo, name string) {
 // 配る sh そのものを起こす試験（コピーしない）は、これだけでホストへ繋ぐ前の判定まで届く。
 func newMarkerSite(t *testing.T, branch string) *site {
 	t.Helper()
-	need(t, "sh", "git", "jq", "curl")
+	shkit.Need(t, "sh", "git", "jq", "curl")
 	tmp := base.TempDir(t)
 	s := &site{t: t, tmp: tmp, ws: tmp, scripts: filepath.Join(tmp, ".ccnavi", "scripts")}
-	write(t, filepath.Join(s.scripts, "ccnavi-common.sh"), "")
+	shkit.Write(t, filepath.Join(s.scripts, "ccnavi-common.sh"), "")
 	s.initRepo(tmp, branch, "")
 	return s
 }
@@ -266,7 +214,7 @@ for a in "$@"; do
 done
 exit 0
 `
-	writeExec(t, s.Path, head+tail)
+	shkit.WriteExec(t, s.Path, head+tail)
 	return s
 }
 
@@ -274,7 +222,7 @@ exit 0
 func (s stubDir) passed() []string { return lines(readIf(s.Args)) }
 
 // reset は溜めた引数を消す。
-func (s stubDir) reset(t testing.TB) { t.Helper(); remove(t, s.Args) }
+func (s stubDir) reset(t testing.TB) { t.Helper(); shkit.Remove(t, s.Args) }
 
 // pathWith は、先頭に dirs を足した PATH。
 func pathWith(dirs ...string) string {
@@ -347,12 +295,12 @@ func writePlan(t testing.TB, state, planPath string, spec map[string]any) string
 	if err != nil {
 		t.Fatal(err)
 	}
-	specPath := write(t, planPath+".spec", string(data))
+	specPath := shkit.Write(t, planPath+".spec", string(data))
 	var stderr strings.Builder
 	if code := samples.OprecordMain([]string{state, planPath, specPath}, &stderr); code != 0 {
 		t.Fatalf("操作記録を作れない: %s", stderr.String())
 	}
-	return decode(t, read(t, planPath))["op"].(string)
+	return decode(t, shkit.Read(t, planPath))["op"].(string)
 }
 
 // keepPlan は、指摘 nodes を全部「そのまま受け入れる」計画を書く（キーは `u/<id>`）。返信の本文は受け入れの目印で始まる。

@@ -4,7 +4,6 @@ package flow
 // 元: tests/ticket/test_approval_news.py。
 
 import (
-	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,11 +23,7 @@ func (tr *Tree) event(event, session, agentID, tool string, input map[string]any
 	if agentID != "" {
 		payload["agent_id"] = agentID
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		tr.T.Fatal(err)
-	}
-	return ticketkit.OK(tr.T, tr.Call(ticketkit.Call{Stdin: string(raw)}, "--mode", "enable"))
+	return ticketkit.OK(tr.T, tr.CallJSON(payload, "--mode", "enable"))
 }
 
 // approveBody は見せたダイジェストを渡して `--agree --yes` で承認する（渡さない --yes は承認しない）。

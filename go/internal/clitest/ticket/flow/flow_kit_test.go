@@ -134,18 +134,14 @@ func (tr *Tree) writeTo(path string, o writeOpts) run.Result {
 	if o.AgentID != "" {
 		payload["agent_id"] = o.AgentID
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		tr.T.Fatal(err)
-	}
-	return tr.Call(ticketkit.Call{Stdin: string(raw)}, "--guard-core-files", o.Guard, "--mode", "enable")
+	return tr.CallJSON(payload, "--guard-core-files", o.Guard, "--mode", "enable")
 }
 
 // bashCheck は Bash の command を、コアファイルの守りを有効にして判定にかける。
 func (tr *Tree) bashCheck(command string, guard string) run.Result {
 	tr.T.Helper()
-	raw, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1", "tool_input": map[string]any{"command": command}})
-	return tr.Call(ticketkit.Call{Stdin: string(raw)}, "--guard-core-files", guard, "--mode", "enable")
+	return tr.CallJSON(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1", "tool_input": map[string]any{"command": command}},
+		"--guard-core-files", guard, "--mode", "enable")
 }
 
 func hookOut(t testing.TB, r run.Result) map[string]any {

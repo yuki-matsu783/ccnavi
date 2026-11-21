@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // decide の復旧と照合の穴を確かめる sh の受入テスト（ccnavi-user-decide.sh）。道具は decide_test.go と同じ。
@@ -39,7 +40,7 @@ func TestDecideAMismatchAfterTheHostWriteKeepsTheResolvedPartAndPlacesNothing(t 
 	// 記録に解決した分が残り、適用（local）は立たない。計画も残す
 	applied := d.record()["applied"].(map[string]any)
 	if applied["accepted_on_host"] == nil || applied["local"] == true || !strings.Contains(failed.Stderr, "計画を残した") ||
-		!exists(filepath.Join(d.state, "review-accept-i0001-1.json")) {
+		!shkit.Exists(filepath.Join(d.state, "review-accept-i0001-1.json")) {
 		t.Errorf("applied = %v, 残り = %v\n%s", applied, d.leftovers(), failed.Stderr)
 	}
 }
@@ -161,7 +162,7 @@ func TestDecideTwoResumesOfTheSameOperationDoNotPostTwice(t *testing.T) {
 	host := strings.TrimSpace(run.Command(t, "hostname", nil).Stdout)
 	now := time.Now().Unix()
 	pid := base.LiveShPid(t)
-	write(t, filepath.Join(lock, "owner"), fmt.Sprintf("%s %d %d %d-%d\n", host, pid, now, pid, now))
+	shkit.Write(t, filepath.Join(lock, "owner"), fmt.Sprintf("%s %d %d %d-%d\n", host, pid, now, pid, now))
 	// 最初の判断で issue 以外の段階（note）は送り済み。--resume でも増えないことを確かめる
 	_, notesBefore := d.gl.stored()
 	callsBefore := len(d.calls())

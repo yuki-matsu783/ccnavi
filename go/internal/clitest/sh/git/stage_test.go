@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 )
 
 // stageWS は ccnavi-stage.sh を置いた使い捨てのワークスペース。
@@ -21,12 +22,12 @@ type stageWS struct {
 
 func newStageWS(t *testing.T) *stageWS {
 	t.Helper()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	tmp := base.TempDir(t)
 	ws := filepath.Join(tmp, "ws")
-	scripts := copyScripts(t, ws, "ccnavi-stage.sh")
+	scripts := shkit.CopyScripts(t, ws, "ccnavi-stage.sh")
 	base.PutMessages(t, ws)
-	return &stageWS{t: t, ws: ws, bin: exeWrapper(t, filepath.Join(tmp, "bin")), script: slash(filepath.Join(scripts, "ccnavi-stage.sh"))}
+	return &stageWS{t: t, ws: ws, bin: shkit.ExeWrapper(t, filepath.Join(tmp, "bin")), script: shkit.Slash(filepath.Join(scripts, "ccnavi-stage.sh"))}
 }
 
 // stage は ccnavi-stage.sh を cwd（空なら ws）で打つ。本体は実行ファイル（ccnavi stage）。
@@ -47,8 +48,8 @@ const (
 
 func newStageFixture(t *testing.T) *stageWS {
 	s := newStageWS(t)
-	write(t, s.path(rulesRel), "version: 1\n")
-	write(t, s.path(hookRel), "echo lint\n")
+	shkit.Write(t, s.path(rulesRel), "version: 1\n")
+	shkit.Write(t, s.path(hookRel), "echo lint\n")
 	return s
 }
 
@@ -61,9 +62,9 @@ func TestStageCopiesWithTheSameLayoutAndLeavesTheOriginal(t *testing.T) {
 		t.Fatalf("code = %d: %s", r.Code, r.Stderr)
 	}
 	for _, c := range []struct{ got, want string }{
-		{read(t, s.path("wip/handoff/"+rulesRel)), "version: 1\n"},
-		{read(t, s.path("wip/handoff/handoff-.claude/hooks/lint-py.sh")), "echo lint\n"},
-		{read(t, s.path(rulesRel)), "version: 1\n"},
+		{shkit.Read(t, s.path("wip/handoff/"+rulesRel)), "version: 1\n"},
+		{shkit.Read(t, s.path("wip/handoff/handoff-.claude/hooks/lint-py.sh")), "echo lint\n"},
+		{shkit.Read(t, s.path(rulesRel)), "version: 1\n"},
 	} {
 		if c.got != c.want {
 			t.Errorf("got %q, want %q", c.got, c.want)
@@ -76,25 +77,25 @@ func TestStageInsideAWorktreeUsesThatWorktreesHandoff(t *testing.T) {
 	t.Parallel()
 	s := newStageFixture(t)
 	wt := s.path(".claude/worktrees/scratch-1-x")
-	write(t, filepath.Join(wt, "src", ".keep"), "")
-	write(t, filepath.Join(wt, filepath.FromSlash(rulesRel)), "version: 1\n")
+	shkit.Write(t, filepath.Join(wt, "src", ".keep"), "")
+	shkit.Write(t, filepath.Join(wt, filepath.FromSlash(rulesRel)), "version: 1\n")
 	r := s.stage(filepath.Join(wt, "src"), s.path(rulesRel))
 	if r.Code != 0 {
 		t.Fatalf("code = %d: %s", r.Code, r.Stderr)
 	}
 	draft := filepath.Join(wt, "wip", "handoff", filepath.FromSlash(rulesRel))
-	if !isFile(draft) {
+	if !shkit.IsFile(draft) {
 		t.Fatalf("下書きが無い: %s", r.Stdout)
 	}
-	if exists(s.path("wip/handoff/" + rulesRel)) {
+	if shkit.Exists(s.path("wip/handoff/" + rulesRel)) {
 		t.Error("ワークスペースの下書きの置き場にも作られた")
 	}
-	write(t, draft, "version: 2\n")
+	shkit.Write(t, draft, "version: 2\n")
 	r = s.stage(wt, "--commands", s.path(rulesRel))
 	if r.Code != 0 {
 		t.Fatalf("--commands code = %d: %s", r.Code, r.Stderr)
 	}
-	if strings.Contains(r.Stdout, "mv ") || !strings.Contains(slash(r.Stdout), "--root '"+slash(wt)+"' '"+rulesRel+"'") {
+	if strings.Contains(r.Stdout, "mv ") || !strings.Contains(shkit.Slash(r.Stdout), "--root '"+shkit.Slash(wt)+"' '"+rulesRel+"'") {
 		t.Errorf("取り込みの手順が --root にワークツリーを指していない: %s", r.Stdout)
 	}
 	// 下書きの置き場の中は元として受けない
@@ -132,11 +133,11 @@ func TestStageCommandsPrintTheHandoffForEditedDraftsNotMv(t *testing.T) {
 	t.Parallel()
 	s := newStageFixture(t)
 	s.stage("", rulesRel, hookRel)
-	write(t, s.path("wip/handoff/handoff-.claude/hooks/lint-py.sh"), "echo lint2\n")
+	shkit.Write(t, s.path("wip/handoff/handoff-.claude/hooks/lint-py.sh"), "echo lint2\n")
 	r := s.stage("", "--commands", rulesRel, hookRel)
-	handoff := "sh '" + slash(s.ws) + "/.ccnavi/scripts/ccnavi-user-handoff.sh'"
+	handoff := "sh '" + shkit.Slash(s.ws) + "/.ccnavi/scripts/ccnavi-user-handoff.sh'"
 	for _, want := range []string{handoff + " '" + hookRel + "'\n", "--yes --expect <上のハッシュ>"} {
-		if !strings.Contains(slash(r.Stdout), want) {
+		if !strings.Contains(shkit.Slash(r.Stdout), want) {
 			t.Errorf("stdout に %q が無い: %s", want, r.Stdout)
 		}
 	}
@@ -146,7 +147,7 @@ func TestStageCommandsPrintTheHandoffForEditedDraftsNotMv(t *testing.T) {
 	if r.Code != 1 || !strings.Contains(r.Stderr, "まだ編集していない") {
 		t.Errorf("code = %d, stderr = %q", r.Code, r.Stderr)
 	}
-	if got := read(t, s.path(hookRel)); got != "echo lint\n" {
+	if got := shkit.Read(t, s.path(hookRel)); got != "echo lint\n" {
 		t.Errorf("元が書き換わった: %q", got)
 	}
 }
@@ -176,7 +177,7 @@ func TestStageConvertsEveryNameSample(t *testing.T) {
 		t.Run(sample.From, func(t *testing.T) {
 			t.Parallel()
 			s := newStageWS(t)
-			write(t, s.path(sample.From), "x\n")
+			shkit.Write(t, s.path(sample.From), "x\n")
 			r := s.stage("", sample.From)
 			if r.Code != 0 {
 				t.Fatalf("code = %d: %s", r.Code, r.Stderr)
@@ -195,12 +196,12 @@ func TestStageRefusesAnOriginalPathWithTheReservedName(t *testing.T) {
 		t.Run(rel, func(t *testing.T) {
 			t.Parallel()
 			s := newStageWS(t)
-			write(t, s.path(rel), "x\n")
+			shkit.Write(t, s.path(rel), "x\n")
 			r := s.stage("", rel)
 			if r.Code != 2 || !strings.Contains(r.Stderr, "予約") {
 				t.Errorf("code = %d, stderr = %q", r.Code, r.Stderr)
 			}
-			if exists(s.path("wip")) {
+			if shkit.Exists(s.path("wip")) {
 				t.Error("断ったのに wip を作った")
 			}
 		})
@@ -211,15 +212,15 @@ func TestStageRefusesAnOriginalPathWithTheReservedName(t *testing.T) {
 func TestStageCommandsPointTheHandoffAtTheOriginalPathNotTheRenamedDraft(t *testing.T) {
 	t.Parallel()
 	s := newStageWS(t)
-	write(t, s.path(".claude/settings.json"), "{\"a\": 1}\n")
+	shkit.Write(t, s.path(".claude/settings.json"), "{\"a\": 1}\n")
 	if r := s.stage("", ".claude/settings.json"); r.Code != 0 {
 		t.Fatalf("stage code = %d: %s", r.Code, r.Stderr)
 	}
 	draft := s.path("wip/handoff/handoff-.claude/settings.json")
-	if got := read(t, draft); got != "{\"a\": 1}\n" {
+	if got := shkit.Read(t, draft); got != "{\"a\": 1}\n" {
 		t.Fatalf("下書き = %q", got)
 	}
-	write(t, draft, "{\"a\": 2}\n")
+	shkit.Write(t, draft, "{\"a\": 2}\n")
 	r := s.stage("", "--commands", ".claude/settings.json")
 	if r.Code != 0 {
 		t.Fatalf("code = %d: %s", r.Code, r.Stderr)

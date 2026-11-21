@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 )
@@ -36,7 +37,7 @@ func (k *kit) startChild(ident string) string {
 func (k *kit) approveSecondChild() {
 	k.t.Helper()
 	k.approveChildren(childBID, "approval-request b", "approve b", func() {
-		write(k.t, filepath.Join(k.tree, "wip", "proposals", "todo", childBID+".md"),
+		shkit.Write(k.t, filepath.Join(k.tree, "wip", "proposals", "todo", childBID+".md"),
 			samples.ChildTextReview(childBID, parentID, 1, []string{"wip/design/*"}, samples.Off))
 	})
 	k.git(k.tree, "push", "-q", "origin", parentID)
@@ -44,7 +45,7 @@ func (k *kit) approveSecondChild() {
 
 func (k *kit) work(tree, rel, text string) string {
 	k.t.Helper()
-	write(k.t, filepath.Join(tree, parts(rel)), text)
+	shkit.Write(k.t, filepath.Join(tree, parts(rel)), text)
 	k.git(tree, "add", "--", rel)
 	k.git(tree, "commit", "-q", "-m", "work")
 	return k.sha(tree, "HEAD")
@@ -67,10 +68,10 @@ func (k *kit) assertUntouched(head string) {
 	if k.merging() {
 		k.t.Error("合流の途中で止まっている")
 	}
-	if !isFile(k.copyPath(childID, "doing")) {
+	if !shkit.IsFile(k.copyPath(childID, "doing")) {
 		k.t.Error("doing/ から動いている")
 	}
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		k.t.Error("ロックが残っている")
 	}
 }
@@ -83,13 +84,13 @@ func (k *kit) assertRolledBack(before string) {
 	if k.merging() {
 		k.t.Error("合流の途中で止まっている")
 	}
-	if exists(filepath.Join(k.tree, "wip", "design", "a.md")) {
+	if shkit.Exists(filepath.Join(k.tree, "wip", "design", "a.md")) {
 		k.t.Error("合流したファイルが残っている")
 	}
-	if !isFile(k.copyPath(childID, "doing")) {
+	if !shkit.IsFile(k.copyPath(childID, "doing")) {
 		k.t.Error("doing/ から動いている")
 	}
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		k.t.Error("ロックが残っている")
 	}
 }
@@ -98,7 +99,7 @@ func (k *kit) assertRolledBack(before string) {
 func (k *kit) termAfter(pattern string) string {
 	k.t.Helper()
 	mark := filepath.Join(k.base, "reached")
-	path := k.shim("shim", "case \" $* \" in *\""+pattern+"\"*)\n  \"$REAL\" \"$@\"; rc=$?; : >'"+slash(mark)+"'; sleep 3; exit $rc ;;\nesac")
+	path := k.shim("shim", "case \" $* \" in *\""+pattern+"\"*)\n  \"$REAL\" \"$@\"; rc=$?; : >'"+shkit.Slash(mark)+"'; sleep 3; exit $rc ;;\nesac")
 	return k.spawn("ccnavi-ticket.sh", map[string]string{env.Path: path}, "finish", childID).termWhen(k.t, mark)
 }
 
@@ -120,7 +121,7 @@ func TestFinishMergesTheChildInOneMergeCommitAndPushes(t *testing.T) {
 	has(t, changed, "wip/design/a.md")
 	has(t, changed, approved+"/doing/"+childID+".md")
 	has(t, changed, "wip/proposals/review/"+childID+".md")
-	review := read(t, filepath.Join(k.tree, "wip", "proposals", "review", childID+".md"))
+	review := shkit.Read(t, filepath.Join(k.tree, "wip", "proposals", "review", childID+".md"))
 	has(t, review, `merged_sha: "`+childHead+`"`)
 	// 子の先頭は親の先頭の祖先
 	code(t, k.try(k.tree, "merge-base", "--is-ancestor", childHead, "HEAD"), 0)
@@ -137,10 +138,10 @@ func TestAChildAlreadyInTheParentIsNotMergedAgain(t *testing.T) {
 	eq(t, "親の数（合流するものが無いので、ふつうのコミット）", len(k.parentsOfHead()), 2)
 	eq(t, "リモート", k.remoteParent(), k.head())
 	// 親子ごとの取り込み状態は作らない
-	if exists(filepath.Join(k.state, "sync")) {
+	if shkit.Exists(filepath.Join(k.state, "sync")) {
 		t.Error("取り込み状態を作った")
 	}
-	has(t, read(t, filepath.Join(k.tree, "wip", "proposals", "review", childID+".md")), `merged_sha: "`+k.sha(tree, "HEAD")+`"`)
+	has(t, shkit.Read(t, filepath.Join(k.tree, "wip", "proposals", "review", childID+".md")), `merged_sha: "`+k.sha(tree, "HEAD")+`"`)
 }
 
 // 記録の無い別の PC でも、子 2 の着手で子 1 のコードが入り、finish の合流まで通る。
@@ -152,7 +153,7 @@ func TestASecondChildSeesTheFirstAndReachesTheRequest(t *testing.T) {
 	firstHead := k.work(first, "wip/design/a.md", "a\n")
 	okRun(t, k.ticket("finish", childID))
 	second := k.startChild(childBID)
-	if !isFile(filepath.Join(second, "wip", "design", "a.md")) {
+	if !shkit.IsFile(filepath.Join(second, "wip", "design", "a.md")) {
 		t.Error("子 2 に子 1 のコードが入っていない")
 	}
 	secondHead := k.work(second, "wip/design/b.md", "b\n")
@@ -161,7 +162,7 @@ func TestASecondChildSeesTheFirstAndReachesTheRequest(t *testing.T) {
 	for _, sha := range []string{firstHead, secondHead} {
 		code(t, k.try(k.tree, "merge-base", "--is-ancestor", sha, "HEAD"), 0)
 	}
-	body := write(t, filepath.Join(k.base, "body.md"), "見てほしい\n")
+	body := shkit.Write(t, filepath.Join(k.base, "body.md"), "見てほしい\n")
 	prepared := k.exe(opts{}, "--cwd", k.tree, "--phase", "1", "--body-file", body, "review", "prepare")
 	lacks(t, prepared.Stderr, "合流")
 }
@@ -268,13 +269,13 @@ func TestACommitAfterTheScopeCheckIsNotMerged(t *testing.T) {
 	mark := filepath.Join(k.base, "checked")
 	// 子のワークツリーで範囲の検査（diff -z）が済んだ直後に、範囲外のファイルをコミットする。
 	path := k.shim("shim", "case \" $* \" in *\" diff --name-only --no-renames --ignore-submodules=none -z \"*)\n"+
-		"  if [ ! -e '"+slash(mark)+"' ] && [ \"$(pwd -P)\" = \"$(cd '"+slash(tree)+"' && pwd -P)\" ]; then\n"+
-		"    \"$REAL\" \"$@\"; rc=$?; : >'"+slash(mark)+"'\n"+
+		"  if [ ! -e '"+shkit.Slash(mark)+"' ] && [ \"$(pwd -P)\" = \"$(cd '"+shkit.Slash(tree)+"' && pwd -P)\" ]; then\n"+
+		"    \"$REAL\" \"$@\"; rc=$?; : >'"+shkit.Slash(mark)+"'\n"+
 		"    mkdir -p src && echo evil > src/evil.py && \"$REAL\" add src/evil.py >/dev/null &&"+
 		" \"$REAL\" commit -q -m evil >/dev/null\n"+
 		"    exit $rc\n  fi ;;\nesac")
 	okRun(t, k.ticketWith(map[string]string{env.Path: path}, "finish", childID))
-	if !exists(mark) {
+	if !shkit.Exists(mark) {
 		t.Error("検査の差分を読んでいない")
 	}
 	if k.sha(tree, "HEAD") == checked {
@@ -294,17 +295,17 @@ func TestACommitAfterThePlanStillRecordsTheMergedHead(t *testing.T) {
 	planned := k.work(tree, "wip/design/a.md", "a\n")
 	// 書く前の検査（--check）では積まない。計画（write-and-push merge）のあと、書く呼び出しで積む。
 	wrap := k.wrapExe("wrap", "case \" $* \" in *\" --check \"*) ;; *\" ticket finish \"*)\n"+
-		"  cd '"+slash(tree)+"' && echo late > wip/design/late.md && '"+k.gitPath+"' add -A &&"+
+		"  cd '"+shkit.Slash(tree)+"' && echo late > wip/design/late.md && '"+k.gitPath+"' add -A &&"+
 		" '"+k.gitPath+"' commit -q -m late ;;\nesac\n", k.bin)
 	okRun(t, k.ticketWith(map[string]string{env.EntryPath: wrap}, "finish", childID))
 	if k.sha(tree, "HEAD") == planned {
 		t.Error("子にコミットが積まれていない")
 	}
-	has(t, read(t, filepath.Join(k.tree, "wip", "proposals", "review", childID+".md")), `merged_sha: "`+planned+`"`)
+	has(t, shkit.Read(t, filepath.Join(k.tree, "wip", "proposals", "review", childID+".md")), `merged_sha: "`+planned+`"`)
 	var risk struct {
 		Summary string `json:"summary"`
 	}
-	if err := json.Unmarshal([]byte(read(t, filepath.Join(k.tree, parts(approved), "phases", parentID, childID+".risk.json"))), &risk); err != nil {
+	if err := json.Unmarshal([]byte(shkit.Read(t, filepath.Join(k.tree, parts(approved), "phases", parentID, childID+".risk.json"))), &risk); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(risk.Summary, "1 ファイル、+1 -0 行") {

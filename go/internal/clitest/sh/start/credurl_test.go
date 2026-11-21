@@ -7,6 +7,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // hoststub の CredURL（Docker の GitLab で git の push が通るようにする仕掛け）の観点。git のスタブは、その URL だけに環境変数 GITLAB_TOKEN を
@@ -14,7 +15,7 @@ import (
 // 値を引数に入れず環境変数から読むので、プロセスの一覧にトークンが出ない。
 func TestCredURLReturnsTheTokenOnlyForThatURL(t *testing.T) {
 	t.Parallel()
-	need(t, "git")
+	shkit.Need(t, "git")
 	dir := base.TempDir(t)
 	stub := hoststub.Build(t, dir, false)
 	const cred = "http://127.0.0.1:8929"

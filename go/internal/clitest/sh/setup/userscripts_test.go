@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -42,7 +43,7 @@ func scriptsDir() string { return base.ScriptsDir() }
 func shNames(t testing.TB) []string {
 	t.Helper()
 	var out []string
-	for _, n := range names(t, scriptsDir()) {
+	for _, n := range shkit.Names(t, scriptsDir()) {
 		if strings.HasSuffix(n, ".sh") {
 			out = append(out, n)
 		}
@@ -63,7 +64,7 @@ func codeOf(text string) string {
 
 func shText(t testing.TB, name string) string {
 	t.Helper()
-	return codeOf(read(t, filepath.Join(scriptsDir(), name)))
+	return codeOf(shkit.Read(t, filepath.Join(scriptsDir(), name)))
 }
 
 func defined(t testing.TB, name string) map[string]bool {
@@ -199,12 +200,12 @@ func newUserEntry(t *testing.T) *userEntry {
 	work := base.TempDir(t)
 	u := &userEntry{t: t, ws: filepath.Join(work, "ws"), called: filepath.Join(work, "called")}
 	u.scripts = filepath.Join(u.ws, ".ccnavi", "scripts")
-	mkdir(t, u.scripts)
+	shkit.Mkdir(t, u.scripts)
 	for _, name := range shNames(t) {
 		copyFile(t, filepath.Join(scriptsDir(), name), filepath.Join(u.scripts, name), 0o644)
 	}
 	bin := filepath.Join(work, "bin", "ccnavi")
-	writeExec(t, bin, "#!/bin/sh\nprintf '%s\\n' \"$*\" >>'"+u.called+"'\nexit 0\n")
+	shkit.WriteExec(t, bin, "#!/bin/sh\nprintf '%s\\n' \"$*\" >>'"+u.called+"'\nexit 0\n")
 	u.bin = bin
 	return u
 }
@@ -215,7 +216,7 @@ func (u *userEntry) sh(name string, args ...string) run.Result {
 		run.Opts{Dir: u.ws, Env: map[string]string{"CCNAVI_WORKSPACE": u.ws, env.EntryPath: u.bin}})
 }
 
-func (u *userEntry) wasCalled() bool { return exists(u.called) }
+func (u *userEntry) wasCalled() bool { return shkit.Exists(u.called) }
 
 func TestEveryUserScriptStartsAndShowsItsUsage(t *testing.T) {
 	t.Parallel()

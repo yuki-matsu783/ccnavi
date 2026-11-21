@@ -8,6 +8,7 @@ import (
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-review.sh merged の約束。ccnavi-sync.sh は答えが `none` のときだけ「マージされていない」と読み、
@@ -23,7 +24,7 @@ func mergedRun(t *testing.T, origin, tokenName, curl, token string, args ...stri
 	t.Helper()
 	s := newSite(t, origin, reviewSh)
 	bin := filepath.Join(s.tmp, "bin")
-	writeExec(t, filepath.Join(bin, "curl"), curl)
+	shkit.WriteExec(t, filepath.Join(bin, "curl"), curl)
 	env := map[string]string{"CCNAVI_ENTRY_PATH": exe.ShPath(t), "PATH": pathWith(bin)}
 	if token != "" {
 		env[tokenName] = token

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-start.sh の受入テスト（既存のブランチ・MR を採用する経路と GitLab）。土台は startenv_test.go。新しく作る経路と事前確認は
@@ -33,15 +34,15 @@ func TestSingleLocalCandidateGetsAWorktree(t *testing.T) {
 	// このPCにそのブランチのワークツリーが無いので、--issue だけでは聞いて止まる
 	asked := code(t, e.sh("--issue", "152"), 3)
 	has(t, asked.Stdout, "issue #152 に紐づく MR !3", "--issue 152 --mr 3 を打つ", "直接実装には切り替えない")
-	truth(t, !isDir(e.wt("fix-152-other")), "聞く前にワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("fix-152-other")), "聞く前にワークツリーを切った")
 	// ユーザが続けると決めたら、--mr を付けて打ち直す
 	done := code(t, e.sh("--issue", "152", "--mr", "3"), 0)
-	truth(t, isDir(e.wt("fix-152-other")), "ワークツリーが無い")
+	truth(t, shkit.IsDir(e.wt("fix-152-other")), "ワークツリーが無い")
 	eq(t, len(e.posts()), 0, "POST の数")
 	eq(t, fields(done.Stdout)["ブランチ"], "fix-152-other", "ブランチ")
 	// ワークツリーができたあとの再開は、聞かずに続けて、ワークツリーを知らせる
 	again := code(t, e.sh("--issue", "152"), 0)
-	truth(t, strings.HasSuffix(slash(fields(again.Stdout)["ワークツリー"]), "worktrees/fix-152-other"), fields(again.Stdout)["ワークツリー"])
+	truth(t, strings.HasSuffix(shkit.Slash(fields(again.Stdout)["ワークツリー"]), "worktrees/fix-152-other"), fields(again.Stdout)["ワークツリー"])
 }
 
 // MR の無い候補（名前に番号を含むブランチ）も、親に使えない識別子なら出さずに止める。
@@ -53,7 +54,7 @@ func TestACandidateWithoutAnMRIsCheckedToo(t *testing.T) {
 	e.route(routes{pulls: ok(arr{})})
 	done := code(t, e.sh("--issue", "152"), 1)
 	has(t, done.Stderr, "末尾")
-	truth(t, !isDir(e.wt("fix-152-other-05")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("fix-152-other-05")), "ワークツリーを切った")
 }
 
 // ---- 2. `/` を含むブランチ
@@ -66,7 +67,7 @@ func TestMRWithSlashBranchChecksOutDirectlyWithoutIdentifierBranch(t *testing.T)
 	done := code(t, e.sh("--mr", "5"), 0)
 	got := fields(done.Stdout)
 	eq(t, got["ブランチ"], "topic/x", "ブランチ")
-	truth(t, strings.HasSuffix(slash(got["ワークツリー"]), "worktrees/topic-x"), got["ワークツリー"])
+	truth(t, strings.HasSuffix(shkit.Slash(got["ワークツリー"]), "worktrees/topic-x"), got["ワークツリー"])
 	eq(t, git(t, e.wt("topic-x"), "rev-parse", "--abbrev-ref", "HEAD"), "topic/x", "ワークツリーのブランチ")
 	// 識別子のブランチ（topic-x）は作らない。switch の回り道もしない
 	eq(t, strings.Join(e.localBranches(), ","), "main,topic/x", "手元のブランチ")
@@ -82,7 +83,7 @@ func TestAdoptStopsWhenIdentifierIsUnusable(t *testing.T) {
 	e := newStart(t, ghURL)
 	done := code(t, e.adopt("feature/123-login-05", nil, nil), 1)
 	has(t, done.Stderr, "使えない", "末尾")
-	truth(t, !isDir(e.wt("feature-123-login-05")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("feature-123-login-05")), "ワークツリーを切った")
 }
 
 // origin の全ブランチで見る（MR の無い別ブランチ、手元に無いブランチも）。
@@ -92,7 +93,7 @@ func TestAdoptStopsWhenAnotherBranchHasTheSameIdentifier(t *testing.T) {
 	git(t, e.ws, "push", "-q", e.bare, "main:refs/heads/topic-x")
 	done := code(t, e.adopt("topic/x", nil, nil), 1)
 	has(t, done.Stderr, "識別子 topic-x")
-	truth(t, !isDir(e.wt("topic-x")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("topic-x")), "ワークツリーを切った")
 }
 
 func TestAdoptMergedCheckUnreachablePrintsGuidanceAndMCPCheckedGoesOn(t *testing.T) {
@@ -102,9 +103,9 @@ func TestAdoptMergedCheckUnreachablePrintsGuidanceAndMCPCheckedGoesOn(t *testing
 	e.route(routes{"GET " + ghAPI + "/pulls/5": ok(prOf(5, "topic/x"))})
 	done := code(t, e.sh("--mr", "5"), 4)
 	has(t, done.Stdout, "マージ済みの MR があるかを確かめられなかった", "state=closed")
-	truth(t, !isDir(e.wt("topic-x")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("topic-x")), "ワークツリーを切った")
 	code(t, e.sh("--mr", "5", "--mcp-checked"), 0)
-	truth(t, isDir(e.wt("topic-x")), "ワークツリーが無い")
+	truth(t, shkit.IsDir(e.wt("topic-x")), "ワークツリーが無い")
 }
 
 // MR を採用するときは origin の全ブランチで識別子の重なりを確かめるので、git のリモートに届かないと止まる。
@@ -117,10 +118,10 @@ func TestUnreachableRemoteStopsWhenTheMRIsAdopted(t *testing.T) {
 		pulls:                       ok(arr{prBody(3, "fix-152-other", "Closes #152")}),
 		"GET " + ghAPI + "/pulls/3": ok(prBody(3, "fix-152-other", "Closes #152")),
 	}, closedPulls("fix-152-other")))
-	remove(t, e.bare)
+	shkit.Remove(t, e.bare)
 	done := code(t, e.sh("--issue", "152", "--mr", "3"), 1)
 	has(t, done.Stderr, "origin のブランチ一覧を取れなかった")
-	truth(t, !isDir(e.wt("fix-152-other")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("fix-152-other")), "ワークツリーを切った")
 }
 
 // ---- 4. 毎回 fetch して早送りする
@@ -130,7 +131,7 @@ func (e *startEnv) otherClone() string {
 	e.t.Helper()
 	other := filepath.Join(e.base, "other")
 	git(e.t, e.base, "clone", "-q", e.bare, other)
-	identity(e.t, other)
+	shkit.Identity(e.t, other)
 	git(e.t, other, "checkout", "-q", "topic/x")
 	return other
 }
@@ -168,15 +169,15 @@ func TestFastForwardDoesNotOverwriteAnIgnoredFile(t *testing.T) {
 	wt := e.wt("topic-x")
 	before := git(t, wt, "rev-parse", "HEAD")
 	other := e.otherClone()
-	write(t, filepath.Join(other, "ign.txt"), "remote\n")
+	shkit.Write(t, filepath.Join(other, "ign.txt"), "remote\n")
 	git(t, other, "add", "ign.txt")
 	git(t, other, "commit", "-q", "-m", "remote ign")
 	git(t, other, "push", "-q", "origin", "topic/x")
-	write(t, filepath.Join(gitPath(t, wt, "info"), "exclude"), "ign.txt\n")
-	write(t, filepath.Join(wt, "ign.txt"), "手元の ignored\n")
+	shkit.Write(t, filepath.Join(gitPath(t, wt, "info"), "exclude"), "ign.txt\n")
+	shkit.Write(t, filepath.Join(wt, "ign.txt"), "手元の ignored\n")
 	code(t, e.sh("--mr", "5"), 0)
 	eq(t, git(t, wt, "rev-parse", "HEAD"), before, "HEAD")
-	eq(t, read(t, filepath.Join(wt, "ign.txt")), "手元の ignored\n", "ignored のファイル")
+	eq(t, shkit.Read(t, filepath.Join(wt, "ign.txt")), "手元の ignored\n", "ignored のファイル")
 }
 
 // ---- 5. MR が閉じる issue
@@ -196,7 +197,7 @@ func TestMRThatDoesNotCloseTheIssueStopsBeforeTheWorktree(t *testing.T) {
 	e.mrBranch("fix-152-other", 5, routes{graphql: ok(closing(false))})
 	done := code(t, e.sh("--issue", "152", "--mr", "5"), 1)
 	has(t, done.Stderr, "閉じるリンクを持たない")
-	truth(t, !isDir(e.wt("fix-152-other")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("fix-152-other")), "ワークツリーを切った")
 }
 
 func TestLinkedIssuesNeedingASixthPageStopWithExit4(t *testing.T) {
@@ -205,7 +206,7 @@ func TestLinkedIssuesNeedingASixthPageStopWithExit4(t *testing.T) {
 	e.mrBranch("fix-152-other", 5, routes{graphql: ok(closing(true, [2]any{12, "acme/widgets"}))})
 	done := code(t, e.sh("--mr", "5"), 4)
 	has(t, done.Stdout, "mcp__github__pull_request_read", "--mr 5 --issue <issue の番号> --branch")
-	truth(t, !isDir(e.wt("fix-152-other")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("fix-152-other")), "ワークツリーを切った")
 }
 
 // GraphQL を使えない環境（403）では MR の本文の Closes を読む。401 は認証の失敗なので、本文に切り替えない。
@@ -239,7 +240,7 @@ func TestTheGuidedRerunAfterAnUnreadableClosingLinkSucceeds(t *testing.T) {
 		"紐づく issue を読めなかった")
 	again := code(t, e.sh("--mr", "5", "--issue", "152", "--branch", "fix-152-other", "--mcp-checked"), 0)
 	has(t, again.Stdout, "必須: 提案の frontmatter に issue: 152 と mr: 5 を書く")
-	truth(t, isDir(e.wt("fix-152-other")), "ワークツリーが無い")
+	truth(t, shkit.IsDir(e.wt("fix-152-other")), "ワークツリーが無い")
 }
 
 func TestTheGuidedRerunDoesNotPassAnIssueThatDoesNotExist(t *testing.T) {
@@ -248,7 +249,7 @@ func TestTheGuidedRerunDoesNotPassAnIssueThatDoesNotExist(t *testing.T) {
 	e.mrBranch("fix-152-other", 5, routes{graphql: ok(obj{"errors": arr{obj{"message": "boom"}}, "data": nil})})
 	done := code(t, e.sh("--mr", "5", "--issue", "999", "--branch", "fix-152-other", "--mcp-checked"), 1)
 	has(t, done.Stderr, "issue #999 が見つからない")
-	truth(t, !isDir(e.wt("fix-152-other")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("fix-152-other")), "ワークツリーを切った")
 }
 
 // ---- 6. GitLab
@@ -310,7 +311,7 @@ if [ -n "$input" ]; then
 fi
 exec '%BIN%/curl' -X "$method" "https://gitlab.com/api/v4/$path"
 `
-	writeExec(e.t, filepath.Join(e.bin, "glab"), strings.ReplaceAll(text, "%BIN%", slash(e.bin)))
+	shkit.WriteExec(e.t, filepath.Join(e.bin, "glab"), strings.ReplaceAll(text, "%BIN%", shkit.Slash(e.bin)))
 }
 
 func TestGitLabGlabSendsContentTypeForCreate(t *testing.T) {
@@ -411,7 +412,7 @@ func TestGitLabAdoptChecksTheMergedMR(t *testing.T) {
 	}))
 	done := code(t, e.sh("--mr", "9"), 1)
 	has(t, done.Stderr, "マージ済み MR（!3）")
-	truth(t, !isDir(e.wt("topic-x")), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt("topic-x")), "ワークツリーを切った")
 	e.route(combine(baseRoutes, routes{"GET " + glProj + "/merge_requests/9": ok(gitlabMR(nil))}))
 	code(t, e.sh("--mr", "9"), 0)
 	eq(t, git(t, e.wt("topic-x"), "rev-parse", "--abbrev-ref", "HEAD"), "topic/x", "ワークツリーのブランチ")

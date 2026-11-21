@@ -1,7 +1,6 @@
 package life
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -102,11 +101,8 @@ func TestTheHumanEntriesAreDeniedToTheAgent(t *testing.T) {
 	t.Parallel()
 	tr := authority(t)
 	decide := func(command string) string {
-		raw, err := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1", "tool_input": map[string]any{"command": command}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return ticketkit.Decision(t, tr.Call(ticketkit.Call{Stdin: string(raw)}, "--guard-ticket-approval", "enable", "--mode", "enable"))
+		return ticketkit.Decision(t, tr.CallJSON(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1", "tool_input": map[string]any{"command": command}},
+			"--guard-ticket-approval", "enable", "--mode", "enable"))
 	}
 	for _, command := range []string{
 		"sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason r",
@@ -144,7 +140,7 @@ func TestRequestDecideAndReadyWriteOnlyThePlaces(t *testing.T) {
 	tr.Propose(childName, samples.ChildText(childName, "i0001", 1, []string{"wip/design/*"}), "")
 	tr.CommitParent("tickets")
 	ticketkit.OK(t, tr.Approve())
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	tr.RunChild(childName, ticketkit.File{Path: "wip/design/plan.md", Text: "d\n"})
 	ticketkit.OK(t, tr.Ccnavi("ticket", "finish", childName))
 	tr.CommitParent("close 01")

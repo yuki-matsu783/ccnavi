@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-session-start.sh と ccnavi-dirs.sh の受入テスト。使い捨ての木に sh をコピーして外から呼ぶ。
@@ -27,11 +28,11 @@ type sessionEnv struct {
 
 func newSession(t testing.TB) *sessionEnv {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	dir := base.TempDir(t)
 	s := &sessionEnv{t: t, project: filepath.Join(dir, "project"), scripts: filepath.Join(dir, "scripts")}
-	mkdir(t, s.project)
-	copyScriptsTo(t, s.scripts, "ccnavi-session-start.sh", "ccnavi-dirs.sh")
+	shkit.Mkdir(t, s.project)
+	shkit.CopyScriptsTo(t, s.scripts, "ccnavi-session-start.sh", "ccnavi-dirs.sh")
 	return s
 }
 
@@ -59,7 +60,7 @@ func (s *sessionEnv) makeDirs(count int) {
 	s.t.Helper()
 	for i := 0; i < count; i++ {
 		path := filepath.Join(s.project, "projects", fmt.Sprintf("d%02d", i))
-		mkdir(s.t, path)
+		shkit.Mkdir(s.t, path)
 		s.commitAt(path, 1_000_000_000+i)
 	}
 }
@@ -99,8 +100,8 @@ func TestSessionStartPrintsNothingWithoutRepositories(t *testing.T) {
 	t.Parallel()
 	for name, prepare := range map[string]func(s *sessionEnv){
 		"no directories":           func(s *sessionEnv) {},
-		"top level directories":    func(s *sessionEnv) { mkdir(s.t, filepath.Join(s.project, "src", ".git")) },
-		"a directory without .git": func(s *sessionEnv) { mkdir(s.t, filepath.Join(s.project, "projects", "plain")) },
+		"top level directories":    func(s *sessionEnv) { shkit.Mkdir(s.t, filepath.Join(s.project, "src", ".git")) },
+		"a directory without .git": func(s *sessionEnv) { shkit.Mkdir(s.t, filepath.Join(s.project, "projects", "plain")) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -119,7 +120,7 @@ func TestSessionStartOrdersByLatestCommitNotDirMtime(t *testing.T) {
 	// 並べ替えが、ディレクトリの更新時刻でなくコミット時刻で決まることを見る。最古のコミットの d00 だけ更新時刻を未来にする。更新時刻で並べると d00 が先頭になり、コミット時刻で並ぶ（d02・d01・d00）ことと区別できる。
 	old := filepath.Join(s.project, "projects", "d00")
 	touchLater(t, old)
-	mkdir(t, filepath.Join(s.project, "projects", "nocommit", ".git"))
+	shkit.Mkdir(t, filepath.Join(s.project, "projects", "nocommit", ".git"))
 	r := s.run("ccnavi-dirs.sh")
 	eq(t, strings.Join(names(r.Stdout), "|"), "- d02|- d01|- d00|- nocommit", "一覧")
 }
@@ -128,7 +129,7 @@ func TestSessionStartSkipsDirectoriesWithoutGit(t *testing.T) {
 	t.Parallel()
 	s := newSession(t)
 	s.makeDirs(1)
-	mkdir(t, filepath.Join(s.project, "projects", "plain"))
+	shkit.Mkdir(t, filepath.Join(s.project, "projects", "plain"))
 	r := s.run("ccnavi-dirs.sh")
 	has(t, r.Stdout, "- d00")
 	lacks(t, r.Stdout, "plain")
@@ -138,8 +139,8 @@ func TestSessionStartCountsAGitFileAndOddNames(t *testing.T) {
 	t.Parallel()
 	s := newSession(t)
 	projects := filepath.Join(s.project, "projects")
-	write(t, filepath.Join(projects, "sub mod", ".git"), "gitdir: ../x\n")
-	mkdir(t, filepath.Join(projects, "-dash", ".git"))
+	shkit.Write(t, filepath.Join(projects, "sub mod", ".git"), "gitdir: ../x\n")
+	shkit.Mkdir(t, filepath.Join(projects, "-dash", ".git"))
 	r := s.run("ccnavi-dirs.sh")
 	has(t, r.Stdout, "- sub mod", "- -dash")
 }
@@ -148,7 +149,7 @@ func TestSessionStartEntryRunsDirsEvenWhenFetchFails(t *testing.T) {
 	t.Parallel()
 	s := newSession(t)
 	s.makeDirs(1)
-	write(t, filepath.Join(s.scripts, "ccnavi-fetch.sh"), "echo fetch-ran\nexit 1\n")
+	shkit.Write(t, filepath.Join(s.scripts, "ccnavi-fetch.sh"), "echo fetch-ran\nexit 1\n")
 	r := code(t, s.run("ccnavi-session-start.sh"), 0)
 	has(t, r.Stdout, "fetch-ran", "- d00")
 }

@@ -106,8 +106,17 @@ func DecodeJSON(data []byte, into any) error {
 	return dec.Decode(into)
 }
 
+// Root は手で使う入口（TestMain を持たない実行ファイル）が、リポジトリの根を渡す欄。空ならテストの base.Root。
+var Root string
+
 // DataDir は契約のデータ（tests/contract/gitlab）の置き場。
-func DataDir() string { return filepath.Join(base.Root(), "tests", "contract", "gitlab") }
+func DataDir() string {
+	root := Root
+	if root == "" {
+		root = base.Root()
+	}
+	return filepath.Join(root, "tests", "contract", "gitlab")
+}
 
 // LoadData は DataDir の JSON を読む。
 func LoadData(name string, into any) error {

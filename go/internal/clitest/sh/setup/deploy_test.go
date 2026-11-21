@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/shkit"
 )
 
 // `--deploy` が、設定だけでは動かないものを配布元から配る。`dist/` は .gitignore に入っていて git では渡らず、`CCNAVI_ENTRY_PATH` は
@@ -20,29 +21,29 @@ func TestDeployWritesTheSettingsAndCopiesThePartsInOneRun(t *testing.T) {
 	r := w.setup("--mode", "enable", "--deploy", src)
 	code(t, r, 0)
 	eq(t, "CCNAVI_MODE", w.envOf()["CCNAVI_MODE"], any("enable"))
-	if !exists(w.built(thisMachine(), "ccnavi")) {
+	if !shkit.Exists(w.built(thisMachine(), "ccnavi")) {
 		t.Error("実行ファイルを配っていない")
 	}
-	eq(t, "振り分けの sh", read(t, w.launcher()), read(t, launcherPath()))
+	eq(t, "振り分けの sh", shkit.Read(t, w.launcher()), shkit.Read(t, launcherPath()))
 	for _, rel := range []string{"config/common/rules.yml", "config/common/risks.yml", "config/common/phases.yml"} {
-		if !exists(w.path(".ccnavi", filepath.FromSlash(rel))) {
+		if !shkit.Exists(w.path(".ccnavi", filepath.FromSlash(rel))) {
 			t.Errorf("%s を配っていない", rel)
 		}
 	}
 	// 自身のレイヤーの phases.yml は配らない（レイアウトに依存する定義は配布先のユーザが書く）。
-	if exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
+	if shkit.Exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
 		t.Error("自身のレイヤーの phases.yml を配った")
 	}
 	for _, name := range deployScripts {
-		if !exists(w.path(".ccnavi", "scripts", name)) {
+		if !shkit.Exists(w.path(".ccnavi", "scripts", name)) {
 			t.Errorf("%s を配っていない", name)
 		}
 	}
 	// セッションの開始で渡す作業の決まりと、使い方の文書を、中身を変えずに配る。
-	eq(t, "CCNAVI.md", read(t, w.path(".ccnavi", "CCNAVI.md")), "# ccnavi の作業の決まり\n")
+	eq(t, "CCNAVI.md", shkit.Read(t, w.path(".ccnavi", "CCNAVI.md")), "# ccnavi の作業の決まり\n")
 	wantListed(t, r.Stdout, "配った", ".ccnavi/CCNAVI.md")
 	for _, name := range deployDocs {
-		eq(t, name, read(t, w.path(".ccnavi", "docs", name)), read(t, filepath.Join(src, ".ccnavi", "docs", name)))
+		eq(t, name, shkit.Read(t, w.path(".ccnavi", "docs", name)), shkit.Read(t, filepath.Join(src, ".ccnavi", "docs", name)))
 	}
 	wantListed(t, r.Stdout, "配った", ".ccnavi/docs/worktree.md")
 }
@@ -53,10 +54,10 @@ func TestDeployDeploysTheProposalFormatDocFromTheRealSourceTree(t *testing.T) {
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{NoDocs: true})
 	docs := filepath.Join(base.Root(), ".ccnavi", "docs")
-	copyTree(t, docs, filepath.Join(src, ".ccnavi", "docs"), false, nil)
+	shkit.CopyTree(t, docs, filepath.Join(src, ".ccnavi", "docs"))
 	r := w.setup("--mode", "enable", "--deploy", src)
 	code(t, r, 0)
-	eq(t, "proposal-format.md", read(t, w.path(".ccnavi", "docs", "proposal-format.md")), read(t, filepath.Join(docs, "proposal-format.md")))
+	eq(t, "proposal-format.md", shkit.Read(t, w.path(".ccnavi", "docs", "proposal-format.md")), shkit.Read(t, filepath.Join(docs, "proposal-format.md")))
 	wantListed(t, r.Stdout, "配った", ".ccnavi/docs/proposal-format.md")
 }
 
@@ -80,11 +81,11 @@ func TestDeployKeepsWhatTheProjectAlreadyHasUnlessForced(t *testing.T) {
 			t.Parallel()
 			w := newTarget(t)
 			src := makeSource(t, c.opts)
-			write(t, w.path(c.path...), c.mine)
+			shkit.Write(t, w.path(c.path...), c.mine)
 			w.setup("--deploy", src)
-			eq(t, "既にあるもの", read(t, w.path(c.path...)), c.mine)
+			eq(t, "既にあるもの", shkit.Read(t, w.path(c.path...)), c.mine)
 			w.setup("--deploy", src, "--force")
-			eq(t, "--force のあと", read(t, w.path(c.path...)), c.forced)
+			eq(t, "--force のあと", shkit.Read(t, w.path(c.path...)), c.forced)
 		})
 	}
 }
@@ -108,11 +109,11 @@ func TestDeployCopiesOnlyTheYmlTemplatesWithoutChangingThem(t *testing.T) {
 	r := w.setup("--mode", "enable", "--deploy", makeSource(t, srcOpts{Templates: templates}))
 	code(t, r, 0)
 	place := w.path(".ccnavi", "config", "common", "templates")
-	if got := names(t, place); !reflect.DeepEqual(got, []string{"feature.yml", "fix.yml"}) {
+	if got := shkit.Names(t, place); !reflect.DeepEqual(got, []string{"feature.yml", "fix.yml"}) {
 		t.Errorf("配ったテンプレート = %v", got)
 	}
 	for _, name := range []string{"feature.yml", "fix.yml"} {
-		eq(t, name, read(t, filepath.Join(place, name)), templates[name])
+		eq(t, name, shkit.Read(t, filepath.Join(place, name)), templates[name])
 		wantListed(t, r.Stdout, "配った", ".ccnavi/config/common/templates/"+name)
 	}
 	notIn(t, r.Stdout, "まだ無いもの")
@@ -127,10 +128,10 @@ func TestDeployATemplateNameWithASpaceIsSkippedAndTheRestIsDeployed(t *testing.T
 	}})
 	r := w.setup("--mode", "enable", "--deploy", src)
 	code(t, r, 0)
-	if got := names(t, w.path(".ccnavi", "config", "common", "templates")); !reflect.DeepEqual(got, []string{"feature.yml"}) {
+	if got := shkit.Names(t, w.path(".ccnavi", "config", "common", "templates")); !reflect.DeepEqual(got, []string{"feature.yml"}) {
 		t.Errorf("配ったテンプレート = %v", got)
 	}
-	if !exists(w.launcher()) || !exists(w.rules()) {
+	if !shkit.Exists(w.launcher()) || !shkit.Exists(w.rules()) {
 		t.Error("ほかのファイルが配られていない")
 	}
 	in(t, r.Stdout, "名前に使えない文字があるので配っていないテンプレート")
@@ -150,7 +151,7 @@ func TestDeployASourceWithoutTemplatesAddsNothingAndSaysNothing(t *testing.T) {
 			r := w.setup("--mode", "enable", "--deploy", makeSource(t, srcOpts{Templates: templates}))
 			code(t, r, 0)
 			eq(t, "stderr", r.Stderr, "")
-			if exists(w.path(".ccnavi", "config", "common", "templates")) {
+			if shkit.Exists(w.path(".ccnavi", "config", "common", "templates")) {
 				t.Error("テンプレートの置き場を作った")
 			}
 			notIn(t, r.Stdout, "テンプレート", "templates")
@@ -176,7 +177,7 @@ func processSkillFiles() map[string]string {
 
 func filesUnder(t testing.TB, dir string) []string {
 	t.Helper()
-	if !exists(dir) {
+	if !shkit.Exists(dir) {
 		return []string{}
 	}
 	return listing(t, dir)
@@ -194,7 +195,7 @@ func TestDeployDeploysOnlyTheCommonPartOfTheProcessSkills(t *testing.T) {
 	if got := filesUnder(t, skills); !reflect.DeepEqual(got, want) {
 		t.Errorf("配ったスキル = %v", got)
 	}
-	eq(t, "SKILL.md", read(t, filepath.Join(skills, "process-test", "SKILL.md")), processSkill)
+	eq(t, "SKILL.md", shkit.Read(t, filepath.Join(skills, "process-test", "SKILL.md")), processSkill)
 	wantListed(t, r.Stdout, "配った", ".claude/skills/process-test/references/common/purpose.md")
 	notIn(t, r.Stdout, "まだ無いもの")
 }
@@ -257,7 +258,7 @@ func TestDeployReadsTheFlagsLikeTheTicketStartDoes(t *testing.T) {
 		w := newTarget(t)
 		code(t, w.setup("--mode", "enable", "--deploy", makeSource(t, srcOpts{Skills: skills})), 0)
 		for i, label := range labels {
-			got := exists(w.path(".claude", "skills", "probe-"+string(rune('a'+i)), "SKILL.md"))
+			got := shkit.Exists(w.path(".claude", "skills", "probe-"+string(rune('a'+i)), "SKILL.md"))
 			if got != cases[label].deploy {
 				t.Errorf("%s: %s を配ったか = %v, want %v", flag, label, got, cases[label].deploy)
 			}
@@ -274,11 +275,11 @@ func TestDeployDoesNotDeployASkillMdThatIsASymlink(t *testing.T) {
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{Skills: processSkillFiles()})
 	skillMd := filepath.Join(src, ".claude", "skills", "process-test", "SKILL.md")
-	remove(t, skillMd)
-	outside := write(t, filepath.Join(src, "outside.md"), processSkill)
+	shkit.Remove(t, skillMd)
+	outside := shkit.Write(t, filepath.Join(src, "outside.md"), processSkill)
 	symlink(t, outside, skillMd)
 	code(t, w.setup("--mode", "enable", "--deploy", src), 0)
-	if exists(w.path(".claude", "skills", "process-test")) {
+	if shkit.Exists(w.path(".claude", "skills", "process-test")) {
 		t.Error("リンクの SKILL.md を配った")
 	}
 }
@@ -288,12 +289,12 @@ func TestDeployNamesABlockedPlaceAndGoesOnDeploying(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{Skills: processSkillFiles()})
-	write(t, w.path(".claude", "skills", "process-test"), "ユーザのファイル\n")
+	shkit.Write(t, w.path(".claude", "skills", "process-test"), "ユーザのファイル\n")
 	r := w.setup("--mode", "enable", "--deploy", src)
 	code(t, r, 0)
 	wantListed(t, r.Stdout, "配布先の道にディレクトリでないものがある", ".claude/skills/process-test/SKILL.md")
-	eq(t, "ユーザのファイル", read(t, w.path(".claude", "skills", "process-test")), "ユーザのファイル\n")
-	if !exists(w.launcher()) {
+	eq(t, "ユーザのファイル", shkit.Read(t, w.path(".claude", "skills", "process-test")), "ユーザのファイル\n")
+	if !shkit.Exists(w.launcher()) {
 		t.Error("後ろの配布物が届いていない")
 	}
 }
@@ -304,7 +305,7 @@ func TestDeployCheckListsTheProcessSkillFilesItWouldDeploy(t *testing.T) {
 	r := w.setup("--deploy", makeSource(t, srcOpts{Skills: processSkillFiles()}), "--check")
 	code(t, r, 1)
 	wantListed(t, r.Stdout, "配る", ".claude/skills/process-test/SKILL.md")
-	if exists(w.path(".claude", "skills")) {
+	if shkit.Exists(w.path(".claude", "skills")) {
 		t.Error("--check が書いた")
 	}
 }
@@ -314,7 +315,7 @@ func TestDeployASourceWithoutProcessSkillsDeploysNothingOfThem(t *testing.T) {
 	w := newTarget(t)
 	r := w.setup("--mode", "enable", "--deploy", makeSource(t, srcOpts{Skills: map[string]string{"commit/SKILL.md": "---\nname: commit\n---\n"}}))
 	code(t, r, 0)
-	if exists(w.path(".claude", "skills")) {
+	if shkit.Exists(w.path(".claude", "skills")) {
 		t.Error("スキルを配った")
 	}
 	notIn(t, r.Stdout, "skills")

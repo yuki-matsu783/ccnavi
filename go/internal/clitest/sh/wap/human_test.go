@@ -16,6 +16,7 @@ import (
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -33,9 +34,9 @@ func (k *kit) pushApproved(args ...string) run.Result {
 func TestPushApprovedWithoutNamesSkipsChildTrees(t *testing.T) {
 	k := newKit(t, "chores", "design")
 	rel := approved + "/flows/" + childID + ".yml"
-	write(t, filepath.Join(k.tree, parts(rel)), "steps: []\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(rel)), "steps: []\n")
 	childTree := k.childTree()
-	write(t, filepath.Join(childTree, parts(approved), "doing", "stray.md"), "x\n")
+	shkit.Write(t, filepath.Join(childTree, parts(approved), "doing", "stray.md"), "x\n")
 	r := k.pushApproved()
 	code(t, r, 1)
 	has(t, r.Stderr, "子のワークツリー")
@@ -47,7 +48,7 @@ func TestPushApprovedWithoutNamesSkipsChildTrees(t *testing.T) {
 func TestPushApprovedTakesInBeforeSending(t *testing.T) {
 	k := newKit(t, "chores", "design")
 	rel := approved + "/flows/" + childID + ".yml"
-	write(t, filepath.Join(k.tree, parts(rel)), "steps: []\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(rel)), "steps: []\n")
 	remote := k.remoteCommit("src/remote.py", "y = 2\n")
 	okRun(t, k.pushApproved(parentID))
 	has(t, strings.Join(k.committed("HEAD"), "\n"), rel)
@@ -58,14 +59,14 @@ func TestPushApprovedTakesInBeforeSending(t *testing.T) {
 func TestPushApprovedKeepsTheCommitWhenThePushFails(t *testing.T) {
 	k := newKit(t, "chores", "design")
 	rel := approved + "/flows/" + childID + ".yml"
-	write(t, filepath.Join(k.tree, parts(rel)), "steps: []\n")
-	hook := writeExec(t, filepath.Join(k.remote, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(rel)), "steps: []\n")
+	hook := shkit.WriteExec(t, filepath.Join(k.remote, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n")
 	r := k.pushApproved(parentID)
 	code(t, r, 1)
 	has(t, r.Stderr, "コミットはローカルに残っています")
 	has(t, strings.Join(k.committed("HEAD"), "\n"), rel)
 	// 次の write-and-push は未送信のユーザの判断を見つけて止まり、承認の push を打ち直すよう言う。
-	remove(t, hook)
+	shkit.Remove(t, hook)
 	stopped := k.ticket("start", parentID)
 	code(t, stopped, 1)
 	has(t, stopped.Stderr, "未送信のユーザの判断")
@@ -81,16 +82,16 @@ func TestPushApprovedCarriesARemovedDraftWithTheFlow(t *testing.T) {
 	rewritten := drafts + "/" + parentID + "-01-02.yml"
 	untracked := drafts + "/" + parentID + "-01-03.yml"
 	for _, rel := range []string{taken, rewritten} {
-		write(t, filepath.Join(k.tree, parts(rel)), "nodes: []\n")
+		shkit.Write(t, filepath.Join(k.tree, parts(rel)), "nodes: []\n")
 	}
 	k.git(k.tree, "add", "--", taken, rewritten)
 	k.git(k.tree, "commit", "-q", "-m", "drafts")
 	k.git(k.tree, "push", "-q", "origin", parentID)
 	flowRel := approved + "/flows/" + childID + ".yml"
-	write(t, filepath.Join(k.tree, parts(flowRel)), "nodes: []\n")
-	remove(t, filepath.Join(k.tree, parts(taken)))
-	write(t, filepath.Join(k.tree, parts(rewritten)), "nodes: [x]\n")
-	write(t, filepath.Join(k.tree, parts(untracked)), "nodes: []\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(flowRel)), "nodes: []\n")
+	shkit.Remove(t, filepath.Join(k.tree, parts(taken)))
+	shkit.Write(t, filepath.Join(k.tree, parts(rewritten)), "nodes: [x]\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(untracked)), "nodes: []\n")
 	okRun(t, k.pushApproved(parentID))
 	// 同じ中身なので、改名として読まずに 2 つのパスで見る。
 	got := strings.Fields(k.git(k.tree, "show", "--name-only", "--no-renames", "--format=", "HEAD"))
@@ -108,7 +109,7 @@ func TestPushApprovedCarriesARemovedDraftWithTheFlow(t *testing.T) {
 
 func TestPushApprovedWithoutNamesCarriesTheFamilyThroughWriteAndPush(t *testing.T) {
 	k := newKit(t, "chores", "design")
-	write(t, filepath.Join(k.tree, parts(approved+"/flows/"+childID+".yml")), "steps: []\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(approved+"/flows/"+childID+".yml")), "steps: []\n")
 	k.remoteCommit("src/remote.py", "y = 2\n")
 	r := okRun(t, k.pushApproved())
 	has(t, r.Stdout, "承認済みチケットを取り込んだうえで")
@@ -130,10 +131,10 @@ type chromeKit struct {
 }
 
 func newChromeKit(t *testing.T) *chromeKit {
-	need(t, "jq")
+	shkit.Need(t, "jq")
 	k := newKit(t)
 	shimDir := filepath.Join(k.base, "shim")
-	writeExec(t, filepath.Join(shimDir, "git"), fill(urlGit, "URL", "https://github.com/acme/widgets.git", "GIT", k.gitPath))
+	shkit.WriteExec(t, filepath.Join(shimDir, "git"), fill(urlGit, "URL", "https://github.com/acme/widgets.git", "GIT", k.gitPath))
 	fakes := filepath.Join(k.base, "fakes")
 	hostfixture.Install(t, fakes, hostfixture.GitHub)
 	c := &chromeKit{kit: k, path: strings.Join([]string{shimDir, fakes, os.Getenv(env.Path)}, string(os.PathListSeparator))}
@@ -172,7 +173,7 @@ func snapshotFiles(t testing.TB, root string, prefixes []string) map[string]stri
 				return nil
 			}
 			rel, _ := filepath.Rel(root, path)
-			found[filepath.ToSlash(rel)] = read(t, path)
+			found[filepath.ToSlash(rel)] = shkit.Read(t, path)
 			return nil
 		})
 	}
@@ -235,12 +236,12 @@ func (c *chromeKit) chromeRequest(scene string) map[string]any {
 	var recorded struct {
 		Head string `json:"head"`
 	}
-	if err := json.Unmarshal([]byte(read(t, filepath.Join(c.tree, parts(c.requestedMark())))), &recorded); err != nil {
+	if err := json.Unmarshal([]byte(shkit.Read(t, filepath.Join(c.tree, parts(c.requestedMark())))), &recorded); err != nil {
 		t.Fatal(err)
 	}
 	head := c.head()
 	var expected any
-	if err := json.Unmarshal([]byte(read(t, filepath.Join(hostfixture.SceneDir(hostfixture.GitHub, scene), "expected.json"))), &expected); err != nil {
+	if err := json.Unmarshal([]byte(shkit.Read(t, filepath.Join(hostfixture.SceneDir(hostfixture.GitHub, scene), "expected.json"))), &expected); err != nil {
 		t.Fatal(err)
 	}
 	zero := strings.Repeat("0", 40)
@@ -313,7 +314,7 @@ func topKeys(t testing.TB, text string) []string {
 
 func (c *chromeKit) request() string {
 	c.t.Helper()
-	body := write(c.t, filepath.Join(c.base, "body.md"), "見てほしい\n")
+	body := shkit.Write(c.t, filepath.Join(c.base, "body.md"), "見てほしい\n")
 	okRun(c.t, c.review(chromeScene, "review-request", "--phase", "1", "--body-file", body))
 	has(c.t, strings.Join(c.committed("HEAD"), "\n"), c.requestedMark())
 	return body
@@ -409,17 +410,17 @@ func TestChromeWritesWhatWriteAndPushWritesAndSends(t *testing.T) {
 		path, content := row["path"].(string), row["content"]
 		full := filepath.Join(c.tree, parts(path))
 		if row["op"] == "delete" {
-			if exists(full) {
+			if shkit.Exists(full) {
 				t.Errorf("%s: 消すはずが残っている", path)
 			}
 			continue
 		}
-		eq(t, path, normalized(t, path, content.(string)), normalized(t, path, read(t, full)))
+		eq(t, path, normalized(t, path, content.(string)), normalized(t, path, shkit.Read(t, full)))
 		if strings.HasSuffix(path, "1.reviewed") {
 			remoteText = content.(string)
 		}
 	}
-	localText := read(t, filepath.Join(c.tree, parts(approved+"/phases/"+parentID+"/1.reviewed")))
+	localText := shkit.Read(t, filepath.Join(c.tree, parts(approved+"/phases/"+parentID+"/1.reviewed")))
 	var remote, local map[string]any
 	if err := json.Unmarshal([]byte(remoteText), &remote); err != nil {
 		t.Fatal(err)

@@ -98,15 +98,31 @@ func (tr *Tree) Remote(merge []string) Fixture {
 	if merge == nil {
 		merge = []string{"i0001-01-01", "i0001-01-02"}
 	}
-	bare := filepath.Join(tr.Root, "origin.git")
-	tr.Git(tr.Root, "init", "--quiet", "--bare", bare)
-	tr.Git(tr.Root, "remote", "add", "origin", bare)
+	tr.AddOrigin()
 	for _, child := range merge {
 		tr.Merge(child)
 	}
 	tr.Parent("push", "--quiet", "origin", ParentName)
 	f := tr.Fixture()
 	Write(tr.T, f.Path, `{"host": "fixture", "mr": {"number": 7, "url": "https://example/mr/7"}}`)
+	return f
+}
+
+// AddOrigin は origin（空の bare）を足す。
+func (tr *Tree) AddOrigin() {
+	tr.T.Helper()
+	bare := filepath.Join(tr.Root, "origin.git")
+	tr.Git(tr.Root, "init", "--quiet", "--bare", bare)
+	tr.Git(tr.Root, "remote", "add", "origin", bare)
+}
+
+// Origin は AddOrigin して親のブランチを push し、Draft の MR 7 を答える結果ファイルを置いて返す（子の合流はしない）。
+func (tr *Tree) Origin() Fixture {
+	tr.T.Helper()
+	tr.AddOrigin()
+	tr.Parent("push", "--quiet", "origin", ParentName)
+	f := tr.Fixture()
+	Write(tr.T, f.Path, `{"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": true}}`)
 	return f
 }
 

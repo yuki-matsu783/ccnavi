@@ -13,6 +13,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/ospath"
 )
 
@@ -34,18 +35,18 @@ type wrapFix struct {
 // それが無いと「ワークスペースの外」として断られ、判定まで届かない。
 func newWrap(t *testing.T) *wrapFix {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	dir := base.TempDir(t)
-	write(t, filepath.Join(dir, ".ccnavi", "scripts", "ccnavi-common.sh"), "")
+	shkit.Write(t, filepath.Join(dir, ".ccnavi", "scripts", "ccnavi-common.sh"), "")
 	initRepo(t, dir, "")
 	var lines []string
 	for n := 0; n < 200; n++ {
 		lines = append(lines, "line "+strconv.Itoa(n))
 	}
-	write(t, filepath.Join(dir, "tracked.txt"), strings.Join(lines, "\n")+"\n")
+	shkit.Write(t, filepath.Join(dir, "tracked.txt"), strings.Join(lines, "\n")+"\n")
 	git(t, dir, "add", "tracked.txt")
 	git(t, dir, "commit", "-q", "-m", "seed")
-	write(t, filepath.Join(dir, "untracked.txt"), "x\n")
+	shkit.Write(t, filepath.Join(dir, "untracked.txt"), "x\n")
 	return &wrapFix{t: t, dir: dir}
 }
 
@@ -102,7 +103,7 @@ func (w *wrapFix) logs() []string {
 	sort.Sort(sort.Reverse(sort.StringSlice(files)))
 	var out []string
 	for _, name := range files {
-		out = append(out, read(w.t, filepath.Join(dir, name)))
+		out = append(out, shkit.Read(w.t, filepath.Join(dir, name)))
 	}
 	return out
 }
@@ -177,7 +178,7 @@ func TestGitWrapRmRemovesATrackedFile(t *testing.T) {
 	t.Parallel()
 	w := newWrap(t)
 	w.succeed(w.run("rm", "tracked.txt"), "rm")
-	if exists(w.join("tracked.txt")) {
+	if shkit.Exists(w.join("tracked.txt")) {
 		t.Error("tracked.txt が残っている")
 	}
 }
@@ -198,15 +199,15 @@ func TestGitWrapAMergeThatIsNotAFastForwardGoesThrough(t *testing.T) {
 	t.Parallel()
 	w := newWrap(t)
 	w.succeed(w.run("checkout", "-b", "topic"), "checkout")
-	write(t, w.join("topic.txt"), "topic\n")
+	shkit.Write(t, w.join("topic.txt"), "topic\n")
 	w.run("add", "topic.txt")
 	w.run("commit", "-m", "topic")
 	w.run("checkout", "-")
-	write(t, w.join("main.txt"), "main\n")
+	shkit.Write(t, w.join("main.txt"), "main\n")
 	w.run("add", "main.txt")
 	w.run("commit", "-m", "main")
 	w.succeed(w.run("merge", "topic", "--no-edit"), "merge")
-	if !exists(w.join("topic.txt")) {
+	if !shkit.Exists(w.join("topic.txt")) {
 		t.Error("topic.txt が取り込まれていない")
 	}
 }
@@ -216,12 +217,12 @@ func TestGitWrapAFastForwardMergeWithNoOverwriteIgnoreGoesThrough(t *testing.T) 
 	t.Parallel()
 	w := newWrap(t)
 	w.succeed(w.run("checkout", "-b", "topic"), "checkout")
-	write(t, w.join("topic.txt"), "topic\n")
+	shkit.Write(t, w.join("topic.txt"), "topic\n")
 	w.run("add", "topic.txt")
 	w.run("commit", "-m", "topic")
 	w.run("checkout", "-")
 	w.succeed(w.run("merge", "--ff-only", "--no-overwrite-ignore", "topic"), "merge")
-	if !exists(w.join("topic.txt")) {
+	if !shkit.Exists(w.join("topic.txt")) {
 		t.Error("topic.txt が取り込まれていない")
 	}
 }
@@ -246,10 +247,10 @@ func TestGitWrapPushFromAChildTicketWorktreeIsRejected(t *testing.T) {
 	w := newWrap(t)
 	bare := w.makeBare()
 	git(t, w.dir, "remote", "add", "origin", bare)
-	write(t, w.join(".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
-	write(t, w.join(".ccnavi", "approved", "doing", "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
+	shkit.Write(t, w.join(".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
+	shkit.Write(t, w.join(".ccnavi", "approved", "doing", "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
 	// 閉じた子。承認済みチケットは done/ に動いているが、ツリーはまだ子のもの。
-	write(t, w.join(".ccnavi", "approved", "done", "i0001-01-02.md"), "---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\n---\n")
+	shkit.Write(t, w.join(".ccnavi", "approved", "done", "i0001-01-02.md"), "---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\n---\n")
 	trees := map[string]string{}
 	for _, name := range []string{"i0001", "i0001-01-01", "i0001-01-02", "free"} {
 		trees[name] = w.addWorktree(name)
@@ -281,8 +282,8 @@ func TestGitWrapPushIsRejectedWhenTheChildTicketLivesInTheParentTree(t *testing.
 		trees[name] = w.addWorktree(name)
 	}
 	doing := filepath.Join(trees["i0001"], ".ccnavi", "approved", "doing")
-	write(t, filepath.Join(doing, "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
-	write(t, filepath.Join(doing, "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
+	shkit.Write(t, filepath.Join(doing, "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
+	shkit.Write(t, filepath.Join(doing, "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
 	push := func(name string) run.Result { return w.runIn(trees[name], nil, "push", "-u", "origin", name) }
 	if r := w.refused(push("i0001-01-01"), "child"); !strings.Contains(r.Stderr, "子チケット") {
 		t.Errorf("stderr = %q", r.Stderr)
@@ -317,30 +318,30 @@ func (w *wrapFix) conflict() string {
 	w.t.Helper()
 	home := w.branch(w.dir)
 	git(w.t, w.dir, "checkout", "-q", "-b", "other")
-	write(w.t, w.join("tracked.txt"), "other\n")
+	shkit.Write(w.t, w.join("tracked.txt"), "other\n")
 	git(w.t, w.dir, "commit", "-q", "-am", "other")
 	git(w.t, w.dir, "checkout", "-q", home)
-	write(w.t, w.join("tracked.txt"), "mine\n")
+	shkit.Write(w.t, w.join("tracked.txt"), "mine\n")
 	git(w.t, w.dir, "commit", "-q", "-am", "mine")
 	gitTry(w.dir, "merge", "other")
 	if status := git(w.t, w.dir, "status", "--porcelain"); !strings.Contains(status, "UU tracked.txt") {
 		w.t.Fatalf("衝突していない: %q", status)
 	}
-	return read(w.t, w.join("tracked.txt"))
+	return shkit.Read(w.t, w.join("tracked.txt"))
 }
 
 func TestGitWrapMergeFileUnionToStdoutWritesNothing(t *testing.T) {
 	t.Parallel()
 	w := newWrap(t)
-	write(t, w.join("current.txt"), "a\nmine\nc\n")
-	write(t, w.join("base.txt"), "a\nb\nc\n")
-	write(t, w.join("other.txt"), "a\ntheirs\nc\n")
+	shkit.Write(t, w.join("current.txt"), "a\nmine\nc\n")
+	shkit.Write(t, w.join("base.txt"), "a\nb\nc\n")
+	shkit.Write(t, w.join("other.txt"), "a\ntheirs\nc\n")
 	r := w.run("merge-file", "-p", "--union", "-L", "ours", "-L", "base", "-L", "theirs", "current.txt", "base.txt", "other.txt")
 	w.succeed(r, "merge-file")
 	if !strings.HasPrefix(r.Stdout, "ok  git merge-file") || !strings.Contains(r.Stdout, "mine\ntheirs\n") {
 		t.Errorf("stdout = %q", r.Stdout)
 	}
-	if got := read(t, w.join("current.txt")); got != "a\nmine\nc\n" {
+	if got := shkit.Read(t, w.join("current.txt")); got != "a\nmine\nc\n" {
 		t.Errorf("current.txt が書き換わった: %q", got)
 	}
 }
@@ -360,7 +361,7 @@ func TestGitWrapMergeFileUnionOfTheThreeStagesWritesNothing(t *testing.T) {
 	if !strings.HasPrefix(r.Stdout, "ok  git merge-file") || !strings.Contains(r.Stdout, "mine\nother\n") || strings.Contains(r.Stdout, "<<<<<<<") {
 		t.Errorf("stdout = %q", r.Stdout)
 	}
-	if read(t, w.join("tracked.txt")) != conflicted || git(t, w.dir, "count-objects") != before {
+	if shkit.Read(t, w.join("tracked.txt")) != conflicted || git(t, w.dir, "count-objects") != before {
 		t.Error("ファイルかオブジェクトが書き換わった")
 	}
 }
@@ -456,7 +457,7 @@ func TestGitWrapKeepsTheHostGitConfigLockout(t *testing.T) {
 	t.Parallel()
 	w := newWrap(t)
 	home := base.TempDir(t)
-	write(t, filepath.Join(home, ".gitconfig"), "[status]\n\tshowUntrackedFiles = no\n")
+	shkit.Write(t, filepath.Join(home, ".gitconfig"), "[status]\n\tshowUntrackedFiles = no\n")
 	r := w.runEnv(map[string]string{"HOME": home, "USERPROFILE": home}, "status", "--porcelain")
 	w.succeed(r, "status")
 	if !strings.Contains(r.Stdout, "untracked.txt") {
@@ -539,12 +540,12 @@ const (
 func newStoreFix(t *testing.T) *wrapFix {
 	w := newWrap(t)
 	for _, rel := range []string{storeCopy, storeReview} {
-		write(t, w.join(filepath.FromSlash(rel)), "old\n")
+		shkit.Write(t, w.join(filepath.FromSlash(rel)), "old\n")
 	}
 	git(t, w.dir, "add", storeCopy, storeReview)
 	git(t, w.dir, "commit", "-q", "-m", "old")
 	for _, rel := range []string{storeCopy, storeReview, "tracked.txt"} {
-		write(t, w.join(filepath.FromSlash(rel)), "new\n")
+		shkit.Write(t, w.join(filepath.FromSlash(rel)), "new\n")
 	}
 	git(t, w.dir, "commit", "-q", "-am", "new")
 	return w
@@ -553,7 +554,7 @@ func newStoreFix(t *testing.T) *wrapFix {
 func (w *wrapFix) assertStoreUntouched() {
 	w.t.Helper()
 	for _, rel := range []string{storeCopy, storeReview} {
-		if got := read(w.t, w.join(filepath.FromSlash(rel))); got != "new\n" {
+		if got := shkit.Read(w.t, w.join(filepath.FromSlash(rel))); got != "new\n" {
 			w.t.Errorf("%s が書き換わった: %q", rel, got)
 		}
 	}
@@ -590,7 +591,7 @@ func TestGitWrapWorktreeAddRejectsAMismatchedName(t *testing.T) {
 	w := newWrap(t)
 	git(t, w.dir, "branch", "other")
 	w.reject("worktree", "add", ".claude/worktrees/a", "other") // 引数だけの形は Go の表が見る
-	if exists(w.join(".claude", "worktrees", "a")) {
+	if shkit.Exists(w.join(".claude", "worktrees", "a")) {
 		t.Error("断ったのに作った")
 	}
 }
@@ -618,7 +619,7 @@ func TestGitWrapMovingAwayFromTheParentBranchIsRejected(t *testing.T) {
 	w := newWrap(t)
 	home := w.branch(w.dir)
 	parent := w.addWorktree("i0001")
-	write(t, filepath.Join(parent, "wip", "proposals", "todo", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
+	shkit.Write(t, filepath.Join(parent, "wip", "proposals", "todo", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
 	w.addWorktree("free")
 	for _, args := range [][]string{{"checkout", home}, {"checkout", "-b", "other"}} {
 		r := w.refused(w.runIn(parent, nil, args...), strings.Join(args, " "))
@@ -656,7 +657,7 @@ func newGate(t *testing.T) *gateFix {
 	git(t, w.dir, "remote", "add", "origin", g.bare)
 	g.tree = w.addWorktree("i0001")
 	// 提案だけの親。
-	write(t, filepath.Join(g.tree, "wip", "proposals", "todo", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
+	shkit.Write(t, filepath.Join(g.tree, "wip", "proposals", "todo", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
 	git(t, g.tree, "add", "wip/proposals/todo/i0001.md")
 	git(t, g.tree, "commit", "-q", "-m", "proposal")
 	return g
@@ -669,7 +670,7 @@ func (g *gateFix) approve(started bool) {
 	if started {
 		mark = "started_at: 2026-10-18T00:00:00Z\n"
 	}
-	write(g.t, filepath.Join(g.tree, ".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\n"+mark+"---\n")
+	shkit.Write(g.t, filepath.Join(g.tree, ".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\n"+mark+"---\n")
 	git(g.t, g.tree, "add", ".ccnavi/approved/doing/i0001.md")
 	git(g.t, g.tree, "commit", "-q", "-m", "copy")
 }
@@ -691,7 +692,7 @@ func (g *gateFix) deleteOnRemote() {
 
 func (g *gateFix) commitFile(name string) {
 	g.t.Helper()
-	write(g.t, filepath.Join(g.tree, name), "x\n")
+	shkit.Write(g.t, filepath.Join(g.tree, name), "x\n")
 	git(g.t, g.tree, "add", name)
 	git(g.t, g.tree, "commit", "-q", "-m", name)
 }
@@ -705,7 +706,7 @@ func TestGitWrapTheFirstPushOfAParentNeverSentPassesAndWritesNothing(t *testing.
 		t.Errorf("HEAD = %s, remote = %s", got, g.remoteSha())
 	}
 	// 取り込み状態は作らない。案内も出さない。
-	if exists(g.join("logs", "state", "sync")) || strings.Contains(r.Stdout, "取り込み状態") {
+	if shkit.Exists(g.join("logs", "state", "sync")) || strings.Contains(r.Stdout, "取り込み状態") {
 		t.Errorf("取り込み状態を作った: %s", r.Stdout)
 	}
 }
@@ -828,7 +829,7 @@ func newLinkedGate(t *testing.T) (*wrapFix, string) {
 	t.Cleanup(func() { _ = os.Remove(link) })
 	git(t, w.dir, "remote", "add", "origin", w.makeBare())
 	tree := w.addWorktree("i0001")
-	write(t, filepath.Join(tree, ".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nstarted_at: 2026-10-18T00:00:00Z\n---\n")
+	shkit.Write(t, filepath.Join(tree, ".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\nstarted_at: 2026-10-18T00:00:00Z\n---\n")
 	git(t, tree, "add", ".ccnavi/approved/doing/i0001.md")
 	git(t, tree, "commit", "-q", "-m", "copy")
 	return w, filepath.Join(link, ".claude", "worktrees", "i0001")
@@ -853,7 +854,7 @@ func TestGitWrapThePushGateIsActiveThroughTheLink(t *testing.T) {
 	}
 	git(t, w.join(".claude", "worktrees", "i0001"), "push", "-q", "origin", "i0001")
 	w.succeed(w.runIn(via, nil, "push", "-u", "origin", "i0001"), "戻したあとの push")
-	if exists(w.join("logs", "state", "sync")) {
+	if shkit.Exists(w.join("logs", "state", "sync")) {
 		t.Error("取り込み状態を作った")
 	}
 }
@@ -905,8 +906,8 @@ func (f *freshFix) pushFromElsewhere() {
 	other := base.TempDir(f.t)
 	git(f.t, other, "clone", "-q", f.bare, "c")
 	clone := filepath.Join(other, "c")
-	identity(f.t, clone)
-	write(f.t, filepath.Join(clone, "new.txt"), "n\n")
+	shkit.Identity(f.t, clone)
+	shkit.Write(f.t, filepath.Join(clone, "new.txt"), "n\n")
 	git(f.t, clone, "add", "new.txt")
 	git(f.t, clone, "commit", "-q", "-m", "ahead")
 	git(f.t, clone, "push", "-q", "origin", "HEAD:"+f.integ)
@@ -1012,12 +1013,12 @@ func TestGitWrapALaterGoodFetchClearsTheFailureMark(t *testing.T) {
 	mark := f.join(".git", "ccnavi-fetch-failed")
 	git(t, f.dir, "remote", "set-url", "origin", f.bare+".gone")
 	f.run("fetch", "origin", f.integ)
-	if !exists(mark) {
+	if !shkit.Exists(mark) {
 		t.Fatal("失敗の印が付かない")
 	}
 	git(t, f.dir, "remote", "set-url", "origin", f.bare)
 	f.succeed(f.run("fetch", "origin", f.integ), "fetch")
-	if exists(mark) {
+	if shkit.Exists(mark) {
 		t.Error("失敗の印が残った")
 	}
 }

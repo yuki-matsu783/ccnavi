@@ -227,7 +227,7 @@ URL に埋めた資格情報は読み飛ばして出力では伏せる。実行�
 `gh auth git-credential` / `glab auth git-credential` を origin のホストだけに環境変数で足す（git 2.31 以上。origin と `.gitconfig` は書き換えず、既存の `credential.helper` が先に使われる）。
 それ以外は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは `GIT_CONFIG_COUNT` を外し
 `GIT_TERMINAL_PROMPT=0` で動くので、環境変数での差し替えも認証画面も使えない。GitLab の実物で分かった注意点は[付録 C](../appendix.md)、
-確かめ直すための道具は `tests/manual/gitlab/probe_gitlab.py`。`--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）で、
+確かめ直すための道具は `gitlabmanual probe`（`go/internal/harness/gitlabprobe`）。`--result` を実行ファイルに直接渡せるのはユーザの手だけ（`CCNAVI_GUARD_TICKET_APPROVAL`）で、
 エージェントはスクリプト 2 本を通す。
 
 push は親だけが行う。hook は子チケットのワークツリーからの `ccnavi-git.sh push` を、誰が打っても拒み

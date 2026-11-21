@@ -1,6 +1,6 @@
 // claude -p のスタブ（harness/fakeclaude）が、本物から録った形と振る舞いに合っているかを見る。
 //
-// 本物の記録は tests/contract/claude/recorded.json（M2 の claudrecord が作る）。場面（木・hook・打つ手）は fakeclaude の scene.go で本物と共有する。
+// 本物の記録は tests/contract/claude/recorded.json（cmd/claudrecord が作る）。場面（木・hook・打つ手）は fakeclaude の scene.go で本物と共有する。
 //   - 形: スタブが出す欄は本物にもあり、型は本物の型に含まれる。本物にだけある欄は比べない（スタブは ccnavi と実行器が読む欄だけを出す）。
 //     ただし ccnavi が読む hook の欄（readsFields）は、本物にあればスタブにもなければならない
 //   - 振る舞い: observations（呼ばれたイベントの並び、止めたときの理由の出どころ、Stop の差し戻し、サブエージェント、--resume、hook の環境）は本物と同じ

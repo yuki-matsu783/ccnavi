@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ccnavi/internal/harness/shkit"
 )
 
 // ユーザが統合先をチェックアウトしているとき、merge と pull で別のブランチを取り込む形を事前に止める。
@@ -15,7 +17,7 @@ func (f *itg) makeBranch(name string) {
 	git(f.t, f.ws, "branch", name)
 	side := filepath.Join(f.tmp, "side-"+name)
 	git(f.t, f.ws, "worktree", "add", "-q", side, name)
-	write(f.t, filepath.Join(side, name+".txt"), name+"\n")
+	shkit.Write(f.t, filepath.Join(side, name+".txt"), name+"\n")
 	git(f.t, side, "add", ".")
 	git(f.t, side, "commit", "-q", "-m", name)
 	git(f.t, f.ws, "worktree", "remove", "--force", side)
@@ -53,7 +55,7 @@ func TestMergeOnTargetInAWorktreeWithoutOwnCommitsMakesAMergeCommit(t *testing.T
 	f.code(f.shIn(f.wt, nil, "merge", "main", "--no-edit"))
 	f.eq(f.parentsOfHead(f.wt), 2, "親の数")
 	f.eq(gitT(t, f.wt, "rev-parse", "HEAD^2"), mainHead, "HEAD^2")
-	f.eq(read(t, filepath.Join(f.wt, "other.txt")), "y\n", "other.txt")
+	f.eq(shkit.Read(t, filepath.Join(f.wt, "other.txt")), "y\n", "other.txt")
 
 	f.code(f.shIn(ffonly, nil, "merge", "--ff-only", "main"))
 	f.eq(gitT(t, ffonly, "rev-parse", "HEAD"), mainHead, "早送りの HEAD")
@@ -63,12 +65,12 @@ func TestMergeOnTargetInAWorktreeWithoutOwnCommitsMakesAMergeCommit(t *testing.T
 func TestMergeOnTargetAbortEndsAConflictedMergeOnTheTarget(t *testing.T) {
 	t.Parallel()
 	f := newItg(t, true)
-	write(t, f.p("keep.txt"), "main\n")
+	shkit.Write(t, f.p("keep.txt"), "main\n")
 	git(t, f.ws, "commit", "-q", "-am", "main side")
 	git(t, f.ws, "branch", "fb", "HEAD~1")
 	side := filepath.Join(f.tmp, "side-fb")
 	git(t, f.ws, "worktree", "add", "-q", side, "fb")
-	write(t, filepath.Join(side, "keep.txt"), "fb\n")
+	shkit.Write(t, filepath.Join(side, "keep.txt"), "fb\n")
 	git(t, side, "commit", "-q", "-am", "fb side")
 	gitTry(f.ws, "merge", "fb") // ユーザが直接打つ git
 	f.mustExist(f.p(".git/MERGE_HEAD"), "MERGE_HEAD")
@@ -91,12 +93,12 @@ func newPullFix(t *testing.T) *itg {
 	// origin に feat（main と分岐）と、先へ進んだ main を置く。
 	side := filepath.Join(f.tmp, "side-origin")
 	git(t, f.ws, "worktree", "add", "-q", side, "-b", "feat", "main")
-	write(t, filepath.Join(side, "feat.txt"), "feat\n")
+	shkit.Write(t, filepath.Join(side, "feat.txt"), "feat\n")
 	git(t, side, "add", ".")
 	git(t, side, "commit", "-q", "-m", "feat")
 	git(t, side, "push", "-q", "origin", "feat")
 	git(t, side, "checkout", "-q", "--detach", "main")
-	write(t, filepath.Join(side, "next.txt"), "next\n")
+	shkit.Write(t, filepath.Join(side, "next.txt"), "next\n")
 	git(t, side, "add", ".")
 	git(t, side, "commit", "-q", "-m", "next")
 	git(t, side, "push", "-q", "origin", "HEAD:main")
@@ -132,7 +134,7 @@ func TestPullOnTargetPullingAParentBranchInsideAWorktreePasses(t *testing.T) {
 	t.Parallel()
 	f := newPullFix(t)
 	f.code(f.shIn(f.wt, nil, "pull", "--no-edit", "origin", "main"))
-	f.eq(read(t, filepath.Join(f.wt, "next.txt")), "next\n", "next.txt")
+	f.eq(shkit.Read(t, filepath.Join(f.wt, "next.txt")), "next\n", "next.txt")
 }
 
 // 統合先のユーザのチェックアウトの pull が衝突したときだけ、ユーザへ頼む案内を足す。
@@ -145,7 +147,7 @@ func newPullConflictFix(t *testing.T) *itg {
 	// origin の main が keep.txt の 2 行目を直す。
 	side := filepath.Join(f.tmp, "side-conflict")
 	git(t, f.ws, "worktree", "add", "-q", side, "-b", "side-c", "origin/main")
-	write(t, filepath.Join(side, "keep.txt"), "1\nremote\n3\n")
+	shkit.Write(t, filepath.Join(side, "keep.txt"), "1\nremote\n3\n")
 	git(t, side, "commit", "-q", "-am", "remote edit")
 	git(t, side, "push", "-q", "origin", "HEAD:main")
 	git(t, f.ws, "worktree", "remove", "--force", side)
@@ -155,7 +157,7 @@ func newPullConflictFix(t *testing.T) *itg {
 
 func (f *itg) commitLocalEdit(cwd string) {
 	f.t.Helper()
-	write(f.t, filepath.Join(cwd, "keep.txt"), "1\nlocal\n3\n")
+	shkit.Write(f.t, filepath.Join(cwd, "keep.txt"), "1\nlocal\n3\n")
 	git(f.t, cwd, "commit", "-q", "-am", "local edit")
 }
 
@@ -167,7 +169,7 @@ func TestPullConflictNoteConflictOnTheTargetAddsTheNote(t *testing.T) {
 	contains(t, r.Stdout, "CONFLICT", pullNote, "restore --theirs / --ours")
 	// merge の途中なら、merge --abort は統合先のユーザのチェックアウトで通る。
 	f.code(f.sh("merge", "--abort"))
-	f.eq(read(t, f.p("keep.txt")), "1\nlocal\n3\n", "keep.txt")
+	f.eq(shkit.Read(t, f.p("keep.txt")), "1\nlocal\n3\n", "keep.txt")
 }
 
 func TestPullConflictNoteConflictInsideAWorktreeHasNoNote(t *testing.T) {
@@ -179,7 +181,7 @@ func TestPullConflictNoteConflictInsideAWorktreeHasNoNote(t *testing.T) {
 	notContains(t, r.Stdout, pullNote)
 	f.code(f.shIn(f.wt, nil, "merge", "--abort"))
 	// 統合先でも、衝突しない pull には足さない。
-	write(t, f.p("mine.txt"), "m\n")
+	shkit.Write(t, f.p("mine.txt"), "m\n")
 	git(t, f.ws, "add", "mine.txt")
 	git(t, f.ws, "commit", "-q", "-m", "mine")
 	r = f.code(f.sh("pull", "--no-edit"))

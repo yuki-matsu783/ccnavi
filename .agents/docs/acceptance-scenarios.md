@@ -137,10 +137,10 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
    （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`、`state.json`。`context-N.md` と `messages.md` は下の「証拠の読み方」。`setup.host` が `fake-gitlab` / `docker-gitlab` なら `host-N.json` も置く。下の「相手側の状態の記録」）。`run-all` の出力は「続けて回す（run-all）」
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。`human_api` か `human_run` のある step は止まらずに進む（擬似端末を作れない環境の `human_run` は 10 で止まる）。
-   `docker-gitlab` のシナリオで 10 で止まる step は、操作者が `tests/manual/gitlab/scenario_tools.py` で代行する（`<出力の置き場>` は止まった回の `logs/scenarios/<ID>-<日時>/`）。素の shell で承認の sh を打たない。
-   - issue を作る（人間役のトークンで 1 件）: `uv run python tests/manual/gitlab/scenario_tools.py issue <出力の置き場> [--title 題]`
-   - 承認を代行する（スタブの git の環境で擬似端末から y を送る）: `uv run python tests/manual/gitlab/scenario_tools.py agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
-   - 記録にトークンの値が出ていないかを確かめる: `uv run python tests/manual/gitlab/scenario_tools.py leak <出力の置き場>`
+   `docker-gitlab` のシナリオで 10 で止まる step は、操作者が `gitlabmanual tools`（`cd go && go run ./internal/harness/cmd/gitlabmanual tools …`）で代行する（`<出力の置き場>` は止まった回の `logs/scenarios/<ID>-<日時>/`）。素の shell で承認の sh を打たない。
+   - issue を作る（人間役のトークンで 1 件）: `gitlabmanual tools issue <出力の置き場> [--title 題]`
+   - 承認を代行する（スタブの git の環境で擬似端末から y を送る）: `gitlabmanual tools agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
+   - 記録にトークンの値が出ていないかを確かめる: `gitlabmanual tools leak <出力の置き場>`
    人間が「次へ」と言ったら `cd go && go run ./internal/harness/cmd/scenarios next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
    続けずにやめるときは `cd go && go run ./internal/harness/cmd/scenarios restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
 5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない

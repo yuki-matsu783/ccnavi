@@ -3,7 +3,7 @@ title: claude -p のスタブと、本物との契約テスト
 type: guide
 description: 受入シナリオを本物の claude -p の代わりに台本どおりに動くスタブ（go/internal/harness/fakeclaude）で回す仕組み。台本の書き方、スタブが真似る hook の呼び方と応答の扱い、本物から録った形（recorded.json）と比べる契約テスト、録り直し、確かめられないこと
 tags: [testing, scenario]
-keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, claude -p, stream-json, hook, 契約テスト, claudeside, recorded.json, record_hooks, observations, SubagentHandback, CLAUDE_CODE_ENTRYPOINT]
+keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, claude -p, stream-json, hook, 契約テスト, fakeclaude, scene.go, recorded.json, claudrecord, observations, SubagentHandback, CLAUDE_CODE_ENTRYPOINT]
 ---
 
 # claude -p のスタブと、本物との契約テスト
@@ -18,10 +18,10 @@ keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, cl
 | 置き場 | 中身 |
 |---|---|
 | `go/internal/harness/fakeclaude` | スタブの本体。実行器が `claude` と同じ引数で起こす |
-| `tests/contract/claudeside.py` | 本物とスタブで共有する場面（使い捨ての木、hook の入力を書き出すだけの hook、打つ手）と、形・振る舞いへのまとめ |
+| `go/internal/harness/fakeclaude/scene.go` | 本物とスタブで共有する場面（使い捨ての木、hook の入力を書き出すだけの hook、打つ手）と、形・振る舞いへのまとめ |
 | `tests/contract/claude/recorded.json` | 本物の `claude -p` から録った形と振る舞い。**本物だけ** |
 | `go/internal/clitest/contract/claude/contract_test.go` | スタブ（`go/internal/harness/fakeclaude`）を同じ場面で回し、`recorded.json` と比べる（約 4 秒） |
-| `tests/manual/claude/record_hooks.py` | 本物から録る道具。手で回す（費用がかかる） |
+| `go/internal/harness/cmd/claudrecord` | 本物から録る道具。手で回す（費用がかかる） |
 
 ## スタブで回す
 
@@ -89,7 +89,7 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 ## 本物との契約
 
 スタブが本物とずれると、スタブでは通るのに本物で壊れる。GitLab の契約（[gitlab-contract.md](gitlab-contract.md)）と同じく、本物から録った形と比べて防ぐ。
-場面は `claudeside.py` が持ち、本物には自然文の `PROMPT`、スタブには同じ手の台本 `SCRIPT` を渡す。
+場面は `fakeclaude/scene.go` が持ち、本物には自然文の `Prompt`、スタブには同じ手の台本 `ScenePlan(0)` を渡す。
 
 `contract_test.go` が比べるもの:
 
@@ -100,17 +100,17 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 
 ### 録り直す
 
-Claude Code の版を上げたとき、スタブに手を足すとき（`claudeside.py` の `PROMPT` と `SCRIPT` に同じ手を足す）に録り直す。`PROMPT` にだけある「サブエージェントを同期で起動する」指示は、本物を同期に固定するためのもので、`SCRIPT` には対応する欄が無い（スタブは同期の形だけを出す）。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
+Claude Code の版を上げたとき、スタブに手を足すとき（`scene.go` の `Prompt` と `ScenePlan` に同じ手を足す）に録り直す。`Prompt` にだけある「サブエージェントを同期で起動する」指示は、本物を同期に固定するためのもので、`ScenePlan` には対応する欄が無い（スタブは同期の形だけを出す）。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
 
 ```sh
-uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2 --dry-run   # 置かずに標準出力へ
-uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2
+cd go && go run ./internal/harness/cmd/claudrecord --max-budget-usd 2 --dry-run   # 置かずに標準出力へ
+cd go && go run ./internal/harness/cmd/claudrecord --max-budget-usd 2
 ```
 
 - 使い捨ての木で `claude -p --model haiku --setting-sources project` を 2 回（2 回目は `--resume`）回す。上限は 1 回ごとに `--max-budget-usd`。費用の合計を最後に出す
 - 録るのは形（型とキー）と振る舞いだけで、値は持たない。キーにモデルの名前や呼び出しの ID が入る辞書は、キーを `<model>`・`<id>` にまとめる。モデルの名前・機械のパス・メールの形・呼び出しの ID が残っていれば置かない
 - 値を含む生の記録は `scratchpad/claude-record/`（追跡されない）に残る。スタブを直すときに読む
-- 録り直したら `python -m tests tests/contract` を回し、落ちたら本物に合わせてスタブを直す
+- 録り直したら `cd go && go test -count=1 ./internal/clitest/contract/claude/` を回し、落ちたら本物に合わせてスタブを直す
 
 ## 確かめられないこと
 

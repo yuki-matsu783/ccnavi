@@ -1,5 +1,5 @@
 #!/bin/sh
-# 偽の GitLab（tests/manual/gitlab/fake_gitlab.py）と手元の bare を立て、検証用コピーの origin をそこへ向ける。
+# 偽の GitLab（go/internal/harness/cmd/fakegitlab）と手元の bare を立て、検証用コピーの origin をそこへ向ける。
 # チケット作業は issue と MR（ホスト）が要るので、実画面の確認と haiku の通し試験の前に使う。
 #
 #   sh fake-host.sh up   <作業ディレクトリ> <検証用コピー> [<ポート>] [<issue のタイトル> [<issue の本文>]]
@@ -33,13 +33,12 @@ up)
 	mkdir -p "$work/bin"
 	rm -rf "$work/remote.git"
 	git init -q --bare -b main "$work/remote.git"
-	TITLE=$title BODY=$body PORT=$port python3 - "$work/state.json" <<'PY'
-import json, os, sys
-issue = {"iid": 1, "title": os.environ["TITLE"], "description": os.environ["BODY"], "state": "opened", "labels": [],
-         "web_url": f"http://127.0.0.1:{os.environ['PORT']}/demo/greeter/-/issues/1", "author": {"id": 2, "username": "reviewer"}}
-json.dump({"project": "demo/greeter", "seq": 100, "mrs": [], "issues": [issue]}, open(sys.argv[1], "w", encoding="utf-8"), ensure_ascii=False)
-PY
-	(cd "$ccnavi" && setsid nohup uv run python tests/manual/gitlab/fake_gitlab.py "$work/state.json" "$port" >"$work/fake.log" 2>&1 </dev/null &)
+	jq -n --arg title "$title" --arg body "$body" --arg url "http://127.0.0.1:$port/demo/greeter/-/issues/1" \
+		'{project: "demo/greeter", seq: 100, mrs: [], issues: [{iid: 1, title: $title, description: $body, state: "opened", labels: [], web_url: $url, author: {id: 2, username: "reviewer"}}]}' \
+		>"$work/state.json"
+	# 止めるときに名前で探せるよう、組み立てて直に起こす（go run は子の実行ファイルを挟む）
+	(cd "$ccnavi/go" && go build -o "$work/fakegitlab" ./internal/harness/cmd/fakegitlab)
+	setsid nohup "$work/fakegitlab" "$work/state.json" "$port" >"$work/fake.log" 2>&1 </dev/null &
 	i=0
 	until grep -q listening "$work/fake.log" 2>/dev/null; do
 		i=$((i + 1))
@@ -71,7 +70,7 @@ EOF
 	echo "次を設定する: export PATH=$work/bin:\$PATH GITLAB_TOKEN=fake-gitlab-token-0001"
 	;;
 down)
-	pid=$(pgrep -f "[f]ake_gitlab.py $work/state.json" || :)
+	pid=$(pgrep -f "[f]akegitlab $work/state.json" || :)
 	[ -z "$pid" ] || kill $pid
 	echo "止めた"
 	;;
