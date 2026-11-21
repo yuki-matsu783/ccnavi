@@ -29,7 +29,6 @@ VS Code本体の配布元、GitHubのリリース、Open VSXは403で、`code`�
 | Node.js 22.13.1以上とnpm | 拡張の組み立て、code-server | `node -v` |
 | pnpm 10 | 拡張の組み立て | `pnpm -v`（壊れていたら詰まりどころの表） |
 | Go（`go/go.mod`の版以上） | ccnaviの組み立て | `go version` |
-| uvとPython 3.12以上 | チケットの見本を作る | `uv --version` |
 | PlaywrightのChromium | 撮影 | Playwrightのブラウザの置き場（環境変数`PLAYWRIGHT_BROWSERS_PATH`。無ければLinuxは`~/.cache/ms-playwright`、macOSは`~/Library/Caches/ms-playwright`、Windowsは`%LOCALAPPDATA%\ms-playwright`）の`chromium*`。クラウドのコンテナでは`/opt/pw-browsers/`のこともある |
 | git | 検証用コピーのワークツリー | `git --version` |
 
@@ -100,86 +99,15 @@ test-repo本体に反映するときは`--force`を付けない（付けると�
 
 ### 1.3チケットを並べる（親2・子4）
 
-何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`tests/ticketsample.py`）で、次の状態を作る。
+何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`go/internal/harness/samples`）で、次の状態を作る。
 
 - 親A: 承認済み。調査の子は完了、設計の子は作業中（ワークツリーあり）、実装の子は承認待ち
 - 親B: 承認待ち（子1件も承認待ち）
 
-次を`$W/seed.py`に保存して実行する。
-
-```python
-# seed.py: python3 seed.py <検証用コピー> <ccnavi のリポジトリ>
-import os, subprocess, sys
-
-root, ccnavi = sys.argv[1], sys.argv[2]
-sys.path.insert(0, ccnavi)
-from tests.ticketsample import parent_text, child_text  # noqa: E402
-
-phases = open(f"{root}/.ccnavi/config/common/phases.yml", encoding="utf-8").read()
-A, B = "feature-101-ログイン画面", "fix-102-日本語の文字化け"
-
-
-def git(*args, cwd=root):
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, check=True)
-
-
-def put(rel, text):
-    fam = A if A in rel else B  # チケットは親のワークツリーに置く
-    path = os.path.join(root, ".claude/worktrees", fam, rel)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    open(path, "w", encoding="utf-8", newline="").write(text)
-
-
-def parent(name, title, plan, issue):
-    text = parent_text(name, plan, issue=issue, copy=phases).replace("title: 親", f"title: {title}")
-    return text.replace("reason: t", "reason: 画面の見た目が変わるため")
-
-
-def child(name, par, phase, title, scope, review=True):
-    return child_text(name, par, phase, scope, review).replace(
-        f"title: 子 {name}", f"title: {title}"
-    )
-
-
-for fam in (A, B):  # 親ごとにブランチとワークツリー（無いと承認も着手もできない）
-    git("branch", fam)
-    git("worktree", "add", f".claude/worktrees/{fam}", fam)
-
-started = 'started_at: "2026-10-20T09:00:00+09:00"'
-done = 'completed_at: "2026-10-20T11:00:00+09:00"'
-a = parent(A, "ログイン画面を追加する", ["research", "design", "implement"], 101)
-put(f".ccnavi/approved/doing/{A}.md", a.replace('started_at: ""', started))
-c1 = child(f"{A}-01-01", A, 1, "ログイン方式の調査", ("wip/research/*",), False)
-put(
-    f".ccnavi/approved/done/{A}-01-01.md",
-    c1.replace('started_at: ""', started).replace('completed_at: ""', done),
-)
-c2 = child(f"{A}-02-01", A, 2, "ログイン画面の設計", ("wip/design/*",))
-put(f".ccnavi/approved/doing/{A}-02-01.md", c2.replace('started_at: ""', started))
-put(
-    f"wip/proposals/todo/{A}-03-01.md",
-    child(f"{A}-03-01", A, 3, "ログイン画面の実装", ("src/*", "tests/*")),
-)
-put(
-    f"wip/proposals/todo/{B}.md",
-    parent(B, "CSV 出力の日本語が文字化けする不具合を直す", ["quick-work"], 102),
-)
-put(
-    f"wip/proposals/todo/{B}-01-01.md",
-    child(f"{B}-01-01", B, 1, "文字コードを UTF-8（BOM 付き）にそろえる", ("src/*", "tests/*")),
-)
-
-for fam in (A, B):
-    wt = f"{root}/.claude/worktrees/{fam}"
-    git("add", "-A", cwd=wt)
-    git("commit", "-qm", f"チケット: {fam}", cwd=wt)
-# 設計の子は着手済み（子のワークツリーを切る）
-git("branch", f"{A}-02-01", A)
-git("worktree", "add", f".claude/worktrees/{A}-02-01", f"{A}-02-01")
-```
+検証用コピーへ、次で置く。
 
 ```sh
-python3 "$W/seed.py" "$UC" "$CCNAVI"
+(cd "$CCNAVI/go" && go run ./internal/harness/cmd/seedboard "$UC")
 sh "$UC/.ccnavi/scripts/ccnavi-launcher.sh" --lint | tail -3    # error 0 件になること（warn は出てよい）
 ```
 
