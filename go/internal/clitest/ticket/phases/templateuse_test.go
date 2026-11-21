@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/yaml"
 )
 
@@ -75,7 +76,7 @@ func (u *use) put(name, text, layer string) string {
 	if layer != "common" {
 		where = "project"
 	}
-	return write(u.t, filepath.Join(u.root, ".ccnavi", "config", where, "templates", name+".yml"), text)
+	return ticketkit.Write(u.t, filepath.Join(u.root, ".ccnavi", "config", where, "templates", name+".yml"), text)
 }
 
 // newTicket は `ticket new` を打つ。issue と MR は渡さなければ既定を足す。
@@ -105,7 +106,7 @@ func (u *use) newTicket(template, ident, cwd string, extra ...string) run.Result
 
 func (u *use) newT(extra ...string) run.Result { return u.newTicket("feature", "", "", extra...) }
 
-func (u *use) written() string { return read(u.t, u.todo) }
+func (u *use) written() string { return ticketkit.Read(u.t, u.todo) }
 
 func (u *use) flowsDir() string { return filepath.Join(u.tree, "wip", "proposals", "flows") }
 
@@ -116,7 +117,7 @@ func (u *use) draftOf(n int) string { return filepath.Join(u.flowsDir(), child(n
 // assertApprovable は空欄の目印を埋めてコミットすれば、`--lint` に error が無く、承認の確認が通ること。
 func (u *use) assertApprovable() {
 	u.t.Helper()
-	write(u.t, u.todo, placeholder.ReplaceAllString(u.written(), "書いた内容"))
+	ticketkit.Write(u.t, u.todo, placeholder.ReplaceAllString(u.written(), "書いた内容"))
 	u.git(u.tree, "add", "-A")
 	u.git(u.tree, "commit", "--quiet", "-m", "scaffold")
 	lint := u.ccnavi("--lint", "--mode", "enable")
@@ -130,7 +131,7 @@ func (u *use) assertApprovable() {
 
 func (u *use) nothingWritten() {
 	u.t.Helper()
-	if exists(u.todo) || exists(u.flowsDir()) {
+	if ticketkit.Exists(u.todo) || ticketkit.Exists(u.flowsDir()) {
 		u.t.Error("断ったのに何かを書いた")
 	}
 }
@@ -156,7 +157,7 @@ func TestATemplateWithoutFeedbackOrFlowsAndAWarningThatDoesNotStop(t *testing.T)
 	r := u.mustOK(u.newTicket("small", "", ""), "ticket new")
 	lacks(t, "stdout", r.Stdout, "--with-feedback")
 	contains(t, "stdout", r.Stdout, "フローの下書きはありません")
-	if exists(u.flowsDir()) {
+	if ticketkit.Exists(u.flowsDir()) {
 		t.Error("フローが無いのに下書きの置き場ができた")
 	}
 	plan := stepsOf(frontOf(t, u.written()), "plan")
@@ -180,22 +181,22 @@ func TestAnExistingFlowDraftOrChildProposalStopsItAndNothingIsWritten(t *testing
 	t.Parallel()
 	u := newUse(t)
 	u.put("feature", useFeature, "common")
-	write(t, u.draftOf(3), "keep\n")
+	ticketkit.Write(t, u.draftOf(3), "keep\n")
 	r := u.newT()
 	if r.Code == 0 {
 		t.Fatal("既にあるフロー下書きがあるのに通った")
 	}
 	contains(t, "stderr", r.Stderr, "上書きしない", child(3))
-	if exists(u.todo) {
+	if ticketkit.Exists(u.todo) {
 		t.Error("親の提案を書いた")
 	}
-	if read(t, u.draftOf(3)) != "keep\n" {
+	if ticketkit.Read(t, u.draftOf(3)) != "keep\n" {
 		t.Error("既にあるフロー下書きを上書きした")
 	}
 	remove(t, u.draftOf(3))
-	write(t, filepath.Join(u.tree, "wip", "proposals", "todo", child(3)+".md"), "x\n")
+	ticketkit.Write(t, filepath.Join(u.tree, "wip", "proposals", "todo", child(3)+".md"), "x\n")
 	r = u.newT()
-	if r.Code == 0 || !strings.Contains(r.Stderr, "上書きしない") || exists(u.todo) {
+	if r.Code == 0 || !strings.Contains(r.Stderr, "上書きしない") || ticketkit.Exists(u.todo) {
 		t.Errorf("既にある子の提案: code %d\n%s", r.Code, r.Stderr)
 	}
 	// 子の識別子が長さの上限に収まらない親は断る
@@ -205,7 +206,7 @@ func TestAnExistingFlowDraftOrChildProposalStopsItAndNothingIsWritten(t *testing
 	if r.Code == 0 || !strings.Contains(r.Stderr, "子の識別子") {
 		t.Errorf("長すぎる識別子: code %d\n%s", r.Code, r.Stderr)
 	}
-	if exists(filepath.Join(tree, "wip", "proposals")) {
+	if ticketkit.Exists(filepath.Join(tree, "wip", "proposals")) {
 		t.Error("断ったのに何かを書いた")
 	}
 }
@@ -264,7 +265,7 @@ func TestANameThatClashesUsesTheCommonOneAndSaysSo(t *testing.T) {
 
 func (u *use) take() run.Result {
 	rel := targetRel(parentName, "common", "")
-	write(u.t, filepath.Join(u.root, "wip", "handoff", filepath.FromSlash(rel)), u.readDraft())
+	ticketkit.Write(u.t, filepath.Join(u.root, "wip", "handoff", filepath.FromSlash(rel)), u.readDraft())
 	remove(u.t, u.draftPath(parentName))
 	return u.handoff(rel, u.root)
 }
@@ -301,7 +302,7 @@ func assertSamePlan(t *testing.T, original, made *yaml.Map) {
 
 func (u *use) readFlow(n int) *yaml.Map {
 	u.t.Helper()
-	data, err := yaml.Load(read(u.t, u.draftOf(n)))
+	data, err := yaml.Load(ticketkit.Read(u.t, u.draftOf(n)))
 	m, _ := data.(*yaml.Map)
 	if err != nil || m == nil {
 		u.t.Fatalf("フローの下書きが読めない: %v", err)

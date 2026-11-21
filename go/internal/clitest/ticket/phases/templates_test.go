@@ -15,6 +15,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 作業・レビュー計画のテンプレート（読む側）の受入テスト（tests/ticket/test_plan_templates.py）。
@@ -76,7 +77,7 @@ type tpl struct {
 
 func newTpl(t *testing.T) *tpl {
 	r := &tpl{t: t, root: base.TempDir(t)}
-	write(t, base.CommonPath(r.root, "phases"), samples.Phases)
+	ticketkit.Write(t, base.CommonPath(r.root, "phases"), samples.Phases)
 	return r
 }
 
@@ -96,8 +97,10 @@ func (r *tpl) path(layer, name string) string {
 	return filepath.Join(dir, "templates", name+".yml")
 }
 
-func (r *tpl) common(name, text string) string { return write(r.t, r.path("common", name), text) }
-func (r *tpl) own(name, text string) string    { return write(r.t, r.path("self", name), text) }
+func (r *tpl) common(name, text string) string {
+	return ticketkit.Write(r.t, r.path("common", name), text)
+}
+func (r *tpl) own(name, text string) string { return ticketkit.Write(r.t, r.path("self", name), text) }
 
 func (r *tpl) ccnavi(args ...string) run.Result {
 	r.t.Helper()
@@ -110,7 +113,7 @@ func (r *tpl) answer(args ...string) map[string]any {
 	if res.Code != 0 {
 		r.t.Fatalf("code %d\n%s", res.Code, res.Stderr)
 	}
-	return jsonOf(r.t, res.Stdout)
+	return ticketkit.ParseJSON(r.t, res.Stdout)
 }
 
 func (r *tpl) entry(layer, name string) map[string]any {
@@ -157,7 +160,7 @@ func TestAReviewFalseIsAllowedAndAChangedDefinitionOnlyWarns(t *testing.T) {
 	}
 	// 型が phases.yml から消えても、読むのも一覧も止まらない（使うときの承認で error になる）。
 	r.own("feature", featureTemplate)
-	write(t, base.CommonPath(r.root, "phases"), strings.Replace(samples.Phases, "  design:", "  design2:", 1))
+	ticketkit.Write(t, base.CommonPath(r.root, "phases"), strings.Replace(samples.Phases, "  design:", "  design2:", 1))
 	row := r.entry("self", "feature")
 	if got := problemsOf(row, "error"); len(got) != 0 {
 		t.Errorf("型が消えて error: %v", got)
@@ -191,22 +194,22 @@ func TestTheTextOutputs(t *testing.T) {
 		t.Fatalf("code %d\n%s", shown.Code, shown.Stderr)
 	}
 	contains(t, "--show", shown.Stdout, "テンプレート: feature（self）", "2. implement（after 1）", "name: feature")
-	tmpl := jsonOf(t, r.ccnavi("--templates", "--show", "feature", "--json").Stdout)["template"].(map[string]any)
+	tmpl := ticketkit.ParseJSON(t, r.ccnavi("--templates", "--show", "feature", "--json").Stdout)["template"].(map[string]any)
 	sum := sha256.Sum256([]byte(featureTemplate))
 	if tmpl["name"] != "feature" || tmpl["text"] != featureTemplate || tmpl["sha"] != hex.EncodeToString(sum[:]) {
 		t.Errorf("--show --json の template = %v", tmpl)
 	}
 	// 使わない理由を言う。統合結果の相手でないレイヤーの置き場の苦情は混ぜない。
 	r.common("broken", "name: [\n")
-	write(t, filepath.Join(filepath.Dir(r.path("self", "x")), "notes.txt"), "x")
-	write(t, r.path("lib", "lib"), templateText("lib", "  - design\n", "", ""))
+	ticketkit.Write(t, filepath.Join(filepath.Dir(r.path("self", "x")), "notes.txt"), "x")
+	ticketkit.Write(t, r.path("lib", "lib"), templateText("lib", "  - design\n", "", ""))
 	text := r.ccnavi("--templates").Stdout
 	contains(t, "一覧", text, "broken  [common]（使わない: invalid）  YAML として読めない", "notes.txt")
 	other := r.ccnavi("--templates", "--layer", "lib").Stdout
 	lacks(t, "lib の一覧", other, "notes.txt")
 	contains(t, "lib の一覧", other, "lib  [lib]")
 	// 書かずに検査する --check-file のテキスト。
-	path := write(t, filepath.Join(r.root, "tmp-check", "feature.yml"), featureTemplate)
+	path := ticketkit.Write(t, filepath.Join(r.root, "tmp-check", "feature.yml"), featureTemplate)
 	checked := r.ccnavi("--templates", "--check-file", path)
 	if checked.Code != 0 {
 		t.Fatalf("code %d\n%s", checked.Code, checked.Stderr)
@@ -229,7 +232,7 @@ func TestFailuresAndWrongCombinationsAreRefused(t *testing.T) {
 		{"--templates", "--show", "feature", "--layer", "nowhere", "--json"},
 	} {
 		out := r.ccnavi(args...)
-		answer := jsonOf(t, out.Stdout)
+		answer := ticketkit.ParseJSON(t, out.Stdout)
 		if out.Code != 1 || answer["ok"] != false || answer["error"] == "" || answer["version"] != float64(templatesJSONVersion) || out.Stderr != "" {
 			t.Errorf("%v: code %d, answer %v, stderr %q", args, out.Code, answer, out.Stderr)
 		}
@@ -253,7 +256,7 @@ func TestFailuresAndWrongCombinationsAreRefused(t *testing.T) {
 			t.Errorf("%v: code %d, stderr %q, stdout %q", c.args, out.Code, out.Stderr, out.Stdout)
 		}
 	}
-	path := write(t, filepath.Join(r.root, "tmp-check", "feature.yml"), featureTemplate)
+	path := ticketkit.Write(t, filepath.Join(r.root, "tmp-check", "feature.yml"), featureTemplate)
 	for _, extra := range [][]string{{"--show", "x"}, {"--draft", "p"}, {"--keyword", "k"}} {
 		out := r.ccnavi(append([]string{"--templates", "--check-file", path}, extra...)...)
 		if out.Code == 0 || !strings.Contains(out.Stderr, "--check-file") {
@@ -265,7 +268,7 @@ func TestFailuresAndWrongCombinationsAreRefused(t *testing.T) {
 		t.Errorf("code %d\n%s", alone.Code, alone.Stderr)
 	}
 	res := r.ccnavi("--templates", "--check-file", path, "--layer", "nothing", "--json")
-	if res.Code != 1 || jsonOf(t, res.Stdout)["ok"] != false {
+	if res.Code != 1 || ticketkit.ParseJSON(t, res.Stdout)["ok"] != false {
 		t.Errorf("code %d\n%s", res.Code, res.Stdout)
 	}
 }
@@ -276,7 +279,7 @@ func TestProblemsAreReportedWithTheirLayer(t *testing.T) {
 	lint := func() []map[string]any {
 		var out []map[string]any
 		res := r.ccnavi("--lint", "--json", "--mode", "enable")
-		for _, p := range jsonOf(t, res.Stdout)["problems"].([]any) {
+		for _, p := range ticketkit.ParseJSON(t, res.Stdout)["problems"].([]any) {
 			m := p.(map[string]any)
 			if strings.Contains(m["where"].(string), "templates") {
 				out = append(out, m)
@@ -295,7 +298,7 @@ func TestProblemsAreReportedWithTheirLayer(t *testing.T) {
 	r.own("research", strings.Replace(researchTemplate, "調べてから", "調べずに", 1))
 	r.own("ends", templateText("ends", "  - design\n  - acceptance\n", "", ""))
 	r.own("unknown", templateText("unknown", "  - docs\n", "", ""))
-	write(t, r.path("lib", "broken"), "name: [\n")
+	ticketkit.Write(t, r.path("lib", "broken"), "name: [\n")
 	found := map[string]bool{}
 	var details []string
 	for _, p := range lint() {
@@ -315,12 +318,12 @@ func TestProblemsAreReportedWithTheirLayer(t *testing.T) {
 
 func (r *tpl) check(text, name string, args ...string) map[string]any {
 	r.t.Helper()
-	path := write(r.t, filepath.Join(r.root, "tmp-check", name+".yml"), text)
+	path := ticketkit.Write(r.t, filepath.Join(r.root, "tmp-check", name+".yml"), text)
 	res := r.ccnavi(append([]string{"--templates", "--check-file", path, "--json"}, args...)...)
 	if res.Code != 0 {
 		r.t.Fatalf("code %d\n%s", res.Code, res.Stderr)
 	}
-	return jsonOf(r.t, res.Stdout)
+	return ticketkit.ParseJSON(r.t, res.Stdout)
 }
 
 func TestAPlanOnlyTemplateHasOneGraphAndUnreadableYAMLIsInvalid(t *testing.T) {
@@ -348,7 +351,7 @@ func TestTheCheckFileAnswerMatchesTheFixture(t *testing.T) {
 	for _, p := range got["plans"].([]any) {
 		p.(map[string]any)["source_sha"] = "<sha>"
 	}
-	fixture := jsonOf(t, read(t, filepath.Join(base.Root(), "tests", "fixtures", "templates-check-json.json")))
+	fixture := ticketkit.ParseJSON(t, ticketkit.Read(t, filepath.Join(base.Root(), "tests", "fixtures", "templates-check-json.json")))
 	sameJSON(t, "答え", got, fixture["expect"])
 	if s, _ := fixture["about"].(string); s == "" {
 		t.Error("見本に about が無い")
@@ -357,29 +360,29 @@ func TestTheCheckFileAnswerMatchesTheFixture(t *testing.T) {
 
 // showcase は答えの形の見本にするワークスペース。統合結果・衝突・壊れたファイル・検査の苦情が一通り出る。
 func showcase(t testing.TB, root string) {
-	write(t, base.CommonPath(root, "phases"), samples.Phases)
+	ticketkit.Write(t, base.CommonPath(root, "phases"), samples.Phases)
 	common := filepath.Dir(base.CommonPath(root, "rules")) + "/templates/"
 	own := filepath.Dir(base.ConfigPath(root, "rules")) + "/templates/"
-	write(t, common+"feature.yml", featureTemplate)
-	write(t, common+"research.yml", researchTemplate)
-	write(t, common+"broken.yml", "name: [\n")
-	write(t, own+"feature.yml", featureTemplate)
-	write(t, own+"research.yml", strings.Replace(researchTemplate, "調べてから", "調べずに", 1))
-	write(t, own+"local.yml", templateText("local", "  - docs\n", "このプロジェクトだけの作業", ""))
-	write(t, own+"ends.yml", templateText("ends", "  - design\n  - acceptance\n", "終端が 2 つ", ""))
-	write(t, own+"notes.txt", "x")
+	ticketkit.Write(t, common+"feature.yml", featureTemplate)
+	ticketkit.Write(t, common+"research.yml", researchTemplate)
+	ticketkit.Write(t, common+"broken.yml", "name: [\n")
+	ticketkit.Write(t, own+"feature.yml", featureTemplate)
+	ticketkit.Write(t, own+"research.yml", strings.Replace(researchTemplate, "調べてから", "調べずに", 1))
+	ticketkit.Write(t, own+"local.yml", templateText("local", "  - docs\n", "このプロジェクトだけの作業", ""))
+	ticketkit.Write(t, own+"ends.yml", templateText("ends", "  - design\n  - acceptance\n", "終端が 2 つ", ""))
+	ticketkit.Write(t, own+"notes.txt", "x")
 	if err := os.MkdirAll(filepath.Join(root, "projects", "lib", ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(root, "projects", "lib", ".ccnavi/config/project/templates/lib.yml"), templateText("lib", "  - research\n", "lib の調べもの", ""))
+	ticketkit.Write(t, filepath.Join(root, "projects", "lib", ".ccnavi/config/project/templates/lib.yml"), templateText("lib", "  - research\n", "lib の調べもの", ""))
 	// 下書き（効力は無い）。TODO の残り・同名の既存・読めないもの。
 	drafts := filepath.Join(root, "wip", "handoff", ".ccnavi", "config", "project", "templates") + "/"
 	login := strings.Replace(strings.Replace(featureTemplate, "feature", "login", -1), "機能を設計から", "TODO ログインを設計から", 1)
-	write(t, drafts+"login.yml", login)
-	write(t, drafts+"research.yml", researchTemplate)
-	write(t, drafts+"broken.yml", "name: [\n")
+	ticketkit.Write(t, drafts+"login.yml", login)
+	ticketkit.Write(t, drafts+"research.yml", researchTemplate)
+	ticketkit.Write(t, drafts+"broken.yml", "name: [\n")
 	// 同じ中身の下書きがもう 1 つのツリー（lib）にもある（also_in に値が入る）。
-	write(t, filepath.Join(root, "projects", "lib", "wip", "handoff", ".ccnavi/config/project/templates/login.yml"), login)
+	ticketkit.Write(t, filepath.Join(root, "projects", "lib", "wip", "handoff", ".ccnavi/config/project/templates/login.yml"), login)
 }
 
 var yamlReason = regexp.MustCompile(`(YAML として読めない) \(.*\)`)
@@ -415,8 +418,8 @@ func TestTheTemplatesJSONAnswerMatchesTheFixture(t *testing.T) {
 		t.Fatalf("code %d\n%s", res.Code, res.Stderr)
 	}
 	quoted, _ := json.Marshal(root)
-	answer := jsonOf(t, strings.ReplaceAll(res.Stdout, string(quoted[1:len(quoted)-1]), "<root>"))
-	fixture := jsonOf(t, read(t, filepath.Join(base.Root(), "tests", "fixtures", "templates-json.json")))
+	answer := ticketkit.ParseJSON(t, strings.ReplaceAll(res.Stdout, string(quoted[1:len(quoted)-1]), "<root>"))
+	fixture := ticketkit.ParseJSON(t, ticketkit.Read(t, filepath.Join(base.Root(), "tests", "fixtures", "templates-json.json")))
 	sameJSON(t, "答え", plainShape(answer), plainShape(fixture["expect"]))
 	if s, _ := fixture["about"].(string); s == "" {
 		t.Error("見本に about が無い")

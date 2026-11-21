@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 全体計画の順序を計画のステップの `after` で決めることの受入テスト（tests/ticket/test_phases_dag.py）。
@@ -118,12 +119,12 @@ func (w *ws) moveByHand(text string, name ...string) {
 	if len(name) > 0 {
 		at = name[0]
 	}
-	write(w.t, w.doing(at), text)
+	ticketkit.Write(w.t, w.doing(at), text)
 	w.commitParent("moved by hand")
 }
 
 func (w *ws) front(name string) []step {
-	return stepsOf(frontOf(w.t, read(w.t, w.doing(name))), "plan")
+	return stepsOf(frontOf(w.t, ticketkit.Read(w.t, w.doing(name))), "plan")
 }
 
 func TestParallelBranchesStartTogetherAndTheJoinWaits(t *testing.T) {
@@ -193,12 +194,12 @@ func TestNoWorkflowFileIsWrittenAndTheTicketIsMovedAsIs(t *testing.T) {
 	w := newDagWS(t)
 	w.propose(parentName, w.parent(dagPlan(), samples.ParentOpts{}))
 	w.commitParent()
-	before := read(t, w.todo(parentName))
+	before := ticketkit.Read(t, w.todo(parentName))
 	w.mustApprove()
-	if got := read(t, w.doing(parentName)); got != before {
+	if got := ticketkit.Read(t, w.doing(parentName)); got != before {
 		t.Errorf("承認が提案の中身を変えた:\n%s", got)
 	}
-	if exists(w.approved + "/phases/i0001/workflow.yml") {
+	if ticketkit.Exists(w.approved + "/phases/i0001/workflow.yml") {
 		t.Error("workflow.yml が書かれた")
 	}
 	if got := w.waits()[4]; !reflect.DeepEqual(got, []int{1, 2, 3}) {
@@ -355,7 +356,7 @@ func TestExplainNamesEveryBranchAtWork(t *testing.T) {
 	w.closeFirstPhase()
 	w.proposeBranches()
 	w.mustApprove()
-	body := jsonOf(t, w.ccnavi("--explain", "--json").Stdout)
+	body := ticketkit.ParseJSON(t, w.ccnavi("--explain", "--json").Stdout)
 	for _, p := range body["parents"].([]any) {
 		owner := p.(map[string]any)
 		if owner["ticket"] == parentName {

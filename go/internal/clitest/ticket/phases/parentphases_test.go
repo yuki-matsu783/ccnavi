@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/yaml"
 )
 
@@ -50,7 +51,7 @@ func TestAMatchingCopyIsApprovedAsIsAndTheScreenSortsTheDefinitions(t *testing.T
 		t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
 	// 承認は中身を変えない。コピーは承認の前に提案へ書いてある。
-	if got := read(t, w.doing(parentName)); got != text {
+	if got := ticketkit.Read(t, w.doing(parentName)); got != text {
 		t.Errorf("承認が中身を変えた:\n%s", got)
 	}
 	screen := r.Stdout
@@ -192,7 +193,7 @@ func TestEditingPhasesYmlAfterApprovalDoesNotChangeARunningParent(t *testing.T) 
 		{"phases.yml が壊れた", "version: 1\nphases: [\n"},
 	}
 	for _, c := range cases {
-		write(t, w.phases, c.text)
+		ticketkit.Write(t, w.phases, c.text)
 		// コピーした定義の上限（wip/research/*）で切り詰めたまま。
 		beyond := w.writeToTree(tree, "src/a/x.py")
 		if w.decision(beyond) != "deny" {
@@ -210,9 +211,9 @@ func TestPhasesTitlesAndReviewsComeFromTheCopyAfterApproval(t *testing.T) {
 	// 承認のあとに phases.yml の定義を直しても、フェーズのタイトル・レビューの要否・止め方と SubagentStart の案内はコピーのまま。
 	w := newWS(t)
 	tree := w.approvedResearchChild(samples.Off)
-	write(t, w.phases, strings.Replace(strings.Replace(samples.Phases,
+	ticketkit.Write(t, w.phases, strings.Replace(strings.Replace(samples.Phases,
 		"    title: 調査\n    review: false\n", "    title: 調べ\n    review: true\n", 1), "agent: explorer", "agent: planner", 1))
-	board := jsonOf(t, w.ccnavi("--explain", "--json").Stdout)
+	board := ticketkit.ParseJSON(t, w.ccnavi("--explain", "--json").Stdout)
 	var shown []string
 	for _, p := range board["parents"].([]any) {
 		owner := p.(map[string]any)
@@ -229,7 +230,7 @@ func TestPhasesTitlesAndReviewsComeFromTheCopyAfterApproval(t *testing.T) {
 	contains(t, "SubagentStart", said, "1: 調査", "explorer")
 	lacks(t, "SubagentStart", said, "調べ", "planner")
 	// コピーの research はレビュー不要。閉じても止めない（phases.yml の mr なら止まる）。
-	write(t, filepath.Join(tree, "wip", "research", "summary.md"), "まとめ\n")
+	ticketkit.Write(t, filepath.Join(tree, "wip", "research", "summary.md"), "まとめ\n")
 	w.git(tree, "add", "-A")
 	w.git(tree, "commit", "--quiet", "-m", "summary")
 	w.mustClose("i0001-01-01")
@@ -243,7 +244,7 @@ func TestAChildIsApprovedFromTheCopyAfterPhasesYmlLostItsDefinition(t *testing.T
 	t.Parallel()
 	w := newWS(t)
 	w.family(planOf("research", "design"))
-	write(t, w.phases, phasesWithoutResearch())
+	ticketkit.Write(t, w.phases, phasesWithoutResearch())
 	w.propose("i0001-01-01", childText("i0001-01-01", 1, "wip/research/*"))
 	w.commitParent()
 	if r := w.approve(); r.Code != 0 || !w.isApproved("i0001-01-01") {
@@ -340,7 +341,7 @@ func TestDeliverablesComeFromTheCopy(t *testing.T) {
 	w.commitParent()
 	w.mustApprove()
 	// 承認のあとに phases.yml の成果物を変えても、閉じるときに見るのはコピーの成果物。
-	write(t, w.phases, strings.Replace(samples.Phases, `["wip/research/summary.md"]`, `["wip/research/other.md"]`, 1))
+	ticketkit.Write(t, w.phases, strings.Replace(samples.Phases, `["wip/research/summary.md"]`, `["wip/research/other.md"]`, 1))
 	w.runChild("i0001-01-01", file{"wip/research/summary.md", "まとめ\n"})
 	w.mustClose("i0001-01-01")
 }
@@ -352,7 +353,7 @@ func TestAProposalThatOnlyChangesTheCopyIsARevision(t *testing.T) {
 	w := newWS(t)
 	w.family(planOf("research", "design"))
 	changed := strings.Replace(samples.Phases, "title: 設計\n", "title: 設計と方針\n", 1)
-	write(t, w.phases, changed)
+	ticketkit.Write(t, w.phases, changed)
 	w.propose(parentName, samples.ParentText(parentName, planOf("research", "design"), samples.ParentOpts{Copy: changed}))
 	w.commitParent()
 	r := w.approve()
@@ -363,7 +364,7 @@ func TestAProposalThatOnlyChangesTheCopyIsARevision(t *testing.T) {
 	_, after, _ := strings.Cut(r.Stdout, "■ phases: の差分")
 	diff, _, _ := strings.Cut(after, "■")
 	contains(t, "差分", diff, "design", "title")
-	title := frontOf(t, read(t, w.doing(parentName))).Map("phases").Map("design").Text("title")
+	title := frontOf(t, ticketkit.Read(t, w.doing(parentName))).Map("phases").Map("design").Text("title")
 	if title != "設計と方針" {
 		t.Errorf("design の title = %q", title)
 	}
@@ -382,7 +383,7 @@ func TestAFixedNumberKeepsItsDefinitionEvenWhenPhasesYmlChanged(t *testing.T) {
 	w := newWS(t)
 	w.approveFirstChild()
 	changed := strings.Replace(samples.Phases, `scope: ["wip/research/*"]`, `scope: ["wip/research/*", "x/*"]`, 1)
-	write(t, w.phases, changed)
+	ticketkit.Write(t, w.phases, changed)
 	// 子が承認された 1 番（research）の定義は承認済みチケットの値のまま、ほかは今の phases.yml。
 	kept := withBlock(w.noCopy(planOf("research", "design", "acceptance")),
 		joinDefs(defs(samples.Phases, "research", "design"), defs(changed, "acceptance")))
@@ -396,7 +397,7 @@ func TestAFixedNumberCannotTakeTheNewDefinition(t *testing.T) {
 	w := newWS(t)
 	w.approveFirstChild()
 	changed := strings.Replace(samples.Phases, `scope: ["wip/research/*"]`, `scope: ["wip/research/*", "x/*"]`, 1)
-	write(t, w.phases, changed)
+	ticketkit.Write(t, w.phases, changed)
 	r := w.proposeParent(samples.ParentText(parentName, planOf("research", "design", "acceptance"), samples.ParentOpts{Copy: changed}))
 	if r.Code == 0 || !strings.Contains(r.Stderr, "子が承認された番号が使う定義") {
 		t.Errorf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
@@ -421,7 +422,7 @@ func TestFillPhasesWritesOnlyTheUsedDefinitionsAndKeepsOtherBytes(t *testing.T) 
 	if r.Code != 0 {
 		t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
-	text := read(t, w.todo(parentName))
+	text := ticketkit.Read(t, w.todo(parentName))
 	front := frontOf(t, text)
 	keys, _ := front.Map("phases").StringKeys()
 	equalStrings(t, "phases のキー", keys, []string{"research", "design"})
@@ -446,15 +447,15 @@ func TestFillPhasesReplacesAStaleCopyAndDropsUnusedDefinitions(t *testing.T) {
 	if r := w.fill(parentName); r.Code != 0 {
 		t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
-	front := frontOf(t, read(t, w.todo(parentName)))
+	front := frontOf(t, ticketkit.Read(t, w.todo(parentName)))
 	keys, _ := front.Map("phases").StringKeys()
 	equalStrings(t, "phases のキー", keys, []string{"research", "design"})
 	if review, _ := front.Map("phases").Map("design").Bool("review"); !review {
 		t.Error("design の review が phases.yml の値（true）に戻らない")
 	}
 	// 2 度打っても変わらない。
-	before := read(t, w.todo(parentName))
-	if again := w.fill(parentName); again.Code != 0 || read(t, w.todo(parentName)) != before {
+	before := ticketkit.Read(t, w.todo(parentName))
+	if again := w.fill(parentName); again.Code != 0 || ticketkit.Read(t, w.todo(parentName)) != before {
 		t.Errorf("2 度目で変わった: code %d\n%s", again.Code, again.Stderr)
 	}
 }
@@ -464,12 +465,12 @@ func TestFillPhasesOnARevisionKeepsTheDefinitionsOfFixedNumbers(t *testing.T) {
 	w := newWS(t)
 	w.approveFirstChild()
 	changed := strings.Replace(strings.Replace(samples.Phases, `scope: ["wip/research/*"]`, `scope: ["x/*"]`, 1), "title: 設計\n", "title: 設計と方針\n", 1)
-	write(t, w.phases, changed)
+	ticketkit.Write(t, w.phases, changed)
 	w.propose(parentName, w.noCopy(planOf("research", "design", "acceptance")))
 	if r := w.fill(parentName); r.Code != 0 {
 		t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
-	phases := frontOf(t, read(t, w.todo(parentName))).Map("phases")
+	phases := frontOf(t, ticketkit.Read(t, w.todo(parentName))).Map("phases")
 	scope, _ := yaml.Strings(phases.Map("research").Get("scope"))
 	equalStrings(t, "research の scope", scope, []string{"wip/research/*"})
 	if title := phases.Map("design").Text("title"); title != "設計と方針" {
@@ -491,7 +492,7 @@ func TestFillPhasesWritesNothingWhenOtherFieldsWouldChange(t *testing.T) {
 	if r.Code == 0 || !strings.Contains(r.Stderr, "何も反映しません") {
 		t.Errorf("code %d\n%s", r.Code, r.Stderr)
 	}
-	if read(t, w.todo(parentName)) != text {
+	if ticketkit.Read(t, w.todo(parentName)) != text {
 		t.Error("止めたのに提案を書き換えた")
 	}
 }
@@ -504,21 +505,21 @@ func TestFillPhasesWritesOnlyTheCopyInTheCallersTree(t *testing.T) {
 	var paths []string
 	for _, name := range []string{"tree-a", "tree-b"} {
 		tree := w.worktree(name, "main")
-		paths = append(paths, write(t, filepath.Join(tree, "wip", "proposals", "todo", "i0002.md"), text))
+		paths = append(paths, ticketkit.Write(t, filepath.Join(tree, "wip", "proposals", "todo", "i0002.md"), text))
 	}
 	refused := w.fill("i0002")
 	if refused.Code == 0 || !strings.Contains(refused.Stderr, "複数の場所") {
 		t.Errorf("どちらのツリーでもない所から打って止まらない: code %d\n%s", refused.Code, refused.Stderr)
 	}
-	if read(t, paths[0]) != text || read(t, paths[1]) != text {
+	if ticketkit.Read(t, paths[0]) != text || ticketkit.Read(t, paths[1]) != text {
 		t.Error("止めたのに書いた")
 	}
 	done := w.fillIn(filepath.Dir(filepath.Dir(filepath.Dir(paths[0]))), "i0002")
 	if done.Code != 0 {
 		t.Fatalf("code %d\n%s%s", done.Code, done.Stdout, done.Stderr)
 	}
-	contains(t, "打ったツリーの提案", read(t, paths[0]), "phases:")
-	if read(t, paths[1]) != text {
+	contains(t, "打ったツリーの提案", ticketkit.Read(t, paths[0]), "phases:")
+	if ticketkit.Read(t, paths[1]) != text {
 		t.Error("打っていないツリーの提案を書いた")
 	}
 }
@@ -533,7 +534,7 @@ func TestFillPhasesNamesAColumnZeroCommentInsideTheValue(t *testing.T) {
 	if r.Code == 0 || !strings.Contains(r.Stderr, "行頭") {
 		t.Errorf("code %d\n%s", r.Code, r.Stderr)
 	}
-	if read(t, w.todo(parentName)) != text {
+	if ticketkit.Read(t, w.todo(parentName)) != text {
 		t.Error("止めたのに提案を書き換えた")
 	}
 }
@@ -547,7 +548,7 @@ func TestFillPhasesRefusesAPlanItemMissingFromPhasesYml(t *testing.T) {
 	if r.Code == 0 || !strings.Contains(r.Stderr, "nope") {
 		t.Errorf("code %d\n%s", r.Code, r.Stderr)
 	}
-	if read(t, w.todo(parentName)) != text {
+	if ticketkit.Read(t, w.todo(parentName)) != text {
 		t.Error("止めたのに提案を書き換えた")
 	}
 }
@@ -571,5 +572,5 @@ func TestPlanOrderNeedsAKnownProposalAndFillPhases(t *testing.T) {
 			t.Errorf("%s: code %d, stderr に %q が無い:\n%s", c.name, c.r.Code, c.want, c.r.Stderr)
 		}
 	}
-	lacks(t, "提案", read(t, w.todo(parentName)), "phases:")
+	lacks(t, "提案", ticketkit.Read(t, w.todo(parentName)), "phases:")
 }

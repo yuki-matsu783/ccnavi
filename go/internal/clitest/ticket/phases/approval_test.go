@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 全体計画の承認・順序・成果物・レビューの要否・延期（tests/ticket/test_phases.py の前半）。
@@ -58,7 +59,7 @@ func TestAChildOfARejectedParentIsNotApproved(t *testing.T) {
 func TestLintReportsABrokenPhasesFile(t *testing.T) {
 	t.Parallel()
 	w := newWS(t)
-	write(t, w.phases, "version: 1\nphases:\n  a: {title: X, kind: work}\n  b: {title: X, kind: work}\n")
+	ticketkit.Write(t, w.phases, "version: 1\nphases:\n  a: {title: X, kind: work}\n  b: {title: X, kind: work}\n")
 	r := w.ccnavi("--lint", "--mode", "enable")
 	contains(t, "lint", r.Stdout, "表示名")
 	if r.Code == 0 {
@@ -70,7 +71,7 @@ func TestAPlanIsApprovedAndCopied(t *testing.T) {
 	t.Parallel()
 	w := newWS(t)
 	w.family([]samples.Step{samples.Step{Type: "research"}, samples.DeferStep("design"), {Type: "acceptance"}, {Type: "implement"}})
-	text := read(t, w.doing(parentName))
+	text := ticketkit.Read(t, w.doing(parentName))
 	contains(t, "承認済みチケット", text, "plan:", "research", "deferred: true")
 	r := w.ccnavi("--explain")
 	contains(t, "--explain", r.Stdout, "局面: 作業中（1（調査））", "フェーズ 2（設計）: 未計画", "レビューは 3 と一緒に")
@@ -253,7 +254,7 @@ func TestTheLastChildCannotCloseWithoutDeliverables(t *testing.T) {
 	}
 	contains(t, "stderr", refused.Stderr, "成果物が無い", "wip/research/summary.md")
 	tree := filepath.Join(w.root, ".claude", "worktrees", "i0001-01-01")
-	write(t, filepath.Join(tree, "wip", "research", "summary.md"), "x\n")
+	ticketkit.Write(t, filepath.Join(tree, "wip", "research", "summary.md"), "x\n")
 	w.git(tree, "add", "-A")
 	w.git(tree, "commit", "--quiet", "-m", "summary")
 	closed := w.closeChild("i0001-01-01")
@@ -285,10 +286,10 @@ func (w *ws) finishTo(name string, files ...file) string {
 	w.t.Helper()
 	w.runChild(name, files...)
 	w.mustClose(name)
-	if exists(filepath.Join(w.approved, "done", name+".md")) {
+	if ticketkit.Exists(filepath.Join(w.approved, "done", name+".md")) {
 		return "done"
 	}
-	if exists(filepath.Join(w.parentTree, "wip", "proposals", "review", name+".md")) {
+	if ticketkit.Exists(filepath.Join(w.parentTree, "wip", "proposals", "review", name+".md")) {
 		return "review"
 	}
 	return ""
@@ -354,7 +355,7 @@ func TestStartNamesTheProcessSkillOfThePhaseOnlyWhenInstalled(t *testing.T) {
 			w.startParent()
 			w.worktree("i0001-01-01", parentName)
 			if installed {
-				write(t, filepath.Join(w.root, ".claude", "skills", "process-research", "SKILL.md"), "---\nname: process-research\nprocess: true\n---\n")
+				ticketkit.Write(t, filepath.Join(w.root, ".claude", "skills", "process-research", "SKILL.md"), "---\nname: process-research\nprocess: true\n---\n")
 			}
 			started := w.mustOK(w.ccnavi("ticket", "start", "i0001-01-01"), "ticket start")
 			if installed {
@@ -419,10 +420,10 @@ func TestFinishRecordsWhereItPutTheChildAndConfirmRecordsTheRoute(t *testing.T) 
 	w.runChild("i0001-01-01", file{"wip/design/plan.md", "d\n"})
 	w.mustClose("i0001-01-01")
 	waiting := filepath.Join(w.parentTree, "wip", "proposals", "review", "i0001-01-01.md")
-	if !exists(waiting) {
+	if !ticketkit.Exists(waiting) {
 		t.Fatal("finish したレビュー待ちの子が無い")
 	}
-	text := read(t, waiting)
+	text := ticketkit.Read(t, waiting)
 	contains(t, "レビュー待ちの子", text, `finished_to: "review"`)
 	lacks(t, "レビュー待ちの子", text, "settled_by")
 	w.commitParent("close 01")
@@ -430,7 +431,7 @@ func TestFinishRecordsWhereItPutTheChildAndConfirmRecordsTheRoute(t *testing.T) 
 	fixture := w.remote()
 	w.mustOK(w.request(fixture, 1), "request")
 	w.mustOK(w.confirm(fixture, 1), "confirm")
-	contains(t, "done の子", read(t, filepath.Join(w.approved, "done", "i0001-01-01.md")), `finished_to: "review"`, `settled_by: "confirm"`)
+	contains(t, "done の子", ticketkit.Read(t, filepath.Join(w.approved, "done", "i0001-01-01.md")), `finished_to: "review"`, `settled_by: "confirm"`)
 }
 
 func TestAFailedCopyDoesNotClearTheMarksOfAReviewedPhase(t *testing.T) {

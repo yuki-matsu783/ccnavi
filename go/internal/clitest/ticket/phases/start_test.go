@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 親の finish のテンプレート化の案内（tests/ticket/test_template_notice.py）、親の `ticket start` と計画
@@ -38,7 +39,7 @@ func (w *ws) noticeDraft(name, to string) string {
 }
 
 func (w *ws) commonTemplate(name, text string) string {
-	return write(w.t, filepath.Join(w.root, ".ccnavi", "config", "common", "templates", name+".yml"), text)
+	return ticketkit.Write(w.t, filepath.Join(w.root, ".ccnavi", "config", "common", "templates", name+".yml"), text)
 }
 
 func TestAClosedParentWithAPlanSaysHowToMakeATemplateInOneLine(t *testing.T) {
@@ -65,13 +66,13 @@ func TestTheNoticeIsSilencedOrKept(t *testing.T) {
 		before func(w *ws)
 		notice bool
 	}{
-		{"親の識別子の下書きがあれば出さない", func(w *ws) { write(w.t, w.noticeDraft("i0001", "project"), "name: i0001\nplan: [design]\n") }, false},
-		{"共通向けの下書きでも出さない", func(w *ws) { write(w.t, w.noticeDraft("i0001", "common"), "name: i0001\nplan: [design]\n") }, false},
-		{"別の名前の下書きでは出す", func(w *ws) { write(w.t, w.noticeDraft("other", "project"), "name: other\n") }, true},
+		{"親の識別子の下書きがあれば出さない", func(w *ws) { ticketkit.Write(w.t, w.noticeDraft("i0001", "project"), "name: i0001\nplan: [design]\n") }, false},
+		{"共通向けの下書きでも出さない", func(w *ws) { ticketkit.Write(w.t, w.noticeDraft("i0001", "common"), "name: i0001\nplan: [design]\n") }, false},
+		{"別の名前の下書きでは出す", func(w *ws) { ticketkit.Write(w.t, w.noticeDraft("other", "project"), "name: other\n") }, true},
 		{"同じ計画の形のテンプレートが取り込み済みなら出さない", func(w *ws) { w.commonTemplate("same", templateSame) }, false},
 		{"別の計画のテンプレートでは出す", func(w *ws) { w.commonTemplate("other", templateOther) }, true},
 		{"プロジェクトのレイヤーのテンプレートも数える", func(w *ws) {
-			write(w.t, filepath.Join(w.root, ".ccnavi", "config", "project", "templates", "same.yml"), templateSame)
+			ticketkit.Write(w.t, filepath.Join(w.root, ".ccnavi", "config", "project", "templates", "same.yml"), templateSame)
 		}, false},
 	}
 	for _, c := range cases {
@@ -114,7 +115,7 @@ func TestTheNoticeNamesACommandThatWorks(t *testing.T) {
 		t.Fatal("案内が出ない")
 	}
 	w.mustOK(w.bare(nil, "--templates", "--draft", parentName), "--templates --draft")
-	if !exists(w.noticeDraft("i0001", "project")) {
+	if !ticketkit.Exists(w.noticeDraft("i0001", "project")) {
 		t.Error("案内のとおりに打っても下書きができない")
 	}
 }
@@ -239,7 +240,7 @@ func TestLintWarnsWhenTheBaseShaIsOffTheWorktreeHistory(t *testing.T) {
 	w.commitParent("start")
 	said := func() []map[string]any {
 		var out []map[string]any
-		for _, p := range jsonOf(t, w.ccnavi("--lint", "--json").Stdout)["problems"].([]any) {
+		for _, p := range ticketkit.ParseJSON(t, w.ccnavi("--lint", "--json").Stdout)["problems"].([]any) {
 			m := p.(map[string]any)
 			if strings.HasPrefix(m["detail"].(string), parentName+": ") && strings.Contains(m["detail"].(string), "HEAD の祖先でない") {
 				out = append(out, m)
@@ -251,18 +252,18 @@ func TestLintWarnsWhenTheBaseShaIsOffTheWorktreeHistory(t *testing.T) {
 		t.Fatalf("正しい基準点に苦情: %v", got)
 	}
 	other := w.worktree("elsewhere", "main")
-	write(t, filepath.Join(other, "x.txt"), "x\n")
+	ticketkit.Write(t, filepath.Join(other, "x.txt"), "x\n")
 	w.git(other, "add", "-A")
 	w.git(other, "commit", "--quiet", "-m", "elsewhere")
 	stray := strings.TrimSpace(w.git(other, "rev-parse", "HEAD"))
 	var lines []string
-	for _, line := range strings.Split(read(t, w.doing(parentName)), "\n") {
+	for _, line := range strings.Split(ticketkit.Read(t, w.doing(parentName)), "\n") {
 		if strings.HasPrefix(line, "base_sha:") {
 			line = `base_sha: "` + stray + `"`
 		}
 		lines = append(lines, line)
 	}
-	write(t, w.doing(parentName), strings.Join(lines, "\n"))
+	ticketkit.Write(t, w.doing(parentName), strings.Join(lines, "\n"))
 	w.commitParent("rewritten base")
 	got := said()
 	if len(got) != 1 || got[0]["severity"] != "warn" { // 判定には入れないので warn
@@ -290,8 +291,8 @@ func TestAScopeOnlyRevisionReplacesTheScopeAndShowsTheDiff(t *testing.T) {
 		t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
 	contains(t, "承認画面", r.Stdout, "親の改版", "■ 範囲の差分", "allow 追加: docs/*")
-	contains(t, "承認済みチケット", read(t, w.doing(parentName)), "glob: docs/*")
-	if exists(w.todo(parentName)) {
+	contains(t, "承認済みチケット", ticketkit.Read(t, w.doing(parentName)), "glob: docs/*")
+	if ticketkit.Exists(w.todo(parentName)) {
 		t.Error("改版の提案が todo/ に残っている")
 	}
 }
@@ -321,7 +322,7 @@ func TestAStaleCopyInAChildWorktreeDoesNotCountAfterCancel(t *testing.T) {
 	w := newWS(t)
 	w.approveResearchChild()
 	tree := w.runChild("i0001-01-01")
-	if !exists(filepath.Join(tree, ".ccnavi", "approved", "doing", "i0001-01-01.md")) {
+	if !ticketkit.Exists(filepath.Join(tree, ".ccnavi", "approved", "doing", "i0001-01-01.md")) {
 		t.Fatal("子のワークツリーに doing/ のコピーが無い")
 	}
 	cancelled := w.mustOK(w.ccnavi("ticket", "cancel", "i0001-01-01", "--reason", "範囲を広げる"), "cancel")
@@ -341,9 +342,9 @@ func TestAChildInProgressStopsTheRevisionUntilItIsCancelled(t *testing.T) {
 		t.Fatal("作業中の子がいるのに範囲を変える改版が通った")
 	}
 	contains(t, "出力", stopped.Stdout+stopped.Stderr, "i0001-01-01")
-	lacks(t, "承認済みチケット", read(t, w.doing(parentName)), "docs/*")
+	lacks(t, "承認済みチケット", ticketkit.Read(t, w.doing(parentName)), "docs/*")
 	w.mustOK(w.ccnavi("ticket", "cancel", "i0001-01-01", "--reason", "範囲を広げる"), "cancel")
 	w.commitParent("cancel")
 	w.mustApprove()
-	contains(t, "承認済みチケット", read(t, w.doing(parentName)), "docs/*")
+	contains(t, "承認済みチケット", ticketkit.Read(t, w.doing(parentName)), "docs/*")
 }
