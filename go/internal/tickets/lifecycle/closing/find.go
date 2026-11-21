@@ -30,8 +30,8 @@ const (
 	MergedInParent              // 合流済みで、積み残しも無い
 )
 
-// MergeOf は子が親（treeRoot の HEAD）に合流したかを、finish が書いた merged_sha が祖先かで見る（子のブランチは見ない。
-// 別の PC で finish しても結果が変わらないため）。LateFix のときは、積まれた修正の先頭を返す。
+// MergeOf は子が親（treeRoot の HEAD）に合流したかを、finish が書いた merged_sha が祖先かで見る（NoMergedSHA・NotAncestor は子のブランチを見ない。
+// LateFix だけは子のワークツリーとブランチを見るので、子のワークツリーが無い PC では判定しない）。LateFix のときは、積まれた修正の先頭を返す。
 // 依頼の前提の検査（request）と、依頼の前の道の判定（stop）が同じ答えを使う。
 func MergeOf(root, treeRoot string, child *ticket.Ticket, timeout time.Duration) (Merge, string) {
 	if child.MergedSHA == "" {
@@ -40,15 +40,15 @@ func MergeOf(root, treeRoot string, child *ticket.Ticket, timeout time.Duration)
 	if !git.IsAncestor(treeRoot, child.MergedSHA, "HEAD", git.Options{Timeout: timeout}).OK() {
 		return NotAncestor, ""
 	}
-	if late := UnmergedFix(root, treeRoot, child, timeout); late != "" {
+	if late := unmergedFix(root, treeRoot, child, timeout); late != "" {
 		return LateFix, late
 	}
 	return MergedInParent, ""
 }
 
-// UnmergedFix は finish の後に子のブランチへ積まれ、親（treeRoot の HEAD）に入っていないコミットの先頭。
+// unmergedFix は finish の後に子のブランチへ積まれ、親（treeRoot の HEAD）に入っていないコミットの先頭。
 // 無ければ空。子のワークツリーが無い PC（別の PC で finish した子など）では判定しない。
-func UnmergedFix(root, treeRoot string, child *ticket.Ticket, timeout time.Duration) string {
+func unmergedFix(root, treeRoot string, child *ticket.Ticket, timeout time.Duration) string {
 	if !ospath.IsDir(tree.WorktreePath(root, child.ID)) {
 		return ""
 	}
