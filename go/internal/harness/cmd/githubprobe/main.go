@@ -1,4 +1,4 @@
-// githubprobe は、実物の GitHub に sh 3 本と exe を適用して 1 周する（tests/manual/github/probe_github.py の写し）。
+// githubprobe は、実物の GitHub に sh 3 本と exe を適用して 1 周する。
 // ユーザが手で走らせる道具で、自動テストは呼ばない。tests/manual/gitlab の GitLab 版（cmd/gitlabmanual の probe）の GitHub 版。
 //
 // 使い捨てのブランチと PR と issue を、実験場のリポジトリ（既定 yuki-matsu783/test-repo。PUBLIC）に作る。

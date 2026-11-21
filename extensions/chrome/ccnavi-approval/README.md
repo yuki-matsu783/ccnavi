@@ -50,7 +50,7 @@ node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> -
 ### ホストの応答の見本（レビュー済み）
 
 GitHub と GitLab の 2 つ。どちらも実際の形に合わせて手で組んだもので、実物からは録っていない。GitHub の形は、2026-10-12 に実物と突き合わせて、
-sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANGES_REQUESTED` は未確認）。`tests/manual/github/probe_github.py` が見るのは
+sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANGES_REQUESTED` は未確認）。`go/internal/harness/cmd/githubprobe` が見るのは
 `reviewThreads` の欄・解決済みの区別・書き換えられた行の `line` が null になること・COMMENTED のレビュー・gh と curl の両経路。
 ページング（`first:1` と `after: <endCursor>`）は probe には無く、同じ問い合わせの `first` を 1 にして手で打って確かめた
 （2026-10-12、2 本のスレッドで 1 ページ目 `hasNextPage: true`、`endCursor` を渡した 2 ページ目に残りの 1 本）。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・

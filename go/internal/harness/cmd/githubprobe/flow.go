@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// 実測の手順（tests/manual/github/probe_github.py の main の写し）。手順は 0〜6 の段に分け、止める所は false を返す。
+// 実測の手順。手順は 0〜6 の段に分け、止める所は false を返す。
 // 実験場の PR・課題・ブランチは cleanup で片付ける（finish と、途中で落ちたとき）。
 
 // flow は実測の全部。途中で止まったら、そこから先は行わない。

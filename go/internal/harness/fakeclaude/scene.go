@@ -18,7 +18,7 @@ import (
 // 契約の場面（本物とスタブで同じもの）。GitLab の契約の場面と同じ役回りで、使い捨ての木・hook の入力を書き出すだけの hook・
 // 打たせる手を持つ。hook が受けた JSON と stream-json を、形（Node）と振る舞い（Observe）にまとめる。
 //
-//   - 本物の側: M2 の claudrecord が Prompt・PromptResume を `claude -p` に渡し、recorded.json に録る
+//   - 本物の側: 本物の claude -p から録る道具（cmd/claudrecord）が Prompt・PromptResume を `claude -p` に渡し、recorded.json に録る
 //   - スタブの側: clitest/contract/claude が ScenePlan(n)（Prompt と同じ手の台本）を `teststub claude` に渡す
 
 // RecordedRel は本物から録った形と振る舞い（リポジトリの根からの相対）。
