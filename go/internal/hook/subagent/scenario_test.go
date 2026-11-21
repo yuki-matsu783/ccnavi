@@ -198,6 +198,7 @@ func normalized(t *testing.T, r result, root string) string {
 	text = stampText.ReplaceAllString(text, "<stamp>")
 	text = atField.ReplaceAllString(text, `\"at\": <t>`)
 	text = partName.ReplaceAllString(text, "${1}<rand>${2}")
+	text = testkit.Scrub(root, text)
 	return idStamp.ReplaceAllString(text, `:<ms>\"`)
 }
 
@@ -331,7 +332,11 @@ func TestScenarioMatchesGolden(t *testing.T) {
 		call("stop", "", "a1"),
 		// 差し戻されて直したサブエージェントは fixed になり、親は言われない。
 		call("stop", wt(child), "f1"),
-		{Op: "remove", Path: wt(child) + "/src/out.py"},
+		// 範囲外をコミットして戻しても、直したことになる。
+		{Op: "git", Cwd: wt(child), Args: []string{"add", "src/out.py"}},
+		{Op: "git", Cwd: wt(child), Args: []string{"commit", "--quiet", "-m", "stray"}},
+		{Op: "git", Cwd: wt(child), Args: []string{"rm", "--quiet", "-f", "src/out.py"}},
+		{Op: "git", Cwd: wt(child), Args: []string{"commit", "--quiet", "-m", "revert"}},
 		call("stop", wt(child), "f1"),
 		{Op: "call", Kind: "post", Tool: config.ToolAgent, Launched: "f1"},
 		// 結果を保存できなくても、差し戻しを無視した終わりは正常に扱わず、親に言う（記録の置き場をディレクトリで塞ぐ）。
