@@ -302,16 +302,13 @@ func unmetIn(root, treeRoot string, conf *config.Settings, p *phase.Phase) []str
 		if s := p.States[child.ID]; s != place.Review && s != place.Done {
 			continue
 		}
-		if child.MergedSHA == "" {
-			unmet = append(unmet, fmt.Sprintf(msgNoMergedSHA, child.ID))
-			continue
-		}
 		short := pyfmt.Head(child.MergedSHA, git.ShortSHA)
-		if !git.IsAncestor(treeRoot, child.MergedSHA, "HEAD", git.Options{Timeout: git.ReviewTimeout}).OK() {
+		switch state, late := closing.MergeOf(root, treeRoot, child, git.ReviewTimeout); state {
+		case closing.NoMergedSHA:
+			unmet = append(unmet, fmt.Sprintf(msgNoMergedSHA, child.ID))
+		case closing.NotAncestor:
 			unmet = append(unmet, fmt.Sprintf(msgNotAncestor, child.ID, short))
-			continue
-		}
-		if late := closing.UnmergedFix(root, treeRoot, child, git.ReviewTimeout); late != "" {
+		case closing.LateFix:
 			unmet = append(unmet, fmt.Sprintf(msgLateFix, child.ID, pyfmt.Head(late, git.ShortSHA), short))
 		}
 	}
