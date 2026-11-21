@@ -116,7 +116,7 @@ func TestSessionStartOrdersByLatestCommitNotDirMtime(t *testing.T) {
 	t.Parallel()
 	s := newSession(t)
 	s.makeDirs(3)
-	// 並べ替えが、ディレクトリの更新時刻でなくコミット時刻で決まることを見る。d02 のコミットは一番新しいまま、更新時刻だけを未来にする。
+	// 並べ替えが、ディレクトリの更新時刻でなくコミット時刻で決まることを見る。最古のコミットの d00 だけ更新時刻を未来にする。更新時刻で並べると d00 が先頭になり、コミット時刻で並ぶ（d02・d01・d00）ことと区別できる。
 	old := filepath.Join(s.project, "projects", "d00")
 	touchLater(t, old)
 	mkdir(t, filepath.Join(s.project, "projects", "nocommit", ".git"))
