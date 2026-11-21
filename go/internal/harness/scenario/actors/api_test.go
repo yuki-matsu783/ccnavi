@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/scenario/core"
 	"ccnavi/internal/harness/scenario/host"
-	"ccnavi/internal/harness/scenario/prepare"
 )
 
 const (
@@ -63,7 +63,7 @@ func newHuman(t *testing.T) (*host.Manager, *humanAPI) {
 	return m, api
 }
 
-func runAPI(t *testing.T, m *host.Manager, st *prepare.State, ops []Op) (int, string) {
+func runAPI(t *testing.T, m *host.Manager, st *core.State, ops []core.Op) (int, string) {
 	t.Helper()
 	var out strings.Builder
 	st.Host = &host.Host{Kind: host.DockerGitLab, ProjectID: 7}
@@ -75,13 +75,13 @@ func runAPI(t *testing.T, m *host.Manager, st *prepare.State, ops []Op) (int, st
 	return rc, out.String()
 }
 
-var threadThenResolve = []Op{{Op: OpThread, Body: "直してください", As: "t1"}, {Op: OpResolve, Thread: "t1"}}
+var threadThenResolve = []core.Op{{Op: core.OpThread, Body: "直してください", As: "t1"}, {Op: core.OpResolve, Thread: "t1"}}
 
 // 操作は書いた順に、人間役のトークンで実行し、止まらずに進む。
 func TestHumanAPIOpsRunInOrderWithTheHumanToken(t *testing.T) {
 	t.Parallel()
 	m, api := newHuman(t)
-	st := &prepare.State{}
+	st := &core.State{}
 	rc, out := runAPI(t, m, st, threadThenResolve)
 	want := "list_mrs|create_discussion 直してください|list_mrs|resolve d2"
 	if rc != 0 || strings.Join(api.calls, "|") != want {
@@ -104,7 +104,7 @@ func TestHumanAPIOpsRunInOrderWithTheHumanToken(t *testing.T) {
 func TestHumanAPIApproveUsesTheOnlyMR(t *testing.T) {
 	t.Parallel()
 	m, api := newHuman(t)
-	if rc, _ := runAPI(t, m, &prepare.State{}, []Op{{Op: OpApprove}}); rc != 0 || strings.Join(api.calls, "|") != "list_mrs|approve" {
+	if rc, _ := runAPI(t, m, &core.State{}, []core.Op{{Op: core.OpApprove}}); rc != 0 || strings.Join(api.calls, "|") != "list_mrs|approve" {
 		t.Errorf("rc = %d, calls = %v", rc, api.calls)
 	}
 }
@@ -117,7 +117,7 @@ func TestHumanAPIZeroOrTwoMRsHaltTheRun(t *testing.T) {
 			t.Parallel()
 			m, api := newHuman(t)
 			api.mrs = mrs
-			st := &prepare.State{}
+			st := &core.State{}
 			rc, _ := runAPI(t, m, st, threadThenResolve)
 			if rc != 11 || st.Halt == nil || st.Halt.Kind != "human_api" || strings.Join(api.calls, "|") != "list_mrs" {
 				t.Errorf("rc = %d, halt = %+v, calls = %v", rc, st.Halt, api.calls)
@@ -131,7 +131,7 @@ func TestHumanAPIHTTPFailureHaltsAndIsNotRetried(t *testing.T) {
 	t.Parallel()
 	m, api := newHuman(t)
 	api.discussionStatus = 500
-	st := &prepare.State{}
+	st := &core.State{}
 	rc, _ := runAPI(t, m, st, threadThenResolve)
 	if rc != 11 || st.Halt.Kind != "human_api" || strings.Join(api.calls, "|") != "list_mrs|create_discussion 直してください" || st.NextStep != 2 {
 		t.Errorf("rc = %d, halt = %+v, calls = %v", rc, st.Halt, api.calls)
@@ -144,8 +144,8 @@ func TestHumanAPIHTTPFailureHaltsAndIsNotRetried(t *testing.T) {
 func TestHumanAPIResolveNeedsAThreadMadeInThisRun(t *testing.T) {
 	t.Parallel()
 	m, api := newHuman(t)
-	st := &prepare.State{}
-	rc, _ := runAPI(t, m, st, []Op{{Op: OpResolve, Thread: "t9"}})
+	st := &core.State{}
+	rc, _ := runAPI(t, m, st, []core.Op{{Op: core.OpResolve, Thread: "t9"}})
 	if rc != 11 || !strings.Contains(st.Halt.Reasons[0], "t9") || strings.Join(api.calls, "|") != "list_mrs" {
 		t.Errorf("rc = %d, halt = %+v", rc, st.Halt)
 	}
@@ -157,8 +157,8 @@ func TestHumanAPIWithoutTheHumanTokenHaltsWithoutUsingTheAgentToken(t *testing.T
 	if err := os.WriteFile(m.Docker.TokensFile, []byte("GITLAB_TOKEN="+rootPAT+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	st := &prepare.State{}
-	if rc, _ := runAPI(t, m, st, []Op{{Op: OpApprove}}); rc != 11 || len(api.calls) != 0 {
+	st := &core.State{}
+	if rc, _ := runAPI(t, m, st, []core.Op{{Op: core.OpApprove}}); rc != 11 || len(api.calls) != 0 {
 		t.Errorf("rc = %d, calls = %v", rc, api.calls)
 	}
 }

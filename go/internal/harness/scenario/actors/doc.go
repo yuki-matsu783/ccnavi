@@ -6,5 +6,5 @@
 //     呼び手が「手で打つ」で止まる経路に落とす。Playwright の ui 役者は移さずに消した（配線されていない足場だったため）
 //
 // ccnavi を起こす・端末を作る所は Terminal の欄で差し替えられる（このパッケージは testing に依存しない）。
-// 実行器の状態は prepare.State。state.json を書くのは呼び手の save。
+// 実行器の状態は core.State。state.json を書くのは呼び手の save。
 package actors

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/scenario/core"
 	"ccnavi/internal/harness/scenario/host"
 )
 
@@ -26,7 +27,7 @@ func write(t *testing.T, path, text string) {
 func resolve(rel, root, top string) (string, error) {
 	p := filepath.Join(root, rel)
 	if _, err := os.Stat(p); err != nil {
-		return "", &Refusal{What: "追記の対象のファイルが無い: " + rel, Next: "パスを直す"}
+		return "", &core.Refusal{What: "追記の対象のファイルが無い: " + rel, Next: "パスを直す"}
 	}
 	return p, nil
 }
@@ -35,7 +36,7 @@ var hooks = Hooks{ResolveAppend: resolve, CommitExists: func(top, base string) b
 
 func TestRefusalIsReasonNotesAndOneNextLine(t *testing.T) {
 	t.Parallel()
-	r := &Refusal{What: "理由", Next: "直す", Notes: []string{"a", "b"}}
+	r := &core.Refusal{What: "理由", Next: "直す", Notes: []string{"a", "b"}}
 	if got := r.Error(); got != "理由\n案内: a\n案内: b\n次: 直す" {
 		t.Errorf("Error() = %q", got)
 	}
@@ -46,7 +47,7 @@ func TestClashesAreInvertedForAppend(t *testing.T) {
 	t.Parallel()
 	root := base.TempDir(t)
 	write(t, filepath.Join(root, "exists.txt"), "x")
-	files := []File{
+	files := []core.File{
 		{Rel: "exists.txt", Body: "a"},                // 作る形で既にある: 衝突
 		{Rel: "new.txt", Body: "a"},                   // 作る形でまだ無い: 通る
 		{Rel: "exists.txt", Body: "a", Append: true},  // 追記で既にある: 通る
@@ -63,7 +64,7 @@ func TestCleanupRemovesOnlyWhatSetupMade(t *testing.T) {
 	root := base.TempDir(t)
 	write(t, filepath.Join(root, "kept", "tracked.txt"), "元\n")
 	write(t, filepath.Join(root, "old", "keep.txt"), "k")
-	files := []File{
+	files := []core.File{
 		{Rel: "old/new.txt", Body: "n"},
 		{Rel: "fresh/deep/new.txt", Body: "n"},
 		{Rel: "kept/tracked.txt", Body: "追記\n", Append: true},
@@ -95,7 +96,7 @@ func TestPartialFailureRemovesWhatWasMade(t *testing.T) {
 	root := base.TempDir(t)
 	write(t, filepath.Join(root, "blocker"), "ファイル")
 	// 1 つ目は作れ、2 つ目は親がファイルなので作れない。
-	files := []File{{Rel: "ok/a.txt", Body: "a"}, {Rel: "blocker/b.txt", Body: "b"}}
+	files := []core.File{{Rel: "ok/a.txt", Body: "a"}, {Rel: "blocker/b.txt", Body: "b"}}
 	if _, _, err := MakeFiles(hooks, files, root, root); err == nil {
 		t.Fatal("作れないのに成功した")
 	}
@@ -103,16 +104,16 @@ func TestPartialFailureRemovesWhatWasMade(t *testing.T) {
 		t.Errorf("途中まで作ったものが残っている: %v", err)
 	}
 	// 追記の対象が使えないなら、何も作る前に断る。
-	before := []File{{Rel: "x.txt", Body: "x"}, {Rel: "nothing.txt", Body: "a", Append: true}}
+	before := []core.File{{Rel: "x.txt", Body: "x"}, {Rel: "nothing.txt", Body: "a", Append: true}}
 	_, _, err := MakeFiles(hooks, before, root, root)
-	var refusal *Refusal
+	var refusal *core.Refusal
 	if !errors.As(err, &refusal) {
 		t.Fatalf("err = %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "x.txt")); !os.IsNotExist(err) {
 		t.Error("追記の確認より前にファイルを作った")
 	}
-	if _, _, err := MakeFiles(hooks, []File{{Rel: "a", Body: "a", Append: true}}, root, ""); err == nil {
+	if _, _, err := MakeFiles(hooks, []core.File{{Rel: "a", Body: "a", Append: true}}, root, ""); err == nil {
 		t.Error("対象の判定を通っていないのに追記した")
 	}
 }
@@ -123,7 +124,7 @@ func TestCheckBeforeRun(t *testing.T) {
 	m := &host.Manager{} // docker の接続先が無い = 使えない
 	cases := []struct {
 		name    string
-		files   []File
+		files   []core.File
 		base    string
 		kind    host.Kind
 		wantErr string
@@ -131,7 +132,7 @@ func TestCheckBeforeRun(t *testing.T) {
 		{"通る", nil, "good", host.Bare, ""},
 		{"base を指さなければ確かめない", nil, "", host.Real, ""},
 		{"無いコミットの base は何も変える前に断る", nil, "bad", host.Real, "コミットとして無い"},
-		{"使えない追記の対象は確認文より前に断る", []File{{Rel: "none.txt", Body: "a", Append: true}}, "", host.Real, "追記の対象"},
+		{"使えない追記の対象は確認文より前に断る", []core.File{{Rel: "none.txt", Body: "a", Append: true}}, "", host.Real, "追記の対象"},
 		{"止まった docker は、その回だけ断る", nil, "", host.DockerGitLab, "docker-gitlab の GitLab を使えない"},
 	}
 	for _, tc := range cases {
@@ -158,9 +159,9 @@ func TestStartHostRefusesWhenTheTargetHasNoOrigin(t *testing.T) {
 		TempDir: base.TempDir(t),
 		Git:     func([]string, host.GitOpts) host.GitResult { return host.GitResult{Code: 1} },
 	}
-	st := &State{}
+	st := &core.State{}
 	err := StartHost(m, st, host.Setup{Kind: host.Bare}, "UC-99", base.TempDir(t), "top", func() error { return nil })
-	var refusal *Refusal
+	var refusal *core.Refusal
 	if !errors.As(err, &refusal) || !strings.Contains(refusal.Next, "origin") || st.Host != nil {
 		t.Errorf("err = %v, host = %v", err, st.Host)
 	}
@@ -178,16 +179,16 @@ func TestSnapshotAndEnvAreOnlyForALiveFakeOrDockerHost(t *testing.T) {
 	t.Parallel()
 	m := &host.Manager{}
 	for name, h := range map[string]*host.Host{"なし": nil, "bare": {Kind: host.Bare}, "片付け済み": {Kind: host.FakeGitLab, Down: true}} {
-		st := &State{Host: h}
+		st := &core.State{Host: h}
 		if err := SnapshotHost(m, st, 0, "r", base.TempDir(t), func() error { return nil }); err != nil || len(st.HostSnapshots) != 0 {
 			t.Errorf("%s: err = %v, snapshots = %v", name, err, st.HostSnapshots)
 		}
-		if env, err := HostEnv(m, &State{Host: h}, nil); (name == "bare" && (env == nil || err != nil)) || (name != "bare" && env != nil) {
+		if env, err := HostEnv(m, &core.State{Host: h}, nil); (name == "bare" && (env == nil || err != nil)) || (name != "bare" && env != nil) {
 			t.Errorf("%s: env = %v, err = %v", name, env, err)
 		}
 	}
 	// 相手側を読めないとき（接続先が決まらない）はエラーで返し、呼び手が step を止める。
-	st := &State{Host: &host.Host{Kind: host.DockerGitLab}}
+	st := &core.State{Host: &host.Host{Kind: host.DockerGitLab}}
 	if err := SnapshotHost(m, st, 0, "r", base.TempDir(t), func() error { return nil }); err == nil {
 		t.Error("記録の失敗を飲み込んだ")
 	}

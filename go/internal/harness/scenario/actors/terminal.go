@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"ccnavi/internal/harness/scenario/prepare"
+	"ccnavi/internal/harness/scenario/core"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -23,9 +23,6 @@ import (
 
 // RunTimeout は human_run の 1 回の上限。
 const RunTimeout = 300 * time.Second
-
-// DisposableProject は human_run が承認してよい提案のプロジェクト（使い捨てのリポジトリ projects/test-repo の名前）。
-const DisposableProject = "test-repo"
 
 // ErrNoTerminal は擬似端末を作れない（`script` が無い・Windows）。
 var ErrNoTerminal = errors.New("擬似端末を作れない")
@@ -48,15 +45,15 @@ type Board struct {
 }
 
 // pending は承認待ちの提案（識別子, プロジェクト）。複数のツリーに同じ識別子が出るので畳む。
-func (b Board) pending() []prepare.Proposal {
+func (b Board) pending() []core.Proposal {
 	waiting := map[string]bool{}
 	for _, id := range b.Pending {
 		waiting[id] = true
 	}
-	seen := map[prepare.Proposal]bool{}
-	out := []prepare.Proposal{}
+	seen := map[core.Proposal]bool{}
+	out := []core.Proposal{}
 	for _, t := range b.Tickets {
-		p := prepare.Proposal{t.ID, t.Project}
+		p := core.Proposal{t.ID, t.Project}
 		if waiting[t.ID] && !seen[p] {
 			seen[p] = true
 			out = append(out, p)
@@ -70,6 +67,9 @@ func (b Board) pending() []prepare.Proposal {
 	})
 	return out
 }
+
+// Proposals は承認待ちの提案（識別子, プロジェクト）。複数のツリーに同じ識別子が出るので畳む。
+func (b Board) Proposals() []core.Proposal { return b.pending() }
 
 // approved は承認済みで閉じていないチケットの識別子（全ツリー）。
 func (b Board) approved() map[string]bool {
@@ -113,8 +113,8 @@ type Terminal struct {
 	Timeout time.Duration
 }
 
-func halt(st *prepare.State, save func() error, out func(string), num int, reason string) int {
-	st.Halt = &prepare.Halt{Step: num, Kind: "human_run", Reasons: []string{reason}}
+func halt(st *core.State, save func() error, out func(string), num int, reason string) int {
+	st.Halt = &core.Halt{Step: num, Kind: "human_run", Reasons: []string{reason}}
 	_ = save()
 	out(fmt.Sprintf("step %d: 人間役の操作を止めた（%s）。後続の step には進まない", num, reason))
 	return 11
@@ -140,7 +140,7 @@ const (
 //  3. 打ち始めたことを state に書いてから、端末で打つ
 //  4. 終了コードでなく、対象が新しく承認済みになったか、打つ前から承認済みで承認待ちから消えたか（親の改版）で成否を見る
 //     （push の失敗や保護ブランチでも 0 で終わるため。承認待ちのまま残った改版は数えない）
-func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir string, save func() error, out func(string)) int {
+func (tm Terminal) Run(st *core.State, idx int, spec RunSpec, root, outDir string, save func() error, out func(string)) int {
 	num := idx + 1
 	for _, r := range st.HumanRuns {
 		if r.Step == num && r.Status == "started" {
@@ -159,7 +159,7 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 	if err != nil {
 		return halt(st, save, out, num, err.Error())
 	}
-	var added []prepare.Proposal
+	var added []core.Proposal
 	for _, p := range board.pending() {
 		if !before[p[0]] {
 			added = append(added, p)
@@ -172,7 +172,7 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 	idSet := map[string]bool{}
 	for _, p := range added {
 		idSet[p[0]] = true
-		if !pathcase.SameName(p[1], DisposableProject) {
+		if !pathcase.SameName(p[1], core.DisposableProject) {
 			proj := p[1]
 			if proj == "" {
 				proj = "ワークスペースルート"
@@ -181,7 +181,7 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 		}
 	}
 	if len(other) > 0 {
-		return halt(st, save, out, num, DisposableProject+" 以外の提案が増えている: "+strings.Join(other, ", "))
+		return halt(st, save, out, num, core.DisposableProject+" 以外の提案が増えている: "+strings.Join(other, ", "))
 	}
 	ids := make([]string, 0, len(idSet))
 	for id := range idSet {
@@ -189,7 +189,7 @@ func (tm Terminal) Run(st *prepare.State, idx int, spec RunSpec, root, outDir st
 	}
 	sort.Strings(ids)
 
-	st.HumanRuns = append(st.HumanRuns, prepare.HumanRun{Step: num, Script: spec.Script, Tickets: ids, Status: "started"})
+	st.HumanRuns = append(st.HumanRuns, core.HumanRun{Step: num, Script: spec.Script, Tickets: ids, Status: "started"})
 	rec := &st.HumanRuns[len(st.HumanRuns)-1]
 	_ = save()
 	out(fmt.Sprintf("\n== 人間役の操作（step %d、端末）==\n  sh %s %s", num, spec.Script, strings.Join(ids, " ")))

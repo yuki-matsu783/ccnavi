@@ -146,6 +146,8 @@ var subTiers = map[string]map[string]int{
 	"tickets/proposal": {"internal": 0, "candidates": 0, "propose": 0, "templates": 1, "planedit": 1, "agree": 2, "scaffold": 2},
 	"tickets/review":   {"request": 0, "closeout": 1, "decide": 1},
 	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1, "stage": 1},
+	// 受入シナリオの実行器の部品。型・シナリオの読み込み（core）の上に、準備・期待の評価、外の世界、人間役、報告、回す流れが立つ。
+	"harness/scenario": {"host": 0, "core": 1, "prepare": 2, "judge": 2, "world": 3, "actors": 3, "report": 4, "runner": 5},
 	// テストの道具。本体のコードは tickets/testkit と同じく、ここを読まない。
 	"harness": {
 		// 0: 走った機械から締め出した環境・一時置き場・見本の置き場（ほかの道具が読む土台）

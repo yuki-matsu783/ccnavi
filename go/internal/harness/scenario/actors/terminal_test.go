@@ -12,7 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
-	"ccnavi/internal/harness/scenario/prepare"
+	"ccnavi/internal/harness/scenario/core"
 	"ccnavi/internal/infra/env"
 )
 
@@ -91,11 +91,11 @@ func TestEmptyPendingSurvivesJSON(t *testing.T) {
 	if p == nil {
 		t.Fatal("pending が nil")
 	}
-	data, err := json.Marshal(prepare.State{ProposalsBefore: p})
+	data, err := json.Marshal(core.State{ProposalsBefore: p})
 	if err != nil {
 		t.Fatal(err)
 	}
-	var back prepare.State
+	var back core.State
 	if err := json.Unmarshal(data, &back); err != nil || back.ProposalsBefore == nil {
 		t.Errorf("back = %+v, err = %v", back, err)
 	}
@@ -124,7 +124,7 @@ func TestParseBoardReadsStatusAndPending(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p := b.pending(); len(p) != 1 || p[0] != (prepare.Proposal{"i2", "test-repo"}) {
+	if p := b.pending(); len(p) != 1 || p[0] != (core.Proposal{"i2", "test-repo"}) {
 		t.Errorf("pending = %v（複数のツリーの同じ識別子は畳む）", p)
 	}
 	if a := b.approved(); !a["i2"] || a["i1"] {
@@ -134,28 +134,28 @@ func TestParseBoardReadsStatusAndPending(t *testing.T) {
 
 // driveHumanRun は board の列（打つ前・打ったあと）と端末の結果を差し替えて human_run を 1 回回す。
 type humanRunCase struct {
-	before         []prepare.Proposal
-	pending        []prepare.Proposal
-	pendingAfter   *[]prepare.Proposal
+	before         []core.Proposal
+	pending        []core.Proposal
+	pendingAfter   *[]core.Proposal
 	approved       []string
 	approvedBefore []string
 	exit           int
 	execErr        error
 }
 
-func boardOf(pending []prepare.Proposal, open []string) Board {
+func boardOf(pending []core.Proposal, open []string) Board {
 	var b Board
 	for _, p := range pending {
 		b.Pending = append(b.Pending, p[0])
 		b.Tickets = append(b.Tickets, Ticket{ID: p[0], Project: p[1]})
 	}
 	for _, id := range open {
-		b.Tickets = append(b.Tickets, Ticket{ID: id, Project: DisposableProject, Open: true})
+		b.Tickets = append(b.Tickets, Ticket{ID: id, Project: core.DisposableProject, Open: true})
 	}
 	return b
 }
 
-func (c humanRunCase) drive(t *testing.T) (int, *prepare.State, [][]string) {
+func (c humanRunCase) drive(t *testing.T) (int, *core.State, [][]string) {
 	t.Helper()
 	after := c.pending
 	if c.pendingAfter != nil {
@@ -172,16 +172,16 @@ func (c humanRunCase) drive(t *testing.T) (int, *prepare.State, [][]string) {
 	}
 	before := c.before
 	if before == nil {
-		before = []prepare.Proposal{}
+		before = []core.Proposal{}
 	}
-	st := &prepare.State{ProposalsBefore: before}
+	st := &core.State{ProposalsBefore: before}
 	rc := tm.Run(st, 0, RunSpec{Script: ".ccnavi/scripts/ccnavi-user-agree.sh", Answers: []string{"y"}}, base.TempDir(t), base.TempDir(t), func() error { return nil }, func(string) {})
 	return rc, st, executed
 }
 
 func TestHumanRunJudgesByApprovedTicketsNotTheExitCode(t *testing.T) {
 	t.Parallel()
-	rc, st, ran := humanRunCase{pending: []prepare.Proposal{{"i1", "test-repo"}}, exit: 0}.drive(t)
+	rc, st, ran := humanRunCase{pending: []core.Proposal{{"i1", "test-repo"}}, exit: 0}.drive(t)
 	if rc != Halted || !strings.Contains(st.Halt.Reasons[0], "新しく承認済みにならなかった: i1") || ran[0][2] != "i1" {
 		t.Errorf("rc = %d, halt = %+v, ran = %v", rc, st.Halt, ran)
 	}
@@ -192,7 +192,7 @@ func TestHumanRunJudgesByApprovedTicketsNotTheExitCode(t *testing.T) {
 
 func TestHumanRunApprovedContinuesAndIsRecorded(t *testing.T) {
 	t.Parallel()
-	rc, st, _ := humanRunCase{pending: []prepare.Proposal{{"i1", "test-repo"}}, approved: []string{"i1"}}.drive(t)
+	rc, st, _ := humanRunCase{pending: []core.Proposal{{"i1", "test-repo"}}, approved: []string{"i1"}}.drive(t)
 	if rc != Done || st.HumanRuns[0].Status != "done" || st.NextStep != 1 || st.Halt != nil {
 		t.Errorf("rc = %d, state = %+v", rc, st)
 	}
@@ -204,8 +204,8 @@ func TestHumanRunApprovedContinuesAndIsRecorded(t *testing.T) {
 // 承認済みの親を改版したときは、承認待ちから消えれば成功。承認待ちに残ったままなら数えない。
 func TestHumanRunRevisionOfAnApprovedParent(t *testing.T) {
 	t.Parallel()
-	parent := []prepare.Proposal{{"p1", "test-repo"}}
-	gone := []prepare.Proposal{}
+	parent := []core.Proposal{{"p1", "test-repo"}}
+	gone := []core.Proposal{}
 	rc, st, _ := humanRunCase{pending: parent, approved: []string{"p1"}, approvedBefore: []string{"p1"}, pendingAfter: &gone}.drive(t)
 	if rc != Done || st.HumanRuns[0].Status != "done" {
 		t.Errorf("承認待ちから消えた改版: rc = %d, state = %+v", rc, st)
@@ -224,9 +224,9 @@ func TestHumanRunStopsBeforeRunning(t *testing.T) {
 		c      humanRunCase
 		reason string
 	}{
-		{"test-repo 以外の提案", humanRunCase{pending: []prepare.Proposal{{"i1", "test-repo"}, {"w1", ""}}, approved: []string{"i1"}}, "w1（ワークスペースルート）"},
-		{"提案が増えていない", humanRunCase{pending: []prepare.Proposal{{"i1", "test-repo"}}, before: []prepare.Proposal{{"i1", ""}}}, "増えていない"},
-		{"プロジェクト名は大文字小文字を区別しない", humanRunCase{pending: []prepare.Proposal{{"i1", "Test-Repo"}}, approved: []string{"i1"}}, ""},
+		{"test-repo 以外の提案", humanRunCase{pending: []core.Proposal{{"i1", "test-repo"}, {"w1", ""}}, approved: []string{"i1"}}, "w1（ワークスペースルート）"},
+		{"提案が増えていない", humanRunCase{pending: []core.Proposal{{"i1", "test-repo"}}, before: []core.Proposal{{"i1", ""}}}, "増えていない"},
+		{"プロジェクト名は大文字小文字を区別しない", humanRunCase{pending: []core.Proposal{{"i1", "Test-Repo"}}, approved: []string{"i1"}}, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -252,11 +252,11 @@ func TestHumanRunNeedsABaselineAndDoesNotRunTwice(t *testing.T) {
 		return Board{}, nil
 	}}
 	save, out := func() error { return nil }, func(string) {}
-	st := &prepare.State{}
+	st := &core.State{}
 	if rc := tm.Run(st, 0, RunSpec{}, "r", "o", save, out); rc != Halted || !strings.Contains(st.Halt.Reasons[0], "基準が state に無い") {
 		t.Errorf("rc = %d, halt = %+v", rc, st.Halt)
 	}
-	st = &prepare.State{ProposalsBefore: []prepare.Proposal{}, HumanRuns: []prepare.HumanRun{{Step: 1, Status: "started"}}}
+	st = &core.State{ProposalsBefore: []core.Proposal{}, HumanRuns: []core.HumanRun{{Step: 1, Status: "started"}}}
 	if rc := tm.Run(st, 0, RunSpec{}, "r", "o", save, out); rc != Halted || !strings.Contains(st.Halt.Reasons[0], "打ち始めたまま止まった") {
 		t.Errorf("rc = %d, halt = %+v", rc, st.Halt)
 	}
@@ -264,7 +264,7 @@ func TestHumanRunNeedsABaselineAndDoesNotRunTwice(t *testing.T) {
 
 func TestHumanRunWithoutATerminalPausesAndLeavesNoRecord(t *testing.T) {
 	t.Parallel()
-	rc, st, _ := humanRunCase{pending: []prepare.Proposal{{"i1", "test-repo"}}, execErr: ErrNoTerminal}.drive(t)
+	rc, st, _ := humanRunCase{pending: []core.Proposal{{"i1", "test-repo"}}, execErr: ErrNoTerminal}.drive(t)
 	if rc != Pause || len(st.HumanRuns) != 0 || st.Halt != nil {
 		t.Errorf("rc = %d, state = %+v", rc, st)
 	}
@@ -272,7 +272,7 @@ func TestHumanRunWithoutATerminalPausesAndLeavesNoRecord(t *testing.T) {
 
 func TestHumanRunTimeoutHalts(t *testing.T) {
 	t.Parallel()
-	rc, st, _ := humanRunCase{pending: []prepare.Proposal{{"i1", "test-repo"}}, execErr: ErrTimeout}.drive(t)
+	rc, st, _ := humanRunCase{pending: []core.Proposal{{"i1", "test-repo"}}, execErr: ErrTimeout}.drive(t)
 	if rc != Halted || !strings.Contains(st.Halt.Reasons[0], "秒で終わらなかった") || st.HumanRuns[0].Status != "halted" {
 		t.Errorf("rc = %d, state = %+v", rc, st)
 	}
