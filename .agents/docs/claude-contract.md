@@ -3,7 +3,7 @@ title: claude -p のスタブと、本物との契約テスト
 type: guide
 description: 受入シナリオを本物の claude -p の代わりに台本どおりに動くスタブ（go/internal/harness/fakeclaude）で回す仕組み。台本の書き方、スタブが真似る hook の呼び方と応答の扱い、本物から録った形（recorded.json）と比べる契約テスト、録り直し、確かめられないこと
 tags: [testing, scenario]
-keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, claude -p, stream-json, hook, 契約テスト, fakeclaude, scene.go, recorded.json, claudrecord, observations, SubagentHandback, CLAUDE_CODE_ENTRYPOINT]
+keywords: [スタブ, fakeclaude, 台本, script, after_stop_block, --agent, claude -p, stream-json, hook, 契約テスト, scene.go, recorded.json, claudrecord, observations, SubagentHandback, CLAUDE_CODE_ENTRYPOINT]
 ---
 
 # claude -p のスタブと、本物との契約テスト

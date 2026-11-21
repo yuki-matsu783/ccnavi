@@ -86,7 +86,9 @@ const failScript = "#!/bin/sh\nexit 1\n"
 // WriteFail は常に 1 で終わる sh のスタブを書く（認証の無い glab・gh の代わり）。
 func WriteFail(t testing.TB, path string) {
 	t.Helper()
-	writeExecutable(t, path, failScript)
+	if err := writeExecutable(path, failScript); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Route は curl のスタブが 1 つの要求（`<METHOD> <URL>`）に返す答え。JSON では `[状態, 本文]`。
@@ -126,46 +128,65 @@ type Stub struct {
 // WriteShim は PATH に置く sh のスタブを書く。`#!/bin/sh` と `exec '<teststub>' <サブコマンド…> "$@"` の 2 行（Windows の Git Bash でも動く形）。
 func WriteShim(t testing.TB, path, teststub string, sub ...string) {
 	t.Helper()
-	text := "#!/bin/sh\nexec '" + strings.ReplaceAll(teststub, `\`, "/") + "' " + strings.Join(sub, " ") + " \"$@\"\n"
-	writeExecutable(t, path, text)
+	if err := writeShim(path, teststub, sub...); err != nil {
+		t.Fatal(err)
+	}
 }
 
-func writeExecutable(t testing.TB, path, text string) {
-	t.Helper()
+func writeShim(path, teststub string, sub ...string) error {
+	text := "#!/bin/sh\nexec '" + strings.ReplaceAll(teststub, `\`, "/") + "' " + strings.Join(sub, " ") + " \"$@\"\n"
+	return writeExecutable(path, text)
+}
+
+func writeExecutable(path, text string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
+		return err
 	}
-	if err := os.WriteFile(path, []byte(text), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	return os.WriteFile(path, []byte(text), 0o755)
 }
 
 // Build はスタブを dir/hostbin に置く。routes.json（空）とログの場所を決める。
 // curl が false なら curl のスタブを置かない（fakegitlab の模擬に届かなくなるため）。
 func Build(t testing.TB, dir string, curl bool) Stub {
 	t.Helper()
+	s, err := BuildTo(dir, exe.TeststubPath(t), curl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// BuildTo は Build の testing が要らない版。teststub は組んだ teststub のパス（curl のスタブが起こす）。
+func BuildTo(dir, teststub string, curl bool) (Stub, error) {
 	binDir := filepath.Join(dir, "hostbin")
-	writeExecutable(t, filepath.Join(binDir, "git"), gitScript)
-	writeExecutable(t, filepath.Join(binDir, "gh"), failScript)
-	writeExecutable(t, filepath.Join(binDir, "glab"), failScript)
+	for name, text := range map[string]string{"git": gitScript, "gh": failScript, "glab": failScript} {
+		if err := writeExecutable(filepath.Join(binDir, name), text); err != nil {
+			return Stub{}, err
+		}
+	}
 	if curl {
-		WriteShim(t, filepath.Join(binDir, "curl"), exe.TeststubPath(t), "curl")
+		if err := writeShim(filepath.Join(binDir, "curl"), teststub, "curl"); err != nil {
+			return Stub{}, err
+		}
 	}
 	s := Stub{BinDir: binDir, RoutesPath: filepath.Join(dir, "routes.json"), Log: filepath.Join(dir, "requests.log")}
-	s.WriteRoutes(t, Routes{})
-	return s
+	return s, s.writeRoutes(Routes{})
 }
 
 // WriteRoutes は routes.json を書き換える。
 func (s Stub) WriteRoutes(t testing.TB, routes Routes) {
 	t.Helper()
+	if err := s.writeRoutes(routes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (s Stub) writeRoutes(routes Routes) error {
 	data, err := json.Marshal(routes)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
-	if err := os.WriteFile(s.RoutesPath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	return os.WriteFile(s.RoutesPath, data, 0o644)
 }
 
 // EnvOpts は Env の入力。空の項目は効かせない。

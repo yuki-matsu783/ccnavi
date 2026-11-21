@@ -1,5 +1,5 @@
 // Package host は、受入シナリオの `setup.host`（評価の相手）を用意して片付け、step の終わりに相手側の状態を読んで記録する
-// （tests/scenarios/hostenv.py・hostsnap.py の写し）。決まりは .agents/docs/acceptance-scenarios.md。
+// 決まりは .agents/docs/acceptance-scenarios.md。
 //
 //   - bare: 対象の origin への通信を、一時ディレクトリの bare に向ける。git のスタブが URL をホストの形で答える。
 //     ホストの API は gh・glab が失敗し、curl は空の routes で 404（「確かめられなかった」）

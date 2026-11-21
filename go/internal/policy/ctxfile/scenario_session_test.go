@@ -7,7 +7,7 @@ import (
 	"ccnavi/internal/policy/rules"
 )
 
-// 1 度だけの文はセッションごとに数える（tests/scenarios/test_runner.py から移した）。受入シナリオは 1 本ごとに
+// 1 度だけの文はセッションごとに数える。受入シナリオは 1 本ごとに
 // 別のセッションで回すので、前のシナリオで渡した印が次のシナリオに持ち越されない。
 func TestOnceIsCountedPerSession(t *testing.T) {
 	state := t.TempDir()

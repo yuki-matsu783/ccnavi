@@ -43,6 +43,7 @@ import (
 	"ccnavi/internal/harness/contractshape"
 	"ccnavi/internal/harness/fakeclaude"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 )
 
 // claudeTimeout は claude -p 1 回の上限（Python の timeout=900 の写し）。
@@ -95,7 +96,7 @@ type document struct {
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	root, err := findRoot()
+	root, err := ospath.FindRepoRoot(".")
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -165,24 +166,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stderr, "置いた: %s\n", fakeclaude.RecordedRel)
 	return 0
-}
-
-// findRoot は作業ディレクトリから上って go/go.mod を持つ所（リポジトリの根）を探す。
-func findRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", errors.New("リポジトリの根（go/go.mod の親）が見つからない")
-		}
-		dir = parent
-	}
 }
 
 // buildTeststub は teststub（hook の包みが起こす claude-hook）を base の下に組む。

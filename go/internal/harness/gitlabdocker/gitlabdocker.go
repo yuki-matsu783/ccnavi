@@ -74,20 +74,6 @@ func StateDir(getenv func(string) string, home string) string {
 	return filepath.Join(cache, "ccnavi", "gitlab")
 }
 
-// FindRoot は dir から上って、go/go.mod を持つ所（リポジトリの根）を返す。
-func FindRoot(dir string) (string, error) {
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", errors.New("リポジトリの根（go/go.mod の親）が見つからない。リポジトリの中で打つ")
-		}
-		dir = parent
-	}
-}
-
 // Result は外のコマンドの結果。
 type Result struct {
 	Code           int

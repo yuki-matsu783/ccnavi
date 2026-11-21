@@ -1,4 +1,4 @@
-// scenarios は、受入シナリオを回す実行器の入口である（tests/scenarios/runner.py の写し）。手順と決まりは
+// scenarios は、受入シナリオを回す実行器の入口である。手順と決まりは
 // .agents/docs/acceptance-scenarios.md。普段のテストには含めない。人間に確認を取ってから、明確な指示があったときだけ回す。
 //
 //	go run ./internal/harness/cmd/scenarios preflight <シナリオ>
@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -28,9 +29,14 @@ import (
 	"ccnavi/internal/harness/scenario/runner"
 	"ccnavi/internal/harness/scenario/world"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 )
 
-func main() { os.Exit(run(os.Args[1:])) }
+func main() {
+	// Ctrl-C は子の claude を止める。ここでは受けて捨て、step の失敗として後片付けを通す。
+	signal.Notify(make(chan os.Signal, 1), os.Interrupt)
+	os.Exit(run(os.Args[1:]))
+}
 
 // args は argparse と同じく、位置引数とオプションを入れ替えて書ける。
 type args struct {
@@ -78,19 +84,28 @@ func run(argv []string) int {
 		return 2
 	}
 	cmd, rest := argv[0], argv[1:]
-	repoRoot, goDir, err := locate()
+	repoRoot, err := ospath.FindRepoRoot(".")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
+	// パス（tests/・logs/・--root・--out）はリポジトリの根から測る。go/ で打っても同じ。
+	if err := os.Chdir(repoRoot); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	goDir := filepath.Join(repoRoot, "go")
 	tools := &toolchain{goDir: goDir}
 	r := &runner.Runner{
 		RepoRoot: repoRoot,
 		Manager: &host.Manager{
 			Git: world.Git,
-			// hoststub.Build は testing を取るので、入口の実行ファイルからは置けない（bare・fake-gitlab・docker-gitlab は回せない）
-			BuildStub: func(string, bool) (hoststub.Stub, error) {
-				return hoststub.Stub{}, fmt.Errorf("この入口からは PATH のスタブを置けない（hoststub が testing に依存している。setup.host が real のシナリオだけ回せる）")
+			BuildStub: func(dir string, curl bool) (hoststub.Stub, error) {
+				p, err := tools.teststub()
+				if err != nil {
+					return hoststub.Stub{}, err
+				}
+				return hoststub.BuildTo(dir, p, curl)
 			},
 		},
 		Ccnavi: tools.ccnavi, Teststub: tools.teststub, Entry: true,
@@ -162,24 +177,6 @@ func run(argv []string) int {
 	}
 	fmt.Fprintln(os.Stderr, "知らないサブコマンド: "+cmd)
 	return 2
-}
-
-// locate はリポジトリの根と go/ を、作業ディレクトリから上って探す。
-func locate() (repoRoot, goDir string, err error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
-			return dir, filepath.Join(dir, "go"), nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", "", fmt.Errorf("リポジトリの根（go/go.mod の親）が見つからない。go/ の中で打つ")
-		}
-		dir = parent
-	}
 }
 
 // toolchain は組んだ ccnavi・teststub を用意する。

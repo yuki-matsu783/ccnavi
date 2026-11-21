@@ -144,3 +144,28 @@ func TestGhAndGlabFail(t *testing.T) {
 		}
 	}
 }
+
+// BuildTo は testing 無しで git・gh・glab（curl 有りなら curl）と routes.json を置く。
+func TestBuildToPlacesTheStubsWithoutTesting(t *testing.T) {
+	t.Parallel()
+	dir := base.TempDir(t)
+	s, err := BuildTo(dir, "/x/teststub", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"git", "gh", "glab", "curl"} {
+		if _, err := os.Stat(filepath.Join(s.BinDir, name)); err != nil {
+			t.Errorf("%s が置かれていない: %v", name, err)
+		}
+	}
+	if _, err := os.Stat(s.RoutesPath); err != nil {
+		t.Errorf("routes.json が無い: %v", err)
+	}
+	s2, err := BuildTo(base.TempDir(t), "/x/teststub", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(s2.BinDir, "curl")); err == nil {
+		t.Error("curl=false なのに curl が置かれた")
+	}
+}

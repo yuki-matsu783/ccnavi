@@ -1,4 +1,4 @@
-// Package runner は、受入シナリオを回す流れとサブコマンドの中身である（tests/scenarios/drive.py・commands.py・runner.py の写し）。
+// Package runner は、受入シナリオを回す流れとサブコマンドの中身である。
 // 手順と決まりは .agents/docs/acceptance-scenarios.md。普段のテストには含めない（スタブで回す分だけ go test に入る）。
 //
 //	go run ./internal/harness/cmd/scenarios run <シナリオ> [--confirmed] [--agent script]

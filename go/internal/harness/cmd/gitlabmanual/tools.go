@@ -15,8 +15,8 @@ import (
 	"ccnavi/internal/harness/gitlabapi"
 	"ccnavi/internal/harness/gitlabdocker"
 	"ccnavi/internal/harness/scenario/actors"
+	"ccnavi/internal/harness/scenario/core"
 	"ccnavi/internal/harness/scenario/host"
-	"ccnavi/internal/harness/scenario/prepare"
 )
 
 // agreeTimeout は承認の代行の 1 回の上限。
@@ -89,7 +89,7 @@ func (t tools) hostOf() (*host.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	var st prepare.State
+	var st core.State
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("state.json を読めない: %w", err)
 	}

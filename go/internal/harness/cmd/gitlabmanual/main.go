@@ -29,6 +29,7 @@ import (
 	"ccnavi/internal/harness/gitlabdocker"
 	"ccnavi/internal/harness/gitlabprobe"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 )
 
 const usage = `使い方: gitlabmanual <サブコマンド>
@@ -69,7 +70,7 @@ func run(args []string, cwd string, environ []string, stdout, stderr io.Writer) 
 		fmt.Fprintln(stdout, usage)
 		return 0
 	}
-	root, err := gitlabdocker.FindRoot(cwd)
+	root, err := ospath.FindRepoRoot(cwd)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2

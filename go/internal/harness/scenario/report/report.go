@@ -64,15 +64,7 @@ func jsonText(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
-	return judgeDumps(v)
-}
-
-func judgeDumps(v any) string {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Sprint(v)
-	}
-	return strings.ReplaceAll(string(data), `<`, "<")
+	return judge.Dumps(v)
 }
 
 func cut(s string, limit int) string {

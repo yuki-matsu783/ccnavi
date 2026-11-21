@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -251,9 +252,13 @@ func (s *session) snapshot(idx int) bool {
 	return true
 }
 
-func (s *session) terminal() actors.Terminal {
+func (s *session) terminal() (actors.Terminal, error) {
 	tm := actors.Terminal{Board: s.r.board}
-	if h, err := prepare.HostEnv(s.r.Manager, s.st, s.r.environ()); err == nil && h != nil {
+	h, err := prepare.HostEnv(s.r.Manager, s.st, s.r.environ())
+	if err != nil {
+		return tm, err
+	}
+	if h != nil {
 		tm.Env = func(root string) []string {
 			var out []string
 			for _, kv := range host.Environ(h) {
@@ -264,7 +269,7 @@ func (s *session) terminal() actors.Terminal {
 			return append(out, env.Workspace+"="+root)
 		}
 	}
-	return tm
+	return tm, nil
 }
 
 // board は ccnavi のボードを読む（`ccnavi --explain --json --root <root>`）。
@@ -303,7 +308,14 @@ func (s *session) runSteps() (rc int, done bool) {
 		}
 		if step.Human && step.HumanRun != nil {
 			spec := actors.RunSpec{Script: filepath.Join(s.root, filepath.FromSlash(core.HumanRunScripts[step.HumanRun.Script].Path)), Answers: step.HumanRun.Answers}
-			rc := s.terminal().Run(s.st, idx, spec, s.root, s.out, s.save, r.say)
+			tm, err := s.terminal()
+			if err != nil { // 相手の環境を作れないまま打つと、本物の origin に向かう恐れがある
+				s.st.Halt = &core.Halt{Step: idx + 1, Kind: "run", Reasons: []string{fmt.Sprintf("step %d の環境を作れなかった: %v", idx+1, err)}}
+				_ = s.save()
+				r.say(fmt.Sprintf("step %d: 環境を作れなかった（%v）。後続の step には進まず止める", idx+1, err))
+				return ExitHalted, false
+			}
+			rc := tm.Run(s.st, idx, spec, s.root, s.out, s.save, r.say)
 			if rc != actors.Pause {
 				if !s.snapshot(idx) {
 					return ExitHalted, false
@@ -354,7 +366,7 @@ func (s *session) runSteps() (rc int, done bool) {
 			ids = []string{sid}
 		}
 		for _, id := range ids {
-			if !containsStr(s.st.SessionIDs, id) {
+			if !slices.Contains(s.st.SessionIDs, id) {
 				s.st.SessionIDs = append(s.st.SessionIDs, id)
 			}
 		}
@@ -389,15 +401,6 @@ func (s *session) runSteps() (rc int, done bool) {
 		}
 	}
 	return 0, true
-}
-
-func containsStr(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // finish は判定と後片付けまで進め、報告を書いて終了コードを返す。
@@ -616,7 +619,7 @@ func (s *session) setup(top string) error {
 	return nil
 }
 
-// continueScenario は steps を進め、判定と後片付けまで持っていく。回している最中に panic（割り込みなど）が起きても、
+// continueScenario は steps を進め、判定と後片付けまで持っていく。回している最中に panic が起きても、
 // setup のファイルを残さず、対象を base へ戻す（戻せなければ文面を出す。元の panic はそのまま投げ直す）。
 func (s *session) continueScenario() int {
 	r, st := s.r, s.st

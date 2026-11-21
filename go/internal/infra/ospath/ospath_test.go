@@ -284,3 +284,22 @@ func TestIdentity(t *testing.T) {
 		t.Error("無いものは読めない")
 	}
 }
+
+func TestFindRepoRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "go", "internal", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "go", "go.mod"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, from := range []string{root, filepath.Join(root, "go", "internal", "x")} {
+		got, err := FindRepoRoot(from)
+		if err != nil || got != root {
+			t.Errorf("FindRepoRoot(%q) = %q, %v", from, got, err)
+		}
+	}
+	if _, err := FindRepoRoot(t.TempDir()); err == nil {
+		t.Error("根が無い所は失敗するはず")
+	}
+}

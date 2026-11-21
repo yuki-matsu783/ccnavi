@@ -3,7 +3,7 @@
 環境変数を読まない・ファイルや一時ディレクトリを作らない・`sys.exit` しない。接続先は
 `Client(base)` の引数、トークンは各メソッドの引数で受ける。`gitlabmanual probe` と、本物の GitLab の
 応答を記録する道具。受入シナリオの相手の準備と、step の終わりの相手側の状態の読み取り
-（`tests/scenarios/hostsnap.py`）が使う。
+（`go/internal/harness/scenario/prepare`）が使う。
 
 sh と同じ道具（curl・glab）を使わないのは、片方の不具合がもう片方に隠れないようにするため。
 

@@ -138,33 +138,3 @@ func TestSceneTreeHasTheHookAndSettings(t *testing.T) {
 		t.Errorf("git の木になっていない: %v", err)
 	}
 }
-
-// os.Chdir を使うので t.Parallel は呼ばない（並行のテストの作業ディレクトリを動かさない）。
-func TestFindRootNeedsTheGoModule(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "go"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "go", "go.mod"), []byte("module ccnavi\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	inside := filepath.Join(dir, "go", "internal")
-	if err := os.MkdirAll(inside, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	wd, _ := os.Getwd()
-	defer os.Chdir(wd)
-	if err := os.Chdir(inside); err != nil {
-		t.Fatal(err)
-	}
-	got, err := findRoot()
-	if err != nil || !sameDir(got, dir) {
-		t.Errorf("findRoot = %q (%v), want %q", got, err, dir)
-	}
-}
-
-func sameDir(a, b string) bool {
-	ia, errA := os.Stat(a)
-	ib, errB := os.Stat(b)
-	return errA == nil && errB == nil && os.SameFile(ia, ib)
-}

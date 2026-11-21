@@ -87,7 +87,7 @@ func (p *probe) setup() bool {
 	must(err)
 	mustWrite(filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), text)
 	// sh はワークスペースルートを cwd から上へ探す（.ccnavi/scripts/ccnavi-common.sh を持つ親）。一時リポジトリにも scripts を置く
-	must(copyTree(filepath.Join(p.scriptsSrc(), ".ccnavi", "scripts"), filepath.Join(root, ".ccnavi", "scripts")))
+	must(copyTree(filepath.Join(p.srcRoot, ".ccnavi", "scripts"), filepath.Join(root, ".ccnavi", "scripts")))
 	return true
 }
 
@@ -137,7 +137,7 @@ func (p *probe) parentAndChildren() bool {
 	mustWrite(filepath.Join(parent, wipNote), "src/a と src/b を足した。\n")
 	p.commitAll(parent, "wip note")
 
-	body := p.writeOut("request-1.md", "見てほしい点\n\n- src/a と src/b を足した\n")
+	body := p.writeOut("request-1.md", requestBody)
 	early := p.sh(p.script("ccnavi-review.sh"), parent, nil, "review-request", "--phase", "1", "--body-file", body)
 	p.check("push 前の request は前提で止まる",
 		early.Code != 0 && strings.Contains(early.Stderr, "親ブランチの HEAD が push されていない"),
@@ -166,7 +166,7 @@ func (p *probe) reviewRequest() bool {
 		strings.Contains(seen.Stdout, "path="+p.repo) && strings.Contains(seen.Stdout, "api_base=https://api.github.com") && strings.Contains(seen.Stdout, "kind=github"), "")
 	p.check("送り先は gh", strings.Contains(seen.Stdout, "transport=gh"), tailRunes(seen.Stdout, 60))
 
-	body := p.writeOut("request-1.md", "見てほしい点\n\n- src/a と src/b を足した\n")
+	body := p.writeOut("request-1.md", requestBody)
 	requested := p.sh(p.script("ccnavi-review.sh"), parent, nil, "review-request", "--phase", "1", "--body-file", body)
 	p.say("request:\n" + p.redact(requested.Stdout+requested.Stderr))
 	p.check("request が通る（PR を作って投稿してマーカー）", requested.Code == 0, "")
@@ -535,13 +535,13 @@ func (p *probe) worktree(name, base string) string {
 	return path
 }
 
+// requestBody は request に渡す本文（request-1.md）。
+const requestBody = "見てほしい点\n\n- src/a と src/b を足した\n"
+
 // script は .ccnavi/scripts の配布スクリプトの、実測が使う絶対パス（ccnavi の根から）。
 func (p *probe) script(name string) string {
-	return filepath.Join(p.scriptsSrc(), ".ccnavi", "scripts", name)
+	return filepath.Join(p.srcRoot, ".ccnavi", "scripts", name)
 }
-
-// scriptsSrc は配布スクリプトの置かれたこのチェックアウトの根（probe が起こす sh の出どころ）。
-func (p *probe) scriptsSrc() string { return p.srcRoot }
 
 // envWithoutGh は gh を PATH から外した実測の環境（gh が無ければ同じ環境）。
 func (p *probe) envWithoutGh() (map[string]string, error) {

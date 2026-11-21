@@ -98,7 +98,8 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-func dumps(v any) string {
+// Dumps は v を JSON の 1 行にする（`<`・`>`・`&` はそのまま）。
+func Dumps(v any) string {
 	var b strings.Builder
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
@@ -139,7 +140,7 @@ func SummarizeHooks(events []map[string]any, where string) (lines []string, omit
 		case name == "Stop" && (len(data) > 0 || text(ev["stdout"]) != "" || text(ev["stderr"]) != ""):
 			body := text(ev["stdout"])
 			if len(data) > 0 {
-				body = dumps(data)
+				body = Dumps(data)
 			} else if body == "" {
 				body = text(ev["stderr"])
 			}
@@ -318,8 +319,8 @@ func ContextLines(parsed *core.Stream, num int, out string) ([]string, error) {
 		lines = append(lines, fmt.Sprintf("- この Agent 呼び出しの中のツール呼び出し: %d 件", len(kids)))
 		full = append(full, "", fmt.Sprintf("## Agent 呼び出し %s の中のツール呼び出し（%d 件）", a.ID, len(kids)))
 		for _, c := range kids {
-			lines = append(lines, fmt.Sprintf("  - %s: %s", c.Name, core.Clip(dumps(c.Input), 500, where)))
-			full = append(full, fmt.Sprintf("- %s: %s", c.Name, dumps(c.Input)))
+			lines = append(lines, fmt.Sprintf("  - %s: %s", c.Name, core.Clip(Dumps(c.Input), 500, where)))
+			full = append(full, fmt.Sprintf("- %s: %s", c.Name, Dumps(c.Input)))
 		}
 	}
 	for _, i := range sub {

@@ -31,7 +31,7 @@ steps:
       実装はまだしないで。
   - human: true
     instruction: >-
-      スタブの git の環境（PATH 先頭の hostbin、`FAKE_BARE`・`FAKE_REAL_ORIGIN`・`FAKE_CRED_URL`、`GITLAB_TOKEN`。`state.json` の host と `hostenv.step_env` から組む）の中で、
+      スタブの git の環境（PATH 先頭の hostbin、`FAKE_BARE`・`FAKE_REAL_ORIGIN`・`FAKE_CRED_URL`、`GITLAB_TOKEN`。`state.json` の host から実行器が組む）の中で、
       擬似 tty（`script`）を使って `sh .ccnavi/scripts/ccnavi-user-agree.sh <親の識別子> <子の識別子>` を代行して打つ（識別子は 1 つ目の prompt の報告にある）。
       素の shell で打たない（`ccnavi-user-push-approved.sh` が本物の origin に push しうる）。
     check:

@@ -1,7 +1,6 @@
 package base
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -45,22 +44,17 @@ func Root() string {
 
 // findRoot は作業ディレクトリから上って go/go.mod を持つ所を探す。作業ディレクトリからの相対パス（`../..`）も返す。
 func findRoot() (dir, rel string, err error) {
-	dir, err = os.Getwd()
+	cwd, err := os.Getwd()
 	if err != nil {
 		return "", "", err
 	}
-	rel = "."
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
-			return dir, rel, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", "", errors.New("リポジトリの根（go/go.mod の親）が見つからない")
-		}
-		dir = parent
-		rel = filepath.Join(rel, "..")
+	if dir, err = ospath.FindRepoRoot(cwd); err != nil {
+		return "", "", err
 	}
+	if rel, err = filepath.Rel(cwd, dir); err != nil {
+		return "", "", err
+	}
+	return dir, rel, nil
 }
 
 // GoDir は Go のモジュールの根（<リポジトリの根>/go）。

@@ -36,13 +36,14 @@ import (
 	"time"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 )
 
 func main() { os.Exit(run(os.Stdout, os.Stderr)) }
 
 // run は起動の確かめ（実験場・トークン・exe・版）をしてから、実測を回す。止める条件は false の代わりに 1 を返す。
 func run(stdout, stderr io.Writer) int {
-	root, err := findRoot()
+	root, err := ospath.FindRepoRoot(".")
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
@@ -189,24 +190,6 @@ func (p *probe) cleanup() {
 	}
 	p.say(fmt.Sprintf("片付け: PR %v と issue %v を閉じた", p.madePRs, p.madeIssue))
 	p.say(fmt.Sprintf("片付け: ブランチ %v を削除した", p.madeBrs))
-}
-
-// findRoot は作業ディレクトリから上って go/go.mod を持つ所（リポジトリの根）を探す。
-func findRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("リポジトリの根（go/go.mod の親）が見つからない")
-		}
-		dir = parent
-	}
 }
 
 // gitOut は dir で git を起こした標準出力（前後の空白を落とす）。失敗は空。

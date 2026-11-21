@@ -15,7 +15,7 @@ Python のテストは `tests/<グループ>/` に置く。残っているのは
 | グループ | 主題 | 時間 |
 |---|---|---|
 | `core` | 部品の単体と、速い受入テスト | 約 13 秒 |
-| `scenarios` | 受入シナリオの通し（`tests/scenarios/`。台本のあるシナリオをスタブで回す `test_stub_scenarios` と、模擬のホストで回す `test_runner`） | 約 29 秒 |
+| `contract` | 本物から録った応答の形と、模擬・スタブの比べ（`tests/contract/`） | 約 15 秒 |
 
 ```sh
 uv run python -m tests    # 全件（同時実行）。`discover -s tests` の 1 本は使わない
@@ -39,7 +39,8 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `.claude/hooks/test-py.sh` | `uv run python -m tests`（`core` の `test_test_py_hook`）`go test ./internal/clitest/e2e/` |
 | `.claude/hooks/check-adr.sh` | `go test ./internal/clitest/core/`（`checkadrhook_test.go`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `uv run python -m tests`（`core` の `test_ext_tests`） |
-| `tests/fake_claude.py`・`tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/contract/`・`tests/scenarios/` | `uv run python -m tests`（`scenarios` がスタブと模擬を使う） |
+| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/contract/` | `uv run python -m tests` |
+| `go/internal/harness/`・`tests/scenarios/`（受入シナリオの実行器・スタブ・シナリオの yml） | `go test ./internal/harness/... ./internal/clitest/scenarios/` |
 | `extensions/vscode/` | `go test ./internal/clitest/core/`（`testjson_test.go`）。拡張の分は下 |
 | `extensions/chrome/ccnavi-approval/` | その `pnpm test`（下） |
 | `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `go test ./internal/clitest/repo/`（`adr_numbers_test.go`） |

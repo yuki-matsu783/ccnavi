@@ -54,7 +54,7 @@ uv run --with ruff ruff format --check .
 uv run --with ruff ruff check .
 ```
 
-Python のテストは `tests/core` と `tests/scenarios` だけ。Python かその補助（`tests/` の下）を変えたら `uv run python -m tests` を回す（[テストを回す](../../../.agents/docs/testing.md)）。
+Python のテストは `tests/core` と `tests/contract` だけ。Python かその補助（`tests/` の下）を変えたら `uv run python -m tests` を回す（[テストを回す](../../../.agents/docs/testing.md)）。
 worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
 
 `go/`・`.ccnavi/`・`tests/` のどれかのファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。sh・文面・見本だけの変更も、Go に移したテスト（`go/internal/clitest/`）が読むので回す。`-count=1` は要らない（clitest は go test が結果を保存しない）。
