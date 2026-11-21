@@ -49,7 +49,7 @@ fail() {
 # 道具の置き場は上へたどって探す。
 review_place() {
 	root=$(ccnavi_workspace) ||
-		fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+		fail no-workspace "$(ccnavi_no_workspace_text)" 2
 	# 解いたルートを logger に渡し、書くたびに探し直させない。
 	ccnavi_log_root="$root"
 	here="$(pwd -W 2>/dev/null || pwd)"
@@ -57,10 +57,55 @@ review_place() {
 	# このスクリプトの置き場（絶対パス）。`ready --parent` は親のワークツリーへ cd するので、相対の `$0`
 	# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中のコピーを指すか、見失う。
 	# cd の前に解いておき、以降はこれを使う。
-	script_dir=$(cd "$(dirname "$0")" && pwd)
+	script_dir="$ccnavi_self_dir"
 	# 実行ファイルに渡す cwd（どの親かを引く場所）。ふつうは打った場所で、`ready --parent <親>` のときだけ
 	# 親のワークツリーにする。
 	exe_cwd="$here"
+}
+
+# ---- 親を引数で受ける（ready・close-early）。親を cwd・居るブランチから推定しないため。
+#
+# review_parent_arg "$@"  引数から `--parent <親>`（`--parent=<親>` も）を読み、review_parent に入れる（無ければ空）。
+# `--parent` は 1 度だけ渡し、値は空でないものにする。`--parent=`（空）や `--parent X --parent` は読み飛ばさず止める。
+review_parent_arg() {
+	review_parent=""
+	rpa_prev=""
+	rpa_count=0
+	for rpa_arg in "$@"; do
+		if [ "$rpa_prev" = --parent ]; then
+			review_parent="$rpa_arg"
+			[ -n "$rpa_arg" ] || fail "$sub-parent-missing" "$sub の --parent には親の識別子が必要です。" 2
+			rpa_prev=""
+			continue
+		fi
+		case "$rpa_arg" in
+		--parent=*)
+			rpa_count=$((rpa_count + 1))
+			review_parent="${rpa_arg#--parent=}"
+			[ -n "$review_parent" ] || fail "$sub-parent-missing" "$sub の --parent には親の識別子が必要です。" 2
+			;;
+		--parent) rpa_count=$((rpa_count + 1)) ;;
+		esac
+		rpa_prev="$rpa_arg"
+	done
+	if [ "$rpa_prev" = --parent ]; then
+		fail "$sub-parent-missing" "$sub の --parent には親の識別子が必要です。" 2
+	fi
+	[ "$rpa_count" -le 1 ] || fail "$sub-parent-twice" "$sub の --parent は 1 度だけ指定できます。" 2
+}
+
+# review_enter_parent <親>  親のワークツリー（<根>/.claude/worktrees/<親>）へ移り、実行ファイルの cwd もそこにする。
+# 以降、git（origin・ブランチ・親の識別子）は親のワークツリーで引く。移る前の場所を review_from に残す。
+# review_place の後に呼ぶ。
+review_enter_parent() {
+	ccnavi_is_ident "$1" ||
+		fail "$sub-parent-ident" "$sub の --parent の値（${1}）は有効な識別子の形式ではありません。" 2
+	rep_dir="$root/.claude/worktrees/$1"
+	[ -d "$rep_dir" ] && [ ! -L "$rep_dir" ] && [ -e "$rep_dir/.git" ] ||
+		fail "$sub-parent-tree" "親 ${1} のワークツリー（${rep_dir}）がありません。$sub は親のワークツリーで行う。" 2
+	review_from="$(pwd)"
+	cd "$rep_dir" || fail "$sub-parent-cd" "親 ${1} のワークツリー（${rep_dir}）に移れない。" 2
+	exe_cwd="$(pwd -W 2>/dev/null || pwd)"
 }
 
 # ---- 実行ファイル。

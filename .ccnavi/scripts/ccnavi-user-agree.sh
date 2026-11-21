@@ -74,10 +74,7 @@ for id in "$@"; do
 done
 
 # ワークスペースルート。ワークツリーの中から呼ばれても、ツリーの一覧はワークスペースルートの側から数える。
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-user-agree: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-user-agree
 
 # 承認が実際に書けたパスの一覧（JSON）の受け皿。実行ファイルは書き込みに入ったときだけ書く。
 report=$(mktemp "${TMPDIR:-/tmp}/ccnavi-user-agree.XXXXXX") || {

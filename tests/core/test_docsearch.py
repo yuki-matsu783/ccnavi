@@ -317,7 +317,8 @@ class ProjectsTest(Repo):
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertIn("projects/allow/docs/z", done.stdout.splitlines())
         self.assertEqual(
-            read(os.path.join(allow, ".gitignore")), "/*\n!/docs/\n!/docs/**\n**/ccnavi-index.jsonl\n"
+            read(os.path.join(allow, ".gitignore")),
+            "/*\n!/docs/\n!/docs/**\n**/ccnavi-index.jsonl\n",
         )
         self.assertTrue(os.path.exists(os.path.join(allow, "docs", "ccnavi-index.jsonl")))
 

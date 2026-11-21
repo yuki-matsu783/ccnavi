@@ -337,7 +337,8 @@ def _quoted(path: str) -> str:
 
 
 def script_command(root: str, name: str) -> str:
-    """文面が案内する `.ccnavi/scripts/` の sh の打ち方（`sh <ルートの実パス>/.ccnavi/scripts/<name>`）。
+    """文面が案内する `.ccnavi/scripts/` の sh の打ち方
+    （`sh <ルートの実パス>/.ccnavi/scripts/<name>`）。
 
     区切りは `/`。空白やシェルの記号を含むときだけ引用する。実行ファイルの書き方と食い違えば、
     案内の文を比べるテストが落ちる。

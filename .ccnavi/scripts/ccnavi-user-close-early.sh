@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-user-close-early まだ残っているが、早めに閉じる判断を置く。ユーザがターミナルで打つ。
 #
-#   sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由> [--no-issue]
+#   sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
 #
 # ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める。
 #
@@ -13,17 +13,18 @@
 # （ccnavi-user-push-approved.sh <親>）で送る。ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、
 # 承認の push の打ち直しを案内する。
 #
-# 親のワークツリーの中で実行すること。どの親かは cwd から引く。
+# どの親かは --parent <親の識別子> で受ける（cwd・居るブランチからは推定しない）。ワークスペースの中なら
+# どこから打ってもよく、親のワークツリー（.claude/worktrees/<親>）へは自分で移る。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り
 
 set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-close-early.sh --reason <理由> [--no-issue]
+sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
 
   まだ残っているが早めに閉じる判断（ユーザがターミナルで実行します）。残りを issue に書き出す（--no-issue なら書き出さない）。
-  Draft は親が ccnavi-review.sh ready で外す。
+  Draft は親が ccnavi-review.sh ready で外す。--parent は親の識別子（親のワークツリーの名前）。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
 USAGE
@@ -43,6 +44,8 @@ case "${1:-}" in
 esac
 # 診断ログに残す引数の数（読む前の数）。
 args_n=$#
+# 親は引数で受ける（cwd・居るブランチから推定しない）。`--parent` の重複や値の欠落はここで止める。
+review_parent_arg "$@"
 reason=""
 make_issue=1
 while [ "$#" -gt 0 ]; do
@@ -55,12 +58,23 @@ while [ "$#" -gt 0 ]; do
 		make_issue=0
 		shift
 		;;
+	--parent) shift 2 ;; # 読むのは上の review_parent_arg
 	*) shift ;;
 	esac
 done
 [ -n "$reason" ] || fail close-early-no-reason "--reason <理由> が必要です。" 2
 
 review_place
+# --parent が無ければ、ホストへ繋ぐ前に止め、どこからでも打てる 1 行の案内を出す（何も変えない）。
+if [ -z "$review_parent" ]; then
+	review_tree
+	ce_parent="<親の識別子>"
+	[ "$review_in_tree" = yes ] && ce_parent="$family"
+	fail close-early-parent-required "--parent <親の識別子> が必要です（どの親かを cwd から推定しません）。何も変えていません。
+次: sh $(ccnavi_sh_quote "$script_dir/ccnavi-user-close-early.sh") --parent ${ce_parent} --reason $(ccnavi_sh_quote "$reason")
+案内: 親の識別子は 'sh $script_dir/ccnavi-ticket.sh status' か 'sh $script_dir/ccnavi-git.sh worktree list' で確かめる。" 2
+fi
+review_enter_parent "$review_parent"
 review_exe || review_no_bin
 review_host
 review_begin "$args_n"

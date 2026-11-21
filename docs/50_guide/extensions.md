@@ -40,7 +40,7 @@ VS Code からワークツリーを見えるようにする設定は[導入と�
 
 レビューで残った指摘は、レビュー待ちの子のカードの［レビュー完了］で指摘ごとに対応方針を選ぶ（ターミナルでは `ccnavi-user-decide.sh`）。レビューの流れは[レビュー](review.md)にある。
 
-`close-early` はボードに置かない。ターミナルで `ccnavi-user-close-early.sh` を打つ。
+`close-early` はボードに置かない。ターミナルで `ccnavi-user-close-early.sh --parent <親> --reason <理由>` を打つ。
 
 ### バグ報告
 

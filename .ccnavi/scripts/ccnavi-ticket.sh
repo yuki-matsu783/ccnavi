@@ -155,10 +155,7 @@ esac
 # git には聞かない。モード B（projects/ の下に別リポジトリを clone する形）では、
 # cwd がプロジェクトの中にあると git はプロジェクトを答える。それは git として
 # 正しい答えで、ここで欲しいもの（道具の置き場）とは違う。
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-ticket: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-ticket
 
 # 実行ファイル。識別子の読み・結果ファイル・子のワークツリーも実行ファイルに聞くので、最初に探す。
 if ! ccnavi_wap_use_exe "$root"; then

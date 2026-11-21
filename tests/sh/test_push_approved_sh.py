@@ -729,8 +729,10 @@ class PushApprovedTest(Workspace):
         self.assertEqual(self.remote_head("i0001"), "")
         outside = os.path.join(self._tmp.name, "elsewhere")
         os.makedirs(outside)
-        lost = self.push(cwd=outside)
-        self.assertEqual(lost.returncode, 2, lost.stdout + lost.stderr)
+        # cwd がワークスペースの外でも、sh 自身の置き場から根を見つける
+        # （消えたワークツリーに残った端末から打つ形）
+        found = self.push(cwd=outside)
+        self.assertEqual(found.returncode, 0, found.stdout + found.stderr)
 
 
 @unittest.skipUnless(SHELL and GIT, "sh と git が要る")

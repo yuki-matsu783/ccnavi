@@ -92,14 +92,13 @@ class LauncherTest(unittest.TestCase):
     # L1
 
     def test_starts_the_build_for_this_machine_in_the_same_words_as_the_executable(self):
-        """偽の uname を使わない。sh の語と実行ファイル（platformtag）の語が揃っていることを見る。"""
+        """偽の uname を使わない。
+        sh の語と実行ファイル（platformtag）の語が揃っていることを見る。"""
         self.build(host_target())
         self.build("haiku-riscv64")
         result = self.run_launcher(fake=False)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(
-            result.stdout.startswith("bin/" + host_target() + "/"), result.stdout
-        )
+        self.assertTrue(result.stdout.startswith("bin/" + host_target() + "/"), result.stdout)
 
     def test_passes_arguments_and_the_payload_through(self):
         self.pretend("Linux x86_64")
@@ -139,7 +138,8 @@ class LauncherTest(unittest.TestCase):
                 )
 
     def test_worktree_without_bin_starts_the_build_in_the_main_root(self):
-        """ワークツリーの中の launcher には bin/ が無い。git の共通ディレクトリから本体のルートの bin/ を使う。"""
+        """ワークツリーの中の launcher には bin/ が無い。
+        git の共通ディレクトリから本体のルートの bin/ を使う。"""
         git = shutil.which("git")
         if not git:
             self.skipTest("git が無い")

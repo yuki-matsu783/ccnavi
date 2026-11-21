@@ -23,7 +23,8 @@ SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
 
-HARNESS = """
+HARNESS = (
+    """
 . "$(dirname "$0")/ccnavi-common.sh"
 review_label=t
 ccnavi_load ccnavi-common-review.sh
@@ -37,7 +38,8 @@ ccnavi() {
 	printf '%s\\n' "$*" >>"$STATE/ops.log"
 	case "$1" in
 	begin) [ -z "${NO_RECORD:-}" ] || return 1; printf '%s\\n' "$OPID" ;;
-	get) printf 'stage comment\\ncomment.state %s\\ncomment.url u0\\ncomment.tries %s\\n' "$ST" "$TRIES" ;;
+	get) printf 'stage comment\\ncomment.state %s\\ncomment.url u0\\n'"""
+    """'comment.tries %s\\n' "$ST" "$TRIES" ;;
 	reconcile) printf '%s\\n' "$VERDICT" ;;
 	*) : ;;
 	esac
@@ -55,6 +57,7 @@ find_marked() { printf 'yes %s\\n' "${FOUND:-}"; }
 account() { printf 'me'; }
 "${FUNC:-comment_staged}" "$@"
 """
+)
 
 
 @unittest.skipIf(SHELL is None or JQ is None, "sh / jq が無い")
