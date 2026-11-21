@@ -237,7 +237,7 @@ class DecideRecoveryShTest(unittest.TestCase):
         self.assertEqual(len(STORE["issues"]), 0, "ロック中なのに issue を作った")
         self.assertEqual(len(STORE["notes"]), notes_before, "ロック中なのに投稿した")
         self.assertEqual(self.calls()[calls_before:], [], "ロック中なのに ccnavi を呼んだ")
-        self.assertIn("別のプロセスで実行中", result.stderr)
+        self.assertIn("ロックを他の操作が持っている", result.stderr)
         self.assertTrue(os.path.isdir(lock), "他のプロセスのロックを消した")
 
     def ops_locks(self) -> list[str]:

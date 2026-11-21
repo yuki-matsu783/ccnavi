@@ -188,22 +188,10 @@ ccnavi_wap_begin() {
 	ccnavi_cb_wait=$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 120)
 	ccnavi_cb_rc=0
 	ccnavi_lock_take "$ccnavi_wap_root" "$ccnavi_wap_repo" "$ccnavi_wap_family_id" "$ccnavi_cb_wait" || ccnavi_cb_rc=$?
-	case "$ccnavi_cb_rc" in
-	0) ;;
-	2)
-		ccnavi_wap_say "親子のチケット $ccnavi_wap_family_id の古いロックを強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける（$(ccnavi_state "$ccnavi_wap_root")/locks/$ccnavi_wap_repo/${ccnavi_wap_family_id}）"
+	if [ "$ccnavi_cb_rc" -ne 0 ]; then
+		ccnavi_wap_say "$(ccnavi_lock_why "$ccnavi_cb_rc" "親子のチケット $ccnavi_wap_family_id")"
 		return 1
-		;;
-	*)
-		ccnavi_cb_lock="$(ccnavi_state "$ccnavi_wap_root")/locks/$ccnavi_wap_repo/$ccnavi_wap_family_id"
-		if ccnavi_lock_long "$ccnavi_cb_lock"; then
-			ccnavi_wap_say "親子のチケット $ccnavi_wap_family_id のロックが 10 分を超えて取られたままになっている。持ち主はまだ動いているので強制取得しない。終わるのを待つか、持ち主をユーザが確かめてください。$(ccnavi_lock_describe "$ccnavi_cb_lock")"
-		else
-			ccnavi_wap_say "親子のチケット $ccnavi_wap_family_id のロックを他の操作が持っている（$(ccnavi_lock_owner "$ccnavi_cb_lock")）。終わってから再実行してください"
-		fi
-		return 1
-		;;
-	esac
+	fi
 	ccnavi_cb_busy=$(ccnavi_wap_busy "$ccnavi_wap_tree")
 	if [ -n "$ccnavi_cb_busy" ]; then
 		ccnavi_wap_say "親のワークツリーに途中の操作（${ccnavi_cb_busy}）がある。済ませるか取りやめてから再実行してください（何も反映していません）"

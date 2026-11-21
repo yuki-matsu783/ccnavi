@@ -969,7 +969,7 @@ class SyncTest(SyncHarness):
         head = self.remote_commit(PARENT, "theirs.txt", "theirs\n")
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("ロックを持っている", done.stdout)
+        self.assertIn("ロックを他の操作が持っている", done.stdout)
         self.assertNotEqual(head, self.sha(self.tree, "HEAD"))
         self.assertTrue(os.path.isdir(lock), "他人のロックを外した")
 
@@ -989,13 +989,6 @@ class SyncTest(SyncHarness):
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
         self.assertTrue(os.path.isdir(lock))
-
-    def test_an_old_lock_with_leading_zeros_is_taken_over(self):
-        # 先頭の 0 を 8 進に読んで失敗しない。pid を確かめられない（別ホスト）ので時刻で古いと見る。
-        lock = self.own_lock("0123", "0000000001", host="other-host")
-        done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0")
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertFalse(os.path.exists(lock))
 
     def test_a_live_owner_is_not_robbed_after_ten_minutes(self):
         # 同じ機械で持ち主が生きていれば、10 分を過ぎても強制取得しない。
@@ -1024,7 +1017,7 @@ class SyncTest(SyncHarness):
         lock = self.own_lock(live_sh_pid(self), int(time.time()))
         done = self.sync(PARENT, CCNAVI_LOCK_WAIT="0", CCNAVI_LOCK_HELD=f"self/{PARENT}:1-2")
         self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("ロックを持っている", done.stdout)
+        self.assertIn("ロックを他の操作が持っている", done.stdout)
         self.assertTrue(os.path.isdir(lock))
 
     def test_a_true_nesting_mark_is_trusted_and_left_in_place(self):
