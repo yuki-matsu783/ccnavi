@@ -162,7 +162,7 @@ func runScenario(t *testing.T, s scenario, root string) []result {
 		filepath.WalkDir(filepath.Join(state, asideDir), func(p string, d os.DirEntry, err error) error {
 			if err == nil && !d.IsDir() {
 				rel, _ := filepath.Rel(state, p)
-				r.Aside = append(r.Aside, filepath.ToSlash(rel))
+				r.Aside = append(r.Aside, stamp.ReplaceAllString(filepath.ToSlash(rel), "aside/<stamp>"))
 			}
 			return nil
 		})
