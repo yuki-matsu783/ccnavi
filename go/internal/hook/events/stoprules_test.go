@@ -37,7 +37,6 @@ type stopTurn struct {
 	session string
 	active  bool
 	agent   string
-	cwd     string // 空ならワークスペースルート
 }
 
 var (
@@ -79,17 +78,14 @@ func TestStopRulesCountAndGates(t *testing.T) {
 			[]map[string]any{stopRule("stop-deny", "message", "止める")},
 			[]map[string]any{stopRule("stop-ask", "additionalContext", stopNudgeText)}, nil,
 			[]stopTurn{turn, turn, turn, turn}, []bool{false, false, false, false}},
-		{"cwd がプロジェクトの中でも同じルールが当たる", every2, nil, nil,
-			map[string]string{"projects/lib/.git/HEAD": "x"},
-			[]stopTurn{{cwd: "projects/lib"}, turn}, []bool{false, true}},
 		{"プロジェクトのレイヤーの Stop は見ない", nil, nil, nil,
 			map[string]string{"projects/lib/.git/HEAD": "x", "projects/lib/.ccnavi/config/project/rules.yml": stopRuleSet(
 				[]map[string]any{stopRule("lib-review", "additionalContext", "外の文", "every", 2)}, nil, nil)},
-			[]stopTurn{{cwd: "projects/lib"}, turn, {cwd: "projects/lib"}, turn}, []bool{false, false, false, false}},
+			[]stopTurn{turn, turn, turn, turn}, []bool{false, false, false, false}},
 		{"プロジェクトに写した共通ルールが古くても二重に数えない", every2, nil, nil,
 			map[string]string{"projects/lib/.git/HEAD": "x", "projects/lib/.ccnavi/config/project/rules.yml": stopRuleSet(
 				[]map[string]any{stopRule("skill-review", "additionalContext", stopNudgeText, "every", 3)}, nil, nil)},
-			[]stopTurn{{cwd: "projects/lib"}, {cwd: "projects/lib"}, {cwd: "projects/lib"}, {cwd: "projects/lib"}},
+			[]stopTurn{turn, turn, turn, turn},
 			[]bool{false, true, false, true}},
 		{"ワークスペース自身のレイヤーのルールも当たり、同じ id は 1 本だけ数える", every2, nil, nil,
 			map[string]string{".ccnavi/config/project/rules.yml": stopRuleSet(
@@ -133,12 +129,8 @@ func runStopRules(t *testing.T, conf *config.Settings, root string, s stopTurn) 
 	if session == "" {
 		session = "s1"
 	}
-	cwd := root
-	if s.cwd != "" {
-		cwd = filepath.Join(root, filepath.FromSlash(s.cwd))
-	}
 	record := &audit.Record{}
-	in := hookio.Input{Event: hookio.Stop, SessionID: session, Cwd: cwd, StopHookActive: s.active, AgentID: s.agent}
+	in := hookio.Input{Event: hookio.Stop, SessionID: session, Cwd: root, StopHookActive: s.active, AgentID: s.agent}
 	var stderr bytes.Buffer
 	return stopRulesNudge(&stderr, conf, root, in, record), record
 }
@@ -169,10 +161,10 @@ func TestStopRulesTextAndRecord(t *testing.T) {
 			"projects/lib/.git/HEAD":      "x",
 		})
 	conf := testkit.Settings(t, root)
-	if text, _ := runStopRules(t, conf, root, stopTurn{cwd: "projects/lib"}); text != "" {
+	if text, _ := runStopRules(t, conf, root, stopTurn{}); text != "" {
 		t.Fatalf("1 回目で止めた: %q", text)
 	}
-	text, record := runStopRules(t, conf, root, stopTurn{cwd: "projects/lib"})
+	text, record := runStopRules(t, conf, root, stopTurn{})
 	prefix := codeRuleNudge + ": これはタスクの続きではない。"
 	if !strings.HasPrefix(text, prefix) {
 		t.Fatalf("前置きで始まらない: %q", text)
