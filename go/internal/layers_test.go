@@ -151,7 +151,7 @@ var subTiers = map[string]map[string]int{
 		// 0: 走った機械から締め出した環境・一時置き場・見本の置き場（ほかの道具が読む土台）
 		"base": 0,
 		// 1: 実行ファイルの組み立て・GitLab の模擬・見本の組み立て
-		"exe": 1, "fakegitlab": 1, "samples": 1,
+		"exe": 1, "fakegitlab": 1, "samples": 1, "gitlabapi": 1,
 		// 2: 実行ファイルを起こす・PATH のスタブ・契約の形
 		"run": 2, "hoststub": 2, "contractshape": 2,
 		// 3: claude の台本スタブ（契約の形を読む。読み手は teststub と clitest だけ）・組み立ての写し・受入シナリオの実行器の部品・sh を通すテストのファイルと作業場所の道具・ホストの fixture（PATH のスタブの置き方は hoststub を使う）

@@ -124,6 +124,12 @@ const (
 	Msys2ArgConvExcl = "MSYS2_ARG_CONV_EXCL"
 )
 
+// 手動の GitLab の道具（Docker の GitLab のトークンのファイル）が使う人間役の資格情報の名前。
+const (
+	ProbeReviewerToken = "CCNAVI_PROBE_REVIEWER_TOKEN"
+	ProbeReviewerID    = "CCNAVI_PROBE_REVIEWER_ID"
+)
+
 // ccnavi の外が決める変数。リモートの API に付けるトークンと、実行ファイルの探し方・家の場所・端末の幅。
 const (
 	GitHubToken = "GITHUB_TOKEN"
