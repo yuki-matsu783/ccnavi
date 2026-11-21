@@ -15,8 +15,9 @@
 #
 # 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの）のワークツリーは、
 # write-and-push と同じ手順でコミットして push する。取り込んでから送るので、Chrome での承認と重なっても push が拒まれにくい。
-# 手順は、ロック（write-and-push の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh）→
-# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push → 失敗したように見えたら届いたかを ls-remote で確かめる。
+# 手順は、ロック（write-and-push の中からの入れ子を許す）→ 途中の操作の確認 → 取り込み（ccnavi-sync.sh。write-and-push と
+# 共通の ccnavi_wap_take_in。push のゲートまで含む）→
+# 置き場（承認済みと、レビュー待ちの review/ と、承認で消えた todo/ の提案と、取り込んで消えた flows/ の下書き）を commit --only → push と届いたかの確かめ（共通の ccnavi_wap_push）。
 # push が失敗してもコミットは残す（ユーザが打ち直せる）。取り込み済みかは実行ファイル（`write-and-push family`）に聞く。
 # 取り込みの後、push の前に、親のブランチがリモートから消えていないかを push のゲート（ccnavi_push_gate）で確かめる。
 # 消えていれば（確かめられないときも）コミットも push もせずに止める。親でないツリーの push の前にも同じゲートを通す。
@@ -160,7 +161,6 @@ ccnavi_wap_label=ccnavi-user-push-approved
 ccnavi_wap_sh="$(dirname "$0")"
 # 実行ファイルが無ければ ccnavi_wap_exe は 1 を返すだけになり、取り込み済みかを聞けない親子のチケットは止まる。
 ccnavi_wap_use_exe "$root" || :
-tab=$(printf '\t')
 
 # 置き場の変更のパス（承認済み、yes ならレビュー待ちの review/ も、承認で消えた todo/ の提案、取り込んで消えた
 # flows/ の下書き）を ccnavi_wap_tmp/carry に。<ツリー> <yes|no（review/ を含めるか）>
@@ -231,20 +231,10 @@ carry_family() {
 		ccnavi_lock_drop
 		return 1
 	fi
-	# 取り込んでから送る（Chrome の承認と重なっても push が拒まれにくい）。衝突したら取りやめてユーザの対応に切り替える。
-	cf_rc=0
-	sh "$(dirname "$0")/ccnavi-sync.sh" "$cf_p" </dev/null >"$ccnavi_wap_tmp/sync" 2>&1 || cf_rc=$?
-	sed 's/^/  /' "$ccnavi_wap_tmp/sync" >&2
-	if [ "$cf_rc" -ne 0 ]; then
-		printf 'ccnavi-user-push-approved: %s を取り込めなかった（上の ccnavi-sync.sh の文面）。ユーザの判断はまだ送っていません。直してから再実行してください。\n' "$cf_p" >&2
-		ccnavi_lock_drop
-		return 1
-	fi
-	# 親のブランチがリモートから消えていれば、push で作り直さずに止める（push のゲート。write-and-push・ccnavi-git.sh push と同じ）。
-	cf_rc=0
-	ccnavi_push_gate "$cf_tree" "$cf_b" "$cf_p" "$root" "$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)" || cf_rc=$?
-	if [ "$cf_rc" -ne 0 ]; then
-		printf 'ccnavi-user-push-approved: %s。ユーザの判断はまだ送っていません。\n' "$ccnavi_pg_why" >&2
+	# 取り込んでから送る（Chrome の承認と重なっても push が拒まれにくい）。親のブランチがリモートから消えていれば、
+	# push で作り直さずに止める（push のゲート。write-and-push と同じ手順）。
+	if ! ccnavi_wap_take_in; then
+		printf 'ccnavi-user-push-approved: %s のユーザの判断はまだ送っていません。直してから再実行してください。\n' "$cf_p" >&2
 		ccnavi_lock_drop
 		return 1
 	fi
@@ -265,12 +255,7 @@ carry_family() {
 		ccnavi_lock_drop
 		return 0
 	fi
-	cf_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
-	if ccnavi_git_timed "$cf_timeout" "$ccnavi_wap_tmp/push-err" "$cf_tree" \
-		push --quiet origin "refs/heads/$cf_b:refs/heads/$cf_b" >/dev/null ||
-		{ ccnavi_git_timed "$cf_timeout" "$ccnavi_wap_tmp/ls-err" "$cf_tree" \
-			ls-remote origin "refs/heads/$cf_b" >"$ccnavi_wap_tmp/ls" &&
-			grep -F -x -q -- "$cf_head${tab}refs/heads/$cf_b" "$ccnavi_wap_tmp/ls"; }; then
+	if ccnavi_wap_push "$cf_head"; then
 		printf '承認済みチケットを取り込んだうえで、ブランチ %s にpushしました。\n' "$cf_b"
 		ccnavi_lock_drop
 		return 0
