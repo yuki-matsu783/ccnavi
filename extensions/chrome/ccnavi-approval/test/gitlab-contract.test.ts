@@ -35,7 +35,7 @@ const recorded = loadData("recorded.json").requests as Record<string, Recorded>;
 const allow = loadData("allow.json") as { chrome_entries?: Entry[] };
 
 /**
- * 本物の側の場面（tests/manual/gitlab/record_contract.py の `Scene.build`）と同じ形のブランチ:
+ * 本物の側の場面（go/internal/harness/contractrecord の `BuildScene`）と同じ形のブランチ:
  * main に最初のコミット、feature・done・fresh は main から 1 コミット（`<名前>.txt`）、feature はさらに `docs/note.txt`
  */
 function mock(): MockGitLab {
