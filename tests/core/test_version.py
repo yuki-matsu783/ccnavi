@@ -2,7 +2,7 @@
 
 `--version` が版・組み立ての元のコミット・互換の版・書式の版を言い、設定もワークスペースも
 読まずに 0 で終わること。組み立ての元のコミットは、埋めていなければ `unknown` と言う。
-版と互換の版が sh・VS Code 拡張と同じであることは `go/internal/entry/version` の
+互換の版が sh・VS Code 拡張と同じであることは `go/internal/entry/version` の
 go test が見る。sh の互換の版の `--lint` での確かめは tests/core/test_lint_compat.py が見る。
 """
 
