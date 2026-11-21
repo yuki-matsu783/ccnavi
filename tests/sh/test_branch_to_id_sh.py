@@ -2,7 +2,8 @@
 
 表は `tests/fixtures/branch-to-id.json`。
 
-実行ファイル（go/internal/tickets/model/ids の BranchToID）・TS（拡張の `branchToId`）も同じ表を読む。
+実行ファイル（go/internal/tickets/model/ids の BranchToID）・TS（拡張の `branchToId`）も
+同じ表を読む。
 ワークツリーの HEAD の照合は実行ファイル（standing.HeadBranch）が持ち、go test が見る。
 同じ識別子になる別のブランチの見つけ方は、
 実行ファイル（ids.IDClash）が持ち、go test が見る。

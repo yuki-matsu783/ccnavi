@@ -70,7 +70,8 @@ EVENTS = (
     "SubagentStop",
 )
 REQUIRED_ENV = ("CCNAVI_MODE", "CCNAVI_ENTRY_PATH")
-# `projects/` がワークスペースの git に追跡されているときの `--lint` の `(projects)` の warn の先頭の句。
+# `projects/` がワークスペースの git に追跡されているときの
+# `--lint` の `(projects)` の warn の先頭の句。
 # 導入スクリプトは入れ終わりに `--lint` を起こし、この warn をそのまま見せる。
 TRACKED_LEAD = "`projects/` はワークスペースの git が追跡している"
 # 戻す働きの 2 つ（settings.py の RESTORE_IF_DENY_ENV / GUARD_CORE_FILES_ENV）。
@@ -2722,7 +2723,8 @@ class KeepsTheRegionTidy(DeployTest):
         self.assertIn(WORKTREES_LINE, written)
 
     def test_index_negation_does_not_stop_the_index_line(self):
-        """ccnavi-index.jsonl を否定する行があっても、実行ファイルと同じく末尾に足す（--check でも足すと言う）。"""
+        """ccnavi-index.jsonl を否定する行があっても、実行ファイルと同じく末尾に足す
+        （--check でも足すと言う）。"""
         for negation in (
             "!**/ccnavi-index.jsonl",
             "!ccnavi-index.jsonl",
@@ -2955,8 +2957,9 @@ LINT_LATER = f"案内: 導入したあとに、ワークスペースルートで
 class ShowsTheLintAtTheEnd(SetupTest):
     """入れ終わりに、配った振り分けの sh を通して `--lint` を 1 回起こし、結果をそのまま見せる。
 
-    `projects/` の索引の知らせなどの判定と文面は実行ファイルだけが持ち、導入スクリプトは自分で判定しない。
-    止めず、終了コードも変えない。`--check` と、振り分けの sh がまだ無いときは起こさず、確かめ方の 1 行だけを出す。
+    `projects/` の索引の知らせなどの判定と文面は実行ファイルだけが持ち、
+    導入スクリプトは自分で判定しない。止めず、終了コードも変えない。
+    `--check` と、振り分けの sh がまだ無いときは起こさず、確かめ方の 1 行だけを出す。
     """
 
     # 配布元の作り方だけを借りる（継ぐと配布のテストがもう一度走る）。

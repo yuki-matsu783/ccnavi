@@ -136,10 +136,8 @@ set -f
 set -- $named
 set +f
 
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-user-push-approved: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+# 置き場の操作はルートの下だけで cwd に依らないので、ワークスペースの外の端末からも打てる。
+root=$(ccnavi_workspace_anywhere) || ccnavi_no_workspace ccnavi-user-push-approved
 
 # 置き場の名前は ccnavi-common.sh の写し（実行ファイルとの一致は tests/fixtures/layout.json）。
 approved="$ccnavi_approved_dir"

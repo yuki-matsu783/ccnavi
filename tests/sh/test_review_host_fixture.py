@@ -117,7 +117,7 @@ def accept_plan_file(tmp, ws, mr_url, nodes):
         shown=[
             {"key": key, "id": node, "url": key, "path": "a.py", "line": 3, "version": "v1",
              "body": "指摘の本文"}
-            for node, key in zip(nodes, keys)
+            for node, key in zip(nodes, keys, strict=True)
         ],
         choices={key: "keep" for key in keys},
         plan={"digest": "d"},
@@ -129,7 +129,7 @@ def accept_plan_file(tmp, ws, mr_url, nodes):
         "op": op,
         "threads": [
             {"id": node, "key": key, "reply": "<!-- ccnavi:accept -->\nテスト\n"}
-            for node, key in zip(nodes, keys)
+            for node, key in zip(nodes, keys, strict=True)
         ],
     }
     write(path, json.dumps(body, ensure_ascii=False) + "\n")
@@ -280,7 +280,10 @@ class HostFixtureTest(unittest.TestCase):
 
     def test_usage_lists_parent_only_on_ready(self):
         done = self.review("resolved", "--help")
-        lines = [ln for ln in done.stdout.splitlines() if "--parent" in ln]
+        # 並べて案内する別の sh（ccnavi-user-*.sh）の行は数えない
+        lines = [
+            ln for ln in done.stdout.splitlines() if "--parent" in ln and "ccnavi-user-" not in ln
+        ]
         self.assertEqual(len(lines), 1, lines)
         self.assertIn("ready", lines[0])
 

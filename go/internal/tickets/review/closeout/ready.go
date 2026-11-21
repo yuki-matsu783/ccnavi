@@ -37,7 +37,7 @@ const (
 	msgNotYet        = "ccnavi: まだ Draft を解除できません:\n"
 	msgNotYetAgain   = "ccnavi: まだ Draft を解除できません（クローズ済みのチケットは logs/archive/ へ退避済み）:\n"
 	msgProblemLine   = "  - %s\n"
-	msgEarlyHint     = "まだ残るものを承知で早めに閉じるなら、ユーザがターミナルで '%s --reason <理由>' を実行します。\n"
+	msgEarlyHint     = "まだ残るものを承知で早めに閉じるなら、ユーザがターミナルで '%s --parent %s --reason <理由>' を実行します。\n"
 	msgParentNotDone = "親 %s の承認済みチケットが %s/%s/ にありません（いまは %s/）。先に '%s finish %s' で親を閉じ、" +
 		"コミットして push してから再実行してください"
 	msgReadyCheckOK = "確認: ok（ready を打てる状態。何も変えていません）\n"
@@ -133,7 +133,7 @@ func readyGate(stderr io.Writer, conf *config.Settings, root, cwd string) *ticke
 	}
 	// 表に必ず在る操作なので、引けない誤りは起きない。
 	script, _ := useronly.Terminal(useronly.OpCloseEarly)
-	fmt.Fprintf(stderr, msgEarlyHint, config.ScriptCommand(root, script))
+	fmt.Fprintf(stderr, msgEarlyHint, config.ScriptCommand(root, script), parent.ID)
 	fmt.Fprintln(stderr, texts.Say(root, textReadyRefused, texts.Values{"parent": parent.ID}, nil))
 	return nil
 }

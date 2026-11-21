@@ -93,10 +93,7 @@ case "$name" in
 	;;
 esac
 
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-clean: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-clean
 
 # 中身は ccnavi の実行ファイル。--worktree は `worktree drop`（cwd の確かめ・未コミットの確かめ・生成物の
 # 掃除・無視ファイルの退避・worktree remove）、ないときは `worktree clean`（未コミットの確かめ・生成物の掃除）。

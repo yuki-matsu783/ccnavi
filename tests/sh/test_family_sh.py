@@ -1,7 +1,8 @@
 """sh が識別子だけから親子のチケットの親を割り出すこと（ccnavi-common-write-and-push.sh の
 ccnavi_wap_family）。
 
-子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁の連番>`。sh も実行ファイル（go/internal/tickets/model/ids の ParseChild）と
+子の識別子は `<親>-<2 桁のフェーズ番号>-<2 桁の連番>`。
+sh も実行ファイル（go/internal/tickets/model/ids の ParseChild）と
 同じく右から 2 階層を剥がして親にする。親が `-` や数字を含んでも
 （`web-i0012-05-01` の親は `web-i0012`）割り出し方は 1 通りに決まる。
 

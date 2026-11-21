@@ -1167,7 +1167,8 @@ class TicketTest(unittest.TestCase):
     def test_gate_says_the_exempt_form_is_bare(self):
         """止めたときと終わりの知らせは、案内の 1 本を単独で打つことまで言うこと。
 
-        案内どおりの 1 本に付けてよいのは `cd … &&` と `| head`・`| tail` だけで、ほかを足すと止まる。
+        案内どおりの 1 本に付けてよいのは `cd … &&` と `| head`・`| tail` だけで、
+        ほかを足すと止まる。
         それを言わないと、案内に従ったつもりで止まり、案内と拒否が食い違って見える。
         """
         self.family()
@@ -1192,7 +1193,8 @@ class TicketTest(unittest.TestCase):
         )
         self.assertIn("DENY_PHASE_REVIEW", self.reason(other))
         self.assertIn(EXEMPT_NOTE, self.reason(other))
-        # 改版は単独なら通る。heredoc で提案を書く連結は止まり、案内に Write・Edit と単独実行が書かれている。
+        # 改版は単独なら通る。heredoc で提案を書く連結は止まり、
+        # 案内に Write・Edit と単独実行が書かれている。
         ticket_sh = script_command(self.root, "ccnavi-ticket.sh")
         revise = self.hook(
             "PreToolUse", "Bash", self.parent_tree, command=f"{ticket_sh} revise P-1"
@@ -3175,7 +3177,8 @@ class TicketTest(unittest.TestCase):
         self.assertNotIn("worktree-unreadable", self.reason(again))
 
     def break_git_of(self, worktree):
-        """子のワークツリーの HEAD を、親と履歴を共有しないコミットにする（子の仕事の始まりを決められない）。"""
+        """子のワークツリーの HEAD を、親と履歴を共有しないコミットにする
+        （子の仕事の始まりを決められない）。"""
         git(worktree, "checkout", "--quiet", "--orphan", "unrelated")
         git(worktree, "commit", "--quiet", "-m", "unrelated")
 
