@@ -290,7 +290,15 @@ func TestMainTreeMatchesGolden(t *testing.T) {
 		bash("python build.py", "enable", true),
 		{Op: "call", Kind: "check", Tool: config.ToolRead, Input: map[string]any{"file_path": "x"}, Restore: "enable", Enforcing: true},
 	}, many...)
-	s.Steps = append(s.Steps, bash("python gen.py", "disable", true), call("at_stop"))
+	s.Steps = append(s.Steps, bash("python gen.py", "disable", true), call("at_stop"),
+		// レビューの依頼のマーカー（どちらの版も範囲を宣言しない）は外す。偽の新規チケットと、承認待ちへの移動は報告して戻す。
+		write(".ccnavi/approved/phases/t1/1.requested", `{"mr": 1}`+"\n"),
+		bash("ccnavi review-request t1", "enable", true),
+		write(".ccnavi/approved/doing/t3.md", testkit.ParentText("t3", nil)),
+		bash("sed -i s/src/x/ t3.md", "enable", true),
+		step{Op: "remove", Path: ".ccnavi/approved/doing/t1.md"},
+		write("wip/proposals/todo/t1.md", testkit.ParentText("t1", nil)),
+		bash("mv t1.md todo", "enable", true))
 	compareScenario(t, s, mainWorkspace(true))
 }
 
