@@ -29,7 +29,7 @@ func spawn(t *testing.T, payload string) run.Result {
 		run.Opts{
 			Input:      payload,
 			Dir:        base.Root(),
-			Env:        run.CleanEnv(map[string]string{env.GuardCoreFiles: "disable"}),
+			Env:        map[string]string{env.GuardCoreFiles: "disable"},
 			NoMessages: true,
 		})
 }
@@ -105,9 +105,7 @@ func TestATerminalGetsTheUsageWithoutWaitingForAPayload(t *testing.T) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, script, args...)
 	cmd.Dir = base.Root()
-	for k, v := range run.CleanEnv(nil) {
-		cmd.Env = append(cmd.Env, k+"="+v)
-	}
+	cmd.Env = run.Environment(run.Opts{})
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	err = cmd.Run()

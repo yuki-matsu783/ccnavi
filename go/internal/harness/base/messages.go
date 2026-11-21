@@ -83,9 +83,8 @@ func PutMessages(t testing.TB, root string) string {
 
 // 文面に置くパスを引用せずに書ける字（実行ファイルの案内と同じ決め方）。
 var (
-	barePath          = regexp.MustCompile("^[^\\s'\"\\\\$`!*?\\[\\]{}()<>|&;#~]+$")
-	specialInDoubles  = regexp.MustCompile("[\"\\\\$`!]")
-	shellSafeNonQuote = regexp.MustCompile(`^[\w@%+=:,./-]+$`)
+	barePath         = regexp.MustCompile("^[^\\s'\"\\\\$`!*?\\[\\]{}()<>|&;#~]+$")
+	specialInDoubles = regexp.MustCompile("[\"\\\\$`!]")
 )
 
 // quoted は要るときだけ引用する。まず `"…"`、`"` の中でも意味を持つ字があるときは `'…'`。
@@ -95,8 +94,6 @@ func quoted(path string) string {
 		return path
 	case !specialInDoubles.MatchString(path):
 		return `"` + path + `"`
-	case shellSafeNonQuote.MatchString(path):
-		return path
 	}
 	return "'" + strings.ReplaceAll(path, "'", `'"'"'`) + "'"
 }

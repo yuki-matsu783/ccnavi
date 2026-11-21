@@ -1,6 +1,7 @@
 package base
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"ccnavi/internal/infra/ospath"
 )
 
 // 共通レイヤーと config（自身のレイヤー）の 3 本のファイルの置き場。置き場の名前はテストの側に持つ。
@@ -26,41 +29,45 @@ var (
 )
 
 // Root はリポジトリの根（go/go.mod の親）。テストの作業ディレクトリから上って探す。
+// 呼ぶたびに Uncache する（go test に結果を保存させない）。
 func Root() string {
+	requireMain()
+	Uncache()
 	rootOnce.Do(func() {
-		dir, err := os.Getwd()
+		dir, _, err := findRoot()
 		if err != nil {
 			panic(err)
 		}
-		for {
-			if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
-				rootPath = dir
-				return
-			}
-			parent := filepath.Dir(dir)
-			if parent == dir {
-				panic("リポジトリの根（go/go.mod の親）が見つからない")
-			}
-			dir = parent
-		}
+		rootPath = dir
 	})
 	return rootPath
+}
+
+// findRoot は作業ディレクトリから上って go/go.mod を持つ所を探す。作業ディレクトリからの相対パス（`../..`）も返す。
+func findRoot() (dir, rel string, err error) {
+	dir, err = os.Getwd()
+	if err != nil {
+		return "", "", err
+	}
+	rel = "."
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
+			return dir, rel, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", "", errors.New("リポジトリの根（go/go.mod の親）が見つからない")
+		}
+		dir = parent
+		rel = filepath.Join(rel, "..")
+	}
 }
 
 // GoDir は Go のモジュールの根（<リポジトリの根>/go）。
 func GoDir() string { return filepath.Join(Root(), "go") }
 
 // realpath はリンクを解いた絶対パス。在らないパスは絶対パスにして返す。
-func realpath(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return path
-	}
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		return real
-	}
-	return abs
-}
+func realpath(path string) string { return ospath.Realpath(path) }
 
 // TempBase は使い捨ての置き場の親。リンクを解いた実パスにそろえる。macOS の一時置き場は `/var/...` だが実体は
 // `/private/var/...` で、git や realpath は後者を返す。文字列をそのまま比べるテストが機械の違いで食い違わないようにする。

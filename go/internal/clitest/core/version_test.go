@@ -19,13 +19,13 @@ import (
 // 版と互換の版が sh・VS Code 拡張と同じであることは `entry/version` の go test が、sh の互換の版の `--lint` での確かめは
 // lint_compat が見る。
 
-// version は `ccnavi [--root <root>] <args…>` を、リポジトリを作業ディレクトリにして素の環境で起こす。
+// version は `ccnavi [--root <root>] <args…>` を、リポジトリを作業ディレクトリにしてMain が整えた素の環境で起こす。
 func version(t *testing.T, root string, args ...string) run.Result {
 	t.Helper()
 	if root != "" {
 		args = append([]string{"--root", root}, args...)
 	}
-	return run.Ccnavi(t, args, run.Opts{Dir: base.Root(), Env: run.CleanEnv(nil)})
+	return run.Ccnavi(t, args, run.Opts{Dir: base.Root()})
 }
 
 // V10: --json は版・コミット・互換の版・書式の名前を言う。

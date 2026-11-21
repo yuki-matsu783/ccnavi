@@ -3,53 +3,87 @@ package run
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/infra/env"
 )
 
-func TestMain(m *testing.M) { base.Main(m) }
+// Main が外す変数を、Main の前に入れておく（外れていることを見るため）。X_KEEP は外れない。
+func TestMain(m *testing.M) {
+	for name, value := range map[string]string{
+		env.Prefix + "RUN_TEST_LEAK": "1",
+		env.ClaudeProjectDir:         "/dev/null/leak",
+		env.GitDir:                   "/dev/null/leak",
+		"X_KEEP":                     "1",
+	} {
+		if err := os.Setenv(name, value); err != nil {
+			panic(err)
+		}
+	}
+	base.Main(m)
+}
 
 func printEnvScript(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(base.TempDir(t), "env.sh")
-	if err := os.WriteFile(path, []byte("env\nprintf 'a\\r\\nb\\r\\n'\n"), 0o755); err != nil {
+	if err := os.WriteFile(path, []byte("env\nprintf 'a\\r\\nb\\r\\nc\\rd\\r\\n'\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return path
 }
 
-// Env を渡さなければプロセスの環境が、渡せばそのマップ（と git の締め出し・学びの停止）だけが見える。
-func TestEnvIsExactlyWhatWasGiven(t *testing.T) {
+func lines(r Result) map[string]bool {
+	out := map[string]bool{}
+	for _, l := range strings.Split(r.Stdout, "\n") {
+		out[l] = true
+	}
+	return out
+}
+
+// 子に見える環境は、プロセスの環境（Main が外した後）+ 既定（git の締め出しと学びの停止）+ Env の差分 - Unset。
+func TestChildEnvironmentIsTheProcessEnvironmentPlusTheDiff(t *testing.T) {
 	t.Parallel()
 	script := printEnvScript(t)
-	r := Sh(t, script, nil)
-	if !strings.Contains(r.Stdout, env.GitConfigGlobal+"=") || !strings.Contains(r.Stdout, "PATH=") {
-		t.Errorf("継ぐ環境に git の締め出しか PATH が無い:\n%s", r.Stdout)
+	got := lines(Sh(t, script, nil))
+	for _, want := range []string{"X_KEEP=1", env.GitConfigGlobal + "=" + base.GitEnv()[env.GitConfigGlobal], env.Learning + "=disable"} {
+		if !got[want] {
+			t.Errorf("%q が見えない:\n%v", want, got)
+		}
 	}
-	r = Sh(t, script, nil, Opts{Env: map[string]string{"X_GIVEN": "1", env.Learning: "enable"}})
-	lines := strings.Split(r.Stdout, "\n")
-	has := func(line string) bool {
-		for _, l := range lines {
-			if l == line {
-				return true
+	for line := range got {
+		for _, leaked := range []string{env.Prefix + "RUN_TEST_LEAK=", env.ClaudeProjectDir + "=", env.GitDir + "="} {
+			if strings.HasPrefix(line, leaked) {
+				t.Errorf("Main が外すはずの変数が見える: %s", line)
 			}
 		}
-		return false
 	}
-	if !has("X_GIVEN=1") || !has(env.GitConfigGlobal+"="+base.GitEnv()[env.GitConfigGlobal]) {
-		t.Errorf("渡した環境か git の締め出しが無い:\n%s", r.Stdout)
+	got = lines(Sh(t, script, nil, Opts{Env: map[string]string{"X_GIVEN": "1", env.Learning: "enable"}, Unset: []string{"X_KEEP"}}))
+	if !got["X_GIVEN=1"] || !got[env.Learning+"=enable"] {
+		t.Errorf("渡した差分が見えない（呼び手の値は既定に勝つ）:\n%v", got)
 	}
-	if !has(env.Learning + "=enable") {
-		t.Errorf("呼び手の値が既定（disable）に負けた:\n%s", r.Stdout)
+	if got["X_KEEP=1"] {
+		t.Error("Unset した変数が見える")
 	}
-	if strings.Contains(r.Stdout, "HOME=") && os.Getenv("HOME") != "" && !has("HOME="+os.Getenv("HOME")) {
-		t.Error("渡していない変数が見えている")
+	if !got[env.GitConfigGlobal+"="+base.GitEnv()[env.GitConfigGlobal]] {
+		t.Error("空でない差分でも git の締め出しは残る")
 	}
-	if r := Sh(t, script, nil, Opts{Env: map[string]string{}}); !strings.Contains(r.Stdout, env.Learning+"=disable") {
-		t.Errorf("空のマップでも学びの停止は足す:\n%s", r.Stdout)
+}
+
+// 名前の大文字小文字を区別しない環境では、同じ名前の変数は 1 つだけ残り、あとの層が勝つ。並びは決まっている。
+func TestComposeFoldsCaseWhenCaseless(t *testing.T) {
+	t.Parallel()
+	process := []string{"Path=/a", "B=1", "=C:=C:"}
+	defaults := map[string]string{"PATH": "/b"}
+	add := map[string]string{"path": "/c", "D": "2"}
+	if got, want := compose(process, defaults, []string{"b"}, add, true), []string{"D=2", "path=/c"}; !slices.Equal(got, want) {
+		t.Errorf("caseless: %v, want %v", got, want)
+	}
+	if got, want := compose(process, defaults, []string{"B"}, add, false), []string{"D=2", "PATH=/b", "Path=/a", "path=/c"}; !slices.Equal(got, want) {
+		t.Errorf("caseful: %v, want %v", got, want)
 	}
 }
 
@@ -57,7 +91,7 @@ func TestEnvIsExactlyWhatWasGiven(t *testing.T) {
 func TestOutputIsLFNormalized(t *testing.T) {
 	t.Parallel()
 	r := Sh(t, printEnvScript(t), nil)
-	if strings.Contains(r.Stdout, "\r") || !strings.HasSuffix(r.Stdout, "a\nb\n") {
+	if strings.Contains(r.Stdout, "\r") || !strings.HasSuffix(r.Stdout, "a\nb\nc\nd\n") {
 		t.Errorf("stdout の末尾 = %q", r.Stdout[max(0, len(r.Stdout)-10):])
 	}
 }
@@ -81,6 +115,28 @@ func TestMessagesAreCopiedOnlyWhenAbsent(t *testing.T) {
 	putMessagesWhenAbsent(t, inside)
 	if _, err := os.Stat(filepath.Join(inside, ".ccnavi")); err == nil {
 		t.Error("リポジトリの中に文面を写した")
+	}
+}
+
+// 同じ空の木へ並行に起こしても、文面は 1 回だけ置かれ、exclude の行も 1 行。
+func TestMessagesAreCopiedOnceUnderConcurrentStarts(t *testing.T) {
+	t.Parallel()
+	root := base.TempDir(t)
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			putMessagesWhenAbsent(t, root)
+		}()
+	}
+	wg.Wait()
+	exclude, err := os.ReadFile(filepath.Join(root, ".git", "info", "exclude"))
+	if err != nil || strings.Count(string(exclude), "/.ccnavi/messages/") != 1 {
+		t.Errorf("exclude = %q (%v)", exclude, err)
 	}
 }
 

@@ -77,8 +77,8 @@ func ready(t testing.TB, tg target) string {
 	mu.Unlock()
 	once.Do(func() {
 		var b built
-		if path := os.Getenv(tg.variable); path != "" {
-			b.path = path
+		if path := base.TestVar(tg.variable); path != "" {
+			b.path, _ = filepath.Abs(path)
 		} else {
 			b.path, b.err = build(tg)
 		}

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 )
 
 func TestMain(m *testing.M) { Main(m) }
@@ -36,8 +37,8 @@ func TestGitConfigIsBlocked(t *testing.T) {
 }
 
 // PATH の ccnavi があるディレクトリは、ccnavi だけを除いた置き場に替わる。ccnavi の無いディレクトリはそのまま。
-// プロセスの環境を書き換えるので、並行にしない（t.Setenv が止める）。
 func TestDropCcnaviFromPath(t *testing.T) {
+	t.Parallel()
 	if !CanSymlink() {
 		t.Skip("シンボリックリンクを作れない")
 	}
@@ -47,11 +48,11 @@ func TestDropCcnaviFromPath(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv(env.Path, strings.Join([]string{with, without}, string(os.PathListSeparator)))
-	if err := dropCcnaviFromPath(); err != nil {
+	path, err := dropCcnaviFromPath(strings.Join([]string{with, without}, string(os.PathListSeparator)))
+	if err != nil {
 		t.Fatal(err)
 	}
-	places := filepath.SplitList(os.Getenv(env.Path))
+	places := filepath.SplitList(path)
 	if len(places) != 2 || places[1] != without || places[0] == with {
 		t.Fatalf("PATH = %v", places)
 	}
@@ -87,5 +88,70 @@ func TestTempDirIsARealPath(t *testing.T) {
 	dir := TempDir(t)
 	if real, err := filepath.EvalSymlinks(dir); err != nil || real != dir {
 		t.Errorf("TempDir = %q, 実パス = %q (%v)", dir, real, err)
+	}
+}
+
+// macOS の一時置き場（/var → /private/var）が実パスで見える。
+func TestTempDirEnvironmentIsARealPath(t *testing.T) {
+	t.Parallel()
+	if os.TempDir() != TempBase() && !ospath.Windows {
+		t.Errorf("os.TempDir() = %q, TempBase() = %q", os.TempDir(), TempBase())
+	}
+}
+
+// Main は、走らせた人の環境が子の答えを変える変数を外す（外した結果は run の起動のテストが見る）。
+func TestMainScrubsTheProcessEnvironment(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{env.ClaudeProjectDir, env.GitDir, env.GitWorkTree, env.GitIndexFile, env.GitCommonDir, env.TestExe} {
+		if v, ok := os.LookupEnv(name); ok {
+			t.Errorf("%s=%q が残っている", name, v)
+		}
+	}
+}
+
+// go test は、更新時刻が 2 秒より新しいモジュールの中のファイルを開いたテストの結果を保存しない。
+// Uncache（目印を未来の時刻で書き、相対パスで開く）はこれに頼るので、Go を上げたときに 2 回目に (cached) が出ないことを見張る。
+func TestGoDoesNotCacheATestThatOpensAFutureFile(t *testing.T) {
+	t.Parallel()
+	mod := TempDir(t)
+	files := map[string]string{
+		"go.mod": "module probe\n\ngo 1.20\n",
+		"probe_test.go": `package probe
+
+import (
+	"os"
+	"testing"
+)
+
+func TestOpen(t *testing.T) {
+	f, err := os.Open("` + uncacheMark + `")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+}
+`,
+	}
+	for name, text := range files {
+		if err := os.WriteFile(filepath.Join(mod, name), []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := markFor(mod); err != nil {
+		t.Fatal(err)
+	}
+	goTest := func() string {
+		cmd := exec.Command("go", "test", "./...")
+		cmd.Dir = mod
+		cmd.Env = append(os.Environ(), "GOFLAGS=", "GOTOOLCHAIN=local", "GOWORK=off")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("go test: %v\n%s", err, out)
+		}
+		return string(out)
+	}
+	goTest()
+	if out := goTest(); strings.Contains(out, "(cached)") {
+		t.Errorf("2 回目が保存された結果で返った。Uncache の仕掛けが効いていない:\n%s", out)
 	}
 }

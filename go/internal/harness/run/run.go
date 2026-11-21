@@ -7,12 +7,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 )
 
@@ -27,17 +31,20 @@ const worktreesDir = "worktrees"
 type Opts struct {
 	// Input は標準入力。
 	Input string
-	// Env は「その起動に見える環境そのもの」。nil ならテストのプロセスの環境をそのまま渡す。渡したマップに無い変数は見えない。
-	// 例外は走った機械の git の設定を締め出す分（base.GitEnv）と、学びの蓄積を切る CCNAVI_LEARNING=disable で、空のマップでも足す。
-	// 呼び手が同じ名前を渡したときは呼び手を優先する（締め出し方そのものを試すテストのため）。
+	// Env は、テストのプロセスの環境（base.Main が整えたもの）に足す・上書きする分。呼び手の値が既定より優先される。
+	// 子の環境は、プロセスの環境 + 既定（走った機械の git の締め出し base.GitEnv と、学びの蓄積を切る CCNAVI_LEARNING=disable）
+	// + Unset の除去 + Env の順に重ねる。Main がプロセスの環境から GIT_*・CLAUDE_PROJECT_DIR・CCNAVI_* を外してあるので、
+	// 走らせた人の設定や、Claude Code の中で回したことは答えを変えない。
 	Env map[string]string
+	// Unset は、子の環境から外す名前（プロセスの環境と既定の分）。まれに「その変数が無い」姿を試すときだけ使う。
+	Unset []string
 	// Dir は作業ディレクトリ。空ならテストのプロセスのもの。
 	Dir string
 	// NoMessages は、起こす前に文面ファイルを置かないとき（`.ccnavi/` の無い木そのものを試すテスト）に立てる。
 	NoMessages bool
 }
 
-// Result は起こしたプロセスの結果。標準出力・標準エラーは CRLF を LF に揃えてある（Windows でも同じ文字列で比べるため）。
+// Result は起こしたプロセスの結果。標準出力・標準エラーは改行（CRLF と単独の CR）を LF に揃えてある（Windows でも同じ文字列で比べるため）。
 type Result struct {
 	Code           int
 	Stdout, Stderr string
@@ -52,7 +59,7 @@ type Result struct {
 func Ccnavi(t testing.TB, args []string, opts ...Opts) Result {
 	t.Helper()
 	o := first(opts)
-	environ := environment(o.Env)
+	environ := Environment(o)
 	if !o.NoMessages {
 		putMessagesWhenAbsent(t, rootOf(args, environ, o.Dir))
 	}
@@ -67,7 +74,7 @@ func Sh(t testing.TB, script string, args []string, opts ...Opts) Result {
 	if !filepath.IsAbs(script) {
 		script = filepath.Join(base.ScriptsDir(), script)
 	}
-	return start(t, "sh", append([]string{script}, args...), o, environment(o.Env))
+	return start(t, "sh", append([]string{script}, args...), o, Environment(o))
 }
 
 func first(opts []Opts) Opts {
@@ -77,25 +84,46 @@ func first(opts []Opts) Opts {
 	return opts[0]
 }
 
-// environment は子に渡す環境。呼び手の渡した環境（無ければ自分の環境）に、既定を下に敷く。
-func environment(given map[string]string) []string {
-	merged := map[string]string{env.Learning: "disable"}
-	if given == nil {
-		for _, kv := range os.Environ() {
-			k, v, _ := strings.Cut(kv, "=")
-			merged[k] = v
+// Environment は 1 回の起動の子に渡す環境（`NAME=value` の並び。名前順）。
+func Environment(o Opts) []string {
+	defaults := base.GitEnv()
+	defaults[env.Learning] = "disable"
+	return compose(os.Environ(), defaults, o.Unset, o.Env, ospath.Windows)
+}
+
+// compose は環境を process・defaults・unset の除去・add の順に重ねる。
+// caseless なら（Windows）名前の大文字小文字を区別せず、あとの層が前の層の同名（`Path` と `PATH`）を置き換える。
+// 区別しない所で map に名前をそのまま詰めると、同じ変数が 2 つ残り、子にどちらが見えるかが実行ごとに変わる。
+func compose(process []string, defaults map[string]string, unset []string, add map[string]string, caseless bool) []string {
+	key := func(name string) string {
+		if caseless {
+			return strings.ToUpper(name)
 		}
+		return name
 	}
-	for k, v := range base.GitEnv() {
-		merged[k] = v
+	type entry struct{ name, value string }
+	merged := map[string]entry{}
+	for _, kv := range process {
+		name, value, _ := strings.Cut(kv, "=")
+		if name == "" { // Windows の `=C:=C:\` のような内部の項目
+			continue
+		}
+		merged[key(name)] = entry{name, value}
 	}
-	for k, v := range given {
-		merged[k] = v
+	for name, value := range defaults {
+		merged[key(name)] = entry{name, value}
+	}
+	for _, name := range unset {
+		delete(merged, key(name))
+	}
+	for name, value := range add {
+		merged[key(name)] = entry{name, value}
 	}
 	out := make([]string, 0, len(merged))
-	for k, v := range merged {
-		out = append(out, k+"="+v)
+	for _, e := range merged {
+		out = append(out, e.name+"="+e.value)
 	}
+	sort.Strings(out)
 	return out
 }
 
@@ -105,6 +133,9 @@ func start(t testing.TB, program string, args []string, o Opts, environ []string
 	defer cancel()
 	cmd := exec.CommandContext(ctx, program, args...)
 	cmd.Env = environ
+	// 孫のプロセスが標準出力を持ち続けても、上限のあとは待たない（待ち続けると go test 全体の上限まで固まる）。
+	cmd.WaitDelay = 5 * time.Second
+	base.Uncache()
 	cmd.Dir = o.Dir
 	cmd.Stdin = strings.NewReader(o.Input)
 	var stdout, stderr bytes.Buffer
@@ -120,7 +151,9 @@ func start(t testing.TB, program string, args []string, o Opts, environ []string
 	return Result{cmd.ProcessState.ExitCode(), lf(stdout.String()), lf(stderr.String())}
 }
 
-func lf(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+var lfReplacer = strings.NewReplacer("\r\n", "\n", "\r", "\n")
+
+func lf(s string) string { return lfReplacer.Replace(s) }
 
 // rootOf は実行ファイルが使うワークスペースルート。`--root`、CLAUDE_PROJECT_DIR、作業ディレクトリから上って
 // `.claude` を持つ所（ワークツリーは飛ばす）の順。実行ファイルの既定のルートと同じ決め方。
@@ -177,7 +210,19 @@ func insideRepo(path string) bool {
 	return ok
 }
 
+// messagesOnce は根ごとに 1 回だけ文面を置く。表の副テストが同じ根へ並行に起こしても、書きかけの文面を子が読まない。
+var messagesOnce sync.Map
+
 func putMessagesWhenAbsent(t testing.TB, root string) {
+	t.Helper()
+	if root == "" {
+		return
+	}
+	once, _ := messagesOnce.LoadOrStore(pathcase.Fold(root), new(sync.Once))
+	once.(*sync.Once).Do(func() { putMessages(t, root) })
+}
+
+func putMessages(t testing.TB, root string) {
 	t.Helper()
 	// リポジトリの中（tests/fixtures など）に写すと、作業ツリーに追跡されないファイルが残る。
 	if root == "" || !isDir(root) || insideRepo(root) {
@@ -202,19 +247,4 @@ func putMessagesWhenAbsent(t testing.TB, root string) {
 	if _, err := f.WriteString("\n/.ccnavi/messages/\n"); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// CleanEnv はテストのプロセスの環境から ccnavi の変数（`CCNAVI_*`）を外し、学びの蓄積を切って（CCNAVI_LEARNING=disable）、
-// extra を足したもの。走らせた人の設定が答えを変えないよう、素の環境で試したいテストが Opts.Env に渡す。
-func CleanEnv(extra map[string]string) map[string]string {
-	out := map[string]string{env.Learning: "disable"}
-	for _, kv := range os.Environ() {
-		if k, v, _ := strings.Cut(kv, "="); !strings.HasPrefix(k, env.Prefix) {
-			out[k] = v
-		}
-	}
-	for k, v := range extra {
-		out[k] = v
-	}
-	return out
 }

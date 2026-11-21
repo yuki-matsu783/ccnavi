@@ -114,6 +114,8 @@ const (
 	GitHubToken = "GITHUB_TOKEN"
 	GitLabToken = "GITLAB_TOKEN"
 	Path        = "PATH"
+	// Tmpdir は POSIX の一時置き場（Windows は TMP・TEMP）。
+	Tmpdir      = "TMPDIR"
 	Home        = "HOME"
 	UserProfile = "USERPROFILE"
 	HomeDrive   = "HOMEDRIVE"

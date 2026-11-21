@@ -1,7 +1,6 @@
 package exe
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,7 +12,7 @@ func TestMain(m *testing.M) { base.Main(m) }
 
 // 組んだ実行ファイルは、指紋の置き場に置かれ、互換の版を言う。環境変数があればそれを使う。
 func TestPathBuildsOnceUnderTheFingerprint(t *testing.T) {
-	if os.Getenv(env.TestExe) != "" {
+	if base.TestVar(env.TestExe) != "" {
 		t.Skip("実行ファイルを渡されている")
 	}
 	path := Path(t)

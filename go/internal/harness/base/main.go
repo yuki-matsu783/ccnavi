@@ -1,22 +1,17 @@
 package base
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"ccnavi/internal/infra/env"
+	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
-)
-
-var (
-	exitMu    sync.Mutex
-	exitPaths []string
-	gitEnv    map[string]string
 )
 
 // atExit は Main が終わりに消す置き場を覚える。
@@ -29,21 +24,21 @@ func atExit(path string) {
 // Main は clitest の TestMain の共通。`func TestMain(m *testing.M) { base.Main(m) }` と書く。
 //
 // プロセスの環境を 1 度だけ整えてからテストを回し、使い捨ての置き場を消して終わる。
+//   - 走った機械・走らせた人の環境が子の答えを変えないよう、外す（GIT_*・CLAUDE_PROJECT_DIR など・CCNAVI_*）。
+//     CCNAVI_TEST_* は先に覚える（TestVar）
 //   - 走った機械の git の設定を締め出す（GitEnv）
 //   - PATH から ccnavi を外す
 //   - MSYS の引数の書き換えを止める
+//   - 一時置き場（TMPDIR）を実パスにする（macOS）
+//   - go test がこのパッケージの結果を保存しないようにする（Uncache。パッケージの doc を参照）
 //
-// go test のキャッシュで前の結果を返されないよう、-count=1 でない起動は断る（パッケージの doc を参照）。
+// 呼び忘れは、Root・GitEnv・run の起動が最初の 1 本で panic して知らせる。
 func Main(m *testing.M) {
-	flag.Parse()
-	if f := flag.Lookup("test.testlogfile"); f != nil && f.Value.String() != "" {
-		fmt.Fprintln(os.Stderr, "clitest は go test -count=1 で回す。sh・文面・見本はテストのプロセスが読まないので、go test のキャッシュは変更に気づかず前の結果を返す")
-		os.Exit(1)
-	}
 	if err := setup(); err != nil {
 		fmt.Fprintln(os.Stderr, "テストの環境を整えられない:", err)
 		os.Exit(1)
 	}
+	mainDone.Store(true)
 	code := m.Run()
 	exitMu.Lock()
 	for _, path := range exitPaths {
@@ -52,6 +47,25 @@ func Main(m *testing.M) {
 	exitMu.Unlock()
 	os.Exit(code)
 }
+
+var (
+	mainDone   atomic.Bool
+	testVars   = map[string]string{}
+	exitMu     sync.Mutex
+	exitPaths  []string
+	gitEnv     map[string]string
+	gitVarHead = "GIT_"
+)
+
+// requireMain は Main を呼び忘れたテストを、最初の 1 本で落とす。呼ばないと git の締め出しも環境の掃除も黙って効かない。
+func requireMain() {
+	if !mainDone.Load() {
+		panic("TestMain で base.Main(m) を呼ぶ（clitest/doc.go）")
+	}
+}
+
+// TestVar は Main が外す前の CCNAVI_TEST_*（組まずに使う実行ファイルのパス）の値。
+func TestVar(name string) string { return testVars[name] }
 
 // GitEnv は走った機械の git の設定を、テストが起こす git から締め出す環境変数。Main が整えたあとの値。
 //
@@ -65,6 +79,7 @@ func Main(m *testing.M) {
 // `**/.claude/settings.local.json` を書く機械で `git add -A` が設定ファイルを拾わなくなる）。
 // `/dev/null` を指さないのは Windows に無いため。
 func GitEnv() map[string]string {
+	requireMain()
 	out := make(map[string]string, len(gitEnv))
 	for k, v := range gitEnv {
 		out[k] = v
@@ -72,7 +87,47 @@ func GitEnv() map[string]string {
 	return out
 }
 
+// scrubEnvironment はプロセスの環境から、子の答えを変える変数を外す。
+// git の変数（GIT_DIR・GIT_WORK_TREE・GIT_INDEX_FILE など、git の hook の中で回すと入る）は、子の git を別の木に向ける。
+// CLAUDE_PROJECT_DIR は実行ファイルのルートを最優先で決め、Claude Code の中で回すと本物のリポジトリを根にする。
+// CCNAVI_* は走らせた人の設定。CCNAVI_TEST_* だけは先に覚える。
+// 子の環境（run.Opts.Env）はここで整った環境への差分だけを足す。
+func scrubEnvironment() {
+	drop := map[string]bool{
+		fold(env.ClaudeProjectDir): true, fold(env.ClaudeCodeEntrypoint): true,
+		fold(env.ClaudeSessionAttended): true, fold(env.ClaudeSessionID): true,
+	}
+	for _, kv := range os.Environ() {
+		name, value, _ := strings.Cut(kv, "=")
+		folded := fold(name)
+		switch {
+		case strings.HasPrefix(folded, env.Prefix+"TEST_"):
+			testVars[folded] = value
+			_ = os.Unsetenv(name)
+		case strings.HasPrefix(folded, env.Prefix), strings.HasPrefix(folded, gitVarHead), drop[folded]:
+			_ = os.Unsetenv(name)
+		}
+	}
+}
+
+// fold は環境変数の名前の比べ方。Windows は大文字小文字を区別しない。
+func fold(name string) string {
+	if ospath.Windows {
+		return strings.ToUpper(name)
+	}
+	return name
+}
+
 func setup() error {
+	scrubEnvironment()
+	if !ospath.Windows {
+		if err := os.Setenv(env.Tmpdir, TempBase()); err != nil {
+			return err
+		}
+	}
+	if err := writeUncacheMark(); err != nil {
+		return err
+	}
 	home, err := os.MkdirTemp(TempBase(), "ccnavi-gitconfig-")
 	if err != nil {
 		return err
@@ -106,7 +161,11 @@ func setup() error {
 			return err
 		}
 	}
-	return dropCcnaviFromPath()
+	path, err := dropCcnaviFromPath(os.Getenv(env.Path))
+	if err != nil {
+		return err
+	}
+	return os.Setenv(env.Path, path)
 }
 
 // dropCcnaviFromPath は走らせた人の PATH にある ccnavi を、テストから見えなくする。
@@ -115,9 +174,9 @@ func setup() error {
 // 「実体が無い」ことを見るテストの答えが、どの機械で走らせるかで変わる。PATH を使うテストは、自分で置き場を作って PATH に足す。
 // ccnavi があるディレクトリは、ccnavi 以外の中身（git など）を残すため、それらへのリンクだけを並べた使い捨ての
 // ディレクトリに置き換える。
-func dropCcnaviFromPath() error {
+func dropCcnaviFromPath(path string) (string, error) {
 	var kept []string
-	for _, place := range filepath.SplitList(os.Getenv(env.Path)) {
+	for _, place := range filepath.SplitList(path) {
 		entries, err := os.ReadDir(place)
 		if place == "" || err != nil || !holdsCcnavi(entries) {
 			kept = append(kept, place)
@@ -125,7 +184,7 @@ func dropCcnaviFromPath() error {
 		}
 		shim, err := os.MkdirTemp(TempBase(), "ccnavi-path-shim-")
 		if err != nil {
-			return err
+			return "", err
 		}
 		atExit(shim)
 		for _, entry := range entries {
@@ -137,7 +196,7 @@ func dropCcnaviFromPath() error {
 		}
 		kept = append(kept, shim)
 	}
-	return os.Setenv(env.Path, strings.Join(kept, string(os.PathListSeparator)))
+	return strings.Join(kept, string(os.PathListSeparator)), nil
 }
 
 func isCcnaviName(name string) bool {
