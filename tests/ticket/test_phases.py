@@ -1635,6 +1635,7 @@ class ScopeLimitTest(PhaseHarness):
     def assert_answered(self, result):
         """hook が判定の答えとして読める形で返したこと。"""
         self.assertIn(result.returncode, (0, 2), result.stdout + result.stderr)
+        self.assertNotIn("panic:", result.stderr)
         if result.stdout.strip():
             json.loads(result.stdout)
 

@@ -428,25 +428,6 @@ class FetchTest(unittest.TestCase):
         )
         self.assertNotIn("gh auth login", done.stdout)
 
-    def serve_unauthorized(self):
-        class Unauthorized(http.server.BaseHTTPRequestHandler):
-            def do_GET(self):
-                self.send_response(401)
-                self.send_header("WWW-Authenticate", 'Basic realm="ccnavi"')
-                self.send_header("Content-Length", "0")
-                self.end_headers()
-
-            def log_message(self, *args):
-                pass
-
-        server = http.server.HTTPServer(("127.0.0.1", 0), Unauthorized)
-        threading.Thread(
-            target=server.serve_forever, args=(0.05,), daemon=True
-        ).start()  # 止めるときの待ちを縮める
-        self.addCleanup(server.server_close)
-        self.addCleanup(server.shutdown)
-        return server.server_address[1]
-
     def test_a_hanging_remote_is_cut_off(self):
         """応答しないリモートは CCNAVI_FETCH_TIMEOUT 秒で切る。hook の上限まで待たない。"""
         helpers = os.path.join(self._tmp.name, "bin")

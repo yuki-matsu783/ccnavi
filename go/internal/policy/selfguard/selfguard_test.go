@@ -175,6 +175,8 @@ func TestTooManyRedirects(t *testing.T) {
 	}{
 		{strings.Repeat(">", RedirectLimit), false},
 		{strings.Repeat(">", RedirectLimit+1), true},
+		{strings.Repeat(">>", RedirectLimit/2), false},
+		{strings.Repeat(">>", RedirectLimit/2+1), true},
 		{">" + strings.Repeat("a", RawLengthLimit), true},
 		{">" + strings.Repeat("a", RawLengthLimit-1), false},
 		{strings.Repeat("a", RawLengthLimit*2), false},

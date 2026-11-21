@@ -44,9 +44,6 @@ class FailStreakTest(unittest.TestCase):
     def tearDown(self):
         self._dir.cleanup()
 
-    def _reset_state(self):
-        shutil.rmtree(self.state, ignore_errors=True)
-
     def _run(self, payload: dict, mode: str = "enable", session: str = "s1", **env: str):
         body = {"permission_mode": "auto", "cwd": self.ws, **payload}
         if session:
@@ -59,7 +56,6 @@ class FailStreakTest(unittest.TestCase):
         )
 
     def _fail(self, **kw):
-        agent = kw.pop("agent", "")
         interrupt = kw.pop("interrupt", False)
         payload = {
             "hook_event_name": "PostToolUseFailure",
@@ -68,20 +64,7 @@ class FailStreakTest(unittest.TestCase):
             "error": "Exit code 1",
             "is_interrupt": interrupt,
         }
-        if agent:
-            payload["agent_id"] = agent
         return self._run(payload, **kw)
-
-    def _ok(self, **kw):
-        return self._run(
-            {
-                "hook_event_name": "PostToolUse",
-                "tool_name": "Bash",
-                "tool_input": {"command": "true"},
-                "tool_response": {},
-            },
-            **kw,
-        )
 
     def _deny(self, **kw):
         return self._run(
