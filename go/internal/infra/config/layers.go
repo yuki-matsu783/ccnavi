@@ -145,6 +145,11 @@ func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) stri
 	return s.LayerRealPath(homeRoot, kind)
 }
 
+// CommonPath は共通レイヤーの設定ファイルのパス（設定が持つ既定、診断のフラグで動かせる）。
+func (s *Settings) CommonPath(kind LayerKind) string {
+	return map[LayerKind]string{KindRules: s.Rules, KindPhases: s.Phases, KindRisk: s.Risk, KindSections: s.Sections}[kind]
+}
+
 // LayerRealPath はレイヤーの設定ファイルが本来ある場所。
 func (s *Settings) LayerRealPath(homeRoot string, kind LayerKind) string {
 	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, layerFileNames[kind])
