@@ -185,8 +185,16 @@ func TestCompileCondition(t *testing.T) {
 		"a(?=b)":         "先読みは利用できない",
 		`(a)\1`:          "後方参照は利用できない",
 		"(?P<n>a)(?P=n)": "後方参照は利用できない",
+		`[x](a)\1`:       "後方参照は利用できない",
+		`a\\1`:           "",
+		`a\(?=b`:         "",
+		`\(?P=x\)`:       "",
+		`[\1]`:           "",
+		`[(?=]`:          "",
+		`[]\1]`:          "",
+		`[^]\1]`:         "",
 	} {
-		if re, why := CompileCondition("", regex, "gate"); re != nil || why != want {
+		if re, why := CompileCondition("", regex, "gate"); (re != nil) != (want == "") || why != want {
 			t.Errorf("%q: %q", regex, why)
 		}
 	}
