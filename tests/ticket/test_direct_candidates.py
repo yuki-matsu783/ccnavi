@@ -116,7 +116,7 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         path = self.direct(commit=True)
         self.post(os.path.join(path, "src", "a.py"))
         payload = json.dumps({"hook_event_name": "Stop", "cwd": self.root, "session_id": "s1"})
-        self.point_origin_head("main")
+        self.point_origin_head()
         off = self.ccnavi(
             "--mode",
             "enable",
@@ -154,7 +154,7 @@ class DirectCandidatesTest(base.IntegrateNudgeTest):
         }
         self.ccnavi("--mode", "enable", *off, stdin=json.dumps(start))
         payload = json.dumps({"hook_event_name": "Stop", "cwd": path, "session_id": "s1"})
-        self.point_origin_head("main")
+        self.point_origin_head()
         self.assert_not_asked(self.ccnavi("--mode", "enable", *off, stdin=payload))
         stop = dict(start, hook_event_name="SubagentStop")
         self.ccnavi("--mode", "enable", *off, stdin=json.dumps(stop))
