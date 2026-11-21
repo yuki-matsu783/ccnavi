@@ -5,9 +5,7 @@ import contextlib as _contextlib
 import glob as _glob
 import os
 import shutil as _shutil
-import subprocess as _subprocess
 import tempfile as _tempfile
-import unittest as _unittest
 
 # リポジトリの根。テストはグループのサブパッケージにあり、深さが揃わないのでここで 1 回だけ求める。
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,10 +54,6 @@ _drop_ccnavi_from_path()
 # 読まなくなり、設定を前提にしたテストが落ちて気づく。
 _PROJECT_HOME = ".ccnavi"
 _LAYER_FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
-_COMMON_FILES = {
-    kind: os.path.join(_PROJECT_HOME, "config", "common", name)
-    for kind, name in _LAYER_FILE_NAMES.items()
-}
 
 
 def _block_host_git_config() -> dict[str, str]:
@@ -136,135 +130,12 @@ os.environ.update(GIT_ENV)
 os.environ.setdefault("MSYS2_ARG_CONV_EXCL", "refs/;origin/")
 
 
-def shrink_repo(git_dir: str) -> None:
-    """作り置きのリポジトリを、写す前にファイルの数で小さくする。中身と振る舞いは変えない。
-
-    テストごとに作り置きを `shutil.copytree` で写すと、時間はほぼファイルとディレクトリの
-    数で決まる。ばらの object（1 つずつファイルと 2 字のディレクトリ）を 1 つの pack に
-    まとめ、git が `init` で置く使われない見本の hook（`hooks/*.sample`）を消す。
-    `git_dir` は `.git` か bare。
-    """
-    _subprocess.run(["git", "--git-dir", git_dir, "repack", "-a", "-d", "-q"], check=True)
-    for sample in _glob.glob(os.path.join(git_dir, "hooks", "*.sample")):
-        os.remove(sample)
-
-
-_FIXTURE_WORKSPACES: dict[str, str] = {}
-
-
-def common_relpath(kind: str) -> str:
-    """共通レイヤーのファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。"""
-    return _COMMON_FILES[kind]
-
-
-def common_path(root: str, kind: str) -> str:
-    """そのワークスペースルートの共通レイヤーのファイル（rules / phases / risk）のパス。"""
-    return os.path.join(root, common_relpath(kind))
-
-
 def config_path(root: str, kind: str) -> str:
     """ワークスペースルートの config（自身のレイヤー）のファイル（rules / phases / risk）のパス。
 
     フェーズ定義は共通レイヤーと config の両方に置け、判定は 2 本の和を読む。
     """
     return os.path.join(root, _PROJECT_HOME, "config", "project", _LAYER_FILE_NAMES[kind])
-
-
-def fixture_workspace(name: str = "rules.yml") -> str:
-    """`tests/fixtures/<name>` を共通レイヤーのルールに据えたワークスペースルート。
-
-    `--rules` は診断でだけ有効なので、見本のルールを指すのには使わない。
-    `--root` にここを渡して、共通レイヤーの既定の置き場から読ませる。
-
-    リポジトリ自身をルートにしないので、走った機械の `.ccnavi/config/common/rules.yml` が
-    判定に入り込まない。
-
-    組むのは見本ごとにプロセスで 1 度。中身は読むだけなので使い回してよい。
-    """
-    if name not in _FIXTURE_WORKSPACES:
-        ws = _tempfile.mkdtemp(prefix="ccnavi-fixture-ws-")
-        _atexit.register(_shutil.rmtree, ws, ignore_errors=True)
-        target = common_path(ws, "rules")
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        _shutil.copyfile(os.path.join(ROOT, "tests", "fixtures", name), target)
-        _FIXTURE_WORKSPACES[name] = ws
-    return _FIXTURE_WORKSPACES[name]
-
-
-def can_symlink() -> bool:
-    """シンボリックリンクを実際に作れるか。Windows は特権が無いと作れない。
-
-    OS の名前では決めず、使い捨ての置き場で 1 本作って確かめる。作れない環境では、
-    リンクを辿らないことを見るテストは成り立たないので、`requires_symlink` で skip する。
-    """
-    with _tempfile.TemporaryDirectory(prefix="ccnavi-symlink-probe-") as tmp:
-        try:
-            os.symlink(tmp, os.path.join(tmp, "link"))
-        except (OSError, NotImplementedError):
-            return False
-    return True
-
-
-def can_case_sensitive() -> bool:
-    """大文字小文字だけが違う名前を、別のファイルとして並べて作れるか。
-
-    macOS（既定）と Windows のファイルシステムは区別しないので、`a` と `A` が同じ 1 本になる。
-    OS の名前では決めず、使い捨ての置き場で実際に 2 本作って確かめる。
-    """
-    with _tempfile.TemporaryDirectory(prefix="ccnavi-case-probe-") as tmp:
-        try:
-            for name in ("a", "A"):
-                with open(os.path.join(tmp, name), "w", encoding="utf-8") as f:
-                    f.write(name)
-            return len(os.listdir(tmp)) == 2
-        except OSError:
-            return False
-
-
-def can_pass_argument(size: int) -> bool:
-    """sh から jq へ、`size` 字の引数を渡せるか。実際に渡して確かめる。
-
-    取ってきた状態は `jq --argjson` の引数で渡すので、1 引数の上限（Windows は約 32,000 字）を
-    超える場面は、上限のある環境では取れない。sh か jq が無ければ、確かめずに True を返す
-    （そちらは別の skip が受ける）。
-    """
-    sh = _shutil.which("sh") or _shutil.which("bash")
-    if sh is None or _shutil.which("jq") is None:
-        return True
-    done = _subprocess.run(
-        [sh, "-c", "a=$(cat); jq -n --arg a \"$a\" '$a|length'"],
-        input="x" * size,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return done.returncode == 0 and done.stdout.strip() == str(size)
-
-
-def live_sh_pid(test) -> int:
-    """sh の `kill -0` から生きて見えるプロセスの pid。テストごとに 1 つ起こして使い回す。
-
-    ロックの持ち主を「生きているプロセス」にしたいテストは、自分の `os.getpid()` を書いていた。
-    Windows の Python の pid は Git Bash（MSYS）の pid の表に無く、sh からは死んで見える。
-    sh 自身に起こさせた sleep の pid（sh の `$$`）なら、どこでも sh から生きて見える。
-    """
-    pid = getattr(test, "_live_sh_pid", None)
-    if pid is None:
-        sh = _shutil.which("sh") or _shutil.which("bash")
-        proc = _subprocess.Popen(
-            [sh, "-c", "echo $$; exec sleep 600"],
-            stdout=_subprocess.PIPE,
-            stderr=_subprocess.DEVNULL,
-            text=True,
-        )
-        test.addCleanup(proc.wait)
-        test.addCleanup(proc.kill)
-        pid = int(proc.stdout.readline())
-        test._live_sh_pid = pid
-    return pid
-
-
-requires_symlink = _unittest.skipUnless(can_symlink(), "シンボリックリンクを作れない")
 
 
 # 保護済み sh の置き場。
@@ -290,20 +161,6 @@ def common_sh(scripts_dir: str = SH_SCRIPTS) -> tuple[str, ...]:
     return names
 
 
-def put_ccnavi_md(root: str) -> str:
-    """作業ディレクトリに、このリポジトリの `.ccnavi/CCNAVI.md` をコピーする。
-
-    セッション開始で渡す作業の決まりの原本。
-    """
-    target = os.path.join(root, ".ccnavi", "CCNAVI.md")
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    # 保護対象の下書き（wip/handoff/）があれば、取り込んだ後の姿として下書きを読む。
-    draft = os.path.join(ROOT, "wip", "handoff", ".ccnavi", "CCNAVI.md")
-    source = draft if os.path.isfile(draft) else os.path.join(ROOT, ".ccnavi", "CCNAVI.md")
-    _shutil.copyfile(source, target)
-    return target
-
-
 # このリポジトリの文面ファイルの置き場。
 MESSAGES = os.path.join(ROOT, ".ccnavi", "messages")
 
@@ -317,40 +174,3 @@ def put_messages(root: str) -> str:
     target = os.path.join(root, ".ccnavi", "messages")
     _shutil.copytree(MESSAGES, target, dirs_exist_ok=True)
     return target
-
-
-# 文面に置くパスを引用せずに書ける字（実行ファイルの案内と同じ決め方）。
-_BARE_PATH = r"[^\s'\"\\$`!*?\[\]{}()<>|&;#~]+"
-_SPECIAL_IN_DOUBLE_QUOTES = r'["\\$`!]'
-
-
-def _quoted(path: str) -> str:
-    """要るときだけ引用する。まず `"…"`、`"` の中でも意味を持つ字があるときは `'…'`。"""
-    import re
-    import shlex
-
-    if re.fullmatch(_BARE_PATH, path):
-        return path
-    if not re.search(_SPECIAL_IN_DOUBLE_QUOTES, path):
-        return f'"{path}"'
-    return shlex.quote(path)
-
-
-def script_command(root: str, name: str) -> str:
-    """文面が案内する `.ccnavi/scripts/` の sh の打ち方
-    （`sh <ルートの実パス>/.ccnavi/scripts/<name>`）。
-
-    区切りは `/`。空白やシェルの記号を含むときだけ引用する。実行ファイルの書き方と食い違えば、
-    案内の文を比べるテストが落ちる。
-    """
-    base = os.path.realpath(root).replace("\\", "/").rstrip("/")
-    return f"sh {_quoted(f'{base}/{_PROJECT_HOME}/scripts/{name}')}"
-
-
-def shell_path(path: str) -> str:
-    """文面が `cd <パス> && …` の形で案内するパス。区切りは Windows のパスだけ `/` に揃える。"""
-    import re
-
-    if os.name == "nt" or re.match(r"[A-Za-z]:\\", path):
-        path = path.replace("\\", "/")
-    return _quoted(path)
