@@ -149,9 +149,11 @@ func TestWhatIsSaidAboutAPlaceNothingTracks(t *testing.T) {
 	if err := os.Symlink(t.TempDir(), conf.Projects); err == nil {
 		expectUnignored("リンク")
 		os.Remove(conf.Projects)
-		if err := os.MkdirAll(conf.Projects, 0o755); err != nil {
-			t.Fatal(err)
-		}
+	} else {
+		t.Log("リンクを作れないので、リンクの場面は確かめない")
+	}
+	if err := os.MkdirAll(conf.Projects, 0o755); err != nil {
+		t.Fatal(err)
 	}
 	// 無視されていれば、空でもプロジェクトがあっても何も言わない。
 	put(t, root, ".gitignore", "/.claude/\n/projects/\n")

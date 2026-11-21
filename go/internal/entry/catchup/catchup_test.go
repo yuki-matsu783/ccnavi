@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"ccnavi/internal/infra/config"
 	"ccnavi/internal/policy/rules"
+	"ccnavi/internal/tickets/testkit"
 )
 
 func TestReadsWhatShFetched(t *testing.T) {
@@ -178,5 +181,36 @@ func TestExitOf(t *testing.T) {
 		if got := exitOf(c.answers); got != c.want {
 			t.Errorf("exitOf(%q) = %d, want %d", c.answers, got, c.want)
 		}
+	}
+}
+
+// sync tidy は、sh から渡る値が形に合わなければ何も消さない。親 i0001 のブランチ以外を渡して消させない（任意ブランチの
+// 削除の防止）。retire.RunMerged 単体の確認は retire のテストで、入口の拒否はここ。
+func TestTidyRefusesAtTheDoor(t *testing.T) {
+	const head = "0123456789abcdef0123456789abcdef01234567"
+	root := testkit.GitRoot(t)
+	testkit.Git(t, root, "init", "-q", "-b", "main")
+	testkit.Commit(t, root, "init")
+	testkit.Git(t, root, "branch", "other")
+	testkit.Git(t, root, "branch", "i0001")
+	conf, _ := config.Load(root)
+	for _, c := range []struct{ name, family, repo, branch, sha, want string }{
+		{"別のブランチ", "i0001", "self", "other", head, "親 i0001 のブランチではない"},
+		{"- で始まる", "i0001", "self", "-x", head, "ブランチ名の形ではない"},
+		{"git の名前の規則に合わない", "i0001", "self", "bad..name", head, "ブランチ名の形ではない"},
+		{"空", "i0001", "self", "", head, "ブランチ名の形ではない"},
+		{"不正な sha", "i0001", "self", "i0001", "not-a-sha", "有効な形式ではありません"},
+		{"形式違いの識別子", "a/../b", "self", "i0001", head, "有効な形式ではありません"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			var o, e bytes.Buffer
+			code := Tidy(&o, &e, root, conf, root, c.family, c.repo, c.branch, c.sha)
+			if code != config.ExitError || o.Len() != 0 || !strings.Contains(e.String(), c.want) {
+				t.Errorf("code=%d stdout=%q stderr=%q", code, o.String(), e.String())
+			}
+			if got := strings.Fields(testkit.Git(t, root, "branch", "--format=%(refname:short)")); !slices.Contains(got, "other") || !slices.Contains(got, "i0001") {
+				t.Errorf("ブランチが消えた: %v", got)
+			}
+		})
 	}
 }

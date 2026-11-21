@@ -142,6 +142,10 @@ func TestMergedKeepsWhatItCannotCheck(t *testing.T) {
 			if !n.exists(n.parent) || !n.exists(n.record) {
 				t.Errorf("消してはいけないものが消えた\n%s", out)
 			}
+			// 確かめられないなら、未 push の成果を持つブランチも消さない（参照が無い場面だけは、消す物が無い）。
+			if c.name != "ブランチの参照が消えた" && !slices.Contains(n.branches(t), "i0001") {
+				t.Errorf("ブランチ i0001 が消えた\n%s", out)
+			}
 		})
 	}
 }
@@ -172,6 +176,11 @@ func TestRetireKeepsUnverifiableChildren(t *testing.T) {
 			code, out, errText := n.retire("i0001")
 			if code != 1 {
 				t.Errorf("code=%d\n%s%s", code, out, errText)
+			}
+			// 汚れた子のワークツリーは、未コミットの書きかけごと残る。
+			if child := testkit.Worktree(n.root, "i0001-01-01"); c.name == "子のワークツリーが汚れている" &&
+				(!n.exists(filepath.Join(child, "memo.txt")) || !strings.Contains(out, "git -C '"+child+"' status")) {
+				t.Errorf("汚れた子のワークツリーが消えたか、案内が無い: %s\n%s", child, out)
 			}
 			for _, w := range c.want {
 				if !strings.Contains(out, w) {
@@ -229,6 +238,16 @@ func TestNamesThatDifferOnlyInCaseMeanTheSame(t *testing.T) {
 	if code, out, errText := n.branch("I0001-01-09", true); code != 0 || !strings.Contains(out, "ブランチ i0001-01-09 を削除しました") {
 		t.Errorf("code=%d %s%s", code, out, errText)
 	}
+	// 記録の parent が大文字小文字だけ違っても、この親の記録として子のブランチを見つける。
+	n.addCancelled(t, "i0001-01-08", "i0001")
+	held := recordMap(t, n.record)
+	held["parent"] = "I0001"
+	writeRecord(t, n.record, held)
+	if code, out, errText := n.branch("i0001-01-08", true); code != 0 || !strings.Contains(out, "ブランチ i0001-01-08 を削除しました") {
+		t.Errorf("code=%d %s%s", code, out, errText)
+	}
+	held["parent"] = "i0001"
+	writeRecord(t, n.record, held)
 	// 親のワークツリーを片付けた後は、別の綴りでも同じ記録を放棄できる。
 	if code, _, errText := n.retire("I0001"); code != 1 || n.exists(n.parent) {
 		t.Errorf("code=%d parent=%v %s", code, n.exists(n.parent), errText)
