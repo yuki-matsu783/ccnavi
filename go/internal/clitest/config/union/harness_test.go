@@ -63,7 +63,8 @@ func read(t testing.TB, path string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(data)
+	// Windows の git (autocrlf=true) は CRLF で戻すことがあるので、LF にそろえて比べる。
+	return strings.ReplaceAll(string(data), "\r\n", "\n")
 }
 
 func exists(path string) bool {
