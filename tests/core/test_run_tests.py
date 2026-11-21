@@ -61,11 +61,11 @@ class CoversTheSameModulesTest(unittest.TestCase):
 
 class TakesTheSpellingsPeopleTypeTest(unittest.TestCase):
     def test_a_group_can_be_named_in_several_ways(self):
-        by_slash = TOOL.modules(["tests/ticket"])
-        self.assertEqual(by_slash, TOOL.modules(["tests/ticket/"]))
-        self.assertEqual(by_slash, TOOL.modules(["tests.ticket"]))
+        by_slash = TOOL.modules(["tests/scenarios"])
+        self.assertEqual(by_slash, TOOL.modules(["tests/scenarios/"]))
+        self.assertEqual(by_slash, TOOL.modules(["tests.scenarios"]))
         self.assertTrue(by_slash, "グループを名指ししたのに空")
-        self.assertTrue(all(m.startswith("tests.ticket.") for m in by_slash))
+        self.assertTrue(all(m.startswith("tests.scenarios.") for m in by_slash))
 
     def test_a_single_module_can_be_named(self):
         self.assertEqual(
