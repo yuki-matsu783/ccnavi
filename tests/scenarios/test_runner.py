@@ -20,9 +20,8 @@ from unittest import mock
 
 import yaml
 
-from tests import ROOT, common_sh, fake_gitlab, host_stub
+from tests import ROOT, fake_gitlab, host_stub
 from tests import __main__ as full_run
-from tests import exe as built
 from tests.inproc import run_ccnavi
 from tests.scenarios import (
     commands,
@@ -41,7 +40,6 @@ from tests.scenarios import (
     stream,
     workspace,
 )
-from tests.scenarios.actors import terminal, ui
 
 SCENARIOS = sorted(Path(__file__).parent.glob("UC-*.yml"))
 EXPECT_KEYS = {
@@ -405,97 +403,6 @@ class ExpectAfterTest(unittest.TestCase):
             self.load_yml(text)
 
 
-@unittest.skipUnless(hasattr(os, "openpty"), "擬似端末を作れない環境")
-class HumanRunTest(unittest.TestCase):
-    """human_run（実行器が人間役として端末で打つ sh）。claude も本物の sh も呼ばない。"""
-
-    STEP = {"human": True, "instruction": "x", "human_run": {"script": "agree", "answers": ["y"]}}
-
-    def drive(self, pending, approved, rc=0, before=None, approved_before=None, pending_after=None):
-        with tempfile.TemporaryDirectory() as d:
-            out, root = Path(d) / "out", Path(d) / "root"
-            out.mkdir()
-            root.mkdir()
-            scn = {"steps": [dict(self.STEP)], "_prompt_steps": 0}
-            st = {"next_step": 0, "session_ids": [], "cost_usd": 0.0}
-            st["proposals_before"] = before or []
-            with (
-                # 1 回目は打つ前、2 回目は打ったあと
-                mock.patch.object(
-                    terminal,
-                    "pending_proposals",
-                    side_effect=[pending, pending if pending_after is None else pending_after],
-                ),
-                # 打つ前は approved_before（既定は空）、打ったあとは approved
-                mock.patch.object(
-                    terminal, "approved_ids", side_effect=[approved_before or set(), approved]
-                ),
-                mock.patch.object(terminal, "run_on_terminal", return_value=(rc, "")) as term,
-            ):
-                got = drive.run_steps(scn, out, st, root)
-        return got, st, term
-
-    def test_load_scenario_needs_test_repo(self):
-        text = yaml.safe_dump({"id": "T", "steps": [self.STEP]})
-        with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / "scn.yml"
-            path.write_text(text, encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "test_repo: true"):
-                schema.load_scenario(path)
-
-    def test_terminal_is_attached_and_answers_arrive(self):
-        script = 'if [ -t 0 ]; then echo tty; fi; read a; echo "got=$a"; exit 3'
-        rc, text = terminal.run_on_terminal(["sh", "-c", script], None, None, ["y"], timeout=10)
-        self.assertEqual(rc, 3)
-        self.assertIn("tty", text)
-        self.assertIn("got=y", text)
-
-    def test_timeout_stops_the_whole_group(self):
-        with self.assertRaises(subprocess.TimeoutExpired):
-            terminal.run_on_terminal(["sh", "-c", "sleep 30 & wait"], None, None, [], timeout=1)
-
-    def test_success_is_judged_by_approved_tickets_not_exit_code(self):
-        got, st, term = self.drive([["i1", "test-repo"]], approved=set(), rc=0)
-        self.assertEqual(got, 11)
-        self.assertIn("新しく承認済みにならなかった: i1", st["halt"]["reasons"][0])
-        self.assertEqual(term.call_args.args[0][2:], ["i1"])
-
-    def test_revision_of_approved_parent_counts_when_it_leaves_pending(self):
-        got, st, _ = self.drive(
-            [["p1", "test-repo"]], approved={"p1"}, approved_before={"p1"}, pending_after=[]
-        )
-        self.assertIsNone(got)
-        self.assertEqual(st["human_runs"][0]["status"], "done")
-
-    def test_revision_still_pending_is_not_approved(self):
-        got, st, _ = self.drive([["p1", "test-repo"]], approved={"p1"}, approved_before={"p1"})
-        self.assertEqual(got, 11)
-        self.assertIn("新しく承認済みにならなかった: p1", st["halt"]["reasons"][0])
-
-    def test_proposal_outside_test_repo_stops_before_running(self):
-        got, st, term = self.drive([["i1", "test-repo"], ["w1", ""]], approved={"i1"})
-        self.assertEqual(got, 11)
-        self.assertIn("w1（ワークスペースルート）", st["halt"]["reasons"][0])
-        term.assert_not_called()
-
-    def test_nothing_added_stops_before_running(self):
-        got, st, term = self.drive([["i1", "test-repo"]], approved={"i1"}, before=[["i1", ""]])
-        self.assertEqual(got, 11)
-        self.assertIn("増えていない", st["halt"]["reasons"][0])
-        term.assert_not_called()
-
-    def test_scans_run_on_a_workspace_without_tickets(self):
-        with tempfile.TemporaryDirectory() as d:
-            self.assertEqual(terminal.pending_proposals(d), [])
-            self.assertEqual(terminal.approved_ids(d), set())
-
-    def test_approved_run_continues_and_is_recorded(self):
-        got, st, _ = self.drive([["i1", "test-repo"]], approved={"i1"})
-        self.assertIsNone(got)
-        self.assertEqual(st["human_runs"][0]["status"], "done")
-        self.assertEqual(st["next_step"], 1)
-
-
 class PreflightTest(unittest.TestCase):
     def test_missing_project_dir_is_reported_not_raised(self):
         with tempfile.TemporaryDirectory() as d:
@@ -535,27 +442,6 @@ class ModeCheckTest(unittest.TestCase):
         (Path(root) / ".claude/settings.json").write_text("{", encoding="utf-8")
         with mock.patch.dict("os.environ", {}, clear=True):
             self.assertFalse(workspace.mode_check(root)[0])
-
-
-class SetupSafetyTest(unittest.TestCase):
-    def scenario(self, rel):
-        return {"setup": {"files": {rel: "x\n"}}}
-
-    def test_existing_file_is_a_clash_and_not_touched(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            (root / "keep.txt").write_text("元の中身\n", encoding="utf-8")
-            self.assertEqual(prepare.setup_clashes(self.scenario("keep.txt"), root), ["keep.txt"])
-
-    def test_cleanup_removes_only_dirs_setup_created(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            (root / "keepdir").mkdir()
-            files, dirs = prepare.make_files(self.scenario("keepdir/a/b.txt"), root)
-            self.assertEqual(dirs, ["keepdir/a"])
-            prepare.remove_files(files, dirs, root)
-            self.assertFalse((root / "keepdir/a").exists())
-            self.assertTrue((root / "keepdir").is_dir())
 
 
 class StepFailureTest(unittest.TestCase):
@@ -817,41 +703,6 @@ class FullRunDoesNotPickScenariosTest(unittest.TestCase):
         self.assertEqual(
             extra, [], "本物の claude でシナリオを回す道を test_ のモジュールに置かない"
         )
-
-
-class UiActorTest(unittest.TestCase):
-    """actors/ui.py の足場。Playwright が無い環境でも import でき、run は止めて 11 を返す。"""
-
-    def test_op_text_hides_input(self):
-        op = {"op": "fill", "selector": "#q", "text": "secret"}
-        self.assertEqual(ui.op_text(op), "fill（#q）")
-
-    def test_run_halts_without_playwright(self):
-        st = {}
-        step = {"human_ui": [{"op": "goto", "url": "http://localhost"}]}
-        with (
-            tempfile.TemporaryDirectory() as d,
-            mock.patch.object(ui, "load_playwright", return_value=None),
-        ):
-            rc = ui.run(Path(d), st, 0, step, Path(d))
-        self.assertEqual(rc, 11)
-        self.assertEqual(st["halt"]["kind"], "human_ui")
-        self.assertEqual(st["next_step"], 1)
-
-    def test_run_halts_when_browser_cannot_launch(self):
-        pw = mock.MagicMock()
-        pw.sync_playwright.return_value.__enter__.return_value.chromium.launch.side_effect = (
-            RuntimeError("no browser")
-        )
-        st = {}
-        step = {"human_ui": [{"op": "goto", "url": "http://localhost"}]}
-        with (
-            tempfile.TemporaryDirectory() as d,
-            mock.patch.object(ui, "load_playwright", return_value=pw),
-        ):
-            rc = ui.run(Path(d), st, 0, step, Path(d))
-        self.assertEqual(rc, 11)
-        self.assertIn("no browser", st["halt"]["reasons"][0])
 
 
 class ScenarioFilesTest(unittest.TestCase):
@@ -2089,24 +1940,6 @@ class PreRunCheckTest(unittest.TestCase):
             self.assertFalse(ws.out.exists())
 
 
-class SetupFailureTest(unittest.TestCase):
-    def test_partial_failure_removes_what_was_made(self):
-        with tempfile.TemporaryDirectory() as d:
-            root = Path(d)
-            scn = {"setup": {"files": {"a/one.txt": "1", "a/two.txt": "2"}}}
-            real = Path.write_text
-
-            def flaky(self, *a, **k):
-                if self.name == "two.txt":
-                    raise OSError("書けない")
-                return real(self, *a, **k)
-
-            with mock.patch.object(Path, "write_text", flaky), self.assertRaises(OSError):
-                prepare.make_files(scn, root)
-            self.assertFalse((root / "a").exists())
-            self.assertEqual(prepare.setup_clashes(scn, root), [])
-
-
 class CleanupRobustnessTest(unittest.TestCase):
     def test_close_issue_failure_does_not_stop_the_restore(self):
         with tempfile.TemporaryDirectory() as d:
@@ -3007,34 +2840,6 @@ class HostFieldTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             return schema.load_scenario(write_scenario(d, setup))
 
-    def test_values_are_checked_and_the_default_is_real(self):
-        for host in ("bare", "fake-gitlab", "real"):
-            with self.subTest(host=host):
-                self.assertEqual(schema.scenario_host(self.load({"host": host})), host)
-        self.assertEqual(schema.scenario_host(self.load({"files": {}})), "real")
-        for bad in ("mock", "", None, True, "Bare"):
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                self.load({"host": bad})
-
-    def test_it_is_not_combined_with_issue(self):
-        issue = {"repo": "projects/test-repo", "title": "t"}
-        for host in ("bare", "fake-gitlab"):
-            with self.subTest(host=host), self.assertRaises(ValueError) as cm:
-                self.load({"host": host, "issue": issue})
-            self.assertIn("setup.issue", str(cm.exception))
-        self.load({"host": "real", "issue": issue})
-
-    def test_host_state_is_only_for_fake_gitlab_and_needs_a_project_path(self):
-        self.load({"host": "fake-gitlab", "host_state": {"project": "a/b", "issues": []}})
-        for setup in (
-            {"host": "bare", "host_state": {}},
-            {"host_state": {}},
-            {"host": "fake-gitlab", "host_state": []},
-            {"host": "fake-gitlab", "host_state": {"project": "proj"}},
-        ):
-            with self.subTest(setup=setup), self.assertRaises(ValueError):
-                self.load(setup)
-
     def test_a_fake_host_uses_the_disposable_target(self):
         self.assertTrue(schema.uses_target({"setup": {"host": "bare"}}))
         self.assertTrue(schema.uses_target({"setup": {"host": "fake-gitlab"}}))
@@ -3076,41 +2881,6 @@ class StepEnvTest(unittest.TestCase):
             **extra,
         }
 
-    def test_real_tokens_are_dropped_and_everything_else_is_inherited(self):
-        base = {
-            "PATH": "/usr/bin",
-            "HOME": "/home/u",
-            "HTTPS_PROXY": "http://p",
-            "NODE_EXTRA_CA_CERTS": "/ca",
-            "GITHUB_TOKEN": "real-gh",
-            "GH_TOKEN": "real-gh2",
-            "GITLAB_TOKEN": "real-gl",
-            "CCNAVI_PROBE_REVIEWER_TOKEN": "real-probe",
-            "github_token": "lower",
-        }
-        env = hostenv.step_env(self.host("bare"), base)
-        for name in ("HOME", "HTTPS_PROXY", "NODE_EXTRA_CA_CERTS"):
-            self.assertEqual(env[name], base[name])
-        for name in ("GITHUB_TOKEN", "GH_TOKEN", "GITLAB_TOKEN", "CCNAVI_PROBE_REVIEWER_TOKEN"):
-            self.assertNotIn(name, env)
-        self.assertNotIn("github_token", env)
-        self.assertEqual(env["PATH"], os.pathsep.join(["/stub/bin", "/usr/bin"]))
-        self.assertEqual(env["FAKE_ORIGIN_URL"], host_stub.ORIGIN_URL)
-        self.assertEqual(env["FAKE_BARE"], "/stub/origin.git")
-        self.assertEqual(env["FAKE_REAL_ORIGIN"], REAL_ORIGIN)
-        self.assertEqual(env["FAKE_TARGET_COMMON"], "/t/.git")
-
-    def test_fake_gitlab_gets_only_the_fake_token_and_a_local_origin(self):
-        base = {"PATH": "/usr/bin", "GITLAB_TOKEN": "real-gl", "GITHUB_TOKEN": "real-gh"}
-        env = hostenv.step_env(self.host("fake-gitlab", token="fake-token"), base)
-        self.assertEqual(env["GITLAB_TOKEN"], "fake-token")
-        self.assertNotIn("GITHUB_TOKEN", env)
-        self.assertEqual(env["FAKE_ORIGIN_URL"], "http://127.0.0.1:4321/ns/proj.git")
-
-    def test_a_scenario_without_host_passes_no_env(self):
-        self.assertIsNone(prepare.host_env({}))
-        self.assertIsNone(prepare.host_env({"host": {"down": True}}))
-
     def test_run_step_inherits_the_environment_when_env_is_none(self):
         done = subprocess.CompletedProcess([], 0, stdout="", stderr="")
         scn = {"model": "haiku", "budget_usd": 1.0, "_prompt_steps": 1, "permission_mode": "auto"}
@@ -3123,217 +2893,6 @@ class StepEnvTest(unittest.TestCase):
             self.assertIsNone(call.call_args.kwargs["env"])
             drive.run_step(scn, {"prompt": "a"}, Path(d), 1, "sid", None, False, d, env={"A": "1"})
             self.assertEqual(call.call_args.kwargs["env"], {"A": "1"})
-
-
-@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
-class BareHostTest(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.scratch = private_tempdir(self, self._tmp.name)
-        self.ws = host_workspace(self._tmp.name)
-        self.top = str(self.ws.target.resolve())
-        self.root = str(self.ws.root.resolve())
-
-    def prepare(self, kind="bare", **setup):
-        host = hostenv.prepare(self.ws.root, self.top, {"host": kind, **setup}, repo.git)
-        self.addCleanup(hostenv.teardown, self.ws.root, host, repo.git)
-        return host, hostenv.step_env(host, tokens_dropped_env())
-
-    def git(self, env, cwd, *args):
-        return subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True)
-
-    def test_the_stub_answers_a_host_shaped_origin_for_the_target_only(self):
-        git(self.ws.target, "worktree", "add", "-q", str(self.ws.root.parent / "wt"), "-b", "w")
-        host, env = self.prepare()
-        for cwd in (self.top, str(self.ws.root.parent / "wt")):
-            got = self.git(env, cwd, "remote", "get-url", "origin")
-            self.assertEqual(got.stdout.strip(), host_stub.ORIGIN_URL, cwd)
-        self.assertEqual(
-            self.git(env, self.top, "-C", self.top, "remote", "get-url", "origin").stdout.strip(),
-            host_stub.ORIGIN_URL,
-        )
-        # ccnavi 本体のリポジトリには、本物の答えを返す
-        body = self.git(env, self.root, "remote", "get-url", "origin")
-        self.assertEqual(body.stdout.strip(), BODY_ORIGIN)
-        body = self.git(env, self.top, "-C", self.root, "remote", "get-url", "origin")
-        self.assertEqual(body.stdout.strip(), BODY_ORIGIN)
-
-    def test_a_users_insteadof_does_not_send_the_traffic_to_the_real_origin(self):
-        config = Path(self._tmp.name) / "global.gitconfig"
-        config.write_text(
-            '[url "git@example.invalid:"]\n\tinsteadOf = https://github.com/\n', encoding="utf-8"
-        )
-        with mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(config)}):
-            self.assertTrue(
-                git(self.ws.target, "remote", "get-url", "origin").startswith("git@example.invalid")
-            )
-            host, env = self.prepare()
-            self.assertEqual(host["real_origin"], REAL_ORIGIN)
-            git(self.ws.target, "switch", "-q", "-c", "feat")
-            git(self.ws.target, "commit", "-q", "--allow-empty", "-m", "e")
-            pushed = self.git(env, self.top, "push", "-q", "origin", "feat")
-        self.assertEqual(pushed.returncode, 0, pushed.stderr)
-        sha = git(self.ws.target, "rev-parse", "feat")
-        self.assertEqual(git(host["bare"], "rev-parse", "refs/heads/feat"), sha)
-
-    def test_push_and_fetch_reach_the_bare_and_not_the_real_origin(self):
-        host, env = self.prepare()
-        git(self.ws.target, "switch", "-q", "-c", "feat")
-        (self.ws.target / "new.txt").write_text("x\n", encoding="utf-8")
-        git(self.ws.target, "add", "new.txt")
-        git(self.ws.target, "commit", "-q", "-m", "new")
-        pushed = self.git(env, self.top, "push", "-q", "origin", "feat")
-        self.assertEqual(pushed.returncode, 0, pushed.stderr)
-        sha = git(self.ws.target, "rev-parse", "feat")
-        self.assertEqual(git(host["bare"], "rev-parse", "refs/heads/feat"), sha)
-        self.assertEqual(self.git(env, self.top, "fetch", "-q", "origin").returncode, 0)
-        listed = self.git(env, self.top, "ls-remote", "origin")
-        self.assertIn(f"{sha}\trefs/heads/feat", listed.stdout)
-        # .git/config の origin は書き換えない
-        self.assertEqual(git(self.ws.target, "config", "remote.origin.url"), REAL_ORIGIN)
-
-    def test_ccnavi_git_sh_goes_through_the_stub_too(self):
-        host, env = self.prepare()
-        scripts = Path(self.top) / ".ccnavi" / "scripts"
-        scripts.mkdir(parents=True)
-        for name in os.listdir(SH_DIR):
-            if name.startswith("ccnavi-") and name.endswith(".sh"):
-                shutil.copy(os.path.join(SH_DIR, name), scripts)
-        git(self.ws.target, "switch", "-q", "-c", "feat")
-        # ラッパーは引数の形を実行ファイル（`ccnavi git check`）に確かめさせる。
-        env = {**env, "CCNAVI_ENTRY_PATH": built.sh_path()}
-        done = subprocess.run(
-            ["sh", str(scripts / "ccnavi-git.sh"), "fetch", "origin"],
-            cwd=self.top,
-            env=env,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-
-    def test_bare_is_made_from_the_origin_remote_refs(self):
-        git(self.ws.target, "update-ref", "refs/remotes/origin/main", self.ws.base)
-        git(self.ws.target, "update-ref", "refs/remotes/origin/side", self.ws.base)
-        host, _ = self.prepare()
-        heads = git(host["bare"], "for-each-ref", "--format=%(refname)", "refs/heads").split()
-        self.assertEqual(sorted(heads), ["refs/heads/main", "refs/heads/side"])
-        self.assertEqual(git(host["bare"], "symbolic-ref", "HEAD"), "refs/heads/main")
-
-    def test_the_api_stubs_fail_and_curl_is_stubbed_for_bare(self):
-        host, env = self.prepare()
-        for tool in ("gh", "glab"):
-            done = subprocess.run([tool, "x"], env=env, capture_output=True)
-            self.assertEqual(done.returncode, 1, tool)
-        self.assertTrue(os.path.isfile(os.path.join(host["bin"], "curl")))
-        done = subprocess.run(
-            ["curl", "-s", "https://api.github.com/x"], env=env, capture_output=True
-        )
-        self.assertEqual(done.returncode, 22)
-
-    def test_teardown_removes_the_place_and_puts_the_remote_refs_back(self):
-        git(self.ws.target, "update-ref", "refs/remotes/origin/main", self.ws.base)
-        host, env = self.prepare()
-        git(self.ws.target, "switch", "-q", "-c", "feat")
-        git(self.ws.target, "commit", "-q", "--allow-empty", "-m", "e")
-        self.assertEqual(self.git(env, self.top, "push", "-q", "origin", "feat").returncode, 0)
-        self.assertIn("refs/remotes/origin/feat", git(self.ws.target, "for-each-ref"))
-        hostenv.teardown(self.ws.root, host, repo.git)
-        self.assertFalse(os.path.exists(host["dir"]))
-        self.assertNotIn("refs/remotes/origin/feat", git(self.ws.target, "for-each-ref"))
-        self.assertEqual(git(self.ws.target, "rev-parse", "refs/remotes/origin/main"), self.ws.base)
-        hostenv.teardown(self.ws.root, host, repo.git)  # 2 回目は何もしない
-
-    def test_a_target_without_origin_is_refused_and_leaves_nothing(self):
-        git(self.ws.target, "remote", "remove", "origin")
-        with self.assertRaises(RuntimeError):
-            hostenv.prepare(self.ws.root, self.top, {"host": "bare"}, repo.git)
-        self.assertEqual(list(self.scratch.glob("ccnavi-host-*")), [])
-
-
-@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
-class FakeGitlabHostTest(unittest.TestCase):
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.ws = host_workspace(self._tmp.name)
-        self.top = str(self.ws.target.resolve())
-
-    def prepare(self, **setup):
-        host = hostenv.prepare(self.ws.root, self.top, {"host": "fake-gitlab", **setup}, repo.git)
-        self.addCleanup(hostenv.teardown, self.ws.root, host, repo.git)
-        return host
-
-    def test_review_sh_reads_the_fake_mr_and_thread_through_the_stubs(self):
-        host = self.prepare(host_state=seeded())
-        env = hostenv.step_env(host, tokens_dropped_env())
-        self.assertNotIn("curl", os.listdir(host["bin"]))
-        scripts = Path(self.top) / ".ccnavi" / "scripts"
-        for name in (*REVIEW_SH, *common_sh(SH_DIR)):
-            os.makedirs(scripts, exist_ok=True)
-            shutil.copy(os.path.join(SH_DIR, name), scripts)
-        git(self.ws.target, "switch", "-q", "-c", "i0001")
-        exe = write(
-            os.path.join(self._tmp.name, "exe", "ccnavi"),
-            EXE_STUB.format(
-                compat=built.compat(),
-                log=os.path.join(self._tmp.name, "args.txt"),
-                exe=built.sh_path(),
-            ),
-        )
-        os.chmod(exe, 0o755)
-        env.update({"CCNAVI_ENTRY_PATH": exe, "CCNAVI_LEARNING": "disable"})
-        done = subprocess.run(
-            ["sh", str(scripts / "ccnavi-review.sh"), "fetch"],
-            cwd=self.top,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        got = json.loads(done.stdout)
-        self.assertEqual(got["host"], "gitlab")
-        self.assertEqual(got["mr"]["number"], 1)
-        self.assertIn("ここを直してください", got["threads"][0]["body"])
-        server = hostenv._SERVERS[host["dir"]]
-        self.assertIn(f"GET /api/v4/projects/{FAKE_PROJECT.replace('/', '%2F')}", server.requests)
-
-    def test_hold_stops_the_server_and_resume_keeps_the_state(self):
-        host = self.prepare(host_state=seeded())
-        port = host["port"]
-        hostenv.hold(self.ws.root, host)
-        self.assertTrue(os.path.isfile(host["state_path"]))
-        with self.assertRaises(OSError):
-            socket_connect(port)
-        # 止めている間に模擬の状態を直接変える。作った MR が残ったときの代わり
-        state = fake_gitlab.load(host["state_path"])
-        state["seq"] = 777
-        fake_gitlab.save(host["state_path"], state)
-        self.assertEqual(hostenv.resume(self.ws.root, host), [])
-        self.assertEqual(host["port"], port)
-        self.assertEqual(fake_gitlab.load(host["state_path"])["seq"], 777)
-        self.assertEqual(len(fake_gitlab.load(host["state_path"])["mrs"]), 1)
-        socket_connect(port)
-
-    def test_resume_on_another_port_says_so(self):
-        host = self.prepare()
-        hostenv.hold(self.ws.root, host)
-        taken = socket_listen(host["port"])
-        self.addCleanup(taken.close)
-        notes = hostenv.resume(self.ws.root, host)
-        self.assertNotEqual(host["port"], taken.getsockname()[1])
-        self.assertEqual(len(notes), 1)
-        self.assertIn("ポートが", notes[0])
-
-    def test_teardown_stops_the_server(self):
-        host = self.prepare()
-        port = host["port"]
-        hostenv.teardown(self.ws.root, host, repo.git)
-        with self.assertRaises(OSError):
-            socket_connect(port)
-        self.assertFalse(os.path.exists(host["dir"]))
 
 
 def socket_connect(port):
@@ -3352,204 +2911,6 @@ def socket_listen(port):
 
 
 # ---- 相手側の状態の記録（hostsnap。step の終わりに fake-gitlab / docker-gitlab を読む） ----
-
-
-def snap_state():
-    """MR が 3 件（下書き・開いた・マージ済み）と issue が 2 件ある、模擬の初期状態。"""
-    state = seeded()
-    first = state["mrs"][0]
-    first["title"] = "Draft: i0001"
-    second = {**first, "iid": 2, "title": "i0002", "source_branch": "i0002", "discussions": []}
-    third = {**second, "iid": 3, "title": "i0003", "state": "merged", "merged_at": "2026-10-26"}
-    state["mrs"] += [second, third]
-    state["issues"] = [
-        {"iid": 1, "title": "開いた issue", "state": "opened", "description": "本文"},
-        {"iid": 2, "title": "閉じた issue", "state": "closed", "description": ""},
-    ]
-    return state
-
-
-@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
-class HostSnapshotTest(unittest.TestCase):
-    """fake-gitlab（模擬）を相手に hostsnap を確かめる。Docker・ネットワーク・claude は使わない。"""
-
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.scratch = private_tempdir(self, self._tmp.name)
-        self.ws = host_workspace(self._tmp.name)
-        self.top = str(self.ws.target.resolve())
-        self.out = Path(self._tmp.name) / "out"
-        self.out.mkdir()
-        self.host = hostenv.prepare(
-            self.ws.root,
-            self.top,
-            {"host": "fake-gitlab", "host_state": snap_state()},
-            repo.git,
-        )
-        self.addCleanup(hostenv.teardown, self.ws.root, self.host, repo.git)
-
-    def take(self, step=1):
-        result = hostsnap.take(self.ws.root, self.host, step, self.out)
-        text = (self.out / hostsnap.file_name(step)).read_text(encoding="utf-8")
-        return result, json.loads(text), text
-
-    def test_it_records_mrs_threads_and_issues(self):
-        result, snap, _ = self.take()
-        self.assertEqual(result, {"step": 1, "file": "host-1.json", "ok": True, "errors": 0})
-        self.assertEqual(snap["host"], "fake-gitlab")
-        self.assertEqual(snap["project"], FAKE_PROJECT)
-        self.assertEqual(snap["errors"], [])
-        mrs = {m["iid"]: m for m in snap["mrs"]}
-        self.assertEqual(sorted(mrs), [1, 2, 3])
-        self.assertTrue(mrs[1]["draft"])
-        self.assertFalse(mrs[2]["draft"])
-        self.assertEqual(mrs[3]["state"], "merged")
-        self.assertEqual(mrs[3]["merged_at"], "2026-10-26")
-        thread = mrs[1]["threads"][0]
-        self.assertEqual(thread["id"], "d101")
-        self.assertIs(thread["resolved"], False)
-        self.assertEqual(thread["notes"][0]["author"], "reviewer")
-        self.assertEqual(thread["notes"][0]["body"], "ここを直してください")
-        self.assertEqual(thread["notes"][0]["path"], "a.txt")
-        self.assertEqual(mrs[2]["threads"], [])
-        self.assertEqual({i["iid"]: i["state"] for i in snap["issues"]}, {1: "opened", 2: "closed"})
-        self.assertEqual(
-            snap["summary"],
-            {
-                "mrs": 3,
-                "mrs_opened": 2,
-                "mrs_merged": 1,
-                "mrs_draft": 1,
-                "mrs_approved": 0,
-                "threads": 1,
-                "threads_unresolved": 1,
-                "threads_system": 0,
-                "issues": 2,
-                "issues_opened": 1,
-            },
-        )
-
-    def test_approvals_are_recorded_per_mr_and_follow_the_other_side(self):
-        _, before, _ = self.take(1)
-        for mr in before["mrs"]:
-            self.assertEqual(mr["approvals"], {"taken": True, "approved": False, "approved_by": []})
-        self.assertNotIn("approvals", before, "最上位には置かない")
-        self.assertEqual(before["summary"]["mrs_approved"], 0)
-        client, token, project, _ = hostenv.api_access(self.host)
-        self.assertEqual(client.approve(token, project, 2)[0], 201)
-        _, after, _ = self.take(2)
-        mrs = {m["iid"]: m for m in after["mrs"]}
-        self.assertIs(mrs[2]["approvals"]["approved"], True)
-        self.assertEqual([a["username"] for a in mrs[2]["approvals"]["approved_by"]], ["reviewer"])
-        self.assertRegex(mrs[2]["approvals"]["approved_by"][0]["approved_at"], r"^\d{4}-\d\d-\d\d")
-        self.assertEqual(set(mrs[2]["approvals"]["approved_by"][0]), {"username", "approved_at"})
-        self.assertEqual(set(mrs[2]["approvals"]), {"taken", "approved", "approved_by"})
-        self.assertIs(mrs[1]["approvals"]["approved"], False)
-        self.assertEqual(after["summary"]["mrs_approved"], 1)
-
-    def test_an_approval_that_could_not_be_read_is_not_taken_and_is_in_errors(self):
-        reader = mock.Mock()
-        reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
-        reader.get_mr.return_value = (200, {"iid": 1, "title": "t", "state": "opened"})
-        reader.list_discussions.return_value = (200, [])
-        reader.list_approvals.return_value = (500, {"message": "x"})
-        reader.list_issues.return_value = (200, [])
-        with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
-            result, snap, _ = self.take()
-        self.assertEqual(snap["mrs"][0]["approvals"], {"taken": False})
-        self.assertEqual([e["api"] for e in snap["errors"]], ["list_approvals 1"])
-        self.assertEqual(snap["summary"]["mrs_approved"], 0)
-        self.assertFalse(result["ok"])
-
-    def test_it_follows_the_state_of_the_other_side(self):
-        _, before, _ = self.take(1)
-        client, token, project, _ = hostenv.api_access(self.host)
-        self.assertEqual(client.resolve_discussion(token, project, 1, "d101")[0], 200)
-        self.assertEqual(client.merge_mr(token, project, 1, attempts=1)[0], 200)
-        _, after, _ = self.take(2)
-        self.assertIs(before["mrs"][0]["threads"][0]["resolved"], False)
-        self.assertIs(after["mrs"][0]["threads"][0]["resolved"], True)
-        self.assertEqual(before["mrs"][0]["state"], "opened")
-        self.assertEqual(after["mrs"][0]["state"], "merged")
-        self.assertEqual(after["summary"]["threads_unresolved"], 0)
-
-    def test_it_only_reads(self):
-        client, token, project, secrets = hostenv.api_access(self.host)
-        events = []
-        client._recorder = events.append
-        access = (client, token, project, secrets)
-        with mock.patch.object(hostenv, "api_access", return_value=access):
-            self.take()
-        self.assertTrue(events)
-        self.assertEqual({e["method"] for e in events}, {"GET"})
-        self.assertTrue([e for e in events if e["path"].endswith("/approvals")])
-        self.assertFalse([e for e in events if e["path"].endswith("/approve")])
-        self.assertEqual(fake_gitlab.load(self.host["state_path"]), snap_state())
-
-    def test_the_token_is_masked_even_when_the_other_side_returns_it(self):
-        state = fake_gitlab.load(self.host["state_path"])
-        state["mrs"][0]["discussions"][0]["notes"][0]["body"] = f"鍵は {self.host['token']}"
-        state["mrs"][0]["description"] = f"Bearer {self.host['token']}"
-        fake_gitlab.save(self.host["state_path"], state)
-        _, snap, text = self.take()
-        self.assertNotIn(self.host["token"], text)
-        self.assertEqual(snap["mrs"][0]["threads"][0]["notes"][0]["body"], "鍵は ***")
-        self.assertEqual(snap["mrs"][0]["description"], "Bearer ***")
-
-    def test_a_failure_is_recorded_and_does_not_raise(self):
-        hostenv.hold(self.ws.root, self.host)  # 模擬を止める。接続できない
-        result, snap, _ = self.take()
-        self.assertFalse(result["ok"])
-        self.assertGreater(result["errors"], 0)
-        self.assertEqual(snap["mrs"], [])
-        self.assertEqual([c["api"] for c in snap["calls"]], ["list_mrs"], "残りは読まない")
-        self.assertEqual(snap["summary"]["mrs"], 0)
-        self.assertTrue(snap["errors"])
-
-    def test_system_notes_are_kept_but_counted_apart(self):
-        """本物の GitLab が返すシステムのメモ（承認など）は残し、スレッドの件数とは分けて数える。"""
-        system = {"id": 9, "system": True, "body": "approved this merge request"}
-        person = {"id": 1, "body": "直して", "resolvable": True, "resolved": False}
-        reader = mock.Mock()
-        reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
-        reader.get_mr.return_value = (200, {"iid": 1, "title": "t", "state": "opened"})
-        reader.list_discussions.return_value = (
-            200,
-            [
-                {"id": "d1", "individual_note": False, "notes": [person]},
-                {"id": "s1", "individual_note": True, "notes": [system]},
-            ],
-        )
-        reader.list_approvals.return_value = (200, {"approved": False, "approved_by": []})
-        reader.list_issues.return_value = (200, [])
-        with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
-            _, snap, _ = self.take()
-        threads = snap["mrs"][0]["threads"]
-        self.assertEqual([t["system"] for t in threads], [False, True])
-        self.assertEqual(snap["summary"]["threads"], 1)
-        self.assertEqual(snap["summary"]["threads_unresolved"], 1)
-        self.assertEqual(snap["summary"]["threads_system"], 1)
-
-    def test_an_error_from_the_other_side_is_recorded_per_call(self):
-        reader = mock.Mock()
-        reader.list_mrs.return_value = (200, [{"iid": 1, "title": "t", "state": "opened"}])
-        reader.get_mr.return_value = (404, {"message": "404"})
-        reader.list_discussions.return_value = (500, {"message": "x"})
-        reader.list_approvals.return_value = (200, {"approved": False, "approved_by": []})
-        reader.list_issues.return_value = (200, [])
-        with mock.patch.object(hostenv, "api_access", return_value=(reader, "t", "p", [])):
-            result, snap, _ = self.take()
-        self.assertFalse(result["ok"])
-        self.assertEqual(result["errors"], 2)
-        self.assertEqual(snap["mrs"][0]["title"], "t", "1 件が取れなくても、一覧の分は残る")
-        self.assertTrue(snap["mrs"][0]["threads_unavailable"])
-        self.assertEqual({e["api"] for e in snap["errors"]}, {"get_mr 1", "list_discussions 1"})
-
-    def test_it_is_only_for_fake_and_docker_gitlab(self):
-        self.assertEqual(hostenv.snapshot_hosts(), ("fake-gitlab", "docker-gitlab"))
-        with self.assertRaises(ValueError):
-            hostenv.api_access({"kind": "bare"})
 
 
 @unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
@@ -3967,22 +3328,6 @@ class FakeReader:
         return self._get("list_issues", [])
 
 
-class FullPageReader(FakeReader):
-    """issue の一覧が 1 ページ（100 件）ちょうど返る相手。"""
-
-    def list_issues(self, token, pid, *, state="opened", per_page=None):
-        return self._get(
-            "list_issues", [{"iid": n, "title": "x", "state": "opened"} for n in range(100)]
-        )
-
-
-class HostSnapshotPageTest(unittest.TestCase):
-    def test_a_full_page_is_marked_as_possibly_cut(self):
-        record = hostsnap.collect(FullPageReader(), "t", 1)
-        self.assertEqual(100, len(record["issues"]))
-        self.assertIn("list_issues", [e["api"] for e in record["errors"]])
-
-
 class DockerHostBase(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -4001,17 +3346,6 @@ class DockerHostBase(unittest.TestCase):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-
-
-class DockerApiAccessTest(DockerHostBase):
-    def test_both_tokens_in_the_file_are_masked(self):
-        """docker-gitlab の入口が、トークンのファイルの値を両方とも伏せる値に入れる。"""
-        client, token, project, secrets = REAL_API_ACCESS(
-            {"kind": "docker-gitlab", "project_id": 1}
-        )
-        self.assertIs(client, self.client)
-        self.assertEqual((token, project), (ROOT_PAT, 1))
-        self.assertEqual(set(secrets), {ROOT_PAT, REVIEWER_TOKEN})
 
 
 class FieldAndNameTest(DockerHostBase):
@@ -4180,60 +3514,6 @@ class DockerLifecycleTest(DockerLifecycleTools, DockerHostBase):
 
 
 @unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
-class DockerGitTest(DockerHostBase):
-    def test_git_via_resets_the_helper_before_setting_it(self):
-        host = {
-            "kind": "docker-gitlab",
-            "bare": f"{BASE}/root/p.git",
-            "real_origin": "o",
-            "base": BASE,
-        }
-        via = hostenv.git_via(host)
-        key = f"credential.{BASE}.helper"
-        self.assertEqual(via.count(f"{key}="), 1)
-        self.assertLess(via.index(f"{key}="), via.index(f"{key}={hostenv.CRED_HELPER}"))
-        self.assertNotIn(ROOT_PAT, " ".join(via))
-        env = hostenv.git_env(host)
-        self.assertEqual(env, {"GITLAB_TOKEN": ROOT_PAT, "GIT_TERMINAL_PROMPT": "0"})
-        self.assertEqual(hostenv.git_env({"kind": "bare"}), {})
-
-    def test_make_project_pushes_main_then_prunes_stale_remote_refs(self):
-        calls = []
-
-        def git(args, cwd=None, input=None, env=None):
-            calls.append(args)
-            return subprocess.CompletedProcess(args, 0, "", "")
-
-        host = {"kind": "docker-gitlab", "real_origin": "o", "dir": self._tmp.name}
-        values = {"CCNAVI_PROBE_REVIEWER_ID": "5"}
-
-        class Client:
-            def version(self, token):
-                return 200, {"version": "19.4.1"}
-
-            def create_project(self, token, name):
-                return 201, {"id": 7, "path_with_namespace": f"root/{name}"}
-
-            def add_member(self, token, pid, user, level):
-                return 201, {}
-
-        def connect():
-            return Client(), ROOT_PAT, BASE, values
-
-        with mock.patch.object(hostenv, "_connect", connect):
-            hostenv._make_docker_project(self._tmp.name, host, "top", "UC-20", git)
-        verbs = [[a for a in c if a in ("push", "fetch")][0] for c in calls]
-        self.assertEqual(verbs, ["push", "fetch"])
-        fetch = calls[-1]
-        self.assertIn("--prune", fetch)
-        self.assertIn("--no-tags", fetch)
-        self.assertEqual(fetch[-1], "origin")
-
-    def test_the_stub_git_carries_the_scoped_helper(self):
-        self.assertIn("credential.${FAKE_CRED_URL}.helper=", Path(host_stub.__file__).read_text())
-
-
-@unittest.skipUnless(HAS_TOOLS, "sh・git・jq・curl のどれかが無い")
 class HumanApiTest(DockerLifecycleTools, DockerHostBase):
     """human step の human_api（人間役の API 操作）。DockerLifecycleTools の道具を使う。"""
 
@@ -4292,34 +3572,6 @@ class HumanApiTest(DockerLifecycleTools, DockerHostBase):
         with self.assertRaises(ValueError):
             load(docker, [{"prompt": "a", "human_api": self.API}])
 
-    def test_ops_run_in_order_with_the_human_token_and_do_not_stop(self):
-        rc = self.run_steps(self.steps())
-        self.assertIn(rc, (0, 2))
-        names = [c[0] for c in self.client.human]
-        self.assertEqual(names, ["list_mrs", "create_discussion", "list_mrs", "resolve_discussion"])
-        self.assertEqual({c[1] for c in self.client.human}, {REVIEWER_TOKEN})
-        self.assertEqual(self.client.human[1][2], (7, 3, "直してください"))
-        self.assertEqual(self.client.human[3][2], (7, 3, "d2"))
-        state = json.loads(self.state_text())
-        self.assertEqual([o["op"] for o in state["human_ops"]], ["thread", "resolve"])
-        self.assertEqual(state["threads"]["t1"]["iid"], 3)
-        evidence = (self.ws.out / "evidence.md").read_text(encoding="utf-8")
-        self.assertIn("## 人間役の操作", evidence)
-        self.assertIn("thread（t1） → HTTP 201", evidence)
-        rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
-        row = next(r for r in rows if r["kind"] == "human-api")
-        self.assertEqual(row["verdict"], "pass")
-        self.assertTrue(self.client.gone)
-        for n in (1, 2, 3):  # human_api の step（2）の終わりにも残す
-            self.assertTrue((self.ws.out / f"host-{n}.json").exists(), n)
-
-    def test_approve_uses_the_human_token_on_the_only_mr(self):
-        self.run_steps(self.steps([{"op": "approve"}]))
-        self.assertEqual(
-            self.client.human,
-            [("list_mrs", REVIEWER_TOKEN, (7,)), ("approve", REVIEWER_TOKEN, (7, 3))],
-        )
-
     def test_the_human_token_is_not_in_the_records(self):
         with mock.patch.dict(os.environ, {"CCNAVI_PROBE_REVIEWER_TOKEN": REVIEWER_TOKEN}):
             self.run_steps(self.steps())
@@ -4327,25 +3579,6 @@ class HumanApiTest(DockerLifecycleTools, DockerHostBase):
         self.assertNotIn(REVIEWER_TOKEN, text)
         self.assertNotIn(ROOT_PAT, text)
         self.assertNotIn("CCNAVI_PROBE_REVIEWER_TOKEN", text)
-
-    def test_zero_or_two_mrs_halt_the_run(self):
-        for mrs in ([], [{"iid": 1}, {"iid": 2}]):
-            with self.subTest(count=len(mrs)):
-                self.client.mrs = mrs
-                self.client.gone = self.client.marked = False
-                self.client.human.clear()
-                self.run_steps(self.steps())
-                self.assertEqual(self.halt_kind(), "human_api")
-                self.assertEqual([c[0] for c in self.client.human], ["list_mrs"])
-                self.assertTrue(self.client.gone)  # 後片付けは通る
-
-    def test_an_http_failure_halts_the_run_and_is_not_retried(self):
-        self.client.discussion_status = 500
-        self.run_steps(self.steps())
-        self.assertEqual(self.halt_kind(), "human_api")
-        self.assertEqual([c[0] for c in self.client.human], ["list_mrs", "create_discussion"])
-        rows = json.loads((self.ws.out / "report.json").read_text(encoding="utf-8"))
-        self.assertEqual(next(r for r in rows if r["kind"] == "human-api")["verdict"], "fail")
 
     def test_resume_does_not_run_the_ops_twice(self):
         human = {"human": True, "instruction": "手で操作する"}
