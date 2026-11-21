@@ -234,7 +234,6 @@ carry_family() {
 	# 取り込んでから送る（Chrome の承認と重なっても push が拒まれにくい）。親のブランチがリモートから消えていれば、
 	# push で作り直さずに止める（push のゲート。write-and-push と同じ手順）。
 	if ! ccnavi_wap_take_in; then
-		printf 'ccnavi-user-push-approved: %s のユーザの判断はまだ送っていません。直してから再実行してください。\n' "$cf_p" >&2
 		ccnavi_lock_drop
 		return 1
 	fi

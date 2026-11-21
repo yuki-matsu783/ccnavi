@@ -281,13 +281,10 @@ while IFS= read -r line <&4; do
 	while read -r ret_p ret_key ret_mr ret_branch <&3; do
 		[ "$ret_key" = "$key" ] || continue
 		# ロックは自分が取ったものだけを外す（持ち主を確かめる。入れ子で外側が持つロックは外さない）。
-		if ccnavi_lock_take "$root" "$key" "$ret_p" "$lock_wait"; then
+		if take_lock "$key" "$ret_p"; then
 			next="ask $ret_mr"
 			ask_and_tidy retired "$ret_p" "$key" "$ret_branch" "$dir" "$heads" "$ret_mr"
 			ccnavi_lock_drop
-		else
-			ccnavi_lock_why 1 "$ret_p"
-			printf 'failed\n' >>"$scratch/answers"
 		fi
 	done 3<"$scratch/retired"
 
