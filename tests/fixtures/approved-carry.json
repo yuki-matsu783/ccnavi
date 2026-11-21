@@ -1,5 +1,5 @@
 {
-  "note": "承認済みチケットの置き場の変更のパスの読み。sh（ccnavi-common-write-and-push.sh の ccnavi_porcelain_paths・ccnavi_drop_temp。tests/sh/test_sh_copies_sh.py）と実行ファイル（git.PorcelainPaths と wap の temp。go/internal/tickets/approval/wap/carry_sh_test.go）が同じ表で一致を確かめる。porcelain は `status --porcelain -z --no-renames` の 1 項目と、そのパス。temp はパスと、書きかけの一時ファイルとしてコミットから外すか。 under は --path のパスがどのツリーのものか（ccnavi_path_under と pathcase.Under。rest は基準からの相対で、null は下に無い）、same は渡したパスと変更のパスが同じか（ccnavi_path_pick と pathcase.Fold で畳んで比べる）。go_only は ASCII の外の字の大文字小文字で、実行ファイルだけが同じとみなす（sh は ASCII の英字だけを畳む）。",
+  "note": "承認済みチケットの置き場の変更のパスの読み。sh（ccnavi-common-write-and-push.sh の ccnavi_porcelain_paths・ccnavi_drop_temp。go/internal/clitest/sh/small/shcopies_test.go）と実行ファイル（git.PorcelainPaths と wap の temp。go/internal/tickets/approval/wap/carry_sh_test.go）が同じ表で一致を確かめる。porcelain は `status --porcelain -z --no-renames` の 1 項目と、そのパス。temp はパスと、書きかけの一時ファイルとしてコミットから外すか。 under は --path のパスがどのツリーのものか（ccnavi_path_under と pathcase.Under。rest は基準からの相対で、null は下に無い）、same は渡したパスと変更のパスが同じか（ccnavi_path_pick と pathcase.Fold で畳んで比べる）。go_only は ASCII の外の字の大文字小文字で、実行ファイルだけが同じとみなす（sh は ASCII の英字だけを畳む）。",
   "porcelain": [
     {
       "entry": " M .ccnavi/approved/a.md",

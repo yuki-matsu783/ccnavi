@@ -7,7 +7,7 @@ ccnavi の振る舞いを `claude -p` で回して確かめるシナリオ。回
 要求の出どころは [docs/10_requirements.md](../../docs/10_requirements.md)（REQ-xxx）と
 [受け入れ条件](../../docs/11_requirements/acceptance.md)。ここのシナリオは、その通し確認のうち
 **エージェントが実際に打った呼び出しで確かめたいもの**を拾う。ccnavi の外から hook の入力を直接与えて確かめるものは
-既存のテスト（`tests/guard/` など）に任せる。
+既存のテスト（`go/internal/clitest/guard/` など）に任せる。
 
 ## 機能の整理
 
