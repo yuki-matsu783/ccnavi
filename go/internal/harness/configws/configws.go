@@ -1,4 +1,4 @@
-package union
+package configws
 
 import (
 	"encoding/json"
@@ -21,13 +21,13 @@ import (
 
 // 設定の和を見るテストの土台（tests/config/test_config_union.py の ConfigUnionHarness の写し）。
 
-const home = ".ccnavi"
+const Home = ".ccnavi"
 
 var fileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
 
 // layerPath はその git プロジェクトルートのレイヤーのファイル（rules / phases / risk）のパス。
-func layerPath(root, kind string) string {
-	return filepath.Join(root, home, "config", "project", fileNames[kind])
+func LayerPath(root, kind string) string {
+	return filepath.Join(root, Home, "config", "project", fileNames[kind])
 }
 
 func gitIn(dir string, args ...string) (string, error) {
@@ -37,7 +37,7 @@ func gitIn(dir string, args ...string) (string, error) {
 	return string(out), err
 }
 
-func git(t testing.TB, dir string, args ...string) string {
+func Git(t testing.TB, dir string, args ...string) string {
 	t.Helper()
 	out, err := gitIn(dir, args...)
 	if err != nil {
@@ -46,7 +46,7 @@ func git(t testing.TB, dir string, args ...string) string {
 	return out
 }
 
-func write(t testing.TB, path, text string) string {
+func Write(t testing.TB, path, text string) string {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func write(t testing.TB, path, text string) string {
 	return path
 }
 
-func read(t testing.TB, path string) string {
+func Read(t testing.TB, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -67,13 +67,13 @@ func read(t testing.TB, path string) string {
 	return strings.ReplaceAll(string(data), "\r\n", "\n")
 }
 
-func exists(path string) bool {
+func Exists(path string) bool {
 	_, err := os.Lstat(path)
 	return err == nil
 }
 
 // body は書く本文。文字列はそのまま、ほかは JSON にする。
-func body(v any) string {
+func Body(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}
@@ -84,9 +84,9 @@ func body(v any) string {
 	return string(data)
 }
 
-func writeRules(t testing.TB, root string, v any) { write(t, layerPath(root, "rules"), body(v)) }
-func writePhases(t testing.TB, root, text string) { write(t, layerPath(root, "phases"), text) }
-func writeRisk(t testing.TB, root, text string)   { write(t, layerPath(root, "risk"), text) }
+func WriteRules(t testing.TB, root string, v any) { Write(t, LayerPath(root, "rules"), Body(v)) }
+func WritePhases(t testing.TB, root, text string) { Write(t, LayerPath(root, "phases"), text) }
+func WriteRisk(t testing.TB, root, text string)   { Write(t, LayerPath(root, "risk"), text) }
 
 // buildProject は git 初期化したプロジェクトを 1 つ置く。レイヤーは空でない分だけ置く。
 func buildProject(t testing.TB, root string, rules any, phases, risk string) string {
@@ -94,21 +94,21 @@ func buildProject(t testing.TB, root string, rules any, phases, risk string) str
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	git(t, root, "init", "--quiet", "-b", "main")
+	Git(t, root, "init", "--quiet", "-b", "main")
 	for _, rel := range keepFiles {
-		write(t, filepath.Join(root, filepath.FromSlash(rel)), "keep\n")
+		Write(t, filepath.Join(root, filepath.FromSlash(rel)), "keep\n")
 	}
 	if rules != nil {
-		writeRules(t, root, rules)
+		WriteRules(t, root, rules)
 	}
 	if phases != "" {
-		writePhases(t, root, phases)
+		WritePhases(t, root, phases)
 	}
 	if risk != "" {
-		writeRisk(t, root, risk)
+		WriteRisk(t, root, risk)
 	}
-	git(t, root, "add", "-A")
-	git(t, root, "commit", "--quiet", "-m", "init")
+	Git(t, root, "add", "-A")
+	Git(t, root, "commit", "--quiet", "-m", "init")
 	return root
 }
 
@@ -144,13 +144,13 @@ func templateDir(t testing.TB, kind string) string {
 		base.AtExit(holder)
 		dir := filepath.Join(holder, "ws")
 		switch kind {
-		case kindBase:
+		case KindBase:
 			baseTemplate(t, dir)
-		case kindGuard, kindRisk:
-			if err := copyTree(templateDir(t, kindBase), dir); err != nil {
+		case KindGuard, KindRisk:
+			if err := copyTree(templateDir(t, KindBase), dir); err != nil {
 				t.Fatal(err)
 			}
-			if kind == kindGuard {
+			if kind == KindGuard {
 				prepareGuard(t, dir)
 			} else {
 				prepareRisk(t, dir)
@@ -197,33 +197,33 @@ func baseTemplate(t testing.TB, ws string) {
 	if err := os.MkdirAll(filepath.Join(ws, ".claude"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	git(t, ws, "init", "--quiet", "-b", "main")
-	write(t, filepath.Join(ws, ".gitignore"), gitignoreText)
+	Git(t, ws, "init", "--quiet", "-b", "main")
+	Write(t, filepath.Join(ws, ".gitignore"), gitignoreText)
 	for _, rel := range keepFiles {
-		write(t, filepath.Join(ws, filepath.FromSlash(rel)), "keep\n")
+		Write(t, filepath.Join(ws, filepath.FromSlash(rel)), "keep\n")
 	}
-	writeRules(t, ws, ownRules)
-	writePhases(t, ws, ownPhasesText)
-	write(t, base.CommonPath(ws, "rules"), body(commonRules))
-	write(t, base.CommonPath(ws, "risk"), commonRiskText)
-	git(t, ws, "add", "-A")
-	git(t, ws, "commit", "--quiet", "-m", "init")
-	buildProject(t, filepath.Join(ws, "projects", "lib"), libRules, libPhasesText, libRiskText)
+	WriteRules(t, ws, OwnRules)
+	WritePhases(t, ws, ownPhasesText)
+	Write(t, base.CommonPath(ws, "rules"), Body(CommonRules))
+	Write(t, base.CommonPath(ws, "risk"), CommonRiskText)
+	Git(t, ws, "add", "-A")
+	Git(t, ws, "commit", "--quiet", "-m", "init")
+	buildProject(t, filepath.Join(ws, "projects", "lib"), LibRules, LibPhasesText, LibRiskText)
 	buildProject(t, filepath.Join(ws, "projects", "app"), nil, "", "")
 }
 
 // 雛形の種類。guard は設定ファイルの保護を見る土台（何でも通すルール + 共通レイヤーの phases）、
 // risk は risk を見る土台（lib のフェーズに `work` を足したもの）。
 const (
-	kindBase  = "base"
-	kindGuard = "guard"
-	kindRisk  = "risk"
+	KindBase  = "base"
+	KindGuard = "guard"
+	KindRisk  = "risk"
 )
 
 // openRules は何でも通す。deny が 1 件も無いので、止まったものはルールの外で止まっている。
-var openRules = ruleset(nil, []obj{rule("anything", "Bash|Read|Write|Edit|NotebookEdit", "regex", ".", "")})
+var OpenRules = Ruleset(nil, []Obj{Rule("anything", "Bash|Read|Write|Edit|NotebookEdit", "regex", ".", "")})
 
-const libPhasesWork = `version: 1
+const LibPhasesWork = `version: 1
 phases:
   work:
     kind: work
@@ -233,32 +233,32 @@ phases:
 `
 
 func prepareGuard(t testing.TB, ws string) {
-	write(t, base.CommonPath(ws, "rules"), body(openRules))
+	Write(t, base.CommonPath(ws, "rules"), Body(OpenRules))
 	// 共通レイヤーの phases.yml も守る対象。守ることを見るために置き、ワークツリー側の設定ができるようコミットしておく。
-	write(t, base.CommonPath(ws, "phases"), commonPhasesText)
-	git(t, ws, "add", "-A")
-	git(t, ws, "commit", "--quiet", "-m", "common phases")
+	Write(t, base.CommonPath(ws, "phases"), CommonPhasesText)
+	Git(t, ws, "add", "-A")
+	Git(t, ws, "commit", "--quiet", "-m", "common phases")
 }
 
 func prepareRisk(t testing.TB, ws string) {
 	lib := filepath.Join(ws, "projects", "lib")
-	writePhases(t, lib, libPhasesWork)
-	git(t, lib, "add", "-A")
-	git(t, lib, "commit", "--quiet", "-m", "phases")
+	WritePhases(t, lib, LibPhasesWork)
+	Git(t, lib, "add", "-A")
+	Git(t, lib, "commit", "--quiet", "-m", "phases")
 }
 
 // ---- ワークスペース
 
 // ws はテスト 1 本のワークスペース。t はそのテストの t で、サブテストでは as で差し替える。
-type ws struct {
-	t                        testing.TB
-	root, projects, lib, app string
+type WS struct {
+	T                        testing.TB
+	Root, Projects, Lib, App string
 	// 共通レイヤーの 3 本
-	rules, phases, risk string
+	Rules, Phases, Risk string
 	log                 string
 }
 
-func newWS(t testing.TB, kind string) *ws {
+func NewWS(t testing.TB, kind string) *WS {
 	t.Helper()
 	source := templateDir(t, kind)
 	root := filepath.Join(base.TempDir(t), "ws")
@@ -266,42 +266,42 @@ func newWS(t testing.TB, kind string) *ws {
 		t.Fatal(err)
 	}
 	projects := filepath.Join(root, "projects")
-	return &ws{
-		t: t, root: root, projects: projects,
-		lib: filepath.Join(projects, "lib"), app: filepath.Join(projects, "app"),
-		rules: base.CommonPath(root, "rules"), phases: base.CommonPath(root, "phases"), risk: base.CommonPath(root, "risk"),
+	return &WS{
+		T: t, Root: root, Projects: projects,
+		Lib: filepath.Join(projects, "lib"), App: filepath.Join(projects, "app"),
+		Rules: base.CommonPath(root, "rules"), Phases: base.CommonPath(root, "phases"), Risk: base.CommonPath(root, "risk"),
 		log: filepath.Join(root, "logs", "decisions.jsonl"),
 	}
 }
 
 // as はサブテストの t で動く写し。
-func (w *ws) as(t testing.TB) *ws {
+func (w *WS) As(t testing.TB) *WS {
 	c := *w
-	c.t = t
+	c.T = t
 	return &c
 }
 
 // project は `projects/<名前>/` に git 初期化したプロジェクトを足す。
-func (w *ws) project(name string, rules any, phases, risk string) string {
-	w.t.Helper()
-	return buildProject(w.t, filepath.Join(w.projects, name), rules, phases, risk)
+func (w *WS) Project(name string, rules any, phases, risk string) string {
+	w.T.Helper()
+	return buildProject(w.T, filepath.Join(w.Projects, name), rules, phases, risk)
 }
 
 // worktree は `.claude/worktrees/<名前>` に、owner（ワークスペースかプロジェクト）から切る。
 // あれば（`approval-request` が親の提案を書くために切ったもの）そのまま返す。
-func (w *ws) worktree(owner, name string) string {
-	w.t.Helper()
-	path := filepath.Join(w.root, ".claude", "worktrees", name)
+func (w *WS) Worktree(owner, name string) string {
+	w.T.Helper()
+	path := filepath.Join(w.Root, ".claude", "worktrees", name)
 	if info, err := os.Stat(path); err != nil || !info.IsDir() {
-		git(w.t, owner, "worktree", "add", "--quiet", path, "-b", name)
+		Git(w.T, owner, "worktree", "add", "--quiet", path, "-b", name)
 	}
 	return path
 }
 
 // homes は承認済みチケットを持ちうるツリー。ワークスペース、プロジェクト、ワークツリー。
-func (w *ws) homes() []string {
-	found := []string{w.root, w.lib, w.app}
-	dir := filepath.Join(w.root, ".claude", "worktrees")
+func (w *WS) homes() []string {
+	found := []string{w.Root, w.Lib, w.App}
+	dir := filepath.Join(w.Root, ".claude", "worktrees")
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		found = append(found, filepath.Join(dir, e.Name()))
@@ -314,38 +314,38 @@ var parentLine = regexp.MustCompile(`(?m)^parent: (\S+)$`)
 // propose は提案を置く。親の提案は親のワークツリー（識別子と同じ名前）の `wip/proposals/`。
 // 親のワークツリーが無ければ、先にそのプロジェクト（ワークスペース）から切る。正とするのは親のワークツリーだけなので、
 // 提案も承認済みチケットもそこに置く。
-func (w *ws) propose(name, text, project string) string {
-	w.t.Helper()
-	owner := w.root
+func (w *WS) Propose(name, text, project string) string {
+	w.T.Helper()
+	owner := w.Root
 	if project != "" {
-		owner = filepath.Join(w.projects, project)
+		owner = filepath.Join(w.Projects, project)
 	}
 	treeName := name
 	if m := parentLine.FindStringSubmatch(text); m != nil {
 		treeName = m[1]
 	}
-	tree := w.worktree(owner, treeName)
+	tree := w.Worktree(owner, treeName)
 	// 計画を持つ親には、共通レイヤーとそのレイヤーの phases.yml の和から、計画が使う定義のコピー（`phases:`）を足す
 	// （`ccnavi --plan-order <親> --fill-phases` と同じ）。どちらにも無ければ空のコピー。
 	var texts []string
-	for _, path := range []string{w.phases, layerPath(owner, "phases")} {
+	for _, path := range []string{w.Phases, LayerPath(owner, "phases")} {
 		if data, err := os.ReadFile(path); err == nil {
 			texts = append(texts, string(data))
 		}
 	}
 	text = samples.InsertPhases(text, samples.CombinedPhases(texts...))
-	return write(w.t, filepath.Join(tree, "wip", "proposals", "todo", name+".md"), text)
+	return Write(w.T, filepath.Join(tree, "wip", "proposals", "todo", name+".md"), text)
 }
 
 // proposalPath は提案（`wip/proposals/<置き場>/<名前>.md`）のパス。在る側のツリーを探す。無ければ空。
-func (w *ws) proposalPath(name string, states ...string) string {
+func (w *WS) ProposalPath(name string, states ...string) string {
 	if len(states) == 0 {
 		states = []string{"todo", "review"}
 	}
 	for _, where := range w.homes() {
 		for _, place := range states {
 			path := filepath.Join(where, "wip", "proposals", place, name+".md")
-			if exists(path) {
+			if Exists(path) {
 				return path
 			}
 		}
@@ -354,96 +354,96 @@ func (w *ws) proposalPath(name string, states ...string) string {
 }
 
 // approvedPath は承認済みチケットの置き場の下のパス。在る側を探す。
-func (w *ws) approvedPath(parts ...string) string {
+func (w *WS) ApprovedPath(parts ...string) string {
 	for _, where := range w.homes() {
-		path := filepath.Join(append([]string{where, home, "approved"}, parts...)...)
-		if exists(path) {
+		path := filepath.Join(append([]string{where, Home, "approved"}, parts...)...)
+		if Exists(path) {
 			return path
 		}
 	}
-	return filepath.Join(append([]string{w.root, home, "approved"}, parts...)...)
+	return filepath.Join(append([]string{w.Root, Home, "approved"}, parts...)...)
 }
 
-func (w *ws) approvedCopy(name string) string { return w.approvedPath("doing", name+".md") }
+func (w *WS) ApprovedCopy(name string) string { return w.ApprovedPath("doing", name+".md") }
 
 // ---- 起動
 
 // exec は実行ファイルを 1 回起動する。レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本（--rules / --phases / --risk）も
 // レイヤーを探す先の 2 本（--projects / --project-home）も、診断（--lint / --test / --explain）でだけ有効で、
 // hook の判定とチケットのサブコマンドでは無視する。差し替えたいテストは w.rules / w.phases / w.risk に書く。
-func (w *ws) exec(guard, input string, args ...string) run.Result {
-	w.t.Helper()
-	prefix := []string{"--root", w.root, "--guard-core-files", guard, "--restore-if-deny", "disable", "--guard-ticket-approval", "disable"}
-	return run.Ccnavi(w.t, samples.Place(prefix, args), run.Opts{Input: input, Dir: base.Root()})
+func (w *WS) exec(guard, input string, args ...string) run.Result {
+	w.T.Helper()
+	prefix := []string{"--root", w.Root, "--guard-core-files", guard, "--restore-if-deny", "disable", "--guard-ticket-approval", "disable"}
+	return run.Ccnavi(w.T, samples.Place(prefix, args), run.Opts{Input: input, Dir: base.Root()})
 }
 
-func (w *ws) ccnavi(args ...string) run.Result { return w.exec("disable", "", args...) }
+func (w *WS) Ccnavi(args ...string) run.Result { return w.exec("disable", "", args...) }
 
 // hookAs は hook の payload を 1 件渡す。
-func (w *ws) hookAs(event, guard, tool, cwd string, input obj) run.Result {
-	w.t.Helper()
+func (w *WS) HookAs(event, guard, tool, cwd string, input Obj) run.Result {
+	w.T.Helper()
 	if input == nil {
-		input = obj{}
+		input = Obj{}
 	}
-	payload := body(obj{"hook_event_name": event, "tool_name": tool, "cwd": cwd, "session_id": "s1", "tool_input": input})
+	payload := Body(Obj{"hook_event_name": event, "tool_name": tool, "cwd": cwd, "session_id": "s1", "tool_input": input})
 	return w.exec(guard, payload, "--mode", "enable")
 }
 
 // hook は設定ファイルの保護を切った PreToolUse。
-func (w *ws) hook(tool, cwd string, input obj) run.Result {
-	w.t.Helper()
-	return w.hookAs("PreToolUse", "disable", tool, cwd, input)
+func (w *WS) Hook(tool, cwd string, input Obj) run.Result {
+	w.T.Helper()
+	return w.HookAs("PreToolUse", "disable", tool, cwd, input)
 }
 
 // guardedHook は設定ファイルの保護を入れた PreToolUse。
-func (w *ws) guardedHook(tool, cwd string, input obj) run.Result {
-	w.t.Helper()
-	return w.hookAs("PreToolUse", "enable", tool, cwd, input)
+func (w *WS) GuardedHook(tool, cwd string, input Obj) run.Result {
+	w.T.Helper()
+	return w.HookAs("PreToolUse", "enable", tool, cwd, input)
 }
 
 // post は実行後の hook（設定ファイルの保護は切る）。
-func (w *ws) post(tool, cwd string, input obj) run.Result {
-	w.t.Helper()
-	return w.hookAs("PostToolUse", "disable", tool, cwd, input)
+func (w *WS) Post(tool, cwd string, input Obj) run.Result {
+	w.T.Helper()
+	return w.HookAs("PostToolUse", "disable", tool, cwd, input)
 }
 
 // approve は承認して、承認済みチケットを各ワークツリーにコミットする（本番は write-and-push が行う）。
-func (w *ws) approve() run.Result {
-	w.t.Helper()
+func (w *WS) Approve() run.Result {
+	w.T.Helper()
 	done := w.exec("disable", "y\n", "user", "agree")
-	dir := filepath.Join(w.root, ".claude", "worktrees")
+	dir := filepath.Join(w.Root, ".claude", "worktrees")
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		path := filepath.Join(dir, e.Name())
-		git(w.t, path, "add", "-A")
-		git(w.t, path, "commit", "--quiet", "--allow-empty", "-m", "approve")
+		Git(w.T, path, "add", "-A")
+		Git(w.T, path, "commit", "--quiet", "--allow-empty", "-m", "approve")
 	}
 	return done
 }
 
-func (w *ws) mustOK(r run.Result, what string) {
-	w.t.Helper()
+func (w *WS) MustOK(r run.Result, what string) {
+	w.T.Helper()
 	if r.Code != 0 {
-		w.t.Fatalf("%s: code %d\nstdout: %s\nstderr: %s", what, r.Code, r.Stdout, r.Stderr)
+		w.T.Fatalf("%s: code %d\nstdout: %s\nstderr: %s", what, r.Code, r.Stdout, r.Stderr)
 	}
 }
 
 // ---- 診断
 
-type problem struct {
+type Problem struct {
 	Severity string `json:"severity"`
 	Where    string `json:"where"`
 	Detail   string `json:"detail"`
 }
 
-func (w *ws) lintProblems(args ...string) []problem {
-	w.t.Helper()
-	r := w.ccnavi(append([]string{"--lint", "--json"}, args...)...)
+func (w *WS) LintProblems(args ...string) []Problem {
+	w.T.Helper()
+	r := w.Ccnavi(append([]string{"--lint", "--json"}, args...)...)
 	var report struct {
-		Problems []problem `json:"problems"`
+		Problems []Problem `json:"problems"`
 	}
 	if err := json.Unmarshal([]byte(r.Stdout), &report); err != nil {
-		w.t.Fatalf("--lint --json が JSON を返さない: %v\n%s\n%s", err, r.Stdout, r.Stderr)
+		w.T.Fatalf("--lint --json が JSON を返さない: %v\n%s\n%s", err, r.Stdout, r.Stderr)
 	}
 	return report.Problems
 }
@@ -451,10 +451,10 @@ func (w *ws) lintProblems(args ...string) []problem {
 // problems はその深刻度の Problem。where を渡すと、その出どころで先に絞る。
 // detail の部分一致だけで見ると、`self` や `lib` のようなありふれた語が別の苦情の文面に紛れていても通ってしまう。
 // どのレイヤーの話かは where が持つ。
-func (w *ws) problems(severity, where string) []problem {
-	w.t.Helper()
-	var out []problem
-	for _, p := range w.lintProblems() {
+func (w *WS) Problems(severity, where string) []Problem {
+	w.T.Helper()
+	var out []Problem
+	for _, p := range w.LintProblems() {
 		if p.Severity == severity && (where == "" || strings.HasPrefix(p.Where, where)) {
 			out = append(out, p)
 		}
@@ -463,21 +463,21 @@ func (w *ws) problems(severity, where string) []problem {
 }
 
 // projectWhere は `--lint` の Problem の出どころのうち、そのプロジェクトのもの（`(projects/lib)`）。
-func projectWhere(name string) string { return "(projects/" + name + ")" }
+func ProjectWhere(name string) string { return "(projects/" + name + ")" }
 
 // anyDetail は problems のどれかの detail が sub を含むか。
-func anyDetail(ps []problem, sub string) bool {
-	return slices.ContainsFunc(ps, func(p problem) bool { return strings.Contains(p.Detail, sub) })
+func AnyDetail(ps []Problem, sub string) bool {
+	return slices.ContainsFunc(ps, func(p Problem) bool { return strings.Contains(p.Detail, sub) })
 }
 
-func anyWhere(ps []problem, sub string) bool {
-	return slices.ContainsFunc(ps, func(p problem) bool { return strings.Contains(p.Where, sub) })
+func AnyWhere(ps []Problem, sub string) bool {
+	return slices.ContainsFunc(ps, func(p Problem) bool { return strings.Contains(p.Where, sub) })
 }
 
-func (w *ws) mustHaveDetail(ps []problem, sub string) {
-	w.t.Helper()
-	if !anyDetail(ps, sub) {
-		w.t.Errorf("detail に %q を含む問題が無い: %+v", sub, ps)
+func (w *WS) MustHaveDetail(ps []Problem, sub string) {
+	w.T.Helper()
+	if !AnyDetail(ps, sub) {
+		w.T.Errorf("detail に %q を含む問題が無い: %+v", sub, ps)
 	}
 }
 
@@ -492,25 +492,25 @@ type hookOutput struct {
 	SystemMessage string `json:"systemMessage"`
 }
 
-func (w *ws) parse(r run.Result) hookOutput {
-	w.t.Helper()
+func (w *WS) parse(r run.Result) hookOutput {
+	w.T.Helper()
 	var out hookOutput
 	if strings.TrimSpace(r.Stdout) == "" {
 		return out
 	}
 	if err := json.Unmarshal([]byte(r.Stdout), &out); err != nil {
-		w.t.Fatalf("hook の出力が JSON でない: %q", r.Stdout)
+		w.T.Fatalf("hook の出力が JSON でない: %q", r.Stdout)
 	}
 	return out
 }
 
-func (w *ws) decision(r run.Result) string {
-	w.t.Helper()
+func (w *WS) Decision(r run.Result) string {
+	w.T.Helper()
 	return w.parse(r).HookSpecificOutput.Decision
 }
 
-func (w *ws) reason(r run.Result) string {
-	w.t.Helper()
+func (w *WS) Reason(r run.Result) string {
+	w.T.Helper()
 	out := w.parse(r).HookSpecificOutput
 	if out.Reason != "" {
 		return out.Reason
@@ -521,13 +521,13 @@ func (w *ws) reason(r run.Result) string {
 // record は決定ログの 1 件。
 type record map[string]any
 
-func (r record) str(key string) string {
+func (r record) Str(key string) string {
 	s, _ := r[key].(string)
 	return s
 }
 
 // names は記録の rules の記録名（`<相対パス>:<id>`）。
-func (r record) names() []string {
+func (r record) Names() []string {
 	var out []string
 	items, _ := r["rules"].([]any)
 	for _, v := range items {
@@ -537,9 +537,9 @@ func (r record) names() []string {
 }
 
 // ids は記録の rules を、書いた表記（レイヤーの前置きつき）にしたもの。
-func (r record) ids() []string {
+func (r record) Ids() []string {
 	var out []string
-	for _, n := range r.names() {
+	for _, n := range r.Names() {
 		out = append(out, layerID(n))
 	}
 	return out
@@ -547,9 +547,9 @@ func (r record) ids() []string {
 
 // hits は記録の rules のうち、レイヤーのルール。組み込みの deny（`builtin:` で始まる id。共通レイヤーと config の有無によらず
 // 常にヒットする）は数えない。
-func (r record) hits() []string {
+func (r record) Hits() []string {
 	var out []string
-	for _, n := range r.names() {
+	for _, n := range r.Names() {
 		if !strings.HasPrefix(n, "builtin:") {
 			out = append(out, layerID(n))
 		}
@@ -557,27 +557,27 @@ func (r record) hits() []string {
 	return out
 }
 
-func (w *ws) lastRecord() record {
-	w.t.Helper()
+func (w *WS) LastRecord() record {
+	w.T.Helper()
 	var lines []string
-	for _, line := range strings.Split(read(w.t, w.log), "\n") {
+	for _, line := range strings.Split(Read(w.T, w.log), "\n") {
 		if strings.TrimSpace(line) != "" {
 			lines = append(lines, line)
 		}
 	}
 	if len(lines) == 0 {
-		w.t.Fatal("決定ログが空")
+		w.T.Fatal("決定ログが空")
 	}
 	var rec record
 	if err := json.Unmarshal([]byte(lines[len(lines)-1]), &rec); err != nil {
-		w.t.Fatal(err)
+		w.T.Fatal(err)
 	}
 	return rec
 }
 
-func (w *ws) hitRules() []string {
-	w.t.Helper()
-	return w.lastRecord().hits()
+func (w *WS) HitRules() []string {
+	w.T.Helper()
+	return w.LastRecord().Hits()
 }
 
 const (
@@ -624,59 +624,59 @@ func layerID(name string) string {
 	return name
 }
 
-func (w *ws) assertDenied(r run.Result, ids ...string) {
-	w.t.Helper()
-	if d := w.decision(r); d != "deny" {
-		w.t.Errorf("decision = %q, want deny\n%s%s", d, r.Stdout, r.Stderr)
+func (w *WS) AssertDenied(r run.Result, ids ...string) {
+	w.T.Helper()
+	if d := w.Decision(r); d != "deny" {
+		w.T.Errorf("decision = %q, want deny\n%s%s", d, r.Stdout, r.Stderr)
 		return
 	}
-	reason := w.reason(r)
+	reason := w.Reason(r)
 	for _, id := range ids {
 		if !strings.Contains(reason, recordOf(id)) {
-			w.t.Errorf("理由に %q が無い: %s", recordOf(id), reason)
+			w.T.Errorf("理由に %q が無い: %s", recordOf(id), reason)
 		}
 	}
 }
 
-func (w *ws) assertNotDenied(r run.Result) {
-	w.t.Helper()
+func (w *WS) AssertNotDenied(r run.Result) {
+	w.T.Helper()
 	if r.Code != 0 {
-		w.t.Errorf("code = %d\n%s", r.Code, r.Stderr)
+		w.T.Errorf("code = %d\n%s", r.Code, r.Stderr)
 	}
-	if d := w.decision(r); d == "deny" {
-		w.t.Errorf("deny された: %s", r.Stdout)
+	if d := w.Decision(r); d == "deny" {
+		w.T.Errorf("deny された: %s", r.Stdout)
 	}
 }
 
 // ---- ticket 本文
 
-type ticketOpts struct {
-	project string
-	parent  string
-	phase   int
-	plan    []string
-	allow   []string
+type TicketOpts struct {
+	Project string
+	Parent  string
+	Phase   int
+	Plan    []string
+	Allow   []string
 	review  bool
 }
 
 // ticketText は提案の本文。親は plan を、子は parent と phase を持つ。project は行き先のレイヤーを決める。
-func ticketText(name string, o ticketOpts) string {
+func TicketText(name string, o TicketOpts) string {
 	lines := []string{"---", "version: 1", "ticket: " + name}
-	if o.parent == "" {
+	if o.Parent == "" {
 		lines = append(lines, "mr: 1", "issue: 1")
 	}
-	if o.project != "" {
-		lines = append(lines, "project: "+o.project)
+	if o.Project != "" {
+		lines = append(lines, "project: "+o.Project)
 	}
-	if o.parent != "" {
-		lines = append(lines, "parent: "+o.parent, "phase: "+itoa(o.phase))
+	if o.Parent != "" {
+		lines = append(lines, "parent: "+o.Parent, "phase: "+Itoa(o.Phase))
 	}
-	if len(o.plan) > 0 {
+	if len(o.Plan) > 0 {
 		// 計画のステップは、すぐ前のステップが先行する一直線にする（最初のステップは先行なし）。
 		lines = append(lines, "plan:")
-		for n, item := range o.plan {
+		for n, item := range o.Plan {
 			if n > 0 {
-				lines = append(lines, "  - {type: "+item+", after: ["+itoa(n)+"]}")
+				lines = append(lines, "  - {type: "+item+", after: ["+Itoa(n)+"]}")
 			} else {
 				lines = append(lines, "  - "+item)
 			}
@@ -687,9 +687,9 @@ func ticketText(name string, o ticketOpts) string {
 		required = "true"
 	}
 	lines = append(lines, "human_review:", "  required: "+required, "  reason: テスト", "title: 作業", "rationale: |", "  理由")
-	if len(o.allow) > 0 {
+	if len(o.Allow) > 0 {
 		lines = append(lines, "allow:")
-		for _, g := range o.allow {
+		for _, g := range o.Allow {
 			lines = append(lines, "  - match: Write|Edit", `    glob: "`+g+`"`)
 		}
 	}
@@ -697,10 +697,10 @@ func ticketText(name string, o ticketOpts) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-func itoa(n int) string { return strconv.Itoa(n) }
+func Itoa(n int) string { return strconv.Itoa(n) }
 
 // sortedKeys は map のキーを並べたもの。
-func sortedKeys[V any](m map[string]V) []string {
+func SortedKeys[V any](m map[string]V) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -709,22 +709,22 @@ func sortedKeys[V any](m map[string]V) []string {
 	return keys
 }
 
-func removeFile(path string) error { return os.Remove(path) }
+func RemoveFile(path string) error { return os.Remove(path) }
 
-func insertPhases(text, phasesYML string) string {
+func InsertPhases(text, phasesYML string) string {
 	return samples.InsertPhases(text, phasesYML)
 }
 
 // ---- 設定ファイルの保護（tests/config/test_config_union_guard.py の GuardHarness の写し）
 
 // runHook は Bash 1 回。設定ファイルの保護を入れ、実行前でバックアップを取り、実行後で戻す。
-func (w *ws) runHook(event string) run.Result {
-	w.t.Helper()
-	return w.hookAs(event, "enable", "Bash", w.root, obj{"command": "ls"})
+func (w *WS) RunHook(event string) run.Result {
+	w.T.Helper()
+	return w.HookAs(event, "enable", "Bash", w.Root, Obj{"command": "ls"})
 }
 
 // said は失敗したときに何が起きたかをつける。標準エラーを見ないと理由が出ない。
-func said(r run.Result, note string) string {
+func Said(r run.Result, note string) string {
 	head := ""
 	if note != "" {
 		head = note + "\n"
@@ -733,28 +733,28 @@ func said(r run.Result, note string) string {
 }
 
 // breakAllAndRestore はバックアップを 1 回取らせ、全部を壊し、実行後に全部が戻ったかを確かめる。結果を返す。
-func (w *ws) breakAllAndRestore(paths []string) run.Result {
-	w.t.Helper()
+func (w *WS) BreakAllAndRestore(paths []string) run.Result {
+	w.T.Helper()
 	before := map[string]string{}
 	for _, path := range paths {
-		before[path] = read(w.t, path)
+		before[path] = Read(w.T, path)
 	}
-	w.runHook("PreToolUse")
+	w.RunHook("PreToolUse")
 	for _, path := range paths {
 		text := "version: 1\ndeny: []\n"
 		if strings.HasSuffix(path, "phases.yml") {
 			text = "version: 1\nphases: {}\n"
 		}
-		write(w.t, path, text)
+		Write(w.T, path, text)
 	}
-	result := w.runHook("PostToolUse")
+	result := w.RunHook("PostToolUse")
 	for _, path := range paths {
-		if got := read(w.t, path); got != before[path] {
-			w.t.Errorf("%s が戻らない\n%s", path, said(result, path))
+		if got := Read(w.T, path); got != before[path] {
+			w.T.Errorf("%s が戻らない\n%s", path, Said(result, path))
 		}
 	}
 	if !strings.Contains(result.Stdout, "restored") {
-		w.t.Errorf("restored を言わない\n%s", said(result, ""))
+		w.T.Errorf("restored を言わない\n%s", Said(result, ""))
 	}
 	return result
 }
@@ -762,16 +762,16 @@ func (w *ws) breakAllAndRestore(paths []string) run.Result {
 // judgeMany はシェルのコマンドを何本も 1 回の起動で判定し、1 本ごとにヒットしたルールの id を返す。
 // `--test-expectations` に渡す。判定は hook の実行前と同じ関数を通り、居場所はワークスペースルート
 // （hook に cwd をルートで渡したのと同じ）。止めたかどうかも見るので、決定（verdict）と id の組を返す。
-func (w *ws) judgeMany(commands []string, flags ...string) []judged {
-	w.t.Helper()
-	var asks []obj
+func (w *WS) judgeMany(commands []string, flags ...string) []judged {
+	w.T.Helper()
+	var asks []Obj
 	for _, c := range commands {
-		asks = append(asks, obj{"tool": "Bash", "subject": c})
+		asks = append(asks, Obj{"tool": "Bash", "subject": c})
 	}
 	// 期待のタイプは判定に効かない。JSON は YAML としても読める。
-	path := write(w.t, filepath.Join(base.TempDir(w.t), "expectations.yml"), body(obj{"ask": asks}))
+	path := Write(w.T, filepath.Join(base.TempDir(w.T), "expectations.yml"), Body(Obj{"ask": asks}))
 	r := w.exec("enable", "", append(slices.Clone(flags), "--test-expectations", path, "--json")...)
-	w.mustOK(r, "--test-expectations")
+	w.MustOK(r, "--test-expectations")
 	var out struct {
 		Expectations []struct {
 			Verdict string `json:"verdict"`
@@ -781,10 +781,10 @@ func (w *ws) judgeMany(commands []string, flags ...string) []judged {
 		} `json:"expectations"`
 	}
 	if err := json.Unmarshal([]byte(r.Stdout), &out); err != nil {
-		w.t.Fatalf("%v\n%s", err, r.Stdout)
+		w.T.Fatalf("%v\n%s", err, r.Stdout)
 	}
 	if len(out.Expectations) != len(commands) {
-		w.t.Fatalf("判定が %d 件、コマンドが %d 件", len(out.Expectations), len(commands))
+		w.T.Fatalf("判定が %d 件、コマンドが %d 件", len(out.Expectations), len(commands))
 	}
 	var res []judged
 	for _, e := range out.Expectations {
@@ -802,34 +802,34 @@ type judged struct {
 	ids     []string
 }
 
-const settingFilesGuard = "builtin:guard-setting-files"
+const SettingFilesGuard = "builtin:guard-setting-files"
 
 // assertAllGuarded はどれも設定ファイルの保護で止まる。何本も 1 回の起動で判定する。
-func (w *ws) assertAllGuarded(commands []string, flags ...string) {
-	w.t.Helper()
+func (w *WS) AssertAllGuarded(commands []string, flags ...string) {
+	w.T.Helper()
 	for i, j := range w.judgeMany(commands, flags...) {
-		if j.verdict != "deny" || !slices.Contains(j.ids, settingFilesGuard) {
-			w.t.Errorf("止まらない: %q → %s %v", commands[i], j.verdict, j.ids)
+		if j.verdict != "deny" || !slices.Contains(j.ids, SettingFilesGuard) {
+			w.T.Errorf("止まらない: %q → %s %v", commands[i], j.verdict, j.ids)
 		}
 	}
 }
 
 // assertNoneDenied はどれも止まらない。
-func (w *ws) assertNoneDenied(commands []string, flags ...string) {
-	w.t.Helper()
+func (w *WS) AssertNoneDenied(commands []string, flags ...string) {
+	w.T.Helper()
 	for i, j := range w.judgeMany(commands, flags...) {
 		if j.verdict == "deny" {
-			w.t.Errorf("止まった: %q → %v", commands[i], j.ids)
+			w.T.Errorf("止まった: %q → %v", commands[i], j.ids)
 		}
 	}
 }
 
 // assertNoneGuarded はどれも設定ファイルの保護にヒットしない。
-func (w *ws) assertNoneGuarded(commands []string, flags ...string) {
-	w.t.Helper()
+func (w *WS) AssertNoneGuarded(commands []string, flags ...string) {
+	w.T.Helper()
 	for i, j := range w.judgeMany(commands, flags...) {
-		if slices.Contains(j.ids, settingFilesGuard) {
-			w.t.Errorf("設定ファイルの保護にヒットした: %q → %v", commands[i], j.ids)
+		if slices.Contains(j.ids, SettingFilesGuard) {
+			w.T.Errorf("設定ファイルの保護にヒットした: %q → %v", commands[i], j.ids)
 		}
 	}
 }

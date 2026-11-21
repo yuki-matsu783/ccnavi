@@ -1,13 +1,13 @@
-package union
+package configws
 
 // 雛形のワークスペースに置く設定の見本。
 
 // obj は JSON のオブジェクト。ルールファイルは JSON で書く（JSON は YAML としても読める）。
-type obj = map[string]any
+type Obj = map[string]any
 
 // rule はルール 1 件。key は glob か regex。message が空なら書かない（allow は message を持たない）。
-func rule(id, match, key, pattern, message string) obj {
-	o := obj{"id": id, "match": match, key: pattern}
+func Rule(id, match, key, pattern, message string) Obj {
+	o := Obj{"id": id, "match": match, key: pattern}
 	if message != "" {
 		o["message"] = message
 	}
@@ -15,8 +15,8 @@ func rule(id, match, key, pattern, message string) obj {
 }
 
 // ruleset はルールファイルの本文。ask は共通レイヤーだけが使う。
-func ruleset(deny, allow []obj) obj {
-	o := obj{"version": 1}
+func Ruleset(deny, allow []Obj) Obj {
+	o := Obj{"version": 1}
 	if deny != nil {
 		o["deny"] = deny
 	}
@@ -27,8 +27,8 @@ func ruleset(deny, allow []obj) obj {
 }
 
 // with は o の写しに欄を足す・差し替える。
-func with(o obj, kv ...any) obj {
-	out := obj{}
+func With(o Obj, kv ...any) Obj {
+	out := Obj{}
 	for k, v := range o {
 		out[k] = v
 	}
@@ -39,69 +39,69 @@ func with(o obj, kv ...any) obj {
 }
 
 // plus は rules の前に置いた rule を足した新しい並び。
-func plus(rules []obj, more ...obj) []obj {
-	return append(append([]obj{}, rules...), more...)
+func Plus(rules []Obj, more ...Obj) []Obj {
+	return append(append([]Obj{}, rules...), more...)
 }
 
-func denyOf(o obj) []obj  { return o["deny"].([]obj) }
-func allowOf(o obj) []obj { return o["allow"].([]obj) }
+func DenyOf(o Obj) []Obj  { return o["deny"].([]Obj) }
+func AllowOf(o Obj) []Obj { return o["allow"].([]Obj) }
 
 // 共通レイヤー。どのツリーにも適用したい deny と、ワークスペースの allow。
-var commonRules = ruleset(
-	[]obj{
-		rule("credentials", "Write|Edit", "glob", "*/.env*", "credentials are not edited by the agent."),
-		rule("terraform", "Bash", "glob", "*terraform apply*", "terraform apply is not run by the agent."),
-		rule("guard-approved", "Write|Edit|NotebookEdit", "glob", "*/.ccnavi/approved/*", "guard settings. ask the user."),
+var CommonRules = Ruleset(
+	[]Obj{
+		Rule("credentials", "Write|Edit", "glob", "*/.env*", "credentials are not edited by the agent."),
+		Rule("terraform", "Bash", "glob", "*terraform apply*", "terraform apply is not run by the agent."),
+		Rule("guard-approved", "Write|Edit|NotebookEdit", "glob", "*/.ccnavi/approved/*", "guard settings. ask the user."),
 	},
-	[]obj{
-		rule("ws-src", "Write|Edit", "glob", "*/src/*", ""),
-		rule("ws-read", "Read", "regex", ".", ""),
+	[]Obj{
+		Rule("ws-src", "Write|Edit", "glob", "*/src/*", ""),
+		Rule("ws-read", "Read", "regex", ".", ""),
 	},
 )
 
 // ワークスペース自身のレイヤー。ワークスペースのツリーにだけヒットする。
-var ownRules = ruleset(
-	[]obj{
-		rule("generated", "Write|Edit", "glob", "*/generated/*", "generated files are rebuilt, not edited."),
-		rule("dropdb", "Bash", "glob", "*dropdb*", "dropdb is not run by the agent."),
+var OwnRules = Ruleset(
+	[]Obj{
+		Rule("generated", "Write|Edit", "glob", "*/generated/*", "generated files are rebuilt, not edited."),
+		Rule("dropdb", "Bash", "glob", "*dropdb*", "dropdb is not run by the agent."),
 	},
-	[]obj{rule("docs", "Write|Edit", "glob", "*/docs/*", "")},
+	[]Obj{Rule("docs", "Write|Edit", "glob", "*/docs/*", "")},
 )
 
 // lib のレイヤー。lib のツリーにだけヒットする。
-var libRules = ruleset(
-	[]obj{
-		rule("schema", "Write|Edit", "glob", "*/schema/*", "schema is not edited by hand. write a migration."),
-		rule("raw-psql", "Bash", "glob", "*psql*", "psql is not run by the agent."),
+var LibRules = Ruleset(
+	[]Obj{
+		Rule("schema", "Write|Edit", "glob", "*/schema/*", "schema is not edited by hand. write a migration."),
+		Rule("raw-psql", "Bash", "glob", "*psql*", "psql is not run by the agent."),
 	},
-	[]obj{rule("source", "Write|Edit", "glob", "*/src/*", "")},
+	[]Obj{Rule("source", "Write|Edit", "glob", "*/src/*", "")},
 )
 
 // app のレイヤー。雛形では置かない（無いレイヤー = 空）。2 つ目の非空のレイヤーを要るテストだけが置く。
-var appRules = ruleset(
-	[]obj{
-		rule("kube", "Bash", "glob", "*kubectl*", "kubectl is not run by the agent."),
-		rule("deploy", "Bash", "glob", "*deploy.sh*", "deploy.sh is run by a human."),
+var AppRules = Ruleset(
+	[]Obj{
+		Rule("kube", "Bash", "glob", "*kubectl*", "kubectl is not run by the agent."),
+		Rule("deploy", "Bash", "glob", "*deploy.sh*", "deploy.sh is run by a human."),
 	},
 	nil,
 )
 
 // lib 側の、app の `deploy` と同じ呼び出しにヒットする deny。名前順に並ぶかを見る。
-var libDeploy = rule("deploy-any", "Bash", "glob", "*deploy*", "deploy is run by a human.")
+var LibDeploy = Rule("deploy-any", "Bash", "glob", "*deploy*", "deploy is run by a human.")
 
 // 共通レイヤーの `ask`。プロジェクトのレイヤーの `allow` で緩められないことを見る。
-var askVendor = rule("ask-vendor", "Write|Edit", "glob", "*/vendor/*", "vendor はユーザに確かめてから触る。")
+var AskVendor = Rule("ask-vendor", "Write|Edit", "glob", "*/vendor/*", "vendor はユーザに確かめてから触る。")
 
 // NotebookEdit を実際の tool_name として通すためのルール。欄は notebook_path。
-var notebookRule = rule("notebook", "NotebookEdit", "glob", "*/notebooks/*", "ノートはユーザが回す。")
+var NotebookRule = Rule("notebook", "NotebookEdit", "glob", "*/notebooks/*", "ノートはユーザが回す。")
 
 // `{root}` を含む定義。共通レイヤーとレイヤーの両方に同じものを置いて、置換後の全欄一致を見る。
-var rootRule = rule("root-secret", "Write|Edit", "glob", "{root}/*/secret.txt", "secret.txt は置かない。")
+var RootRule = Rule("root-secret", "Write|Edit", "glob", "{root}/*/secret.txt", "secret.txt は置かない。")
 
 // YAML として不正。閉じていないリスト。
-const broken = "version: 1\ndeny: [\n"
+const Broken = "version: 1\ndeny: [\n"
 
-const commonPhasesText = `version: 1
+const CommonPhasesText = `version: 1
 phases:
   design:
     kind: work
@@ -119,7 +119,7 @@ phases:
     scope: ["docs/*"]
 `
 
-const libPhasesText = `version: 1
+const LibPhasesText = `version: 1
 phases:
   design:
     kind: work
@@ -138,13 +138,13 @@ phases:
     scope: ["src/*"]
 `
 
-const commonRiskText = `version: 1
+const CommonRiskText = `version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
   - {id: big-diff, points: 25, lines_over: 5, message: 行数が多い}
 `
 
-const libRiskText = `version: 1
+const LibRiskText = `version: 1
 levels: {critical: 50}
 factors:
   - {id: schema, points: 30, glob: "schema/**", message: スキーマに触った}
