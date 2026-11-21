@@ -3,7 +3,6 @@ package land
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,23 +23,12 @@ type fixture struct {
 
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimRight(string(out), "\r\n")
+	return strings.TrimRight(testkit.Git(t, dir, args...), "\r\n")
 }
 
 func write(t *testing.T, path, text string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	testkit.Put(t, path, text)
 }
 
 // newFixture は、ワークスペース（ルートは main。origin/main が在る）と、記録つきの直接作業のワークツリー wt を組む。
@@ -151,32 +139,32 @@ func TestIntegrateRefusals(t *testing.T) {
 		has   []string
 		not   []string
 	}{
-		{name: "the base branch changed", setup: func(f *fixture) { gitIn(t, f.ws, "checkout", "-q", "-b", "elsewhere") },
+		{name: "the base branch changed", setup: func(f *fixture) { gitIn(f.t, f.ws, "checkout", "-q", "-b", "elsewhere") },
 			has: []string{"取り込み先（main）を開いていません", "elsewhere"}},
 		{name: "from a worktree", cwd: func(f *fixture) string { return f.wt },
 			has: []string{"ユーザのチェックアウト"}},
-		{name: "a dirty source worktree", setup: func(f *fixture) { write(t, filepath.Join(f.wt, "wip.txt"), "x\n") },
+		{name: "a dirty source worktree", setup: func(f *fixture) { write(f.t, filepath.Join(f.wt, "wip.txt"), "x\n") },
 			has: []string{"未コミットの変更"}},
 		{name: "a ticket-bound base branch", setup: func(f *fixture) {
-			write(t, filepath.Join(f.ws, "wip", "proposals", "todo", "main.md"), "---\nticket: main\n---\nbody\n")
+			write(f.t, filepath.Join(f.ws, "wip", "proposals", "todo", "main.md"), "---\nticket: main\n---\nbody\n")
 		}, has: []string{"チケット"}},
 		{name: "without a record it points at adopt", setup: func(f *fixture) {
 			if err := os.Remove(f.record("wt")); err != nil {
-				t.Fatal(err)
+				f.t.Fatal(err)
 			}
 		}, has: []string{"--adopt --base <取り込み先>"}, not: []string{"マージリクエスト"}},
 		{name: "without a record a ticket-bound name is not pointed at adopt", setup: func(f *fixture) {
 			if err := os.Remove(f.record("wt")); err != nil {
-				t.Fatal(err)
+				f.t.Fatal(err)
 			}
-			write(t, filepath.Join(f.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
+			write(f.t, filepath.Join(f.ws, "wip", "proposals", "todo", "wt.md"), "---\n---\n")
 		}, has: []string{"チケットに結び付く名前です", "マージリクエストで出します", "ccnavi-ticket.sh", "status"}, not: []string{"--adopt"}},
 		{name: "a record of another repository", setup: func(f *fixture) {
 			data, err := os.ReadFile(f.record("wt"))
 			if err != nil {
-				t.Fatal(err)
+				f.t.Fatal(err)
 			}
-			write(t, f.record("wt"), strings.ReplaceAll(string(data), f.common(), "/somewhere/else/.git"))
+			write(f.t, f.record("wt"), strings.ReplaceAll(string(data), f.common(), "/somewhere/else/.git"))
 		}, has: []string{"common_dir"}},
 		{name: "a name that is a path", args: []string{"integrate", "../etc"}, has: []string{"名前"}},
 		{name: "a name with a slash", args: []string{"integrate", "a/b"}, has: []string{"名前"}},

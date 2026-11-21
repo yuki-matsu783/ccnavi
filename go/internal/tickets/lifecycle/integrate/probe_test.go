@@ -84,6 +84,7 @@ func TestProbeRecordedDirectWork(t *testing.T) {
 	}
 	t.Run("a switched base branch only tells the reason", func(t *testing.T) {
 		root, here := recordedWorkspace(t, func(snap, gitDir string) []string { return standardRecord(snap, gitDir) })
+		testkit.Put(t, filepath.Join(here.Root, "src", "dirty"), "d\n")
 		clock.Git(t, root, "switch", "--quiet", "-c", "other")
 		got := look(t, root, here)
 		if got.state != hit || !strings.Contains(got.found.Blocked, "取り込み先が切り替わっています") {
@@ -91,6 +92,8 @@ func TestProbeRecordedDirectWork(t *testing.T) {
 		}
 		if notice := BlockedNotice(got.found); strings.Contains(notice, "取り込みの途中") {
 			t.Errorf("途中でないのに途中と言っている: %s", notice)
+		} else if strings.Contains(notice, "未コミット") {
+			t.Errorf("未コミットだけで切り替わりの理由に未コミットが出ている: %s", notice)
 		}
 	})
 	t.Run("a switched base branch during integrate says it is in progress", func(t *testing.T) {

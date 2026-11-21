@@ -3,12 +3,12 @@ package catchup
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // sync plan（取り込む親子のチケットとリポジトリを選ぶ）と、retire の記録（ワークツリーを片付けた後の親）の選び方を、
@@ -16,21 +16,12 @@ import (
 
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
+	testkit.Git(t, dir, args...)
 }
 
 func put(t *testing.T, path, text string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	testkit.Put(t, path, text)
 }
 
 type planFixture struct {

@@ -170,13 +170,19 @@ func TestPathsItCannotStageAreRefusedBeforeWritingAnything(t *testing.T) {
 	// リンクは、ワークスペースの外を指すものも、リンクそのものも断る
 	outDir := filepath.Join(filepath.Dir(f.ws), "outdir")
 	testkit.Put(t, filepath.Join(outDir, "f"), "secret")
-	if os.Symlink(outDir, filepath.Join(f.ws, "link")) == nil && os.Symlink(f.rules, filepath.Join(f.ws, "rules-link.yml")) == nil {
+	t.Run("links are refused", func(t *testing.T) {
+		if os.Symlink(outDir, filepath.Join(f.ws, "link")) != nil {
+			t.Skip("シンボリックリンクを作れない")
+		}
+		if os.Symlink(f.rules, filepath.Join(f.ws, "rules-link.yml")) != nil {
+			t.Skip("シンボリックリンクを作れない")
+		}
 		f.stage("", "link/f").want(t, 2, nil, []string{"外"})
 		f.stage("", "rules-link.yml").want(t, 2, nil, []string{"シンボリックリンク"})
 		if f.exists(filepath.Join(f.ws, "wip", "handoff", "link")) {
 			t.Error("リンクの先を下書きにした")
 		}
-	}
+	})
 	// 引数の誤り
 	f.stage("", "--bogus").want(t, 2, nil, nil)
 	f.stage("").want(t, 2, nil, nil)
@@ -227,7 +233,7 @@ func TestDraftsInsideAWorktreeGoToThatWorktree(t *testing.T) {
 	t.Run("from the root another worktree's file is refused", func(t *testing.T) {
 		inner := filepath.Join(wt, rulesRel)
 		f.stage("", inner).want(t, 2, nil, []string{"別のワークツリー"})
-		f.stage("", strings.Replace(inner, ".claude", ".CLAUDE", 1)).want(t, 2, nil, nil)
+		f.stage("", filepath.Join(f.ws, ".CLAUDE", "worktrees", filepath.Base(wt), rulesRel)).want(t, 2, nil, []string{"別のワークツリー"})
 		if f.exists(filepath.Join(f.ws, "wip")) {
 			t.Error("断ったのにルートに置き場を作った")
 		}

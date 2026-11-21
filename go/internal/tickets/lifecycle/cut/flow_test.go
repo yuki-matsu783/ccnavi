@@ -26,23 +26,12 @@ type flowFixture struct {
 
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimRight(string(out), "\r\n")
+	return strings.TrimRight(testkit.Git(t, dir, args...), "\r\n")
 }
 
 func put(t *testing.T, path, text string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	testkit.Put(t, path, text)
 }
 
 // newFlow は、main を origin に送った状態のワークスペースを組む（.claude/ は .gitignore 済み）。
@@ -81,6 +70,7 @@ func (f *flowFixture) fetched(branch string) Remote {
 	f.t.Helper()
 	cmd := exec.Command("git", "fetch", "-q", "origin", branch)
 	cmd.Dir = f.root
+	cmd.Env = append(os.Environ(), testkit.GitEnv()...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return Remote{FetchOK: false, FetchOut: string(out)} // origin に無いブランチは、取ってこられない（sh も同じ答えを渡す）
 	}
@@ -217,7 +207,6 @@ func TestConfirmCodeBindsTheState(t *testing.T) {
 		name  string
 		setup func(f *flowFixture) // 最初に聞く前
 		move  func(f *flowFixture) // 聞いたあとの動き
-		cwd   func(f *flowFixture) []string
 	}{
 		{name: "the state moves", setup: (*flowFixture).makeFeatureWithOrigin, move: func(f *flowFixture) {
 			f.commit("more.txt", "m")
@@ -573,7 +562,6 @@ func TestCutRefusals(t *testing.T) {
 			}
 			if c.cwd != nil {
 				cwd = c.cwd(f)
-				f.leftover = leftoverOf[cwd]
 			}
 			out := f.run(cwd, nil, args...)
 			for _, h := range c.has {
@@ -596,7 +584,6 @@ func TestCutRefusals(t *testing.T) {
 	t.Run("a parent tree with only a todo proposal may switch", func(t *testing.T) {
 		f := newFlow(t)
 		path := parentTree(Leftover{Leftover: true, Proposal: true, MR: "12"})(f)
-		f.leftover = leftoverOf[path]
 		out := f.run(path, nil, "topic", "--base", "main")
 		has(t, out, "ワークツリーを切った")
 		hasNot(t, out, "引けませんでした")
@@ -640,15 +627,18 @@ func TestCutRefusals(t *testing.T) {
 	})
 }
 
-// leftoverOf は、親のワークツリーのパスごとの、残っているものの答え（shask.Leftover の代わり。その答えは shask のテストが見る）。
-var leftoverOf = map[string]func(string, string) Leftover{}
-
-// parentTree は、親のワークツリー（別ブランチ p0001）を切り、そこに残っているものの答えを leftover に決める。
+// parentTree は、親のワークツリー（別ブランチ p0001）を切り、そのパスにだけ残っているものの答えを leftover に決める
+// （shask.Leftover の代わり。その答えは shask のテストが見る）。ほかのパス（ワークスペースのルートなど）は常に空。
 func parentTree(answer Leftover) func(f *flowFixture) string {
 	return func(f *flowFixture) string {
 		path := f.wt("p0001")
 		gitIn(f.t, f.root, "worktree", "add", "-q", "-b", "p0001", path)
-		leftoverOf[path] = func(string, string) Leftover { return answer }
+		f.leftover = func(p, _ string) Leftover {
+			if p == path {
+				return answer
+			}
+			return Leftover{}
+		}
 		return path
 	}
 }

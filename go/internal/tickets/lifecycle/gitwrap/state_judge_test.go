@@ -2,11 +2,12 @@ package gitwrap
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 状態で決まる Judge の答え（git の状態を読んで決まる形）を、使い捨てのリポジトリで確かめる。sh を起こさない。
@@ -14,23 +15,12 @@ import (
 
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimRight(string(out), "\r\n")
+	return strings.TrimRight(testkit.Git(t, dir, args...), "\r\n")
 }
 
 func writeFile(t *testing.T, path, text string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	testkit.Put(t, path, text)
 }
 
 // newWorkspace は、コミットが 1 件ある main のリポジトリ（ワークスペースルート兼ユーザのチェックアウト）を返す。
@@ -150,6 +140,10 @@ func TestWorktreeAddFreshBase(t *testing.T) {
 		{name: "old FETCH_HEAD", id: stale,
 			setup: func(t *testing.T, root, _ string) { aged(t, root) },
 			has:   []string{"fetch origin 'main'"}, hasNot: []string{"merge --ff-only origin"}},
+		{name: "old FETCH_HEAD then fetched", id: "", setup: func(t *testing.T, root, _ string) {
+			aged(t, root)
+			gitIn(t, root, "fetch", "-q", "origin")
+		}},
 		{name: "missing FETCH_HEAD", id: stale, forms: forms[:1],
 			setup: func(t *testing.T, root, _ string) {
 				if err := os.Remove(filepath.Join(root, ".git", "FETCH_HEAD")); err != nil {

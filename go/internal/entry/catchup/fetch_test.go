@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"ccnavi/internal/tickets/testkit"
 )
 
 // fetch の判定（早送り・統合先を進める・origin/HEAD の向け直し）を、使い捨てのリポジトリと bare の origin で確かめる。
@@ -43,6 +45,7 @@ func newFetch(t *testing.T) *fetchFixture {
 func (f *fetchFixture) rev(dir, ref string) string {
 	cmd := exec.Command("git", "rev-parse", "--verify", "-q", ref)
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), testkit.GitEnv()...)
 	out, _ := cmd.Output()
 	return strings.TrimSpace(string(out))
 }
@@ -330,7 +333,9 @@ func TestForwardTheFamily(t *testing.T) {
 		f, tree := setup(t)
 		before := f.rev(tree, "HEAD")
 		f.advance("i0001")
-		out, _ := exec.Command("git", "-C", tree, "rev-parse", "--git-path", "index.lock").Output()
+		cmd := exec.Command("git", "-C", tree, "rev-parse", "--git-path", "index.lock")
+		cmd.Env = append(os.Environ(), testkit.GitEnv()...)
+		out, _ := cmd.Output()
 		lock := strings.TrimSpace(string(out))
 		if !filepath.IsAbs(lock) {
 			lock = filepath.Join(tree, lock)
@@ -348,7 +353,9 @@ func TestForwardTheFamily(t *testing.T) {
 func TestRetargetTheHostDefault(t *testing.T) {
 	symref := func(name string) string { return "ref: refs/heads/" + name + "\tHEAD\n" }
 	originHead := func(f *fetchFixture) string {
-		out, _ := exec.Command("git", "-C", f.repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD").Output()
+		cmd := exec.Command("git", "-C", f.repo, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD")
+		cmd.Env = append(os.Environ(), testkit.GitEnv()...)
+		out, _ := cmd.Output()
 		return strings.TrimSpace(string(out))
 	}
 	setup := func(t *testing.T) *fetchFixture {
