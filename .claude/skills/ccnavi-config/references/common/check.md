@@ -54,7 +54,7 @@ sh .ccnavi/scripts/ccnavi-launcher.sh --test-expectations .ccnavi/config/common/
 
 `--json` を付けると翻訳後の正規表現（`pattern`）と返る文面（`response`）まで出る。
 
-守られているかも期待する判定で見る。rules.yml・phases.yml・risks.yml、承認済みチケットの置き場、
+守られているかも期待する判定で見る。rules.yml・phases.yml・risks.yml・ticket-sections.yml、承認済みチケットの置き場、
 settings.json への Write / Edit を deny の期待に置いて回す。ワークスペースルート直下と、実在するワークツリーの
 名前での設定の両方（組み込みの `builtin:guard-ccnavi-config` と `builtin:guard-settings` が止める）。出るのは実行前の判定（組み込みの保護を含む）で、
 実行後に戻す働きは出ない。allow に見えたものは「止めていない」として報告する。

@@ -3,7 +3,7 @@ type: guide
 title: 設定と工程スキルが育つ流れ
 description: ルール・フェーズ定義・リスクの配点・計画のテンプレート・工程スキルの reference が、下書きから配布まで育つ共通の 6 段階と、対象ごとの文書への入口
 tags: [config, ticket]
-keywords: [育つ, grow, rules.yml, phases.yml, risks.yml, テンプレート, 工程スキル, 下書き, 検証, 承認, 配布, ミラー, 共通レイヤー]
+keywords: [育つ, grow, rules.yml, phases.yml, risks.yml, ticket-sections.yml, テンプレート, 工程スキル, 下書き, 検証, 承認, 配布, ミラー, 共通レイヤー]
 ---
 
 # 設定と工程スキルが育つ流れ

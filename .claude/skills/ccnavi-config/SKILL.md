@@ -2,8 +2,8 @@
 name: ccnavi-config
 distribute: true
 description: >-
-  ccnavi の設定 3 本（rules.yml・phases.yml・risks.yml。.ccnavi/config/common/ と config/project/ の和）を書く・足す・直す・
-  確かめる。ルールを足したい、フェーズ定義やリスクの配点を変えたい、書いた設定が
+  ccnavi の設定 4 本（rules.yml・phases.yml・risks.yml・ticket-sections.yml。.ccnavi/config/common/ と config/project/ の和）を書く・足す・直す・
+  確かめる。ルールを足したい、フェーズ定義やリスクの配点や提案の見出しを変えたい、書いた設定が
   意図どおりに効いているか疑わしい、`/ccnavi-config` と打たれた、のどれでも使う。
   足すときは下書きを検証してからユーザに渡し、確かめるときは lint と期待する判定を回して
   食い違いを名指しする。settings.json の hook の登録や env はここでは扱わない。
@@ -11,28 +11,29 @@ description: >-
 
 # ccnavi-config
 
-ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユーザが持つ設定。
+ccnavi の判定と進め方は 4 本のファイルで決まる。どれもユーザが持つ設定。
 
 | ファイル | 決めるもの | どのレイヤーにも無いとき |
 |---|---|---|
 | `rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定だけで判定する（無いのは正常で、`--lint` も言わない） |
 | `phases.yml` | フェーズ定義（共通レイヤーと config の和）。親の `plan:` に並べる名前と、その範囲・レビュー・成果物。順序は持たない（親の計画のステップの `after` で書く） | 計画の無い親だけが利用できる（番号だけのフェーズ）。計画を持つ親は承認できない |
 | `risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（big-diff・many-files・ci・deletes） |
+| `ticket-sections.yml` | 親（`parent`）と子（`child`）の提案の本文に求める `## ` の見出しと、親の雛形が見出しの下に置く空欄の目印（`todo`）。Stop の判定（R2）も共通レイヤーの見出しを求める | その種類の見出しを見ない（雛形にも見出しを置かない） |
 
 置けるレイヤーは 3 つ（共通 `.ccnavi/config/common/`、自身と各プロジェクトの `.ccnavi/config/project/`）で、置き場は固定。判定には、共通レイヤーにその操作に関わるレイヤーを足したものを使い、足すだけで上書きも取り消しもしない。
 
 | レイヤー | 置き場 | 何を置くか |
 |---|---|---|
-| 共通 | `.ccnavi/config/common/{rules,phases,risks}.yml` | どのツリーにも適用するもの |
-| ワークスペース自身 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース自身のツリーにだけ適用するもの |
-| プロジェクト | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | そのプロジェクトのツリーにだけ適用するもの |
+| 共通 | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml` | どのツリーにも適用するもの |
+| ワークスペース自身 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
+| プロジェクト | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
 同じ `id` のルールは足すだけで、上書きも取り消しもしない。厳しいほうが採られる。共通レイヤーは、着手済みの親のワークツリーのプロジェクトへミラーされる（`.ccnavi/docs/projects.md`）。
 どのプロジェクトでも同じ構成（`src/*`・`tests/*` など）を前提にできる `phases.yml` の定義は共通に、`scope` がレイアウトに依存する定義は config に置く。
 `phases.yml` を読むのは提案の承認の検査と `--plan-order <親> --fill-phases`（コピーを差し込む）と `--lint` だけで、承認のあとの判定は
 親チケットにコピーした定義（`phases:`）を読む。直しても進行中の親には届かない。
 
-- `risks.yml` と `phases.yml` が足すレイヤーは、親チケットの `project:` が指すレイヤー（空なら自身のレイヤー）
+- `risks.yml`・`phases.yml`・`ticket-sections.yml` が足すレイヤーは、親チケットの `project:` が指すレイヤー（空なら自身のレイヤー）
 
 ファイルが無いのは「設定が無い」正常で、空として扱い、`fallback` にも診断にも出ない。壊れているときだけ `--lint` が error で言う。
 組み込みの deny は、共通レイヤーと config の有無・状態によらず常に有効。
@@ -41,6 +42,7 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 - `phases.yml`: 共通と config のどちらか片方が無ければ、在る側の定義だけを使う。壊れたファイルは空として扱う。使う定義が無ければ、計画を持つ親の提案は承認できない（承認済みの親はコピーで判定し続け、`--lint` が warn で言う）
 - 共通レイヤーの `risks.yml`: 無ければ空として、他のレイヤーの項目だけを数える（組み込みの配点は共通も config も無いときだけ）。壊れていれば組み込みの配点だけで、他のレイヤーは足さない
 - 他のレイヤーの `rules.yml` と `risks.yml`: 無ければ空。壊れていれば空として扱い、そのレイヤーの分だけが抜ける
+- `ticket-sections.yml`: 足さずに置き換える。レイヤーに `parent`（`child`）があれば、その種類は共通の並びの代わりにレイヤーの並びを使う。壊れたファイルは使わない（レイヤーの側が壊れていれば共通の並びを使う）
 
 | 言われたこと | 読むもの |
 |---|---|
@@ -54,7 +56,7 @@ ccnavi の判定と進め方は 3 本のファイルで決まる。どれもユ�
 
 ## 絶対ルール
 
-- 3 本のファイルを書き換えない。下書きはワークツリーの `wip/handoff/`（.ccnavi/docs/scratchpad.md）に置き、検証を通してから
+- 4 本のファイルを書き換えない。下書きはワークツリーの `wip/handoff/`（.ccnavi/docs/scratchpad.md）に置き、検証を通してから
   「何をなぜ変えるか」と一緒にユーザに渡す。置くのはユーザ。`dry-run` で警告だけで通っても同じ
 - 判定を目で真似しない。ヒットするかどうかは必ず `sh .ccnavi/scripts/ccnavi-launcher.sh --test-expectations` か `--lint` に聞く
 - 期待する判定を実際の判定に合わせて書き換えない。食い違いが出たら、ルールと期待のどちらを直すかはユーザが決める
@@ -75,7 +77,7 @@ sh .ccnavi/scripts/ccnavi-launcher.sh --explain --log "" --state ""
 ```
 
 - `--lint` は判定をせず、防御を消す・全部止める記述を error、意図した防御が効いていない
-  記述を warn で名指しする。3 本まとめて見る。error があれば終了コード 1
+  記述を warn で名指しする。4 本まとめて見る。error があれば終了コード 1
 - `--test-expectations` は期待する判定をぜんぶ判定に掛け、置いたタイプ（`deny` / `ask` / `allow`）と
   違う判定になったものを並べる
 - `--explain` はいま効いているルールと承認済みのチケットの範囲を並べる
