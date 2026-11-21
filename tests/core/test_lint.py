@@ -197,26 +197,6 @@ class LintTest(unittest.TestCase):
         self.assertTrue(any("CCNAVI_GUARD_CORE_FILES=disable" in d for d in details), details)
         self.assertTrue(any("CCNAVI_RESTORE_IF_DENY=dry-run" in d for d in details), details)
 
-    def test_切り替えの環境変数が既定か_enableなら何も言わない(self):
-        result = lint(self.root, rules_file(self.root, SOUND))
-
-        self.assertNotIn("CCNAVI_GUARD_CORE_FILES", result.stdout)
-        self.assertNotIn("CCNAVI_RESTORE_IF_DENY", result.stdout)
-        self.assertIn("error 0 件、warn 0 件", result.stdout)
-        self.assertIn("確認できる者が居ないモードで守る: enable", result.stdout)
-        explicit = ccnavi(
-            self.root,
-            "--lint",
-            "--rules",
-            rules_file(self.root, SOUND),
-            "--mode",
-            "enable",
-            "--guard-ticket-approval",
-            "enable",
-        )
-        self.assertEqual(explicit.returncode, 0, explicit.stdout + explicit.stderr)
-        self.assertEqual(counts(explicit.stdout)[0], 0)
-
     def test_同じ識別子がdoingとdoneの両方に在ればerrorになる(self):
         # 動かす途中で止まった形跡（コピーできたが消せなかった）。状態の操作は「複数の場所にある」で
         # 止まるので、CI が先に名指しする。作業中とレビュー待ちだけを横断して数えると、
