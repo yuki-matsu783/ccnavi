@@ -17,7 +17,7 @@ import (
 
 // scripts/ccnavi-doctor.sh の受入テスト。外から動かし、出力と終了コードだけを読む。道具は隔離した bin だけを PATH にし、glab・curl・git の通信は
 // 記録つきの偽物にする。doctor は 1 回の起動が重いので、1 回の起動で読める項目はまとめて確かめる。origin の URL の読み方は
-// `tests/fixtures/host-kinds.json` の表（clitest/sh/small と Go）が確かめるので、ここでは分類ごとの段階だけを見る。
+// `tests/fixtures/host-kinds.json` の表（tests/sh/test_host_kinds_sh.py と Go の host_test.go）が確かめるので、ここでは分類ごとの段階だけを見る。
 
 const gitlabOrigin = "https://gitlab.example.com/g/p.git"
 
@@ -148,7 +148,11 @@ func TestDoctorDefaultRun(t *testing.T) {
 func TestDoctorNoNextAndDefaultCandidates(t *testing.T) {
 	t.Parallel()
 	d := newDoctor(t)
-	r := d.doctor(d.env(), "--no-next")
+	// 既定の候補一覧を通すため、iso.env が入れる空文字を外す（空文字は「探さない」経路になる）。
+	o := d.env()
+	delete(o.Env, "CCNAVI_DOCTOR_GLAB_CANDIDATES")
+	o.Unset = append(o.Unset, "CCNAVI_DOCTOR_GLAB_CANDIDATES")
+	r := d.doctor(o, "--no-next")
 	code(t, r, 0)
 	eq(t, "次: の数", countNext(r.Stdout), 0)
 	notIn(t, r.Stdout, "案内:")
@@ -460,7 +464,7 @@ func TestDoctorExisting(t *testing.T) {
 		want            check
 	}{
 		{"1 行に詰めた JSON と、文字列の中の同じ語", `{"note":"CCNAVI_MODE enable","a":1,"env":{"x":"y","CCNAVI_MODE":"dry-run"},"b":[1]}`, "", check{"ok", "dry-run", ""}},
-		{"エスケープを解き、大文字小文字を区別しない", `{"env":{"CCNAVI_MODE":"Enable"}}`, "", check{"warn", "enable", ""}},
+		{"エスケープを解き、大文字小文字を区別しない", `{"env":{"CCNAVI_MODE":"\u0045nable"}}`, "", check{"warn", "enable", ""}},
 		{"知らない値", `{"env":{"CCNAVI_MODE":"nope"}}`, "", check{"warn", "other", "nope"}},
 		{"local が dry-run なら上書きする", enable, dry, check{"ok", "dry-run", ""}},
 		{"local が enable なら上書きする", dry, enable, check{"warn", "enable", ""}},
@@ -590,9 +594,9 @@ func TestDoctorTimeoutEndsAndLeavesNoWatcher(t *testing.T) {
 }
 
 // signalRun は --online の実行中に信号を送り、終了コードを返す。偽の git の sleep が起きるのを待ってから送る。
-func (d *doctorEnv) signalRun(sig os.Signal, needle string) int {
+func (d *doctorEnv) signalRun(sig os.Signal, needle, limit string) int {
 	d.t.Helper()
-	o := d.slowOpts(needle, "30.123")
+	o := d.slowOpts(needle, limit)
 	// 子の信号の扱いを既定にそろえる。Go が SIGINT を捕まえていれば、背景で起こされて無視されている状態を子へ渡さない。
 	notify := make(chan os.Signal, 1)
 	signal.Notify(notify, os.Interrupt)
@@ -632,17 +636,18 @@ func TestDoctorSignalsCleanUp(t *testing.T) {
 		name   string
 		sig    os.Signal
 		needle string
+		limit  string
 		want   int
 	}{
-		{"INT", os.Interrupt, "61.313", 130},
-		{"TERM", syscall.SIGTERM, "61.314", 143},
+		{"INT", os.Interrupt, "61.313", "30.123", 130},
+		{"TERM", syscall.SIGTERM, "61.314", "30.124", 143},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			d := newDoctor(t)
-			eq(t, "終了コード", d.signalRun(c.sig, c.needle), c.want)
-			if left := waitGone("sleep 30.123", 5); len(left) != 0 {
+			eq(t, "終了コード", d.signalRun(c.sig, c.needle, c.limit), c.want)
+			if left := waitGone("sleep "+c.limit, 5); len(left) != 0 {
 				t.Errorf("見張りが残った: %v", left)
 			}
 		})

@@ -407,7 +407,7 @@ func runTTY(t testing.TB, argv []string, o run.Opts, answer string) run.Result {
 	}
 	script, err := exec.LookPath("script")
 	if err != nil {
-		t.Skip("疑似ターミナルを与える script が無い")
+		t.Skip("script（util-linux・bsdutils）が無いので --bin user の TTY の試験を飛ばす")
 	}
 	// script は $SHELL でコマンドを起こす。試したい SHELL（存在しない fish など）は、script の外ではなく中の環境にだけ渡す。
 	if shell, ok := o.Env["SHELL"]; ok {

@@ -107,7 +107,7 @@ func TestBinLookupSaysWhereItLookedWhenThereIsNothingToRun(t *testing.T) {
 		{"何も無い", func(b *binLookup) map[string]string { return nil }, ".ccnavi/bin/"},
 		{"launcher へのリンクは実行ファイルではない", func(b *binLookup) map[string]string {
 			if !base.CanSymlink() {
-				t.Skip("シンボリックリンクを作れない")
+				b.t.Skip("シンボリックリンクを作れない")
 			}
 			place := filepath.Join(b.ws, "on-path")
 			symlink(b.t, filepath.Join(b.ws, ".ccnavi", "scripts", "ccnavi-launcher.sh"), filepath.Join(place, "ccnavi"))
