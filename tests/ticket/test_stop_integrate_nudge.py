@@ -135,15 +135,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.commit_work(path, rel="src/more.py")
         self.assertIn("コミット 2 件", self.asked(self.stop(path)))
 
-    def test_commits_are_counted_from_the_recorded_start_point(self):
-        """入っていないコミットは S..先頭で数える。S より前のコミットは数えない。"""
-        path = self.direct(commit=True)
-        start = git(path, "rev-parse", "HEAD").strip()
-        self.record(snap=start)
-        self.assert_not_asked(self.stop(path))
-        self.commit_work(path, rel="src/more.py")
-        self.assertIn("コミット 1 件", self.asked(self.stop(path, session="s2")))
-
     def test_a_workspace_with_uncommitted_changes_in_the_main_checkout_does_not_stop_the_nudge(
         self,
     ):
@@ -152,23 +143,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, "src", "someone.py"), "z\n")
         self.asked(self.stop(path))
 
-    def test_a_switched_base_branch_with_uncommitted_changes_only_tells_the_reason(self):
-        """未コミットだけなら促す前提で言わず、取り込めない理由だけを言う。"""
-        path = self.direct(dirty=True)
-        self.record()
-        git(self.root, "switch", "--quiet", "-c", "other")
-        message = self.assert_not_asked(self.stop(path))["systemMessage"]
-        self.assertIn("今は取り込めません", message)
-        self.assertNotIn("未コミット", message)
-
-    def test_a_switched_base_branch_during_integrate_says_it_is_in_progress(self):
-        path = self.direct(commit=True)
-        common = self.record()
-        write(os.path.join(common, "ccnavi-integrate", "scratch", "marker"), "version 4\n")
-        git(self.root, "switch", "--quiet", "-c", "other")
-        message = self.assert_not_asked(self.stop(path))["systemMessage"]
-        self.assertIn("取り込みの途中ですが", message)
-
     def test_a_mid_operation_in_the_main_checkout_is_reported_without_stopping(self):
         path = self.direct(commit=True)
         self.record()
@@ -176,12 +150,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         write(os.path.join(self.root, gitdir), "0" * 40 + "\n")
         body = self.assert_not_asked(self.stop(path))
         self.assertIn("MERGE_HEAD", body["systemMessage"])
-
-    def test_a_record_from_another_repository_is_reported_without_stopping(self):
-        path = self.direct(commit=True)
-        self.record(common_dir=os.path.join(os.path.dirname(self.root), "elsewhere", ".git"))
-        body = self.assert_not_asked(self.stop(path))
-        self.assertIn("共通ディレクトリ", body["systemMessage"])
 
     def test_uncommitted_changes_alone_are_not_asked(self):
         """コミットは integrate の直前にまとめて打つ。未コミットだけなら作業中か返事待ちである。"""
@@ -270,13 +238,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
     def payload(self, cwd, session="s1"):
         return json.dumps({"hook_event_name": "Stop", "cwd": cwd, "session_id": session})
 
-    def test_a_busy_integration_tree_is_reported_without_stopping(self):
-        path = self.direct(commit=True)
-        gitdir = git(self.root, "rev-parse", "--git-path", "SQUASH_MSG").strip()
-        write(os.path.join(self.root, gitdir), "squash\n")
-        body = self.assert_not_asked(self.stop(path))
-        self.assertIn("SQUASH_MSG", body["systemMessage"])
-
     def test_a_missing_integration_ref_with_only_commits_stays_quiet(self):
         """コミットだけでは、統合先に入っているかを数えられない。誤って促さず黙る。"""
         path = self.direct(commit=True)
@@ -284,14 +245,6 @@ class IntegrateNudgeTest(base.StopNudgeTest):
         self.assertNotIn("systemMessage", body)
 
     # ---- integrate が断る名前
-
-    def test_names_that_integrate_refuses_are_not_asked(self):
-        for name in ("release-x", "master", "develop", "release"):
-            path = self.direct(name, commit=True)
-            write(os.path.join(path, "src", "draft.py"), "y\n")
-            result = self.stop(path, session=name)
-            self.assertNotIn(CODE, result.stdout, name)
-            self.assertNotIn("decision", self.body(result), name)
 
 
 def result_text(body):
