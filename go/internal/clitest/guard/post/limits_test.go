@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
@@ -16,9 +15,6 @@ import (
 )
 
 // ---- 判定の期限（REQ-CMN-08） ----
-
-// 判定の期限の既定（秒）。
-const deadlineSeconds = 3.0
 
 // lateOnFirstMatch は最初の照合で超える期限（秒）。実時間を待たずに期限切れの経路を見る。
 const lateOnFirstMatch = "0.000001"
@@ -112,8 +108,8 @@ func mapValues(m map[string]any) []string {
 	return out
 }
 
-// 実時間の代表入力は、期限の 1/3 に収まる大きさにして、上限は緩く取る（遅い機械で揺れないよう期限そのものにする）。
-// 時間を測るので、並行に回さない（ほかのテストと取り合わない）。
+// 代表入力は、判定が期限（既定）に収まる大きさにする。期限の判定は hook 自身が時計で行い、超えれば deadline-exceeded を出すので、
+// 試験は実時間を測らずにそれが出ないことだけを見る（子の起動を含めた壁時計の上限を置くと、ほかの go test と重なったときに揺れる）。
 func TestRepresentativeLargeInputsFinishWellWithinTheDeadline(t *testing.T) {
 	exe.Path(t) // 実行ファイルの組み立てを測りに入れない
 	root := freshWorkspace(t, "rules.yml")
@@ -122,13 +118,8 @@ func TestRepresentativeLargeInputsFinishWellWithinTheDeadline(t *testing.T) {
 		{"many substitutions", "echo " + strings.Repeat("$(:) ", 500)},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			start := time.Now()
 			got := deadlineRun(t, root, "enable", "Bash", bashInput(c.command), "")
-			took := time.Since(start).Seconds()
 			mustNotHave(t, got.Stderr, "deadline-exceeded")
-			if took >= deadlineSeconds {
-				t.Errorf("%.2f 秒かかった（上限 %.0f 秒）", took, deadlineSeconds)
-			}
 		})
 	}
 }

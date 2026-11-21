@@ -161,7 +161,7 @@ func TestContendersForAStaleLockNeverOverlap(t *testing.T) {
 			procs = append(procs, l.start("race", l.lockSh, nil))
 		}
 		// 全員が部品を読み終えて合図を待つまで待つ（決まった時間は待たない）
-		deadline := time.Now().Add(20 * time.Second)
+		deadline := time.Now().Add(60 * time.Second)
 		for len(withPrefix(names(t, l.dir), "ready.")) != lockContenders && time.Now().Before(deadline) {
 			time.Sleep(5 * time.Millisecond)
 		}
@@ -198,13 +198,13 @@ func TestALateThiefDoesNotRobTheLockACollectorTookInBetween(t *testing.T) {
 	lock := l.staleLock()
 	// A は古いと判断して、強制取得の入口で止まる。
 	a := l.start("a", patched, map[string]string{"CCNAVI_TEST_PAUSE_DIR": l.dir})
-	if !waitFor(filepath.Join(l.dir, "a.waiting"), 20*time.Second) {
+	if !waitFor(filepath.Join(l.dir, "a.waiting"), 60*time.Second) {
 		t.Fatal("A が強制取得に入らなかった")
 	}
 	// その間に B が古いロックを回収して、生きたロックを持つ。
 	b := l.start("b", l.lockSh, nil)
 	t.Cleanup(func() { _ = b.Process.Kill() })
-	if !waitFor(filepath.Join(l.dir, "b.held"), 20*time.Second) {
+	if !waitFor(filepath.Join(l.dir, "b.held"), 60*time.Second) {
 		t.Fatal("B がロックを取れなかった")
 	}
 	mark := strings.TrimSpace(read(t, filepath.Join(l.dir, "b.mark")))

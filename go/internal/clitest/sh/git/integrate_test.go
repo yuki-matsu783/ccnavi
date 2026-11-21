@@ -518,7 +518,7 @@ func TestIntegrateTwoOperationsAtOnceOneIsRefusedByTheLock(t *testing.T) {
 		slow <- f.sh("integrate-done", "wt", "-m", "feat: x")
 	}()
 	// integrate-done がロックを持ったままフックに入るまで待つ。
-	if !waitFor(started, 30*time.Second) {
+	if !waitFor(started, 90*time.Second) {
 		t.Fatal("フックが始まらない")
 	}
 	contains(t, f.code(f.sh("integrate", "wt"), 2).Stderr, "動いています")

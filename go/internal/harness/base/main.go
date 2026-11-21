@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,10 +17,24 @@ import (
 	"ccnavi/internal/infra/pathcase"
 )
 
-// waitingParallel は、clitest のテストの並行の数の既定（-parallel を渡せばそちらが優先）。
-// このテストは、ほとんどの時間を子のプロセス（ccnavi・git）の終わりを待って過ごす。CPU の数（go test の -parallel の
-// 既定）では待ちが重なり切らないので上げる。
-const waitingParallel = "16"
+// waitingParallel は、clitest のテストの並行の数の既定（-parallel を渡せばそちらが優先）。CPU の数（GOMAXPROCS）の 2 倍。
+// このテストは、子のプロセス（ccnavi・git・sh）の終わりを待つ時間が長いので、go test の既定（CPU の数）では待ちが重なり切らない。
+// 一方で子の多くは CPU を使うので、固定の大きな数（16 を測った）にすると、4 CPU では 8 より速くならず、sh/git のような重いパッケージは
+// 4 より遅くなり、ほかの go test と重なったときに時間の上限で落ちる。測った結果は scratchpad の H2 の報告。
+func waitingParallel() string { return strconv.Itoa(2 * runtime.GOMAXPROCS(0)) }
+
+// setParallel は、-parallel が渡されていなければ並行の数の既定を上げる（渡されていればそのまま）。
+func setParallel() {
+	explicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "test.parallel" {
+			explicit = true
+		}
+	})
+	if !explicit {
+		_ = flag.Set("test.parallel", waitingParallel())
+	}
+}
 
 // atExit は Main が終わりに消す置き場を覚える。
 func atExit(path string) {
@@ -36,7 +52,7 @@ func atExit(path string) {
 //   - PATH から ccnavi を外す
 //   - MSYS の引数の書き換えを止める
 //   - 一時置き場（TMPDIR）を実パスにする（macOS）
-//   - 並行の数の既定を 16 に上げる（待ちが主のテスト。-parallel を渡せばそちらが優先）
+//   - 並行の数の既定を CPU の数の 2 倍に上げる（待ちが主のテスト。-parallel を渡せばそちらが優先）
 //   - go test がこのパッケージの結果を保存しないようにする（Uncache。パッケージの doc を参照）
 //
 // 呼び忘れは、Root・TempDir・GitEnv・run の起動が最初の 1 本で panic して知らせる。
@@ -47,7 +63,7 @@ func Main(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "テストの環境を整えられない:", err)
 		os.Exit(1)
 	}
-	_ = flag.Set("test.parallel", waitingParallel)
+	setParallel()
 	code := m.Run()
 	exitMu.Lock()
 	for _, path := range exitPaths {
