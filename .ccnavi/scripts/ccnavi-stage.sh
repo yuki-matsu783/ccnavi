@@ -43,10 +43,7 @@ set -eu
 # 共通部分。ワークスペースルートと実行ファイルの探し方はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
 
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-stage: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を、cwd とこのスクリプトの置き場から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-stage
 bin=$(ccnavi_bin "$root") || {
 	printf 'ccnavi-stage: ccnavi の実行ファイルが見つかりません。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' >&2
 	exit 2

@@ -49,7 +49,7 @@ fail() {
 # 道具の置き場は上へたどって探す。
 review_place() {
 	root=$(ccnavi_workspace) ||
-		fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を、cwd とこのスクリプトの置き場から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+		fail no-workspace "$(ccnavi_no_workspace_text)" 2
 	# 解いたルートを logger に渡し、書くたびに探し直させない。
 	ccnavi_log_root="$root"
 	here="$(pwd -W 2>/dev/null || pwd)"

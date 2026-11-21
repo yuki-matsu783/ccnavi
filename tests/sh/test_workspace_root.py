@@ -25,7 +25,9 @@ def put_scripts(root):
     for name in common_sh(SH_SCRIPTS):
         shutil.copy(os.path.join(SH_SCRIPTS, name), dest)
     with open(os.path.join(dest, "probe.sh"), "w", encoding="utf-8", newline="\n") as f:
-        f.write('. "$(dirname "$0")/ccnavi-common.sh"\nccnavi_workspace\n')
+        f.write(
+            '. "$(dirname "$0")/ccnavi-common.sh"\nccnavi_workspace || ccnavi_no_workspace probe\n'
+        )
     return os.path.join(dest, "probe.sh")
 
 

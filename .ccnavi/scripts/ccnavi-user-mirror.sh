@@ -35,10 +35,7 @@ if [ $# -eq 1 ]; then
 fi
 
 # ワークスペースの外で開いた端末からも動くように、cwd から見つからなければ、この sh のある場所からルートを決める。
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-user-mirror: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を、cwd とこのスクリプトの置き場から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace_anywhere) || ccnavi_no_workspace ccnavi-user-mirror
 
 # 実行ファイルは、打った人の cwd のまま起こす（取り込み先のツリーと根は、実行ファイルが cwd から決める）。
 if bin=$(ccnavi_bin "$root"); then

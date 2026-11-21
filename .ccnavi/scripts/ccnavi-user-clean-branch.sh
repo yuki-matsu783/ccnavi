@@ -67,10 +67,7 @@ case "$name" in
 	;;
 esac
 
-root=$(ccnavi_workspace) || {
-	printf 'ccnavi-user-clean-branch: ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を、cwd とこのスクリプトの置き場から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。\n' >&2
-	exit 2
-}
+root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-user-clean-branch
 
 here="$(pwd -W 2>/dev/null || pwd)"
 if bin=$(ccnavi_bin "$root"); then
