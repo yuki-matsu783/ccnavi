@@ -219,7 +219,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
     def test_a_term_before_the_push_ends_undoes_the_commit(self):
         """送る前に TERM が来たら、自分のコミットを戻して抜ける。"""
         import signal
-        import time
 
         mark = os.path.join(self._base, "pushing")
         hooks = git(self.tree, "rev-parse", "--git-path", "hooks").stdout.strip()
