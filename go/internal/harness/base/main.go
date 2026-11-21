@@ -56,6 +56,8 @@ var (
 	exitPaths  []string
 	gitEnv     map[string]string
 	gitVarHead = "GIT_"
+	// fakeVarHead は模擬スタブの設定（FAKE_*）の頭。親の値は混ぜず、必要な値は run.Opts.Env で渡す。
+	fakeVarHead = "FAKE_"
 )
 
 // requireMain は Main を呼び忘れたテストを、最初の 1 本で落とす。呼ばないと git の締め出しも環境の掃除も黙って効かない。
@@ -91,21 +93,26 @@ func GitEnv() map[string]string {
 // scrubEnvironment はプロセスの環境から、子の答えを変える変数を外す。
 // git の変数（GIT_DIR・GIT_WORK_TREE・GIT_INDEX_FILE など、git の hook の中で回すと入る）は、子の git を別の木に向ける。
 // CLAUDE_* は Claude Code の変数。CLAUDE_PROJECT_DIR は実行ファイルのルートを最優先で決め、Claude Code の中で回すと本物のリポジトリを根にする。
+// FAKE_* は模擬スタブの設定。親の値は混ぜない。
 // CCNAVI_* は走らせた人の設定。CCNAVI_TEST_* だけは先に覚える。GITHUB_TOKEN・GITLAB_TOKEN は走らせた人のトークン。
 // 子の環境（run.Opts.Env）はここで整った環境への差分だけを足す。
 func scrubEnvironment() {
-	drop := map[string]bool{fold(env.GitHubToken): true, fold(env.GitLabToken): true}
 	for _, kv := range os.Environ() {
 		name, value, _ := strings.Cut(kv, "=")
 		folded := fold(name)
-		switch {
-		case strings.HasPrefix(folded, env.Prefix+"TEST_"):
+		if strings.HasPrefix(folded, env.Prefix+"TEST_") {
 			testVars[folded] = value
 			_ = os.Unsetenv(name)
-		case strings.HasPrefix(folded, env.Prefix), strings.HasPrefix(folded, env.ClaudePrefix), strings.HasPrefix(folded, gitVarHead), drop[folded]:
+		} else if scrubbed(folded) {
 			_ = os.Unsetenv(name)
 		}
 	}
+}
+
+// scrubbed は fold した名前の変数を子に渡さないかどうか。
+func scrubbed(folded string) bool {
+	return strings.HasPrefix(folded, env.Prefix) || strings.HasPrefix(folded, env.ClaudePrefix) || strings.HasPrefix(folded, gitVarHead) ||
+		strings.HasPrefix(folded, fakeVarHead) || folded == fold(env.GitHubToken) || folded == fold(env.GitLabToken)
 }
 
 // fold は環境変数の名前の比べ方。Windows は大文字小文字を区別しない。

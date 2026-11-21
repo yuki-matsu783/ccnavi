@@ -35,7 +35,7 @@ type Config struct {
 	StatePath string
 	// Initial があれば、StatePath に書いてから起こす。
 	Initial State
-	// Skew は時計を進める量。0 も負も渡せる（0 は 0 のまま。既定は DefaultSkew を入れる）。
+	// Skew は時計を進める量。0 も負も渡せる（0 は 0 のまま）。既定の DefaultSkew を入れるのは Start。New を直に呼ぶ手で使う入口は Skew を自分で決める。
 	Skew time.Duration
 	// Port は待ち受けるポート。0 なら OS が決める（空きを先に探して bind し直すと、その間に取られる）。
 	Port int
@@ -115,10 +115,10 @@ func (s *Server) Requests() []string {
 func (s *Server) record(line string) {
 	s.reqMu.Lock()
 	s.requests = append(s.requests, line)
-	s.reqMu.Unlock()
 	if s.echo != nil {
 		fmt.Fprintf(s.echo, "fake-gitlab %s\n", line)
 	}
+	s.reqMu.Unlock()
 }
 
 func (s *Server) now() string {

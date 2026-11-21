@@ -36,6 +36,19 @@ func TestGitConfigIsBlocked(t *testing.T) {
 	}
 }
 
+// FAKE_* は親の環境から外れる（子のスタブの設定に混ざらない）。
+func TestFakeVariablesOfTheParentAreScrubbed(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{"FAKE_X", "FAKE_TARGET_COMMON", "CCNAVI_X", "GIT_DIR"} {
+		if !scrubbed(fold(name)) {
+			t.Errorf("%s が外れない", name)
+		}
+	}
+	if scrubbed(fold("PATH")) {
+		t.Error("PATH は外さない")
+	}
+}
+
 // PATH の ccnavi があるディレクトリは、ccnavi だけを除いた置き場に替わる。ccnavi の無いディレクトリはそのまま。
 func TestDropCcnaviFromPath(t *testing.T) {
 	t.Parallel()

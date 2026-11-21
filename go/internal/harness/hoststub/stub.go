@@ -83,6 +83,12 @@ exec git "$@"
 
 const failScript = "#!/bin/sh\nexit 1\n"
 
+// WriteFail は常に 1 で終わる sh のスタブを書く（認証の無い glab・gh の代わり）。
+func WriteFail(t testing.TB, path string) {
+	t.Helper()
+	writeExecutable(t, path, failScript)
+}
+
 // Route は curl のスタブが 1 つの要求（`<METHOD> <URL>`）に返す答え。JSON では `[状態, 本文]`。
 type Route struct {
 	Status int
@@ -198,7 +204,7 @@ func (s Stub) Env(o EnvOpts) map[string]string {
 		out[env.GitLabToken] = o.Token
 	}
 	if o.TargetCommon != "" {
-		out["FAKE_TARGET_COMMON"] = o.TargetCommon
+		out["FAKE_TARGET_COMMON"] = filepath.ToSlash(o.TargetCommon)
 	}
 	if o.Bare != "" && o.RealOrigin != "" {
 		out["FAKE_BARE"] = o.Bare

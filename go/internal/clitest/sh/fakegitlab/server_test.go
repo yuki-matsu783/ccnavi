@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"path/filepath"
 	"slices"
@@ -205,8 +206,41 @@ func TestARejectedRequestWithABodyDoesNotBreakTheNextOne(t *testing.T) {
 			if code, got := do(t, srv, "GET", "/api/v4/projects/"+enc, nil); code != 200 || field(got, "path_with_namespace") != project {
 				t.Errorf("次の要求 = %d %v", code, got)
 			}
+			if !nextRequestReusesTheConnection(t, srv) {
+				t.Error("次の要求が同じ接続で通らない（本文を読み捨てていない）")
+			}
 		})
 	}
+}
+
+// nextRequestReusesTheConnection は GET を打ち、直前の要求の接続を使い回したかを返す。
+// 接続が空きの置き場に戻るのは非同期なので、使い回しに当たるまで数回打つ（接続を切る模擬なら毎回当たらない）。
+func nextRequestReusesTheConnection(t testing.TB, srv *fakegitlab.Server) bool {
+	t.Helper()
+	for range 10 {
+		if getReusingTheConnection(t, srv) {
+			return true
+		}
+	}
+	return false
+}
+
+func getReusingTheConnection(t testing.TB, srv *fakegitlab.Server) bool {
+	t.Helper()
+	req, err := http.NewRequest("GET", srv.URL+"/api/v4/projects/"+enc, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("PRIVATE-TOKEN", srv.Token)
+	reused := false
+	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { reused = info.Reused }}
+	res, err := http.DefaultClient.Do(req.WithContext(httptrace.WithClientTrace(req.Context(), trace)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	res.Body.Close()
+	return reused
 }
 
 // act で MR を引くすべての要求（method, path の MR 以降, 本文）。

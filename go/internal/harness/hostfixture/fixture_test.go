@@ -28,6 +28,19 @@ func asJSON(t *testing.T, v any) string {
 	return string(marshal(v))
 }
 
+// 見本の根か場面が空なら、黙って 404・403 にせず、変数名を言って 1 で終わる。
+func TestFixtureCurlNamesAMissingVariable(t *testing.T) {
+	t.Parallel()
+	var stdout, stderr strings.Builder
+	if code := GitlabCurl([]string{"http://x/api/v4/user"}, strings.NewReader(""), &stdout, &stderr, env(nil)); code != 1 || !strings.Contains(stderr.String(), FixtureRootVar) {
+		t.Errorf("code = %d, stderr = %q", code, stderr.String())
+	}
+	stderr.Reset()
+	if code := GithubCurl([]string{"http://x/user"}, strings.NewReader(""), &stdout, &stderr, env(map[string]string{FixtureRootVar: "/r"})); code != 1 || !strings.Contains(stderr.String(), "FAKE_GITHUB_SCENE") {
+		t.Errorf("code = %d, stderr = %q", code, stderr.String())
+	}
+}
+
 // 場面の見本があり、場面の名前を数えられる。
 func TestScenesExist(t *testing.T) {
 	t.Parallel()

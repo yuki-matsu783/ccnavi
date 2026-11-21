@@ -126,7 +126,10 @@ func postedBody(body string) object {
 // 環境変数: FAKE_GITLAB_SCENE（場面。必須）・FAKE_GITLAB_STATE（投稿の溜め先）・FAKE_GITLAB_LOG（要求の記録）・FAKE_GITLAB_NO_USER・
 // FAKE_GITLAB_NO_PROJECT（プロジェクトそのもの `GET /projects/<パス>` だけを 404 にする）。
 func GitlabCurl(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv Getenv) int {
-	method, target, body := parseCurl(args, stdin, true)
+	if requireFixtureEnv(GitLab, stderr, getenv) {
+		return 1
+	}
+	method, target, body := parseCurl(args, stdin)
 	if !strings.HasPrefix(target, gitlabAPI) {
 		fmt.Fprintf(stderr, "curl: 見本の外の URL: %s\n", target)
 		return 6
@@ -152,8 +155,7 @@ func GitlabCurl(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv
 }
 
 // parseCurl は curl の引数から、メソッド・URL・本文（--data-binary があれば標準入力）を取る。
-// withMaxTime が true なら --connect-timeout・--max-time の値も読み飛ばす（GitHub のスタブは読み飛ばさない）。
-func parseCurl(args []string, stdin io.Reader, withMaxTime bool) (method, target, body string) {
+func parseCurl(args []string, stdin io.Reader) (method, target, body string) {
 	method = "GET"
 	for i := 0; i < len(args); {
 		a := args[i]
@@ -163,7 +165,7 @@ func parseCurl(args []string, stdin io.Reader, withMaxTime bool) (method, target
 				method = args[i+1]
 			}
 			i += 2
-		case a == "-H" || a == "--header" || (withMaxTime && (a == "--connect-timeout" || a == "--max-time")):
+		case a == "-H" || a == "--header" || a == "--connect-timeout" || a == "--max-time":
 			i += 2
 		case a == "--data-binary":
 			raw, _ := io.ReadAll(stdin)

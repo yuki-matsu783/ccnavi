@@ -3,6 +3,7 @@ package hostfixture
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
+	"ccnavi/internal/harness/hoststub"
 )
 
 // Host は見本の持ち主のホスト。
@@ -62,39 +64,38 @@ func Env(h Host, scene string) map[string]string {
 	}
 }
 
+// requireFixtureEnv は見本の根と場面が渡されているかを見る。空なら変数名を stderr に言って true を返す（呼び手は 1 で終わる）。
+// 空のままだと相対パスで見本が読めず、404・403 に見えて原因が分からなくなる。
+func requireFixtureEnv(h Host, stderr io.Writer, getenv Getenv) bool {
+	sceneVar := "FAKE_" + strings.ToUpper(string(h)) + "_SCENE"
+	for _, name := range []string{FixtureRootVar, sceneVar} {
+		if getenv(name) == "" {
+			fmt.Fprintf(stderr, "%s が無い（hostfixture.Env を通す）\n", name)
+			return true
+		}
+	}
+	return false
+}
+
 // Install は PATH の先頭に置くスタブを bin に書く。curl は見本を返し、使えない glab（GitHub は gh）は失敗する
 // （認証の無い glab・gh は疎通の試しで失敗して curl に切り替わる）。GitHub の gh は `gh api` を見本で答える版を Install ではなく
 // InstallGh で置く。
 func Install(t testing.TB, bin string, h Host) {
 	t.Helper()
 	stub := exe.TeststubPath(t)
-	write(t, filepath.Join(bin, "curl"), shim(stub, string(h)+"-host", "curl"))
+	hoststub.WriteShim(t, filepath.Join(bin, "curl"), stub, string(h)+"-host", "curl")
 	switch h {
 	case GitLab:
-		write(t, filepath.Join(bin, "glab"), "#!/bin/sh\nexit 1\n")
+		hoststub.WriteFail(t, filepath.Join(bin, "glab"))
 	case GitHub:
-		write(t, filepath.Join(bin, "gh"), "#!/bin/sh\nexit 1\n")
+		hoststub.WriteFail(t, filepath.Join(bin, "gh"))
 	}
 }
 
 // InstallGh は GitHub の `gh api` を見本で答える gh を bin に置く（Install の失敗する gh の代わり）。
 func InstallGh(t testing.TB, bin string) {
 	t.Helper()
-	write(t, filepath.Join(bin, "gh"), shim(exe.TeststubPath(t), "github-host", "gh"))
-}
-
-func shim(teststub string, sub ...string) string {
-	return "#!/bin/sh\nexec '" + strings.ReplaceAll(teststub, `\`, "/") + "' " + strings.Join(sub, " ") + " \"$@\"\n"
-}
-
-func write(t testing.TB, path, text string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	hoststub.WriteShim(t, filepath.Join(bin, "gh"), exe.TeststubPath(t), "github-host", "gh")
 }
 
 // fixtures は 1 つの場面の見本を読む入口。

@@ -350,7 +350,10 @@ func cursorText(c any) string {
 // GithubCurl は teststub の github-host curl。`ccnavi-review.sh` が打つ形を受ける。
 // 環境変数: FAKE_GITHUB_SCENE（必須）・FAKE_GITHUB_STATE・FAKE_GITHUB_LOG・FAKE_GITHUB_NO_USER ほか（GithubAnswer の説明）。
 func GithubCurl(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv Getenv) int {
-	method, target, body := parseCurl(args, stdin, false)
+	if requireFixtureEnv(GitHub, stderr, getenv) {
+		return 1
+	}
+	method, target, body := parseCurl(args, stdin)
 	if !strings.HasPrefix(target, githubAPI) {
 		fmt.Fprintf(stderr, "curl: 見本の外の URL: %s\n", target)
 		return 6
@@ -375,6 +378,9 @@ func GithubCurl(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv
 // FAKE_GH_SLOW_USER に秒を入れると、`user` の答えをその秒だけ遅らせる（時間の上限の試験）。
 func GithubGh(args []string, stdin io.Reader, stdout, stderr io.Writer, getenv Getenv) int {
 	if len(args) == 0 || args[0] != "api" {
+		return 1
+	}
+	if requireFixtureEnv(GitHub, stderr, getenv) {
 		return 1
 	}
 	method, rel, body := "GET", "", ""
