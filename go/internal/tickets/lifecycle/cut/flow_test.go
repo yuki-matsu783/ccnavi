@@ -1,7 +1,6 @@
 package cut
 
 import (
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // ccnavi-worktree.sh が起こす 2 回（Plan のあと、fetch と ls-remote を済ませて Cut）を、使い捨てのワークスペースと bare の origin
@@ -45,41 +45,6 @@ func put(t *testing.T, path, text string) {
 	}
 }
 
-// copyMessages は、このリポジトリの文面ファイル（.ccnavi/messages/）を root の下に置く（文を見る検査に要る）。
-func copyMessages(t *testing.T, root string) {
-	t.Helper()
-	src, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(src, ".ccnavi", "messages")); err == nil {
-			break
-		}
-		parent := filepath.Dir(src)
-		if parent == src {
-			t.Fatal("文面ファイルの置き場（.ccnavi/messages）が上に無い")
-		}
-		src = parent
-	}
-	from := filepath.Join(src, ".ccnavi", "messages")
-	err = filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		rel, _ := filepath.Rel(from, path)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		put(t, filepath.Join(root, ".ccnavi", "messages", rel), string(data))
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // newFlow は、main を origin に送った状態のワークスペースを組む（.claude/ は .gitignore 済み）。
 func newFlow(t *testing.T) *flowFixture {
 	t.Helper()
@@ -103,7 +68,7 @@ func newFlow(t *testing.T) *flowFixture {
 	gitIn(f.t, f.root, "push", "-q", "origin", "main")
 	gitIn(f.t, f.root, "fetch", "-q", "origin")
 	gitIn(f.t, f.root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-	copyMessages(t, f.root)
+	testkit.CopyMessages(t, f.root)
 	return f
 }
 

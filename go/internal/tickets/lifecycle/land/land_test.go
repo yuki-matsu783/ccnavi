@@ -2,7 +2,6 @@ package land
 
 import (
 	"bytes"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/tickets/testkit"
 )
 
 // 直接作業の取り込み（integrate）の、一時ワークツリーを作る前に止まる判断と、下書きの数え方を、使い捨てのワークスペースで
@@ -43,41 +43,6 @@ func write(t *testing.T, path, text string) {
 	}
 }
 
-// copyMessages は、このリポジトリの文面ファイル（.ccnavi/messages/）を root の下に置く（文を見る検査に要る）。
-func copyMessages(t *testing.T, root string) {
-	t.Helper()
-	src, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(src, ".ccnavi", "messages")); err == nil {
-			break
-		}
-		parent := filepath.Dir(src)
-		if parent == src {
-			t.Fatal("文面ファイルの置き場（.ccnavi/messages）が上に無い")
-		}
-		src = parent
-	}
-	from := filepath.Join(src, ".ccnavi", "messages")
-	err = filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		rel, _ := filepath.Rel(from, path)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		write(t, filepath.Join(root, ".ccnavi", "messages", rel), string(data))
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // newFixture は、ワークスペース（ルートは main。origin/main が在る）と、記録つきの直接作業のワークツリー wt を組む。
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
@@ -89,7 +54,7 @@ func newFixture(t *testing.T) *fixture {
 	if err := os.MkdirAll(ws, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	copyMessages(t, ws)
+	testkit.CopyMessages(t, ws)
 	gitIn(t, ws, "init", "-q", "-b", "main")
 	gitIn(t, ws, "config", "user.email", "t@example.invalid")
 	gitIn(t, ws, "config", "user.name", "t")
