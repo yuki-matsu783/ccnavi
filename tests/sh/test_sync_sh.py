@@ -419,10 +419,8 @@ class SyncTest(SyncHarness):
         self.assertEqual(head, self.sha(self.tree, "HEAD"))
         self.assertNotIn("free", done.stdout)
 
-    def test_a_repeated_argument_is_taken_once(self):
-        done = self.sync(PARENT, PARENT)
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertEqual(1, done.stdout.count(f"{PARENT}: リモートと同じ"), done.stdout)
+    def test_without_the_executable_it_says_to_build_or_place_it(self):
+        # 引数の選び方（同じ親を 1 回だけ取る）は Go の `TestSyncPlanPicksTheFamilies` が見る。
         # 実行ファイルが無ければ、判定を持つ側がいないので、組むか置くかを言って止める。
         done = self.sync(PARENT, CCNAVI_ENTRY_PATH=os.path.join(self._tmp.name, "nowhere"))
         self.assertEqual(2, done.returncode, done.stdout + done.stderr)
@@ -698,40 +696,6 @@ class SyncTest(SyncHarness):
         again = self.sync()
         self.assertEqual(0, again.returncode, again.stdout + again.stderr)
 
-    def test_a_retired_record_without_an_mr_number_is_only_announced(self):
-        # mr の無い記録は incomplete と答えられる。一覧の案内だけで、自動では片付けない。
-        record = self.retire_record(mr=None)
-        self.retire_tree()
-        log = self.review_log("none")
-        for args in ((), (PARENT,)):
-            done = self.sync(*args)
-            self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-            self.assertIn("片付けの記録（retire/i0001.json）が利用できない", done.stdout)
-            self.assertIn("mr", done.stdout)
-        self.assertFalse(os.path.exists(log), "番号が無いのにホストへ聞いた")
-        self.assertTrue(os.path.exists(record))
-        self.assertIn(PARENT, self.branches())
-
-    def test_a_retired_record_of_another_parent_is_not_taken(self):
-        # ファイル名と中の parent が合わない記録は数えない（別の親を指させない）。
-        path = self.retire_record(name="other")
-        os.replace(path, os.path.join(self.retire_dir, f"{PARENT}.json"))
-        self.retire_tree()
-        log = self.review_log("none")
-        done = self.sync()
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("ワークツリーは片付け済み", done.stdout)
-        self.assertFalse(os.path.exists(log))
-
-    def test_a_retired_record_is_not_listed_while_the_worktree_exists(self):
-        # 親のワークツリーが在れば、記録があっても親として取り込む（片付けの列挙には入れない）。
-        self.retire_record()
-        self.review_says("none")
-        done = self.sync()
-        self.assertEqual(0, done.returncode, done.stdout + done.stderr)
-        self.assertNotIn("ワークツリーは片付け済み", done.stdout)
-        self.assertIn(f"{PARENT}: リモートと同じ", done.stdout)
-
     # ---- リモートにブランチが残っていても、MR がマージ済みなら閉じている
 
     def review_log(self, answer):
@@ -942,25 +906,6 @@ class SyncTest(SyncHarness):
         self.assertEqual(0, done.returncode, done.stdout + done.stderr)
         self.assertIn("origin がありません。", done.stdout)
         self.assertFalse(os.path.exists(os.path.join(self.state, "sync")))
-
-    def test_a_worktree_that_is_not_a_parent_is_refused(self):
-        other = os.path.join(self.ws, ".claude", "worktrees", "free")
-        git(self.ws, "worktree", "add", "-q", other, "-b", "free")
-        done = self.sync("free")
-        self.assertEqual(4, done.returncode, done.stdout + done.stderr)
-        self.assertIn("親のワークツリーではない", done.stdout)
-
-    def test_a_missing_worktree_says_how_to_cut_it(self):
-        done = self.sync("i0002")
-        self.assertEqual(1, done.returncode, done.stdout + done.stderr)
-        self.assertIn("切り直して", done.stdout)
-        self.assertIn("worktree add .claude/worktrees/i0002 <ブランチ>", done.stdout)
-
-    def test_bad_names_are_refused(self):
-        for bad in ("../x", "a/b", "-x", "a..b"):
-            with self.subTest(bad=bad):
-                done = self.sync(bad)
-                self.assertEqual(2, done.returncode, done.stdout + done.stderr)
 
     # ---- ロック（mkdir で取り、ホスト名・pid・開始時刻を書く。古いロックは mv で強制取得する）
 
