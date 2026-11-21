@@ -13,7 +13,7 @@ import {
   type ApproveWorktree,
 } from "../../src/core/approvemodel.js";
 
-/** Python 側のテスト（tests/ticket/test_approve_json.py）が書き出した、実行ファイルの出力そのもの */
+/** Go 側のテスト（go/internal/clitest/ticket/flow/approve_json_test.go）が書き出した、実行ファイルの出力そのもの */
 function fixtureText(name: string): string {
   return fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", name), "utf8");
 }

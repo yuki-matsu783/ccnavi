@@ -1,7 +1,7 @@
 /**
  * `ccnavi --explain --json`が出す形。実行ファイルと拡張の契約で、拡張はこれ以外を読まない。
  * 形の定義はccnaviのdocs/11_requirements/json-shapes.md「ボードのJSON」。同じ例がtest/fixtures/board.jsonにあり、
- * Python側のテスト（tests/ticket/test_board.py）が同じ例で形を確かめる。
+ * Goのテスト（go/internal/clitest/ticket/flow/board_test.go）が同じ例で形を確かめる。
  */
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */

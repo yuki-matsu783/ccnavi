@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 
-/** Python側のテスト（tests/ticket/test_board.py）が書き出した、実行ファイルの出力そのもの */
+/** Goのテスト（go/internal/clitest/ticket/flow/board_test.go）が書き出した、実行ファイルの出力そのもの */
 export const FIXTURE_PATH = path.join(__dirname, "..", "..", "..", "test", "fixtures", "board.json");
 
 export function fixtureText(): string {
