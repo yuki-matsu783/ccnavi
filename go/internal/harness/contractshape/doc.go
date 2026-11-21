@@ -9,7 +9,7 @@
 //	 "items": node}                   array のとき。要素の形の和集合。空の配列は持たない
 //
 // 比べる側の部品は shape.go（Normalize・Compare・CompareAll・ApplyAllow・ScanForbidden・PlacementProblems・WriteAtomic・Substitute）、
-// 模擬の側の場面と送り手は fakeside.go（SceneState・Run）。本物の側の場面を組むのは手動の道具（cmd/gitlabmanual）で、
+// 模擬の側の場面と送り手は fakeside.go（SceneState・Run）。本物の側の場面を組むのは手動の道具（contractrecord。入口は cmd/gitlabmanual の record-contract）で、
 // 置くか置かないかの判定（PlacementProblems）と原子的な書き込み（WriteAtomic）はここに置き、Docker なしで試す。
 //
 // 応答の本文は encoding/json で、数を json.Number に読んだもの（整数と小数を区別するため。LoadData と Run がそう読む）。
