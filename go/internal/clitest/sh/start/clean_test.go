@@ -3,6 +3,7 @@ package start
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -163,9 +164,14 @@ func TestCleanRejectsAMissingNameAndAnUnknownOption(t *testing.T) {
 }
 
 // linkDir はディレクトリへのリンクを作る。作れなければテストを飛ばす。
+// Windows で symlink が作れないときは junction（mklink /J）を試す。
 func linkDir(t testing.TB, target, link string) {
 	t.Helper()
-	if err := os.Symlink(target, link); err != nil {
+	err := os.Symlink(target, link)
+	if err != nil && runtime.GOOS == "windows" {
+		err = exec.Command("cmd", "/c", "mklink", "/J", link, target).Run()
+	}
+	if err != nil {
 		t.Skipf("リンクが作れない: %v", err)
 	}
 }
