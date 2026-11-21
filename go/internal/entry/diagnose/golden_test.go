@@ -3,15 +3,28 @@ package diagnose
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/golden"
 	"ccnavi/internal/tickets/testkit"
 )
+
+// TestMain は利用者の環境の CCNAVI_* と CLAUDE_* を外す（見本の答えを機械に依らせない）。
+func TestMain(m *testing.M) {
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		if strings.HasPrefix(name, env.Prefix) || strings.HasPrefix(name, "CLAUDE_") {
+			os.Unsetenv(name)
+		}
+	}
+	os.Exit(m.Run())
+}
 
 type diagCase struct {
 	Kind    string `json:"kind"`
