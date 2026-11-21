@@ -214,7 +214,7 @@ deny:
     subject: "/repo/.ccnavi/config/common/risks.yml"
     why: リスクの配点も同じ。自分の作業の重さを自分で決められる
   - tool: Write
-    subject: "/repo/.claude/hooks/lint-py.sh"
+    subject: "/repo/.claude/hooks/lint-go.sh"
     why: ガードを起動する hook 本体
   - tool: Edit
     subject: "/repo/docs/../.ccnavi/config/common/rules.yml"
@@ -223,13 +223,13 @@ deny:
     subject: "echo x > /repo/.ccnavi/config/common/rules.yml"
     why: Write で拒否した場所。リダイレクトで同じところに届く
   - tool: Bash
-    subject: "cd /repo && printf x >> .claude/hooks/lint-py.sh"
+    subject: "cd /repo && printf x >> .claude/hooks/lint-go.sh"
     why: 相対パスでも、追記でも同じ場所
   - tool: Bash
     subject: "sed -i s/deny/allow/ /repo/.ccnavi/config/common/rules.yml"
     why: その場で書き換える形
   - tool: Bash
-    subject: "cp /tmp/x /repo/.claude/hooks/lint-py.sh"
+    subject: "cp /tmp/x /repo/.claude/hooks/lint-go.sh"
     why: 別の場所から上書きする形。行き先に名前が来ている
   - tool: Bash
     subject: "mv /repo/.ccnavi/config/common/rules.yml /tmp/old.yml"
@@ -540,7 +540,7 @@ allow:
     subject: "cat /repo/.ccnavi/config/common/rules.yml"
     why: ガードの設定は読むほうが普通。名前が出ただけでは止めない
   - tool: Bash
-    subject: "grep -n cp /repo/.claude/hooks/lint-py.sh"
+    subject: "grep -n cp /repo/.claude/hooks/lint-go.sh"
     why: 書き込むコマンドの名前を探しているだけ。コマンドの先頭に無い
   - tool: Bash
     subject: "cat /repo/.ccnavi/config/common/rules.yml > /tmp/x"

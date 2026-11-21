@@ -1,6 +1,5 @@
 {
   "env": {
-    "PYTHONUTF8": "1",
     "ARCHIFY_UPDATE_CHECK_DISABLED": "1",
     "CCNAVI_GUARD_CORE_FILES": "dry-run",
     "CCNAVI_MODE": "dry-run",
@@ -97,7 +96,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/lint-py.sh\"",
+            "command": "sh \"${CLAUDE_PROJECT_DIR}/.claude/hooks/lint-go.sh\"",
             "timeout": 180
           },
           {

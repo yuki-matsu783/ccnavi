@@ -221,7 +221,7 @@ ccnavi_log_value() {
 }
 
 # 埋まった資格情報を `***` に伏せる。実行ファイルの diaglog.MaskUserinfo と拡張の maskUserinfo と
-# 同じ規則で伏せ、3 つの結果は 1 文字も違わない（tests/sh/test_diaglog_sh.py）。結果は ccnavi_log_out。
+# 同じ規則で伏せ、3 つの結果は 1 文字も違わない（go/internal/records/diaglog の TestSameLinesAsTheShAndTheExtension と clitest/sh/small の diaglog_test.go）。結果は ccnavi_log_out。
 #
 # 空白・タブ・LF・CR で切った語ごとに見る。
 #   - `://` を含む語: `://` の後ろから次の `/` までを authority とし、`@` があれば最後の `@` より

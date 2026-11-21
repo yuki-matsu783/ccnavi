@@ -188,7 +188,7 @@ ccnavi_fetch_or_note() {
 }
 
 # 報せを組み立てる `$( )` の中に `case` は書けない（macOS の bash 3.2 が `)` を読み違える。
-# tests/core/test_sh_portability.py）。`case` の要るものはここで関数にしておく。
+# go/internal/clitest/repo/sh_portability_test.go）。`case` の要るものはここで関数にしておく。
 
 # 実行ファイルに聞く（`ccnavi fetch <段取り> <引数>...`）。答えの out の行を出し、次の一手（next の語）を
 # ccnavi_fx_next に入れる。答えない（実行ファイルが無い・入れ替え中）なら 1。

@@ -528,7 +528,7 @@ ccnavi_is_branch() {
 #
 # 実行ファイルの `ids.Protected` の写し。実行ファイルを起こさない所（ccnavi_is_branch・ccnavi-user-push-approved.sh）
 # が使う。main・master・develop・release と、release/ か release- で始まる名前で、英字の大文字小文字は区別しない。
-# 一致は tests/fixtures/ident-cases.json の同じ表で、Go（ident_sh_test.go）と Python（tests/sh/test_ident_sh.py）が確かめる。
+# 一致は tests/fixtures/ident-cases.json の同じ表で、Go の試験（clitest/sh/small/ident_test.go と ids のテスト）が確かめる。
 # 規則を変えるときは両方を直す。
 ccnavi_is_protected() {
 	ccnavi_ip_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')
