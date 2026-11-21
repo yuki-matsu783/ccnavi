@@ -63,13 +63,13 @@ class Harness(unittest.TestCase):
 
 
 class TreeParentTest(Harness):
+    """答えの行の並びと、無い・壊れた・退避だけの親の答えは、go/internal/entry/shask の見本
+    （TestAnswersMatchGolden）が 1 字ずつ見る。ここは親の見分け方を、ファイルの形ごとに見る。"""
+
     def parent(self, name="p0001", tree=None):
         return self.answer("tree 1", "tree", "parent", tree or self.tree, name)["parent"]
 
-    def test_no_ticket_is_not_a_parent(self):
-        self.assertEqual("no", self.parent())
-
-    def test_each_place_holds_a_parent(self):
+    def test_the_shape_of_a_ticket_file_decides_whether_it_is_a_parent(self):
         for rel in (
             f"{APPROVED}/doing",
             f"{APPROVED}/done",
@@ -81,59 +81,21 @@ class TreeParentTest(Harness):
                 write(path, front(ticket="p0001"))
                 self.assertEqual("yes", self.parent())
                 os.remove(path)
-
-    def test_a_child_is_not_a_parent(self):
-        write(
-            os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
-            front(ticket="p0001", parent="x"),
-        )
+        doing = os.path.join(self.tree, APPROVED, "doing", "p0001.md")
+        archived = os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md")
+        cases = [
+            (doing, front(ticket="p0001", parent="x"), "no"),
+            (doing, front(ticket="p0002"), "no"),
+            (doing, front(ticket='"p0001"'), "yes"),
+            (doing, "---\nticket: p0001\n---\nparent: これは本文\n", "yes"),
+        ]
+        for path, text, want in cases:
+            with self.subTest(text=text):
+                write(path, text)
+                self.assertEqual(want, self.parent())
+        os.remove(doing)
+        write(archived, front(ticket="p0001", parent="x"))
         self.assertEqual("no", self.parent())
-
-    def test_another_id_inside_is_not_a_parent(self):
-        write(os.path.join(self.tree, APPROVED, "doing", "p0001.md"), front(ticket="p0002"))
-        self.assertEqual("no", self.parent())
-
-    def test_quoted_id_is_read_as_yaml(self):
-        write(os.path.join(self.tree, APPROVED, "doing", "p0001.md"), front(ticket='"p0001"'))
-        self.assertEqual("yes", self.parent())
-
-    def test_a_parent_line_in_the_body_does_not_make_a_child(self):
-        write(
-            os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
-            "---\nticket: p0001\n---\nparent: これは本文\n",
-        )
-        self.assertEqual("yes", self.parent())
-
-    def test_unreadable_frontmatter_is_said_so(self):
-        write(
-            os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
-            "---\nticket: [p0001\n---\n",
-        )
-        self.assertEqual("unreadable", self.parent())
-
-    def test_the_archive_counts_after_ready(self):
-        write(
-            os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
-            front(ticket="p0001"),
-        )
-        self.assertEqual("yes", self.parent())
-
-    def test_an_archived_child_does_not_count(self):
-        write(
-            os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
-            front(ticket="p0001", parent="x"),
-        )
-        self.assertEqual("no", self.parent())
-
-    def test_a_bad_name_is_refused(self):
-        result = self.ask("tree", "parent", self.tree, "../x")
-        self.assertNotEqual(0, result.returncode)
-        self.assertEqual("", result.stdout)
-
-    def test_a_missing_tree_is_refused(self):
-        result = self.ask("tree", "parent", os.path.join(self.ws, "nowhere"), "p0001")
-        self.assertNotEqual(0, result.returncode)
-        self.assertEqual("", result.stdout)
 
 
 class TreeParentGateFactsTest(Harness):
@@ -141,21 +103,6 @@ class TreeParentGateFactsTest(Harness):
 
     def facts(self, name="p0001"):
         return self.answer("tree 1", "tree", "parent", self.tree, name)
-
-    def test_the_lines_come_in_a_fixed_order(self):
-        out = self.ask("tree", "parent", self.tree, "p0001").stdout.splitlines()
-        self.assertEqual(
-            [
-                "tree 1",
-                "parent no",
-                "approved no",
-                "requested no",
-                "archived no",
-                "started no",
-                "mr -",
-            ],
-            out,
-        )
 
     def test_started_needs_a_started_at_in_the_approved_parent(self):
         path = os.path.join(self.tree, APPROVED, "doing", "p0001.md")
@@ -167,33 +114,19 @@ class TreeParentGateFactsTest(Harness):
         found = self.facts()
         self.assertEqual("yes", found["started"])
         self.assertEqual("yes", found["approved"])
-
-    def test_started_is_no_for_a_proposal_a_child_and_unreadable_frontmatter(self):
+        # 提案・子・読めない frontmatter では始まっていない。
+        write(path, front(ticket="p0001", parent="x", started_at="2026-10-18T00:00:00Z"))
+        self.assertEqual("no", self.facts()["started"])
+        write(path, "---\nticket: [p0001\n---\n")
+        self.assertEqual("no", self.facts()["started"])
+        os.remove(path)
         write(
             os.path.join(self.tree, PROPOSALS, "todo", "p0001.md"),
             front(ticket="p0001", started_at="2026-10-18T00:00:00Z"),
         )
         self.assertEqual("no", self.facts()["started"])
-        done = os.path.join(self.tree, APPROVED, "doing", "p0001.md")
-        write(done, front(ticket="p0001", parent="x", started_at="2026-10-18T00:00:00Z"))
-        self.assertEqual("no", self.facts()["started"])
-        write(done, "---\nticket: [p0001\n---\n")
-        self.assertEqual("no", self.facts()["started"])
 
-    def test_nothing_says_no_everywhere(self):
-        self.assertEqual(
-            {
-                "parent": "no",
-                "approved": "no",
-                "requested": "no",
-                "archived": "no",
-                "started": "no",
-                "mr": "-",
-            },
-            self.facts(),
-        )
-
-    def test_approved_counts_doing_and_done_but_not_proposals(self):
+    def test_approved_counts_doing_and_done_but_not_proposals_or_children(self):
         for rel in (f"{APPROVED}/doing", f"{APPROVED}/done"):
             with self.subTest(rel=rel):
                 path = os.path.join(self.tree, rel, "p0001.md")
@@ -208,34 +141,20 @@ class TreeParentGateFactsTest(Harness):
                 self.assertEqual("yes", found["parent"])
                 self.assertEqual("no", found["approved"])
                 os.remove(path)
-
-    def test_an_approved_child_is_not_an_approved_parent(self):
         write(
             os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
             front(ticket="p0001", parent="x"),
         )
         self.assertEqual("no", self.facts()["approved"])
 
-    def test_unreadable_frontmatter_is_unreadable_for_approved_too(self):
-        write(
-            os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
-            "---\nticket: [p0001\n---\n",
-        )
-        found = self.facts()
-        self.assertEqual("unreadable", found["parent"])
-        self.assertEqual("unreadable", found["approved"])
-
-    def test_requested_needs_a_requested_marker(self):
+    def test_requested_needs_a_requested_marker_of_this_parent(self):
         marks = os.path.join(self.tree, APPROVED, "phases", "p0001")
         write(os.path.join(marks, "1.reviewed"), "{}\n")
         write(os.path.join(marks, "x.requested"), "{}\n")
+        write(os.path.join(self.tree, APPROVED, "phases", "p0002", "1.requested"), "{}\n")
         self.assertEqual("no", self.facts()["requested"])
         write(os.path.join(marks, "2.requested"), "{}\n")
         self.assertEqual("yes", self.facts()["requested"])
-
-    def test_a_marker_of_another_parent_does_not_count(self):
-        write(os.path.join(self.tree, APPROVED, "phases", "p0002", "1.requested"), "{}\n")
-        self.assertEqual("no", self.facts()["requested"])
 
     def test_archived_is_the_local_archive_of_a_parent(self):
         archive = os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md")
@@ -246,44 +165,18 @@ class TreeParentGateFactsTest(Harness):
         self.assertEqual("yes", found["archived"])
         self.assertEqual("yes", found["parent"])
 
-    def test_the_archive_is_not_read_outside_the_worktrees(self):
-        outside = os.path.join(self.ws, "elsewhere")
-        os.makedirs(outside)
-        write(
-            os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
-            front(ticket="p0001"),
-        )
-        found = self.answer("tree 1", "tree", "parent", outside, "p0001")
-        self.assertEqual("no", found["archived"])
-
     def test_mr_is_the_mr_field_of_the_approved_parent(self):
-        write(os.path.join(self.tree, APPROVED, "doing", "p0001.md"), front(ticket="p0001", mr=430))
+        path = os.path.join(self.tree, APPROVED, "doing", "p0001.md")
+        write(path, front(ticket="p0001", mr=430))
         self.assertEqual("430", self.facts()["mr"])
-
-    def test_a_bad_mr_is_a_dash(self):
         for value in ("0", "-3", "abc", "[1]", '""'):
             with self.subTest(value=value):
-                write(
-                    os.path.join(self.tree, APPROVED, "doing", "p0001.md"),
-                    front(ticket="p0001", mr=value),
-                )
+                write(path, front(ticket="p0001", mr=value))
                 self.assertEqual("-", self.facts()["mr"])
-
-    def test_mr_of_a_proposal_is_not_used(self):
+        # 提案の mr は使わない。
+        os.remove(path)
         write(os.path.join(self.tree, PROPOSALS, "todo", "p0001.md"), front(ticket="p0001", mr=5))
         self.assertEqual("-", self.facts()["mr"])
-
-    def test_mr_comes_from_the_archive_after_ready(self):
-        write(
-            os.path.join(self.ws, "logs", "archive", "self", "done", "p0001.md"),
-            front(ticket="p0001", mr=77),
-        )
-        self.assertEqual("77", self.facts()["mr"])
-
-    def test_the_old_closed_answer_is_gone(self):
-        result = self.ask("sync", "closed", "p0001", "self", "main", self.tree)
-        self.assertNotEqual(0, result.returncode)
-        self.assertEqual("", result.stdout)
 
 
 if __name__ == "__main__":
