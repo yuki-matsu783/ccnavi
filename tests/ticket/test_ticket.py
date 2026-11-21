@@ -2801,31 +2801,12 @@ class TicketTest(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
 
-    def _stray(self):
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        stray = os.path.join(child, "src", "b", "stray.py")
-        write(stray, "x\n")
-        git(child, "add", "-A")
-        git(child, "commit", "--quiet", "-m", "stray")
-        return child, stray
-
     def test_outcome_ok_is_recorded_and_says_nothing(self):
         self.family()
         child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
         self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-o").returncode, 0)
         self.assertEqual(self._outcome_of("sub-o")["outcome"], "ok")
         self.assertNotIn("SUBAGENT", self.reason(self._agent_done("sub-o")))
-
-    def test_a_bounce_that_got_fixed_is_fixed_and_the_parent_is_not_warned(self):
-        self.family()
-        child, stray = self._stray()
-        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-f").returncode, 2)
-        self.assertFalse(self._outcome_of("sub-f")["final"])
-        git(child, "rm", "--quiet", "-f", "src/b/stray.py")
-        git(child, "commit", "--quiet", "-m", "revert")
-        self.assertEqual(self.hook("SubagentStop", "", child, agent_id="sub-f").returncode, 0)
-        self.assertEqual(self._outcome_of("sub-f")["outcome"], "fixed")
-        self.assertNotIn("差し戻されたまま", self.reason(self._agent_done("sub-f")))
 
     def test_an_unreadable_worktree_of_another_child_does_not_make_a_parent_tree_agent_unchecked(
         self,
@@ -2834,72 +2815,6 @@ class TicketTest(unittest.TestCase):
         shutil.rmtree(os.path.join(self.root, ".claude", "worktrees", "i0001-01-02"))
         self.hook("SubagentStop", "", self.parent_tree, agent_id="sub-p")
         self.assertEqual(self._outcome_of("sub-p")["outcome"], "ok")
-
-    def break_git_of(self, worktree):
-        """子のワークツリーの HEAD を、親と履歴を共有しないコミットにする
-        （子の仕事の始まりを決められない）。"""
-        git(worktree, "checkout", "--quiet", "--orphan", "unrelated")
-        git(worktree, "commit", "--quiet", "-m", "unrelated")
-
-    def unreadable_stop(self, agent_id, session="s1"):
-        """子のワークツリーを読めないまま、サブエージェントを終わらせる。"""
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        stop = {
-            "hook_event_name": "SubagentStop",
-            "cwd": child,
-            "session_id": session,
-            "agent_id": agent_id,
-        }
-        self.break_git_of(child)
-        done = self.ccnavi("--mode", "enable", stdin=json.dumps(stop))
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-
-    def test_marks_of_another_session_are_left_alone_and_the_prompt_tells_the_parent(self):
-        """印の名前の前置きが重なる別のセッション（`s1` と `s1-x`）の印は、読まずに残す。
-        親がツールを使わずにターンを終えたなら、次の依頼（UserPromptSubmit）で言う。"""
-        self.family()
-        self.unreadable_stop("sub-bg", session="s1-x")
-        mine = self.hook("PostToolUse", "Bash", self.parent_tree, command="ls")
-        self.assertNotIn("worktree-unreadable", self.reason(mine))
-        theirs = self.hook("PostToolUse", "Bash", self.parent_tree, session="s1-x", command="ls")
-        self.assertIn("worktree-unreadable", self.reason(theirs))
-        child = os.path.join(self.root, ".claude", "worktrees", "i0001-01-01")
-        stop = {
-            "hook_event_name": "SubagentStop",
-            "cwd": child,
-            "session_id": "s1",
-            "agent_id": "sub-bg2",
-        }
-        self.assertEqual(self.ccnavi("--mode", "enable", stdin=json.dumps(stop)).returncode, 0)
-        prompt = {
-            "hook_event_name": "UserPromptSubmit",
-            "cwd": self.parent_tree,
-            "session_id": "s1",
-            "prompt": "続けて",
-        }
-        result = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        said = self.reason(result)
-        self.assertIn("worktree-unreadable", said)
-        self.assertIn("sub-bg2", said)
-        again = self.ccnavi("--mode", "enable", stdin=json.dumps(prompt))
-        self.assertNotIn("worktree-unreadable", self.reason(again))
-
-    def test_an_outcome_that_cannot_be_saved_is_not_treated_as_normal(self):
-        """AT28: `.outcome` を保存できないとき、記録は残らない（言うのは標準エラーだけ）が、
-        差し戻しを無視して終わった体は、記録が無いときの従来の経路で親に「差し戻されたまま」と
-        言われる。正常（言わない）には扱われない。"""
-        self.family()
-        child, _ = self._stray()
-        # 記録の置き場をディレクトリで塞ぐ（書き換えられない）
-        outcome = os.path.join(self.root, "logs", "state", "subagent-s1-sub-w.outcome")
-        os.makedirs(outcome)
-        first = self.hook("SubagentStop", "", child, agent_id="sub-w")
-        second = self.hook("SubagentStop", "", child, agent_id="sub-w")
-        self.assertEqual(first.returncode, 2)
-        self.assertIn("保存できませんでした", second.stderr)
-        self.assertFalse(os.path.isfile(outcome))
-        self.assertIn("差し戻されたまま", self.reason(self._agent_done("sub-w")))
 
     # ---- 診断
 

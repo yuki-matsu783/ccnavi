@@ -285,6 +285,14 @@ func TestTicketSessionMatchesGolden(t *testing.T) {
 		},
 		writePair("dry-run out", childWT, childRel+"/src/y.py", "t7", with("CCNAVI_MODE", "dry-run")),
 		writePair("restore", childWT, childRel+"/src/z.py", "t8", with("CCNAVI_RESTORE_IF_DENY", "enable")),
+		// 子のワークツリーを読めないまま終わったサブエージェントは、親がツールを使わずにターンを終えても、次の発言で 1 度だけ言う。
+		[]step{
+			{Name: "unreadable stop", Payload: payload("SubagentStop", childWT, "agent_id", "bg2", "agent_type", "general-purpose"), Env: plain,
+				Git: []gitCall{{Dir: childRel, Args: []string{"checkout", "--quiet", "--orphan", "unrelated"}},
+					{Dir: childRel, Args: []string{"commit", "--quiet", "-m", "unrelated"}}}},
+			{Name: "prompt unreadable", Payload: payload("UserPromptSubmit", parentWT, "prompt", "続けて"), Env: plain},
+			{Name: "prompt unreadable again", Payload: payload("UserPromptSubmit", parentWT, "prompt", "もう一度"), Env: plain},
+		},
 	)
 	compareScenario(t, workspace, steps)
 }

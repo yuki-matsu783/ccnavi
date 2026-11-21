@@ -21,11 +21,13 @@ import (
 // サブエージェントの始まりと終わりの一連の呼び出しを決めた形のワークスペースへ打ち、応答・終了コード・標準エラー・
 // 判定の記録・state に書いた印を、Go の答えの見本（答えが確かめ済みだった Go の出力から取った）と比べる。
 
-// step は 1 つの手順。op が write ならワークスペースにファイルを書き、call なら呼ぶ。
+// step は 1 つの手順。op が write ならワークスペースにファイルを書き、remove なら消し、mkdir ならディレクトリを作り、git なら Cwd で git を打ち、call なら呼ぶ。
 type step struct {
 	Op   string `json:"op"`
 	Path string `json:"path,omitempty"`
-	Text string `json:"text,omitempty"`
+	// git は Cwd のワークツリーで打つ git の引数。
+	Args []string `json:"args,omitempty"`
+	Text string   `json:"text,omitempty"`
 	// call の中身。kind は start・stop・post（親の PostToolUse が言う知らせ）・error・running・forget。
 	Kind      string    `json:"kind,omitempty"`
 	Cwd       string    `json:"cwd,omitempty"` // root からの相対
@@ -88,8 +90,22 @@ func runScenario(t *testing.T, steps []step, root string) []result {
 	t.Helper()
 	var out []result
 	for _, st := range steps {
-		if st.Op == "write" {
+		switch st.Op {
+		case "write":
 			testkit.Put(t, filepath.Join(root, filepath.FromSlash(st.Path)), st.Text)
+			continue
+		case "remove":
+			if err := os.Remove(filepath.Join(root, filepath.FromSlash(st.Path))); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		case "mkdir":
+			if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(st.Path)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			continue
+		case "git":
+			testkit.Git(t, filepath.Join(root, st.Cwd), st.Args...)
 			continue
 		}
 		conf := testkit.Settings(t, root)
@@ -157,6 +173,8 @@ var (
 	stampText   = regexp.MustCompile(`\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:?\d\d`)
 	atField     = regexp.MustCompile(`\\"at\\": [0-9.e+]+`)
 	idStamp     = regexp.MustCompile(`:\d{13}\\"`)
+	// 書きかけの一時ファイルの名前（毎回違う綴りが入る）。
+	partName = regexp.MustCompile(`(\.subagent-[\w-]+\.)\w{8}(\.part\.outcome)`)
 )
 
 func normalized(t *testing.T, r result, root string) string {
@@ -179,6 +197,7 @@ func normalized(t *testing.T, r result, root string) string {
 	text = startedLine.ReplaceAllString(text, "${1}<t>\\n")
 	text = stampText.ReplaceAllString(text, "<stamp>")
 	text = atField.ReplaceAllString(text, `\"at\": <t>`)
+	text = partName.ReplaceAllString(text, "${1}<rand>${2}")
 	return idStamp.ReplaceAllString(text, `:<ms>\"`)
 }
 
@@ -310,6 +329,25 @@ func TestScenarioMatchesGolden(t *testing.T) {
 		{Op: "call", Kind: "running", Session: "s2"},
 		{Op: "call", Kind: "stop", Cwd: wt(child), Agent: "c1x", Off: true},
 		call("stop", "", "a1"),
+		// 差し戻されて直したサブエージェントは fixed になり、親は言われない。
+		call("stop", wt(child), "f1"),
+		{Op: "remove", Path: wt(child) + "/src/out.py"},
+		call("stop", wt(child), "f1"),
+		{Op: "call", Kind: "post", Tool: config.ToolAgent, Launched: "f1"},
+		// 結果を保存できなくても、差し戻しを無視した終わりは正常に扱わず、親に言う（記録の置き場をディレクトリで塞ぐ）。
+		{Op: "write", Path: wt(child) + "/src/out.py", Text: "x\n"},
+		{Op: "mkdir", Path: "logs/state/subagent-s1-w.outcome"},
+		call("stop", wt(child), "w"),
+		call("stop", wt(child), "w"),
+		{Op: "call", Kind: "post", Tool: config.ToolAgent, Launched: "w"},
+		{Op: "remove", Path: wt(child) + "/src/out.py"},
+		// 前置きが重なる別のセッション（s1 と s1-x）の結果は、読まずに残す。子のワークツリーを読めないまま終わった
+		// サブエージェントの知らせは、その終わりのセッションの親にだけ言う。
+		{Op: "git", Cwd: wt(child), Args: []string{"checkout", "--quiet", "--orphan", "unrelated"}},
+		{Op: "git", Cwd: wt(child), Args: []string{"commit", "--quiet", "-m", "unrelated"}},
+		{Op: "call", Kind: "stop", Cwd: wt(child), Agent: "bg", Session: "s1-x"},
+		{Op: "call", Kind: "post", Tool: config.ToolBash},
+		{Op: "call", Kind: "post", Tool: config.ToolBash, Session: "s1-x"},
 	}
 	root := workspace(t)
 	got := runScenario(t, steps, root)
@@ -323,7 +361,7 @@ func TestScenarioMatchesGolden(t *testing.T) {
 	for _, mark := range []string{
 		ownFlowOnly, "別の編集するサブエージェントが動いています", "ワークスペースルート", "（" + child + "）",
 		"定義 設計 の上限の外", "親 " + parent + " の範囲の外", "SUBAGENT_UNATTRIBUTED", "差し戻されたまま終わっています",
-		"内部エラーで止まり", "のワークツリーを読めず", "着手後にフローが書き換わった", "スキル候補", "unchecked: " + child3,
+		"内部エラーで止まり", "のワークツリーを読めず", "着手後にフローが書き換わった", "スキル候補", "unchecked: " + child3, `"outcome": "fixed"`, "worktree-unreadable", "保存できませんでした",
 	} {
 		if !strings.Contains(string(all), strings.Trim(mustJSON(mark), `"`)) {
 			t.Errorf("見本が %q を通っていない", mark)
