@@ -1,0 +1,97 @@
+package setup
+
+import (
+	"path/filepath"
+	"testing"
+)
+
+// 導入スクリプト（scripts/ccnavi-setup.sh）が配る設定のひな形の置き場。rules・phases・risk のひな形は、どれも共通レイヤー
+// （.ccnavi/config/common/）へ配る。自身のレイヤー（.ccnavi/config/project/）の phases.yml は配らない（レイアウトに依存する定義は
+// 配布先のユーザが書く。既にあれば触らない）。配らないときは、rules と risk と、phases が共通にも自身のレイヤーにも無いことが
+// 「まだ無いもの」に名前が出る。
+
+const (
+	layerRisk   = "version: 1\nlevels: {medium: 20, high: 40, critical: 70}\nfactors: {}\n"
+	layerPhases = "version: 1\nphases:\n  implement:\n    kind: work\n    title: 実装とテスト\n    review: true\n    scope: [\"src/*\", \"tests/*\"]\n"
+	ownPhases   = "version: 1\nphases:\n  docs:\n    kind: work\n    title: 文書\n    review: true\n    scope: [\"docs/*\"]\n"
+	minePhases  = "version: 1\nphases:\n  mine:\n    kind: work\n    title: 自分の\n"
+)
+
+// layersSource は配布元のふり。実行ファイルと、共通レイヤーの rules / phases / risk と、自身のレイヤーの phases。
+// 代わりに通る sh は起動して最初に共通部を読むので、配布元にもそれを置く（無いと「配布元に無くて配れないもの」として名指しされる）。
+func layersSource(t *testing.T) string {
+	t.Helper()
+	root := makeSource(t, srcOpts{NoParts: true})
+	write(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
+	write(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), layerRisk)
+	write(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), layerPhases)
+	write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), ownPhases)
+	write(t, filepath.Join(root, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
+	write(t, filepath.Join(root, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
+	copyFile(t, launcherPath(), filepath.Join(root, ".ccnavi", "scripts", launcherName), 0o644)
+	for _, name := range deployScripts {
+		write(t, filepath.Join(root, ".ccnavi", "scripts", name), "# "+name+"\n")
+	}
+	return root
+}
+
+// 共通レイヤーに rules.yml・risks.yml・phases.yml のひな形を中身を変えずに配る。自身のレイヤーの phases.yml は、配布元にあっても配らず、
+// 配布先に既にあれば --force でも触らない。
+func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
+	t.Parallel()
+	t.Run("配布先が空", func(t *testing.T) {
+		t.Parallel()
+		w := newTarget(t)
+		r := w.setup("--mode", "enable", "--deploy", layersSource(t))
+		code(t, r, 0)
+		for _, kind := range []string{"rules.yml", "risks.yml", "phases.yml"} {
+			if !exists(w.path(".ccnavi", "config", "common", kind)) {
+				t.Errorf("共通レイヤーの %s が配られていない", kind)
+			}
+		}
+		if exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
+			t.Error("自身のレイヤーの phases.yml を配った")
+		}
+		notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml", "まだ無いもの")
+	})
+	t.Run("--force でも配布先の自身のレイヤーに触らない", func(t *testing.T) {
+		t.Parallel()
+		w := newTarget(t)
+		own := write(t, w.path(".ccnavi", "config", "project", "phases.yml"), minePhases)
+		r := w.setup("--mode", "enable", "--deploy", layersSource(t), "--force")
+		code(t, r, 0)
+		eq(t, "共通の phases.yml", read(t, w.path(".ccnavi", "config", "common", "phases.yml")), layerPhases)
+		eq(t, "自身のレイヤーの phases.yml", read(t, own), minePhases)
+		in(t, r.Stdout, ".ccnavi/config/common/phases.yml")
+		notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml")
+	})
+}
+
+// 配布先に共通レイヤーの phases.yml があれば、--force の無い配布では入れ替えない。
+func TestExistingCommonPhasesIsKeptWithoutForce(t *testing.T) {
+	t.Parallel()
+	w := newTarget(t)
+	common := write(t, w.path(".ccnavi", "config", "common", "phases.yml"), minePhases)
+	r := w.setup("--mode", "enable", "--deploy", layersSource(t))
+	code(t, r, 0)
+	eq(t, "共通の phases.yml", read(t, common), minePhases)
+}
+
+// フェーズ定義が共通レイヤーにだけあれば、自身のレイヤーの phases.yml が無くても「まだ無いもの」に出さない。
+func TestPhasesOnlyInCommonIsNotMissing(t *testing.T) {
+	t.Parallel()
+	w := newTarget(t)
+	write(t, w.path(".ccnavi", "config", "common", "phases.yml"), layerPhases)
+	r := w.setup("--mode", "enable", "--no-deploy")
+	code(t, r, 0)
+	notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml", ".ccnavi/config/common/phases.yml")
+}
+
+// rules と risk と、どこにも無いフェーズ定義を「まだ無いもの」の点検に数える。
+func TestMissingTemplatesAreNamed(t *testing.T) {
+	t.Parallel()
+	w := newTarget(t)
+	r := w.setup("--mode", "enable", "--no-deploy")
+	code(t, r, 0)
+	in(t, r.Stdout, "まだ無いもの", ".ccnavi/config/common/rules.yml", ".ccnavi/config/common/risks.yml", ".ccnavi/config/common/phases.yml")
+}
