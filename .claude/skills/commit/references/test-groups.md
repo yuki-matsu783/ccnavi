@@ -58,7 +58,7 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`・`test_start_sh_adopt`） |
 | `go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_start_sh_adopt`・`test_ticket_preflight_sh`・`test_write_and_push_ticket`）。`ccnavi-common-host.sh` は多くの sh が読むため、下の「全件を回すとき」に従う |
 | `.ccnavi/scripts/ccnavi-common-write-and-push.sh`・`go/internal/tickets/lifecycle/wapmerge/`・`go/internal/entry/cli/wapwrite.go` | `sh`（`test_write_and_push_*`・`test_push_approved_sh`）`ticket`（`test_write_and_push`） |
-| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`・`test_branches_sh`・`test_mask_url_sh`） |
+| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`・`test_branches_sh`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/check-adr.sh` | `core`（`test_check_adr_hook`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
@@ -69,7 +69,7 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/scenarios/hostenv.py`・`tests/scenarios/runner.py` と、その下請けの `tests/scenarios/` のモジュール（`drive.py`・`repo.py`・`actors/` など） | `scenarios` `sh` `contract` `core`（`sh` `contract` は、この 2 つのスタブと模擬を import して使う。`core` の `test_scenario_layers` は、`tests/scenarios/` の import の向きを読む） |
 | `tests/scenarios/*.yml`・`tests/scenarios/sandbox.py` | `scenarios`（`test_stub_scenarios` が、台本のあるシナリオを使い捨てのワークスペースでスタブで回す。ccnavi の判定を変えても結果が変わる） |
 | `tests/manual/gitlab/gitlab_api.py` | `scenarios` `core`（受入シナリオの相手の準備と状態の読み取りに使う。`core` の `test_gitlab_manual_tools` も使う） |
-| `tests/fixtures/` | `guard` `ticket`（sh の写しとの一致の表 `ident-cases.json`・`sh-quote-cases.json`・`host-kinds.json`・`layout.json`・`approved-carry.json` は、`sh` の `test_ident_sh`・`test_sh_quote_sh`・`test_host_kinds_sh`・`test_sh_copies_sh` と `go test` の両方で確かめる） |
+| `tests/fixtures/` | `guard` `ticket`（sh の写しとの一致の表 `ident-cases.json`・`sh-quote-cases.json`・`host-kinds.json`・`layout.json`・`approved-carry.json` は、`go test`（`go/internal/clitest/sh/small/` を含む）で確かめる） |
 | `extensions/vscode/` | `ticket`（`core` の `test_test_json` と `guard` の `test_suggest` も `test/fixtures/` を読む） |
 | `tests/contract/`（`shape.py`・`*.json`） | `contract`。あわせて `extensions/chrome/ccnavi-approval` の `pnpm test`（TS の比較器が同じ表を読む） |
 | `extensions/chrome/ccnavi-approval/test/helpers/mock-gitlab.ts`・`shape.ts` | `extensions/chrome/ccnavi-approval` の `pnpm test`（契約の試験） |
