@@ -158,23 +158,18 @@ func checkCases(t *testing.T, build func(t *testing.T) string, cases []judgeCase
 	root := build(t)
 	var seen []judgeAnswer
 	// 相対パスは作業ディレクトリで絶対にされ、その場所（ワークツリーの中かどうか）で答えも変わる。
-	// checkout の場所で見本が変わらないよう、回す間だけ空の使い捨てのディレクトリ（{CWD}）に移る（setEnv が環境を丸ごと替えるので並行しない）。
+	// checkout の場所で見本が変わらないよう、回す間だけ空の使い捨てのディレクトリ（{CWD}）に移る（サブテストの t.Chdir が、見本を開く前に戻す。setEnv が環境を丸ごと替えるので並行しない）。
 	cwd, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	prev, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(cwd); err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range cases {
-		seen = append(seen, runGo(t, root, c.at(root)).normalized(root, cwd))
-	}
-	if err := os.Chdir(prev); err != nil {
-		t.Fatal(err)
+	if !t.Run("calls", func(t *testing.T) {
+		t.Chdir(cwd)
+		for _, c := range cases {
+			seen = append(seen, runGo(t, root, c.at(root)).normalized(root, cwd))
+		}
+	}) {
+		return
 	}
 	golden.Check(t, strings.TrimPrefix(t.Name(), "Test"), seen)
 }
