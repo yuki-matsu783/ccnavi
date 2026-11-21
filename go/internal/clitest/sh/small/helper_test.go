@@ -136,7 +136,7 @@ func probe(t *testing.T, shell, dir, fn, value, locale string) bool {
 	return res.Code == 0
 }
 
-// splitLines は Python の splitlines に合わせる（末尾の改行は 1 つだけ区切り。空は空の並び）。
+// splitLines は `\n` で切る。末尾の改行 1 つは区切りにしない。空は nil。
 func splitLines(s string) []string {
 	s = strings.TrimSuffix(s, "\n")
 	if s == "" {

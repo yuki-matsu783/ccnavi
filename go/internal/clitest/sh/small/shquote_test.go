@@ -1,6 +1,7 @@
 package small
 
 import (
+	"strings"
 	"testing"
 
 	"ccnavi/internal/harness/run"
@@ -35,7 +36,7 @@ func TestShQuoteMatchesTheTable(t *testing.T) {
 				if res.Code != 0 {
 					t.Fatalf("code = %d, stderr = %q", res.Code, res.Stderr)
 				}
-				if got := trimOneNewline(res.Stdout); got != c.Out {
+				if got := strings.TrimSuffix(res.Stdout, "\n"); got != c.Out {
 					t.Errorf("got %q, want %q", got, c.Out)
 				}
 			})

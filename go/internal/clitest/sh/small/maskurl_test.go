@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"ccnavi/internal/harness/base"
@@ -39,17 +40,9 @@ func TestDoctorMasksCredentialsInURLs(t *testing.T) {
 			if res.Code != 0 {
 				t.Fatalf("code = %d, stderr = %q", res.Code, res.Stderr)
 			}
-			if got := trimOneNewline(res.Stdout); got != "git clone "+c.want {
+			if got := strings.TrimSuffix(res.Stdout, "\n"); got != "git clone "+c.want {
 				t.Errorf("got %q, want %q", got, "git clone "+c.want)
 			}
 		})
 	}
-}
-
-// trimOneNewline は末尾の改行を 1 つだけ外す（Python の stdout.rstrip("\n") の代わりに、余分な行を残さない）。
-func trimOneNewline(s string) string {
-	if len(s) > 0 && s[len(s)-1] == '\n' {
-		return s[:len(s)-1]
-	}
-	return s
 }

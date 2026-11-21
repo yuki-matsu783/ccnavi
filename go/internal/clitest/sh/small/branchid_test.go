@@ -1,6 +1,7 @@
 package small
 
 import (
+	"strings"
 	"testing"
 
 	"ccnavi/internal/harness/run"
@@ -29,18 +30,10 @@ func TestBranchToIDMatchesTheTable(t *testing.T) {
 				res := runProgram(t, shell, run.Opts{
 					Env: map[string]string{"LC_ALL": "C"},
 				}, "-c", `. "$0"; ccnavi_branch_to_id "$1"`, common, c.Branch)
-				if got := trimNewlines(res.Stdout); got != c.ID {
+				if got := strings.TrimRight(res.Stdout, "\n"); got != c.ID {
 					t.Errorf("got %q, want %q", got, c.ID)
 				}
 			})
 		}
 	}
-}
-
-// trimNewlines は末尾の改行をすべて外す（Python の rstrip("\n")）。
-func trimNewlines(s string) string {
-	for len(s) > 0 && s[len(s)-1] == '\n' {
-		s = s[:len(s)-1]
-	}
-	return s
 }

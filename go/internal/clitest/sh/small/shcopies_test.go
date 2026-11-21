@@ -146,7 +146,7 @@ func TestPathUnderIsCaseFoldedOnlyForASCII(t *testing.T) {
 				if res.Code != 0 {
 					t.Fatalf("code = %d, stderr = %q", res.Code, res.Stderr)
 				}
-				if got := trimNewlines(res.Stdout); got != *c.Rest {
+				if got := strings.TrimRight(res.Stdout, "\n"); got != *c.Rest {
 					t.Errorf("rest = %q, want %q", got, *c.Rest)
 				}
 			})
