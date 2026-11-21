@@ -106,7 +106,8 @@ func Slash(path string) string { return filepath.ToSlash(path) }
 
 // CopyOpts は CopyTree の選び方。
 type CopyOpts struct {
-	// KeepLinks なら、リンクをリンクのまま写す（既定はリンク先の中身を写す）。
+	// KeepLinks なら、リンクをリンクのまま写す。既定では、ファイルを指すリンクはリンク先の中身を写し、
+	// ディレクトリを指すリンクは空のディレクトリになる（WalkDir はリンクの先へ下りない）。
 	KeepLinks bool
 	// Skip が true を返す相対パス（`/` 区切り）は写さない（ディレクトリなら下も）。
 	Skip func(rel string) bool
