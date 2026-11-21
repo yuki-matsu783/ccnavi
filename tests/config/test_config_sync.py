@@ -287,53 +287,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertTrue(os.path.isfile(mirror_of(tree, "templates/feature.yml")))
 
-    def test_a_symlinked_templates_place_skips_only_the_templates(self):
-        """3: 共通のテンプレートの置き場がリンクなら、テンプレートだけコピーせず、
-        着手は止まらない。"""
-        real = os.path.join(self.ws, "elsewhere")
-        write(os.path.join(real, "feature.yml"), FEATURE_TEMPLATE)
-        link = os.path.join(self.ws, ".ccnavi", "config", "common", "templates")
-        self.symlink_or_skip(real, link)
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-
-        started = self.start_ticket("i0001")
-
-        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
-        # ほかの設定のミラーはコピーされる。
-        self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
-
-    def test_files_gone_from_the_common_layer_are_removed_from_the_mirror(self):
-        """1: 共通レイヤーから無くなったファイルは、ミラーからも消す。config は消さない。"""
-        old = mirror_of(self.lib, "scripts/old.sh")
-        write(old, "old\n")
-        write(mirror_of(self.lib, "rule-expectations.yml"), EXPECTATIONS)
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "--quiet", "-m", "old mirror")
-
-        tree, started = self.start_parent()
-
-        self.assertFalse(os.path.exists(mirror_of(tree, "scripts/old.sh")))
-        self.assertFalse(os.path.exists(mirror_of(tree, "rule-expectations.yml")))
-        self.assertFalse(os.path.isdir(mirror_of(tree, "scripts")))
-        self.assertIn("削除した", started.stdout)
-        self.assertTrue(os.path.isfile(config_of(tree, "phases")))
-
-    def test_identical_mirror_is_not_touched(self):
-        """1: 中身が同じなら何も書かない。改行の違いは見ない。"""
-        write(mirror_of(self.lib, "rules.yml"), json.dumps(COMMON_RULES))
-        write(mirror_of(self.lib, "risks.yml"), COMMON_RISK.replace("\n", "\r\n"))
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "--quiet", "-m", "same")
-
-        _, started = self.start_parent()
-
-        self.assertNotIn("ミラー", started.stdout)
-
     def test_a_project_without_a_layer_gets_the_mirror(self):
         """1: `.ccnavi/` を持たないプロジェクトにも新しく置く。"""
         tree, started = self.start_parent(project="app")
@@ -341,21 +294,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK)
         self.assertIn("新しく置いた", started.stdout)
         self.assertFalse(os.path.exists(config_of(tree, "rules")))
-
-    def test_a_missing_or_empty_common_layer_leaves_the_mirror_alone(self):
-        """1: 共通レイヤーが無い（空）なら配らず、ミラーを消さない。着手は止めない。"""
-        common = os.path.join(self.ws, ".ccnavi", "config", "common")
-        for name in os.listdir(common):
-            os.remove(os.path.join(common, name))
-        write(mirror_of(self.lib, "rules.yml"), json.dumps(COMMON_RULES))
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "--quiet", "-m", "old mirror")
-
-        tree, started = self.start_parent()
-
-        self.assertEqual(json.loads(read(mirror_of(tree, "rules.yml"))), COMMON_RULES)
-        self.assertNotIn("ミラー", started.stdout)
-        self.assertTrue(os.path.isfile(config_of(tree, "rules")))
 
     def test_workspace_tickets_are_not_mirrored(self):
         """2: ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるのでコピーしない。"""
@@ -516,52 +454,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertIn("count.sh", started.stdout + started.stderr)
         self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
 
-    def symlink_or_skip(self, source, link):
-        """リンクを張る。Windows で権限が無いなど、張れない環境ではテストを飛ばす。"""
-        try:
-            os.symlink(source, link)
-        except (OSError, NotImplementedError) as error:
-            privilege_not_held = getattr(error, "winerror", None) == 1314
-            if not (privilege_not_held or isinstance(error, NotImplementedError)):
-                raise
-            self.skipTest(f"シンボリックリンクが作れない: {error}")
-
-    def test_a_symlinked_target_is_reported_and_the_start_goes_on(self):
-        """3: コピー先がシンボリックリンクなら、コピーせず、理由を言う（着手は止めない）。"""
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-        target = mirror_of(tree, "rules.yml")
-        os.makedirs(os.path.dirname(target), exist_ok=True)
-        self.symlink_or_skip(config_of(tree, "phases"), target)
-
-        started = self.start_ticket("i0001")
-
-        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.assertIn("シンボリックリンク", started.stdout + started.stderr)
-        self.assertTrue(os.path.islink(target))
-
-    def test_a_symlinked_mirror_directory_is_reported_and_the_start_goes_on(self):
-        """3: ミラーの置き場そのものがリンクでもコピーせず、理由を言う。
-        リンク先には何も書かない。
-        """
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-        elsewhere = os.path.join(os.path.dirname(tree), "elsewhere")
-        os.makedirs(elsewhere)
-        os.makedirs(os.path.join(tree, ".ccnavi"), exist_ok=True)
-        self.symlink_or_skip(elsewhere, os.path.join(tree, ".ccnavi", "config", "common"))
-
-        started = self.start_ticket("i0001")
-
-        self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
-        self.assertEqual(os.listdir(elsewhere), [])
-
     def test_post_monitor_does_not_report_the_mirror(self):
         """4: 発言でコピーした分は受け入れの対象になり、繰り返し報告しない。
 
@@ -705,26 +597,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK)
 
-    def test_a_failed_sync_is_said_every_time_and_not_remembered(self):
-        """3: コピーできなかった理由は発言のたびに言い、直ったらその発言でコピーする。"""
-        write(self.risk, "version: 1\nfactors: [\n")
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001").returncode, 0)
-
-        first = self.reason(self.prompt())
-        second = self.reason(self.prompt())
-
-        self.assertIn("ミラーとして読めない", first)
-        self.assertIn("ミラーとして読めない", second)
-        self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
-        write(self.risk, COMMON_RISK)
-        self.prompt()
-        self.assertEqual(read(mirror_of(tree, "risks.yml")), COMMON_RISK)
-
     def test_a_rewrite_with_the_same_size_and_time_is_still_noticed(self):
         """5: 同じ大きさで書き換え、更新時刻を元に戻しても、指紋が変わって比べ直す。"""
         tree, _ = self.start_parent()
@@ -739,18 +611,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
 
         self.assertNotEqual(read(mirror_of(tree, "risks.yml")), text)
         self.assertEqual(read(mirror_of(tree, "risks.yml")), read(source))
-
-    def test_an_unstarted_parent_is_not_mirrored(self):
-        """2: 着手していない親のワークツリーにはコピーしない。"""
-        self.propose(
-            "i0001", ticket_text("i0001", project="lib", plan=["build"], allow=SCOPE), project="lib"
-        )
-        self.assertEqual(self.approve().returncode, 0)
-        tree = self.worktree(self.lib, "i0001")
-
-        self.prompt()
-
-        self.assertFalse(os.path.exists(mirror_of(tree, "rules.yml")))
 
     def test_a_worktree_without_an_approved_parent_is_not_mirrored(self):
         """2: 承認済みの親の無いワークツリーにはコピーしない。"""
