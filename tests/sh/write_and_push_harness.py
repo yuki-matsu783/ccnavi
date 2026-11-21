@@ -22,7 +22,7 @@ ccnavi-user-push-approved.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.s
    1 回だけやり直す
 6. 届いていた push（応答だけが失われた）は ls-remote で確かめて成功にする
 7. 書いたパスの一覧の基点は親のワークツリー。置き場の外に書けば error（着手で configsync が
-   プロジェクトのレイヤーへコピーしたものは例外。tests/ticket/test_swap_points.py と
+   プロジェクトのレイヤーへコピーしたものは例外。go/internal/clitest/ticket/phases/chrome_test.go と
    tests/config/ が見る）
 8. hook の書きかけ（pending・skipped）はコミットし、
    ユーザの判断（c）と知らない変更（d）は止める

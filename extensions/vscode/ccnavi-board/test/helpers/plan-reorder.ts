@@ -1,6 +1,6 @@
 /**
  * 計画の番号の振り直しの見本の表（リポジトリの`tests/fixtures/plan-reorder.json`）を読む。
- * 表は実行ファイルのテスト（`tests/ticket/test_plan_order.py`）と共有していて、**ここでは書き換えない**。
+ * 表は実行ファイルのテスト（`go/internal/clitest/ticket/phases/planorder_test.go`）と共有していて、**ここでは書き換えない**。
  *
  * 拡張はまだ番号を振り直さない（振り直しの正は実行ファイル）。ここで使うのは、表の計画（振り直す前の
  * `plan`と、振り直したあとの`expect.plan`）を、実行ファイルが承認のpreviewに載せる`plans`の形に

@@ -28,8 +28,8 @@ node scripts/build.js --hosts <一覧の JSON> # 組織ごとのビルド（GHES
 
 ```sh
 pnpm test       # 単体・Node の上の WASM での組み立て・手元向けの同じ入口（.cache/ccnavi-chrome）との突き合わせ。
-                # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの tests/ticket/test_swap_points.py が
-                # 書き出す（CCNAVI_CHROME_FIXTURE=1）。
+                # 判定のコアの見本 test/fixtures/core-scenarios.json は、リポジトリの go/internal/clitest/ticket/phases/chrome_test.go が
+                # 書き出す（-update-chrome-fixture）。
                 # 契約の試験 test/gitlab-contract.test.ts は、模擬の GitLab（MockGitLab）の応答を本物の記録と reads の範囲で比べる
 pnpm test:e2e   # 拡張を読み込んだ Chromium（Playwright、PLAYWRIGHT_BROWSERS_PATH）と模擬の GitHub・GitLab で実機の試験
                 # （承認・レビュー済み・「始める」を含む。GitLab はセルフホストとして通信先に足したビルドで回す）
