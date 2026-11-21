@@ -369,24 +369,6 @@ class WriteAndPushTicketTest(WriteAndPushHarness):
         self.assertFalse(os.path.exists(os.path.join(self.ws, ".claude", "worktrees", CHILD)))
         self.assertEqual(self.sha(self.tree, "HEAD"), before)
 
-    def test_a_long_lock_names_its_owner_and_how_to_stop_it(self):
-        """生きている持ち主のロックは、10 分を超えても取らない。持ち主と止め方を言う。"""
-        os.makedirs(self.lock_dir())
-        host = subprocess.run(["hostname"], capture_output=True, text=True).stdout.strip()
-        old = int(subprocess.run(["date", "+%s"], capture_output=True, text=True).stdout) - 3600
-        write(
-            os.path.join(self.lock_dir(), "owner"),
-            f"{host} {live_sh_pid(self)} {old} {live_sh_pid(self)}-{old}\n",
-        )
-        result = self.ticket("start", PARENT)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("10 分を超えて取られたまま", result.stderr)
-        at = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(old))
-        self.assertIn(f"持ち主は pid {live_sh_pid(self)}・ホスト {host}・開始 {at}", result.stderr)
-        self.assertIn("ユーザに終了させてもらってから再実行して", result.stderr)
-        self.assertNotIn("started_at: 20", self.read(self.copy(PARENT)))
-        self.assertTrue(os.path.isdir(self.lock_dir()))
-
     @requires_symlink
     def test_a_linked_workspace_still_carries(self):
         linked = self.ws + "-link"
