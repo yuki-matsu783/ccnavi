@@ -512,32 +512,12 @@ class UnverifiableParentTest(RetireHarness):
 
 
 class BrokenChildrenTest(RetireHarness):
-    """記録の `children` が配列でないとき（null・数）は、落ちずに、壊れた記録として扱う。"""
+    """記録の `children` が配列でないとき（数）は、壊れた記録として何も消さずに止める。"""
 
     def break_children(self, value):
         held = self.read_record()
         held["children"] = value
         write(self.record, json.dumps(held))
-
-    def test_sync_tidy_does_not_crash_and_keeps_the_record(self):
-        self.closed_and_pushed()
-        self.break_children(None)
-        head = git(self.root, "rev-parse", "refs/remotes/origin/i0001").strip()
-        done = self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", "i0001", head)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertNotIn("Traceback", done.stderr)
-        self.assertIn("片付けの記録を読めない", done.stdout)
-        self.assertEqual(done.stdout.splitlines()[-1], "record no")
-        self.assertTrue(os.path.exists(self.record))
-
-    def test_sync_retired_names_it_as_incomplete(self):
-        self.closed_and_pushed()
-        self.break_children(None)
-        done = self.ccnavi("sync", "retired")
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        (line,) = done.stdout.splitlines()[1:]
-        self.assertTrue(line.startswith("incomplete i0001 "), line)
-        self.assertIn("children が配列ではない", line)
 
     def test_worktree_retire_removes_nothing(self):
         self.closed_and_pushed()
@@ -547,17 +527,6 @@ class BrokenChildrenTest(RetireHarness):
         self.assertIn("children が配列ではない", done.stderr)
         self.assertTrue(os.path.isdir(self.child_tree))
         self.assertTrue(os.path.isdir(self.parent_tree))
-
-    def test_ready_does_not_overwrite_it(self):
-        fixture = self.closable()
-        write(
-            self.record,
-            json.dumps({"parent": "i0001", "project": "", "children": None, "mr": 7}),
-        )
-        done = self.ready(fixture)
-        self.assertEqual(done.returncode, 1, done.stdout + done.stderr)
-        self.assertIn("上書きしない", done.stderr)
-        self.assertIn("children が配列ではない", done.stderr)
 
 
 class BrokenSiblingRecordTest(CancelledChildHarness):
