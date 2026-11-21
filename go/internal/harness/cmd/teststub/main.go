@@ -10,6 +10,8 @@
 //	github-host  見本を返す GitHub のスタブ。`github-host curl|gh <引数…>`（hostfixture.GithubCurl・GithubGh）
 //	userform     `user` の入口の並びを実行ファイルと同じに検べる（samples.UserformMain）
 //	oprecord     操作記録と、その操作ID を入れた計画を書く（samples.OprecordMain）
+//	claude       `claude -p` の台本スタブ（fakeclaude.Run）。台本は環境変数 CCNAVI_FAKE_CLAUDE_SCRIPT
+//	claude-hook  契約の場面の hook（fakeclaude.RecordHook）。`claude-hook <記録の置き場> <目印>`
 package main
 
 import (
@@ -19,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"ccnavi/internal/harness/fakeclaude"
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/samples"
@@ -39,6 +42,17 @@ var commands = map[string]command{
 	},
 	"oprecord": func(a []string, _ io.Reader, _, errw io.Writer) int {
 		return samples.OprecordMain(a, errw)
+	},
+	"claude": func(a []string, _ io.Reader, out, errw io.Writer) int {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintln(errw, err)
+			return 1
+		}
+		return fakeclaude.Run(a, os.Environ(), cwd, out, errw)
+	},
+	"claude-hook": func(a []string, in io.Reader, out, errw io.Writer) int {
+		return fakeclaude.RecordHook(a, in, out, errw, os.Environ())
 	},
 }
 
