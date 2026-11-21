@@ -55,7 +55,7 @@ func (tr *Tree) FamilyPlan(plan []samples.Step, feedback []samples.Step) {
 	ticketkit.OK(tr.T, tr.Approve())
 }
 
-// ProposeChild は子の提案を親のワークツリーに書き、親がコミットし、承認する。
+// ApproveChild は子の提案を親のワークツリーに書き、親がコミットし、承認する。
 func (tr *Tree) ApproveChild(name string, phase int, allow ...string) {
 	tr.T.Helper()
 	tr.Propose(name, child(name, phase, allow...), "")
