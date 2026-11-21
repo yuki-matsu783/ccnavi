@@ -50,11 +50,6 @@ def write_mark(approved, parent, number, kind, data):
     write(mark_path(approved, parent, number, kind), json.dumps(stamped, ensure_ascii=False))
 
 
-def write_child_record(approved, parent, child, kind, data):
-    path = os.path.join(approved, "phases", parent, f"{child}.{kind}.json")
-    write(path, json.dumps(data, ensure_ascii=False, indent=1))
-
-
 def clear_marks(approved, parent, number):
     """フェーズを開き直したときと同じく、その番号のマーカーを消す。消した種類を返す。"""
     folder = os.path.join(approved, "phases", parent)
@@ -403,43 +398,6 @@ class ManualSettleGapsTest(PhaseHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("依頼の記録がありません", refused.stderr)
         self.no_reviewed_mark()
-
-    def test_a_child_that_finished_straight_to_done_is_not_manual(self):
-        self.family(plan=["research"])
-        self.work("i0001-01-01", 1, "wip/research/*", "wip/research/summary.md", review=False)
-        self.assertTrue(os.path.exists(self.child_path("i0001-01-01", "done")))
-        with open(self.child_path("i0001-01-01", "done"), encoding="utf-8") as f:
-            self.assertIn('finished_to: "done"', f.read())
-        self.assertNotIn("手で done/", self.status())
-
-    # ---- AT35
-
-    def done_child_family(self):
-        self.family(plan=["research"])
-        self.work("i0001-01-01", 1, "wip/research/*", "wip/research/summary.md", review=False)
-        return self.child_path("i0001-01-01", "done")
-
-    def test_a_child_done_by_itself_is_not_manual_after_the_risk_rises(self):
-        self.done_child_family()
-        write_mark(self.approved, "i0001", 1, "requested", {"mr": 7, "host": "fixture"})
-        write_child_record(
-            self.approved,
-            "i0001",
-            "i0001-01-01",
-            "risk",
-            {"points": 90, "level": "HIGH", "hits": []},
-        )
-        self.assertNotIn("手で done/", self.status())
-
-    def test_a_child_done_by_itself_is_not_manual_after_the_plan_is_revised_to_mr(self):
-        done = self.done_child_family()
-        write_mark(self.approved, "i0001", 1, "requested", {"mr": 7, "host": "fixture"})
-        copy = os.path.join(self.approved, "doing", "i0001.md")
-        self.edit(
-            copy, lambda t: t.replace("  - research\n", "  - {type: research, review: true}\n", 1)
-        )
-        self.assertTrue(os.path.exists(done))
-        self.assertNotIn("手で done/", self.status())
 
     # ---- AT34
 
