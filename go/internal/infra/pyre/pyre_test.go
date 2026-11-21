@@ -35,6 +35,12 @@ func TestSearchTable(t *testing.T) {
 		{`[a-z]`, IgnoreCase, "İ", true},
 		{`[İ]`, IgnoreCase, "I", true},
 		{`[^K-k]`, IgnoreCase, "K", false},
+		{`ß`, IgnoreCase, "ẞ", true}, // ß は 1 字の大文字が S なので、大小の別がある字
+		{`[ß]`, IgnoreCase, "ẞ", true},
+		{`[ß-ß]`, IgnoreCase, "ẞ", true},
+		{"ΐ", IgnoreCase, "\u1fd3", true}, // Python の _casefix に載る字の組
+		{"[ﬅ]", IgnoreCase, "ﬆ", true},
+		{`ﬀ`, IgnoreCase, "FF", false},
 		{`(?:[^\s\x00\\/]*+[\\/])*+find`, 0, "/usr/bin/find", true},
 		{`a*+a`, 0, "aaa", false}, // 所有的な繰り返しは戻らない
 		{`(?>a*)a`, 0, "aaa", false},
@@ -80,7 +86,7 @@ func TestErrorsReadExpected(t *testing.T) {
 		"(?P<a>x)(?P<a>y)": "redefinition of group name 'a' as group 2; was group 1 at position 12",
 		"a{3,2}":           "min repeat greater than max repeat at position 2",
 		"x\n(":             "missing ), unterminated subpattern at position 2 (line 2, column 1)",
-		`\N{EM DASH}`:      "undefined character name 'EM DASH' at position 0",
+		`\N{EM DASH}`:      `\N{EM DASH} は文字の名前から字を引けないので読めない。字そのものか \uXXXX の形で書いてください at position 0`,
 	}
 	for pattern, want := range cases {
 		_, err := Compile(pattern, 0)
@@ -132,7 +138,7 @@ func TestEscape(t *testing.T) {
 	}
 }
 
-// ルールの glob は先頭に ^ を付けて当てる（ルールの読み込みと同じ）。式の字面は golden_test.go が Python の答えの見本と突き合わせるので、
+// ルールの glob は先頭に ^ を付けて当てる（ルールの読み込みと同じ）。fnmatch の翻訳の字面は golden_test.go で Python の答えと突き合わせる。
 // ここでは当たり方の境界（全体に当たる・区切りの両方の表記・改行・文字クラス）を確かめる。
 func TestTranslateGlobMatches(t *testing.T) {
 	cases := []struct {
@@ -168,9 +174,17 @@ func TestTranslateGlobMatches(t *testing.T) {
 		{"[^a]", "^", true},
 		{"[^a]", "b", false},
 		{"[[:x]", ":", true},
-		// クラスの中の "/" も置き換わり、クラスが途中で閉じる（Python と同じ）。
-		{"[a/b]", "/", false},
-		{"[a/b]", `\b]`, true},
+		// クラスの中の "/" も両方の区切りに当たる。
+		{"[a/b]", "/", true},
+		{"[a/b]", `\`, true},
+		{"[a/b]", "b", true},
+		{"[a/b]", `\b]`, false},
+		{"x[!/]y", "x/y", false},
+		{"x[!/]y", `x\y`, false},
+		{"x[!/]y", "x-y", true},
+		{"[+-/]", `\`, true},
+		{"[+-/]", ",", true},
+		{"[/-!]", "/", false}, // 空の範囲は何にも当たらない（fnmatch と同じ）
 	}
 	for _, c := range cases {
 		re, err := Compile("^"+TranslateGlob(c.glob), 0)

@@ -6,24 +6,20 @@ import "strings"
 // これで区切りをつなぐ（ルールは 1 回書いて、どの機械でも同じ意味にする）。
 const AnySeparator = `[\\/]`
 
-// TranslateGlob は glob を Python 3.13 の fnmatch.translate と同じ式にし、"/" を両方の区切りに当てる
-// （Python の globmatch.translate）。文字列全体に当たる形（末尾は `\Z`）で、先頭の `^` は呼び手が付ける。
-// 式の字面も Python と同じにする。判定の説明に式をそのまま出すためである。
-//
-// 置き換えるのは翻訳後の "/" で、文字クラスの中の "/"（`[a/b]`）も置き換わる。Python と同じ答えにするため
-// そのままにしてある。
-func TranslateGlob(glob string) string {
-	return strings.ReplaceAll(TranslateFnmatch(glob), "/", AnySeparator)
-}
+// TranslateGlob は glob を Python 3.13 の fnmatch.translate をもとにした式にし、"/" を両方の区切りに当てる。
+// 文字列全体に当たる形（末尾は `\Z`）で、先頭の `^` は呼び手が付ける。
+// 文字クラスの外の "/" は AnySeparator に置き換え、"/" を含む文字クラス（`[a/b]`・`[!/]`）には "\" も加える。
+func TranslateGlob(glob string) string { return fnmatchTranslate([]rune(glob), true) }
 
 // TranslateFnmatch は Python 3.13 の fnmatch.translate そのもの（"/" は "/" にだけ当たる）。区切りを "/" に
 // そろえたパスに当てる呼び手が使う。
-func TranslateFnmatch(glob string) string { return fnmatchTranslate([]rune(glob)) }
+func TranslateFnmatch(glob string) string { return fnmatchTranslate([]rune(glob), false) }
 
 // star は翻訳の途中で `*` の位置を表す印。
 const star = "\x00*"
 
-func fnmatchTranslate(pat []rune) string {
+// fnmatchTranslate は fnmatch.translate。anySep なら "/" を両方の区切りに当てる。
+func fnmatchTranslate(pat []rune, anySep bool) string {
 	var res []string
 	n := len(pat)
 	for i := 0; i < n; {
@@ -51,8 +47,18 @@ func fnmatchTranslate(pat []rune) string {
 				res = append(res, `\[`)
 				break
 			}
-			res = append(res, classOf(pat, i, j))
+			class := classOf(pat, i, j)
+			if anySep && strings.HasPrefix(class, "[") && strings.Contains(class, "/") {
+				class = class[:len(class)-1] + `\\]`
+			}
+			res = append(res, class)
 			i = j + 1
+		case '/':
+			if anySep {
+				res = append(res, AnySeparator)
+			} else {
+				res = append(res, "/")
+			}
 		default:
 			res = append(res, Escape(string(c)))
 		}

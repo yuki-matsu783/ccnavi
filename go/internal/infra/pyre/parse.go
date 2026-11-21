@@ -412,7 +412,8 @@ func (t *tokenizer) classEscape(escape string) (setItem, bool, error) {
 	return bad()
 }
 
-// namedEscape は \N{名前}。Unicode の名前の表を持たないので、名前を読んだうえで未定義として断る。
+// namedEscape は \N{名前}。Unicode の名前の表を持たないので、名前は読んだうえで断る。Python は読める式なので、
+// Python の文面（undefined character name）は使わない。読めない理由と書き換え方を、書いた名前を挙げて言う。
 func (t *tokenizer) namedEscape() error {
 	ok, err := t.match("{")
 	if err != nil {
@@ -425,7 +426,7 @@ func (t *tokenizer) namedEscape() error {
 	if err != nil {
 		return err
 	}
-	return t.error("undefined character name "+pyfmt.Repr(name), runeLen(name)+len(`\N{}`))
+	return t.error(`\N{`+name+`} は文字の名前から字を引けないので読めない。字そのものか \uXXXX の形で書いてください`, runeLen(name)+len(`\N{}`))
 }
 
 // escape は式の中のエスケープ（Python の _escape）。

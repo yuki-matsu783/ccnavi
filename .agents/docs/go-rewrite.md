@@ -98,7 +98,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 |---|---|
 | `str.casefold()`・`unicodedata.normalize` | パスは `pathcase.Fold`、パスでない語は `pyfmt.Casefold`（区切りを変えない）。NFKC・NFC は `pyfmt.NFKC`・`pyfmt.NFC`。`golang.org/x/text` を直に使わない |
 | `os.path.normcase` | Windows だけ `/` を `\` にして小文字にする。Linux・macOS は何もしない |
-| 正規表現 | Python の re の答えが要る式は `infra/pyre`（Python 3.13 の re の写し）を使う。固定の式で RE2 で書けるものは `regexp`。pyre は RE2 の 5〜10 倍遅い |
+| 正規表現 | Python の re の答えが要る式は `infra/pyre`（Python 3.13 の re の写し）を使う。固定の式で RE2 で書けるものは `regexp`。pyre は RE2 より遅い（Python の C 実装と比べると、式によって同程度から 5 倍ほど遅い） |
 | 正規表現の照合の深さ | pyre は入れ子が `pyre.depthLimit` を越えた照合を打ち切る（Python の sre は打ち切らない。Go はスタックがあふれるとプロセスごと落ちるため）。打ち切りは `SearchChecked` が知らせ、ルールの照合（`rules.Rule.Matches`）は止める側（deny・ask）を当たり、allow を外れにする。数 KB の通常のコマンドでは届かない |
 | YAML（PyYAML の SafeLoader、YAML 1.1） | `gopkg.in/yaml.v3` は libyaml の写しで、1.1 の真偽・8 進・時刻の読みも、読める・読めないの境界も違う。そこで PyYAML の純 Python の読み手を `infra/yaml` に写した。上の層は `*yaml.Map` の取り出し（`Text`・`Map` など）で値を読む。壊れた YAML の苦情の文は純 Python の読み手（SafeLoader）に合わせる。libyaml（CSafeLoader）の文とは違う。書き出し（`yaml.safe_dump`）は純 Python の書き手を写した `yaml.Dump`（80 字の折り返しも同じ） |
 | 辞書の順序 | Python の dict は入れた順。JSON を出すところは順序を保つ型で組む |
@@ -127,7 +127,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 
 | いつ | 何を |
 |---|---|
-| 当面扱わない | `infra/pyre` の照合を速くする（Python の C 実装の約 5 倍遅い）、照合の深さの上限（`depthLimit`）を外す、`(?i)ß` などの小さな食い違い。中身は [yuki-matsu783/ccnavi#806](https://github.com/yuki-matsu783/ccnavi/issues/806) |
+| 当面扱わない | 照合の深さの上限（`depthLimit`）を外す（照合をヒープに積む形に作り直す）。hook はコマンドが 4,000 字を超えると止めるので、上限には届かない。経緯は [yuki-matsu783/ccnavi#806](https://github.com/yuki-matsu783/ccnavi/issues/806) |
 
 ## 回す
 

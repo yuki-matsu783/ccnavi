@@ -324,7 +324,7 @@ ccnaviは判定を返さず、Claude Codeの権限モードに従う。
 書いて`*sed *`とすれば切れ目を表せる。左側はglobでは書けない（`*git push*`は`legit push`にもヒットし、
 `* git push*`は行頭の`git push`が外れる）。左の切れ目が要るルールは`regex`を使う。
 
-区切りは`/`と書けば`\`にもヒットする。`*/secrets/*`は`C:\repo\secrets\key`にもヒットする。
+区切りは`/`と書けば`\`にもヒットする。`*/secrets/*`は`C:\repo\secrets\key`にもヒットする。`[a/b]`のような文字クラスの中の`/`も`\`にヒットする。
 
 `{root}`はワークスペースルートに置き換わる。hookなら`CLAUDE_PROJECT_DIR`、ターミナルなら`--root`の
 実パス。globなら`{root}/wip/*`、regexなら`^{root}[\\/]`のように書く。
