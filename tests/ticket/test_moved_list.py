@@ -10,8 +10,65 @@ from __future__ import annotations
 import json
 import os
 
-from tests.ticket.test_review_actor import ActorHarness
-from tests.ticket.test_ticket import git, write
+from tests import exe, treecache
+from tests.ticket.test_swap_points import CoreHarness
+from tests.ticket.test_ticket import git, read_json, write
+
+RESULT = {"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "reviews": []}
+
+
+class ActorHarness(CoreHarness):
+    def setUp(self):
+        super().setUp()
+        # 統合先の互換のマーカー（Chrome は版が違えば書く操作を受けない）
+        write(
+            os.path.join(self.root, ".ccnavi", "scripts", "ccnavi-common.sh"),
+            f"#!/bin/sh\nCCNAVI_COMPAT={exe.compat()}\n",
+        )
+
+    def mark_path(self, kind="reviewed"):
+        return os.path.join(self.parent_tree, ".ccnavi", "approved", "phases", "i0001", f"1.{kind}")
+
+    @treecache.cached
+    def ready(self):
+        """フェーズ 1 を依頼まで進め、取得した結果を置いた fixture を返す。"""
+        fixture = self.reviewed_phase_one()
+        self.commit_parent("requested")
+        write(fixture, json.dumps(RESULT))
+        return fixture
+
+    def confirm_as(self, fixture, *extra):
+        return self.ccnavi(
+            "--cwd",
+            self.parent_tree,
+            "--phase",
+            "1",
+            "review",
+            "confirm",
+            "--result",
+            fixture,
+            *extra,
+        )
+
+    def host_compare(self):
+        recorded = read_json(self.mark_path("requested"))["head"]
+        head = git(self.parent_tree, "rev-parse", "HEAD").strip()
+        names = git(self.parent_tree, "diff", "--name-only", "--no-renames", f"{recorded}..HEAD")
+        return {"base": recorded, "head": head, "files": names.split()}
+
+    def chrome_confirm(self, compare, actor=None, head=None):
+        """Chrome の confirm。読んだ `P` の先頭は `head`（既定は compare の先頭）。"""
+        request = self.chrome_request(
+            "confirm",
+            "i0001",
+            heads={"i0001": head or compare["head"]},
+            phase=1,
+            result=RESULT,
+            compare=compare,
+            **({"actor": actor} if actor else {}),
+        )
+        return self.ask_chrome(request)
+
 
 FIXED = "依頼時のコミットといまの HEAD が違う。何が変わったかユーザに確かめてもらい、依頼し直す。"
 

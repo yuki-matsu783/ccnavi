@@ -15,9 +15,9 @@ from __future__ import annotations
 
 import os
 
-from tests.ticket import test_feedback_plan_approval
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import git
+from tests.ticketsample import child_text
 
 # スクリプトだけが書く欄。写しでは空にする。
 SCRIPT_FIELDS = (
@@ -33,9 +33,22 @@ SCRIPT_FIELDS = (
 
 
 class ReviseTest(PhaseHarness):
-    # 全体計画のレビューを依頼したところまでの流れは、承認の試験の部品を借りる（継承すると
-    # 承認の試験が丸ごともう 1 度走る。クラスを名前で取り込んでも、このモジュールで走る）
-    requested = test_feedback_plan_approval.FeedbackPlanHarness.requested
+    # 全体計画のレビューを依頼したところまでの流れ。
+    def requested(self):
+        """フェーズ 1 の子を閉じて合流し、レビューを依頼したところまで。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.commit_parent("request")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        return fixture
 
     def revise(self, *extra, ident="i0001", cwd=None):
         return self.ccnavi("ticket", "revise", ident, *extra, "--cwd", cwd or self.parent_tree)

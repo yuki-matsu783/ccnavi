@@ -20,11 +20,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import unittest
 
 import yaml
 
-from tests.ticket.test_board import _portable
 from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import ROOT, write
 from tests.ticketsample import child_text, parent_text
@@ -33,6 +33,27 @@ from tests.ticketsample import child_text, parent_text
 PLAN_ORDER_FIXTURE = os.path.join(
     ROOT, "extensions", "vscode", "ccnavi-board", "test", "fixtures", "plan-order.json"
 )
+
+
+def _portable(value, root: str):
+    """絶対パスと時刻を、機械に依らない表記に置き換える。フィクスチャに書く分だけ。"""
+    if isinstance(value, dict):
+        return {k: _portable(v, root) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_portable(v, root) for v in value]
+    if isinstance(value, str):
+        # ワークツリーの根の表記は機械で変わりうる（Windows は小文字）ので、表記を問わず置き換える。
+        # ccnavi は根を行き着く先まで解いたパスで出す（macOS の /var → /private/var）。
+        # 解いたパスを先に置き換える。後にすると、中に含まれる元のパスだけが先に
+        # 置き換わって `/private<root>` が残る。
+        text = value.replace("\\", "/")
+        for spelling in dict.fromkeys((os.path.realpath(root), root)):
+            text = re.sub(
+                re.escape(spelling.replace("\\", "/")), "<root>", text, flags=re.IGNORECASE
+            )
+        return text
+    return value
+
 
 # 3 ステップの一直線。research → design → implement。
 PLAN3 = ["research", {"type": "design", "after": [1]}, {"type": "implement", "after": [2]}]

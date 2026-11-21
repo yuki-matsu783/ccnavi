@@ -18,10 +18,46 @@ import os
 import unittest
 
 from tests import script_command
-from tests.ticket.test_feedback_plan_approval import FeedbackPlanHarness
-from tests.ticket.test_ticket import write
+from tests.ticket.test_phases import PhaseHarness
+from tests.ticket.test_ticket import git, read_json, write
+from tests.ticketsample import child_text, parent_text
 
 CODE = "NUDGE_TICKET_FEEDBACK"
+
+FEEDBACK = ["implement-feedback"]
+
+
+class FeedbackPlanHarness(PhaseHarness):
+    """フィードバックのフェーズの計画を承認する場面の準備。テストは持たない（継ぐ側で同じテストが重ねて回らないように）。"""
+
+    def requested(self):
+        """フェーズ 1 の子を閉じて合流し、レビューを依頼したところまで。"""
+        self.family(plan=["design"])
+        self.propose("i0001-01-01", child_text("i0001-01-01", "i0001", 1, ["wip/design/*"]))
+        self.commit_parent()
+        self.assertEqual(self.approve().returncode, 0)
+        self.run_child("i0001-01-01", [("wip/design/plan.md", "d\n")])
+        self.assertEqual(self.close_child("i0001-01-01").returncode, 0)
+        self.commit_parent("close 01")
+        self.merge("i0001-01-01")
+        fixture = self.remote()
+        self.assertEqual(self.request(fixture, 1).returncode, 0)
+        self.commit_parent("request")
+        git(self.parent_tree, "push", "--quiet", "origin", "i0001")
+        return fixture
+
+    def propose_feedback(self, feedback=None):
+        self.start_parent()
+        plan = FEEDBACK if feedback is None else feedback
+        self.propose("i0001", parent_text("i0001", ["design"], feedback=plan))
+
+    def phase_dir(self):
+        return os.path.join(self.approved, "phases", "i0001")
+
+    def reviewed_mark(self):
+        """フェーズ 1 のレビュー済みのマーカー（`phases/i0001/1.reviewed`）。無ければ None。"""
+        path = os.path.join(self.phase_dir(), "1.reviewed")
+        return read_json(path) if os.path.exists(path) else None
 
 
 def load_tests(loader, tests, pattern):
