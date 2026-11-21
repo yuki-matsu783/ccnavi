@@ -144,7 +144,6 @@ const (
 const (
 	ProbeRepo      = "CCNAVI_PROBE_REPO"
 	ProbeRepoOK    = "CCNAVI_PROBE_REPO_OK"
-	ProbeOut       = "CCNAVI_PROBE_OUT"
 	ProbeStrictExe = "CCNAVI_PROBE_STRICT_EXE"
 )
 
