@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import http.server
 import json
 import os
 import shutil
@@ -384,16 +385,111 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.assertEqual(before, self.committed())
 
 
+class GitLab(http.server.BaseHTTPRequestHandler):
+    """sh が呼ぶ経路だけを返すスタブ。
+
+    投稿は `posted` に積む。`fail_notes` なら投稿のコメントを 500 にする。
+    """
+
+    posted: list[tuple[str, dict]] = []
+    fail_notes = False
+    fail_reply = False
+    fail_resolve = False
+    # 失敗させる discussion の id（解決の PUT だけ）
+    fail_resolve_ids: set = set()
+    # discussion の id → 解決済みか。GET で返し、解決の PUT で真にする
+    discussions: dict = {}
+    fetches = 0
+    port = 0
+
+    def log_message(self, *args):  # 出力を出さないようにする
+        pass
+
+    def reply(self, code: int, payload) -> None:
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def thread_list(self):
+        return [
+            {
+                "id": ident,
+                "notes": [
+                    {
+                        "id": 100 + i,
+                        "resolvable": True,
+                        "resolved": resolved,
+                        "body": "指摘",
+                        "created_at": "2026-09-23T00:00:00Z",
+                        "author": {"id": 5},
+                        "position": {"new_path": "src/a.py", "new_line": 3},
+                    }
+                ],
+            }
+            for i, (ident, resolved) in enumerate(GitLab.discussions.items())
+        ]
+
+    def do_GET(self):
+        if "/discussions" in self.path and "per_page" in self.path:
+            if "page=1" in self.path:
+                GitLab.fetches += 1
+            self.reply(200, self.thread_list() if "page=1" in self.path else [])
+        elif "/merge_requests?" in self.path:
+            url = f"http://127.0.0.1:{self.port}/demo/greeter/-/merge_requests/1"
+            self.reply(200, [{"iid": 1, "web_url": url, "source_project_id": 1}])
+        elif "/merge_requests" not in self.path and "per_page" not in self.path:
+            self.reply(200, {"id": 1})
+        else:
+            self.reply(200, [])
+
+    def do_PUT(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        data = json.loads(self.rfile.read(length) or b"{}")
+        if "/discussions/" in self.path:
+            ident = self.path.rsplit("/", 1)[-1]
+            if GitLab.fail_resolve or ident in GitLab.fail_resolve_ids:
+                self.reply(500, {"message": "500 boom"})
+                return
+            GitLab.posted.append(("resolve", {"path": self.path, **data}))
+            if ident in GitLab.discussions:
+                GitLab.discussions[ident] = True
+            self.reply(200, {"id": ident})
+        else:
+            self.reply(405, {"message": "405"})
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        data = json.loads(self.rfile.read(length) or b"{}")
+        if "/discussions/" in self.path and self.path.endswith("/notes"):
+            if GitLab.fail_reply:
+                self.reply(500, {"message": "500 boom"})
+                return
+            GitLab.posted.append(("reply", {"path": self.path, **data}))
+            self.reply(201, {"id": 11})
+        elif self.path.endswith("/notes"):
+            if GitLab.fail_notes:
+                self.reply(500, {"message": "500 boom"})
+                return
+            GitLab.posted.append(("note", data))
+            self.reply(201, {"id": 9, "created_at": "2026-09-23T00:00:00Z"})
+        elif self.path.endswith("/issues"):
+            GitLab.posted.append(("issue", data))
+            url = f"http://127.0.0.1:{self.port}/demo/greeter/-/issues/1"
+            self.reply(201, {"iid": 1, "web_url": url})
+        else:
+            self.reply(405, {"message": "405"})
+
+
 @unittest.skipIf(shutil.which("jq") is None or shutil.which("curl") is None, "jq と curl が要る")
 class WriteAndPushReviewTest(WriteAndPushHarness):
     """レビューの状態を書く sh も write-and-push で回す（ccnavi-user-decide.sh を代表に見る）。"""
 
     def setUp(self):
         super().setUp()
-        import http.server
         import threading
-
-        from tests.sh.test_review_decide import GitLab
 
         GitLab.posted = []
         GitLab.fail_notes = False
