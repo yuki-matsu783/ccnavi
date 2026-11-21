@@ -17,7 +17,7 @@ import unittest
 
 from tests import ROOT, exe
 
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 SCRIPT = os.path.join(SH_DIR, "ccnavi-review.sh")
 SHELL = shutil.which("sh") or shutil.which("bash")
 JQ = shutil.which("jq")
