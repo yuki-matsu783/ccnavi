@@ -55,8 +55,8 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 ページング（`first:1` と `after: <endCursor>`）は probe には無く、同じ問い合わせの `first` を 1 にして手で打って確かめた
 （2026-10-12、2 本のスレッドで 1 ページ目 `hasNextPage: true`、`endCursor` を渡した 2 ページ目に残りの 1 本）。GitLab の見本は `test/fixtures/host/gitlab/<場面>/`（`scene.json` に名前空間・プロジェクト・
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
-スタブは sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `tests/sh/test_review_host_fixture.py` の
-`GitLabHostFixtureTest` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。
+スタブは sh の試験の `tests/sh/gitlab_host.py` と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `go/internal/clitest/sh/review/gitlabhost_test.go` の
+`TestGitLabHostFixtureCopyMatchesEachRecordedScene` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。
 拡張はホストの種類を自動判定しない（設定画面で種類を手で選ぶ）。自動判定の表（`github.com`・`ghe.com`・`*.ghe.com` は GitHub、それ以外は GitLab）は sh と実行ファイルだけが持ち、`tests/fixtures/host-kinds.json` で突き合わせる。拡張が持つのは、GHE.com の接続先を組むための `ghe.com` とそのサブドメインの照合（`src/core/custom-hosts.ts` の `isGheHost`）だけ。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
 依頼コメントへの返信の見本（`replies`・`replies-accepted`）は、system のノートを除いたノートから代表のノートと `own` を決め、返信を指摘として数える。実物の GitLab で返信がスレッドになり resolvable になるかは未検証。
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
@@ -71,13 +71,13 @@ MR のスレッドとレビューを取ってくる処理は、手元の sh（`.
   （`pulls.json`・`threads.<k>.json`（GraphQL の `reviewThreads` のページ）・`reviews.<N>.json`（REST のページ）・`user.json`）、
   期待値（`expected.json` = sh がその見本から組んだ結果から `fetched_at` を除いたもの、`conclusion.json` = 変更要求と未解決の結論）
 - 見本を返すスタブは 2 つ（sh の試験の `tests/sh/github_host.py`、拡張の試験の `test/helpers/host-fixture.ts`）で、同じ規則で返す
-- 試験: sh はリポジトリの `tests/sh/test_review_host_fixture.py`、拡張は `test/reviewed.test.ts` の CX-T129。どちらも同じ `expected.json` と比べる
+- 試験: sh は `go/internal/clitest/sh/review/hostfixture_test.go`（GitLab は `gitlabhost_test.go`）、拡張は `test/reviewed.test.ts` の CX-T129。どちらも同じ `expected.json` と比べる
 
 ホストの API の形が変わったら（応答の欄が増える・名前が変わる・ページの切り方が変わる）、次の手順で手作業で更新する。
 
 1. 見本を直す。実際の MR を `gh api`（REST）と `gh api graphql`（`ccnavi-review.sh` の `threads` と同じ問い合わせ）で取り、
    該当の場面のファイルを置き換えるか、形の変わった欄だけを手で直す。トークン・個人の名前・社内の URL は見本に残さない
-2. リポジトリのルートで `CCNAVI_HOST_FIXTURE=1 uv run python -m unittest tests.sh.test_review_host_fixture` を回し、sh が組んだ結果で
+2. `go/` で `go test ./internal/clitest/sh/review -run HostFixture -update-host-fixture` を回し、sh が組んだ結果で
    `expected.json` を書き直す。続けて `go/` で `CCNAVI_HOST_FIXTURE=1 go test ./internal/tickets/model/host -run HostFixture` を回し、
    実行ファイルが出す結論で `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
    読めていなければ `ccnavi-review.sh` を直す
