@@ -17,7 +17,7 @@ sh の仕事（引数・origin・道具・トークンの有無・ホストに�
 理由には資格情報を入れない。ホストへの道具（curl）は PATH の先頭に置いたスタブに差し替える
 （gh / glab はスタブで必ず失敗させ、実際のホストに触れない）。
 
-`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。
+`CCNAVI_TEST_SH_DIR` で、コピーする sh の出どころを差し替えられる。
 既定はこのツリーの `.ccnavi/scripts/`。
 差し替えた場所に同じ名前の sh があれば、`.ccnavi/scripts/` からコピーしたあとにその上へ重ねる
 （コピーする前の版は一部の sh しか持たない）。使った sh のパスは最初に標準エラーへ 1 行出す。
@@ -38,7 +38,7 @@ from tests import ROOT, common_sh, exe
 SHELL = shutil.which("sh") or shutil.which("bash")
 NEEDED = all(shutil.which(tool) for tool in ("git", "jq"))
 SH_DIR = os.path.join(ROOT, ".ccnavi", "scripts")
-_OVERLAY = os.environ.get("CCNAVI_SH_DIR", "")
+_OVERLAY = os.environ.get("CCNAVI_TEST_SH_DIR", "")
 OVERLAY_DIR = os.path.join(ROOT, _OVERLAY) if _OVERLAY else ""
 TOKEN = "s3cr3t-token"
 
@@ -54,11 +54,11 @@ def _has_mr_state() -> bool:
         return "mr_state()" in f.read()
 
 
-# 取り込み前（`.ccnavi/scripts/` の本体にまだ mr-state が無い）は、コピーを `CCNAVI_SH_DIR` で
+# 取り込み前（`.ccnavi/scripts/` の本体にまだ mr-state が無い）は、コピーを `CCNAVI_TEST_SH_DIR` で
 # 指したときだけ回る。
 # 取り込み後は何も指さなくても回る
 SKIP_UNTIL_IMPORTED = (
-    "ccnavi-review.sh に mr-state がまだ無い（取り込み前。CCNAVI_SH_DIR でコピーを指すと回る）"
+    "ccnavi-review.sh に mr-state がまだ無い（取り込み前。CCNAVI_TEST_SH_DIR でコピーを指すと回る）"
 )
 
 # 使った sh を 1 度だけ言う（コピーで試した結果と、取り込み後の結果を取り違えないため）

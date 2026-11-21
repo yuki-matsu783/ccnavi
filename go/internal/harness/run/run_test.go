@@ -173,3 +173,23 @@ func TestRootOfFollowsTheExecutablesOrder(t *testing.T) {
 		}
 	}
 }
+
+// IsWorktreeDir は綴りの大文字小文字を区別せず、名前の一部一致（x.claude/worktreesY）では真にしない。
+func TestIsWorktreeDir(t *testing.T) {
+	ws := filepath.Join("ws")
+	for _, c := range []struct {
+		dir  string
+		want bool
+	}{
+		{filepath.Join(ws, ".claude", "worktrees", "x"), true},
+		{filepath.Join(ws, ".Claude", "Worktrees", "x"), true},
+		{filepath.Join(ws, ".claude", "worktreesY", "x"), false},
+		{filepath.Join(ws, "x.claude", "worktrees", "y"), false},
+		{filepath.Join(ws, ".claude", "x"), false},
+		{filepath.Join(ws, ".claude", "worktrees"), false},
+	} {
+		if got := IsWorktreeDir(c.dir); got != c.want {
+			t.Errorf("IsWorktreeDir(%q) = %v, want %v", c.dir, got, c.want)
+		}
+	}
+}

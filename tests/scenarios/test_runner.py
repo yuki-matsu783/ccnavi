@@ -2930,7 +2930,7 @@ class LifecycleTest(unittest.TestCase):
 # ---- setup.host（評価の相手: bare / fake-gitlab / docker-gitlab / real） ----
 
 # 別のグループ（tests/sh）の部品は import できないので、読むのに要るぶんだけここに持つ
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")
 FAKE_PROJECT = "ns/proj"
 # 実行ファイルのスタブ。版の問い合わせにだけ答える

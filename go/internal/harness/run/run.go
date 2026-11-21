@@ -177,7 +177,7 @@ func rootOf(args []string, environ []string, dir string) string {
 	dir, _ = filepath.Abs(dir)
 	for {
 		holder := filepath.Dir(dir)
-		if isDir(filepath.Join(dir, claudeDir)) && !isWorktreeDir(dir) {
+		if isDir(filepath.Join(dir, claudeDir)) && !IsWorktreeDir(dir) {
 			return dir
 		}
 		if holder == dir {
@@ -187,8 +187,8 @@ func rootOf(args []string, environ []string, dir string) string {
 	}
 }
 
-// isWorktreeDir は `<ワークスペースルート>/.claude/worktrees/<名前>` の位置にあるディレクトリか。
-func isWorktreeDir(dir string) bool {
+// IsWorktreeDir は `<ワークスペースルート>/.claude/worktrees/<名前>` の位置にあるディレクトリか。
+func IsWorktreeDir(dir string) bool {
 	holder := filepath.Dir(dir)
 	return pathcase.SameName(filepath.Base(holder), worktreesDir) &&
 		pathcase.SameName(filepath.Base(filepath.Dir(holder)), claudeDir)
