@@ -386,6 +386,17 @@ class BrokenChildrenTest(RetireHarness):
         self.assertTrue(os.path.isdir(self.child_tree))
         self.assertTrue(os.path.isdir(self.parent_tree))
 
+    def test_sync_tidy_does_not_crash_and_keeps_the_record(self):
+        self.closed_and_pushed()
+        self.break_children(5)
+        head = git(self.root, "rev-parse", "refs/remotes/origin/i0001").strip()
+        done = self.ccnavi("--cwd", self.root, "sync", "tidy", "i0001", "self", "i0001", head)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertNotIn("Traceback", done.stderr)
+        self.assertIn("片付けの記録を読めない", done.stdout)
+        self.assertEqual(done.stdout.splitlines()[-1], "record no")
+        self.assertTrue(os.path.exists(self.record))
+
 
 class CaseFoldTest(CancelledChildHarness):
     """大文字小文字だけが違う名前は同じものとして扱う（Linux でも）。"""

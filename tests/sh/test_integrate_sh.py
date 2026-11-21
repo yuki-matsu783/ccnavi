@@ -1152,23 +1152,20 @@ class IntegrateGapsTest(Fixture):
         for kind in ("s", "t", "c", "k"):
             self.assertEqual("", self.ref(kind), kind)
 
-    def stage_stops_then_resumes(
-        self, match, wt=True, tmp=True, branch=True, stopped_before_refs=True
-    ):
+    def stage_stops_then_resumes(self, match):
         """止めた段階までの片付けが済み、その先が残っていることを確かめてから、打ち直して完了させる。"""
         self.work_in_branch()
         self.assertOk(self.run_git_sh("integrate", "wt"))
         self.install_failing_git()
         before, r = self.done_stopped_at(match)
         k = self.assert_landed_once(before, r)
-        self.assertEqual(wt, os.path.exists(self.wt))
-        self.assertEqual(tmp, os.path.exists(self.tmp_wt()))
-        self.assertEqual(branch, self.has_branch())
+        self.assertTrue(os.path.exists(self.wt))
+        self.assertTrue(os.path.exists(self.tmp_wt()))
+        self.assertTrue(self.has_branch())
         self.assertTrue(os.path.isfile(self.marker()))
-        if stopped_before_refs:
-            for kind in ("s", "t", "c", "k"):
-                self.assertTrue(self.ref(kind), kind)
-            self.assertTrue(os.path.isfile(self.record()))
+        for kind in ("s", "t", "c", "k"):
+            self.assertTrue(self.ref(kind), kind)
+        self.assertTrue(os.path.isfile(self.record()))
         again = self.run_git_sh("integrate-done", "wt")
         self.assertOk(again)
         self.assert_fully_cleaned(before, k)
