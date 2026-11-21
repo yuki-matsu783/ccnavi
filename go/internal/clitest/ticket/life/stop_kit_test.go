@@ -52,15 +52,15 @@ func stop(tr *ticketkit.Tree, cwd string, opts ...stopOpts) run.Result {
 	if o.AgentID != "" {
 		payload["agent_id"] = o.AgentID
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		tr.T.Fatal(err)
-	}
 	if o.Mode == "disable" {
 		// disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			tr.T.Fatal(err)
+		}
 		return tr.Call(ticketkit.Call{Stdin: string(raw), Env: map[string]string{"CCNAVI_MODE": "disable"}}, o.Extra...)
 	}
-	return tr.Call(ticketkit.Call{Stdin: string(raw)}, append([]string{"--mode", o.Mode}, o.Extra...)...)
+	return tr.CallJSON(payload, append([]string{"--mode", o.Mode}, o.Extra...)...)
 }
 
 // body は hook の出力（JSON）。出力が空なら空の map。終了コードが 0 でなければ止める。

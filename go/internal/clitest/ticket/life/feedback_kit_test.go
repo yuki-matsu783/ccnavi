@@ -26,7 +26,7 @@ func buildRequested(tr *ticketkit.Tree) {
 	ticketkit.OK(t, tr.Ccnavi("ticket", "finish", childName))
 	tr.CommitParent("close 01")
 	tr.Merge(childName)
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	ticketkit.OK(t, tr.Request(f))
 	tr.CommitParent("request")
 	tr.Parent("push", "--quiet", "origin", "i0001")

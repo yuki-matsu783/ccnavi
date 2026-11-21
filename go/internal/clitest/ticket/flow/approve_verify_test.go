@@ -225,10 +225,8 @@ func TestVerifyFailsOnTheStateOfTheParentWorktree(t *testing.T) {
 }
 
 func withOrigin(tr *Tree) {
-	bare := filepath.Join(tr.Root, "origin.git")
-	tr.Git(tr.Root, "init", "--quiet", "--bare", bare)
-	tr.Git(tr.Root, "remote", "add", "origin", bare)
-	tr.Parent("push", "--quiet", "origin", "i0001")
+	tr.AddOrigin()
+	tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
 }
 
 func TestVerifyAPushedCleanParentStillPasses(t *testing.T) {

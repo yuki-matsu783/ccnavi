@@ -1,7 +1,6 @@
 package life
 
 import (
-	"encoding/json"
 	"os"
 	"slices"
 	"strings"
@@ -347,12 +346,8 @@ func TestAnAgentCannotDropThePredecessorFromTheApprovedTicket(t *testing.T) {
 	}
 	// シェルから書く形。組み込みの保護（コアファイル）を本番と同じく有効にして打つ（このテストの道具は既定で切っている）。
 	bash := func(command, permissionMode string) string {
-		raw, err := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1",
-			"tool_input": map[string]any{"command": command}, "permission_mode": permissionMode})
-		if err != nil {
-			t.Fatal(err)
-		}
-		r := tr.Call(ticketkit.Call{Stdin: string(raw)}, "--mode", "enable", "--guard-core-files", "enable")
+		r := tr.CallJSON(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1",
+			"tool_input": map[string]any{"command": command}, "permission_mode": permissionMode}, "--mode", "enable", "--guard-core-files", "enable")
 		return ticketkit.Decision(t, r)
 	}
 	// リダイレクトは ccnavi ディレクトリの保護が止める。
