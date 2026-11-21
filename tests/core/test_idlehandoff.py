@@ -69,72 +69,56 @@ class CliTest(Fixture):
             env={"CCNAVI_HANDOFF_WAIT_SECONDS": "7", **(env or {})},
         )
 
-    def test_startは待機の3行を返す(self):
+    def started(self):
         result = self.idle("start", self.payload())
-
         self.assertEqual(result.returncode, 0, result.stderr)
-        lines = dict(line.split(" ", 1) for line in result.stdout.splitlines())
-        self.assertEqual(lines["wait"], "7")
-        self.assertEqual(lines["session"], SESSION)
-        self.assertTrue(lines["token"])
+        return dict(line.split(" ", 1) for line in result.stdout.splitlines())
 
-    def test_startとcheckで起こす指示が返る(self):
-        started = dict(
-            line.split(" ", 1) for line in self.idle("start", self.payload()).stdout.splitlines()
-        )
+    def test_startからcheckで起こし_resetで取り消す(self):
+        first = self.started()
+        self.assertEqual(first["wait"], "7")
+        self.assertEqual(first["session"], SESSION)
+        self.assertTrue(first["token"])
 
-        result = self.idle("check", "", None, SESSION, started["token"], "7")
+        fired = self.idle("check", "", None, SESSION, first["token"], "7")
+        self.assertTrue(fired.stdout.startswith("fire\n"), fired.stdout)
+        self.assertIn(MARKER, fired.stdout)
 
-        self.assertTrue(result.stdout.startswith("fire\n"), result.stdout)
-        self.assertIn(MARKER, result.stdout)
+        # 新しい待機を始めてから、ユーザの入力で取り消すと起こさない。
+        other = self.idle("start", self.payload(session_id="sess-3"))
+        second = dict(line.split(" ", 1) for line in other.stdout.splitlines())
+        reset = self.payload("UserPromptSubmit", prompt="続けます", session_id="sess-3")
+        self.idle("reset", reset)
+        skipped = self.idle("check", "", None, "sess-3", second["token"], "7")
+        self.assertTrue(skipped.stdout.startswith("skip"), skipped.stdout)
 
-    def test_resetのあとのcheckは起こさない(self):
-        started = dict(
-            line.split(" ", 1) for line in self.idle("start", self.payload()).stdout.splitlines()
-        )
-
-        self.idle("reset", self.payload("UserPromptSubmit", prompt="続けます"))
-        result = self.idle("check", "", None, SESSION, started["token"], "7")
-
-        self.assertTrue(result.stdout.startswith("skip"), result.stdout)
-
-    def test_サブエージェントと見ている人がいない実行は始めない(self):
+    def test_始めない場合は理由を返す(self):
         sub = self.idle("start", self.payload(agent_id="agent-1"))
         sdk = self.idle("start", self.payload(), {"CLAUDE_CODE_ENTRYPOINT": "sdk-cli"})
         headless = self.idle("start", self.payload(), {"CLAUDE_CODE_SESSION_ATTENDED": "0"})
+        off = self.idle("start", self.payload(), {"CCNAVI_HANDOFF_SUGGEST_TOKENS": "0"})
+        high = self.idle("start", self.payload(), {"CCNAVI_HANDOFF_SUGGEST_TOKENS": "600000"})
 
         self.assertEqual(sub.stdout, "skip subagent\n")
         self.assertEqual(sdk.stdout, "skip unattended\n")
         self.assertEqual(headless.stdout, "skip unattended\n")
+        self.assertEqual(off.stdout, "skip disabled\n")
+        self.assertEqual(high.stdout, "skip not-due\n")
 
-    def test_環境変数を0にすると無効(self):
-        result = self.idle("start", self.payload(), {"CCNAVI_HANDOFF_SUGGEST_TOKENS": "0"})
-
-        self.assertEqual(result.stdout, "skip disabled\n")
-
-    def test_環境変数で閾値を変えられる(self):
-        result = self.idle("start", self.payload(), {"CCNAVI_HANDOFF_SUGGEST_TOKENS": "600000"})
-
-        self.assertEqual(result.stdout, "skip not-due\n")
-
-    def test_noticeはsystemMessageのJSONを1回だけ出す(self):
+    def test_noticeはsystemMessageのJSONを1回だけ出し_起こした後は報告を1回だけ出す(self):
         first = self.idle("notice", self.payload())
         second = self.idle("notice", self.payload())
-
         self.assertIn("systemMessage", json.loads(first.stdout))
         self.assertEqual(second.stdout, "")
 
-    def test_書かせた後のnoticeは報告を1回だけ出す(self):
-        started = dict(
-            line.split(" ", 1) for line in self.idle("start", self.payload()).stdout.splitlines()
-        )
-        self.idle("check", "", None, SESSION, started["token"], "7")
-
-        first = self.idle("notice", self.payload())
-        second = self.idle("notice", self.payload())
-
-        self.assertIn("放置されたため", json.loads(first.stdout)["systemMessage"])
-        self.assertEqual(second.stdout, "")
+        # 別のセッションで、起こした後の報告を見る。
+        started = self.idle("start", self.payload(session_id="sess-2"))
+        lines = dict(line.split(" ", 1) for line in started.stdout.splitlines())
+        self.idle("check", "", None, "sess-2", lines["token"], "7")
+        reported = self.idle("notice", self.payload(session_id="sess-2"))
+        again = self.idle("notice", self.payload(session_id="sess-2"))
+        self.assertIn("放置されたため", json.loads(reported.stdout)["systemMessage"])
+        self.assertEqual(again.stdout, "")
 
     def test_payloadが無くても止まらない(self):
         for verb in ("notice", "start", "reset"):
