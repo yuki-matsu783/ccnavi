@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 const (
@@ -128,19 +129,10 @@ func only(t *testing.T, hooks []object) object {
 	return hooks[0]
 }
 
-func has(t *testing.T, got string, wants ...string) {
-	t.Helper()
-	for _, w := range wants {
-		if !strings.Contains(got, w) {
-			t.Errorf("%q が無い:\n%s", w, got)
-		}
-	}
-}
-
 func TestDefaultIsNotRegistered(t *testing.T) {
 	s := newSpace(t)
 	r := s.ok("check")
-	has(t, r.Stdout, "登録されていません")
+	ticketkit.Has(t, r.Stdout, "登録されていません")
 	if s.exists(s.settings) {
 		t.Error("check が設定ファイルを作った")
 	}
@@ -181,7 +173,9 @@ func TestRegisterKeepsOtherDefinitionsAndAddsOurs(t *testing.T) {
 	if !strings.HasPrefix(prompt, marker) {
 		t.Errorf("prompt の先頭が目印でない: %q", prompt)
 	}
-	has(t, prompt, "$ARGUMENTS", "stop-review material", "stop-review record")
+	for _, w := range []string{"$ARGUMENTS", "stop-review material", "stop-review record"} {
+		ticketkit.Has(t, prompt, w)
+	}
 	if agent["model"] != "haiku" {
 		t.Errorf("model = %v", agent["model"])
 	}
@@ -210,7 +204,7 @@ func TestRegisterSetsTheMarkerEnvAndIsIdempotent(t *testing.T) {
 	if asObject(before["env"])[envFlag] != "1" {
 		t.Errorf("env が立っていない: %v", before["env"])
 	}
-	has(t, s.ok("register").Stdout, "すでに登録")
+	ticketkit.Has(t, s.ok("register").Stdout, "すでに登録")
 	if !reflect.DeepEqual(s.read(), before) {
 		t.Error("2 回目の register が設定を変えた")
 	}
@@ -238,19 +232,23 @@ func TestUnregisterRemovesOnlyOurs(t *testing.T) {
 	if _, ok := asObject(data["env"])[envFlag]; ok {
 		t.Error("env が残った")
 	}
-	has(t, s.ok("unregister").Stdout, "外すものはありません")
+	ticketkit.Has(t, s.ok("unregister").Stdout, "外すものはありません")
 }
 
 func TestRegisterThenUnregisterRestoresTheUserSettings(t *testing.T) {
 	s := newSpace(t)
-	for name, original := range map[string]object{
-		"ユーザの設定": {
+	for _, c := range []struct {
+		name     string
+		original object
+	}{
+		{"ユーザの設定", object{
 			"model": "x",
 			"env":   object{"KEEP": "1"},
 			"hooks": object{"Stop": []any{object{"hooks": []any{}}, object{"hooks": []any{object{"type": "command", "command": "c"}}}}},
-		},
-		"空の設定": {},
+		}},
+		{"空の設定", object{}},
 	} {
+		name, original := c.name, c.original
 		s.write(original)
 		s.ok("register")
 		s.ok("unregister")
@@ -277,7 +275,7 @@ func TestCheckReportsMismatchesAndRegisterFixesThem(t *testing.T) {
 	if r.Code != 1 {
 		t.Fatalf("env が無いとき check = %d, want 1", r.Code)
 	}
-	has(t, r.Stdout, envFlag+"=1 がありません")
+	ticketkit.Has(t, r.Stdout, envFlag+"=1 がありません")
 
 	asObject(data["env"])[envFlag] = "1"
 	stop := asList(asObject(data["hooks"])["Stop"])
@@ -287,7 +285,7 @@ func TestCheckReportsMismatchesAndRegisterFixesThem(t *testing.T) {
 	if r.Code != 1 {
 		t.Fatalf("重複のとき check = %d, want 1", r.Code)
 	}
-	has(t, r.Stdout, "重複")
+	ticketkit.Has(t, r.Stdout, "重複")
 
 	s.ok("register") // 重複を 1 件に直す
 	only(t, agents(s.read()))
@@ -324,7 +322,7 @@ func TestNothingToRemoveDoesNotRewriteTheFile(t *testing.T) {
 	s := newSpace(t)
 	text := `{"model":"x","permissions":{"allow":["Bash(ls)"]}}`
 	s.writeText(text)
-	has(t, s.ok("unregister").Stdout, "外すものはありません")
+	ticketkit.Has(t, s.ok("unregister").Stdout, "外すものはありません")
 	if got := s.text(); got != text {
 		t.Errorf("設定を書き換えた: %q", got)
 	}
