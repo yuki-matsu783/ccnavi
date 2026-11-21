@@ -455,7 +455,7 @@ func TestGitWrapConfigInjectedThroughTheEnvironmentIsDropped(t *testing.T) {
 func TestGitWrapKeepsTheHostGitConfigLockout(t *testing.T) {
 	t.Parallel()
 	w := newWrap(t)
-	home := t.TempDir()
+	home := base.TempDir(t)
 	write(t, filepath.Join(home, ".gitconfig"), "[status]\n\tshowUntrackedFiles = no\n")
 	r := w.runEnv(map[string]string{"HOME": home, "USERPROFILE": home}, "status", "--porcelain")
 	w.succeed(r, "status")
