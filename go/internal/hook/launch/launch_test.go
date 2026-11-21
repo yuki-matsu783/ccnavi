@@ -87,7 +87,7 @@ func childText(id, phase string, globs []string, extra ...string) string {
 }
 
 // workspace は親 1 本と、状態の違う子（着手済み 2 本・未着手・ワークツリーの無い着手済み・閉じた・取り消した・
-// レビュー待ち）、直接作業のワークツリー 2 つ、読み取りの定義を置いたワークスペース。
+// レビュー待ち・blocked（着手していないのに基準点がある）・ワークツリーだけある未着手）、直接作業のワークツリー 2 つ、読み取りの定義を置いたワークスペース。
 func workspace(t *testing.T) string {
 	root := testkit.Workspace(t, parent, "direct-a", "direct-b")
 	approved := testkit.ApprovedDir(root, parent)
@@ -104,6 +104,8 @@ func workspace(t *testing.T) string {
 	put("doing", child2, childText(child2, "2", long, started))
 	put("doing", "i0001-02-01", childText("i0001-02-01", "2", design))
 	put("doing", "i0001-02-03", childText("i0001-02-03", "2", design, started))
+	put("doing", "i0001-02-04", childText("i0001-02-04", "2", design, "base_sha: abc123"))
+	put("doing", "i0001-02-05", childText("i0001-02-05", "2", design))
 	put("done", "i0001-01-03", childText("i0001-01-03", "1", research, started, done))
 	put("done", "i0001-01-04", childText("i0001-01-04", "1", research, started, `cancelled_at: "2026-01-03T00:00:00+0900"`))
 	testkit.Put(t, filepath.Join(testkit.Worktree(root, parent), "wip", "proposals", "review", "i0001-01-05.md"),
@@ -115,7 +117,7 @@ func workspace(t *testing.T) string {
 	testkit.Put(t, filepath.Join(root, ".claude", "skills", "process-research", "SKILL.md"),
 		"---\nname: process-research\nprocess: true\n---\n")
 	testkit.Commit(t, testkit.Worktree(root, parent), "approve")
-	for _, id := range []string{child, child2} {
+	for _, id := range []string{child, child2, "i0001-02-04", "i0001-02-05"} {
 		testkit.AddWorktree(t, root, id, parent)
 	}
 	return root
@@ -192,6 +194,12 @@ func cases(root string) []launchCase {
 	add(false, config.ToolAgent, parentTree, "sub", d("d"))
 	add(false, config.ToolAgent, childTree, "", d(""))
 	add(false, "Bash", root, "", map[string]any{"command": "ls", "isolation": "x"})
+	// 呼び手の子が担当にできないとき（blocked・未着手）は、言及が無くても止める。blocked の子を名指しても直接作業にしない。
+	add(false, config.ToolAgent, testkit.Worktree(root, "i0001-02-04"), "sub", d("d"))
+	add(false, config.ToolAgent, testkit.Worktree(root, "i0001-02-05"), "sub", d("d"))
+	add(false, config.ToolAgent, root, "", d("i0001-02-04 を直す"))
+	add(false, config.ToolAgent, root, "", d("i0001-02-05 を直す"))
+	add(false, config.ToolAgent, childTree, "sub", d(parent+" を直す"))
 	return out
 }
 

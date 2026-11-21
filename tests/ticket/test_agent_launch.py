@@ -13,14 +13,12 @@
 4. 言及に数えないもの
 5. 親のワークツリーから、言及なしで編集する種類を起こす → `DENY_AGENT_NO_CHILD`
 6. isolation → `DENY_AGENT_ISOLATION`（チケット制御が無効でも、dry-run でも。disable では通す）
-7. 担当にできない子 → `DENY_AGENT_CHILD_UNAVAILABLE`
 8. 親のワークツリーの名前 → `DENY_AGENT_PARENT_TREE`
 9. プロンプトの別のワークツリー名・パス・案内の囲みは担当を増やさず、再送でも案内は 1 つ
 10. レビュー待ちの止めが先に効く
 11. 既にある cwd → `DENY_AGENT_CWD_CONFLICT`
 12. 既存の判定との合成
 13. チケット制御が無効のとき
-14. 入れ子
 15. 案内の組み立て（偽の囲み、上限）
 """
 
@@ -154,23 +152,6 @@ class IsolationTest(LaunchHarness):
         self.assertNotIn("DENY_AGENT_ISOLATION", result.stdout)
 
 
-class AvailabilityTest(LaunchHarness):
-    def test_a_blocked_child_is_not_a_target(self):
-        self.open_family(PARALLEL, [(CHILD, 1, RESEARCH), (CHILD2, 2, DESIGN)])
-        self.worktree(CHILD2, PARENT)
-        copy = os.path.join(self.approved, "doing", f"{CHILD2}.md")
-        with open(copy, encoding="utf-8") as f:
-            text = f.read()
-        # 着手していないのに基準点がある形は、判定が信頼しない（blocked）
-        write(copy, text.replace('base_sha: ""', "base_sha: abc123"))
-        out = self.call(self.root, description=f"{CHILD2} を直す", prompt="p")
-        self.assert_stopped(out, "DENY_AGENT_CHILD_UNAVAILABLE")
-        self.assertIn("blocked", out["permissionDecisionReason"])
-        # 直接作業として扱い直さない（案内も cwd も付かない）
-        self.assertNotIn("直接作業", out["permissionDecisionReason"])
-        self.assertNotIn("ccnavi-ticket.sh", out["permissionDecisionReason"])
-
-
 class PromptIsNotReadTest(LaunchHarness):
     """担当は description だけで決める。プロンプトの中身（パス・案内の囲み）は担当を増やさない。"""
 
@@ -255,23 +236,6 @@ class CompositionTest(LaunchHarness):
         self.assertEqual(out.get("permissionDecision"), "deny", out)
         out = self.call(self.root, "Task", description=f"{CHILD} asked", prompt="直す")
         self.assertEqual(out.get("permissionDecision"), "ask", out)
-
-
-class NestedTest(LaunchHarness):
-    def test_a_caller_in_a_child_is_held_to_that_child(self):
-        a, _ = self.two_children()
-        out = self.call(a, agent_id="sub-1", description=f"{CHILD} を直す", prompt="p")
-        self.assertIn("updatedInput", out)
-        out = self.call(a, agent_id="sub-1", description=f"{CHILD2} を直す", prompt="p")
-        self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
-        out = self.call(a, agent_id="sub-1", description=f"{PARENT} を直す", prompt="p")
-        self.assert_stopped(out, "DENY_AGENT_MULTI_TARGET")
-
-    def test_a_callers_child_that_cannot_be_a_target_stops(self):
-        self.open_family(["research", "design"], [(CHILD, 1, RESEARCH)])
-        tree = self.worktree(CHILD, PARENT)  # 着手していない
-        out = self.call(tree, agent_id="sub-1", description="d", prompt="さらに調べる")
-        self.assert_stopped(out, "DENY_AGENT_CHILD_UNAVAILABLE")
 
 
 if __name__ == "__main__":
