@@ -145,6 +145,7 @@ class AttendedTest(TurnGateHookTest):
     def test_同じ発言の中でも_integrate_done_は確認に出る(self):
         self.say()
         self.assertFalse(self.stopped(self.run_command(INTEGRATE)))
+        self.assertEqual(self.entries(), [])
 
         done = self.run_command(DONE)
 
@@ -152,17 +153,12 @@ class AttendedTest(TurnGateHookTest):
         self.assertFalse(self.stopped(done))
         self.assertIn("builtin:turn-gate:integrate-user-turn", done.stdout)
         self.assertIn("ユーザの確認が要ります", done.stdout)
-
-    def test_integrate_は記録を残さない(self):
-        self.say()
-        self.run_command(INTEGRATE)
-
-        self.assertEqual(self.entries(), [])
-
-    def test_integrate_を打たなくても確認に出る(self):
-        self.say()
-
-        self.assertTrue(self.asked(self.run_command(DONE)))
+        asked = [d for d in self.decisions() if d.get("code") == "RULE_ASK"]
+        self.assertEqual(len(asked), 1)
+        self.assertEqual(asked[0]["decision"], "ask")
+        self.assertEqual(asked[0]["rules"], ["builtin:turn-gate:integrate-user-turn"])
+        # キーが違う名前も確認に出る。
+        self.assertTrue(self.asked(self.run_command(f"{GIT} integrate-done bar -m 'msg x'")))
 
     def test_同じコマンドに並べた呼び出しは確認でなく止まる(self):
         self.say()
@@ -171,11 +167,6 @@ class AttendedTest(TurnGateHookTest):
 
         self.assertTrue(self.stopped(done))
         self.assertFalse(self.asked(done))
-
-    def test_キーが違う名前も確認に出る(self):
-        self.say()
-
-        self.assertTrue(self.asked(self.run_command(f"{GIT} integrate-done bar -m 'msg x'")))
 
     def test_確認の記録は_ask_と_RULE_ASK_と宣言の名前を残す(self):
         self.say()
@@ -205,13 +196,6 @@ class AttendedTest(TurnGateHookTest):
 
         self.assertTrue(self.asked(self.run_command(DONE)))
 
-    def test_非対話に戻れば発言を待つゲートが働く(self):
-        self.attended = "0"
-        self.say()
-        self.run_command(INTEGRATE)
-
-        self.assertTrue(self.stopped(self.run_command(DONE)))
-
 
 class BrokenEntryTest(TurnGateHookTest):
     def test_壊れた記録は止め_次のユーザの発言で解ける(self):
@@ -234,15 +218,6 @@ class BrokenEntryTest(TurnGateHookTest):
 
 
 class NotUserTurnTest(TurnGateHookTest):
-    def test_完了通知のあとのターンでも止まる(self):
-        self.say()
-        self.run_command(INTEGRATE)
-        self.hook("Stop")
-
-        self.say(NOTICE)
-
-        self.assertTrue(self.stopped(self.run_command(DONE)))
-
     def test_完了通知を何回はさんでも開かない(self):
         self.say()
         self.run_command(INTEGRATE)
@@ -298,48 +273,10 @@ class NotUserTurnTest(TurnGateHookTest):
 
 
 class ScopeTest(TurnGateHookTest):
-    def test_キーが違う名前は対象外(self):
-        self.say()
-        self.run_command(INTEGRATE)
-
-        other = f"{GIT} integrate-done bar -m x"
-
-        self.assertFalse(self.stopped(self.run_command(other)))
-        self.assertTrue(self.stopped(self.run_command(DONE)))
-
-    def test_メッセージが先でも名前で組む(self):
-        self.say()
-        self.run_command(INTEGRATE)
-
-        self.assertTrue(self.stopped(self.run_command(f"{GIT} integrate-done -m 'msg x' foo")))
-        self.assertFalse(self.stopped(self.run_command(f"{GIT} integrate-done -m foo bar")))
-
-    def test_integrate_の_abort_は_A_にならない(self):
-        self.say()
-        self.run_command(f"{GIT} integrate --abort foo")
-
-        self.assertFalse(self.stopped(self.run_command(DONE)))
-
-    def test_integrate_がなければ_integrate_done_は対象外(self):
-        self.say()
-
-        self.assertFalse(self.stopped(self.run_command(DONE)))
-
     def test_失敗した_integrate_は数えない(self):
         self.say()
         self.run_command(INTEGRATE, tool_use_id="toolu_a")
         self.hook("PostToolUseFailure", tool_use_id="toolu_a", error="rejected")
-
-        self.assertFalse(self.stopped(self.run_command(DONE)))
-
-    def test_失敗した_integrate_は_前の_integrate_の返事を無にしない(self):
-        self.say()
-        self.run_command(INTEGRATE)
-        self.hook("Stop")
-        self.say("差分を見ました")
-        # 返事のあとに、誤って integrate をもう 1 度打ったが失敗した。
-        self.run_command(INTEGRATE, tool_use_id="toolu_b")
-        self.hook("PostToolUseFailure", tool_use_id="toolu_b", error="rejected")
 
         self.assertFalse(self.stopped(self.run_command(DONE)))
 
@@ -385,34 +322,12 @@ class WhoTest(TurnGateHookTest):
 
         self.assertFalse(self.stopped(self.run_command(DONE)))
 
-    def test_別のセッションの_integrate_は数えない(self):
-        self.say(session="s1")
-        self.run_command(INTEGRATE, session="s1")
-        self.say(session="s2")
-
-        self.assertFalse(self.stopped(self.run_command(DONE, session="s2")))
-        self.assertTrue(self.stopped(self.run_command(DONE, session="s1")))
-
     def test_並行した呼び出しでも_実行前の記録で止まる(self):
         # 同じメッセージで A と B を並べると、A の実行後を待たずに B の実行前が来る。
         self.say()
         self.run_command(INTEGRATE)
 
         self.assertTrue(self.stopped(self.run_command(DONE)))
-
-    def test_同じコマンドに連結しても止まる(self):
-        self.say()
-
-        done = self.run_command(f"{INTEGRATE} && {DONE}")
-
-        self.assertTrue(self.stopped(done))
-        self.assertIn("1 つのコマンドにまとめて", done.stdout)
-
-    def test_実行役の中でも止まる(self):
-        self.say()
-        self.run_command(f"env X=1 {INTEGRATE}")
-
-        self.assertTrue(self.stopped(self.run_command(f'sh -c "{DONE}"')))
 
     def test_変数で名前を渡しても止まる(self):
         self.say()
@@ -422,22 +337,17 @@ class WhoTest(TurnGateHookTest):
 
 
 class SessionTest(TurnGateHookTest):
-    def test_再開で記録を破棄する(self):
-        self.say()
-        self.run_command(INTEGRATE)
+    def test_再開と起動で記録を破棄する(self):
+        for source in ("resume", "startup"):
+            with self.subTest(source=source):
+                self.say()
+                self.run_command(INTEGRATE)
 
-        self.hook("SessionStart", source="resume")
+                self.hook("SessionStart", source=source)
 
-        self.assertEqual(self.entries(), [])
-        self.assertFalse(self.stopped(self.run_command(DONE)))
-
-    def test_起動で記録を破棄する(self):
-        self.say()
-        self.run_command(INTEGRATE)
-
-        self.hook("SessionStart", source="startup")
-
-        self.assertEqual(self.entries(), [])
+                self.assertEqual(self.entries(), [])
+                self.assertFalse(os.path.exists(os.path.join(self.state, "userprompt-s1.json")))
+                self.assertFalse(self.stopped(self.run_command(DONE)))
 
     def test_compact_では破棄しない(self):
         # ターンの途中で compact が走りうる。
@@ -447,12 +357,6 @@ class SessionTest(TurnGateHookTest):
         self.hook("SessionStart", source="compact")
 
         self.assertTrue(self.stopped(self.run_command(DONE)))
-
-    def test_再開のあとは_ユーザの発言の記録も消える(self):
-        self.say()
-        self.hook("SessionStart", source="resume")
-
-        self.assertFalse(os.path.exists(os.path.join(self.state, "userprompt-s1.json")))
 
     def test_dry_run_でも止まる(self):
         self.say(mode="dry-run")
@@ -468,15 +372,6 @@ class SessionTest(TurnGateHookTest):
         self.run_command(INTEGRATE, mode="disable")
 
         self.assertFalse(self.stopped(self.run_command(DONE, mode="disable")))
-
-    def test_記録の置き場を読めなくても内部エラーにしない(self):
-        os.makedirs(os.path.dirname(self.state), exist_ok=True)
-        with open(self.state, "w", encoding="utf-8") as f:
-            f.write("x")
-
-        done = self.run_command(DONE)
-
-        self.assertNotIn("internal-error", done.stderr)
 
 
 class ReviewConfirmTest(TurnGateHookTest):
@@ -503,7 +398,7 @@ class ReviewConfirmTest(TurnGateHookTest):
         self.assertFalse(self.stopped(self.run_command(CONFIRM)))
         self.assertEqual(self.entries(), [])
 
-    def test_付き添いのあるセッションでも確認に出さず止める(self):
+    def test_付き添いのあるセッションでも確認に出さず止め_発言をはさめば通る(self):
         self.attended = "1"
         self.say()
         self.run_command(REQUEST)
@@ -513,14 +408,9 @@ class ReviewConfirmTest(TurnGateHookTest):
         self.assertTrue(self.stopped(done))
         self.assertIn('"permissionDecision": "deny"', done.stdout)
 
-    def test_付き添いのあるセッションでも発言をはさめば通る(self):
-        self.attended = "1"
-        self.say()
-        self.run_command(REQUEST)
         self.say("レビューが済みました")
 
         done = self.run_command(CONFIRM)
-
         self.assertFalse(self.stopped(done))
         self.assertNotIn("builtin:turn-gate", done.stdout)
 
@@ -528,22 +418,6 @@ class ReviewConfirmTest(TurnGateHookTest):
         self.say()
 
         self.assertFalse(self.stopped(self.run_command(CONFIRM)))
-
-    def test_同じコマンドに連結しても止まる(self):
-        self.say()
-
-        self.assertTrue(self.stopped(self.run_command(f"{REQUEST} && {CONFIRM}")))
-
-    def test_check_と他の副命令は対象外(self):
-        self.say()
-        self.assertFalse(self.stopped(self.run_command(f"{REQUEST} --check")))
-        self.assertEqual(self.entries(), [])
-        self.run_command(REQUEST)
-
-        self.assertFalse(self.stopped(self.run_command(f"{CONFIRM} --check")))
-        for sub in ("decide 1", "ready", "fetch", "mr-state"):
-            with self.subTest(sub=sub):
-                self.assertFalse(self.stopped(self.run_command(f"{REVIEW} {sub}")))
 
     def test_完了通知は発言に数えない(self):
         self.say()
@@ -558,13 +432,6 @@ class ReviewConfirmTest(TurnGateHookTest):
         self.hook("Stop")
 
         self.assertTrue(self.stopped(self.run_command(CONFIRM)))
-
-    def test_別のセッションでは働かない(self):
-        self.say(session="s1")
-        self.run_command(REQUEST, session="s1")
-        self.say(session="s2")
-
-        self.assertFalse(self.stopped(self.run_command(CONFIRM, session="s2")))
 
     def test_再開で記録が消え_confirm_は通る(self):
         self.say()

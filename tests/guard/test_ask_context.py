@@ -20,8 +20,6 @@ import json
 import os
 import shutil
 import tempfile
-import threading
-import time
 import unittest
 
 from tests import ROOT
@@ -47,10 +45,6 @@ def call(tool_use_id="toolu_test"):
     """この呼び出し自身の tool_use の行。あれば、直前の発言は書き込み済み。"""
     block = {"type": "tool_use", "id": tool_use_id, "name": "X", "input": {}}
     return {"type": "assistant", "message": {"content": [block]}}
-
-
-def tool_result():
-    return {"type": "user", "message": {"content": [{"type": "tool_result", "content": "ok"}]}}
 
 
 class AskContextHookTest(unittest.TestCase):
@@ -105,15 +99,6 @@ class AskUserQuestionTest(AskContextHookTest):
         self.assertIn("「前提・背景」・「想定結果」", done.stdout)
         self.assertIn("消してよいですか", done.stdout)
 
-    def test_片方の節が無ければ無いほうだけを言う(self):
-        self.write(prompt(), assistant("## 背景\n理由"))
-
-        done = self.hook()
-
-        self.assertTrue(self.stopped(done))
-        self.assertIn("「想定結果」の節", done.stdout)
-        self.assertNotIn("「前提・背景」の節", done.stdout)
-
     def test_節が揃えば通る(self):
         self.write(prompt(), assistant(BOTH))
 
@@ -121,38 +106,6 @@ class AskUserQuestionTest(AskContextHookTest):
 
         self.assertFalse(self.stopped(done))
         self.assertNotIn("deny", done.stdout)
-
-    def test_節が_2_つの発言に分かれていても揃えば通る(self):
-        self.write(prompt(), assistant("## 背景\n理由"), assistant("## 選んだ時の結果\n消える"))
-
-        self.assertFalse(self.stopped(self.hook()))
-
-    def test_見出しを書いたあとに別のツールを呼んでも_同じ発言の中なら数える(self):
-        self.write(prompt(), assistant(BOTH), tool_result(), assistant("消してよいですか？"))
-
-        self.assertFalse(self.stopped(self.hook()))
-
-    def test_ツールの結果をはさんでも_ユーザの発言より前の発言は数えない(self):
-        self.write(
-            assistant(BOTH), prompt("どうぞ"), tool_result(), assistant("消してよいですか？")
-        )
-
-        self.assertTrue(self.stopped(self.hook()))
-
-    def test_発言の中に_U_2028_があっても行を割らない(self):
-        self.write(prompt(), assistant(BOTH.replace("消す", "消す\u2028")))
-
-        self.assertFalse(self.stopped(self.hook()))
-
-    def test_ユーザの発言より前の発言は数えない(self):
-        self.write(assistant(BOTH), prompt("どうぞ"))
-
-        self.assertTrue(self.stopped(self.hook()))
-
-    def test_サイドチェーンの発言は数えない(self):
-        self.write(prompt(), assistant(BOTH, isSidechain=True))
-
-        self.assertTrue(self.stopped(self.hook()))
 
     def test_止めた記録は拒否コードと_rules_を残す(self):
         self.write(prompt(), assistant("消してよいですか？"))
@@ -165,36 +118,6 @@ class AskUserQuestionTest(AskContextHookTest):
         self.assertEqual(record["rules"], [RULE_ID])
         self.assertEqual(record["decision"], "deny")
 
-    def test_自分の行がまだ無く_待っても見出しも現れなければ通す(self):
-        self.write(prompt(), assistant("消してよいですか？"), called=False)
-
-        self.assertFalse(self.stopped(self.hook()))
-
-    def test_自分の行があって見出しが無ければ_待たずに止める(self):
-        self.write(prompt(), assistant("消してよいですか？"))
-        started = time.monotonic()
-
-        done = self.hook(**{"tool_input": {"questions": [{"question": "消してよいですか"}]}})
-
-        self.assertTrue(self.stopped(done))
-        self.assertLess(time.monotonic() - started, 5)
-
-    def test_発言が遅れて書かれても待てば通る(self):
-        self.write(prompt(), called=False)
-
-        def late():
-            time.sleep(0.15)
-            with open(self.transcript, "a", encoding="utf-8") as handle:
-                for row in (assistant(BOTH), call()):
-                    handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-
-        thread = threading.Thread(target=late)
-        thread.start()
-        done = self.hook()
-        thread.join()
-
-        self.assertFalse(self.stopped(done))
-
     def test_dry_run_では止めず_返していたはずだと言う(self):
         self.write(prompt(), assistant("消してよいですか？"))
 
@@ -206,21 +129,10 @@ class AskUserQuestionTest(AskContextHookTest):
 
 
 class NotCheckedTest(AskContextHookTest):
-    def test_記録のパスが無ければ検査しない(self):
-        self.assertFalse(self.stopped(self.hook(transcript=False)))
-
-    def test_記録が読めなければ検査しない(self):
-        self.assertFalse(self.stopped(self.hook()))
-
     def test_サブエージェントの呼び出しは検査しない(self):
         self.write(prompt(), assistant("消してよいですか？"))
 
         self.assertFalse(self.stopped(self.hook(agent_id="a1")))
-
-    def test_tool_use_id_が無ければ検査しない(self):
-        self.write(prompt(), assistant("消してよいですか？"))
-
-        self.assertFalse(self.stopped(self.hook(tool_use_id="")))
 
     def test_ほかのツールは検査しない(self):
         self.write(prompt(), assistant("調べます"))

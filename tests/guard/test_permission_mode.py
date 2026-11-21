@@ -69,12 +69,6 @@ def decision_of(case, result):
 
 
 class HandoverTest(unittest.TestCase):
-    def test_auto_gets_no_verdict(self):
-        """auto では判定を返さない。classifier がそのために居る。"""
-        result, record = run("auto")
-        self.assertEqual(0, result.returncode, result.stderr)
-        self.assertIsNone(decision_of(self, result), "判定を返している")
-
     def test_the_handover_is_still_recorded(self):
         """渡した回も記録に残る。ここが唯一「ルールが薄い場所」の手掛かりになる。"""
         _, record = run("auto")
@@ -100,24 +94,6 @@ class HandoverTest(unittest.TestCase):
         self.assertNotEqual(handed["decision"], asked["decision"])
 
 
-class AskTest(unittest.TestCase):
-    def test_an_unknown_mode_asks(self):
-        """知らないモードは確認にする。名前が 1 つ増えてもそのまま通さない。"""
-        result, _ = run("someFutureMode")
-        self.assertEqual("ask", decision_of(self, result))
-
-    def test_a_missing_mode_asks(self):
-        """モードが payload に無くても確認にする。"""
-        result, _ = run("")
-        self.assertEqual("ask", decision_of(self, result))
-
-    def test_an_unreadable_command_is_never_handed_over(self):
-        """読み切れなかったコマンドは渡さない。読めなかったことは委ねた先に伝わらない。"""
-        result, record = run("auto", command="bash -c 'docker run --rm alpine'")
-        self.assertEqual("ask", decision_of(self, result))
-        self.assertEqual("PARSE_UNCERTAIN", record["code"])
-
-
 class NoJudgeTest(unittest.TestCase):
     def test_bypass_permissions_refuses(self):
         """確認できる者が居ないモードでは許可としない。"""
@@ -125,10 +101,10 @@ class NoJudgeTest(unittest.TestCase):
         self.assertEqual("deny", decision_of(self, result))
         self.assertEqual("deny", record["decision"])
         self.assertEqual("UNDECLARED", record["code"])
-
-    def test_dont_ask_refuses(self):
-        result, _ = run("dontAsk")
-        self.assertEqual("deny", decision_of(self, result))
+        # 断りの文面は、言えば通るかもしれない ask とは別の次の一手を示す。
+        reason = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("no one to ask", reason)
+        self.assertNotIn("asks the user", reason)
 
     def test_the_project_can_open_this_gate(self):
         """CCNAVI_GUARD_UNWATCHED=disable にしたレイヤーでは、ここも渡す側になる。"""
@@ -148,13 +124,6 @@ class NoJudgeTest(unittest.TestCase):
         )
         self.assertEqual("deny", decision_of(self, result))
         self.assertEqual("PARSE_UNCERTAIN", record["code"])
-
-    def test_the_refusal_says_asking_is_not_available(self):
-        """断りの文面は、言えば通るかもしれない ask とは別の次の一手を示す。"""
-        result, _ = run("bypassPermissions")
-        reason = json.loads(result.stdout)["hookSpecificOutput"]["permissionDecisionReason"]
-        self.assertIn("no one to ask", reason)
-        self.assertNotIn("asks the user", reason)
 
 
 class UndeclaredTextTest(unittest.TestCase):

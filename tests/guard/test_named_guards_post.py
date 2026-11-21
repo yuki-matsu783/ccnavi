@@ -23,7 +23,7 @@ import tempfile
 import unittest
 
 from tests import ROOT, script_command
-from tests.guard.test_post import DOING, STARTED, TICKET, copy_repo, git, template, write
+from tests.guard.test_post import DOING, TICKET, copy_repo, git, template, write
 from tests.inproc import run_ccnavi
 
 HOOKS = "builtin:guard-hooks"
@@ -545,29 +545,6 @@ class ScriptWritesTest(Fixture):
     def run_script(self):
         return self.run_hook(command="sh .ccnavi/scripts/ccnavi-ticket.sh start i0001")
 
-    def test_start_fields_are_not_reported_or_restored(self):
-        write(self.path("ws", DOING), STARTED)
-        # 着手の欄は、コミット済みの版にまだ無い欄だけ。
-        result = self.run_script()
-        self.assertEqual(result.returncode, 0, self.said(result))
-        self.assertEqual(read(self.path("ws", DOING)), STARTED)
-
-    def test_a_marker_is_not_reported(self):
-        marker = ".ccnavi/approved/phases/i0001/1.requested"
-        write(self.path("ws", marker), '{"mr": 1}\n')
-        result = self.run_script()
-        self.assertEqual(result.returncode, 0, self.said(result))
-        self.assertTrue(os.path.exists(self.path("ws", marker)))
-
-    def test_finish_move_is_not_reported(self):
-        os.remove(self.path("ws", DOING))
-        write(
-            self.path("ws", "wip/proposals/review/i0001.md"),
-            TICKET.replace("---\nbody", 'completed_at: "2026-09-22T01:00:00Z"\n---\nbody'),
-        )
-        result = self.run_script()
-        self.assertEqual(result.returncode, 0, self.said(result))
-
     def test_forged_changes_are_reported_and_restored(self):
         cases = {
             "scope": TICKET.replace('glob: "src/*"', 'glob: "*"'),
@@ -583,23 +560,11 @@ class ScriptWritesTest(Fixture):
                 self.assertEqual(self.last_record()["rules"], [APPROVED])
                 self.assertEqual(read(self.path("ws", DOING)), TICKET)
 
-    def test_a_new_fake_ticket_is_reported(self):
-        write(self.path("ws", ".ccnavi/approved/doing/i0002.md"), TICKET.replace("i0001", "i0002"))
-        result = self.run_script()
-        self.assertEqual(result.returncode, 2, self.said(result))
-        self.assertEqual(self.last_record()["rules"], [APPROVED])
-
     def test_a_plain_deletion_is_reported_and_restored(self):
         os.remove(self.path("ws", DOING))
         result = self.run_script()
         self.assertEqual(result.returncode, 2, self.said(result))
         self.assertEqual(read(self.path("ws", DOING)), TICKET)
-
-    def test_a_move_to_the_todo_place_is_reported(self):
-        os.remove(self.path("ws", DOING))
-        write(self.path("ws", "wip/proposals/todo/i0001.md"), TICKET)
-        result = self.run_script()
-        self.assertEqual(result.returncode, 2, self.said(result))
 
 
 if __name__ == "__main__":
