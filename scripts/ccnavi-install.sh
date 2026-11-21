@@ -356,14 +356,7 @@ main() {
 	[ -d "$ws" ] || die "$ws というディレクトリがありません。"
 	ws=$(iabs "$ws")
 
-	install_tmp=${TMPDIR:-/tmp}/ccnavi-install.$$
-	install_try=0
-	while ! (umask 077 && mkdir "$install_tmp") 2>/dev/null; do
-		install_try=$((install_try + 1))
-		install_tmp=""
-		[ "$install_try" -lt 20 ] || die "作業用のディレクトリを作れません。" 4
-		install_tmp=${TMPDIR:-/tmp}/ccnavi-install.$$.$install_try
-	done
+	install_tmp=$(umask 077 && mktemp -d "${TMPDIR:-/tmp}/ccnavi-install.XXXXXX" 2>/dev/null) || die "作業用のディレクトリを作れません。" 4
 	trap cleanup EXIT
 	trap 'exit 130' INT
 	trap 'exit 143' TERM
