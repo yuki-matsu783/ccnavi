@@ -55,7 +55,12 @@ _drop_ccnavi_from_path()
 # 置き場の名前はテストの側に持つ。既定が動いたら、ここを置いた木で実行ファイルが設定を
 # 読まなくなり、設定を前提にしたテストが落ちて気づく。
 _PROJECT_HOME = ".ccnavi"
-_LAYER_FILE_NAMES = {"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
+_LAYER_FILE_NAMES = {
+    "rules": "rules.yml",
+    "phases": "phases.yml",
+    "risk": "risks.yml",
+    "sections": "ticket-sections.yml",
+}
 _COMMON_FILES = {
     kind: os.path.join(_PROJECT_HOME, "config", "common", name)
     for kind, name in _LAYER_FILE_NAMES.items()

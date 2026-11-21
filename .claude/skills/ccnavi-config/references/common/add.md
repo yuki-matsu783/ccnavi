@@ -1,9 +1,9 @@
 ---
 type: skill-reference
 title: 足す・直す
-description: ccnavi の設定（rules.yml、phases.yml、risks.yml）に新しいルールや設定を追加する方法と検証手順
+description: ccnavi の設定（rules.yml、phases.yml、risks.yml、ticket-sections.yml）に新しいルールや設定を追加する方法と検証手順
 tags: [rules, config, skills]
-keywords: [rules.yml, phases.yml, risks.yml, deny, ask, allow, glob, regex, ルール, lint, 検証]
+keywords: [rules.yml, phases.yml, risks.yml, ticket-sections.yml, 見出し, deny, ask, allow, glob, regex, ルール, lint, 検証]
 ---
 
 # 足す・直す
@@ -247,6 +247,27 @@ factors:
 
 基準は「軽い」と宣言した作業が大きくなったときにレビューへ戻すためのもの。普通の子が毎回 HIGH に届く配点も、
 どの子も届かない配点も役に立たない。最近の子の差分で何点になるかを、渡すときに添える。
+
+## ticket-sections.yml
+
+新しい親と子の提案の本文に求める `## ` の見出し。欠けると承認と `--lint` が warn で名指しし、`ticket new` は親の雛形に
+`parent` の見出しを並べて、`todo` を見出しの下に置く（目印が残った新規の提案は承認で止まる）。Stop の判定（R2）は
+共通レイヤーの見出しを求める（`.ccnavi/config/stop-review.md` があればそちらをそのまま使う）。
+
+```yaml
+version: 1
+parent:
+  - name: 目的
+    todo: （ここにこの作業の目的を書く）   # 省ける。雛形が見出しの下に置く空欄の目印
+  - name: 範囲
+child:
+  - name: 担当範囲
+```
+
+- レイヤーのファイルに `parent`（`child`）があれば、その種類は共通の並びと置き換わる。足し合わせない
+- `name` は並びの中で一意（大文字小文字は区別しない）。知らないキーや形の誤りがあれば、そのファイルは使われない
+- `todo` は本文に普通は現れない文にする。提案に残っていると承認が止まるので、本文に書く語と同じにしない
+- 渡す前に、置き場に置いた形で `--lint` の error が 0 件になるかを確かめる（下書きのパスを差し替えるフラグはない。取り込み `ccnavi-user-handoff.sh` の検査も同じ基準で見る）
 
 ## ユーザに渡す形
 

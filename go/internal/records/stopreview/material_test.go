@@ -173,18 +173,32 @@ func TestRenderMaterial(t *testing.T) {
 
 func TestLoadCriteria(t *testing.T) {
 	root := t.TempDir()
-	if got := LoadCriteria(root); got != criteriaMD {
+	parent, child := []string{"目的", "範囲"}, []string{"担当範囲"}
+	builtin := LoadCriteria(root, parent, child)
+	if builtin != builtinCriteria(parent, child) {
 		t.Error("ファイルが無いのに組み込みでない")
+	}
+	for _, line := range []string{"親なら、目的・範囲のどれかを欠いたら不備。子なら、担当範囲のどれかを欠いたら不備。",
+		"短くても狭い変更として十分具体的なら不備ではない。"} {
+		if !strings.Contains(builtin, line) {
+			t.Errorf("R2 に %q が無い:\n%s", line, builtin)
+		}
+	}
+	if got := LoadCriteria(root, nil, child); !strings.Contains(got, "親なら、見出しは判定しない") {
+		t.Errorf("親の見出しが空なのに判定する:\n%s", got)
+	}
+	if MaterialVersion(builtin) == MaterialVersion(LoadCriteria(root, parent[:1], child)) {
+		t.Error("見出しが変わっても版が同じ")
 	}
 	path := filepath.Join(root, ".ccnavi", "config", "stop-review.md")
 	writeFile(t, path, "# 自前の基準\n")
-	if got := LoadCriteria(root); got != "# 自前の基準\n" {
+	if got := LoadCriteria(root, parent, child); got != "# 自前の基準\n" {
 		t.Errorf("LoadCriteria = %q", got)
 	}
 	// 在るのに読めない・空・大きすぎるときは、別の定義を推測しない。
 	for _, text := range []string{"  \n", strings.Repeat("x", criteriaLimit+1)} {
 		writeFile(t, path, text)
-		if got := LoadCriteria(root); got != "" {
+		if got := LoadCriteria(root, parent, child); got != "" {
 			t.Errorf("LoadCriteria = %q", got[:min(len(got), 20)])
 		}
 	}
@@ -192,10 +206,10 @@ func TestLoadCriteria(t *testing.T) {
 	if err := os.Mkdir(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if got := LoadCriteria(root); got != "" {
+	if got := LoadCriteria(root, parent, child); got != "" {
 		t.Error("ディレクトリを読んだ")
 	}
-	if MaterialVersion(criteriaMD) == MaterialVersion("# 自前の基準\n") {
+	if MaterialVersion(builtin) == MaterialVersion("# 自前の基準\n") {
 		t.Error("定義が変わっても版が同じ")
 	}
 }

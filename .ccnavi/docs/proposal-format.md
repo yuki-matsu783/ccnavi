@@ -3,7 +3,7 @@ title: 提案の書式
 type: guide
 description: 親の提案・子の提案の frontmatter と本文、plan / after / phases のコピー、子のフロー、雛形を作る ticket new と、書いたあとに打つ検査。フェーズの型の選び方の引き先
 tags: [ticket, phase]
-keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー, feedback, フィードバック計画]
+keywords: [proposal-format, 提案書式, 提案, 子の提案, 親の提案, 書式, phases, フェーズ, plan, after, 計画, frontmatter, ticket new, ticket revise, 改版, 雛形, lint, flows, フロー, feedback, フィードバック計画, ticket-sections, 見出し]
 ---
 
 # 提案の書式
@@ -32,7 +32,7 @@ sh .ccnavi/scripts/ccnavi-launcher.sh ticket new <識別子> --title <タイト�
 - `--plan` は `phases.yml` の型の名前をカンマで並べる（例: `research,design,implement`）。計画は前のステップに続く一直線になる
 - `--scope <glob>` は、`quick-work` のように `scope: inherit` の型だけで計画を組むときに必ず渡す（ワークツリーのルートからの相対パス。繰り返せる）
 - `--plan` の代わりに `--template <名前>` を渡すと、溜めたテンプレートから計画を作る（[templates.md](templates.md)）
-- 作るのは親だけ。`todo/<識別子>.md` に、frontmatter（`version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow`）と、本文の見出し `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由` が入る
+- 作るのは親だけ。`todo/<識別子>.md` に、frontmatter（`version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow`）と、本文の見出しが入る。見出しは `ticket-sections.yml` の `parent` の並び（[下](#本文の見出し)）
 - `rationale` と各見出しの下の `（ここに〜を書く）` は空欄の目印で、これが残ったままの新しい提案は、承認と `--lint` が止めるので、すべて書き換える
 - 止まったときは、何も書かれない（子の識別子を渡した、識別子と同名のワークツリーの外で打った、同じ識別子の提案が既にある、など）。出力の案内に従う
 - 子の提案は雛形が作らない。すぐ始まるステップ（`after` の無いステップ）ごとに、子を 1 つ以上同じ承認で通す。無いと `approval-request`（`--check` も）が警告する（止めないが、子の承認がもう 1 回要る）。`sh .ccnavi/scripts/ccnavi-launcher.sh ticket new` の出力も、「必須:」の行で同じことを言う。先行のあるステップの子は、先行のレビューを見てから足してよい
@@ -89,7 +89,16 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 - `human_review: {required: true, reason: …}` は子ごとの欄。省くと宣言なしで、フェーズのレビューの要否は計画のステップの `review` とフェーズ定義（型）に従う。`required: true` は「要る」を足すだけで、要らないことは言えない。`required: false` にするときは `reason` に理由を書く
 - 計画のステップに `review: true`（要る）か `review: false`（要らない）を書くと、型の `review` より優先する（例 `{type: research, review: false}`）。レビューの要否をチケットで決めたいときは、ここに書く
 - `started_at` `completed_at` `base_sha` などの欄と、本文の最後の「参照したファイル」の節は `finish` などのスクリプトが書く。提案には書かない
-- `branch:` は書けない（使えない欄としてエラーになる）。本文は自由で、MR の下書きの本文に使われる
+- `branch:` は書けない（使えない欄としてエラーになる）。本文は MR の下書きの本文に使われる
+
+## 本文の見出し
+
+新しい親と子の提案の本文には、`ticket-sections.yml` が求める `## <見出し>` を書く。欠けると承認と `--lint` が warn で名指しし、Stop の判定も同じ見出しを求める。
+
+- 置き場は共通の `.ccnavi/config/common/ticket-sections.yml` と、親の `project:` が指すレイヤーの `.ccnavi/config/project/ticket-sections.yml`。レイヤーに `parent`（`child`）があれば、その種類はレイヤーの並びに置き換わる
+- 既定の見出しは配布する共通の `ticket-sections.yml` に書いてある。親が `目的`・`範囲`・`対象外`・`完了の確かめ方`・`計画の理由`、子が `担当範囲`・`親の要求との対応`・`確認の手順`
+- 見出しの名前は大文字小文字を区別せずに探す。コードフェンスの中の見出しは数えない
+- ユーザの設定で、エージェントは書き換えない。見出しを変えたいときはユーザに頼む
 
 ## plan / after / phases
 
@@ -123,8 +132,20 @@ allow:
   - match: Write|Edit
     glob: "app/components/Settings/*"
 ---
-この子で何をするか。
+## 担当範囲
+
+設定画面のコンポーネントを分割する。
+
+## 親の要求との対応
+
+親の目的「設定画面の分割」の実装部分を受け持つ。
+
+## 確認の手順
+
+分割後の各画面を開き、既存のテストを回す。
 ```
+
+- 本文の見出しは `ticket-sections.yml` の `child` の並び（[上](#本文の見出し)）。子は承認のあと新しいセッションで始まり、本文が担当への引き継ぎになる
 
 - `phase` は親の `plan` の番号と、識別子の 2 桁のフェーズ番号に揃える（食い違えばエラー）
 - `allow` / `ask` が指す場所は、親の `allow` / `ask` の中に収める。超える項や `regex` は `--lint` が警告し、判定は親の範囲で切り詰める（超えた分は効かない）

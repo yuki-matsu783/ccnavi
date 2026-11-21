@@ -59,7 +59,7 @@ test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み
   // 今の ccnavi の答え: 先行 i0003-01-01 が閉じていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
   assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /先行 i0003-01-01 が完了していない/);
+  assert.match((f?.result?.rejected?.[0].problems ?? []).join("\n"), /先行 i0003-01-01 が完了していない/);
   assert.equal(f?.result?.batch?.[0].path, "i0001:wip/proposals/todo/i0001.md");
 });
 
@@ -82,7 +82,7 @@ test("CX-T043 先行の親のブランチが無いときは、今の ccnavi の�
   const f = family(board, "i0002");
   assert.deepEqual(f?.result?.closure.absent, ["i0007"]);
   assert.equal(f?.result?.rejected?.[0].ticket, "i0002-01-01");
-  assert.match(f?.result?.rejected?.[0].problems[0] ?? "", /i0007-01-01 がどの置き場/);
+  assert.match((f?.result?.rejected?.[0].problems ?? []).join("\n"), /i0007-01-01 がどの置き場/);
 });
 
 test("CX-T044 統合先の名前: 設定したブランチが無ければ止めて名前を出す。設定どおりなら「設定」と出す", async () => {

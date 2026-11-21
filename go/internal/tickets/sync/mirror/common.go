@@ -14,11 +14,12 @@ import (
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/config/risk"
+	"ccnavi/internal/tickets/config/sections"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/proposal/templates"
 )
 
-// 共通レイヤーからミラーへ写すもの: 設定 3 本と期待する判定、配点の script: が指す共通のスクリプト、
+// 共通レイヤーからミラーへ写すもの: 設定 4 本と期待する判定、配点の script: が指す共通のスクリプト、
 // error の無いテンプレート。ミラーとして（単体 clone では共通レイヤーとして）読めない設定があれば何も写さない。
 
 // expectationsName は共通レイヤーの期待する判定のファイル名。
@@ -26,8 +27,9 @@ const expectationsName = "rule-expectations.yml"
 
 // 設定の読み込みで、苦情の出どころとして添える where。
 const (
-	phasesWhere = "(phases)"
-	riskWhere   = "(risk)"
+	phasesWhere   = "(phases)"
+	riskWhere     = "(risk)"
+	sectionsWhere = "(sections)"
 )
 
 // commonSources は共通レイヤーのうち写すもの（ミラーの置き場からの相対 → 中身）。写せなければ理由。
@@ -138,6 +140,9 @@ func unreadableAsCommon(kind config.LayerKind, content []byte, root string) stri
 	case config.KindRisk:
 		definition, problems := risk.Parse(text, riskWhere, risk.ScriptHomes())
 		return errorDetails(problems, definition == nil, "配点として読めない")
+	case config.KindSections:
+		file, problems := sections.Parse(text, sectionsWhere)
+		return errorDetails(problems, file == nil, "見出しの決まりとして読めない")
 	}
 	data, err := yaml.Load(text)
 	if err != nil {

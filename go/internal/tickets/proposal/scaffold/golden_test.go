@@ -126,6 +126,7 @@ func scaffoldWorkspace(t *testing.T) string {
 	testkit.CopyMessages(t, root)
 	common := filepath.Join(root, ".ccnavi", "config", "common")
 	testkit.Put(t, filepath.Join(common, "phases.yml"), scaffoldPhases)
+	testkit.PutSections(t, root)
 	testkit.Put(t, filepath.Join(common, "templates", "feature.yml"), featureTemplate)
 	testkit.Put(t, filepath.Join(common, "templates", "wrongkind.yml"), kindTemplate)
 	conf, _ := config.Load(root)

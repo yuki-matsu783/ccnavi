@@ -184,7 +184,7 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 		// origin が無いリポジトリ（git でない、リモートを持たない）は、取得で解けないので言わない。
 		return nil, !git.Run(home, []string{"remote", "get-url", "origin"}, git.Options{}).OK()
 	}
-	// 比べるファイル。ワークスペース自身は共通レイヤーの 3 本も含み、どのリポジトリも自身のレイヤーの 3 本を比べる。
+	// 比べるファイル。ワークスペース自身は共通レイヤーの 4 本も含み、どのリポジトリも自身のレイヤーの 4 本を比べる。
 	homeRel := strings.Trim(ospath.Slashed(projectHome(conf)), "/")
 	var rels []string
 	if project == "" {

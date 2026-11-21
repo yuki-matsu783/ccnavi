@@ -81,10 +81,10 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
   子に `phases:` は書けない（error。子は `phase:` で番号を指す）（9.7）
 - 親の提案の雛形は `ccnavi ticket new <識別子> --title <タイトル> (--plan <型,型,...> | --template <名前> [--layer <名>] [--with-feedback]) --issue <N|owner/repo#N> --mr <N>` で作る（`--issue` と `--mr` は必須）（`tickets/proposal/scaffold`。
   REQ-TKT-56）。識別子と同名のワークツリーの中から打つと、`<提案の置き場>/todo/<識別子>.md` に書く。生成物は
-  `version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow` と、本文の見出し
-  `## 目的` `## 範囲` `## 対象外` `## 完了の確かめ方` `## 計画の理由`（この順。前の 4 つは Stop の判定が親の提案に求める内容で、
-  「計画の理由」は計画の説明）。rationale と各見出しの下には空欄の目印
-  （`（ここに〜を書く）`）を 1 行ずつ置く。目印は `tickets/model/form` が持つ
+  `version` `ticket` `issue` `mr` `title` `phases` `plan` `rationale` `allow` と、本文の見出し。見出しは親の
+  `project:` のレイヤーの `ticket-sections.yml` の `parent` の並び（下の「本文の見出しの決まり」）で、`todo` のある見出しは
+  その下に目印を 1 行置く。rationale の下には `（ここにこの作業をする理由を書く）` を置く（`form.RationaleTodo`）。
+  `parent` が無ければ見出しを書かない
   - `allow` は plan の順に各型の `scope` を集め、重複を除いた `match: Write|Edit` の項にする（判定側は `wip/` を
     既定では許さない。承認していない範囲が黙って広がるため）。項が 20 件を超えれば止める
   - `plan` は各ステップが前のステップを `after` に書いた一直線（終端が 1 つになり、承認の検査を通る）。並行させたいステップはユーザが `after` を直す
@@ -106,9 +106,17 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
     判定側（`blocked`・範囲の判定）には入れず、承認済みチケットへの書き込みは止めない
     - 空欄の目印が rationale か本文に残っている: 新規は error、改版は warn（改版は承認済みチケットのコピーなので、承認済みチケットに残った目印では止めない）。
       残っている目印と、rationale・本文のどちらにあるかを名指しする
-    - 親の必須の見出しが本文に欠けている: 親の新規の提案だけ warn で 1 件にまとめて挙げる。子と改版には言わない。
-      見出しはコードフェンス（行頭が ``` か ~~~）の外にある `## <名前>` の行で、名前が前後の空白を除いてちょうど一致するものだけ数える
-      （`###` など深さの違う見出しは数えない）
+    - 見出しが本文に欠けている: 親と子の新規の提案だけ warn で 1 件にまとめて挙げる。改版には言わない。
+      求める見出しは、その提案の `project:` のレイヤーの `ticket-sections.yml` の `parent`（子は `child`）。
+      見出しはコードフェンス（行頭が ``` か ~~~）の外にある `## <名前>` の行で、名前が前後の空白を除いて大文字小文字を区別せずに
+      一致するものだけ数える（`###` など深さの違う見出しは数えない）
+  - 本文の見出しの決まり（`ticket-sections.yml`）。ユーザが持つ設定で、共通の `.ccnavi/config/common/ticket-sections.yml` と
+    レイヤーの `.ccnavi/config/project/ticket-sections.yml` の 2 段（`tickets/config/sections`）。形は `version: 1` と、
+    `parent`・`child` の並び（各項は `name` と省ける `todo`）。レイヤーに `parent`（`child`）があればその種類の並びを置き換え、
+    無ければ共通の並びを使う。組み込みの見出しは持たず、どちらにも無い種類は見出しを見ない。`name` は並びの中で大文字小文字を
+    区別せずに一意。版の違い・知らないキー・形の誤りは `--lint` が error で言い、そのファイルは使わない（レイヤーの側が壊れていれば
+    共通の並びを使う）。目印は rationale の目印と、渡した並びの `todo` 全部。
+    Stop の判定の R2 は共通の並びの名前から組む（`.ccnavi/config/stop-review.md` があればそれをそのまま使い、差し込まない）
   - `ccnavi-ticket.sh` は `new` を通さない。`--fill-phases` と同じく実行ファイルを直接打つ。
     `new` は承認ではなく、`todo/` に書くだけなので、組み込みの止め（9.2）にはヒットしない
 - `started_at` `completed_at` `base_sha` `merged_sha` `cancelled_at` `cancel_reason` はスクリプトの欄。スクリプトが

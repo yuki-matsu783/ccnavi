@@ -360,15 +360,16 @@ func SumView(stderr io.Writer, conf *config.Settings, root string, l Layer) Laye
 	return view
 }
 
-// LayerFiles は、守る対象（selfguard）に渡すレイヤーごとの設定ファイルを返す。共通レイヤーは phases と risk だけ
-// （rules は守る側が別に受け取る）。自身とプロジェクトのレイヤーは本来の置き場の 3 本を渡す（差し替えは診断のため）。
-// プロジェクトはさらに、共通レイヤーのミラーの 3 本も渡す。Origin で分けるのは、`projects/common/` の名前で比べると
+// LayerFiles は、守る対象（selfguard）に渡すレイヤーごとの設定ファイルを返す。共通レイヤーは phases・risk・sections
+// だけ（rules は守る側が別に受け取る）。自身とプロジェクトのレイヤーは本来の置き場の 4 本を渡す（差し替えは診断のため）。
+// プロジェクトはさらに、共通レイヤーのミラーの 4 本も渡す。Origin で分けるのは、`projects/common/` の名前で比べると
 // 共通レイヤーと同じ key になって外れるため。予約名のプロジェクトも並べる。判定に使わないものを守るだけで、
 // 緩む側にはならない。在るかどうかは見ない（無いものは守る側が外す）。
 func LayerFiles(conf *config.Settings, root string) []config.LayerFile {
 	found := []config.LayerFile{
 		{Origin: config.OriginCommon, Layer: config.LayerCommon, Kind: config.KindPhases, Path: conf.Phases},
 		{Origin: config.OriginCommon, Layer: config.LayerCommon, Kind: config.KindRisk, Path: conf.Risk},
+		{Origin: config.OriginCommon, Layer: config.LayerCommon, Kind: config.KindSections, Path: conf.Sections},
 	}
 	type home struct {
 		origin config.Origin

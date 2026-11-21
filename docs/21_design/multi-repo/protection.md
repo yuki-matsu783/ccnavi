@@ -15,24 +15,24 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 | 対象 | 場所 |
 |---|---|
 | hook の登録 | `.claude/settings.json`、`.claude/settings.local.json` |
-| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks}.yml` |
-| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
-| 自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` |
-| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` |
+| 共通レイヤーのファイル | `<root>/.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml` |
+| 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml`（11.12。単体 clone では共通レイヤーとして読まれる） |
+| 自身のレイヤーの 4 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` |
+| プロジェクトのレイヤーの 4 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` |
 | 実行ファイル | `CCNAVI_ENTRY_PATH`（振り分けの sh）と、sh が起動する実体（8.2） |
 | ワークツリー側の設定 | 上の各ファイルのうち追跡されているものについて、**その元リポジトリから切った**ワークツリーが持つ同じファイル |
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/<名前>.yml`）は、`*/.ccnavi/*` の一般の保護で、Write / Edit もシェルからの書き込みも止める。
 
 ファイル単位で、無いものは対象から外れる（REQ-SLF-03）。Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、
-`rules.yml` と同じものを掛ける。3 本とも判定の中身そのもので、書けるとエージェントが自分の判定を緩められる。
+`rules.yml` と同じものを掛ける。4 本とも判定の中身そのもので、書けるとエージェントが自分の判定を緩められる。
 
-予約名のプロジェクトの 3 本も守る。ファイルはバックアップして戻す。バックアップの名前はレイヤーの種別で決め、レイヤーの名前の表記では決めない
-（レイヤーの名前で比べると `projects/common/` の 3 本が共通レイヤーと同じ名前になり、バックアップと復元の対象から外れる）。
+予約名のプロジェクトの 4 本も守る。ファイルはバックアップして戻す。バックアップの名前はレイヤーの種別で決め、レイヤーの名前の表記では決めない
+（レイヤーの名前で比べると `projects/common/` の 4 本が共通レイヤーと同じ名前になり、バックアップと復元の対象から外れる）。
 
 共通レイヤーのファイルは、フェーズ定義と配点もコアに入れる。シェルからの書き込みは組み込みで止め、書けても戻す。名指しのツールから共通レイヤーのファイルを守るぶんも組み込み
 （`builtin:guard-common-layer`）で持つ（ルールの 1 行に任せると、書き換えたルールファイルのもとで通る）。組み込みで名指しのツールを止めるのは、
-実行ファイル・ccnavi ディレクトリ・置き場のリンク・記録の置き場・共通レイヤーの 5 本（`selfguard.AddRules`。同じ関数がシェルから書き込む形と、置き場の中にリンクを作る `ln` の 2 本も足す）と、hook・hook の登録（`.claude/settings*.json`）・scripts・共通の設定 3 本を名前で書くツールから守る 4 本（`selfguard.AddNamedRules`）。ルールの `deny` には書かない。
+実行ファイル・ccnavi ディレクトリ・置き場のリンク・記録の置き場・共通レイヤーの 5 本（`selfguard.AddRules`。同じ関数がシェルから書き込む形と、置き場の中にリンクを作る `ln` の 2 本も足す）と、hook・hook の登録（`.claude/settings*.json`）・scripts・共通の設定ファイルを名前で書くツールから守る 4 本（`selfguard.AddNamedRules`）。ルールの `deny` には書かない。
 
 プロジェクトから切ったワークツリー側の設定も足す。ワークツリーは元リポジトリを添えて列挙し、ワークツリー側の設定の相対を元リポジトリから
 組む（REQ-MLT-08）。
@@ -45,7 +45,7 @@ keywords: [コアファイル, 保護, 共通レイヤー, ミラー, プロジ�
 
 ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match: Write|Edit|NotebookEdit`、`glob: */.ccnavi/*` の 1 本を `deny` の先頭に足す
 （`builtin:guard-project-home`。パスは ccnavi ディレクトリの名前（既定 `.ccnavi`）で組む）。シェルからの書き込みは
-`builtin:guard-setting-files` の 1 本で止める。3 本に絞らないのは、配点が呼ぶスクリプトも含めるため。
+`builtin:guard-setting-files` の 1 本で止める。設定ファイルに絞らないのは、配点が呼ぶスクリプトも含めるため。
 
 シェルの側のパスは「区切りが続くか、そこで終わる」形 `\.ccnavi(?:[\\/ \x00\x01]|$)` で書き、`rm -rf .ccnavi` と
 `mv .ccnavi .ccnavi.bak` も止める。語の中の目印 `\x01` も終わりに数えるので、`rm ".ccnavi x"` も止まる（別名を指すので誤検知）。
@@ -60,8 +60,8 @@ ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match:
 `cp .ccnavi/config/common/rules.yml /tmp/backup.yml` や `cp -t /tmp/out .ccnavi/config/common/rules.yml` のように守る場所が元の側に出ただけの形は
 読むだけなので組み込みの保護では止めず、通すかどうかはルールに任せる。`cp /tmp/x .ccnavi && echo` や `cp /tmp/x .ccnavi > /dev/null` のように
 後ろに何か続けた形、`sudo` / `env` の後ろ（`infra/shell` が実行役のコマンドを外した層）、`cd` で移った先から見た表記も止める。
-動かした ccnavi ディレクトリ・共通レイヤーの 3 本・実行ファイルの表記は、書き込み用・最後の引数用・`-t` の値用に分けて足す
-（`selfguard.shellWriteRegex`）。共通レイヤーの 3 本はファイルなので、書き込み用と最後の引数用にだけ足す。
+動かした ccnavi ディレクトリ・共通レイヤーの設定ファイル・実行ファイルの表記は、書き込み用・最後の引数用・`-t` の値用に分けて足す
+（`selfguard.shellWriteRegex`）。共通レイヤーの設定ファイルはファイルなので、書き込み用と最後の引数用にだけ足す。
 適用の仕方は組み込みのルールの regex 1 本のまま（`rules.Builtin` を通る）で、語の割り方が 1 通りに決まる形に書いてある。
 
 行き先を、守るものが入っているディレクトリにした形（`cp /tmp/decisions.jsonl logs/`・`mv /tmp/decisions.jsonl logs/`・
@@ -69,7 +69,7 @@ ccnavi ディレクトリの全体に組み込みの deny を掛ける。`match:
 止めるのは、元の側に守る名前の語（後ろの区切りは問わない）か、名前の決まらない語（グロブ・`$`・逆引用・ブレース、
 `.` と `..` で終わる元）があるか、`-T` / `--no-target-directory` があるときだけ。組を作る先は、`logs/` の中の記録と state の置き場、
 実行ファイルの末尾 2 要素（振り分けの sh なら組み立ての置き場の `bin/` とその親も）、動かした ccnavi ディレクトリと
-ワークスペースルートの下に置いた共通レイヤーの 3 本（ルートからの相対の各階層）、ルートの外に置いた共通レイヤーの 3 本（すぐ上のディレクトリ）、
+ワークスペースルートの下に置いた共通レイヤーの設定ファイル（ルートからの相対の各階層）、ルートの外に置いた共通レイヤーの設定ファイル（すぐ上のディレクトリ）、
 そしてワークスペースルート（`.` とルートの絶対パスを行き先に、`.ccnavi` `.claude` `logs` と上で足したいちばん上の名前）。
 `.claude/` `.ccnavi/` `logs/state/` そのものを行き先にした形は、名前を問わずに上の場所の表記で止まる。
 元の語はリストのどこにあってもよいので、最初に見つかった元の語で決め打ちし（後戻りしない括り `(?>...)`）、

@@ -141,6 +141,7 @@ RULES_PARTS = (".ccnavi", "config", "common", "rules.yml")
 RISK_PARTS = (".ccnavi", "config", "common", "risks.yml")
 PHASES_PARTS = (".ccnavi", "config", "project", "phases.yml")
 COMMON_PHASES_PARTS = (".ccnavi", "config", "common", "phases.yml")
+SECTIONS_PARTS = (".ccnavi", "config", "common", "ticket-sections.yml")
 # 置き場は 2 つに分けて固定する（設計 launcher-scripts 1）。hook が起動する振り分けの sh は
 # 代わりに通る sh と同じ .ccnavi/scripts/、機械ごとの組み立ては .ccnavi/bin/<os>-<arch>/。
 BIN_DIR_PARTS = (".ccnavi", "bin")
@@ -160,6 +161,7 @@ NO_TEMPLATES_FILES = [
     ".ccnavi/config/common/phases.yml",
     ".ccnavi/config/common/risks.yml",
     ".ccnavi/config/common/rules.yml",
+    ".ccnavi/config/common/ticket-sections.yml",
     ".ccnavi/docs/frontmatter.md",
     ".ccnavi/docs/worktree.md",
     *(
@@ -235,6 +237,7 @@ ccnavi を登録した hook:
   .ccnavi/CCNAVI.md
   .ccnavi/config/common/risks.yml
   .ccnavi/config/common/phases.yml
+  .ccnavi/config/common/ticket-sections.yml
   .ccnavi/docs/frontmatter.md
   .ccnavi/docs/worktree.md
   .ccnavi/scripts/ccnavi-ticket.sh
@@ -1048,12 +1051,14 @@ class DeployTest(SetupTest):
                 encoding="utf-8",
             ) as f:
                 f.write("deny: []\n")
-            # 設定 3 本のひな形は共通レイヤー。
+            # 設定 4 本のひな形は共通レイヤー。
             # 自身のレイヤーの phases.yml は配布元にあっても配らない。
             with open(os.path.join(src, *RISK_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nlevels: {}\nfactors: []\n")
             with open(os.path.join(src, *COMMON_PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
+            with open(os.path.join(src, *SECTIONS_PARTS), "w", encoding="utf-8") as f:
+                f.write("version: 1\nparent: []\nchild: []\n")
             os.makedirs(os.path.join(src, ".ccnavi", "config", "project"))
             with open(os.path.join(src, *PHASES_PARTS), "w", encoding="utf-8") as f:
                 f.write("version: 1\nphases: {}\n")
@@ -1171,6 +1176,7 @@ class DeploysWhatTheProjectNeeds(DeployTest):
         self.assertTrue(os.path.isfile(self.deployed(*RULES_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*RISK_PARTS)))
         self.assertTrue(os.path.isfile(self.deployed(*COMMON_PHASES_PARTS)))
+        self.assertTrue(os.path.isfile(self.deployed(*SECTIONS_PARTS)))
         # 自身のレイヤーの phases.yml は配らない（レイアウトに依存する定義は配布先のユーザが書く）
         self.assertFalse(os.path.exists(self.deployed(*PHASES_PARTS)))
         for name in DEPLOY_SCRIPTS:

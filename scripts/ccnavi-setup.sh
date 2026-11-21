@@ -120,12 +120,14 @@ DEPLOY_RULES=".ccnavi/config/common/rules.yml"
 # セッションの開始（SessionStart）で ccnavi がモデルに渡す作業の決まり。文面はこの md にあり、
 # 実行ファイルは条件と差し込みを解くだけ。無いと、決まりが渡らないことを 1 行で言うだけになる。
 DEPLOY_CCNAVI_MD=".ccnavi/CCNAVI.md"
-# 設定 3 本のひな形。rules・phases・risk はどれも共通レイヤー（.ccnavi/config/common/）へ配る。
+# 設定 4 本のひな形。rules・phases・risk・ticket-sections はどれも共通レイヤー（.ccnavi/config/common/）へ配る。
 # phases の判定は、共通レイヤーと自身のレイヤー（.ccnavi/config/project/）の和を読む。自身のレイヤーの
 # phases.yml は配らない。そこに置くのはワークスペースのレイアウト（scope のパス）に依存する定義で、
 # 配布元のものは配布元のレイアウトに合わせてあるため。配布先に既にあれば触らない。
 DEPLOY_RISK=".ccnavi/config/common/risks.yml"
 DEPLOY_COMMON_PHASES=".ccnavi/config/common/phases.yml"
+# 提案の本文に求める見出し（親の雛形の見出しと承認の検査・Stop の判定の R2）。
+DEPLOY_SECTIONS=".ccnavi/config/common/ticket-sections.yml"
 # 点検でだけ見る。共通レイヤーにも自身のレイヤーにも無いときだけ「まだ無いもの」に出す。
 DEPLOY_PHASES=".ccnavi/config/project/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
@@ -134,7 +136,7 @@ DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # additionalContextFile（スキルの振り返りの手順）と、sh の案内が指す先でもある。
 DEPLOY_DOCS_DIR=".ccnavi/docs"
 # 共通の作業・レビュー計画のテンプレートの置き場。配布元にある *.yml を全部配る。共通レイヤーの
-# 一部なので、設定 3 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
+# 一部なので、設定 4 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # 文面ファイル（拒否・促し・次の一手の文）の置き場。実行ファイルの `ccnavi text` が引く。配布元にある
@@ -243,8 +245,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             （環境変数 CCNAVI_HANDOFF_SUGGEST_TOKENS を 0 にしても止められる）
 
 CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
-.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 3 本（.ccnavi/config/common/rules.yml、
-.ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
+.ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 4 本（.ccnavi/config/common/rules.yml、
+.ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml、.ccnavi/config/common/ticket-sections.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
 配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
 （.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・文面ファイル
@@ -771,6 +773,14 @@ if [ -n "$deploy" ]; then
 	fi
 	common_phases_verdict=$(verdict "$source_root/$DEPLOY_COMMON_PHASES" "$common_phases_there")
 	note_deploy "$common_phases_verdict" "$DEPLOY_COMMON_PHASES" "$DEPLOY_COMMON_PHASES"
+
+	if [ -e "$root/$DEPLOY_SECTIONS" ]; then
+		sections_there=yes
+	else
+		sections_there=no
+	fi
+	sections_verdict=$(verdict "$source_root/$DEPLOY_SECTIONS" "$sections_there")
+	note_deploy "$sections_verdict" "$DEPLOY_SECTIONS" "$DEPLOY_SECTIONS"
 
 
 	if [ -d "$source_root/$DEPLOY_DOCS_DIR" ]; then
@@ -1798,7 +1808,7 @@ if [ "$vscode_linked" = yes ]; then
 	printf '%s はリンクだったので、リンクを保ったまま中身を書きました。\n' "$VSCODE_REL"
 fi
 
-# 配る。順は実行ファイル → 設定 3 本（ルール・リスクの配点・フェーズ定義）→
+# 配る。順は実行ファイル → 設定 4 本（ルール・リスクの配点・フェーズ定義・提案の見出し）→
 # 共通のテンプレート → 文書 → 代わりに通る sh → 振り分けの sh。途中で失敗したときに、判定するものだけがあって
 # 何を止めるかが無い、という状態にしないため。
 if [ "$deploy_work" = yes ]; then
@@ -1858,6 +1868,11 @@ if [ "$deploy_work" = yes ]; then
 	case "$common_phases_verdict" in
 	copy | replace)
 		copy_file "$source_root/$DEPLOY_COMMON_PHASES" "$root/$DEPLOY_COMMON_PHASES"
+		;;
+	esac
+	case "$sections_verdict" in
+	copy | replace)
+		copy_file "$source_root/$DEPLOY_SECTIONS" "$root/$DEPLOY_SECTIONS"
 		;;
 	esac
 	for name in $templates_todo; do
@@ -2007,6 +2022,9 @@ if [ ! -f "$root/$DEPLOY_CCNAVI_MD" ]; then
 fi
 if [ ! -f "$root/$DEPLOY_RISK" ]; then
 	note_missing "${DEPLOY_RISK}（リスクの配点。無いと組み込みの配点で測る）"
+fi
+if [ ! -f "$root/$DEPLOY_SECTIONS" ]; then
+	note_missing "${DEPLOY_SECTIONS}（提案の本文に求める見出し。無いと見出しを確かめず、親の雛形にも見出しを置かない）"
 fi
 # フェーズ定義は共通レイヤーと自身のレイヤーの和。どちらか片方があれば足りるので、両方無いときだけ言う。
 if [ ! -f "$root/$DEPLOY_PHASES" ] && [ ! -f "$root/$DEPLOY_COMMON_PHASES" ]; then

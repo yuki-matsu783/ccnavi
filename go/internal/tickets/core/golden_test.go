@@ -30,6 +30,7 @@ var (
 func approveWorkspace(t *testing.T) string {
 	root := workspace(t, "i0001", "i0002", "i0003", "i0004")
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), "version: 1\n"+phasesCopy)
+	testkit.PutSections(t, root)
 	todo := filepath.Join(testkit.Worktree(root, "i0001"), "wip", "proposals", "todo")
 	testkit.Put(t, filepath.Join(todo, "i0001.md"), parentText("i0001"))
 	testkit.Put(t, filepath.Join(todo, "i0001-01-01.md"), childText("i0001-01-01", "i0001"))

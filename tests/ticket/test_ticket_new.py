@@ -39,11 +39,21 @@ HEADING_TODO = {
     "計画の理由": "（ここに計画の理由を書く）",
 }
 PLACEHOLDERS = (RATIONALE_TODO, *HEADING_TODO.values())
+# 雛形の見出しを決める ticket-sections.yml（このリポジトリの共通レイヤーと同じ見出し）。
+SECTIONS = yaml.safe_dump(
+    {
+        "version": 1,
+        "parent": [{"name": n, "todo": HEADING_TODO[n]} for n in PARENT_HEADINGS],
+        "child": [{"name": n} for n in ("担当範囲", "親の要求との対応", "確認の手順")],
+    },
+    allow_unicode=True,
+)
 
 
 class TicketNewTestBase(PhaseHarness):
     def setUp(self):
         super().setUp()
+        write(config_path(self.root, "sections"), SECTIONS)
         self.tree = self.worktree(IDENT, "main")
         self.todo = os.path.join(self.tree, "wip", "proposals", "todo", IDENT + ".md")
 

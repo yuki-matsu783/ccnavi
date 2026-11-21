@@ -36,10 +36,10 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定 3 本と ccnavi ディレクトリ、共通レイヤーの 3 本（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
+| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定ファイルと ccnavi ディレクトリ、共通レイヤーの設定ファイル（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
 | `builtin:guard-binary` | `CCNAVI_ENTRY_PATH` が設定されているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` |
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
-| `builtin:guard-common-layer` | 共通レイヤーの 3 本の置き場が決まっているとき（11.6） | 同上 |
+| `builtin:guard-common-layer` | 共通レイヤーの設定ファイルの置き場が決まっているとき（11.6） | 同上 |
 | `builtin:guard-records` | 常に | `Write` `Edit` `MultiEdit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも適用する）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
 | `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていないコピーと置き場の外にはヒットしない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
@@ -103,9 +103,9 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 （`builtin:guard-config-via-bash`）が、呼び出しごとに同じ設定から組んで、実行ファイル・ccnavi ディレクトリ・共通レイヤーを
 動かした先への書き込みも止める。
 
-共通レイヤーの 3 本は、置き場がどこでも `builtin:guard-common-layer` が `Write` / `Edit` から止める。適用するのはワークスペースルートと、
+共通レイヤーの設定ファイル（`config.LayerKinds` の各種類）は、置き場がどこでも `builtin:guard-common-layer` が `Write` / `Edit` から止める。適用するのはワークスペースルートと、
 そこから切ったワークツリーの下の同じ相対（ワークスペースルートの外に置いたなら、そのパス）。既定の置き場（`.ccnavi/config/common/`）では
-`builtin:guard-project-home` より先にこちらがヒットする。期待する判定（`rule-expectations.yml`）は 3 本に入らず、既定の置き場なら
+`builtin:guard-project-home` より先にこちらがヒットする。期待する判定（`rule-expectations.yml`）はこれに入らず、既定の置き場なら
 `builtin:guard-project-home` が止める。
 
 生の git（`builtin:guard-raw-git`）: いつも、生の git を組み込みで止める（9.1）。ラッパーがあればその打ち方を文面で名指しする。

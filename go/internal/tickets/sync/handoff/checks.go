@@ -100,6 +100,7 @@ func overlay(conf *config.Settings, entries []*Entry) *config.Settings {
 	out.ProjectRulesFiles = copied(conf.ProjectRulesFiles)
 	out.ProjectPhasesFiles = copied(conf.ProjectPhasesFiles)
 	out.ProjectRiskFiles = copied(conf.ProjectRiskFiles)
+	out.ProjectSectionsFiles = copied(conf.ProjectSectionsFiles)
 	for _, e := range entries {
 		if e.Kind.ID != layerConfig || e.raw == nil || e.configKind == "" {
 			continue
@@ -112,12 +113,15 @@ func overlay(conf *config.Settings, entries []*Entry) *config.Settings {
 				out.Phases = e.draft
 			case config.KindRisk:
 				out.Risk = e.draft
+			case config.KindSections:
+				out.Sections = e.draft
 			}
 		} else if e.layer != "" {
 			swaps := map[config.LayerKind]map[string]string{
-				config.KindRules:  out.ProjectRulesFiles,
-				config.KindPhases: out.ProjectPhasesFiles,
-				config.KindRisk:   out.ProjectRiskFiles,
+				config.KindRules:    out.ProjectRulesFiles,
+				config.KindPhases:   out.ProjectPhasesFiles,
+				config.KindRisk:     out.ProjectRiskFiles,
+				config.KindSections: out.ProjectSectionsFiles,
 			}[e.configKind]
 			swaps[e.layer] = e.draft
 		}

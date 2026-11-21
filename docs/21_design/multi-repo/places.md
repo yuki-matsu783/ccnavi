@@ -13,12 +13,12 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | 何 | 場所 | git |
 |---|---|---|
 | hook の登録、実行ファイル、保護済みスクリプト、スキル、CLAUDE.md | ワークスペースルート | ワークスペース |
-| 共通レイヤーのルール / フェーズ定義 / リスクの配点 | `.ccnavi/config/common/{rules,phases,risks}.yml`（置き場は固定） | ワークスペース |
+| 共通レイヤーのルール / フェーズ定義 / リスクの配点 / 提案の見出し | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml`（置き場は固定） | ワークスペース |
 | ルールの期待する判定 | `.ccnavi/config/common/rule-expectations.yml` | ワークスペース |
 | 共通の作業・レビュー計画のテンプレート | `.ccnavi/config/common/templates/<名前>.yml`（置き場は固定。9.15。`*/.ccnavi/*` の一般の保護で守る） | ワークスペース |
 | 共通レイヤーのミラー | `projects/<名前>/.ccnavi/config/common/`（着手済みの親があるとき、ユーザの発言でワークスペースルートの `.ccnavi/config/common/` から配る。11.12） | プロジェクト |
-| ワークスペース自身のレイヤーの 3 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks}.yml` | ワークスペース |
-| プロジェクトのレイヤーの 3 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml` | プロジェクト |
+| ワークスペース自身のレイヤーの 4 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース |
+| プロジェクトのレイヤーの 4 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | プロジェクト |
 | 自身・プロジェクトのレイヤーのテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |
 | 固有スクリプト（配点の `script:` が指す先） | 共通レイヤーとそのミラーは `.ccnavi/config/common/scripts/`。自身のレイヤーとプロジェクトのレイヤーは、それぞれの `.ccnavi/scripts/` | レイヤーと同じ |
 | プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 階層に固定 | ワークスペースでは無視。プロジェクト自身の git |
@@ -51,7 +51,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 どちらの場合も「共通 + 1 レイヤー」の和になる（11.4）。
 
 ccnavi ディレクトリは git プロジェクトルートの直下の `.ccnavi` で、自身のレイヤーとプロジェクトのレイヤーに同じ名前が使われる。
-`config/` と `scripts/` と 3 本のファイル名は固定。プロジェクトの `config/project/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
+`config/` と `scripts/` と 4 本のファイル名は固定。プロジェクトの `config/project/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。
 
 読むのは常に元リポジトリに checkout されている版（ブランチは問わない。REQ-MLT-04）。
 
@@ -64,7 +64,7 @@ common と config の両方が無ければ、ルールは組み込みの既定�
 共通レイヤーのルール（`.ccnavi/config/common/rules.yml`）自身が破損して読めないときは、組み込みの既定を使い（REQ-PRE-06）、自身のレイヤーとプロジェクトのレイヤーは足さない。
 共通レイヤーのルールが「無い」ときは、これと違って組み込みの既定へは戻らず、空として config のレイヤーだけを土台の deny の上に足す。
 
-プロジェクトの git に入るのは、ccnavi ディレクトリ（`config/project/` の 3 本、ミラーの `config/common/`、配点のスクリプト）と、提案・承認済みチケット・フェーズのマーカー。
+プロジェクトの git に入るのは、ccnavi ディレクトリ（`config/project/` の 4 本、ミラーの `config/common/`、配点のスクリプト）と、提案・承認済みチケット・フェーズのマーカー。
 A が承認して B の機械で作業する流れでは、これらを共有する（9.2）。feature ブランチに乗り、squash merge で 1 コミットにまとめられる。
 git のラッパースクリプトの記録（`logs/`）はワークスペース側に残す。
 
