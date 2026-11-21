@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"ccnavi/internal/harness/contractshape"
 	"ccnavi/internal/infra/env"
 )
 
@@ -151,9 +152,9 @@ func Settings() object {
 
 // Doc は本物またはスタブの 1 回分の記録（recorded.json の hooks・stream・observations）。
 type Doc struct {
-	Hooks        map[string]*Node `json:"hooks"`
-	Stream       map[string]*Node `json:"stream"`
-	Observations object           `json:"observations"`
+	Hooks        map[string]*contractshape.Node `json:"hooks"`
+	Stream       map[string]*contractshape.Node `json:"stream"`
+	Observations object                         `json:"observations"`
 }
 
 // Recorded は recorded.json（本物だけ。source・claude_version のほかは Doc と同じ）。
@@ -186,10 +187,10 @@ var (
 
 // collapse は、形の中でキーにモデルの名前や呼び出しの ID が入る辞書（modelUsage・wire_tool_inputs など）のキーを
 // `<model>`・`<id>` にまとめる。まとめたキーどうしの形は合わせる。
-func collapse(node *Node) *Node {
+func collapse(node *contractshape.Node) *contractshape.Node {
 	out := *node
 	if node.Keys != nil {
-		keys := map[string]*Node{}
+		keys := map[string]*contractshape.Node{}
 		renamed := false
 		for k, v := range node.Keys {
 			name := k
@@ -202,7 +203,7 @@ func collapse(node *Node) *Node {
 			renamed = renamed || name != k
 			v = collapse(v)
 			if have, ok := keys[name]; ok {
-				v = Merge(have, v)
+				v = contractshape.Merge(have, v)
 			}
 			keys[name] = v
 		}
@@ -217,10 +218,10 @@ func collapse(node *Node) *Node {
 	return &out
 }
 
-func add(table map[string]*Node, key string, value any) {
-	node := collapse(Normalize(value, 0))
+func add(table map[string]*contractshape.Node, key string, value any) {
+	node := collapse(contractshape.Normalize(value))
 	if have, ok := table[key]; ok {
-		node = Merge(have, node)
+		node = contractshape.Merge(have, node)
 	}
 	table[key] = node
 }
@@ -296,7 +297,7 @@ func Collect(tree string, run func(n int, prompt string) (string, error)) (Doc, 
 		return Doc{}, err
 	}
 	streams := [][]object{readJSONL(first), readJSONL(second)}
-	hooks, stream := map[string]*Node{}, map[string]*Node{}
+	hooks, stream := map[string]*contractshape.Node{}, map[string]*contractshape.Node{}
 	for _, e := range logs {
 		if e.Tag == "A" {
 			add(hooks, toolKey(e.Payload), e.Payload)

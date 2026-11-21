@@ -12,7 +12,7 @@
 //     形（Node）と振る舞い（Observe）にまとめる Collect。本物の側（M2 の claudrecord）もこれを使う
 //
 // 形が本物と合っていることは clitest/contract/claude が、本物から録った tests/contract/claude/recorded.json と比べて確かめる。
-// 形の表（Node・Normalize・Merge）は、契約の形の器（contractshape）が置かれたらそちらに寄せる。
+// 形の表（Node・Normalize・Merge）は契約の形の器（contractshape）のものを使う。
 //
 // モデル・費用・Claude Code 自身の権限の仕組みは真似ない。hook が止めなければツールを実行する。同じイベントに当たった hook は、本物と同じく並行に起こす。
 package fakeclaude

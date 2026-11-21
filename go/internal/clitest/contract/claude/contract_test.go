@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/contractshape"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/fakeclaude"
 	"ccnavi/internal/harness/run"
@@ -83,7 +84,7 @@ func TestFakeClaudeMatchesTheRecording(t *testing.T) {
 
 	t.Run("スタブの形は本物の形に含まれる", func(t *testing.T) {
 		var problems []string
-		for section, pair := range map[string][2]map[string]*fakeclaude.Node{
+		for section, pair := range map[string][2]map[string]*contractshape.Node{
 			"hooks":  {fake.Hooks, real.Hooks},
 			"stream": {fake.Stream, real.Stream},
 		} {
@@ -144,7 +145,7 @@ func TestFakeClaudeMatchesTheRecording(t *testing.T) {
 }
 
 // notInReal はスタブの形のうち、本物に無い欄と、本物の型に含まれない型。
-func notInReal(fake, real *fakeclaude.Node, path string) []string {
+func notInReal(fake, real *contractshape.Node, path string) []string {
 	var out []string
 	for _, kind := range fake.T {
 		if !slices.Contains(real.T, kind) {
