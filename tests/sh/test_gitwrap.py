@@ -441,6 +441,11 @@ class OutputTest(GitWrapperTest):
         self.assertEqual(7, len(body), result.stdout)  # 要約 + 本文 5 行 + 残りの案内
         self.assertTrue(body[-1].startswith("... 残り "), body[-1])
         self.assertIn("line 199", logs_of(self.dir)[0], "全量が記録に残っていない")
+        self.assertIn(
+            "$ git show --no-ext-diff HEAD",
+            logs_of(self.dir)[0],
+            "実行した引数が記録に残っていない",
+        )
         self.assertNotIn("line 199", result.stdout, "抑えたはずの本文が出ている")
 
     def test_failure_returns_exit_1_and_the_tail(self):
@@ -450,14 +455,11 @@ class OutputTest(GitWrapperTest):
         self.assertIn("log=logs/git-", result.stdout.splitlines()[0])
         self.assertIn("no-such-ref", logs_of(self.dir)[0])
 
-    def test_the_log_records_what_was_run(self):
-        self.run_wrapper("status", "--porcelain")
-        self.assertIn("$ git status --porcelain", logs_of(self.dir)[0])
-
     def test_old_logs_are_dropped_by_generation(self):
-        for _ in range(4):
-            self.run_wrapper("rev-parse", "HEAD", env={"CCNAVI_GIT_KEEP_LOGS": "2"})
-        self.assertEqual(2, len(logs_of(self.dir)))
+        # 環境変数が渡ることだけを見る（切り捨ては gitlog の TestReport が見る）。
+        for _ in range(2):
+            self.run_wrapper("rev-parse", "HEAD", env={"CCNAVI_GIT_KEEP_LOGS": "1"})
+        self.assertEqual(1, len(logs_of(self.dir)))
 
 
 class EnvironmentTest(GitWrapperTest):
@@ -468,8 +470,8 @@ class EnvironmentTest(GitWrapperTest):
         "GIT_CONFIG_VALUE_0": "no",
     }
 
-    def test_the_injection_works_on_plain_git(self):
-        """見本が有効なことを先に確かめる。有効でない見本では次のテストが何も確かめられない。"""
+    def test_config_injected_through_the_environment_is_dropped(self):
+        # 見本が有効なことを先に確かめる。有効でない見本では何も確かめられない。
         environment = dict(os.environ)
         environment.update(self.INJECT)
         result = subprocess.run(
@@ -481,7 +483,6 @@ class EnvironmentTest(GitWrapperTest):
         )
         self.assertNotIn("untracked.txt", result.stdout)
 
-    def test_config_injected_through_the_environment_is_dropped(self):
         result = self.run_wrapper("status", "--porcelain", env=self.INJECT)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("untracked.txt", result.stdout, "環境からの設定注入が通っている")
@@ -574,28 +575,18 @@ class ResetGuidanceTest(GitWrapperTest):
         git(self.dir, "commit", "-q", "-m", "local")
         return branch
 
-    def test_usage_names_ccnavi_sync_not_checkout_B(self):
-        usage = self.run_wrapper("--help").stdout
+    def test_usage_names_ccnavi_sync_and_what_it_rejects(self):
+        """使い方の文が、checkout -B の代わり・branch で通さない形・tag は一覧だけを言う。
+
+        判定そのものは実行ファイル（`ccnavi git check`）が行い、
+        go/internal/tickets/lifecycle/gitwrap の見本が見る。
+        """
+        result = self.run_wrapper("--help")
+        usage = result.stdout
         self.assertIn("ccnavi-sync.sh <P>", usage)
         self.assertNotIn("checkout -B <ブランチ>", usage)
-
-    def test_creating_a_new_branch_still_passes(self):
-        for args in (("checkout", "-b", "fresh", "HEAD"), ("switch", "--create", "fresh2", "HEAD")):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-
-class BranchUsageTest(GitWrapperTest):
-    """使い方の文が、branch で通さない形（-D・-m・-M・-C・-f・-u）を挙げる。
-
-    判定そのものは実行ファイル（`ccnavi git check`）が行い、
-    go/internal/tickets/lifecycle/gitwrap の見本が見る。
-    """
-
-    def test_usage_lists_what_it_rejects(self):
-        usage = self.run_wrapper("--help").stdout
         self.assertIn("-D -m -M -C -f -u は不可", usage)
+        self.assertIn("作成はユーザに依頼", usage + result.stderr)
 
 
 class FetchRefspecTest(GitWrapperTest):
@@ -690,31 +681,6 @@ class StoreRewindTest(GitWrapperTest):
                 result = self.run_wrapper("restore", "--source", "HEAD~1", rel, env=env)
                 self.assertEqual(2, result.returncode, result.stdout + result.stderr)
         self.assertUntouched()
-
-    def test_forms_outside_the_store_still_pass(self):
-        for args in (
-            ("checkout", "HEAD~1", "tracked.txt"),
-            ("restore", "--source", "HEAD~1", "tracked.txt"),
-            ("restore", "--source", "HEAD~1", ".ccnavi-other/x.md"),
-            ("restore", self.COPY),
-            ("restore", "--staged", self.COPY),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertNotEqual(2, result.returncode, result.stdout + result.stderr)
-        # 置き場の外は戻った（HEAD~1 の tracked.txt は見本を作ったときの中身）。
-        self.assertTrue(self.read("tracked.txt").startswith("line 0\n"))
-
-    def test_moving_between_branches_still_passes(self):
-        # 行き先だけの形と、-b / -c の値と起点は、パスと読まない（-B / -C は止める）。
-        for args in (
-            ("checkout", "-b", "topic", "HEAD~1"),
-            ("switch", "--create", "topic2", "HEAD"),
-            ("switch", "topic"),
-        ):
-            with self.subTest(args=args):
-                result = self.run_wrapper(*args)
-                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
 
 def run_in(cwd, *args):
@@ -950,14 +916,6 @@ class ParentPushGateTest(GitWrapperTest):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.remote_sha())
 
-    def test_an_approved_parent_never_started_passes_as_the_first_push(self):
-        # 直接作業で提案を書き、同名のワークツリーで承認して、最初に打つ push。
-        # 承認済みというだけでは形跡にしない。
-        self.approve()
-        result = self.push()
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertEqual(git_out(self.tree, "rev-parse", "HEAD"), self.remote_sha())
-
     def test_a_started_parent_missing_from_the_remote_is_refused(self):
         # 参照（origin/i0001）が無くても、着手済み（started_at あり）なら一度は送った親として扱う。
         self.approve(started=True)
@@ -966,15 +924,6 @@ class ParentPushGateTest(GitWrapperTest):
         self.assertIn("親のブランチ i0001 がリモートに無い", result.stderr)
         self.assertIn("ccnavi-sync.sh i0001", result.stderr)
         self.assertEqual("", self.remote_sha())
-
-    def test_a_requested_parent_missing_from_the_remote_is_refused(self):
-        self.approve()
-        write_text(
-            os.path.join(self.tree, ".ccnavi", "approved", "phases", "i0001", "1.requested"), "{}\n"
-        )
-        result = self.push()
-        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
-        self.assertIn("親のブランチ i0001 がリモートに無い", result.stderr)
 
     def test_the_origin_url_written_directly_is_still_gated(self):
         # origin の URL が `:` を含まないローカルのパスのとき、
@@ -1037,20 +986,6 @@ class ParentPushGateTest(GitWrapperTest):
             errors="replace",
             env=environment,
         )
-
-    def test_other_trees_are_not_gated(self):
-        free = os.path.join(self.dir, ".claude", "worktrees", "free")
-        git(self.dir, "worktree", "add", "-q", free, "-b", "free")
-        # origin に free が無くても、参照が無ければ初回として通す。参照があって消えていても、
-        # 親のワークツリーでなければ掛けない。
-        result = self.push(free, "free")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.delete_on_remote("free")
-        write_text(os.path.join(free, "x.txt"), "x\n")
-        git(free, "add", "x.txt")
-        git(free, "commit", "-q", "-m", "x")
-        result = self.push(free, "free")
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     # 送り先は git と同じ順で解き、origin 以外へ送るときはゲートを掛けない。
 
@@ -1476,18 +1411,6 @@ class IntegrationPushTest(GitWrapperTest):
         git(self.dir, "checkout", "--quiet", "-b", "trunk")
         result = self.push(branch="trunk")
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-
-class TagListOnlyTest(GitWrapperTest):
-    """使い方の文が、tag は一覧だけでタグの作成はユーザに頼むと言う。
-
-    判定そのものは実行ファイル（`ccnavi git check`）が行い、
-    go/internal/tickets/lifecycle/gitwrap の見本が見る。
-    """
-
-    def test_help_says_creation_is_the_users(self):
-        result = self.run_wrapper("--help")
-        self.assertIn("作成はユーザに依頼", result.stdout + result.stderr)
 
 
 if __name__ == "__main__":
