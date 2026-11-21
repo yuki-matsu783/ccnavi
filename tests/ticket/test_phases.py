@@ -1439,16 +1439,12 @@ class WrapperFlagsComeOnceTest(PhaseHarness):
     1 本足すと argparse が後勝ちで読むので、2 本目が在ること自体を断る。
     """
 
-    def test_a_second_cwd_is_refused(self):
+    def test_a_second_cwd_is_refused_and_one_of_each_goes_through(self):
         refused = self.ccnavi("--cwd", self.parent_tree, "--cwd", self.root, "--explain", "--json")
-
         self.assertNotEqual(refused.returncode, 0)
         self.assertIn("--cwd は 1 度しか渡せない", refused.stderr)
-
-    def test_one_of_each_still_goes_through(self):
-        """1 本ずつなら通る。断る側だけを見ると、全部断る実装でもテストが通ってしまう。"""
+        # 1 本ずつなら通る。断る側だけを見ると、全部断る実装でもテストが通ってしまう。
         passed = self.ccnavi("--cwd", self.parent_tree, "--explain", "--json")
-
         self.assertEqual(passed.returncode, 0, passed.stderr)
         self.assertTrue(json.loads(passed.stdout))
 
@@ -1547,34 +1543,100 @@ class ScopeLimitTest(PhaseHarness):
 
     # ---- 6.2 判定
 
-    def test_write_beyond_the_phase_type_is_denied_and_names_the_type(self):
-        """7. enable: 定義の上限の外で子の範囲の中への Write は DENY_TICKET_SCOPE。"""
+    def test_a_write_beyond_the_phase_type_is_stopped_on_every_path(self):
+        """7・8・12・6・15・16. 定義の上限の外は、Write の判定・dry-run・phases.yml の状態が
+        どうでも・Bash の実行後チェック・SubagentStop のどれでも、上限の名指しつきで止まる。
+
+        承認のあとの判定は親に固定したコピー（`phases:`）の定義で切り詰める。`phases.yml` から
+        定義を消しても、壊しても（UTF-8 として読めなくても）、消しても、判定は phases.yml を
+        読まないので上限は変わらず、例外で終わらない。
+        """
         tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
+            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
         )
         inside = self.write_to(tree, "wip/research/note.md")
         self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
         self.assertNotIn("DENY_TICKET_SCOPE", self.reason(inside))
-
         denied = self.write_to(tree, "src/a/x.py")
         self.assertEqual(denied.returncode, 0, denied.stderr)
         self.assertEqual(self.decision(denied), "deny", denied.stdout)
         reason = self.reason(denied)
         self.assertIn("DENY_TICKET_SCOPE", reason)
         self.assertIn("limit: phase type 調査 (research): wip/research/*", reason)
-
-    def test_dry_run_still_stops_the_write_and_says_which_limit(self):
-        """8. dry-run: 範囲の外の Write はゲートなので止まり、`limit: phase type` が出る。"""
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
-        )
-        result = self.write_to(tree, "src/a/x.py", mode="dry-run")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.decision(result), "deny", result.stdout)
-        text = self.reason(result)
+        # dry-run でもゲートなので止まり、上限を名指しする。
+        dry = self.write_to(tree, "src/a/x.py", mode="dry-run")
+        self.assertEqual(dry.returncode, 0, dry.stderr)
+        self.assertEqual(self.decision(dry), "deny", dry.stdout)
+        text = self.reason(dry)
         self.assertIn("still applies", text)
         self.assertIn("DENY_TICKET_SCOPE", text)
         self.assertIn("limit: phase type", text)
+        # phases.yml をどう変えても、上限は変わらない。
+        undecodable = PHASES.encode("utf-8").replace("調査".encode(), b"\xff\xfe\x80")
+        for label, content in (
+            ("定義を消した", PHASES_WITHOUT_RESEARCH.encode("utf-8")),
+            ("phases.yml が不正", b"version: 1\nphases: [\n"),
+            ("phases.yml が UTF-8 でない", undecodable),
+            ("phases.yml が無い", None),
+        ):
+            with self.subTest(label):
+                if content is None:
+                    os.remove(self.phases)
+                else:
+                    with open(self.phases, "wb") as f:
+                        f.write(content)
+                beyond_type = self.write_to(tree, "src/a/x.py")
+                self.assert_answered(beyond_type)
+                self.assertEqual(self.decision(beyond_type), "deny", beyond_type.stdout)
+                self.assertIn("limit: phase type 調査 (research)", self.reason(beyond_type))
+                self.assertNotIn("切り詰めていない", self.reason(beyond_type))
+                inside = self.write_to(tree, "wip/research/x.md")
+                self.assert_answered(inside)
+                self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
+                self.assertNotIn("読めない", self.reason(inside))
+                beyond_parent = self.write_to(tree, "docs/x.md")
+                self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
+                self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
+                self.assertIn("limit: parent i0001", self.reason(beyond_parent))
+                for command in (
+                    "ls",
+                    "echo x > src/a/x.py",
+                    "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
+                ):
+                    self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
+        # 実行後チェック: Bash が定義の上限の外に書くと POST_TICKET_SCOPE。
+        self.hook("UserPromptSubmit", "", tree)
+        first = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        # 定義の中への書き込みは言わない。
+        write(os.path.join(tree, "wip", "research", "gen.md"), "ok\n")
+        quiet = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
+        self.assertEqual(quiet.returncode, 0, quiet.stdout + quiet.stderr)
+        self.assertNotIn("POST_TICKET_SCOPE", quiet.stdout + quiet.stderr)
+        # 子の範囲の中だが定義の外。
+        write(os.path.join(tree, "src", "a", "gen.py"), "x\n")
+        after = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
+        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
+        self.assertIn("POST_TICKET_SCOPE", after.stderr)
+        self.assertIn("src/a/gen.py", after.stderr.replace("\\", "/"))
+        self.assertIn("調査", after.stderr)
+        # SubagentStop: 定義の上限の外の変更で差し戻し、上限の名指しが付く。
+        write(os.path.join(tree, "wip", "research", "ok.md"), "ok\n")
+        write(os.path.join(tree, "src", "a", "stray.py"), "x\n")
+        git(tree, "add", "-A")
+        git(tree, "commit", "--quiet", "-m", "stray")
+        result = self.hook("SubagentStop", "", tree, agent_id="sub-1")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("POST_TICKET_SCOPE", result.stderr)
+        self.assertIn("src/a/stray.py", result.stderr)
+        self.assertIn("（定義 調査 の上限の外）", result.stderr)
+        self.assertNotIn("wip/research/ok.md", result.stderr)
+
+    def assert_answered(self, result):
+        """hook が判定の答えとして読める形で返したこと。"""
+        self.assertIn(result.returncode, (0, 2), result.stdout + result.stderr)
+        if result.stdout.strip():
+            json.loads(result.stdout)
 
     def test_ask_inside_the_phase_type_stays_ask(self):
         """9. 定義の上限の中で子が `ask` と書いた場所は TICKET_ASK のまま。外なら止まる。"""
@@ -1621,91 +1683,7 @@ class ScopeLimitTest(PhaseHarness):
         self.assertIn("phases.yml に最小のフェーズ定義", started.stderr)
         self.assertIn("書くのはユーザ", started.stderr)
 
-    def test_editing_phases_yml_does_not_change_the_cut_of_an_approved_child(self):
-        """12. 承認のあとの判定は親に固定したコピー（`phases:`）の定義で切り詰める。
-
-        `phases.yml` から定義を消しても、壊しても、判定はコピーを読むので上限は変わらない。
-        """
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*", "docs/*"])
-        )
-        for label, text in (
-            ("定義を消した", PHASES_WITHOUT_RESEARCH),
-            ("phases.yml が不正", "version: 1\nphases: [\n"),
-        ):
-            with self.subTest(label):
-                write(self.phases, text)
-                beyond_type = self.write_to(tree, "src/a/x.py")
-                self.assertEqual(self.decision(beyond_type), "deny", beyond_type.stdout)
-                self.assertIn("limit: phase type 調査 (research)", self.reason(beyond_type))
-                self.assertNotIn("定義の上限では切り詰めていない", self.reason(beyond_type))
-                inside = self.write_to(tree, "wip/research/x.md")
-                self.assertNotEqual(self.decision(inside), "deny", self.reason(inside))
-                beyond_parent = self.write_to(tree, "docs/x.md")
-                self.assertEqual(self.decision(beyond_parent), "deny", beyond_parent.stdout)
-                self.assertIn("DENY_TICKET_SCOPE", self.reason(beyond_parent))
-                self.assertIn("limit: parent i0001", self.reason(beyond_parent))
-
     # ---- 判定が失敗しない（チケット approve-carry-04 の 6〜8）
-
-    def assert_answered(self, result):
-        """hook が例外で終わらず、判定の答えとして読める形で返したこと。"""
-        self.assertIn(result.returncode, (0, 2), result.stdout + result.stderr)
-        self.assertNotIn("Traceback", result.stderr)
-        if result.stdout.strip():
-            json.loads(result.stdout)
-
-    def break_phases_encoding(self):
-        """共通レイヤーの phases.yml に、UTF-8 として読めないバイト列を混ぜる。"""
-        with open(self.phases, "wb") as f:
-            f.write(PHASES.encode("utf-8").replace("調査".encode(), b"\xff\xfe\x80"))
-
-    def test_undecodable_phases_file_does_not_crash_the_write_judge(self):
-        """6. phases.yml が UTF-8 として読めなくても、Write の判定は例外で終わらない。"""
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
-        )
-        self.break_phases_encoding()
-        result = self.write_to(tree, "src/a/x.py")
-        self.assert_answered(result)
-        # 判定は親に固定したコピー（`phases:`）の定義で切り詰め、phases.yml は読まない。
-        self.assertEqual(self.decision(result), "deny", result.stdout)
-        self.assertIn("limit: phase type 調査 (research)", self.reason(result))
-        self.assertNotIn("切り詰めていない", self.reason(result))
-
-    def test_undecodable_phases_file_does_not_crash_the_bash_judge(self):
-        """7. 同じ状態で、Bash の実行前チェック（止めるかどうかの経路）も例外で終わらない。"""
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
-        )
-        self.break_phases_encoding()
-        for command in (
-            "ls",
-            "echo x > src/a/x.py",
-            "sh ../../../.ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-        ):
-            with self.subTest(command):
-                self.assert_answered(self.hook("PreToolUse", "Bash", tree, command=command))
-
-    def test_no_phases_file_with_a_plan_says_nothing_about_the_type(self):
-        """8. 承認のあとに phases.yml を消しても、判定は親に固定したコピーの定義で切り詰める。
-
-        判定は phases.yml を読まない。注記も出さない。
-        """
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
-        )
-        os.remove(self.phases)
-        self.assertFalse(os.path.exists(self.phases))
-        inside = self.write_to(tree, "wip/research/note.md")
-        self.assert_answered(inside)
-        self.assertNotEqual(self.decision(inside), "deny", inside.stdout)
-        self.assertNotIn("読めない", self.reason(inside))
-        beyond = self.write_to(tree, "src/a/x.py")
-        self.assert_answered(beyond)
-        self.assertEqual(self.decision(beyond), "deny", beyond.stdout)
-        self.assertIn("limit: phase type 調査 (research)", self.reason(beyond))
-        self.assertNotIn("切り詰めていない", self.reason(beyond))
 
     def test_regex_child_is_judged_by_the_real_path(self):
         """14. regex の子: 実際のパスで親と定義に適用する。"""
@@ -1754,43 +1732,6 @@ class ScopeLimitTest(PhaseHarness):
         outside = self.write_to(tree, "wip/Research/x.md")
         self.assertEqual(self.decision(outside), "deny", outside.stdout)
         self.assertIn("DENY_TICKET_SCOPE", self.reason(outside))
-
-    def test_post_monitoring_reports_a_shell_write_beyond_the_type(self):
-        """15. 実行後チェック: Bash が定義の上限の外に書くと POST_TICKET_SCOPE。"""
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
-        )
-        self.hook("UserPromptSubmit", "", tree)
-        first = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
-        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-        # 定義の中への書き込みは言わない。
-        write(os.path.join(tree, "wip", "research", "gen.md"), "ok\n")
-        quiet = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
-        self.assertEqual(quiet.returncode, 0, quiet.stdout + quiet.stderr)
-        self.assertNotIn("POST_TICKET_SCOPE", quiet.stdout + quiet.stderr)
-        # 子の範囲の中だが定義の外。
-        write(os.path.join(tree, "src", "a", "gen.py"), "x\n")
-        after = self.hook("PostToolUse", "Bash", tree, command="python gen.py")
-        self.assertEqual(after.returncode, 2, after.stdout + after.stderr)
-        self.assertIn("POST_TICKET_SCOPE", after.stderr)
-        self.assertIn("src/a/gen.py", after.stderr.replace("\\", "/"))
-        self.assertIn("調査", after.stderr)
-
-    def test_subagent_stop_bounces_a_change_beyond_the_type_and_names_it(self):
-        """16. SubagentStop: 定義の上限の外の変更で差し戻し、上限の名指しが付く。"""
-        tree = self.approved_child(
-            child_text("i0001-01-01", "i0001", 1, ["wip/research/*", "src/a/*"])
-        )
-        write(os.path.join(tree, "wip", "research", "ok.md"), "ok\n")
-        write(os.path.join(tree, "src", "a", "stray.py"), "x\n")
-        git(tree, "add", "-A")
-        git(tree, "commit", "--quiet", "-m", "stray")
-        result = self.hook("SubagentStop", "", tree, agent_id="sub-1")
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn("POST_TICKET_SCOPE", result.stderr)
-        self.assertIn("src/a/stray.py", result.stderr)
-        self.assertIn("（定義 調査 の上限の外）", result.stderr)
-        self.assertNotIn("wip/research/ok.md", result.stderr)
 
 
 if __name__ == "__main__":

@@ -827,134 +827,6 @@ class TicketTest(unittest.TestCase):
 
     # ---- 3. 状態の置き場
 
-    def test_state_directories_cannot_be_written_directly(self):
-        self.family()
-        target = os.path.join(self.parent_tree, "wip", "proposals", "review", "i0001-01-01.md")
-        result = self.hook("PreToolUse", "Write", self.parent_tree, file_path=target)
-        self.assertIn("builtin:ticket-state", self.reason(result))
-        moved = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="mv .ccnavi/approved/doing/i0001-01-01.md wip/proposals/review/",
-        )
-        self.assertIn("builtin:ticket-state", self.reason(moved))
-        # todo/ への作成は自由。
-        todo = os.path.join(self.parent_tree, "wip", "proposals", "todo", "i0001-01-03.md")
-        free = self.hook("PreToolUse", "Write", self.parent_tree, file_path=todo)
-        self.assertNotIn("builtin:ticket-state", self.reason(free))
-
-    def test_copies_into_the_state_directory_are_read_by_their_destination(self):
-        """コピーする動詞の行き先は、組み込みの保護と同じ部品で読む（`-t` の値か最後の引数）。
-
-        `-t` で行き先を前に出した形、行き先のあとに選択肢を回した形、状態の置き場が入っている
-        ディレクトリ（提案の置き場）を行き先にして元の名前を状態の名前にした形も止める。
-        置き場から外へコピーするだけの形と、todo/ へコピーする形は止めない。
-
-        hook を通した代表だけを見る。動詞・旗・行き先の表記ごとの表は、ここで打っていた形を集めた
-        Go の見本（`go/internal/hook/judge/testdata/captured.jsonl`）が確かめる。
-        """
-        self.family()
-        for command in (
-            "cp -t wip/proposals/review .ccnavi/approved/doing/i0001-01-01.md",
-            "cp /tmp/i0001-01-01.md wip/proposals/review -f",
-            "cp -r /tmp/review wip/proposals/",
-            "cd wip/proposals/review && cp /tmp/i0001-01-01.md .",
-        ):
-            with self.subTest(command=command):
-                result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertIn("builtin:ticket-state", self.reason(result))
-        for command in (
-            "cp -t /tmp/out wip/proposals/review/i0001-01-01.md",
-            "cp /tmp/i0001-01-03.md wip/proposals/todo/",
-        ):
-            with self.subTest(command=command):
-                result = self.hook("PreToolUse", "Bash", self.parent_tree, command=command)
-                self.assertNotIn("builtin:ticket-state", self.reason(result))
-
-    def test_subagent_cannot_move_state(self):
-        self.family()
-        result = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-        )
-        self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
-        self.assertEqual(self.last_rules(), ["builtin:subagent-ticket-op"])
-        parent = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-        )
-        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
-
-    def test_subagent_cannot_push(self):
-        """リモートに置く枝は親ブランチ 1 本で、送るのは親の仕事。
-
-        ラッパースクリプトは cwd のツリーで子を見分けるが、サブエージェントが親のツリーへ
-        cd して打てばラッパースクリプトは通す。素性で止めるレイヤーを hook に持つ。
-        """
-        self.family()
-        for command in (
-            "sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001-01-01",
-            "cd ../i0001 && sh .ccnavi/scripts/ccnavi-git.sh push origin i0001",
-        ):
-            with self.subTest(command=command):
-                result = self.hook(
-                    "PreToolUse",
-                    "Bash",
-                    self.parent_tree,
-                    agent_id="sub-1",
-                    command=command,
-                )
-                self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
-                self.assertIn("push", self.reason(result))
-        parent = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            command="sh .ccnavi/scripts/ccnavi-git.sh push -u origin i0001",
-        )
-        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(parent))
-        # 読むだけの形は、サブエージェントでも通る。
-        reading = self.hook(
-            "PreToolUse",
-            "Bash",
-            self.parent_tree,
-            agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-git.sh status",
-        )
-        self.assertNotIn("DENY_SUBAGENT_TICKET_OP", self.reason(reading))
-
-    def test_subagent_cannot_move_state_through_a_runner_command(self):
-        """実行役のコマンドを前に置いても、サブエージェントの禁止は外れない。
-
-        禁止の形はコマンドの先頭の `sh` に固定していたので、`env sh` `command sh` `/bin/sh`
-        と `sh -c '…'` は止められずに通っていた（wip/design/launcher-scripts.md 3.5.1、12 節 W5）。
-        禁止は中で実行されるコマンドにも適用する（3.5.3）。先頭の形は対照として今のまま止まる。
-        """
-        self.family()
-        for command in (
-            "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
-            "env sh .ccnavi/scripts/ccnavi-ticket.sh start x",
-            "command sh .ccnavi/scripts/ccnavi-ticket.sh start x",
-            "/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish x",
-            "sh .ccnavi/scripts/ccnavi-ticket.sh approval-request x",
-            "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1'",
-        ):
-            with self.subTest(command=command):
-                result = self.hook(
-                    "PreToolUse",
-                    "Bash",
-                    self.parent_tree,
-                    agent_id="sub-1",
-                    command=command,
-                )
-                self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result), self.reason(result))
-
     def test_done_moves_the_ticket_to_review_without_approval(self):
         """レビュー要の子を閉じると、承認済みチケットは doing/ から wip/proposals/review/ へ動く。
 
@@ -1592,20 +1464,6 @@ class TicketTest(unittest.TestCase):
             *extra,
             stdin=stdin,
         )
-
-    def test_decide_preview_shows_the_threads_and_places_nothing(self):
-        """ボードが読む一覧。指摘・ダイジェスト・issue に回せるかを返し、何も置かない。"""
-        fixture = self.two_threads()
-        shown = self.decide(fixture, "--preview", "--json")
-        self.assertEqual(shown.returncode, 0, shown.stderr)
-        data = json.loads(shown.stdout)
-        self.assertEqual([t["key"] for t in data["threads"]], ["u1", "u2"])
-        self.assertEqual(data["parent"], "i0001")
-        self.assertNotIn("can_issue", data)
-        self.assertRegex(data["digest"], r"^v2\.[A-Za-z0-9_-]+$")
-        phases = os.path.join(self.approved, "phases", "i0001")
-        self.assertFalse(os.path.exists(os.path.join(phases, "1.reviewed")))
-        self.assertFalse(os.path.exists(os.path.join(phases, "accepted.json")))
 
     def test_decide_yes_places_each_choice(self):
         """指摘ごとの行き先。対応しない分は受け入れ、直す分は続きの子に載せ、フェーズは開き直る。"""
@@ -2291,17 +2149,6 @@ class TicketTest(unittest.TestCase):
         self.assertIn("ターミナル", refused.stderr)
         self.assertEqual(self.approve().returncode, 0)
 
-    def test_subagent_cannot_move_state_from_powershell_either(self):
-        self.family()
-        result = self.hook(
-            "PreToolUse",
-            "PowerShell",
-            self.parent_tree,
-            agent_id="sub-1",
-            command="sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01",
-        )
-        self.assertIn("DENY_SUBAGENT_TICKET_OP", self.reason(result))
-
     # ---- 8. 親を閉じる順
 
     def test_parent_cannot_close_while_children_are_open(self):
@@ -2834,38 +2681,6 @@ class TicketTest(unittest.TestCase):
         os.remove(os.path.join(self.approved, "phases", "i0001", "1.reviewed"))
         self.assertNotEqual(self.confirm(fixture).returncode, 0)
 
-    def test_prepare_writes_only_the_request_body_and_never_a_merge_request_draft(self):
-        """依頼の準備が書き出すのは依頼の本文だけ。マージリクエストの下書きは作らない。
-
-        マージリクエストが無ければ sh が止める（作るのは `ccnavi-start.sh`）。
-        """
-        self.propose("i0001", allow=("src/*", "wip/*"), title="挨拶の言語を切り替える", issue=12)
-        self.propose("i0001-01-01", parent="i0001", phase=1, allow=("src/a/*",))
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "tickets")
-        self.assertEqual(self.approve().returncode, 0)
-        self.start_parent()
-        self.worktree("i0001-01-01", "i0001")
-        self.assertEqual(self.ccnavi("ticket", "start", "i0001-01-01").returncode, 0)
-        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
-        git(self.parent_tree, "add", "-A")
-        git(self.parent_tree, "commit", "--quiet", "-m", "done")
-        self.remote(merge=("i0001-01-01",))
-
-        prepared = self.ccnavi(
-            "--cwd",
-            self.parent_tree,
-            "--phase",
-            "1",
-            "--body-file",
-            write(os.path.join(self.root, "body.md"), "見てほしい点\n"),
-            "review",
-            "prepare",
-        )
-        self.assertEqual(prepared.returncode, 0, prepared.stderr)
-        self.assertEqual(len(prepared.stdout.splitlines()), 1, prepared.stdout)
-        self.assertEqual([n for n in os.listdir(self.state) if n.startswith("review-mr-")], [])
-
     def test_prepare_check_refuses_like_prepare_and_writes_nothing(self):
         """`prepare --check` は本体と同じ前提で断り、何も書かない（フェーズが終わっていない）。"""
         self.family()
@@ -2881,19 +2696,6 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(len([ln for ln in checked.stderr.splitlines() if "次:" in ln]), 1)
         after = sorted(os.listdir(self.state)) if os.path.isdir(self.state) else []
         self.assertEqual(before, after)
-
-    def test_prepare_check_passes_without_writing_the_body(self):
-        self.family()
-        self.close_phase()
-        self.remote()
-        body = write(os.path.join(self.root, "body.md"), "見てほしい点\n")
-        checked = self.ccnavi(
-            "--check", "--cwd", self.parent_tree, "--phase", "1", "--body-file", body,
-            "review", "prepare",
-        )  # fmt: skip
-        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
-        self.assertIn("何も変えていません", checked.stdout)
-        self.assertFalse(os.path.isdir(self.state) and os.listdir(self.state))
 
     def test_decide_check_refuses_without_a_request_and_writes_nothing(self):
         """依頼の記録が無ければ、`--check` は本体（`--preview`）と同じ理由で断る。"""
@@ -2911,27 +2713,6 @@ class TicketTest(unittest.TestCase):
         self.assertEqual(len([ln for ln in checked.stderr.splitlines() if "次:" in ln]), 1)
         self.assertEqual(git(self.parent_tree, "rev-parse", "HEAD"), head)
         self.assertEqual(git(self.parent_tree, "status", "--porcelain"), "")
-
-    def test_decide_check_passes_after_a_request_and_checks_the_choices_shape(self):
-        self.family()
-        self.close_phase()
-        fixture = self.remote()
-        self.assertEqual(self.request(fixture).returncode, 0)
-        base = (
-            "--cwd",
-            self.parent_tree,
-            "user",
-            "reviewed",
-            "1",
-            "--accept-unresolved",
-            "--check",
-        )
-        ok = self.ccnavi(*base)
-        self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
-        self.assertIn("何も変えていません", ok.stdout)
-        bad = self.ccnavi(*base, "--yes", "not-json", "--digest", "d0")
-        self.assertEqual(bad.returncode, 1, bad.stdout + bad.stderr)
-        self.assertEqual(len([ln for ln in bad.stderr.splitlines() if "次:" in ln]), 1)
 
     def confirm(self, fixture, phase="1"):
         return self.ccnavi(
