@@ -16,7 +16,15 @@ import (
 // Final はリポジトリからの相対パス（`/` 区切り）のファイルの、できあがりの姿のパス。
 func Final(rel string) string {
 	parts := strings.Split(rel, "/")
-	draft := filepath.Join(append([]string{Root(), "wip", "handoff"}, parts...)...)
+	draftParts := make([]string, len(parts))
+	for i, p := range parts {
+		// 下書きの置き場では .claude の階層を handoff-.claude に読み替えて置く（ccnavi-stage.sh）。
+		draftParts[i] = p
+		if strings.EqualFold(p, ".claude") {
+			draftParts[i] = "handoff-.claude"
+		}
+	}
+	draft := filepath.Join(append([]string{Root(), "wip", "handoff"}, draftParts...)...)
 	if info, err := os.Stat(draft); err == nil && !info.IsDir() {
 		return draft
 	}

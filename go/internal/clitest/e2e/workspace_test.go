@@ -280,14 +280,20 @@ func buildWorkspace(t *testing.T, s sources, root string, projects ...string) {
 			copyFile(t, filepath.Join(s.shDir, e.Name()), filepath.Join(scripts, e.Name()))
 		}
 	}
-	// 守る場所の hook は、コピーする版（CCNAVI_TEST_SH_DIR）を優先する。hook だけ古い版を測らないため。
-	const hook = "test-py.sh"
-	hookSrc := filepath.Join(s.shDir, hook)
-	if !isFilePath(hookSrc) {
-		hookSrc = filepath.Join(s.hookDir, hook)
+	// 守る場所の hook（`.claude/hooks/` の sh）は、コピーする版（CCNAVI_TEST_SH_DIR）を優先する。hook だけ別の版を測らないため。
+	hooks, err := os.ReadDir(s.hookDir)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if isFilePath(hookSrc) {
-		copyFile(t, hookSrc, filepath.Join(root, ".claude", "hooks", hook))
+	for _, h := range hooks {
+		if h.IsDir() || !strings.HasSuffix(h.Name(), ".sh") {
+			continue
+		}
+		hookSrc := filepath.Join(s.shDir, h.Name())
+		if !isFilePath(hookSrc) {
+			hookSrc = filepath.Join(s.hookDir, h.Name())
+		}
+		copyFile(t, hookSrc, filepath.Join(root, ".claude", "hooks", h.Name()))
 	}
 	copyTree(t, s.dist, filepath.Join(root, "dist", "ccnavi"))
 	if err := os.MkdirAll(filepath.Join(root, ".ccnavi", "approved", "doing"), 0o755); err != nil {
