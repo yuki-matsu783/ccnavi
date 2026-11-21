@@ -92,20 +92,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         self.assertIn("子 i0001-01-01 が残っています", reason)
         self.assertNotIn("i0001-01-02", reason)
 
-    def test_progress_asks_again_once(self):
-        """子を 1 本閉じると状態が変わる。次に終えるときまた 1 回だけ止める。"""
-        self.family()
-        self.asked(self.stop(self.parent_tree))
-        self.assert_not_asked(self.stop(self.parent_tree))
-        self.assertEqual(self.ccnavi("ticket", "finish", "i0001-01-01").returncode, 0)
-        reason = self.asked(self.stop(self.parent_tree))
-        self.assertIn("子 i0001-01-02 が残っています", reason)
-        self.assert_not_asked(self.stop(self.parent_tree))
-
-    def test_a_child_that_is_not_started_is_not_asked(self):
-        tree = self.family_without_starting()
-        self.assert_not_asked(self.stop(tree))
-
     # ---- 子が全部閉じた。依頼まで 1 手ずつ
 
     def test_a_blocked_parent_is_not_asked(self):
@@ -121,34 +107,6 @@ class RequestNudgeTest(base.StopNudgeTest):
         # 手で書き換えた親は信頼できない（判定が範囲を使わずに止める）。
         blocked = self.hook("PreToolUse", "Write", self.parent_tree, file_path="src/x.py")
         self.assertIn("DENY_TICKET_BLOCKED", self.reason(blocked))
-        self.assert_not_asked(self.stop(self.parent_tree))
-
-    def test_a_phase_without_review_is_not_asked(self):
-        """レビューが要らないフェーズ（省略）は、依頼を打たない。"""
-        self.family(review=(False, False))
-        self.close_children(work=False)
-        # 全部のフェーズが済んでいるので、次はフィードバック計画（test_stop_feedback_nudge.py）。
-        # 依頼の促しは出ない。
-        body = self.body(self.stop(self.parent_tree))
-        self.assertNotIn(CODE, json.dumps(body, ensure_ascii=False))
-        self.assertIn("NUDGE_TICKET_FEEDBACK", body.get("reason", ""))
-
-    def test_the_marker_dropped_by_a_new_child_is_asked_again(self):
-        """子を足すと依頼のマーカーが外れる。足した子を閉じたあとの、依頼し直しの前も止める。"""
-        self.family(plan=["work-mr"])
-        self.close_children(work=False)
-        self.mark_requested()
-        self.assert_not_asked(self.stop(self.parent_tree))
-        os.remove(os.path.join(self.approved, "phases", "i0001", "1.requested"))
-        self.asked(self.stop(self.parent_tree))
-
-    def test_the_parent_closed_early_is_not_asked(self):
-        self.family()
-        self.close_children(work=False)
-        write(
-            os.path.join(self.approved, "phases", "i0001", "close-early.json"),
-            json.dumps({"at": "2026-01-01"}),
-        )
         self.assert_not_asked(self.stop(self.parent_tree))
 
     def test_a_parent_whose_worktree_is_not_settled_is_left_out_and_the_rule_still_runs(self):

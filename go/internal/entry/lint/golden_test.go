@@ -121,6 +121,21 @@ func TestReportSwitches(t *testing.T) {
 	compare(t, "switches-off", root, []reportRun{textRun}, nil)
 }
 
+// 切り替えが既定か enable と書いてあるだけなら、切り替えのことは何も言わない。disable と書いたときだけ warn で言う
+// （起動のフラグで disable を渡した 3 本目）。
+func TestReportSwitchesAreQuietWhenNothingIsOff(t *testing.T) {
+	quietEnv(t)
+	root := testkit.Workspace(t)
+	for name, value := range map[string]string{
+		env.GuardTicketApproval: "enable", env.GuardCoreFiles: "enable", env.TicketControl: "enable",
+		env.GuardUnwatched: "enable", env.RestoreIfDeny: "enable", env.Mode: "enable",
+	} {
+		t.Setenv(name, value)
+	}
+	put(t, root, ".ccnavi/CCNAVI.md", "# 決まり\n")
+	compare(t, "switches-quiet", root, []reportRun{textRun, jsonRun, {Restore: "disable"}}, nil)
+}
+
 // Claude Code の設定ファイル・sh の互換・作業の決まりの md。
 func TestReportProjectFiles(t *testing.T) {
 	quietEnv(t)

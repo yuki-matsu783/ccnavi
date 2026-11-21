@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"ccnavi/internal/infra/config"
@@ -284,6 +285,14 @@ func TestTicketSessionMatchesGolden(t *testing.T) {
 		},
 		writePair("dry-run out", childWT, childRel+"/src/y.py", "t7", with("CCNAVI_MODE", "dry-run")),
 		writePair("restore", childWT, childRel+"/src/z.py", "t8", with("CCNAVI_RESTORE_IF_DENY", "enable")),
+		// 子のワークツリーを読めないまま終わったサブエージェントは、親がツールを使わずにターンを終えても、次の発言で 1 度だけ言う。
+		[]step{
+			{Name: "unreadable stop", Payload: payload("SubagentStop", childWT, "agent_id", "bg2", "agent_type", "general-purpose"), Env: plain,
+				Git: []gitCall{{Dir: childRel, Args: []string{"checkout", "--quiet", "--orphan", "unrelated"}},
+					{Dir: childRel, Args: []string{"commit", "--quiet", "-m", "unrelated"}}}},
+			{Name: "prompt unreadable", Payload: payload("UserPromptSubmit", parentWT, "prompt", "続けて"), Env: plain},
+			{Name: "prompt unreadable again", Payload: payload("UserPromptSubmit", parentWT, "prompt", "もう一度"), Env: plain},
+		},
 	)
 	compareScenario(t, workspace, steps)
 }
@@ -367,5 +376,50 @@ func TestStopReviewMatchesGolden(t *testing.T) {
 				Files: map[string]*string{transcript: line("a6")}},
 		},
 	)
+	compareScenario(t, workspace, steps)
+}
+
+// ターン分離のゲートを、呼ぶ順（発言・実行前・完了通知・Stop・再開）で回す。`integrate` → `integrate-done`、
+// `review-request` → `confirm` は、同じ発言の中では止まり、ユーザの発言を 1 回はさむと通る。付き添いのあるセッションの
+// `integrate-done` は確認（ask）に出る。完了通知と Stop の促しで続けたターンは、発言に数えない。
+func TestTurnGateMatchesGolden(t *testing.T) {
+	heavyScenario(t)
+	unattended := with("CLAUDE_CODE_SESSION_ATTENDED", "0")
+	attended := with("CLAUDE_CODE_SESSION_ATTENDED", "1")
+	git := "sh .ccnavi/scripts/ccnavi-git.sh "
+	review := "sh .ccnavi/scripts/ccnavi-review.sh "
+	n := 0
+	run := func(name, command string, envs map[string]string) step {
+		n++
+		return step{Name: name, Payload: tool("PreToolUse", config.ToolBash, ws, "g"+strconv.Itoa(n),
+			map[string]any{"command": command}), Env: envs}
+	}
+	say := func(name, prompt string, envs map[string]string) step {
+		return step{Name: name, Payload: payload("UserPromptSubmit", ws, "prompt", prompt), Env: envs}
+	}
+	steps := []step{
+		{Name: "start", Payload: payload("SessionStart", ws, "source", "startup"), Env: unattended},
+		say("prompt", "お願いします", unattended),
+		run("integrate", git+"integrate foo", unattended),
+		run("integrate-done same turn", git+"integrate-done foo -m 'msg x'", unattended),
+		say("notification", "<task-notification>\n<status>completed</status>\n</task-notification>", unattended),
+		run("integrate-done after notification", git+"integrate-done foo -m 'msg x'", unattended),
+		{Name: "stop active", Payload: payload("Stop", ws, "stop_hook_active", true), Env: unattended},
+		run("integrate-done after stop", git+"integrate-done foo -m 'msg x'", unattended),
+		say("prompt user", "続けて", unattended),
+		run("integrate-done next turn", git+"integrate-done foo -m 'msg x'", unattended),
+		run("integrate-done passed", git+"integrate-done foo -m 'msg x'", unattended),
+		run("review-request", review+"review-request --phase 1 --body-file req.md", unattended),
+		run("confirm same turn", review+"confirm --phase 1", unattended),
+		say("prompt confirm", "確認した", unattended),
+		run("confirm next turn", review+"confirm --phase 1", unattended),
+		run("attended integrate", git+"integrate foo", attended),
+		run("attended integrate-done", git+"integrate-done foo -m 'msg x'", attended),
+		run("attended chained", git+"integrate bar && "+git+"integrate-done bar -m 'msg x'", attended),
+		{Name: "resume", Payload: payload("SessionStart", ws, "source", "resume"), Env: unattended},
+		run("integrate after resume", git+"integrate foo", unattended),
+		{Name: "resume again", Payload: payload("SessionStart", ws, "source", "resume"), Env: unattended},
+		run("integrate-done after resume", git+"integrate-done foo -m 'msg x'", unattended),
+	}
 	compareScenario(t, workspace, steps)
 }

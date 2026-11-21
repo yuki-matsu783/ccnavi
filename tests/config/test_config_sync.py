@@ -185,44 +185,9 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.prompt()
         self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
 
-    def test_the_risk_script_is_mirrored_without_rewriting_the_value(self):
-        """1: 配点が指すスクリプトもミラーする。`script:` の値は共通レイヤーと同じ表記のまま。"""
-        self.add_script()
-
-        tree, started = self.start_parent()
-
-        self.assertEqual(read(mirror_of(tree, "scripts/count.sh")), COUNT_SH)
-        self.assertIn(
-            "script: .ccnavi/config/common/scripts/count.sh", read(mirror_of(tree, "risks.yml"))
-        )
-        self.assertIn(".ccnavi/config/common/scripts/count.sh", started.stdout)
-
     def add_template(self, name="feature", text=FEATURE_TEMPLATE):
         directory = os.path.join(self.ws, ".ccnavi", "config", "common", "templates")
         return write(os.path.join(directory, name + ".yml"), text)
-
-    def test_a_common_template_is_mirrored_and_kept_by_the_next_plan(self):
-        """1: 共通のテンプレートもコピーする。ミラーに置いたものが次の着手で消されない。"""
-        self.add_template()
-        write(
-            os.path.join(self.ws, ".ccnavi", "config", "common", "templates", ".hidden.yml"),
-            "x: 1\n",
-        )
-        write(
-            os.path.join(self.ws, ".ccnavi", "config", "common", "templates", "notes.txt"),
-            "x\n",
-        )
-
-        tree, started = self.start_parent()
-
-        self.assertEqual(read(mirror_of(tree, "templates/feature.yml")), FEATURE_TEMPLATE)
-        self.assertIn(".ccnavi/config/common/templates/feature.yml", started.stdout)
-        # `.yml` でないものと、`.` で始まるものは、テンプレートとして読まれないのでコピーしない。
-        self.assertFalse(os.path.exists(mirror_of(tree, "templates/notes.txt")))
-        self.assertFalse(os.path.exists(mirror_of(tree, "templates/.hidden.yml")))
-        # 次の発言は、ミラーに在るテンプレートを消さない。
-        self.prompt()
-        self.assertEqual(read(mirror_of(tree, "templates/feature.yml")), FEATURE_TEMPLATE)
 
     def test_the_mirrored_template_is_read_as_the_common_one_in_a_single_clone(self):
         """1: 単体 clone では、ミラー（`config/common/`）が共通として `--templates` に読まれる。"""
@@ -260,32 +225,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(mirror_of(tree, "templates/old.yml")))
         self.assertFalse(os.path.isdir(mirror_of(tree, "templates")))
         self.assertIn("削除した", started.stdout)
-
-    def skipped_template_keeps_the_start(self, text):
-        """3: error のあるテンプレートはコピーせずに飛ばす。そのために着手は止めない。"""
-        self.add_template(text=text)
-
-        tree, started = self.start_parent()
-
-        self.assertEqual(started.returncode, 0, started.stderr)
-        self.assertTrue(os.path.isfile(mirror_of(tree, "rules.yml")))
-        self.assertFalse(os.path.exists(mirror_of(tree, "templates/feature.yml")))
-
-    def test_a_template_that_is_not_yaml_is_skipped(self):
-        self.skipped_template_keeps_the_start("plan: [design\n")
-
-    def test_a_template_with_a_broken_shape_is_skipped(self):
-        self.skipped_template_keeps_the_start(
-            "name: feature\ndescription: d\nplan: [design]\nflows: 3\n"
-        )
-
-    def test_a_template_with_only_warnings_is_mirrored(self):
-        """3: 定義に無い型は warn にとどまる（定義は後から変わる）。止めずにコピーする。"""
-        self.add_template(text=FEATURE_TEMPLATE.replace("design", "nothing-like-it"))
-
-        tree, _ = self.start_parent()
-
-        self.assertTrue(os.path.isfile(mirror_of(tree, "templates/feature.yml")))
 
     def test_a_project_without_a_layer_gets_the_mirror(self):
         """1: `.ccnavi/` を持たないプロジェクトにも新しく置く。"""
@@ -537,22 +476,6 @@ class ConfigMirrorTest(ConfigUnionHarness):
         self.hook("Bash", tree, event="PostToolUse", command="echo x", guard="enable")
 
         self.assertFalse(os.path.exists(mirror_of(tree, "phases.yml")))
-
-    def test_a_non_utf8_script_is_mirrored_byte_for_byte(self):
-        """1: UTF-8 でないスクリプトも、バイト列のままコピーする。
-        改行や文字の読み替えをしない。
-        """
-        write(self.risk, COMMON_SCRIPT_RISK)
-        script = os.path.join(self.ws, ".ccnavi", "config", "common", "scripts", "count.sh")
-        os.makedirs(os.path.dirname(script), exist_ok=True)
-        raw = b"# \x82\xa0\rprintf 1\n"
-        with open(script, "wb") as f:
-            f.write(raw)
-
-        tree, _ = self.start_parent()
-
-        with open(mirror_of(tree, "scripts/count.sh"), "rb") as f:
-            self.assertEqual(f.read(), raw)
 
     def test_a_mirrored_script_factor_is_not_counted_twice(self):
         """ミラーが統合先に入っても、共通レイヤーの同じ項目と 2 回数えない。

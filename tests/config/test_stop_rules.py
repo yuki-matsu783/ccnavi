@@ -1,18 +1,13 @@
-"""`match: Stop` のルール（ターンの終わりに N 回に 1 度止めて文を渡す）の受入テスト。
+"""`match: Stop` のルールを、hook を通して確かめる数本。
 
-メインエージェントの Stop は、これまで `finish` の打ち忘れのほかは止めなかった。
-`match: Stop` の `allow` のルールを書いたときだけ、渡す回（`every`）に `decision: block` で止め、
-ルールの文を `reason` に載せる。Stop でモデルに文を届ける経路は、止めて `reason` に
-書くことしか無いため。見るのは次のとおり。
+数えの規則・止めた文・記録は go/internal/hook/events/stoprules_test.go、lint の苦情は
+go/internal/policy/rulelint の見本、`--test Stop` と期待する判定は
+go/internal/entry/diagnose が見る。
+ここに残すのは、実行ファイルと hook を通した次の経路だけ。
 
-1. 書いていなければ今までどおり止めない
-2. `every: N` で N 回に 1 度止める。本文のファイルも載る。数えはセッションごと
-3. `stop_hook_active` が真の回は止めず、数えも進めない。サブエージェント（`agent_id`）も同じ
-4. 数えを覚えられない（`--state ""`）ときは止めない
-5. `dry-run` でも同じ回に止める（止めないと文がモデルに届かない）
-6. cwd がプロジェクトの中でも同じルールがヒットする。プロジェクトのレイヤーのルールもヒットする
-7. `--lint` は `deny` / `ask` に置いたもの、`(stop)` にヒットしない表記、`every` の無いものを
-   warn で言う
+1. `every: N` で N 回に 1 度、`decision: block` で止め、ルールの文を `reason` に載せる
+2. `dry-run` でも同じ回に止める（止めないと文がモデルに届かない）。`disable` では止めない
+3. 数えは compact・再開・clear では消えず、起動（startup）でだけ消える
 
 `finish` の促しと重なったときの順は tests/ticket/test_stop_nudge.py。
 """
@@ -121,69 +116,12 @@ class StopRulesTest(unittest.TestCase):
         )
         return done.stdout
 
-    # --- 1. 書かなければ止めない ------------------------------------------------
-
-    def test_no_block_without_a_stop_rule(self):
-        self.rules(ruleset({"id": "src", "match": "Write", "glob": "*/src/*"}))
-        self.assertEqual([self.blocked(self.stop()) for _ in range(3)], ["", "", ""])
-
-    # --- 2. every で N 回に 1 度 -------------------------------------------------
-
     def test_every_counts_stops(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=3)))
         got = [self.blocked(self.stop()) for _ in range(6)]
         self.assertEqual([bool(g) for g in got], [False, False, True, False, False, True])
         self.assertTrue(got[2].startswith(f"{CODE}: "), got[2])
         self.assertIn(NUDGE, got[2])
-
-    def test_file_body_is_carried(self):
-        write(os.path.join(self.root, "docs", "review.md"), "振り返りの手順")
-        self.rules(ruleset(stop_rule(additionalContextFile="docs/review.md", every=2)))
-        self.assertEqual(self.blocked(self.stop()), "")
-        self.assertIn("振り返りの手順", self.blocked(self.stop()))
-
-    def test_the_count_is_per_session(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.assertEqual(self.blocked(self.stop(session="a")), "")
-        self.assertEqual(self.blocked(self.stop(session="b")), "")
-        self.assertIn(NUDGE, self.blocked(self.stop(session="a")))
-
-    # --- 3. 連鎖の 2 回目とサブエージェント -----------------------------------------
-
-    def test_stop_hook_active_neither_blocks_nor_counts(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.assertEqual(self.blocked(self.stop()), "")
-        self.assertEqual(self.blocked(self.stop(active=True)), "")
-        self.assertEqual(self.blocked(self.stop(active=True)), "")
-        self.assertIn(NUDGE, self.blocked(self.stop()))
-
-    def test_subagents_are_not_blocked(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.assertEqual([self.blocked(self.stop(agent_id="a1")) for _ in range(4)], [""] * 4)
-
-    # --- 4. 覚えられないなら止めない ------------------------------------------------
-
-    def test_no_state_means_no_block(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        # 置き場を外すフラグ（`--state ""`）は診断でだけ効くので、置き場にファイルを置いて塞ぐ。
-        write(self.state, "塞ぐ\n")
-        self.assertEqual([self.blocked(self.stop()) for _ in range(4)], [""] * 4)
-
-    def test_unreadable_count_means_no_block(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        write(os.path.join(self.state, "stop-s1.json"), "{壊れた")
-        self.assertEqual([self.blocked(self.stop()) for _ in range(4)], [""] * 4)
-
-    def test_every_below_two_is_ignored_at_runtime(self):
-        """`every` が無い（1）ルールは、lint だけでなく実行時にも使わない。毎回止めないため。"""
-        self.rules(
-            ruleset(
-                stop_rule(additionalContext=NUDGE), stop_rule("once", additionalContextOnce=NUDGE)
-            )
-        )
-        self.assertEqual([self.blocked(self.stop()) for _ in range(3)], [""] * 3)
-
-    # --- 5. dry-run --------------------------------------------------------------
 
     def test_dry_run_blocks_like_enable(self):
         self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
@@ -198,35 +136,6 @@ class StopRulesTest(unittest.TestCase):
         # disable を言えるのは起動した環境だけ（フラグの disable は enable になる）。
         off = {"CCNAVI_MODE": "disable"}
         self.assertEqual([self.blocked(self.stop(mode="", env=off)) for _ in range(4)], [""] * 4)
-
-    # --- 5b. 止めた回の頭の文と記録 ------------------------------------------------
-
-    def test_the_fixed_preface_comes_before_the_rule_text(self):
-        """ルールの文やファイルが何であっても、止めた文は決まった前置きで始まる。"""
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.stop()
-        reason = self.blocked(self.stop())
-        self.assertTrue(reason.startswith(f"{CODE}: これはタスクの続きではない。"), reason)
-        self.assertIn("問いを最後にもう一度書いて", reason)
-        self.assertIn("「振り返り: 無し」", reason)
-        self.assertLess(reason.index("振り返り: 無し"), reason.index(NUDGE))
-
-    def test_the_record_names_only_delivered_rules(self):
-        self.rules(
-            ruleset(
-                stop_rule("two", additionalContext="二", every=2),
-                stop_rule("three", additionalContext="三", every=3),
-            )
-        )
-        log = os.path.join(self.root, "logs", "decisions.jsonl")
-        for _ in range(2):
-            self.stop(log=log)
-        with open(log, encoding="utf-8") as f:
-            last = json.loads(f.read().splitlines()[-1])
-        self.assertEqual(last.get("rules"), [".ccnavi/config/common/rules.yml:two"])
-        self.assertEqual(last.get("code"), CODE)
-
-    # --- 5c. compact・再開では数えを破棄しない -------------------------------------------
 
     def session_start(self, source: str) -> None:
         payload = {
@@ -257,171 +166,6 @@ class StopRulesTest(unittest.TestCase):
         self.stop()
         self.session_start("startup")
         self.assertEqual([bool(self.blocked(self.stop())) for _ in range(3)], [False, False, True])
-
-    # --- 6. レイヤーとプロジェクト ------------------------------------------------------------
-
-    def project(self, name: str = "lib") -> str:
-        home = os.path.join(self.root, "projects", name)
-        os.makedirs(os.path.join(home, ".git"), exist_ok=True)
-        return home
-
-    def test_same_rule_from_inside_a_project(self):
-        home = self.project()
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.assertEqual(self.blocked(self.stop(cwd=home)), "")
-        self.assertIn(NUDGE, self.blocked(self.stop(cwd=self.root)))
-
-    def test_project_layer_rules_do_not_stop_the_main_session(self):
-        """プロジェクトのレイヤー（外のリポジトリ）の `match: Stop` は見ない。
-        cwd がどこでも同じ。"""
-        home = self.project()
-        self.rules(ruleset({"id": "src", "match": "Write", "glob": "*/src/*"}))
-        layer = {
-            "version": 1,
-            "allow": [stop_rule("lib-review", additionalContext="外の文", every=2)],
-        }
-        write(os.path.join(home, ".ccnavi", "config", "project", "rules.yml"), json.dumps(layer))
-        for cwd in (self.root, home, self.root, home):
-            self.assertEqual(self.blocked(self.stop(cwd=cwd)), "")
-
-    def test_a_stale_project_copy_of_the_common_rule_is_not_counted_twice(self):
-        """プロジェクトのレイヤーへコピーした共通レイヤーが古くなって `every` が違っても、
-        数えるのは共通レイヤーの 1 本。
-
-        共通レイヤーは同期でプロジェクトのレイヤーへコピーするので、コピーしたレイヤーが古いまま残ることがある。
-        """
-        home = self.project()
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        stale = {"version": 1, "allow": [stop_rule(additionalContext=NUDGE, every=3)]}
-        write(os.path.join(home, ".ccnavi", "config", "project", "rules.yml"), json.dumps(stale))
-        got = [bool(self.blocked(self.stop(cwd=home))) for _ in range(6)]
-        self.assertEqual(got, [False, True, False, True, False, True])
-
-    def test_the_workspace_own_layer_applies_and_the_same_id_counts_once(self):
-        own = {"version": 1, "allow": [stop_rule(additionalContext="自身のレイヤー", every=2)]}
-        write(os.path.join(self.root, ".ccnavi", "config", "project", "rules.yml"), json.dumps(own))
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=2)))
-        self.stop()
-        reason = self.blocked(self.stop())
-        self.assertIn(NUDGE, reason)
-        self.assertNotIn("自身のレイヤー", reason)
-
-    def test_the_file_is_read_from_the_workspace_root_only(self):
-        """本文のファイルはワークスペースルートの版だけ。プロジェクトやワークツリーの版は読まない。"""
-        home = self.project()
-        write(os.path.join(self.root, "docs", "review.md"), "ワークスペースの手順")
-        write(os.path.join(home, "docs", "review.md"), "プロジェクトの手順")
-        self.rules(ruleset(stop_rule(additionalContextFile="docs/review.md", every=2)))
-        self.stop(cwd=home)
-        reason = self.blocked(self.stop(cwd=home))
-        self.assertIn("ワークスペースの手順", reason)
-        self.assertNotIn("プロジェクトの手順", reason)
-
-    # --- 7. lint -----------------------------------------------------------------
-
-    def said(self, out: str, name: str) -> list[str]:
-        return [line for line in out.splitlines() if f": {name}: " in line]
-
-    def test_deny_and_ask_do_not_block_and_lint_warns(self):
-        self.rules(
-            ruleset(
-                deny=(stop_rule("stop-deny", message="止める"),),
-                ask=(stop_rule("stop-ask", additionalContext=NUDGE),),
-            )
-        )
-        self.assertEqual(self.blocked(self.stop()), "")
-        out = self.lint()
-        for name in ("stop-deny", "stop-ask"):
-            self.assertTrue(
-                any(
-                    s.startswith("warn:") and "allow の別のルールに分けて置いて" in s
-                    for s in self.said(out, name)
-                ),
-                f"{name} に warn が無い:\n{out}",
-            )
-
-    def test_lint_warns_on_a_pattern_that_never_matches_and_on_missing_every(self):
-        self.rules(
-            ruleset(
-                stop_rule("never", glob="*review*", additionalContext=NUDGE, every=5),
-                stop_rule("each-time", additionalContext=NUDGE),
-            )
-        )
-        out = self.lint()
-        self.assertTrue(any('glob: "*"' in s for s in self.said(out, "never")), out)
-        self.assertTrue(any("every: 10" in s for s in self.said(out, "each-time")), out)
-
-    def test_lint_is_quiet_on_a_well_formed_rule(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=10)))
-        self.assertEqual(self.said(self.lint(), "skill-review"), [])
-
-    def test_lint_on_deny_with_bash_and_stop_names_only_the_stop_part(self):
-        both = {"id": "both", "match": "Bash|Stop", "glob": "*rm -rf*", "message": "止める"}
-        self.rules(ruleset(deny=(both,)))
-        said = self.said(self.lint(), "both")
-        self.assertTrue(
-            any(
-                "Stop の部分は何も起きない" in s and "Bash の部分はふつうに判定される" in s
-                for s in said
-            ),
-            said,
-        )
-
-    def test_lint_warns_on_a_stop_rule_in_a_project_layer(self):
-        home = os.path.join(self.root, "projects", "lib")
-        os.makedirs(os.path.join(home, ".git"))
-        self.rules(ruleset({"id": "src", "match": "Write", "glob": "*/src/*"}))
-        layer = {"version": 1, "allow": [stop_rule("outer", additionalContext=NUDGE, every=5)]}
-        write(os.path.join(home, ".ccnavi", "config", "project", "rules.yml"), json.dumps(layer))
-        out = self.lint()
-        self.assertTrue(
-            any("使われない" in line and "outer" in line for line in out.splitlines()), out
-        )
-
-    # --- 8. --test と期待する判定 -----------------------------------------------------------
-
-    def diagnose(self, *args: str) -> str:
-        done = run_ccnavi(
-            ["--root", self.root, *args],
-            cwd=ROOT,
-            env=self.env(),
-        )
-        return done.stdout
-
-    def test_test_stop_lists_the_rules_that_would_be_used(self):
-        self.rules(
-            ruleset(
-                stop_rule(additionalContext=NUDGE, every=10),
-                stop_rule("each-time", additionalContext=NUDGE),
-            )
-        )
-        out = self.diagnose("--test", "Stop", "(stop)")
-        self.assertIn("verdict: allow", out)
-        self.assertIn("  skill-review", out)
-        self.assertNotIn("each-time", out)
-        self.assertNotIn("対象を取り出せない", out)
-
-    def test_test_stop_without_rules_says_it_never_stops(self):
-        self.rules(ruleset({"id": "src", "match": "Write", "glob": "*/src/*"}))
-        out = self.diagnose("--test", "Stop", "(stop)")
-        self.assertIn("verdict: skip", out)
-        self.assertIn("止めない", out)
-
-    def test_expectations_can_check_stop(self):
-        self.rules(ruleset(stop_rule(additionalContext=NUDGE, every=10)))
-        expectations = write(
-            os.path.join(self.root, "expectations.yml"),
-            json.dumps(
-                {
-                    "deny": [],
-                    "allow": [{"tool": "Stop", "subject": "(stop)", "why": "振り返り"}],
-                }
-            ),
-        )
-        body = json.loads(self.diagnose("--test-expectations", expectations, "--json"))
-        self.assertEqual(body["mismatches"], 0, body)
-        self.assertEqual(body["skipped"], 0, body)
-        self.assertEqual([h["id"] for h in body["expectations"][0]["rules"]], ["skill-review"])
 
 
 if __name__ == "__main__":
