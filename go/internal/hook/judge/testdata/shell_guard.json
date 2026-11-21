@@ -1,0 +1,2202 @@
+[
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x {WS}/.ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "ln -sf /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "install /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp .ccnavi/config/common/rules.yml .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml; echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml > /dev/null 2>&1",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "echo go && cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp \"/tmp/a b\" .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x \".ccnavi/config/common/rules.yml\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cd .ccnavi && cp /tmp/x common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x {WS}/.ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "ln -sf /tmp/x .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "install /tmp/x .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp .ccnavi/config/common/phases.yml .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/phases.yml && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/phases.yml; echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/phases.yml > /dev/null 2>&1",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "echo go && cp /tmp/x .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp \"/tmp/a b\" .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x \".ccnavi/config/common/phases.yml\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cd .ccnavi && cp /tmp/x common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x {WS}/.ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "ln -sf /tmp/x .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "install /tmp/x .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp .ccnavi/config/common/risks.yml .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/risks.yml && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/risks.yml; echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/risks.yml > /dev/null 2>&1",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "echo go && cp /tmp/x .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp \"/tmp/a b\" .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/x \".ccnavi/config/common/risks.yml\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cd .ccnavi && cp /tmp/x common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/rules.yml .ccnavi/config/common",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/rules.yml .ccnavi/config/common/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/rules.yml {WS}/.ccnavi/config/common",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp /tmp/rules.yml .ccnavi/config/common && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp -t .ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "cp --target-directory=.ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "install -Dt .ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_the_common_layer_is_denied",
+  "command": "ln -st .ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "shell_writes_into_project_home_are_denied",
+  "command": "echo x > projects/lib/.ccnavi/scripts/count.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "shell_writes_into_project_home_are_denied",
+  "command": "echo x >> .ccnavi/config/project/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "shell_writes_into_project_home_are_denied",
+  "command": "sed -i s/deny/allow/ projects/lib/.ccnavi/config/project/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "shell_writes_into_project_home_are_denied",
+  "command": "cp /tmp/x .ccnavi/config/project/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "shell_writes_into_project_home_are_denied",
+  "command": "cd projects/lib && echo x > .ccnavi/config/project/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "mv .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "rm .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "tee .ccnavi/config/common/rules.yml < /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "sed -i s/deny/allow/ .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "echo x > .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/x && rm .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "mv .ccnavi/config/common/phases.yml /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "rm .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "tee .ccnavi/config/common/phases.yml < /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "sed -i s/deny/allow/ .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "echo x > .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "cp .ccnavi/config/common/phases.yml /tmp/x && rm .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "mv .ccnavi/config/common/risks.yml /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "rm .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "tee .ccnavi/config/common/risks.yml < /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "sed -i s/deny/allow/ .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "echo x > .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writing_from_the_common_layer_side_is_still_denied",
+  "command": "cp .ccnavi/config/common/risks.yml /tmp/x && rm .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "cp -Svt /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "cp -S -t /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "cp --suffix -t /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "install -m -t /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "cp -- -t /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "cp /tmp/x '' .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "a_dash_t_that_is_a_value_does_not_hide_the_last_argument",
+  "command": "install /tmp/x --strip .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "echo go && cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "true; cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cat /tmp/x | cp /dev/stdin .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml | cat",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/x \".ccnavi/config/common/\"rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/x '.ccnavi'/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/x .CCNAVI/Common/RULES.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "CP /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/x '.ccnavi\\config\\common\\rules.yml'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp -- /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp -T /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "sudo cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "sudo -u root cp -t .ccnavi/config/common /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "env FOO=1 cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "nohup cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "sh -c 'cp /tmp/x .ccnavi/config/common/rules.yml'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml {fd}>/dev/null",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cd .ccnavi/config/common && cp /tmp/rules.yml .",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "cp /tmp/settings.json .claude/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "detours_around_the_destination_are_denied",
+  "command": "mv /tmp/settings.json .claude/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t .ccnavi /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t.ccnavi /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -vt .ccnavi/config/common /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -rft .ccnavi/scripts /tmp/count.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp --target-directory .ccnavi/config/common /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp --target=.ccnavi/config/common /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp --t .ccnavi/config/common /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "ln -st .ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "ln --target-directory=.ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "install -Dt .ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "install -m 644 -t .ccnavi/config/common /tmp/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t .claude/hooks /tmp/x.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t .claude /tmp/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t .claude/ /tmp/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t logs/state /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_the_target_option_is_denied",
+  "command": "cp -t /abs/path/.ccnavi/config/common /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml -f",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml -f -v",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml -S .bak",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml --suffix .bak --verbose",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml --backup=numbered",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "install /tmp/x .ccnavi/config/common/rules.yml -m 644 -o root -g root",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "ln -s /tmp/x .ccnavi/config/common/rules.yml --force",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi -r",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml -f 2>/dev/null",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml -f && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml -S -t",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "options_after_the_destination_are_skipped",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml --",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp /repo/.ccnavi/config/common/rules.yml /tmp/backup.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -r .ccnavi /tmp/keep",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -v .ccnavi/config/common/rules.yml .ccnavi/config/common/phases.yml /tmp/out/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/x -f",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .ccnavi/config/common/rules.yml -t /tmp/out",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -t /tmp/out .ccnavi/config/common/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp --target-directory=/tmp/out .ccnavi/config/common/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -T .ccnavi/config/common /tmp/out",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -v -t /tmp/out .ccnavi/config/common/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp --verbose -t /tmp/out .ccnavi/config/common/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -t /tmp/out .ccnavi/config/common/rules.yml .ccnavi/config/common/phases.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "ln -s .ccnavi/config/common/rules.yml /tmp/link",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "install -m 644 .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .claude/settings.json /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .claude/hooks/x.sh /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp logs/decisions.jsonl /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp -r logs/state /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .ccnavi/scripts/ccnavi-git.sh /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "sudo cp .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/x && cat /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "reading_copies_pass_through_the_guard",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/x 2>/dev/null",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "mv .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "rm .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "tee .ccnavi/config/common/rules.yml < /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "dd if=/tmp/x of=.ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "truncate -s 0 .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "patch .ccnavi/config/common/rules.yml /tmp/p",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "shred .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "sed -i s/deny/allow/ .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "echo x > .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/a && rm .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "writes_from_the_source_side_are_still_denied",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/a > .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl logs",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl ./logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl logs/.",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl /repo/logs//",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.20260101.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -r /tmp/state logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -r /tmp/state/ logs",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "mv /tmp/state logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "ln -s /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "install -m 644 /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/notes.txt /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl.bak /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl logs/ -f",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl logs/ 2>/dev/null",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -- /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -- /tmp/decisions.jsonl -t logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -S -t /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -t logs /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -t logs/ /tmp/notes.txt /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -vt logs /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp -tlogs /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp --target-directory=logs /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp --target logs /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl -t logs",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "mv -t logs /tmp/decisions.jsonl",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "CP /tmp/DECISIONS.JSONL LOGS/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp \"/tmp/decisions.jsonl\" \"logs/\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp '/tmp\\decisions.jsonl' 'logs\\'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "echo go && cp /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "true; mv /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cp /tmp/decisions.jsonl logs/ | cat",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "sudo cp /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "env A=1 mv /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cd logs && cp /tmp/decisions.jsonl .",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "every_spelling_of_a_directory_destination_is_denied",
+  "command": "cd logs && mv /tmp/decisions.jsonl ./",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/notes.txt logs/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "mv /tmp/notes.txt logs/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp -t logs /tmp/notes.txt",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/decisions.jsonl.bak logs/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/mydecisions.jsonl logs/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/statement logs/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/decisions.jsonl backlogs/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/decisions.jsonl logs/old/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp /tmp/decisions.jsonl /tmp/logs.d/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp logs/decisions.jsonl /tmp/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp -r logs/state /tmp/out/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp -t /tmp/out logs/decisions.jsonl",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp logs/a.log logs/b.log",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp -r .ccnavi /tmp/keep",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp -r /tmp/src .",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_and_reading_copies_pass_through_the_guard",
+  "command": "cp -r /tmp/.ccnavi /tmp/keep/",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp /tmp/* logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp /tmp/dec?sions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp /tmp/[d]ecisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp \"$F\" logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp $(ls /tmp/x) logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp -r /tmp/d/. logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp -r . logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp -rT /tmp/d logs",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp -r --no-target-directory /tmp/d logs",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "sources_whose_name_is_not_fixed_are_denied",
+  "command": "cp -t logs /tmp/*",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_forms_of_the_report_are_denied",
+  "command": "cp /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_forms_of_the_report_are_denied",
+  "command": "mv /tmp/decisions.jsonl logs/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cp -r /tmp/.ccnavi .",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cp -r /tmp/.claude ./",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cp -r /tmp/logs .",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "mv /tmp/.ccnavi .",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cp -rt . /tmp/.ccnavi",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cp -r /tmp/.ccnavi {WS}",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cp -r /tmp/.ccnavi {WS}/",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_workspace_root_as_a_destination_is_denied",
+  "command": "cd sub && cp -r /tmp/.ccnavi ..",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x {WS}/.ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/rules.yml && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "ln -sf /tmp/x .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "echo x > .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "rm .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x {WS}/.ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/phases.yml && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "ln -sf /tmp/x .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "echo x > .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "rm .ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x {WS}/.ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "cp /tmp/x .ccnavi/config/common/risks.yml && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "ln -sf /tmp/x .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "echo x > .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_into_a_common_layer_file_is_still_denied",
+  "command": "rm .ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "cp .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "cp {WS}/.ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "ln -s .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "install .ccnavi/config/common/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "cp .ccnavi/config/common/phases.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "cp {WS}/.ccnavi/config/common/phases.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "ln -s .ccnavi/config/common/phases.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "install .ccnavi/config/common/phases.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "cp .ccnavi/config/common/risks.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "cp {WS}/.ccnavi/config/common/risks.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "ln -s .ccnavi/config/common/risks.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "copying_out_of_a_common_layer_file_is_not_denied",
+  "command": "install .ccnavi/config/common/risks.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "rm -r .claudexyz",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "rm -r .ccnavixyz",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "mv .ccnavi-notes.md notes.md",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "rm -r .claude-backup",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "rm -r .claude/worktrees/w1",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "cp .ccnavi/config/project/rules.yml /tmp/x",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "other_names_are_not_denied",
+  "command": "cat .ccnavi/config/project/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "anything"
+  ]
+ },
+ {
+  "case": "removing_or_moving_the_umbrella_itself_is_denied",
+  "command": "rm -rf .ccnavi",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "removing_or_moving_the_umbrella_itself_is_denied",
+  "command": "rm -rf projects/lib/.ccnavi",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "removing_or_moving_the_umbrella_itself_is_denied",
+  "command": "mv .ccnavi .ccnavi.bak",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "removing_or_moving_the_umbrella_itself_is_denied",
+  "command": "mv projects/lib/.ccnavi /tmp/keep",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "removing_or_moving_the_umbrella_itself_is_denied",
+  "command": "cp /tmp/x .ccnavi",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "removing_or_moving_the_umbrella_itself_is_denied",
+  "command": "rm -rf .ccnavi && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_default_umbrella_is_closed_after_a_joined_command",
+  "command": "cp -r /tmp/scripts .ccnavi && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_default_umbrella_is_closed_after_a_joined_command",
+  "command": "cp /tmp/x .claude; echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_default_umbrella_is_closed_after_a_joined_command",
+  "command": "cp /tmp/x logs/state && echo done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_default_umbrella_is_closed_after_a_joined_command",
+  "command": "cp -r /tmp/scripts .ccnavi 2>&1 | cat",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ },
+ {
+  "case": "the_default_umbrella_is_closed_after_a_joined_command",
+  "command": "cp -t .ccnavi/scripts /tmp/count.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ]
+ }
+]
