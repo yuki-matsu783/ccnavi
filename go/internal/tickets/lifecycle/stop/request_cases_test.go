@@ -72,6 +72,9 @@ func TestPendingAtStopLeavesOutWhatIsNotOnTheWayToARequest(t *testing.T) {
 			t.Errorf("%s（%s）を促した: %+v", parent, why, p)
 		}
 	}
+	if w := WaitingAtStop(conf, root, testkit.Worktree(root, "j0004"), nil); w == nil {
+		t.Error("レビューが要らないフェーズだけの親は、依頼を飛ばしてフィードバック計画へ進む")
+	}
 	// 子を足すと依頼のマーカーが外れる。外れたあとの依頼し直しの前は、促す。
 	marker := filepath.Join(approvedDir(testkit.Worktree(root, "j0002")), "phases", "j0002", "1.requested")
 	if err := os.Remove(marker); err != nil {
