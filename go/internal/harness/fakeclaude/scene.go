@@ -154,15 +154,6 @@ type Doc struct {
 	Hooks        map[string]*Node `json:"hooks"`
 	Stream       map[string]*Node `json:"stream"`
 	Observations object           `json:"observations"`
-	// Raw は録った生の記録（記録に入れない）。
-	Raw Raw `json:"-"`
-}
-
-// Raw は 2 回の stream-json（行ごとの文字列）と、hook の記録のパス。
-type Raw struct {
-	Streams []string
-	LogPath string
-	Parsed  [][]object
 }
 
 // Recorded は recorded.json（本物だけ。source・claude_version のほかは Doc と同じ）。
@@ -304,7 +295,6 @@ func Collect(tree string, run func(n int, prompt string) (string, error)) (Doc, 
 	if err != nil {
 		return Doc{}, err
 	}
-	streamsText := []string{first, second}
 	streams := [][]object{readJSONL(first), readJSONL(second)}
 	hooks, stream := map[string]*Node{}, map[string]*Node{}
 	for _, e := range logs {
@@ -323,7 +313,6 @@ func Collect(tree string, run func(n int, prompt string) (string, error)) (Doc, 
 	}
 	return Doc{
 		Hooks: hooks, Stream: stream, Observations: observe(tree, logs, streams),
-		Raw: Raw{Streams: streamsText, LogPath: logPath, Parsed: streams},
 	}, nil
 }
 
