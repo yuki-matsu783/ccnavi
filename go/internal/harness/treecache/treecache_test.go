@@ -186,11 +186,13 @@ func TestParallelUsersOfOneKeyTakeTurns(t *testing.T) {
 // fakeT は Fatal を受け取る偽のテスト。Build の落ちを、本物のテストを落とさずに確かめる。
 type fakeT struct {
 	testing.TB
+	name     string
 	msg      string
 	cleanups []func()
 }
 
 func (f *fakeT) Helper()                   {}
+func (f *fakeT) Name() string              { return f.name }
 func (f *fakeT) Cleanup(fn func())         { f.cleanups = append(f.cleanups, fn) }
 func (f *fakeT) Fatal(args ...any)         { f.fail(fmt.Sprint(args...)) }
 func (f *fakeT) Fatalf(s string, a ...any) { f.fail(fmt.Sprintf(s, a...)) }
@@ -252,6 +254,33 @@ func TestSameKeyFromAnotherCallSiteFails(t *testing.T) {
 	})
 	if !strings.Contains(done, "別の組み立てなら別の鍵") {
 		t.Errorf("呼び出し点の違いを拾えない: %q", done)
+	}
+}
+
+// BuildAt は呼び手が渡した呼び出し点で、別の組み立てへの鍵のコピペを拾う（Build を包む側が、包みの呼び手の点で拾わせられる）。
+func TestBuildAtFailsOnAnotherSiteForTheSameKey(t *testing.T) {
+	key := fmt.Sprintf("build-at-%d", time.Now().UnixNano())
+	BuildAt(t, key, "wrapper-a", func(dir string) int { return 1 })
+	msg := (&fakeT{}).run(func(c testing.TB) {
+		BuildAt(c, key, "wrapper-b", func(dir string) int { return 2 })
+	})
+	if !strings.Contains(msg, "別の組み立てなら別の鍵") {
+		t.Errorf("site の違いを拾えない: %q", msg)
+	}
+}
+
+// 親のテストが持つ鍵を t.Run の子で使うと、lockWait を待たずに即座に落ちる。
+func TestChildOfTheOwnerFailsAtOnce(t *testing.T) {
+	key := fmt.Sprintf("owner-child-%d", time.Now().UnixNano())
+	use := func(t testing.TB) { Build(t, key, func(dir string) int { return 0 }) }
+	use(t)
+	start := time.Now()
+	msg := (&fakeT{name: t.Name() + "/child"}).run(use)
+	if !strings.Contains(msg, "で使えない") {
+		t.Errorf("祖先が持つ鍵を拾えない: %q", msg)
+	}
+	if time.Since(start) > lockWait/2 {
+		t.Errorf("待ってから落ちた: %v", time.Since(start))
 	}
 }
 

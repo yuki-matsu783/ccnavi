@@ -24,7 +24,7 @@ sh を外から呼び、GitLab のスタブと実行ファイルのスタブで 
 判定そのものは `tests/ticket` が見る。
 GitLab は同じプロセスの小さな HTTP サーバで、sh が呼ぶ経路だけを返す。
 
-`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_TEST_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -46,7 +46,7 @@ from tests.sh import decide_support
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
 NEEDS = [tool for tool in ("jq", "curl") if shutil.which(tool) is None]
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 TOKEN = "t0k"
 # 受け入れの返信の頭の印（実行ファイルの host.AcceptReply と同じ）。
 MARKER_ACCEPT = "<!-- ccnavi:accept -->"

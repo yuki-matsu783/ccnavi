@@ -1,6 +1,7 @@
 package base
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,11 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 )
+
+// waitingParallel は、clitest のテストの並行の数の既定（-parallel を渡せばそちらが優先）。
+// このテストは、ほとんどの時間を子のプロセス（ccnavi・git）の終わりを待って過ごす。CPU の数（go test の -parallel の
+// 既定）では待ちが重なり切らないので上げる。
+const waitingParallel = "16"
 
 // atExit は Main が終わりに消す置き場を覚える。
 func atExit(path string) {
@@ -30,6 +36,7 @@ func atExit(path string) {
 //   - PATH から ccnavi を外す
 //   - MSYS の引数の書き換えを止める
 //   - 一時置き場（TMPDIR）を実パスにする（macOS）
+//   - 並行の数の既定を 16 に上げる（待ちが主のテスト。-parallel を渡せばそちらが優先）
 //   - go test がこのパッケージの結果を保存しないようにする（Uncache。パッケージの doc を参照）
 //
 // 呼び忘れは、Root・TempDir・GitEnv・run の起動が最初の 1 本で panic して知らせる。
@@ -40,6 +47,7 @@ func Main(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "テストの環境を整えられない:", err)
 		os.Exit(1)
 	}
+	_ = flag.Set("test.parallel", waitingParallel)
 	code := m.Run()
 	exitMu.Lock()
 	for _, path := range exitPaths {

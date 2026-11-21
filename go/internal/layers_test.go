@@ -156,8 +156,10 @@ var subTiers = map[string]map[string]int{
 		"run": 2, "hoststub": 2, "fakeclaude": 2, "contractshape": 2,
 		// 3: 組み立ての写し・受入シナリオの実行器の部品・ホストの fixture（PATH のスタブの置き方は hoststub を使う）
 		"treecache": 3, "scenario": 3, "hostfixture": 3,
-		// 4: 入口（main）
-		"cmd": 4,
+		// 3 のうち設定の和を見るテストの土台（ワークスペースの雛形と見本の設定。clitest/config が使う）
+		"configws": 3,
+		// 4: 入口（main）・チケット・フェーズ・レビューを CLI で通すテストが共有する木と本文（treecache の上に立つ。clitest/ticket/…）
+		"cmd": 4, "ticketkit": 4,
 	},
 	// 目録。1 つのツリーの索引（docindex）の上に、ツリーを合わせて引く docs が立つ。
 	"catalog": {"docindex": 0, "skills": 0, "docs": 1},

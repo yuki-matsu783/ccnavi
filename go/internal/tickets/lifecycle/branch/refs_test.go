@@ -94,7 +94,6 @@ func TestLabel(t *testing.T) {
 	}
 }
 
-// sh 側（tests/sh/test_branches_sh.py）にも同じ表がある。規則を変えたら両方を直す。
 func TestNamesNumber(t *testing.T) {
 	prefixes := []string{"feature", "fix", "chore", "docs", "refactor", "test"}
 	slug := "feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用"
@@ -108,7 +107,7 @@ func TestNamesNumber(t *testing.T) {
 		{"feature-152-login", 152, true}, {"152-login", 152, true}, {"feature_152_x", 152, true}, {"v1.152.x", 152, true},
 		{"feature-1520-x", 152, false}, {"feature-2152-x", 152, false}, {"v15-2", 152, false}, {"main", 152, false},
 		{"i152", 152, false}, {"152a", 152, false}, {"claude/tender-volta-qmy99q", 99, false}, {"claude/zesty-a5b-x5y7z9", 5, false},
-		{"x-1520-152", 152, true},
+		{"x-1520-152", 152, true}, {"feature-1-152-x", 152, false},
 	}
 	for _, c := range cases {
 		if got := namesNumber(c.name, c.number, prefixes); got != c.want {

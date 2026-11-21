@@ -44,8 +44,8 @@ def skip_if_too_big_for_argument(test: unittest.TestCase, scene_dir: str) -> Non
 
 
 # コピーする sh の出どころ。
-# `CCNAVI_SH_DIR` で差し替えられる（既定はこのツリーの `.ccnavi/scripts/`）。
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+# `CCNAVI_TEST_SH_DIR` で差し替えられる（既定はこのツリーの `.ccnavi/scripts/`）。
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 
 # コピーする sh。decide の置く形は、ユーザ専用の ccnavi-user-decide.sh（共有の部品を読む）に移った。
 REVIEW_SH = ("ccnavi-review.sh", "ccnavi-user-decide.sh", "ccnavi-user-lib-review.sh")

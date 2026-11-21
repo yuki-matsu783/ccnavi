@@ -18,7 +18,7 @@ ccnavi の実行ファイルの代わりに、承認済みチケットを 1 枚�
 
 読み返すのは終了コード・出力と、git に残ったものだけ。
 
-`CCNAVI_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
+`CCNAVI_TEST_SH_DIR` で、コピーする sh の出どころを差し替えられる。既定はこのツリーの
 `.ccnavi/scripts/`（テストしているソースそのもの）。
 """
 
@@ -35,7 +35,7 @@ from tests import ROOT, common_sh, exe
 
 SHELL = shutil.which("sh") or shutil.which("bash")
 GIT = shutil.which("git")
-SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_SH_DIR", "") or ".ccnavi/scripts")
+SH_DIR = os.path.join(ROOT, os.environ.get("CCNAVI_TEST_SH_DIR", "") or ".ccnavi/scripts")
 PUSH_SCRIPTS = ("ccnavi-user-push-approved.sh", *common_sh(SH_DIR))
 APPROVE_SCRIPTS = (*PUSH_SCRIPTS, "ccnavi-user-agree.sh")
 APPROVED = ".ccnavi/approved/doing"

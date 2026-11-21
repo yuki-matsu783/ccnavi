@@ -19,6 +19,8 @@ const (
 // 起動の場所と、hook・sh が実行ファイルへ渡す文脈。
 const (
 	EntryPath = "CCNAVI_ENTRY_PATH"
+	// Workspace は走らせる人がワークスペースルートを上書きする変数（sh の探し方の抜け道）。
+	Workspace = "CCNAVI_WORKSPACE"
 	Root      = "CCNAVI_ROOT"
 	Docs      = "CCNAVI_DOCS"
 	DenyIDs   = "CCNAVI_DENY_IDS"
@@ -54,6 +56,9 @@ const (
 	TestExe       = "CCNAVI_TEST_EXE"
 	TestChromeExe = "CCNAVI_TEST_CHROME_EXE"
 	TestStubExe   = "CCNAVI_TEST_STUB_EXE"
+	// TestShDir・TestDist は e2e の出どころ（測る sh の置き場と組み立て済みの dist/ccnavi）を差し替える。
+	TestShDir = "CCNAVI_TEST_SH_DIR"
+	TestDist  = "CCNAVI_TEST_DIST"
 )
 
 // Compat は sh（ccnavi-common.sh）が互換の版を宣言する変数。環境からは読まず、`--lint` が sh の中の代入を読む。

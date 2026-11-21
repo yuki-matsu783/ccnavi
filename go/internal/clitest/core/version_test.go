@@ -19,12 +19,14 @@ import (
 // 版と互換の版が sh・VS Code 拡張と同じであることは `entry/version` の go test が、sh の互換の版の `--lint` での確かめは
 // lint_compat が見る。
 
-// version は `ccnavi [--root <root>] <args…>` を、リポジトリを作業ディレクトリにしてMain が整えた素の環境で起こす。
+// version は `ccnavi --root <root> <args…>` を、リポジトリを作業ディレクトリにして Main が整えた素の環境で起こす。
+// root が空なら使い捨ての空の根を渡す（根の外へ文面を書かせない）。
 func version(t *testing.T, root string, args ...string) run.Result {
 	t.Helper()
-	if root != "" {
-		args = append([]string{"--root", root}, args...)
+	if root == "" {
+		root = base.TempDir(t)
 	}
+	args = append([]string{"--root", root}, args...)
 	return run.Ccnavi(t, args, run.Opts{Dir: base.Root()})
 }
 
