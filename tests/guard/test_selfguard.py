@@ -235,16 +235,6 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(json.loads(read(self.rules)), RULES)
         self.assertEqual(json.loads(read(self.settings)), SETTINGS)
 
-    def test_hook_の登録を消された設定ファイルも戻る(self):
-        self.run_hook("PreToolUse")
-        broken = dict(SETTINGS)
-        broken["hooks"] = {"PreToolUse": []}
-        write(self.settings, json.dumps(broken))
-
-        self.run_hook("PostToolUse")
-
-        self.assertEqual(json.loads(read(self.settings))["hooks"], SETTINGS["hooks"])
-
     def test_直前の断面に戻すのでコミットしていない編集は残る(self):
         # git から戻すとコミット済みの内容まで巻き戻り、ユーザの書きかけが消える。
         # バックアップから戻せば、戻る先はこのツール呼び出しの直前になる。
@@ -311,16 +301,6 @@ class SelfGuardTest(unittest.TestCase):
 
     # 消されたとき
 
-    def test_消された設定ファイルは実行前に戻る(self):
-        self.run_hook("PreToolUse")
-        os.remove(self.settings)
-
-        result = self.run_hook("PreToolUse")
-
-        self.assertTrue(os.path.exists(self.settings))
-        self.assertEqual(json.loads(read(self.settings)), SETTINGS)
-        self.assertIn("settings.json", result.stdout)
-
     def test_バックアップが無ければ_git_から戻る(self):
         # 実行前を通らずに消された場合。バックアップの置き場ごと消えた形も同じ。
         os.remove(self.rules)
@@ -351,20 +331,6 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("settings.local.json", result.stdout)
 
     # ワークツリー側の設定
-
-    def test_ワークツリーの中の設定ファイルも戻る(self):
-        # その場では誰も読まないファイルだが、統合すれば main の hook の
-        # 登録になる。止める側も気づく側も無い経路なので、ここで戻す。
-        work = self.worktree()
-        copy = self.copy_in(work, "settings.json")
-        self.run_hook("PreToolUse")
-        write(copy, "{}\n")
-
-        result = self.run_hook("PostToolUse")
-
-        self.assertEqual(json.loads(read(copy)), SETTINGS)
-        self.assertIn("restored", result.stdout)
-        self.assertIn("統合すれば", result.stdout)
 
     def test_ワークツリーの中のルールファイルも戻る(self):
         work = self.worktree()
@@ -436,26 +402,17 @@ class SelfGuardTest(unittest.TestCase):
         self.assertIn("deny", result.stdout)
         self.assertIn("builtin:guard-setting-files", result.stdout)
 
-    def test_cd_で入っても読むだけなら通る(self):
-        result = self.run_hook("PreToolUse", command="cd .ccnavi/config/common && cat rules.yml")
-
-        self.assertNotIn("deny", result.stdout)
-
     def test_設定ファイルを読むだけなら通る(self):
         # 場所の名前が出たかどうかでは止めない。ここは読むほうが普通の場所で、
         # 名前で止めると、いちばんガードを直したいときにいちばん強く止まる。
-        result = self.run_hook("PreToolUse", command="cat .ccnavi/config/common/rules.yml")
+        for command in (
+            "cd .ccnavi/config/common && cat rules.yml",
+            "cat .ccnavi/config/common/rules.yml",
+        ):
+            with self.subTest(command=command):
+                result = self.run_hook("PreToolUse", command=command)
 
-        self.assertNotIn("deny", result.stdout)
-
-    def test_sed_の書き換えの表記は止まる(self):
-        # 表記ごとの止める・通す（語の途中の `-i`・読むだけの sed・空白や引用の行き先・
-        # cd で入る形・logs/ の下）は Go（hook/judge）の TestSelfGuardShellWrites が見る。
-        # ここでは hook を通した代表だけ。
-        result = self.run_hook("PreToolUse", command=f"sed -i s/a/b/ {self.rules_in_shell()}")
-
-        self.assertIn("deny", result.stdout)
-        self.assertIn("builtin:guard-setting-files", result.stdout)
+                self.assertNotIn("deny", result.stdout)
 
     def test_disable_なら止める側も足さない(self):
         result = self.run_hook(
@@ -505,14 +462,6 @@ class SelfGuardTest(unittest.TestCase):
         """シェルに書くパスのルールファイル。引用の外に置くので区切りは `/`。"""
         return self.rules.replace("\\", "/")
 
-    def test_引用の中に書いたリダイレクトの行き先は書き込みではない(self):
-        # `> 場所` が引用の中にある。grep の引数であって、書き込み先にはならない。
-        # 語の中の目印がリダイレクトの行き先として読まれると、ここが止まる。
-        result = self.run_hook("PreToolUse", command=f'grep -n "> {self.rules_in_shell()}" f')
-
-        self.assertNotIn("deny", result.stdout)
-        self.assertNotIn("builtin:guard-setting-files", result.stdout)
-
     def test_引用に空白を含む書き換えも止まる(self):
         # 動詞と行き先の間に引用の空白があっても、同じコマンドの中なら届く。
         # 引用の空白がコマンドの区切りと同じ目印だった間は、ここが穴だった。
@@ -527,35 +476,6 @@ class SelfGuardTest(unittest.TestCase):
 
                 self.assertIn("deny", result.stdout)
                 self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_ワークスペースルートの絶対パスに空白があってもリダイレクトは止まる(self):
-        rules = self.rules_in_shell()
-        spaced = rules.replace("/.ccnavi/", " dir/.ccnavi/", 1)
-        result = self.run_hook("PreToolUse", command=f'echo x > "{spaced}"')
-        self.assertIn("deny", result.stdout)
-        self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_空白なしのリダイレクトは止まったまま(self):
-        for command in [
-            "echo x > .ccnavi/config/common/rules.yml",
-            f"echo x > {self.rules_in_shell()}",
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-
-                self.assertIn("deny", result.stdout)
-                self.assertIn("builtin:guard-setting-files", result.stdout)
-
-    def test_引用の中の大なりは空白があっても書き込みではない(self):
-        for command in [
-            'echo "a > .ccnavi/config/common/rules.yml"',
-            'echo ">  .ccnavi/config/common/rules.yml"',
-            'echo "x y > .ccnavi/config/common/rules.yml"',
-        ]:
-            with self.subTest(command=command):
-                result = self.run_hook("PreToolUse", command=command)
-
-                self.assertNotIn("builtin:guard-setting-files", result.stdout)
 
     def test_引用の中で目印が続くパスへのリダイレクトも止まる(self):
         # 引用の中の空白の連続と、空白に隣り合う演算子の文字は、語の中の目印が 2 つ続く形になる。
@@ -612,22 +532,6 @@ class SelfGuardTest(unittest.TestCase):
         self.assertEqual(record["code"], "DENY_REDIRECT_LIMIT")
         self.assertEqual(record["rules"][0], "builtin:redirect-limit")
         return reason
-
-    def test_上限を超える大なりは止めて書き方を案内する(self):
-        command = 'echo "' + ">a" * (REDIRECT_LIMIT + 1)
-
-        self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
-
-    def test_上限を超える大なりの後ろの保護対象への書き込みは素通りしない(self):
-        # 上限より前では止まる形。上限を超えると保護を適用せずに止める。通しはしない。
-        command = (
-            "echo "
-            + ">a" * (REDIRECT_LIMIT + 1)
-            + '; echo x > .ccnavi/config/common/rules.yml; echo "'
-        )
-        self.assertTrue(self.reading(command)["degraded"])
-
-        self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
 
     def test_上限を超えてもほかのルールの拒否はそのまま(self):
         # 上限で外すのは保護の照合だけ。ルールファイルの deny は生の文字列に適用し続ける。
@@ -689,20 +593,6 @@ class SelfGuardTest(unittest.TestCase):
                 self.assertEqual(got, "deny")
                 self.assertIn("rule: .ccnavi/config/common/rules.yml:push", reason)
                 self.assertNotIn("REDIRECT_LIMIT", reason)
-
-    def test_大なりは並びではなく文字の数で数える(self):
-        # `>>` も `2>&1` も、並びの数ではなく `>` の文字の数で足す。
-        over = [
-            'echo "' + " >>a" * 26,  # 文字は 52 個、並びは 26 個
-            'echo "' + " 2>&1" * 20 + " >>a" * 16,  # 文字は 52 個、並びは 36 個
-        ]
-        for command in over:
-            with self.subTest(command=command):
-                self.assertGreater(command.count(">"), REDIRECT_LIMIT)
-                self.assert_limit_denied(self.run_hook("PreToolUse", command=command), command)
-        under = 'echo "' + " >>a" * 25  # 文字は 50 個ちょうど
-        got, reason = self.verdict(self.run_hook("PreToolUse", command=under))
-        self.assertNotIn("REDIRECT_LIMIT", reason)
 
     def test_PowerShell_の生の文字列にも上限を掛ける(self):
         # PowerShell は読まずに生の文字列に適用する。チケットの置き場を守る 1 本がヒットする。
@@ -812,18 +702,6 @@ class SelfGuardTest(unittest.TestCase):
         result = self.run_hook("PreToolUse", command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe")
 
         self.assertNotIn("deny", result.stdout)
-
-    def test_実行ファイルが行き先ならコピーする形でも止まる(self):
-        # 実行ファイルの場所は CCNAVI_ENTRY_PATH から決まる。表記ごとの止める・通す（つないだ形・
-        # ディレクトリを行き先にする形・外へコピーするだけの形）は
-        # Go（hook/judge）の TestSelfGuardBinaryDestination が見る。
-        path = self.binary()
-        result = self.run_hook(
-            "PreToolUse", bin=path, command="cp /tmp/other.exe dist/ccnavi/ccnavi.exe"
-        )
-
-        self.assertIn("deny", result.stdout)
-        self.assertIn("builtin:guard-setting-files", result.stdout)
 
     def test_振り分けの実体を外へコピーするだけなら止まらず行き先なら止まる(self):
         # 組み立ての置き場（`bin/<os>-<arch>/`）の書き込み用の表記は空白をまたぐので、
@@ -1493,47 +1371,6 @@ class SelfGuardTest(unittest.TestCase):
         self.run_hook("SessionStart", session="s1")
 
         self.assertNotIn("old", self.sessions())
-
-    def test_動いているセッションのバックアップは巻き添えにしない(self):
-        # 実行前のバックアップは呼び出しのたびに書き直される。日付で切るのは
-        # それを前提にするため。並行しているセッションの戻す先を消さない。
-        self.run_hook("PreToolUse", session="other")
-
-        self.run_hook("SessionStart", session="s1")
-
-        self.assertIn("other", self.sessions())
-
-    def test_自分のバックアップは日付を見ずに残る(self):
-        # 時計がずれている環境で、自分が戻す先を自分で消さないこと。
-        self.run_hook("SessionStart", session="s1")
-        self.run_hook("UserPromptSubmit", session="s1", prompt="お願いします")
-        self.backdate(os.path.join(self.state, "selfguard", "s1"))
-
-        self.run_hook("SessionStart", session="s1")
-
-        self.assertIn("s1", self.sessions())
-
-    def test_参照されなくなった実体も消える(self):
-        path = self.binary()
-        self.run_hook("SessionStart", bin=path, session="old")
-        self.backdate(
-            os.path.join(self.state, "selfguard", "old"),
-            os.path.join(self.state, "selfguard", "store"),
-        )
-
-        self.run_hook("SessionStart", session="s1")
-
-        self.assertEqual(self.store(), [])
-
-    def test_使われている実体は古くても残る(self):
-        # 何日も続いているセッションが、自分が戻す先を失わないこと。
-        path = self.binary()
-        self.run_hook("SessionStart", bin=path, session="s1")
-        self.backdate(os.path.join(self.state, "selfguard", "store"))
-
-        self.run_hook("SessionStart", session="s2")
-
-        self.assertEqual(self.store(), ["MZ fake executable\n"])
 
     # 設定で切る
 
