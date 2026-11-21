@@ -69,17 +69,6 @@ func draftUsage(a opts) string {
 	if ospath.Strip(a.Str("draft")) == "" {
 		return "--draft には完了した親の識別子を渡す"
 	}
-	to := a.Str("to")
-	if to != "" && !slices.Contains(drafts.Targets(), drafts.Target(to)) {
-		shown := make([]string, len(drafts.Targets()))
-		for i, t := range drafts.Targets() {
-			shown[i] = string(t)
-		}
-		return "--to は " + strings.Join(shown, " か ")
-	}
-	if a.Str("layer") != "" && to == string(drafts.ToCommon) {
-		return "--layer は --to project のときだけ使う"
-	}
 	return ""
 }
 
@@ -309,21 +298,7 @@ func templateDraft(stdout, stderr io.Writer, conf *config.Settings, root string,
 	made, why := drafts.Make(conf, root, drafts.Request{Parent: parent, Name: ospath.Strip(a.Str("name")),
 		To: drafts.Target(cmpOr(a.Str("to"), string(drafts.ToProject))), Layer: ospath.Strip(a.Str("layer"))})
 	if a.Truthy("json") {
-		shown := made
-		if shown == nil {
-			shown = &drafts.Made{}
-		}
-		notes := make([]any, len(shown.Notes))
-		for i, n := range shown.Notes {
-			notes[i] = n
-		}
-		problems := []any{}
-		for _, p := range shown.Problems {
-			problems = append(problems, pyjson.NewObject("severity", string(p.Severity), "detail", p.Detail))
-		}
-		writeAnswer(stdout, pyjson.NewObject("version", templates.JSONVersion, "ok", made != nil, "error", why,
-			"name", shown.Name, "path", shown.Rel, "target", shown.Target, "layer", shown.Layer, "sha", shown.SHA,
-			"tree", shown.Tree, "notes", notes, "problems", problems))
+		writeAnswer(stdout, drafts.AnswerJSON(made, why))
 		return okIf(made != nil)
 	}
 	if made == nil {

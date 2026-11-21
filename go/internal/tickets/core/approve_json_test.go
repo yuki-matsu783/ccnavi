@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/tickets/model/via"
 	"ccnavi/internal/tickets/testkit"
 )
@@ -71,6 +72,12 @@ func TestTerminalAgreeShowsAgainWhenAProposalChanged(t *testing.T) {
 		{"BOM を足して、2 回目はいいえ", func(root string) func() {
 			return rewrite(todo(root, "i0001-01-01"), func(b []byte) []byte { return append([]byte("\xef\xbb\xbf"), b...) })
 		}, []string{"y", "n"}, nil, 1, 2, true, nil, []string{"i0001", "i0001-01-01"}},
+		{"本文だけを書き足して、2 回目もはい", func(root string) func() {
+			return rewrite(todo(root, "i0001-01-01"), func(b []byte) []byte { return append(b, []byte("追記\n")...) })
+		}, []string{"y", "y"}, nil, 0, 2, true, []string{"i0001", "i0001-01-01"}, nil},
+		{"本文に NUL を入れて、2 回目もはい", func(root string) func() {
+			return rewrite(todo(root, "i0001-01-01"), func(b []byte) []byte { return append(b, []byte("a\x00b\n")...) })
+		}, []string{"y", "y"}, nil, 0, 2, true, []string{"i0001", "i0001-01-01"}, nil},
 		{"変わらない", func(string) func() { return func() {} }, []string{"y"}, nil, 0, 1, false, []string{"i0001", "i0001-01-01"}, nil},
 		{"指名した提案が消えて別の提案が増えた", func(root string) func() {
 			return func() {
@@ -128,5 +135,42 @@ func TestTerminalAgreeApprovesTheBytesShownAgain(t *testing.T) {
 	data, err := os.ReadFile(testkit.Approved(root, "i0001", "doing", "i0001-01-01"))
 	if err != nil || !bytes.Contains(data, []byte("\r\n")) {
 		t.Errorf("最新のバイト列を承認しない: %q %v", data, err)
+	}
+}
+
+// --yes は、見せた直後の本物のダイジェストでも、そのあとに提案の本文が変われば何も置かない。
+func TestYesRefusesARealDigestOfAnEditedProposal(t *testing.T) {
+	defer via.Session(via.CLI, "")()
+	root := approveWorkspace(t)
+	conf, _ := config.Load(root)
+	var shown, quiet bytes.Buffer
+	if code := Preview(&shown, &quiet, conf, root, true, nil); code != 0 {
+		t.Fatalf("preview: %d %s", code, quiet.String())
+	}
+	loaded, err := pyjson.Loads(shown.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := loaded.(*pyjson.Object).String("digest")
+	child := filepath.Join(testkit.Worktree(root, "i0001"), "wip", "proposals", "todo", "i0001-01-01.md")
+	data, err := os.ReadFile(child)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(child, append(data, []byte("追記\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	code, err := ApproveYes(&out, &errOut, conf, root, []string{"i0001", "i0001-01-01"}, true, nil, digest)
+	if err != nil || code != 1 {
+		t.Fatalf("code %d err %v\n%s", code, err, errOut.String())
+	}
+	if !strings.Contains(errOut.String(), "提案ファイルの中身が見せたときと違う") {
+		t.Errorf("中身の違いで止まっていない: %s", errOut.String())
+	}
+	for _, id := range []string{"i0001", "i0001-01-01"} {
+		if _, err := os.Stat(testkit.Approved(root, "i0001", "doing", id)); err == nil {
+			t.Errorf("%s が置かれた", id)
+		}
 	}
 }

@@ -208,7 +208,7 @@ class FlowDraftTest(Use):
         result = self.new(ident=long, cwd=tree)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("子の識別子", result.stderr)
-        self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals", "flows")))
+        self.assertFalse(os.path.exists(os.path.join(tree, "wip", "proposals")))
 
 
 class RefusalTest(Use):

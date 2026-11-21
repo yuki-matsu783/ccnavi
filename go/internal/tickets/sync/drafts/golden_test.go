@@ -204,16 +204,11 @@ func goCall(t *testing.T, conf *config.Settings, root string, c call) string {
 		return strings.ReplaceAll(CloseNotice(conf, root, c[1].(string)), root, "ROOT")
 	case "make":
 		m, why := Make(conf, root, Request{Parent: c[1].(string), Name: c[2].(string), To: Target(c[3].(string)), Layer: c[4].(string)})
-		if m == nil {
-			m = &Made{}
-		}
 		tmpl := ""
-		if m.Template != nil {
+		if m != nil && m.Template != nil {
 			tmpl = templates.Dump(m.Template)
 		}
-		return dumped(t, pyjson.NewObject("ok", why == "", "error", why, "name", m.Name, "path", m.Rel,
-			"target", m.Target, "layer", m.Layer, "sha", m.SHA, "tree", m.Tree, "tree_root", m.TreeRoot,
-			"notes", strs(m.Notes), "problems", problemsJSON(m.Problems), "template", tmpl), root)
+		return dumped(t, AnswerJSON(m, why).With("template", tmpl), root)
 	}
 	scanned := templates.Load(conf, root)
 	found := Scan(conf, root, &scanned.Catalog)

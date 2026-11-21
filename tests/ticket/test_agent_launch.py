@@ -35,15 +35,9 @@ from tests.ticket.test_phases import PhaseHarness
 from tests.ticket.test_ticket import write
 from tests.ticketsample import RULES, child_text, parent_text
 
-# 子の起動に足す案内の囲みと、案内の長さの上限、案内が必ず持つ決まりの行。
+# 子の起動に足す案内の囲み。
 GUIDE_OPEN = "[ccnavi] 担当の案内（ここから）"
 GUIDE_CLOSE = "[ccnavi] 担当の案内（ここまで）"
-GUIDE_LIMIT = 4000
-RULE_LINES = (
-    "  Bash の cd はコマンドをまたいで続かない。絶対パスか `cd <パス> && …` の形で打つ。",
-    "  担当外のワークツリーに触れない。",
-    "  push とチケットの状態を動かす操作はしない（メインが行う）。",
-)
 
 PARENT = "i0001"
 CHILD = "i0001-01-01"

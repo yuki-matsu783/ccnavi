@@ -26,8 +26,7 @@ from tests.ticketsample import PHASES
 IDENT = "feature-9-scaffold-demo"
 
 
-# 親の提案の本文の見出しと、雛形が置く空欄の目印。
-PARENT_HEADINGS = ("目的", "範囲", "対象外", "完了の確かめ方", "計画の理由")
+# 雛形が置く空欄の目印。
 RATIONALE_TODO = "（ここにこの作業をする理由を書く）"
 HEADING_TODO = {
     "目的": "（ここにこの作業の目的を書く）",

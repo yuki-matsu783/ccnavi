@@ -168,6 +168,7 @@ func TestUsageRefusals(t *testing.T) {
 		{[]string{"--close"}, 1, "ccnavi: error: unrecognized arguments: --close"},
 		{[]string{"--root", "a", "--root", "b", "ticket", "status"}, 1, "--root は 1 度しか渡せない（2 度渡された）"},
 		{[]string{"--entry", "sh", "ticket"}, 2, "--entry は user の入口と一緒に渡す"},
+		{[]string{"--entry", "sh", "user", "agree", "--preview", "--yes", "i0001", "--json"}, 1, "--preview と --yes は同時に指定できません。"},
 	} {
 		var out, errOut bytes.Buffer
 		code := Run(strings.NewReader(""), &out, &errOut, c.args)

@@ -42,7 +42,6 @@ FLOW_IMPL = textwrap.dedent(
     """
 )
 
-DENY = "DENY_TICKET_APPROVAL_CLI"
 # 一般化を待つ欄に下書きが付ける印。
 TODO_MARK = "TODO"
 GUARD_ENV = "CCNAVI_GUARD_TICKET_APPROVAL"
