@@ -18,9 +18,12 @@
 //   - dir は鍵ごとの固定のパス。手順は dir の下にだけ書く。dir の外に書いたものは写しに入らず、戻らない
 //   - 返す値は JSON に直して取っておく。写しからは、取っておいた JSON を新しく読んで返す（呼び手が書き換えても次に響かない）
 //   - 同じ鍵を同じパスへ戻すので、同じ鍵を使うテストどうしは並行に動けない。Build は鍵ごとにテストの終わりまで待たせる
-//     （t.Parallel のテストでも取り合わず、順に並ぶ）。同じテストの中で同じ鍵を 2 度使えない
-//   - 戻すときは、いまの木と写しの違うファイルだけを消す・写す（木を丸ごと写し直さない）。更新時刻は写しの値に戻す。
-//     前のテストが木に残したものは、写しと同じ中身へ戻る（テストどうしで状態を持ち越さない）
+//     （t.Parallel のテストでも取り合わず、順に並ぶ）。t.Parallel() は Build より前に呼ぶ。親が持つ鍵を t.Run の子で
+//     使わない（どちらも lockWait 待って落ちる）
+//   - 鍵は最初に使った呼び出し点（file:line）を覚える。同じ鍵が別の呼び出し点から来たら落ちる（別の組み立てに鍵を
+//     コピペした間違いを拾う）。呼び出し点を共通の関数に包むなら、その関数が変わる引数を鍵に入れる
+//   - 戻すときは、いまの木と写しの違うファイルだけを消す・写す（木を丸ごと写し直さない）。違うファイルは写しの内容と
+//     時刻に戻る。前のテストが木に残したものは、写しと同じ中身へ戻る（テストどうしで状態を持ち越さない）
 //   - 写しはプロセスの終わりに消える（base.AtExit）
 package treecache
 
@@ -28,13 +31,16 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"testing"
+	"time"
 
 	"ccnavi/internal/harness/base"
 )
@@ -62,8 +68,7 @@ type listing map[string]item
 // entry は鍵 1 つの作業用ディレクトリと写し。
 type entry struct {
 	mu    sync.Mutex // テスト 1 本が使っている間、持つ
-	omu   sync.Mutex // owner を守る
-	owner testing.TB
+	site  string     // 最初に使った呼び出し点
 	saved bool
 	work  string
 	snap  string
@@ -77,7 +82,10 @@ var (
 	entries = map[string]*entry{}
 )
 
-func entryFor(t testing.TB, key string) *entry {
+// lockWait は、別のテストが持つ鍵を待つ上限。超えたら詰まりとみなして落とす（永久に待たない）。
+var lockWait = 30 * time.Second
+
+func entryFor(t testing.TB, key, site string) *entry {
 	homeMu.Lock()
 	defer homeMu.Unlock()
 	if home == "" {
@@ -89,11 +97,14 @@ func entryFor(t testing.TB, key string) *entry {
 		base.AtExit(home)
 	}
 	if e, ok := entries[key]; ok {
+		if e.site != site {
+			t.Fatalf("treecache: 鍵 %q は %s で使い始めた。%s は別の組み立てなら別の鍵にする", key, e.site, site)
+		}
 		return e
 	}
 	sum := sha256.Sum256([]byte(key))
 	place := filepath.Join(home, hex.EncodeToString(sum[:6]))
-	e := &entry{work: filepath.Join(place, "w"), snap: filepath.Join(place, "snap")}
+	e := &entry{site: site, work: filepath.Join(place, "w"), snap: filepath.Join(place, "snap")}
 	entries[key] = e
 	return e
 }
@@ -102,23 +113,16 @@ func entryFor(t testing.TB, key string) *entry {
 // 写しを取り、2 度目からは dir を写しの中身へ戻す。
 func Build[T any](t testing.TB, key string, build func(dir string) T) (string, T) {
 	t.Helper()
-	e := entryFor(t, key)
-	e.omu.Lock()
-	again := e.owner == t
-	e.omu.Unlock()
-	if again {
-		t.Fatalf("treecache: 同じテストで鍵 %q を 2 度使えない", key)
+	_, file, line, _ := runtime.Caller(1)
+	e := entryFor(t, key, fmt.Sprintf("%s:%d", file, line))
+	deadline := time.Now().Add(lockWait)
+	for !e.mu.TryLock() {
+		if time.Now().After(deadline) {
+			t.Fatalf("treecache: 鍵 %q を使う別のテストが %v 終わらない。t.Parallel() より前に Build していないか、親テストが同じ鍵を持ったまま t.Run の中で Build していないかを見る", key, lockWait)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-	e.mu.Lock()
-	e.omu.Lock()
-	e.owner = t
-	e.omu.Unlock()
-	t.Cleanup(func() {
-		e.omu.Lock()
-		e.owner = nil
-		e.omu.Unlock()
-		e.mu.Unlock()
-	})
+	t.Cleanup(e.mu.Unlock)
 
 	var zero T
 	if e.saved {

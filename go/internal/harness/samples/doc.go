@@ -18,5 +18,6 @@
 //     記録を作り、plan の欄に "op": <操作ID> を足した JSON（Python の json.dump の形）を <計画の出力先> に書く。成功 0・失敗は文を stderr に出して 1
 //
 // 見本は実行ファイルの関数を呼んで作らない（見本が実装の書き方に引きずられないように）。例外は操作記録で、
-// tickets/model/oplog の型を直に使う（記録の形を別に書かず、同じ型を使うことで食い違いを防ぐ）。
+// tickets/model/oplog の型を直に使う（記録の形を別に書かず、同じ型を使うことで食い違いを防ぐ）。もう 1 つは userform で、
+// 入口の判定に useronly.TakeEntry を呼ぶ。
 package samples

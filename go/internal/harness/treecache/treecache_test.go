@@ -1,8 +1,11 @@
 package treecache
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -52,10 +55,11 @@ func TestSecondUseRestoresTheSavedTreeAtTheSamePathWithoutRunningTheBuild(t *tes
 		}
 		return state{Root: filepath.Join(dir, "a"), Count: 7}
 	}
+	key := fmt.Sprintf("restore-%d", time.Now().UnixNano()) // -count=2 の 2 周目も手順を 1 度走らせる
 	var first string
 	for round := range 3 {
 		t.Run("", func(t *testing.T) {
-			dir, v := Build(t, "restore", build)
+			dir, v := Build(t, key, build)
 			if round == 0 {
 				first = dir
 			} else if dir != first {
@@ -152,13 +156,14 @@ func TestParallelUsersOfOneKeyTakeTurns(t *testing.T) {
 	var inside, worst atomic.Int32
 	var builds atomic.Int32
 	build := func(dir string) int { builds.Add(1); write(t, filepath.Join(dir, "f"), "0"); return 0 }
+	key := fmt.Sprintf("serial-%d", time.Now().UnixNano())
 	var wg sync.WaitGroup
 	for i := range 6 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			t.Run("", func(t *testing.T) {
-				dir, _ := Build(t, "serial", build)
+				dir, _ := Build(t, key, build)
 				now := inside.Add(1)
 				if now > worst.Load() {
 					worst.Store(now)
@@ -175,6 +180,78 @@ func TestParallelUsersOfOneKeyTakeTurns(t *testing.T) {
 	wg.Wait()
 	if worst.Load() != 1 || builds.Load() != 1 {
 		t.Errorf("同時に %d 本が使った・手順は %d 回", worst.Load(), builds.Load())
+	}
+}
+
+// fakeT は Fatal を受け取る偽のテスト。Build の落ちを、本物のテストを落とさずに確かめる。
+type fakeT struct {
+	testing.TB
+	msg      string
+	cleanups []func()
+}
+
+func (f *fakeT) Helper()                   {}
+func (f *fakeT) Cleanup(fn func())         { f.cleanups = append(f.cleanups, fn) }
+func (f *fakeT) Fatal(args ...any)         { f.fail(fmt.Sprint(args...)) }
+func (f *fakeT) Fatalf(s string, a ...any) { f.fail(fmt.Sprintf(s, a...)) }
+func (f *fakeT) fail(msg string)           { f.msg = msg; runtime.Goexit() }
+
+// run は fn を別の goroutine で走らせ、Fatal で止まったときの文を返す。止まらなければ空。
+func (f *fakeT) run(fn func(t testing.TB)) string {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		fn(f)
+	}()
+	<-done
+	for i := len(f.cleanups) - 1; i >= 0; i-- {
+		f.cleanups[i]()
+	}
+	return f.msg
+}
+
+func shortWait(t *testing.T) {
+	old := lockWait
+	lockWait = 100 * time.Millisecond
+	t.Cleanup(func() { lockWait = old })
+}
+
+// 親が持つ鍵を t.Run の子が Build すると、永久に待たず失敗する。
+func TestChildUsingTheKeyHeldByItsParentFailsInsteadOfHanging(t *testing.T) {
+	shortWait(t)
+	key := fmt.Sprintf("parent-child-%d", time.Now().UnixNano())
+	use := func(t testing.TB) { Build(t, key, func(dir string) int { return 0 }) } // 呼び出し点は 1 つ
+	use(t)
+	msg := (&fakeT{}).run(use)
+	if !strings.Contains(msg, "終わらない") {
+		t.Errorf("詰まりが失敗にならない: %q", msg)
+	}
+}
+
+// Build の後に t.Parallel() を呼ぶテストが鍵を持ったまま止まると、後の Build は永久に待たず失敗する。
+func TestBuildBeforeParallelFailsTheNextUserInsteadOfHanging(t *testing.T) {
+	shortWait(t)
+	key := fmt.Sprintf("build-then-parallel-%d", time.Now().UnixNano())
+	use := func(t testing.TB) { Build(t, key, func(dir string) int { return 0 }) }
+	t.Run("holder", func(t *testing.T) {
+		use(t)
+		t.Parallel() // 親の関数が返るまで止まる。鍵は持ったまま
+	})
+	msg := (&fakeT{}).run(use)
+	if !strings.Contains(msg, "終わらない") {
+		t.Errorf("詰まりが失敗にならない: %q", msg)
+	}
+}
+
+// 同じ鍵を別の呼び出し点から使うと失敗する（別の組み立てに鍵をコピペした間違い）。
+func TestSameKeyFromAnotherCallSiteFails(t *testing.T) {
+	key := fmt.Sprintf("two-sites-%d", time.Now().UnixNano())
+	Build(t, key, func(dir string) int { return 1 })
+	done := (&fakeT{}).run(func(c testing.TB) {
+		Build(c, key, func(dir string) int { return 2 })
+	})
+	if !strings.Contains(done, "別の組み立てなら別の鍵") {
+		t.Errorf("呼び出し点の違いを拾えない: %q", done)
 	}
 }
 
