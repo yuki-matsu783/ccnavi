@@ -152,8 +152,8 @@ func (tp *template) build(t testing.TB, origin string) string {
 			t.Fatal(err)
 		}
 		base.AtExit(dir)
-		tp.dir = dir
 		buildRepos(t, dir, origin)
+		tp.dir = dir
 	})
 	if tp.dir == "" {
 		t.Fatal("作り置きを組めなかった")
