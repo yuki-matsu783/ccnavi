@@ -26,16 +26,15 @@
 #
 # 終了コード: 0 ng が無い / 1 ng がある / 2 引数の誤り
 #
-# ccnavi の部品の読み込み: <配布元>/.ccnavi/scripts/ccnavi-common-host.sh を副シェルの中で直接 `.` で
-# 読む。共通の入口 ccnavi-common.sh は使わない。入口は部品を `dirname "$0"` で探すので、
-# 別のディレクトリのこのスクリプトから読むと部品が見つからず 1 で終わる。host 部品を単体で読むのは
-# 「部品は単体では読まない」という既存の決まりの外の使い方になる。host 部品が他の部品の関数に頼るように
-# なったら、tests/sh/test_doctor_sh.py の HostPartLoadTest が落ちて気づける。
+# ccnavi の部品の読み込み: <配布元>/.ccnavi/scripts/ccnavi-common-host.sh を `.` で直接読む。共通の入口
+# ccnavi-common.sh は使わない。入口は部品を `dirname "$0"` で探すので、別のディレクトリのこのスクリプトから
+# 読むと部品が見つからず 1 で終わる。host 部品を単体で読むのは「部品は単体では読まない」という既存の決まりの
+# 外の使い方になる。host 部品が他の部品の関数に頼るようになったら、tests/sh/test_doctor_sh.py の
+# HostPartLoadTest が落ちて気づける。
 #
-# 通信する確認（git・glab・curl）はすべて時間の上限を付ける。時間を測るのは doctor_timed の 1 つ。
-# ccnavi_git_timed（.ccnavi/scripts/ccnavi-common-state.sh）のやり方に倣い、さらに、時間切れと
-# INT・TERM のときは ssh や資格情報の取り手などの子孫まで止める。POSIX sh には子孫をたどる手段が無いので、
-# ps の出力（pid と ppid）から木を作って kill する。ps が使えない環境では、直接の子だけを止める。
+# 通信する確認（git・glab・curl）はすべて時間の上限を付ける。時間を測るのは host 部品の ccnavi_run_timed
+# （ほかの sh と同じ部品）。時間切れと INT・TERM で止めるのは、起こしたコマンド（直接の子）だけ。
+# ssh などの孫が残っても、doctor は上限どおりに終わる。
 
 set -eu
 
@@ -44,10 +43,6 @@ DOCTOR_CURL_LIMIT=${CCNAVI_DOCTOR_CURL_LIMIT:-20}
 DOCTOR_GIT_MIN="2.31"
 
 doctor_tmp=""
-doctor_seq=0
-doctor_pid=""
-doctor_dog=""
-doctor_os=""
 doctor_host_sh=""
 
 usage() {
@@ -140,110 +135,13 @@ res_get() {
 	eval "printf '%s' \"\${R_${rg_name}_$2:-}\""
 }
 
-# ---- 時間の上限と後始末
-
-doctor_table() {
-	# pid と ppid を 1 行ずつ。使えなければ 1 を返す。
-	if ps -A -o pid= -o ppid= 2>/dev/null; then
-		return 0
-	fi
-	case "$doctor_os" in
-	MINGW* | MSYS* | CYGWIN*)
-		# MSYS の ps の既定の列は PID PPID PGID WINPID …
-		ps 2>/dev/null | awk '$1 ~ /^[0-9]+$/ {print $1, $2}'
-		return 0
-		;;
-	esac
-	return 1
-}
-
-# $1 とその子孫の pid を、親が先の順で出す。表が取れなければ $1 だけ。
-doctor_tree() {
-	{ doctor_table || :; } | awk -v root="$1" '
-		{ kids[$2] = kids[$2] " " $1 }
-		END {
-			n = 1; q[1] = root
-			for (i = 1; i <= n; i++) {
-				print q[i]
-				m = split(kids[q[i]], a, " ")
-				for (j = 1; j <= m; j++) { n++; q[n] = a[j] }
-			}
-		}'
-}
-
-# $1 とその子孫を止める。$2 が 1 なら、止まらなかった子孫を少し待って KILL する。
-doctor_kill_tree() {
-	[ -n "${1:-}" ] || return 0
-	kt_pids=$(doctor_tree "$1")
-	kt_live=""
-	for kt_p in $kt_pids; do
-		if kill -0 "$kt_p" 2>/dev/null; then
-			kt_live="$kt_live $kt_p"
-		fi
-	done
-	[ -n "$kt_live" ] || return 0
-	# shellcheck disable=SC2086
-	kill -TERM $kt_live 2>/dev/null || :
-	[ "${2:-0}" = 1 ] || return 0
-	# TERM を無視する子もいる。少し待って、残っているものには根も含めて KILL を送る。
-	# 根は呼んだ側がまだ wait していないので、止まっていてもゾンビとして見える。ゾンビへの KILL は無害。
-	sleep 1
-	for kt_p in $kt_live; do
-		if kill -0 "$kt_p" 2>/dev/null; then
-			kill -KILL "$kt_p" 2>/dev/null || :
-		fi
-	done
-	return 0
-}
+# ---- 後始末
 
 doctor_cleanup() {
 	trap '' INT TERM
-	[ -z "$doctor_pid" ] || doctor_kill_tree "$doctor_pid" 1
-	[ -z "$doctor_dog" ] || doctor_kill_tree "$doctor_dog" 0
+	ccnavi_run_timed_end
 	[ -z "$doctor_tmp" ] || rm -rf "$doctor_tmp"
 	return 0
-}
-
-# コマンドを時間の上限つきで打つ。
-#   doctor_timed <秒> <標準出力の書き先> <標準エラーの書き先> <コマンド または 関数>...
-# 戻り値はコマンドのもの。時間切れは 124。
-#
-# - 見張りはバックグラウンドのサブシェルで、sleep をバックグラウンドで起こして wait で待つ。標準入出力は閉じる
-#   （つないだままだと、呼ぶ側の `$( )` やパイプが sleep の終わりまで閉じない）
-# - 正常に終わったら、見張りとその sleep を木ごと止める
-# - 時間切れのときは、見張りがコマンドの木（ssh・資格情報の取り手を含む）を止める
-# - INT・TERM を受けたら、EXIT の doctor_cleanup が同じ後始末をする（wait は信号で戻る）
-doctor_timed() {
-	dt_limit=$1
-	dt_out=$2
-	dt_err=$3
-	shift 3
-	doctor_seq=$((doctor_seq + 1))
-	dt_mark="$doctor_tmp/timeout.$doctor_seq"
-	"$@" >"$dt_out" 2>"$dt_err" </dev/null &
-	doctor_pid=$!
-	dt_target=$doctor_pid
-	(
-		exec </dev/null >/dev/null 2>&1
-		dt_sleep=""
-		trap 'test -z "$dt_sleep" || kill "$dt_sleep"; exit 0' TERM
-		sleep "$dt_limit" &
-		dt_sleep=$!
-		wait "$dt_sleep"
-		: >"$dt_mark"
-		doctor_kill_tree "$dt_target" 1
-	) &
-	doctor_dog=$!
-	dt_rc=0
-	wait "$dt_target" 2>/dev/null || dt_rc=$?
-	doctor_kill_tree "$doctor_dog" 0
-	{ wait "$doctor_dog"; } 2>/dev/null || :
-	doctor_pid=""
-	doctor_dog=""
-	if [ -f "$dt_mark" ] && [ "$dt_rc" -ge 128 ]; then
-		return 124
-	fi
-	return "$dt_rc"
 }
 
 # ---- 見つける
@@ -442,10 +340,10 @@ doctor_glab_local() {
 	fi
 	# `glab auth git-credential --help` の終了コードでは判定しない。help の出力に載るかを見る。
 	gl_rc=0
-	doctor_timed "$DOCTOR_GIT_LIMIT" "$doctor_tmp/glab-help.out" "$doctor_tmp/glab-help.err" glab auth --help || gl_rc=$?
+	ccnavi_run_timed "$DOCTOR_GIT_LIMIT" /dev/null "$doctor_tmp/glab-help.out" "$doctor_tmp/glab-help.err" glab auth --help || gl_rc=$?
 	gl_help=$(cat "$doctor_tmp/glab-help.out" "$doctor_tmp/glab-help.err" 2>/dev/null || :)
 	gl_vrc=0
-	doctor_timed "$DOCTOR_GIT_LIMIT" "$doctor_tmp/glab-ver.out" "$doctor_tmp/glab-ver.err" glab --version || gl_vrc=$?
+	ccnavi_run_timed "$DOCTOR_GIT_LIMIT" /dev/null "$doctor_tmp/glab-ver.out" "$doctor_tmp/glab-ver.err" glab --version || gl_vrc=$?
 	gl_ver=$(doctor_version_of "$(cat "$doctor_tmp/glab-ver.out" 2>/dev/null || :)")
 	glab_detail=$gl_ver
 	if printf '%s\n' "$gl_help" | grep -q 'git-credential'; then
@@ -494,7 +392,6 @@ doctor_workspace() {
 doctor_origin_info() {
 	oi_url=$(git -C "$1" remote get-url origin 2>/dev/null) || return 3
 	[ -n "$oi_url" ] || return 3
-	. "$doctor_host_sh"
 	ccnavi_host_parse "$oi_url" >/dev/null 2>&1 || return 4
 	oi_scheme=$ccnavi_h_scheme
 	case "$oi_url" in
@@ -551,7 +448,6 @@ doctor_origin() {
 # origin に読みに行く（git ls-remote）。timed の中のバックグラウンドのサブシェルで動く。<リポジトリ>
 # 認証は ccnavi_git_auth（glab / gh の資格情報の取り手を足す）。尋ねさせない。
 doctor_probe_remote() {
-	. "$doctor_host_sh"
 	ccnavi_git_auth "$1"
 	pr_ssh=${GIT_SSH_COMMAND:-}
 	pr_core=$(git -C "$1" config --get core.sshCommand 2>/dev/null || :)
@@ -578,7 +474,7 @@ doctor_probe_remote() {
 doctor_check_remote() {
 	cr_name=$1
 	cr_rc=0
-	doctor_timed "$DOCTOR_GIT_LIMIT" "$doctor_tmp/$cr_name.out" "$doctor_tmp/$cr_name.err" doctor_probe_remote "$2" || cr_rc=$?
+	ccnavi_run_timed "$DOCTOR_GIT_LIMIT" /dev/null "$doctor_tmp/$cr_name.out" "$doctor_tmp/$cr_name.err" doctor_probe_remote "$2" || cr_rc=$?
 	case "$cr_rc" in
 	0) res "$cr_name" ok readable "読めるだけで、push の権限は確かめていない" ;;
 	2)
@@ -599,7 +495,6 @@ doctor_check_remote() {
 
 # 手段を決める（ccnavi_host_connect）。timed の中で動く。標準出力に `<戻り値> <手段>`。
 doctor_probe_connect() {
-	. "$doctor_host_sh"
 	pc_url=$(git -C "$1" remote get-url origin 2>/dev/null)
 	ccnavi_host_parse "$pc_url" >/dev/null 2>&1 || exit 20
 	ccnavi_h_tmp=$doctor_tmp
@@ -616,7 +511,6 @@ doctor_on_fail() {
 # curl で API を実際に打つ。glab の疎通は phase 1 で済んでいる（glab が通らなかった結果が curl）ので、
 # ここでは glab を呼ばせない（同じ glab を 2 度試して 2 度待たないため）。
 doctor_probe_api() {
-	. "$doctor_host_sh"
 	glab() { return 1; }
 	pa_url=$(git -C "$1" remote get-url origin 2>/dev/null)
 	ccnavi_host_parse "$pa_url" >/dev/null 2>&1 || exit 20
@@ -654,7 +548,7 @@ doctor_api_class() {
 
 doctor_check_host_api() {
 	ha_rc=0
-	doctor_timed "$DOCTOR_GIT_LIMIT" "$doctor_tmp/connect.out" "$doctor_tmp/connect.err" doctor_probe_connect "$workspace" || ha_rc=$?
+	ccnavi_run_timed "$DOCTOR_GIT_LIMIT" /dev/null "$doctor_tmp/connect.out" "$doctor_tmp/connect.err" doctor_probe_connect "$workspace" || ha_rc=$?
 	if [ "$ha_rc" -eq 124 ]; then
 		res host-api todo timeout "手段を決める確認が ${DOCTOR_GIT_LIMIT} 秒で終わらなかった"
 		return 0
@@ -692,7 +586,7 @@ doctor_check_host_api() {
 	fi
 	rm -f "$doctor_tmp/api.fail"
 	ha_rc=0
-	doctor_timed $((DOCTOR_CURL_LIMIT + 5)) "$doctor_tmp/api.out" "$doctor_tmp/api.err" doctor_probe_api "$workspace" || ha_rc=$?
+	ccnavi_run_timed $((DOCTOR_CURL_LIMIT + 5)) /dev/null "$doctor_tmp/api.out" "$doctor_tmp/api.err" doctor_probe_api "$workspace" || ha_rc=$?
 	case "$ha_rc" in
 	0) res host-api ok curl ;;
 	124) res host-api todo timeout "${DOCTOR_CURL_LIMIT} 秒で応答が無かった" ;;
@@ -965,18 +859,12 @@ main() {
 	from=$(doctor_abs "$from")
 	doctor_host_sh="$from/.ccnavi/scripts/ccnavi-common-host.sh"
 	[ -f "$doctor_host_sh" ] || die "$from は ccnavi の配布元に見えません（.ccnavi/scripts/ccnavi-common-host.sh が無い）。"
+	. "$doctor_host_sh"
 	if [ "$with_extensions" = yes ] && [ "$mode" != build ]; then
 		die "--with-extensions は --mode build のときだけ指定できます。"
 	fi
 
-	doctor_os=$(uname -s 2>/dev/null || :)
-	doctor_tmp=${TMPDIR:-/tmp}/ccnavi-doctor.$$
-	doctor_try=0
-	while ! (umask 077 && mkdir "$doctor_tmp") 2>/dev/null; do
-		doctor_try=$((doctor_try + 1))
-		[ "$doctor_try" -lt 20 ] || die "作業用のディレクトリを作れません。" 1
-		doctor_tmp=${TMPDIR:-/tmp}/ccnavi-doctor.$$.$doctor_try
-	done
+	doctor_tmp=$(umask 077 && mktemp -d "${TMPDIR:-/tmp}/ccnavi-doctor.XXXXXX" 2>/dev/null) || die "作業用のディレクトリを作れません。" 1
 	trap doctor_cleanup EXIT
 	trap 'exit 130' INT
 	trap 'exit 143' TERM

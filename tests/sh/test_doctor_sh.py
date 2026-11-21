@@ -435,31 +435,15 @@ class DoctorTest(Env):
         self.ctl_set("ls_sleep", ls_sleep)
         return self.env(CCNAVI_DOCTOR_GIT_LIMIT=limit)
 
-    def test_timeout_ends_and_leaves_no_children(self):
-        env = self.slow_env("7311")
+    def test_timeout_ends_and_leaves_no_watcher(self):
+        env = self.slow_env("61.311")
         start = time.time()
         done = self.doctor("--online", env=env)
         took = time.time() - start
         got = checks(done.stdout)
         self.assertEqual(got["remote"][:2], ("todo", "timeout"), done.stdout)
         self.assertLess(took, 15)
-        self.assertEqual(self.wait_gone("sleep 7311"), [])
         self.assertEqual(self.wait_gone("sleep 2.718"), [])
-
-    def test_hanging_glab_that_ignores_term_is_killed(self):
-        # --online なしで上限が掛かるのは glab だけなので、上限を短くしてよい
-        self.fake("glab", "trap '' TERM\nsleep 7315 &\nwait")
-        env = self.env(CCNAVI_DOCTOR_GIT_LIMIT="1.217")
-        start = time.time()
-        done = self.run_sh(
-            [DOCTOR, "--workspace", self.ws, "--from", self.src], env=env, timeout=40
-        )
-        self.assertLess(time.time() - start, 20)
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        # 応答しない glab を「古い」とは言わない
-        self.assertEqual(checks(done.stdout)["glab"][:2], ("todo", "timeout"))
-        self.assertEqual(self.wait_gone("sleep 7315"), [])
-        self.assertEqual(self.wait_gone("sleep 1.217"), [])
 
     def signal_run(self, sig: int, needle: str) -> subprocess.Popen:
         env = self.slow_env(needle, limit="30.123")
@@ -486,15 +470,13 @@ class DoctorTest(Env):
         return proc
 
     def test_int_cleans_up(self):
-        proc = self.signal_run(signal.SIGINT, "7313")
+        proc = self.signal_run(signal.SIGINT, "61.313")
         self.assertEqual(proc.returncode, 130)
-        self.assertEqual(self.wait_gone("sleep 7313"), [])
         self.assertEqual(self.wait_gone("sleep 30.123"), [])
 
     def test_term_cleans_up(self):
-        proc = self.signal_run(signal.SIGTERM, "7314")
+        proc = self.signal_run(signal.SIGTERM, "61.314")
         self.assertEqual(proc.returncode, 143)
-        self.assertEqual(self.wait_gone("sleep 7314"), [])
         self.assertEqual(self.wait_gone("sleep 30.123"), [])
 
 
