@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // GitLab の見本から sh が組む JSON と結論（拡張も同じ期待値と比べる）。GitHub の側は hostfixture_test.go。
@@ -17,7 +18,7 @@ import (
 func originOf(h hostSite, scene string) {
 	h.t.Helper()
 	var meta struct{ Namespace, Project string }
-	if err := json.Unmarshal([]byte(read(h.t, filepath.Join(hostfixture.SceneDir(hostfixture.GitLab, scene), "scene.json"))), &meta); err != nil {
+	if err := json.Unmarshal([]byte(shkit.Read(h.t, filepath.Join(hostfixture.SceneDir(hostfixture.GitLab, scene), "scene.json"))), &meta); err != nil {
 		h.t.Fatal(err)
 	}
 	h.git("remote", "set-url", "origin", "https://gitlab.com/"+meta.Namespace+"/"+meta.Project+".git")
@@ -123,7 +124,7 @@ func (h hostSite) requestOn(branch, cwd string, extra map[string]string) (run.Re
 	}
 	sent := filepath.Join(h.tmp, "created.json")
 	catcher := filepath.Join(h.tmp, "bin-create")
-	writeExec(h.t, filepath.Join(catcher, "curl"), "#!/bin/sh\n"+
+	shkit.WriteExec(h.t, filepath.Join(catcher, "curl"), "#!/bin/sh\n"+
 		"case \" $* \" in\n"+
 		"*\" -X POST \"*\"/merge_requests \"*) cat >"+shq(sent)+"\n"+
 		"  printf '%s' '"+createdMR+"'\n"+
@@ -150,14 +151,14 @@ func TestRequestRecordsTheAccountThatPosted(t *testing.T) {
 		if done.Code != 0 {
 			t.Fatalf("code = %d\n%s%s", done.Code, done.Stdout, done.Stderr)
 		}
-		result := decode(t, read(t, h.stub.Result))
+		result := decode(t, shkit.Read(t, h.stub.Result))
 		// 投稿者は名前でなく id で残す（名前で比べると取り違える）
 		if result["host"] != "gitlab" || result["author"] != "201" || result["mr"].(map[string]any)["number"] != json.Number("7") {
 			t.Errorf("result = %v", result)
 		}
 	}
 	var notes []any
-	if err := json.Unmarshal([]byte(read(t, state)), &notes); err != nil || len(notes) != 1 {
+	if err := json.Unmarshal([]byte(shkit.Read(t, state)), &notes); err != nil || len(notes) != 1 {
 		t.Errorf("投稿したノート = %v（%v）, want 1 件", notes, err)
 	}
 }
@@ -209,7 +210,7 @@ func TestRequestChecksTheMergeRequestAndItsTarget(t *testing.T) {
 				cwd = c.setup(h)
 			}
 			done, sent := h.requestOn(c.branch, cwd, nil)
-			if exists(sent) {
+			if shkit.Exists(sent) {
 				t.Errorf("MR を作る要求が出た")
 			}
 			if c.stderr == "" {
@@ -232,7 +233,7 @@ func TestRequestPostsTheRequestBodyAsIs(t *testing.T) {
 	state := filepath.Join(h.tmp, "notes.json")
 	done := h.review("resolved", map[string]string{"FAKE_GITLAB_STATE": state}, "review-request", "--phase", "1", "--body-file", "x")
 	var notes []struct{ Body string }
-	if err := json.Unmarshal([]byte(read(t, state)), &notes); done.Code != 0 || err != nil || len(notes) == 0 ||
+	if err := json.Unmarshal([]byte(shkit.Read(t, state)), &notes); done.Code != 0 || err != nil || len(notes) == 0 ||
 		!strings.HasPrefix(notes[0].Body, "<!-- ccnavi:request i0001:1 key=k -->") {
 		t.Errorf("code = %d, notes = %v, err = %v\n%s%s", done.Code, notes, err, done.Stdout, done.Stderr)
 	}
@@ -252,10 +253,10 @@ func TestRequestRemovesABodyFileUnderScratchpad(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(h.ws, "scratchpad", "sub"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	body := write(t, filepath.Join(h.ws, "scratchpad", "req.md"), "依頼文\n")
+	body := shkit.Write(t, filepath.Join(h.ws, "scratchpad", "req.md"), "依頼文\n")
 	done := h.requestWithBody("scratchpad/sub/../req.md")
-	if done.Code != 0 || exists(body) || !strings.Contains(done.Stdout, "案内: 依頼文 ") || !strings.Contains(done.Stdout, "消した") {
-		t.Errorf("code = %d, 依頼文が残る = %v\n%s%s", done.Code, exists(body), done.Stdout, done.Stderr)
+	if done.Code != 0 || shkit.Exists(body) || !strings.Contains(done.Stdout, "案内: 依頼文 ") || !strings.Contains(done.Stdout, "消した") {
+		t.Errorf("code = %d, 依頼文が残る = %v\n%s%s", done.Code, shkit.Exists(body), done.Stdout, done.Stderr)
 	}
 }
 
@@ -263,10 +264,10 @@ func TestRequestRemovesABodyFileUnderScratchpad(t *testing.T) {
 func TestRequestKeepsABodyFileOutsideScratchpad(t *testing.T) {
 	t.Parallel()
 	h := newHostSite(t, hostfixture.GitLab)
-	outside := write(t, filepath.Join(h.tmp, "mine.md"), "利用者のファイル\n")
+	outside := shkit.Write(t, filepath.Join(h.tmp, "mine.md"), "利用者のファイル\n")
 	done := h.requestWithBody(outside)
-	if done.Code != 0 || strings.Contains(done.Stdout, "消した") || !exists(outside) {
-		t.Errorf("code = %d, 残っている = %v\n%s%s", done.Code, exists(outside), done.Stdout, done.Stderr)
+	if done.Code != 0 || strings.Contains(done.Stdout, "消した") || !shkit.Exists(outside) {
+		t.Errorf("code = %d, 残っている = %v\n%s%s", done.Code, shkit.Exists(outside), done.Stdout, done.Stderr)
 	}
 }
 
@@ -277,14 +278,14 @@ func TestRequestOnlyWarnsWhenTheBodyFileCannotBeRemoved(t *testing.T) {
 		t.Skip("書き込めないディレクトリを作れない")
 	}
 	h := newHostSite(t, hostfixture.GitLab)
-	body := write(t, filepath.Join(h.ws, "scratchpad", "locked", "req.md"), "依頼文\n")
+	body := shkit.Write(t, filepath.Join(h.ws, "scratchpad", "locked", "req.md"), "依頼文\n")
 	locked := filepath.Dir(body)
 	if err := os.Chmod(locked, 0o555); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 	done := h.requestWithBody("scratchpad/locked/req.md")
-	if done.Code != 0 || !exists(body) || !strings.Contains(done.Stderr, "消せなかった") {
-		t.Errorf("code = %d, 残っている = %v\n%s%s", done.Code, exists(body), done.Stdout, done.Stderr)
+	if done.Code != 0 || !shkit.Exists(body) || !strings.Contains(done.Stderr, "消せなかった") {
+		t.Errorf("code = %d, 残っている = %v\n%s%s", done.Code, shkit.Exists(body), done.Stdout, done.Stderr)
 	}
 }

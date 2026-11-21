@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/harness/exe"
+	"ccnavi/internal/harness/shkit"
 )
 
 // 実行ファイルの代わりと git の代わりの sh。@名前@ を fill で差し込む。
@@ -208,19 +209,17 @@ func (k *kit) prelude() string { return fill(wapPrelude, "EXE", k.exePath) }
 
 // acceptPlan は --accept-plan のスタブの case（teststub と spec を差し込む）。
 func (k *kit) acceptPlan() string {
-	spec := write(k.t, filepath.Join(k.base, "accept-plan-spec.json"), acceptPlanSpec)
-	return fill(acceptPlanCase, "STUB", slash(exe.TeststubPath(k.t)), "SPEC", slash(spec))
+	spec := shkit.Write(k.t, filepath.Join(k.base, "accept-plan-spec.json"), acceptPlanSpec)
+	return fill(acceptPlanCase, "STUB", shkit.Slash(exe.TeststubPath(k.t)), "SPEC", shkit.Slash(spec))
 }
-
-func slash(path string) string { return strings.ReplaceAll(path, `\`, "/") }
 
 // installHalf は half の置き場に name の実行ファイルの代わり（half か hostHalf）を置き、パスを返す。
 func (k *kit) installHalf(name, template string) string {
-	return writeExec(k.t, filepath.Join(k.base, "bin", name),
+	return shkit.WriteExec(k.t, filepath.Join(k.base, "bin", name),
 		fill(template, "PRELUDE", k.prelude(), "PLAN_CASE", k.acceptPlan(), "EXE", k.exePath))
 }
 
 // wrapExe は実行ファイル bin の前に、body の sh を挟む実行ファイルの代わりを置く。body の後で "$@" を target に渡す。
 func (k *kit) wrapExe(name, body, target string) string {
-	return writeExec(k.t, filepath.Join(k.base, "bin", name), "#!/bin/sh\n"+body+"exec '"+target+"' \"$@\"\n")
+	return shkit.WriteExec(k.t, filepath.Join(k.base, "bin", name), "#!/bin/sh\n"+body+"exec '"+target+"' \"$@\"\n")
 }

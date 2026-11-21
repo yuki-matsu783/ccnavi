@@ -41,18 +41,6 @@ func closedText(name, parent string) string {
 	return strings.Join(lines, "\n")
 }
 
-// remoteDraft は origin（bare）を作って親のブランチを push し、Draft の結果ファイルを置く。
-func remoteDraft(tr *ticketkit.Tree) ticketkit.Fixture {
-	tr.T.Helper()
-	bare := filepath.Join(tr.Root, "origin.git")
-	tr.Git(tr.Root, "init", "--quiet", "--bare", bare)
-	tr.Git(tr.Root, "remote", "add", "origin", bare)
-	tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
-	f := tr.Fixture()
-	ticketkit.Write(tr.T, f.Path, `{"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": true}}`)
-	return f
-}
-
 // buildClosable は、親を閉じて片付け、push 済みにする（Draft のマージリクエストの結果ファイルは Root/fixture.json）。
 func buildClosable(tr *ticketkit.Tree) {
 	t := tr.T
@@ -61,7 +49,7 @@ func buildClosable(tr *ticketkit.Tree) {
 	tr.Propose(childName, samples.ChildText(childName, "i0001", 1, []string{"wip/design/*"}), "")
 	tr.CommitParent("tickets")
 	ticketkit.OK(t, tr.Approve())
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	tr.RunChild(childName, ticketkit.File{Path: "wip/design/plan.md", Text: "d\n"})
 	ticketkit.OK(t, tr.Ccnavi("ticket", "finish", childName))
 	tr.CommitParent("close 01")
@@ -241,7 +229,7 @@ func TestReadyDoesNotMoveAnythingWhileTheParentIsNotClosable(t *testing.T) {
 	t.Parallel()
 	tr := ticketkit.New(t, ticketkit.Options{Phases: samples.Phases})
 	tr.PhaseFamily(samples.Plan("design"))
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	ticketkit.Fails(t, ready(tr, f))
 	if ticketkit.Exists(filepath.Join(tr.Root, "logs", "archive")) {
 		t.Error("logs/archive を作った")

@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // 導入スクリプト（scripts/ccnavi-setup.sh）の受入テストの道具。外からスクリプトを動かし、読み返すのは、書かれた
@@ -114,14 +115,14 @@ func (w *target) writeSettings(data any) {
 func writeJSON(t testing.TB, path string, data any) {
 	t.Helper()
 	if s, ok := data.(string); ok {
-		write(t, path, s)
+		shkit.Write(t, path, s)
 		return
 	}
 	b, err := json.Marshal(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, path, string(b))
+	shkit.Write(t, path, string(b))
 }
 
 type jsonObj = map[string]any
@@ -137,7 +138,7 @@ func parseJSON(t testing.TB, text string) jsonObj {
 
 func (w *target) settings() jsonObj {
 	w.t.Helper()
-	return parseJSON(w.t, read(w.t, w.settingsPath()))
+	return parseJSON(w.t, shkit.Read(w.t, w.settingsPath()))
 }
 
 func (w *target) envOf() jsonObj {
@@ -148,7 +149,7 @@ func (w *target) envOf() jsonObj {
 
 func (w *target) vscodePath() string { return w.path(".vscode", "settings.json") }
 
-func (w *target) vscode() jsonObj { return parseJSON(w.t, read(w.t, w.vscodePath())) }
+func (w *target) vscode() jsonObj { return parseJSON(w.t, shkit.Read(w.t, w.vscodePath())) }
 
 // hooksOf は event に登録された hook（command・type・timeout の入れ物）。
 func hooksOf(data jsonObj, event string) []jsonObj {
@@ -239,35 +240,35 @@ func makeSource(t testing.TB, o srcOpts) string {
 	}
 	if !o.Unbuilt {
 		if !o.NoTarget {
-			write(t, filepath.Join(src, "dist", "ccnavi.target"), machine+"\n")
+			shkit.Write(t, filepath.Join(src, "dist", "ccnavi.target"), machine+"\n")
 		}
-		writeExec(t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), "#!/bin/sh\nexit 0\n")
+		shkit.WriteExec(t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), "#!/bin/sh\nexit 0\n")
 	}
 	if o.NoParts {
 		return src
 	}
 	// 設定 3 本のひな形は共通レイヤー。自身のレイヤーの phases.yml は配布元にあっても配らない。
-	write(t, filepath.Join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
-	write(t, filepath.Join(src, ".ccnavi", "config", "common", "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
-	write(t, filepath.Join(src, ".ccnavi", "config", "common", "phases.yml"), "version: 1\nphases: {}\n")
-	write(t, filepath.Join(src, ".ccnavi", "config", "project", "phases.yml"), "version: 1\nphases: {}\n")
+	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
+	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
+	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "phases.yml"), "version: 1\nphases: {}\n")
+	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "project", "phases.yml"), "version: 1\nphases: {}\n")
 	for _, name := range deployScripts {
-		write(t, filepath.Join(src, ".ccnavi", "scripts", name), "# "+name+"\n")
+		shkit.Write(t, filepath.Join(src, ".ccnavi", "scripts", name), "# "+name+"\n")
 	}
-	write(t, filepath.Join(src, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
+	shkit.Write(t, filepath.Join(src, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
 	if !o.NoDocs {
 		for _, name := range deployDocs {
-			write(t, filepath.Join(src, ".ccnavi", "docs", name), "# "+name+"\n")
+			shkit.Write(t, filepath.Join(src, ".ccnavi", "docs", name), "# "+name+"\n")
 		}
 	}
 	if o.Templates != nil {
-		mkdir(t, filepath.Join(src, ".ccnavi", "config", "common", "templates"))
+		shkit.Mkdir(t, filepath.Join(src, ".ccnavi", "config", "common", "templates"))
 		for name, text := range o.Templates {
-			write(t, filepath.Join(src, ".ccnavi", "config", "common", "templates", name), text)
+			shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "templates", name), text)
 		}
 	}
 	for rel, text := range o.Skills {
-		write(t, filepath.Join(src, ".claude", "skills", filepath.FromSlash(rel)), text)
+		shkit.Write(t, filepath.Join(src, ".claude", "skills", filepath.FromSlash(rel)), text)
 	}
 	if !o.NoLauncher {
 		// 振り分けの sh は実物をコピーし、代わりに通る sh と同じ置き場に置く（配布先で中身が同じであることを見るため）。
@@ -296,19 +297,19 @@ func (w *target) launcher() string { return w.path(".ccnavi", "scripts", launche
 func (w *target) rules() string { return w.path(".ccnavi", "config", "common", "rules.yml") }
 
 // makeGit は配布先を git のリポジトリに見せる。.gitignore を書くのはここだけ。
-func (w *target) makeGit() { mkdir(w.t, w.path(".git")) }
+func (w *target) makeGit() { shkit.Mkdir(w.t, w.path(".git")) }
 
 func (w *target) gitignore() (string, bool) {
 	data, err := os.ReadFile(w.path(".gitignore"))
 	return string(data), err == nil
 }
 
-func (w *target) writeGitignore(text string) { write(w.t, w.path(".gitignore"), text) }
+func (w *target) writeGitignore(text string) { shkit.Write(w.t, w.path(".gitignore"), text) }
 
-func (w *target) readRaw() string { return read(w.t, w.path(".gitignore")) }
+func (w *target) readRaw() string { return shkit.Read(w.t, w.path(".gitignore")) }
 
 // changeSourceBuild は配布元の組み立てを変える（組み立て直したことにする）。
 func changeSourceBuild(t testing.TB, src, text string) {
 	t.Helper()
-	write(t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), text)
+	shkit.Write(t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), text)
 }

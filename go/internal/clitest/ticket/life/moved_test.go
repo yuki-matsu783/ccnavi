@@ -126,7 +126,7 @@ func TestTheHoldTextHasTheNoteBeforeAndAfterTheRequest(t *testing.T) {
 	hasAll(t, preparing, requestNoteParts)
 	hasAll(t, tr.Bash(tr.ParentTree, "make"), requestNoteParts)
 	// レビュー待ち（依頼のあと）。
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	asked := ticketkit.OK(t, tr.Request(f))
 	hasAll(t, tr.Spawn(tr.ParentTree, "次"), requestNoteParts)
 	// request が成功したときの出力にも添える。

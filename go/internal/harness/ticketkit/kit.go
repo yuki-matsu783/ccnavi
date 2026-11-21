@@ -3,14 +3,13 @@ package ticketkit
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // TryGit は git を 1 回起こす（コミッターの名前を固定する）。標準出力と、失敗したときのエラー（標準エラーを含む）を返す。
@@ -49,26 +48,16 @@ func Git(t testing.TB, dir string, args ...string) string {
 	return out
 }
 
-// Write は path に text を書く（親のディレクトリも作る。改行はそのまま）。path を返す。
+// Write は path に text を書く（親のディレクトリも作る。改行はそのまま）。path を返す（shkit.Write）。
 func Write(t testing.TB, path, text string) string {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return shkit.Write(t, path, text)
 }
 
-// Read は path の中身。読めなければテストを止める。
+// Read は path の中身。読めなければテストを止める（shkit.Read）。
 func Read(t testing.TB, path string) string {
 	t.Helper()
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(raw)
+	return shkit.Read(t, path)
 }
 
 // ReadJSON は path の JSON を map に読む。
@@ -91,11 +80,8 @@ func ParseJSON(t testing.TB, text string) map[string]any {
 	return data
 }
 
-// Exists は path がある（ファイルでもディレクトリでも）か。
-func Exists(path string) bool {
-	_, err := os.Lstat(path)
-	return err == nil
-}
+// Exists は path がある（ファイルでもディレクトリでも）か（shkit.Exists）。
+func Exists(path string) bool { return shkit.Exists(path) }
 
 // OK は終了コードが 0 であることを確かめる（違えば出力つきで止める）。r を返す。
 func OK(t testing.TB, r run.Result) run.Result {

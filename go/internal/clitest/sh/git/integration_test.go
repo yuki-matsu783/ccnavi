@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-common-state.sh の ccnavi_integration（統合先を実行ファイルに聞く口）。決め方（origin/HEAD → origin/main・origin/master）と
@@ -32,8 +33,8 @@ type integrationWS struct {
 func newIntegrationWS(t *testing.T) *integrationWS {
 	t.Helper()
 	ws := base.TempDir(t)
-	scripts := copyScripts(t, ws)
-	h := write(t, filepath.Join(scripts, "integration-harness.sh"), integrationHarness)
+	scripts := shkit.CopyScripts(t, ws)
+	h := shkit.Write(t, filepath.Join(scripts, "integration-harness.sh"), integrationHarness)
 	seedRepo(t, ws, "work")
 	return &integrationWS{t: t, ws: ws, harness: h}
 }
@@ -62,7 +63,7 @@ func pointOriginHead(t *testing.T, repo, name string) {
 // origin/HEAD も origin/main・master も無ければ当てずっぽうで宣言せず、終了コード 1 で何も出さない。実行ファイルが無いときも同じ。
 func TestIntegrationUnknownIsExit1(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	for _, tc := range []struct {
 		name      string
 		missingEx bool
@@ -86,7 +87,7 @@ func TestIntegrationUnknownIsExit1(t *testing.T) {
 // ワークツリーは元リポジトリの参照を読み、プロジェクト（projects/<名前>）は自分の origin を読む。
 func TestIntegrationAWorktreeAndAProjectEachReadTheirOwnRepository(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	w := newIntegrationWS(t)
 	tree := filepath.Join(w.ws, ".claude", "worktrees", "i0001")
 	git(t, w.ws, "worktree", "add", "-q", tree, "-b", "i0001")
@@ -105,7 +106,7 @@ func TestIntegrationAWorktreeAndAProjectEachReadTheirOwnRepository(t *testing.T)
 // 案内は、origin が無いときと、origin/HEAD が決まらないときで言い分ける。
 func TestIntegrationHintTellsApartNoOriginAndNoOriginHead(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	w := newIntegrationWS(t)
 	r := w.call("hint", w.ws, nil)
 	if r.Code != 0 || !strings.Contains(r.Stdout, "origin が無いので統合先が決まらない") {

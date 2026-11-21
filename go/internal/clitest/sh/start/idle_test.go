@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/shkit"
 )
 
 // `ccnavi-idle.sh`（放置したセッションの引き継ぎ促しの待機）の受入テスト。
@@ -22,10 +23,10 @@ type idleEnv struct {
 
 func newIdle(t testing.TB) *idleEnv {
 	t.Helper()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	ws := base.TempDir(t)
-	copyTree(t, base.ScriptsDir(), filepath.Join(ws, ".ccnavi", "scripts"))
-	return &idleEnv{t: t, ws: ws, exe: exeWrapper(t, filepath.Join(ws, "fake")), transcript: filepath.Join(ws, "t.jsonl")}
+	shkit.CopyTree(t, base.ScriptsDir(), filepath.Join(ws, ".ccnavi", "scripts"), shkit.CopyOpts{KeepLinks: true})
+	return &idleEnv{t: t, ws: ws, exe: shkit.ExeWrapper(t, filepath.Join(ws, "fake")), transcript: filepath.Join(ws, "t.jsonl")}
 }
 
 func transcriptRow(tokens int) string {
@@ -43,7 +44,7 @@ func transcriptRow(tokens int) string {
 // start は Stop の payload を渡して `ccnavi-idle.sh start` を起こす。
 func (e *idleEnv) start(tokens int, extra map[string]string) (int, string) {
 	e.t.Helper()
-	write(e.t, e.transcript, transcriptRow(tokens)+"\n")
+	shkit.Write(e.t, e.transcript, transcriptRow(tokens)+"\n")
 	payload, err := json.Marshal(map[string]any{"hook_event_name": "Stop", "session_id": "sess-sh", "transcript_path": e.transcript})
 	if err != nil {
 		e.t.Fatal(err)

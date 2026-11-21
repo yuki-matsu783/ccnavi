@@ -13,6 +13,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // scripts/ccnavi-doctor.sh の受入テスト。外から動かし、出力と終了コードだけを読む。道具は隔離した bin だけを PATH にし、glab・curl・git の通信は
@@ -71,10 +72,10 @@ func (d *doctorEnv) makeFrom(target string, exe bool) string {
 		target = thisMachine()
 	}
 	copyFile(d.t, filepath.Join(base.ScriptsDir(), "ccnavi-common-host.sh"), filepath.Join(src, ".ccnavi", "scripts", "ccnavi-common-host.sh"), 0o644)
-	write(d.t, filepath.Join(src, "dist", "ccnavi.target"), target+"\n")
-	mkdir(d.t, filepath.Join(src, "dist", "ccnavi"))
+	shkit.Write(d.t, filepath.Join(src, "dist", "ccnavi.target"), target+"\n")
+	shkit.Mkdir(d.t, filepath.Join(src, "dist", "ccnavi"))
 	if exe {
-		writeExec(d.t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), "#!/bin/sh\nexit 0\n")
+		shkit.WriteExec(d.t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), "#!/bin/sh\nexit 0\n")
 	}
 	return src
 }
@@ -89,7 +90,7 @@ func (d *doctorEnv) doctor(o run.Opts, args ...string) run.Result {
 func (d *doctorEnv) online(kv ...string) run.Result { return d.doctor(d.env(kv...), "--online") }
 
 func (d *doctorEnv) writeSettings(name, text string) {
-	write(d.t, filepath.Join(d.ws, ".claude", name), text)
+	shkit.Write(d.t, filepath.Join(d.ws, ".claude", name), text)
 }
 
 func (d *doctorEnv) setOrigin(args ...string) {
@@ -175,7 +176,7 @@ func TestDoctorBadArgumentsExit2(t *testing.T) {
 func TestDoctorAZipFileAsFromIsRefused(t *testing.T) {
 	t.Parallel()
 	d := newDoctor(t)
-	zipped := write(t, filepath.Join(d.tmp, "a.zip"), "PK")
+	zipped := shkit.Write(t, filepath.Join(d.tmp, "a.zip"), "PK")
 	r := d.sh([]string{doctorSh(), "--workspace", d.ws, "--from", zipped}, d.env(), "")
 	code(t, r, 2)
 	in(t, r.Stderr, "zip")
@@ -207,8 +208,8 @@ func TestDoctorCandidatesNotOnPath(t *testing.T) {
 	d := newDoctor(t)
 	d.unlink("jq")
 	jqDir := filepath.Join(d.tmp, "cand dir")
-	writeExec(t, filepath.Join(jqDir, "jq.exe"), "#!/bin/sh\nexit 0\n")
-	glab := writeExec(t, filepath.Join(d.tmp, "gl dir", "glab"), "#!/bin/sh\nexit 0\n")
+	shkit.WriteExec(t, filepath.Join(jqDir, "jq.exe"), "#!/bin/sh\nexit 0\n")
+	glab := shkit.WriteExec(t, filepath.Join(d.tmp, "gl dir", "glab"), "#!/bin/sh\nexit 0\n")
 	got := checks(d.doctor(d.env(
 		"CCNAVI_DOCTOR_JQ_CANDIDATES", "/nope/jq\n"+filepath.Join(jqDir, "j*.exe"),
 		"CCNAVI_DOCTOR_GLAB_CANDIDATES", "\n"+filepath.Join(filepath.Dir(glab), "g*b")+"\n")).Stdout)
@@ -235,7 +236,7 @@ func TestDoctorWithoutJq(t *testing.T) {
 func TestDoctorWorkspaceNotGit(t *testing.T) {
 	t.Parallel()
 	d := newDoctor(t)
-	plain := mkdir(t, filepath.Join(d.tmp, "plain"))
+	plain := shkit.Mkdir(t, filepath.Join(d.tmp, "plain"))
 	r := d.sh([]string{doctorSh(), "--workspace", plain, "--from", d.src, "--online"}, d.env(), "")
 	got := checks(r.Stdout)
 	wantCheck(t, got, "workspace", "warn", "not-git")
@@ -406,7 +407,7 @@ func TestDoctorWithoutGlabButReachableGlabIsOptional(t *testing.T) {
 	t.Parallel()
 	d := newDoctor(t)
 	d.fakeCurl("ok")
-	tmp := mkdir(t, filepath.Join(d.tmp, "tmp"))
+	tmp := shkit.Mkdir(t, filepath.Join(d.tmp, "tmp"))
 	before := snapshot(t, d.src)
 	r := d.online("GITLAB_TOKEN", "x", "TMPDIR", tmp, "CCNAVI_DOCTOR_GIT_LIMIT", "2.719")
 	got := checks(r.Stdout)
@@ -418,7 +419,7 @@ func TestDoctorWithoutGlabButReachableGlabIsOptional(t *testing.T) {
 	}
 	notIn(t, r.Stdout, "案内: glab")
 	code(t, r, 0)
-	if left := names(t, tmp); len(left) != 0 {
+	if left := shkit.Names(t, tmp); len(left) != 0 {
 		t.Errorf("一時の置き場に残った: %v", left)
 	}
 	if !sameSnapshot(snapshot(t, d.src), before) {
@@ -492,11 +493,11 @@ func TestDoctorExisting(t *testing.T) {
 func TestDoctorPackageStates(t *testing.T) {
 	t.Parallel()
 	d := newDoctor(t)
-	remove(t, filepath.Join(d.src, "dist", "ccnavi", "ccnavi"))
+	shkit.Remove(t, filepath.Join(d.src, "dist", "ccnavi", "ccnavi"))
 	wantCheck(t, checks(d.doctor(d.env()).Stdout), "package", "ng", "no-executable")
-	writeExec(t, filepath.Join(d.src, "dist", "ccnavi", "ccnavi.exe"), "#!/bin/sh\n")
+	shkit.WriteExec(t, filepath.Join(d.src, "dist", "ccnavi", "ccnavi.exe"), "#!/bin/sh\n")
 	wantCheck(t, checks(d.doctor(d.env()).Stdout), "package", "ok", "ok")
-	remove(t, filepath.Join(d.src, "dist", "ccnavi.target"))
+	shkit.Remove(t, filepath.Join(d.src, "dist", "ccnavi.target"))
 	r := d.doctor(d.env())
 	wantCheck(t, checks(r.Stdout), "package", "ng", "missing")
 	code(t, r, 1)
@@ -540,7 +541,7 @@ func TestDoctorBuildModeItems(t *testing.T) {
 		t.Error("build モードで package を出した")
 	}
 	wantCheck(t, got, "node", "warn", "not-installed")
-	write(t, build, "")
+	shkit.Write(t, build, "")
 	d.fake("go", "echo go version go1.26.0 linux/amd64")
 	r = d.doctor(d.env(), "--mode", "build", "--with-extensions")
 	got = checks(r.Stdout)
@@ -563,7 +564,7 @@ func TestDoctorWorkspaceSpellings(t *testing.T) {
 		wantCheck(t, checks(r.Stdout), "workspace", "warn", "not-git")
 	})
 	t.Run("- で始まる名前も見つかる", func(t *testing.T) {
-		mkdir(t, filepath.Join(d.tmp, "-odd"))
+		shkit.Mkdir(t, filepath.Join(d.tmp, "-odd"))
 		r := d.sh([]string{doctorSh(), "--workspace", "-odd", "--from", d.src}, d.env(), d.tmp)
 		code(t, r, 0)
 	})

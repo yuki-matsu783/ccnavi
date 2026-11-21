@@ -14,6 +14,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/pyjson"
 )
 
@@ -87,9 +88,9 @@ func checkScenes(t *testing.T, kind hostfixture.Host, want []string, prepare fun
 				t.Fatal(err)
 			}
 			if *updateHostFixture {
-				write(t, expected, copy+"\n")
+				shkit.Write(t, expected, copy+"\n")
 			}
-			if !jsonEqual(t, copy, read(t, expected)) {
+			if !jsonEqual(t, copy, shkit.Read(t, expected)) {
 				t.Errorf("%s の expected.json が古い（-update-host-fixture で書き直す）\nsh が組んだ結果:\n%s", scene, copy)
 			}
 		})
@@ -103,7 +104,7 @@ func concluded(t *testing.T, kind hostfixture.Host, scene string) (changes, unre
 		ChangesRequested []any `json:"changes_requested"`
 		Unresolved       []any `json:"unresolved"`
 	}
-	if err := json.Unmarshal([]byte(read(t, filepath.Join(hostfixture.SceneDir(kind, scene), "conclusion.json"))), &said); err != nil {
+	if err := json.Unmarshal([]byte(shkit.Read(t, filepath.Join(hostfixture.SceneDir(kind, scene), "conclusion.json"))), &said); err != nil {
 		t.Fatal(err)
 	}
 	return said.ChangesRequested, said.Unresolved
@@ -152,7 +153,7 @@ func TestGitHubConfirmOnTheIntegrationBranchSaysToTypeItInTheParentWorktree(t *t
 	setOriginHead(t, h.ws, "main")
 	done := h.review("resolved", nil, "confirm", "--phase", "1")
 	if done.Code != 2 || !strings.Contains(done.Stderr, "の中で打ってください") || !strings.Contains(done.Stderr, ".claude/worktrees/") ||
-		strings.Contains(done.Stderr, "切り直し") || exists(h.stub.Args) { // main を親と読んで、親のワークツリーを切り直せとは案内しない
+		strings.Contains(done.Stderr, "切り直し") || shkit.Exists(h.stub.Args) { // main を親と読んで、親のワークツリーを切り直せとは案内しない
 		t.Errorf("code = %d\n%s%s", done.Code, done.Stdout, done.Stderr)
 	}
 }
@@ -168,7 +169,7 @@ func TestParentOptionIsRefusedExceptForReady(t *testing.T) {
 			}
 		}
 	}
-	if exists(h.stub.Args) {
+	if shkit.Exists(h.stub.Args) {
 		t.Errorf("実行ファイルを起こした: %v", h.stub.passed())
 	}
 }
@@ -239,7 +240,7 @@ func TestAnAccountLookupThatIsTooSlowIsCutOffAndNoActorIsPassed(t *testing.T) {
 func TestThroughGlabTheUsernameIsPassed(t *testing.T) {
 	t.Parallel()
 	h := newHostSite(t, hostfixture.GitHub)
-	glab := writeExec(t, filepath.Join(h.tmp, "glabbin", "glab"), `#!/bin/sh
+	glab := shkit.WriteExec(t, filepath.Join(h.tmp, "glabbin", "glab"), `#!/bin/sh
 echo 'glab: 雑音' >&2
 for a in "$@"; do last="$a"; done
 case "$last" in
@@ -385,7 +386,7 @@ func TestDecideAndConfirmDoNotTakeAnActorFromTheCaller(t *testing.T) {
 			t.Errorf("confirm %v: code = %d\n%s%s", given, done.Code, done.Stdout, done.Stderr)
 		}
 	}
-	if exists(h.stub.Args) {
+	if shkit.Exists(h.stub.Args) {
 		t.Errorf("実行ファイルを起こした: %v", h.stub.passed())
 	}
 }

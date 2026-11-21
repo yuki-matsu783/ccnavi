@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-start.sh の受入テストの土台（start_new_test.go・start_adopt_test.go が使う）。
@@ -121,7 +122,7 @@ func lookGit(t testing.TB) string {
 	if err != nil {
 		t.Skip("git が無い")
 	}
-	return slash(p)
+	return shkit.Slash(p)
 }
 
 // startGit は fetch / push / pull / ls-remote のときだけ、origin の URL を bare リポジトリへ向ける git のスタブ。
@@ -166,17 +167,17 @@ func buildRepos(t testing.TB, dir, origin string) {
 	bare := filepath.Join(dir, "origin.git")
 	git(t, dir, "init", "-q", "--bare", "-b", "main", bare)
 	ws := filepath.Join(dir, "ws")
-	mkdir(t, ws)
+	shkit.Mkdir(t, ws)
 	git(t, dir, "init", "-q", "-b", "main", ws)
-	identity(t, ws)
-	write(t, filepath.Join(ws, ".gitignore"), "logs/\n.ccnavi/\n.claude/\n")
+	shkit.Identity(t, ws)
+	shkit.Write(t, filepath.Join(ws, ".gitignore"), "logs/\n.ccnavi/\n.claude/\n")
 	git(t, ws, "add", ".gitignore")
 	git(t, ws, "commit", "-q", "-m", "seed")
 	git(t, ws, "push", "-q", bare, "main")
 	git(t, ws, "remote", "add", "origin", origin)
 	git(t, ws, "update-ref", "refs/remotes/origin/main", "HEAD")
 	git(t, ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-	copyScripts(t, ws, "ccnavi-start.sh", "ccnavi-branches.sh", "ccnavi-git.sh", "ccnavi-sync.sh")
+	shkit.CopyScripts(t, ws, "ccnavi-start.sh", "ccnavi-branches.sh", "ccnavi-git.sh", "ccnavi-sync.sh")
 	base.PutMessages(t, ws)
 	base.ShrinkRepo(t, filepath.Join(ws, ".git"))
 	base.ShrinkRepo(t, bare)
@@ -205,18 +206,18 @@ type opt struct {
 // newStart は origin（ghURL か glURL）のワークスペースを組む。
 func newStart(t testing.TB, origin string) *startEnv {
 	t.Helper()
-	need(t, "sh", "git", "jq")
+	shkit.Need(t, "sh", "git", "jq")
 	tpl := templates[origin].build(t, origin)
 	dir := base.TempDir(t)
 	e := &startEnv{t: t, origin: origin, base: dir, gitHubHost: origin == ghURL}
 	e.bare = filepath.Join(dir, "origin.git")
 	e.ws = filepath.Join(dir, "ws")
-	copyTree(t, filepath.Join(tpl, "origin.git"), e.bare)
-	copyTree(t, filepath.Join(tpl, "ws"), e.ws)
-	e.exe = exeWrapper(t, filepath.Join(dir, "exe"))
+	shkit.CopyTree(t, filepath.Join(tpl, "origin.git"), e.bare, shkit.CopyOpts{KeepLinks: true})
+	shkit.CopyTree(t, filepath.Join(tpl, "ws"), e.ws, shkit.CopyOpts{KeepLinks: true})
+	e.exe = shkit.ExeWrapper(t, filepath.Join(dir, "exe"))
 	e.stub = hoststub.Build(t, dir, true)
 	e.bin = e.stub.BinDir
-	writeExec(t, filepath.Join(e.bin, "git"), strings.NewReplacer("%GIT%", lookGit(t), "%BARE%", slash(e.bare)).Replace(startGit))
+	shkit.WriteExec(t, filepath.Join(e.bin, "git"), strings.NewReplacer("%GIT%", lookGit(t), "%BARE%", shkit.Slash(e.bare)).Replace(startGit))
 	e.route(routes{})
 	return e
 }
@@ -344,7 +345,7 @@ func (e *startEnv) nothingMade(name string) {
 	if got := e.remoteBranches(); len(got) != 1 || got[0] != "main" {
 		e.t.Errorf("origin のブランチ = %v", got)
 	}
-	truth(e.t, !isDir(e.wt(name)), "ワークツリーが作られた")
+	truth(e.t, !shkit.IsDir(e.wt(name)), "ワークツリーが作られた")
 	if got := e.posts(); len(got) != 0 {
 		e.t.Errorf("POST した: %v", got)
 	}
@@ -428,7 +429,7 @@ func (e *startEnv) noIdentity() map[string]string {
 	git(e.t, e.ws, "config", "--unset", "user.name")
 	git(e.t, e.ws, "config", "--unset", "user.email")
 	home := filepath.Join(e.base, "home")
-	mkdir(e.t, home)
+	shkit.Mkdir(e.t, home)
 	return map[string]string{
 		"GIT_CONFIG_GLOBAL": os.DevNull, "GIT_CONFIG_SYSTEM": os.DevNull, "HOME": home,
 		"GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "user.useConfigOnly", "GIT_CONFIG_VALUE_0": "true",

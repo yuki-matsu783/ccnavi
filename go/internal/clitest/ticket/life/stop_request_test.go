@@ -1,7 +1,6 @@
 package life
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -180,11 +179,7 @@ func TestStartupAndResumeDropTheMarksButCompactAndClearKeepThem(t *testing.T) {
 	t.Parallel()
 	tr := ticketkit.FamilyTree(t, ticketkit.FamilyOpts{})
 	sessionStart := func(source string) {
-		raw, err := json.Marshal(map[string]any{"hook_event_name": "SessionStart", "session_id": "s1", "source": source})
-		if err != nil {
-			t.Fatal(err)
-		}
-		ticketkit.OK(t, tr.Call(ticketkit.Call{Stdin: string(raw)}, "--mode", "enable"))
+		ticketkit.OK(t, tr.CallJSON(map[string]any{"hook_event_name": "SessionStart", "session_id": "s1", "source": source}, "--mode", "enable"))
 	}
 	for _, source := range []string{"compact", "clear"} {
 		startAgent(tr, "a1", tr.ParentTree)
@@ -313,7 +308,7 @@ func TestAPlannedParentAsksForAReviewPhaseAsAControlAndNotForADeferredOne(t *tes
 func TestARealChangeRequestKeepsTheRequestedMarkAndIsNotAsked(t *testing.T) {
 	t.Parallel()
 	tr := closeFirstChild(t, samples.Plan("design", "implement"), []string{"wip/design/*"}, "wip/design/p.md")
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	ticketkit.OK(t, tr.Request(f))
 	if !ticketkit.Exists(tr.RequestedMark()) {
 		t.Fatal("依頼のマーカーが無い")

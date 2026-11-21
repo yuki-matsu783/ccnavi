@@ -17,6 +17,7 @@ import (
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/env"
 )
@@ -53,56 +54,6 @@ type opts struct {
 	input  string
 	env    map[string]string
 	script string // review の道具だけが使う（既定は ccnavi-review.sh）
-}
-
-func need(t *testing.T, tools ...string) {
-	t.Helper()
-	for _, tool := range tools {
-		if _, err := exec.LookPath(tool); err != nil {
-			t.Skipf("%s が無い", tool)
-		}
-	}
-}
-
-func write(t testing.TB, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func writeExec(t testing.TB, path, text string) string {
-	t.Helper()
-	write(t, path, text)
-	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func read(t testing.TB, path string) string { return ticketkit.Read(t, path) }
-
-func exists(path string) bool { return ticketkit.Exists(path) }
-
-func isDir(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
-}
-
-func isFile(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.Mode().IsRegular()
-}
-
-func remove(t testing.TB, path string) {
-	t.Helper()
-	if err := os.Remove(path); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func parts(rel string) string { return filepath.Join(strings.Split(rel, "/")...) }
@@ -147,7 +98,7 @@ func linesWith(s, prefix string) []string {
 // newKit は木を組む。テストを並行にする（t.Parallel を呼ぶ）。
 func newKit(t *testing.T, plan ...string) *kit {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	t.Parallel()
 	if len(plan) == 0 {
 		plan = []string{"design"}
@@ -187,11 +138,11 @@ func (k *kit) build() {
 	}
 	base.PutMessages(t, k.ws)
 	run.Git(t, k.base, "init", "-q", "-b", "main", k.ws)
-	k.configure(k.ws)
-	write(t, filepath.Join(k.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
-	write(t, base.CommonPath(k.ws, "rules"), samples.Rules)
-	write(t, base.ConfigPath(k.ws, "phases"), samples.Phases)
-	write(t, filepath.Join(k.ws, "src", "keep.py"), "print(1)\n")
+	shkit.Identity(k.t, k.ws)
+	shkit.Write(t, filepath.Join(k.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
+	shkit.Write(t, base.CommonPath(k.ws, "rules"), samples.Rules)
+	shkit.Write(t, base.ConfigPath(k.ws, "phases"), samples.Phases)
+	shkit.Write(t, filepath.Join(k.ws, "src", "keep.py"), "print(1)\n")
 	run.Git(t, k.ws, "add", "-A")
 	run.Git(t, k.ws, "commit", "-q", "-m", "seed")
 	k.remote = filepath.Join(k.base, "origin.git")
@@ -199,20 +150,13 @@ func (k *kit) build() {
 	run.Git(t, k.ws, "remote", "add", "origin", k.remote)
 	run.Git(t, k.ws, "push", "-q", "-u", "origin", "main")
 	run.Git(t, k.ws, "remote", "set-head", "origin", "main")
-	k.bin = writeExec(t, filepath.Join(k.base, "bin", "ccnavi"), strings.ReplaceAll(exeWrapper, "@EXE@", k.exePath))
+	k.bin = shkit.WriteExec(t, filepath.Join(k.base, "bin", "ccnavi"), strings.ReplaceAll(exeWrapper, "@EXE@", k.exePath))
 	k.state = filepath.Join(k.ws, "logs", "state")
 	// ホストのスタブ（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
 	k.stub = hoststub.Build(t, k.base, true)
 	k.tree = k.parentTree()
 	k.approveFamily()
 	run.Git(t, k.tree, "push", "-q", "-u", "origin", parentID)
-}
-
-// configure は sh が打つ git のための作者と署名なしを、そのリポジトリの設定に書く。
-func (k *kit) configure(dir string) {
-	for _, kv := range [][2]string{{"user.email", "t@example.invalid"}, {"user.name", "t"}, {"commit.gpgsign", "false"}} {
-		run.Git(k.t, dir, "config", kv[0], kv[1])
-	}
 }
 
 func (k *kit) parentTree() string {
@@ -225,9 +169,9 @@ func (k *kit) parentTree() string {
 func (k *kit) approveFamily() {
 	t := k.t
 	k.approveChildren(parentID+","+childID, "approval-request", "approve", func() {
-		write(t, filepath.Join(k.tree, "wip", "proposals", "todo", parentID+".md"),
+		shkit.Write(t, filepath.Join(k.tree, "wip", "proposals", "todo", parentID+".md"),
 			samples.ParentText(parentID, samples.Plan(k.plan...), samples.ParentOpts{Allow: []string{"src/*", "wip/*"}}))
-		write(t, filepath.Join(k.tree, "wip", "proposals", "todo", childID+".md"),
+		shkit.Write(t, filepath.Join(k.tree, "wip", "proposals", "todo", childID+".md"),
 			samples.ChildTextReview(childID, parentID, 1, []string{"wip/design/*"}, samples.Off))
 	})
 }
@@ -338,9 +282,9 @@ func (k *kit) remoteParent() string { k.t.Helper(); return k.remoteSHA(parentID)
 // pusher はリモートを動かす別の clone（ワークスペースからは「他の機械が push した」ように見える）。
 func (k *kit) pusher() string {
 	path := filepath.Join(k.base, "pusher")
-	if !isDir(path) {
+	if !shkit.IsDir(path) {
 		k.git(k.base, "clone", "-q", k.remote, path)
-		k.configure(path)
+		shkit.Identity(k.t, path)
 	}
 	k.git(path, "fetch", "-q", "--prune", "origin")
 	return path
@@ -351,7 +295,7 @@ func (k *kit) remoteCommit(rel, text string) string { return k.remoteCommitOn(pa
 func (k *kit) remoteCommitOn(branch, rel, text string) string {
 	path := k.pusher()
 	k.git(path, "checkout", "-q", "-B", branch, "origin/"+branch)
-	write(k.t, filepath.Join(path, parts(rel)), text)
+	shkit.Write(k.t, filepath.Join(path, parts(rel)), text)
 	k.git(path, "add", "--", rel)
 	k.git(path, "commit", "-q", "-m", "remote "+rel)
 	k.git(path, "push", "-q", "origin", branch)
@@ -386,7 +330,7 @@ func (k *kit) subjects(n int) []string {
 
 // wipNoteCommitted は wip/ の下の追跡済みのファイルを親のワークツリーに書き、コミットして push する。
 func (k *kit) wipNoteCommitted() string {
-	write(k.t, filepath.Join(k.tree, parts(wipNote)), "メモ\n")
+	shkit.Write(k.t, filepath.Join(k.tree, parts(wipNote)), "メモ\n")
 	k.git(k.tree, "add", "--", wipNote)
 	k.git(k.tree, "commit", "-q", "-m", "docs: wip note")
 	k.git(k.tree, "push", "-q", "origin", parentID)
@@ -399,7 +343,7 @@ func (k *kit) copyPath(ident, where string) string {
 
 func (k *kit) mark(n int, kind, data string) string {
 	rel := approved + "/phases/" + parentID + "/" + strconv.Itoa(n) + "." + kind
-	write(k.t, filepath.Join(k.tree, parts(rel)), data)
+	shkit.Write(k.t, filepath.Join(k.tree, parts(rel)), data)
 	return rel
 }
 
@@ -422,14 +366,14 @@ func (k *kit) mergeHead() string {
 // shim は git の前に body を挟む置き場を作り、PATH の値（先頭に足したもの）を返す。body の中の "$REAL" は本物の git。
 func (k *kit) shim(name, body string) string {
 	dir := filepath.Join(k.base, name)
-	writeExec(k.t, filepath.Join(dir, "git"), "#!/bin/sh\nREAL='"+k.gitPath+"'\n"+body+"\nexec \"$REAL\" \"$@\"\n")
+	shkit.WriteExec(k.t, filepath.Join(dir, "git"), "#!/bin/sh\nREAL='"+k.gitPath+"'\n"+body+"\nexec \"$REAL\" \"$@\"\n")
 	return dir + string(os.PathListSeparator) + os.Getenv(env.Path)
 }
 
 // rawShim は git の代わりの sh をそのまま置く。
 func (k *kit) rawShim(name, text string) string {
 	dir := filepath.Join(k.base, name)
-	writeExec(k.t, filepath.Join(dir, "git"), text)
+	shkit.WriteExec(k.t, filepath.Join(dir, "git"), text)
 	return dir + string(os.PathListSeparator) + os.Getenv(env.Path)
 }
 
@@ -439,21 +383,21 @@ func (k *kit) finishPhaseOne() {
 	okRun(t, k.ticket("start", parentID))
 	tree := k.childTree()
 	okRun(t, k.ticket("start", childID))
-	write(t, filepath.Join(tree, "wip", "design", "a.md"), "a\n")
+	shkit.Write(t, filepath.Join(tree, "wip", "design", "a.md"), "a\n")
 	k.git(tree, "add", "-A")
 	k.git(tree, "commit", "-q", "-m", "work")
 	okRun(t, k.ticket("finish", childID))
 }
 
 func (k *kit) rejectAllPushes() {
-	writeExec(k.t, filepath.Join(k.remote, "hooks", "pre-receive"), "#!/bin/sh\necho busy >&2\nexit 1\n")
+	shkit.WriteExec(k.t, filepath.Join(k.remote, "hooks", "pre-receive"), "#!/bin/sh\necho busy >&2\nexit 1\n")
 }
 
 // rejectPushes は pre-receive が最初の times 回の push を断る（負ならずっと）。
 func (k *kit) rejectPushes(times int) {
 	counter := filepath.Join(k.base, "rejected")
-	write(k.t, counter, "0\n")
-	writeExec(k.t, filepath.Join(k.remote, "hooks", "pre-receive"), "#!/bin/sh\n"+
+	shkit.Write(k.t, counter, "0\n")
+	shkit.WriteExec(k.t, filepath.Join(k.remote, "hooks", "pre-receive"), "#!/bin/sh\n"+
 		"n=$(cat '"+counter+"'); echo $((n + 1)) > '"+counter+"'\n"+
 		`if [ `+strconv.Itoa(times)+` -lt 0 ] || [ "$n" -lt `+strconv.Itoa(times)+` ]; then echo busy >&2; exit 1; fi`+"\n")
 }
@@ -485,10 +429,10 @@ func (k *kit) spawn(name string, env map[string]string, args ...string) *proc {
 func (p *proc) termWhen(t *testing.T, mark string) string {
 	t.Helper()
 	deadline := time.Now().Add(60 * time.Second)
-	for !exists(mark) && time.Now().Before(deadline) {
+	for !shkit.Exists(mark) && time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)
 	}
-	if !exists(mark) {
+	if !shkit.Exists(mark) {
 		t.Fatal("目印まで届かなかった")
 	}
 	if err := p.cmd.Process.Signal(syscall.SIGTERM); err != nil {

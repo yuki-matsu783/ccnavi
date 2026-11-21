@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 )
@@ -33,7 +34,7 @@ func (k *kit) put(rel, text string) string {
 			text = samples.ChildTextReview(childID, parentID, 1, []string{"wip/design/*"}, samples.Off) + text
 		}
 	}
-	write(k.t, filepath.Join(k.tree, parts(rel)), text)
+	shkit.Write(k.t, filepath.Join(k.tree, parts(rel)), text)
 	return rel
 }
 
@@ -53,7 +54,7 @@ func (k *kit) results() []result {
 		if !strings.HasSuffix(e.Name(), ".kv") {
 			continue
 		}
-		text := read(k.t, filepath.Join(dir, e.Name()))
+		text := shkit.Read(k.t, filepath.Join(dir, e.Name()))
 		row := result{"text": text}
 		for _, line := range strings.Split(text, "\n") {
 			if key, value, ok := strings.Cut(line, "="); ok {
@@ -101,7 +102,7 @@ func TestNewProposalsAreCommittedAndPushed(t *testing.T) {
 	has(t, r.Stdout, "提案: "+todoRel)
 	eqList(t, "次の一手", linesWith(r.Stdout, "次: "), []string{"次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない"})
 	lacks(t, r.Stderr, "子の提案がありません")
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		t.Error("ロックが残っている")
 	}
 	rows := k.results()
@@ -119,7 +120,7 @@ func TestAParentNeverPushedStopsBeforeAnythingIsWritten(t *testing.T) {
 	k := newKit(t)
 	tree := filepath.Join(k.ws, ".claude", "worktrees", "i0002")
 	k.git(k.ws, "worktree", "add", "-q", tree, "-b", "i0002", "main")
-	write(t, filepath.Join(tree, parts(todo+"/i0002.md")),
+	shkit.Write(t, filepath.Join(tree, parts(todo+"/i0002.md")),
 		samples.ParentText("i0002", samples.Plan("design"), samples.ParentOpts{Allow: []string{"src/*", "wip/*"}}))
 	before := k.sha(tree, "HEAD")
 
@@ -137,7 +138,7 @@ func TestAParentNeverPushedStopsBeforeAnythingIsWritten(t *testing.T) {
 		lacks(t, err, "bad revision")
 		lacks(t, err, "差分を読めない")
 		eq(t, "リモート", k.remoteSHA("i0002"), "")
-		if exists(filepath.Join(k.state, "locks", "self", "i0002")) {
+		if shkit.Exists(filepath.Join(k.state, "locks", "self", "i0002")) {
 			t.Error("ロックが残っている")
 		}
 	})
@@ -219,7 +220,7 @@ func TestCheckReportsOKAndSendsNothing(t *testing.T) {
 	lacks(t, r.Stdout, "提案:")
 	eq(t, "HEAD とリモート", [2]string{k.head(), k.remoteParent()}, before)
 	has(t, k.dirty(), "?? "+todo+"/"+parentID+".md")
-	if exists(filepath.Join(k.state, "stopops-result")) {
+	if shkit.Exists(filepath.Join(k.state, "stopops-result")) {
 		t.Error("結果ファイルを書いた")
 	}
 }
@@ -333,7 +334,7 @@ func TestNoProposalAndAUserDecisionAreFailedBeforeNotStopped(t *testing.T) {
 	has(t, empty.Stderr, "送る提案がありません")
 	eq(t, "未コミット", k.dirty(), "")
 	k.put(todo+"/"+parentID+".md", "")
-	write(t, filepath.Join(k.tree, parts(approved), "done", "zzz.md"), "x\n")
+	shkit.Write(t, filepath.Join(k.tree, parts(approved), "done", "zzz.md"), "x\n")
 	code(t, k.ticket("approval-request", parentID), 1)
 	eq(t, "リモート", k.remoteParent(), before)
 	rows := k.results()
@@ -377,7 +378,7 @@ func TestARejectedPushKeepsWhatTheUserWrote(t *testing.T) {
 		k := newKit(t)
 		newRel := k.put(todo+"/"+parentID+".md", "v1\n")
 		flow := k.put(flows+"/"+childID+".yml", "flow\n")
-		written := read(t, filepath.Join(k.tree, parts(newRel)))
+		written := shkit.Read(t, filepath.Join(k.tree, parts(newRel)))
 		k.rejectAllPushes()
 		before, remoteBefore := k.head(), k.remoteParent()
 		r := k.ticket("approval-request", parentID)
@@ -386,8 +387,8 @@ func TestARejectedPushKeepsWhatTheUserWrote(t *testing.T) {
 		}
 		eq(t, "HEAD", k.head(), before)
 		eq(t, "リモート", k.remoteParent(), remoteBefore)
-		eq(t, "提案", read(t, filepath.Join(k.tree, parts(newRel))), written)
-		eq(t, "フロー", read(t, filepath.Join(k.tree, parts(flow))), "flow\n")
+		eq(t, "提案", shkit.Read(t, filepath.Join(k.tree, parts(newRel))), written)
+		eq(t, "フロー", shkit.Read(t, filepath.Join(k.tree, parts(flow))), "flow\n")
 		lacks(t, r.Stdout, "次: ")
 		rows := k.results()
 		if len(rows) != 1 {
@@ -403,13 +404,13 @@ func TestARejectedPushKeepsWhatTheUserWrote(t *testing.T) {
 		rel := k.put(todo+"/"+parentID+".md", "v1\n")
 		code(t, k.ticket("approval-request", parentID), 0)
 		k.put(rel, "v2 precious edit\n")
-		edited := read(t, filepath.Join(k.tree, parts(rel)))
+		edited := shkit.Read(t, filepath.Join(k.tree, parts(rel)))
 		k.rejectAllPushes()
 		r := k.ticket("approval-request", parentID)
 		if r.Code == 0 {
 			t.Error("push を断られたのに 0")
 		}
-		eq(t, "直し", read(t, filepath.Join(k.tree, parts(rel))), edited)
+		eq(t, "直し", shkit.Read(t, filepath.Join(k.tree, parts(rel))), edited)
 		lacks(t, r.Stdout, "次: ")
 	})
 }
@@ -427,7 +428,7 @@ func TestUnpushedCodeIsNotSentAlongWithTheProposal(t *testing.T) {
 	has(t, r.Stderr, "src/secret.py")
 	eq(t, "リモート", k.remoteParent(), before)
 	has(t, k.dirty(), "?? "+todo+"/"+parentID+".md")
-	if exists(k.lockDir()) {
+	if shkit.Exists(k.lockDir()) {
 		t.Error("ロックが残っている")
 	}
 }
@@ -435,7 +436,7 @@ func TestUnpushedCodeIsNotSentAlongWithTheProposal(t *testing.T) {
 // ワークスペースルートにコピーがあっても、親のワークツリーに無ければ送らない。
 func TestItReadsOnlyTheParentWorktree(t *testing.T) {
 	k := newKit(t)
-	write(t, filepath.Join(k.ws, "wip", "proposals", "todo", parentID+".md"), "x\n")
+	shkit.Write(t, filepath.Join(k.ws, "wip", "proposals", "todo", parentID+".md"), "x\n")
 	r := k.ticket("approval-request", parentID)
 	code(t, r, 1)
 	has(t, r.Stderr, "送る提案がありません")
@@ -447,22 +448,22 @@ func TestFinishAsksTheExeToTidyAfterSending(t *testing.T) {
 	log := filepath.Join(k.base, "tidy.log")
 	logger := k.wrapExe("logger", "case \" $* \" in\n*\" worktree tidy \"*) printf '%s\\n' \"$*\" >>'"+log+"' ;;\nesac\n", k.bin)
 	okRun(t, k.ticketWith(map[string]string{env.EntryPath: logger}, "start", parentID))
-	if exists(log) {
+	if shkit.Exists(log) {
 		t.Error("親の着手で tidy を頼んだ")
 	}
 	tree := k.childTree()
 	okRun(t, k.ticketWith(map[string]string{env.EntryPath: logger}, "start", childID))
-	write(t, filepath.Join(tree, "wip", "design", "a.md"), "a\n")
+	shkit.Write(t, filepath.Join(tree, "wip", "design", "a.md"), "a\n")
 	k.git(tree, "add", "-A")
 	k.git(tree, "commit", "-q", "-m", "work")
 	okRun(t, k.ticketWith(map[string]string{env.EntryPath: logger}, "finish", childID))
 	eq(t, "リモート", k.remoteParent(), k.head())
-	called := read(t, log)
+	called := shkit.Read(t, log)
 	// 識別子は名前の形で剥がさずにそのまま渡す（親へ割り出すのは実行ファイル）。この子はレビュー待ち（review/）へ動いたので、
 	// 見返す場所としてワークツリーは残る（消すのは confirm が done/ へ動かした後）
 	has(t, called, "worktree tidy "+childID)
 	has(t, called, "--cwd")
-	if !isDir(tree) {
+	if !shkit.IsDir(tree) {
 		t.Error("レビュー待ちの子のワークツリーが消えた")
 	}
 }
@@ -476,7 +477,7 @@ func TestCancelDropsTheCancelledChildsWorktree(t *testing.T) {
 	r := okRun(t, k.ticket("cancel", childID, "--reason", "やめた"))
 	eq(t, "リモート", k.remoteParent(), k.head())
 	has(t, r.Stdout, "ワークツリー "+childID+" を削除しました")
-	if exists(tree) {
+	if shkit.Exists(tree) {
 		t.Error("子のワークツリーが残っている")
 	}
 	eq(t, "ブランチ", k.git(k.ws, "branch", "--list", childID), childID)
@@ -487,12 +488,12 @@ func TestStartCreatesTheMissingChildWorktreeFromTheParentBranch(t *testing.T) {
 	k := newKit(t)
 	okRun(t, k.ticket("start", parentID))
 	childPath := filepath.Join(k.ws, ".claude", "worktrees", childID)
-	if exists(childPath) {
+	if shkit.Exists(childPath) {
 		t.Fatal("子のワークツリーが先にある")
 	}
 	parentHead := k.head()
 	r := okRun(t, k.ticket("start", childID))
-	if !isDir(childPath) {
+	if !shkit.IsDir(childPath) {
 		t.Fatal("子のワークツリーを作っていない")
 	}
 	eq(t, "子のブランチ", k.git(childPath, "rev-parse", "--abbrev-ref", "HEAD"), childID)
@@ -502,7 +503,7 @@ func TestStartCreatesTheMissingChildWorktreeFromTheParentBranch(t *testing.T) {
 	has(t, strings.Join(k.committed("HEAD"), "\n"), approved+"/doing/"+childID+".md")
 	eq(t, "リモート", k.remoteParent(), k.head())
 	// 親子ごとの取り込み状態は、どこにも作らない。手元に残った子のブランチの扱いは Go の単体テスト（ticketsh）が見る。
-	if exists(filepath.Join(k.state, "sync")) {
+	if shkit.Exists(filepath.Join(k.state, "sync")) {
 		t.Error("取り込み状態を作った")
 	}
 }

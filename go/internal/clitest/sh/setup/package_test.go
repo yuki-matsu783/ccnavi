@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -56,33 +57,33 @@ func (p *packageEnv) buildRepo(root string, realCcnavi bool) {
 	for _, name := range []string{"package", "build", "setup", "install", "doctor"} {
 		copyFile(t, scriptPath("ccnavi-"+name+".sh"), filepath.Join(root, "scripts", "ccnavi-"+name+".sh"), 0o755)
 	}
-	write(t, filepath.Join(root, ".gitignore"), "dist/\nbuild/\n")
-	write(t, filepath.Join(root, "go", "cmd", "ccnavi", "main.go"), "package main\n")
+	shkit.Write(t, filepath.Join(root, ".gitignore"), "dist/\nbuild/\n")
+	shkit.Write(t, filepath.Join(root, "go", "cmd", "ccnavi", "main.go"), "package main\n")
 	vsc := filepath.Join(root, "extensions", "vscode", "ccnavi-board")
-	write(t, filepath.Join(vsc, "package.json"), `{"name":"ccnavi-board","version":"0.1.0"}`+"\n")
-	write(t, filepath.Join(vsc, vscodeVersion), "export const EXTENSION_COMPAT = 18;\n")
-	write(t, filepath.Join(root, chromeDir, "package.json"), `{"version":"0.4.0"}`+"\n")
+	shkit.Write(t, filepath.Join(vsc, "package.json"), `{"name":"ccnavi-board","version":"0.1.0"}`+"\n")
+	shkit.Write(t, filepath.Join(vsc, vscodeVersion), "export const EXTENSION_COMPAT = 18;\n")
+	shkit.Write(t, filepath.Join(root, chromeDir, "package.json"), `{"version":"0.4.0"}`+"\n")
 	if realCcnavi {
 		skip := map[string]bool{"bin": true, "logs": true, "wip": true, "scratchpad": true}
-		copyTree(t, filepath.Join(base.Root(), ".ccnavi"), filepath.Join(root, ".ccnavi"), true, func(rel string) bool {
+		shkit.CopyTree(t, filepath.Join(base.Root(), ".ccnavi"), filepath.Join(root, ".ccnavi"), shkit.CopyOpts{KeepLinks: true, Skip: func(rel string) bool {
 			return skip[filepath.Base(rel)]
-		})
-		remove(t, filepath.Join(root, ".ccnavi", "config", "project"))
+		}})
+		shkit.Remove(t, filepath.Join(root, ".ccnavi", "config", "project"))
 	} else {
-		write(t, filepath.Join(root, ".ccnavi", "CCNAVI.md"), "md\n")
-		write(t, filepath.Join(root, ".ccnavi", "scripts", "ccnavi-x.sh"), "echo x\n")
-		write(t, filepath.Join(root, ".ccnavi", "docs", "a.md"), "doc\n")
+		shkit.Write(t, filepath.Join(root, ".ccnavi", "CCNAVI.md"), "md\n")
+		shkit.Write(t, filepath.Join(root, ".ccnavi", "scripts", "ccnavi-x.sh"), "echo x\n")
+		shkit.Write(t, filepath.Join(root, ".ccnavi", "docs", "a.md"), "doc\n")
 	}
-	write(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
-	write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), "mine\n")
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), "version: 1\n")
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), "mine\n")
 	for _, junk := range []string{".ccnavi/scripts/ccnavi-index.jsonl", ".ccnavi/docs/.DS_Store", ".claude/skills/s/ccnavi-index.jsonl"} {
-		write(t, filepath.Join(root, filepath.FromSlash(junk)), "x\n")
+		shkit.Write(t, filepath.Join(root, filepath.FromSlash(junk)), "x\n")
 	}
-	write(t, filepath.Join(root, ".claude", "skills", "s", "SKILL.md"), "skill\n")
+	shkit.Write(t, filepath.Join(root, ".claude", "skills", "s", "SKILL.md"), "skill\n")
 	// zip がリンクを保つかを見る置き場。
 	symlink(t, "SKILL.md", filepath.Join(root, ".claude", "skills", "s", "link.md"))
 	for _, top := range []string{"logs", "wip", "tests"} {
-		write(t, filepath.Join(root, top, "keep.txt"), "x\n")
+		shkit.Write(t, filepath.Join(root, top, "keep.txt"), "x\n")
 	}
 	run.Git(t, root, "add", "-A")
 	run.Git(t, root, "commit", "-q", "-m", "init")
@@ -93,14 +94,14 @@ func (p *packageEnv) buildDist(root string) {
 	t := p.t
 	head := run.Git(t, root, "rev-parse", "HEAD")
 	dist := filepath.Join(root, "dist")
-	remove(t, dist)
-	write(t, filepath.Join(dist, "ccnavi.target"), thisMachine()+"\n")
-	writeExec(t, filepath.Join(dist, "ccnavi", "ccnavi"), strings.ReplaceAll(fakeExe, "COMMIT", head))
-	write(t, filepath.Join(dist, "ccnavi-board-0.1.0.vsix"), "current")
-	write(t, filepath.Join(dist, "ccnavi-board-0.0.9.vsix"), "old")
+	shkit.Remove(t, dist)
+	shkit.Write(t, filepath.Join(dist, "ccnavi.target"), thisMachine()+"\n")
+	shkit.WriteExec(t, filepath.Join(dist, "ccnavi", "ccnavi"), strings.ReplaceAll(fakeExe, "COMMIT", head))
+	shkit.Write(t, filepath.Join(dist, "ccnavi-board-0.1.0.vsix"), "current")
+	shkit.Write(t, filepath.Join(dist, "ccnavi-board-0.0.9.vsix"), "old")
 	cdist := filepath.Join(root, chromeDir, "dist")
-	write(t, filepath.Join(cdist, "manifest.json"), `{"version":"0.4.0"}`+"\n")
-	write(t, filepath.Join(cdist, "background.js"), `x({compat:18,version:"0.4.0"});`+"\n")
+	shkit.Write(t, filepath.Join(cdist, "manifest.json"), `{"version":"0.4.0"}`+"\n")
+	shkit.Write(t, filepath.Join(cdist, "background.js"), `x({compat:18,version:"0.4.0"});`+"\n")
 }
 
 func (p *packageEnv) packageSh(o run.Opts, dir string, args ...string) run.Result {
@@ -114,7 +115,7 @@ func (p *packageEnv) pack(args ...string) run.Result { return p.packageSh(run.Op
 func (p *packageEnv) zipPath() string {
 	p.t.Helper()
 	var found []string
-	for _, n := range names(p.t, p.out) {
+	for _, n := range shkit.Names(p.t, p.out) {
 		if strings.HasSuffix(n, ".zip") {
 			found = append(found, n)
 		}
@@ -240,8 +241,8 @@ func TestPackageMismatchedOrMissingExtensionsAreLeftOutWithANote(t *testing.T) {
 	t.Run("vsix が無く、Chrome の版が合わない", func(t *testing.T) {
 		t.Parallel()
 		p := newPackage(t, false)
-		remove(t, filepath.Join(p.root, "dist", "ccnavi-board-0.1.0.vsix"))
-		write(t, filepath.Join(p.root, chromeDir, "dist", "manifest.json"), `{"version":"0.3.0"}`+"\n")
+		shkit.Remove(t, filepath.Join(p.root, "dist", "ccnavi-board-0.1.0.vsix"))
+		shkit.Write(t, filepath.Join(p.root, chromeDir, "dist", "manifest.json"), `{"version":"0.3.0"}`+"\n")
 		r := p.pack()
 		code(t, r, 0)
 		if p.hasSuffixMember(".vsix") || p.hasMember("ccnavi-approval") {
@@ -257,7 +258,7 @@ func TestPackageMismatchedOrMissingExtensionsAreLeftOutWithANote(t *testing.T) {
 		t.Run("Chrome: "+name, func(t *testing.T) {
 			t.Parallel()
 			p := newPackage(t, false)
-			write(t, filepath.Join(p.root, chromeDir, "dist", "background.js"), bundle)
+			shkit.Write(t, filepath.Join(p.root, chromeDir, "dist", "background.js"), bundle)
 			r := p.pack()
 			if p.hasMember("ccnavi-approval") {
 				t.Error("Chrome 拡張を入れた")
@@ -270,7 +271,7 @@ func TestPackageMismatchedOrMissingExtensionsAreLeftOutWithANote(t *testing.T) {
 	t.Run("vsix の互換の版が違う", func(t *testing.T) {
 		t.Parallel()
 		p := newPackage(t, false)
-		write(t, filepath.Join(p.root, "extensions", "vscode", "ccnavi-board", vscodeVersion), "export const EXTENSION_COMPAT = 17;\n")
+		shkit.Write(t, filepath.Join(p.root, "extensions", "vscode", "ccnavi-board", vscodeVersion), "export const EXTENSION_COMPAT = 17;\n")
 		r := p.pack()
 		if p.hasSuffixMember(".vsix") {
 			t.Error("vsix を入れた")
@@ -284,7 +285,7 @@ func TestPackageReusingOutDoesNotAppendToTheOldZip(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
 	p.pack()
-	remove(t, filepath.Join(p.root, "dist", "ccnavi-board-0.1.0.vsix"))
+	shkit.Remove(t, filepath.Join(p.root, "dist", "ccnavi-board-0.1.0.vsix"))
 	r := p.pack()
 	code(t, r, 0)
 	if p.hasSuffixMember(".vsix") {
@@ -298,7 +299,7 @@ func TestPackageSecretsAndRuntimeJunkInCopiedDirsAreLeftOut(t *testing.T) {
 	p := newPackage(t, false)
 	junk := []string{".ccnavi/scripts/.env", ".ccnavi/docs/server.pem", ".claude/skills/s/credentials.json", ".claude/skills/s/logs/run.log", ".ccnavi/docs/wip/draft.md"}
 	for _, rel := range junk {
-		write(t, filepath.Join(p.root, filepath.FromSlash(rel)), "secret\n")
+		shkit.Write(t, filepath.Join(p.root, filepath.FromSlash(rel)), "secret\n")
 	}
 	code(t, p.pack(), 0)
 	got := p.members()
@@ -314,7 +315,7 @@ func TestPackageADashNamedOutIsTakenAsAPath(t *testing.T) {
 	p := newPackage(t, false)
 	r := run.Command(t, "sh", []string{filepath.Join(p.root, "scripts", "ccnavi-package.sh"), "--out", "-dd"}, run.Opts{Dir: p.base})
 	code(t, r, 0)
-	if !exists(filepath.Join(p.base, "-dd")) {
+	if !shkit.Exists(filepath.Join(p.base, "-dd")) {
 		t.Error("-dd を作っていない")
 	}
 }
@@ -325,11 +326,11 @@ func TestPackageSecondRunCarriesNothingFromTheFirst(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
 	p.pack()
-	stale := write(t, filepath.Join(p.root, "build", "package", "stale-dir", "old.txt"), "x\n")
-	leftover := write(t, filepath.Join(p.root, "build", "package", "ccnavi-old.zip"), "x\n")
+	stale := shkit.Write(t, filepath.Join(p.root, "build", "package", "stale-dir", "old.txt"), "x\n")
+	leftover := shkit.Write(t, filepath.Join(p.root, "build", "package", "ccnavi-old.zip"), "x\n")
 	r := p.pack()
 	code(t, r, 0)
-	if exists(stale) || exists(leftover) {
+	if shkit.Exists(stale) || shkit.Exists(leftover) {
 		t.Error("前回の残りが消えていない")
 	}
 	if p.hasMember("stale") || p.hasMember("old.txt") {
@@ -341,13 +342,13 @@ func TestPackageSecondRunCarriesNothingFromTheFirst(t *testing.T) {
 func TestPackageCommitMismatchIs2(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
-	write(t, filepath.Join(p.root, "newfile.txt"), "x\n")
+	shkit.Write(t, filepath.Join(p.root, "newfile.txt"), "x\n")
 	run.Git(t, p.root, "add", "-A")
 	run.Git(t, p.root, "commit", "-q", "-m", "next")
 	r := p.pack()
 	code(t, r, 2)
 	in(t, r.Stderr, "--build")
-	if exists(p.out) && len(names(t, p.out)) != 0 {
+	if shkit.Exists(p.out) && len(shkit.Names(t, p.out)) != 0 {
 		t.Error("zip を作った")
 	}
 }
@@ -355,17 +356,17 @@ func TestPackageCommitMismatchIs2(t *testing.T) {
 func TestPackageMissingTargetOrExecutableIs2(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
-	remove(t, filepath.Join(p.root, "dist", "ccnavi", "ccnavi"))
+	shkit.Remove(t, filepath.Join(p.root, "dist", "ccnavi", "ccnavi"))
 	code(t, p.pack(), 2)
 	p.buildDist(p.root)
-	remove(t, filepath.Join(p.root, "dist", "ccnavi.target"))
+	shkit.Remove(t, filepath.Join(p.root, "dist", "ccnavi.target"))
 	code(t, p.pack(), 2)
 }
 
 func TestPackageDirtyTreeMarksTheName(t *testing.T) {
 	t.Parallel()
 	p := newPackage(t, false)
-	write(t, filepath.Join(p.root, ".ccnavi", "CCNAVI.md"), "changed\n")
+	shkit.Write(t, filepath.Join(p.root, ".ccnavi", "CCNAVI.md"), "changed\n")
 	r := p.pack()
 	code(t, r, 0)
 	if !strings.HasSuffix(p.zipPath(), "-dirty.zip") {
@@ -379,7 +380,7 @@ func TestPackageSha256IsWrittenAndMatches(t *testing.T) {
 	p := newPackage(t, false)
 	p.pack()
 	zipped := p.zipPath()
-	if !exists(zipped + ".sha256") {
+	if !shkit.Exists(zipped + ".sha256") {
 		t.Fatal(".sha256 が無い")
 	}
 	r := run.Command(t, "sha256sum", []string{"-c", filepath.Base(zipped) + ".sha256"}, run.Opts{Dir: p.out})
@@ -400,7 +401,7 @@ func (p *packageEnv) isolatedPathWithoutZip() run.Opts {
 	if !base.CanSymlink() {
 		p.t.Skip("シンボリックリンクを作れない")
 	}
-	bin := mkdir(p.t, filepath.Join(p.base, "nozip"))
+	bin := shkit.Mkdir(p.t, filepath.Join(p.base, "nozip"))
 	for _, name := range []string{
 		"sh", "git", "jq", "find", "cp", "rm", "mkdir", "sed", "tr", "cut", "grep", "cat",
 		"sha256sum", "dirname", "basename", "uname", "date", "ls", "chmod", "head", "python3",
@@ -426,7 +427,7 @@ func TestPackagePythonZipfileFallback(t *testing.T) {
 	t.Run("リンクが無ければ作る", func(t *testing.T) {
 		t.Parallel()
 		p := newPackage(t, false)
-		remove(t, filepath.Join(p.root, ".claude", "skills", "s", "link.md"))
+		shkit.Remove(t, filepath.Join(p.root, ".claude", "skills", "s", "link.md"))
 		r := p.packageSh(p.isolatedPathWithoutZip(), "")
 		code(t, r, 0)
 		if !p.members()["dist/ccnavi/ccnavi"] {
@@ -442,18 +443,18 @@ func TestPackageZipUnzipInstallAndLaunch(t *testing.T) {
 	p := newPackage(t, true)
 	r := p.pack()
 	code(t, r, 0)
-	unpacked := mkdir(t, filepath.Join(p.base, "unpacked"))
+	unpacked := shkit.Mkdir(t, filepath.Join(p.base, "unpacked"))
 	if u := run.Command(t, "unzip", []string{"-q", p.zipPath(), "-d", unpacked}, run.Opts{}); u.Code != 0 {
 		t.Fatalf("unzip: %s", u.Stderr)
 	}
-	folder := filepath.Join(unpacked, names(t, unpacked)[0])
+	folder := filepath.Join(unpacked, shkit.Names(t, unpacked)[0])
 	link := filepath.Join(folder, ".claude", "skills", "s", "link.md")
 	if to, err := os.Readlink(link); err != nil || to != "SKILL.md" {
 		t.Errorf("リンクが保たれていない: %q, %v", to, err)
 	}
 	ws := filepath.Join(p.base, "ws")
 	gitInit(t, ws)
-	home := mkdir(t, filepath.Join(p.base, "home"))
+	home := shkit.Mkdir(t, filepath.Join(p.base, "home"))
 	o := run.Opts{Env: map[string]string{env.Home: home}, Unset: []string{"CLAUDECODE"}}
 	installer := filepath.Join(folder, "scripts", "ccnavi-install.sh")
 	checked := run.Command(t, "sh", []string{installer, ws, "--from", folder, "--check"}, o)

@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 )
 
 // decide の投稿を操作記録の段階に載せた形（ccnavi-user-decide.sh と ccnavi-user-lib-review.sh）。
@@ -42,7 +43,9 @@ func (d *decideSite) recordPath(id string) string {
 	return filepath.Join(d.state, "ops", id+".json")
 }
 
-func (d *decideSite) load(id string) map[string]any { return decode(d.t, read(d.t, d.recordPath(id))) }
+func (d *decideSite) load(id string) map[string]any {
+	return decode(d.t, shkit.Read(d.t, d.recordPath(id)))
+}
 
 func (d *decideSite) save(rec map[string]any) {
 	d.t.Helper()
@@ -50,7 +53,7 @@ func (d *decideSite) save(rec map[string]any) {
 	if err != nil {
 		d.t.Fatal(err)
 	}
-	write(d.t, d.recordPath(fmt.Sprint(rec["id"])), string(data))
+	shkit.Write(d.t, d.recordPath(fmt.Sprint(rec["id"])), string(data))
 }
 
 // stage は記録の段階 id の行。

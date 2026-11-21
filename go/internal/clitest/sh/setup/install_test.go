@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // scripts/ccnavi-install.sh の受入テスト。外から動かし、出力・終了コード・書かれたものを読む。配布元は偽物の組み立て
@@ -39,10 +40,10 @@ func (i *installEnv) makeSrc(root string) string {
 		copyFile(i.t, scriptPath(name), filepath.Join(root, "scripts", name), 0o644)
 	}
 	copyFile(i.t, filepath.Join(base.ScriptsDir(), "ccnavi-common-host.sh"), filepath.Join(root, ".ccnavi", "scripts", "ccnavi-common-host.sh"), 0o644)
-	write(i.t, filepath.Join(root, "dist", "ccnavi.target"), thisMachine()+"\n")
-	writeExec(i.t, filepath.Join(root, "dist", "ccnavi", "ccnavi"), "#!/bin/sh\nexit 0\n")
-	write(i.t, filepath.Join(root, ".claude", "skills", "foo", "SKILL.md"), "new foo\n")
-	writeExec(i.t, filepath.Join(root, "scripts", "ccnavi-setup.sh"), i.setupText())
+	shkit.Write(i.t, filepath.Join(root, "dist", "ccnavi.target"), thisMachine()+"\n")
+	shkit.WriteExec(i.t, filepath.Join(root, "dist", "ccnavi", "ccnavi"), "#!/bin/sh\nexit 0\n")
+	shkit.Write(i.t, filepath.Join(root, ".claude", "skills", "foo", "SKILL.md"), "new foo\n")
+	shkit.WriteExec(i.t, filepath.Join(root, "scripts", "ccnavi-setup.sh"), i.setupText())
 	return root
 }
 
@@ -95,7 +96,7 @@ func (i *installEnv) setupCalls() [][]string {
 }
 
 func (i *installEnv) writeSettings(name, text string) {
-	write(i.t, filepath.Join(i.ws, ".claude", name), text)
+	shkit.Write(i.t, filepath.Join(i.ws, ".claude", name), text)
 }
 
 func (i *installEnv) oneNext(r run.Result) {
@@ -112,11 +113,11 @@ func modeSettings(value string) string {
 
 func (i *installEnv) backups() []string {
 	root := filepath.Join(i.home, ".cache", "ccnavi", "backup")
-	if !exists(root) {
+	if !shkit.Exists(root) {
 		return nil
 	}
 	var out []string
-	for _, n := range names(i.t, root) {
+	for _, n := range shkit.Names(i.t, root) {
 		out = append(out, filepath.Join(root, n))
 	}
 	return out
@@ -130,7 +131,7 @@ func TestInstallResolvesTheSource(t *testing.T) {
 	t.Run("1 つ下に配布元がある", func(t *testing.T) {
 		t.Parallel()
 		i := newInstall(t)
-		parent := mkdir(t, filepath.Join(i.tmp, "parent"))
+		parent := shkit.Mkdir(t, filepath.Join(i.tmp, "parent"))
 		inner := i.makeSrc(filepath.Join(parent, "pkg"))
 		r := i.install("--from", parent, "--check")
 		code(t, r, 0)
@@ -141,10 +142,10 @@ func TestInstallResolvesTheSource(t *testing.T) {
 	t.Run("候補が 2 つ・無いのは 3", func(t *testing.T) {
 		t.Parallel()
 		i := newInstall(t)
-		two := mkdir(t, filepath.Join(i.tmp, "two"))
+		two := shkit.Mkdir(t, filepath.Join(i.tmp, "two"))
 		i.makeSrc(filepath.Join(two, "a"))
 		i.makeSrc(filepath.Join(two, "b"))
-		none := mkdir(t, filepath.Join(i.tmp, "empty"))
+		none := shkit.Mkdir(t, filepath.Join(i.tmp, "empty"))
 		for _, from := range []string{two, none} {
 			r := i.install("--from", from, "--check")
 			code(t, r, 3)
@@ -157,7 +158,7 @@ func TestInstallResolvesTheSource(t *testing.T) {
 	t.Run("zip は 2", func(t *testing.T) {
 		t.Parallel()
 		i := newInstall(t)
-		r := i.install("--from", write(t, filepath.Join(i.tmp, "a.zip"), "PK"), "--check")
+		r := i.install("--from", shkit.Write(t, filepath.Join(i.tmp, "a.zip"), "PK"), "--check")
 		code(t, r, 2)
 		in(t, r.Stderr, "zip")
 	})
@@ -276,7 +277,7 @@ func (i *installEnv) prepareInstalled() {
 		".vscode/settings.json":             "{}\n",
 		".ccnavi/config/project/phases.yml": "mine\n",
 	} {
-		write(i.t, filepath.Join(i.ws, filepath.FromSlash(rel)), text)
+		shkit.Write(i.t, filepath.Join(i.ws, filepath.FromSlash(rel)), text)
 	}
 	i.writeSettings("settings.json", `{"env":{"CCNAVI_MODE":"dry-run"}}`)
 }
@@ -287,8 +288,8 @@ func TestInstallPlainRealRun(t *testing.T) {
 	t.Parallel()
 	i := newInstall(t)
 	i.prepareInstalled()
-	write(t, filepath.Join(i.src, "dist", "ccnavi-board-1.0.0.vsix"), "x")
-	write(t, filepath.Join(i.src, "extensions", "chrome", "ccnavi-approval", "dist", "manifest.json"), "{}")
+	shkit.Write(t, filepath.Join(i.src, "dist", "ccnavi-board-1.0.0.vsix"), "x")
+	shkit.Write(t, filepath.Join(i.src, "extensions", "chrome", "ccnavi-approval", "dist", "manifest.json"), "{}")
 	before := snapshot(t, i.src)
 	r := i.install("--from", i.src)
 	code(t, r, 0)
@@ -301,7 +302,7 @@ func TestInstallPlainRealRun(t *testing.T) {
 	if !canExec(exe) {
 		t.Error("実行ファイルに実行の権限が付いていない")
 	}
-	if exists(exe + ".exe") {
+	if shkit.Exists(exe + ".exe") {
 		t.Error(".exe を作った")
 	}
 	in(t, i.callsText(), "launcher --lint --root "+i.ws+" --log  --state ")
@@ -407,7 +408,7 @@ func (i *installEnv) makeBuildSrc() string {
 	i.t.Helper()
 	i.fake("go", "echo go version go1.26.0 linux/amd64")
 	for _, name := range []string{"build", "build-install"} {
-		writeExec(i.t, filepath.Join(i.src, "scripts", "ccnavi-"+name+".sh"),
+		shkit.WriteExec(i.t, filepath.Join(i.src, "scripts", "ccnavi-"+name+".sh"),
 			"#!/bin/sh\nprintf '"+name+" %s\\n' \"$*\" >> \""+i.calls+"\"\n")
 	}
 	return i.src
@@ -477,7 +478,7 @@ func TestInstallBuildFailureIs4(t *testing.T) {
 	t.Parallel()
 	i := newInstall(t)
 	src := i.makeBuildSrc()
-	writeExec(t, filepath.Join(src, "scripts", "ccnavi-build.sh"), "#!/bin/sh\nexit 1\n")
+	shkit.WriteExec(t, filepath.Join(src, "scripts", "ccnavi-build.sh"), "#!/bin/sh\nexit 1\n")
 	r := i.installFrom(src, "--build")
 	code(t, r, 4)
 	i.oneNext(r)
@@ -518,9 +519,9 @@ func TestInstallForceBacksUpOutsideTheWorkspaceWithMode700(t *testing.T) {
 		".claude/skills/foo/SKILL.md":     "old foo\n",
 		".vscode/settings.json":           "{}\n",
 	} {
-		eq(t, rel, read(t, filepath.Join(found[0], filepath.FromSlash(rel))), text)
+		eq(t, rel, shkit.Read(t, filepath.Join(found[0], filepath.FromSlash(rel))), text)
 	}
-	if exists(filepath.Join(found[0], ".claude", "skills", "mine")) || exists(filepath.Join(found[0], ".ccnavi", "config", "project")) {
+	if shkit.Exists(filepath.Join(found[0], ".claude", "skills", "mine")) || shkit.Exists(filepath.Join(found[0], ".ccnavi", "config", "project")) {
 		t.Error("ユーザ自身のものまで写した")
 	}
 	in(t, r.Stdout, found[0], "cp -R")
@@ -555,7 +556,7 @@ func TestInstallAnUnusableBackupPlaceStopsWith4BeforeSetup(t *testing.T) {
 		t.Parallel()
 		i := newInstall(t)
 		i.prepareInstalled()
-		write(t, filepath.Join(i.home, ".cache", "ccnavi"), "a file where the directory should be\n")
+		shkit.Write(t, filepath.Join(i.home, ".cache", "ccnavi"), "a file where the directory should be\n")
 		r := i.install("--from", i.src, "--force")
 		code(t, r, 4)
 		if len(i.setupCalls()) != 0 {
@@ -571,7 +572,7 @@ func TestInstallAnUnusableBackupPlaceStopsWith4BeforeSetup(t *testing.T) {
 		o.Dir = i.ws
 		r := i.sh([]string{installSh(), i.ws, "--from", i.src, "--force"}, o, i.ws)
 		code(t, r, 4)
-		if exists(filepath.Join(i.ws, "cache")) {
+		if shkit.Exists(filepath.Join(i.ws, "cache")) {
 			t.Error("相対の置き場を作った")
 		}
 		if len(i.setupCalls()) != 0 {
@@ -602,7 +603,7 @@ func TestInstallLintOutcomes(t *testing.T) {
 
 func (i *installEnv) fakeXattr(where string) {
 	i.t.Helper()
-	flag := write(i.t, filepath.Join(i.ctl, "q"), "1")
+	flag := shkit.Write(i.t, filepath.Join(i.ctl, "q"), "1")
 	i.fake("xattr", "case \"$*\" in\n"+
 		"\"-p com.apple.quarantine \"*"+where+"*) [ -f \""+flag+"\" ] && exit 0; exit 1;;\n"+
 		"\"-dr com.apple.quarantine \"*) rm -f \""+flag+"\"; exit 0;;\n"+

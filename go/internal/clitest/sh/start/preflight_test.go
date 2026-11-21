@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/harness/ticketkit"
 )
 
@@ -62,9 +63,9 @@ type preflightEnv struct {
 
 func newPreflight(t testing.TB) *preflightEnv {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	tr := ticketkit.New(t)
-	identity(t, tr.Root)
+	shkit.Identity(t, tr.Root)
 	tr.ProposeTicket(preParent, ticketkit.TicketOpts{Allow: []string{"src/*", "wip/*"}})
 	tr.ProposeTicket(preChild, ticketkit.TicketOpts{Parent: preParent, Phase: 1, Allow: []string{"wip/design/*"}, NoReview: true})
 	tr.CommitParent("approval-request")
@@ -82,7 +83,7 @@ func newPreflight(t testing.TB) *preflightEnv {
 			names = append(names, e.Name())
 		}
 	}
-	p.scripts = copyScripts(t, tr.Root, names...)
+	p.scripts = shkit.CopyScripts(t, tr.Root, names...)
 	base.PutMessages(t, tr.Root)
 	appendTo(t, filepath.Join(tr.Root, ".git", "info", "exclude"), "logs/\n.ccnavi/\n")
 	p.bare = filepath.Join(tr.Root, "origin.git")
@@ -91,7 +92,7 @@ func newPreflight(t testing.TB) *preflightEnv {
 	git(t, tr.Root, "push", "-q", "-u", "origin", "main")
 	git(t, tr.Root, "remote", "set-head", "origin", "main")
 	git(t, tr.ParentTree, "push", "-q", "-u", "origin", preParent)
-	p.bin = writeExec(t, filepath.Join(tr.Root, "..", "bin-"+filepath.Base(tr.Root), "ccnavi"), strings.ReplaceAll(preflightExe, "%EXE%", exeShPath(t)))
+	p.bin = shkit.WriteExec(t, filepath.Join(tr.Root, "..", "bin-"+filepath.Base(tr.Root), "ccnavi"), strings.ReplaceAll(preflightExe, "%EXE%", exeShPath(t)))
 	p.stub = hoststub.Build(t, base.TempDir(t), true)
 	return p
 }
@@ -137,10 +138,10 @@ func (p *preflightEnv) gitShim(body string) (string, string) {
 	dir := filepath.Dir(p.bin)
 	shim := filepath.Join(dir, "shim")
 	log := filepath.Join(dir, "ls-remote.log")
-	writeExec(p.t, filepath.Join(shim, "git"), "#!/bin/sh\n"+
+	shkit.WriteExec(p.t, filepath.Join(shim, "git"), "#!/bin/sh\n"+
 		"case \" $* \" in\n"+
 		"*\" ls-remote --heads \"*)\n"+
-		"  echo ls-remote >> '"+slash(log)+"'\n"+
+		"  echo ls-remote >> '"+shkit.Slash(log)+"'\n"+
 		body+"\n"+
 		"  ;;\n"+
 		"esac\n"+
@@ -158,7 +159,7 @@ func (p *preflightEnv) untouched(head, remote string) {
 	p.t.Helper()
 	eq(p.t, sha(p.t, p.tr.ParentTree, "HEAD"), head, "親の HEAD")
 	eq(p.t, p.remoteSHA(), remote, "リモートの親")
-	truth(p.t, !exists(p.lockDir()), "ロックを取った")
+	truth(p.t, !shkit.Exists(p.lockDir()), "ロックを取った")
 	eq(p.t, p.dirty(), "", "親の作業ツリー")
 }
 
@@ -186,7 +187,7 @@ func TestPreflightUnverifiedAPIWithAWorkingGitContinuesWithANote(t *testing.T) {
 	has(t, r.Stderr, "確認: api: 未確認", "確認: access: 省略", "このあとの review-request・confirm・ready はホストの API が要る")
 	lacks(t, r.Stdout, "確認:")
 	eq(t, p.remoteSHA(), sha(t, p.tr.ParentTree, "HEAD"), "リモートの親")
-	has(t, read(t, log), "ls-remote")
+	has(t, shkit.Read(t, log), "ls-remote")
 }
 
 func TestPreflightAnUnverifiedGitStopsWithoutWriting(t *testing.T) {

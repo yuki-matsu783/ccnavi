@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 )
 
 // 残った指摘の対応方針の受入テスト（ccnavi-user-decide.sh と ccnavi-review.sh decide --preview）。
@@ -241,8 +242,8 @@ func TestAFailingRmInTheExitTrapKeepsTheExitCode(t *testing.T) {
 			t.Parallel()
 			d := newDecideSite(t)
 			d.putTools() // 先に標準コマンドを置き、rm だけを失敗するスタブに替える
-			remove(t, filepath.Join(d.tools, "rm"))
-			writeExec(t, filepath.Join(d.tools, "rm"), "#!/bin/sh\necho 'rm: cannot remove' >&2\nexit 1\n")
+			shkit.Remove(t, filepath.Join(d.tools, "rm"))
+			shkit.WriteExec(t, filepath.Join(d.tools, "rm"), "#!/bin/sh\necho 'rm: cannot remove' >&2\nexit 1\n")
 			refused := d.decide(dOpts{shell: shell, script: reviewSh}, "x")
 			if refused.Code != 2 || refused.Stderr != "ccnavi-review: decide には <N>（フェーズ番号）が必要です。\n" {
 				t.Errorf("code = %d, stderr = %q", refused.Code, refused.Stderr)

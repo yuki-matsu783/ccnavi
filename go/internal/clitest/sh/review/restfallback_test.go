@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // GraphQL が 403 の環境（Claude Code のクラウド）で、GitHub の 4 か所が REST に替わること。
@@ -84,7 +85,7 @@ func newRestSite(t *testing.T) restSite {
 
 func (r restSite) setRest(comments []map[string]any) {
 	r.t.Helper()
-	write(r.t, r.rest, mustJSON(map[string]any{"review_threads": restThreads, "comments": comments, "body": "", "draft": true}))
+	shkit.Write(r.t, r.rest, mustJSON(map[string]any{"review_threads": restThreads, "comments": comments, "body": "", "draft": true}))
 }
 
 // env は GraphQL の断り方（空なら通る）と、道（curl か gh）を決める。
@@ -128,7 +129,7 @@ func (r restSite) driver(body, graphql, transport string, extra map[string]strin
 		body,
 	}, "\n")
 	// dirname $0 で共通部を探すので、配った sh と同じ場所に置いて打つ
-	write(r.t, filepath.Join(r.scripts, "driver-test.sh"), script+"\n")
+	shkit.Write(r.t, filepath.Join(r.scripts, "driver-test.sh"), script+"\n")
 	return r.sh("driver-test.sh", run.Opts{Env: r.env2(graphql, transport, extra)})
 }
 
@@ -223,7 +224,7 @@ func TestAResponseThatIsNotAnArrayStopsWithTheHint(t *testing.T) {
 	t.Parallel()
 	r := newRestSite(t)
 	catcher := filepath.Join(r.tmp, "bin-object")
-	writeExec(t, filepath.Join(catcher, "curl"), "#!/bin/sh\n"+
+	shkit.WriteExec(t, filepath.Join(catcher, "curl"), "#!/bin/sh\n"+
 		"case \" $* \" in *ccr/review_threads*) printf '%s' '{\"threads\": []}'; exit 0 ;; esac\n"+
 		"exec "+shq(filepath.Join(r.bin, "curl"))+" \"$@\"\n")
 	done := r.fetch("blocked", "curl", map[string]string{"PATH": pathWith(catcher, r.bin)}, "fetch")
@@ -243,7 +244,7 @@ func TestConfirmHandsTheThreadsToTheExecutable(t *testing.T) {
 	// 数え方（機構自身の投稿を除くなど）は go test（host の Unresolved）が見る。ここのスレッドは全部レビュアーのもの
 	var copied struct{ Threads []struct{ ID, Resolved any } }
 	var unresolved []any
-	if err := json.Unmarshal([]byte(read(t, r.stub.Result)), &copied); err != nil {
+	if err := json.Unmarshal([]byte(shkit.Read(t, r.stub.Result)), &copied); err != nil {
 		t.Fatal(err)
 	}
 	for _, th := range copied.Threads {

@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ワークスペースルート（origin は GitHub）から review の confirm・decide・request を打ったときの止まり方
@@ -29,7 +30,7 @@ func newRootSite(t *testing.T) rootSite {
 	s.git("remote", "add", "origin", "https://github.com/o/r.git")
 	s.git("update-ref", "refs/remotes/origin/main", "HEAD") // 統合先は origin/main から決まる
 	shim := filepath.Join(s.tmp, "shim")
-	writeExec(t, filepath.Join(shim, "gh"), "#!/bin/sh\nexit 1\n")
+	shkit.WriteExec(t, filepath.Join(shim, "gh"), "#!/bin/sh\nexit 1\n")
 	// 統合先は本物の実行ファイル（git integration）に聞く
 	return rootSite{s, map[string]string{"CCNAVI_ENTRY_PATH": exe.Path(t), "PATH": pathWith(shim)}}
 }
