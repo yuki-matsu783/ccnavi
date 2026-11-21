@@ -1,7 +1,6 @@
 [project]
 # 実行ファイルは Go（go/）。ここはテスト（tests/、Python）を回すための定義で、パッケージとしては配らない。
-# name は実行ファイルが ccnavi 自身のソースツリーを見分ける目印、version は実行ファイルの版と揃える
-# （go/internal/infra/config・go/internal/entry/version が読む）。
+# name と version は uv が要る値で、Go は読まない（Python のテストを Go に移したら、この pyproject.toml ごと消す）。
 name = "ccnavi"
 version = "0.1.0"
 description = "Claude Code のツール呼び出しを止め、代わりに取る手段を返す hook"
