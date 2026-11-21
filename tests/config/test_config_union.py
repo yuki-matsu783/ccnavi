@@ -145,59 +145,6 @@ factors:
   - {id: schema, points: 30, glob: "schema/**", message: スキーマに触った}
 """
 
-# app のレイヤー。fixture では置かない（無いレイヤー = 空）。
-# 2 つ目の非空のレイヤーを要るテストだけが置く。
-APP_RULES = {
-    "version": 1,
-    "deny": [
-        {
-            "id": "kube",
-            "match": "Bash",
-            "glob": "*kubectl*",
-            "message": "kubectl is not run by the agent.",
-        },
-        {
-            "id": "deploy",
-            "match": "Bash",
-            "glob": "*deploy.sh*",
-            "message": "deploy.sh is run by a human.",
-        },
-    ],
-}
-
-# lib 側の、app の `deploy` と同じ呼び出しにヒットする deny。名前順に並ぶかを見る。
-LIB_DEPLOY = {
-    "id": "deploy-any",
-    "match": "Bash",
-    "glob": "*deploy*",
-    "message": "deploy is run by a human.",
-}
-
-# 共通レイヤーの `ask`。プロジェクトのレイヤーの `allow` で緩められないことを見る。
-ASK_VENDOR = {
-    "id": "ask-vendor",
-    "match": "Write|Edit",
-    "glob": "*/vendor/*",
-    "message": "vendor はユーザに確かめてから触る。",
-}
-
-# NotebookEdit を実際の `tool_name` として通すためのルール。欄は notebook_path。
-NOTEBOOK_RULE = {
-    "id": "notebook",
-    "match": "NotebookEdit",
-    "glob": "*/notebooks/*",
-    "message": "ノートはユーザが回す。",
-}
-
-# `{root}` を含む定義。
-# 共通レイヤーとレイヤーの両方に同じものを置いて、置換後の全欄一致を見る。
-ROOT_RULE = {
-    "id": "root-secret",
-    "match": "Write|Edit",
-    "glob": "{root}/*/secret.txt",
-    "message": "secret.txt は置かない。",
-}
-
 # YAML として不正。閉じていないリスト。
 BROKEN = "version: 1\ndeny: [\n"
 
@@ -452,20 +399,6 @@ class ConfigUnionHarness(unittest.TestCase):
         text = phasecopy.insert(text, phasecopy.combined(*texts))
         return write(os.path.join(home, "wip", "proposals", "todo", name + ".md"), text)
 
-    def proposal_path(self, name, state=""):
-        """提案（`wip/proposals/<置き場>/<名前>.md`）のパス。在る側のツリーを探す。無ければ空。"""
-        for where in self.homes():
-            for place in [state] if state else ["todo", "review"]:
-                path = os.path.join(where, "wip", "proposals", place, name + ".md")
-                if os.path.exists(path):
-                    return path
-        return ""
-
-    def approved_dir_of(self, project=""):
-        """このプロジェクトの承認済みチケットの置き場。"""
-        base = os.path.join(self.projects, project) if project else self.ws
-        return os.path.join(base, ".ccnavi", "approved")
-
     def approved_path(self, *parts, project=""):
         """承認済みチケットの置き場の下のパス。プロジェクトを渡さなければ、在る側を探す。"""
         for where in self.homes():
@@ -564,10 +497,6 @@ class ConfigUnionHarness(unittest.TestCase):
             for p in self.lint_json(*args, **options)["problems"]
             if p["severity"] == severity and (not where or p["where"].startswith(where))
         ]
-
-    def project_where(self, name):
-        """`--lint` の Problem の出どころのうち、そのプロジェクトのもの（`(projects/lib)`）。"""
-        return f"(projects/{name})"
 
     # ---- 読み取り
 
