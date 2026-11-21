@@ -1,6 +1,6 @@
 ---
 name: 設定変更
-about: rules.yml / phases.yml / risks.yml の変更提案
+about: rules.yml / phases.yml / risks.yml / ticket-sections.yml の変更提案
 title: '[Config] '
 labels: ['config']
 assignees: ''

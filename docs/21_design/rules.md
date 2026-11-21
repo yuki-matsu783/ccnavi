@@ -167,7 +167,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
 | `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `MultiEdit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先にヒットする） | 通す |
-| `hook`・`settings`・`scripts`・共通の設定 3 本への `Write` `Edit` `MultiEdit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
+| `hook`・`settings`・`scripts`・共通の設定ファイルへの `Write` `Edit` `MultiEdit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
 | ワークスペースルート直下への `Write` `Edit` と、`Bash` の書き込み先（`workspace-root`） | 既定には入らない（ルールファイルの決まり）。ルールファイルを読めないときは、どちらも権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
 

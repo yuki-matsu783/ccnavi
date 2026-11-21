@@ -1,6 +1,7 @@
 package selfguard
 
 import (
+	"regexp"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -68,7 +69,7 @@ type Options struct {
 	Bin         string
 	ProjectHome string
 	Root        string
-	// CommonFiles は共通レイヤーの 3 本（CommonLayerFiles）。
+	// CommonFiles は共通レイヤーの設定ファイル（CommonLayerFiles）。
 	CommonFiles []string
 	// Log と State は記録と state の置き場（診断のフラグで動かせる）。
 	Log, State string
@@ -80,7 +81,7 @@ type Options struct {
 }
 
 // AddRules はガード自身を守るルールを、ルールファイルの外から判定の先頭に足す（ルールに書かせると消せるため）。
-// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通レイヤーの 3 本。
+// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通レイヤーの設定ファイル。
 // 先頭に挿すので、後に足したものほど先に当たる（共通レイヤーの 1 本が ccnavi ディレクトリの 1 本より先）。
 func AddRules(rs *rules.RuleSet, o Options) {
 	next := nextHint(o.Root)
@@ -131,7 +132,7 @@ func AddRules(rs *rules.RuleSet, o Options) {
 	}
 }
 
-// AddNamedRules は、hook・settings・scripts・共通の設定 3 本を名前で書くツールから守る 4 本を、先頭に足す。
+// AddNamedRules は、hook・settings・scripts・共通の設定ファイルを名前で書くツールから守る 4 本を、先頭に足す。
 // ルールファイルが読めない間も、実行後の保護範囲に同じ 4 本を使う。実行前は AddRules の後に呼ぶ（専用の文が先に並ぶため）。
 // 置き場の中のつながっていないコピーは外す。ccnavi ディレクトリの名前が空なら、scripts と共通の設定は足さない。
 func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
@@ -147,7 +148,7 @@ func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 			rules.Spec{ID: scriptsRuleID, Glob: "*/" + homeName(projectHome) + "/" + config.ScriptsDir + "/*", Text: texts.Spec(textScripts, variants)},
 			rules.Spec{
 				ID:    ccnaviConfigRuleID,
-				Regex: pyre.AnySeparator + strings.Join([]string{home, config.ConfigDir, config.LayerCommon, `(rules|phases|risks)\.yml$`}, pyre.AnySeparator),
+				Regex: pyre.AnySeparator + strings.Join([]string{home, config.ConfigDir, config.LayerCommon, commonFileNames() + `$`}, pyre.AnySeparator),
 				Text:  texts.Spec(textCCNaviConfig, variants),
 			})
 	}
@@ -155,6 +156,16 @@ func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 		s.Match, s.Exempt = namedMatch, exempt
 		insert(rs, s, root)
 	}
+}
+
+// commonFileNames は共通レイヤーの設定ファイルの名前を並べた式（config.LayerKinds の順）。
+func commonFileNames() string {
+	names := config.LayerFileNames()
+	var quoted []string
+	for _, kind := range config.LayerKinds() {
+		quoted = append(quoted, regexp.QuoteMeta(names[kind]))
+	}
+	return "(" + strings.Join(quoted, "|") + ")"
 }
 
 // nextHint は守る場所を直す手順の文の場合。

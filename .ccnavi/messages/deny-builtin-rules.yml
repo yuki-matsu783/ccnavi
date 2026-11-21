@@ -209,7 +209,7 @@ messages:
   RULE_GUARD_CCNAVI_CONFIG:
     kind: deny
     what: |-
-      ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。
+      ccnavi の設定（ルール・フェーズ定義・リスクの配点・提案の見出し）です。
     next:
       root: |-
         エージェントの判断で書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼する（/ccnavi-config）。ルールファイルが読めないときも同じで、wip/handoff/.ccnavi/config/common/rules.yml に下書きを置いてユーザに取り込みを頼む。直すときは '{script:ccnavi-stage.sh} <パス>' で wip/handoff/ にコピーし、コピーを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む

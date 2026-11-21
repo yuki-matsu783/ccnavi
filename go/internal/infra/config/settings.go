@@ -25,6 +25,8 @@ var (
 	DirectTmpDir  = filepath.Join("logs", "direct-tmp")
 	defaultPhases = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
 	defaultRisk   = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
+	// defaultSections は提案の本文に求める見出しの共通レイヤーの置き場。
+	defaultSections = filepath.Join(DefaultProjectHome, ConfigDir, "common", "ticket-sections.yml")
 
 	// LocalClaudeSettings は個人の上書き設定。`env` は Claude Code が起こしたプロセスに渡る。
 	LocalClaudeSettings = filepath.Join(ClaudeDir, "settings.local.json")
@@ -111,6 +113,7 @@ type Settings struct {
 	Approved    string
 	Phases      string
 	Risk        string
+	Sections    string
 	Projects    string
 	ProjectHome string
 
@@ -119,6 +122,8 @@ type Settings struct {
 	ProjectRulesFiles  map[string]string
 	ProjectPhasesFiles map[string]string
 	ProjectRiskFiles   map[string]string
+	// ProjectSectionsFiles は取り込みの検査だけが入れる（診断のフラグは無い）。
+	ProjectSectionsFiles map[string]string
 
 	BranchPrefixes         []string
 	BranchPrefixesRejected []string
@@ -161,11 +166,13 @@ func Load(root string) (*Settings, []string) {
 		Approved:                    DefaultApproved,
 		Phases:                      ospath.Join(root, defaultPhases),
 		Risk:                        ospath.Join(root, defaultRisk),
+		Sections:                    ospath.Join(root, defaultSections),
 		Projects:                    ospath.Join(root, DefaultProjects),
 		ProjectHome:                 DefaultProjectHome,
 		ProjectRulesFiles:           map[string]string{},
 		ProjectPhasesFiles:          map[string]string{},
 		ProjectRiskFiles:            map[string]string{},
+		ProjectSectionsFiles:        map[string]string{},
 	}
 	if bin := os.Getenv(env.EntryPath); bin != "" {
 		s.Bin = resolveBin(root, bin)

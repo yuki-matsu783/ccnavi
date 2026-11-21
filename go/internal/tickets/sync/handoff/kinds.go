@@ -47,7 +47,7 @@ func (k *Kind) matches(key string) bool {
 const (
 	reName  = `[^/]+`
 	reDeep  = `(?:[^/]+/)*[^/]+`
-	reLayer = `(?:rules|phases|risks)\.yml`
+	reLayer = `(?:rules|phases|risks|ticket-sections)\.yml`
 )
 
 func full(patterns ...string) []*regexp.Regexp {
@@ -85,8 +85,8 @@ var kinds = sync.OnceValue(func() []*Kind {
 		{
 			ID: layerConfig,
 			shown: []string{
-				".ccnavi/config/{common,project}/{rules,phases,risks}.yml",
-				"projects/<名前>/.ccnavi/config/project/{rules,phases,risks}.yml",
+				".ccnavi/config/{common,project}/{rules,phases,risks,ticket-sections}.yml",
+				"projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml",
 			},
 			patterns: full(
 				`\.ccnavi/config/(?:common|project)/`+reLayer,

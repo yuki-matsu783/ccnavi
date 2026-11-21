@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/config/phases"
+	"ccnavi/internal/tickets/config/sections"
 	"ccnavi/internal/tickets/model/form"
 	"ccnavi/internal/tickets/model/standing"
 	"ccnavi/internal/tickets/model/ticket"
@@ -62,19 +63,24 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 	var batch []*Candidate
 	var rejected []Rejected
 	cache := map[string]*phases.Types{}
+	headings := map[string]form.Sections{}
 	cached := map[string]bool{}
 	var preds approval.Pool
 	fams := standing.NewFamilies(conf, root)
 	mixed := feedbackWithPlanChildren(revisions, pending, openIndex)
 
-	configFor := func(t *ticket.Ticket) *phases.Types {
+	// 定義と見出しはチケットごとにレイヤーが違いうるので、プロジェクトごとに 1 回だけ読む。
+	load := func(t *ticket.Ticket) string {
 		name := ProjectOf(t, pool)
 		if !cached[name] {
 			cache[name] = phases.LoadTypes(conf, root, name)
+			headings[name] = sections.For(conf, root, name)
 			cached[name] = true
 		}
-		return cache[name]
+		return name
 	}
+	configFor := func(t *ticket.Ticket) *phases.Types { return cache[load(t)] }
+	sectionsFor := func(t *ticket.Ticket) form.Sections { return headings[load(t)] }
 
 	// 1. 承認済みの親の改版。通ったものだけを pool に入れ、新規の子の検査が改版後の親を見られるようにする。
 	for _, t := range sortedBy(revisions, func(a, b *ticket.Ticket) int { return strings.Compare(a.ID, b.ID) }) {
@@ -83,7 +89,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 		t.Workflow = phases.Compute(t)
 		types := phases.TypesOf(t)
 		complaints := fieldProblems(t)
-		complaints = append(complaints, form.Problems(t, true)...)
+		complaints = append(complaints, form.Problems(t, true, sectionsFor(t))...)
 		complaints = append(complaints, revisionProblems(conf, root, t, current, cfg)...)
 		complaints = append(complaints, approval.FamilyProblems(conf, root, t, fams)...)
 		complaints = append(complaints, approval.MRProblems(t)...)
@@ -129,7 +135,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 			complaints = append(complaints, phases.ChildlessReady(t, proposed[t.ID])...)
 		}
 		complaints = append(complaints, fieldProblems(t)...)
-		complaints = append(complaints, form.Problems(t, false)...)
+		complaints = append(complaints, form.Problems(t, false, sectionsFor(t))...)
 		complaints = append(complaints, approval.ProjectProblems(t, pool, conf)...)
 		complaints = append(complaints, approval.PlaceProblems(root, conf, t)...)
 		complaints = append(complaints, approval.FamilyProblems(conf, root, t, fams)...)

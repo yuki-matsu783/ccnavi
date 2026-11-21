@@ -169,7 +169,7 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-11-20T23:14:14+0000\"\ncompleted_at: \"2026-11-20T23:14:14+0000\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\nfinished_to: \"review\"\nmerged_sha: \"940ee6e94d9c3089c412e8063245fbfe771c468c\"\nsettled_by: \"chrome\"\n---\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-11-21T00:52:37+0000\"\ncompleted_at: \"2026-11-21T00:52:37+0000\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\nfinished_to: \"review\"\nmerged_sha: \"940ee6e94d9c3089c412e8063245fbfe771c468c\"\nsettled_by: \"chrome\"\n---\n\n本文\n",
       "op": "create",
       "path": ".ccnavi/approved/done/i0001-01-01.md"
      },
@@ -196,11 +196,11 @@
   },
   "request": {
    "compare": {
-    "base": "3e1f1c9592f4825fe9948ac98f485f3ebbf82fcb",
+    "base": "6cc14278acabd9d83abbfdc949181108df4d30a6",
     "files": [
      ".ccnavi/approved/phases/i0001/1.requested"
     ],
-    "head": "cf9e342efb271a3dd534abd86de03c93d7c24a61"
+    "head": "461abb16b44c1fde75f49ab468b5b34fcb6eb943"
    },
    "family": "i0001",
    "op": "confirm",
@@ -220,13 +220,13 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-11-20T23:14:14+0000\"\ncompleted_at: \"\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"3e1f1c9592f4825fe9948ac98f485f3ebbf82fcb\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-11-20T23:14:14+0000\"}",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-11-20T23:14:14+0000\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"940ee6e94d9c3089c412e8063245fbfe771c468c\",\n \"base\": \"64ddeaf7722f27be77198c889acbc65529577372\",\n \"at\": \"2026-11-20T23:14:14+0000\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
-       "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-11-20T23:14:14+0000\"\ncompleted_at: \"2026-11-20T23:14:14+0000\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\nfinished_to: \"review\"\nmerged_sha: \"940ee6e94d9c3089c412e8063245fbfe771c468c\"\n---\n\n本文\n"
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-11-21T00:52:37+0000\"\ncompleted_at: \"\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"6cc14278acabd9d83abbfdc949181108df4d30a6\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-11-21T00:52:38+0000\"}",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-11-21T00:52:37+0000\"\n}\n",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"940ee6e94d9c3089c412e8063245fbfe771c468c\",\n \"base\": \"64ddeaf7722f27be77198c889acbc65529577372\",\n \"at\": \"2026-11-21T00:52:37+0000\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
+       "wip/proposals/review/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-11-21T00:52:37+0000\"\ncompleted_at: \"2026-11-21T00:52:37+0000\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\nfinished_to: \"review\"\nmerged_sha: \"940ee6e94d9c3089c412e8063245fbfe771c468c\"\n---\n\n本文\n"
       },
-      "head": "cf9e342efb271a3dd534abd86de03c93d7c24a61"
+      "head": "461abb16b44c1fde75f49ab468b5b34fcb6eb943"
      },
      "i0001-01-01": {
       "files": {
@@ -275,7 +275,7 @@
    "changes": {
     "i0001": [
      {
-      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n- design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: 2026-11-20T23:14:15+0000\ncompleted_at: ''\nbase_sha: 64ddeaf7722f27be77198c889acbc65529577372\nfeedback: []\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+      "content": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n- design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n- match: Write|Edit\n  glob: src/*\n- match: Write|Edit\n  glob: wip/*\n- match: Write|Edit\n  glob: tests/*\nstarted_at: 2026-11-21T00:52:38+0000\ncompleted_at: ''\nbase_sha: 64ddeaf7722f27be77198c889acbc65529577372\nfeedback: []\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
       "op": "update",
       "path": ".ccnavi/approved/doing/i0001.md"
      },
@@ -311,12 +311,12 @@
     "branches": {
      "i0001": {
       "files": {
-       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-11-20T23:14:15+0000\"\ncompleted_at: \"\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
-       ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-11-20T23:14:15+0000\"\ncompleted_at: \"2026-11-20T23:14:15+0000\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\nfinished_to: \"review\"\nmerged_sha: \"940ee6e94d9c3089c412e8063245fbfe771c468c\"\nsettled_by: \"confirm\"\n---\n\n本文\n",
-       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"6fdeaadfc8afcc1185fac719d7757a32012b7efe\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-11-20T23:14:15+0000\"}",
-       ".ccnavi/approved/phases/i0001/1.reviewed": "{\"mr\": 7, \"accepted\": [], \"at\": \"2026-11-20T23:14:15+0000\"}",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-11-20T23:14:15+0000\"\n}\n",
-       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"940ee6e94d9c3089c412e8063245fbfe771c468c\",\n \"base\": \"64ddeaf7722f27be77198c889acbc65529577372\",\n \"at\": \"2026-11-20T23:14:15+0000\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
+       ".ccnavi/approved/doing/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n  - design\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"2026-11-21T00:52:38+0000\"\ncompleted_at: \"\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n",
+       ".ccnavi/approved/done/i0001-01-01.md": "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\nhuman_review:\n  required: true\n  reason: t\ntitle: 子 i0001-01-01\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"wip/design/*\"\nstarted_at: \"2026-11-21T00:52:38+0000\"\ncompleted_at: \"2026-11-21T00:52:38+0000\"\nbase_sha: \"64ddeaf7722f27be77198c889acbc65529577372\"\nfinished_to: \"review\"\nmerged_sha: \"940ee6e94d9c3089c412e8063245fbfe771c468c\"\nsettled_by: \"confirm\"\n---\n\n本文\n",
+       ".ccnavi/approved/phases/i0001/1.requested": "{\"head\": \"ec7e7a994faad342dca08b8a0d5f33515b5c1a74\", \"mr\": 7, \"url\": \"u/7#1\", \"host\": \"fixture\", \"since\": \"2026-01-01T00:00:00Z\", \"at\": \"2026-11-21T00:52:38+0000\"}",
+       ".ccnavi/approved/phases/i0001/1.reviewed": "{\"mr\": 7, \"accepted\": [], \"at\": \"2026-11-21T00:52:38+0000\"}",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.flow.json": "{\n \"fingerprint\": \"absent\",\n \"path\": \".ccnavi/approved/flows/i0001-01-01.yml\",\n \"at\": \"2026-11-21T00:52:38+0000\"\n}\n",
+       ".ccnavi/approved/phases/i0001/i0001-01-01.risk.json": "{\n \"points\": 0,\n \"level\": \"LOW\",\n \"hits\": [],\n \"unmeasured\": [],\n \"head\": \"940ee6e94d9c3089c412e8063245fbfe771c468c\",\n \"base\": \"64ddeaf7722f27be77198c889acbc65529577372\",\n \"at\": \"2026-11-21T00:52:38+0000\",\n \"summary\": \"1 ファイル、+1 -0 行、削除したファイル 0\"\n}",
        "wip/proposals/todo/i0001.md": "---\nversion: 1\nticket: i0001\nmr: 1\nissue: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: true\n    scope:\n    - wip/design/*\nplan:\n  - design\nfeedback: []\nhuman_review:\n  required: true\n  reason: t\ntitle: 親\nrationale: r\nallow:\n  - match: Write|Edit\n    glob: \"src/*\"\n  - match: Write|Edit\n    glob: \"wip/*\"\n  - match: Write|Edit\n    glob: \"tests/*\"\nstarted_at: \"\"\ncompleted_at: \"\"\nbase_sha: \"\"\n---\n\n## 目的\n\n本文\n\n## 範囲\n\n本文\n\n## 対象外\n\n本文\n\n## 完了の確かめ方\n\n本文\n\n## 計画の理由\n\n本文\n"
       },
       "head": "0000000000000000000000000000000000000000"

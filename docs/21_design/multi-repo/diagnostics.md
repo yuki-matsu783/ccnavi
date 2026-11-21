@@ -67,7 +67,7 @@ VS Code 拡張は同じ warn をプロジェクト画面に出す。
 ターミナルから打つ `user agree` は、承認の対象の一部が外れたら終了コード 4 で終わる（何も置かずに失敗したときは 1）。通ったぶんの承認済みチケットは置き、外れたものは名指しする。`ccnavi-user-agree.sh` は 0 と 4 のどちらでも、この承認で書いたパスをコミットして push し、4 のときは最後に 1 で終わる。
 拡張が子プロセスで打つ `user agree --yes`（10 章）の終了コードは別。
 
-導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml` のひな形を配る。自身のレイヤーの `phases.yml` は配らず、既にあれば触らない。
+導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml` のひな形を配る。自身のレイヤーの `phases.yml` は配らず、既にあれば触らない。
 「まだ無いもの」の点検には、`rules.yml` と `risks.yml` と、共通にも自身のレイヤーにも無い `phases.yml` を数える。
 配布元に共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）があるときは、配布先に無いものも挙げる。配るスキル（工程スキルと配るだけのスキル）の配布先に `SKILL.md` や `references/common/` の `.md` が無いときも、書き込みのあとの点検で挙げる（`--check` は書かないので、配るものを「配る」に並べる）。
 

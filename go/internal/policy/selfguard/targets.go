@@ -119,7 +119,7 @@ func collectPlaces(root, projectsDir, rulesPath string, layers []config.LayerFil
 }
 
 // layerKey はレイヤーのバックアップの key。名前ではなく種別で決める。`projects/common/` が共通レイヤーと同じ key に
-// なると、重なりの排除でその 3 本が保護から外れるため。予約名のプロジェクトとミラーは置き場の前置きを付ける。
+// なると、重なりの排除でその 4 本が保護から外れるため。予約名のプロジェクトとミラーは置き場の前置きを付ける。
 func layerKey(origin config.Origin, layer string, kind config.LayerKind) string {
 	switch {
 	case origin == config.OriginCommon:

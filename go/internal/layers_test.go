@@ -115,7 +115,7 @@ var subTiers = map[string]map[string]int{
 	},
 	// tickets の各パッケージの中。並びはいまの依存のとおり。
 	"tickets/approval": {"marks": 0, "wap": 1},
-	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "check": 2},
+	"tickets/config":   {"layer": 0, "phases": 1, "risk": 1, "sections": 1, "check": 2},
 	"tickets/lifecycle": {
 		"closing": 0, "plan": 0, "treegate": 0, "worktrees": 0,
 		// 0: git が断った理由の 1 文（land と、sh が git refusal で聞く経路が共有する）

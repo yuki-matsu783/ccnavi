@@ -154,7 +154,7 @@ ccnavi の動作に依存する決まりと考え方なので、ワークスペ�
 | 置き場 | 場所 |
 |---|---|
 | プロジェクト | `projects/`（ワークスペースルートの直下。直下で `.git` を持つディレクトリがプロジェクトになる） |
-| ccnavi ディレクトリ | `.ccnavi/`（各 git プロジェクトルートの直下。その下の `config/project/{rules,phases,risks}.yml` が 1 つのレイヤーの 3 本、`config/common/` が共通レイヤー（ミラー）、`scripts/` が配点の `script:` の置き場） |
+| ccnavi ディレクトリ | `.ccnavi/`（各 git プロジェクトルートの直下。その下の `config/project/{rules,phases,risks,ticket-sections}.yml` が 1 つのレイヤーの 4 本、`config/common/` が共通レイヤー（ミラー）、`scripts/` が配点の `script:` の置き場） |
 | 提案 | `wip/proposals/`（各ツリーのルートの直下。そのツリーの git が追跡する） |
 | 承認済みチケットとフェーズのマーカー | `.ccnavi/approved/`（各ツリーのルートの直下。そのツリーの git が追跡し、親チケットのブランチに乗って他の機械へ届く） |
 | 判定の記録 | `logs/decisions.jsonl`（ワークスペースルートの下） |

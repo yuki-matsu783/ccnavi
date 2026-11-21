@@ -14,6 +14,7 @@ import (
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/config/phases"
+	"ccnavi/internal/tickets/config/sections"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/model/place"
 	"ccnavi/internal/tickets/model/ticket"
@@ -181,11 +182,12 @@ func New(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, req 
 	}
 
 	path := proposalPath(conf, where.Root, place.Todo, ident)
+	headings := sections.For(conf, root, where.Project).Parent
 	var text string
 	if u == nil {
-		text = render(ident, title, linear(plan), nil, allow, issue, mr)
+		text = render(ident, title, linear(plan), nil, allow, issue, mr, headings)
 	} else {
-		text = render(ident, title, u.plan, u.feedback, allow, issue, mr)
+		text = render(ident, title, u.plan, u.feedback, allow, issue, mr, headings)
 	}
 	if failed := writeNew(path, []byte(text), path); failed != "" {
 		return refuse(failed)

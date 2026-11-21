@@ -15,6 +15,7 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/tickets/approval"
+	"ccnavi/internal/tickets/config/sections"
 )
 
 const (
@@ -152,7 +153,7 @@ func stopReviewMaterial(stdout io.Writer, conf *config.Settings, store stoprevie
 		return writeNotCandidate(stdout, string(status)), nil
 	}
 	// 計画が候補になったら、判定の基準と、このターンの会話から材料を組む。
-	criteria := stopreview.LoadCriteria(root)
+	criteria := sections.StopCriteria(conf, root)
 	material, err := stopreview.TurnMaterial(transcript)
 	if err != nil {
 		return 0, err
@@ -230,7 +231,7 @@ func stopReviewRecord(in *input, stdout io.Writer, conf *config.Settings, store 
 	if err != nil {
 		result = nil
 	}
-	criteria := stopreview.LoadCriteria(root)
+	criteria := sections.StopCriteria(conf, root)
 	plan, _ := store.ReadPlan(key)
 	idents := map[string]string{}
 	for _, p := range plan.Proposals {
