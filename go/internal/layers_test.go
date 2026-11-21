@@ -152,10 +152,10 @@ var subTiers = map[string]map[string]int{
 		"base": 0,
 		// 1: 実行ファイルの組み立て・GitLab の模擬・見本の組み立て
 		"exe": 1, "fakegitlab": 1, "samples": 1,
-		// 2: 実行ファイルを起こす・PATH のスタブ・ホストの fixture・claude の台本スタブ・契約の形
-		"run": 2, "hoststub": 2, "hostfixture": 2, "fakeclaude": 2, "contractshape": 2,
-		// 3: 組み立ての写し・受入シナリオの実行器の部品
-		"treecache": 3, "scenario": 3,
+		// 2: 実行ファイルを起こす・PATH のスタブ・claude の台本スタブ・契約の形
+		"run": 2, "hoststub": 2, "fakeclaude": 2, "contractshape": 2,
+		// 3: 組み立ての写し・受入シナリオの実行器の部品・ホストの fixture（PATH のスタブの置き方は hoststub を使う）
+		"treecache": 3, "scenario": 3, "hostfixture": 3,
 		// 4: 入口（main）
 		"cmd": 4,
 	},
