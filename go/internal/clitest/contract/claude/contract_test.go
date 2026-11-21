@@ -118,7 +118,12 @@ func TestFakeClaudeMatchesTheRecording(t *testing.T) {
 				}
 			}
 			for _, field := range responseReads[key] {
-				if _, ok := got.Keys["tool_response"].Keys[field]; !ok {
+				tr := got.Keys["tool_response"]
+				if tr == nil {
+					problems = append(problems, key+".tool_response."+field+": スタブに無い")
+					continue
+				}
+				if _, ok := tr.Keys[field]; !ok {
 					problems = append(problems, key+".tool_response."+field+": スタブに無い")
 				}
 			}

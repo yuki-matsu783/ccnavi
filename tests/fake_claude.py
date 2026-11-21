@@ -2,9 +2,9 @@
 stream-json を出す。
 
 受入シナリオを `--agent script` で回すとき、実行器（`tests/scenarios/drive.py`）が
-`claude` の代わりに起こす。仕様は `.agents/docs/claude-contract.md`。形が本物と合っていることは
-`go/internal/clitest/contract/claude/contract_test.go` が、本物から録った
-`tests/contract/claude/recorded.json` と比べて確かめる。
+`claude` の代わりに起こす。仕様は `.agents/docs/claude-contract.md`。
+形の検査は無い（Go に移した模擬 `go/internal/harness/fakeclaude` の側で
+`go/internal/clitest/contract/claude` が確かめる。これは SC1 が移すまでの Python 版）。
 
     python -m tests.fake_claude -p <prompt> --output-format stream-json --verbose \\
         --include-hook-events --session-id <id>      （実行器が渡す引数と同じ）
