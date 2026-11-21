@@ -14,7 +14,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// Version は ccnavi の版。版の置き場はここだけ。
+// Version は ccnavi の版。Go が使う版はここだけ（pyproject.toml の version は uv のための値で、揃えない）。
 const Version = "0.1.0"
 
 // Compat は実行ファイルと sh・拡張の契約の版。呼ぶ側が頼っているフラグや出力の形を、呼ぶ側を直さないと動かない形に
