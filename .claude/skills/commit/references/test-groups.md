@@ -25,7 +25,7 @@ keywords: [テスト, go test, clitest, harness, contract, scenarios, e2e]
 
 ```sh
 cd go && go test ./...        # 全件
-cd go && go test ./internal/clitest/sh/stage/   # 1 パッケージ
+cd go && go test ./internal/clitest/sh/git/   # 1 パッケージ
 ```
 
 理由と手順は[テストを回す](../../../../.agents/docs/testing.md)。
@@ -42,19 +42,15 @@ cd go && go test ./internal/clitest/sh/stage/   # 1 パッケージ
 |---|---|
 | `scripts/ccnavi-build.sh` | `go test ./internal/clitest/core/`（`build_test.go`）`go test ./internal/clitest/e2e/` |
 | `.ccnavi/scripts/` の sh・`scripts/ccnavi-setup.sh`、sh が実行ファイルに聞く部品（`go/internal/tickets/lifecycle/` ほか） | `go test ./internal/clitest/sh/... ./internal/clitest/e2e/` |
-| `.claude/hooks/`（`test-go.sh`・`lint-go.sh`・`mark-ext.sh`・`test-ext.sh`） | `go test ./internal/clitest/repo/ ./internal/clitest/e2e/` |
+| `.claude/hooks/`（`test-go.sh`・`lint-go.sh`・`mark-ext.sh`・`test-ext.sh`） | `go test ./internal/clitest/core/`（`devhooks_test.go`）`go test ./internal/clitest/repo/ ./internal/clitest/e2e/` |
 | `.claude/hooks/check-adr.sh` | `go test ./internal/clitest/core/`（`checkadrhook_test.go`） |
 | `go/internal/harness/hostfixture`・`hoststub`・`fakegitlab`・`fakeclaude`・`tests/contract/` | `go test ./internal/clitest/contract/... ./internal/harness/...` |
 | `go/internal/harness/`・`tests/scenarios/`（受入シナリオの実行器・スタブ・シナリオの yml） | `go test ./internal/harness/... ./internal/clitest/scenarios/` |
 | `extensions/vscode/` | `go test ./internal/clitest/core/`（`testjson_test.go`）。拡張の分は下 |
+| `extensions/vscode/ccnavi-board/scripts/test-groups.js` | その `pnpm test`（`test/shared/test-groups.test.ts`） |
 | `extensions/chrome/ccnavi-approval/` | その `pnpm test`（下） |
 | `docs/30_adr/`・`docs/30_adr.md`（枚を足す・番号を動かす） | `go test ./internal/clitest/repo/`（`adr_numbers_test.go`） |
 | そのほかのドキュメントだけ（`*.md`・`docs/`） | 回さない |
-
-自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:
-
-- `.claude/hooks/lint-go.sh`
-- `.claude/hooks/test-go.sh` の差し戻しの回数の上限
 
 統合先に取り込む前・MR に出す前は、`go test ./...` を全件回す。
 

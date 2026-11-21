@@ -23,7 +23,7 @@ keywords: [テスト, スタブ, STUB, 操作記録, 全件, go test, パッケ�
 
 ### 回す単位は、変えたパッケージまで絞る
 
-最初は、変えたパッケージだけを回す（`go test ./internal/clitest/sh/stage/`、`go test ./internal/policy/rules/ -run TestX`）。通ったら、近いパッケージ、`./internal/clitest/...`、全件の順に広げる。広げる目安は、hook の判定や共通の関数のように、変えた動きが呼び出し元の多い所に及ぶとき。
+最初は、変えたパッケージだけを回す（`go test ./internal/clitest/sh/git/`、`go test ./internal/policy/rules/ -run TestX`）。通ったら、近いパッケージ、`./internal/clitest/...`、全件の順に広げる。広げる目安は、hook の判定や共通の関数のように、変えた動きが呼び出し元の多い所に及ぶとき。
 
 clitest のテストは、本物の git のリポジトリを一時的に作り、本物のシェルを起動して確かめる。1本ごとに数秒かかるものがあり、数が増えると合計が伸びる。同じ木の鍵を直列に待つパッケージ（`clitest/ticket/life`）は 40〜60 秒かかる。
 

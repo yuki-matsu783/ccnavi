@@ -16,7 +16,7 @@ keywords: [実画面, code-server, 日本語, ユーザ目線, 画面確認, Chr
 
 動かした環境はLinux（クラウドのコンテナ、root）で、外へ出られるのはnpmのレジストリだけだった。
 VS Code本体の配布元、GitHubのリリース、Open VSXは403で、`code`や`@vscode/test-electron`は使えない。
-そのためVS Codeはnpmの`code-server`（ブラウザで開くVS Code）で代える。手順はLinuxで動かした。macOSやGit Bashでは、`setsid`・`disown`・`python3`を読み替える（未確認）。
+そのためVS Codeはnpmの`code-server`（ブラウザで開くVS Code）で代える。手順はLinuxで動かした。macOSやGit Bashでは、`setsid`・`disown`を読み替える（未確認）。
 
 `code-server`と`playwright`が環境に入っていれば（`command -v code-server`、`playwright --version`）、それを使う。無ければ [1.0](#10-道具があるか確かめる)で入れる。入っていれば、1.5のcode-serverの取得は要らない。
 
@@ -162,7 +162,7 @@ npm install code-server --ignore-scripts --no-audit --no-fund
 VER=$(node -p "require('$BOARD/package.json').version")
 VSIX="$CCNAVI/dist/ccnavi-board-$VER.vsix"
 rm -rf "$W/x" "$W/ext" && mkdir -p "$W/x" "$W/ext" "$W/ud/User"
-python3 -m zipfile -e "$VSIX" "$W/x"
+unzip -q "$VSIX" -d "$W/x"
 cp -r "$W/x/extension" "$W/ext/local.ccnavi-board-$VER"
 echo '{"workbench.startupEditor":"none","security.workspace.trust.enabled":false,"telemetry.telemetryLevel":"off","update.mode":"none","extensions.autoCheckUpdates":false,"workbench.tips.enabled":false}' > "$W/ud/User/settings.json"
 ```
@@ -266,7 +266,7 @@ fs.writeFileSync(path.join(ud, "languagepacks.json"), JSON.stringify({ ja: { has
 | 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる。ツアーは globalState に記録されるので、`--user-data-dir`を作り直すと毎回初回になる | 案内の × を1回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js`の`skipTour`）。表示が出ない画面もあるので、あるときだけ閉じる形にする |
 | `npm install code-server`が`sh ./postinstall.sh`で失敗する（rootでは`--unsafe-perm`を要求される） | postinstallがネイティブモジュールをビルドする。`--unsafe-perm`を付けても`kerberos`のnode-gypが失敗する | `--ignore-scripts`で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
 | code-serverに繋ぐと500で`Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts`では、`lib/vscode/`の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
-| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性）。言語パックは同じCLIで入った（1.7） | vsixを`python3 -m zipfile -e`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
+| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性）。言語パックは同じCLIで入った（1.7） | vsixを`unzip`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
 | `pkill -f code-server/out/node/entry.js`を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード144） | `pkill -f`が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill`する。起動は`setsid nohup … < /dev/null & disown` |
 | Playwrightが`strict mode violation`（同じplaceholderの入力欄が16個）や`element is not visible`で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]`や`textarea.f-message:visible`のように、空の値・見えているものに絞る |
 | 画面を開いた直後に撮ると、中身が空や古い | webviewは拡張が中身を渡すまで読み込み中 | 開いてから5秒待つ。ボードは`ccnavi --explain --json`を呼ぶので、遅いときは増やす |

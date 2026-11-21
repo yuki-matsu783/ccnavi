@@ -45,7 +45,7 @@ ccnavi 自身を開発する人向けの入口である。使う人向けの手�
 ```sh
 sh scripts/ccnavi-build.sh                         # 実行ファイルの組み立て（--target <os>-<arch> で別の機械向け）
 cd go && gofmt -l . && go vet ./... && go test ./...  # 整形・検査・テスト全件
-cd go && go test ./internal/clitest/sh/stage/      # 1 パッケージ
+cd go && go test ./internal/clitest/sh/git/      # 1 パッケージ
 ```
 
 - git の入口（`.ccnavi/scripts/ccnavi-git.sh`）は、実行ファイルに引数の形を確かめさせる。組み立てる前は使えないので、新しい環境（Claude Code on the web など）では最初に `sh scripts/ccnavi-build.sh` を打つ。`go/` を変えたら組み立て直す（`.ccnavi/bin/` の実行ファイルは、組み立てたときの判定のまま）
@@ -84,4 +84,4 @@ echo '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command"
 | `README.md`・`AGENTS.md`・`CLAUDE.md` | 利用者向けの入口、開発者のエージェント向けの決まり、`AGENTS.md` を読み込ませる 1 行 |
 | `wip/` | 作業ブランチで使う下書きの置き場。main には入れない（`.github` の CI と `scripts/ccnavi-check-no-wip.sh` が、main へ入れる PR の差分を見る） |
 
-git 管理外のもの: `dist/`・`build/`・`go/ccnavi`（組み立ての出力）、`logs/`（記録。絶対パスとコマンド全文が入るのでコミットしない）、`knowledge/`（参照専用の資料。Claude Code の hook にまつわる実測）、`.venv/`、`projects/`、`scratchpad/`。
+git 管理外のもの: `dist/`・`build/`・`go/ccnavi`（組み立ての出力）、`logs/`（記録。絶対パスとコマンド全文が入るのでコミットしない）、`knowledge/`（参照専用の資料。Claude Code の hook にまつわる実測）、`projects/`、`scratchpad/`。
