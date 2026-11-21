@@ -153,7 +153,7 @@ class ManualSettleTest(PhaseHarness):
         for label, thread, word in (
             ("移動の後の指摘", _thread(created_at=FUTURE), "移動の後に付いた指摘"),
             ("移動の後の返信", _thread(last_at=FUTURE, last_id="c9"), "移動の後に付いた指摘"),
-            ("時刻を読めない指摘", _thread(created_at=""), ""),
+            ("時刻を読めない指摘", _thread(created_at=""), "時刻を読めない指摘"),
         ):
             with self.subTest(label):
                 refused = self.confirm(self.result([thread]), 1)

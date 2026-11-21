@@ -34,10 +34,6 @@ def load_tests(loader, tests, pattern):
     return suite
 
 
-# 実行中のサブエージェントの印を、古いと数えるまでの長さ（既定の 4 時間）。
-RUNNING_MAX_SECONDS = 4 * 3600
-
-
 def nudge_path(state: str, session: str) -> str:
     """促した（チケット, HEAD）の記録。セッションごとに置く。"""
     return os.path.join(state, f"nudged-{session}.json")

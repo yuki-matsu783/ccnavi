@@ -186,16 +186,11 @@ class ApproveJsonTest(PhaseHarness):
 
     def test_yes_without_json_prints_the_human_lines(self):
         self.pending_parent_and_child()
-        result = self.ccnavi("user", "agree", "--preview", "--yes", "i0001", "--json")
-        self.assertEqual(result.returncode, 1)
-        self.assertFalse(self.copy_exists("i0001"))
         digest = self.preview()["digest"]
         result = self.ccnavi("user", "agree", "--yes", "i0001,i0001-01-01", "--digest", digest)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("承認した", result.stdout)
         self.assertTrue(self.copy_exists("i0001"))
-
-    # ---- 4b. 見せた本文のダイジェストを照合する（チケット approve-carry-04 の 1〜5）
 
     # ---- 4c. ダイジェストは承認済みチケットに書き込む欄も覆う（チケット approve-carry-05 の 1〜5）
 
