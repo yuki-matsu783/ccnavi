@@ -271,7 +271,8 @@ class CopyDestinationTest(GuardHarness):
 
     行き先は `-t <dir>` / `--target-directory` の値か、選択肢でない最後の引数。元の側に
     出ただけの守る場所は読まれるだけなので止めず、行き先になる形は書き方を変えても止める。
-    形ごとの表は Go の go/internal/hook/judge/shell_guard_test.go に移した。ここには hook を通した 1 本だけを残す。
+    形ごとの表は Go の go/internal/hook/judge/shell_guard_test.go に移した。
+    ここには hook を通した 1 本だけを残す。
     """
 
     def assert_not_guarded(self, command):
