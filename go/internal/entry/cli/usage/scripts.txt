@@ -289,7 +289,7 @@ ccnavi-review.sh decide N --preview が呼び、エージェントも実行で�
 
 人が親を早期にクローズする（「今のところ十分」とする）には、次を実行します。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-user-close-early.sh --reason <why>
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-close-early.sh --parent <parent> --reason <why>
 
 `ccnavi --entry sh user close-early --reason <why> --result <json>` を実行した後、
 マージリクエストのDraftを解除し、残った項目を新しいissueとして登録します。

@@ -182,7 +182,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "  printf 'tree %s\\n' \"$tree\"\n"
             f"  printf 'wip-from {head}\\nwip {WIP_NOTE}\\n'\n"
             # 報告の文は実行ファイルが組み、sh は成功のあとにそのまま出す
-            f"  printf 'say wip/ の追跡済みのファイルを削除しました（1 件。削除する前のコミット {head[:12]} から戻せる）:\\n'\n"
+            "  printf 'say wip/ の追跡済みのファイルを削除しました（1 件。"
+            f"削除する前のコミット {head[:12]} から戻せる）:\\n'\n"
             f"  printf 'say   {WIP_NOTE}\\n'\n"
             "  exit 0 ;;\n"
             "esac\n"
@@ -258,8 +259,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         first = self.review("review-request", "--phase", "1", "--body-file", body, HALF_FAIL=once)
         self.assertNotEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertEqual(len(Host.notes), 1)
-        # 投稿の後、送れたかを書く前に落ちた形にする（段階を unknown に戻す）。打ち直しは、目印で見つけた投稿を
-        # `ops mark-sent` で送り済みに直す。
+        # 投稿の後、送れたかを書く前に落ちた形にする（段階を unknown に戻す）。
+        # 打ち直しは、目印で見つけた投稿を `ops mark-sent` で送り済みに直す。
         pending = self.exe("ops", "pending")
         self.assertEqual(pending.returncode, 0, pending.stderr)
         self.assertEqual(pending.stdout, "")
@@ -303,7 +304,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
             "  printf '{}' >\"$tree/.ccnavi/approved/phases/i0001/1.reviewed\"\n"
             "  printf '.ccnavi/approved/phases/i0001/1.reviewed\\n' >\"$list\"\n"
             '  prev=""; for a in "$@"; do\n'
-            '    [ "$prev" = --accept-done ] && dp="$a"; [ "$prev" = --root ] && r="$a"; prev="$a"; done\n'
+            '    [ "$prev" = --accept-done ] && dp="$a"; '
+            '[ "$prev" = --root ] && r="$a"; prev="$a"; done\n'
             '  op=$(sed -n \'s/.*"op": "\\([0-9a-f]*\\)".*/\\1/p\' "$dp")\n'
             f'  [ -z "$op" ] || \'{exe.sh_path()}\' --root "$r" ops applied "$op" local true\n'
             '  printf \'{"version":1,"ok":true}\\n\'; exit 0 ;;\n'
@@ -317,9 +319,41 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         self.carried(f"{APPROVED}/phases/{PARENT}/1.reviewed")
 
     def test_close_early_hands_over_to_the_carrier(self):
-        closed = self.review("--reason", "r", "--no-issue", script="ccnavi-user-close-early.sh")
+        # 親は --parent で受ける。ワークスペースルート（統合先のブランチ）から打っても、
+        # その親を閉じる。
+        closed = self.review(
+            "--parent",
+            PARENT,
+            "--reason",
+            "r",
+            "--no-issue",
+            script="ccnavi-user-close-early.sh",
+            cwd=self.ws,
+        )
         self.assertEqual(closed.returncode, 0, closed.stdout + closed.stderr)
         self.carried(f"{APPROVED}/phases/{PARENT}/2.skipped")
+
+    def test_close_early_without_a_parent_stops_before_the_host(self):
+        log = os.path.join(self._base, "calls.log")
+        logging = executable(
+            os.path.join(self._base, "bin", "logging"),
+            f"#!/bin/sh\nprintf '%s\\n' \"$*\" >>'{log}'\nexec '{self.half}' \"$@\"\n",
+        )
+        before = self.committed()
+        closed = self.review(
+            "--reason", "r", script="ccnavi-user-close-early.sh", CCNAVI_ENTRY_PATH=logging
+        )
+        self.assertEqual(closed.returncode, 2, closed.stdout + closed.stderr)
+        self.assertIn("--parent <親の識別子> が必要です", closed.stderr)
+        # 親のワークツリーの中なら、案内に親の識別子を埋める
+        self.assertIn(f"--parent {PARENT} --reason 'r'", closed.stderr)
+        calls = ""
+        if os.path.exists(log):
+            with open(log, encoding="utf-8") as f:
+                calls = f.read()
+        self.assertNotIn("close-early", calls)
+        self.assertEqual([], Host.notes)
+        self.assertEqual(before, self.committed())
 
     def test_close_early_refuses_first_when_the_family_cannot_be_written(self):
         log = os.path.join(self._base, "calls.log")
@@ -334,6 +368,8 @@ class WriteAndPushHostTest(WriteAndPushHostHarness):
         )
         before = self.committed()
         closed = self.review(
+            "--parent",
+            PARENT,
             "--reason",
             "r",
             script="ccnavi-user-close-early.sh",

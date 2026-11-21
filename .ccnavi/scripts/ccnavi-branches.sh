@@ -86,7 +86,7 @@ esac
 [ "${#number}" -le 9 ] || fail bad-number "番号が長すぎます（${number}）。" 2
 
 root=$(ccnavi_workspace) ||
-	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
+	fail no-workspace "$(ccnavi_no_workspace_text)" 2
 ccnavi_log_root="$root"
 here="$(pwd -W 2>/dev/null || pwd)"
 git rev-parse --show-toplevel >/dev/null 2>&1 ||

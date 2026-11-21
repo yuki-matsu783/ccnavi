@@ -25,7 +25,9 @@ def put_scripts(root):
     for name in common_sh(SH_SCRIPTS):
         shutil.copy(os.path.join(SH_SCRIPTS, name), dest)
     with open(os.path.join(dest, "probe.sh"), "w", encoding="utf-8", newline="\n") as f:
-        f.write('. "$(dirname "$0")/ccnavi-common.sh"\nccnavi_workspace\n')
+        f.write(
+            '. "$(dirname "$0")/ccnavi-common.sh"\nccnavi_workspace || ccnavi_no_workspace probe\n'
+        )
     return os.path.join(dest, "probe.sh")
 
 
@@ -81,6 +83,22 @@ class WorkspaceRootIsNotAProjectCopy(unittest.TestCase):
         os.makedirs(other)
         put_scripts(other)
         self.assertEqual(self.root_from(self.script, other), os.path.realpath(other))
+
+    def test_a_removed_cwd_stops_with_the_cd_to_the_root(self):
+        # ready が親のワークツリーを消したあと、ターミナルが消えたディレクトリに残る形。
+        # 根は返さず、スクリプトの置き場から見つけた根へ cd する 1 行を出して止まる。
+        gone = os.path.join(self.ws, "gone")
+        os.makedirs(gone)
+        self.addCleanup(shutil.rmtree, gone, ignore_errors=True)
+        env = {k: v for k, v in os.environ.items() if k != "CCNAVI_WORKSPACE"}
+        probe = f"cd '{gone}' && rmdir '{gone}' && exec '{SHELL}' '{self.script}'"
+        result = subprocess.run(
+            [SHELL, "-c", probe], env=env, capture_output=True, text=True, check=False
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("消えています", result.stderr)
+        self.assertIn(f"cd '{self.ws}'", result.stderr)
 
 
 if __name__ == "__main__":
