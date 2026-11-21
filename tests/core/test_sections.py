@@ -1,16 +1,11 @@
-"""3 つのタイプと権限モードへの委譲の受入テスト。道具を外から呼んで応答だけを見る。
+"""どのルールも言及しない呼び出しが確認になることの受入テスト。道具を外から呼んで応答だけを見る。
 
-見るのは 4 つ。
+ルールが置いた確認と権限モードへの委譲は区別して返す。委譲は設定の穴に起因するので、穴が直るまで同じ問いが
+繰り返される。ルールが置いた確認はユーザが置いた確認ポイントで、繰り返されること自体に価値がある。
+混ぜると前者の数に後者が埋もれる。
 
-1. 強さの順が deny > ルールが置いた確認 > allow > 権限モードへの委譲であること
-2. どのルールも言及しない呼び出しが確認になること
-3. ルールが置いた確認と権限モードへの委譲が区別して返ること
-4. ルールがチケットより強いこと
-
-3 つ目が要る理由は次のとおり。権限モードへの委譲は設定の穴に起因するので、
-穴が直るまで同じ問いが繰り返される。ルールが置いた確認はユーザが意図して置いた
-確認ポイントで、繰り返されること自体に価値がある。混ぜると前者の数に
-後者が埋もれる。
+強さの順（deny > ask > allow）と読み切れないコマンドの扱いは Go（go/internal/hook/judge の sections_test.go）に
+移した。ここには、実行ファイルを通した 1 本だけを残す。
 """
 
 from __future__ import annotations
@@ -99,59 +94,6 @@ class SectionsTest(unittest.TestCase):
         self.assertIn("not a warning about the call itself", reason["permissionDecisionReason"])
         # 繰り返しを止める先はルールの側。そこを言わないと同じ問いが出続ける。
         self.assertIn("allow section", reason["permissionDecisionReason"])
-
-    def test_タイプの強さは_deny_ask_allow_の順(self):
-        # 1 つのルールファイルに全部置き、呼び出しごとに強さを見る。
-        self.rules(
-            deny=[
-                rule("a", "Bash", "*git push*", message="拒否の文面"),
-                rule("b", "Bash", "* origin *", message="拒否の文面 2 つ目"),
-                rule("secrets", "Write", "*/secrets/*", message="止めます"),
-            ],
-            ask=[
-                rule("g", "Bash", "*git *", message="確認の文面"),
-                rule("everything", "Write", "*/secrets/*", message="聞きます"),
-                rule("migrations", "Write", "*/migrations/*", message="ユーザが中身を見ます"),
-            ],
-            allow=[
-                rule("ls", "Bash", "*ls *", message=""),
-                rule("c", "Bash", "*", message=""),
-                rule("anything", "Write", "*", message=""),
-            ],
-        )
-
-        # allow にヒットすれば通る。
-        self.assertNotIn("permissionDecision", self.judge("Bash", "ls -la"))
-        # ルールが置いた確認は未言及と区別して返り、ユーザが置いた文面が届く。
-        asked = self.judge("Write", os.path.join(self.root, "migrations", "0001.sql"))
-        self.assertEqual(asked.get("permissionDecision"), "ask")
-        self.assertIn("RULE_ASK", asked["permissionDecisionReason"])
-        self.assertIn("ユーザが中身を見ます", asked["permissionDecisionReason"])
-        # deny が明示的な ask より強い。弱い側の文面は返さない。
-        denied = self.judge("Write", os.path.join(self.root, "secrets", "x.txt"))
-        self.assertEqual(denied.get("permissionDecision"), "deny")
-        self.assertIn("止めます", denied["permissionDecisionReason"])
-        self.assertNotIn("聞きます", denied["permissionDecisionReason"])
-        # タイプをまたいでヒットしても強いほうだけ。同じタイプなら全部返す
-        # （どれか 1 つを選ぶと、選ばれなかったルールの言い分は誰にも届かない）。
-        reason = self.judge("Bash", "git push origin main")["permissionDecisionReason"]
-        self.assertIn("拒否の文面", reason)
-        self.assertIn("拒否の文面 2 つ目", reason)
-        self.assertNotIn("確認の文面", reason)
-
-    def test_読み切れないコマンドは確認になり_実行される部分が無いコマンドは何も返さない(self):
-        # 対象を確定できなかっただけで、禁じられたことをしたわけではない。
-        # コメントだけの行は、何も走らないのでユーザに聞く意味が無い。
-        self.rules(
-            deny=[rule("push", "Bash", "*git push*")],
-            allow=[rule("anything", "Bash", "*", message="")],
-        )
-
-        out = self.judge("Bash", "cat <<'EOF'\nhello\n")
-
-        self.assertEqual(out.get("permissionDecision"), "ask")
-        self.assertIn("PARSE_UNCERTAIN", out["permissionDecisionReason"])
-        self.assertEqual(self.judge("Bash", "# git push origin main"), {})
 
 
 if __name__ == "__main__":
