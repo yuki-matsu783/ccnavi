@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-sync.sh の受入テスト。
@@ -58,7 +59,7 @@ func TestSyncAndCommonStateDoNotParseFrontmatter(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			var code []string
-			for _, line := range strings.Split(read(t, filepath.Join(base.ScriptsDir(), name)), "\n") {
+			for _, line := range strings.Split(shkit.Read(t, filepath.Join(base.ScriptsDir(), name)), "\n") {
 				if !strings.HasPrefix(strings.TrimLeft(line, " \t"), "#") {
 					code = append(code, line)
 				}
@@ -85,14 +86,14 @@ type syncEnv struct {
 
 func newSync(t testing.TB) *syncEnv {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	s := &syncEnv{t: t, dir: base.TempDir(t)}
 	s.ws = filepath.Join(s.dir, "ws")
-	s.scripts = copyScripts(t, s.ws, "ccnavi-sync.sh", "ccnavi-git.sh")
+	s.scripts = shkit.CopyScripts(t, s.ws, "ccnavi-sync.sh", "ccnavi-git.sh")
 	git(t, s.dir, "init", "-q", "-b", "main", s.ws)
-	identity(t, s.ws)
-	write(t, filepath.Join(s.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
-	write(t, filepath.Join(s.ws, "README.md"), "seed\n")
+	shkit.Identity(t, s.ws)
+	shkit.Write(t, filepath.Join(s.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
+	shkit.Write(t, filepath.Join(s.ws, "README.md"), "seed\n")
 	git(t, s.ws, "add", "--", ".gitignore", "README.md")
 	git(t, s.ws, "commit", "-q", "-m", "seed")
 	s.remote = filepath.Join(s.dir, "origin.git")
@@ -116,10 +117,10 @@ func (s *syncEnv) parentTree(name string, push, approved bool) string {
 	var rel string
 	if approved {
 		rel = ".ccnavi/approved/doing/" + name + ".md"
-		write(s.t, filepath.Join(tree, rel), strings.Replace(syncCopyText("", "42"), "ticket: "+syncParent, "ticket: "+name, 1))
+		shkit.Write(s.t, filepath.Join(tree, rel), strings.Replace(syncCopyText("", "42"), "ticket: "+syncParent, "ticket: "+name, 1))
 	} else {
 		rel = "wip/proposals/todo/" + name + ".md"
-		write(s.t, filepath.Join(tree, rel), "---\nversion: 1\nticket: "+name+"\nmr: 42\n---\n")
+		shkit.Write(s.t, filepath.Join(tree, rel), "---\nversion: 1\nticket: "+name+"\nmr: 42\n---\n")
 	}
 	git(s.t, tree, "add", "--", rel)
 	git(s.t, tree, "commit", "-q", "-m", "copy")
@@ -136,7 +137,7 @@ func (s *syncEnv) addRefDifferingOnlyInCase(existing, added string) {
 	s.t.Helper()
 	git(s.t, s.dir, "--git-dir", s.remote, "pack-refs", "--all", "--prune")
 	packed := filepath.Join(s.remote, "packed-refs")
-	lines := strings.Split(strings.TrimRight(read(s.t, packed), "\n"), "\n")
+	lines := strings.Split(strings.TrimRight(shkit.Read(s.t, packed), "\n"), "\n")
 	var shaOf string
 	var header, refs []string
 	for _, ln := range lines {
@@ -158,7 +159,7 @@ func (s *syncEnv) addRefDifferingOnlyInCase(existing, added string) {
 	sort.Slice(refs, func(i, j int) bool { // packed-refs は ref 名のバイト順に並ぶ
 		return strings.SplitN(refs[i], " ", 2)[1] < strings.SplitN(refs[j], " ", 2)[1]
 	})
-	write(s.t, packed, strings.Join(append(header, refs...), "\n")+"\n")
+	shkit.Write(s.t, packed, strings.Join(append(header, refs...), "\n")+"\n")
 	names := strings.Fields(git(s.t, s.dir, "--git-dir", s.remote, "for-each-ref", "--format=%(refname)"))
 	truth(s.t, contains(names, "refs/heads/"+existing) && contains(names, "refs/heads/"+added), "綴り違いの ref を並べられなかった")
 }
@@ -167,9 +168,9 @@ func (s *syncEnv) addRefDifferingOnlyInCase(existing, added string) {
 func (s *syncEnv) pusher() string {
 	s.t.Helper()
 	path := filepath.Join(s.dir, "pusher")
-	if !isDir(path) {
+	if !shkit.IsDir(path) {
 		git(s.t, s.dir, "clone", "-q", s.remote, path)
-		identity(s.t, path)
+		shkit.Identity(s.t, path)
 	}
 	git(s.t, path, "fetch", "-q", "--prune", "origin")
 	return path
@@ -180,7 +181,7 @@ func (s *syncEnv) remoteCommit(branch, rel, text string) string {
 	s.t.Helper()
 	path := s.pusher()
 	git(s.t, path, "checkout", "-q", "-B", branch, "origin/"+branch)
-	write(s.t, filepath.Join(path, rel), text)
+	shkit.Write(s.t, filepath.Join(path, rel), text)
 	git(s.t, path, "add", "--", rel)
 	git(s.t, path, "commit", "-q", "-m", "remote "+rel)
 	git(s.t, path, "push", "-q", "origin", branch)
@@ -199,7 +200,7 @@ func (s *syncEnv) localCommit(rel, text string) string {
 
 func (s *syncEnv) localCommitIn(tree, rel, text string) string {
 	s.t.Helper()
-	write(s.t, filepath.Join(tree, rel), text)
+	shkit.Write(s.t, filepath.Join(tree, rel), text)
 	git(s.t, tree, "add", "--", rel)
 	git(s.t, tree, "commit", "-q", "-m", "local "+rel)
 	return sha(s.t, tree, "HEAD")
@@ -212,23 +213,23 @@ func (s *syncEnv) reviewSays(text string, code int) {
 	if text != "" {
 		body = "#!/bin/sh\n[ \"$1\" = merged ] || exit 2\nprintf \"%s\\n\" \"" + text + "\"\nexit " + strconv.Itoa(code) + "\n"
 	}
-	write(s.t, filepath.Join(s.scripts, "ccnavi-review.sh"), body)
+	shkit.Write(s.t, filepath.Join(s.scripts, "ccnavi-review.sh"), body)
 }
 
 // reviewLog は答えを決めた ccnavi-review.sh のスタブ。呼ばれた引数を 1 行ずつ残す。残す先を返す。
 func (s *syncEnv) reviewLog(answer string) string {
 	s.t.Helper()
 	log := filepath.Join(s.dir, "review-args")
-	write(s.t, filepath.Join(s.scripts, "ccnavi-review.sh"),
-		"#!/bin/sh\nprintf \"%s\\n\" \"$*\" >>'"+slash(log)+"'\nprintf \"%s\\n\" \""+answer+"\"\n")
+	shkit.Write(s.t, filepath.Join(s.scripts, "ccnavi-review.sh"),
+		"#!/bin/sh\nprintf \"%s\\n\" \"$*\" >>'"+shkit.Slash(log)+"'\nprintf \"%s\\n\" \""+answer+"\"\n")
 	return log
 }
 
 // sourceExe はソースの実行ファイルを起こすもの。launcher とは別の置き場（上書きし合わない）。
 func (s *syncEnv) sourceExe() string {
 	path := filepath.Join(s.dir, "source-bin", "ccnavi")
-	if !exists(path) {
-		exeWrapper(s.t, filepath.Dir(path))
+	if !shkit.Exists(path) {
+		shkit.ExeWrapper(s.t, filepath.Dir(path))
 	}
 	return path
 }
@@ -236,9 +237,9 @@ func (s *syncEnv) sourceExe() string {
 func (s *syncEnv) launcher(body string) string {
 	s.t.Helper()
 	if body == "" {
-		return exeWrapper(s.t, filepath.Join(s.dir, "bin"))
+		return shkit.ExeWrapper(s.t, filepath.Join(s.dir, "bin"))
 	}
-	return writeExec(s.t, filepath.Join(s.dir, "bin", "ccnavi"), body)
+	return shkit.WriteExec(s.t, filepath.Join(s.dir, "bin", "ccnavi"), body)
 }
 
 func (s *syncEnv) env(extra map[string]string) map[string]string {
@@ -266,7 +267,7 @@ func (s *syncEnv) retireRecord(mr int, branch string) string {
 	if err != nil {
 		s.t.Fatal(err)
 	}
-	return write(s.t, filepath.Join(s.retireDir, syncParent+".json"), string(text)+"\n")
+	return shkit.Write(s.t, filepath.Join(s.retireDir, syncParent+".json"), string(text)+"\n")
 }
 
 func (s *syncEnv) lockDir() string { return filepath.Join(s.state, "locks", "self", syncParent) }
@@ -288,7 +289,7 @@ func (s *syncEnv) ownLock(pid int, started int64, host string) string {
 	if err := os.Mkdir(lock, 0o755); err != nil {
 		s.t.Fatal(err)
 	}
-	write(s.t, filepath.Join(lock, "owner"), host+" "+strconv.Itoa(pid)+" "+strconv.FormatInt(started, 10)+" "+strconv.Itoa(pid)+"-"+strconv.FormatInt(started, 10)+"\n")
+	shkit.Write(s.t, filepath.Join(lock, "owner"), host+" "+strconv.Itoa(pid)+" "+strconv.FormatInt(started, 10)+" "+strconv.Itoa(pid)+"-"+strconv.FormatInt(started, 10)+"\n")
 	return lock
 }
 
@@ -314,7 +315,7 @@ func (s *syncEnv) ignoreLocally(rel string) {
 
 func (s *syncEnv) archiveLocally(text string) {
 	s.t.Helper()
-	write(s.t, filepath.Join(s.ws, "logs", "archive", "self", "done", syncParent+".md"), text)
+	shkit.Write(s.t, filepath.Join(s.ws, "logs", "archive", "self", "done", syncParent+".md"), text)
 }
 
 // ---- 取り込み（P がリモートにある）
@@ -327,9 +328,9 @@ func TestSyncFastForwardAndLeavesNoState(t *testing.T) {
 	eq(t, sha(t, s.tree, "HEAD"), head, "HEAD")
 	has(t, done.Stdout, "早送り", "統合先: main")
 	// 親子ごとの取り込み状態も、統合先のコピーも、もう書かない。
-	truth(t, !exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
-	truth(t, !exists(s.retireDir), "片付けの記録を書いた")
-	truth(t, !exists(s.lockDir()), "ロックが残っている")
+	truth(t, !shkit.Exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
+	truth(t, !shkit.Exists(s.retireDir), "片付けの記録を書いた")
+	truth(t, !shkit.Exists(s.lockDir()), "ロックが残っている")
 }
 
 func TestSyncDivergedBranchesAreMerged(t *testing.T) {
@@ -354,12 +355,12 @@ func TestSyncAFastForwardDoesNotOverwriteAnIgnoredFile(t *testing.T) {
 	s := newSync(t)
 	s.remoteCommit(syncParent, "theirs.txt", "theirs\n")
 	s.ignoreLocally("theirs.txt")
-	write(t, filepath.Join(s.tree, "theirs.txt"), "手元の ignored\n")
+	shkit.Write(t, filepath.Join(s.tree, "theirs.txt"), "手元の ignored\n")
 	before := sha(t, s.tree, "HEAD")
 	done := s.sync(syncParent)
 	eq(t, sha(t, s.tree, "HEAD"), before, "HEAD ("+done.Stdout+")")
 	has(t, done.Stdout, "早送りできなかった")
-	eq(t, read(t, filepath.Join(s.tree, "theirs.txt")), "手元の ignored\n", "ignored のファイル")
+	eq(t, shkit.Read(t, filepath.Join(s.tree, "theirs.txt")), "手元の ignored\n", "ignored のファイル")
 }
 
 func TestSyncAConflictIsAbortedAndLeftToAPerson(t *testing.T) {
@@ -370,7 +371,7 @@ func TestSyncAConflictIsAbortedAndLeftToAPerson(t *testing.T) {
 	done := code(t, s.sync(syncParent), 1)
 	has(t, done.Stdout, "衝突", syncCopy)
 	eq(t, sha(t, s.tree, "HEAD"), mine, "HEAD")
-	truth(t, !exists(gitPath(t, s.tree, "MERGE_HEAD")), "MERGE_HEAD が残った")
+	truth(t, !shkit.Exists(gitPath(t, s.tree, "MERGE_HEAD")), "MERGE_HEAD が残った")
 	eq(t, git(t, s.tree, "status", "--porcelain"), "", "作業ツリー")
 }
 
@@ -384,11 +385,11 @@ func TestSyncAMergeInProgressIsLeftAlone(t *testing.T) {
 	s.localCommit(syncCopy, syncCopyText("mine\n", "42"))
 	gitRes(t, s.tree, "merge", "side")
 	mergeHead := gitPath(t, s.tree, "MERGE_HEAD")
-	truth(t, exists(mergeHead), "前提: merge が途中")
+	truth(t, shkit.Exists(mergeHead), "前提: merge が途中")
 	s.remoteCommit(syncParent, "theirs.txt", "theirs\n")
 	done := code(t, s.sync(syncParent), 1)
 	has(t, done.Stdout, "途中の操作（MERGE_HEAD）")
-	truth(t, exists(mergeHead), "ユーザの merge を取りやめた")
+	truth(t, shkit.Exists(mergeHead), "ユーザの merge を取りやめた")
 }
 
 func TestSyncStagedChangesStopAMerge(t *testing.T) {
@@ -396,7 +397,7 @@ func TestSyncStagedChangesStopAMerge(t *testing.T) {
 	s := newSync(t)
 	s.remoteCommit(syncParent, "theirs.txt", "theirs\n")
 	mine := s.localCommit("mine.txt", "mine\n")
-	write(t, filepath.Join(s.tree, "staged.txt"), "x\n")
+	shkit.Write(t, filepath.Join(s.tree, "staged.txt"), "x\n")
 	git(t, s.tree, "add", "--", "staged.txt")
 	done := code(t, s.sync(syncParent), 1)
 	has(t, done.Stdout, "ステージ済み")
@@ -408,12 +409,12 @@ func TestSyncFastForwardThatOverlapsWorkInProgressStops(t *testing.T) {
 	s := newSync(t)
 	s.remoteCommit(syncParent, "README.md", "theirs\n")
 	before := sha(t, s.tree, "HEAD")
-	write(t, filepath.Join(s.tree, "README.md"), "書きかけ\n")
+	shkit.Write(t, filepath.Join(s.tree, "README.md"), "書きかけ\n")
 	// 書きかけとの重なりは終了コード 3（write-and-push が文を読まずに言い分ける）
 	done := code(t, s.sync(syncParent), 3)
 	has(t, done.Stdout, "書きかけの README.md と重なる")
 	eq(t, sha(t, s.tree, "HEAD"), before, "HEAD")
-	eq(t, read(t, filepath.Join(s.tree, "README.md")), "書きかけ\n", "書きかけ")
+	eq(t, shkit.Read(t, filepath.Join(s.tree, "README.md")), "書きかけ\n", "書きかけ")
 }
 
 // 重なっていないのに「（空）と重なる」と言わない。
@@ -421,7 +422,7 @@ func TestSyncARefusalThatIsNotAnOverlapSaysWhy(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
 	s.remoteCommit(syncParent, "theirs.txt", "theirs\n")
-	write(t, gitPath(t, s.tree, "index.lock"), "")
+	shkit.Write(t, gitPath(t, s.tree, "index.lock"), "")
 	done := code(t, s.sync(syncParent), 1)
 	has(t, done.Stdout, "index.lock")
 	lacks(t, done.Stdout, "と重なる")
@@ -454,12 +455,12 @@ func TestSyncTheCheckReportsAnErrorAndALaterRunClearsIt(t *testing.T) {
 	launcher := map[string]string{"CCNAVI_ENTRY_PATH": s.launcher("")}
 	code(t, s.syncEnvRun(launcher, syncParent), 0)
 	// 元ツリーに未コミットで残った子チケット（親のワークツリーの外）。検査が error を言い、終了コードが 1 になる。状態は何も書かない。
-	stray := write(t, filepath.Join(s.ws, ".ccnavi", "approved", "doing", syncParent+"-01-01.md"), syncChildText())
+	stray := shkit.Write(t, filepath.Join(s.ws, ".ccnavi", "approved", "doing", syncParent+"-01-01.md"), syncChildText())
 	done := code(t, s.syncEnvRun(launcher, syncParent), 1)
 	has(t, done.Stdout, "取り込みの後の検査で止める理由がある", "ワークツリーの外", "再実行してください")
-	truth(t, !exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
+	truth(t, !shkit.Exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
 	// 理由を片付けて打ち直せば、検査し直して通る。
-	remove(t, stray)
+	shkit.Remove(t, stray)
 	again := code(t, s.syncEnvRun(launcher, syncParent), 0)
 	lacks(t, again.Stdout, "検査で止める")
 }
@@ -469,13 +470,13 @@ func TestSyncTheCheckNeverEndsWith3(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
 	launcher := s.launcher("")
-	holder := writeExec(t, filepath.Join(s.dir, "bin", "holder"), "#!/bin/sh\n"+
+	holder := shkit.WriteExec(t, filepath.Join(s.dir, "bin", "holder"), "#!/bin/sh\n"+
 		"case \"$*\" in *\"sync recheck\"*)\n"+
-		"  mkdir -p \""+slash(s.state)+"/locks/self/"+syncParent+"\" && "+
+		"  mkdir -p \""+shkit.Slash(s.state)+"/locks/self/"+syncParent+"\" && "+
 		"printf \"elsewhere 1 9999999999 1-1\\n\" "+
-		"> \""+slash(s.state)+"/locks/self/"+syncParent+"/owner\" ;; esac\n"+
-		"exec \""+slash(launcher)+"\" \"$@\"\n")
-	write(t, filepath.Join(s.ws, ".ccnavi", "approved", "doing", syncParent+"-01-01.md"), syncChildText())
+		"> \""+shkit.Slash(s.state)+"/locks/self/"+syncParent+"/owner\" ;; esac\n"+
+		"exec \""+shkit.Slash(launcher)+"\" \"$@\"\n")
+	shkit.Write(t, filepath.Join(s.ws, ".ccnavi", "approved", "doing", syncParent+"-01-01.md"), syncChildText())
 	done := code(t, s.syncEnvRun(map[string]string{"CCNAVI_ENTRY_PATH": holder, "CCNAVI_LOCK_WAIT": "0"}, syncParent), 1)
 	lacks(t, done.Stdout, "まだ止まっていない")
 }
@@ -484,7 +485,7 @@ func TestSyncTheCheckNeverEndsWith3(t *testing.T) {
 func TestSyncTheCheckIsSkippedForABranchGoneFromTheRemote(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
-	write(t, filepath.Join(s.ws, ".ccnavi", "approved", "doing", syncParent+"-01-01.md"), syncChildText())
+	shkit.Write(t, filepath.Join(s.ws, ".ccnavi", "approved", "doing", syncParent+"-01-01.md"), syncChildText())
 	s.reviewSays("none", 0)
 	s.deleteRemoteBranch(syncParent)
 	done := code(t, s.syncEnvRun(map[string]string{"CCNAVI_ENTRY_PATH": s.launcher("")}, syncParent), 1)
@@ -511,7 +512,7 @@ func TestSyncAFamilyNeverPushedIsLeftAsItIs(t *testing.T) {
 	tree := s.parentTree("i0002", false, false)
 	done := code(t, s.sync("i0002"), 0)
 	has(t, done.Stdout, "まだ送っていない")
-	truth(t, isDir(tree), "ワークツリーが消えた")
+	truth(t, shkit.IsDir(tree), "ワークツリーが消えた")
 }
 
 // 参照（origin/P）が fetch.prune で消えても、承認済みの親チケットがあれば送った親にする。
@@ -564,7 +565,7 @@ func TestSyncADoneCopyOnTheIntegrationBranchIsNotConsulted(t *testing.T) {
 	done := s.closedAfterDelete()
 	assertGone(t, done)
 	lacks(t, done.Stdout, "クローズ済みの親子のチケット")
-	truth(t, !exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
+	truth(t, !shkit.Exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
 }
 
 // 承認待ち（todo/ の提案）の親は、承認済みのチケットだけを読む決まりで mr 欄を読めない。提案に mr: があっても「mr 欄に番号が無い」とは
@@ -576,13 +577,13 @@ func TestSyncAParentWaitingForApprovalDoesNotWarnAboutTheMRField(t *testing.T) {
 	log := s.reviewLog("none")
 	done := code(t, s.sync(syncParent), 0)
 	lacks(t, out(done), "mr 欄に MR の番号が無い")
-	truth(t, !exists(log), "MR を聞きに行った")
+	truth(t, !shkit.Exists(log), "MR を聞きに行った")
 }
 
 // backToTodo は親チケットを承認前の提案に戻して push する。
 func (s *syncEnv) backToTodo() {
 	s.t.Helper()
-	mkdir(s.t, filepath.Join(s.tree, "wip", "proposals", "todo"))
+	shkit.Mkdir(s.t, filepath.Join(s.tree, "wip", "proposals", "todo"))
 	git(s.t, s.tree, "mv", "--", syncCopy, "wip/proposals/todo/"+syncParent+".md")
 	git(s.t, s.tree, "commit", "-q", "-m", "back to todo")
 	git(s.t, s.tree, "push", "-q", "origin", syncParent)
@@ -607,7 +608,7 @@ func TestSyncABranchGoneWithoutAClosedRecordStopsTheFamily(t *testing.T) {
 	has(t, done.Stdout, "決められない", "push のゲート", "戻し方 1", "git push origin "+syncParent, "戻し方 2", "worktree remove", "retire --abandon i0001")
 	lacks(t, done.Stdout, "--forget")
 	// 状態は書かない。ワークツリーが在る間は、何度打っても 1。
-	truth(t, !exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
+	truth(t, !shkit.Exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
 	code(t, s.sync(syncParent), 1)
 	code(t, s.sync(), 1)
 	// 消えた親のブランチをユーザが戻せば、次の sync は普通に取り込む。
@@ -621,12 +622,12 @@ func TestSyncAPushedBranchWithoutAnMRNumberStopsWithoutGuessing(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
 	log := filepath.Join(s.dir, "review-args")
-	write(t, filepath.Join(s.scripts, "ccnavi-review.sh"), "#!/bin/sh\necho \"$*\" >>'"+slash(log)+"'\n")
+	shkit.Write(t, filepath.Join(s.scripts, "ccnavi-review.sh"), "#!/bin/sh\necho \"$*\" >>'"+shkit.Slash(log)+"'\n")
 	s.mine(syncCopyText("", ""))
 	s.deleteRemoteBranch(syncParent)
 	done := code(t, s.sync(syncParent), 1)
 	has(t, done.Stdout, syncNoMR)
-	truth(t, !exists(log), "MR を聞きに行った")
+	truth(t, !shkit.Exists(log), "MR を聞きに行った")
 }
 
 // API が失敗した・道具が無い。「消えた」とは言わず、確かめられなかったと言って止まる。
@@ -652,10 +653,10 @@ func TestSyncAMergedRequestCleansUpWithoutADoneCopy(t *testing.T) {
 	done := code(t, s.sync(syncParent), 0)
 	has(t, done.Stdout, "マージ済み", "42", "ブランチ "+syncParent+" を削除しました")
 	lacks(t, done.Stdout, "戻し方")
-	eq(t, strings.TrimSpace(read(t, log)), "merged 42", "MR を聞いた引数")
-	truth(t, !exists(s.tree), "親のワークツリーが残った")
+	eq(t, strings.TrimSpace(shkit.Read(t, log)), "merged 42", "MR を聞いた引数")
+	truth(t, !shkit.Exists(s.tree), "親のワークツリーが残った")
 	eq(t, strings.Join(s.branches(), ","), "main", "手元のブランチ")
-	truth(t, !exists(s.lockDir()), "ロックが残っている")
+	truth(t, !shkit.Exists(s.lockDir()), "ロックが残っている")
 }
 
 func TestSyncAnUnpushedCommitKeepsTheBranch(t *testing.T) {
@@ -674,11 +675,11 @@ func TestSyncUncommittedChangesKeepTheWorktree(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
 	s.reviewSays("merged 42 "+sha(t, s.tree, "HEAD"), 0)
-	write(t, filepath.Join(s.tree, "memo.txt"), "書きかけ\n")
+	shkit.Write(t, filepath.Join(s.tree, "memo.txt"), "書きかけ\n")
 	s.deleteRemoteBranch(syncParent)
 	done := s.sync(syncParent)
 	has(t, done.Stdout, "未コミットの変更があるので、何も削除しませんでした")
-	truth(t, isDir(s.tree), "ワークツリーが消えた")
+	truth(t, shkit.IsDir(s.tree), "ワークツリーが消えた")
 	truth(t, contains(s.branches(), syncParent), "ブランチが消えた")
 }
 
@@ -689,7 +690,7 @@ func TestSyncWithoutTheHeadOfTheRequestNothingIsDeleted(t *testing.T) {
 	s.deleteRemoteBranch(syncParent)
 	done := s.sync(syncParent)
 	has(t, done.Stdout, "先頭の sha をホストから取れなかった")
-	truth(t, isDir(s.tree), "ワークツリーが消えた")
+	truth(t, shkit.IsDir(s.tree), "ワークツリーが消えた")
 	truth(t, contains(s.branches(), syncParent), "ブランチが消えた")
 }
 
@@ -709,10 +710,10 @@ func TestSyncARetiredFamilyIsCleanedWhenItsRequestIsMerged(t *testing.T) {
 	done := code(t, s.sync(), 0)
 	has(t, done.Stdout, "ワークツリーは片付け済み", "親のブランチ "+syncParent+" はリモートから消えた", "ブランチ "+syncParent+" を削除しました")
 	// 片付けの記録は実行ファイル（sync tidy）が消す。sh は消さない。
-	truth(t, !exists(record), "片付けの記録が残った")
+	truth(t, !shkit.Exists(record), "片付けの記録が残った")
 	eq(t, strings.Join(s.branches(), ","), "main", "手元のブランチ")
 	// ホストには記録の MR の番号で聞く。
-	eq(t, strings.TrimSpace(read(t, log)), "merged 42", "MR を聞いた引数")
+	eq(t, strings.TrimSpace(shkit.Read(t, log)), "merged 42", "MR を聞いた引数")
 	// 打ち直しても何も起きない
 	code(t, s.sync(), 0)
 }
@@ -726,7 +727,7 @@ func TestSyncAMergedRequestWhoseBranchIsLeftOnTheRemoteIsCleaned(t *testing.T) {
 	s.reviewSays("merged 42 "+head+" "+syncParent, 0)
 	done := code(t, s.sync(syncParent), 0)
 	has(t, done.Stdout, "親のブランチ "+syncParent+" はリモートに残っているが", "片付けた")
-	truth(t, !exists(s.tree), "親のワークツリーが残った")
+	truth(t, !shkit.Exists(s.tree), "親のワークツリーが残った")
 	eq(t, strings.Join(s.branches(), ","), "main", "手元のブランチ")
 }
 
@@ -738,8 +739,8 @@ func TestSyncAPresentFamilyWithoutAnMRNumberIsNotGuessed(t *testing.T) {
 	// 取り込みの後の検査も、mr の無い親チケットを error と言う（終了コード 1）。
 	done := code(t, s.sync(syncParent), 1)
 	has(t, done.Stdout, syncNoMR, "mr: が記録されていない")
-	truth(t, !exists(log), "MR を聞きに行った")
-	truth(t, isDir(s.tree), "ワークツリーが消えた")
+	truth(t, !shkit.Exists(log), "MR を聞きに行った")
+	truth(t, shkit.IsDir(s.tree), "ワークツリーが消えた")
 }
 
 // ---- ready の後に残った記録（present 以外も）
@@ -771,8 +772,8 @@ func TestSyncARetiredFamilyKeepsTheLockHeldByTheCaller(t *testing.T) {
 	lock := s.ownLock(pid, started, "")
 	done := s.syncEnvRun(map[string]string{"CCNAVI_LOCK_HELD": "self/" + syncParent + ":" + strconv.Itoa(pid) + "-" + strconv.FormatInt(started, 10)})
 	code(t, done, 0)
-	truth(t, isDir(lock), "外側のロックを外した")
-	truth(t, exists(record), "片付けの記録を消した")
+	truth(t, shkit.IsDir(lock), "外側のロックを外した")
+	truth(t, shkit.Exists(record), "片付けの記録を消した")
 }
 
 // マージ済みかを確かめられないときは、手元の退避（ready が移した先）の親があっても推定せず、何も変えずに止める。
@@ -921,5 +922,5 @@ func TestSyncWithoutOriginNothingHappens(t *testing.T) {
 	git(t, s.ws, "remote", "remove", "origin")
 	done := code(t, s.sync(), 0)
 	has(t, done.Stdout, "origin がありません。")
-	truth(t, !exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
+	truth(t, !shkit.Exists(filepath.Join(s.state, "sync")), "取り込み状態を書いた")
 }

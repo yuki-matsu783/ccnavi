@@ -156,8 +156,8 @@ var subTiers = map[string]map[string]int{
 		"run": 2, "hoststub": 2, "contractshape": 2,
 		// 手動の GitLab の道具（Docker の操作・probe。契約の録りは契約の形を読むので 3）。実物を立てる側で、自動テストは本物を立てない
 		"gitlabdocker": 2, "gitlabprobe": 2,
-		// 3: claude の台本スタブ（契約の形を読む。読み手は teststub と clitest だけ）・組み立ての写し・受入シナリオの実行器の部品・ホストの fixture（PATH のスタブの置き方は hoststub を使う）
-		"fakeclaude": 3, "treecache": 3, "contractrecord": 3, "scenario": 3, "hostfixture": 3,
+		// 3: claude の台本スタブ（契約の形を読む。読み手は teststub と clitest だけ）・組み立ての写し・契約の録り・受入シナリオの実行器の部品・sh を通すテストのファイルと作業場所の道具・ホストの fixture（PATH のスタブの置き方は hoststub を使う）
+		"fakeclaude": 3, "treecache": 3, "contractrecord": 3, "shkit": 3, "scenario": 3, "hostfixture": 3,
 		// 3 のうち設定の和を見るテストの土台（ワークスペースの雛形と見本の設定。clitest/config が使う）
 		"configws": 3,
 		// 4: 入口（main）・チケット・フェーズ・レビューを CLI で通すテストが共有する木と本文（treecache の上に立つ。clitest/ticket/…）

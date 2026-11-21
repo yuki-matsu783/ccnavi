@@ -1,13 +1,13 @@
 package review
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ccnavi/internal/harness/hostfixture"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // hostSite は、録ったホストの応答の見本（hostfixture）を返す curl を PATH の先頭に置いたワークスペース。
@@ -104,8 +104,8 @@ func (h hostSite) reviewIn(cwd, scene string, extra map[string]string, args ...s
 func (h hostSite) sceneWith(from, login string) string {
 	h.t.Helper()
 	dst := filepath.Join(h.tmp, "odd")
-	copyTree(h.t, hostfixture.SceneDir(h.kind, from), dst)
-	write(h.t, filepath.Join(dst, "user.json"), `{"login": `+quoteJSON(login)+`}`)
+	shkit.CopyTree(h.t, hostfixture.SceneDir(h.kind, from), dst)
+	shkit.Write(h.t, filepath.Join(dst, "user.json"), `{"login": `+quoteJSON(login)+`}`)
 	rel, err := filepath.Rel(filepath.Dir(hostfixture.SceneDir(h.kind, from)), dst)
 	if err != nil { // Windows で別のドライブ
 		h.t.Skip("見本の根から相対で指せない: " + err.Error())
@@ -115,19 +115,4 @@ func (h hostSite) sceneWith(from, login string) string {
 
 func quoteJSON(s string) string {
 	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(s) + `"`
-}
-
-func copyTree(t testing.TB, from, to string) {
-	t.Helper()
-	entries, err := os.ReadDir(from)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if e.IsDir() {
-			copyTree(t, filepath.Join(from, e.Name()), filepath.Join(to, e.Name()))
-			continue
-		}
-		write(t, filepath.Join(to, e.Name()), read(t, filepath.Join(from, e.Name())))
-	}
 }

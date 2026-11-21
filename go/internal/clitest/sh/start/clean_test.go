@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-clean.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
@@ -32,13 +33,13 @@ type cleanEnv struct {
 
 func newClean(t testing.TB) *cleanEnv {
 	t.Helper()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	c := &cleanEnv{t: t, dir: base.TempDir(t)}
 	c.ws = filepath.Join(c.dir, "ws")
-	copyScripts(t, c.ws, cleanScripts...)
+	shkit.CopyScripts(t, c.ws, cleanScripts...)
 	c.worktrees = filepath.Join(c.ws, ".claude", "worktrees")
-	mkdir(t, c.worktrees)
-	c.bin = exeWrapper(t, filepath.Join(c.dir, "bin"))
+	shkit.Mkdir(t, c.worktrees)
+	c.bin = shkit.ExeWrapper(t, filepath.Join(c.dir, "bin"))
 	return c
 }
 
@@ -76,7 +77,7 @@ func (c *cleanEnv) makeShell(name string) string {
 		".pytest_cache/v/cache":             "",
 		".ruff_cache/0.16.6/123/abc":        "",
 	} {
-		write(c.t, filepath.Join(top, filepath.FromSlash(rel)), text)
+		shkit.Write(c.t, filepath.Join(top, filepath.FromSlash(rel)), text)
 	}
 	return top
 }
@@ -121,7 +122,7 @@ func TestCleanWorkspaceRootIsFoundFromInsideAWorktree(t *testing.T) {
 	c := newClean(t)
 	top := c.makeShell("shell")
 	code(t, c.runIn("ccnavi-clean.sh", filepath.Join(top, "src"), nil, "shell"), 0)
-	truth(t, !exists(filepath.Join(top, "node_modules")), "node_modules が残った")
+	truth(t, !shkit.Exists(filepath.Join(top, "node_modules")), "node_modules が残った")
 }
 
 func TestCleanDryRunListsAndKeepsEverything(t *testing.T) {
@@ -137,7 +138,7 @@ func TestCleanDryRunListsAndKeepsEverything(t *testing.T) {
 func TestCleanNothingToRemove(t *testing.T) {
 	t.Parallel()
 	c := newClean(t)
-	write(t, filepath.Join(c.worktrees, "empty", "a.txt"), "")
+	shkit.Write(t, filepath.Join(c.worktrees, "empty", "a.txt"), "")
 	has(t, code(t, c.clean("empty"), 0).Stdout, "削除するものはありません")
 }
 
@@ -145,12 +146,12 @@ func TestCleanRejectsAnythingButAName(t *testing.T) {
 	t.Parallel()
 	c := newClean(t)
 	// 置き場の外に、消えてはいけない生成物を置いておく。
-	outside := write(t, filepath.Join(c.ws, "node_modules", "keep.js"), "")
+	outside := shkit.Write(t, filepath.Join(c.ws, "node_modules", "keep.js"), "")
 	c.makeShell("shell")
 	for _, arg := range []string{"..", ".", "../..", "shell/src", ".claude/worktrees/shell", `..\..`, "C:x"} {
 		code(t, c.clean(arg), 2)
 	}
-	truth(t, exists(outside), "置き場の外の生成物が消えた")
+	truth(t, shkit.Exists(outside), "置き場の外の生成物が消えた")
 }
 
 func TestCleanRejectsAMissingNameAndAnUnknownOption(t *testing.T) {
@@ -160,7 +161,7 @@ func TestCleanRejectsAMissingNameAndAnUnknownOption(t *testing.T) {
 	for _, args := range [][]string{{}, {"nothing-here"}, {"shell", "--force"}, {"shell", "other"}} {
 		code(t, c.clean(args...), 2)
 	}
-	truth(t, exists(filepath.Join(c.worktrees, "shell", "node_modules")), "node_modules が消えた")
+	truth(t, shkit.Exists(filepath.Join(c.worktrees, "shell", "node_modules")), "node_modules が消えた")
 }
 
 // linkDir はディレクトリへのリンクを作る。作れなければテストを飛ばす。
@@ -180,27 +181,27 @@ func TestCleanDoesNotFollowLinks(t *testing.T) {
 	t.Parallel()
 	c := newClean(t)
 	precious := filepath.Join(c.dir, "precious")
-	write(t, filepath.Join(precious, "node_modules", "keep.js"), "")
-	write(t, filepath.Join(precious, "out", "keep.js"), "")
+	shkit.Write(t, filepath.Join(precious, "node_modules", "keep.js"), "")
+	shkit.Write(t, filepath.Join(precious, "out", "keep.js"), "")
 	top := c.makeShell("shell")
 	linkDir(t, precious, filepath.Join(top, "linked"))
 	// 生成物の名前をしたリンクは、リンクだけが消えて先は残る。
 	linkDir(t, filepath.Join(precious, "out"), filepath.Join(top, "ext", "out-link"))
 	linkDir(t, filepath.Join(precious, "node_modules"), filepath.Join(top, "src", "node_modules"))
 	code(t, c.clean("shell"), 0)
-	truth(t, exists(filepath.Join(precious, "node_modules", "keep.js")), "リンクの先の node_modules が消えた")
-	truth(t, exists(filepath.Join(precious, "out", "keep.js")), "リンクの先の out が消えた")
-	truth(t, !exists(filepath.Join(top, "src", "node_modules")), "リンクが残った")
+	truth(t, shkit.Exists(filepath.Join(precious, "node_modules", "keep.js")), "リンクの先の node_modules が消えた")
+	truth(t, shkit.Exists(filepath.Join(precious, "out", "keep.js")), "リンクの先の out が消えた")
+	truth(t, !shkit.Exists(filepath.Join(top, "src", "node_modules")), "リンクが残った")
 }
 
 func TestCleanRejectsAWorktreeDirectoryThatIsALink(t *testing.T) {
 	t.Parallel()
 	c := newClean(t)
 	precious := filepath.Join(c.dir, "precious")
-	write(t, filepath.Join(precious, "node_modules", "keep.js"), "")
+	shkit.Write(t, filepath.Join(precious, "node_modules", "keep.js"), "")
 	linkDir(t, precious, filepath.Join(c.worktrees, "linked"))
 	code(t, c.clean("linked"), 2)
-	truth(t, exists(filepath.Join(precious, "node_modules", "keep.js")), "リンクの先が消えた")
+	truth(t, shkit.Exists(filepath.Join(precious, "node_modules", "keep.js")), "リンクの先が消えた")
 }
 
 func TestCleanReportsWhatCouldNotBeRemoved(t *testing.T) {
@@ -218,49 +219,49 @@ func TestCleanReportsWhatCouldNotBeRemoved(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 	r := code(t, c.clean("shell"), 1)
 	has(t, r.Stderr, "node_modules", "削除しきれませんでした")
-	truth(t, !exists(filepath.Join(top, ".venv")), ".venv が残った") // 他は消す
+	truth(t, !shkit.Exists(filepath.Join(top, ".venv")), ".venv が残った") // 他は消す
 }
 
 func TestCleanStopsOnUncommittedChangesThenCleansWhenClean(t *testing.T) {
 	t.Parallel()
-	need(t, "git")
+	shkit.Need(t, "git")
 	c := newClean(t)
 	git(t, c.ws, "init", "-q", "-b", "main")
-	identity(t, c.ws)
-	write(t, filepath.Join(c.ws, ".gitignore"), "node_modules/\n.claude/worktrees/\n")
+	shkit.Identity(t, c.ws)
+	shkit.Write(t, filepath.Join(c.ws, ".gitignore"), "node_modules/\n.claude/worktrees/\n")
 	git(t, c.ws, "add", ".gitignore")
 	git(t, c.ws, "commit", "-q", "-m", "seed")
 	git(t, c.ws, "worktree", "add", "-q", ".claude/worktrees/wt", "-b", "wt", "main")
 	top := filepath.Join(c.worktrees, "wt")
-	write(t, filepath.Join(top, "node_modules", "x.js"), "")
-	write(t, filepath.Join(top, "draft.txt"), "書きかけ")
+	shkit.Write(t, filepath.Join(top, "node_modules", "x.js"), "")
+	shkit.Write(t, filepath.Join(top, "draft.txt"), "書きかけ")
 	r := code(t, c.clean("wt"), 1)
 	has(t, r.Stderr, "draft.txt")
-	truth(t, exists(filepath.Join(top, "node_modules", "x.js")), "node_modules が消えた")
-	remove(t, filepath.Join(top, "draft.txt"))
+	truth(t, shkit.Exists(filepath.Join(top, "node_modules", "x.js")), "node_modules が消えた")
+	shkit.Remove(t, filepath.Join(top, "draft.txt"))
 	code(t, c.clean("wt"), 0)
-	truth(t, !exists(filepath.Join(top, "node_modules")), "node_modules が残った")
+	truth(t, !shkit.Exists(filepath.Join(top, "node_modules")), "node_modules が残った")
 }
 
 // ---- `.git` があるときの確かめ。読めない・指す先が消えている、の扱いを分ける。
 
 func TestCleanAGitfilePointingNowhereIsTreatedAsALeftover(t *testing.T) {
 	t.Parallel()
-	need(t, "git")
+	shkit.Need(t, "git")
 	c := newClean(t)
 	top := c.makeShell("shell")
-	write(t, filepath.Join(top, ".git"), "gitdir: /nonexistent/gitdir\n")
+	shkit.Write(t, filepath.Join(top, ".git"), "gitdir: /nonexistent/gitdir\n")
 	r := code(t, c.clean("shell"), 0)
 	has(t, r.Stderr, "git の登録が残っていない")
-	truth(t, !exists(filepath.Join(top, "node_modules")), "node_modules が残った")
+	truth(t, !shkit.Exists(filepath.Join(top, "node_modules")), "node_modules が残った")
 }
 
 func TestCleanAnUnreadableGitStateStopsWithoutRemovingAnything(t *testing.T) {
 	t.Parallel()
-	need(t, "git")
+	shkit.Need(t, "git")
 	c := newClean(t)
 	top := c.makeShell("shell")
-	mkdir(t, filepath.Join(top, ".git")) // 中身の無い .git。git status は失敗する
+	shkit.Mkdir(t, filepath.Join(top, ".git")) // 中身の無い .git。git status は失敗する
 	before := filesUnder(t, top)
 	r := code(t, c.clean("shell"), 1)
 	has(t, r.Stderr, "git の状態を読めない")
@@ -281,17 +282,17 @@ func TestCleanAMissingExecutableIsAnEnvironmentError(t *testing.T) {
 // newCleanWorktree は git のワークスペースと、ワークツリー wt（node_modules 入り）を組む。
 func newCleanWorktree(t testing.TB) (*cleanEnv, string) {
 	t.Helper()
-	need(t, "git")
+	shkit.Need(t, "git")
 	c := newClean(t)
 	base.PutMessages(t, c.ws)
 	git(t, c.ws, "init", "-q", "-b", "main")
-	identity(t, c.ws)
-	write(t, filepath.Join(c.ws, ".gitignore"), "node_modules/\n.claude/worktrees/\nlogs/\n")
+	shkit.Identity(t, c.ws)
+	shkit.Write(t, filepath.Join(c.ws, ".gitignore"), "node_modules/\n.claude/worktrees/\nlogs/\n")
 	git(t, c.ws, "add", ".gitignore")
 	git(t, c.ws, "commit", "-q", "-m", "seed")
 	git(t, c.ws, "worktree", "add", "-q", ".claude/worktrees/wt", "-b", "wt", "main")
 	top := filepath.Join(c.ws, ".claude", "worktrees", "wt")
-	write(t, filepath.Join(top, "node_modules", "x.js"), "")
+	shkit.Write(t, filepath.Join(top, "node_modules", "x.js"), "")
 	return c, top
 }
 
@@ -309,7 +310,7 @@ func TestCleanRemovesTheWorktreeFromOutsideAndKeepsTheBranch(t *testing.T) {
 	c, top := newCleanWorktree(t)
 	r := code(t, c.clean("--worktree", "wt"), 0)
 	has(t, r.Stdout, "ワークツリー wt を削除しました")
-	truth(t, !exists(top), "ワークツリーが残った")
+	truth(t, !shkit.Exists(top), "ワークツリーが残った")
 	eq(t, branchWt(t, c.ws), "wt", "ブランチ")
 }
 
@@ -318,7 +319,7 @@ func TestCleanKeepsTheWorktreeWhenTheCwdIsInside(t *testing.T) {
 	c, top := newCleanWorktree(t)
 	r := code(t, c.runIn("ccnavi-clean.sh", top, nil, "--worktree", "wt"), 1)
 	has(t, r.Stdout, "cwd がワークツリー wt の中にあるので削除しませんでした", "ccnavi-clean.sh --worktree wt")
-	truth(t, exists(filepath.Join(top, "node_modules", "x.js")), "node_modules が消えた")
+	truth(t, shkit.Exists(filepath.Join(top, "node_modules", "x.js")), "node_modules が消えた")
 }
 
 func TestCleanRejectsPathsAndDryRunWithWorktree(t *testing.T) {
@@ -327,7 +328,7 @@ func TestCleanRejectsPathsAndDryRunWithWorktree(t *testing.T) {
 	for _, args := range [][]string{{"--worktree", "wt", "--dry-run"}, {"--worktree", "../wt"}, {"--worktree"}} {
 		code(t, c.clean(args...), 2)
 	}
-	truth(t, isDir(top), "ワークツリーが消えた")
+	truth(t, shkit.IsDir(top), "ワークツリーが消えた")
 }
 
 // 記録に無いブランチは、確認の有無によらず消さない（git branch -D の代わりに使わせない）。
@@ -357,6 +358,6 @@ func TestCleanTheRetiredBranchModeIsRefusedAsAnUnknownOption(t *testing.T) {
 		r := code(t, c.clean(args...), 2)
 		has(t, r.Stderr, "は指定できません")
 	}
-	truth(t, exists(filepath.Join(top, "node_modules", "x.js")), "node_modules が消えた")
+	truth(t, shkit.Exists(filepath.Join(top, "node_modules", "x.js")), "node_modules が消えた")
 	eq(t, branchWt(t, c.ws), "wt", "ブランチ")
 }

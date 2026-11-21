@@ -108,7 +108,7 @@ func TestFinishAndStatusSayWhoMovesBeforeAndAfterTheRequest(t *testing.T) {
 	before := nextStep(tr, "i0001-01-01")
 	ticketkit.Has(t, before, "次の操作: まだレビュー準備中")
 	ticketkit.Has(t, before, "メインエージェントのみ実行可能")
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	ticketkit.OK(t, tr.Request(f))
 	// 依頼の後。ここで初めてユーザを待つ。
 	after := nextStep(tr, "i0001-01-01")
@@ -128,7 +128,7 @@ func TestTheLastConfirmTellsTheWayToReadyAndTidiesTheChildren(t *testing.T) {
 	t.Parallel()
 	tr := plainTree(t, "work-mr")
 	tree, _ := closedChild(tr, "i0001-01-01")
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	ticketkit.OK(t, tr.Request(f))
 	confirmed := ticketkit.OK(t, tr.Confirm(f))
 	for _, w := range []string{"全部のフェーズのレビューが済み", "finish i0001", "ready", "`wip/` の追跡済みのファイル", "ready --parent i0001",
@@ -156,7 +156,7 @@ func TestAConfirmThatIsNotTheLastSaysNothingMore(t *testing.T) {
 	t.Parallel()
 	tr := plainTree(t, "work-mr", "work-mr")
 	closedChild(tr, "i0001-01-01")
-	f := remoteDraft(tr)
+	f := tr.Origin()
 	ticketkit.OK(t, tr.Request(f))
 	tr.Parent("push", "--quiet", "origin", "i0001")
 	confirmed := ticketkit.OK(t, tr.Confirm(f))

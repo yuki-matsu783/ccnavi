@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -44,10 +45,10 @@ func newIso(t *testing.T) *iso {
 	}
 	haveCommands(t, "sh", "git", "jq", "ps")
 	e := &iso{t: t, tmp: base.TempDir(t)}
-	e.bin = mkdir(t, filepath.Join(e.tmp, "bin"))
+	e.bin = shkit.Mkdir(t, filepath.Join(e.tmp, "bin"))
 	e.calls = filepath.Join(e.tmp, "calls.log")
-	e.home = mkdir(t, filepath.Join(e.tmp, "home"))
-	e.ctl = mkdir(t, filepath.Join(e.tmp, "ctl"))
+	e.home = shkit.Mkdir(t, filepath.Join(e.tmp, "home"))
+	e.ctl = shkit.Mkdir(t, filepath.Join(e.tmp, "ctl"))
 	for _, name := range baseTools {
 		e.link(name)
 	}
@@ -73,10 +74,10 @@ func (e *iso) fake(name, body string) {
 	e.t.Helper()
 	dst := filepath.Join(e.bin, name)
 	_ = os.Remove(dst)
-	writeExec(e.t, dst, fmt.Sprintf("#!/bin/sh\nprintf '%%s %%s\\n' %s \"$*\" >> \"%s\"\n%s\n", name, e.calls, body))
+	shkit.WriteExec(e.t, dst, fmt.Sprintf("#!/bin/sh\nprintf '%%s %%s\\n' %s \"$*\" >> \"%s\"\n%s\n", name, e.calls, body))
 }
 
-func (e *iso) ctlSet(key, value string) { write(e.t, filepath.Join(e.ctl, key), value) }
+func (e *iso) ctlSet(key, value string) { shkit.Write(e.t, filepath.Join(e.ctl, key), value) }
 
 func (e *iso) ctlRef(key string) string { return filepath.Join(e.ctl, key) }
 

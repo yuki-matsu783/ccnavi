@@ -3,6 +3,8 @@ package setup
 import (
 	"path/filepath"
 	"testing"
+
+	"ccnavi/internal/harness/shkit"
 )
 
 // 導入スクリプト（scripts/ccnavi-setup.sh）が配る設定のひな形の置き場。rules・phases・risk のひな形は、どれも共通レイヤー
@@ -22,15 +24,15 @@ const (
 func layersSource(t *testing.T) string {
 	t.Helper()
 	root := makeSource(t, srcOpts{NoParts: true})
-	write(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
-	write(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), layerRisk)
-	write(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), layerPhases)
-	write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), ownPhases)
-	write(t, filepath.Join(root, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
-	write(t, filepath.Join(root, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), layerRisk)
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), layerPhases)
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), ownPhases)
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
 	copyFile(t, launcherPath(), filepath.Join(root, ".ccnavi", "scripts", launcherName), 0o644)
 	for _, name := range deployScripts {
-		write(t, filepath.Join(root, ".ccnavi", "scripts", name), "# "+name+"\n")
+		shkit.Write(t, filepath.Join(root, ".ccnavi", "scripts", name), "# "+name+"\n")
 	}
 	return root
 }
@@ -45,11 +47,11 @@ func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 		r := w.setup("--mode", "enable", "--deploy", layersSource(t))
 		code(t, r, 0)
 		for _, kind := range []string{"rules.yml", "risks.yml", "phases.yml"} {
-			if !exists(w.path(".ccnavi", "config", "common", kind)) {
+			if !shkit.Exists(w.path(".ccnavi", "config", "common", kind)) {
 				t.Errorf("共通レイヤーの %s が配られていない", kind)
 			}
 		}
-		if exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
+		if shkit.Exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
 			t.Error("自身のレイヤーの phases.yml を配った")
 		}
 		notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml", "まだ無いもの")
@@ -57,11 +59,11 @@ func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 	t.Run("--force でも配布先の自身のレイヤーに触らない", func(t *testing.T) {
 		t.Parallel()
 		w := newTarget(t)
-		own := write(t, w.path(".ccnavi", "config", "project", "phases.yml"), minePhases)
+		own := shkit.Write(t, w.path(".ccnavi", "config", "project", "phases.yml"), minePhases)
 		r := w.setup("--mode", "enable", "--deploy", layersSource(t), "--force")
 		code(t, r, 0)
-		eq(t, "共通の phases.yml", read(t, w.path(".ccnavi", "config", "common", "phases.yml")), layerPhases)
-		eq(t, "自身のレイヤーの phases.yml", read(t, own), minePhases)
+		eq(t, "共通の phases.yml", shkit.Read(t, w.path(".ccnavi", "config", "common", "phases.yml")), layerPhases)
+		eq(t, "自身のレイヤーの phases.yml", shkit.Read(t, own), minePhases)
 		in(t, r.Stdout, ".ccnavi/config/common/phases.yml")
 		notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml")
 	})
@@ -71,17 +73,17 @@ func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 func TestExistingCommonPhasesIsKeptWithoutForce(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
-	common := write(t, w.path(".ccnavi", "config", "common", "phases.yml"), minePhases)
+	common := shkit.Write(t, w.path(".ccnavi", "config", "common", "phases.yml"), minePhases)
 	r := w.setup("--mode", "enable", "--deploy", layersSource(t))
 	code(t, r, 0)
-	eq(t, "共通の phases.yml", read(t, common), minePhases)
+	eq(t, "共通の phases.yml", shkit.Read(t, common), minePhases)
 }
 
 // フェーズ定義が共通レイヤーにだけあれば、自身のレイヤーの phases.yml が無くても「まだ無いもの」に出さない。
 func TestPhasesOnlyInCommonIsNotMissing(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
-	write(t, w.path(".ccnavi", "config", "common", "phases.yml"), layerPhases)
+	shkit.Write(t, w.path(".ccnavi", "config", "common", "phases.yml"), layerPhases)
 	r := w.setup("--mode", "enable", "--no-deploy")
 	code(t, r, 0)
 	notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml", ".ccnavi/config/common/phases.yml")

@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // noWipSh は配る sh ではなく、リポジトリの scripts/ にある（.ccnavi/scripts/ ではない）。
@@ -15,7 +16,7 @@ func noWipSh() string { return filepath.Join(base.Root(), "scripts", "ccnavi-che
 // ccnavi-check-no-wip.sh: 統合先へ入れる差分に wip/ が含まれていれば失敗させる。wip/handoff/ は通す。大文字小文字は区別しない。
 func TestCheckNoWipFailsOnlyWhenTheDiffHoldsWip(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	for _, tc := range []struct {
 		name    string
 		files   []string
@@ -33,7 +34,7 @@ func TestCheckNoWipFailsOnlyWhenTheDiffHoldsWip(t *testing.T) {
 			seedRepo(t, dir, "main")
 			git(t, dir, "checkout", "-q", "-b", "topic")
 			for _, f := range tc.files {
-				write(t, filepath.Join(dir, f), "x\n")
+				shkit.Write(t, filepath.Join(dir, f), "x\n")
 			}
 			git(t, dir, "add", "-A")
 			git(t, dir, "commit", "-q", "--allow-empty", "-m", "topic")
@@ -47,7 +48,7 @@ func TestCheckNoWipFailsOnlyWhenTheDiffHoldsWip(t *testing.T) {
 
 func TestCheckNoWipFailsOnAnUnknownRef(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	dir := base.TempDir(t)
 	seedRepo(t, dir, "main")
 	r := run.Sh(t, noWipSh(), []string{"nosuch"}, run.Opts{Dir: dir})

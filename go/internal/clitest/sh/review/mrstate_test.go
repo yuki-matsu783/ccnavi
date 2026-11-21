@@ -11,6 +11,7 @@ import (
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-review.sh mr-state の約束。ボードの「MR の状況を確認」が、MR の今の状態を機械で読む。出力は 2 行で、
@@ -97,18 +98,18 @@ func newMRSite(t *testing.T, h mrHost) mrSite {
 	t.Helper()
 	s := newSite(t, h.origin, reviewSh)
 	bin := filepath.Join(s.tmp, "bin")
-	writeExec(t, filepath.Join(bin, "gh"), "#!/bin/sh\nexit 1\n")
-	writeExec(t, filepath.Join(bin, "glab"), "#!/bin/sh\nexit 1\n")
-	writeExec(t, filepath.Join(bin, "curl"), mrCurl)
+	shkit.WriteExec(t, filepath.Join(bin, "gh"), "#!/bin/sh\nexit 1\n")
+	shkit.WriteExec(t, filepath.Join(bin, "glab"), "#!/bin/sh\nexit 1\n")
+	shkit.WriteExec(t, filepath.Join(bin, "curl"), mrCurl)
 	return mrSite{s, h, bin}
 }
 
 // says は curl のスタブの答えを決める。
 func (m mrSite) says(body string, code int, stderr string) {
 	m.t.Helper()
-	write(m.t, filepath.Join(m.bin, "curl.body"), body)
-	write(m.t, filepath.Join(m.bin, "curl.code"), fmt.Sprint(code))
-	write(m.t, filepath.Join(m.bin, "curl.err"), stderr)
+	shkit.Write(m.t, filepath.Join(m.bin, "curl.body"), body)
+	shkit.Write(m.t, filepath.Join(m.bin, "curl.code"), fmt.Sprint(code))
+	shkit.Write(m.t, filepath.Join(m.bin, "curl.err"), stderr)
 }
 
 // mrOpts は mr-state の起こし方の差し替え。
@@ -167,7 +168,7 @@ func TestMRStateAsksOnlyThatRequestOfTheHost(t *testing.T) {
 			m := newMRSite(t, h)
 			m.says(h.answer("open", false, true), 0, "")
 			m.assertKnown(m.state(mrOpts{}, "9"), "open 9 yes "+h.url)
-			asked := strings.Fields(read(t, filepath.Join(m.bin, "curl.url")))
+			asked := strings.Fields(shkit.Read(t, filepath.Join(m.bin, "curl.url")))
 			if len(asked) != 1 || !strings.HasSuffix(asked[0], h.request) {
 				t.Errorf("聞いた URL = %v, want 1 つで %s で終わる", asked, h.request)
 			}

@@ -1,7 +1,6 @@
 package life
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -69,11 +68,7 @@ func askedNamed(t *testing.T, r run.Result, name string) string {
 // rawCall は payload（hook_event_name・cwd など）をそのまま渡す。
 func rawCall(tr *ticketkit.Tree, payload map[string]any, extra ...string) run.Result {
 	tr.T.Helper()
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		tr.T.Fatal(err)
-	}
-	return tr.Call(ticketkit.Call{Stdin: string(raw)}, append([]string{"--mode", "enable"}, extra...)...)
+	return tr.CallJSON(payload, append([]string{"--mode", "enable"}, extra...)...)
 }
 
 func TestReadsAndTheMainTreeAreNotRegistered(t *testing.T) {

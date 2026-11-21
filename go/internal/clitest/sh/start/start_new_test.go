@@ -7,6 +7,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-start.sh の受入テスト（新しく作る経路と事前確認）。土台は startenv_test.go。既存のブランチ・MR を採用する経路と GitLab は
@@ -36,8 +37,8 @@ func TestNewIssueCreatesBranchWorktreeCommitPushAndDraftMR(t *testing.T) {
 	eq(t, got["ブランチ"], branch, "ブランチ")
 	eq(t, got["MR"], "https://github.com/acme/widgets/pull/7", "MR")
 	eq(t, got["対象リポジトリ"], "acme/widgets（ワークスペース自身）", "対象リポジトリ")
-	truth(t, strings.HasSuffix(slash(got["ワークツリー"]), ".claude/worktrees/"+branch), "ワークツリーの末尾: "+got["ワークツリー"])
-	truth(t, isDir(e.wt(branch)), "ワークツリーが無い")
+	truth(t, strings.HasSuffix(shkit.Slash(got["ワークツリー"]), ".claude/worktrees/"+branch), "ワークツリーの末尾: "+got["ワークツリー"])
+	truth(t, shkit.IsDir(e.wt(branch)), "ワークツリーが無い")
 	eq(t, git(t, e.wt(branch), "rev-parse", "--abbrev-ref", "HEAD"), branch, "ワークツリーのブランチ")
 	eq(t, git(t, e.wt(branch), "log", "-1", "--format=%s"), initSubject, "初期コミット")
 	truth(t, contains(e.remoteBranches(), branch), "origin に push していない")
@@ -216,7 +217,7 @@ func TestGitHubUnreachableAtSearchPrintsMCPGuidanceAndExits4(t *testing.T) {
 	done := code(t, e.noTokenSh("--issue", "152"), 4)
 	has(t, done.Stdout, "mcp__github__search_pull_requests", "repo:acme/widgets", "--mcp-checked", "何も作成せずに処理を中断しました")
 	eq(t, strings.Join(e.localBranches(), ","), "main", "手元のブランチ")
-	truth(t, !isDir(filepath.Join(e.ws, ".claude", "worktrees")), "ワークツリーの置き場ができた")
+	truth(t, !shkit.IsDir(filepath.Join(e.ws, ".claude", "worktrees")), "ワークツリーの置き場ができた")
 }
 
 // API が失敗して実在を確かめられない間は、--slug・--title があっても無確認で進まない。
@@ -252,7 +253,7 @@ func TestGitHubUnreachableAtCreatePrintsMCPGuidanceThenRerunContinues(t *testing
 	has(t, done.Stdout, "mcp__github__create_pull_request", "mcp__github__list_pull_requests", "owner: acme", "repo: widgets",
 		"head: "+branch, "base: main", "title: Add login", "body: Closes #152", "draft: true", "push 済み", "--mr <作った番号> --branch")
 	truth(t, contains(e.remoteBranches(), branch), "origin に push していない")
-	truth(t, isDir(e.wt(branch)), "ワークツリーが無い")
+	truth(t, shkit.IsDir(e.wt(branch)), "ワークツリーが無い")
 	// 打ち直し: MR が無くホストが答えるなら、続きの MR 作成から進む
 	e.githubNewDefault()
 	again := code(t, e.sh("--issue", "152"), 0)
@@ -294,7 +295,7 @@ func TestRerunAfterMCPMadeTheMRFollowsTheGuidedCommands(t *testing.T) {
 		}
 	}
 	done := code(t, e.noTokenSh(args...), 0)
-	truth(t, strings.HasSuffix(slash(fields(done.Stdout)["ワークツリー"]), "worktrees/feature-152-login"), fields(done.Stdout)["ワークツリー"])
+	truth(t, strings.HasSuffix(shkit.Slash(fields(done.Stdout)["ワークツリー"]), "worktrees/feature-152-login"), fields(done.Stdout)["ワークツリー"])
 	has(t, done.Stdout, addedMR, "ホストは見ていない（MCP などで確認済みとして扱った）", "--issue 152 --mr 7")
 	eq(t, len(e.posts()), 0, "POST の数")
 }
@@ -393,7 +394,7 @@ func TestARepoThatDiffersFromCwdStopsBeforeAskingTheHost(t *testing.T) {
 	t.Parallel()
 	e := newStart(t, ghURL)
 	proj := filepath.Join(e.ws, "projects", "tour")
-	mkdir(t, proj)
+	shkit.Mkdir(t, proj)
 	git(t, proj, "init", "-q", "-b", "main")
 	git(t, proj, "remote", "add", "origin", "https://github.com/Acme/Tour.git")
 	done := code(t, e.sh("--issue", "2", "--repo", "acme/tour"), 1)
@@ -403,7 +404,7 @@ func TestARepoThatDiffersFromCwdStopsBeforeAskingTheHost(t *testing.T) {
 	// 同じリポジトリ（大文字小文字違い）なら止めない
 	same := e.sh("--issue", "152", "--repo", "ACME/Widgets", "--dry-run")
 	lacks(t, same.Stderr, "が違います")
-	remove(t, e.stub.Log)
+	shkit.Remove(t, e.stub.Log)
 	// projects/ の中から、ワークスペース自身のリポジトリを頼むと、ルートへの移動を案内する
 	up := code(t, e.run(opt{dir: proj}, "--issue", "152", "--repo", "acme/widgets"), 1)
 	has(t, up.Stderr, "ワークスペースルートに移動")
@@ -416,9 +417,9 @@ func TestARepoThatDiffersFromCwdStopsBeforeAskingTheHost(t *testing.T) {
 // 日本語を生でクエリに入れるとホストが HTML のエラーを返す。エンコードして渡す。
 func TestHostEncodePercentEncodesJapaneseBranchNames(t *testing.T) {
 	t.Parallel()
-	need(t, "sh", "jq")
+	shkit.Need(t, "sh", "jq")
 	script := filepath.Join(base.ScriptsDir(), "ccnavi-common-host.sh")
-	r := run.Command(t, "sh", []string{"-c", `. "$1"; ccnavi_h_jq=$(command -v jq); ccnavi_host_encode "$2"`, "sh", slash(script), "acme:feature-418-状態/jsonl"})
+	r := run.Command(t, "sh", []string{"-c", `. "$1"; ccnavi_h_jq=$(command -v jq); ccnavi_host_encode "$2"`, "sh", shkit.Slash(script), "acme:feature-418-状態/jsonl"})
 	code(t, r, 0)
 	eq(t, strings.TrimSpace(r.Stdout), "acme%3Afeature-418-%E7%8A%B6%E6%85%8B%2Fjsonl", "エンコード")
 }
@@ -449,7 +450,7 @@ func TestCheckAllOKCreatesNothingAndTellsToTryNewIssue(t *testing.T) {
 	has(t, done.Stdout, "作れなかった")
 	eq(t, strings.Join(e.localBranches(), ","), "main", "手元のブランチ")
 	eq(t, strings.Join(e.remoteBranches(), ","), "main", "origin のブランチ")
-	truth(t, !isDir(filepath.Join(e.ws, ".claude", "worktrees")), "ワークツリーの置き場ができた")
+	truth(t, !shkit.IsDir(filepath.Join(e.ws, ".claude", "worktrees")), "ワークツリーの置き場ができた")
 	lacks(t, out(done), dummyToken)
 }
 
@@ -491,7 +492,7 @@ func TestCheckTimesOutOnAHangingHostTool(t *testing.T) {
 			return opt{env: map[string]string{"FAKE_SLEEP": "30", "CCNAVI_PREFLIGHT_TIMEOUT": "2"}}
 		},
 		"gh": func(e *startEnv) opt {
-			writeExec(e.t, filepath.Join(e.bin, "gh"), "#!/bin/sh\nsleep 30\n")
+			shkit.WriteExec(e.t, filepath.Join(e.bin, "gh"), "#!/bin/sh\nsleep 30\n")
 			return opt{noToken: true, env: map[string]string{"CCNAVI_PREFLIGHT_TIMEOUT": "2"}}
 		},
 	} {
@@ -522,7 +523,7 @@ func TestInsufficientRoleStopsAResumedStartBeforeTheWorktree(t *testing.T) {
 	e.route(combine(routes{pulls: ok(arr{}), "GET " + ghAPI: ok(obj{"permissions": obj{"push": false}})}, closedPulls(branch)))
 	done := code(t, e.sh("--issue", "152"), 1)
 	has(t, done.Stderr, "書き込みの権限が足りない")
-	truth(t, !isDir(e.wt(branch)), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt(branch)), "ワークツリーを切った")
 	eq(t, len(e.posts()), 0, "POST の数")
 }
 
@@ -534,7 +535,7 @@ func TestAResumedStartChecksTheIssueBeforeTheWorktree(t *testing.T) {
 	e.route(combine(routes{pulls: ok(arr{})}, closedPulls(branch)))
 	done := code(t, e.sh("--issue", "152"), 2)
 	has(t, done.Stderr, "issue #152 が見つからない")
-	truth(t, !isDir(e.wt(branch)), "ワークツリーを切った")
+	truth(t, !shkit.IsDir(e.wt(branch)), "ワークツリーを切った")
 	eq(t, len(e.posts()), 0, "POST の数")
 }
 
@@ -549,7 +550,7 @@ func TestAMissingAuthorStopsWithGuidanceAndRemovesTheNewWorktree(t *testing.T) {
 	has(t, done.Stderr, "作成者情報")
 	lacks(t, out(done), "許可リスト")
 	has(t, done.Stdout, "git config user.name")
-	truth(t, !isDir(e.wt(branch)), "ワークツリーが残った")
+	truth(t, !shkit.IsDir(e.wt(branch)), "ワークツリーが残った")
 	truth(t, !contains(e.localBranches(), branch), "ブランチが残った")
 	eq(t, len(e.posts()), 0, "POST の数")
 }
@@ -563,7 +564,7 @@ func TestABranchThatCannotBeDeletedIsReportedAsTheOnlyLeftover(t *testing.T) {
 	e.githubNewDefault()
 	done := e.run(opt{env: e.noIdentity()}, "--issue", "152")
 	truth(t, done.Code != 0, "終了コードが 0: "+out(done))
-	truth(t, !isDir(e.wt(branch)), "ワークツリーが残った")
+	truth(t, !shkit.IsDir(e.wt(branch)), "ワークツリーが残った")
 	truth(t, contains(e.localBranches(), branch), "ブランチが消えた")
 	has(t, done.Stdout, "ブランチ "+branch+" が残っている")
 	lacks(t, done.Stdout, "worktree remove")
@@ -576,5 +577,5 @@ func TestAResumedStartKeepsItsWorktreeWithoutAnAuthor(t *testing.T) {
 	e.initialBranch(branch)
 	e.githubNewDefault()
 	code(t, e.run(opt{env: e.noIdentity()}, "--issue", "152"), 0)
-	truth(t, isDir(e.wt(branch)), "ワークツリーが無い")
+	truth(t, shkit.IsDir(e.wt(branch)), "ワークツリーが無い")
 }

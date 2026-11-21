@@ -15,6 +15,7 @@ import (
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // このファイルは、ユーザ専用の decide（ccnavi-user-decide.sh）の試験が共有する道具。sh を外から呼び、ホスト（GitLab）の
@@ -347,7 +348,7 @@ func putTool(t testing.TB, found, link string) {
 		}
 		return
 	}
-	writeExec(t, link, "#!/bin/sh\nexec "+shq(found)+" \"$@\"\n")
+	shkit.WriteExec(t, link, "#!/bin/sh\nexec "+shq(found)+" \"$@\"\n")
 }
 
 // decideSite は decide の試験の木。ws は git のリポジトリではなく、その下の tree が i0001 の作業ツリー（origin は偽のホスト）。
@@ -367,7 +368,7 @@ type decideSite struct {
 func newDecideSite(t *testing.T) *decideSite {
 	t.Helper()
 	s := newBareSite(t, reviewScripts...)
-	need(t, "curl")
+	shkit.Need(t, "curl")
 	d := &decideSite{site: s, gl: newGitlab(t), shell: shellPath(t)}
 	d.state = filepath.Join(s.ws, "logs", "state")
 	if err := os.MkdirAll(d.state, 0o755); err != nil {
@@ -382,8 +383,8 @@ func newDecideSite(t *testing.T) *decideSite {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, d.begin, string(data))
-	writeExec(t, d.stub, strings.ReplaceAll(decideStub, "@COMPAT@", exe.Compat(t)))
+	shkit.Write(t, d.begin, string(data))
+	shkit.WriteExec(t, d.stub, strings.ReplaceAll(decideStub, "@COMPAT@", exe.Compat(t)))
 	d.tools = filepath.Join(s.tmp, "bin")
 	d.teststubPath = exe.TeststubPath(t)
 	return d
@@ -406,7 +407,7 @@ func (d *decideSite) putTools() {
 			}
 			continue
 		}
-		if exists(filepath.Join(d.tools, name)) {
+		if shkit.Exists(filepath.Join(d.tools, name)) {
 			continue
 		}
 		putTool(d.t, found, filepath.Join(d.tools, name))
@@ -499,7 +500,7 @@ func (d *decideSite) planFile(op *string, ids ...string) string {
 	if err != nil {
 		d.t.Fatal(err)
 	}
-	return write(d.t, filepath.Join(d.tmp, "plan-in.json"), string(body)+"\n")
+	return shkit.Write(d.t, filepath.Join(d.tmp, "plan-in.json"), string(body)+"\n")
 }
 
 // answer は標準出力の最後の行（JSON の答え）。

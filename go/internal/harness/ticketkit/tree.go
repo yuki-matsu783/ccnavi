@@ -220,13 +220,19 @@ func (tr *Tree) Hook(event, tool, cwd string, input map[string]any, opts ...Hook
 	for k, v := range o.Extra {
 		payload[k] = v
 	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		tr.T.Fatal(err)
-	}
 	args := []string{"--mode", o.Mode}
 	if o.GuardTicketApproval != "" {
 		args = append(args, "--guard-ticket-approval", o.GuardTicketApproval)
+	}
+	return tr.CallJSON(payload, args...)
+}
+
+// CallJSON は payload（hook の入力）を JSON にして標準入力に渡し、args で ccnavi を起こす（Call の Stdin だけを使う形）。
+func (tr *Tree) CallJSON(payload map[string]any, args ...string) run.Result {
+	tr.T.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		tr.T.Fatal(err)
 	}
 	return tr.Call(Call{Stdin: string(raw)}, args...)
 }

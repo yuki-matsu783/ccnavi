@@ -12,6 +12,7 @@ import (
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 )
 
 // `/` を含む既存のブランチ（feature/123-login）で、識別子 feature-123-login の親チケットの作業が、承認 → 着手 → push → 取り込み → 終える
@@ -70,7 +71,7 @@ type pb struct {
 
 func newPB(t *testing.T) *pb {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	tmp := base.TempDir(t)
 	p := &pb{t: t, tmp: tmp, ws: filepath.Join(tmp, "ws")}
 	p.scripts = filepath.Join(p.ws, ".ccnavi", "scripts")
@@ -85,12 +86,12 @@ func newPB(t *testing.T) *pb {
 			shs = append(shs, e.Name())
 		}
 	}
-	copyInto(t, p.scripts, shs...)
+	shkit.CopyScriptsTo(t, p.scripts, shs...)
 	initRepo(t, p.ws, "main")
-	write(t, filepath.Join(p.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
-	write(t, base.CommonPath(p.ws, "rules"), samples.Rules)
-	write(t, base.ConfigPath(p.ws, "phases"), samples.Phases)
-	write(t, filepath.Join(p.ws, "src", "keep.py"), "print(1)\n")
+	shkit.Write(t, filepath.Join(p.ws, ".gitignore"), ".claude/worktrees/\nlogs/\n")
+	shkit.Write(t, base.CommonPath(p.ws, "rules"), samples.Rules)
+	shkit.Write(t, base.ConfigPath(p.ws, "phases"), samples.Phases)
+	shkit.Write(t, filepath.Join(p.ws, "src", "keep.py"), "print(1)\n")
 	git(t, p.ws, "add", "-A")
 	git(t, p.ws, "commit", "-q", "-m", "seed")
 	p.remote = filepath.Join(tmp, "origin.git")
@@ -98,7 +99,7 @@ func newPB(t *testing.T) *pb {
 	git(t, p.ws, "remote", "add", "origin", p.remote)
 	git(t, p.ws, "push", "-q", "-u", "origin", "main")
 	git(t, p.ws, "remote", "set-head", "origin", "main")
-	p.bin = writeExec(t, filepath.Join(tmp, "bin", "ccnavi"), strings.ReplaceAll(pbExe, "EXE", exe.ShPath(t)))
+	p.bin = shkit.WriteExec(t, filepath.Join(tmp, "bin", "ccnavi"), strings.ReplaceAll(pbExe, "EXE", exe.ShPath(t)))
 	p.state = filepath.Join(p.ws, "logs", "state")
 	// ホストのスタブ（git remote get-url だけがホストの形を答える。本物のネットワークには出ない）
 	p.stub = hoststub.Build(t, tmp, true)
@@ -170,9 +171,9 @@ func (p *pb) remoteSha(branch string) string {
 func (p *pb) pusher() string {
 	p.t.Helper()
 	path := filepath.Join(p.tmp, "pusher")
-	if !isDir(path) {
+	if !shkit.IsDir(path) {
 		git(p.t, p.tmp, "clone", "-q", p.remote, path)
-		identity(p.t, path)
+		shkit.Identity(p.t, path)
 	}
 	git(p.t, path, "fetch", "-q", "--prune", "origin")
 	return path
@@ -192,7 +193,7 @@ func (p *pb) remoteCommit(rel, text, branch, start string) string {
 		start = branch
 	}
 	git(p.t, path, "checkout", "-q", "-B", branch, "origin/"+start)
-	write(p.t, filepath.Join(path, rel), text)
+	shkit.Write(p.t, filepath.Join(path, rel), text)
 	git(p.t, path, "add", "--", rel)
 	git(p.t, path, "commit", "-q", "-m", "remote "+rel)
 	git(p.t, path, "push", "-q", "origin", branch)
@@ -216,8 +217,8 @@ func (p *pb) propose(tree, text string) {
 	if text == "" {
 		text = samples.ParentText(pbParent, samples.Plan("design"), samples.ParentOpts{Allow: []string{"src/*", "wip/*"}})
 	}
-	write(p.t, filepath.Join(tree, pbTodo, pbParent+".md"), text)
-	write(p.t, filepath.Join(tree, pbTodo, pbChild+".md"), samples.ChildTextReview(pbChild, pbParent, 1, []string{"wip/design/*"}, samples.Off))
+	shkit.Write(p.t, filepath.Join(tree, pbTodo, pbParent+".md"), text)
+	shkit.Write(p.t, filepath.Join(tree, pbTodo, pbChild+".md"), samples.ChildTextReview(pbChild, pbParent, 1, []string{"wip/design/*"}, samples.Off))
 	git(p.t, tree, "add", "-A")
 	git(p.t, tree, "commit", "-q", "-m", "approval-request")
 }
@@ -307,7 +308,7 @@ func TestParentBranchTheMainPathOnAnExistingBranchWithASlash(t *testing.T) {
 		t.Errorf("承認画面: found = %v, warnings = %v, text = %q", found, body.BranchWarnings, body.Text)
 	}
 	p.approve()
-	if !isFile(filepath.Join(p.tree, pbApproved, "doing", pbParent+".md")) || !isFile(filepath.Join(p.tree, "src", "login.py")) {
+	if !shkit.IsFile(filepath.Join(p.tree, pbApproved, "doing", pbParent+".md")) || !shkit.IsFile(filepath.Join(p.tree, "src", "login.py")) {
 		t.Error("承認済みのコピーか取り込んだファイルが無い")
 	}
 	if status := git(t, p.tree, "status", "--porcelain"); status != "" {
@@ -316,7 +317,7 @@ func TestParentBranchTheMainPathOnAnExistingBranchWithASlash(t *testing.T) {
 
 	// 3. 最初の push は、リモートにブランチが在るのでゲートを通る。取り込み状態は作らない
 	pushed := p.ok(p.sh("ccnavi-git.sh", p.tree, "push", "-u", "origin", pbBranch))
-	if strings.Contains(pushed.Stdout, "取り込み状態") || exists(filepath.Join(p.state, "sync")) {
+	if strings.Contains(pushed.Stdout, "取り込み状態") || shkit.Exists(filepath.Join(p.state, "sync")) {
 		t.Error("最初の push が取り込み状態を作った")
 	}
 	if p.remoteSha(pbBranch) != p.sha(p.tree, "HEAD") {
@@ -345,12 +346,12 @@ func TestParentBranchTheMainPathOnAnExistingBranchWithASlash(t *testing.T) {
 	p.ok(p.sh("ccnavi-git.sh", "", "worktree", "add", ".claude/worktrees/"+pbChild, "-b", pbChild, pbBranch))
 	childTree := filepath.Join(p.ws, ".claude", "worktrees", pbChild)
 	p.ok(p.sh("ccnavi-ticket.sh", "", "start", pbChild))
-	write(t, filepath.Join(childTree, "wip", "design", "plan.md"), "# 設計\n")
+	shkit.Write(t, filepath.Join(childTree, "wip", "design", "plan.md"), "# 設計\n")
 	git(t, childTree, "add", "-A")
 	git(t, childTree, "commit", "-q", "-m", "design")
 	p.refused(p.sh("ccnavi-git.sh", childTree, "push", "-u", "origin", pbChild))
 	finished := p.ok(p.sh("ccnavi-ticket.sh", "", "finish", pbChild))
-	if !isFile(filepath.Join(p.tree, "wip", "proposals", "review", pbChild+".md")) {
+	if !shkit.IsFile(filepath.Join(p.tree, "wip", "proposals", "review", pbChild+".md")) {
 		t.Errorf("finish がレビュー待ちを作っていない:\n%s%s", finished.Stdout, finished.Stderr)
 	}
 	if p.remoteSha(pbBranch) != p.sha(p.tree, "HEAD") {
@@ -360,12 +361,12 @@ func TestParentBranchTheMainPathOnAnExistingBranchWithASlash(t *testing.T) {
 	// 7. 他の機械の push を取り込む（ccnavi-sync.sh とセッションの頭の早送り）
 	p.remoteCommit("wip/note-1.md", "1\n", pbBranch, "")
 	has(p.ok(p.sh("ccnavi-sync.sh", "", pbParent)), "早送りで取り込んだ")
-	if !isFile(filepath.Join(p.tree, "wip", "note-1.md")) {
+	if !shkit.IsFile(filepath.Join(p.tree, "wip", "note-1.md")) {
 		t.Error("note-1.md が取り込まれていない")
 	}
 	remote := p.remoteCommit("wip/note-2.md", "2\n", pbBranch, "")
 	has(p.ok(p.sh("ccnavi-fetch.sh", "")), pbParent+": 親ブランチ "+pbBranch+" を 1 コミット進めた")
-	if p.sha(p.tree, "HEAD") != remote || exists(filepath.Join(p.state, "sync")) {
+	if p.sha(p.tree, "HEAD") != remote || shkit.Exists(filepath.Join(p.state, "sync")) {
 		t.Error("早送りされていないか、取り込み状態ができた")
 	}
 	lint := p.exe("--lint")
@@ -395,7 +396,7 @@ func TestParentBranchAParentWorktreeBeforeTheTicketDoesNotStopTheApproval(t *tes
 	p.ok(p.sh("ccnavi-git.sh", "", "fetch", "origin", pbBranch))
 	p.ok(p.sh("ccnavi-git.sh", "", "worktree", "add", ".claude/worktrees/"+pbParent, pbBranch))
 	synced := p.sh("ccnavi-sync.sh", "", pbParent)
-	if synced.Code != 4 || !strings.Contains(synced.Stdout, "親チケットも提案もありません") || exists(filepath.Join(p.state, "sync")) {
+	if synced.Code != 4 || !strings.Contains(synced.Stdout, "親チケットも提案もありません") || shkit.Exists(filepath.Join(p.state, "sync")) {
 		t.Errorf("code = %d\n%s%s", synced.Code, synced.Stdout, synced.Stderr)
 	}
 	p.propose(p.tree, "")
@@ -410,7 +411,7 @@ func TestParentBranchAParentWorktreeBeforeTheTicketDoesNotStopTheApproval(t *tes
 	}
 	p.approve()
 	p.ok(p.sh("ccnavi-git.sh", p.tree, "push", "-u", "origin", pbBranch))
-	if exists(filepath.Join(p.state, "sync")) {
+	if shkit.Exists(filepath.Join(p.state, "sync")) {
 		t.Error("取り込み状態を作った")
 	}
 }
@@ -420,7 +421,7 @@ func TestParentBranchALeftOverBranchFieldIsAnError(t *testing.T) {
 	p := newPB(t)
 	p.addParentTree()
 	// 承認済みの親チケット（古い branch: 付き）を手で書く。
-	write(t, filepath.Join(p.tree, pbApproved, "doing", pbParent+".md"),
+	shkit.Write(t, filepath.Join(p.tree, pbApproved, "doing", pbParent+".md"),
 		withBranch(samples.ParentText(pbParent, samples.Plan("design"), samples.ParentOpts{Allow: []string{"src/*"}}), "origin/main"))
 	git(t, p.tree, "add", "-A")
 	git(t, p.tree, "commit", "-q", "-m", "copy")
@@ -474,7 +475,7 @@ func TestParentBranchAGoneParentBranchCannotBePushed(t *testing.T) {
 		t.Errorf("stderr = %q, remote = %q", refused.Stderr, p.remoteSha(pbBranch))
 	}
 	// 診断は ccnavi-sync.sh が出す（MR の答えはスタブ。マージされていない）。
-	writeExec(t, filepath.Join(p.scripts, "ccnavi-review.sh"), "#!/bin/sh\n[ \"$1\" = merged ] && echo none\nexit 0\n")
+	shkit.WriteExec(t, filepath.Join(p.scripts, "ccnavi-review.sh"), "#!/bin/sh\n[ \"$1\" = merged ] && echo none\nexit 0\n")
 	synced := p.sh("ccnavi-sync.sh", "", pbParent)
 	if synced.Code != 1 || !strings.Contains(synced.Stdout, "戻し方 1") {
 		t.Errorf("code = %d\n%s%s", synced.Code, synced.Stdout, synced.Stderr)
@@ -509,11 +510,11 @@ func TestParentBranchAStartedParentWhoseReferenceWasPrunedIsStillGuarded(t *test
 	p.importedFamily()
 	copyPath := filepath.Join(p.tree, pbApproved, "doing", pbParent+".md")
 	// 承認済みのコピーは、着手前は started_at: "" を持つ。着手済みの値に書き換える。
-	text := read(t, copyPath)
+	text := shkit.Read(t, copyPath)
 	if !strings.Contains(text, `started_at: ""`) {
 		t.Fatal(`承認済みのコピーに started_at: "" が無い`)
 	}
-	write(t, copyPath, strings.Replace(text, `started_at: ""`, "started_at: 2026-10-18T00:00:00Z", 1))
+	shkit.Write(t, copyPath, strings.Replace(text, `started_at: ""`, "started_at: 2026-10-18T00:00:00Z", 1))
 	git(t, p.tree, "add", "-A")
 	git(t, p.tree, "commit", "-q", "-m", "start")
 	p.deleteRemoteBranch()

@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // `ccnavi-git.sh integrate` / `integrate --abort` / `integrate-done` の受入テスト。
@@ -52,21 +53,21 @@ type itg struct {
 // newItg は sh と git（v4 を要るなら 2.40 以上）が無ければ飛ばす。
 func newItg(t *testing.T, needV4 bool) *itg {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	if needV4 && !gitAtLeast(2, 40) {
 		t.Skip("git 2.40 以上が要る")
 	}
 	tmp := base.TempDir(t)
 	f := &itg{t: t, tmp: tmp, ws: filepath.Join(tmp, "ws")}
-	copyScripts(t, f.ws, "ccnavi-git.sh", "ccnavi-clean.sh")
+	shkit.CopyScripts(t, f.ws, "ccnavi-git.sh", "ccnavi-clean.sh")
 	base.PutMessages(t, f.ws)
-	f.bin = exeWrapper(t, filepath.Join(tmp, "bin"))
+	f.bin = shkit.ExeWrapper(t, filepath.Join(tmp, "bin"))
 	initRepo(t, f.ws, "main")
-	write(t, filepath.Join(f.ws, ".gitignore"), "/.ccnavi/\n/.claude/worktrees/\n/logs/\n*.local\n")
-	write(t, filepath.Join(f.ws, "keep.txt"), "1\n2\n3\n")
-	write(t, filepath.Join(f.ws, "gone.txt"), "bye\n")
-	write(t, filepath.Join(f.ws, "other.txt"), "x\n")
-	write(t, filepath.Join(f.ws, "wip/handoff/d.md"), "draft\n")
+	shkit.Write(t, filepath.Join(f.ws, ".gitignore"), "/.ccnavi/\n/.claude/worktrees/\n/logs/\n*.local\n")
+	shkit.Write(t, filepath.Join(f.ws, "keep.txt"), "1\n2\n3\n")
+	shkit.Write(t, filepath.Join(f.ws, "gone.txt"), "bye\n")
+	shkit.Write(t, filepath.Join(f.ws, "other.txt"), "x\n")
+	shkit.Write(t, filepath.Join(f.ws, "wip/handoff/d.md"), "draft\n")
 	git(t, f.ws, "add", ".")
 	git(t, f.ws, "commit", "-q", "-m", "seed")
 	git(t, f.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
@@ -101,7 +102,7 @@ func (f *itg) cut(name, repo, baseBranch string) string {
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	write(f.t, filepath.Join(f.commonDir(repo), "ccnavi-direct", name),
+	shkit.Write(f.t, filepath.Join(f.commonDir(repo), "ccnavi-direct", name),
 		"version 4\n"+
 			"base_branch "+baseBranch+"\nbase_sha "+head+"\nsnap_sha "+head+"\nsnap_wip no\n"+
 			"side_by_side no\nmain_tree "+real+"\n"+
@@ -131,7 +132,7 @@ func (f *itg) shIn(cwd string, env map[string]string, args ...string) run.Result
 	for k, v := range env {
 		merged[k] = v
 	}
-	return run.Sh(f.t, slash(filepath.Join(f.ws, ".ccnavi", "scripts", "ccnavi-git.sh")), args, run.Opts{Dir: cwd, Env: merged})
+	return run.Sh(f.t, shkit.Slash(filepath.Join(f.ws, ".ccnavi", "scripts", "ccnavi-git.sh")), args, run.Opts{Dir: cwd, Env: merged})
 }
 
 // workInBranch は作業ワークツリーで、変更・追加・削除を 2 コミットに分けて積む。
@@ -139,8 +140,8 @@ func (f *itg) workInBranch() { f.t.Helper(); f.workIn(f.wt) }
 
 func (f *itg) workIn(wt string) {
 	f.t.Helper()
-	write(f.t, filepath.Join(wt, "keep.txt"), "1\n2\nthree\n")
-	write(f.t, filepath.Join(wt, "new.txt"), "new\n")
+	shkit.Write(f.t, filepath.Join(wt, "keep.txt"), "1\n2\nthree\n")
+	shkit.Write(f.t, filepath.Join(wt, "new.txt"), "new\n")
 	git(f.t, wt, "add", ".")
 	git(f.t, wt, "commit", "-q", "-m", "w1")
 	git(f.t, wt, "rm", "-q", "gone.txt")
@@ -149,7 +150,7 @@ func (f *itg) workIn(wt string) {
 
 func (f *itg) advanceMain(name, text string) {
 	f.t.Helper()
-	write(f.t, f.p(name), text)
+	shkit.Write(f.t, f.p(name), text)
 	git(f.t, f.ws, "commit", "-q", "-am", "main moves")
 }
 
@@ -159,7 +160,7 @@ func (f *itg) marker(name string) string {
 
 func (f *itg) markerValue(key, name string) string {
 	f.t.Helper()
-	for _, line := range strings.Split(read(f.t, f.marker(name)), "\n") {
+	for _, line := range strings.Split(shkit.Read(f.t, f.marker(name)), "\n") {
 		if v, ok := strings.CutPrefix(line, key+" "); ok {
 			return v
 		}
@@ -198,7 +199,7 @@ func (f *itg) repoState(repo string) state {
 
 func (f *itg) hook(name, body string) {
 	f.t.Helper()
-	writeExec(f.t, filepath.Join(f.commonDir(""), "hooks", name), "#!/bin/sh\n"+body)
+	shkit.WriteExec(f.t, filepath.Join(f.commonDir(""), "hooks", name), "#!/bin/sh\n"+body)
 }
 
 // code は終了コードが want であることを確かめる（省略は 0）。
@@ -234,14 +235,14 @@ func notContains(t *testing.T, got string, bads ...string) {
 
 func (f *itg) mustExist(path, what string) {
 	f.t.Helper()
-	if !exists(path) {
+	if !shkit.Exists(path) {
 		f.t.Errorf("%s が無い: %s", what, path)
 	}
 }
 
 func (f *itg) mustNotExist(path, what string) {
 	f.t.Helper()
-	if exists(path) {
+	if shkit.Exists(path) {
 		f.t.Errorf("%s が残っている: %s", what, path)
 	}
 }
@@ -255,7 +256,7 @@ func (f *itg) eq(got, want any, what string) {
 
 func (f *itg) commitDraft(rel, text string) {
 	f.t.Helper()
-	write(f.t, filepath.Join(f.wt, filepath.FromSlash(rel)), text)
+	shkit.Write(f.t, filepath.Join(f.wt, filepath.FromSlash(rel)), text)
 	git(f.t, f.wt, "add", "-f", rel)
 	git(f.t, f.wt, "commit", "-q", "-m", "draft")
 }
@@ -266,4 +267,4 @@ func (f *itg) strayCommit(treeish, parent, msg string) string {
 	return gitT(f.t, f.ws, "commit-tree", treeish, "-p", parent, "-m", msg)
 }
 
-func (f *itg) touch(path string) { f.t.Helper(); write(f.t, path, "") }
+func (f *itg) touch(path string) { f.t.Helper(); shkit.Write(f.t, path, "") }

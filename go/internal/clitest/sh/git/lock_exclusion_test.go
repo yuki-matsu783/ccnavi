@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ロックの強制取得の排他を固定する試験（ccnavi-common-lock.sh の ccnavi_lock_take）。古いロックを取り合っても、
@@ -82,12 +83,12 @@ const lockPause = `	if [ -n "${CCNAVI_TEST_PAUSE_DIR:-}" ]; then
 func waitFor(path string, d time.Duration) bool {
 	deadline := time.Now().Add(d)
 	for time.Now().Before(deadline) {
-		if exists(path) {
+		if shkit.Exists(path) {
 			return true
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	return exists(path)
+	return shkit.Exists(path)
 }
 
 type lockWS struct {
@@ -106,7 +107,7 @@ func newLockWS(t *testing.T) *lockWS {
 	if err := os.MkdirAll(l.dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	l.driver = write(t, filepath.Join(tmp, "driver.sh"), lockDriver)
+	l.driver = shkit.Write(t, filepath.Join(tmp, "driver.sh"), lockDriver)
 	return l
 }
 
@@ -125,7 +126,7 @@ func (l *lockWS) staleLock() string {
 		l.t.Fatal(err)
 	}
 	started := time.Now().Unix()
-	write(l.t, filepath.Join(l.lockDir(), "owner"), fmt.Sprintf("%s %s %d %s-%d\n", host, pid, started, pid, started))
+	shkit.Write(l.t, filepath.Join(l.lockDir(), "owner"), fmt.Sprintf("%s %s %d %s-%d\n", host, pid, started, pid, started))
 	return l.lockDir()
 }
 
@@ -147,7 +148,7 @@ func (l *lockWS) start(mode, lockSh string, extra map[string]string) *exec.Cmd {
 
 func TestContendersForAStaleLockNeverOverlap(t *testing.T) {
 	t.Parallel()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	l := newLockWS(t)
 	for round := 0; round < lockRounds; round++ {
 		_ = os.RemoveAll(l.ws)
@@ -162,24 +163,24 @@ func TestContendersForAStaleLockNeverOverlap(t *testing.T) {
 		}
 		// 全員が部品を読み終えて合図を待つまで待つ（決まった時間は待たない）
 		deadline := time.Now().Add(60 * time.Second)
-		for len(withPrefix(names(t, l.dir), "ready.")) != lockContenders && time.Now().Before(deadline) {
+		for len(withPrefix(shkit.Names(t, l.dir), "ready.")) != lockContenders && time.Now().Before(deadline) {
 			time.Sleep(5 * time.Millisecond)
 		}
-		if got := len(withPrefix(names(t, l.dir), "ready.")); got != lockContenders {
+		if got := len(withPrefix(shkit.Names(t, l.dir), "ready.")); got != lockContenders {
 			t.Fatalf("round %d: 取りに行くプロセスが揃わなかった（%d）", round, got)
 		}
-		write(t, filepath.Join(l.dir, "go"), "")
+		shkit.Write(t, filepath.Join(l.dir, "go"), "")
 		for _, p := range procs {
 			_ = p.Wait()
 		}
-		all := names(t, l.dir)
+		all := shkit.Names(t, l.dir)
 		if overlaps := withPrefix(all, "overlap."); len(overlaps) > 0 {
 			t.Fatalf("round %d: 臨界区間が重なった: %v", round, overlaps)
 		}
 		if len(withPrefix(all, "entered.")) < 1 {
 			t.Fatalf("round %d: 古いロックを誰も取れなかった", round)
 		}
-		if exists(filepath.Join(l.dir, "crit")) {
+		if shkit.Exists(filepath.Join(l.dir, "crit")) {
 			t.Fatalf("round %d: 臨界区間の印が残った", round)
 		}
 	}
@@ -187,14 +188,14 @@ func TestContendersForAStaleLockNeverOverlap(t *testing.T) {
 
 func TestALateThiefDoesNotRobTheLockACollectorTookInBetween(t *testing.T) {
 	t.Parallel()
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	l := newLockWS(t)
-	text := read(t, l.lockSh)
+	text := shkit.Read(t, l.lockSh)
 	head := "ccnavi_lock_steal() {\n"
 	if strings.Count(text, head) != 1 {
 		t.Fatal("差し込む場所が見つからない")
 	}
-	patched := write(t, filepath.Join(l.tmp, "ccnavi-common-lock.sh"), strings.Replace(text, head, head+lockPause, 1))
+	patched := shkit.Write(t, filepath.Join(l.tmp, "ccnavi-common-lock.sh"), strings.Replace(text, head, head+lockPause, 1))
 	lock := l.staleLock()
 	// A は古いと判断して、強制取得の入口で止まる。
 	a := l.start("a", patched, map[string]string{"CCNAVI_TEST_PAUSE_DIR": l.dir})
@@ -207,24 +208,24 @@ func TestALateThiefDoesNotRobTheLockACollectorTookInBetween(t *testing.T) {
 	if !waitFor(filepath.Join(l.dir, "b.held"), 60*time.Second) {
 		t.Fatal("B がロックを取れなかった")
 	}
-	mark := strings.TrimSpace(read(t, filepath.Join(l.dir, "b.mark")))
+	mark := strings.TrimSpace(shkit.Read(t, filepath.Join(l.dir, "b.mark")))
 	// A が再開する。
-	write(t, filepath.Join(l.dir, "a.go"), "")
+	shkit.Write(t, filepath.Join(l.dir, "a.go"), "")
 	_ = a.Wait()
-	if exists(filepath.Join(l.dir, "a.entered")) {
+	if shkit.Exists(filepath.Join(l.dir, "a.entered")) {
 		t.Error("A が B のロックを奪った")
 	}
-	if rc := strings.TrimSpace(read(t, filepath.Join(l.dir, "a.rc"))); rc != "1" {
+	if rc := strings.TrimSpace(shkit.Read(t, filepath.Join(l.dir, "a.rc"))); rc != "1" {
 		t.Errorf("A の終了コード = %q, want 1", rc)
 	}
-	if owner := read(t, filepath.Join(lock, "owner")); !strings.Contains(owner, " "+mark) {
+	if owner := shkit.Read(t, filepath.Join(lock, "owner")); !strings.Contains(owner, " "+mark) {
 		t.Errorf("B のロックの持ち主が替わった: %q（B の印 %q）", owner, mark)
 	}
-	write(t, filepath.Join(l.dir, "b.release"), "")
+	shkit.Write(t, filepath.Join(l.dir, "b.release"), "")
 	if err := b.Wait(); err != nil {
 		t.Errorf("B が正常に終わらなかった: %v", err)
 	}
-	if exists(lock) || exists(lock+".steal") {
+	if shkit.Exists(lock) || shkit.Exists(lock+".steal") {
 		t.Error("ロックか .steal が残った")
 	}
 }

@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-fetch.sh の受入テスト。使い捨てのワークスペースを組み立てて sh を外から呼ぶ。
@@ -33,12 +34,12 @@ type fetchEnv struct {
 
 func newFetch(t testing.TB) *fetchEnv {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	f := &fetchEnv{t: t, dir: base.TempDir(t)}
 	f.ws = filepath.Join(f.dir, "ws")
-	f.scripts = copyScripts(t, f.ws, "ccnavi-fetch.sh")
+	f.scripts = shkit.CopyScripts(t, f.ws, "ccnavi-fetch.sh")
 	// 承認済みチケットの置き場。第 1 周はこれがあるツリーだけを見る。
-	mkdir(t, filepath.Join(f.ws, ".ccnavi", "approved", "doing"))
+	shkit.Mkdir(t, filepath.Join(f.ws, ".ccnavi", "approved", "doing"))
 	f.remote = f.repository(f.ws)
 	return f
 }
@@ -47,9 +48,9 @@ func newFetch(t testing.TB) *fetchEnv {
 func (f *fetchEnv) repository(path string) string {
 	f.t.Helper()
 	git(f.t, f.dir, "init", "-q", "-b", "main", path)
-	identity(f.t, path)
-	write(f.t, filepath.Join(path, ".gitignore"), ".claude/worktrees/\n")
-	write(f.t, filepath.Join(path, "README.md"), "seed\n")
+	shkit.Identity(f.t, path)
+	shkit.Write(f.t, filepath.Join(path, ".gitignore"), ".claude/worktrees/\n")
+	shkit.Write(f.t, filepath.Join(path, "README.md"), "seed\n")
 	git(f.t, path, "add", "--", ".gitignore", "README.md")
 	git(f.t, path, "commit", "-q", "-m", "seed")
 	remote := filepath.Join(f.dir, filepath.Base(path)+".git")
@@ -65,9 +66,9 @@ func (f *fetchEnv) repository(path string) string {
 func (f *fetchEnv) advance(remote, branch string) string {
 	f.t.Helper()
 	pusher := filepath.Join(f.dir, "push-"+filepath.Base(remote))
-	if !isDir(pusher) {
+	if !shkit.IsDir(pusher) {
 		git(f.t, f.dir, "clone", "-q", remote, pusher)
-		identity(f.t, pusher)
+		shkit.Identity(f.t, pusher)
 	}
 	git(f.t, pusher, "checkout", "-q", branch)
 	git(f.t, pusher, "pull", "-q", "--ff-only", "origin", branch)
@@ -76,7 +77,7 @@ func (f *fetchEnv) advance(remote, branch string) string {
 		f.t.Fatal(err)
 	}
 	n := strconv.Itoa(len(entries))
-	write(f.t, filepath.Join(pusher, "r"+n+".txt"), "remote\n")
+	shkit.Write(f.t, filepath.Join(pusher, "r"+n+".txt"), "remote\n")
 	git(f.t, pusher, "add", "-A")
 	git(f.t, pusher, "commit", "-q", "-m", "remote "+n)
 	git(f.t, pusher, "push", "-q", "origin", branch)
@@ -88,8 +89,8 @@ func (f *fetchEnv) advanceMain() string { return f.advance(f.remote, "main") }
 
 func (f *fetchEnv) sourceExe() string {
 	path := filepath.Join(f.dir, "source-bin", "ccnavi")
-	if !exists(path) {
-		exeWrapper(f.t, filepath.Dir(path))
+	if !shkit.Exists(path) {
+		shkit.ExeWrapper(f.t, filepath.Dir(path))
 	}
 	return path
 }
@@ -128,7 +129,7 @@ func (f *fetchEnv) spyOnLsRemote(o spyOpts) (map[string]string, string) {
 	bindir := filepath.Join(f.dir, "spy-bin")
 	log := filepath.Join(f.dir, "ls-remote.log")
 	script := "#!/bin/sh\nfor a in \"$@\"; do\n  if [ \"$a\" = ls-remote ]; then\n"
-	script += "    echo \"$*\" >>'" + slash(log) + "'\n"
+	script += "    echo \"$*\" >>'" + shkit.Slash(log) + "'\n"
 	if o.hang {
 		script += "    exec sleep 30\n"
 	}
@@ -139,12 +140,12 @@ func (f *fetchEnv) spyOnLsRemote(o spyOpts) (map[string]string, string) {
 		script += "    printf 'ref: refs/heads/%s\\tHEAD\\n' '" + o.answer + "'; exit 0\n"
 	}
 	script += "  fi\n  if [ \"$a\" = fetch ]; then\n"
-	script += "    echo \"$*\" >>'" + slash(log) + ".fetch'\n"
+	script += "    echo \"$*\" >>'" + shkit.Slash(log) + ".fetch'\n"
 	if o.failFetch {
 		script += "    echo 'fatal: could not read from remote repository' >&2; exit 128\n"
 	}
 	script += "  fi\ndone\nexec '" + lookGit(f.t) + "' \"$@\"\n"
-	writeExec(f.t, filepath.Join(bindir, "git"), script)
+	shkit.WriteExec(f.t, filepath.Join(bindir, "git"), script)
 	return map[string]string{"PATH": bindir + string(os.PathListSeparator) + os.Getenv("PATH")}, log
 }
 
@@ -203,7 +204,7 @@ func TestFetchProjectDefaultBranchAdvances(t *testing.T) {
 	f := newFetch(t)
 	project := filepath.Join(f.ws, "projects", "p")
 	remote := f.repository(project)
-	mkdir(t, filepath.Join(project, ".ccnavi", "approved", "doing"))
+	shkit.Mkdir(t, filepath.Join(project, ".ccnavi", "approved", "doing"))
 	f.leaveMain(project, "claude/p")
 	head := f.advance(remote, "main")
 	done := f.fetch(nil)
@@ -245,7 +246,7 @@ func TestFetchUnreachableOriginIsTriedOnce(t *testing.T) {
 	f := newFetch(t)
 	f.leaveMain("", "claude/x")
 	git(t, f.ws, "branch", "-q", "--set-upstream-to", "origin/main")
-	missing := slash(filepath.Join(f.dir, "nowhere.git"))
+	missing := shkit.Slash(filepath.Join(f.dir, "nowhere.git"))
 	git(t, f.ws, "remote", "set-url", "origin", "file://user:secret@"+strings.TrimLeft(missing, "/"))
 	env, log := f.spyOnLsRemote(spyOpts{})
 	done := code(t, f.fetch(env), 0)
@@ -254,7 +255,7 @@ func TestFetchUnreachableOriginIsTriedOnce(t *testing.T) {
 		// 届かないだけで、認証の話ではない。
 		"認証")
 	// 第 1 周で届かなかった origin には、向け直すための ls-remote を打たない。
-	truth(t, !exists(log), "第 1 周で失敗した origin に ls-remote を打った")
+	truth(t, !shkit.Exists(log), "第 1 周で失敗した origin に ls-remote を打った")
 }
 
 // 401 を返すリモート。尋ねずに失敗し、認証に失敗したことと、ユーザがすることを言う。
@@ -281,7 +282,7 @@ func TestFetchAHangingRemoteIsCutOff(t *testing.T) {
 	t.Parallel()
 	f := newFetch(t)
 	helpers := filepath.Join(f.dir, "bin")
-	writeExec(t, filepath.Join(helpers, "git-remote-slow"), "#!/bin/sh\nsleep 60\n")
+	shkit.WriteExec(t, filepath.Join(helpers, "git-remote-slow"), "#!/bin/sh\nsleep 60\n")
 	git(t, f.ws, "remote", "set-url", "origin", "slow::x")
 	path := helpers + string(os.PathListSeparator) + os.Getenv("PATH")
 	started := time.Now()
@@ -302,7 +303,7 @@ func (f *fetchEnv) family(name string) string {
 	tree := filepath.Join(f.ws, ".claude", "worktrees", name)
 	git(f.t, f.ws, "worktree", "add", "-q", tree, "-b", name, "main")
 	copyRel := ".ccnavi/approved/doing/" + name + ".md"
-	write(f.t, filepath.Join(tree, copyRel), "---\nversion: 1\nticket: "+name+"\n---\n")
+	shkit.Write(f.t, filepath.Join(tree, copyRel), "---\nversion: 1\nticket: "+name+"\n---\n")
 	git(f.t, tree, "add", "--", copyRel)
 	git(f.t, tree, "commit", "-q", "-m", "copy")
 	git(f.t, tree, "push", "-q", "-u", "origin", name)
@@ -314,7 +315,7 @@ func TestFetchAFamilyUnderALockIsSkipped(t *testing.T) {
 	f := newFetch(t)
 	tree := f.family("i0001")
 	lock := filepath.Join(f.ws, "logs", "state", "locks", "self", "i0001")
-	mkdir(t, lock)
+	shkit.Mkdir(t, lock)
 	now := time.Now().Unix()
 	pid := base.LiveShPid(t)
 	host, err := os.Hostname()
@@ -322,13 +323,13 @@ func TestFetchAFamilyUnderALockIsSkipped(t *testing.T) {
 		t.Fatal(err)
 	}
 	stamp := strconv.FormatInt(now, 10)
-	write(t, filepath.Join(lock, "owner"), host+" "+strconv.Itoa(pid)+" "+stamp+" "+strconv.Itoa(pid)+"-"+stamp+"\n")
+	shkit.Write(t, filepath.Join(lock, "owner"), host+" "+strconv.Itoa(pid)+" "+stamp+" "+strconv.Itoa(pid)+"-"+stamp+"\n")
 	before := sha(t, tree, "HEAD")
 	f.advance(f.remote, "i0001")
 	done := f.fetch(nil)
 	eq(t, sha(t, tree, "HEAD"), before, "HEAD")
 	has(t, done.Stdout, "他の操作の最中")
-	truth(t, isDir(lock), "ロックを外した")
+	truth(t, shkit.IsDir(lock), "ロックを外した")
 }
 
 // P がリモートに無くても、その origin を失敗したものに数えない（統合先を飛ばさない）。
@@ -390,7 +391,7 @@ func TestFetchAChangedHostDefaultMovesOriginHeadAndTheBaseFollows(t *testing.T) 
 	// 第 2 周は新しい名前で進む（手元の trunk は無かったので origin/trunk から作る）。
 	eq(t, sha(t, f.ws, "refs/heads/trunk"), head, "trunk")
 	eq(t, sha(t, f.ws, "refs/heads/main"), mainBefore, "main")
-	eq(t, len(strings.Split(strings.TrimRight(read(t, log), "\n"), "\n")), 1, "ls-remote の回数")
+	eq(t, len(strings.Split(strings.TrimRight(shkit.Read(t, log), "\n"), "\n")), 1, "ls-remote の回数")
 }
 
 // 手元に origin/trunk が無い（set-head は失敗する状態）。1 回のセッションで追いつく。
@@ -436,7 +437,7 @@ func TestFetchAnUnreachableHostLeavesOriginHeadAndSaysNothing(t *testing.T) {
 	done := code(t, f.fetch(env), 0)
 	eq(t, strings.TrimSpace(done.Stdout), "", "標準出力")
 	eq(t, f.originHead(f.ws), before, "origin/HEAD")
-	truth(t, exists(log), "ls-remote を打っていない")
+	truth(t, shkit.Exists(log), "ls-remote を打っていない")
 }
 
 // ホストは trunk と答えたが、trunk を取れない（fetch が失敗する）。向け直さない。ls-remote の答えはスタブが返し、fetch はスタブが失敗させる。
@@ -491,15 +492,15 @@ func TestFetchAWorktreeIsFastForwardedWithoutAnyState(t *testing.T) {
 	before := sha(t, tree, "HEAD")
 	head := f.advance(f.remote, "i0001")
 	// 重ならない書きかけ（staged と未追跡）は、進めるのを止めない（重なりは git に任せる）。
-	write(t, filepath.Join(tree, "note.txt"), "書きかけ\n")
+	shkit.Write(t, filepath.Join(tree, "note.txt"), "書きかけ\n")
 	git(t, tree, "add", "--", "note.txt")
-	write(t, filepath.Join(tree, "memo.txt"), "書きかけ\n")
+	shkit.Write(t, filepath.Join(tree, "memo.txt"), "書きかけ\n")
 	done := code(t, f.fetch(nil), 0)
 	truth(t, sha(t, tree, "HEAD") != before, "HEAD が動いていない")
 	eq(t, sha(t, tree, "HEAD"), head, "HEAD")
 	has(t, done.Stdout, "i0001: 親ブランチ")
 	// 書きかけは残る
-	truth(t, exists(filepath.Join(tree, "note.txt")) && exists(filepath.Join(tree, "memo.txt")), "書きかけが消えた")
+	truth(t, shkit.Exists(filepath.Join(tree, "note.txt")) && shkit.Exists(filepath.Join(tree, "memo.txt")), "書きかけが消えた")
 }
 
 // ---- 何も出さないとき
@@ -526,7 +527,7 @@ func TestFetchWithoutTheExecutableItOnlyFetches(t *testing.T) {
 	eq(t, sha(t, f.ws, "refs/remotes/origin/main"), head, "origin/main")
 	eq(t, sha(t, f.ws, "HEAD"), before, "HEAD")
 	eq(t, f.originHead(f.ws), "refs/remotes/origin/main", "origin/HEAD")
-	truth(t, !exists(log), "ls-remote を打った")
+	truth(t, !shkit.Exists(log), "ls-remote を打った")
 	// ブランチを名指しせず、リポジトリごとに `fetch --quiet origin` を 1 回だけ打つ。
 	calls := fetchCalls(t, log)
 	eq(t, len(calls), 1, "fetch の回数")

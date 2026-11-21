@@ -69,18 +69,6 @@ func (tr *Tree) CloseChild(name string) run.Result { return tr.Ccnavi("ticket", 
 // MergeChild は子を親へ合流し、合流の記録を書く（merge）。
 func (tr *Tree) MergeChild(name string) { tr.Merge(name) }
 
-// Origin は origin（空の bare）を作り、親のブランチを push して、結果ファイル（fixture.json）を書く（remote）。
-func (tr *Tree) Origin() ticketkit.Fixture {
-	tr.T.Helper()
-	bare := filepath.Join(tr.Root, "origin.git")
-	tr.Git(tr.Root, "init", "--quiet", "--bare", bare)
-	tr.Git(tr.Root, "remote", "add", "origin", bare)
-	tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
-	f := tr.Fixture()
-	ticketkit.Write(tr.T, f.Path, `{"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": true}}`)
-	return f
-}
-
 // RequestFor はフェーズ phase のレビュー依頼（prepare → requested）を通す（request。結果の投稿先は 1 つ）。
 func (tr *Tree) RequestFor(f ticketkit.Fixture, phase string) run.Result {
 	tr.T.Helper()
