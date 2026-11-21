@@ -21,6 +21,7 @@ type stageWS struct {
 
 func newStageWS(t *testing.T) *stageWS {
 	t.Helper()
+	need(t, "sh")
 	tmp := base.TempDir(t)
 	ws := filepath.Join(tmp, "ws")
 	scripts := copyScripts(t, ws, "ccnavi-stage.sh")

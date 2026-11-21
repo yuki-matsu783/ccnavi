@@ -242,6 +242,9 @@ func gitWith(dir string, env map[string]string, args ...string) (string, int) {
 	if ee, ok := err.(*exec.ExitError); ok {
 		return string(out), ee.ExitCode()
 	}
+	if err != nil {
+		return string(out), -1
+	}
 	return string(out), 0
 }
 

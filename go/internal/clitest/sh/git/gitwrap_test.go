@@ -451,6 +451,19 @@ func TestGitWrapConfigInjectedThroughTheEnvironmentIsDropped(t *testing.T) {
 	}
 }
 
+// 走った機械の git の設定の締め出し（GIT_CONFIG_GLOBAL など）を、ラッパーが外さない。
+func TestGitWrapKeepsTheHostGitConfigLockout(t *testing.T) {
+	t.Parallel()
+	w := newWrap(t)
+	home := t.TempDir()
+	write(t, filepath.Join(home, ".gitconfig"), "[status]\n\tshowUntrackedFiles = no\n")
+	r := w.runEnv(map[string]string{"HOME": home, "USERPROFILE": home}, "status", "--porcelain")
+	w.succeed(r, "status")
+	if !strings.Contains(r.Stdout, "untracked.txt") {
+		t.Errorf("締め出しが外れて HOME の設定を読んだ: %q", r.Stdout)
+	}
+}
+
 // ---- worktree remove の案内（Windows）
 
 // worktree remove が Permission denied で止まったときだけ、立て直し方を案内する。Windows では、プロセスの cwd がそのディレクトリを

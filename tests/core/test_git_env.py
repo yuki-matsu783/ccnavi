@@ -9,7 +9,7 @@
 3. 検査対象の sh が環境を消毒するときに巻き添えで消す。`ccnavi-git.sh` は
    `GIT_CONFIG_COUNT` などを unset していて、そこに名前が足されると気づかないうちに外れる
 
-3 のぶんは `tests/sh/test_gitwrap.py` が持つ（ラッパーを起こす道具があちらにある）。
+3 のぶんは `go/internal/clitest/sh/git/gitwrap_test.go` の `TestGitWrapKeepsTheHostGitConfigLockout` が持つ。
 
 締め出さないと何が起きるかは、2 つとも実際に起きている。`init.defaultBranch = main` を
 持つ機械では `tests/guard/test_post.py` が失敗し、`commit.gpgsign = true` を持つ機械では
