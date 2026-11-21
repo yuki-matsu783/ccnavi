@@ -20,7 +20,7 @@ keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, cl
 | `tests/fake_claude.py` | スタブの本体。実行器が `claude` と同じ引数で起こす |
 | `tests/contract/claudeside.py` | 本物とスタブで共有する場面（使い捨ての木、hook の入力を書き出すだけの hook、打つ手）と、形・振る舞いへのまとめ |
 | `tests/contract/claude/recorded.json` | 本物の `claude -p` から録った形と振る舞い。**本物だけ** |
-| `tests/contract/test_claude_contract.py` | スタブを同じ場面で回し、`recorded.json` と比べる（テストのグループ `contract`。約 4 秒） |
+| `go/internal/clitest/contract/claude/contract_test.go` | スタブ（`go/internal/harness/fakeclaude`）を同じ場面で回し、`recorded.json` と比べる（約 4 秒） |
 | `tests/manual/claude/record_hooks.py` | 本物から録る道具。手で回す（費用がかかる） |
 
 ## スタブで回す
@@ -91,10 +91,10 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 スタブが本物とずれると、スタブでは通るのに本物で壊れる。GitLab の契約（[gitlab-contract.md](gitlab-contract.md)）と同じく、本物から録った形と比べて防ぐ。
 場面は `claudeside.py` が持ち、本物には自然文の `PROMPT`、スタブには同じ手の台本 `SCRIPT` を渡す。
 
-`test_claude_contract.py` が比べるもの:
+`contract_test.go` が比べるもの:
 
 - **形**: スタブが出す欄は本物にもあり、型は本物の型に含まれる（hook の payload はイベントとツールごと、stream-json は `type/subtype` ごと）。本物にだけある欄は比べない。スタブは ccnavi と実行器が読む欄だけを出す
-- **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `READS`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
+- **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `readsFields`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
 - **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境と `settings.json` の `env` が hook に届くか）が本物と同じ。場面の hook の命令は ccnavi と同じく `settings.json` の `env` の変数で組むので、`env` が届かなければ hook が起きず、観察が空になって落ちる
 - 観察には、モデルの答え方で変わるものを入れない。理由の文が現れる行は、モデルが書く行（`assistant`・`result`）を除いた、行の種類の集合で見る。サブエージェントの中の行は数ではなく有無で見る。本物には `run_in_background` を `false` と指示して、サブエージェントを同期に固定する
 

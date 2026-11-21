@@ -3,7 +3,7 @@ stream-json を出す。
 
 受入シナリオを `--agent script` で回すとき、実行器（`tests/scenarios/drive.py`）が
 `claude` の代わりに起こす。仕様は `.agents/docs/claude-contract.md`。形が本物と合っていることは
-`tests/contract/test_claude_contract.py` が、本物から録った
+`go/internal/clitest/contract/claude/contract_test.go` が、本物から録った
 `tests/contract/claude/recorded.json` と比べて確かめる。
 
     python -m tests.fake_claude -p <prompt> --output-format stream-json --verbose \\
