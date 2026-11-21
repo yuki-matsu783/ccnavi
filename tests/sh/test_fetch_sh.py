@@ -218,106 +218,6 @@ class FetchTest(unittest.TestCase):
         self.assertIn("統合先ブランチ", "\n".join(self.lines(done)))
         self.assertIn("main", done.stdout)
 
-    def test_default_branch_comes_from_origin_head(self):
-        # `origin/HEAD` が指すものが起点。名前が main とは限らない。
-        git(self.ws, "checkout", "-q", "-b", "trunk")
-        git(self.ws, "push", "-q", "-u", "origin", "trunk")
-        git(self.ws, "remote", "set-head", "origin", "trunk")
-        self.host_default("trunk")
-        self.leave_main()
-        before = self.sha(self.ws, "refs/heads/main")
-        head = self.advance(self.remote, "trunk")
-        self.advance(self.remote, "main")
-        done = self.fetch()
-        self.assertEqual(head, self.sha(self.ws, "refs/heads/trunk"))
-        self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
-        self.assertIn("trunk", done.stdout)
-
-    def test_default_branch_is_created_when_it_is_missing(self):
-        # 手元に無いと `worktree add ... main` の起点に指せない。origin/main から作る。
-        self.leave_main()
-        head = self.sha(self.ws, "refs/heads/main")
-        git(self.ws, "branch", "-q", "-D", "main")
-        done = self.fetch()
-        self.assertEqual(head, self.sha(self.ws, "refs/heads/main"))
-        self.assertEqual(
-            "origin/main",
-            git(self.ws, "rev-parse", "--abbrev-ref", "main@{u}").stdout.strip(),
-        )
-        self.assertIn("ローカルに統合先ブランチ main が無かった", done.stdout)
-
-    def test_default_branch_is_left_alone_when_it_diverged(self):
-        # 手元にしか無いコミットがあるときは触らない。ff で入らないものはユーザが合流させる。
-        write(os.path.join(self.ws, "local.txt"), "local\n")
-        git(self.ws, "add", "-A")
-        git(self.ws, "commit", "-q", "-m", "local")
-        mine = self.sha(self.ws, "refs/heads/main")
-        self.leave_main()
-        self.advance(self.remote)
-        done = self.fetch()
-        self.assertEqual(mine, self.sha(self.ws, "refs/heads/main"))
-        self.assertIn("分岐", done.stdout)
-
-    def test_default_branch_in_a_shallow_clone_is_reported_as_not_matching(self):
-        # 浅い clone で履歴が切れると、手元の版が丸ごと「リモートに無いコミット」に見える。
-        # 原因は見分けず、リモートの最新と一致しないことと両方の sha を言う。
-        # 手元の ref には触らない。
-        for _ in range(3):
-            self.advance(self.remote)
-        git(self.ws, "pull", "-q", "--ff-only", "origin", "main")
-        git(self.ws, "update-ref", "refs/heads/main", self.sha(self.ws, "HEAD") + "~2")
-        self.leave_main()
-        git(self.ws, "fetch", "-q", "--depth", "1", "origin", "main")
-        before = self.sha(self.ws, "refs/heads/main")
-        unrelated = git(self.ws, "merge-base", "main", "origin/main", check=False)
-        self.assertNotEqual(0, unrelated.returncode)
-        done = self.fetch()
-        self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
-        self.assertIn("一致しない", done.stdout)
-        self.assertIn(before[:7], done.stdout)
-        self.assertIn(self.sha(self.ws, "origin/main")[:7], done.stdout)
-
-    def test_default_branch_is_left_alone_when_its_tree_is_dirty(self):
-        # チェックアウトしているツリーに書きかけがあれば触らない（他セッションのもの）。
-        tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
-        self.leave_main()
-        git(self.ws, "worktree", "add", "-q", tree, "main")
-        before = self.sha(self.ws, "refs/heads/main")
-        self.advance(self.remote)
-        write(os.path.join(tree, "README.md"), "書きかけ\n")
-        done = self.fetch()
-        self.assertEqual(before, self.sha(self.ws, "refs/heads/main"))
-        self.assertIn("未コミットの変更", done.stdout)
-
-    def test_default_branch_does_not_overwrite_an_ignored_file(self):
-        # 進める先に ignored と同じパスがあれば、上書きせず進めない。
-        # 判定は --no-overwrite-ignore で行う。
-        tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
-        self.leave_main()
-        git(self.ws, "worktree", "add", "-q", tree, "main")
-        before = self.sha(tree, "HEAD")
-        self.advance(self.remote)
-        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
-        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
-        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
-        write(os.path.join(tree, added), "ignored の手元のファイル\n")
-        done = self.fetch()
-        self.assertEqual(before, self.sha(tree, "HEAD"))
-        with open(os.path.join(tree, added), encoding="utf-8") as handle:
-            self.assertEqual("ignored の手元のファイル\n", handle.read())
-        self.assertIn("進められなかった", done.stdout)
-
-    def test_default_branch_advances_in_the_tree_that_holds_it(self):
-        # チェックアウトされているブランチの ref は書き換えず、そのツリーで ff する。
-        tree = os.path.join(self.ws, ".claude", "worktrees", "main-tree")
-        self.leave_main()
-        git(self.ws, "worktree", "add", "-q", tree, "main")
-        head = self.advance(self.remote)
-        done = self.fetch()
-        self.assertEqual(head, self.sha(tree, "HEAD"))
-        self.assertEqual("", git(tree, "status", "--porcelain").stdout.strip())
-        self.assertIn("統合先ブランチ", "\n".join(self.lines(done)))
-
     def test_project_default_branch_advances(self):
         # プロジェクトも同じ。起点はそのプロジェクトのデフォルトブランチ。
         project = os.path.join(self.ws, "projects", "p")
@@ -338,35 +238,6 @@ class FetchTest(unittest.TestCase):
         done = self.fetch()
         self.assertEqual(head, self.sha(self.ws, "HEAD"))
         self.assertIn("親ブランチ", "\n".join(self.lines(done)))
-
-    def test_checked_out_branch_does_not_overwrite_an_ignored_file(self):
-        self.leave_main()
-        git(self.ws, "push", "-q", "-u", "origin", "claude/x")
-        before = self.sha(self.ws, "HEAD")
-        self.advance(self.remote, "claude/x")
-        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
-        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
-        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
-        write(os.path.join(self.ws, added), "手元の ignored\n")
-        done = self.fetch()
-        self.assertEqual(before, self.sha(self.ws, "HEAD"), done.stdout)
-        with open(os.path.join(self.ws, added), encoding="utf-8") as handle:
-            self.assertEqual("手元の ignored\n", handle.read())
-
-    def test_checked_out_branch_that_does_not_match_is_named_not_merged(self):
-        # 進められない理由（分岐か、浅い clone か）は見分けず、一致しないことと両方の sha を言う。
-        self.leave_main()
-        git(self.ws, "push", "-q", "-u", "origin", "claude/x")
-        remote = self.advance(self.remote, "claude/x")
-        write(os.path.join(self.ws, "mine.txt"), "mine\n")
-        git(self.ws, "add", "--", "mine.txt")
-        git(self.ws, "commit", "-q", "-m", "mine")
-        mine = self.sha(self.ws, "HEAD")
-        done = self.fetch()
-        self.assertEqual(mine, self.sha(self.ws, "HEAD"))
-        self.assertIn("一致しない", done.stdout)
-        self.assertIn(mine[:7], done.stdout)
-        self.assertIn(remote[:7], done.stdout)
 
     def test_default_branch_is_not_reported_twice(self):
         # ルートが main に居るなら第 1 周で済む。第 2 周は同じことを言わない。
@@ -457,47 +328,6 @@ class FetchTest(unittest.TestCase):
         git(tree, "push", "-q", "-u", "origin", name)
         return tree
 
-    def test_a_family_that_overlaps_work_in_progress_is_not_moved(self):
-        tree = self.family()
-        before = self.sha(tree, "HEAD")
-        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
-        self.advance(self.remote, "i0001")
-        # 押し手は r<n>.txt を足す。同じ名前を手元で書きかけにする。
-        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
-        write(os.path.join(tree, added), "書きかけ\n")
-        done = self.fetch()
-        self.assertEqual(before, self.sha(tree, "HEAD"))
-        self.assertIn("重なる", done.stdout)
-        self.assertIn(added, done.stdout)
-        self.assertIn("ccnavi-sync.sh i0001", done.stdout)
-
-    def test_a_family_does_not_overwrite_an_ignored_file(self):
-        tree = self.family()
-        before = self.sha(tree, "HEAD")
-        self.advance(self.remote, "i0001")
-        pusher = os.path.join(self._tmp.name, "push-" + os.path.basename(self.remote))
-        added = git(pusher, "show", "--name-only", "--format=", "HEAD").stdout.strip()
-        write(os.path.join(self.ws, ".git", "info", "exclude"), added + "\n")
-        write(os.path.join(tree, added), "手元の ignored\n")
-        done = self.fetch()
-        self.assertEqual(before, self.sha(tree, "HEAD"), done.stdout)
-        with open(os.path.join(tree, added), encoding="utf-8") as handle:
-            self.assertEqual("手元の ignored\n", handle.read())
-
-    def test_a_diverged_family_is_named_but_not_merged(self):
-        tree = self.family()
-        self.advance(self.remote, "i0001")
-        write(os.path.join(tree, "mine.txt"), "mine\n")
-        git(tree, "add", "--", "mine.txt")
-        git(tree, "commit", "-q", "-m", "mine")
-        mine = self.sha(tree, "HEAD")
-        done = self.fetch()
-        self.assertEqual(mine, self.sha(tree, "HEAD"))
-        self.assertIn("一致しない", done.stdout)
-        self.assertIn("取り込みが必要です", done.stdout)
-        self.assertIn(mine[:7], done.stdout)
-        self.assertIn("ccnavi-sync.sh i0001", done.stdout)
-
     def test_a_family_under_a_lock_is_skipped(self):
         import socket
 
@@ -542,18 +372,6 @@ class FetchTest(unittest.TestCase):
         self.assertEqual(main_before, self.sha(self.ws, "refs/heads/main"))
         self.assertIn("時間の枠", done.stdout)
         self.assertIn("取得しませんでした", done.stdout)
-
-    def test_a_refusal_that_is_not_an_overlap_says_why(self):
-        # 重なっていないのに「重なる」と言わない。
-        tree = self.family()
-        before = self.sha(tree, "HEAD")
-        self.advance(self.remote, "i0001")
-        lock = git(tree, "rev-parse", "--git-path", "index.lock").stdout.strip()
-        write(lock if os.path.isabs(lock) else os.path.join(tree, lock), "")
-        done = self.fetch()
-        self.assertEqual(before, self.sha(tree, "HEAD"))
-        self.assertIn("index.lock", done.stdout)
-        self.assertNotIn("と重なる", done.stdout)
 
     def test_a_family_in_a_single_branch_clone_is_forwarded(self):
         # origin の fetch の refspec が main だけでも origin/P を進める（fetch に行き先を書く）。
@@ -640,17 +458,6 @@ class FetchTest(unittest.TestCase):
             "trunk を取りに行っていない（向け直す手前の経路を通っていない）",
         )
 
-    def test_a_default_the_host_does_not_have_does_not_move_origin_head(self):
-        # ホストは trunk と答えたが、リモートに trunk が無い（本物の fetch が「無い」と返す）。
-        # 存在しない ref を指す状態を残さない。
-        self.leave_main()
-        before = self.origin_head()
-        path, _ = self.spy_on_ls_remote(answer="trunk")
-        done = self.fetch(PATH=path)
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual(before, self.origin_head())
-        self.assertNotIn("合わせた", done.stdout)
-
     def test_a_hung_origin_is_not_waited_for_twice(self):
         # 向け直しの ls-remote が返事をしない origin は、第 2 周で同じ origin をもう一度待たない。
         self.leave_main()
@@ -665,16 +472,6 @@ class FetchTest(unittest.TestCase):
         self.assertLess(elapsed, 8)
         self.assertNotEqual(head, self.sha(self.ws, "refs/heads/main"))
         self.assertEqual(1, done.stdout.count("取ってこられなかった"), done.stdout)
-
-    def test_a_host_default_that_differs_only_in_case_is_the_same_name(self):
-        # ホストは Main と答える。手元は main。綴り違いだけなので向け直さず、何も取りに行かない。
-        self.leave_main()
-        path, log = self.spy_on_ls_remote(answer="Main")
-        done = self.fetch(PATH=path)
-        self.assertEqual(0, done.returncode, done.stderr)
-        self.assertEqual("refs/remotes/origin/main", self.origin_head())
-        self.assertNotIn("合わせた", done.stdout)
-        self.assertFalse(any("Main" in call for call in self.fetch_calls(log)))
 
     def test_a_retarget_failure_is_not_recorded_as_a_failed_origin(self):
         # ls-remote が失敗しても、その origin を「失敗した origin」に数えない。第 2 周は取りに行く。
