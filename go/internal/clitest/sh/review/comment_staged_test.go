@@ -8,6 +8,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // `comment_staged`（ccnavi-common-review.sh）。エージェントの単発の投稿を操作記録に載せて送る。
@@ -60,15 +61,15 @@ func stagedRun(t *testing.T, env map[string]string, args ...string) (res run.Res
 	if err != nil {
 		t.Skip("jq が無い")
 	}
-	need(t, "sh")
+	shkit.Need(t, "sh")
 	dir = base.TempDir(t)
 	src := base.ScriptsDir()
 	scripts := filepath.Join(dir, "scripts")
 	for _, name := range append(base.CommonSh(t, src), commonRevSh) {
-		write(t, filepath.Join(scripts, name), read(t, filepath.Join(src, name)))
+		shkit.Write(t, filepath.Join(scripts, name), shkit.Read(t, filepath.Join(src, name)))
 	}
-	harness := write(t, filepath.Join(scripts, "harness.sh"), stagedHarness)
-	write(t, filepath.Join(dir, "body.md"), "本文\n")
+	harness := shkit.Write(t, filepath.Join(scripts, "harness.sh"), stagedHarness)
+	shkit.Write(t, filepath.Join(dir, "body.md"), "本文\n")
 	all := map[string]string{"JQ_BIN": filepath.ToSlash(jq), "STATE": dir, "OPID": opID, "ST": "pending", "TRIES": "0", "VERDICT": "send "}
 	for k, v := range env {
 		all[k] = v
@@ -135,7 +136,7 @@ func TestCommentStagedDoesNotPostWhenItCannotBeSure(t *testing.T) {
 			if done.Code != c.code || !strings.Contains(done.Stdout, c.out) || !strings.Contains(done.Stderr, c.err) {
 				t.Errorf("code = %d, stdout = %q, stderr = %q", done.Code, done.Stdout, done.Stderr)
 			}
-			if posted := exists(filepath.Join(dir, "posted.md")); posted != c.posted {
+			if posted := shkit.Exists(filepath.Join(dir, "posted.md")); posted != c.posted {
 				t.Errorf("投稿した = %v, want %v", posted, c.posted)
 			}
 			if !strings.Contains(readIf(filepath.Join(dir, "ops.log")), c.opsLogWord) {

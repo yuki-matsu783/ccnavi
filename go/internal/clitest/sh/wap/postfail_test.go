@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -21,7 +22,7 @@ func (h *hostKit) opsRecords() []map[string]any {
 	var found []map[string]any
 	for _, path := range paths {
 		var record map[string]any
-		if err := json.Unmarshal([]byte(read(h.t, path)), &record); err != nil {
+		if err := json.Unmarshal([]byte(shkit.Read(h.t, path)), &record); err != nil {
 			h.t.Fatal(err)
 		}
 		found = append(found, record)
@@ -45,14 +46,14 @@ func (h *hostKit) stageStates(kind string) []string {
 }
 
 func (h *hostKit) commentArgs() []string {
-	return []string{"comment", "--body-file", write(h.t, filepath.Join(h.base, "comment.md"), "コメント\n")}
+	return []string{"comment", "--body-file", shkit.Write(h.t, filepath.Join(h.base, "comment.md"), "コメント\n")}
 }
 
 // readyExe は ready の補助コメントの下書きを返す実行ファイルの代わり（実際の ready は下書きを置く）。
 func (h *hostKit) readyExe() string {
-	note := write(h.t, filepath.Join(h.base, "ready-note.md"), "Draft を外した\n")
-	return writeExec(h.t, filepath.Join(h.base, "bin", "readyhalf"), "#!/bin/sh\ncase \" $* \" in\n*\" review ready \"*)\n"+
-		"  '"+h.half+"' \"$@\" || exit $?\n  printf '%s\\n' '"+slash(note)+"'\n  exit 0 ;;\nesac\nexec '"+h.half+"' \"$@\"\n")
+	note := shkit.Write(h.t, filepath.Join(h.base, "ready-note.md"), "Draft を外した\n")
+	return shkit.WriteExec(h.t, filepath.Join(h.base, "bin", "readyhalf"), "#!/bin/sh\ncase \" $* \" in\n*\" review ready \"*)\n"+
+		"  '"+h.half+"' \"$@\" || exit $?\n  printf '%s\\n' '"+shkit.Slash(note)+"'\n  exit 0 ;;\nesac\nexec '"+h.half+"' \"$@\"\n")
 }
 
 var badPosts = []struct {
@@ -103,7 +104,7 @@ func TestAFailedOrMalformedPostIsNotReportedAsSuccess(t *testing.T) {
 				if c.kind == "ready" {
 					has(t, done.Stderr, "補助のコメントは未完了")
 				}
-				if c.kind == "request" && exists(filepath.Join(h.tree, parts(approved), "phases", parentID, "1.requested")) {
+				if c.kind == "request" && shkit.Exists(filepath.Join(h.tree, parts(approved), "phases", parentID, "1.requested")) {
 					t.Error("投稿が失敗したのに依頼済みのマーカーを置いた")
 				}
 			})
@@ -164,14 +165,14 @@ func TestARequestRetypedAfterLosingTheOpRecordIsNotPostedTwice(t *testing.T) {
 // （decide の通しの half が使う --accept-plan のスタブと同じ記録）
 func TestTheOpsCLIReadsTheRecordTheStubWrites(t *testing.T) {
 	h := newHostKit(t, hostHalf)
-	spec := write(t, filepath.Join(h.base, "spec.json"), acceptPlanSpec)
+	spec := shkit.Write(t, filepath.Join(h.base, "spec.json"), acceptPlanSpec)
 	planOut := filepath.Join(h.base, "plan.json")
 	okRun(t, run.Command(t, exe.TeststubPath(t), []string{"oprecord", h.state, planOut, spec}))
 	var plan struct {
 		Op string `json:"op"`
 	}
-	if err := json.Unmarshal([]byte(read(t, planOut)), &plan); err != nil || plan.Op == "" {
-		t.Fatalf("計画に op が無い: %v\n%s", err, read(t, planOut))
+	if err := json.Unmarshal([]byte(shkit.Read(t, planOut)), &plan); err != nil || plan.Op == "" {
+		t.Fatalf("計画に op が無い: %v\n%s", err, shkit.Read(t, planOut))
 	}
 	shown := okRun(t, h.exe(opts{}, "ops", "show", plan.Op))
 	var show struct {

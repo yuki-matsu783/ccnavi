@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -32,7 +33,7 @@ func newBinLookup(t *testing.T) *binLookup {
 	notWindows(t)
 	haveCommands(t, "sh")
 	b := &binLookup{t: t, ws: base.TempDir(t)}
-	copyTree(t, base.ScriptsDir(), filepath.Join(b.ws, ".ccnavi", "scripts"), false, nil)
+	shkit.CopyTree(t, base.ScriptsDir(), filepath.Join(b.ws, ".ccnavi", "scripts"))
 	chmod(t, filepath.Join(b.ws, ".ccnavi", "scripts", "ccnavi-launcher.sh"), 0o755)
 	return b
 }
@@ -45,12 +46,12 @@ func (b *binLookup) ticket(extra map[string]string) run.Result {
 }
 
 func (b *binLookup) machineBuild() {
-	writeExec(b.t, filepath.Join(b.ws, ".ccnavi", "bin", exe.HostTarget(), "ccnavi"), stubExe("bin"))
+	shkit.WriteExec(b.t, filepath.Join(b.ws, ".ccnavi", "bin", exe.HostTarget(), "ccnavi"), stubExe("bin"))
 }
 
 func (b *binLookup) pathBuild() string {
 	place := filepath.Join(b.ws, "on-path")
-	writeExec(b.t, filepath.Join(place, "ccnavi"), stubExe("path"))
+	shkit.WriteExec(b.t, filepath.Join(place, "ccnavi"), stubExe("path"))
 	return place
 }
 
@@ -67,12 +68,12 @@ func TestBinLookupOrder(t *testing.T) {
 		}, "bin "},
 		{"ローカルの組み立てが機械の組み立てより先", func(b *binLookup) map[string]string {
 			b.machineBuild()
-			writeExec(b.t, filepath.Join(b.ws, "dist", "ccnavi", "ccnavi"), stubExe("dist"))
+			shkit.WriteExec(b.t, filepath.Join(b.ws, "dist", "ccnavi", "ccnavi"), stubExe("dist"))
 			return nil
 		}, "dist "},
 		{"env があれば env が先", func(b *binLookup) map[string]string {
 			b.machineBuild()
-			writeExec(b.t, filepath.Join(b.ws, "other", "ccnavi"), stubExe("env"))
+			shkit.WriteExec(b.t, filepath.Join(b.ws, "other", "ccnavi"), stubExe("env"))
 			return map[string]string{env.EntryPath: "other/ccnavi"}
 		}, "env "},
 		{"bin もソースも無ければ PATH の ccnavi を使う", func(b *binLookup) map[string]string {

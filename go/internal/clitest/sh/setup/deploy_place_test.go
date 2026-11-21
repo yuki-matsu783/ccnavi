@@ -11,6 +11,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -22,11 +23,11 @@ func TestDeployDeploysTheLauncherNextToTheGateScripts(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	code(t, w.setup("--deploy", makeSource(t, srcOpts{})), 0)
-	eq(t, "振り分けの sh", read(t, w.launcher()), read(t, launcherPath()))
+	eq(t, "振り分けの sh", shkit.Read(t, w.launcher()), shkit.Read(t, launcherPath()))
 	if runtime.GOOS != "windows" && !canExec(w.launcher()) {
 		t.Error("実行ビットが付いていない")
 	}
-	if exists(w.path(".ccnavi", "scripts", thisMachine())) {
+	if shkit.Exists(w.path(".ccnavi", "scripts", thisMachine())) {
 		t.Error("sh の隣に機械ごとの置き場を作った")
 	}
 }
@@ -39,10 +40,10 @@ func TestDeployPutsTheExecutableInTheFixedPlace(t *testing.T) {
 	r := w.setup("--deploy", makeSource(t, srcOpts{}))
 	code(t, r, 0)
 	eq(t, "CCNAVI_ENTRY_PATH", w.envOf()["CCNAVI_ENTRY_PATH"], any(binPath))
-	if !exists(w.built(thisMachine(), "ccnavi")) {
+	if !shkit.Exists(w.built(thisMachine(), "ccnavi")) {
 		t.Error("実行ファイルを配っていない")
 	}
-	if got := names(t, w.path(".ccnavi", "bin")); !reflect.DeepEqual(got, []string{thisMachine()}) {
+	if got := shkit.Names(t, w.path(".ccnavi", "bin")); !reflect.DeepEqual(got, []string{thisMachine()}) {
 		t.Errorf("bin/ の中 = %v", got)
 	}
 	notIn(t, r.Stdout, "まだ無いもの")
@@ -65,7 +66,7 @@ func TestDeployRefusesABinValueItDoesNotKnowAndWritesNothing(t *testing.T) {
 		r := w.setup(append([]string{"--mode", "enable", "--deploy", src}, c.args...)...)
 		code(t, r, 2)
 		in(t, r.Stderr, c.message)
-		if got := names(t, w.dir); !reflect.DeepEqual(got, []string{".git"}) {
+		if got := shkit.Names(t, w.dir); !reflect.DeepEqual(got, []string{".git"}) {
 			t.Errorf("%v: 何かを書いた: %v", c.args, got)
 		}
 	}
@@ -126,7 +127,7 @@ func TestBinUserWithoutATerminalWritesNothing(t *testing.T) {
 	r := w.userBin(home, nil, nil, "--deploy", src, "--bin", "user")
 	code(t, r, 2)
 	in(t, r.Stderr, "ターミナルでの確認が要ります")
-	if len(names(t, home)) != 0 || !reflect.DeepEqual(names(t, w.dir), []string{".git"}) {
+	if len(shkit.Names(t, home)) != 0 || !reflect.DeepEqual(shkit.Names(t, w.dir), []string{".git"}) {
 		t.Error("何かを書いた")
 	}
 }
@@ -140,17 +141,17 @@ func TestBinUserAsksOnTheTerminalAndPlacesTheBuildForThePath(t *testing.T) {
 	code(t, r, 0)
 	share := shareDir(home, thisMachine())
 	link := filepath.Join(home, ".local", "bin", "ccnavi")
-	if !exists(filepath.Join(share, "ccnavi")) {
+	if !shkit.Exists(filepath.Join(share, "ccnavi")) {
 		t.Error("実体を置いていない")
 	}
 	if to, err := os.Readlink(link); err != nil || to != filepath.Join(share, "ccnavi") {
 		t.Errorf("リンク = %q, %v", to, err)
 	}
 	// 配布先の .ccnavi/bin/ には置かず、無視する行も追加しない。sh と設定は配る。
-	if exists(w.built(thisMachine())) {
+	if shkit.Exists(w.built(thisMachine())) {
 		t.Error("配布先の bin/ に置いた")
 	}
-	if !exists(w.launcher()) {
+	if !shkit.Exists(w.launcher()) {
 		t.Error("sh を配っていない")
 	}
 	if gi, _ := w.gitignore(); strings.Contains(gi, ".ccnavi/bin/") {
@@ -158,7 +159,7 @@ func TestBinUserAsksOnTheTerminalAndPlacesTheBuildForThePath(t *testing.T) {
 	}
 	// リンクを置く場所が PATH に無ければ、追加する行を知らせる。シェルの設定ファイルには書かない。
 	in(t, r.Stdout, "PATH に入っていません")
-	if got := names(t, home); !reflect.DeepEqual(got, []string{".local"}) {
+	if got := shkit.Names(t, home); !reflect.DeepEqual(got, []string{".local"}) {
 		t.Errorf("ホームの中 = %v", got)
 	}
 	notIn(t, r.Stdout, "まだ無いもの")
@@ -172,7 +173,7 @@ func TestBinUserStopsWithoutWritingWhenTheAnswerIsNo(t *testing.T) {
 	r := w.userBin(home, ptr("n"), nil, "--deploy", src, "--bin", "user")
 	code(t, r, 1)
 	in(t, r.Stderr, "中止しました")
-	if len(names(t, home)) != 0 || !reflect.DeepEqual(names(t, w.dir), []string{".git"}) {
+	if len(shkit.Names(t, home)) != 0 || !reflect.DeepEqual(shkit.Names(t, w.dir), []string{".git"}) {
 		t.Error("何かを書いた")
 	}
 }
@@ -193,7 +194,7 @@ func TestBinUserAsksAgainOnlyWhenSomethingWillBeWritten(t *testing.T) {
 	changeSourceBuild(t, src, "新しい組み立て")
 	code(t, w.userBin(home, nil, nil, args...), 2)
 	code(t, w.userBin(home, ptr("y"), nil, args...), 0)
-	eq(t, "置き換えた実体", read(t, filepath.Join(shareDir(home, thisMachine()), "ccnavi")), "新しい組み立て")
+	eq(t, "置き換えた実体", shkit.Read(t, filepath.Join(shareDir(home, thisMachine()), "ccnavi")), "新しい組み立て")
 }
 
 // ---- PATH の案内は、環境に合った追加の仕方を言う
@@ -202,7 +203,7 @@ func TestBinUserAsksAgainOnlyWhenSomethingWillBeWritten(t *testing.T) {
 func fakeUname(t testing.TB, real, system string) string {
 	t.Helper()
 	shim := base.TempDir(t)
-	writeExec(t, filepath.Join(shim, "uname"), "#!/bin/sh\ncase \"$1\" in -s) echo "+system+" ;; *) exec "+real+" \"$@\" ;; esac\n")
+	shkit.WriteExec(t, filepath.Join(shim, "uname"), "#!/bin/sh\ncase \"$1\" in -s) echo "+system+" ;; *) exec "+real+" \"$@\" ;; esac\n")
 	return shim
 }
 
@@ -285,18 +286,18 @@ func TestBinUserOnGitBashPutsTheFolderOnThePathAndMakesNoLink(t *testing.T) {
 	haveCommands(t, "script")
 	w := newTarget(t)
 	src := w.userSource(srcOpts{Target: "windows-x86_64"})
-	write(t, filepath.Join(src, "dist", "ccnavi", "ccnavi.exe"), "exe")
+	shkit.Write(t, filepath.Join(src, "dist", "ccnavi", "ccnavi.exe"), "exe")
 	home := w.userHome()
 	shim := base.TempDir(t)
-	writeExec(t, filepath.Join(shim, "uname"), "#!/bin/sh\ncase \"$1\" in -m) echo x86_64 ;; *) echo MINGW64_NT-10.0 ;; esac\n")
+	shkit.WriteExec(t, filepath.Join(shim, "uname"), "#!/bin/sh\ncase \"$1\" in -m) echo x86_64 ;; *) echo MINGW64_NT-10.0 ;; esac\n")
 	path := strings.Join([]string{shim, pathWithoutLocalBin()}, string(os.PathListSeparator))
 	r := w.userBin(home, ptr("y"), map[string]string{env.Path: path, "SHELL": "/usr/bin/bash"}, "--deploy", src, "--bin", "user")
 	code(t, r, 0)
 	share := shareDir(home, "windows-x86_64")
-	if !exists(filepath.Join(share, "ccnavi.exe")) {
+	if !shkit.Exists(filepath.Join(share, "ccnavi.exe")) {
 		t.Error("exe を置いていない")
 	}
-	if exists(filepath.Join(home, ".local", "bin")) {
+	if shkit.Exists(filepath.Join(home, ".local", "bin")) {
 		t.Error("リンクの置き場を作った")
 	}
 	in(t, r.Stdout, "SetEnvironmentVariable", share)
@@ -327,10 +328,10 @@ func TestBinUserKeepsWhatTheUserAlreadyHas(t *testing.T) {
 		src := w.userSource(srcOpts{})
 		home := w.userHome()
 		link := filepath.Join(home, ".local", "bin", "ccnavi")
-		mkdir(t, filepath.Join(link, "inside"))
+		shkit.Mkdir(t, filepath.Join(link, "inside"))
 		r := w.userBin(home, ptr("y"), nil, "--deploy", src, "--bin", "user", "--force")
 		code(t, r, 0)
-		if !exists(filepath.Join(link, "inside")) || isLink(link) {
+		if !shkit.Exists(filepath.Join(link, "inside")) || isLink(link) {
 			t.Error("ディレクトリを置き換えた")
 		}
 		in(t, r.Stdout, "ディレクトリがあるので、リンクを張れない")
@@ -340,7 +341,7 @@ func TestBinUserKeepsWhatTheUserAlreadyHas(t *testing.T) {
 		w := newTarget(t)
 		src := w.userSource(srcOpts{})
 		home := w.userHome()
-		link := write(t, filepath.Join(home, ".local", "bin", "ccnavi"), "自分で置いたもの")
+		link := shkit.Write(t, filepath.Join(home, ".local", "bin", "ccnavi"), "自分で置いたもの")
 		r := w.userBin(home, ptr("y"), nil, "--deploy", src, "--bin", "user")
 		code(t, r, 0)
 		if isLink(link) {
@@ -358,7 +359,7 @@ func TestBinUserCheckWritesNothingAndDoesNotAsk(t *testing.T) {
 	r := w.userBin(home, nil, nil, "--deploy", src, "--bin", "user", "--check")
 	code(t, r, 1)
 	notIn(t, r.Stdout, "続けますか")
-	if len(names(t, home)) != 0 || !reflect.DeepEqual(names(t, w.dir), []string{".git"}) {
+	if len(shkit.Names(t, home)) != 0 || !reflect.DeepEqual(shkit.Names(t, w.dir), []string{".git"}) {
 		t.Error("何かを書いた")
 	}
 }
@@ -379,7 +380,7 @@ func TestBinUserStillAddsTheWorktreesLine(t *testing.T) {
 // 配る sh の一覧（setup が持つ DEPLOY_SCRIPTS）は、このツリーの .ccnavi/scripts/ の sh と同じ。
 func TestTheDeployedListMatchesTheScriptsInTheTree(t *testing.T) {
 	t.Parallel()
-	found := regexp.MustCompile(`(?m)^DEPLOY_SCRIPTS="([^"]*)"$`).FindStringSubmatch(read(t, scriptPath("ccnavi-setup.sh")))
+	found := regexp.MustCompile(`(?m)^DEPLOY_SCRIPTS="([^"]*)"$`).FindStringSubmatch(shkit.Read(t, scriptPath("ccnavi-setup.sh")))
 	if found == nil {
 		t.Fatal("DEPLOY_SCRIPTS が見つからない")
 	}
@@ -388,7 +389,7 @@ func TestTheDeployedListMatchesTheScriptsInTheTree(t *testing.T) {
 		listed[n] = true
 	}
 	here := map[string]bool{}
-	for _, n := range names(t, base.ScriptsDir()) {
+	for _, n := range shkit.Names(t, base.ScriptsDir()) {
 		if strings.HasSuffix(n, ".sh") || strings.HasSuffix(n, ".js") || strings.HasSuffix(n, ".txt") {
 			here[n] = true
 		}
@@ -411,12 +412,12 @@ func TestDeployNamesThePushScriptWhenTheSourceLacksIt(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{})
-	remove(t, filepath.Join(src, ".ccnavi", "scripts", "ccnavi-user-push-approved.sh"))
+	shkit.Remove(t, filepath.Join(src, ".ccnavi", "scripts", "ccnavi-user-push-approved.sh"))
 	r := w.setup("--mode", "enable", "--deploy", src)
 	in(t, r.Stdout, "まだ無いもの")
 	missing := strings.SplitN(r.Stdout, "まだ無いもの", 2)[1]
 	in(t, missing, "ccnavi-user-push-approved.sh")
-	if exists(w.path(".ccnavi", "scripts", "ccnavi-user-push-approved.sh")) {
+	if shkit.Exists(w.path(".ccnavi", "scripts", "ccnavi-user-push-approved.sh")) {
 		t.Error("無い sh が配られた")
 	}
 	notIn(t, missing, "ccnavi-ticket.sh") // 他の sh は配ったので、一覧には出ない
@@ -429,7 +430,7 @@ func TestDeployNoDeployWritesOnlyTheSettings(t *testing.T) {
 	r := w.setup("--mode", "enable", "--no-deploy")
 	code(t, r, 0)
 	eq(t, "CCNAVI_MODE", w.envOf()["CCNAVI_MODE"], any("enable"))
-	if exists(w.path(".ccnavi", "bin")) {
+	if shkit.Exists(w.path(".ccnavi", "bin")) {
 		t.Error("bin/ を作った")
 	}
 	in(t, r.Stdout, "まだ無いもの", "--no-deploy を外すと")
@@ -438,7 +439,7 @@ func TestDeployNoDeployWritesOnlyTheSettings(t *testing.T) {
 	r2 := w2.setup("--deploy", makeSource(t, srcOpts{}), "--no-deploy")
 	code(t, r2, 2)
 	in(t, r2.Stderr, "ccnavi-setup:")
-	if exists(w2.settingsPath()) {
+	if shkit.Exists(w2.settingsPath()) {
 		t.Error("設定を書いた")
 	}
 }
@@ -453,12 +454,12 @@ func TestDeployCopiesWithoutBeingToldWhereFrom(t *testing.T) {
 	code(t, r, 0)
 	eq(t, "CCNAVI_MODE", w.envOf()["CCNAVI_MODE"], any("enable"))
 	for _, p := range []string{w.built(thisMachine(), "ccnavi"), w.launcher(), w.rules()} {
-		if !exists(p) {
+		if !shkit.Exists(p) {
 			t.Errorf("%s を配っていない", p)
 		}
 	}
 	for _, name := range deployScripts {
-		if !exists(w.path(".ccnavi", "scripts", name)) {
+		if !shkit.Exists(w.path(".ccnavi", "scripts", name)) {
 			t.Errorf("%s を配っていない", name)
 		}
 	}
@@ -484,7 +485,7 @@ func TestDeployWritesTheSettingsWhenTheDefaultSourceIsNotBuilt(t *testing.T) {
 			code(t, r, 0)
 			eq(t, "CCNAVI_MODE", w.envOf()["CCNAVI_MODE"], any("enable"))
 			in(t, r.Stdout, "配っていません", c.say)
-			if exists(w.path(".ccnavi", "bin")) {
+			if shkit.Exists(w.path(".ccnavi", "bin")) {
 				t.Error("実行ファイルを配った")
 			}
 		})
@@ -500,7 +501,7 @@ func TestDeployDoesNotRefuseWhenTheDefaultSourceIsTheTarget(t *testing.T) {
 	r := runCmdArgs(t, script, src, "--mode", "enable")
 	code(t, r, 0)
 	in(t, r.Stdout, "配布元と配布先が同じ")
-	eq(t, "CCNAVI_MODE", parseJSON(t, read(t, filepath.Join(src, ".claude", "settings.json")))["env"].(map[string]any)["CCNAVI_MODE"], any("enable"))
+	eq(t, "CCNAVI_MODE", parseJSON(t, shkit.Read(t, filepath.Join(src, ".claude", "settings.json")))["env"].(map[string]any)["CCNAVI_MODE"], any("enable"))
 }
 
 // 実行の許しを外さない。外れていると hook は「実行ファイルが無い」ではなく「起動できない」で何も言わずに失敗する。
@@ -520,11 +521,11 @@ func TestDeployRunningTwiceDoesNotCopyAgain(t *testing.T) {
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{})
 	w.setup("--deploy", src)
-	write(t, w.rules(), "# このプロジェクトで直したルール\n")
+	shkit.Write(t, w.rules(), "# このプロジェクトで直したルール\n")
 	r := w.setup("--deploy", src)
 	code(t, r, 0)
 	in(t, r.Stdout, "配布先に既にあるので配っていないもの")
-	in(t, read(t, w.rules()), "このプロジェクトで直した")
+	in(t, shkit.Read(t, w.rules()), "このプロジェクトで直した")
 }
 
 // 組み立て直して中身が違えば、`--force` が無くても実行ファイルを置き換える（古いままだと、sh との互換の食い違いで hook が働かなくなる）。
@@ -537,22 +538,22 @@ func TestDeployReplacesABuildThatDiffersFromTheSource(t *testing.T) {
 		w := newTarget(t)
 		src := makeSource(t, srcOpts{})
 		w.setup("--deploy", src)
-		stale := write(t, w.built(thisMachine(), "前の版の残り"), "前の版")
-		write(t, w.rules(), "# このプロジェクトで直したルール\n")
+		stale := shkit.Write(t, w.built(thisMachine(), "前の版の残り"), "前の版")
+		shkit.Write(t, w.rules(), "# このプロジェクトで直したルール\n")
 		changeSourceBuild(t, src, "新しい組み立て")
 		r := w.setup("--deploy", src)
 		code(t, r, 0)
 		in(t, r.Stdout, "入れ替えた")
-		eq(t, "実行ファイル", read(t, w.built(thisMachine(), "ccnavi")), "新しい組み立て")
-		if exists(stale) {
+		eq(t, "実行ファイル", shkit.Read(t, w.built(thisMachine(), "ccnavi")), "新しい組み立て")
+		if shkit.Exists(stale) {
 			t.Error("前の版の残りが残った")
 		}
-		for _, n := range names(t, filepath.Dir(w.built(thisMachine()))) {
+		for _, n := range shkit.Names(t, filepath.Dir(w.built(thisMachine()))) {
 			if strings.Contains(n, ".new.") || strings.Contains(n, ".old.") {
 				t.Errorf("途中の置き場が残った: %s", n)
 			}
 		}
-		in(t, read(t, w.rules()), "このプロジェクトで直した")
+		in(t, shkit.Read(t, w.rules()), "このプロジェクトで直した")
 	})
 	t.Run("中身が同じなら置き換えない", func(t *testing.T) {
 		t.Parallel()
@@ -575,7 +576,7 @@ func TestDeployReplacesABuildThatDiffersFromTheSource(t *testing.T) {
 		w.setup("--deploy", src)
 		changeSourceBuild(t, src, "新しい組み立て")
 		code(t, w.setup("--deploy", src, "--check"), 1)
-		eq(t, "実行ファイル", read(t, w.built(thisMachine(), "ccnavi")), "#!/bin/sh\nexit 0\n")
+		eq(t, "実行ファイル", shkit.Read(t, w.built(thisMachine(), "ccnavi")), "#!/bin/sh\nexit 0\n")
 	})
 }
 
@@ -585,15 +586,15 @@ func TestDeployForceReplacesAndDropsThePreviousBuild(t *testing.T) {
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{})
 	w.setup("--deploy", src)
-	stale := write(t, w.built(thisMachine(), "前の版の残り"), "前の版")
-	write(t, w.rules(), "# 直したルール\n")
+	stale := shkit.Write(t, w.built(thisMachine(), "前の版の残り"), "前の版")
+	shkit.Write(t, w.rules(), "# 直したルール\n")
 	r := w.setup("--deploy", src, "--force")
 	code(t, r, 0)
 	in(t, r.Stdout, "入れ替えた")
-	if exists(stale) {
+	if shkit.Exists(stale) {
 		t.Error("前の版の残りが残った")
 	}
-	eq(t, "ルール", read(t, w.rules()), "deny: []\n")
+	eq(t, "ルール", shkit.Read(t, w.rules()), "deny: []\n")
 }
 
 // 組み立てていない配布元では、何も言わずに進まない（報告だけにすると「配ったはずなのに実行ファイルが無い」が最後の一覧にしか出ない）。
@@ -603,7 +604,7 @@ func TestDeployRefusesASourceThatWasNeverBuilt(t *testing.T) {
 	r := w.setup("--deploy", makeSource(t, srcOpts{Unbuilt: true}))
 	code(t, r, 2)
 	in(t, r.Stderr, "scripts/ccnavi-build.sh")
-	if exists(w.settingsPath()) {
+	if shkit.Exists(w.settingsPath()) {
 		t.Error("設定を書いた")
 	}
 }
@@ -615,7 +616,7 @@ func TestDeployNamesWhatTheSourceDoesNotHave(t *testing.T) {
 	r := w.setup("--deploy", makeSource(t, srcOpts{NoParts: true}))
 	code(t, r, 0)
 	in(t, r.Stdout, "配布元に無くて配れないもの", "rules.yml", "ccnavi-launcher.sh")
-	if !exists(w.built(thisMachine(), "ccnavi")) {
+	if !shkit.Exists(w.built(thisMachine(), "ccnavi")) {
 		t.Error("実行ファイルは配るはず")
 	}
 }
@@ -630,7 +631,7 @@ func TestDeployNamesTheLauncherTheSourceDoesNotHave(t *testing.T) {
 	r := w.setup("--deploy", src)
 	code(t, r, 0)
 	wantListed(t, r.Stdout, "配布元に無くて配れないもの", binPath)
-	if exists(w.launcher()) {
+	if shkit.Exists(w.launcher()) {
 		t.Error("別の置き場の sh を配った")
 	}
 	wantListed(t, r.Stdout, "まだ無いもの", binPath)
@@ -644,14 +645,14 @@ func TestDeployPutsTheRunBitBackOnALauncherItKeeps(t *testing.T) {
 	w := newTarget(t)
 	src := makeSource(t, srcOpts{})
 	w.setup("--deploy", src)
-	write(t, w.launcher(), "#!/bin/sh\n# このプロジェクトで直した sh\n")
+	shkit.Write(t, w.launcher(), "#!/bin/sh\n# このプロジェクトで直した sh\n")
 	chmod(t, w.launcher(), 0o644)
 	r := w.setup("--deploy", src)
 	code(t, r, 0)
 	if !canExec(w.launcher()) {
 		t.Error("実行ビットを付け直していない")
 	}
-	in(t, read(t, w.launcher()), "このプロジェクトで直した")
+	in(t, shkit.Read(t, w.launcher()), "このプロジェクトで直した")
 }
 
 // `--check` は配らない。揃っていないので 1 を返し、揃えば 0 を返す。
@@ -662,7 +663,7 @@ func TestDeployCheck(t *testing.T) {
 	r := w.setup("--deploy", src, "--check")
 	code(t, r, 1)
 	in(t, r.Stdout, "配る")
-	if exists(w.path(".ccnavi", "bin")) || exists(w.launcher()) {
+	if shkit.Exists(w.path(".ccnavi", "bin")) || shkit.Exists(w.launcher()) {
 		t.Error("--check が配った")
 	}
 	w.setup("--deploy", src)
@@ -696,9 +697,9 @@ func TestDeployTheRealTree(t *testing.T) {
 	w := newTarget(t)
 	root := base.Root()
 	src := makeSource(t, srcOpts{NoDocs: true})
-	remove(t, filepath.Join(src, ".claude", "skills"))
-	copyTree(t, filepath.Join(root, ".claude", "skills"), filepath.Join(src, ".claude", "skills"), false, nil)
-	copyTree(t, filepath.Join(root, ".ccnavi", "docs"), filepath.Join(src, ".ccnavi", "docs"), false, nil)
+	shkit.Remove(t, filepath.Join(src, ".claude", "skills"))
+	shkit.CopyTree(t, filepath.Join(root, ".claude", "skills"), filepath.Join(src, ".claude", "skills"))
+	shkit.CopyTree(t, filepath.Join(root, ".ccnavi", "docs"), filepath.Join(src, ".ccnavi", "docs"))
 	copyFile(t, base.Final(".ccnavi/CCNAVI.md"), filepath.Join(src, ".ccnavi", "CCNAVI.md"), 0o644)
 	r := w.setup("--mode", "enable", "--force", "--deploy", src)
 	code(t, r, 0)
@@ -706,12 +707,12 @@ func TestDeployTheRealTree(t *testing.T) {
 	t.Run("本物の ccnavi-config のスキルが届き、配布元固有のスキルは配らない", func(t *testing.T) {
 		skill := w.path(".claude", "skills", "ccnavi-config")
 		for _, rel := range []string{"SKILL.md", "references/common/add.md", "references/common/check.md"} {
-			if !exists(filepath.Join(skill, filepath.FromSlash(rel))) {
+			if !shkit.Exists(filepath.Join(skill, filepath.FromSlash(rel))) {
 				t.Errorf("%s が届いていない", rel)
 			}
 		}
 		for _, name := range []string{"commit", "yomiyasu", "eli5", "ccnavi-install"} {
-			if exists(w.path(".claude", "skills", name)) {
+			if shkit.Exists(w.path(".claude", "skills", name)) {
 				t.Errorf("配布元固有の %s を配った", name)
 			}
 		}
@@ -720,24 +721,24 @@ func TestDeployTheRealTree(t *testing.T) {
 	// 配布先の文書が案内する `/<スキル名>` と `.claude/skills/...` が、配布先に実在する。
 	t.Run("配った文書は配布先にあるものだけを指す", func(t *testing.T) {
 		deployed := map[string]bool{}
-		for _, n := range names(t, w.path(".claude", "skills")) {
+		for _, n := range shkit.Names(t, w.path(".claude", "skills")) {
 			deployed[n] = true
 		}
 		docs := []string{w.path(".ccnavi", "CCNAVI.md")}
-		for _, n := range names(t, w.path(".ccnavi", "docs")) {
+		for _, n := range shkit.Names(t, w.path(".ccnavi", "docs")) {
 			if strings.HasSuffix(n, ".md") {
 				docs = append(docs, w.path(".ccnavi", "docs", n))
 			}
 		}
 		// 配布元の .claude/skills にあるスキル名を、配布先にも無ければならない名前として拾う（組み込みのコマンドは拾わない）。
 		source := map[string]bool{}
-		for _, n := range names(t, filepath.Join(root, ".claude", "skills")) {
+		for _, n := range shkit.Names(t, filepath.Join(root, ".claude", "skills")) {
 			source[n] = true
 		}
 		slash := regexp.MustCompile("`/([a-z][a-z0-9-]*)(?:\\s[^`]*)?`")
 		ref := regexp.MustCompile(`\.claude/skills/[A-Za-z0-9._/\-]+`)
 		for _, path := range docs {
-			text := read(t, path)
+			text := shkit.Read(t, path)
 			rel, _ := filepath.Rel(w.dir, path)
 			for _, m := range slash.FindAllStringSubmatch(text, -1) {
 				if source[m[1]] && !deployed[m[1]] {
@@ -749,7 +750,7 @@ func TestDeployTheRealTree(t *testing.T) {
 				if loc[1] < len(text) && text[loc[1]] == '*' {
 					continue // glob（範囲の例）は場所の案内ではない
 				}
-				if !exists(w.path(strings.Split(target, "/")...)) {
+				if !shkit.Exists(w.path(strings.Split(target, "/")...)) {
 					t.Errorf("%s: %s は配布先に無い", rel, target)
 				}
 			}
@@ -768,7 +769,7 @@ func TestDeployTheRealTree(t *testing.T) {
 		skills := w.path(".claude", "skills")
 		for _, rel := range listing(t, skills) {
 			path := filepath.Join(skills, filepath.FromSlash(rel))
-			text := read(t, path)
+			text := shkit.Read(t, path)
 			for label, re := range forbidden {
 				if re.MatchString(text) {
 					t.Errorf("%s: %s", rel, label)
@@ -777,7 +778,7 @@ func TestDeployTheRealTree(t *testing.T) {
 			// 同じスキルの中を指すリンクは、配布先で辿れる。
 			if filepath.Base(path) == "SKILL.md" {
 				for _, m := range link.FindAllStringSubmatch(text, -1) {
-					if !exists(filepath.Join(filepath.Dir(path), filepath.FromSlash(m[1]))) {
+					if !shkit.Exists(filepath.Join(filepath.Dir(path), filepath.FromSlash(m[1]))) {
 						t.Errorf("%s: %s は配布先に無い", rel, m[1])
 					}
 				}
@@ -797,7 +798,7 @@ func TestDeployPlacesABuildForAnotherMachineInItsOwnPlace(t *testing.T) {
 		w := newTarget(t)
 		r := w.setup("--deploy", makeSource(t, srcOpts{Target: anotherMachine}))
 		code(t, r, 0)
-		if !exists(w.built(anotherMachine, "ccnavi")) || exists(w.built(thisMachine())) {
+		if !shkit.Exists(w.built(anotherMachine, "ccnavi")) || shkit.Exists(w.built(thisMachine())) {
 			t.Error("置き場が違う")
 		}
 		in(t, r.Stdout, anotherMachine+" 向け", "まだ無いもの", thisMachine()+"/ccnavi")
@@ -807,7 +808,7 @@ func TestDeployPlacesABuildForAnotherMachineInItsOwnPlace(t *testing.T) {
 		w := newTarget(t)
 		r := w.copied(installScript(t, makeSource(t, srcOpts{Target: anotherMachine})))
 		code(t, r, 0)
-		if !exists(w.built(anotherMachine, "ccnavi")) || !exists(w.settingsPath()) {
+		if !shkit.Exists(w.built(anotherMachine, "ccnavi")) || !shkit.Exists(w.settingsPath()) {
 			t.Error("置き場が違う")
 		}
 	})
@@ -820,7 +821,7 @@ func TestDeployKeepsBuildsForTwoMachinesSideBySide(t *testing.T) {
 	w.setup("--deploy", makeSource(t, srcOpts{Target: anotherMachine}))
 	r := w.setup("--deploy", makeSource(t, srcOpts{}))
 	code(t, r, 0)
-	if !exists(w.built(anotherMachine, "ccnavi")) || !exists(w.built(thisMachine(), "ccnavi")) {
+	if !shkit.Exists(w.built(anotherMachine, "ccnavi")) || !shkit.Exists(w.built(thisMachine(), "ccnavi")) {
 		t.Error("片方が残っていない")
 	}
 	notIn(t, r.Stdout, "まだ無いもの")
@@ -831,13 +832,13 @@ func TestDeployABuildForThisMachineCarriesNoNoteAndNoMark(t *testing.T) {
 	w := newTarget(t)
 	r := w.setup("--deploy", makeSource(t, srcOpts{}))
 	code(t, r, 0)
-	if !exists(w.built(thisMachine(), "ccnavi")) {
+	if !shkit.Exists(w.built(thisMachine(), "ccnavi")) {
 		t.Error("実行ファイルを配っていない")
 	}
 	notIn(t, r.Stdout, "確かめていません", "向けで")
 	// 目印は dist/ccnavi/ の外にあるので、配布先へはコピーされない。
 	for _, parts := range [][]string{{".ccnavi", "ccnavi.target"}, {".ccnavi", "bin", "ccnavi.target"}, {".ccnavi", "bin", thisMachine(), "ccnavi.target"}} {
-		if exists(w.path(parts...)) {
+		if shkit.Exists(w.path(parts...)) {
 			t.Errorf("目印を配った: %v", parts)
 		}
 	}
@@ -850,7 +851,7 @@ func TestDeployASourceWithoutTheMark(t *testing.T) {
 	r := w.setup("--deploy", makeSource(t, srcOpts{NoTarget: true}))
 	code(t, r, 2)
 	in(t, r.Stderr, "ccnavi.target")
-	if exists(w.settingsPath()) {
+	if shkit.Exists(w.settingsPath()) {
 		t.Error("設定を書いた")
 	}
 }
@@ -862,7 +863,7 @@ func TestDeployRefusesAMarkThatWouldLeaveThePlace(t *testing.T) {
 		w := newTarget(t)
 		r := w.setup("--deploy", makeSource(t, srcOpts{Target: mark}))
 		code(t, r, 2)
-		if exists(w.path(".ccnavi", "escape")) || exists(w.path("escape")) {
+		if shkit.Exists(w.path(".ccnavi", "escape")) || shkit.Exists(w.path("escape")) {
 			t.Errorf("%s: 置き場の外へ書いた", mark)
 		}
 	}
@@ -889,7 +890,7 @@ func TestSetupLeavesAPathItDidNotWriteAndNamesIt(t *testing.T) {
 		if !named {
 			t.Errorf("名指しする行が無い:\n%s", r.Stdout)
 		}
-		if !exists(w.built(thisMachine(), "ccnavi")) {
+		if !shkit.Exists(w.built(thisMachine(), "ccnavi")) {
 			t.Error("実行ファイルは配るはず")
 		}
 	})

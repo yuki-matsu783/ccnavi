@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -45,12 +46,12 @@ func (l *launcherEnv) put(place, target, name string, code int) {
 	} else {
 		where = filepath.Base(place)
 	}
-	writeExec(l.t, filepath.Join(place, target, name),
+	shkit.WriteExec(l.t, filepath.Join(place, target, name),
 		fmt.Sprintf("#!/bin/sh\nprintf \"%%s|%%s|%%s\" \"%s/%s/%s\" \"$*\" \"$(cat)\"\nexit %d\n", where, target, name, code))
 }
 
 func (l *launcherEnv) pretend(uname string) {
-	writeExec(l.t, filepath.Join(l.fake, "uname"), fmt.Sprintf("#!/bin/sh\necho %q\n", uname))
+	shkit.WriteExec(l.t, filepath.Join(l.fake, "uname"), fmt.Sprintf("#!/bin/sh\necho %q\n", uname))
 }
 
 type launch struct {
@@ -153,7 +154,7 @@ func TestLauncherInAWorktreeWithoutBinStartsTheBuildInTheMainRoot(t *testing.T) 
 	run.Git(t, l.dir, "add", ".ccnavi/scripts")
 	run.Git(t, l.dir, "commit", "-q", "-m", "i")
 	run.Git(t, l.dir, "worktree", "add", "-q", filepath.Join(l.dir, "wt"))
-	if exists(filepath.Join(l.dir, "wt", ".ccnavi", "bin")) {
+	if shkit.Exists(filepath.Join(l.dir, "wt", ".ccnavi", "bin")) {
 		t.Fatal("ワークツリーに bin/ がある")
 	}
 	r := l.run(launch{args: []string{"x"}, argv: []string{"sh", filepath.Join(l.dir, "wt", ".ccnavi", "scripts", "ccnavi-launcher.sh")}})
@@ -253,7 +254,7 @@ func TestLauncherSaysWhichMachineHasNoBuildAndWhereItLooked(t *testing.T) {
 // bin/ に無いときだけ PATH の ccnavi を使う。
 func (l *launcherEnv) onPath(name, where string) string {
 	place := filepath.Join(l.dir, "on-path")
-	writeExec(l.t, filepath.Join(place, name), fmt.Sprintf("#!/bin/sh\nprintf \"%%s|%%s\" \"%s\" \"$*\"\n", where))
+	shkit.WriteExec(l.t, filepath.Join(place, name), fmt.Sprintf("#!/bin/sh\nprintf \"%%s|%%s\" \"%s\" \"$*\"\n", where))
 	return place
 }
 
@@ -290,7 +291,7 @@ func TestLauncherSkipsRelativeAndEmptyPathEntries(t *testing.T) {
 	t.Parallel()
 	l := newLauncher(t)
 	l.pretend("Linux x86_64")
-	writeExec(t, filepath.Join(l.dir, "evil", "ccnavi"), "#!/bin/sh\nprintf \"evil\"\n")
+	shkit.WriteExec(t, filepath.Join(l.dir, "evil", "ccnavi"), "#!/bin/sh\nprintf \"evil\"\n")
 	for _, entry := range []string{"evil", "", "."} {
 		r := l.run(launch{pathDirs: []string{entry}, dir: l.dir})
 		code(t, r, 127)
@@ -328,7 +329,7 @@ func TestLauncherFindsACcnaviInAPathEntryWithASpace(t *testing.T) {
 	l := newLauncher(t)
 	l.pretend("Linux x86_64")
 	spaced := filepath.Join(l.dir, "a b")
-	writeExec(t, filepath.Join(spaced, "ccnavi"), "#!/bin/sh\nprintf \"spaced\"\n")
+	shkit.WriteExec(t, filepath.Join(spaced, "ccnavi"), "#!/bin/sh\nprintf \"spaced\"\n")
 	r := l.run(launch{pathDirs: []string{spaced}})
 	eq(t, "stdout", r.Stdout, "spaced")
 }

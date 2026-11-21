@@ -12,6 +12,7 @@ import (
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/hoststub"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-branches.sh の受入テスト。使い捨てのワークスペースを組み、sh を外から呼ぶ。ホストは PATH の先頭に置いた curl のスタブが
@@ -70,16 +71,16 @@ type branchesWS struct {
 
 func newBranchesWS(t *testing.T) *branchesWS {
 	t.Helper()
-	need(t, "sh", "git", "jq")
+	shkit.Need(t, "sh", "git", "jq")
 	tmp := base.TempDir(t)
 	b := &branchesWS{t: t, ws: filepath.Join(tmp, "ws")}
 	seedRepo(t, b.ws, "main")
 	for _, name := range []string{"feature-152-login", "fix/1520-other"} {
 		git(t, b.ws, "branch", name)
 	}
-	write(t, filepath.Join(b.ws, ".gitignore"), "logs/\n.ccnavi/\nprojects/\n")
-	copyScripts(t, b.ws, "ccnavi-branches.sh")
-	b.exe = exeWrapper(t, filepath.Join(tmp, "exe"))
+	shkit.Write(t, filepath.Join(b.ws, ".gitignore"), "logs/\n.ccnavi/\nprojects/\n")
+	shkit.CopyScripts(t, b.ws, "ccnavi-branches.sh")
+	b.exe = shkit.ExeWrapper(t, filepath.Join(tmp, "exe"))
 	b.bin = filepath.Join(tmp, "bin")
 	hoststub.WriteShim(t, filepath.Join(b.bin, "curl"), exe.TeststubPath(t), "curl")
 	// gh / glab があっても使わせない（疎通の試しで失敗して curl に切り替わる）

@@ -22,6 +22,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -36,48 +37,6 @@ func launcherPath() string { return filepath.Join(base.ScriptsDir(), "ccnavi-lau
 
 // scriptPath は scripts/ の下の導入の sh。
 func scriptPath(name string) string { return filepath.Join(base.Root(), "scripts", name) }
-
-func write(t testing.TB, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func writeExec(t testing.TB, path, text string) string {
-	t.Helper()
-	write(t, path, text)
-	if err := os.Chmod(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func mkdir(t testing.TB, path string) string {
-	t.Helper()
-	if err := os.MkdirAll(path, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func read(t testing.TB, path string) string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
-}
-
-func exists(path string) bool {
-	_, err := os.Lstat(path)
-	return err == nil
-}
 
 func isLink(path string) bool {
 	info, err := os.Lstat(path)
@@ -96,13 +55,6 @@ func chmod(t testing.TB, path string, mode os.FileMode) {
 	}
 }
 
-func remove(t testing.TB, path string) {
-	t.Helper()
-	if err := os.RemoveAll(path); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func symlink(t testing.TB, target, link string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
@@ -111,20 +63,6 @@ func symlink(t testing.TB, target, link string) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-}
-
-// names はディレクトリの直下の名前（名前順）。
-func names(t testing.TB, dir string) []string {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	out := []string{}
-	for _, e := range entries {
-		out = append(out, e.Name())
-	}
-	return out
 }
 
 // listing は base の下の全ファイルの相対パス（`/` 区切り、名前順）。リンクはファイルとして数える。
@@ -148,52 +86,9 @@ func listing(t testing.TB, base string) []string {
 	return found
 }
 
-// copyTree は src の中身を dst へ写す。リンクはリンク先の中身を写す（symlinks=true ならリンクのまま）。
-func copyTree(t testing.TB, src, dst string, keepLinks bool, skip func(rel string) bool) {
-	t.Helper()
-	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(src, path)
-		if rel == "." {
-			return os.MkdirAll(dst, 0o755)
-		}
-		if skip != nil && skip(filepath.ToSlash(rel)) {
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		target := filepath.Join(dst, rel)
-		if d.Type()&os.ModeSymlink != 0 && keepLinks {
-			to, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(to, target)
-		}
-		info, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		return os.WriteFile(target, data, info.Mode().Perm())
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func copyFile(t testing.TB, from, to string, mode os.FileMode) {
 	t.Helper()
-	write(t, to, read(t, from))
+	shkit.Write(t, to, shkit.Read(t, from))
 	chmod(t, to, mode)
 }
 
@@ -255,7 +150,7 @@ func pathWith(dirs ...string) string {
 
 func gitInit(t testing.TB, dir string) {
 	t.Helper()
-	mkdir(t, dir)
+	shkit.Mkdir(t, dir)
 	run.Git(t, "", "init", "-q", dir)
 }
 

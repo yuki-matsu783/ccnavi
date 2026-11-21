@@ -5,12 +5,14 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"ccnavi/internal/harness/shkit"
 )
 
 // VS Code へ渡す設定（docs/50_guide/install.md「VS Code からワークツリーを見る」と対）。ccnavi は作業を .claude/worktrees/ の中でさせる。
 // この 1 行が無いと、エディタからはワークスペースルートのブランチしか見えないまま作業が進む。
 
-func vscodeText(w *target) string { return read(w.t, w.vscodePath()) }
+func vscodeText(w *target) string { return shkit.Read(w.t, w.vscodePath()) }
 
 func TestVscodeCreatesTheFileWhenItIsNotThere(t *testing.T) {
 	t.Parallel()
@@ -31,7 +33,7 @@ func TestVscodeKeepsOtherSettingsAndRunningTwiceChangesNothing(t *testing.T) {
 	eq(t, "editor.tabSize", landed["editor.tabSize"], any(float64(2)))
 	eq(t, "git.detectWorktrees", landed["git.detectWorktrees"], any(true))
 	eq(t, "git.repositoryScanMaxDepth", landed["git.repositoryScanMaxDepth"], any(float64(2)))
-	if !exists(w.vscodePath() + ".bak") {
+	if !shkit.Exists(w.vscodePath() + ".bak") {
 		t.Error("バックアップを取っていない")
 	}
 
@@ -40,7 +42,7 @@ func TestVscodeKeepsOtherSettingsAndRunningTwiceChangesNothing(t *testing.T) {
 	before := vscodeText(w2)
 	code(t, w2.setup(), 0)
 	eq(t, "打ち直したあと", vscodeText(w2), before)
-	if exists(w2.vscodePath() + ".bak") {
+	if shkit.Exists(w2.vscodePath() + ".bak") {
 		t.Error("打ち直しでバックアップを取った")
 	}
 }
@@ -63,7 +65,7 @@ func TestVscodeDoesNotTouchAFileItCannotRead(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	jsonc := "{\n  // worktree は見せない\n  \"git.detectWorktrees\": false\n}\n"
-	write(t, w.vscodePath(), jsonc)
+	shkit.Write(t, w.vscodePath(), jsonc)
 	r := w.setup()
 	code(t, r, 0)
 	eq(t, ".vscode/settings.json", vscodeText(w), jsonc)
@@ -77,7 +79,7 @@ func TestVscodeNoVscodeLeavesItAlone(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	code(t, w.setup("--no-vscode"), 0)
-	if exists(w.vscodePath()) {
+	if shkit.Exists(w.vscodePath()) {
 		t.Error("--no-vscode が書いた")
 	}
 	code(t, w.setup("--check", "--no-vscode"), 0)
@@ -90,7 +92,7 @@ func TestVscodeCheckIsNotSettledWhenTheLineIsMissing(t *testing.T) {
 	r := w.setup("--check")
 	code(t, r, 1)
 	in(t, r.Stdout, "git.detectWorktrees")
-	if exists(w.vscodePath()) {
+	if shkit.Exists(w.vscodePath()) {
 		t.Error("--check が書いた")
 	}
 }
@@ -110,16 +112,16 @@ const (
 func sourceWithExe(t *testing.T, body string) string {
 	t.Helper()
 	src := makeSource(t, srcOpts{})
-	write(t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), body)
+	shkit.Write(t, filepath.Join(src, "dist", "ccnavi", "ccnavi"), body)
 	return src
 }
 
 func lintCalls(t *testing.T, log string) []string {
 	t.Helper()
-	if !exists(log) {
+	if !shkit.Exists(log) {
 		return nil
 	}
-	return strings.Split(strings.TrimRight(read(t, log), "\n"), "\n")
+	return strings.Split(strings.TrimRight(shkit.Read(t, log), "\n"), "\n")
 }
 
 func TestLintRunsOnceAtTheEndAndShowsItAsIsAndCheckDoesNotRunIt(t *testing.T) {

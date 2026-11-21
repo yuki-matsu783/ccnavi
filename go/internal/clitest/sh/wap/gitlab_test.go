@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -137,7 +138,7 @@ type hostKit struct {
 
 // newHostKit は GitLab の代わりをつなぐ。template は実行ファイルの代わり（hostHalf か half）。
 func newHostKit(t *testing.T, template string) *hostKit {
-	need(t, "jq", "curl")
+	shkit.Need(t, "jq", "curl")
 	k := newKit(t)
 	h := &hostKit{kit: k, gl: newGitlab(t)}
 	h.path = k.rawShim("shim", fill(urlGit, "URL", h.gl.repoURL(), "GIT", k.gitPath))
@@ -170,7 +171,7 @@ func (h *hostKit) carried(rel string) {
 // carriedAfterDrop は ready が親のワークツリーを消したあと。親のブランチ（ワークスペースの側）で確かめる。
 func (h *hostKit) carriedAfterDrop(rel string) {
 	h.t.Helper()
-	if exists(h.tree) {
+	if shkit.Exists(h.tree) {
 		h.t.Errorf("親のワークツリーが残っている")
 	}
 	has(h.t, strings.Join(h.committedIn(h.ws, parentID), "\n"), rel)

@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -87,37 +88,27 @@ type pushKit struct {
 // newPushKit はワークスペースを組む。withAgree なら ccnavi-user-agree.sh も写す。
 func newPushKit(t *testing.T, withAgree bool) *pushKit {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	t.Parallel()
 	p := &pushKit{t: t, tmp: base.TempDir(t), exe: exe.ShPath(t)}
 	p.ws = filepath.Join(p.tmp, "ws")
-	scripts := filepath.Join(p.ws, ".ccnavi", "scripts")
-	from := base.ScriptsDir()
-	names := append([]string{pushApproved}, base.CommonSh(t, from)...)
+	names := []string{pushApproved}
 	if withAgree {
 		names = append(names, "ccnavi-user-agree.sh")
 	}
-	for _, name := range names {
-		write(t, filepath.Join(scripts, name), read(t, filepath.Join(from, name)))
-	}
+	shkit.CopyScripts(t, p.ws, names...)
 	run.Git(t, p.tmp, "init", "-q", "-b", "main", p.ws)
-	p.configure(p.ws)
-	write(t, filepath.Join(p.ws, ".gitignore"), ".claude/worktrees/\n")
-	write(t, filepath.Join(p.ws, "README.md"), "seed\n")
+	shkit.Identity(p.t, p.ws)
+	shkit.Write(t, filepath.Join(p.ws, ".gitignore"), ".claude/worktrees/\n")
+	shkit.Write(t, filepath.Join(p.ws, "README.md"), "seed\n")
 	run.Git(t, p.ws, "add", "--", ".gitignore", "README.md", ".ccnavi/scripts")
 	run.Git(t, p.ws, "commit", "-q", "-m", "seed")
 	p.remote = filepath.Join(p.tmp, "origin.git")
 	run.Git(t, p.tmp, "init", "-q", "--bare", p.remote)
 	run.Git(t, p.ws, "remote", "add", "origin", p.remote)
-	p.stub = writeExec(t, filepath.Join(p.tmp, "write-and-push-bin", "ccnavi"),
+	p.stub = shkit.WriteExec(t, filepath.Join(p.tmp, "write-and-push-bin", "ccnavi"),
 		fill(notWriteAndPush, "COMPAT", exe.Compat(t), "EXE", p.exe))
 	return p
-}
-
-func (p *pushKit) configure(dir string) {
-	for _, kv := range [][2]string{{"user.email", "t@example.invalid"}, {"user.name", "t"}, {"commit.gpgsign", "false"}} {
-		run.Git(p.t, dir, "config", kv[0], kv[1])
-	}
 }
 
 func (p *pushKit) git(dir string, args ...string) string {
@@ -137,11 +128,11 @@ func (p *pushKit) worktree(name string, detach bool) string {
 
 // place は承認済みの親チケット（着手前。push のゲートは最初の push として通す）を置く。
 func (p *pushKit) place(tree, ticket string) string {
-	return write(p.t, filepath.Join(tree, parts(approvedDoing), ticket+".md"), "---\nversion: 1\nticket: "+ticket+"\ntitle: t\n---\n")
+	return shkit.Write(p.t, filepath.Join(tree, parts(approvedDoing), ticket+".md"), "---\nversion: 1\nticket: "+ticket+"\ntitle: t\n---\n")
 }
 
 func (p *pushKit) env(extra map[string]string) map[string]string {
-	out := map[string]string{env.EntryPath: slash(p.stub)}
+	out := map[string]string{env.EntryPath: shkit.Slash(p.stub)}
 	for name, value := range extra {
 		out[name] = value
 	}
@@ -165,8 +156,8 @@ func (p *pushKit) push(args ...string) run.Result {
 // repository はワークスペースの下の別のリポジトリに bare のリモートを付けて、リモートのパスを返す。
 func (p *pushKit) repository(path, branch string) string {
 	p.git(p.tmp, "init", "-q", "-b", "main", path)
-	p.configure(path)
-	write(p.t, filepath.Join(path, "README.md"), "project\n")
+	shkit.Identity(p.t, path)
+	shkit.Write(p.t, filepath.Join(path, "README.md"), "project\n")
 	p.git(path, "add", "--", "README.md")
 	p.git(path, "commit", "-q", "-m", "seed")
 	p.git(path, "checkout", "-q", "-b", branch)
@@ -227,8 +218,8 @@ func TestCommitsOnlyTheApprovedPlaceAndPushes(t *testing.T) {
 	p := newPushKit(t, false)
 	tree := p.worktree(parentID, false)
 	p.place(tree, parentID)
-	write(t, filepath.Join(tree, "README.md"), "書きかけ\n")
-	write(t, filepath.Join(tree, "src", "draft.py"), "x\n")
+	shkit.Write(t, filepath.Join(tree, "README.md"), "書きかけ\n")
+	shkit.Write(t, filepath.Join(tree, "src", "draft.py"), "x\n")
 	r := p.push()
 	code(t, r, 0)
 	eq(t, "件名", p.subject(tree), carryMessage)
@@ -246,7 +237,7 @@ func TestDoesNotCarryChangesSomeoneElseStaged(t *testing.T) {
 	p := newPushKit(t, false)
 	tree := p.worktree(parentID, false)
 	p.place(tree, parentID)
-	write(t, filepath.Join(tree, "README.md"), "ステージ済みの書きかけ\n")
+	shkit.Write(t, filepath.Join(tree, "README.md"), "ステージ済みの書きかけ\n")
 	p.git(tree, "add", "--", "README.md")
 	code(t, p.push(), 0)
 	eq(t, "件名", p.subject(tree), carryMessage)
@@ -261,11 +252,11 @@ func TestLeftoverFlowTempFilesAreNotCarried(t *testing.T) {
 	p := newPushKit(t, false)
 	tree := p.worktree(parentID, false)
 	flowsDir := filepath.Join(tree, ".ccnavi", "approved", "flows")
-	write(t, filepath.Join(flowsDir, "i0001-01-01.yml"), "nodes: []\n")
-	temp := write(t, filepath.Join(flowsDir, ".i0001-01-01.yml.123.abcdef.tmp"), "half")
+	shkit.Write(t, filepath.Join(flowsDir, "i0001-01-01.yml"), "nodes: []\n")
+	temp := shkit.Write(t, filepath.Join(flowsDir, ".i0001-01-01.yml.123.abcdef.tmp"), "half")
 	code(t, p.push(), 0)
 	eqList(t, "コミット", p.committed(tree), []string{".ccnavi/approved/flows/i0001-01-01.yml"})
-	if !exists(temp) {
+	if !shkit.Exists(temp) {
 		t.Error("一時ファイルを消した")
 	}
 	eq(t, "索引", p.staged(tree), "")
@@ -284,15 +275,15 @@ func TestARemovedDraftIsCarriedWithTheFlow(t *testing.T) {
 	rewritten := drafts + "/i0001-01-02.yml"
 	untracked := drafts + "/i0001-01-03.yml"
 	for _, rel := range []string{taken, rewritten} {
-		write(t, filepath.Join(tree, parts(rel)), "nodes: []\n")
+		shkit.Write(t, filepath.Join(tree, parts(rel)), "nodes: []\n")
 	}
 	p.git(tree, "add", "--", taken, rewritten)
 	p.git(tree, "commit", "-q", "-m", "drafts")
 	flow := ".ccnavi/approved/flows/i0001-01-01.yml"
-	write(t, filepath.Join(tree, parts(flow)), "nodes: []\n")
-	remove(t, filepath.Join(tree, parts(taken)))
-	write(t, filepath.Join(tree, parts(rewritten)), "nodes: [x]\n")
-	write(t, filepath.Join(tree, parts(untracked)), "nodes: []\n")
+	shkit.Write(t, filepath.Join(tree, parts(flow)), "nodes: []\n")
+	shkit.Remove(t, filepath.Join(tree, parts(taken)))
+	shkit.Write(t, filepath.Join(tree, parts(rewritten)), "nodes: [x]\n")
+	shkit.Write(t, filepath.Join(tree, parts(untracked)), "nodes: []\n")
 	r := p.push()
 	code(t, r, 0)
 	// 同じ中身なので、改名として読まずに 2 つのパスで見る。
@@ -311,10 +302,10 @@ func TestDraftsAloneAreNotCarried(t *testing.T) {
 	p := newPushKit(t, false)
 	tree := p.worktree(parentID, false)
 	taken := "wip/proposals/flows/i0001-01-01.yml"
-	write(t, filepath.Join(tree, parts(taken)), "nodes: []\n")
+	shkit.Write(t, filepath.Join(tree, parts(taken)), "nodes: []\n")
 	p.git(tree, "add", "--", taken)
 	p.git(tree, "commit", "-q", "-m", "draft")
-	remove(t, filepath.Join(tree, parts(taken)))
+	shkit.Remove(t, filepath.Join(tree, parts(taken)))
 	before := p.head(tree)
 	r := p.push()
 	code(t, r, 0)
@@ -328,7 +319,7 @@ func TestNothingToCarrySaysSo(t *testing.T) {
 	p := newPushKit(t, false)
 	tree := p.worktree(parentID, false)
 	// 置き場の外の書きかけはコミットするものに数えない。
-	write(t, filepath.Join(tree, "README.md"), "書きかけ\n")
+	shkit.Write(t, filepath.Join(tree, "README.md"), "書きかけ\n")
 	before := p.head(tree)
 	r := p.push()
 	code(t, r, 0)
@@ -394,7 +385,7 @@ func TestAProjectIsJudgedByItsOwnIntegration(t *testing.T) {
 	eq(t, "プロジェクトのリモート", p.headOf(remote, "develop-v1.0.0"), p.head(project))
 
 	// プロジェクト側の origin/HEAD が develop-v1.0.0 なら、そのプロジェクトでは止まる。
-	write(t, filepath.Join(project, parts(approvedDoing), "i0002.md"), "approved\n")
+	shkit.Write(t, filepath.Join(project, parts(approvedDoing), "i0002.md"), "approved\n")
 	before := p.headOf(remote, "develop-v1.0.0")
 	p.git(project, "update-ref", ref, "HEAD")
 	p.git(project, "symbolic-ref", "refs/remotes/origin/HEAD", ref)
@@ -432,7 +423,7 @@ func (p *pushKit) sentParent() string {
 	p.git(tree, "push", "-q", "-u", "origin", parentID)
 	p.git(p.tmp, "--git-dir", p.remote, "update-ref", "-d", "refs/heads/"+parentID)
 	// 着手済みの承認済み親チケット（送った形跡になる）
-	write(p.t, filepath.Join(tree, parts(approvedDoing), parentID+".md"),
+	shkit.Write(p.t, filepath.Join(tree, parts(approvedDoing), parentID+".md"),
 		"---\nversion: 1\nticket: "+parentID+"\nstarted_at: 2026-01-01T00:00:00Z\ntitle: 親\n---\n")
 	return tree
 }
@@ -449,7 +440,7 @@ func TestAParentGoneFromTheRemoteIsCommittedButNotPushed(t *testing.T) {
 	has(t, r.Stderr, "コミットはローカルに残っている")
 	// ユーザがターミナルで元の名前に戻せば、打ち直して送れる。
 	p.git(tree, "push", "-q", "origin", parentID)
-	write(t, filepath.Join(tree, parts(approvedDoing), "i0002.md"), "approved\n")
+	shkit.Write(t, filepath.Join(tree, parts(approvedDoing), "i0002.md"), "approved\n")
 	code(t, p.push(), 0)
 	eq(t, "リモート", p.remoteHead(parentID), p.head(tree))
 }
@@ -473,7 +464,7 @@ func TestWithoutTheExecutableOnlyATrackedBranchIsChecked(t *testing.T) {
 	p.git(project, "push", "-q", "-u", "origin", "work")
 	p.git(p.tmp, "--git-dir", remote, "update-ref", "-d", "refs/heads/work")
 	p.place(project, parentID)
-	gone := p.env(map[string]string{env.EntryPath: slash(filepath.Join(p.tmp, "no-such-bin"))})
+	gone := p.env(map[string]string{env.EntryPath: shkit.Slash(filepath.Join(p.tmp, "no-such-bin"))})
 	r := p.runSh(pushApproved, opts{env: gone})
 	code(t, r, 1)
 	has(t, r.Stderr, "実行ファイルが答えないため")
@@ -543,7 +534,7 @@ func TestAFailedAddInOneTreeDoesNotStopTheOthers(t *testing.T) {
 	p.place(locked, parentID)
 	before := p.head(locked)
 	// そのツリーのインデックスを他のプロセスが握っている形。git add が失敗する。
-	write(t, filepath.Join(p.git(locked, "rev-parse", "--absolute-git-dir"), "index.lock"), "")
+	shkit.Write(t, filepath.Join(p.git(locked, "rev-parse", "--absolute-git-dir"), "index.lock"), "")
 	tree := p.worktree("i0002", false)
 	p.place(tree, "i0002")
 	r := p.push()
@@ -647,11 +638,11 @@ func TestPathCarriesOnlyTheNamedPaths(t *testing.T) {
 	tree := p.worktree(parentID, false)
 	p.place(tree, parentID)
 	p.place(tree, "i0009")
-	gone := write(t, filepath.Join(tree, "wip", "proposals", "todo", "i0001.md"), "proposal\n")
+	gone := shkit.Write(t, filepath.Join(tree, "wip", "proposals", "todo", "i0001.md"), "proposal\n")
 	p.git(tree, "add", "--", gone)
 	p.git(tree, "commit", "-q", "-m", "approval-request")
-	remove(t, gone)
-	review := write(t, filepath.Join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
+	shkit.Remove(t, gone)
+	review := shkit.Write(t, filepath.Join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
 	other := p.worktree("i0002", false)
 	p.place(other, "i0002")
 	rel := ".claude/worktrees/i0001"
@@ -713,7 +704,7 @@ type approveKit struct{ *pushKit }
 
 func newApproveKit(t *testing.T) *approveKit {
 	p := newPushKit(t, true)
-	p.stub = writeExec(t, filepath.Join(p.tmp, "bin", "ccnavi"), fill(approveStub, "COMPAT", exe.Compat(t), "EXE", p.exe))
+	p.stub = shkit.WriteExec(t, filepath.Join(p.tmp, "bin", "ccnavi"), fill(approveStub, "COMPAT", exe.Compat(t), "EXE", p.exe))
 	return &approveKit{p}
 }
 
@@ -723,7 +714,7 @@ func (a *approveKit) approve(extra map[string]string, ids ...string) run.Result 
 }
 
 func (a *approveKit) received(path string) []string {
-	return strings.Split(strings.TrimRight(read(a.t, path), "\n"), "\n")
+	return strings.Split(strings.TrimRight(shkit.Read(a.t, path), "\n"), "\n")
 }
 
 // 並べた識別子だけを承認の対象にする（同じ親の承認待ちのうち 1 本だけを先に承認する形）。識別子の無い承認は全部の承認待ちを対象にする。
@@ -742,7 +733,7 @@ func TestApprovePassesTheIdsAfterUserAgree(t *testing.T) {
 			a := newApproveKit(t)
 			a.worktree(parentID, false)
 			args := filepath.Join(a.tmp, "args")
-			okRun(t, a.approve(map[string]string{"STUB_ARGS": slash(args)}, c.ids...))
+			okRun(t, a.approve(map[string]string{"STUB_ARGS": shkit.Slash(args)}, c.ids...))
 			got := a.received(args)
 			eqList(t, "先頭", got[:1], []string{"--root"})
 			// 実行ファイルには、書いたパスの一覧（--record-writes）と、書けたパスの報告の書き出し先（--placed-out）も渡す
@@ -765,10 +756,10 @@ func TestApproveRefusesWordsThatAreNotIds(t *testing.T) {
 	tree := a.worktree(parentID, false)
 	args := filepath.Join(a.tmp, "args")
 	for _, ids := range [][]string{{"--yes", "i0002"}, {"i0002", "--root", "/elsewhere"}, {"-x"}, {""}, {"--help", "i0002-01-01"}} {
-		r := a.approve(map[string]string{"STUB_ARGS": slash(args), "STUB_TREE": slash(tree)}, ids...)
+		r := a.approve(map[string]string{"STUB_ARGS": shkit.Slash(args), "STUB_TREE": shkit.Slash(tree)}, ids...)
 		code(t, r, 2)
 		has(t, r.Stderr, "チケットID以外の引数")
-		if exists(args) {
+		if shkit.Exists(args) {
 			t.Errorf("%q: 実行ファイルを呼んだ", ids)
 		}
 		eq(t, "リモート", a.remoteHead(parentID), "")
@@ -787,7 +778,7 @@ func TestApproveHelpStillShowsUsage(t *testing.T) {
 func TestApproveCarriesAfterApproval(t *testing.T) {
 	a := newApproveKit(t)
 	tree := a.worktree(parentID, false)
-	code(t, a.approve(map[string]string{"STUB_TREE": slash(tree)}), 0)
+	code(t, a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree)}), 0)
 	eq(t, "件名", a.subject(tree), carryMessage)
 	eqList(t, "コミット", a.committed(tree), []string{approvedDoing + "/i0001.md"})
 	eq(t, "リモート", a.remoteHead(parentID), a.head(tree))
@@ -818,7 +809,7 @@ func TestAFailedApprovalCarriesNothing(t *testing.T) {
 func TestAPartialApprovalStillCarriesWhatWasPlaced(t *testing.T) {
 	a := newApproveKit(t)
 	tree := a.worktree(parentID, false)
-	r := a.approve(map[string]string{"STUB_TREE": slash(tree), "STUB_AFTER_EXIT": "4"})
+	r := a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree), "STUB_AFTER_EXIT": "4"})
 	code(t, r, 1)
 	eq(t, "件名", a.subject(tree), carryMessage)
 	eqList(t, "コミット", a.committed(tree), []string{approvedDoing + "/i0001.md"})
@@ -832,7 +823,7 @@ func TestAPartialApprovalReportsTheWrittenAndTheFailed(t *testing.T) {
 	tree := a.worktree(parentID, false)
 	report := `{"version":1,"placed":["/w/.ccnavi/approved/doing/i0001.md"],` +
 		`"failed":[{"ticket":"i0001-01-01","reason":"保存できませんでした"}],"unwritten":[],"rejected":[]}`
-	r := a.approve(map[string]string{"STUB_TREE": slash(tree), "STUB_AFTER_EXIT": "4", "STUB_REPORT": report})
+	r := a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree), "STUB_AFTER_EXIT": "4", "STUB_REPORT": report})
 	code(t, r, 1)
 	eqList(t, "コミット", a.committed(tree), []string{approvedDoing + "/i0001.md"})
 	eq(t, "リモート", a.remoteHead(parentID), a.head(tree))
@@ -846,9 +837,9 @@ func TestAPartialApprovalReportsTheWrittenAndTheFailed(t *testing.T) {
 func TestApproveShowsAChangeLeftInTheParentWorktree(t *testing.T) {
 	a := newApproveKit(t)
 	tree := a.worktree(parentID, false)
-	report := `{"placed":["` + slash(tree) + `/` + approvedDoing + `/i0001.md"],"failed":[],"unwritten":[],` +
+	report := `{"placed":["` + shkit.Slash(tree) + `/` + approvedDoing + `/i0001.md"],"failed":[],"unwritten":[],` +
 		`"rejected":[],"dirty_parent":[{"ticket":"i0001","paths":["index.html"]}]}`
-	r := a.approve(map[string]string{"STUB_TREE": slash(tree), "STUB_REPORT": report})
+	r := a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree), "STUB_REPORT": report})
 	code(t, r, 0)
 	has(t, r.Stderr, "dirty_parent=")
 	has(t, r.Stderr, "index.html")
@@ -861,7 +852,7 @@ func TestAPartialApprovalWhosePushFailsNamesTheUnsentPaths(t *testing.T) {
 	a := newApproveKit(t)
 	tree := a.worktree(parentID, false)
 	a.git(a.ws, "remote", "set-url", "origin", filepath.Join(a.tmp, "missing.git"))
-	r := a.approve(map[string]string{"STUB_TREE": slash(tree), "STUB_AFTER_EXIT": "4", "STUB_REPORT": `{"placed":[]}`})
+	r := a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree), "STUB_AFTER_EXIT": "4", "STUB_REPORT": `{"placed":[]}`})
 	code(t, r, 1)
 	eq(t, "件名", a.subject(tree), carryMessage)
 	has(t, r.Stderr, "未送信")
@@ -873,10 +864,10 @@ func TestApproveCarriesOnlyWhatTheApprovalWrote(t *testing.T) {
 	a := newApproveKit(t)
 	tree := a.worktree(parentID, false)
 	a.place(tree, "i0009")
-	review := write(t, filepath.Join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
+	review := shkit.Write(t, filepath.Join(tree, "wip", "proposals", "review", "i0008.md"), "review\n")
 	other := a.worktree("i0002", false)
 	a.place(other, "i0002")
-	r := a.approve(map[string]string{"STUB_TREE": slash(tree)})
+	r := a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree)})
 	code(t, r, 0)
 	eqList(t, "コミット", a.committed(tree), []string{approvedDoing + "/i0001.md"})
 	eq(t, "リモート", a.remoteHead(parentID), a.head(tree))
@@ -909,6 +900,6 @@ func TestAFailedPushDoesNotFailTheApproval(t *testing.T) {
 	a := newApproveKit(t)
 	a.git(a.ws, "remote", "set-url", "origin", filepath.Join(a.tmp, "missing.git"))
 	tree := a.worktree(parentID, false)
-	code(t, a.approve(map[string]string{"STUB_TREE": slash(tree)}), 0)
+	code(t, a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree)}), 0)
 	eq(t, "件名", a.subject(tree), carryMessage)
 }

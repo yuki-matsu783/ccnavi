@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-sync.sh のロック（mkdir で取り、ホスト名・pid・開始時刻を書く。古いロックは mv で強制取得する）。
@@ -42,7 +43,7 @@ func TestSyncLock(t *testing.T) {
 		// 強制取得の操作は 1 つずつ。取得用のロック（<ロック>.steal）が新しければ強制取得せずに待つ。
 		{"another thief holds the steal gate", func(s *syncEnv) (string, map[string]string) {
 			lock := s.ownLock(s.deadPid(), now(), "")
-			mkdir(s.t, lock+".steal")
+			shkit.Mkdir(s.t, lock+".steal")
 			return lock, nil
 		}, 1, false, true, false},
 		// CCNAVI_LOCK_HELD の持ち主の情報がロックの持ち主と合わなければ入れ子として扱わない。
@@ -66,9 +67,9 @@ func TestSyncLock(t *testing.T) {
 				has(t, done.Stdout, "ロックを他の操作が持っている")
 			}
 			eq(t, sha(t, s.tree, "HEAD") == head, c.wantMerged, "取り込みが進んだか")
-			eq(t, exists(lock), c.lockKept, "ロックが残っているか")
+			eq(t, shkit.Exists(lock), c.lockKept, "ロックが残っているか")
 			if c.wantCode == 0 && !c.lockKept {
-				truth(t, !exists(lock+".steal"), "取得用のロックが残っている")
+				truth(t, !shkit.Exists(lock+".steal"), "取得用のロックが残っている")
 			}
 		})
 	}

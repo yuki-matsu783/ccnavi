@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/shkit"
 )
 
 // ccnavi-worktree.sh の受入テスト。
@@ -85,26 +86,26 @@ type wtEnv struct {
 // newWorktree はワークスペース（ディレクトリ名 wsName）と bare の origin を組む。
 func newWorktree(t testing.TB, wsName string) *wtEnv {
 	t.Helper()
-	need(t, "sh", "git")
+	shkit.Need(t, "sh", "git")
 	w := &wtEnv{t: t, dir: base.TempDir(t), wsName: wsName}
 	w.bare = filepath.Join(w.dir, "origin.git")
 	git(t, w.dir, "init", "-q", "--bare", "-b", "main", w.bare)
 	w.ws = filepath.Join(w.dir, wsName)
-	mkdir(t, w.ws)
+	shkit.Mkdir(t, w.ws)
 	git(t, w.dir, "init", "-q", "-b", "main", w.ws)
-	identity(t, w.ws)
-	write(t, filepath.Join(w.ws, ".gitignore"), "logs/\n.ccnavi/\n.claude/\n")
+	shkit.Identity(t, w.ws)
+	shkit.Write(t, filepath.Join(w.ws, ".gitignore"), "logs/\n.ccnavi/\n.claude/\n")
 	git(t, w.ws, "add", ".gitignore")
 	git(t, w.ws, "commit", "-q", "-m", "seed")
 	git(t, w.ws, "push", "-q", w.bare, "main")
 	git(t, w.ws, "remote", "add", "origin", worktreeOrigin)
 	git(t, w.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
 	git(t, w.ws, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-	copyScripts(t, w.ws, "ccnavi-worktree.sh", "ccnavi-git.sh")
+	shkit.CopyScripts(t, w.ws, "ccnavi-worktree.sh", "ccnavi-git.sh")
 	base.PutMessages(t, w.ws)
-	w.exe = exeWrapper(t, filepath.Join(w.dir, "exe"))
+	w.exe = shkit.ExeWrapper(t, filepath.Join(w.dir, "exe"))
 	w.bin = filepath.Join(w.dir, "bin")
-	writeExec(t, filepath.Join(w.bin, "git"), strings.NewReplacer("%GIT%", lookGit(t), "%BARE%", slash(w.bare)).Replace(worktreeGit))
+	shkit.WriteExec(t, filepath.Join(w.bin, "git"), strings.NewReplacer("%GIT%", lookGit(t), "%BARE%", shkit.Slash(w.bare)).Replace(worktreeGit))
 	return w
 }
 
@@ -154,7 +155,7 @@ func (w *wtEnv) recordPath(name string) string {
 // record は取り込みの記録（`キー 値` の行）。
 func (w *wtEnv) record(name string) map[string]string {
 	out := map[string]string{}
-	for _, line := range strings.Split(read(w.t, w.recordPath(name)), "\n") {
+	for _, line := range strings.Split(shkit.Read(w.t, w.recordPath(name)), "\n") {
 		if k, v, found := strings.Cut(line, " "); found {
 			out[k] = v
 		}
@@ -192,14 +193,14 @@ func (w *wtEnv) makeFeatureWithOrigin() {
 // dirtyRoot は追跡済みの変更 1・新規 1・staged 1 の書きかけ。
 func (w *wtEnv) dirtyRoot() {
 	w.t.Helper()
-	write(w.t, filepath.Join(w.ws, "tracked.txt"), "v1\n")
+	shkit.Write(w.t, filepath.Join(w.ws, "tracked.txt"), "v1\n")
 	git(w.t, w.ws, "add", "tracked.txt")
 	git(w.t, w.ws, "commit", "-q", "-m", "tracked")
 	git(w.t, w.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
 	git(w.t, w.ws, "push", "-q", w.bare, "main")
-	write(w.t, filepath.Join(w.ws, "tracked.txt"), "v2 書きかけ\n")
-	write(w.t, filepath.Join(w.ws, "fresh.txt"), "新規\n")
-	write(w.t, filepath.Join(w.ws, "staged.txt"), "staged\n")
+	shkit.Write(w.t, filepath.Join(w.ws, "tracked.txt"), "v2 書きかけ\n")
+	shkit.Write(w.t, filepath.Join(w.ws, "fresh.txt"), "新規\n")
+	shkit.Write(w.t, filepath.Join(w.ws, "staged.txt"), "staged\n")
 	git(w.t, w.ws, "add", "staged.txt")
 }
 
@@ -220,7 +221,7 @@ func (w *wtEnv) parentTree(places map[string]map[string]string) string {
 				text += k + ": " + v + "\n"
 			}
 		}
-		write(w.t, filepath.Join(path, filepath.FromSlash(rel)), text+"---\n本文\n")
+		shkit.Write(w.t, filepath.Join(path, filepath.FromSlash(rel)), text+"---\n本文\n")
 	}
 	return path
 }
@@ -231,7 +232,7 @@ func (w *wtEnv) addProject(name string) string {
 	appendTo(w.t, filepath.Join(w.ws, ".git", "info", "exclude"), "projects/\n")
 	project := filepath.Join(w.ws, "projects", name)
 	git(w.t, w.dir, "init", "-q", "-b", "work", project)
-	identity(w.t, project)
+	shkit.Identity(w.t, project)
 	git(w.t, project, "commit", "-q", "--allow-empty", "-m", "seed")
 	git(w.t, project, "update-ref", "refs/remotes/origin/work", "HEAD")
 	git(w.t, project, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/work")
@@ -244,7 +245,7 @@ func (w *wtEnv) uncordedWorktree(name string, commits int) {
 	git(w.t, w.ws, "worktree", "add", "-q", w.wt(name), "-b", name)
 	for i := 0; i < commits; i++ {
 		n := itoa(i)
-		write(w.t, filepath.Join(w.wt(name), "w"+n+".txt"), "w"+n+"\n")
+		shkit.Write(w.t, filepath.Join(w.wt(name), "w"+n+".txt"), "w"+n+"\n")
 		git(w.t, w.wt(name), "add", "-A")
 		git(w.t, w.wt(name), "commit", "-q", "-m", "work "+n)
 	}
@@ -253,7 +254,7 @@ func (w *wtEnv) uncordedWorktree(name string, commits int) {
 // commitIn は dir に file を書いてコミットする。
 func commitIn(t testing.TB, dir, file, text, message string) {
 	t.Helper()
-	write(t, filepath.Join(dir, file), text)
+	shkit.Write(t, filepath.Join(dir, file), text)
 	git(t, dir, "add", "-A")
 	git(t, dir, "commit", "-q", "-m", message)
 }
@@ -270,7 +271,7 @@ func TestWorktreeARemovedFirstWorktreeIsNotNamed(t *testing.T) {
 	t.Parallel()
 	w := newWorktree(t, "ws")
 	code(t, w.sh("first"), 0)
-	remove(t, w.wt("first"))
+	shkit.Remove(t, w.wt("first"))
 	code(t, w.sh("second"), 0)
 }
 
@@ -278,7 +279,7 @@ func TestWorktreeARemovedFirstWorktreeIsNotNamed(t *testing.T) {
 func TestWorktreeAParentTreeIsToldHowToWithdrawWhatStaysAfterTheSwitch(t *testing.T) {
 	t.Parallel()
 	w := newWorktree(t, "ws")
-	write(t, filepath.Join(w.ws, "wip", "proposals", "todo", "ws.md"), "---\nticket: ws\nissue: 5\nmr: 12\n---\n本文\n")
+	shkit.Write(t, filepath.Join(w.ws, "wip", "proposals", "todo", "ws.md"), "---\nticket: ws\nissue: 5\nmr: 12\n---\n本文\n")
 	git(t, w.ws, "add", "wip")
 	git(t, w.ws, "commit", "-q", "-m", "proposal")
 	git(t, w.ws, "push", "-q", w.bare, "main")
@@ -296,7 +297,7 @@ func (w *wtEnv) assertRefused(r run.Result) {
 	has(w.t, r.Stderr, "直接作業へは切り替えられない")
 	eq(w.t, lineCount(r.Stdout, "\n次: ")+lineCount(r.Stderr, "\n次: "), 1, "次: の行の数")
 	truth(w.t, strings.HasPrefix(lastLine(r.Stderr), "次: "), lastLine(r.Stderr))
-	truth(w.t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(w.t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 	eq(w.t, git(w.t, w.ws, "for-each-ref", "refs/ccnavi"), "", "refs/ccnavi")
 	eq(w.t, git(w.t, w.ws, "branch", "--list", "topic"), "", "ブランチ topic")
 }
@@ -342,13 +343,13 @@ func TestWorktreeAProjectIsCutFromItsOwnMainCheckoutBranch(t *testing.T) {
 	w := newWorktree(t, "ws")
 	project := filepath.Join(w.ws, "projects", "app")
 	git(t, w.dir, "init", "-q", "-b", "work", project)
-	identity(t, project)
+	shkit.Identity(t, project)
 	git(t, project, "commit", "-q", "--allow-empty", "-m", "seed")
 	git(t, project, "update-ref", "refs/remotes/origin/trunk", "HEAD")
 	git(t, project, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
 	r := code(t, w.shIn(project, nil, "topic", "--dry-run"), 0)
 	has(t, r.Stdout, "取り込み先: work（", "リモートのデフォルトは trunk", "デフォルトブランチ（trunk）でない")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 }
 
 // ---- projects/ の変更をワークスペースルートから頼まれたときの案内
@@ -360,7 +361,7 @@ func TestWorktreeACutFromTheRootWithProjectsPointsAtCd(t *testing.T) {
 	r := code(t, w.sh("topic"), 0)
 	has(t, r.Stdout, projectsHint)
 	eq(t, lineCount(r.Stdout, "案内: projects/ の下"), 1, "案内の数")
-	truth(t, isDir(w.wt("topic")), "ワークツリーが無い")
+	truth(t, shkit.IsDir(w.wt("topic")), "ワークツリーが無い")
 	// 案内は次の一手より前。
 	hint, step := -1, -1
 	for i, line := range strings.Split(r.Stdout, "\n") {
@@ -377,7 +378,7 @@ func TestWorktreeACutFromTheRootWithProjectsPointsAtCd(t *testing.T) {
 func TestWorktreeADirectoryInProjectsWithoutARepositoryGetsNoHint(t *testing.T) {
 	t.Parallel()
 	w := newWorktree(t, "ws")
-	mkdir(t, filepath.Join(w.ws, "projects", "notes"))
+	shkit.Mkdir(t, filepath.Join(w.ws, "projects", "notes"))
 	lacks(t, code(t, w.sh("topic"), 0).Stdout, projectsHint)
 }
 
@@ -398,7 +399,7 @@ func TestWorktreeTheHintIsNotPrintedByDryRun(t *testing.T) {
 	r := code(t, w.sh("topic", "--dry-run"), 0)
 	lacks(t, r.Stdout, projectsHint)
 	has(t, r.Stdout, "warn: 直接作業のワークツリー名 topic が")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 }
 
 func TestWorktreeANameInTheFormIsNotWarned(t *testing.T) {
@@ -427,7 +428,7 @@ func TestWorktreeTheLastLineIsTheNextStepWithOneLineCommands(t *testing.T) {
 			has(t, r.Stdout, "warn: 直接作業のワークツリー名 topic が")
 			last := lastLine(r.Stdout)
 			truth(t, strings.HasPrefix(last, "次: 編集はこのワークツリーの下で行います"), last)
-			has(t, last, "Write / Edit に渡すパス: "+slash(w.wt("topic"))+"/…", "が済んでから integrate を打ちます")
+			has(t, last, "Write / Edit に渡すパス: "+shkit.Slash(w.wt("topic"))+"/…", "が済んでから integrate を打ちます")
 			// 名前の警告よりも後ろ。
 			truth(t, strings.LastIndex(r.Stdout, "次:") > strings.Index(r.Stdout, "warn:"), "警告が次の一手より後ろ")
 			// 案内の git は、書いたとおりに新しいシェルで打てる。
@@ -440,15 +441,15 @@ func TestWorktreeTheLastLineIsTheNextStepWithOneLineCommands(t *testing.T) {
 			shell := run.Command(t, "sh", []string{"-c", command}, run.Opts{Dir: "/", Env: map[string]string{"CCNAVI_ENTRY_PATH": w.exe}})
 			eq(t, lastLine(shell.Stdout), "topic", "案内の git の答え ("+shell.Stderr+")")
 			// 既にあるときは切り直さず（中の物は残る）、記録があると言う。最後の行は同じ。
-			write(t, filepath.Join(w.wt("topic"), "keep.txt"), "mine")
+			shkit.Write(t, filepath.Join(w.wt("topic"), "keep.txt"), "mine")
 			again := code(t, w.sh("topic", "--no-wip"), 0)
 			has(t, again.Stdout, "ワークツリーは既にある", "取り込みの記録は、ある（ccnavi-direct/topic）")
 			lacks(t, again.Stdout, "--adopt")
-			truth(t, exists(filepath.Join(w.wt("topic"), "keep.txt")), "中のファイルが消えた")
+			truth(t, shkit.Exists(filepath.Join(w.wt("topic"), "keep.txt")), "中のファイルが消えた")
 			truth(t, strings.HasPrefix(lastLine(again.Stdout), "次: 編集は"), lastLine(again.Stdout))
 			// 2 本目は切れて、1 本目を名指しする。
 			second := code(t, w.sh("second"), 0)
-			truth(t, isDir(w.wt("second")), "2 本目が無い")
+			truth(t, shkit.IsDir(w.wt("second")), "2 本目が無い")
 			has(t, second.Stdout, "作業中の直接作業のワークツリーが他にある: topic")
 		})
 	}
@@ -463,12 +464,12 @@ func TestWorktreeABaseOtherThanTheDefaultBranchNeedsTheAcceptCode(t *testing.T) 
 	// 合わないコードは報告からやり直す。
 	wrong := code(t, w.sh("topic", "--accept", "deadbeef"), 3)
 	has(t, wrong.Stdout, "確認コードが今の状態と合わない")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 	r := code(t, w.sh("topic"), 3)
 	has(t, r.Stdout, "取り込み先 feature/x (", "リモートのデフォルトは main", "取り込み先がデフォルトブランチ（main）でない")
 	lacks(t, r.Stdout, "書きかけ:")
 	accept := codeOf(t, r)
-	truth(t, !exists(w.wt("topic")), "確認の前にワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "確認の前にワークツリーを切った")
 	code(t, w.sh("topic", "--accept", accept), 0)
 	eq(t, w.headOf("topic"), git(t, w.ws, "rev-parse", "feature/x"), "切った HEAD")
 	eq(t, w.record("topic")["confirm"], accept, "confirm")
@@ -493,7 +494,7 @@ func TestWorktreeFetchFailureIsAnUnverifiedRemoteAndAsksForTheAcceptCode(t *test
 	t.Parallel()
 	w := newWorktree(t, "ws")
 	r := code(t, w.shEnv(failFetch, "topic"), 3)
-	truth(t, !exists(w.wt("topic")), "切らずに止まる")
+	truth(t, !shkit.Exists(w.wt("topic")), "切らずに止まる")
 	has(t, r.Stdout, "リモート未確認")
 	has(t, r.Stderr, "Could not resolve host") // 原因の出力を見せる
 	done := code(t, w.shEnv(failFetch, "topic", "--accept", codeOf(t, r)), 0)
@@ -507,7 +508,7 @@ func TestWorktreeAnUnreadableBranchListOfOriginIsAnUnverifiedRemote(t *testing.T
 	lsFail := map[string]string{"FAKE_LS_REMOTE_FAIL": "1"}
 	r := code(t, w.shEnv(lsFail, "topic"), 3)
 	has(t, r.Stdout, "リモート未確認")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 	code(t, w.shEnv(lsFail, "topic", "--accept", codeOf(t, r)), 0)
 }
 
@@ -526,7 +527,7 @@ func TestWorktreeCopyWipTakesTheWipAtTheTimeOfConfirmation(t *testing.T) {
 	eq(t, git(t, w.ws, "rev-parse", "refs/ccnavi/direct/topic/s"), pending, "S の ref")
 	eq(t, git(t, w.ws, "rev-parse", pending+"^"), git(t, w.ws, "rev-parse", "HEAD"), "候補の親")
 	for rel, want := range map[string]string{"tracked.txt": "v2 書きかけ\n", "fresh.txt": "新規\n", "staged.txt": "staged\n"} {
-		eq(t, read(t, filepath.Join(w.wt("topic"), rel)), want, rel)
+		eq(t, shkit.Read(t, filepath.Join(w.wt("topic"), rel)), want, rel)
 	}
 	eq(t, w.record("topic")["snap_wip"], "yes", "snap_wip")
 	eq(t, w.record("topic")["snap_sha"], pending, "snap_sha")
@@ -538,14 +539,14 @@ func TestWorktreeCopyWipTakesTheWipAtTheTimeOfConfirmation(t *testing.T) {
 // 置き場が .gitignore 済みでも、書きかけを含むスナップショットを作れる。
 func (w *wtEnv) leaveWorktreesIgnored() {
 	w.t.Helper()
-	write(w.t, filepath.Join(w.ws, ".gitignore"), "logs/\n.ccnavi/\n/.claude/worktrees/\n")
-	write(w.t, filepath.Join(w.ws, "README.md"), "# readme\n")
+	shkit.Write(w.t, filepath.Join(w.ws, ".gitignore"), "logs/\n.ccnavi/\n/.claude/worktrees/\n")
+	shkit.Write(w.t, filepath.Join(w.ws, "README.md"), "# readme\n")
 	git(w.t, w.ws, "add", ".gitignore", "README.md")
 	git(w.t, w.ws, "commit", "-q", "-m", "ignore worktrees")
 	git(w.t, w.ws, "update-ref", "refs/remotes/origin/main", "HEAD")
 	git(w.t, w.ws, "push", "-q", w.bare, "main")
 	code(w.t, w.sh("first"), 0)
-	truth(w.t, isDir(w.wt("first")), "前提: 他のワークツリーが 1 本ある")
+	truth(w.t, shkit.IsDir(w.wt("first")), "前提: 他のワークツリーが 1 本ある")
 	lacks(w.t, git(w.t, w.ws, "status", "--porcelain", "--untracked-files=all"), ".claude/worktrees")
 }
 
@@ -553,7 +554,7 @@ func TestWorktreeAFailingReadTreeStillStopsWithSnapshotFailed(t *testing.T) {
 	t.Parallel()
 	w := newWorktree(t, "ws")
 	w.leaveWorktreesIgnored()
-	write(t, filepath.Join(w.ws, "notes.txt"), "メモ\n")
+	shkit.Write(t, filepath.Join(w.ws, "notes.txt"), "メモ\n")
 	accept := codeOf(t, w.sh("second"))
 	r := code(t, w.shEnv(map[string]string{"FAKE_READ_TREE_FAIL": "1"}, "second", "--accept", accept, "--copy-wip"), 1)
 	has(t, out(r), "スナップショットを作れませんでした")
@@ -576,9 +577,9 @@ func TestWorktreeReadingTheRootDoesNotRewriteItsIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	index := filepath.Join(w.ws, ".git", "index")
-	before := read(t, index)
+	before := shkit.Read(t, index)
 	w.sh("topic")
-	eq(t, read(t, index), before, "index")
+	eq(t, shkit.Read(t, index), before, "index")
 }
 
 func TestWorktreeAdoptRefusesANameBoundToATicket(t *testing.T) {
@@ -588,7 +589,7 @@ func TestWorktreeAdoptRefusesANameBoundToATicket(t *testing.T) {
 	git(t, w.ws, "update-ref", "refs/remotes/origin/topic", "HEAD")
 	r := code(t, w.sh("topic", "--adopt", "--base", "main"), 1)
 	has(t, r.Stderr, "チケットに結び付く")
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 }
 
 // ---- C1〜C3: 先に断るもの
@@ -597,7 +598,7 @@ func TestWorktreeAnUnansweredBaseBoundIsRefused(t *testing.T) {
 	t.Parallel()
 	w := newWorktree(t, "ws")
 	code(t, w.shEnv(map[string]string{"CCNAVI_ENTRY_PATH": filepath.Join(w.dir, "none")}, "topic"), 1)
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 }
 
 func TestWorktreeGitBefore240IsRefused(t *testing.T) {
@@ -605,7 +606,7 @@ func TestWorktreeGitBefore240IsRefused(t *testing.T) {
 	w := newWorktree(t, "ws")
 	r := code(t, w.shEnv(map[string]string{"FAKE_GIT_VERSION": "2.39.5"}, "topic"), 1)
 	has(t, r.Stderr, "2.40 未満")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 	code(t, w.shEnv(map[string]string{"FAKE_GIT_VERSION": "2.40.0"}, "topic"), 0)
 }
 
@@ -617,7 +618,7 @@ func TestWorktreeRetiredArgumentsExit2WithGuidance(t *testing.T) {
 	w := newWorktree(t, "ws")
 	r := code(t, w.sh("topic", "--from-origin"), 2)
 	has(t, r.Stderr, "廃止しました", "--accept")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 }
 
 // 手で切ったワークツリーには記録が無いため、引き取る手を言う。記録があるときは、ずれが無いときの通しが見る。
@@ -657,7 +658,7 @@ func TestWorktreeSameNameBranchOnOriginStopsAndPointsToStart(t *testing.T) {
 	git(t, w.ws, "push", "-q", w.bare, "main:refs/heads/topic")
 	r := code(t, w.sh("topic"), 1)
 	has(t, r.Stdout, "origin にブランチ topic が既にある", "ccnavi-start.sh' --mr", "ccnavi-start.sh' --issue")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 	// 別の名前なら切れる
 	code(t, w.sh("topic2"), 0)
 }
@@ -667,11 +668,11 @@ func TestWorktreeARefusedWorktreeAddRemovesTheRecordAndTheRef(t *testing.T) {
 	t.Parallel()
 	w := newWorktree(t, "ws")
 	// 行き先の親をファイルにして worktree add を失敗させる。
-	remove(t, filepath.Join(w.ws, ".claude", "worktrees"))
-	write(t, filepath.Join(w.ws, ".claude", "worktrees"), "file")
+	shkit.Remove(t, filepath.Join(w.ws, ".claude", "worktrees"))
+	shkit.Write(t, filepath.Join(w.ws, ".claude", "worktrees"), "file")
 	r := w.sh("topic")
 	truth(t, r.Code != 0, "終了コードが 0: "+r.Stdout)
-	truth(t, !exists(w.recordPath("topic")), "記録が残った")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録が残った")
 	truth(t, !w.hasRef("refs/ccnavi/direct/topic/s"), "S の ref が残った")
 }
 
@@ -680,9 +681,9 @@ func TestWorktreeDryRunCreatesNothing(t *testing.T) {
 	w := newWorktree(t, "ws")
 	r := code(t, w.shEnv(failFetch, "topic", "--dry-run"), 0)
 	has(t, r.Stdout, "dry-run")
-	truth(t, !exists(w.wt("topic")), "ワークツリーを切った")
+	truth(t, !shkit.Exists(w.wt("topic")), "ワークツリーを切った")
 	eq(t, git(t, w.ws, "branch", "--list", "topic"), "", "ブランチ topic")
-	truth(t, !exists(filepath.Join(w.ws, ".git", "ccnavi-direct")), "記録の置き場ができた")
+	truth(t, !shkit.Exists(filepath.Join(w.ws, ".git", "ccnavi-direct")), "記録の置き場ができた")
 }
 
 // ---- 引き取り（--adopt）
@@ -696,11 +697,11 @@ func TestWorktreeAdoptShowsTheRangeAndTheCodeFirstAndWritesNothing(t *testing.T)
 	has(t, dry.Stdout, "dry-run")
 	wrong := code(t, w.sh("topic", "--adopt", "--base", "main", "--accept", "deadbeef"), 3)
 	has(t, wrong.Stdout, "確認コードが今の状態と合わない")
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 	first := code(t, w.sh("topic", "--adopt", "--base", "main"), 3)
 	has(t, first.Stdout, "この範囲全体をエージェントの成果として扱う", "work 0", "work 1", "w1.txt", git(t, w.ws, "rev-parse", "--short", "main"))
 	codeOf(t, first)
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 	eq(t, git(t, w.ws, "for-each-ref", "refs/ccnavi/direct/topic"), "", "refs/ccnavi/direct/topic")
 }
 
@@ -740,7 +741,7 @@ func TestWorktreeAdoptCodeChangesWhenTheBranchMoves(t *testing.T) {
 	accept := codeOf(t, w.sh("topic", "--adopt", "--base", "main"))
 	commitIn(t, w.wt("topic"), "more.txt", "m\n", "more")
 	code(t, w.sh("topic", "--adopt", "--base", "main", "--accept", accept), 3)
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 }
 
 func TestWorktreeAdoptNeedsTheBaseAndItMustBeTheCurrentBase(t *testing.T) {
@@ -768,7 +769,7 @@ func TestWorktreeAdoptRefusesWhenThereAreSeveralMergeBases(t *testing.T) {
 	eq(t, len(strings.Fields(git(t, w.ws, "merge-base", "--all", "topic", "main"))), 2, "merge-base の数")
 	r := code(t, w.sh("topic", "--adopt", "--base", "main"), 1)
 	has(t, r.Stderr, "merge-base が複数")
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 }
 
 func TestWorktreeAdoptRefusesAnAlreadyRecordedWorktreeAndAMissingOne(t *testing.T) {
@@ -787,7 +788,7 @@ func TestWorktreeAdoptRefusesAWorktreeThatOpensAnotherBranch(t *testing.T) {
 	w.uncordedWorktree("topic", 2)
 	git(t, w.wt("topic"), "checkout", "-q", "-b", "elsewhere")
 	code(t, w.sh("topic", "--adopt", "--base", "main"), 1)
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 }
 
 func TestWorktreeAdoptIsRefusedWhenTheBaseBoundCannotBeAnswered(t *testing.T) {
@@ -795,7 +796,7 @@ func TestWorktreeAdoptIsRefusedWhenTheBaseBoundCannotBeAnswered(t *testing.T) {
 	w := newWorktree(t, "ws")
 	w.uncordedWorktree("topic", 2)
 	code(t, w.shEnv(map[string]string{"CCNAVI_ENTRY_PATH": "/nonexistent"}, "topic", "--adopt", "--base", "main"), 1)
-	truth(t, !exists(w.recordPath("topic")), "記録を書いた")
+	truth(t, !shkit.Exists(w.recordPath("topic")), "記録を書いた")
 }
 
 func TestWorktreeIntegrateWithoutARecordPointsToAdoptAndItWorksAfterAdopting(t *testing.T) {

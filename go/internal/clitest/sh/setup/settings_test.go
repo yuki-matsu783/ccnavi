@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 )
 
@@ -172,7 +173,7 @@ func TestSetupTicketControl(t *testing.T) {
 		for _, value := range []string{"off", "dry-run", "Enable"} {
 			w := newTarget(t)
 			code(t, w.setup("--ticket-control", value), 2)
-			if exists(w.settingsPath()) {
+			if shkit.Exists(w.settingsPath()) {
 				t.Errorf("%s: 設定を書いた", value)
 			}
 		}
@@ -212,7 +213,7 @@ func TestSetupACcnaviOnPathCountsAsARunnableBuildUnlessItIsTheLauncher(t *testin
 		t.Parallel()
 		w := newTarget(t)
 		place := base.TempDir(t)
-		writeExec(t, filepath.Join(place, "ccnavi"), "#!/bin/sh\n")
+		shkit.WriteExec(t, filepath.Join(place, "ccnavi"), "#!/bin/sh\n")
 		r := w.setupEnv(map[string]string{env.Path: pathWith(place)})
 		wantNotListed(t, r.Stdout, "まだ無いもの", machineBuild)
 	})
@@ -222,7 +223,7 @@ func TestSetupACcnaviOnPathCountsAsARunnableBuildUnlessItIsTheLauncher(t *testin
 			t.Skip("シンボリックリンクを作れない")
 		}
 		w := newTarget(t)
-		launcher := writeExec(t, w.path(strings.Split(binPath, "/")...), "#!/bin/sh\n")
+		launcher := shkit.WriteExec(t, w.path(strings.Split(binPath, "/")...), "#!/bin/sh\n")
 		place := base.TempDir(t)
 		symlink(t, launcher, filepath.Join(place, "ccnavi"))
 		r := w.setupEnv(map[string]string{env.Path: pathWith(place)})
@@ -278,7 +279,7 @@ func TestSetupKeepsTheCopyItTookBeforeTheFirstChange(t *testing.T) {
 	w.writeSettings(jsonObj{"env": jsonObj{"MY_IMPORTANT": "keep"}})
 	w.setup("--mode", "enable")
 	w.setup("--mode", "enable", "--all")
-	saved := parseJSON(t, read(t, w.settingsPath()+".bak"))
+	saved := parseJSON(t, shkit.Read(t, w.settingsPath()+".bak"))
 	if !reflect.DeepEqual(saved, jsonObj{"env": map[string]any{"MY_IMPORTANT": "keep"}}) {
 		t.Errorf("バックアップ = %v", saved)
 	}
@@ -291,7 +292,7 @@ func TestSetupRefusesDisable(t *testing.T) {
 	r := w.setup("--mode", "disable")
 	code(t, r, 2)
 	in(t, r.Stderr, "disable")
-	if exists(w.settingsPath()) {
+	if shkit.Exists(w.settingsPath()) {
 		t.Error("設定を書いた")
 	}
 }
@@ -329,7 +330,7 @@ func TestSetupCheckReportsWithoutWriting(t *testing.T) {
 	r := w.setup("--check")
 	code(t, r, 1)
 	in(t, r.Stdout, "CCNAVI_ENTRY_PATH", "SubagentStop")
-	if exists(w.settingsPath()) {
+	if shkit.Exists(w.settingsPath()) {
 		t.Error("--check が設定を書いた")
 	}
 	w.setup()
@@ -391,7 +392,7 @@ func TestSetupRefusesASettingsFileItCannotHandle(t *testing.T) {
 		r := w.setup()
 		code(t, r, 2)
 		in(t, r.Stderr, "ccnavi-setup:")
-		eq(t, "設定の中身", read(t, w.settingsPath()), raw)
+		eq(t, "設定の中身", shkit.Read(t, w.settingsPath()), raw)
 	}
 }
 
@@ -410,7 +411,7 @@ func TestSetupAcceptsAnEntryWithoutAHooksKey(t *testing.T) {
 func TestSetupRefusesWhenTheClaudeDirectoryIsAFile(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
-	write(t, w.path(".claude"), "not a directory\n")
+	shkit.Write(t, w.path(".claude"), "not a directory\n")
 	r := w.setup()
 	code(t, r, 2)
 	in(t, r.Stderr, "ccnavi-setup:")
@@ -435,7 +436,7 @@ func TestSetupReadsItsArguments(t *testing.T) {
 		for _, mode := range []string{"off", "Enable", "yes"} {
 			w := newTarget(t)
 			code(t, w.setup("--mode", mode), 2)
-			if exists(w.settingsPath()) {
+			if shkit.Exists(w.settingsPath()) {
 				t.Errorf("%s: 設定を書いた", mode)
 			}
 		}
@@ -454,10 +455,10 @@ func TestSetupReadsItsArguments(t *testing.T) {
 	t.Run("-- で終わりにすれば - で始まる名前のディレクトリも対象にできる", func(t *testing.T) {
 		t.Parallel()
 		w := newTarget(t)
-		odd := mkdir(t, w.path("-weird"))
+		odd := shkit.Mkdir(t, w.path("-weird"))
 		r := w.raw("--", odd)
 		code(t, r, 0)
-		if !exists(filepath.Join(odd, ".claude", "settings.json")) {
+		if !shkit.Exists(filepath.Join(odd, ".claude", "settings.json")) {
 			t.Error("設定を書いていない")
 		}
 	})
@@ -468,7 +469,7 @@ func TestSetupLeavesNoTemporaryFile(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	w.setup()
-	if got := names(t, w.path(".claude")); !reflect.DeepEqual(got, []string{"settings.json"}) {
+	if got := shkit.Names(t, w.path(".claude")); !reflect.DeepEqual(got, []string{"settings.json"}) {
 		t.Errorf(".claude の中 = %v", got)
 	}
 }
@@ -480,12 +481,12 @@ func TestSetupKeepsALinkInsteadOfReplacingIt(t *testing.T) {
 	w := newTarget(t)
 	shared := w.path("real.json")
 	writeJSON(t, shared, jsonObj{"env": jsonObj{"KEEP": "yes"}})
-	mkdir(t, w.path(".claude"))
+	shkit.Mkdir(t, w.path(".claude"))
 	if err := os.Link(shared, w.settingsPath()); err != nil {
 		t.Skipf("ハードリンクを作れない: %v", err)
 	}
 	code(t, w.setup("--mode", "enable"), 0)
-	landed := parseJSON(t, read(t, shared))["env"].(map[string]any)
+	landed := parseJSON(t, shkit.Read(t, shared))["env"].(map[string]any)
 	eq(t, "CCNAVI_MODE", landed["CCNAVI_MODE"], any("enable"))
 	eq(t, "KEEP", landed["KEEP"], any("yes"))
 }

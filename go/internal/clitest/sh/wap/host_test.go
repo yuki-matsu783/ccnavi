@@ -10,6 +10,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/shkit"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
@@ -27,7 +28,7 @@ func (h *hostKit) vars(more ...string) map[string]string {
 }
 
 func (h *hostKit) bodyFile() string {
-	return write(h.t, filepath.Join(h.base, "body.md"), "見てほしい\n")
+	return shkit.Write(h.t, filepath.Join(h.base, "body.md"), "見てほしい\n")
 }
 
 func (h *hostKit) requestArgs() []string {
@@ -42,15 +43,15 @@ func TestRequestConfirmAndReadyAreCarried(t *testing.T) {
 	h.carried(approved + "/phases/" + parentID + "/1.requested")
 	eq(t, "投稿", h.gl.noteCount(), 1)
 	log := filepath.Join(h.base, "tidy.log")
-	logger := h.wrapExe("logger", "case \" $* \" in\n*\" worktree \"*) printf '%s\\n' \"$*\" >>'"+slash(log)+"' ;;\nesac\n", h.half)
+	logger := h.wrapExe("logger", "case \" $* \" in\n*\" worktree \"*) printf '%s\\n' \"$*\" >>'"+shkit.Slash(log)+"' ;;\nesac\n", h.half)
 	okRun(t, h.review(opts{env: map[string]string{env.EntryPath: logger}}, "confirm", "--phase", "1"))
 	h.carried(approved + "/phases/" + parentID + "/1.reviewed")
 	// done/ へ動いた子のワークツリーの片付けを、送った後に実行ファイルへ頼む
-	has(t, read(t, log), "worktree tidy "+parentID+" --phase 1")
+	has(t, shkit.Read(t, log), "worktree tidy "+parentID+" --phase 1")
 	ready := okRun(t, h.review(opts{dir: h.ws, env: map[string]string{env.EntryPath: logger}}, h.readyArgs()...))
 	h.carriedAfterDrop(approved + "/phases/" + parentID + "/ready.json")
 	// 最後に親のワークツリーを外から消し、そのあと残っているワークツリーの一覧を頼む
-	logged := read(t, log)
+	logged := shkit.Read(t, log)
 	retire := strings.Index(logged, "worktree retire "+parentID)
 	remaining := strings.Index(logged, "worktree remaining "+parentID)
 	if retire < 0 || remaining < 0 || retire > remaining {
@@ -61,7 +62,7 @@ func TestRequestConfirmAndReadyAreCarried(t *testing.T) {
 	if d, w := strings.Index(ready.Stdout, "Draft を解除した"), strings.Index(ready.Stdout, dropped); d < 0 || d > w {
 		t.Errorf("Draft の解除が削除より先でない:\n%s", ready.Stdout)
 	}
-	if exists(h.tree) {
+	if shkit.Exists(h.tree) {
 		t.Error("親のワークツリーが残っている")
 	}
 	eq(t, "親のブランチ", h.git(h.ws, "branch", "--list", parentID), parentID)
@@ -79,7 +80,7 @@ func TestReadyKeepsTheParentWorktreeWhenTheDraftStays(t *testing.T) {
 	}
 	has(t, r.Stderr, "Draft を解除できませんでした")
 	lacks(t, r.Stdout, "を削除した")
-	if !isDir(h.tree) {
+	if !shkit.IsDir(h.tree) {
 		t.Error("親のワークツリーを消した")
 	}
 }
@@ -97,7 +98,7 @@ func TestReadyFromOutsideByARelativeScriptPath(t *testing.T) {
 	code(t, r, 0)
 	has(t, r.Stdout, "Draft を解除した")
 	has(t, r.Stdout, "ワークツリー "+parentID+" を削除しました")
-	if exists(h.tree) {
+	if shkit.Exists(h.tree) {
 		t.Error("親のワークツリーが残っている")
 	}
 }
@@ -119,7 +120,7 @@ func TestReadyParentRefusesWhatIsNotAParentWorktree(t *testing.T) {
 		}
 		lacks(t, r.Stdout, "Draft を解除した")
 	}
-	if !isDir(h.tree) {
+	if !shkit.IsDir(h.tree) {
 		t.Error("親のワークツリーを消した")
 	}
 }
@@ -129,7 +130,7 @@ func TestReadyParentRefusesWhatIsNotAParentWorktree(t *testing.T) {
 func TestReadyCommitsTheArchiveAndWipRemovalsAndNamesThem(t *testing.T) {
 	h := newHostKit(t, hostHalf)
 	old := approved + "/phases/old/closed.json"
-	write(t, filepath.Join(h.tree, parts(old)), "{}\n")
+	shkit.Write(t, filepath.Join(h.tree, parts(old)), "{}\n")
 	h.git(h.tree, "add", old)
 	h.git(h.tree, "commit", "-q", "-m", "old")
 	h.wipNoteCommitted()
@@ -171,26 +172,26 @@ func TestTheRealReadyMovesTheRestAgainAfterAFailedPush(t *testing.T) {
 	for _, rel := range []string{"doing/" + parentID + ".md", "doing/" + childID + ".md"} {
 		h.git(h.tree, "rm", "-q", "--", approved+"/"+rel)
 	}
-	write(t, filepath.Join(archive, "done", parentID+".md"), h.parentText(samples.Plan(h.plan...), nil))
-	write(t, filepath.Join(archive, "phases", parentID, "ready.json"), `{"mr": 1}`)
+	shkit.Write(t, filepath.Join(archive, "done", parentID+".md"), h.parentText(samples.Plan(h.plan...), nil))
+	shkit.Write(t, filepath.Join(archive, "phases", parentID, "ready.json"), `{"mr": 1}`)
 	oldTicket := "---\nversion: 1\nticket: old\ntitle: 古い親\nrationale: r\n" +
 		"human_review:\n  required: false\n  reason: t\n" +
 		"allow:\n  - match: Write|Edit\n    glob: \"src/*\"\n---\n"
-	write(t, filepath.Join(h.tree, parts(approved), "done", "old.md"), oldTicket)
-	write(t, filepath.Join(h.tree, parts(approved), "phases", "old", "closed.json"), "{}\n")
+	shkit.Write(t, filepath.Join(h.tree, parts(approved), "done", "old.md"), oldTicket)
+	shkit.Write(t, filepath.Join(h.tree, parts(approved), "phases", "old", "closed.json"), "{}\n")
 	h.git(h.tree, "add", "-A")
 	h.git(h.tree, "commit", "-q", "-m", "退避の途中")
 	h.git(h.tree, "push", "-q", "origin", parentID)
 	head := h.head()
 	// 記録のツリーは実行ファイルの pathcase.Fold と同じ形（大文字小文字を畳む）で書く
 	record, _ := json.Marshal(map[string]any{"parent": parentID, "tree": pathcase.Fold(ospath.Realpath(h.tree)), "head": head, "files": []string{}})
-	write(t, filepath.Join(archive, "ready", parentID+".json"), string(record))
+	shkit.Write(t, filepath.Join(archive, "ready", parentID+".json"), string(record))
 	// リモートは 1 回目の push だけ断る
 	once := filepath.Join(h.base, "refused-once")
-	writeExec(t, filepath.Join(h.remote, "hooks", "pre-receive"),
-		"#!/bin/sh\n[ -e '"+slash(once)+"' ] && exit 0\n: >'"+slash(once)+"'\necho refused >&2\nexit 1\n")
+	shkit.WriteExec(t, filepath.Join(h.remote, "hooks", "pre-receive"),
+		"#!/bin/sh\n[ -e '"+shkit.Slash(once)+"' ] && exit 0\n: >'"+shkit.Slash(once)+"'\necho refused >&2\nexit 1\n")
 	ready := okRun(t, h.review(opts{dir: h.ws, env: map[string]string{env.EntryPath: h.bin}}, h.readyArgs()...))
-	if !exists(once) {
+	if !shkit.Exists(once) {
 		t.Error("1 回目の push を断っていない")
 	}
 	has(t, ready.Stderr, "push が通らなかった")
@@ -198,7 +199,7 @@ func TestTheRealReadyMovesTheRestAgainAfterAFailedPush(t *testing.T) {
 	h.carriedAfterDrop(approved + "/done/old.md")
 	for _, rel := range []string{"done/old.md", "phases/old/closed.json"} {
 		eq(t, rel+" の ls-tree", h.git(h.ws, "ls-tree", parentID, "--", approved+"/"+rel), "")
-		if !isFile(filepath.Join(archive, parts(rel))) {
+		if !shkit.IsFile(filepath.Join(archive, parts(rel))) {
 			t.Errorf("%s が退避にない", rel)
 		}
 	}
@@ -239,14 +240,14 @@ func TestARequestIsNotPostedTwiceAcrossRuns(t *testing.T) {
 		t.Fatalf("ops show: %v\n%s", err, shown.Stdout)
 	}
 	var record map[string]any
-	dec := json.NewDecoder(bytes.NewReader([]byte(read(t, filepath.Join(opsDir, records[0])))))
+	dec := json.NewDecoder(bytes.NewReader([]byte(shkit.Read(t, filepath.Join(opsDir, records[0])))))
 	dec.UseNumber()
 	if err := dec.Decode(&record); err != nil {
 		t.Fatal(err)
 	}
 	record["stages"].([]any)[0].(map[string]any)["state"] = "unknown"
 	data, _ := json.Marshal(record)
-	write(t, filepath.Join(opsDir, records[0]), string(data))
+	shkit.Write(t, filepath.Join(opsDir, records[0]), string(data))
 	has(t, h.exe(opts{}, "ops", "pending").Stdout, show.Stages[0].ID)
 	again := okRun(t, h.review(failing, h.requestArgs()...))
 	has(t, again.Stdout, "投稿済み")
@@ -260,7 +261,7 @@ func TestTerminalDecideChoosesOutsideWriteAndPushAndWritesInside(t *testing.T) {
 	h := newHostKit(t, hostHalf)
 	chooser := h.wrapExe("chooser", h.prelude()+"case \" $* \" in\n*\" --choose-out \"*)\n"+
 		"  prev=\"\"; for a in \"$@\"; do [ \"$prev\" = --choose-out ] && out=\"$a\"; prev=\"$a\"; done\n"+
-		"  [ -d '"+slash(h.lockDir())+"' ] && echo LOCKED-WHILE-CHOOSING >&2\n"+
+		"  [ -d '"+shkit.Slash(h.lockDir())+"' ] && echo LOCKED-WHILE-CHOOSING >&2\n"+
 		"  printf 'choices {\"u1\":\"keep\"}\\ndigest d0\\n' >\"$out\"\n"+
 		"  exit 0 ;;\n"+
 		// 事前の検査（--check）は通す。受け入れる指摘の計画（--accept-plan）は、操作記録を作るスタブ（half）に任せる
@@ -295,7 +296,7 @@ func TestCloseEarlyHandsOverToTheCarrier(t *testing.T) {
 func TestCloseEarlyWithoutAParentStopsBeforeTheHost(t *testing.T) {
 	h := newHostKit(t, hostHalf)
 	log := filepath.Join(h.base, "calls.log")
-	logging := h.wrapExe("logging", "printf '%s\\n' \"$*\" >>'"+slash(log)+"'\n", h.half)
+	logging := h.wrapExe("logging", "printf '%s\\n' \"$*\" >>'"+shkit.Slash(log)+"'\n", h.half)
 	before := h.committed("HEAD")
 	r := h.review(opts{script: "ccnavi-user-close-early.sh", env: map[string]string{env.EntryPath: logging}}, "--reason", "r")
 	code(t, r, 2)
@@ -303,8 +304,8 @@ func TestCloseEarlyWithoutAParentStopsBeforeTheHost(t *testing.T) {
 	// 親のワークツリーの中なら、案内に親の識別子を埋める
 	has(t, r.Stderr, "--parent "+parentID+" --reason 'r'")
 	calls := ""
-	if exists(log) {
-		calls = read(t, log)
+	if shkit.Exists(log) {
+		calls = shkit.Read(t, log)
 	}
 	lacks(t, calls, "close-early")
 	eq(t, "投稿", h.gl.noteCount(), 0)
@@ -314,13 +315,13 @@ func TestCloseEarlyWithoutAParentStopsBeforeTheHost(t *testing.T) {
 func TestCloseEarlyRefusesFirstWhenTheFamilyCannotBeWritten(t *testing.T) {
 	h := newHostKit(t, hostHalf)
 	log := filepath.Join(h.base, "calls.log")
-	refusing := h.wrapExe("refusing", "printf '%s\\n' \"$*\" >>'"+slash(log)+"'\ncase \" $* \" in\n*\" write-and-push family \"*) exit 1 ;;\nesac\n", h.half)
+	refusing := h.wrapExe("refusing", "printf '%s\\n' \"$*\" >>'"+shkit.Slash(log)+"'\ncase \" $* \" in\n*\" write-and-push family \"*) exit 1 ;;\nesac\n", h.half)
 	before := h.committed("HEAD")
 	r := h.review(opts{script: "ccnavi-user-close-early.sh", env: map[string]string{env.EntryPath: refusing}}, "--parent", parentID, "--reason", "r")
 	code(t, r, 1)
 	has(t, r.Stderr, "書かずに止めた")
 	// 受け入れの計画・ホストへの返信・issue・コメントの前に止まり、何も変わらない
-	lacks(t, read(t, log), "close-early")
+	lacks(t, shkit.Read(t, log), "close-early")
 	eq(t, "投稿", h.gl.noteCount(), 0)
 	eqList(t, "コミット", h.committed("HEAD"), before)
 }
@@ -352,7 +353,7 @@ func TestDecidePreviewTakesNoLockAndWritesNothing(t *testing.T) {
 	if err := os.MkdirAll(h.lockDir(), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(h.lockDir(), "owner"), "other 1 1 1-1\n")
+	shkit.Write(t, filepath.Join(h.lockDir(), "owner"), "other 1 1 1-1\n")
 	shown := h.sh("ccnavi-review.sh", opts{dir: h.tree, env: h.vars()}, "decide", "1", "--preview")
 	lacks(t, shown.Stderr, "ロック")
 	eq(t, "HEAD", h.head(), head)
