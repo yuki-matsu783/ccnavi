@@ -147,4 +147,4 @@ CCNAVI_TEST_EXE=/tmp/ccnavi-go uv run python -m unittest tests.guard.test_permis
 
 依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers` と、親のパスごとの `subTiers`）に行を足す。
 
-依存は `go mod tidy` で整える。外の依存は `golang.org/x/text` と `github.com/BurntSushi/toml` だけにする。
+依存は `go mod tidy` で整える。外の依存は `golang.org/x/text` だけにする。

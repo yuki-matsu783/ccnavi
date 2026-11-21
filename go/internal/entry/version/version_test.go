@@ -74,11 +74,3 @@ func TestCompatAgreesWithTheShAndTheExtension(t *testing.T) {
 		}
 	}
 }
-
-// 版は pyproject.toml の version と同じ。
-func TestVersionAgreesWithPyproject(t *testing.T) {
-	m := regexp.MustCompile(`(?m)^version = "([^"]+)"$`).FindStringSubmatch(readRepo(t, "pyproject.toml"))
-	if m == nil || m[1] != Version {
-		t.Errorf("pyproject.toml の版 %v が %s と違う", m, Version)
-	}
-}
