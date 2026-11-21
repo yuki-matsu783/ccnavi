@@ -245,8 +245,8 @@ media/
   tour/*.md           左パネルの案内（ウォークスルー）の各ステップの本文（panel・projects・board・basics・more）
 test/
   fixtures/board.json 実行ファイルの出力の実例。Go 側の go/internal/clitest/ticket/flow/board_test.go が書き出す
-  fixtures/test.json, expectations.json  --test --json / --test-expectations --json の実例。tests/core/test_test_json.py が書き出す
-  fixtures/suggest.json             --suggest --json の実例。tests/guard/test_suggest.py がキーの集合を突き合わせる
+  fixtures/test.json, expectations.json  --test --json / --test-expectations --json の実例。go/internal/clitest/core/testjson_test.go が書き出す
+  fixtures/suggest.json             --suggest --json の実例。go/internal/clitest/guard/rules/suggest_test.go がキーの集合を突き合わせる
   fixtures/approve-preview.json, approve-yes.json, approve-mismatch.json  承認の JSON の実例。go/internal/clitest/ticket/flow/approve_json_test.go が書き出す
   fixtures/plan-order.json          --plan-order <親> --json の答えの実例（開いたとき・逆向きの線・循環・終端の検査・書いたとき・改版）。go/internal/clitest/ticket/phases/planorder_test.go が書き出す
   helpers/fixture.ts  board.json を読む

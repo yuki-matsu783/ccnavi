@@ -41,7 +41,7 @@ dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
 ## 実行ファイルの選ばれ方
 
 - `bin/` に実行ファイルが無いときは、振り分けの sh が PATH の `ccnavi` を起動する（`bin/` が先）。`dist/ccnavi/` を PATH に通すと、組み立てたあとのコピーなしで hook が動く
-- PATH の実行ファイルも自己防衛が守る。テストは `tests/__init__.py` が PATH から ccnavi を外して回す
+- PATH の実行ファイルも自己防衛が守る。テストは `harness/base` の `Main` が PATH から ccnavi を外して回す
 - `dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_ENTRY_PATH` を `dist/ccnavi/ccnavi` にする。自己防衛も同じ env を読むので、守る実体と起動する実体は食い違わない。代償は、その機械では振り分けの sh の不具合に気づけないこと
 - `ccnavi.settings.local.json`（追跡しない）のキー `bin` でも `CCNAVI_ENTRY_PATH` を上書きできる。変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない
 

@@ -1,45 +1,50 @@
 ---
 type: skill-reference
-title: テストのグループと回すグループの決め方
-description: ccnavi のテストを複数のグループに分けて管理する方法と、変更時にどのグループを実行すべきか決める基準
+title: テストの置き場と、回す範囲の決め方
+description: ccnavi のテスト（Go）の置き場と、変更したファイルからどのパッケージを回すか決める基準
 tags: [process-test, skills]
-keywords: [テストグループ, tests, core, scenarios, e2e]
+keywords: [テスト, go test, clitest, harness, contract, scenarios, e2e]
 ---
 
-# テストのグループと、回すグループの決め方
+# テストの置き場と、回す範囲の決め方
 
-## グループ
+## 置き場
 
-Python のテストは `tests/<グループ>/` に置く。残っているのは 2 つだけで、判定・設定・チケット・sh は Go（`go/internal/clitest/`）が守る。
+テストは全部 Go（`go/`）にある。
 
-| グループ | 主題 | 時間 |
-|---|---|---|
-| `core` | 部品の単体と、速い受入テスト | 約 13 秒 |
-| `contract` | 本物から録った応答の形と、模擬・スタブの比べ（`tests/contract/`） | 約 15 秒 |
+| 置き場 | 主題 |
+|---|---|
+| `go/internal/<層>/<パッケージ>/` の `_test.go` | 部品の単体（判定・設定・チケット・基盤） |
+| `go/internal/clitest/core/` | 実行ファイルの外から見える約束（`--lint`・`--test`・文面・ビルド・hook の入口） |
+| `go/internal/clitest/repo/` | リポジトリそのものの決まり（ADR の番号・配る sh の書き方・期待する判定・Stop の場面） |
+| `go/internal/clitest/config/`・`guard/`・`ticket/` | 設定の統合・判定・チケットの流れ |
+| `go/internal/clitest/sh/` | 配る sh を通しで回す |
+| `go/internal/clitest/contract/` | 本物から録った応答の形と、模擬・スタブの比べ |
+| `go/internal/clitest/scenarios/`・`e2e/`・`manual/` | 受入シナリオ・組み立て済みの配布物・手動の道具の入口 |
+| `go/internal/harness/` | テストの道具（偽の GitLab・claude のスタブ・sh の作業木など）。自身の試験も持つ |
 
 ```sh
-uv run python -m tests    # 全件（同時実行）。`discover -s tests` の 1 本は使わない
+cd go && go test ./...        # 全件
+cd go && go test ./internal/clitest/sh/stage/   # 1 パッケージ
 ```
 
 理由と手順は[テストを回す](../../../../.agents/docs/testing.md)。
 
-実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が無い環境（Claude Code on the web、ビルド前）では、ランチャー経由の `--lint` と `ccnavi` コマンドが動かない。
-`sh scripts/ccnavi-build.sh` で組み立ててから回す。
+実行ファイル（`.ccnavi/bin/`、無ければ PATH の `ccnavi`）が要るテストは、`harness/exe` が `go build` で組む。組み立て済みの `dist/ccnavi` と配る sh を外から呼ぶ e2e は、`dist/ccnavi` が無ければ skip する（約 3 秒）。
 
 ## 回すもの
 
-Python か補助（`tests/` の下）を変えたら `uv run python -m tests`。
+`go/`・`.ccnavi/`・`tests/`・`scripts/` のどれかを変えたら `cd go && gofmt -l . && go vet ./... && go test ./...` を commit の前に回す。sh・文面・見本の変更は Go のテストが守る。`-count=1` は要らない（clitest は go test が結果を保存しない）。
 
-Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/` のどれかを変えたら必ず回す。sh・文面・見本の変更は Go のテストが守る。`docs/30_adr/`・`.claude/hooks/`・`scripts/` を変えたときも `cd go && go test ./internal/clitest/repo/` を回す（ADR の番号・配る sh の書き方・期待する判定・Stop の場面を見る）。`-count=1` は要らない。Go の e2e（`go test ./internal/clitest/e2e/`）は組み立て済みの `dist/ccnavi` と配る sh を外から呼ぶ。`dist/ccnavi` が無ければ skip（約 3 秒）。
+`docs/30_adr/`・`.claude/hooks/`・`scripts/` を変えたときは、少なくとも `go test ./internal/clitest/repo/` を回す（ADR の番号・配る sh の書き方・期待する判定・Stop の場面を見る）。
 
 | 変えたもの | 足すもの |
 |---|---|
 | `scripts/ccnavi-build.sh` | `go test ./internal/clitest/core/`（`build_test.go`）`go test ./internal/clitest/e2e/` |
-| `.ccnavi/scripts/` の sh・`scripts/ccnavi-setup.sh`、sh が実行ファイルに聞く部品（`go/internal/tickets/lifecycle/` ほか） | `go test ./internal/clitest/e2e/` |
-| `.claude/hooks/test-py.sh` | `uv run python -m tests`（`core` の `test_test_py_hook`）`go test ./internal/clitest/e2e/` |
+| `.ccnavi/scripts/` の sh・`scripts/ccnavi-setup.sh`、sh が実行ファイルに聞く部品（`go/internal/tickets/lifecycle/` ほか） | `go test ./internal/clitest/sh/... ./internal/clitest/e2e/` |
+| `.claude/hooks/`（`test-go.sh`・`lint-go.sh`・`mark-ext.sh`・`test-ext.sh`） | `go test ./internal/clitest/repo/ ./internal/clitest/e2e/` |
 | `.claude/hooks/check-adr.sh` | `go test ./internal/clitest/core/`（`checkadrhook_test.go`） |
-| `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `uv run python -m tests`（`core` の `test_ext_tests`） |
-| `tests/host_stub.py`・`tests/fake_gitlab.py`・`tests/contract/` | `uv run python -m tests` |
+| `go/internal/harness/hostfixture`・`hoststub`・`fakegitlab`・`fakeclaude`・`tests/contract/` | `go test ./internal/clitest/contract/... ./internal/harness/...` |
 | `go/internal/harness/`・`tests/scenarios/`（受入シナリオの実行器・スタブ・シナリオの yml） | `go test ./internal/harness/... ./internal/clitest/scenarios/` |
 | `extensions/vscode/` | `go test ./internal/clitest/core/`（`testjson_test.go`）。拡張の分は下 |
 | `extensions/chrome/ccnavi-approval/` | その `pnpm test`（下） |
@@ -48,10 +53,10 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 
 自動テストで中身を確かめられないもの（変えたら手で動かして確かめる）:
 
-- `.claude/hooks/lint-py.sh`
-- `.claude/hooks/test-py.sh` の差し戻しの回数の上限
+- `.claude/hooks/lint-go.sh`
+- `.claude/hooks/test-go.sh` の差し戻しの回数の上限
 
-統合先に取り込む前・MR に出す前は、Python の全件と `go test ./...` の両方を回す。
+統合先に取り込む前・MR に出す前は、`go test ./...` を全件回す。
 
 ## 拡張（`extensions/vscode/ccnavi-board`）のグループ
 

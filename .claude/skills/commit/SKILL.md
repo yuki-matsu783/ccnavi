@@ -2,7 +2,7 @@
 name: commit
 description: >-
   Create one or more atomic git commits in this repository with a Conventional Commits prefix and a
-  one-line Japanese description, after running the Python checks and filtering out credentials and
+  one-line Japanese description, after running the Go checks and filtering out credentials and
   build junk. Use whenever a commit is made here, both when the user types /commit and whenever the
   agent commits on its own after finishing a change. Not for writing or fixing the content itself,
   and not for push, branch, or PR operations.
@@ -47,17 +47,14 @@ sh .ccnavi/scripts/ccnavi-git.sh log --oneline -10
 
 ### 2. 検査を通す
 
-Python のファイルが変わっているなら、すべて通してからコミットする。error が残ったままコミットしない。
+`go/`・`.ccnavi/`・`tests/`・`scripts/` のどれかのファイルが変わっているなら、すべて通してからコミットする。error が残ったままコミットしない。
 
 ```sh
-uv run --with ruff ruff format --check .
-uv run --with ruff ruff check .
+cd go && gofmt -l . && go vet ./... && go test ./...
 ```
 
-Python のテストは `tests/core` と `tests/contract` だけ。Python かその補助（`tests/` の下）を変えたら `uv run python -m tests` を回す（[テストを回す](../../../.agents/docs/testing.md)）。
-worktree で作業しているときは、そのツリーの中で実行する（`pyproject.toml` はツリーごと）。
-
-`go/`・`.ccnavi/`・`tests/` のどれかのファイルが変わっているなら、`cd go && gofmt -l . && go vet ./... && go test ./...` も通す（`gofmt -l` は何も出さないこと）。sh・文面・見本だけの変更も、Go に移したテスト（`go/internal/clitest/`）が読むので回す。`-count=1` は要らない（clitest は go test が結果を保存しない）。
+`gofmt -l` は何も出さないこと。sh・文面・見本だけの変更も、Go に移したテスト（`go/internal/clitest/`）が読むので回す。`-count=1` は要らない（clitest は go test が結果を保存しない）。回す範囲の絞り方は[テストの置き場と回す範囲](references/test-groups.md)。
+worktree で作業しているときは、そのツリーの中で実行する。
 
 拡張（`extensions/vscode/ccnavi-board`）のファイルが変わっているなら、そのぶんも通す。
 
@@ -68,7 +65,7 @@ pnpm test:for src/core/rules-doc.ts src/webview/board/App.tsx   # 変えたフ�
 pnpm test                                             # 統合先に取り込む前・MR に出す前
 ```
 
-hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査を走らせていても、コミット前に明示的に実行してよい。
+hook（`lint-go.sh` `test-go.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査を走らせていても、コミット前に明示的に実行してよい。
 実行ファイルはここでは作り直さない。要るときは `sh scripts/ccnavi-build.sh` を手で回す。
 
 ### 3. prefix と論理的まとまりを決める
@@ -78,11 +75,11 @@ hook（`lint-py.sh` `test-py.sh` `mark-ext.sh` `test-ext.sh`）が同じ検査�
 | `feat` | `go/` への機能追加 |
 | `fix` | `go/` / hook スクリプトのバグ修正 |
 | `refactor` | 挙動を変えないコード整理 |
-| `test` | `tests/*.py` / `tests/fixtures/` |
+| `test` | `go/` の `_test.go`・`go/internal/harness/` / `tests/fixtures/` |
 | `docs` | `README.md` / `docs/10_requirements.md`・`docs/11_requirements/` / `docs/20_design.md`・`docs/21_design/` / `docs/30_adr.md`・`docs/30_adr/` / `docs/CONTEXT.md` |
 | `ai-asset` | `.claude/` 配下（settings.json / hooks / skills / ccnavi のルール）と `CLAUDE.md`・`AGENTS.md`・`.ccnavi/docs/`・`.agents/docs/`。エージェント向けの指示は docs ではなくこちら |
 | `chore` | `.gitignore` / 雑務 |
-| `build` | `pyproject.toml` / `uv.lock` |
+| `build` | `go/go.mod` / `go/go.sum` / `scripts/ccnavi-build.sh` |
 | `ci` | CI 設定 |
 | `perf` | 性能改善 |
 | `style` | 意味に影響しない整形 |
@@ -97,7 +94,7 @@ prefix か主題が別なら別コミットに分ける。要件（`docs/11_requ
 
 - クレデンシャル（必ず除外）: `.env` / `.env.*` / `*.pem` / `*.key` / `*.p12` / `*.pfx` / `*.ppk` / `credentials.json` / `service-account*.json` / `id_rsa` / `id_ed25519` / `id_ecdsa` / `.aws/credentials` / `.netrc` / `secrets.yml` / `secrets.yaml`
 - 開発環境の副産物: `.DS_Store` / `Thumbs.db` / `desktop.ini` / `*.swp` / `*.swo` / `*~` / `*.log` / `tmp/` / `*.tmp` / `*.tmp.*` / `*.bak` / `*.orig` / `*.stackdump` / `.claude/settings.local.json`
-- このリポジトリの生成物: `dist/` / `build/` / `__pycache__/` / `*.pyc` / `.venv/` / `.ruff_cache/` / `*.jsonl` / `logs/`（判定記録。絶対パスとコマンド全文が入る） / `knowledge/`（参照専用の外部資料）
+- このリポジトリの生成物: `dist/` / `build/` / `*.jsonl` / `logs/`（判定記録。絶対パスとコマンド全文が入る） / `knowledge/`（参照専用の外部資料）
 
 `wip/handoff/`（下書きの置き場）は追跡してpushする置き場なので、除外しない。統合時に `ccnavi-git.sh integrate` が外す。
 `.gitignore` に無い新種の副産物を見つけたら、この一覧と `.gitignore` の両方に足す。

@@ -105,7 +105,7 @@ log_debug 判定の材料 -- "sub=$sub" "top=$root" "cwd=$PWD"
 | scp形式でも`:`が無いもの | `git@github.com:org/r.git` | 変えない |
 
 - `@`を含まない文字列はそのまま返す。shは語に区切らずに返す
-- 出力は3つのloggerで1文字も違わない。`tests/sh/test_diaglog_sh.py`の比較にURLとscp形式を入れてある
+- 出力は3つのloggerで1文字も違わない。`go/internal/clitest/sh/small/diaglog_test.go`の比較にURLとscp形式を入れてある
 - ユーザやモデルに見せる文面での伏せ方（`ccnavi_mask_url`の`<伏せた>@host`）とは表記が違う。そちらは
   契約として決まっている出力なので変えない
 - loggerが伏せるのは最後の安全網にすぎない。まず秘密の値をloggerに渡さないことで守る
@@ -147,7 +147,7 @@ shで`redact`を再現すると、正規表現の解釈が環境ごとに違う�
 ## テスト
 
 - 各スクリプトやモジュールのテストでは、診断ログの中身を検査しない。行の形式と動作は、logger自体のテスト
-  （`go/internal/records/diaglog`のgo test、`tests/sh/test_diaglog_sh.py`、拡張の`test/shared/log.test.ts`）で固定している
-- `tests/sh/test_diaglog_sh.py`は同じ入力を3つの言語のloggerに渡し、時刻とpidを除いて同じ行になることを確かめる。
+  （`go/internal/records/diaglog`のgo test、`go/internal/clitest/sh/small/diaglog_test.go`、拡張の`test/shared/log.test.ts`）で固定している
+- `diaglog_test.go`は同じ入力を3つの言語のloggerに渡し、時刻とpidを除いて同じ行になることを確かめる。
   行の形式を変えるときは3つのloggerを揃えて直し、このテストを通す
 - ワークスペースの`logs/`の中身を数えるテストは、`logs/diag/`ディレクトリが増えることを前提にする

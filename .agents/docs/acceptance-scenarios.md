@@ -289,7 +289,7 @@ setup:
 | 値 | 相手 | 使う場面 |
 |---|---|---|
 | `bare` | 一時ディレクトリの bare。ホストの API は失敗（「確かめられなかった」） | 直接作業・integrate・レビューなしのチケット作業（毎回） |
-| `fake-gitlab` | bare と `tests/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
+| `fake-gitlab` | bare と `go/internal/harness/fakegitlab` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
 | `docker-gitlab` | Docker の本物の GitLab CE に作る使い捨てのプロジェクト | 模擬のずれを避けたい通し確認。応答が本物と同じ形になり、ホストを汚さない（下の節） |
 | `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
 
@@ -301,9 +301,9 @@ setup:
 - ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
 - 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH のスタブと `FAKE_*` が届くところまで
 
-**`docker-gitlab`。** 動いている Docker の GitLab（`tests/manual/gitlab/docker_gitlab.py`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
+**`docker-gitlab`。** 動いている Docker の GitLab（`go/internal/harness/gitlabdocker`・`gitlabmanual`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
 
-- 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（共用の注意は [gitlab-manual.md](gitlab-manual.md) の「ほかの作業が使っているとき」）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
+- 起動: 回す前に `gitlabmanual status` で動いているかを見る。止まっていれば `up`（共用の注意は [gitlab-manual.md](gitlab-manual.md) の「ほかの作業が使っているとき」）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
 - 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push し、続けて `git fetch --prune --no-tags origin` を 1 回打つ（対象に残る本物の origin の古い `refs/remotes/origin/*` が、新規プロジェクトの issue #1 などに番号で当たってブランチ候補になるのを防ぐ。戻すのは後片付けの `refs/remotes/origin/*` の巻き戻し）。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
 - origin: `bare` と同じ git のスタブで、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（スタブを置かない）、`gh`・`glab` は失敗するスタブ
 - 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
@@ -498,7 +498,7 @@ steps:
 - 失敗は `halt`（`kind: human_run`）を立てて止め、`inconclusive` にする
 - 記録: 打つ前に `state.json` の `human_runs` に `started` を書き、終われば `done` か `halted` にする。`started` のまま残った回を `next` で続けると、打ち直さずに止める。出力は `human-run-<step>.log`
 - `check` は、打った step の項目ごとに `human-run-check` の行（needs-review）になる。人間が見ていた項目を誰も見ていないので、全体は pass にならない。ログを見て判断する
-- 擬似端末を作れない環境（Windows の Python）では、従来の human step と同じく `instruction` を出して 10 で止まる
+- 擬似端末を作れない環境（Windows）では、従来の human step と同じく `instruction` を出して 10 で止まる
 - 受け入れた穴: runner はエージェントも Bash から起動できる。開発ワークスペースでは、エージェントが yml を書いて runner を通せば、ユーザの承認を出せる。runner は配布物に入らない（配布先に穴は増えない）ため、この穴を受け入れた。`human_run` を書くことが、その回で runner が test-repo の提案を承認し push することへの同意になる（回す前の確認文の手順に「実行器が打つ」と出る）
 
 ## 見つけたものの扱い

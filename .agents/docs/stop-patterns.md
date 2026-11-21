@@ -101,7 +101,7 @@ keywords: [止め方, 拒否, 確認, ask, 確認コード, --accept, ユーザ�
 
 1. `go/internal/hook/turngate/turngate.go` の `Builtin` に宣言を 1 件足す。キーの regex は、引数の並びの揺れ（`-m <メッセージ>` を名前の前後どちらにも置ける、など）を実際のスクリプトの引数の読み方に合わせて書く
 2. `go/internal/hook/turngate/turngate_test.go` に、宣言の表を直接渡す単体のテストを足す。`integrate` と関係の無い架空の組が先例にある
-3. hook の入口のテスト（`tests/guard/test_turngate_hook.py`）に、実際の呼び出しの順で止まることと、発言を 1 回はさむと通ることを足す
+3. hook の入口のテスト（`go/internal/clitest/guard/`）に、実際の呼び出しの順で止まることと、発言を 1 回はさむと通ることを足す
 4. 文面ファイルに `DENY_NEEDS_USER_TURN__<宣言>` を足し、宣言の `message` に指す。上の文面の型に沿わせる。設計書の付録の組み込みの名前の表に宣言の id を足す
 5. 手順書・出力・促しで、A のあとの一手を「ユーザの了承（対話では確認の許可、非対話では次の発言）のあと」と揃えて書く。`askIfAttended` を立てるなら、確認の前に見せるものを文面の次の一手で言う（確認の画面に出るのはコマンドだけ）
 
