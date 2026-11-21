@@ -2,6 +2,7 @@ package rules
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -83,12 +84,10 @@ func TestAuxAndGateStopsStayInDryRun(t *testing.T) {
 	}{
 		"raw git":                      {"git status", "", "", nil},
 		"env assignment before script": {"CCNAVI_WORKSPACE=/x sh .ccnavi/scripts/ccnavi-git.sh push", "", "", nil},
-		// 自己防衛を切っても、実行ファイルの置き換えの形は止める。
-		"env assignment with the core guard off": {"CCNAVI_WORKSPACE=/x sh .ccnavi/scripts/ccnavi-git.sh push", "", "", map[string]string{"CCNAVI_GUARD_CORE_FILES": "disable"}},
 		// 層の deny（認証情報）と同時にヒットしても、生の git の補助止めは dry-run で効く。
 		"raw git with a layer rule": {"git status; cat .env", "", "still applies", nil},
 		// 数えない上限を超えたリダイレクトで、置き場への書き込みを隠す形。
-		"redirect cap":              {"echo hi " + repeat("> /dev/null ", 60) + "> .ccnavi/approved/phases/i0001/1.reviewed ; cat <<EOF", "", "", nil},
+		"redirect cap":              {"echo hi " + strings.Repeat("> /dev/null ", 60) + "> .ccnavi/approved/phases/i0001/1.reviewed ; cat <<EOF", "", "", nil},
 		"git hidden by a variable":  {"c=git; $c push origin main", "", "", nil},
 		"git hidden by a brace":     {"{git,push,origin,main}", "", "", nil},
 		"subagent brace expansion":  {"ls {src,tests}", "a1", "", nil},
@@ -110,12 +109,14 @@ func TestAuxAndGateStopsStayInDryRun(t *testing.T) {
 	}
 }
 
-func repeat(s string, n int) string {
-	out := ""
-	for i := 0; i < n; i++ {
-		out += s
+// 自己防衛を切っても、実行ファイルの置き換えの形は enable（既定）で止める。
+func TestAnEnvAssignmentIsStoppedWithTheCoreGuardOff(t *testing.T) {
+	t.Parallel()
+	g := newGate(t)
+	off := map[string]string{"CCNAVI_GUARD_CORE_FILES": "disable"}
+	if decision, text := g.bash(t, "CCNAVI_WORKSPACE=/x sh .ccnavi/scripts/ccnavi-git.sh push", "enable", "", off); decision != "deny" {
+		t.Errorf("deny のはず: %q %s", decision, text)
 	}
-	return out
 }
 
 func TestAPathContainingCcnaviIsNotAnEntry(t *testing.T) {

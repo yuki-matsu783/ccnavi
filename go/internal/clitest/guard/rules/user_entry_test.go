@@ -344,6 +344,18 @@ func TestTheBoardPathIsStoppedEvenUnderAnotherName(t *testing.T) {
 		"uv run main.py user close-early",
 		"poetry run ccnavi user agree",
 		"poetry run ccnavi $X agree",
+		"python3 -I -m ccnavi user agree",
+		"python3 -OO -m ccnavi user agree",
+		"python3 -Wignore -m ccnavi user agree",
+		"python3 -X utf8 -m ccnavi user agree",
+		"python3 -mccnavi user agree",
+		"py -m ccnavi user agree",
+		"python3 /repo/main.py user handoff",
+		"python3 -u -m ccnavi $X agree",
+		"uv run -m ccnavi user agree",
+		"uv run --frozen python -m ccnavi user agree",
+		"poetry run python -m ccnavi user agree",
+		"pipenv run python -m ccnavi user agree",
 	} {
 		t.Run(command, func(t *testing.T) {
 			t.Parallel()

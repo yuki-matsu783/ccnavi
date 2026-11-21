@@ -683,6 +683,8 @@ func TestLintNamesProjectConfigProblems(t *testing.T) {
 	mustHave(t, out, "projects/ がワークスペースの git で無視されていない", "(projects/app)")
 	// `.claude/` を持つだけのプロジェクトには苦情を出さない
 	mustNotHave(t, out, "(projects/lib)")
+	// scratchpad の無視行は求めない（実行前チェックの話）
+	mustNotHave(t, out, "(scratch")
 
 	// `--explain` はレイヤーごとに並べる。読めないレイヤーはその位置で言う。
 	explained := p.ccnavi("", "--explain")
