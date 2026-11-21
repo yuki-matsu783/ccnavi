@@ -1,5 +1,4 @@
 // Package manual は、手で使う GitLab の道具（`harness/cmd/gitlabmanual`・`harness/cmd/fakegitlab`）を、組み立てた実行ファイルで通す。
-// tests/core/test_gitlab_manual_tools.py の入口の観点の写し。
 //
 // 本物の GitLab（Docker）は立てない（.agents/docs/gitlab-manual.md）。見るのは、本物を立てずに回る分だけである。
 //   - gitlabmanual: 引数の振り分け・`probe --help` がトークンも実行ファイルも要らず終わること・トークンが無いときは何も作らず止まること

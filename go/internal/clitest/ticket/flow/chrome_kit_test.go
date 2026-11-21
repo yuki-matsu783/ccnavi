@@ -1,7 +1,7 @@
 package flow
 
 // Chrome の入口（go/cmd/ccnavi-chrome）を、手元のツリーから組んだ要求で叩く道具。
-// 元: tests/ticket/test_swap_points.py の CoreHarness（trees・disk・diff・chrome_request・ask_chrome）。
+// の CoreHarness（trees・disk・diff・chrome_request・ask_chrome）。
 
 import (
 	"encoding/json"

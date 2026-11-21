@@ -1,5 +1,5 @@
 // Package wap は、write-and-push（取り込み → 書く → コミット → push を 1 操作にする sh）と、承認の push（ccnavi-user-push-approved.sh）を
-// 外から起こして確かめるテスト（clitest/sh/wap）。tests/sh/ の test_write_and_push_*（7 本）と test_push_approved_sh の移し。
+// 外から起こして確かめるテスト（clitest/sh/wap）。
 //
 // 使い捨てのワークスペース（main）・bare のリモート・親のワークツリー（.claude/worktrees/i0001。承認済みで、送ってある）をテストごとに
 // 組む（kit_test.go）。組む手順は実行ファイルを 2 回起こすだけなので、作り置きの写し（treecache）は使わず、並行に回す。実行ファイルの

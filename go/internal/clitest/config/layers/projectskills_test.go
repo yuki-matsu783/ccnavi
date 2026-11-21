@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// プロジェクトのスキルの目録の受入テスト（tests/config/test_project_skills.py の写し）。
+// プロジェクトのスキルの目録の受入テスト。
 //
 // スキルの形の手順書は、プロジェクトの git に入るよう `projects/<名前>/skills/<スキル>/SKILL.md` に置く。ccnavi は SessionStart と
 // SubagentStart で、cwd がそのプロジェクトの中にあるときだけ、名前・説明・場所の目録を渡す。見るのは次のとおり。

@@ -1,6 +1,6 @@
 package flow
 
-// `ccnavi --lint --flow <パス>` の受入テスト。元: tests/ticket/test_flow_lint.py。
+// `ccnavi --lint --flow <パス>` の受入テスト。
 //
 // VS Code 拡張のフロー編集画面は、開くときと保存の前に編集中の本文を一時ファイルに書いてこれに掛け、
 // 正しいかの答えを実行ファイルから受ける。見るのは次のとおり。

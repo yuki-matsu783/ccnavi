@@ -14,7 +14,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 作業・レビュー計画のテンプレートの下書きの受入テスト（tests/ticket/test_template_drafts.py）。
+// 作業・レビュー計画のテンプレートの下書きの受入テスト。
 //
 //  1. 下書きの置き場: 親のツリーの `wip/handoff/<取り込み先の相対パス>`。取り込み先は `--to`（既定は project）と `--layer`
 //     で決まる。取り込みは `ccnavi user handoff`

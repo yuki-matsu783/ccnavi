@@ -14,7 +14,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 計画の順序を振り直して書き戻す `ccnavi --plan-order <親>` の受入テスト（tests/ticket/test_plan_order.py）。
+// 計画の順序を振り直して書き戻す `ccnavi --plan-order <親>` の受入テスト。
 // VS Code の計画編集タブが打つ経路。タブは図で引いた線（元の番号での直接の先行）を `--order` に付けて渡し、実行ファイルが
 // 番号を振り直して答える。保存では `--write --expect <ハッシュ>` で提案の計画を書き換える。
 // 番号の振り直しの決まり（拡張と共有する見本の表 tests/fixtures/plan-reorder.json）と、承認を渡す文は

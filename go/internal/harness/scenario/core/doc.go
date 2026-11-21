@@ -1,4 +1,4 @@
-// Package core は、受入シナリオの実行器の芯である（tests/scenarios/common.py・schema.py・stream.py の写し）。
+// Package core は、受入シナリオの実行器の芯である。
 // 決まりは .agents/docs/acceptance-scenarios.md。
 //
 //   - Scenario・Step・Setup・Expect: シナリオの yml を読んだ型（Load・LoadFile）。形の検査は読むときに全部行う

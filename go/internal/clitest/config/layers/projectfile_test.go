@@ -10,7 +10,7 @@ import (
 )
 
 // `--project-phases-file <名前>=<パス>` と `--project-risk-file <名前>=<パス>` の受入テスト
-// （tests/config/test_project_phases_file.py・test_project_risk_file.py の写し）。
+// 。
 //
 // VS Code 拡張のフェーズ管理画面とリスク管理画面が、編集中のレイヤー（自身かプロジェクト）の定義を保存せずに、
 // 共通レイヤーと合わせて検証するための差し替え。config 単体の形式だけでなく、合成したあとの

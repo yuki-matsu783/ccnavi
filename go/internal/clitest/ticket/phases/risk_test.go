@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 実績で測るリスクの受入テスト（tests/ticket/test_risk.py）。定義の検証と差分の数え方の細部は
+// 実績で測るリスクの受入テスト。定義の検証と差分の数え方の細部は
 // go/internal/tickets/config/risk が見る。
 //
 //  1. 差分から点を数える（行数・ファイル数・消したファイル）

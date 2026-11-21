@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 全体計画の承認・順序・成果物・レビューの要否・延期（tests/ticket/test_phases.py の前半）。
+// 全体計画の承認・順序・成果物・レビューの要否・延期。
 // 順序の止め方は承認で見る。先行のない番号は並行する。
 
 func TestAChildCannotBeApprovedAgainstAnOldPlanWhenTheParentHasAPendingRevision(t *testing.T) {

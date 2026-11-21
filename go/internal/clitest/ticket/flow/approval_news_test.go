@@ -1,7 +1,6 @@
 package flow
 
 // 承認したことの伝わり方。拡張が渡す文（`--agree --yes` の prompt）と status で伝わり、hook は承認を伝えない。
-// 元: tests/ticket/test_approval_news.py。
 
 import (
 	"path/filepath"

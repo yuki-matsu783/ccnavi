@@ -78,7 +78,7 @@ func mkdirRename(src, dst string) error {
 	return os.Rename(src, dst)
 }
 
-// ---- 親子の木（tests/ticket の AuthorityHarness）
+// ---- 親子の木
 
 const childName = "i0001-01-01"
 

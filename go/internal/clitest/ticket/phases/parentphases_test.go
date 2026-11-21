@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/infra/yaml"
 )
 
-// 親に固定するフェーズ定義（親の `phases:`）の受入テスト（tests/ticket/test_parent_phases.py）。
+// 親に固定するフェーズ定義（親の `phases:`）の受入テスト。
 // 計画を持つ親は、計画が使う定義だけのコピーを `phases:` に持つ。見るのは 5 つ。
 //  1. 承認の検査。コピーは承認したときの phases.yml の同じ名前の定義と、読んだ形で同じでなければ落ちる。
 //  2. 承認のあとの判定はコピーを読み、phases.yml を読まない

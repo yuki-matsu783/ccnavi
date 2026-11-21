@@ -18,7 +18,7 @@ import (
 
 // scripts/ccnavi-doctor.sh の受入テスト。外から動かし、出力と終了コードだけを読む。道具は隔離した bin だけを PATH にし、glab・curl・git の通信は
 // 記録つきの偽物にする。doctor は 1 回の起動が重いので、1 回の起動で読める項目はまとめて確かめる。origin の URL の読み方は
-// `tests/fixtures/host-kinds.json` の表（tests/sh/test_host_kinds_sh.py と Go の host_test.go）が確かめるので、ここでは分類ごとの段階だけを見る。
+// `tests/fixtures/host-kinds.json` の表が確かめるので、ここでは分類ごとの段階だけを見る。
 
 const gitlabOrigin = "https://gitlab.example.com/g/p.git"
 

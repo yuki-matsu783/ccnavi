@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 設定の受入テスト（tests/config/test_config_union_phases_risk.py の後半）。risk は共通 + 1 レイヤーの和。
+// 設定の受入テスト。risk は共通 + 1 レイヤーの和。
 // risk は共通レイヤーに `big-diff`、lib のレイヤーに `schema` と `levels: {critical: 50}` がある。
 // 親と子は lib の `work`（範囲の上限が無くレビュー不要）を使う。
 

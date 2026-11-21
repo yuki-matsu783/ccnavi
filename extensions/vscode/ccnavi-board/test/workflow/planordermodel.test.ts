@@ -1,6 +1,6 @@
 /**
  * `--plan-order <親> --json`の答え（実行ファイルとの契約。`src/core/planordermodel.ts`）の読み取り。
- * 見本はPython側が書き出した実例（`test/fixtures/plan-order.json`）。画面は判定せず、答えを読むだけ。
+ * 見本は実行ファイルが書き出した実例（`test/fixtures/plan-order.json`）。画面は判定せず、答えを読むだけ。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";

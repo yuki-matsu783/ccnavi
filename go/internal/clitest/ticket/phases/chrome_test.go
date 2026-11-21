@@ -26,7 +26,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 判定のコアを Chrome の入口と手元の CLI が同じに使うことの受入テスト（tests/ticket/test_swap_points.py）。
+// 判定のコアを Chrome の入口と手元の CLI が同じに使うことの受入テスト。
 //
 //  1. 承認は提案の中身を変えない（承認済みチケットは提案のバイト列のまま。CRLF も）
 //  2. 親のワークツリーの HEAD がブランチを指していなければ承認しない

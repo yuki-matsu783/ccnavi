@@ -1,5 +1,4 @@
-// Package clitest は、実行ファイル（ccnavi）と配る sh を起こして外から確かめるテストの置き場である。tests/ の Python のテストを
-// 移したもので、置き場はグループごとのサブパッケージ（core・repo・ticket/…・sh/…・guard/…・config/…）に分け、go test の -p で並行に回す。
+// Package clitest は、実行ファイル（ccnavi）と配る sh を起こして外から確かめるテストの置き場である。置き場はグループごとのサブパッケージ（core・repo・ticket/…・sh/…・guard/…・config/…）に分け、go test の -p で並行に回す。
 // このパッケージ自身には本体が無い。道具は internal/harness（base・exe・run、sh 向けの shkit、チケット向けの ticketkit など）にある。
 //
 // 書き方の見本（core/version_test.go・core/texts_test.go が実物）:

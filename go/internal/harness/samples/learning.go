@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// 学びの蓄積のテストが共有する、パターンと採否の記録の文面（tests/learningsample.py の写し）。
+// 学びの蓄積のテストが共有する、パターンと採否の記録の文面。
 
 const (
 	// DefaultTarget・DefaultDecided は Pattern・Impact の既定の対象と決めた時刻。

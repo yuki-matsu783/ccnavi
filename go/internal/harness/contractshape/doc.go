@@ -1,4 +1,4 @@
-// Package contractshape は、GitLab の応答の「形」を作り、比べる（tests/contract/shape.py・fakeside.py の写し）。仕様は
+// Package contractshape は、GitLab の応答の「形」を作り、比べる。仕様は
 // `.agents/docs/gitlab-contract.md`。
 //
 // 形（Node）は JSON で表せる木で、Chrome 拡張の TS（`test/helpers/shape.ts`）も同じ表（`tests/contract/gitlab/normalize-cases.json`）で読む。

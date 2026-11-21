@@ -1,5 +1,5 @@
-// Package contractrecord は、動いている本物の GitLab に requests.json の列を送り、応答の形を recorded.json に録る（契約テストの録る側。
-// 消した tests/manual/gitlab/record_contract.py の写し）。仕様は `.agents/docs/gitlab-contract.md`。手動で回す。自動テストは本物を立てない。
+// Package contractrecord は、動いている本物の GitLab に requests.json の列を送り、応答の形を recorded.json に録る。
+// 仕様は `.agents/docs/gitlab-contract.md`。手動で回す。自動テストは本物を立てない。
 //
 //	gitlabmanual record-contract            録って tests/contract/gitlab/recorded.json に置く
 //	gitlabmanual record-contract --dry-run  置かずに標準出力へ（理由も出す）

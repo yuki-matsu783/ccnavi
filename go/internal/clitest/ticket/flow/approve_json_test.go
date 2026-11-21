@@ -1,6 +1,6 @@
 package flow
 
-// `--agree --preview --json` と `--agree --yes <識別子,…> --json`（承認の JSON）の受入テスト。元: tests/ticket/test_approve_json.py。
+// `--agree --preview --json` と `--agree --yes <識別子,…> --json`（承認の JSON）の受入テスト。
 //
 // VS Code のボード拡張がオーバーレイで承認するための経路。見るのは次のとおり。
 //

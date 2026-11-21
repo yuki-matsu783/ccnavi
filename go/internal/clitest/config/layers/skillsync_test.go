@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// ユーザの発言のたびに、共通の工程スキルをプロジェクトの `skills/` へコピーする（tests/config/test_skill_sync.py の写し）。
+// ユーザの発言のたびに、共通の工程スキルをプロジェクトの `skills/` へコピーする。
 //
 // ワークスペースの `.claude/skills/` に工程スキル（`process: true`）と、そうでないスキルを置く。見るのは 3 つ。
 //

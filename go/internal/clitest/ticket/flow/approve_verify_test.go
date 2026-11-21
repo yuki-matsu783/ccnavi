@@ -1,7 +1,6 @@
 package flow
 
 // `--agree --preview --verify`（承認を頼む前の確認）と、書いた回にそれを伝える案内。
-// 元: tests/ticket/test_approve_verify.py。
 
 import (
 	"path/filepath"

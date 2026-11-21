@@ -1,5 +1,4 @@
 // Package ticketkit は、チケット・フェーズ・レビューを CLI で通すテスト（internal/clitest/ticket/…）が共有する道具である。
-// Python のテストの土台（TicketTest・PhaseHarness）から、Go のテストに要る部分を移したもの。
 //
 // 置くもの
 //   - kit.go: git・ファイルの読み書き（Write・Read・Exists は shkit の写し）・終了コードと文面の確かめ（Git・ReadJSON・OK・Fails・Has・Lacks）

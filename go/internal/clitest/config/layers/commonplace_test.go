@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// 共通レイヤーの置き場は `.ccnavi/config/common/` 固定の受入テスト（tests/config/test_common_layer_place.py の写し）。
+// 共通レイヤーの置き場は `.ccnavi/config/common/` 固定の受入テスト。
 //
 // 3 つのレイヤーのうち共通レイヤーだけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）で動き、自身のレイヤーとプロジェクトの
 // レイヤーは `<ccnavi ディレクトリ>/config/project/` 固定、という非対称を無くす。env を渡しても共通レイヤーは既定の置き場のままになる。

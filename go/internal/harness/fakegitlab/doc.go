@@ -1,4 +1,4 @@
-// Package fakegitlab は GitLab API v4 の模擬サーバである（tests/fake_gitlab.py の写し）。
+// Package fakegitlab は GitLab API v4 の模擬サーバである。
 //
 // `.ccnavi/scripts/` の sh の HTTP の経路（curl・jq での組み立て・ページング・投稿・認証）を、実物の GitLab（4GB 要る）なしで
 // 走らせるための的。分かるのは sh が動くことだけで、返す形が実物と同じかどうかは契約テストが見る。

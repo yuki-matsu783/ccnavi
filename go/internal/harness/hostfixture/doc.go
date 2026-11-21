@@ -1,4 +1,4 @@
-// Package hostfixture は、ホストの応答の見本を返す GitLab・GitHub のスタブである（tests/sh/gitlab_host.py・github_host.py の写し）。
+// Package hostfixture は、ホストの応答の見本を返す GitLab・GitHub のスタブである。
 //
 // Chrome と手元の sh が同じ見本から同じ JSON を組むことを見るために使う。見本は
 // `extensions/chrome/ccnavi-approval/test/fixtures/host/<gitlab|github>/<場面>/` にある。拡張の試験も同じ見本を同じ規則で返す。

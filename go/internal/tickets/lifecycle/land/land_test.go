@@ -13,7 +13,7 @@ import (
 
 // 直接作業の取り込み（integrate）の、一時ワークツリーを作る前に止まる判断と、下書きの数え方を、使い捨てのワークスペースで
 // 確かめる。sh と実行ファイルは起こさない（Run を直に呼ぶ）。取り込みの流れ全体（C を作る・載せる・片付ける）は
-// tests/sh/test_integrate_sh.py が通しで見る。
+// clitest/sh/git が通しで見る。
 
 type fixture struct {
 	t  *testing.T

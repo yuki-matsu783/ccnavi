@@ -16,7 +16,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// hook の処理が ccnavi 自身の失敗で終わった回（tests/guard/test_internal_error.py から移した）。
+// hook の処理が ccnavi 自身の失敗で終わった回。
 // 失敗はイベントの処理の中からは起こせないので、受け皿（internalError・hookCrashed・onPanic）を直に呼ぶ。
 
 func crashInput(event hookio.Event, tool string, field, value string) hookio.Input {

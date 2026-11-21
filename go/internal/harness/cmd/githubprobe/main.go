@@ -1,5 +1,5 @@
 // githubprobe は、実物の GitHub に sh 3 本と exe を適用して 1 周する。
-// ユーザが手で走らせる道具で、自動テストは呼ばない。tests/manual/gitlab の GitLab 版（cmd/gitlabmanual の probe）の GitHub 版。
+// ユーザが手で走らせる道具で、自動テストは呼ばない。cmd/gitlabmanual の probe の GitHub 版。
 //
 // 使い捨てのブランチと PR と issue を、実験場のリポジトリ（既定 yuki-matsu783/test-repo。PUBLIC）に作る。
 // 終わったら PR と issue は閉じ（public なので履歴に残る）、ブランチは消す。ここに秘密や個人情報を書き込まない。

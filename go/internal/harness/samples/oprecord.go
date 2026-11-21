@@ -15,11 +15,11 @@ import (
 	"ccnavi/internal/tickets/model/oplog"
 )
 
-// テストの準備で、操作記録（`logs/state/ops/<操作ID>.json`）を実行ファイルと同じ形で書く（tests/oprecord.py の写し）。
+// テストの準備で、操作記録（`logs/state/ops/<操作ID>.json`）を実行ファイルと同じ形で書く。
 //
 // 実行ファイルの `ops begin` は、判断の中身（shown・choices・plan）を受けない。受け入れの計画をスタブで書く試験は、
 // 判断を載せた記録が要るので、ここで書く。記録は tickets/model/oplog の型で書くので、形が食い違えば、
-// このパッケージが組めず、読む側（`ccnavi ops …`）の変更に追随する（Python の「食い違えば試験が落ちる」守りと同じ）。
+// このパッケージが組めず、読む側（`ccnavi ops …`）の変更に追随する（「食い違えば試験が落ちる」守りと同じ）。
 // 記録の読み・段階や適用の欄の書き換えは oplog.Load・StageSet・AppliedSet をそのまま使う。
 
 // BeginRecord は操作を始める記録を書き、操作ID を返す。stages は（段階ID, 種類）を送る順に並べたもの。
@@ -62,7 +62,7 @@ func RecordIDs(state string) []string {
 }
 
 // OprecordMain は sh のスタブが `teststub oprecord <state> <計画の出力先> <記録と計画の JSON ファイル>` で起こす口の本体
-// （Python の `python oprecord.py <state> <計画の出力先> <記録と計画の JSON>`）。記録を作って、その操作ID を入れた計画を書く。
+// （引数は `<state> <計画の出力先> <記録と計画の JSON>`）。記録を作って、その操作ID を入れた計画を書く。
 // JSON は `{"begin": {kind・repo・parent・phase・mr・request_head・shown・choices・plan・stages}, "plan": {計画の欄}}`
 // （stages は [段階ID, 種類] の並び）。成功は 0、読めない・書けないときは文を stderr に出して 1。
 func OprecordMain(args []string, stderr io.Writer) int {

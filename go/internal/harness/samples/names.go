@@ -1,6 +1,6 @@
 package samples
 
-// 下書きの階層名の読み替えの見本（ticket と sh のテストが同じ見本を使う。tests/handoff_names_samples.py の写し）。
+// 下書きの階層名の読み替えの見本（ticket と sh のテストが同じ見本を使う）。
 //
 // 表（`.ccnavi/scripts/ccnavi-handoff-names.txt`）に名前を足したときは、NameSamples に 1 行足す。
 

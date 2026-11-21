@@ -8,7 +8,7 @@ import (
 	"ccnavi/internal/infra/pathcase"
 )
 
-// 見本は tests/handoff_names_samples.py と同じ（sh の試験も同じ見本を通る）。
+// 見本は harness/samples/names.go と同じ（sh の試験も同じ見本を通る）。
 var samples = [][2]string{
 	{".claude/settings.json", "handoff-.claude/settings.json"},
 	{".claude/hooks/lint-go.sh", "handoff-.claude/hooks/lint-go.sh"},

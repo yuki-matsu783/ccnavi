@@ -151,7 +151,7 @@ func TestRedacted(t *testing.T) {
 	}
 }
 
-// 3 つの logger で 1 字も違わない伏せ方（tests/sh/test_diaglog_sh.py も同じ入力を比べる）。
+// 3 つの logger で 1 字も違わない伏せ方。
 func TestMaskUserinfo(t *testing.T) {
 	cases := map[string]string{
 		"https://user:tok@host/x y":           "https://***@host/x y",

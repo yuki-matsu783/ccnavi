@@ -11,7 +11,7 @@ import (
 )
 
 // 状態で決まる Judge の答え（git の状態を読んで決まる形）を、使い捨てのリポジトリで確かめる。sh を起こさない。
-// 引数だけで決まる形は judge_test.go と testdata/check.json が見る。ラッパー（sh）を通す確認は tests/sh/test_gitwrap.py に数本だけ残す。
+// 引数だけで決まる形は judge_test.go と testdata/check.json が見る。ラッパー（sh）を通す確認は clitest/sh/git に数本だけ残す。
 
 func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()

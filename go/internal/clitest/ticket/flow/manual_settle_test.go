@@ -2,7 +2,7 @@ package flow
 
 // 手で動かした子の判定と、confirm による版つきの確定、受け入れ台帳。
 // ユーザが子を review/ から done/ へ手で動かす（settled_by を持たない）と、親が confirm を打ったときだけ、
-// 未解決の指摘を解決せずに台帳へ受け入れてレビュー済みにする。元: tests/ticket/test_manual_settle.py。
+// 未解決の指摘を解決せずに台帳へ受け入れてレビュー済みにする。
 //
 // 判定の細部（状態ごとの答え・台帳の読み方）は go の phase・host・marks のテストが見る。ここは status と confirm の出力で見る。
 import (

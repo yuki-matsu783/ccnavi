@@ -1,4 +1,4 @@
-// Package gitlabdocker は、Docker の本物の GitLab CE を起動・停止・確認する（tests/manual/gitlab/docker_gitlab.py の写し）。
+// Package gitlabdocker は、Docker の本物の GitLab CE を起動・停止・確認する。
 // 手で走らせる道具で、自動テストは本物を立てない（docker の呼び出しと GitLab への HTTP を差し込み口から差し替えて見る）。
 //
 //		gitlabmanual up [--pull] [--rotate]   起動して、応答するまで待つ（Tool.Up）

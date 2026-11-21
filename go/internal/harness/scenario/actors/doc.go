@@ -1,4 +1,4 @@
-// Package actors は、受入シナリオの人間役の操作である（tests/scenarios/actors/api.py・terminal.py の写し）。
+// Package actors は、受入シナリオの人間役の操作である。
 //
 //   - API（human_api）: 人間役のトークンで GitLab の API を打つ（スレッド・解決・承認）
 //   - Terminal（human_run）: 人間役として端末で sh を打つ。擬似端末は `script` コマンドで包む

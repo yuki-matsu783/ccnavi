@@ -1,4 +1,4 @@
-// Package run は、テストから ccnavi・sh・その他のプログラムを 1 回起こす（tests/inproc.py の写し）。
+// Package run は、テストから ccnavi・sh・その他のプログラムを 1 回起こす。
 //
 //	r := run.Ccnavi(t, []string{"--root", root, "text", "NEXT_SAMPLE"}, run.Opts{Input: "", Env: map[string]string{...}})
 //	r := run.Sh(t, "ccnavi-start.sh", []string{"--help"}, run.Opts{Dir: root})

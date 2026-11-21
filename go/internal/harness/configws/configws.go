@@ -18,7 +18,7 @@ import (
 	"ccnavi/internal/harness/samples"
 )
 
-// 設定の和を見るテストの土台（tests/config/test_config_union.py の ConfigUnionHarness の写し）。
+// 設定の和を見るテストの土台。
 
 const Home = ".ccnavi"
 
@@ -731,7 +731,7 @@ func InsertPhases(text, phasesYML string) string {
 	return samples.InsertPhases(text, phasesYML)
 }
 
-// ---- 設定ファイルの保護（tests/config/test_config_union_guard.py の GuardHarness の写し）
+// ---- 設定ファイルの保護
 
 // runHook は Bash 1 回。設定ファイルの保護を入れ、実行前でバックアップを取り、実行後で戻す。
 func (w *WS) RunHook(event string) run.Result {

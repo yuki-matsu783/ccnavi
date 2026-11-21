@@ -46,7 +46,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// claudeTimeout は claude -p 1 回の上限（Python の timeout=900 の写し）。
+// claudeTimeout は claude -p 1 回の上限（900 秒）。
 const claudeTimeout = 15 * time.Minute
 
 // recordTail は失敗したときに見せる標準エラーの末尾の長さ（バイト）。

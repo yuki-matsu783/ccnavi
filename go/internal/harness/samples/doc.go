@@ -1,6 +1,4 @@
-// Package samples は、CLI を通すテスト（internal/clitest）が共有する見本の組み立てである。tests/ の ticketsample・phasecopy・
-// learningsample・handoff_names_samples・userform・oprecord・write_and_push_flag の写し。
-//
+// Package samples は、CLI を通すテスト（internal/clitest）が共有する見本の組み立てである。//
 // 置くもの
 //   - ticket.go: ルール（Rules）・フェーズ定義（Phases・PlainPhases）・親と子の提案の本文（ParentText・ChildText・PlainParent）・
 //     計画のステップ（Step・Plan）・WritePlainPhases

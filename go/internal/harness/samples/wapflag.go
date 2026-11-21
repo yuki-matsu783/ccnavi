@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 )
 
-// sh（write-and-push）を通らずに実行ファイルを直に起こすテストが、状態の操作に付ける印（tests/write_and_push_flag.py の写し）。
+// sh（write-and-push）を通らずに実行ファイルを直に起こすテストが、状態の操作に付ける印。
 //
 // origin のある親子のチケットの状態の操作（ticket start|finish|cancel|approval-request、review requested|confirm|ready、
 // `--reviewed N --accept-unresolved`）は、write-and-push の sh が --record-writes と --record-tree を付けて起こす。

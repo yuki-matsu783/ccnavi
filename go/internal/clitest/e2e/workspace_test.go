@@ -19,7 +19,7 @@ import (
 	"ccnavi/internal/infra/env"
 )
 
-// このパッケージは、配る形の実行ファイル（dist/ccnavi）と配る sh を、使い捨てのワークスペースの上で外から呼ぶ（tests/e2e の写し）。
+// このパッケージは、配る形の実行ファイル（dist/ccnavi）と配る sh を、使い捨てのワークスペースの上で外から呼ぶ。
 // dist/ccnavi が無ければ飛ばす。試すのはソースではなくその実行ファイルなので、go/ を直したら `sh scripts/ccnavi-build.sh` で組み直す。
 // CCNAVI_TEST_SH_DIR で測る sh の置き場を、CCNAVI_TEST_DIST で組み立て済みの dist/ccnavi を差し替えられる。
 
@@ -316,7 +316,7 @@ type fixture struct {
 	p1, p2, wp1, w0 string
 }
 
-// newFixture はプロジェクトのあるワークスペースを組む（tests/e2e の WorkspaceTest）。
+// newFixture はプロジェクトのあるワークスペースを組む。
 func newFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := buildFixture(t, "p1", "p2")

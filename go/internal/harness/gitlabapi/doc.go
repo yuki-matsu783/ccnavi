@@ -1,4 +1,4 @@
-// Package gitlabapi は、GitLab API v4 を人間役のトークンで直に呼ぶ部品である（tests/manual/gitlab/gitlab_api.py の写し）。
+// Package gitlabapi は、GitLab API v4 を人間役のトークンで直に呼ぶ部品である。
 //
 // 手動の GitLab の道具（probe・契約の録り・Docker の操作）と、受入シナリオの相手の準備・step の終わりの相手側の状態の読み取りが共有する。
 // sh と同じ道具（curl・glab）を使わないのは、片方の不具合がもう片方に隠れないようにするため。
