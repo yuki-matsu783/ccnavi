@@ -10,6 +10,7 @@ const ClaudePrefix = "CLAUDE_"
 const (
 	ClaudeProjectDir      = "CLAUDE_PROJECT_DIR"
 	ClaudeCodeEntrypoint  = "CLAUDE_CODE_ENTRYPOINT"
+	ClaudeEnvFile         = "CLAUDE_ENV_FILE"
 	ClaudeSessionAttended = "CLAUDE_CODE_SESSION_ATTENDED"
 	// ClaudeSessionID は Claude Code が Bash のコマンドに渡すセッションの識別子（hook の session_id と同じ値）。
 	// サブコマンドが、打ったセッションの記録を引くのに使う。
@@ -59,6 +60,12 @@ const (
 	// TestShDir・TestDist は e2e の出どころ（測る sh の置き場と組み立て済みの dist/ccnavi）を差し替える。
 	TestShDir = "CCNAVI_TEST_SH_DIR"
 	TestDist  = "CCNAVI_TEST_DIST"
+)
+
+// テストの道具（harness/fakeclaude）が読む。claude -p のスタブの台本のパスと、セッションの記録の置き場。
+const (
+	FakeClaudeScript = "CCNAVI_FAKE_CLAUDE_SCRIPT"
+	FakeClaudeHome   = "CCNAVI_FAKE_CLAUDE_HOME"
 )
 
 // Compat は sh（ccnavi-common.sh）が互換の版を宣言する変数。環境からは読まず、`--lint` が sh の中の代入を読む。
