@@ -85,60 +85,46 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertEqual(started.returncode, 0, started.stdout + started.stderr)
         return tree, started
 
-    def test_start_copies_only_process_skills(self):
-        """1: 工程スキルの SKILL.md と references をコピーし、
-        process: true の無いスキルはコピーしない"""
+    def test_start_copies_the_common_files_and_leaves_the_project_files(self):
+        """1・2: 工程スキルの SKILL.md と common/ の .md をコピーし、共通側の中身で上書きする。
+
+        共通側に無くなった common/ の .md は消し、空のディレクトリも片付ける。process: true の
+        無いスキル・common 以外の references・.md でないものは、コピーも削除もしない。
+        """
         write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("process-test", "references", "common", "unit", "basics.md"), "# 基本\n")
-        write(self.source("process-test", "references", "common", "ccnavi-index.jsonl"), "{}\n")
+        common = self.source("process-test", "references", "common")
+        write(os.path.join(common, "unit", "basics.md"), "# 基本\n")
+        write(os.path.join(common, "ccnavi-index.jsonl"), "{}\n")
+        write(os.path.join(common, "shared.md"), "共通の新しい中身\n")
+        write(self.source("process-test", "references", "project", "workspace-only.md"), "固有\n")
+        write(self.source("process-test", "references", "loose.md"), "直下\n")
         write(self.source("commit", "SKILL.md"), plain_skill("commit"))
-
-        tree, started = self.start_parent()
-
-        self.assertEqual(
-            read(os.path.join(tree, "skills", "process-test", "SKILL.md")),
-            process_skill("process-test"),
-        )
-        self.assertEqual(
-            read(
-                os.path.join(
-                    tree, "skills", "process-test", "references", "common", "unit", "basics.md"
-                )
-            ),
-            "# 基本\n",
-        )
-        self.assertFalse(
-            os.path.exists(
-                os.path.join(
-                    tree, "skills", "process-test", "references", "common", "ccnavi-index.jsonl"
-                )
-            )
-        )
-        self.assertFalse(os.path.exists(os.path.join(tree, "skills", "commit")))
-        self.assertIn("skills/process-test/SKILL.md", started.stdout)
-        # 元リポジトリには触れない（親のブランチに乗って届く）。
-        self.assertFalse(os.path.exists(os.path.join(self.lib, "skills")))
-
-    def test_start_overwrites_common_and_leaves_project_files(self):
-        """2: common/ の同じパスは共通の中身で上書きし、project/ のファイルは残す"""
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(
-            self.source("process-test", "references", "common", "shared.md"), "共通の新しい中身\n"
-        )
-        own = os.path.join(self.lib, "skills", "process-test", "references", "project", "own.md")
-        stale = os.path.join(
-            self.lib, "skills", "process-test", "references", "common", "shared.md"
-        )
-        write(own, "プロジェクト固有\n")
-        write(stale, "古い中身\n")
+        seeded = os.path.join(self.lib, "skills", "process-test", "references")
+        write(os.path.join(seeded, "common", "shared.md"), "古い中身\n")
+        write(os.path.join(seeded, "common", "old", "gone.md"), "消える\n")
+        write(os.path.join(seeded, "common", "note.txt"), "md でないものは触れない\n")
+        write(os.path.join(seeded, "project", "own.md"), "プロジェクト固有\n")
         git(self.lib, "add", "-A")
         git(self.lib, "commit", "-m", "seed")
 
-        tree, _ = self.start_parent()
+        tree, started = self.start_parent()
 
-        base = os.path.join(tree, "skills", "process-test", "references")
-        self.assertEqual(read(os.path.join(base, "common", "shared.md")), "共通の新しい中身\n")
-        self.assertEqual(read(os.path.join(base, "project", "own.md")), "プロジェクト固有\n")
+        skill_dir = os.path.join(tree, "skills", "process-test")
+        out = os.path.join(skill_dir, "references")
+        self.assertEqual(read(os.path.join(skill_dir, "SKILL.md")), process_skill("process-test"))
+        self.assertEqual(read(os.path.join(out, "common", "unit", "basics.md")), "# 基本\n")
+        self.assertEqual(read(os.path.join(out, "common", "shared.md")), "共通の新しい中身\n")
+        self.assertFalse(os.path.exists(os.path.join(out, "common", "old")))
+        self.assertTrue(os.path.exists(os.path.join(out, "common", "note.txt")))
+        self.assertFalse(os.path.exists(os.path.join(out, "common", "ccnavi-index.jsonl")))
+        self.assertEqual(read(os.path.join(out, "project", "own.md")), "プロジェクト固有\n")
+        self.assertFalse(os.path.exists(os.path.join(out, "project", "workspace-only.md")))
+        self.assertFalse(os.path.exists(os.path.join(out, "loose.md")))
+        self.assertFalse(os.path.exists(os.path.join(tree, "skills", "commit")))
+        self.assertIn("skills/process-test/SKILL.md", started.stdout)
+        self.assertIn("削除した", started.stdout)
+        # 元リポジトリには触れない（親のブランチに乗って届く）。
+        self.assertFalse(os.path.exists(os.path.join(self.lib, "skills", "commit")))
 
     def test_same_content_is_not_reported(self):
         """3: 中身が同じなら知らせない"""
@@ -180,39 +166,3 @@ class SkillSyncTest(ConfigUnionHarness):
         self.assertNotIn("skills/", read(target) if os.path.exists(target) else "")
         self.prompt()
         self.assertTrue(os.path.isfile(os.path.join(tree, "skills", "process-test", "SKILL.md")))
-
-    def test_only_the_common_references_are_copied(self):
-        """1: references/ の common 以外(プロジェクト固有)は、
-        ワークスペースにあってもコピーしない"""
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("process-test", "references", "common", "shared.md"), "共通\n")
-        write(self.source("process-test", "references", "project", "workspace-only.md"), "固有\n")
-        write(self.source("process-test", "references", "loose.md"), "直下\n")
-
-        tree, _ = self.start_parent()
-
-        base = os.path.join(tree, "skills", "process-test", "references")
-        self.assertEqual(read(os.path.join(base, "common", "shared.md")), "共通\n")
-        self.assertFalse(os.path.exists(os.path.join(base, "project")))
-        self.assertFalse(os.path.exists(os.path.join(base, "loose.md")))
-
-    def test_start_deletes_common_files_gone_from_the_source(self):
-        """2: 共通側から無くなった common/ の .md は消し、空になったディレクトリも片付ける"""
-        write(self.source("process-test", "SKILL.md"), process_skill("process-test"))
-        write(self.source("process-test", "references", "common", "kept.md"), "残る\n")
-        base = os.path.join(self.lib, "skills", "process-test", "references")
-        write(os.path.join(base, "common", "kept.md"), "古い\n")
-        write(os.path.join(base, "common", "old", "gone.md"), "消える\n")
-        write(os.path.join(base, "common", "note.txt"), "md でないものは触れない\n")
-        write(os.path.join(base, "project", "own.md"), "プロジェクト固有\n")
-        git(self.lib, "add", "-A")
-        git(self.lib, "commit", "-m", "seed")
-
-        tree, started = self.start_parent()
-
-        out = os.path.join(tree, "skills", "process-test", "references")
-        self.assertEqual(read(os.path.join(out, "common", "kept.md")), "残る\n")
-        self.assertFalse(os.path.exists(os.path.join(out, "common", "old")))
-        self.assertTrue(os.path.exists(os.path.join(out, "common", "note.txt")))
-        self.assertEqual(read(os.path.join(out, "project", "own.md")), "プロジェクト固有\n")
-        self.assertIn("削除した", started.stdout)
