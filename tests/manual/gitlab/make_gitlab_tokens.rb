@@ -3,7 +3,7 @@
 #
 #   docker exec -i gitlab gitlab-rails runner - < tests/manual/gitlab/make_gitlab_tokens.rb
 #
-# 出力は KEY=VALUE の 4 行。probe_gitlab.py はこれを環境変数で受ける。
+# 出力は KEY=VALUE の 4 行。gitlabmanual probe はこれを環境変数で受ける。
 # GitLab 18 は組織（organization）と、よくある語を含まないパスワードを求める。
 require 'securerandom'
 

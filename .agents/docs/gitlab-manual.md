@@ -9,7 +9,7 @@ keywords: [GitLab, Docker, gitlabmanual, probe, make_gitlab_tokens, compose, CE,
 # 手動の GitLab（Docker）の立て方と使い方
 
 本物の GitLab を立てて、ccnavi の sh と実行ファイルを 1 周させる手動の道具。自動テストは呼ばない（自動テストは本物の GitLab を立てず、引数・組み立て・模擬への 1 往復だけを見る）。
-道具は Go の `go/internal/harness/` にあり、入口は 1 本の `gitlabmanual`。打ち方は `cd go && go run ./internal/harness/cmd/gitlabmanual <サブコマンド>`（以下 `gitlabmanual` と書く）。Docker の GitLab の立て方の定義（`compose.yml`・`make_gitlab_tokens.rb`）だけが `tests/manual/gitlab/` に残る。
+道具は Go の `go/internal/harness/` にあり、入口は 1 本の `gitlabmanual`。打ち方は `cd go && go run ./internal/harness/cmd/gitlabmanual <サブコマンド>`（以下 `gitlabmanual` と書く）。Docker の GitLab の立て方の定義（`compose.yml`・`make_gitlab_tokens.rb`）が `tests/manual/gitlab/` に残る。`docker_gitlab.py`・`gitlab_api.py` は受入シナリオの Python が読むので SC1 まで残る（同じ状態ファイルを使う。版の定義は `gitlabdocker.Image` と二重で、上げるときは両方）。
 
 | 置き場 | 役割 |
 |---|---|

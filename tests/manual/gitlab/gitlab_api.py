@@ -1,7 +1,7 @@
 """GitLab API v4 を人間役のトークンで直に呼ぶ部品。import しても何も起こらない。
 
 環境変数を読まない・ファイルや一時ディレクトリを作らない・`sys.exit` しない。接続先は
-`Client(base)` の引数、トークンは各メソッドの引数で受ける。`probe_gitlab.py` と、本物の GitLab の
+`Client(base)` の引数、トークンは各メソッドの引数で受ける。`gitlabmanual probe` と、本物の GitLab の
 応答を記録する道具。受入シナリオの相手の準備と、step の終わりの相手側の状態の読み取り
 （`tests/scenarios/hostsnap.py`）が使う。
 
@@ -316,7 +316,7 @@ class Client:
             tag="reviewers-after-approve",
         )
 
-    # ---- 契約テストの録り（record_contract.py）が場面を組むために足したもの。既存は変えていない
+    # ---- 契約テストの録り（gitlabmanual record-contract）が場面を組むために足したもの。既存は変えていない
 
     def first_commit(self, token: str, project_id: int, branch: str = "main"):
         """空のリポジトリに最初のコミットを作り、`branch` を作る。"""
