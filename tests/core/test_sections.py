@@ -4,8 +4,8 @@
 繰り返される。ルールが置いた確認はユーザが置いた確認ポイントで、繰り返されること自体に価値がある。
 混ぜると前者の数に後者が埋もれる。
 
-強さの順（deny > ask > allow）と読み切れないコマンドの扱いは Go（go/internal/hook/judge の sections_test.go）に
-移した。ここには、実行ファイルを通した 1 本だけを残す。
+強さの順（deny > ask > allow）と読み切れないコマンドの扱いは、Go の
+go/internal/hook/judge/sections_test.go に移した。ここには、実行ファイルを通した 1 本だけを残す。
 """
 
 from __future__ import annotations
