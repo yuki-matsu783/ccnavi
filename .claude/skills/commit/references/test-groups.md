@@ -58,7 +58,7 @@ Go のテスト（`cd go && go test ./...`）は、`go/`・`.ccnavi/`・`tests/`
 | `.ccnavi/scripts/ccnavi-start.sh`・`go/internal/tickets/lifecycle/start/` | `sh`（`test_start_sh`・`test_start_sh_adopt`） |
 | `go/internal/tickets/lifecycle/preflight/` | `sh`（`test_start_sh`・`test_start_sh_adopt`・`test_ticket_preflight_sh`・`test_write_and_push_ticket`）。`ccnavi-common-host.sh` は多くの sh が読むため、下の「全件を回すとき」に従う |
 | `.ccnavi/scripts/ccnavi-common-write-and-push.sh`・`go/internal/tickets/lifecycle/wapmerge/`・`go/internal/entry/cli/wapwrite.go` | `sh`（`test_write_and_push_*`・`test_push_approved_sh`）`ticket`（`test_write_and_push`） |
-| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`・`test_branches_sh`） |
+| `go/internal/tickets/model/hostreply/`・`go/internal/entry/cli/host.go`・`go/internal/records/redact/url.go`・`ccnavi-review.sh`・`ccnavi-common-review.sh` | `sh`（`test_review_*`・`test_start_sh`・`test_start_sh_adopt`） |
 | `.claude/hooks/test-py.sh` | `core`（`test_test_py_hook`）`e2e` |
 | `.claude/hooks/check-adr.sh` | `go test ./internal/clitest/core/`（`checkadrhook_test.go`） |
 | `.claude/hooks/mark-ext.sh`・`test-ext.sh`・`extensions/vscode/ccnavi-board/scripts/test-groups.js` | `core`（`test_ext_tests`） |
