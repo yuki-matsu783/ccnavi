@@ -3,7 +3,6 @@ package phases
 import (
 	"encoding/json"
 	"flag"
-	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 計画の順序を振り直して書き戻す `ccnavi --plan-order <親>` の受入テスト（tests/ticket/test_plan_order.py）。
@@ -43,7 +43,7 @@ func (w *ws) orderBody(extra ...string) map[string]any {
 	if code != 0 {
 		w.t.Fatalf("--plan-order: code %d\n%s%s", code, out, errText)
 	}
-	return jsonOf(w.t, out)
+	return ticketkit.ParseJSON(w.t, out)
 }
 
 // writeOrder は振り直した順序を提案に書く。expect が空なら今の source_sha を渡す。
@@ -61,11 +61,11 @@ func (w *ws) mustWriteOrder(order string) map[string]any {
 	if code != 0 {
 		w.t.Fatalf("--write: code %d\n%s%s", code, out, errText)
 	}
-	return jsonOf(w.t, out)
+	return ticketkit.ParseJSON(w.t, out)
 }
 
 func (w *ws) previewBody() map[string]any {
-	return jsonOf(w.t, w.ccnavi("--agree", "--preview", "--json").Stdout)
+	return ticketkit.ParseJSON(w.t, w.ccnavi("--agree", "--preview", "--json").Stdout)
 }
 
 func TestTheSourceShaCoversThePendingChildren(t *testing.T) {
@@ -90,7 +90,7 @@ func TestTheWrittenProposalIsApprovedAndTheOldDigestIsNot(t *testing.T) {
 	w.commitParent()
 	old := w.previewBody()["digest"].(string)
 	w.mustWriteOrder(reverse)
-	written := read(t, w.todo(parentName))
+	written := ticketkit.Read(t, w.todo(parentName))
 	w.commitParent("reorder")
 	stale := w.ccnavi("user", "agree", "--yes", parentName, "--digest", old, "--json")
 	if stale.Code != 1 {
@@ -101,7 +101,7 @@ func TestTheWrittenProposalIsApprovedAndTheOldDigestIsNot(t *testing.T) {
 	}
 	fresh := w.previewBody()["digest"].(string)
 	w.mustOK(w.ccnavi("user", "agree", "--yes", parentName, "--digest", fresh, "--json"), "agree")
-	if read(t, w.doing(parentName)) != written {
+	if ticketkit.Read(t, w.doing(parentName)) != written {
 		t.Error("承認が書き換えた提案の中身と違う")
 	}
 }
@@ -187,7 +187,7 @@ func TestAFixedNumberStaysAndFreeOnesArePacked(t *testing.T) {
 	}
 	w.mustWriteOrder(revisionOrder)
 	var types []string
-	for _, s := range stepsOf(frontOf(t, read(t, w.todo(parentName))), "plan") {
+	for _, s := range stepsOf(frontOf(t, ticketkit.Read(t, w.todo(parentName))), "plan") {
 		types = append(types, s.Type)
 	}
 	equalStrings(t, "plan の型", types, []string{"research", "acceptance", "chores", "design", "implement"})
@@ -206,7 +206,7 @@ func TestAnApprovedChildStaysAndAPendingOneMoves(t *testing.T) {
 	w.propose("i0001-01-01", childReview("i0001-01-01", 1, samples.Off, "wip/research/*"))
 	w.commitParent()
 	w.mustApprove()
-	held := read(t, w.doing("i0001-01-01"))
+	held := ticketkit.Read(t, w.doing("i0001-01-01"))
 	w.propose(parentName, w.parent(revisedPlan, samples.ParentOpts{Copy: samples.Phases}))
 	w.propose("i0001-02-01", childText("i0001-02-01", 2, "wip/design/*"))
 	w.commitParent("revise")
@@ -218,13 +218,13 @@ func TestAnApprovedChildStaysAndAPendingOneMoves(t *testing.T) {
 	}
 	equalStrings(t, "children", moved, []string{"i0001-02-01->i0001-04-01"})
 	w.mustWriteOrder(revisionOrder)
-	if phase := frontOf(t, read(t, w.todo("i0001-04-01"))).Text("phase"); phase != "4" {
+	if phase := frontOf(t, ticketkit.Read(t, w.todo("i0001-04-01"))).Text("phase"); phase != "4" {
 		t.Errorf("phase = %v", phase)
 	}
-	if exists(w.todo("i0001-02-01")) {
+	if ticketkit.Exists(w.todo("i0001-02-01")) {
 		t.Error("元の子の提案が残っている")
 	}
-	if read(t, w.doing("i0001-01-01")) != held {
+	if ticketkit.Read(t, w.doing("i0001-01-01")) != held {
 		t.Error("承認済みの子が変わった")
 	}
 }
@@ -257,15 +257,7 @@ func portable(t testing.TB, v any, root string) any {
 		}
 		return out
 	case string:
-		text := strings.ReplaceAll(x, `\`, "/")
-		spellings := []string{root}
-		if real, err := filepath.EvalSymlinks(root); err == nil && real != root {
-			spellings = []string{real, root}
-		}
-		for _, s := range spellings {
-			text = regexp.MustCompile(`(?i)`+regexp.QuoteMeta(strings.ReplaceAll(s, `\`, "/"))).ReplaceAllString(text, "<root>")
-		}
-		return text
+		return ticketkit.PortableText(x, root)
 	}
 	return v
 }
@@ -313,12 +305,10 @@ func TestShapesMatchTheExtensionFixture(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(body+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		ticketkit.WriteFixture(t, path, body)
 	}
 	var fixture map[string]any
-	if err := json.Unmarshal([]byte(read(t, path)), &fixture); err != nil {
+	if err := json.Unmarshal([]byte(ticketkit.Read(t, path)), &fixture); err != nil {
 		t.Fatal(err)
 	}
 	for name := range got {

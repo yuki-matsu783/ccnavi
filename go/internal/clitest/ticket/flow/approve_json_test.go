@@ -21,6 +21,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // parentAllowWip は計画（research, design）の範囲と重なる allow の親（重ならないと親にも超過が出る）。
@@ -33,7 +34,7 @@ func parentAllowWip(name string, plan []samples.Step, allow ...string) string {
 
 func (tr *Tree) previewJSON(extra ...string) map[string]any {
 	tr.T.Helper()
-	return ParseJSON(tr.T, OK(tr.T, tr.Ccnavi(append([]string{"--agree", "--preview", "--json"}, extra...)...)).Stdout)
+	return ticketkit.ParseJSON(tr.T, ticketkit.OK(tr.T, tr.Ccnavi(append([]string{"--agree", "--preview", "--json"}, extra...)...)).Stdout)
 }
 
 // yesBoard は拡張と同じく、直前に同じ extra でプレビューして見せたダイジェストを渡して承認する。
@@ -47,7 +48,7 @@ func (tr *Tree) yesBoard(tickets []string, digest string, extra ...string) run.R
 	return tr.Ccnavi(args...)
 }
 
-func (tr *Tree) copyExists(name string) bool { return Exists(tr.ApprovedPath("doing", name)) }
+func (tr *Tree) copyExists(name string) bool { return ticketkit.Exists(tr.ApprovedPath("doing", name)) }
 
 // pendingParentAndChild は親 1 本と、フェーズ 1 の子 1 枚を提案したまま（未承認）にする。
 func (tr *Tree) pendingParentAndChild() {
@@ -61,8 +62,8 @@ func TestYesWithoutJSONPrintsTheHumanLines(t *testing.T) {
 	tr := newTree(t)
 	tr.pendingParentAndChild()
 	digest := js(tr.previewJSON(), "digest")
-	r := OK(t, tr.Ccnavi("user", "agree", "--yes", "i0001,i0001-01-01", "--digest", digest))
-	Has(t, r.Stdout, "承認した")
+	r := ticketkit.OK(t, tr.Ccnavi("user", "agree", "--yes", "i0001,i0001-01-01", "--digest", digest))
+	ticketkit.Has(t, r.Stdout, "承認した")
 	if !tr.copyExists("i0001") {
 		t.Error("承認済みチケットが置かれない")
 	}
@@ -81,7 +82,7 @@ func TestAChangeOfTheApprovedCopyAloneIsNotCollated(t *testing.T) {
 		t.Fatalf("batch = %v", shown["batch"])
 	}
 	copyPath := tr.ApprovedPath("doing", "i0001")
-	Write(t, copyPath, Read(t, copyPath)+"\n")
+	ticketkit.Write(t, copyPath, ticketkit.Read(t, copyPath)+"\n")
 	if got := js(tr.previewJSON(), "digest"); got != js(shown, "digest") {
 		t.Errorf("承認済みチケットだけの変化でダイジェストが動いた")
 	}
@@ -93,8 +94,8 @@ func TestYesDoesNotNeedATerminalButPlainApproveStillDoes(t *testing.T) {
 	t.Parallel()
 	tr := newTree(t)
 	tr.pendingParentAndChild()
-	refused := Fails(t, tr.Call(Call{Stdin: "y\n"}, "--entry", "sh", "user", "agree", "--guard-ticket-approval", "enable"))
-	Has(t, refused.Stderr, "ターミナル")
+	refused := ticketkit.Fails(t, tr.Call(ticketkit.Call{Stdin: "y\n"}, "--entry", "sh", "user", "agree", "--guard-ticket-approval", "enable"))
+	ticketkit.Has(t, refused.Stderr, "ターミナル")
 	if tr.copyExists("i0001") {
 		t.Error("壁で止まらず承認した")
 	}
@@ -128,7 +129,7 @@ func TestApproveJSONShapesMatchTheExtensionFixtures(t *testing.T) {
 	tr.Propose("i0001-01-02", child("i0001-01-02", 1, "wip/design/*"), "")
 	tr.Propose("i0001-05-05", child("i0001-05-05", 5, "wip/research/*"), "")
 	tr.CommitParent("tickets")
-	preview := OK(t, tr.Ccnavi("--agree", "--preview", "--json"))
+	preview := ticketkit.OK(t, tr.Ccnavi("--agree", "--preview", "--json"))
 	checkApproveFixture(t, "approve-preview.json", preview.Stdout, tr.Root)
 
 	// 承認の答えは親と子 1 枚の形で書き出す。超過のある子は提案を下げてから承認する。
@@ -151,7 +152,7 @@ func TestApproveJSONShapesMatchTheExtensionFixtures(t *testing.T) {
 func TestPartialCarriesTheProgressLines(t *testing.T) {
 	t.Parallel()
 	tr := newTree(t)
-	OK(t, tr.ConfirmFor(tr.Phase1Requested(), "1"))
+	ticketkit.OK(t, tr.ConfirmFor(tr.Phase1Requested(), "1"))
 	gate, waiting, marks := tr.BoardPhase(1, "i0001")
 	if gate || waiting || strings.Join(marks, ",") != "requested,reviewed" {
 		t.Fatalf("board phase = %v %v %v", gate, waiting, marks)
@@ -164,7 +165,7 @@ func TestPartialCarriesTheProgressLines(t *testing.T) {
 	}
 	r := tr.yesBoard([]string{"i0001-01-02", "i0001-01-03"}, "")
 	wantCode(t, r, 1)
-	partial := jm(ParseJSON(t, r.Stdout), "partial")
+	partial := jm(ticketkit.ParseJSON(t, r.Stdout), "partial")
 	if placed := strs(jl(partial, "placed")); len(placed) != 1 || placed[0] != "i0001-01-02" || js(partial, "ticket") != "i0001-01-03" {
 		t.Errorf("partial = %v", partial)
 	}

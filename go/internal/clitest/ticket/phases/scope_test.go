@@ -9,6 +9,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 範囲の上限（設計 wip/design/approve-carry.md 3・4、6.1〜6.2）と、サブコマンドに足した診断のオプション
@@ -72,7 +73,7 @@ func TestAParentWithoutAPlanIsApprovedButCannotStartEvenWithChildren(t *testing.
 	}
 	contains(t, "stderr", started.Stderr, "に plan が無いので着手できない", "子や子の提案があっても同じ", "phases.yml", ".ccnavi/config/project/phases.yml", "work を 1 つ", "書くのはユーザ")
 	// 着手の欄は書かれない
-	contains(t, "承認済みチケット", read(t, w.doing(parentName)), `started_at: ""`)
+	contains(t, "承認済みチケット", ticketkit.Read(t, w.doing(parentName)), `started_at: ""`)
 	// 子の着手は親が着手済みであることが条件のまま。親が止まれば子も着手できない。
 	w.worktree("i0001-01-01", parentName)
 	if child := w.ccnavi("ticket", "start", "i0001-01-01"); child.Code != 1 {
@@ -107,7 +108,7 @@ func TestASecondCwdIsRefusedAndOneOfEachGoesThrough(t *testing.T) {
 	}
 	// 1 本ずつなら通る。断る側だけを見ると、全部断る実装でもテストが通ってしまう。
 	passed := w.mustOK(w.ccnavi("--cwd", w.parentTree, "--explain", "--json"), "--explain --json")
-	if len(jsonOf(t, passed.Stdout)) == 0 {
+	if len(ticketkit.ParseJSON(t, passed.Stdout)) == 0 {
 		t.Error("答えが空")
 	}
 }
@@ -118,7 +119,7 @@ func TestAPhasesFlagOnTicketFinishDoesNotDropTheReview(t *testing.T) {
 	// そのまま渡すので、この形はエージェントが Bash で打てる。通していた頃は、`review: true` の定義を `review: false` と
 	// 宣言するファイルに差し替えて、レビュー待ちを飛ばせた。
 	w := newWS(t)
-	loose := write(t, filepath.Join(w.root, "loose.yml"), "version: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: false\n    scope: [\"wip/design/*\"]\n")
+	loose := ticketkit.Write(t, filepath.Join(w.root, "loose.yml"), "version: 1\nphases:\n  design:\n    kind: work\n    title: 設計\n    review: false\n    scope: [\"wip/design/*\"]\n")
 	w.family(planOf("design"))
 	w.propose("i0001-01-01", childReview("i0001-01-01", 1, samples.Off, "wip/design/*"))
 	w.commitParent()
@@ -127,10 +128,10 @@ func TestAPhasesFlagOnTicketFinishDoesNotDropTheReview(t *testing.T) {
 	closed := w.mustOK(w.ccnavi("ticket", "finish", "i0001-01-01", "--phases", loose), "finish")
 	contains(t, "stderr", closed.Stderr, "--phases は診断") // 無視したことを言う
 	// `review: true` のまま。閉じた先はレビュー待ちで、done/ ではない。
-	if !exists(filepath.Join(w.parentTree, "wip", "proposals", "review", "i0001-01-01.md")) {
+	if !ticketkit.Exists(filepath.Join(w.parentTree, "wip", "proposals", "review", "i0001-01-01.md")) {
 		t.Error("レビュー待ちへ動いていない（渡した定義で判定された）")
 	}
-	if exists(filepath.Join(w.approved, "done", "i0001-01-01.md")) {
+	if ticketkit.Exists(filepath.Join(w.approved, "done", "i0001-01-01.md")) {
 		t.Error("レビューを飛ばして閉じた")
 	}
 }
@@ -238,22 +239,22 @@ func TestAWriteBeyondThePhaseTypeIsStoppedOnEveryPath(t *testing.T) {
 		t.Errorf("書いていないのに実行後チェックが落ちた: code %d\n%s%s", first.Code, first.Stdout, first.Stderr)
 	}
 	// 定義の中への書き込みは言わない。
-	write(t, filepath.Join(tree, "wip", "research", "gen.md"), "ok\n")
+	ticketkit.Write(t, filepath.Join(tree, "wip", "research", "gen.md"), "ok\n")
 	quiet := w.hook("PostToolUse", "Bash", tree, input{"command": "python gen.py"})
 	if quiet.Code != 0 {
 		t.Errorf("code %d\n%s%s", quiet.Code, quiet.Stdout, quiet.Stderr)
 	}
 	lacks(t, "実行後チェック", quiet.Stdout+quiet.Stderr, "POST_TICKET_SCOPE")
 	// 子の範囲の中だが定義の外。
-	write(t, filepath.Join(tree, "src", "a", "gen.py"), "x\n")
+	ticketkit.Write(t, filepath.Join(tree, "src", "a", "gen.py"), "x\n")
 	after := w.hook("PostToolUse", "Bash", tree, input{"command": "python gen.py"})
 	if after.Code != 2 {
 		t.Errorf("定義の外へ書いたのに止まらない: code %d\n%s%s", after.Code, after.Stdout, after.Stderr)
 	}
 	contains(t, "stderr", slash(after.Stderr), "POST_TICKET_SCOPE", "src/a/gen.py", "調査")
 	// SubagentStop: 定義の上限の外の変更で差し戻し、上限の名指しが付く。
-	write(t, filepath.Join(tree, "wip", "research", "ok.md"), "ok\n")
-	write(t, filepath.Join(tree, "src", "a", "stray.py"), "x\n")
+	ticketkit.Write(t, filepath.Join(tree, "wip", "research", "ok.md"), "ok\n")
+	ticketkit.Write(t, filepath.Join(tree, "src", "a", "stray.py"), "x\n")
 	w.git(tree, "add", "-A")
 	w.git(tree, "commit", "--quiet", "-m", "stray")
 	stop := w.hookWith(hookOpts{AgentID: "sub-1"}, "SubagentStop", "", tree, nil)

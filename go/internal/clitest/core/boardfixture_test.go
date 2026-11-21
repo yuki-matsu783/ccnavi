@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/base"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/pyjson"
 )
 
@@ -41,9 +42,7 @@ func checkBoardFixture(t *testing.T, name, stdout, root string, paths ...string)
 		for _, form := range []string{strings.ReplaceAll(root, `\`, "/"), strings.ReplaceAll(strings.ReplaceAll(root, `\`, "/"), "/", `\\`)} {
 			text = strings.ReplaceAll(text, form, "/ws")
 		}
-		if err := os.WriteFile(path, []byte(text+"\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		ticketkit.WriteFixture(t, path, text)
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {

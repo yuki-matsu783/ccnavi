@@ -8,6 +8,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 実績で測るリスクの受入テスト（tests/ticket/test_risk.py）。定義の検証と差分の数え方の細部は
@@ -42,7 +43,7 @@ type riskWS struct {
 func newRiskWS(t *testing.T) *riskWS {
 	w := newWS(t)
 	w.setPhases(riskPhases)
-	return &riskWS{ws: w, risk: write(t, base.CommonPath(w.root, "risk"), riskDef)}
+	return &riskWS{ws: w, risk: ticketkit.Write(t, base.CommonPath(w.root, "risk"), riskDef)}
 }
 
 func (r *riskWS) oneChild(review samples.Flag) string {
@@ -56,11 +57,11 @@ func (r *riskWS) oneChild(review samples.Flag) string {
 }
 
 func (r *riskWS) record() map[string]any {
-	return readJSON(r.t, filepath.Join(r.approved, "phases", parentName, "i0001-01-01.risk.json"))
+	return ticketkit.ReadJSON(r.t, filepath.Join(r.approved, "phases", parentName, "i0001-01-01.risk.json"))
 }
 
 func (r *riskWS) commitBig(tree string) {
-	write(r.t, filepath.Join(tree, "src", "a.py"), strings.Repeat("x\n", 20))
+	ticketkit.Write(r.t, filepath.Join(tree, "src", "a.py"), strings.Repeat("x\n", 20))
 	r.git(tree, "add", "-A")
 	r.git(tree, "commit", "--quiet", "-m", "big")
 }
@@ -83,9 +84,9 @@ func TestABigChangeEscalatesToReviewEvenWhenDeclaredUnneeded(t *testing.T) {
 	r := newRiskWS(t)
 	tree := r.oneChild(samples.Off)
 	// 行数と、ファイル数と、CI と、削除。全部ヒットする。
-	write(t, filepath.Join(tree, "src", "a.py"), strings.Repeat("x\n", 20))
-	write(t, filepath.Join(tree, "src", "b.py"), "b\n")
-	write(t, filepath.Join(tree, ".github", "ci.yml"), "on: push\n")
+	ticketkit.Write(t, filepath.Join(tree, "src", "a.py"), strings.Repeat("x\n", 20))
+	ticketkit.Write(t, filepath.Join(tree, "src", "b.py"), "b\n")
+	ticketkit.Write(t, filepath.Join(tree, ".github", "ci.yml"), "on: push\n")
 	r.git(tree, "rm", "-q", filepath.Join("src", "keep.py"))
 	r.git(tree, "add", "-A")
 	r.git(tree, "commit", "--quiet", "-m", "big")
@@ -120,9 +121,9 @@ func TestABigChangeEscalatesToReviewEvenWhenDeclaredUnneeded(t *testing.T) {
 func TestAScriptFactorAddsItsPointsAndFailsHeavy(t *testing.T) {
 	t.Parallel()
 	r := newRiskWS(t)
-	write(t, filepath.Join(r.root, ".ccnavi", "config", "common", "scripts", "count.sh"),
+	ticketkit.Write(t, filepath.Join(r.root, ".ccnavi", "config", "common", "scripts", "count.sh"),
 		"printf '{\"points\": 30, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
-	write(t, r.risk, "version: 1\nfactors:\n"+
+	ticketkit.Write(t, r.risk, "version: 1\nfactors:\n"+
 		"  - {id: counted, points: 5, script: .ccnavi/config/common/scripts/count.sh, message: 数えた}\n"+
 		"  - {id: broken, points: 45, script: .ccnavi/config/common/scripts/none.sh, message: 無い}\n")
 	r.oneChild(samples.On)
@@ -149,7 +150,7 @@ func TestAScriptFactorAddsItsPointsAndFailsHeavy(t *testing.T) {
 func TestAJudgeFactorBlocksDoneUntilRecorded(t *testing.T) {
 	t.Parallel()
 	r := newRiskWS(t)
-	write(t, r.risk, "version: 1\nlevels: {high: 30}\nfactors:\n"+
+	ticketkit.Write(t, r.risk, "version: 1\nlevels: {high: 30}\nfactors:\n"+
 		"  - {id: untested, points: 30, judge: テストの無い振る舞いの変更を含むか, message: テスト無し}\n")
 	tree := r.oneChild(samples.On)
 	refused := r.ccnavi("ticket", "finish", "i0001-01-01")
@@ -157,14 +158,14 @@ func TestAJudgeFactorBlocksDoneUntilRecorded(t *testing.T) {
 		t.Fatal("判定が無いのに閉じられた")
 	}
 	contains(t, "stderr", refused.Stderr, "untested", "judge")
-	contains(t, "判定の依頼", read(t, filepath.Join(r.state, "risk-judge-i0001-01-01.md")), "テストの無い振る舞いの変更を含むか", "wip/research/summary.md")
+	contains(t, "判定の依頼", ticketkit.Read(t, filepath.Join(r.state, "risk-judge-i0001-01-01.md")), "テストの無い振る舞いの変更を含むか", "wip/research/summary.md")
 	// 親が記録する。yes で加点。
 	r.mustOK(r.ccnavi("ticket", "record-risk", "i0001-01-01", "untested", "yes", "--reason", "テストが無い"), "record-risk yes")
 	if wrong := r.ccnavi("ticket", "record-risk", "i0001-01-01", "nope", "yes", "--reason", "x"); wrong.Code == 0 {
 		t.Error("知らない項目の記録が通った")
 	}
 	// HEAD が動いたら判定は古い。
-	write(t, filepath.Join(tree, "src", "later.py"), "1\n")
+	ticketkit.Write(t, filepath.Join(tree, "src", "later.py"), "1\n")
 	r.git(tree, "add", "-A")
 	r.git(tree, "commit", "--quiet", "-m", "later")
 	stale := r.ccnavi("ticket", "finish", "i0001-01-01")
@@ -197,7 +198,7 @@ func TestARiskFlagOnTicketFinishDoesNotChangeTheScore(t *testing.T) {
 			r := newRiskWS(t)
 			value := ""
 			if !c.empty {
-				value = write(t, filepath.Join(r.root, "cheap.yml"), cheap)
+				value = ticketkit.Write(t, filepath.Join(r.root, "cheap.yml"), cheap)
 			}
 			tree := r.oneChild(samples.Off)
 			r.commitBig(tree)
@@ -227,7 +228,7 @@ func TestASecondRootOnTicketFinishIsRefused(t *testing.T) {
 	if !r.isApproved("i0001-01-01") {
 		t.Error("doing/ から動いた")
 	}
-	if exists(filepath.Join(r.approved, "phases", parentName, "i0001-01-01.risk.json")) {
+	if ticketkit.Exists(filepath.Join(r.approved, "phases", parentName, "i0001-01-01.risk.json")) {
 		t.Error("採点の記録が残った")
 	}
 }
@@ -235,7 +236,7 @@ func TestASecondRootOnTicketFinishIsRefused(t *testing.T) {
 func TestLintReportsABrokenDefinitionAndBuiltinTakesOver(t *testing.T) {
 	t.Parallel()
 	r := newRiskWS(t)
-	write(t, r.risk, "version: 1\nfactors: 3\n")
+	ticketkit.Write(t, r.risk, "version: 1\nfactors: 3\n")
 	linted := r.ccnavi("--lint")
 	contains(t, "lint", linted.Stdout+linted.Stderr, "(risk)")
 	r.oneChild(samples.Off)

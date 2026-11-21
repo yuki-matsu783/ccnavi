@@ -15,15 +15,16 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // requestedTree はフェーズ 1 のレビューを依頼して、親がコミットして push したところまでの木と結果ファイル。
-func requestedTree(t *testing.T) (*Tree, Fixture) {
+func requestedTree(t *testing.T) (*Tree, ticketkit.Fixture) {
 	t.Helper()
 	tr := cachedTree(t, "feedback-requested", func(tr *Tree) {
 		tr.Phase1Requested()
 		tr.CommitParent("request")
-		tr.Parent("push", "--quiet", "origin", ParentName)
+		tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
 	})
 	return tr, tr.Fixture()
 }
@@ -35,15 +36,15 @@ func (tr *Tree) proposeFeedbackPlan(feedback []samples.Step) {
 
 var singleFeedback = samples.Plan("implement-feedback")
 
-func (tr *Tree) phaseDir() string { return filepath.Join(tr.Approved, "phases", ParentName) }
+func (tr *Tree) phaseDir() string { return filepath.Join(tr.Approved, "phases", ticketkit.ParentName) }
 
 // reviewedMark はフェーズ 1 のレビュー済みのマーカー。無ければ nil。
 func (tr *Tree) reviewedMark() map[string]any {
 	path := filepath.Join(tr.phaseDir(), "1.reviewed")
-	if !Exists(path) {
+	if !ticketkit.Exists(path) {
 		return nil
 	}
-	return ReadJSON(tr.T, path)
+	return ticketkit.ReadJSON(tr.T, path)
 }
 
 func snapshot(t *testing.T, root string) map[string]string {
@@ -52,7 +53,7 @@ func snapshot(t *testing.T, root string) map[string]string {
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
 		if err == nil && !d.IsDir() {
 			rel, _ := filepath.Rel(root, p)
-			out[filepath.ToSlash(rel)] = Read(t, p)
+			out[filepath.ToSlash(rel)] = ticketkit.Read(t, p)
 		}
 		return nil
 	})
@@ -64,7 +65,7 @@ func TestFeedbackPlanIsRefusedUntilTheLastReviewIsDone(t *testing.T) {
 		t.Parallel()
 		tr, _ := requestedTree(t)
 		tr.proposeFeedbackPlan(singleFeedback)
-		Has(t, Fails(t, tr.Approve()).Stderr, "レビューが済んでから")
+		ticketkit.Has(t, ticketkit.Fails(t, tr.Approve()).Stderr, "レビューが済んでから")
 		if tr.reviewedMark() != nil {
 			t.Error("レビュー済みになった")
 		}
@@ -72,12 +73,12 @@ func TestFeedbackPlanIsRefusedUntilTheLastReviewIsDone(t *testing.T) {
 	t.Run("unresolved threads keep the last review open", func(t *testing.T) {
 		t.Parallel()
 		tr, f := requestedTree(t)
-		f.SetThreads(Thread{ID: "t0", Resolved: false, URL: "u/7#t0", Body: "直して"})
-		Fails(t, tr.ConfirmFor(f, "1"))
+		f.SetThreads(ticketkit.Thread{ID: "t0", Resolved: false, URL: "u/7#t0", Body: "直して"})
+		ticketkit.Fails(t, tr.ConfirmFor(f, "1"))
 		tr.proposeFeedbackPlan(singleFeedback)
-		Has(t, Fails(t, tr.Approve()).Stderr, "レビューが済んでから")
+		ticketkit.Has(t, ticketkit.Fails(t, tr.Approve()).Stderr, "レビューが済んでから")
 		// 拒んだだけで、何も動かしていない。
-		if tr.reviewedMark() != nil || Exists(filepath.Join(tr.phaseDir(), "accepted.json")) {
+		if tr.reviewedMark() != nil || ticketkit.Exists(filepath.Join(tr.phaseDir(), "accepted.json")) {
 			t.Error("拒んだのにマーカーが動いた")
 		}
 	})
@@ -86,13 +87,13 @@ func TestFeedbackPlanIsRefusedUntilTheLastReviewIsDone(t *testing.T) {
 func TestReviewedPassesAndNothingButThePlanChanges(t *testing.T) {
 	t.Parallel()
 	tr, f := requestedTree(t)
-	OK(t, tr.ConfirmFor(f, "1"))
+	ticketkit.OK(t, tr.ConfirmFor(f, "1"))
 	tr.CommitParent("reviewed")
 	tr.proposeFeedbackPlan(singleFeedback)
 	before := snapshot(t, tr.Approved)
-	approved := OK(t, tr.Agree("y"))
-	Lacks(t, approved.Stdout, "済ませた扱い")
-	Lacks(t, approved.Stdout, "レビュー待ちの子を閉じた")
+	approved := ticketkit.OK(t, tr.Agree("y"))
+	ticketkit.Lacks(t, approved.Stdout, "済ませた扱い")
+	ticketkit.Lacks(t, approved.Stdout, "レビュー待ちの子を閉じた")
 	after := snapshot(t, tr.Approved)
 	var changed []string
 	for k := range before {
@@ -109,8 +110,8 @@ func TestReviewedPassesAndNothingButThePlanChanges(t *testing.T) {
 	if !slices.Equal(slices.Compact(changed), []string{"doing/i0001.md"}) {
 		t.Errorf("変わったファイル = %v", changed)
 	}
-	Has(t, after["doing/i0001.md"], "feedback:")
-	Lacks(t, after["doing/i0001.md"], "feedback-plan")
+	ticketkit.Has(t, after["doing/i0001.md"], "feedback:")
+	ticketkit.Lacks(t, after["doing/i0001.md"], "feedback-plan")
 }
 
 // 承認は review/ の子を done/ へ動かさず、settled_by も書かない。
@@ -118,15 +119,15 @@ func TestAChildInReviewStaysWhereItIs(t *testing.T) {
 	t.Parallel()
 	tr, _ := requestedTree(t)
 	review := filepath.Join(tr.ParentTree, "wip", "proposals", "review", "i0001-01-01.md")
-	if !Exists(review) {
+	if !ticketkit.Exists(review) {
 		t.Fatal("review/ に子が無い")
 	}
 	tr.proposeFeedbackPlan(singleFeedback)
-	Fails(t, tr.Approve())
-	if !Exists(review) || Exists(tr.ApprovedPath("done", "i0001-01-01")) {
+	ticketkit.Fails(t, tr.Approve())
+	if !ticketkit.Exists(review) || ticketkit.Exists(tr.ApprovedPath("done", "i0001-01-01")) {
 		t.Error("子が動いた")
 	}
-	Lacks(t, Read(t, review), "settled_by")
+	ticketkit.Lacks(t, ticketkit.Read(t, review), "settled_by")
 }
 
 func TestPassesAfterAManuallyMovedChildIsSettled(t *testing.T) {
@@ -141,15 +142,15 @@ func TestPassesAfterAManuallyMovedChildIsSettled(t *testing.T) {
 		t.Fatal(err)
 	}
 	tr.CommitParent("move by hand")
-	tr.Parent("push", "--quiet", "origin", ParentName)
+	tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
 	f.Update(func(d map[string]any) { d["threads"], d["reviews"] = []any{}, []any{} })
-	OK(t, tr.ConfirmFor(f, "1"))
+	ticketkit.OK(t, tr.ConfirmFor(f, "1"))
 	if js(tr.reviewedMark(), "via") != "manual" {
 		t.Errorf("reviewed = %v", tr.reviewedMark())
 	}
 	tr.CommitParent("settled")
 	tr.proposeFeedbackPlan([]samples.Step{})
-	OK(t, tr.Approve())
+	ticketkit.OK(t, tr.Approve())
 	if js(tr.reviewedMark(), "via") != "manual" {
 		t.Errorf("承認の後の reviewed = %v", tr.reviewedMark())
 	}
@@ -159,7 +160,7 @@ func TestPassesAfterAManuallyMovedChildIsSettled(t *testing.T) {
 func reviewedWithPlanChild(t *testing.T) *Tree {
 	t.Helper()
 	tr, f := requestedTree(t)
-	OK(t, tr.ConfirmFor(f, "1"))
+	ticketkit.OK(t, tr.ConfirmFor(f, "1"))
 	tr.CommitParent("reviewed")
 	tr.proposeFeedbackPlan(singleFeedback)
 	tr.Propose("i0001-01-02", child("i0001-01-02", 1, "wip/design/*"), "")
@@ -168,7 +169,7 @@ func reviewedWithPlanChild(t *testing.T) *Tree {
 
 func (tr *Tree) previewAgree(only ...string) map[string]any {
 	tr.T.Helper()
-	return ParseJSON(tr.T, tr.Ccnavi(append([]string{"--agree", "--preview", "--json"}, only...)...).Stdout)
+	return ticketkit.ParseJSON(tr.T, tr.Ccnavi(append([]string{"--agree", "--preview", "--json"}, only...)...).Stdout)
 }
 
 func TestTheRevisionAndThePlanChildAreBothRefused(t *testing.T) {
@@ -188,16 +189,16 @@ func TestTheRevisionAndThePlanChildAreBothRefused(t *testing.T) {
 		}
 		for _, text := range refused {
 			for _, w := range []string{"全体計画に足す子を先に承認し", "再レビュー（レビュー済み）を済ませてから", "フィードバック計画の改版を承認する"} {
-				Has(t, text, w)
+				ticketkit.Has(t, text, w)
 			}
 		}
 	}
 	// 承認は何も置かない。
 	tr.Approve()
-	if !Exists(tr.TodoPath("i0001")) || !Exists(tr.TodoPath("i0001-01-02")) || Exists(tr.ApprovedPath("doing", "i0001-01-02")) {
+	if !ticketkit.Exists(tr.TodoPath("i0001")) || !ticketkit.Exists(tr.TodoPath("i0001-01-02")) || ticketkit.Exists(tr.ApprovedPath("doing", "i0001-01-02")) {
 		t.Error("拒んだはずの提案が動いた")
 	}
-	Lacks(t, Read(t, tr.ApprovedPath("doing", "i0001")), "feedback:")
+	ticketkit.Lacks(t, ticketkit.Read(t, tr.ApprovedPath("doing", "i0001")), "feedback:")
 }
 
 func TestThePlanChildFirstThenTheRevisionAfterTheReview(t *testing.T) {
@@ -207,21 +208,21 @@ func TestThePlanChildFirstThenTheRevisionAfterTheReview(t *testing.T) {
 	if err := os.Rename(tr.TodoPath("i0001"), held); err != nil {
 		t.Fatal(err)
 	}
-	OK(t, tr.Approve())
-	if !Exists(tr.ApprovedPath("doing", "i0001-01-02")) {
+	ticketkit.OK(t, tr.Approve())
+	if !ticketkit.Exists(tr.ApprovedPath("doing", "i0001-01-02")) {
 		t.Error("子が承認されない")
 	}
 	// 子を足すとフェーズは開き直る。作業と再レビューを済ませるまで、改版は通らない。
 	if err := os.Rename(held, tr.TodoPath("i0001")); err != nil {
 		t.Fatal(err)
 	}
-	Has(t, Fails(t, tr.Approve()).Stderr, "レビューが済んでから")
+	ticketkit.Has(t, ticketkit.Fails(t, tr.Approve()).Stderr, "レビューが済んでから")
 }
 
 func TestAFeedbackPhaseChildMayBeApprovedWithTheRevision(t *testing.T) {
 	t.Parallel()
 	tr, f := requestedTree(t)
-	OK(t, tr.ConfirmFor(f, "1"))
+	ticketkit.OK(t, tr.ConfirmFor(f, "1"))
 	tr.CommitParent("reviewed")
 	tr.proposeFeedbackPlan(singleFeedback)
 	tr.Propose("i0001-02-02", child("i0001-02-02", 2, "src/*"), "")
@@ -237,8 +238,8 @@ func TestAFeedbackPhaseChildMayBeApprovedWithTheRevision(t *testing.T) {
 	if !slices.Equal(batch, []string{"i0001", "i0001-02-02"}) {
 		t.Errorf("batch = %v", batch)
 	}
-	OK(t, tr.Approve())
-	if !Exists(tr.ApprovedPath("doing", "i0001-02-02")) {
+	ticketkit.OK(t, tr.Approve())
+	if !ticketkit.Exists(tr.ApprovedPath("doing", "i0001-02-02")) {
 		t.Error("フィードバックのフェーズの子が承認されない")
 	}
 }

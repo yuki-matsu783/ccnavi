@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 作業・レビュー計画のテンプレートの下書きの受入テスト（tests/ticket/test_template_drafts.py）。
@@ -49,7 +50,7 @@ type drafts struct {
 func newDrafts(t *testing.T) *drafts {
 	w := newWS(t)
 	// 共通のフェーズ定義。取り込み先が共通のとき、この定義で検査される。
-	write(t, base.CommonPath(w.root, "phases"), samples.Phases)
+	ticketkit.Write(t, base.CommonPath(w.root, "phases"), samples.Phases)
 	return &drafts{ws: w, to: "project"}
 }
 
@@ -83,7 +84,7 @@ func (d *drafts) doneParent(plan []samples.Step, feedback []samples.Step, flows 
 func (d *drafts) doneParentAt(parent, tree, place string, plan, feedback []samples.Step, flows map[string]string, children map[string]int) {
 	d.t.Helper()
 	root := filepath.Join(tree, ".ccnavi", "approved")
-	write(d.t, filepath.Join(root, place, parent+".md"), samples.ParentText(parent, plan, samples.ParentOpts{Feedback: feedback}))
+	ticketkit.Write(d.t, filepath.Join(root, place, parent+".md"), samples.ParentText(parent, plan, samples.ParentOpts{Feedback: feedback}))
 	if children == nil {
 		children = map[string]int{}
 		for n := 1; n <= len(plan); n++ {
@@ -91,10 +92,10 @@ func (d *drafts) doneParentAt(parent, tree, place string, plan, feedback []sampl
 		}
 	}
 	for child, phase := range children {
-		write(d.t, filepath.Join(root, place, child+".md"), samples.ChildText(child, parent, phase, []string{"src/*"}))
+		ticketkit.Write(d.t, filepath.Join(root, place, child+".md"), samples.ChildText(child, parent, phase, []string{"src/*"}))
 	}
 	for child, body := range flows {
-		write(d.t, filepath.Join(root, flowFolder, child+".yml"), body)
+		ticketkit.Write(d.t, filepath.Join(root, flowFolder, child+".yml"), body)
 	}
 }
 
@@ -122,7 +123,7 @@ func (d *drafts) draft(extra ...string) run.Result {
 	return d.tpl("", append(args, extra...)...)
 }
 
-func (d *drafts) readDraft() string { return read(d.t, d.draftPath(parentName)) }
+func (d *drafts) readDraft() string { return ticketkit.Read(d.t, d.draftPath(parentName)) }
 
 // checked は下書きを `--templates --check-file` で読んだ答え。
 func (d *drafts) checked() map[string]any {
@@ -131,7 +132,7 @@ func (d *drafts) checked() map[string]any {
 	if r.Code != 0 {
 		d.t.Fatalf("code %d\n%s%s", r.Code, r.Stdout, r.Stderr)
 	}
-	a := jsonOf(d.t, r.Stdout)
+	a := ticketkit.ParseJSON(d.t, r.Stdout)
 	if a["valid"] != true {
 		d.t.Fatalf("下書きが読めない: %v", a)
 	}
@@ -175,7 +176,7 @@ func (d *drafts) generalize() string {
 	if strings.Contains(fixed, todoMark) {
 		d.t.Fatalf("TODO が残っている:\n%s", fixed)
 	}
-	write(d.t, d.draftPath(parentName), fixed)
+	ticketkit.Write(d.t, d.draftPath(parentName), fixed)
 	sum := sha256.Sum256([]byte(fixed))
 	return hex.EncodeToString(sum[:])
 }
@@ -188,7 +189,7 @@ func (d *drafts) handoff(rel, tree string) run.Result {
 	if shown.Code != 0 {
 		d.t.Fatalf("handoff 表示: code %d\n%s%s", shown.Code, shown.Stdout, shown.Stderr)
 	}
-	expect := jsonOf(d.t, shown.Stdout)["expect"].(string)
+	expect := ticketkit.ParseJSON(d.t, shown.Stdout)["expect"].(string)
 	return run.Ccnavi(d.t, []string{"--root", tree, "user", "handoff", rel, "--yes", "--expect", expect, "--json"}, run.Opts{Env: env, Dir: base.Root()})
 }
 
@@ -198,7 +199,7 @@ func (d *drafts) answer(args ...string) map[string]any {
 	if r.Code != 0 {
 		d.t.Fatalf("code %d\n%s", r.Code, r.Stderr)
 	}
-	return jsonOf(d.t, r.Stdout)
+	return ticketkit.ParseJSON(d.t, r.Stdout)
 }
 
 func TestTheMadeDraftReadsBackAndTheTextAsksForGeneralizing(t *testing.T) {
@@ -264,11 +265,11 @@ func TestTheDraftIsTakenByHandoff(t *testing.T) {
 	if taken.Code != 0 {
 		t.Fatalf("code %d\n%s%s", taken.Code, taken.Stdout, taken.Stderr)
 	}
-	placed := read(t, filepath.Join(d.parentTree, filepath.FromSlash(targetRel(parentName, "project", ""))))
+	placed := ticketkit.Read(t, filepath.Join(d.parentTree, filepath.FromSlash(targetRel(parentName, "project", ""))))
 	if sum := sha256.Sum256([]byte(placed)); hex.EncodeToString(sum[:]) != sha {
 		t.Error("取り込んだ中身が下書きと違う")
 	}
-	if exists(d.draftPath(parentName)) {
+	if ticketkit.Exists(d.draftPath(parentName)) {
 		t.Error("取り込んだのに下書きが残っている")
 	}
 }
@@ -315,12 +316,12 @@ func planTemplate(name, plan string) string { return templateText(name, plan, ""
 func TestLintNeverMakesADraftAnError(t *testing.T) {
 	t.Parallel()
 	d := newDrafts(t)
-	write(t, d.draftPath("broken"), "name: [\n")
-	write(t, d.draftPath("ends"), planTemplate("ends", "  - design\n  - acceptance\n"))
+	ticketkit.Write(t, d.draftPath("broken"), "name: [\n")
+	ticketkit.Write(t, d.draftPath("ends"), planTemplate("ends", "  - design\n  - acceptance\n"))
 	d.doneParent(planOf("design"), nil, nil)
 	d.draft()
 	r := d.tpl("", "--lint", "--json", "--mode", "enable")
-	body := jsonOf(t, r.Stdout)
+	body := ticketkit.ParseJSON(t, r.Stdout)
 	var found []map[string]any
 	var others []map[string]any
 	for _, p := range body["problems"].([]any) {
@@ -367,14 +368,14 @@ func TestADraftInAProjectTreeIsFoundAtTheProjectsPlace(t *testing.T) {
 	t.Parallel()
 	d := newDrafts(t)
 	// 下書きの行でないファイルは一覧に出ない
-	write(t, filepath.Join(d.root, "wip", "handoff", "learnings", "x.md"), "x\n")
-	write(t, filepath.Join(d.root, "wip", "handoff", ".ccnavi", "docs", "a.md"), "a\n")
+	ticketkit.Write(t, filepath.Join(d.root, "wip", "handoff", "learnings", "x.md"), "x\n")
+	ticketkit.Write(t, filepath.Join(d.root, "wip", "handoff", ".ccnavi", "docs", "a.md"), "a\n")
 	if got := d.answer()["drafts"].([]any); len(got) != 0 {
 		t.Errorf("drafts = %v", got)
 	}
 	project := filepath.Join(d.root, "projects", "lib")
-	write(t, filepath.Join(project, ".git", "keep"), "")
-	write(t, d.draftPath("lib-draft", project), planTemplate("lib-draft", "  - design\n"))
+	ticketkit.Write(t, filepath.Join(project, ".git", "keep"), "")
+	ticketkit.Write(t, d.draftPath("lib-draft", project), planTemplate("lib-draft", "  - design\n"))
 	rows := d.answer()["drafts"].([]any)
 	if len(rows) != 1 {
 		t.Fatalf("drafts = %v", rows)
@@ -388,8 +389,8 @@ func TestADraftInAProjectTreeIsFoundAtTheProjectsPlace(t *testing.T) {
 func TestTheDraftPlaceIsNotPartOfThePostCheck(t *testing.T) {
 	t.Parallel()
 	d := newDrafts(t)
-	write(t, d.draftPath("x"), "name: x\n")
-	ok := write(t, filepath.Join(d.parentTree, "wip", "a.md"), "a\n")
+	ticketkit.Write(t, d.draftPath("x"), "name: x\n")
+	ok := ticketkit.Write(t, filepath.Join(d.parentTree, "wip", "a.md"), "a\n")
 	r := d.hook("PostToolUse", "Write", d.parentTree, input{"file_path": ok, "content": "a"})
 	lacks(t, "post", r.Stdout+r.Stderr, "POST_TICKET_SCOPE", "POST_VIOLATION")
 }
@@ -397,10 +398,10 @@ func TestTheDraftPlaceIsNotPartOfThePostCheck(t *testing.T) {
 func TestADraftIsNotReadAsATicket(t *testing.T) {
 	t.Parallel()
 	d := newDrafts(t)
-	write(t, d.draftPath("x"), planTemplate("x", "  - design\n"))
+	ticketkit.Write(t, d.draftPath("x"), planTemplate("x", "  - design\n"))
 	d.git(d.parentTree, "add", "-A")
 	r := d.mustOK(d.ccnavi("--explain", "--json"), "--explain")
-	if tickets := jsonOf(t, r.Stdout)["tickets"].([]any); len(tickets) != 0 {
+	if tickets := ticketkit.ParseJSON(t, r.Stdout)["tickets"].([]any); len(tickets) != 0 {
 		t.Errorf("tickets = %v", tickets)
 	}
 }

@@ -1,6 +1,7 @@
 package phases
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,11 +17,13 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/exe"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 判定のコアを Chrome の入口と手元の CLI が同じに使うことの受入テスト（tests/ticket/test_swap_points.py）。
@@ -202,7 +205,7 @@ func (w *ws) handle(request any, dir string) map[string]any {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	return jsonOf(w.t, samples.ChromeHandle(w.t, w.chromeExe(), string(b), filepath.Join(w.root, dir)))
+	return ticketkit.ParseJSON(w.t, samples.ChromeHandle(w.t, w.chromeExe(), string(b), filepath.Join(w.root, dir)))
 }
 
 func (w *ws) askChrome(request any) map[string]any {
@@ -236,9 +239,7 @@ func keepScenario(t testing.TB, name string, request, answer any) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(scenariosPath(), []byte(body+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	ticketkit.WriteFixture(t, scenariosPath(), body)
 }
 
 func marshalIndent(v any) (string, error) {
@@ -274,7 +275,7 @@ func normalized(t testing.TB, changes any) any {
 				content = stampPattern.ReplaceAllString(content, "<stamp>")
 				row["content"] = content
 				if strings.HasSuffix(row["path"].(string), ".reviewed") {
-					mark := jsonOf(t, content)
+					mark := ticketkit.ParseJSON(t, content)
 					delete(mark, "via")
 					row["content"] = mark
 				}
@@ -326,12 +327,12 @@ func TestTheApprovedCopyIsTheProposal(t *testing.T) {
 	text := w.parent(planOf("research"), samples.ParentOpts{})
 	w.propose(parentName, text)
 	w.commitParent()
-	before := read(t, w.todo(parentName))
-	preview := jsonOf(t, w.ccnavi("--agree", "--preview", "--json").Stdout)
+	before := ticketkit.Read(t, w.todo(parentName))
+	preview := ticketkit.ParseJSON(t, w.ccnavi("--agree", "--preview", "--json").Stdout)
 	contains(t, "preview", preview["text"].(string), "提案: wip/proposals/todo/i0001.md")
 	lacks(t, "preview", preview["text"].(string), w.root)
 	w.mustApprove()
-	if read(t, w.doing(parentName)) != before {
+	if ticketkit.Read(t, w.doing(parentName)) != before {
 		t.Error("承認が提案の中身を変えた")
 	}
 }
@@ -340,10 +341,10 @@ func TestACRLFProposalMovesByteForByte(t *testing.T) {
 	t.Parallel()
 	w := newWS(t)
 	text := strings.ReplaceAll(w.parent(planOf("research"), samples.ParentOpts{}), "\n", "\r\n")
-	write(t, w.todo(parentName), text)
+	ticketkit.Write(t, w.todo(parentName), text)
 	w.commitParent()
 	w.mustApprove()
-	if read(t, w.doing(parentName)) != text {
+	if ticketkit.Read(t, w.doing(parentName)) != text {
 		t.Error("CRLF の提案のバイト列が変わった")
 	}
 }
@@ -367,7 +368,7 @@ func TestADetachedHeadIsNotApproved(t *testing.T) {
 func newChromeWS(t *testing.T) *ws {
 	w := newWS(t)
 	w.env = map[string]string{"GIT_AUTHOR_DATE": stamp, "GIT_COMMITTER_DATE": stamp}
-	write(t, filepath.Join(w.root, ".ccnavi", "scripts", "ccnavi-common.sh"), "#!/bin/sh\nCCNAVI_COMPAT="+exe.Compat(t)+"\n")
+	ticketkit.Write(t, filepath.Join(w.root, ".ccnavi", "scripts", "ccnavi-common.sh"), "#!/bin/sh\nCCNAVI_COMPAT="+exe.Compat(t)+"\n")
 	return w
 }
 
@@ -384,7 +385,7 @@ func TestTheFixtureAnswersAreWhatTheEntrySays(t *testing.T) {
 		Request any `json:"request"`
 		Answer  any `json:"answer"`
 	}
-	if err := json.Unmarshal([]byte(read(t, scenariosPath())), &held); err != nil {
+	if err := json.Unmarshal([]byte(ticketkit.Read(t, scenariosPath())), &held); err != nil {
 		t.Fatal(err)
 	}
 	names := slices.Sorted(maps.Keys(held))
@@ -406,7 +407,7 @@ func (w *ws) sameAsCLI(name, family string, only ...string) map[string]any {
 	}
 	request := w.chromeRequest("plan", family, nil, extra)
 	answer := w.askChrome(request)
-	preview := jsonOf(w.t, w.ccnavi(append([]string{"--agree", "--preview", "--json"}, only...)...).Stdout)
+	preview := ticketkit.ParseJSON(w.t, w.ccnavi(append([]string{"--agree", "--preview", "--json"}, only...)...).Stdout)
 	if answer["text"] != preview["text"] || answer["digest"] != preview["digest"] {
 		w.t.Errorf("画面の本文かダイジェストが CLI と違う:\n%v\n%v", answer["text"], preview["text"])
 	}
@@ -423,7 +424,7 @@ func (w *ws) sameAsCLI(name, family string, only ...string) map[string]any {
 	if result.Code != 0 {
 		w.t.Fatalf("user agree --yes: code %d\n%s%s", result.Code, result.Stdout, result.Stderr)
 	}
-	body := jsonOf(w.t, result.Stdout)
+	body := ticketkit.ParseJSON(w.t, result.Stdout)
 	if answer["stopped"] != nil {
 		w.t.Errorf("stopped = %v", answer["stopped"])
 	}
@@ -452,8 +453,8 @@ func TestChromeApproveReopensAReviewedPhase(t *testing.T) {
 	w.commitParent()
 	w.mustApprove()
 	marks := filepath.Join(w.approved, "phases", parentName)
-	write(t, filepath.Join(marks, "1.requested"), `{"at": "x"}`)
-	write(t, filepath.Join(marks, "1.reviewed"), `{"at": "x"}`)
+	ticketkit.Write(t, filepath.Join(marks, "1.requested"), `{"at": "x"}`)
+	ticketkit.Write(t, filepath.Join(marks, "1.reviewed"), `{"at": "x"}`)
 	w.propose("i0001-01-02", childText("i0001-01-02", 1, "wip/design/*"))
 	w.commitParent()
 	answer := w.sameAsCLI("approve-reopen", parentName)
@@ -530,12 +531,12 @@ func TestChromePredecessorsAcrossFamilies(t *testing.T) {
 	for family, rows := range copies {
 		for _, r := range rows {
 			ident := strings.SplitN(strings.SplitN(r.text, "ticket: ", 2)[1], "\n", 2)[0]
-			write(t, filepath.Join(trees[family], ".ccnavi", "approved", r.state, ident+".md"), r.text)
+			ticketkit.Write(t, filepath.Join(trees[family], ".ccnavi", "approved", r.state, ident+".md"), r.text)
 		}
 	}
 	todo := filepath.Join(trees["i0003"], "wip", "proposals", "todo")
-	write(t, filepath.Join(todo, "i0003-01-01.md"), withPredecessors(child("i0003-01-01", "i0003"), []string{"i0002-01-01"}))
-	write(t, filepath.Join(todo, "i0003-01-02.md"), withPredecessors(child("i0003-01-02", "i0003"), []string{"i0002-01-02"}))
+	ticketkit.Write(t, filepath.Join(todo, "i0003-01-01.md"), withPredecessors(child("i0003-01-01", "i0003"), []string{"i0002-01-01"}))
+	ticketkit.Write(t, filepath.Join(todo, "i0003-01-02.md"), withPredecessors(child("i0003-01-02", "i0003"), []string{"i0002-01-02"}))
 	for _, path := range trees {
 		w.git(path, "add", "-A")
 		w.git(path, "commit", "--quiet", "-m", "copies")
@@ -551,7 +552,7 @@ func TestChromePredecessorsAcrossFamilies(t *testing.T) {
 // hostCompare は compare API の代わり: 依頼時の先頭から親の今の先頭までに変わったパス。
 func (w *ws) hostCompare() map[string]any {
 	w.t.Helper()
-	recorded := readJSON(w.t, filepath.Join(w.parentTree, ".ccnavi", "approved", "phases", parentName, "1.requested"))["head"].(string)
+	recorded := ticketkit.ReadJSON(w.t, filepath.Join(w.parentTree, ".ccnavi", "approved", "phases", parentName, "1.requested"))["head"].(string)
 	head := strings.TrimSpace(w.git(w.parentTree, "rev-parse", "HEAD"))
 	names := w.git(w.parentTree, "diff", "--name-only", "--no-renames", recorded+"..HEAD")
 	return map[string]any{"base": recorded, "head": head, "files": strings.Fields(names)}
@@ -668,7 +669,7 @@ func TestChromeConfirm(t *testing.T) {
 		m := r.(map[string]any)
 		if strings.HasSuffix(m["path"].(string), "1.reviewed") {
 			// Chrome のマーカーは経路（chrome）を持つ。アカウントは要求に無いので書かない。
-			sameJSON(t, "マーカー", jsonOf(t, m["content"].(string)), map[string]any{"mr": 7, "accepted": []any{}, "via": "chrome", "at": stamp})
+			sameJSON(t, "マーカー", ticketkit.ParseJSON(t, m["content"].(string)), map[string]any{"mr": 7, "accepted": []any{}, "via": "chrome", "at": stamp})
 		}
 	}
 	keepScenario(t, "confirm", request, answer)
@@ -681,7 +682,7 @@ func TestChromeConfirmAHandMovedChildAsksForTheTimeAndAcceptsOldThreads(t *testi
 	w.reviewedPhaseOne()
 	waiting := filepath.Join(w.parentTree, "wip", "proposals", "review", "i0001-01-01.md")
 	done := filepath.Join(w.parentTree, ".ccnavi", "approved", "done", "i0001-01-01.md")
-	write(t, done, read(t, waiting))
+	ticketkit.Write(t, done, ticketkit.Read(t, waiting))
 	remove(t, waiting)
 	w.commitParent("moved by hand")
 	old := map[string]any{"id": "t1", "url": "https://h/c/1", "body": "直して", "created_at": "2026-01-01T00:00:00Z", "last_id": "c1"}
@@ -701,7 +702,7 @@ func TestChromeConfirmAHandMovedChildAsksForTheTimeAndAcceptsOldThreads(t *testi
 	for _, r := range rows {
 		m := r.(map[string]any)
 		paths = append(paths, m["path"].(string))
-		if strings.HasSuffix(m["path"].(string), "1.reviewed") && jsonOf(t, m["content"].(string))["via"] != "manual" {
+		if strings.HasSuffix(m["path"].(string), "1.reviewed") && ticketkit.ParseJSON(t, m["content"].(string))["via"] != "manual" {
 			t.Errorf("via = %v", m["content"])
 		}
 	}
@@ -775,7 +776,10 @@ func (w *ws) handleWithEnv(request any, dir string, env map[string]string) map[s
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		w.t.Fatal(err)
 	}
-	cmd := exec.Command(w.chromeExe(), path)
+	ctx, cancel := context.WithTimeout(context.Background(), base.ExecTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, w.chromeExe(), path)
+	cmd.WaitDelay = 5 * time.Second
 	cmd.Stdin = strings.NewReader(string(b) + "\n")
 	cmd.Env = os.Environ()
 	for k, v := range env {
@@ -785,7 +789,7 @@ func (w *ws) handleWithEnv(request any, dir string, env map[string]string) map[s
 	if err != nil {
 		w.t.Fatalf("ccnavi-chrome: %v", err)
 	}
-	return jsonOf(w.t, strings.TrimSpace(string(out)))
+	return ticketkit.ParseJSON(w.t, strings.TrimSpace(string(out)))
 }
 
 func (w *ws) askPlacement(extra map[string]any, env map[string]string) map[string]any {
@@ -885,7 +889,7 @@ func (w *ws) record(target string, args ...string) (run.Result, []string) {
 	r := w.ccnavi(append([]string{"--record-writes", target}, args...)...)
 	var listed []string
 	if st, err := os.Stat(target); err == nil && st.Mode().IsRegular() {
-		listed = splitLines(read(w.t, target))
+		listed = splitLines(ticketkit.Read(w.t, target))
 	}
 	return r, listed
 }
@@ -908,7 +912,7 @@ func TestEachCommandListsWhatItWrote(t *testing.T) {
 	w.propose(parentName, w.parent(planOf("research"), samples.ParentOpts{}))
 	w.propose("i0001-01-01", childReview("i0001-01-01", 1, samples.Off, "wip/research/*"))
 	w.commitParent()
-	digest := jsonOf(t, w.ccnavi("--agree", "--preview", "--json").Stdout)["digest"].(string)
+	digest := ticketkit.ParseJSON(t, w.ccnavi("--agree", "--preview", "--json").Stdout)["digest"].(string)
 	steps := [][]string{
 		{"user", "agree", "--yes", "i0001,i0001-01-01", "--digest", digest, "--json"},
 		{"ticket", "start", parentName},
@@ -926,7 +930,7 @@ func TestEachCommandListsWhatItWrote(t *testing.T) {
 	sort.Strings(listed)
 	equalStrings(t, "start child", listed, w.changed(w.parentTree))
 	w.commitParent("start 01")
-	write(t, filepath.Join(tree, "wip", "research", "summary.md"), "s\n")
+	ticketkit.Write(t, filepath.Join(tree, "wip", "research", "summary.md"), "s\n")
 	w.git(tree, "add", "-A")
 	w.git(tree, "commit", "--quiet", "-m", "work")
 	r, listed = w.record("", "ticket", "finish", "i0001-01-01")
@@ -946,7 +950,7 @@ func TestAFailedCommandStillWritesItsList(t *testing.T) {
 	if r.Code == 0 {
 		t.Error("存在しない識別子の着手が通った")
 	}
-	if !exists(filepath.Join(w.placeDir(), "self", "i0001.t.writes")) {
+	if !ticketkit.Exists(filepath.Join(w.placeDir(), "self", "i0001.t.writes")) {
 		t.Error("一覧を書かなかった")
 	}
 	if len(listed) != 0 {
@@ -980,18 +984,18 @@ func TestTheListGoesOnlyUnderTheDefaultStatePlace(t *testing.T) {
 	w := newWS(t)
 	outside := filepath.Join(w.root, "wip", "list.txt")
 	w.refusedList(outside)
-	if exists(outside) {
+	if ticketkit.Exists(outside) {
 		t.Error("置き場の外に書いた")
 	}
 	// `..` で出るパス。
 	w.refusedList(filepath.Join(w.placeDir(), "..", "..", "..", "wip", "list.txt"))
-	if exists(outside) {
+	if ticketkit.Exists(outside) {
 		t.Error("`..` で置き場の外に書いた")
 	}
 	// `--state` で置き場を動かしても、書き出し先は動かない。
 	moved := filepath.Join(w.root, "wip")
 	w.refusedList(filepath.Join(moved, "write-and-push", "list.txt"), "--state", moved)
-	if exists(filepath.Join(moved, "write-and-push")) {
+	if ticketkit.Exists(filepath.Join(moved, "write-and-push")) {
 		t.Error("--state で動かした置き場に書いた")
 	}
 }
@@ -1017,13 +1021,13 @@ func TestLinksUnderThePlaceAreNotFollowed(t *testing.T) {
 		t.Error("リンクの先に書いた")
 	}
 	// 行き先そのものがリンク。リンクの先は書き換えない。
-	victim := write(t, filepath.Join(w.root, "wip", "victim.txt"), "keep\n")
+	victim := ticketkit.Write(t, filepath.Join(w.root, "wip", "victim.txt"), "keep\n")
 	link := filepath.Join(w.placeDir(), "link.writes")
 	if err := os.Symlink(victim, link); err != nil {
 		t.Fatal(err)
 	}
 	w.refusedList(link)
-	if read(t, victim) != "keep\n" {
+	if ticketkit.Read(t, victim) != "keep\n" {
 		t.Error("リンクの先を書き換えた")
 	}
 }
@@ -1042,12 +1046,12 @@ func TestALinkedWorkspaceRootListsRelativePaths(t *testing.T) {
 	t.Cleanup(func() { _ = os.Remove(linked) })
 	w.propose(parentName, w.parent(planOf("research"), samples.ParentOpts{}))
 	w.commitParent()
-	digest := jsonOf(t, w.ccnavi("--agree", "--preview", "--json").Stdout)["digest"].(string)
+	digest := ticketkit.ParseJSON(t, w.ccnavi("--agree", "--preview", "--json").Stdout)["digest"].(string)
 	target := filepath.Join(linked, "logs", "state", "write-and-push", "self", "l.writes")
 	r := run.Ccnavi(t, []string{"--root", linked, "--record-writes", target, "user", "agree", "--guard-core-files", "disable",
 		"--restore-if-deny", "disable", "--guard-ticket-approval", "disable", "--yes", parentName, "--digest", digest, "--json"}, run.Opts{Dir: base.Root()})
 	w.mustOK(r, "user agree via link")
-	listed := splitLines(read(t, target))
+	listed := splitLines(ticketkit.Read(t, target))
 	sort.Strings(listed)
 	equalStrings(t, "一覧", listed, w.changed(w.parentTree))
 }

@@ -12,6 +12,7 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 const flowChild = "i0001-01-01"
@@ -79,7 +80,7 @@ const (
 // fingerprint は着手のときに記録するフローのダイジェスト（sha256:<16 進>）。
 func fingerprint(t testing.TB, path string) string {
 	t.Helper()
-	sum := sha256.Sum256([]byte(Read(t, path)))
+	sum := sha256.Sum256([]byte(ticketkit.Read(t, path)))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
@@ -92,8 +93,8 @@ func flowTree(t *testing.T) *Tree {
 		tr.Propose("i0001", samples.ParentText("i0001", samples.Plan("research"), samples.ParentOpts{Allow: []string{"src/*", "wip/*", "tests/*"}}), "")
 		tr.Propose(flowChild, child(flowChild, 1, "wip/research/*"), "")
 		tr.CommitParent("tickets")
-		OK(tr.T, tr.Approve())
-		Write(tr.T, tr.flowIn(tr.ParentTree, flowChild), workflowYAML)
+		ticketkit.OK(tr.T, tr.Approve())
+		ticketkit.Write(tr.T, tr.flowIn(tr.ParentTree, flowChild), workflowYAML)
 		tr.CommitParent("flow")
 	})
 }
@@ -137,14 +138,14 @@ func (tr *Tree) writeTo(path string, o writeOpts) run.Result {
 	if err != nil {
 		tr.T.Fatal(err)
 	}
-	return tr.Call(Call{Stdin: string(raw)}, "--guard-core-files", o.Guard, "--mode", "enable")
+	return tr.Call(ticketkit.Call{Stdin: string(raw)}, "--guard-core-files", o.Guard, "--mode", "enable")
 }
 
 // bashCheck は Bash の command を、コアファイルの守りを有効にして判定にかける。
 func (tr *Tree) bashCheck(command string, guard string) run.Result {
 	tr.T.Helper()
 	raw, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": tr.ParentTree, "session_id": "s1", "tool_input": map[string]any{"command": command}})
-	return tr.Call(Call{Stdin: string(raw)}, "--guard-core-files", guard, "--mode", "enable")
+	return tr.Call(ticketkit.Call{Stdin: string(raw)}, "--guard-core-files", guard, "--mode", "enable")
 }
 
 func hookOut(t testing.TB, r run.Result) map[string]any {
@@ -166,19 +167,19 @@ func (tr *Tree) assertLocked(r run.Result) {
 		tr.T.Errorf("deny でない: %v", out)
 	}
 	for _, w := range []string{codeLocked, "着手中", "finish"} {
-		Has(tr.T, reason, w)
+		ticketkit.Has(tr.T, reason, w)
 	}
 }
 
 func (tr *Tree) assertNotLocked(r run.Result) {
 	tr.T.Helper()
-	Lacks(tr.T, r.Stdout, codeLocked)
+	ticketkit.Lacks(tr.T, r.Stdout, codeLocked)
 }
 
 // boardFlow はボードの JSON の ticket の flow 欄（無ければ nil）。
 func (tr *Tree) boardFlow(ticket string) map[string]any {
 	tr.T.Helper()
-	board := ParseJSON(tr.T, OK(tr.T, tr.Ccnavi("--explain", "--json")).Stdout)
+	board := ticketkit.ParseJSON(tr.T, ticketkit.OK(tr.T, tr.Ccnavi("--explain", "--json")).Stdout)
 	for _, tk := range jl(board, "tickets") {
 		if js(tk, "ticket") == ticket {
 			return jm(tk, "flow")
@@ -190,7 +191,7 @@ func (tr *Tree) boardFlow(ticket string) map[string]any {
 
 func (tr *Tree) boardTicketIDs() []string {
 	tr.T.Helper()
-	board := ParseJSON(tr.T, tr.Ccnavi("--explain", "--json").Stdout)
+	board := ticketkit.ParseJSON(tr.T, tr.Ccnavi("--explain", "--json").Stdout)
 	var ids []string
 	for _, tk := range jl(board, "tickets") {
 		ids = append(ids, js(tk, "ticket"))
@@ -199,11 +200,11 @@ func (tr *Tree) boardTicketIDs() []string {
 }
 
 func (tr *Tree) subagentStart(cwd string) run.Result {
-	return tr.Hook("SubagentStart", "", cwd, nil, HookOpts{AgentID: "sub-1"})
+	return tr.Hook("SubagentStart", "", cwd, nil, ticketkit.HookOpts{AgentID: "sub-1"})
 }
 
 func (tr *Tree) subagentStop(cwd string) run.Result {
-	return tr.Hook("SubagentStop", "", cwd, nil, HookOpts{AgentID: "sub-1"})
+	return tr.Hook("SubagentStop", "", cwd, nil, ticketkit.HookOpts{AgentID: "sub-1"})
 }
 
 func samePath(t testing.TB, a, b string) bool {

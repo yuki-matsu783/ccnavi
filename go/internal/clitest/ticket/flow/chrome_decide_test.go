@@ -12,6 +12,7 @@ package flow
 //  7. 続きの子の識別子が、親のブランチ上の既存のチケットと重ならない
 //  8. 手元の decide と同じ書くものになる（レビュー済みのマーカー・続きの子）
 import (
+	"ccnavi/internal/harness/ticketkit"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -48,7 +49,7 @@ func resolvedThread(id, body string) map[string]any {
 type decideKit struct {
 	t       *testing.T
 	tr      *Tree
-	fixture Fixture
+	fixture ticketkit.Fixture
 	compare map[string]any
 }
 
@@ -141,7 +142,7 @@ func (k *decideKit) mark(a map[string]any) map[string]any {
 	if row == nil {
 		k.t.Fatalf("1.reviewed の行が無い: %v", a["changes"])
 	}
-	return ParseJSON(k.t, js(row, "content"))
+	return ticketkit.ParseJSON(k.t, js(row, "content"))
 }
 
 func allChoices(value string, keys ...string) map[string]string {
@@ -182,8 +183,8 @@ func TestTheDecidePreviewIsTheSameAsTheTerminalOne(t *testing.T) {
 		d["threads"] = ts
 		d["mr"] = map[string]any{"number": 7, "url": "https://example/mr/7"}
 	})
-	local := OK(t, k.tr.Ccnavi("--cwd", k.tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--result", k.fixture.Path, "--preview", "--json"))
-	if !reflect.DeepEqual(shown, ParseJSON(t, local.Stdout)) {
+	local := ticketkit.OK(t, k.tr.Ccnavi("--cwd", k.tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--result", k.fixture.Path, "--preview", "--json"))
+	if !reflect.DeepEqual(shown, ticketkit.ParseJSON(t, local.Stdout)) {
 		t.Errorf("Chrome の preview と手元が違う:\nchrome: %v\nlocal: %s", shown, local.Stdout)
 	}
 	if !regexp.MustCompile(`^v2\.[A-Za-z0-9_-]+$`).MatchString(js(shown, "digest")) || jf(shown, "version") != decideVersion {
@@ -263,8 +264,8 @@ func TestAMixOfKeepIssueAndFix(t *testing.T) {
 	if !strings.HasPrefix(js(issue, "body"), fmt.Sprintf("<!-- ccnavi:issue op=%s -->\n", js(issue, "op"))) {
 		t.Errorf("body = %q", js(issue, "body"))
 	}
-	Has(t, js(issue, "body"), "テスト")
-	Has(t, js(issue, "title"), "src/a/x.py:3")
+	ticketkit.Has(t, js(issue, "body"), "テスト")
+	ticketkit.Has(t, js(issue, "title"), "src/a/x.py:3")
 	// 返信と解決は keep と issue だけ。fix の指摘（t3）は入らない。
 	replies := jl(plan, "replies")
 	var keys, threadIDs []string
@@ -277,12 +278,12 @@ func TestAMixOfKeepIssueAndFix(t *testing.T) {
 	if want := []any{map[string]any{"key": "u-t1", "thread_id": "t1"}, map[string]any{"key": "u-t2", "thread_id": "t2"}}; !reflect.DeepEqual(plan["resolves"], want) {
 		t.Errorf("resolves = %v", plan["resolves"])
 	}
-	Lacks(t, js(replies[0], "body"), "<!-- ccnavi:issue op=")
-	Has(t, js(replies[0], "body"), markerAccept)
-	Lacks(t, js(replies[0], "body"), issueURLSlot)
-	Has(t, js(replies[1], "body"), issueURLSlot)
-	Has(t, js(plan, "comment"), issueLinksSlot)
-	Has(t, js(plan, "comment"), "u-t3")
+	ticketkit.Lacks(t, js(replies[0], "body"), "<!-- ccnavi:issue op=")
+	ticketkit.Has(t, js(replies[0], "body"), markerAccept)
+	ticketkit.Lacks(t, js(replies[0], "body"), issueURLSlot)
+	ticketkit.Has(t, js(replies[1], "body"), issueURLSlot)
+	ticketkit.Has(t, js(plan, "comment"), issueLinksSlot)
+	ticketkit.Has(t, js(plan, "comment"), "u-t3")
 	// 続きの子を起こし、マーカーは置かない。レビュー待ちの子は done/ へ。
 	rows := k.rows(a)
 	if jb(a, "reviewed") || js(a, "followup") != "i0001-01-02" {
@@ -297,8 +298,8 @@ func TestAMixOfKeepIssueAndFix(t *testing.T) {
 		t.Error("マーカーを置いた")
 	}
 	child := js(rows[[2]string{"create", ".ccnavi/approved/doing/i0001-01-02.md"}], "content")
-	Has(t, child, "性能")
-	Lacks(t, child, "命名")
+	ticketkit.Has(t, child, "性能")
+	ticketkit.Lacks(t, child, "命名")
 	if len(jl(a, "pending_extra")) != 0 {
 		t.Errorf("pending_extra = %v", a["pending_extra"])
 	}
@@ -320,8 +321,8 @@ func TestAllKeepPlacesTheReviewedMark(t *testing.T) {
 	if len(jl(plan, "issues")) != 0 || len(jl(plan, "replies")) != 3 || len(jl(plan, "resolves")) != 3 {
 		t.Errorf("plan = %v", plan)
 	}
-	Lacks(t, js(plan, "comment"), issueLinksSlot)
-	Has(t, js(plan, "comment"), markerDecide)
+	ticketkit.Lacks(t, js(plan, "comment"), issueLinksSlot)
+	ticketkit.Has(t, js(plan, "comment"), markerDecide)
 }
 
 func TestAllFixRepliesAndResolvesNothing(t *testing.T) {
@@ -338,7 +339,7 @@ func TestAllFixRepliesAndResolvesNothing(t *testing.T) {
 	}
 	child := js(k.rows(a)[[2]string{"create", ".ccnavi/approved/doing/i0001-01-02.md"}], "content")
 	for _, body := range []string{"命名", "テスト", "性能"} {
-		Has(t, child, body)
+		ticketkit.Has(t, child, body)
 	}
 }
 
@@ -354,7 +355,7 @@ func TestNoThreadsPlacesTheReviewedMark(t *testing.T) {
 	if len(jl(plan, "issues")) != 0 || len(jl(plan, "replies")) != 0 || len(jl(plan, "resolves")) != 0 {
 		t.Errorf("plan = %v", plan)
 	}
-	Has(t, js(plan, "comment"), "未解決（Unresolved）の指摘なし")
+	ticketkit.Has(t, js(plan, "comment"), "未解決（Unresolved）の指摘なし")
 }
 
 // fix の指摘は、どんな組み合わせでも計画（issue・返信・解決）に入らない。
@@ -456,7 +457,7 @@ func TestADecideMismatchPlacesNothing(t *testing.T) {
 				t.Errorf("changes/host_plan = %v / %v", a["changes"], a["host_plan"])
 			}
 			if c.changed == "u-t1" {
-				Has(t, js(a, "mismatch", "digest", "expected"), "v2.")
+				ticketkit.Has(t, js(a, "mismatch", "digest", "expected"), "v2.")
 			}
 		})
 	}
@@ -501,7 +502,7 @@ func TestAThreadAddedAfterShowingIsLeftPending(t *testing.T) {
 		t.Errorf("fixed = %v", fixed)
 	}
 	raw, _ := json.Marshal(jm(fixed, "host_plan")["replies"])
-	Lacks(t, string(raw), "u-t9")
+	ticketkit.Lacks(t, string(raw), "u-t9")
 }
 
 // ---- 5. 受け入れ済み（carry）の扱い
@@ -536,9 +537,9 @@ func TestTheHostWriteIsNotAMismatchWithCarryAndIsNotWrittenAgain(t *testing.T) {
 	if len(jl(plan, "issues")) != 0 || len(jl(plan, "replies")) != 0 || len(jl(plan, "resolves")) != 0 || js(a, "followup") != "i0001-01-02" {
 		t.Errorf("answer = %v", a)
 	}
-	Has(t, js(plan, "comment"), "u-t1")
+	ticketkit.Has(t, js(plan, "comment"), "u-t1")
 	// 今回作る issue が無いので、作った issue の一覧の枠は MR に出さない。
-	Lacks(t, js(plan, "comment"), issueLinksSlot)
+	ticketkit.Lacks(t, js(plan, "comment"), issueLinksSlot)
 	// 受け入れ済みの 2 件は、見せた指摘の一部として数える。
 	if len(jl(a, "pending_extra")) != 0 {
 		t.Errorf("pending_extra = %v", a["pending_extra"])
@@ -629,7 +630,7 @@ func TestTheOpIsTheSameForTheSameThread(t *testing.T) {
 	if !regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(js(first, "op")) {
 		t.Errorf("op = %v", first["op"])
 	}
-	Has(t, js(first, "body"), fmt.Sprintf("<!-- ccnavi:issue op=%s -->", js(first, "op")))
+	ticketkit.Has(t, js(first, "body"), fmt.Sprintf("<!-- ccnavi:issue op=%s -->", js(first, "op")))
 	// 指摘ごとに違う。
 	if other := k.issueOf(threads, "u-t1"); js(first, "op") == js(other, "op") {
 		t.Error("別の指摘で op が同じ")
@@ -677,7 +678,7 @@ func TestTheNextIDSkipsTheExistingChildrenOfThePhase(t *testing.T) {
 	t.Parallel()
 	k := newDecideKit(t)
 	existing := strings.Replace(childNoReview("i0001-01-03", 1, "wip/design/*"), `completed_at: ""`, `completed_at: "2026-01-01T00:00:00+0000"`, 1)
-	Write(t, k.tr.ApprovedPath("done", "i0001-01-03"), existing)
+	ticketkit.Write(t, k.tr.ApprovedPath("done", "i0001-01-03"), existing)
 	a := k.apply([]map[string]any{dthread("t1", "命名")}, map[string]string{"u-t1": "fix"}, nil, nil, nil)
 	noProblems(t, a)
 	if js(a, "followup") != "i0001-01-04" {
@@ -729,11 +730,11 @@ func (k *decideKit) local(threads []map[string]any, choices map[string]string, s
 	}
 	k.put(shown)
 	base := []string{"--cwd", k.tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--result", k.fixture.Path}
-	digest := js(ParseJSON(k.t, OK(k.t, k.tr.Ccnavi(append(append([]string{}, base...), "--preview", "--json")...)).Stdout), "digest")
+	digest := js(ticketkit.ParseJSON(k.t, ticketkit.OK(k.t, k.tr.Ccnavi(append(append([]string{}, base...), "--preview", "--json")...)).Stdout), "digest")
 	k.put(threads)
 	before := k.tr.disk()
 	raw, _ := json.Marshal(choices)
-	OK(k.t, k.tr.Ccnavi(append(append([]string{}, base...), "--yes", string(raw), "--digest", digest, "--json", "--actor", "alice")...))
+	ticketkit.OK(k.t, k.tr.Ccnavi(append(append([]string{}, base...), "--yes", string(raw), "--digest", digest, "--json", "--actor", "alice")...))
 	return diffDisk(before, k.tr.disk(), "i0001")
 }
 
@@ -754,7 +755,7 @@ func normalized(t testing.TB, rows []diffRow) map[[2]string]any {
 		content = opTextRe.ReplaceAllString(content, "")
 		var value any = content
 		if strings.HasSuffix(r.Path, ".reviewed") {
-			mark := ParseJSON(t, content)
+			mark := ticketkit.ParseJSON(t, content)
 			delete(mark, "via")
 			delete(mark, "at")
 			value = mark
@@ -827,8 +828,8 @@ func TestNothingDecidedAndAThreadAddedSaysSoInTheComment(t *testing.T) {
 	a := k.apply([]map[string]any{dthread("t9", "あとから")}, map[string]string{}, []map[string]any{}, nil, nil)
 	noProblems(t, a)
 	comment := js(jm(a, "host_plan"), "comment")
-	Has(t, comment, "今回の判断なし。追加分 1 件は判断待ち")
-	Lacks(t, comment, "レビュー済みにした")
+	ticketkit.Has(t, comment, "今回の判断なし。追加分 1 件は判断待ち")
+	ticketkit.Lacks(t, comment, "レビュー済みにした")
 	if jb(a, "reviewed") {
 		t.Error("reviewed")
 	}
@@ -849,7 +850,7 @@ func TestMoreThanTheLimitOfIssuesPlacesNothing(t *testing.T) {
 	}
 	a := k.apply(many, choices, nil, nil, nil)
 	choiceCode(t, a, "CORE_DECIDE_CHOICES")
-	Has(t, strs(jl(a, "problems"))[0], fmt.Sprint(maxIssues+1))
+	ticketkit.Has(t, strs(jl(a, "problems"))[0], fmt.Sprint(maxIssues+1))
 	fewer := map[string]string{}
 	for _, th := range many[:maxIssues] {
 		fewer[th["url"].(string)] = "issue"
@@ -946,17 +947,17 @@ func TestOutsideTextDoesNotActInTheMetaOrTheTitle(t *testing.T) {
 			break
 		}
 	}
-	Has(t, meta, "`u-x @alice e`")
-	Has(t, meta, "`src/ab @carol/x.py:3`")
-	Lacks(t, js(issue, "body"), "\n@alice")
+	ticketkit.Has(t, meta, "`u-x @alice e`")
+	ticketkit.Has(t, meta, "`src/ab @carol/x.py:3`")
+	ticketkit.Lacks(t, js(issue, "body"), "\n@alice")
 	if strings.Count(js(issue, "title"), "\n") != 0 {
 		t.Errorf("title に改行: %q", js(issue, "title"))
 	}
-	Has(t, js(issue, "title"), "`src/ab @carol/x.py:3`")
+	ticketkit.Has(t, js(issue, "title"), "`src/ab @carol/x.py:3`")
 	// 本文の ccnavi の目印は壊れ、先頭の操作ID の印だけが残る。
 	if strings.Count(js(issue, "body"), "<!-- ccnavi:") != 1 {
 		t.Errorf("目印の数 = %d", strings.Count(js(issue, "body"), "<!-- ccnavi:"))
 	}
-	Has(t, js(issue, "body"), "<!‐- ccnavi:accept -->")
-	Lacks(t, js(jm(a, "host_plan"), "comment"), "\n@alice")
+	ticketkit.Has(t, js(issue, "body"), "<!‐- ccnavi:accept -->")
+	ticketkit.Lacks(t, js(jm(a, "host_plan"), "comment"), "\n@alice")
 }

@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/exe"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 var chromeActor = map[string]any{"account": "alice", "version": "9.9.9"}
@@ -52,7 +53,7 @@ func TestAnAbsentFamilyStopsAndItsStaleCopyIsUndecided(t *testing.T) {
 	// P の上に古いチケット（閉じた i0009-01-01）があっても、i0009 がホストに無ければ決まらない。
 	text := strings.Replace(childNoReview("i0009-01-01", 1, "wip/research/*"), "parent: i0001", "parent: i0009", 1)
 	text = strings.Replace(text, `completed_at: ""`, `completed_at: "2026-01-01T00:00:00+0000"`, 1)
-	Write(t, tr.ApprovedPath("done", "i0009-01-01"), text)
+	ticketkit.Write(t, tr.ApprovedPath("done", "i0009-01-01"), text)
 	kid := strings.Replace(childNoReview("i0001-01-01", 1, "wip/research/*"), "human_review:", "predecessors: [\"i0009-01-01\"]\nhuman_review:", 1)
 	tr.Propose("i0001-01-01", kid, "")
 	tr.CommitParent("tickets")
@@ -87,7 +88,7 @@ func TestARequestedFamilyMissingFromTheSnapshotIsRefused(t *testing.T) {
 		for _, op := range []string{"board", "plan"} {
 			request["op"] = op
 			body := tr.answer(request)
-			Has(t, js(body, "error"), "family のブランチが snapshot にありません")
+			ticketkit.Has(t, js(body, "error"), "family のブランチが snapshot にありません")
 			if _, ok := body["identifiers"]; ok {
 				t.Errorf("%s %v: identifiers がある", op, absent)
 			}
@@ -102,10 +103,10 @@ func TestAnUnreadableInputStopsTheBoardAndThePlan(t *testing.T) {
 	tr.CommitParent("tickets")
 	request := tr.chromeRequest("plan", "i0001", nil, nil)
 	jm(request, "snapshot", "branches", "main")["binary"] = []any{".ccnavi/approved/done/x.md"}
-	Has(t, js(tr.answer(request), "error"), "判定できません")
+	ticketkit.Has(t, js(tr.answer(request), "error"), "判定できません")
 	request["op"] = "board"
 	board := tr.answer(request)
-	Has(t, js(board, "undecided"), "バイナリ")
+	ticketkit.Has(t, js(board, "undecided"), "バイナリ")
 	if _, ok := board["batch"]; ok {
 		t.Error("batch がある")
 	}
@@ -122,12 +123,12 @@ func TestADifferentCompatRefusesWritingButStillShows(t *testing.T) {
 	if jb(board, "write", "allowed") {
 		t.Error("互換が違うのに書ける")
 	}
-	Has(t, js(board, "write", "reason"), "拡張を更新してください。")
+	ticketkit.Has(t, js(board, "write", "reason"), "拡張を更新してください。")
 	if b := jl(board, "batch"); len(b) != 1 || js(b[0], "ticket") != "i0001" {
 		t.Errorf("batch = %v", board["batch"])
 	}
 	refused := tr.answer(tr.chromeRequest("plan", "i0001", nil, map[string]any{"shown": map[string]any{"ids": first["identifiers"], "digest": first["digest"]}}))
-	Has(t, js(refused, "error"), "互換")
+	ticketkit.Has(t, js(refused, "error"), "互換")
 }
 
 func TestADifferentDigestWritesNothing(t *testing.T) {
@@ -162,7 +163,7 @@ func TestNothingToApproveCarriesItsReasonCode(t *testing.T) {
 	tr := chromeTree(t)
 	tr.Propose("i0001", parentOf("i0001", "research"), "")
 	tr.CommitParent("tickets")
-	OK(t, tr.Approve())
+	ticketkit.OK(t, tr.Approve())
 	body := tr.answer(tr.chromeRequest("plan", "i0001", nil, nil))
 	if !isNull(body, "changes") || !isNull(body, "mismatch") || js(body, "code") != "CORE_APPROVE_NOTHING" {
 		t.Errorf("body = %v", body)
@@ -181,11 +182,11 @@ func TestTheLocalCcnaviReadsWhatChromeWroteTheSame(t *testing.T) {
 		t.Fatalf("identifiers = %v (%v)", ids, body)
 	}
 	tr.applyChanges(jl(body, "changes", "i0001"), tr.ParentTree)
-	preview := ParseJSON(t, tr.Ccnavi("--agree", "--preview", "--json").Stdout)
+	preview := ticketkit.ParseJSON(t, tr.Ccnavi("--agree", "--preview", "--json").Stdout)
 	if len(jl(preview, "batch")) != 0 {
 		t.Errorf("batch = %v", preview["batch"])
 	}
-	lint := ParseJSON(t, tr.Ccnavi("--lint", "--json").Stdout)
+	lint := ticketkit.ParseJSON(t, tr.Ccnavi("--lint", "--json").Stdout)
 	for _, p := range jl(lint, "problems") {
 		if js(p, "severity") == "error" {
 			t.Errorf("error: %v", p)
@@ -215,7 +216,7 @@ func TestEveryWritingOpChecksCompatAndTheBranch(t *testing.T) {
 		"plan":    nil,
 		"confirm": {"phase": 1, "result": map[string]any{"host": "h", "mr": map[string]any{"number": 1, "url": "u"}}},
 	} {
-		Has(t, js(tr.answer(tr.chromeRequest(op, "i0001", nil, extra)), "error"), "互換")
+		ticketkit.Has(t, js(tr.answer(tr.chromeRequest(op, "i0001", nil, extra)), "error"), "互換")
 	}
 }
 

@@ -17,18 +17,19 @@ import (
 	"testing"
 
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/pyjson"
 )
 
 const resultJSON = `{"host": "fixture", "mr": {"number": 7, "url": "u/7"}, "threads": [], "reviews": []}`
 
 // actorTree はフェーズ 1 を依頼まで進めて取得した結果を置いた木と結果ファイル（ready）。
-func actorTree(t *testing.T) (*Tree, Fixture) {
+func actorTree(t *testing.T) (*Tree, ticketkit.Fixture) {
 	t.Helper()
 	tr := chromeTree(t)
 	f := tr.reviewedPhaseOne()
 	tr.CommitParent("requested")
-	Write(t, f.Path, resultJSON)
+	ticketkit.Write(t, f.Path, resultJSON)
 	return tr, f
 }
 
@@ -36,7 +37,7 @@ func (tr *Tree) actorMarkPath(kind string) string {
 	return filepath.Join(tr.ParentTree, ".ccnavi", "approved", "phases", "i0001", "1."+kind)
 }
 
-func (tr *Tree) confirmAs(f Fixture, extra ...string) run.Result {
+func (tr *Tree) confirmAs(f ticketkit.Fixture, extra ...string) run.Result {
 	tr.T.Helper()
 	return tr.Ccnavi(append([]string{"--cwd", tr.ParentTree, "--phase", "1", "review", "confirm", "--result", f.Path}, extra...)...)
 }
@@ -59,7 +60,7 @@ func sorted(keys []string) []string { k := slices.Clone(keys); slices.Sort(k); r
 
 func (tr *Tree) hostCompare() map[string]any {
 	tr.T.Helper()
-	recorded := js(ReadJSON(tr.T, tr.actorMarkPath("requested")), "head")
+	recorded := js(ticketkit.ReadJSON(tr.T, tr.actorMarkPath("requested")), "head")
 	head := strings.TrimSpace(tr.Parent("rev-parse", "HEAD"))
 	names := tr.Parent("diff", "--name-only", "--no-renames", recorded+"..HEAD")
 	files := []any{}
@@ -87,9 +88,9 @@ func (tr *Tree) chromeConfirm(compare map[string]any, actor map[string]any, head
 func TestWithoutAnActorTheMarkIsAsBefore(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
-	OK(t, tr.confirmAs(f))
-	text := Read(t, tr.actorMarkPath("reviewed"))
-	mark := ParseJSON(t, text)
+	ticketkit.OK(t, tr.confirmAs(f))
+	text := ticketkit.Read(t, tr.actorMarkPath("reviewed"))
+	mark := ticketkit.ParseJSON(t, text)
 	if !slices.Equal(sorted(keysOf(t, text)), []string{"accepted", "at", "mr"}) || jf(mark, "mr") != 7 || len(jl(mark, "accepted")) != 0 {
 		t.Errorf("mark = %s", text)
 	}
@@ -98,9 +99,9 @@ func TestWithoutAnActorTheMarkIsAsBefore(t *testing.T) {
 func TestAnActorGoesIntoTheMark(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
-	OK(t, tr.confirmAs(f, "--actor", "octo-reviewer"))
-	text := Read(t, tr.actorMarkPath("reviewed"))
-	mark := ParseJSON(t, text)
+	ticketkit.OK(t, tr.confirmAs(f, "--actor", "octo-reviewer"))
+	text := ticketkit.Read(t, tr.actorMarkPath("reviewed"))
+	mark := ticketkit.ParseJSON(t, text)
 	if !slices.Equal(keysOf(t, text), []string{"mr", "accepted", "actor", "via", "at"}) || jf(mark, "mr") != 7 || js(mark, "actor") != "octo-reviewer" || js(mark, "via") != "cli" {
 		t.Errorf("mark = %s", text)
 	}
@@ -110,9 +111,9 @@ func TestAMalformedActorIsRefusedAndNothingIsWritten(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
 	for _, bad := range []string{"a b", "x/y", "<script>", strings.Repeat("a", 101)} {
-		done := Fails(t, tr.confirmAs(f, "--actor", bad))
-		Has(t, done.Stderr, "--actor")
-		if Exists(tr.actorMarkPath("reviewed")) {
+		done := ticketkit.Fails(t, tr.confirmAs(f, "--actor", bad))
+		ticketkit.Has(t, done.Stderr, "--actor")
+		if ticketkit.Exists(tr.actorMarkPath("reviewed")) {
 			t.Errorf("%q でマーカーが書かれた", bad)
 		}
 	}
@@ -121,7 +122,7 @@ func TestAMalformedActorIsRefusedAndNothingIsWritten(t *testing.T) {
 func TestAnActorOutsideReviewConfirmIsRefused(t *testing.T) {
 	t.Parallel()
 	tr := chromeTree(t)
-	Has(t, Fails(t, tr.Ccnavi("--actor", "octo", "--explain", "--json")).Stderr, "review confirm")
+	ticketkit.Has(t, ticketkit.Fails(t, tr.Ccnavi("--actor", "octo", "--explain", "--json")).Stderr, "review confirm")
 }
 
 // ---- 依頼の後に動いたか
@@ -129,9 +130,9 @@ func TestAnActorOutsideReviewConfirmIsRefused(t *testing.T) {
 func TestCodeMovedAfterTheRequestIsRefusedTheSameByChromeAndLocally(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
-	Write(t, filepath.Join(tr.ParentTree, "src", "late.py"), "print(1)\n")
+	ticketkit.Write(t, filepath.Join(tr.ParentTree, "src", "late.py"), "print(1)\n")
 	tr.CommitParent("late code")
-	tr.Parent("push", "--quiet", "origin", ParentName)
+	tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
 	compare := tr.hostCompare()
 	if !slices.Contains(strs(jl(compare, "files")), "src/late.py") {
 		t.Fatalf("files = %v", compare["files"])
@@ -160,7 +161,7 @@ func TestCodeMovedAfterTheRequestIsRefusedTheSameByChromeAndLocally(t *testing.T
 	if !reflect.DeepEqual(same, said) {
 		t.Errorf("Chrome と手元の文面が違う:\nChrome: %q\n手元: %q", same, said)
 	}
-	Has(t, strs(jl(chrome, "problems"))[0], "依頼の後に親の HEAD が動いている")
+	ticketkit.Has(t, strs(jl(chrome, "problems"))[0], "依頼の後に親の HEAD が動いている")
 	if !isNull(chrome, "changes") {
 		t.Errorf("changes = %v", chrome["changes"])
 	}
@@ -184,9 +185,9 @@ func TestATruncatedOrMismatchedCompareCountsAsMoved(t *testing.T) {
 			t.Errorf("%v: changes = %v", broken, chrome["changes"])
 		}
 		said := strings.Join(strs(jl(chrome, "problems")), "\n")
-		Has(t, said, "依頼の後に親の HEAD が動いている")
+		ticketkit.Has(t, said, "依頼の後に親の HEAD が動いている")
 		// 何が変わったかは断定しない固定の文。
-		Has(t, said, "何が変わったかユーザに確かめてもらい、依頼し直す")
+		ticketkit.Has(t, said, "何が変わったかユーザに確かめてもらい、依頼し直す")
 	}
 }
 
@@ -209,10 +210,10 @@ func TestChromeAndLocalMarksDifferOnlyByTheRouteAndTheTime(t *testing.T) {
 		t.Fatalf("1.reviewed の行が無い: %v", chrome["changes"])
 	}
 	remoteText := js(row, "content")
-	remote := ParseJSON(t, remoteText)
-	OK(t, tr.confirmAs(f, "--actor", "octo-reviewer"))
-	localText := Read(t, tr.actorMarkPath("reviewed"))
-	local := ParseJSON(t, localText)
+	remote := ticketkit.ParseJSON(t, remoteText)
+	ticketkit.OK(t, tr.confirmAs(f, "--actor", "octo-reviewer"))
+	localText := ticketkit.Read(t, tr.actorMarkPath("reviewed"))
+	local := ticketkit.ParseJSON(t, localText)
 	if js(remote, "via") != "chrome" || js(local, "via") != "cli" || js(remote, "at") != chromeStamp {
 		t.Errorf("via/at: remote %v local %v", remote, local)
 	}
@@ -236,7 +237,7 @@ func TestTheBoardNamesRequestedPhasesUntilTheyAreReviewed(t *testing.T) {
 	if !reflect.DeepEqual(board["reviewable"], want) {
 		t.Errorf("reviewable = %v", board["reviewable"])
 	}
-	OK(t, tr.confirmAs(f))
+	ticketkit.OK(t, tr.confirmAs(f))
 	tr.CommitParent("reviewed")
 	board = tr.askChrome(tr.chromeRequest("board", "i0001", nil, nil))
 	if l, ok := board["reviewable"].([]any); !ok || len(l) != 0 {
@@ -252,14 +253,14 @@ func TestAReviewedPhaseIsNotConfirmedAgainLocallyOrFromChrome(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
 	compare := tr.hostCompare()
-	OK(t, tr.confirmAs(f))
-	before := Read(t, tr.actorMarkPath("reviewed"))
+	ticketkit.OK(t, tr.confirmAs(f))
+	before := ticketkit.Read(t, tr.actorMarkPath("reviewed"))
 	again := tr.confirmAs(f, "--actor", "someone")
 	wantCode(t, again, 1)
-	if first := Lines(again.Stderr)[0]; first != alreadyReviewed {
+	if first := ticketkit.Lines(again.Stderr)[0]; first != alreadyReviewed {
 		t.Errorf("先頭の行 = %q", first)
 	}
-	if Read(t, tr.actorMarkPath("reviewed")) != before {
+	if ticketkit.Read(t, tr.actorMarkPath("reviewed")) != before {
 		t.Error("マーカーが書き換わった")
 	}
 	tr.CommitParent("reviewed")
@@ -276,14 +277,14 @@ func requestPosted(t *testing.T, before func(tr *Tree), extra func(tr *Tree) []s
 	tr := chromeTree(t)
 	tr.FamilyPlan(planOf("design"), nil)
 	tr.ApproveChild("i0001-01-01", 1, "wip/design/*")
-	tr.RunChild("i0001-01-01", File{"wip/design/plan.md", "d\n"})
-	OK(t, tr.CloseChild("i0001-01-01"))
+	tr.RunChild("i0001-01-01", ticketkit.File{Path: "wip/design/plan.md", Text: "d\n"})
+	ticketkit.OK(t, tr.CloseChild("i0001-01-01"))
 	tr.CommitParent("close 01")
 	tr.Merge("i0001-01-01")
 	tr.Origin()
-	body := Write(t, filepath.Join(tr.Root, "body.md"), "見てほしい\n")
-	OK(t, tr.Ccnavi("--cwd", tr.ParentTree, "--phase", "1", "--body-file", body, "review", "prepare"))
-	posted := Write(t, filepath.Join(tr.Root, "posted.json"), `{"host": "gitlab", "mr": {"number": 7, "url": "u/7"}, "url": "u/7#1", "created_at": "t", "author": "ccnavi-bot"}`)
+	body := ticketkit.Write(t, filepath.Join(tr.Root, "body.md"), "見てほしい\n")
+	ticketkit.OK(t, tr.Ccnavi("--cwd", tr.ParentTree, "--phase", "1", "--body-file", body, "review", "prepare"))
+	posted := ticketkit.Write(t, filepath.Join(tr.Root, "posted.json"), `{"host": "gitlab", "mr": {"number": 7, "url": "u/7"}, "url": "u/7#1", "created_at": "t", "author": "ccnavi-bot"}`)
 	if before != nil {
 		before(tr)
 	}
@@ -294,7 +295,7 @@ func requestPosted(t *testing.T, before func(tr *Tree), extra func(tr *Tree) []s
 	return tr, tr.Ccnavi(append(append([]string{}, more...), "--cwd", tr.ParentTree, "--phase", "1", "review", "requested", "--result", posted)...)
 }
 
-func (tr *Tree) doingText() string { return Read(tr.T, tr.ApprovedPath("doing", "i0001")) }
+func (tr *Tree) doingText() string { return ticketkit.Read(tr.T, tr.ApprovedPath("doing", "i0001")) }
 
 func (tr *Tree) setDoingMR(value string) {
 	tr.T.Helper()
@@ -302,7 +303,7 @@ func (tr *Tree) setDoingMR(value string) {
 	if value != "" {
 		replacement = "\nmr: " + value + "\n"
 	}
-	Write(tr.T, tr.ApprovedPath("doing", "i0001"), strings.Replace(tr.doingText(), "\nmr: 1\n", replacement, 1))
+	ticketkit.Write(tr.T, tr.ApprovedPath("doing", "i0001"), strings.Replace(tr.doingText(), "\nmr: 1\n", replacement, 1))
 	tr.Parent("add", "-A")
 	tr.Parent("commit", "--quiet", "-m", "mr")
 }
@@ -311,8 +312,8 @@ func TestTheRequestRecordsThePosterWhenKnown(t *testing.T) {
 	t.Parallel()
 	tr, done := requestPosted(t, nil, nil)
 	wantCode(t, done, 0)
-	if js(ReadJSON(t, tr.actorMarkPath("requested")), "poster") != "ccnavi-bot" {
-		t.Errorf("requested = %v", ReadJSON(t, tr.actorMarkPath("requested")))
+	if js(ticketkit.ReadJSON(t, tr.actorMarkPath("requested")), "poster") != "ccnavi-bot" {
+		t.Errorf("requested = %v", ticketkit.ReadJSON(t, tr.actorMarkPath("requested")))
 	}
 }
 
@@ -321,11 +322,11 @@ func TestTheRequestWritesMRIntoAnEmptyFieldOnly(t *testing.T) {
 	t.Parallel()
 	tr, done := requestPosted(t, func(tr *Tree) {
 		tr.setDoingMR("")
-		Lacks(t, tr.doingText(), "mr: 1")
+		ticketkit.Lacks(t, tr.doingText(), "mr: 1")
 	}, nil)
 	wantCode(t, done, 0)
-	Has(t, tr.doingText(), "mr: 7\n")
-	Has(t, done.Stderr, "`mr:` に MR !7 を追記しました")
+	ticketkit.Has(t, tr.doingText(), "mr: 7\n")
+	ticketkit.Has(t, done.Stderr, "`mr:` に MR !7 を追記しました")
 	if strings.Count(tr.doingText(), "mr: 7") != 1 {
 		t.Error("mr: 7 が 1 行でない")
 	}
@@ -345,11 +346,11 @@ func TestTheMRWriteIsInTheWriteAndPushWriteList(t *testing.T) {
 	wantCode(t, done, 0)
 	rel := filepath.ToSlash(filepath.Join(".ccnavi", "approved", "doing", "i0001.md"))
 	found := false
-	for _, l := range Lines(Read(t, listing)) {
+	for _, l := range ticketkit.Lines(ticketkit.Read(t, listing)) {
 		found = found || strings.HasSuffix(filepath.ToSlash(filepath.Clean(strings.TrimSpace(l))), rel)
 	}
 	if !found {
-		t.Errorf("書いたパスの一覧に %s が無い: %s", rel, Read(t, listing))
+		t.Errorf("書いたパスの一覧に %s が無い: %s", rel, ticketkit.Read(t, listing))
 	}
 }
 
@@ -372,12 +373,12 @@ func TestTheRequestWithTheSameMROrAnotherMR(t *testing.T) {
 				t.Error("承認済みチケットが書き換わった")
 			}
 			if c.warns {
-				Has(t, done.Stderr, "警告")
-				Has(t, done.Stderr, "別の値が既にある")
-				Has(t, done.Stderr, "!7")
+				ticketkit.Has(t, done.Stderr, "警告")
+				ticketkit.Has(t, done.Stderr, "別の値が既にある")
+				ticketkit.Has(t, done.Stderr, "!7")
 			} else {
-				Lacks(t, done.Stderr, "追記しました")
-				Lacks(t, done.Stderr, "警告")
+				ticketkit.Lacks(t, done.Stderr, "追記しました")
+				ticketkit.Lacks(t, done.Stderr, "警告")
 			}
 		})
 	}
@@ -385,11 +386,11 @@ func TestTheRequestWithTheSameMROrAnotherMR(t *testing.T) {
 
 // ---- decide のマーカーにも actor と via（confirm と同じ形）。
 
-func (tr *Tree) decideWith(f Fixture, extra ...string) run.Result {
+func (tr *Tree) decideWith(f ticketkit.Fixture, extra ...string) run.Result {
 	tr.T.Helper()
 	base := []string{"--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved"}
-	preview := OK(tr.T, tr.Ccnavi(append(append([]string{}, base...), "--preview", "--json", "--result", f.Path)...))
-	digest := js(ParseJSON(tr.T, preview.Stdout), "digest")
+	preview := ticketkit.OK(tr.T, tr.Ccnavi(append(append([]string{}, base...), "--preview", "--json", "--result", f.Path)...))
+	digest := js(ticketkit.ParseJSON(tr.T, preview.Stdout), "digest")
 	args := append(append([]string{}, base...), "--yes", "{}", "--digest", digest, "--json", "--result", f.Path)
 	return tr.Ccnavi(append(args, extra...)...)
 }
@@ -397,8 +398,8 @@ func (tr *Tree) decideWith(f Fixture, extra ...string) run.Result {
 func TestWithoutAnActorTheDecideMarkIsAsBefore(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
-	OK(t, tr.decideWith(f))
-	if got := sorted(keysOf(t, Read(t, tr.actorMarkPath("reviewed")))); !slices.Equal(got, []string{"accepted", "at", "mr"}) {
+	ticketkit.OK(t, tr.decideWith(f))
+	if got := sorted(keysOf(t, ticketkit.Read(t, tr.actorMarkPath("reviewed")))); !slices.Equal(got, []string{"accepted", "at", "mr"}) {
 		t.Errorf("keys = %v", got)
 	}
 }
@@ -408,9 +409,9 @@ func TestAnActorAndTheWayGoIntoTheDecideMark(t *testing.T) {
 		t.Run(via, func(t *testing.T) {
 			t.Parallel()
 			tr, f := actorTree(t)
-			OK(t, tr.decideWith(f, "--actor=octo-reviewer", "--via="+via))
-			text := Read(t, tr.actorMarkPath("reviewed"))
-			mark := ParseJSON(t, text)
+			ticketkit.OK(t, tr.decideWith(f, "--actor=octo-reviewer", "--via="+via))
+			text := ticketkit.Read(t, tr.actorMarkPath("reviewed"))
+			mark := ticketkit.ParseJSON(t, text)
 			if !slices.Equal(keysOf(t, text), []string{"mr", "accepted", "actor", "via", "at"}) || js(mark, "actor") != "octo-reviewer" || js(mark, "via") != via {
 				t.Errorf("mark = %s", text)
 			}
@@ -428,22 +429,22 @@ func TestTheWayIsRefusedAloneOrWithTheWrongWord(t *testing.T) {
 		{[]string{"--via=board"}, "--via は decide の --actor"},
 		{[]string{"--actor=octo", "--via=chrome"}, "--via に渡せるのは terminal か board"},
 	} {
-		Has(t, Fails(t, tr.decideWith(f, c.extra...)).Stderr, c.word)
-		if Exists(tr.actorMarkPath("reviewed")) {
+		ticketkit.Has(t, ticketkit.Fails(t, tr.decideWith(f, c.extra...)).Stderr, c.word)
+		if ticketkit.Exists(tr.actorMarkPath("reviewed")) {
 			t.Errorf("%v でマーカーが書かれた", c.extra)
 		}
 	}
-	preview := Fails(t, tr.Ccnavi("--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--preview", "--json", "--result", f.Path, "--actor=octo"))
-	Has(t, preview.Stderr, "--actor")
+	preview := ticketkit.Fails(t, tr.Ccnavi("--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--preview", "--json", "--result", f.Path, "--actor=octo"))
+	ticketkit.Has(t, preview.Stderr, "--actor")
 }
 
 // ターミナルで 1 件ずつ選ぶ形（--yes 無し）に --via board は受けない。
 func TestBoardIsRefusedForTheWayThatPicksOneByOne(t *testing.T) {
 	t.Parallel()
 	tr, f := actorTree(t)
-	done := Fails(t, tr.Ccnavi("--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--result", f.Path, "--actor=octo", "--via=board"))
-	Has(t, done.Stderr, "--via board は --yes")
-	if Exists(tr.actorMarkPath("reviewed")) {
+	done := ticketkit.Fails(t, tr.Ccnavi("--cwd", tr.ParentTree, "user", "reviewed", "1", "--accept-unresolved", "--result", f.Path, "--actor=octo", "--via=board"))
+	ticketkit.Has(t, done.Stderr, "--via board は --yes")
+	if ticketkit.Exists(tr.actorMarkPath("reviewed")) {
 		t.Error("マーカーが書かれた")
 	}
 }

@@ -1,6 +1,7 @@
 package phases
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/yaml"
 )
 
@@ -47,14 +49,14 @@ func newWS(t *testing.T) *ws {
 	t.Helper()
 	root := base.TempDir(t)
 	w := &ws{t: t, root: root, phasesText: samples.Phases}
-	write(t, filepath.Join(root, ".claude", "keep"), "")
+	ticketkit.Write(t, filepath.Join(root, ".claude", "keep"), "")
 	w.git(root, "init", "--quiet", "-b", "main")
-	write(t, filepath.Join(root, "src", "keep.py"), "print(1)\n")
-	write(t, filepath.Join(root, ".gitignore"), ".claude/\n")
+	ticketkit.Write(t, filepath.Join(root, "src", "keep.py"), "print(1)\n")
+	ticketkit.Write(t, filepath.Join(root, ".gitignore"), ".claude/\n")
 	w.git(root, "add", "-A")
 	w.git(root, "commit", "--quiet", "-m", "init")
-	w.rules = write(t, base.CommonPath(root, "rules"), samples.Rules)
-	w.phases = write(t, base.ConfigPath(root, "phases"), samples.Phases)
+	w.rules = ticketkit.Write(t, base.CommonPath(root, "rules"), samples.Rules)
+	w.phases = ticketkit.Write(t, base.ConfigPath(root, "phases"), samples.Phases)
 	w.state = filepath.Join(root, "logs", "state")
 	w.parentTree = w.worktree(parentName, "main")
 	w.approved = filepath.Join(w.parentTree, ".ccnavi", "approved")
@@ -71,36 +73,11 @@ func (w *ws) as(t testing.TB) *ws {
 // setPhases は自身のレイヤーの phases.yml を書き、親にコピーする元の本文も揃える。
 func (w *ws) setPhases(text string) {
 	w.t.Helper()
-	write(w.t, w.phases, text)
+	ticketkit.Write(w.t, w.phases, text)
 	w.phasesText = text
 }
 
 // ---- ファイルと git
-
-func write(t testing.TB, path, text string) string {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-func read(t testing.TB, path string) string {
-	t.Helper()
-	b, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(b)
-}
-
-func exists(path string) bool {
-	_, err := os.Lstat(path)
-	return err == nil
-}
 
 func remove(t testing.TB, path string) {
 	t.Helper()
@@ -111,27 +88,20 @@ func remove(t testing.TB, path string) {
 
 func slash(s string) string { return strings.ReplaceAll(s, `\`, "/") }
 
-func readJSON(t testing.TB, path string) map[string]any {
-	t.Helper()
-	var v map[string]any
-	if err := json.Unmarshal([]byte(read(t, path)), &v); err != nil {
-		t.Fatalf("%s が JSON でない: %v", path, err)
-	}
-	return v
-}
-
 func writeJSON(t testing.TB, path string, v any) string {
 	t.Helper()
 	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return write(t, path, string(b))
+	return ticketkit.Write(t, path, string(b))
 }
 
 func (w *ws) git(dir string, args ...string) string {
 	w.t.Helper()
-	cmd := exec.Command("git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
+	ctx, cancel := context.WithTimeout(context.Background(), base.ExecTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-c", "user.email=t@example.com", "-c", "user.name=t"}, args...)...)
 	cmd.Dir = dir
 	cmd.Env = os.Environ()
 	for k, v := range w.env {
@@ -264,7 +234,7 @@ func (w *ws) propose(name, text string, tree ...string) string {
 	if len(tree) > 0 {
 		at = tree[0]
 	}
-	return write(w.t, filepath.Join(at, "wip", "proposals", "todo", name+".md"), text)
+	return ticketkit.Write(w.t, filepath.Join(at, "wip", "proposals", "todo", name+".md"), text)
 }
 
 func (w *ws) commitParent(message ...string) {
@@ -281,7 +251,7 @@ func (w *ws) commitParent(message ...string) {
 func (w *ws) approve() run.Result {
 	w.t.Helper()
 	r := w.ccnaviIn("y\n", "user", "agree")
-	if exists(w.approved) {
+	if ticketkit.Exists(w.approved) {
 		w.git(w.parentTree, "add", "-A")
 		w.git(w.parentTree, "commit", "--quiet", "--allow-empty", "-m", "approve")
 	}
@@ -333,7 +303,7 @@ func (w *ws) runChild(name string, files ...file) string {
 	tree := w.worktree(name, parentName)
 	w.mustOK(w.ccnavi("ticket", "start", name), "ticket start "+name)
 	for _, f := range files {
-		write(w.t, filepath.Join(tree, filepath.FromSlash(f.rel)), f.text)
+		ticketkit.Write(w.t, filepath.Join(tree, filepath.FromSlash(f.rel)), f.text)
 	}
 	w.git(tree, "add", "-A")
 	if len(files) > 0 {
@@ -373,13 +343,13 @@ func (w *ws) push() { w.git(w.parentTree, "push", "--quiet", "origin", parentNam
 // request はレビューを依頼する（prepare → requested）。依頼の本文は lastBody に残る。
 func (w *ws) request(fixture string, phase int) run.Result {
 	w.t.Helper()
-	body := write(w.t, filepath.Join(w.root, "body.md"), "見てほしい\n")
+	body := ticketkit.Write(w.t, filepath.Join(w.root, "body.md"), "見てほしい\n")
 	prepared := w.ccnavi("--cwd", w.parentTree, "--phase", itoa(phase), "--body-file", body, "review", "prepare")
 	if prepared.Code != 0 {
 		return prepared
 	}
-	w.lastBody = read(w.t, strings.Split(prepared.Stdout, "\n")[0])
-	data := readJSON(w.t, fixture)
+	w.lastBody = ticketkit.Read(w.t, strings.Split(prepared.Stdout, "\n")[0])
+	data := ticketkit.ReadJSON(w.t, fixture)
 	result := writeJSON(w.t, filepath.Join(w.root, "posted.json"), map[string]any{
 		"host": "fixture", "mr": data["mr"], "url": "u/7#1", "created_at": "2026-01-01T00:00:00Z",
 	})
@@ -435,7 +405,7 @@ func itoa(n int) string { return strconv.Itoa(n) }
 // doing は承認済みチケットの置き場（doing/）のパス。
 func (w *ws) doing(name string) string { return filepath.Join(w.approved, "doing", name+".md") }
 
-func (w *ws) isApproved(name string) bool { return exists(w.doing(name)) }
+func (w *ws) isApproved(name string) bool { return ticketkit.Exists(w.doing(name)) }
 
 // todo は親のワークツリーの提案の置き場のパス。
 func (w *ws) todo(name string) string {
@@ -483,19 +453,10 @@ var noFeedback = []samples.Step{}
 
 // ---- 小さな道具
 
-func jsonOf(t testing.TB, text string) map[string]any {
-	t.Helper()
-	var v map[string]any
-	if err := json.Unmarshal([]byte(text), &v); err != nil {
-		t.Fatalf("JSON でない: %v\n%s", err, text)
-	}
-	return v
-}
-
 // setThreads は取得結果の見本の threads を差し替える。
 func setThreads(t testing.TB, fixture string, threads ...map[string]any) {
 	t.Helper()
-	data := readJSON(t, fixture)
+	data := ticketkit.ReadJSON(t, fixture)
 	data["threads"] = threads
 	writeJSON(t, fixture, data)
 }

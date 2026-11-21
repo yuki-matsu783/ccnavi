@@ -1,6 +1,6 @@
 package flow
 
-// このパッケージのテストが共有する道具のうち、ticketkit（kit_*_test.go の写し）に無いもの。
+// このパッケージのテストが共有する道具のうち、ticketkitに無いもの。
 // tests/ticket/test_phases.py の PhaseHarness の続き（フェーズ定義つきの親子・Chrome の要求・JSON の読み）。
 
 import (
@@ -13,10 +13,11 @@ import (
 
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // phaseOpts は PhaseHarness と同じ木（フェーズ定義 samples.Phases を設定の置き場に置く）。
-var phaseOpts = Options{Phases: samples.Phases}
+var phaseOpts = ticketkit.Options{Phases: samples.Phases}
 
 // newTree は写しを使わない木（親のワークツリー i0001 まで）。
 func newTree(t *testing.T) *Tree { t.Helper(); return New(t, phaseOpts) }
@@ -29,11 +30,11 @@ func cachedTree(t *testing.T, key string, build func(tr *Tree)) *Tree {
 
 // child・childNoReview は親 i0001 のフェーズ phase の子の提案。
 func child(name string, phase int, allow ...string) string {
-	return samples.ChildText(name, ParentName, phase, allow)
+	return samples.ChildText(name, ticketkit.ParentName, phase, allow)
 }
 
 func childNoReview(name string, phase int, allow ...string) string {
-	return samples.ChildTextReview(name, ParentName, phase, allow, samples.Off)
+	return samples.ChildTextReview(name, ticketkit.ParentName, phase, allow, samples.Off)
 }
 
 // parentOf は計画（定義の名前の並び）だけの親の提案。
@@ -49,17 +50,17 @@ func parentWith(name string, plan []samples.Step, o samples.ParentOpts) string {
 // FamilyPlan は親 i0001 を計画つきで提案して承認する（family）。feedback が nil でなければフィードバック計画も書く。
 func (tr *Tree) FamilyPlan(plan []samples.Step, feedback []samples.Step) {
 	tr.T.Helper()
-	tr.Propose(ParentName, samples.ParentText(ParentName, plan, samples.ParentOpts{Feedback: feedback, Copy: tr.Phases}), "")
+	tr.Propose(ticketkit.ParentName, samples.ParentText(ticketkit.ParentName, plan, samples.ParentOpts{Feedback: feedback, Copy: tr.Phases}), "")
 	tr.CommitParent("tickets")
-	OK(tr.T, tr.Approve())
+	ticketkit.OK(tr.T, tr.Approve())
 }
 
-// ProposeChild は子の提案を親のワークツリーに書き、親がコミットし、承認する。
+// ApproveChild は子の提案を親のワークツリーに書き、親がコミットし、承認する。
 func (tr *Tree) ApproveChild(name string, phase int, allow ...string) {
 	tr.T.Helper()
 	tr.Propose(name, child(name, phase, allow...), "")
 	tr.CommitParent("tickets")
-	OK(tr.T, tr.Approve())
+	ticketkit.OK(tr.T, tr.Approve())
 }
 
 // CloseChild は子を閉じる（ticket finish）。
@@ -69,21 +70,21 @@ func (tr *Tree) CloseChild(name string) run.Result { return tr.Ccnavi("ticket", 
 func (tr *Tree) MergeChild(name string) { tr.Merge(name) }
 
 // Origin は origin（空の bare）を作り、親のブランチを push して、結果ファイル（fixture.json）を書く（remote）。
-func (tr *Tree) Origin() Fixture {
+func (tr *Tree) Origin() ticketkit.Fixture {
 	tr.T.Helper()
 	bare := filepath.Join(tr.Root, "origin.git")
 	tr.Git(tr.Root, "init", "--quiet", "--bare", bare)
 	tr.Git(tr.Root, "remote", "add", "origin", bare)
-	tr.Parent("push", "--quiet", "origin", ParentName)
+	tr.Parent("push", "--quiet", "origin", ticketkit.ParentName)
 	f := tr.Fixture()
-	Write(tr.T, f.Path, `{"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": true}}`)
+	ticketkit.Write(tr.T, f.Path, `{"host": "fixture", "mr": {"number": 7, "url": "u/7", "draft": true}}`)
 	return f
 }
 
 // RequestFor はフェーズ phase のレビュー依頼（prepare → requested）を通す（request。結果の投稿先は 1 つ）。
-func (tr *Tree) RequestFor(f Fixture, phase string) run.Result {
+func (tr *Tree) RequestFor(f ticketkit.Fixture, phase string) run.Result {
 	tr.T.Helper()
-	body := Write(tr.T, filepath.Join(tr.Root, "body.md"), "見てほしい\n")
+	body := ticketkit.Write(tr.T, filepath.Join(tr.Root, "body.md"), "見てほしい\n")
 	prepared := tr.Ccnavi("--cwd", tr.ParentTree, "--phase", phase, "--body-file", body, "review", "prepare")
 	if prepared.Code != 0 {
 		return prepared
@@ -93,38 +94,38 @@ func (tr *Tree) RequestFor(f Fixture, phase string) run.Result {
 	if err != nil {
 		tr.T.Fatal(err)
 	}
-	result := Write(tr.T, filepath.Join(tr.Root, "posted.json"), string(raw))
+	result := ticketkit.Write(tr.T, filepath.Join(tr.Root, "posted.json"), string(raw))
 	return tr.Ccnavi("--cwd", tr.ParentTree, "--phase", phase, "review", "requested", "--result", result)
 }
 
 // ConfirmFor はフェーズ phase の review confirm。
-func (tr *Tree) ConfirmFor(f Fixture, phase string) run.Result {
+func (tr *Tree) ConfirmFor(f ticketkit.Fixture, phase string) run.Result {
 	tr.T.Helper()
 	return tr.Ccnavi("--cwd", tr.ParentTree, "--phase", phase, "review", "confirm", "--result", f.Path)
 }
 
 // Phase1Requested はデザイン 1 ステップの全体計画のフェーズ 1 を閉じて合流し、レビューを依頼したところまで進める。
 // 返すのは結果ファイル。
-func (tr *Tree) Phase1Requested(plan ...string) Fixture {
+func (tr *Tree) Phase1Requested(plan ...string) ticketkit.Fixture {
 	tr.T.Helper()
 	if len(plan) == 0 {
 		plan = []string{"design"}
 	}
 	tr.FamilyPlan(samples.Plan(plan...), nil)
 	tr.ApproveChild("i0001-01-01", 1, "wip/design/*")
-	tr.RunChild("i0001-01-01", File{"wip/design/plan.md", "d\n"})
-	OK(tr.T, tr.CloseChild("i0001-01-01"))
+	tr.RunChild("i0001-01-01", ticketkit.File{Path: "wip/design/plan.md", Text: "d\n"})
+	ticketkit.OK(tr.T, tr.CloseChild("i0001-01-01"))
 	tr.CommitParent("close 01")
 	tr.Merge("i0001-01-01")
 	f := tr.Origin()
-	OK(tr.T, tr.RequestFor(f, "1"))
+	ticketkit.OK(tr.T, tr.RequestFor(f, "1"))
 	return f
 }
 
 // BoardPhase はボードの JSON の親のフェーズ 1 つを (gate_closed, review_waiting, マーカーの種類) で返す。
 func (tr *Tree) BoardPhase(number int, parent string) (gateClosed, reviewWaiting bool, marks []string) {
 	tr.T.Helper()
-	board := ParseJSON(tr.T, OK(tr.T, tr.Ccnavi("--explain", "--json")).Stdout)
+	board := ticketkit.ParseJSON(tr.T, ticketkit.OK(tr.T, tr.Ccnavi("--explain", "--json")).Stdout)
 	for _, p := range jl(board, "parents") {
 		if js(p, "ticket") != parent {
 			continue
@@ -182,7 +183,7 @@ func strs(l []any) []string {
 
 // ---- 結果の見方
 
-func decision(t testing.TB, r run.Result) string { return Decision(t, r) }
+func decision(t testing.TB, r run.Result) string { return ticketkit.Decision(t, r) }
 
 // contextOf はモデルへ渡した文（判定とは別の欄）。
 func contextOf(t testing.TB, r run.Result) string {
@@ -208,7 +209,7 @@ func wantCode(t testing.TB, r run.Result, code int) {
 	}
 }
 
-func readFile(t testing.TB, path string) string { return Read(t, path) }
+func readFile(t testing.TB, path string) string { return ticketkit.Read(t, path) }
 
 func removeFile(t testing.TB, path string) {
 	t.Helper()

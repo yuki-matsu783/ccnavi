@@ -20,6 +20,7 @@ import (
 
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
+	"ccnavi/internal/harness/ticketkit"
 )
 
 // 読まない理由（SubagentStart と同じ文）と、読むファイルの大きさの上限、JSON に載らない値の目印。
@@ -56,7 +57,7 @@ func (k lintKit) lint(path string, extra ...string) run.Result {
 
 func (k lintKit) flowProblems(path string) []any {
 	k.t.Helper()
-	return flowOnly(jl(ParseJSON(k.t, k.lint(path).Stdout), "problems"))
+	return flowOnly(jl(ticketkit.ParseJSON(k.t, k.lint(path).Stdout), "problems"))
 }
 
 func flowOnly(problems []any) []any {
@@ -83,7 +84,7 @@ func (k lintKit) file(text, name string) string {
 	if name == "" {
 		name = "flow.yml"
 	}
-	return Write(k.t, filepath.Join(k.outside, name), text)
+	return ticketkit.Write(k.t, filepath.Join(k.outside, name), text)
 }
 
 func (k lintKit) assertRefused(path, reason string) {
@@ -95,7 +96,7 @@ func (k lintKit) assertRefused(path, reason string) {
 	if js(problems[0], "severity") != "error" {
 		k.t.Errorf("error でない: %v", problems[0])
 	}
-	Has(k.t, js(problems[0], "detail"), reason)
+	ticketkit.Has(k.t, js(problems[0], "detail"), reason)
 	// 苦情には渡したパスを出す（画面が対象のファイルのパスに直す）。
 	if !strings.HasPrefix(js(problems[0], "detail"), path) {
 		k.t.Errorf("detail がパスで始まらない: %s", js(problems[0], "detail"))
@@ -111,8 +112,8 @@ func TestAReadableFlowHasNoFlowProblem(t *testing.T) {
 	}
 	// ユーザ向けの本文も、確かめたフローの名前を出す。
 	text := k.run(run.Opts{}, "--lint", "--flow", path)
-	Has(t, text.Stdout, "フロー: "+path)
-	Lacks(t, text.Stdout, "(flow)")
+	ticketkit.Has(t, text.Stdout, "フロー: "+path)
+	ticketkit.Lacks(t, text.Stdout, "(flow)")
 }
 
 func TestTheFlowLintJSONKeepsTheLintShape(t *testing.T) {
@@ -120,7 +121,7 @@ func TestTheFlowLintJSONKeepsTheLintShape(t *testing.T) {
 	k := newLintKit(t)
 	r := k.lint(k.file("nodes: [\n", ""))
 	wantCode(t, r, 1)
-	payload := ParseJSON(t, r.Stdout)
+	payload := ticketkit.ParseJSON(t, r.Stdout)
 	if jf(payload, "version") != 1 {
 		t.Errorf("version = %v", payload["version"])
 	}
@@ -187,7 +188,7 @@ func TestLinksAndNonRegularFilesAreErrors(t *testing.T) {
 	}
 	k.assertRefused(link, linkedNote)
 	// ツリーの中なら、ルートからの途中のリンクも見る（SubagentStart と同じ）。
-	Write(t, filepath.Join(k.root, "elsewhere", "b.yml"), workflowYAML)
+	ticketkit.Write(t, filepath.Join(k.root, "elsewhere", "b.yml"), workflowYAML)
 	if err := os.MkdirAll(filepath.Join(k.root, ".ccnavi", "approved"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +218,7 @@ func TestRelativePathsAreReadFromTheWorkingDirectory(t *testing.T) {
 	k := newLintKit(t)
 	k.file("nodes: [\n", "")
 	r := k.run(run.Opts{Dir: k.outside}, "--lint", "--json", "--flow", "flow.yml")
-	flows := flowOnly(jl(ParseJSON(t, r.Stdout), "problems"))
+	flows := flowOnly(jl(ticketkit.ParseJSON(t, r.Stdout), "problems"))
 	if len(flows) != 1 {
 		t.Fatalf("flows = %v", flows)
 	}
@@ -229,7 +230,7 @@ func TestRelativePathsAreReadFromTheWorkingDirectory(t *testing.T) {
 
 func (k lintKit) flowData(text string) any {
 	k.t.Helper()
-	payload := ParseJSON(k.t, k.lint(k.file(text, "")).Stdout)
+	payload := ticketkit.ParseJSON(k.t, k.lint(k.file(text, "")).Stdout)
 	if _, ok := payload["flow"]; !ok {
 		k.t.Fatalf("flow の欄が無い: %v", payload)
 	}
@@ -240,17 +241,17 @@ func TestTheJSONCarriesWhatWasRead(t *testing.T) {
 	t.Parallel()
 	k := newLintKit(t)
 	path := k.file(workflowYAML, "")
-	payload := ParseJSON(t, k.lint(path).Stdout)
+	payload := ticketkit.ParseJSON(t, k.lint(path).Stdout)
 	if js(payload, "flow", "path") != path || js(payload, "flow", "data", "nodes", 0, "id") != "s" {
 		t.Errorf("flow = %v", payload["flow"])
 	}
 	// 読めなければ中身は null（苦情は error）。
-	broken := ParseJSON(t, k.lint(k.file("nodes: [\n", "")).Stdout)
+	broken := ticketkit.ParseJSON(t, k.lint(k.file("nodes: [\n", "")).Stdout)
 	if v, ok := jm(broken, "flow")["data"]; !ok || v != nil {
 		t.Errorf("読めない flow.data = %v", v)
 	}
 	// --flow を渡さなければ欄ごと無い。
-	plain := ParseJSON(t, k.run(run.Opts{}, "--lint", "--json").Stdout)
+	plain := ticketkit.ParseJSON(t, k.run(run.Opts{}, "--lint", "--json").Stdout)
 	if _, ok := plain["flow"]; ok {
 		t.Error("--flow なしで flow の欄がある")
 	}
@@ -325,12 +326,12 @@ func TestOnlyLintReadsTheFlowFlag(t *testing.T) {
 	path := k.file("nodes: [\n", "")
 	payload := mustJSONText(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Read", "tool_input": map[string]any{"file_path": filepath.Join(k.root, "README.md")}, "cwd": k.root})
 	hook := k.run(run.Opts{Input: payload}, "--mode", "enable", "--flow", path)
-	Has(t, hook.Stderr, "--flow は診断")
+	ticketkit.Has(t, hook.Stderr, "--flow は診断")
 	tried := k.run(run.Opts{}, "--test", "Bash", "ls", "--json", "--flow", path)
-	Has(t, tried.Stderr, "--flow は --lint でだけ読む")
+	ticketkit.Has(t, tried.Stderr, "--flow は --lint でだけ読む")
 	// 渡さなければ (flow) の苦情は出ない。
 	plain := k.run(run.Opts{}, "--lint", "--json")
-	if got := flowOnly(jl(ParseJSON(t, plain.Stdout), "problems")); len(got) != 0 {
+	if got := flowOnly(jl(ticketkit.ParseJSON(t, plain.Stdout), "problems")); len(got) != 0 {
 		t.Errorf("(flow) の苦情 = %v", got)
 	}
 }
@@ -358,8 +359,8 @@ connections:
 
 func (k lintKit) lintText(text string) map[string]any {
 	k.t.Helper()
-	path := Write(k.t, filepath.Join(k.root, "flow.yml"), text)
-	return ParseJSON(k.t, run.Ccnavi(k.t, []string{"--root", k.root, "--lint", "--json", "--flow", path}).Stdout)
+	path := ticketkit.Write(k.t, filepath.Join(k.root, "flow.yml"), text)
+	return ticketkit.ParseJSON(k.t, run.Ccnavi(k.t, []string{"--root", k.root, "--lint", "--json", "--flow", path}).Stdout)
 }
 
 func TestRenderedIsWhatSubagentStartLists(t *testing.T) {
@@ -383,7 +384,7 @@ func TestRenderedIsWhatSubagentStartLists(t *testing.T) {
 func TestCandidatesComeFromTheWorkspace(t *testing.T) {
 	t.Parallel()
 	k := newLintKit(t)
-	Write(t, filepath.Join(k.root, ".claude", "agents", "r.md"), "---\nname: rev\n---\n")
+	ticketkit.Write(t, filepath.Join(k.root, ".claude", "agents", "r.md"), "---\nname: rev\n---\n")
 	payload := k.lintText(workflowYAML)
 	found := false
 	for _, a := range jl(payload, "flow", "candidates", "agents") {

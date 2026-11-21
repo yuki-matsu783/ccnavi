@@ -12,6 +12,7 @@ import (
 	"ccnavi/internal/harness/base"
 	"ccnavi/internal/harness/run"
 	"ccnavi/internal/harness/samples"
+	"ccnavi/internal/harness/ticketkit"
 	"ccnavi/internal/infra/ospath"
 )
 
@@ -73,10 +74,10 @@ func TestTheFeedbackPlanComesAfterTheLastReviewAndOnlyOnce(t *testing.T) {
 		t.Fatalf("code %d\n%s%s", approved.Code, approved.Stdout, approved.Stderr)
 	}
 	contains(t, "承認画面", approved.Stdout, "対応なし")
-	text := read(t, w.doing(parentName))
+	text := ticketkit.Read(t, w.doing(parentName))
 	contains(t, "承認済みチケット", text, "feedback: []")
 	lacks(t, "承認済みチケット", text, "feedback_at") // 改版の時刻はチケットに書かない
-	if exists(w.todo(parentName)) {
+	if ticketkit.Exists(w.todo(parentName)) {
 		t.Error("改版の提案が承認で todo/ から消えない")
 	}
 	// 2 度目は拒む。
@@ -110,21 +111,21 @@ func TestAFeedbackWorkPhaseRunsAndDecideSendsTheRestToAnIssue(t *testing.T) {
 	}
 	// 最後のレビューでも、残った指摘を issue に回せる（フィードバック計画の有無に関わらない）。回す先を選んだ decide がレビュー済みにする。
 	last := w.mustOK(w.ccnavi("--cwd", w.parentTree, "user", "reviewed", "1", "--accept-unresolved", "--preview", "--json", "--result", fixture), "reviewed preview")
-	lastPreview := jsonOf(t, last.Stdout)
+	lastPreview := ticketkit.ParseJSON(t, last.Stdout)
 	if _, ok := lastPreview["can_issue"]; ok {
 		t.Error("preview に can_issue が残っている")
 	}
 	choices, _ := json.Marshal(map[string]string{"u/7#t0": "issue"})
 	settled := w.mustOK(w.ccnavi("--cwd", w.parentTree, "user", "reviewed", "1", "--accept-unresolved", "--yes", string(choices),
 		"--digest", lastPreview["digest"].(string), "--json", "--result", fixture), "reviewed --yes")
-	if jsonOf(t, settled.Stdout)["reviewed"] != true {
+	if ticketkit.ParseJSON(t, settled.Stdout)["reviewed"] != true {
 		t.Errorf("reviewed が true でない: %s", settled.Stdout)
 	}
 	reviewedMark := filepath.Join(w.approved, "phases", parentName, "1.reviewed")
-	before := read(t, reviewedMark)
+	before := ticketkit.Read(t, reviewedMark)
 	planned := w.mustOK(w.approve(), "approve feedback plan")
 	lacks(t, "承認画面", planned.Stdout, "済ませた扱い")
-	if read(t, reviewedMark) != before {
+	if ticketkit.Read(t, reviewedMark) != before {
 		t.Error("フィードバック計画の承認がレビュー済みのマーカーを書き直した")
 	}
 	spawn = w.hook("PreToolUse", "Agent", w.parentTree, input{"description": "次"})
@@ -146,12 +147,12 @@ func TestAFeedbackWorkPhaseRunsAndDecideSendsTheRestToAnIssue(t *testing.T) {
 	if w.confirm(fixture, 2).Code == 0 {
 		t.Fatal("前の指摘が残っているのに confirm が通った")
 	}
-	data := readJSON(t, fixture)
+	data := ticketkit.ReadJSON(t, fixture)
 	data["threads"] = append(data["threads"].([]any), thread("t1", "まだ", false))
 	writeJSON(t, fixture, data)
 	// フィードバック計画が承認済みなので、ユーザは残りを issue に回せる。
 	shown := w.mustOK(w.ccnavi("--cwd", w.parentTree, "user", "reviewed", "2", "--accept-unresolved", "--preview", "--json", "--result", fixture), "preview 2")
-	preview := jsonOf(t, shown.Stdout)
+	preview := ticketkit.ParseJSON(t, shown.Stdout)
 	if _, ok := preview["can_issue"]; ok {
 		t.Error("preview に can_issue が残っている")
 	}
@@ -161,11 +162,11 @@ func TestAFeedbackWorkPhaseRunsAndDecideSendsTheRestToAnIssue(t *testing.T) {
 	}
 	done := w.mustOK(w.ccnavi("--cwd", w.parentTree, "user", "reviewed", "2", "--accept-unresolved", "--yes", string(choices),
 		"--digest", preview["digest"].(string), "--json", "--result", fixture), "reviewed 2 --yes")
-	answer := jsonOf(t, done.Stdout)
+	answer := ticketkit.ParseJSON(t, done.Stdout)
 	if answer["reviewed"] != true {
 		t.Errorf("reviewed が true でない: %s", done.Stdout)
 	}
-	text := read(t, answer["issue_draft"].(string))
+	text := ticketkit.Read(t, answer["issue_draft"].(string))
 	if !strings.HasPrefix(text, "レビューで残った指摘（i0001 のフェーズ 2）\n\n") {
 		t.Errorf("issue の下書きの頭が違う: %q", text)
 	}
@@ -235,8 +236,8 @@ func (w *ws) readyRecorded(fixture string) ([]string, run.Result) {
 	listed := filepath.Join(w.root, "logs", "state", "write-and-push", "ready.writes")
 	done := w.ccnavi("--record-writes", listed, "--record-tree", w.parentTree, "--cwd", w.parentTree, "review", "ready", "--result", fixture)
 	var written []string
-	if exists(listed) {
-		written = splitLines(read(w.t, listed))
+	if ticketkit.Exists(listed) {
+		written = splitLines(ticketkit.Read(w.t, listed))
 	}
 	return written, done
 }
@@ -294,7 +295,7 @@ func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	lacks(t, "finish", closed.Stdout, "rm -r wip")
 	contains(t, "finish", closed.Stdout, "ready", "`wip/` の追跡済みのファイルを削除して", "ready --parent i0001", "合意した範囲に入る", "確認を取り直さずに進める", "squash")
 	// 閉じた記録（どのフェーズをどこで見たか）を置く。
-	record := readJSON(t, filepath.Join(w.approved, "phases", parentName, "closed.json"))
+	record := ticketkit.ReadJSON(t, filepath.Join(w.approved, "phases", parentName, "closed.json"))
 	if reviews, _ := record["reviews"].(map[string]any); len(reviews) != 1 || reviews["1"] != true {
 		t.Errorf("closed.json の reviews = %v", record["reviews"])
 	}
@@ -303,13 +304,13 @@ func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	contains(t, "stderr", w.ready(fixture).Stderr, "push されていない")
 	w.push()
 	// wip/ に未追跡のファイルがあれば、消さずに名指しして止める（履歴から戻せないため）。
-	memo := write(t, filepath.Join(w.parentTree, "wip", "memo.txt"), "メモ\n")
+	memo := ticketkit.Write(t, filepath.Join(w.parentTree, "wip", "memo.txt"), "メモ\n")
 	refused = w.ready(fixture)
 	if refused.Code == 0 {
 		t.Error("未追跡のファイルがあるのに ready が通った")
 	}
 	contains(t, "stderr", refused.Stderr, "未追跡のファイルが 1 件", "wip/memo.txt")
-	if !exists(memo) {
+	if !ticketkit.Exists(memo) {
 		t.Error("止めたのに未追跡のファイルを消した")
 	}
 	remove(t, memo)
@@ -321,14 +322,14 @@ func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	if passed.Code != 0 {
 		t.Fatalf("code %d\n%s%s", passed.Code, passed.Stdout, passed.Stderr)
 	}
-	written := splitLines(read(t, listed))
+	written := splitLines(ticketkit.Read(t, listed))
 	for _, rel := range tracked {
 		if !slices.Contains(written, rel) {
 			t.Errorf("書いたパスの一覧に %s が無い", rel)
 		}
 	}
 	lines := splitLines(passed.Stdout)
-	note := read(t, lines[0])
+	note := ticketkit.Read(t, lines[0])
 	contains(t, "note の下書き", note, "ccnavi:ready", "squash")
 	if !slices.Contains(lines, "wip-from "+head) {
 		t.Errorf("wip-from の行が無い: %v", lines)
@@ -344,19 +345,19 @@ func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	sort.Strings(sorted)
 	equalStrings(t, "wip の行", wipLines, sorted)
 	for _, rel := range tracked {
-		if exists(filepath.Join(w.parentTree, filepath.FromSlash(rel))) {
+		if ticketkit.Exists(filepath.Join(w.parentTree, filepath.FromSlash(rel))) {
 			t.Errorf("%s が消えていない", rel)
 		}
 	}
-	if exists(filepath.Join(w.parentTree, "wip")) {
+	if ticketkit.Exists(filepath.Join(w.parentTree, "wip")) {
 		t.Error("wip/ が残っている")
 	}
 	// マーカーは閉じたチケットと一緒に手元の退避（logs/archive/）へ移る
-	mark := readJSON(t, filepath.Join(w.root, "logs", "archive", "self", "phases", parentName, "ready.json"))
+	mark := ticketkit.ReadJSON(t, filepath.Join(w.root, "logs", "archive", "self", "phases", parentName, "ready.json"))
 	if mark["mr"] != float64(7) {
 		t.Errorf("ready.json の mr = %v", mark["mr"])
 	}
-	if exists(filepath.Join(w.approved, "done", "i0001.md")) {
+	if ticketkit.Exists(filepath.Join(w.approved, "done", "i0001.md")) {
 		t.Error("done/ に親が残っている")
 	}
 	// 同じ親にもう 1 度打っても通る（sh が外し損ねたときの打ち直し。MR がまだ Draft のとき）。
@@ -378,7 +379,7 @@ func TestWriteAndPushLetsReadyRemoveWipInAnyCaseButNothingElse(t *testing.T) {
 	fixture := w.closedFamily()
 	odd := []string{"WIP/design/a.html", `wip\design\b.html`}
 	for _, rel := range odd {
-		write(t, filepath.Join(w.parentTree, filepath.FromSlash(rel)), "<p>x</p>\n")
+		ticketkit.Write(t, filepath.Join(w.parentTree, filepath.FromSlash(rel)), "<p>x</p>\n")
 		w.git(w.parentTree, "add", "--", rel)
 	}
 	w.git(w.parentTree, "commit", "--quiet", "-m", "odd wip")
@@ -443,14 +444,14 @@ func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 	}
 	contains(t, "stdout", stdout, "早めに閉じた")
 	cancelled := filepath.Join(w.approved, "done", "i0001-02-02.md")
-	if !exists(cancelled) {
+	if !ticketkit.Exists(cancelled) {
 		t.Fatal("取り消した子が done/ に無い")
 	}
-	contains(t, "取り消した子", read(t, cancelled), "cancelled_at:")
+	contains(t, "取り消した子", ticketkit.Read(t, cancelled), "cancelled_at:")
 	if w.isApproved("i0001-02-02") {
 		t.Error("取り消した子が doing/ に残っている")
 	}
-	mark := readJSON(t, filepath.Join(w.approved, "phases", parentName, "close-early.json"))
+	mark := ticketkit.ReadJSON(t, filepath.Join(w.approved, "phases", parentName, "close-early.json"))
 	if mark["reason"] != "今期はここまで" {
 		t.Errorf("reason = %v", mark["reason"])
 	}
@@ -465,7 +466,7 @@ func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 	if got, _ := mark["accepted"].([]any); len(got) != 1 || got[0] != "u/7#t0" {
 		t.Errorf("accepted = %v", mark["accepted"])
 	}
-	issue := read(t, filepath.Join(w.state, "review-close-early-issue-i0001.md"))
+	issue := ticketkit.Read(t, filepath.Join(w.state, "review-close-early-issue-i0001.md"))
 	if !strings.HasPrefix(issue, "親 の残り\n\n") {
 		t.Errorf("issue の下書きの頭が違う: %q", issue)
 	}
@@ -479,7 +480,7 @@ func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 	contains(t, "--explain", w.ccnavi("--explain").Stdout, "ユーザが早めにクローズした")
 	w.mustOK(w.ccnavi("ticket", "finish", parentName), "finish parent")
 	// Draft はまだ外れていない。片付けて push してから ready で外す。
-	if exists(filepath.Join(w.approved, "phases", parentName, "ready.json")) {
+	if ticketkit.Exists(filepath.Join(w.approved, "phases", parentName, "ready.json")) {
 		t.Error("ready 前に ready.json がある")
 	}
 	w.commitParent("状態の移動")
@@ -496,7 +497,7 @@ func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 func (w *ws) noSkipMarks(numbers ...int) {
 	w.t.Helper()
 	for _, n := range numbers {
-		if exists(filepath.Join(w.approved, "phases", parentName, itoa(n)+".skipped")) {
+		if ticketkit.Exists(filepath.Join(w.approved, "phases", parentName, itoa(n)+".skipped")) {
 			w.t.Errorf("フェーズ %d に省略のマーカーがある", n)
 		}
 	}
@@ -529,25 +530,25 @@ func TestCloseEarlyAcceptsThreadsInThreeStages(t *testing.T) {
 		}
 	}
 	// n なら計画も書かない
-	if code, _, _ := run("n\n", "--result", fixture, "--accept-plan", plan); code == 0 || exists(plan) {
+	if code, _, _ := run("n\n", "--result", fixture, "--accept-plan", plan); code == 0 || ticketkit.Exists(plan) {
 		t.Errorf("n なのに計画を書いた: code %d", code)
 	}
 	code, stdout, stderr := run("y\n", "--result", fixture, "--accept-plan", plan)
 	if code != 0 {
 		t.Fatalf("accept-plan: code %d\n%s%s", code, stdout, stderr)
 	}
-	body := readJSON(t, plan)
+	body := ticketkit.ReadJSON(t, plan)
 	threads, _ := body["threads"].([]any)
 	if len(threads) != 1 || threads[0].(map[string]any)["id"] != "t0" {
 		t.Fatalf("計画の threads = %v", body["threads"])
 	}
 	reply := threads[0].(map[string]any)["reply"].(string)
 	contains(t, "返信", reply, "早めに閉じた", "issue の下書き")
-	if exists(marker) {
+	if ticketkit.Exists(marker) {
 		t.Error("計画だけの段でマーカーを置いた")
 	}
 	// y/N の間に指摘が増えていたら、ホストに触る前に止まる
-	grown := readJSON(t, fixture)
+	grown := ticketkit.ReadJSON(t, fixture)
 	grown["threads"] = append(grown["threads"].([]any), thread("t1", "追加", false))
 	grownFixture := writeJSON(t, filepath.Join(w.state, "grown.json"), grown)
 	if code, _, stderr = run("", "--result", grownFixture, "--accept-check", plan); code == 0 || !strings.Contains(stderr, "未解決の指摘が変わった") {
@@ -556,26 +557,26 @@ func TestCloseEarlyAcceptsThreadsInThreeStages(t *testing.T) {
 	if code, _, stderr = run("", "--result", fixture, "--accept-check", plan); code != 0 {
 		t.Errorf("accept-check: code %d\n%s", code, stderr)
 	}
-	if exists(marker) {
+	if ticketkit.Exists(marker) {
 		t.Error("確かめだけの段でマーカーを置いた")
 	}
 	// sh が解決する前（ホストは未解決のまま）に置こうとしても置かない
 	if code, _, stderr = run("", "--result", fixture, "--accept-done", plan); code == 0 || !strings.Contains(stderr, "ホストで解決済みになっていない") {
 		t.Errorf("未解決のまま置ける: code %d\n%s", code, stderr)
 	}
-	if exists(marker) {
+	if ticketkit.Exists(marker) {
 		t.Error("未解決のままマーカーを置いた")
 	}
 	// 解決したあとに、見せていない未解決が増えていたら置かない
-	data := readJSON(t, fixture)
+	data := ticketkit.ReadJSON(t, fixture)
 	data["threads"] = []any{thread("t0", "気になる", true)}
-	extra := jsonOf(t, mustMarshal(t, data))
+	extra := ticketkit.ParseJSON(t, mustMarshal(t, data))
 	extra["threads"] = append(extra["threads"].([]any), thread("t1", "追加", false))
 	extraFixture := writeJSON(t, filepath.Join(w.state, "extra.json"), extra)
 	if code, _, stderr = run("", "--result", extraFixture, "--accept-done", plan); code == 0 || !strings.Contains(stderr, "計画のほかに未解決の指摘が残っている") {
 		t.Errorf("見せていない未解決を置ける: code %d\n%s", code, stderr)
 	}
-	if exists(marker) {
+	if ticketkit.Exists(marker) {
 		t.Error("見せていない未解決があるのにマーカーを置いた")
 	}
 	// 解決済みで、ほかに増えていなければ、聞き直さずに置く（stdin は空）
@@ -583,11 +584,11 @@ func TestCloseEarlyAcceptsThreadsInThreeStages(t *testing.T) {
 	if code, stdout, stderr = run("", "--result", fixture, "--accept-done", plan); code != 0 {
 		t.Fatalf("accept-done: code %d\n%s%s", code, stdout, stderr)
 	}
-	mark := readJSON(t, marker)
+	mark := ticketkit.ReadJSON(t, marker)
 	if got, _ := mark["accepted"].([]any); len(got) != 1 || got[0] != "u/7#t0" {
 		t.Errorf("accepted = %v", mark["accepted"])
 	}
-	if exists(filepath.Join(w.approved, "phases", parentName, "accepted.json")) {
+	if ticketkit.Exists(filepath.Join(w.approved, "phases", parentName, "accepted.json")) {
 		t.Error("accepted.json が残っている")
 	}
 }
@@ -614,7 +615,7 @@ func TestCloseEarlyReplyDoesNotPromiseAnIssueWithNoIssue(t *testing.T) {
 	if planned.Code != 0 {
 		t.Fatalf("code %d\n%s%s", planned.Code, planned.Stdout, planned.Stderr)
 	}
-	reply := readJSON(t, plan)["threads"].([]any)[0].(map[string]any)["reply"].(string)
+	reply := ticketkit.ReadJSON(t, plan)["threads"].([]any)[0].(map[string]any)["reply"].(string)
 	lacks(t, "返信", reply, "issue")
 }
 
@@ -642,12 +643,12 @@ func TestCloseEarlyMarksATouchedPhaseSoTheHookStaysQuiet(t *testing.T) {
 	}
 	dir := filepath.Join(w.approved, "phases", parentName)
 	// 手を付けたフェーズ 1 には置く。手を付けていないフェーズ 2 には置かない。
-	if !exists(filepath.Join(dir, "1.skipped")) {
+	if !ticketkit.Exists(filepath.Join(dir, "1.skipped")) {
 		t.Error("手を付けたフェーズ 1 に省略のマーカーが無い")
 	}
 	w.noSkipMarks(2)
 	w.hook("PostToolUse", "Bash", w.parentTree, input{"command": "ls"})
-	if exists(filepath.Join(dir, "1.pending")) {
+	if ticketkit.Exists(filepath.Join(dir, "1.pending")) {
 		t.Error("次の hook が pending を書いた")
 	}
 }
