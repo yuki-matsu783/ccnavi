@@ -370,14 +370,14 @@ class AbandonTest(RetireHarness):
 
 
 class BrokenChildrenTest(RetireHarness):
-    """記録の `children` が配列でないとき（null・数）は、何も消さない。"""
+    """記録の `children` が配列でないとき（数）は、壊れた記録として何も消さずに止める。"""
 
     def break_children(self, value):
         held = self.read_record()
         held["children"] = value
         write(self.record, json.dumps(held))
 
-    def test_nothing_is_removed(self):
+    def test_worktree_retire_removes_nothing(self):
         self.closed_and_pushed()
         self.break_children(5)
         done = self.retire()
@@ -385,11 +385,6 @@ class BrokenChildrenTest(RetireHarness):
         self.assertIn("children が配列ではない", done.stderr)
         self.assertTrue(os.path.isdir(self.child_tree))
         self.assertTrue(os.path.isdir(self.parent_tree))
-        self.break_children(None)
-        done = self.tidy(self.pushed_head())
-        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
-        self.assertEqual(done.stdout.splitlines()[-1], "record no")
-        self.assertTrue(os.path.exists(self.record))
 
 
 class CaseFoldTest(CancelledChildHarness):

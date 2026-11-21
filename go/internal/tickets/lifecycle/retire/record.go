@@ -276,24 +276,13 @@ func Entries(conf *config.Settings) []Entry {
 		if ospath.IsLink(path) || !ospath.IsFile(path) || !ids.IsValidID(stem) {
 			continue
 		}
-		data, err := fsio.ReadJSON(path)
-		obj, isObj := data.(*pyjson.Object)
-		if err != nil || !isObj {
-			reason := "JSON のマップではない"
-			if err != nil {
-				reason = err.Error()
-			}
+		obj, reason := heldRecord(path)
+		if reason != "" {
 			out = append(out, Entry{Parent: stem, Incomplete: "記録を読めない（" + reason + "）"})
 			continue
 		}
 		if !pathcase.SameName(textOf(obj.Value(keyParent)), stem) {
 			continue
-		}
-		if v, has := obj.Get(keyChildren); has {
-			if _, list := v.([]any); !list {
-				out = append(out, Entry{Parent: stem, Incomplete: "記録の children が配列ではない"})
-				continue
-			}
 		}
 		project, branch := textOf(obj.Value(keyProject)), textOf(obj.Value(keyBranch))
 		switch mr := mrText(obj.Value(keyMR)); {
