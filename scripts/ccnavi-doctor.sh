@@ -29,8 +29,8 @@
 # ccnavi の部品の読み込み: <配布元>/.ccnavi/scripts/ccnavi-common-host.sh を `.` で直接読む。共通の入口
 # ccnavi-common.sh は使わない。入口は部品を `dirname "$0"` で探すので、別のディレクトリのこのスクリプトから
 # 読むと部品が見つからず 1 で終わる。host 部品を単体で読むのは「部品は単体では読まない」という既存の決まりの
-# 外の使い方になる。host 部品が他の部品の関数に頼るようになったら、tests/sh/test_doctor_sh.py の
-# HostPartLoadTest が落ちて気づける。
+# 外の使い方になる。host 部品が他の部品の関数に頼るようになったら、go/internal/clitest/sh/setup の
+# TestHostPartLoadsAloneAndHasTheFunctions が落ちて気づける。
 #
 # 通信する確認（git・glab・curl）はすべて時間の上限を付ける。時間を測るのは host 部品の ccnavi_run_timed
 # （ほかの sh と同じ部品）。時間切れと INT・TERM で止めるのは、起こしたコマンド（直接の子）だけ。
