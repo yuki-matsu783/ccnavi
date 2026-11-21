@@ -6,7 +6,7 @@
 //
 // 判定が読む値はプロセスの環境から取り、ワークツリーの中の設定ファイルからは取らない。
 // エージェントが書けるファイルから読むと、監視される側が次の呼び出しから監視を緩められるからである。
-// 例外は ccnavi 自身のソースツリーだけ（ownSourceTree）。
+// 例外は ccnavi 自身のソースツリーだけ（OwnSourceTree）。
 //
 // 上の層が直書きしがちな名前もここに置く。sh の名前は ReviewWrapper・StartWrapper・WorktreeWrapper・StageWrapper・
 // LauncherScript、Artifact のツール名は ToolArtifact、dry-run の報告の頭（`[ccnavi dry-run] enable would have …`）は

@@ -172,7 +172,7 @@ func Load(root string) (*Settings, []string) {
 	}
 	s.BranchPrefixes, s.BranchPrefixesRejected = branchPrefixes(root)
 
-	if !ownSourceTree(root) {
+	if !OwnSourceTree(root) {
 		return s, nil
 	}
 	// ccnavi 自身を開発しているときだけ、編集を次のツール呼び出しから効かせる。開発の便宜であって
@@ -226,9 +226,9 @@ func resolveBin(root, path string) string {
 	return full
 }
 
-// ownSourceTree は root が ccnavi を開発しているチェックアウトか（go/cmd/ccnavi/main.go の有無）。
+// OwnSourceTree は root が ccnavi を開発しているチェックアウトか（go/cmd/ccnavi/main.go の有無）。
 // 安全性の検査ではない。
-func ownSourceTree(root string) bool {
+func OwnSourceTree(root string) bool {
 	return ospath.DiskExists(filepath.Join(root, filepath.FromSlash(ownMarker)))
 }
 
@@ -302,7 +302,7 @@ func ReadHookView(root string) HookView {
 		}
 	}
 	ticketControl := values[env.TicketControl]
-	if ownSourceTree(root) {
+	if OwnSourceTree(root) {
 		if conf, _ := readLocal(root); conf != nil {
 			if v, ok := conf.Value("ticket_control").(string); ok {
 				ticketControl = v
