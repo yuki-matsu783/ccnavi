@@ -154,8 +154,10 @@ func linear(plan []string) []templates.Item {
 }
 
 // render は雛形の全文。phases: は書かない（書いたあとに planedit.Fill が差し込む）。after は提案の絶対番号
-// （フィードバック計画は全体計画の続き）。issue は 12 か owner/repo#12。
-func render(ident, title string, plan, feedback []templates.Item, allow []string, issue string, mr int) string {
+// （フィードバック計画は全体計画の続き）。issue は 12 か owner/repo#12。headings は本文に置く見出し（レイヤーの
+// ticket-sections.yml の parent）で、目印のある見出しはその下に目印を 1 行置く。
+func render(ident, title string, plan, feedback []templates.Item, allow []string, issue string, mr int,
+	headings []form.Heading) string {
 	lines := []string{ticket.Fence, fmt.Sprintf("version: %d", ticket.Version), "ticket: " + ident,
 		"issue: " + issue, fmt.Sprintf("mr: %d", mr), "title: " + quote(title), "plan:"}
 	for _, item := range plan {
@@ -172,8 +174,15 @@ func render(ident, title string, plan, feedback []templates.Item, allow []string
 		lines = append(lines, "  - match: "+allowMatch, "    glob: "+quote(glob))
 	}
 	lines = append(lines, ticket.Fence)
-	for _, heading := range form.ParentHeadings() {
-		lines = append(lines, "## "+heading, "", form.HeadingTodo()[heading], "")
+	if len(headings) == 0 {
+		// 見出しが無くても、閉じのフェンスの行は改行で終える。
+		lines = append(lines, "")
+	}
+	for _, h := range headings {
+		lines = append(lines, "## "+h.Name, "")
+		if h.Todo != "" {
+			lines = append(lines, h.Todo, "")
+		}
 	}
 	return strings.Join(lines, "\n")
 }

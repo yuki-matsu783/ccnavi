@@ -14,15 +14,17 @@ import (
 	"ccnavi/internal/tickets/config/layer"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/config/risk"
+	"ccnavi/internal/tickets/config/sections"
 )
 
 // 苦情の出どころの表記。VS Code 拡張がこの前置きでプロジェクトを引く。
 const (
-	commonWhere  = "(rules)"
-	selfWhere    = "(self)"
-	phasesWhere  = "(phases)"
-	riskWhere    = "(risk)"
-	projectWhere = "(projects/"
+	commonWhere   = "(rules)"
+	selfWhere     = "(self)"
+	phasesWhere   = "(phases)"
+	riskWhere     = "(risk)"
+	sectionsWhere = "(sections)"
+	projectWhere  = "(projects/"
 )
 
 // LayerWhere はそのレイヤーの苦情の出どころの表記。
@@ -88,6 +90,17 @@ func CommonRisk(conf *config.Settings, root string) []rules.Problem {
 	return out
 }
 
+// CommonSections は共通レイヤーの ticket-sections.yml が読めるか。無いのは正常で、何も言わない。読めなければ
+// 判定は共通レイヤーの見出しを使わない（各レイヤーは LayerConfigs が見る）。
+func CommonSections(conf *config.Settings) []rules.Problem {
+	_, notes := sections.CommonFile(conf)
+	var out []rules.Problem
+	for _, p := range notes {
+		out = append(out, problem(p.Severity, sectionsWhere, p.Rule+": "+p.Detail))
+	}
+	return out
+}
+
 // LayerRules はレイヤーのルールファイルに食い違いが無いか（読めること、レイヤーをまたいだ重複と同名の衝突）。
 // only を渡せばそのレイヤーだけ。共通レイヤーは CommonRules が見るので、2 つ目以降だけを回す。
 // .ccnavi/config/project/ が無いことは言わない（無いのは正常で、言うと本当に言うべきものが埋もれる）。
@@ -132,9 +145,9 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 	return out
 }
 
-// LayerConfigs は各レイヤーの phases・risk が共通レイヤーと合成できるか。only を渡せばそのレイヤーだけ、kind
-// （KindPhases か KindRisk）を渡せばその種類だけ。見るのは合成したあとの内容で、共通レイヤー自身の苦情は
-// CommonPhases・CommonRisk が言うので、レイヤーの側だけを数える。
+// LayerConfigs は各レイヤーの phases・risk・sections が共通レイヤーと合成できるか。only を渡せばそのレイヤーだけ、
+// kind（KindPhases・KindRisk・KindSections）を渡せばその種類だけ。見るのは合成したあとの内容で、共通レイヤー自身の
+// 苦情は CommonPhases・CommonRisk・CommonSections が言うので、レイヤーの側だけを数える。
 func LayerConfigs(conf *config.Settings, root, only string, kind config.LayerKind) []rules.Problem {
 	var out []rules.Problem
 	for _, name := range layer.Names(conf) {
@@ -155,6 +168,12 @@ func LayerConfigs(conf *config.Settings, root, only string, kind config.LayerKin
 				out = append(out, prefixed(where+" "+riskWhere, p))
 			}
 		}
+		if kind == "" || kind == config.KindSections {
+			_, notes := sections.Layer(conf, root, project)
+			for _, p := range notes {
+				out = append(out, prefixed(where+" "+sectionsWhere, p))
+			}
+		}
 	}
 	return out
 }
@@ -168,6 +187,8 @@ func FileProblems(conf *config.Settings, root string, kind config.LayerKind, nam
 			return CommonRules(conf, root)
 		case config.KindPhases:
 			return CommonPhases(conf)
+		case config.KindSections:
+			return CommonSections(conf)
 		}
 		return CommonRisk(conf, root)
 	}

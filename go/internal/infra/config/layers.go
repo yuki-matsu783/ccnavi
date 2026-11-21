@@ -26,16 +26,19 @@ const (
 	KindRules  LayerKind = "rules"
 	KindPhases LayerKind = "phases"
 	KindRisk   LayerKind = "risk"
+	// KindSections は提案の本文に求める見出し（ticket-sections.yml）。
+	KindSections LayerKind = "sections"
 )
 
-// layerKinds は 3 本の設定。3 本は独立に無くてよい。
-var layerKinds = []LayerKind{KindRules, KindPhases, KindRisk}
+// layerKinds は 4 本の設定。4 本は独立に無くてよい。
+var layerKinds = []LayerKind{KindRules, KindPhases, KindRisk, KindSections}
 
 // LayerKinds は layerKinds の写しを返す（呼び手が書き換えても元は変わらない）。
 func LayerKinds() []LayerKind { return slices.Clone(layerKinds) }
 
 // layerFileNames はレイヤーの設定のファイル名。
-var layerFileNames = map[LayerKind]string{KindRules: "rules.yml", KindPhases: "phases.yml", KindRisk: "risks.yml"}
+var layerFileNames = map[LayerKind]string{KindRules: "rules.yml", KindPhases: "phases.yml", KindRisk: "risks.yml",
+	KindSections: "ticket-sections.yml"}
 
 // LayerFileNames は layerFileNames の写しを返す（呼び手が書き換えても元は変わらない）。
 func LayerFileNames() map[LayerKind]string { return maps.Clone(layerFileNames) }
@@ -119,9 +122,10 @@ func (s *Settings) LayerScriptHome() string {
 // layer が空ならパスの最後の名前で差し替えを引く。守る対象は差し替えを見ない LayerRealPath を使う。
 func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) string {
 	swaps := map[LayerKind]map[string]string{
-		KindRules:  s.ProjectRulesFiles,
-		KindPhases: s.ProjectPhasesFiles,
-		KindRisk:   s.ProjectRiskFiles,
+		KindRules:    s.ProjectRulesFiles,
+		KindPhases:   s.ProjectPhasesFiles,
+		KindRisk:     s.ProjectRiskFiles,
+		KindSections: s.ProjectSectionsFiles,
 	}[kind]
 	if len(swaps) > 0 {
 		if layer == "" && homeRoot != "" {

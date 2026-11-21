@@ -88,6 +88,10 @@ class SetupTest(unittest.TestCase):
         write(os.path.join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
         write(os.path.join(src, ".ccnavi", "config", "common", "risks.yml"), COMMON_RISK)
         write(os.path.join(src, ".ccnavi", "config", "common", "phases.yml"), COMMON_PHASES)
+        write(
+            os.path.join(src, ".ccnavi", "config", "common", "ticket-sections.yml"),
+            "version: 1\nparent: []\n",
+        )
         write(os.path.join(src, HOME, "config", "project", "phases.yml"), OWN_PHASES)
         # セッションの開始で渡す作業の決まりと、使い方の文書も配るもの。
         write(os.path.join(src, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")

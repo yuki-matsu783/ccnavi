@@ -13,6 +13,7 @@ import (
 	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/records/stopreview"
 	"ccnavi/internal/tickets/approval"
+	"ccnavi/internal/tickets/config/sections"
 	"ccnavi/internal/tickets/model/ticket"
 )
 
@@ -50,7 +51,7 @@ func planStopReview(stderr io.Writer, conf *config.Settings, root string, in hoo
 		store.LogSuspected(in.SessionID, key)
 	}
 	store.NoteLastStop(in.SessionID, key, nudged, false, now)
-	criteria := stopreview.LoadCriteria(root)
+	criteria := sections.StopCriteria(conf, root)
 	stopreview.Rebind(conf.State, in.SessionID, now)
 	since := stopreview.TurnStart(conf.State, in.SessionID)
 	ops := stopreview.TurnOps(conf.State, in.SessionID, since)

@@ -1,48 +1,52 @@
 package form
 
 import (
-	"maps"
 	"slices"
 	"strings"
 
 	"ccnavi/internal/infra/ospath"
+	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/policy/rules"
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// parentHeadings は親の必須の見出し（雛形の本文の並び）。
-var parentHeadings = []string{"目的", "範囲", "対象外", "完了の確かめ方", "計画の理由"}
+// SectionsFile は見出しの決まりのファイル名（苦情で名指しする）。
+const SectionsFile = "ticket-sections.yml"
 
-// ParentHeadings は parentHeadings の写しを返す（呼び手が書き換えても元は変わらない）。
-func ParentHeadings() []string { return slices.Clone(parentHeadings) }
+// Heading は提案の本文に求める `## ` の見出し 1 つ。Todo は空欄の目印（雛形が見出しの下に置く 1 行。空なら置かない）。
+type Heading struct {
+	Name string
+	Todo string
+}
 
-// childHeadings は子の必須の見出し。子は承認のあと新しいセッションで始まり、本文が担当のサブエージェントへの
-// 引き継ぎになるので、Stop の判定（R2）が子に求める内容を見出しにする。子には雛形が無いので、空欄の目印は持たない。
-var childHeadings = []string{"担当範囲", "親の要求との対応", "確認の手順"}
+// Sections は親と子の提案に求める見出し（ticket-sections.yml の parent と child）。空の並びはその種類の見出しを見ない。
+type Sections struct {
+	Parent []Heading
+	Child  []Heading
+}
+
+// Names は見出しの名前の並び。
+func Names(list []Heading) []string {
+	out := make([]string, len(list))
+	for i, h := range list {
+		out[i] = h.Name
+	}
+	return out
+}
 
 // RationaleTodo は rationale の空欄の目印。
 const RationaleTodo = "（ここにこの作業をする理由を書く）"
 
-// headingTodo は見出しごとの空欄の目印。雛形は見出しの下に 1 行ずつ置く。
-var headingTodo = map[string]string{
-	"目的":      "（ここにこの作業の目的を書く）",
-	"範囲":      "（ここにこの作業の範囲を書く）",
-	"対象外":     "（ここにこの作業の対象外を書く）",
-	"完了の確かめ方": "（ここに完了をどう確かめるかを書く）",
-	"計画の理由":   "（ここに計画の理由を書く）",
-}
-
-// HeadingTodo は headingTodo の写しを返す（呼び手が書き換えても元は変わらない）。
-func HeadingTodo() map[string]string { return maps.Clone(headingTodo) }
-
-// placeholders は予約した目印。提案に 1 つでも残っていれば空欄が埋まっていない。並びは rationale・見出しの順。
-var placeholders = func() []string {
+// placeholders は予約した目印。提案に 1 つでも残っていれば空欄が埋まっていない。並びは rationale・親・子の見出しの順。
+func (s Sections) placeholders() []string {
 	out := []string{RationaleTodo}
-	for _, name := range parentHeadings {
-		out = append(out, headingTodo[name])
+	for _, h := range slices.Concat(s.Parent, s.Child) {
+		if h.Todo != "" && !slices.Contains(out, h.Todo) {
+			out = append(out, h.Todo)
+		}
 	}
 	return out
-}()
+}
 
 const (
 	fenceChars = "`~"
@@ -70,8 +74,8 @@ func fenceOf(line string) (fence, bool) {
 	return fence{}, false
 }
 
-// headings は本文のコードフェンスの外にある `## <名前>` の名前の集まり。フェンスは開きと同じ記号で、開き以上の
-// 長さの、記号だけの行で閉じる。閉じなければ末尾まで続く。
+// headings は本文のコードフェンスの外にある `## <名前>` の名前の集まり。キーは大文字小文字を区別しない比べの形。
+// フェンスは開きと同じ記号で、開き以上の長さの、記号だけの行で閉じる。閉じなければ末尾まで続く。
 func headings(body string) map[string]bool {
 	found := map[string]bool{}
 	var open *fence
@@ -89,23 +93,25 @@ func headings(body string) map[string]bool {
 			continue
 		}
 		if name, ok := strings.CutPrefix(line, "## "); ok {
-			found[ospath.Strip(name)] = true
+			found[pyfmt.Casefold(ospath.Strip(name))] = true
 		}
 	}
 	return found
 }
 
-// Problems は提案の形式の苦情。目印の残りは新規の提案なら error、改版（revision）なら warn（承認済みチケットの
-// コピーなので、残りで止めない）。見出しの欠けは新規の提案（親と子）だけを warn で言う。
-func Problems(t *ticket.Ticket, revision bool) []rules.Problem {
+// Problems は提案の形式の苦情。目印（rationale の目印と sections の各見出しの目印）の残りは新規の提案なら error、
+// 改版（revision）なら warn（承認済みチケットのコピーなので、残りで止めない）。見出しの欠けは新規の提案（親と子）
+// だけを warn で言う。求める見出しは sections（その提案のレイヤーの ticket-sections.yml）。
+func Problems(t *ticket.Ticket, revision bool, sections Sections) []rules.Problem {
 	var out []rules.Problem
 	severity := rules.Error
 	if revision {
 		severity = rules.Warn
 	}
+	marks := sections.placeholders()
 	for _, part := range []struct{ place, text string }{{"rationale", t.Rationale}, {"本文", t.Body}} {
 		var left []string
-		for _, mark := range placeholders {
+		for _, mark := range marks {
 			if strings.Contains(part.text, mark) {
 				left = append(left, "「"+mark+"」")
 			}
@@ -120,21 +126,21 @@ func Problems(t *ticket.Ticket, revision bool) []rules.Problem {
 	if revision {
 		return out
 	}
-	who, want, why := "親", parentHeadings, "Stop の判定は親の提案に目的・範囲・対象外・完了の確かめ方を求める"
+	who, key, want := "親", "parent", sections.Parent
 	if t.IsChild() {
-		who, want, why = "子", childHeadings,
-			"子は承認のあと新しいセッションで始まり、本文が担当への引き継ぎになる。Stop の判定も子の提案に担当範囲・親の要求との対応・確認の手順を求める"
+		who, key, want = "子", "child", sections.Child
 	}
 	present := headings(t.Body)
 	var missing []string
-	for _, name := range want {
-		if !present[name] {
-			missing = append(missing, "`## "+name+"`")
+	for _, h := range want {
+		if !present[pyfmt.Casefold(h.Name)] {
+			missing = append(missing, "`## "+h.Name+"`")
 		}
 	}
 	if len(missing) > 0 {
 		out = append(out, rules.Problem{Severity: rules.Warn, Rule: t.ID,
-			Detail: who + "の提案の本文に見出しが欠けている: " + strings.Join(missing, "、") + "。" + why})
+			Detail: who + "の提案の本文に見出しが欠けている: " + strings.Join(missing, "、") + "。" +
+				SectionsFile + " の " + key + " が求める見出しで、Stop の判定も同じ見出しを求める"})
 	}
 	return out
 }

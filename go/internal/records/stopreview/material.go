@@ -33,8 +33,10 @@ const (
 	criteriaFile = "stop-review.md"
 )
 
-// criteriaMD は組み込みの判定用 Markdown。ワークスペースに `.ccnavi/config/stop-review.md` があればそちらを使う。
-const criteriaMD = `# Stop の AI 判定の基準
+// criteriaHead・criteriaTail は組み込みの判定用 Markdown の R2 の前と後。R2 は提案に求める見出し（共通レイヤーの
+// ticket-sections.yml）から builtinCriteria が組む。ワークスペースに `.ccnavi/config/stop-review.md` があれば
+// 見出しを差し込まず、そちらをそのまま使う。
+const criteriaHead = `# Stop の AI 判定の基準
 
 ## R1（単位: Stop の機会）
 材料の中に、チケット作業の明示の指示・合意、または issue／MR の指定が特定できるのに、提案を書かずに
@@ -44,9 +46,10 @@ const criteriaMD = `# Stop の AI 判定の基準
 なる／提出済みの提案の承認待ちを説明しただけ／根拠を材料の中に特定できない（判定不能）。
 
 ## R2（単位: 提案の版）
-親なら、目的・範囲・対象外と、完了をどう確かめるか、のどれかを欠いたら不備。子なら、担当範囲・親の要求
-との対応と、確認の手順、のどれかを欠いたら不備。短くても狭い変更として十分具体的なら不備ではない。
-長さや項目数では判定しない。
+`
+
+const criteriaTail = `
+短くても狭い変更として十分具体的なら不備ではない。長さや項目数では判定しない。
 
 ## R3（単位: Stop の機会）
 停止理由が正当か。不可欠な質問、合意外の判断への相談、承認待ちは正当。R2・R4 の不備は免除しない。
@@ -56,20 +59,33 @@ const criteriaMD = `# Stop の AI 判定の基準
 理由（止めた・書くだけ）を説明して止まった場合は不備ではない。
 `
 
+// builtinCriteria は組み込みの判定用 Markdown。parent・child は親と子の提案に求める見出しの名前。空ならその種類の
+// 見出しは判定しない。
+func builtinCriteria(parent, child []string) string {
+	r2 := func(who string, names []string) string {
+		if len(names) == 0 {
+			return who + "なら、見出しは判定しない（欠けても不備ではない）。"
+		}
+		return who + "なら、" + strings.Join(names, "・") + "のどれかを欠いたら不備。"
+	}
+	return criteriaHead + r2("親", parent) + r2("子", child) + criteriaTail
+}
+
 // MaterialVersion は材料の版。抽出器の版と判定用 Markdown の版から決まる。record が計画の版と突き合わせる。
 func MaterialVersion(criteria string) string {
 	return extractorVersion + ":" + shortKey(criteria)
 }
 
-// LoadCriteria は判定用 Markdown の中身を返す。ワークスペースに `.ccnavi/config/stop-review.md` があればそれを、無ければ組み込みの定義を返す。
+// LoadCriteria は判定用 Markdown の中身を返す。ワークスペースに `.ccnavi/config/stop-review.md` があればそれを
+// そのまま、無ければ組み込みの定義（R2 に parent・child の見出しを入れたもの）を返す。
 // あるのに読めない・空・大きすぎるときは空を返す。別の定義を推測せず、呼び手は未検査にする。
-func LoadCriteria(root string) string {
+func LoadCriteria(root string, parent, child []string) string {
 	if root == "" {
-		return criteriaMD
+		return builtinCriteria(parent, child)
 	}
 	path := ospath.Join(root, config.DefaultProjectHome, config.ConfigDir, criteriaFile)
 	if !ospath.DiskLexists(path) {
-		return criteriaMD
+		return builtinCriteria(parent, child)
 	}
 	if !ospath.IsFile(path) {
 		return ""
