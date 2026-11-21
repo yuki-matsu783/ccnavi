@@ -126,18 +126,6 @@ class TestJsonTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def test_json_right_after_test_is_the_output_form(self):
-        # `--test` は 2 語を取る。直後に `--json` を書いても TOOL として取らない。
-        for args in (
-            ("--test", "--json", "Bash", "cd /repo && git push"),
-            ("--test", "Bash", "--json", "cd /repo && git push"),
-        ):
-            with self.subTest(args=args):
-                done = ccnavi(self.root, self.rules_path, *args)
-                body = json.loads(done.stdout)
-                self.assertEqual(body["tool"], "Bash")
-                self.assertEqual(body["verdict"], "deny", done.stdout + done.stderr)
-
     def test_rule_problems_are_said_once(self):
         # 試験は判定とヒットしたルールの一覧で共通レイヤーを 2 度読み、期待は 1 件ずつ判定する。
         # どちらでも、同じ苦情を 2 度出さない。
@@ -179,15 +167,23 @@ class TestJsonTest(unittest.TestCase):
             plain.stdout.startswith("verdict: deny (DENY_COMMAND_PATTERN)\n"), plain.stdout
         )
 
-        self._check_fixture("test.json", body)
+        # `--test` は 2 語を取る。直後に `--json` を書いても TOOL として取らない。
+        for args in (
+            ("--test", "--json", "Bash", "cd /repo && git push"),
+            ("--test", "Bash", "--json", "cd /repo && git push"),
+        ):
+            with self.subTest(args=args):
+                again = json.loads(ccnavi(self.root, self.rules_path, *args).stdout)
+                self.assertEqual((again["tool"], again["verdict"]), ("Bash", "deny"))
+        # 判定が対象を取り出せないツールは known が偽で、判定しない。
+        unknown = ccnavi(self.root, self.rules_path, "--test", "WebSearch", "ccnavi", "--json")
+        self.assertEqual(unknown.returncode, 0, unknown.stderr)
+        unknown_body = json.loads(unknown.stdout)
+        self.assertEqual(
+            (unknown_body["known"], unknown_body["verdict"], unknown_body["rules"]), (False, "", [])
+        )
 
-    def test_unknown_tool_is_not_judged(self):
-        done = ccnavi(self.root, self.rules_path, "--test", "WebSearch", "ccnavi", "--json")
-        self.assertEqual(done.returncode, 0, done.stderr)
-        body = json.loads(done.stdout)
-        self.assertFalse(body["known"])
-        self.assertEqual(body["verdict"], "")
-        self.assertEqual(body["rules"], [])
+        self._check_fixture("test.json", body)
 
     def test_tools_named_like_permission_rules_are_judged(self):
         """Claude Code の権限ルールの名前（括弧の中を除いたもの）で試せる。

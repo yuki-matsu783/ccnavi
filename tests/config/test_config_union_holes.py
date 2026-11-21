@@ -855,16 +855,20 @@ class ReservedLayerRestoreTest(GuardHarness):
             risk=RESERVED_PROJECT_RISK,
         )
 
-    def test_the_layer_of_a_project_named_common_is_restored(self):
-        """レイヤーの名前と同じ名前のプロジェクトでも、レイヤーの 3 本が
-        バックアップと復元の対象。"""
-        for kind in LAYER_KINDS:
-            with self.subTest(kind=kind):
-                path = layer_path(self.reserved, kind)
-                broken = "version: 1\ndeny: []\n" if kind == "rules" else "version: 1\n"
-                before, after, result = self.break_and_restore(path, broken=broken)
-                self.assertEqual(after, before, self.said(result, kind))
-                self.assertIn("restored", result.stdout, self.said(result, kind))
+    def test_the_layers_of_reserved_names_are_restored_with_the_common_layer(self):
+        """`projects/common/` の 3 本・`projects/self/` の 2 本・共通レイヤーの phases / risk・
+        ワークスペース自身の risk が、同じ 1 回のバックアップと復元で全部戻る（key が衝突しない）。
+
+        `projects/self/` は、ワークスペース自身のレイヤーとは別に守る。
+        """
+        project = self.project(
+            LAYER_SELF, rules=RESERVED_PROJECT_RULES, phases=RESERVED_PROJECT_PHASES
+        )
+        write(layer_path(self.ws, "risk"), COMMON_RISK)
+        paths = [layer_path(self.reserved, kind) for kind in LAYER_KINDS]
+        paths += [layer_path(project, "rules"), layer_path(project, "phases")]
+        paths += [layer_path(self.ws, "risk"), self.phases, self.risk]
+        self.break_all_and_restore(paths)
 
     def test_the_restore_asks_the_project_git(self):
         """戻す先を聞く相手はそのプロジェクトの git。バックアップが無くても戻る。"""
@@ -876,28 +880,6 @@ class ReservedLayerRestoreTest(GuardHarness):
 
         self.assertTrue(os.path.exists(path), self.said(result))
         self.assertEqual(read(path), expected, self.said(result))
-
-    def test_the_common_layer_is_still_restored_alongside_it(self):
-        """共通レイヤーの phases / risk も同じ 1 回で戻る（key が衝突していない）。"""
-        for path in (self.phases, self.risk):
-            name = os.path.basename(path)
-            with self.subTest(path=name):
-                before, after, result = self.break_and_restore(path, broken="version: 1\n")
-                self.assertEqual(after, before, self.said(result, name))
-                self.assertIn("restored", result.stdout, self.said(result, name))
-
-    def test_the_layer_of_a_project_named_self_is_restored_too(self):
-        """`projects/self/` の 3 本も、ワークスペース自身のレイヤーとは別に守る。"""
-        project = self.project(
-            LAYER_SELF, rules=RESERVED_PROJECT_RULES, phases=RESERVED_PROJECT_PHASES
-        )
-        write(layer_path(self.ws, "risk"), COMMON_RISK)
-        for home, kind in ((project, "rules"), (project, "phases"), (self.ws, "risk")):
-            with self.subTest(home=os.path.basename(home), kind=kind):
-                path = layer_path(home, kind)
-                broken = "version: 1\ndeny: []\n" if kind == "rules" else "version: 1\n"
-                before, after, result = self.break_and_restore(path, broken=broken)
-                self.assertEqual(after, before, self.said(result, kind))
 
 
 class ScriptTamperTest(GuardHarness):

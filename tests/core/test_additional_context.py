@@ -228,40 +228,6 @@ class AdditionalContextTest(unittest.TestCase):
         # 欄は、once の案内を渡した 1 回目にだけ付く。2 回目と、毎回渡す案内だけの回には付かない。
         self.assertEqual([r.get("hinted") for r in rows], [True, None, None, None])
 
-    def test_both_texts_join_the_first_time_and_only_the_short_one_after(self):
-        always = "src は自由に直してよい。"
-        self.rules(
-            deny=[rule("push", "Bash", glob="*git push*")],
-            allow=[
-                rule(
-                    "src",
-                    "Write",
-                    "",
-                    glob="*/src/*",
-                    additionalContext=always,
-                    additionalContextOnce=NOTE,
-                )
-            ],
-        )
-        target = os.path.join(self.root, "src", "a.py")
-        payload = json.dumps(
-            {
-                "hook_event_name": "PreToolUse",
-                "tool_name": "Write",
-                "session_id": "s1",
-                "cwd": self.root,
-                "tool_input": {"file_path": target},
-            }
-        )
-
-        def hit() -> str:
-            done = self.run_ccnavi("--mode", "enable", payload=payload)
-            return json.loads(done.stdout)["hookSpecificOutput"]["additionalContext"]
-
-        self.assertEqual(hit(), f"{always}\n\n{NOTE}")
-        self.assertEqual(hit(), always)
-        self.assertEqual(hit(), always)
-
     def test_test_shows_reason_and_context(self):
         self.rules(
             deny=[

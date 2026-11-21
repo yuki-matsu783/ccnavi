@@ -154,15 +154,18 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertFalse(os.path.exists(self.approved_copy("i0004")))
 
     def test_the_same_id_in_two_layers_is_not_a_conflict(self):
-        """自身のレイヤーとプロジェクトのレイヤーどうしは足さないので、その間の `id` の衝突は無い。
+        """自身のレイヤーとプロジェクトのレイヤーどうしは足さないので、その間の衝突は無い。
 
-        足すのは共通レイヤーと親の `project:` が指すレイヤーだけ。
-        自身のレイヤーと lib が同じ `design` を別の中身で持っても、どちらも error にならず、
-        lib 向けの親は lib の `design` を使う。"""
+        足すのは共通レイヤーと親の `project:` が指すレイヤーだけ（その和の苦情は Go の phases の
+        TestLayerTypes が見る）。同じ `design` を別の中身で持っても、`title` が重なっても、
+        全欄が同じでも、error にも info にもならず、lib 向けの親は lib の `design` を使う。"""
         write_layer(self.ws, phases=OWN_PHASES_DESIGN)
+        for lib_phases in (LIB_PHASES, LIB_PHASES_TITLE_OVERLAP, LIB_PHASES_COPIED):
+            with self.subTest(lib=lib_phases[:60]):
+                write_layer(self.lib, phases=lib_phases)
+                self.assertEqual(self.phase_problems("error"), [])
+                self.assertEqual(self.phase_problems("info"), [])
         write_layer(self.lib, phases=LIB_PHASES)
-
-        self.assertEqual(self.phase_problems("error"), [])
         self.assertEqual(self.phase_problems("warn"), [])
         self.propose(
             "i0001",
@@ -173,31 +176,6 @@ class PhaseUnionTest(ConfigUnionHarness):
         sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
         self.assertEqual([t["title"] for t in sums["lib"]["phases"]["types"]][0], "設計")
         self.assertEqual(sums["self"]["phases"]["types"][0]["title"], "設計（自身）")
-
-    def test_title_overlap_across_layers_is_not_an_error(self):
-        """`title` の重なりのレイヤーまたぎも無い。重なりを見るのは 1 本の中だけ。"""
-        write_layer(self.ws, phases=OWN_PHASES_DESIGN)
-        write_layer(self.lib, phases=LIB_PHASES_TITLE_OVERLAP)
-
-        self.assertEqual(self.phase_problems("error"), [])
-
-    def test_title_overlap_inside_one_file_is_an_error(self):
-        """1 本の中の `title` の重なりは、その読み込みで error。"""
-        write_layer(
-            self.lib,
-            phases=LIB_PHASES_TITLE_OVERLAP
-            + "  other:\n    kind: work\n    title: 設計\n    review: false\n",
-        )
-
-        errors = self.phase_problems("error", "lib")
-        self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
-
-    def test_identical_types_in_two_layers_are_both_kept(self):
-        """全欄一致でも後ろを破棄しない（info も出ない）。統合結果が無いので重複が起きない。"""
-        write_layer(self.lib, phases=LIB_PHASES_COPIED)
-
-        self.assertEqual(self.phase_problems("error"), [])
-        self.assertEqual(self.phase_problems("info"), [])
 
     def test_a_common_phases_file_is_not_an_error_and_is_used(self):
         """共通レイヤーの phases.yml は置ける。
@@ -306,63 +284,6 @@ class PhaseUnionTest(ConfigUnionHarness):
         self.assertNotEqual(refused.returncode, 0)
         self.assertFalse(os.path.exists(self.approved_copy("i0002")))
 
-    def test_title_overlap_with_common_is_an_error(self):
-        """共通レイヤーの定義と `title` が重なる別 id の定義は error。重なった定義だけを破棄する。
-
-        そのレイヤーのほかの定義は生きている。
-        """
-        write(self.phases, COMMON_PHASES)
-        write_layer(
-            self.lib,
-            phases=LIB_PHASES_TITLE_OVERLAP
-            + "  release:\n    kind: work\n    title: リリース\n    review: true\n"
-            + '    scope: ["CHANGELOG.md"]\n',
-        )
-
-        errors = self.phase_problems("error", "lib")
-        self.assertTrue(any("設計" in p["detail"] for p in errors), errors)
-        sums = {s["name"]: s for s in json.loads(self.ccnavi("--explain", "--json").stdout)["sums"]}
-        ids = sorted(t["id"] for t in sums["lib"]["phases"]["types"])
-        self.assertEqual(ids, ["design", "release"])
-        self.propose(
-            "i0001",
-            ticket_text("i0001", project="lib", plan=["release"], allow=("CHANGELOG.md",)),
-            project="lib",
-        )
-        approved = self.approve()
-        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-        self.propose(
-            "i0002",
-            ticket_text("i0002", project="lib", plan=["build"], allow=("src/*",)),
-            project="lib",
-        )
-        refused = self.approve()
-        self.assertNotEqual(refused.returncode, 0)
-        self.assertFalse(os.path.exists(self.approved_copy("i0002")))
-
-    def test_identical_type_in_common_and_layer_is_dropped_with_info(self):
-        """共通レイヤーと全欄が同じ定義は、レイヤーの側を破棄して info で言う。error ではない。"""
-        write(self.phases, COMMON_PHASES)
-
-        # lib の design は共通レイヤーの design と全欄が同じ。
-        self.assertEqual(self.phase_problems("error", "lib"), [])
-        infos = self.phase_problems("info", "lib")
-        self.assertTrue(any("design" in p["where"] + p["detail"] for p in infos), infos)
-        self.propose(
-            "i0001",
-            ticket_text("i0001", project="lib", plan=["design", "build"], allow=("src/*",)),
-            project="lib",
-        )
-        approved = self.approve()
-        self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
-
-    def test_a_broken_common_phases_file_is_an_error(self):
-        """読めない共通レイヤーの phases.yml は --lint が error で名指しする。"""
-        write(self.phases, "version: 1\nphases: [\n")
-
-        errors = self.phase_problems("error")
-        self.assertTrue(any(p["where"].startswith("(phases)") for p in errors), errors)
-
     def test_a_broken_common_layer_leaves_the_layer_types_in_use(self):
         """共通レイヤーの phases.yml が読めなくても、レイヤーの定義だけで `plan:` が読める。
 
@@ -370,6 +291,8 @@ class PhaseUnionTest(ConfigUnionHarness):
         """
         write(self.phases, "version: 1\nphases: [\n")
 
+        errors = self.phase_problems("error")
+        self.assertTrue(any(p["where"].startswith("(phases)") for p in errors), errors)
         self.assertEqual(self.phase_problems("error", "lib"), [])
         self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
         approved = self.approve()
@@ -384,15 +307,6 @@ class PhaseUnionTest(ConfigUnionHarness):
         refused = self.approve()
         self.assertNotEqual(refused.returncode, 0)
         self.assertFalse(os.path.exists(self.approved_copy("i0002")))
-
-    def test_a_missing_phases_file_is_normal(self):
-        """phases.yml が無いのは正常（空）。--lint に出さず、`plan:` だけが読めない。"""
-        os.remove(layer_path(self.ws, "phases"))
-
-        self.assertEqual(self.phase_problems("error"), [])
-        self.assertEqual(self.phase_problems("warn"), [])
-        self.propose("i0001", ticket_text("i0001", plan=["docs"], allow=("docs/*",)))
-        self.assertNotEqual(self.approve().returncode, 0)
 
     def test_the_order_comes_from_the_plan_and_not_from_the_file(self):
         """9.7: ファイルの `order` と定義の `after` は読まない。先行関係は計画のステップの `after`。

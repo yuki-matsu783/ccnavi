@@ -517,17 +517,18 @@ class ModeCheckTest(unittest.TestCase):
         with mock.patch.dict("os.environ", environ or {}, clear=True):
             return workspace.mode_check(root)[0]
 
-    def test_enable_in_settings_passes(self):
-        self.assertTrue(self._check({"CCNAVI_MODE": "enable"}))
-
-    def test_dry_run_in_settings_stops(self):
-        self.assertFalse(self._check({"CCNAVI_MODE": "dry-run"}))
-
-    def test_dry_run_in_environment_stops_even_when_settings_enable(self):
-        self.assertFalse(self._check({"CCNAVI_MODE": "enable"}, {"CCNAVI_MODE": "dry-run"}))
-
-    def test_missing_value_counts_as_enable(self):
-        self.assertTrue(self._check({}))
+    def test_only_enable_passes(self):
+        cases = [
+            ({"CCNAVI_MODE": "enable"}, None, True),
+            ({"CCNAVI_MODE": "dry-run"}, None, False),
+            # 環境変数の dry-run は、設定の enable より強い。
+            ({"CCNAVI_MODE": "enable"}, {"CCNAVI_MODE": "dry-run"}, False),
+            # 値が無ければ enable と数える。
+            ({}, None, True),
+        ]
+        for settings_env, environ, passes in cases:
+            with self.subTest(settings=settings_env, environ=environ):
+                self.assertEqual(self._check(settings_env, environ), passes)
 
     def test_unreadable_settings_stops(self):
         root = self._root({"CCNAVI_MODE": "enable"})
@@ -681,8 +682,6 @@ class JudgeTest(unittest.TestCase):
     def test_parse_reads_rows_and_skips_header(self):
         rows = expect.parse_judgment(self.TABLE)
         self.assertEqual(rows, [("a", "pass", "r1"), ("b", "pass", "r2")])
-
-    def test_parse_rejects_a_verdict_that_is_not_pass_or_fail(self):
         with self.assertRaises(ValueError):
             expect.parse_judgment("| a | needs-review | r |\n")
 
@@ -690,13 +689,10 @@ class JudgeTest(unittest.TestCase):
         mech = [("decisions", {}, common.PASS, "")]
         judged = [("a", common.PASS, "")]
         self.assertIn("受け入れ待ち", expect.final_verdict(mech, judged, False))
-
-    def test_final_verdict_after_acceptance(self):
-        mech = [("decisions", {}, common.PASS, "")]
-        self.assertEqual(expect.final_verdict(mech, [("a", common.PASS, "")], True), common.PASS)
+        self.assertEqual(expect.final_verdict(mech, judged, True), common.PASS)
         self.assertEqual(expect.final_verdict(mech, [("a", common.FAIL, "")], True), common.FAIL)
         bad = [("decisions", {}, common.FAIL, "")]
-        self.assertEqual(expect.final_verdict(bad, [("a", common.PASS, "")], True), common.FAIL)
+        self.assertEqual(expect.final_verdict(bad, judged, True), common.FAIL)
 
     def test_cmd_judge_appends_once_and_records_acceptance(self):
         uc01 = str(Path(__file__).parent / "UC-01-direct-edit-denied.yml")
@@ -768,13 +764,9 @@ class AcceptWithoutTableFileTest(unittest.TestCase):
 
 
 class RepoResultTest(unittest.TestCase):
-    def test_same_state_passes(self):
+    def test_only_an_unchanged_state_passes(self):
         self.assertEqual(expect.repo_result("a", "a")[0], common.PASS)
-
-    def test_changed_state_fails(self):
         self.assertEqual(expect.repo_result("a", "b"), (common.FAIL, expect.REPO_CHANGED))
-
-    def test_missing_before_state_is_not_passed(self):
         self.assertEqual(expect.repo_result(None, "a")[0], common.INCONCLUSIVE)
 
 
@@ -1151,9 +1143,7 @@ class ParseStreamIdsTest(unittest.TestCase):
         for r in got["tool_results"]:
             self.assertIn(r["tool_use_id"], by_id)
             self.assertEqual(r["parent"], by_id[r["tool_use_id"]]["parent"])
-
-    def test_existing_fields_are_unchanged(self):
-        got = stream.parse_stream(fixture_text("subagent-edit-denied.jsonl"))
+        # 既存の欄は変わらない。
         self.assertEqual(got["session_ids"], ["sess-main"])
         self.assertEqual([c["name"] for c in got["tool_calls"]], ["Agent", "Read", "Edit"])
         edit = got["tool_calls"][2]["input"]
@@ -1649,19 +1639,16 @@ class SetupGitTest(unittest.TestCase):
         schema.check_git_argv(["git", "switch", "-c", "feat"])
         schema.check_git_argv(["git", "commit", "-m", "x"])
 
-    def test_git_without_reset_is_rejected(self):
-        with tempfile.TemporaryDirectory() as d:
-            path = write_scenario(d, {"git": [["git", "status"]]})
-            with self.assertRaises(ValueError) as cm:
-                schema.load_scenario(path)
-        self.assertIn("setup.reset", str(cm.exception))
-
-    def test_load_scenario_rejects_a_bad_command(self):
+    def test_load_scenario_rejects_a_bad_command_and_git_without_reset(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             path = ws.scenario_file({"git": [["git", "-C", "/", "status"]]})
             with self.assertRaises(ValueError):
                 schema.load_scenario(path)
+            path = write_scenario(d, {"git": [["git", "status"]]})
+            with self.assertRaises(ValueError) as cm:
+                schema.load_scenario(path)
+        self.assertIn("setup.reset", str(cm.exception))
 
     def test_runs_in_the_target_not_the_body_and_logs_it(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1747,8 +1734,6 @@ class ScenarioFieldsTest(unittest.TestCase):
         ):
             with self.subTest(setup=setup), self.assertRaises(ValueError):
                 self.load(setup)
-
-    def test_append_without_reset_is_rejected(self):
         with self.assertRaises(ValueError) as cm:
             self.load({"files": {"x.md": {"content": "y", "append": True}}})
         self.assertIn("setup.reset", str(cm.exception))
@@ -2519,7 +2504,9 @@ class RunAllTest(unittest.TestCase):
             self.assertIn("確認した内容と今回の対象が違う", buf.getvalue())
             self.assertIn("UC-91, UC-92", buf.getvalue())
 
-    def test_a_removed_scenario_a_new_cap_and_a_new_base_each_invalidate_the_confirmation(self):
+    def test_any_change_to_what_is_confirmed_invalidates_the_confirmation(self):
+        """費用の上限・base・シナリオの増減・permission_mode・prompt（概要は 120 字で切るので
+        出ない後ろ）のどれが変わっても、確認の印は変わる。"""
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             scn_dir = self.make(ws, "UC-91")
@@ -2527,6 +2514,17 @@ class RunAllTest(unittest.TestCase):
             confirmed = self.digest(ws, scn_dir, 5.0)
             # 費用の上限が違う
             self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 4.0))
+            # permission_mode が違う
+            path1 = scn_dir / "UC-91.yml"
+            data1 = yaml.safe_load(path1.read_text(encoding="utf-8"))
+            data1["permission_mode"] = "bypassPermissions"
+            path1.write_text(yaml.safe_dump(data1, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            # prompt の概要に出ない後ろが違う
+            data1["permission_mode"] = "auto"
+            data1["steps"][0]["prompt"] += "x" * 200
+            path1.write_text(yaml.safe_dump(data1, allow_unicode=True), encoding="utf-8")
+            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
             # base が違う
             git(ws.target, "commit", "--allow-empty", "-q", "-m", "next")
             other = git(ws.target, "rev-parse", "HEAD")
@@ -2592,14 +2590,7 @@ class RunAllTest(unittest.TestCase):
             self.assertEqual(rc, 3)
             self.assertEqual(calls, [])
 
-    def test_non_positive_cap_is_refused(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
-            scn_dir = self.make(ws, "UC-91")
-            with contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", "0"), 2)
-
-    def test_nan_and_inf_caps_are_refused(self):
+    def test_non_positive_nan_and_inf_caps_are_refused(self):
         with tempfile.TemporaryDirectory() as d:
             ws = Workspace(d)
             scn_dir = self.make(ws, "UC-91")
@@ -2608,24 +2599,10 @@ class RunAllTest(unittest.TestCase):
                 mock.patch.object(drive, "run_step", side_effect=step),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
-                for bad in ("nan", "inf"):
-                    self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", bad), 2)
+                for bad in ("0", "nan", "inf"):
+                    with self.subTest(cap=bad):
+                        self.assertEqual(self.main(ws, str(scn_dir), "--max-total-usd", bad), 2)
             self.assertEqual(calls, [])
-
-    def test_editing_the_prompt_or_permission_mode_invalidates_the_confirmation(self):
-        with tempfile.TemporaryDirectory() as d:
-            ws = Workspace(d)
-            scn_dir = self.make(ws, "UC-91")
-            confirmed = self.digest(ws, scn_dir, 5.0)
-            path = scn_dir / "UC-91.yml"
-            data = yaml.safe_load(path.read_text(encoding="utf-8"))
-            data["permission_mode"] = "bypassPermissions"
-            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
-            data["permission_mode"] = "auto"
-            data["steps"][0]["prompt"] += "x" * 200  # 概要は 120 字で切るので出ない後ろ
-            path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
 
     def test_failed_step_cost_counts_toward_the_total(self):
         scn = {"budget_usd": 1.0, "_prompt_steps": 2}

@@ -150,6 +150,25 @@ class GuardHarness(ConfigUnionHarness):
         result = self.run_hook("PostToolUse")
         return before, read(path), result
 
+    def break_all_and_restore(self, paths, note=""):
+        """バックアップを 1 回取らせ、全部を壊し、実行後に全部が戻ったかを確かめる。結果を返す。"""
+        paths = list(paths)
+        before = {path: read(path) for path in paths}
+        self.run_hook("PreToolUse")
+        for path in paths:
+            write(
+                path,
+                "version: 1\nphases: {}\n"
+                if path.endswith("phases.yml")
+                else "version: 1\ndeny: []\n",
+            )
+        result = self.run_hook("PostToolUse")
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertEqual(read(path), before[path], self.said(result, note + path))
+        self.assertIn("restored", result.stdout, self.said(result, note))
+        return result
+
     def said(self, result, note=""):
         """失敗したときに何が起きたかをつける。標準エラーを見ないと理由が出ない。"""
         head = f"{note}\n" if note else ""
@@ -159,74 +178,41 @@ class GuardHarness(ConfigUnionHarness):
 class RestoreTest(GuardHarness):
     """バックアップと復元。"""
 
-    def test_project_layer_files_are_restored(self):
-        """プロジェクトのレイヤーの 3 本がバックアップと復元の対象。"""
-        for kind in ("rules", "phases", "risk"):
-            with self.subTest(kind=kind):
-                path = layer_path(self.lib, kind)
-                before, after, result = self.break_and_restore(path)
-                self.assertEqual(after, before, self.said(result, kind))
-                self.assertIn("restored", result.stdout, self.said(result, kind))
-                self.assertIn(os.path.basename(path), result.stdout, self.said(result, kind))
+    def test_layer_files_are_restored(self):
+        """守る対象は、プロジェクト・自身のレイヤーの 3 本ずつと、共通レイヤーの phases・risks。
 
-    def test_own_layer_files_are_restored(self):
-        """自身のレイヤー `<ワークスペースルート>/.ccnavi/config/project/` の 3 本も対象。"""
+        どの対象が守られるかの組み立ては Go の selfguard の見本（backup_golden_test.go の
+        TestTargetsMatchGolden・TestStepsMatchGolden）が見る。ここは本物の hook で戻ることの通し。
+        """
         write(layer_path(self.ws, "risk"), COMMON_RISK)
-        for kind in ("rules", "phases", "risk"):
-            with self.subTest(kind=kind):
-                path = layer_path(self.ws, kind)
-                before, after, result = self.break_and_restore(path)
-                self.assertEqual(after, before, self.said(result, kind))
-                self.assertIn("restored", result.stdout, self.said(result, kind))
-
-    def test_common_phases_and_risk_are_restored(self):
-        """共通レイヤーの phases.yml / risks.yml を足す（既存の穴の修正）。"""
-        for path in (self.phases, self.risk):
-            name = os.path.basename(path)
-            with self.subTest(path=name):
-                before, after, result = self.break_and_restore(path)
-                self.assertEqual(after, before, self.said(result, name))
-                self.assertIn("restored", result.stdout, self.said(result, name))
-
-    def test_copies_in_a_worktree_cut_from_a_project_are_restored(self):
-        """プロジェクトである元リポジトリから切ったワークツリー側の設定も対象。"""
-        tree = self.worktree(self.lib, "w1")
-        copy = layer_path(tree, "rules")
-        self.assertTrue(
-            os.path.exists(copy), "lib の .ccnavi/ は追跡されているのでワークツリー側の設定がある"
+        paths = [
+            layer_path(root, kind)
+            for root in (self.lib, self.ws)
+            for kind in ("rules", "phases", "risk")
+        ]
+        paths += [self.phases, self.risk]
+        result = self.break_all_and_restore(paths)
+        self.assertIn(
+            os.path.basename(layer_path(self.lib, "rules")), result.stdout, self.said(result)
         )
 
-        before, after, result = self.break_and_restore(copy)
-        self.assertEqual(after, before, self.said(result))
-        self.assertIn("restored", result.stdout, self.said(result))
+    def test_copies_in_worktrees_are_restored(self):
+        """ワークツリー側の設定も対象。lib から切った分・ワークスペースから切った自身の分・
+        共通レイヤーの 3 本（既存の穴。直す前は allow `worktrees` にヒットして書けた）。"""
+        t1 = self.worktree(self.lib, "w1")
+        t2 = self.worktree(self.ws, "w2")
+        t3 = self.worktree(self.ws, "w3")
+        paths = [layer_path(t1, "rules"), layer_path(t2, "phases")]
+        paths += [
+            os.path.join(t3, ".ccnavi", "config", "common", n)
+            for n in ("rules.yml", "phases.yml", "risks.yml")
+        ]
+        for path in paths:
+            self.assertTrue(
+                os.path.exists(path), "追跡されているのでワークツリー側の設定がある: " + path
+            )
+        result = self.break_all_and_restore(paths)
         self.assertIn("統合すれば", result.stdout, self.said(result))
-
-    def test_copies_in_a_worktree_cut_from_the_workspace_are_restored(self):
-        """ワークスペースから切ったワークツリー側の、自身のレイヤーの設定も対象。"""
-        tree = self.worktree(self.ws, "w2")
-        copy = layer_path(tree, "phases")
-        before, after, result = self.break_and_restore(copy, broken="version: 1\nphases: {}\n")
-        self.assertEqual(after, before, self.said(result))
-
-    def test_copies_of_the_common_layer_in_a_worktree_are_restored(self):
-        """ワークスペースから切ったワークツリー側の、共通レイヤーの設定も対象（既存の穴）。
-
-        共通レイヤーの 3 本はワークスペースの git が追跡しているので、ワークツリー側の設定もできる。
-        直す前は、そこがルールの allow `worktrees` にヒットして書けてしまい、戻りもしなかった。
-        """
-        tree = self.worktree(self.ws, "w3")
-        for name in ("rules.yml", "phases.yml", "risks.yml"):
-            with self.subTest(name=name):
-                copy = os.path.join(tree, ".ccnavi", "config", "common", name)
-                self.assertTrue(
-                    os.path.exists(copy),
-                    "共通レイヤーは追跡されているのでワークツリー側の設定がある",
-                )
-                broken = "version: 1\ndeny: []\n" if name == "rules.yml" else "version: 1\n"
-                before, after, result = self.break_and_restore(copy, broken=broken)
-                self.assertEqual(after, before, self.said(result, name))
-                self.assertIn("restored", result.stdout, self.said(result, name))
-                self.assertIn("統合すれば", result.stdout, self.said(result, name))
 
     def test_deleted_layer_file_comes_back_from_the_project_git(self):
         """バックアップが無ければ、そのレイヤーの git（プロジェクト自身）

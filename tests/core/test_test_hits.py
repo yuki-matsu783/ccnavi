@@ -94,7 +94,7 @@ class TestHitsTest(unittest.TestCase):
 
     # ---- 1. ヒットしたルール
 
-    def test_builtin_guard_is_outside_with_a_short_form(self):
+    def test_builtin_guards_are_outside_with_a_short_form(self):
         os.makedirs(os.path.join(self.root, ".ccnavi", "config", "common"))
         body = self.body("Bash", "echo x > .ccnavi/config/common/rules.yml")
         self.assertEqual(body["verdict"], "deny")
@@ -112,7 +112,7 @@ class TestHitsTest(unittest.TestCase):
         self.assertIn("deny:builtin:guard-setting-files（ルールファイルの外にある根拠）", plain)
         self.assertLess(max(len(line) for line in plain.splitlines()), 1000)
 
-    def test_ticket_state_guard_is_outside(self):
+        # チケットの状態の保護も、ルールファイルの外にある根拠。
         body = self.body("Write", f"{self.root}/wip/proposals/review/x.md")
         self.assertEqual(body["verdict"], "deny")
         by_id = {hit["id"]: hit for hit in body["rules"]}
@@ -232,27 +232,16 @@ class TestHitsTest(unittest.TestCase):
     def test_permission_mode_reaches_the_judgment(self):
         rules = write(os.path.join(self.root, "empty.yml"), json.dumps({"version": 1}))
         cases = [
-            ((), "ask"),
-            (("--permission-mode", "default"), "handover"),
-            (("--permission-mode", "dontAsk"), "deny"),
+            ((), None, "ask"),
+            (("--permission-mode", "default"), None, "handover"),
+            (("--permission-mode", "dontAsk"), None, "deny"),
+            # 切り替えの環境変数は、hook と同じく空白と大文字を落として読んでから判定に渡す。
+            (("--permission-mode", "dontAsk"), {"CCNAVI_GUARD_UNWATCHED": " Disable"}, "handover"),
         ]
-        for extra, verdict in cases:
-            with self.subTest(extra=extra):
-                body = self.body("Bash", "unknowncmd", *extra, rules=rules)
+        for extra, env, verdict in cases:
+            with self.subTest(extra=extra, env=env):
+                body = self.body("Bash", "unknowncmd", *extra, rules=rules, env=env)
                 self.assertEqual((body["verdict"], body["code"]), (verdict, "UNDECLARED"))
-
-    def test_guard_unwatched_is_resolved_like_the_hook(self):
-        # hook は空白と大文字を落として読む。試験も同じ値で判定する。
-        rules = write(os.path.join(self.root, "empty.yml"), json.dumps({"version": 1}))
-        body = self.body(
-            "Bash",
-            "unknowncmd",
-            "--permission-mode",
-            "dontAsk",
-            rules=rules,
-            env={"CCNAVI_GUARD_UNWATCHED": " Disable"},
-        )
-        self.assertEqual(body["verdict"], "handover")
 
     def test_agent_id_reaches_the_judgment(self):
         command = "sh .ccnavi/scripts/ccnavi-ticket.sh start x"
@@ -260,42 +249,32 @@ class TestHitsTest(unittest.TestCase):
         body = self.body("Bash", command, "--agent-id", "a1")
         self.assertEqual((body["verdict"], body["code"]), ("deny", "DENY_SUBAGENT_TICKET_OP"))
 
-    def test_unknown_mode_and_missing_cwd_are_refused(self):
-        cases = [
-            (("--permission-mode", "dontask"), "権限モードの名前ではない"),
-            (("--cwd", os.path.join(self.root, "missing")), "ディレクトリではない"),
-        ]
-        for extra, said in cases:
-            for json_flag in ((), ("--json",)):
-                with self.subTest(extra=extra, json=json_flag):
-                    done = self.ccnavi("--test", "Bash", "ls", *extra, *json_flag)
-                    self.assertEqual(done.returncode, 1, done.stdout)
-                    self.assertEqual(done.stdout, "")
-                    self.assertIn(said, done.stderr)
-
-    def test_payload_flags_are_for_test_only(self):
-        for route in ("--explain", "--lint", "--docs"):
-            for flag in ("--permission-mode", "--agent-id"):
-                with self.subTest(route=route, flag=flag):
-                    done = self.ccnavi(route, flag, "default")
-                    self.assertEqual(done.returncode, 1)
-                    self.assertIn(f"{flag} は --test でだけ指定できる", done.stderr)
-
-    def test_flags_between_tool_and_subject_and_extra_words_are_refused(self):
-        """オプションを TOOL と SUBJECT の間に置いた形と、余った語は、黙って破棄せずに断る。"""
-        for argv, said in (
+    def test_bad_arguments_are_refused(self):
+        """知らない権限モード・無いディレクトリ・TOOL と SUBJECT の間のオプション・余った語は、
+        黙って破棄せずに断る。payload の欄は --test でだけ指定できる。"""
+        missing = os.path.join(self.root, "missing")
+        refusals = [
+            (("--test", "Bash", "ls", "--permission-mode", "dontask"), "権限モードの名前ではない"),
+            (("--test", "Bash", "ls", "--cwd", missing), "ディレクトリではない"),
             (
                 ("--test", "Bash", "--permission-mode", "auto", "ls"),
                 "オプション（--permission-mode）",
             ),
             (("--test", "--agent-id", "a1", "ls"), "オプション（--agent-id）"),
             (("--test", "Bash", "ls", "extra"), "余った語: extra"),
-        ):
+        ]
+        for route in ("--explain", "--lint", "--docs"):
+            for flag in ("--permission-mode", "--agent-id"):
+                refusals.append(((route, flag, "default"), f"{flag} は --test でだけ指定できる"))
+        for argv, said in refusals:
             with self.subTest(argv=argv):
                 done = self.ccnavi(*argv)
                 self.assertEqual(done.returncode, 1, done.stdout)
                 self.assertEqual(done.stdout, "")
                 self.assertIn(said, done.stderr)
+        # 出力の形（--json）が付いても同じ。
+        done = self.ccnavi("--test", "Bash", "ls", "--cwd", missing, "--json")
+        self.assertEqual((done.returncode, done.stdout), (1, ""))
         done = self.ccnavi("--test", "Bash", "ls", "--permission-mode", "auto")
         self.assertEqual(done.returncode, 0, done.stderr)
 
