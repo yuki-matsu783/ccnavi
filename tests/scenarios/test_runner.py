@@ -2512,19 +2512,26 @@ class RunAllTest(unittest.TestCase):
             scn_dir = self.make(ws, "UC-91")
             self.make(ws, "UC-92")
             confirmed = self.digest(ws, scn_dir, 5.0)
+            # each step compares against the state just before it, so a later change
+            # cannot hide an earlier one (the prompt of UC-91 stays changed throughout)
             # 費用の上限が違う
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 4.0))
+            now = self.digest(ws, scn_dir, 4.0)
+            self.assertNotEqual(confirmed, now)
+            confirmed = now
             # permission_mode が違う
             path1 = scn_dir / "UC-91.yml"
             data1 = yaml.safe_load(path1.read_text(encoding="utf-8"))
             data1["permission_mode"] = "bypassPermissions"
             path1.write_text(yaml.safe_dump(data1, allow_unicode=True), encoding="utf-8")
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            now = self.digest(ws, scn_dir, 4.0)
+            self.assertNotEqual(confirmed, now)
+            confirmed = now
             # prompt の概要に出ない後ろが違う
-            data1["permission_mode"] = "auto"
             data1["steps"][0]["prompt"] += "x" * 200
             path1.write_text(yaml.safe_dump(data1, allow_unicode=True), encoding="utf-8")
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            now = self.digest(ws, scn_dir, 4.0)
+            self.assertNotEqual(confirmed, now)
+            confirmed = now
             # base が違う
             git(ws.target, "commit", "--allow-empty", "-q", "-m", "next")
             other = git(ws.target, "rev-parse", "HEAD")
@@ -2532,10 +2539,13 @@ class RunAllTest(unittest.TestCase):
             data = yaml.safe_load(path.read_text(encoding="utf-8"))
             data["setup"]["reset"]["base"] = other
             path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            now = self.digest(ws, scn_dir, 4.0)
+            self.assertNotEqual(confirmed, now)
+            confirmed = now
             # 減った
             path.unlink()
-            self.assertNotEqual(confirmed, self.digest(ws, scn_dir, 5.0))
+            now = self.digest(ws, scn_dir, 4.0)
+            self.assertNotEqual(confirmed, now)
 
     def test_it_stops_when_the_next_budget_exceeds_what_is_left(self):
         with tempfile.TemporaryDirectory() as d:
