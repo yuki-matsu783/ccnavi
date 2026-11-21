@@ -86,7 +86,13 @@ const childName = "i0001-01-01"
 // 親の計画は research・design。t.Parallel() は呼ぶ前に済ませる。
 func authority(t *testing.T) *ticketkit.Tree {
 	t.Helper()
-	return ticketkit.Cached(t, "authority", ticketkit.Options{Phases: samples.Phases}, func(tr *ticketkit.Tree) {
+	return authorityWith(t, ticketkit.Options{Phases: samples.Phases})
+}
+
+// authorityWith は authority を Options 指定で組む（write-and-push の印を付けない木など）。
+func authorityWith(t *testing.T, o ticketkit.Options) *ticketkit.Tree {
+	t.Helper()
+	return ticketkit.Cached(t, "authority", o, func(tr *ticketkit.Tree) {
 		tr.PhaseFamily(samples.Plan("research", "design"))
 		tr.Propose(childName, samples.ChildText(childName, "i0001", 1, []string{"wip/research/*"}), "")
 		tr.CommitParent("approval-request child")
@@ -189,3 +195,5 @@ func (p preview) rejectedHas(word string) bool {
 
 // baseCommonRules は共通レイヤーのルールのパス。
 func baseCommonRules(root string) string { return base.CommonPath(root, "rules") }
+
+func removeAll(path string) error { return os.RemoveAll(path) }
