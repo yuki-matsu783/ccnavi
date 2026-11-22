@@ -36,6 +36,9 @@ type judgeAnswer struct {
 
 const rootMark = "{ROOT}"
 
+// cwdMark は判定が相対パスを解く作業ディレクトリの置き換え。
+const cwdMark = "{CWD}"
+
 func (c judgeCase) at(root string) judgeCase {
 	envs := map[string]string{}
 	for k, v := range c.Env {
@@ -128,8 +131,9 @@ func lastRecord(t *testing.T, path string) map[string]any {
 }
 
 // normalized はルートを {ROOT} に戻し、時刻と経過時間を落とした答え。
-func (a judgeAnswer) normalized(root string) judgeAnswer {
+func (a judgeAnswer) normalized(root, cwd string) judgeAnswer {
 	fix := func(s string) string {
+		s = strings.ReplaceAll(strings.ReplaceAll(s, jsonInner(cwd), cwdMark), cwd, cwdMark)
 		return strings.ReplaceAll(strings.ReplaceAll(s, jsonInner(root), rootMark), root, rootMark)
 	}
 	out := judgeAnswer{Code: a.Code, Stdout: fix(a.Stdout), Stderr: fix(a.Stderr), Error: a.Error}
@@ -153,8 +157,19 @@ func checkCases(t *testing.T, build func(t *testing.T) string, cases []judgeCase
 	t.Helper()
 	root := build(t)
 	var seen []judgeAnswer
-	for _, c := range cases {
-		seen = append(seen, runGo(t, root, c.at(root)).normalized(root))
+	// 相対パスは作業ディレクトリで絶対にされ、その場所（ワークツリーの中かどうか）で答えも変わる。
+	// checkout の場所で見本が変わらないよう、回す間だけ空の使い捨てのディレクトリ（{CWD}）に移る（サブテストの t.Chdir が、見本を開く前に戻す。setEnv が環境を丸ごと替えるので並行しない）。
+	cwd, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !t.Run("calls", func(t *testing.T) {
+		t.Chdir(cwd)
+		for _, c := range cases {
+			seen = append(seen, runGo(t, root, c.at(root)).normalized(root, cwd))
+		}
+	}) {
+		return
 	}
 	golden.Check(t, strings.TrimPrefix(t.Name(), "Test"), seen)
 }

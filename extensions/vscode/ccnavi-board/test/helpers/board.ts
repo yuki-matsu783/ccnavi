@@ -57,7 +57,7 @@ export async function openBoard(
   );
 }
 
-/** 承認画面の見本（`--agree --preview --json`の出力そのもの）。Python側のtests/ticket/test_approve_json.pyが書き出す */
+/** 承認画面の見本（`--agree --preview --json`の出力そのもの）。Go側のgo/internal/clitest/ticket/flow/approve_json_test.goが書き出す */
 export function approvePreview(): ApprovePreview {
   const text = fs.readFileSync(path.join(__dirname, "..", "..", "..", "test", "fixtures", "approve-preview.json"), "utf8");
   const parsed = parseApprovePreview(text);

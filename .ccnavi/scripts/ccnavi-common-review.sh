@@ -498,35 +498,16 @@ staged_send() {
 		return 1
 	fi
 	# 同じ操作を同時に送らない（照合の前に 2 つが「未送信」と見て、両方が投稿するのを防ぐ）。
-	# ロックが使えない構成（root が無い）では、取らずに進む。
-	cs_locked=""
-	if [ -n "${root:-}" ] && command -v ccnavi_lock_take >/dev/null 2>&1; then
-		# 取る関数の状態はグローバル変数 1 組。write-and-push のロックを持ったまま取ると、その情報が
-		# 上書きされて外せなくなるので、取る前に退避して、外したあとに戻す。
-		cs_sv_dir="$ccnavi_lock_dir"
-		cs_sv_mark="$ccnavi_lock_mark"
-		cs_sv_set="$ccnavi_lock_set_held"
-		cs_sv_prev="$ccnavi_lock_prev_held"
-		cs_sv_prev_set="$ccnavi_lock_prev_set"
-		if ccnavi_lock_take "$root" ops "$cs_id" "$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 30)"; then
-			cs_locked=1
-		else
-			ccnavi_lock_dir="$cs_sv_dir"
-			ccnavi_lock_mark="$cs_sv_mark"
-			printf '%s: 同じ投稿が別のプロセスで実行中。待っても取れなかったので止めた。\n' "${review_label:-ccnavi-review}" >&2
-			return 1
-		fi
+	# write-and-push のロックを持ったままでも取れる（外側の状態は変えない）。
+	cs_lock_rc=0
+	ccnavi_lock_take_aside cs_lk "$root" ops "$cs_id" "$(ccnavi_number_or "${CCNAVI_LOCK_WAIT:-}" 30)" || cs_lock_rc=$?
+	if [ "$cs_lock_rc" -ne 0 ]; then
+		printf '%s: %s\n' "${review_label:-ccnavi-review}" "$(ccnavi_lock_why "$cs_lock_rc" "操作 $cs_id")何も送らずに止めた。" >&2
+		return 1
 	fi
 	staged_send_locked
 	cs_rc=$?
-	if [ -n "$cs_locked" ]; then
-		ccnavi_lock_drop
-		ccnavi_lock_dir="$cs_sv_dir"
-		ccnavi_lock_mark="$cs_sv_mark"
-		ccnavi_lock_set_held="$cs_sv_set"
-		ccnavi_lock_prev_held="$cs_sv_prev"
-		ccnavi_lock_prev_set="$cs_sv_prev_set"
-	fi
+	ccnavi_lock_drop_aside cs_lk
 	return "$cs_rc"
 }
 

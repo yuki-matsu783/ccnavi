@@ -29,6 +29,9 @@ var topTiers = map[string]int{
 	"catalog": 4,
 	"hook":    5,
 	"entry":   6,
+	// テストの道具（harness）と、それを使う CLI を通すテスト（clitest。_test.go だけ）。道具は本体より上に置き、本体から読めないようにする。
+	"harness": 7,
+	"clitest": 8,
 }
 
 var subTiers = map[string]map[string]int{
@@ -143,6 +146,25 @@ var subTiers = map[string]map[string]int{
 	"tickets/proposal": {"internal": 0, "candidates": 0, "propose": 0, "templates": 1, "planedit": 1, "agree": 2, "scaffold": 2},
 	"tickets/review":   {"request": 0, "closeout": 1, "decide": 1},
 	"tickets/sync":     {"handoff": 0, "mirror": 0, "drafts": 1, "stage": 1},
+	// 受入シナリオの実行器の部品。型・シナリオの読み込み（core）の上に、準備・期待の評価、外の世界、人間役、報告、回す流れが立つ。
+	"harness/scenario": {"host": 0, "core": 1, "prepare": 2, "judge": 2, "world": 3, "actors": 3, "report": 4, "runner": 5},
+	// テストの道具。本体のコードは tickets/testkit と同じく、ここを読まない。
+	"harness": {
+		// 0: 走った機械から締め出した環境・一時置き場・見本の置き場（ほかの道具が読む土台）
+		"base": 0,
+		// 1: 実行ファイルの組み立て・GitLab の模擬・見本の組み立て
+		"exe": 1, "fakegitlab": 1, "samples": 1, "gitlabapi": 1,
+		// 2: 実行ファイルを起こす・PATH のスタブ・契約の形
+		"run": 2, "hoststub": 2, "contractshape": 2,
+		// 手動の GitLab の道具（Docker の操作・probe。契約の録りは契約の形を読むので 3）。実物を立てる側で、自動テストは本物を立てない
+		"gitlabdocker": 2, "gitlabprobe": 2,
+		// 3: claude の台本スタブ（契約の形を読む。読み手は teststub と clitest だけ）・組み立ての写し・契約の録り・受入シナリオの実行器の部品・sh を通すテストのファイルと作業場所の道具・ホストの fixture（PATH のスタブの置き方は hoststub を使う）
+		"fakeclaude": 3, "treecache": 3, "contractrecord": 3, "shkit": 3, "scenario": 3, "hostfixture": 3,
+		// 3 のうち設定の和を見るテストの土台（ワークスペースの雛形と見本の設定。clitest/config が使う）
+		"configws": 3,
+		// 4: 入口（main）・チケット・フェーズ・レビューを CLI で通すテストが共有する木と本文（treecache の上に立つ。clitest/ticket/…）
+		"cmd": 4, "ticketkit": 4,
+	},
 	// 目録。1 つのツリーの索引（docindex）の上に、ツリーを合わせて引く docs が立つ。
 	"catalog": {"docindex": 0, "skills": 0, "docs": 1},
 	// hook の中。

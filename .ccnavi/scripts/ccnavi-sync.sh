@@ -108,7 +108,6 @@ esac
 
 root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-sync
 ccnavi_log_root="$root"
-state=$(ccnavi_state "$root")
 here_sh="$(dirname "$0")"
 # 打った場所。手元の片付けが、自分の居るワークツリーを消さないために渡す。
 sync_cwd="$(pwd -W 2>/dev/null || pwd)"
@@ -202,11 +201,8 @@ ask_and_tidy() {
 take_lock() {
 	lock_rc=0
 	ccnavi_lock_take "$root" "$1" "$2" "$lock_wait" || lock_rc=$?
-	case "$lock_rc" in
-	0) return 0 ;;
-	2) printf '%s: 古いロック（%s/locks/%s/%s）を強制取得する途中で止まり、元に戻せなかった。ユーザが中身を見て片付ける\n' "$2" "$state" "$1" "$2" ;;
-	*) printf '%s: 他の操作がロックを持っている（%s）。終わってから再実行してください\n' "$2" "$(ccnavi_lock_owner "$state/locks/$1/$2")" ;;
-	esac
+	[ "$lock_rc" -ne 0 ] || return 0
+	ccnavi_lock_why "$lock_rc" "$2"
 	printf 'failed\n' >>"$scratch/answers"
 	return 1
 }
@@ -285,13 +281,10 @@ while IFS= read -r line <&4; do
 	while read -r ret_p ret_key ret_mr ret_branch <&3; do
 		[ "$ret_key" = "$key" ] || continue
 		# ロックは自分が取ったものだけを外す（持ち主を確かめる。入れ子で外側が持つロックは外さない）。
-		if ccnavi_lock_take "$root" "$key" "$ret_p" "$lock_wait"; then
+		if take_lock "$key" "$ret_p"; then
 			next="ask $ret_mr"
 			ask_and_tidy retired "$ret_p" "$key" "$ret_branch" "$dir" "$heads" "$ret_mr"
 			ccnavi_lock_drop
-		else
-			printf '%s: 他の操作がロックを持っている。終わってから再実行してください\n' "$ret_p"
-			printf 'failed\n' >>"$scratch/answers"
 		fi
 	done 3<"$scratch/retired"
 

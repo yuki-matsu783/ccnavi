@@ -1,15 +1,15 @@
 ---
 title: claude -p のスタブと、本物との契約テスト
 type: guide
-description: 受入シナリオを本物の claude -p の代わりに台本どおりに動くスタブ（tests/fake_claude.py）で回す仕組み。台本の書き方、スタブが真似る hook の呼び方と応答の扱い、本物から録った形（recorded.json）と比べる契約テスト、録り直し、確かめられないこと
+description: 受入シナリオを本物の claude -p の代わりに台本どおりに動くスタブ（go/internal/harness/fakeclaude）で回す仕組み。台本の書き方、スタブが真似る hook の呼び方と応答の扱い、本物から録った形（recorded.json）と比べる契約テスト、録り直し、確かめられないこと
 tags: [testing, scenario]
-keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, claude -p, stream-json, hook, 契約テスト, claudeside, recorded.json, record_hooks, observations, SubagentHandback, CLAUDE_CODE_ENTRYPOINT]
+keywords: [スタブ, fakeclaude, 台本, script, after_stop_block, --agent, claude -p, stream-json, hook, 契約テスト, scene.go, recorded.json, claudrecord, observations, SubagentHandback, CLAUDE_CODE_ENTRYPOINT]
 ---
 
 # claude -p のスタブと、本物との契約テスト
 
 受入シナリオ（[acceptance-scenarios.md](acceptance-scenarios.md)）は本物の `claude -p` を呼ぶので、費用がかかり、結果が毎回揺れる。
-スタブ（`tests/fake_claude.py`）は、モデルが打つ手を台本に固定し、Claude Code が hook を呼んでツールを実行する部分だけを真似る。
+スタブ（`go/internal/harness/fakeclaude`）は、モデルが打つ手を台本に固定し、Claude Code が hook を呼んでツールを実行する部分だけを真似る。
 これで、hook の登録（`.claude/settings.json` のイベント・matcher）、何手も続く流れ（拒否・Stop の差し戻し・`--resume`・サブエージェント）、実行器の動きを、費用なしで毎回同じ結果で確かめられる。
 モデルが案内に従うか（`judge`）は確かめられない。それは本物で回す。
 
@@ -17,11 +17,11 @@ keywords: [スタブ, fake_claude, 台本, script, after_stop_block, --agent, cl
 
 | 置き場 | 中身 |
 |---|---|
-| `tests/fake_claude.py` | スタブの本体。実行器が `claude` と同じ引数で起こす |
-| `tests/contract/claudeside.py` | 本物とスタブで共有する場面（使い捨ての木、hook の入力を書き出すだけの hook、打つ手）と、形・振る舞いへのまとめ |
+| `go/internal/harness/fakeclaude` | スタブの本体。実行器が `claude` と同じ引数で起こす |
+| `go/internal/harness/fakeclaude/scene.go` | 本物とスタブで共有する場面（使い捨ての木、hook の入力を書き出すだけの hook、打つ手）と、形・振る舞いへのまとめ |
 | `tests/contract/claude/recorded.json` | 本物の `claude -p` から録った形と振る舞い。**本物だけ** |
-| `tests/contract/test_claude_contract.py` | スタブを同じ場面で回し、`recorded.json` と比べる（テストのグループ `contract`。約 4 秒） |
-| `tests/manual/claude/record_hooks.py` | 本物から録る道具。手で回す（費用がかかる） |
+| `go/internal/clitest/contract/claude/contract_test.go` | スタブ（`go/internal/harness/fakeclaude`）を同じ場面で回し、`recorded.json` と比べる（約 4 秒） |
+| `go/internal/harness/cmd/claudrecord` | 本物から録る道具。手で回す（費用がかかる） |
 
 ## スタブで回す
 
@@ -40,7 +40,7 @@ steps:
 ```
 
 ```sh
-uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --agent script --confirmed
+cd go && go run ./internal/harness/cmd/scenarios run tests/scenarios/UC-01-direct-edit-denied.yml --agent script --confirmed
 ```
 
 - 1 手は `tool`（`Read`・`Write`・`Edit`・`Bash`）と `input`、`say`（最後の文。`result` に入る）、`agent`（サブエージェント。`type`・`description`・`script`）のどれか
@@ -54,13 +54,13 @@ uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-de
 ## 使い捨てのワークスペースで回す
 
 ```sh
-uv run python -m tests.scenarios.runner run-stub tests/scenarios
+cd go && go run ./internal/harness/cmd/scenarios run-stub tests/scenarios
 ```
 
 - 回すのは、人間の操作が無く、step がすべて `script` を持ち、`setup` が作るファイル（追記でないもの）だけのシナリオ（`schema.stub_unready`）。ほかは回さず、理由を出す
-- ワークスペースは `tests/scenarios/sandbox.py` が一時ディレクトリに組む。このリポジトリの作業ツリーから、`.gitignore` で外していないファイル（まだ add していないものも含む）として `.ccnavi/`・`.claude/settings.json`・`.claude/hooks/`・`.gitignore`・`docs/wiki/`（ccnavi が学びの案内に読む）をコピーし、テスト用に組んだ実行ファイル（`tests/exe.py`）を `.ccnavi/bin/` に置き、`settings.json` の `CCNAVI_MODE` を `enable` にする。`projects/test-repo` は README を 1 本持つ小さなリポジトリにする（UC-01 の台本が書き換える見出しを持つ）
+- ワークスペースは `go/internal/harness/scenario/world/sandbox.go` が一時ディレクトリに組む。このリポジトリの作業ツリーから、`.gitignore` で外していないファイル（まだ add していないものも含む）として `.ccnavi/`・`.claude/settings.json`・`.claude/hooks/`・`.gitignore`・`docs/wiki/`（ccnavi が学びの案内に読む）をコピーし、テスト用に組んだ実行ファイル（`harness/exe`）を `.ccnavi/bin/` に置き、`settings.json` の `CCNAVI_MODE` を `enable` にする。`projects/test-repo` は README を 1 本持つ小さなリポジトリにする（UC-01 の台本が書き換える見出しを持つ）
 - 出力は `logs/scenarios/<ID>-stub-<日時>/`。終了コードは 0 全部 pass / 1 fail がある・回せるものが無い / 2 未成立がある / 3 後片付けができなかった回がある
-- 全量テストでも回る（`tests/scenarios/test_stub_scenarios.py`）。シナリオに台本を足すと、そこで回る
+- 全量テストでも回る（`go/internal/clitest/scenarios` の TestEveryScriptedScenarioPassesInAThrowawayWorkspace）。シナリオに台本を足すと、そこで回る
 
 ## スタブが真似ること
 
@@ -89,28 +89,28 @@ Claude Code 自身の権限の仕組み（allow・deny の一覧、確認の表�
 ## 本物との契約
 
 スタブが本物とずれると、スタブでは通るのに本物で壊れる。GitLab の契約（[gitlab-contract.md](gitlab-contract.md)）と同じく、本物から録った形と比べて防ぐ。
-場面は `claudeside.py` が持ち、本物には自然文の `PROMPT`、スタブには同じ手の台本 `SCRIPT` を渡す。
+場面は `fakeclaude/scene.go` が持ち、本物には自然文の `Prompt`、スタブには同じ手の台本 `ScenePlan(0)` を渡す。
 
-`test_claude_contract.py` が比べるもの:
+`contract_test.go` が比べるもの:
 
 - **形**: スタブが出す欄は本物にもあり、型は本物の型に含まれる（hook の payload はイベントとツールごと、stream-json は `type/subtype` ごと）。本物にだけある欄は比べない。スタブは ccnavi と実行器が読む欄だけを出す
-- **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `READS`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
+- **ccnavi が読む欄**: hook の payload で ccnavi が読む欄（`go/internal/infra/hookio/decode.go` の欄の一覧。テストの `readsFields`）と、`tool_response` の `type`（Write）・`agentId`（Agent）は、本物にあればスタブにもある
 - **振る舞い**: `observations`（呼ばれたイベントの並び、止めたときの理由がどこに出るか、Stop の差し戻し、サブエージェント、`--resume` の `source`、hook が並行に起きるか、hook の環境と `settings.json` の `env` が hook に届くか）が本物と同じ。場面の hook の命令は ccnavi と同じく `settings.json` の `env` の変数で組むので、`env` が届かなければ hook が起きず、観察が空になって落ちる
 - 観察には、モデルの答え方で変わるものを入れない。理由の文が現れる行は、モデルが書く行（`assistant`・`result`）を除いた、行の種類の集合で見る。サブエージェントの中の行は数ではなく有無で見る。本物には `run_in_background` を `false` と指示して、サブエージェントを同期に固定する
 
 ### 録り直す
 
-Claude Code の版を上げたとき、スタブに手を足すとき（`claudeside.py` の `PROMPT` と `SCRIPT` に同じ手を足す）に録り直す。`PROMPT` にだけある「サブエージェントを同期で起動する」指示は、本物を同期に固定するためのもので、`SCRIPT` には対応する欄が無い（スタブは同期の形だけを出す）。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
+Claude Code の版を上げたとき、スタブに手を足すとき（`scene.go` の `Prompt` と `ScenePlan` に同じ手を足す）に録り直す。`Prompt` にだけある「サブエージェントを同期で起動する」指示は、本物を同期に固定するためのもので、`ScenePlan` には対応する欄が無い（スタブは同期の形だけを出す）。本物の `claude -p` を呼ぶので、明確な指示があったときだけ回す。
 
 ```sh
-uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2 --dry-run   # 置かずに標準出力へ
-uv run python tests/manual/claude/record_hooks.py --max-budget-usd 2
+cd go && go run ./internal/harness/cmd/claudrecord --max-budget-usd 2 --dry-run   # 置かずに標準出力へ
+cd go && go run ./internal/harness/cmd/claudrecord --max-budget-usd 2
 ```
 
 - 使い捨ての木で `claude -p --model haiku --setting-sources project` を 2 回（2 回目は `--resume`）回す。上限は 1 回ごとに `--max-budget-usd`。費用の合計を最後に出す
 - 録るのは形（型とキー）と振る舞いだけで、値は持たない。キーにモデルの名前や呼び出しの ID が入る辞書は、キーを `<model>`・`<id>` にまとめる。モデルの名前・機械のパス・メールの形・呼び出しの ID が残っていれば置かない
 - 値を含む生の記録は `scratchpad/claude-record/`（追跡されない）に残る。スタブを直すときに読む
-- 録り直したら `python -m tests tests/contract` を回し、落ちたら本物に合わせてスタブを直す
+- 録り直したら `cd go && go test -count=1 ./internal/clitest/contract/claude/` を回し、落ちたら本物に合わせてスタブを直す
 
 ## 確かめられないこと
 

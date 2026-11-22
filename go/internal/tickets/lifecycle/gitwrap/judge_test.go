@@ -7,8 +7,8 @@ import (
 
 // 引数だけで決まる Judge の答え（git の状態を読まずに決まる形）。リポジトリでない場所で判定するので、
 // 統合先のユーザのチェックアウトでも親のワークツリーでもない。止める識別子と、文が言うべきこと（has）を見る。
-// 状態で決まる形（push・統合先の merge と pull・親のワークツリー・サブディレクトリからのパス）は、
-// tests/sh/test_gitwrap.py がワークスペースを組んで確かめる。
+// 状態で決まる形（push・統合先の merge と pull・親のワークツリー・worktree add の起点）は state_judge_test.go が、
+// ラッパー（sh）を通す確認は clitest/sh/git が見る。
 func TestJudgeByTheArguments(t *testing.T) {
 	const store = ".ccnavi/approved/doing/i0001.md"
 	const review = "wip/proposals/review/i0001-01-01.md"

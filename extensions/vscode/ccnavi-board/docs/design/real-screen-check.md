@@ -16,7 +16,7 @@ keywords: [実画面, code-server, 日本語, ユーザ目線, 画面確認, Chr
 
 動かした環境はLinux（クラウドのコンテナ、root）で、外へ出られるのはnpmのレジストリだけだった。
 VS Code本体の配布元、GitHubのリリース、Open VSXは403で、`code`や`@vscode/test-electron`は使えない。
-そのためVS Codeはnpmの`code-server`（ブラウザで開くVS Code）で代える。手順はLinuxで動かした。macOSやGit Bashでは、`setsid`・`disown`・`python3`を読み替える（未確認）。
+そのためVS Codeはnpmの`code-server`（ブラウザで開くVS Code）で代える。手順はLinuxで動かした。macOSやGit Bashでは、`setsid`・`disown`を読み替える（未確認）。
 
 `code-server`と`playwright`が環境に入っていれば（`command -v code-server`、`playwright --version`）、それを使う。無ければ [1.0](#10-道具があるか確かめる)で入れる。入っていれば、1.5のcode-serverの取得は要らない。
 
@@ -29,7 +29,6 @@ VS Code本体の配布元、GitHubのリリース、Open VSXは403で、`code`�
 | Node.js 22.13.1以上とnpm | 拡張の組み立て、code-server | `node -v` |
 | pnpm 10 | 拡張の組み立て | `pnpm -v`（壊れていたら詰まりどころの表） |
 | Go（`go/go.mod`の版以上） | ccnaviの組み立て | `go version` |
-| uvとPython 3.12以上 | チケットの見本を作る | `uv --version` |
 | PlaywrightのChromium | 撮影 | Playwrightのブラウザの置き場（環境変数`PLAYWRIGHT_BROWSERS_PATH`。無ければLinuxは`~/.cache/ms-playwright`、macOSは`~/Library/Caches/ms-playwright`、Windowsは`%LOCALAPPDATA%\ms-playwright`）の`chromium*`。クラウドのコンテナでは`/opt/pw-browsers/`のこともある |
 | git | 検証用コピーのワークツリー | `git --version` |
 
@@ -100,86 +99,15 @@ test-repo本体に反映するときは`--force`を付けない（付けると�
 
 ### 1.3チケットを並べる（親2・子4）
 
-何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`tests/ticketsample.py`）で、次の状態を作る。
+何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`go/internal/harness/samples`）で、次の状態を作る。
 
 - 親A: 承認済み。調査の子は完了、設計の子は作業中（ワークツリーあり）、実装の子は承認待ち
 - 親B: 承認待ち（子1件も承認待ち）
 
-次を`$W/seed.py`に保存して実行する。
-
-```python
-# seed.py: python3 seed.py <検証用コピー> <ccnavi のリポジトリ>
-import os, subprocess, sys
-
-root, ccnavi = sys.argv[1], sys.argv[2]
-sys.path.insert(0, ccnavi)
-from tests.ticketsample import parent_text, child_text  # noqa: E402
-
-phases = open(f"{root}/.ccnavi/config/common/phases.yml", encoding="utf-8").read()
-A, B = "feature-101-ログイン画面", "fix-102-日本語の文字化け"
-
-
-def git(*args, cwd=root):
-    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, check=True)
-
-
-def put(rel, text):
-    fam = A if A in rel else B  # チケットは親のワークツリーに置く
-    path = os.path.join(root, ".claude/worktrees", fam, rel)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    open(path, "w", encoding="utf-8", newline="").write(text)
-
-
-def parent(name, title, plan, issue):
-    text = parent_text(name, plan, issue=issue, copy=phases).replace("title: 親", f"title: {title}")
-    return text.replace("reason: t", "reason: 画面の見た目が変わるため")
-
-
-def child(name, par, phase, title, scope, review=True):
-    return child_text(name, par, phase, scope, review).replace(
-        f"title: 子 {name}", f"title: {title}"
-    )
-
-
-for fam in (A, B):  # 親ごとにブランチとワークツリー（無いと承認も着手もできない）
-    git("branch", fam)
-    git("worktree", "add", f".claude/worktrees/{fam}", fam)
-
-started = 'started_at: "2026-10-20T09:00:00+09:00"'
-done = 'completed_at: "2026-10-20T11:00:00+09:00"'
-a = parent(A, "ログイン画面を追加する", ["research", "design", "implement"], 101)
-put(f".ccnavi/approved/doing/{A}.md", a.replace('started_at: ""', started))
-c1 = child(f"{A}-01-01", A, 1, "ログイン方式の調査", ("wip/research/*",), False)
-put(
-    f".ccnavi/approved/done/{A}-01-01.md",
-    c1.replace('started_at: ""', started).replace('completed_at: ""', done),
-)
-c2 = child(f"{A}-02-01", A, 2, "ログイン画面の設計", ("wip/design/*",))
-put(f".ccnavi/approved/doing/{A}-02-01.md", c2.replace('started_at: ""', started))
-put(
-    f"wip/proposals/todo/{A}-03-01.md",
-    child(f"{A}-03-01", A, 3, "ログイン画面の実装", ("src/*", "tests/*")),
-)
-put(
-    f"wip/proposals/todo/{B}.md",
-    parent(B, "CSV 出力の日本語が文字化けする不具合を直す", ["quick-work"], 102),
-)
-put(
-    f"wip/proposals/todo/{B}-01-01.md",
-    child(f"{B}-01-01", B, 1, "文字コードを UTF-8（BOM 付き）にそろえる", ("src/*", "tests/*")),
-)
-
-for fam in (A, B):
-    wt = f"{root}/.claude/worktrees/{fam}"
-    git("add", "-A", cwd=wt)
-    git("commit", "-qm", f"チケット: {fam}", cwd=wt)
-# 設計の子は着手済み（子のワークツリーを切る）
-git("branch", f"{A}-02-01", A)
-git("worktree", "add", f".claude/worktrees/{A}-02-01", f"{A}-02-01")
-```
+検証用コピーへ、次で置く。
 
 ```sh
-python3 "$W/seed.py" "$UC" "$CCNAVI"
+(cd "$CCNAVI/go" && go run ./internal/harness/cmd/seedboard "$UC")
 sh "$UC/.ccnavi/scripts/ccnavi-launcher.sh" --lint | tail -3    # error 0 件になること（warn は出てよい）
 ```
 
@@ -234,7 +162,7 @@ npm install code-server --ignore-scripts --no-audit --no-fund
 VER=$(node -p "require('$BOARD/package.json').version")
 VSIX="$CCNAVI/dist/ccnavi-board-$VER.vsix"
 rm -rf "$W/x" "$W/ext" && mkdir -p "$W/x" "$W/ext" "$W/ud/User"
-python3 -m zipfile -e "$VSIX" "$W/x"
+unzip -q "$VSIX" -d "$W/x"
 cp -r "$W/x/extension" "$W/ext/local.ccnavi-board-$VER"
 echo '{"workbench.startupEditor":"none","security.workspace.trust.enabled":false,"telemetry.telemetryLevel":"off","update.mode":"none","extensions.autoCheckUpdates":false,"workbench.tips.enabled":false}' > "$W/ud/User/settings.json"
 ```
@@ -338,7 +266,7 @@ fs.writeFileSync(path.join(ud, "languagepacks.json"), JSON.stringify({ ja: { has
 | 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる。ツアーは globalState に記録されるので、`--user-data-dir`を作り直すと毎回初回になる | 案内の × を1回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js`の`skipTour`）。表示が出ない画面もあるので、あるときだけ閉じる形にする |
 | `npm install code-server`が`sh ./postinstall.sh`で失敗する（rootでは`--unsafe-perm`を要求される） | postinstallがネイティブモジュールをビルドする。`--unsafe-perm`を付けても`kerberos`のnode-gypが失敗する | `--ignore-scripts`で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
 | code-serverに繋ぐと500で`Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts`では、`lib/vscode/`の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
-| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性）。言語パックは同じCLIで入った（1.7） | vsixを`python3 -m zipfile -e`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
+| `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性）。言語パックは同じCLIで入った（1.7） | vsixを`unzip`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
 | `pkill -f code-server/out/node/entry.js`を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード144） | `pkill -f`が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill`する。起動は`setsid nohup … < /dev/null & disown` |
 | Playwrightが`strict mode violation`（同じplaceholderの入力欄が16個）や`element is not visible`で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]`や`textarea.f-message:visible`のように、空の値・見えているものに絞る |
 | 画面を開いた直後に撮ると、中身が空や古い | webviewは拡張が中身を渡すまで読み込み中 | 開いてから5秒待つ。ボードは`ccnavi --explain --json`を呼ぶので、遅いときは増やす |

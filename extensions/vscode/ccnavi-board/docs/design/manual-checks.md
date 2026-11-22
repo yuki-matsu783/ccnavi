@@ -25,7 +25,7 @@ keywords: [手動確認, 拡張開発ホスト, F5, Developer: Reload Window, �
 表の「ツールで代替できるか」の列は、その確認をツールで代えられるかを示す。`不可`はVS Code・拡張ホスト・画面の操作が要るもの、
 `一部`は括弧内の範囲だけをツールで確かめられるもの。ボード以外の画面はツールの対象外なので、すべて`不可`。
 
-`extension.ts` / `board-panel.ts` / `settings-panel.ts` / `panel-common.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `templates-panel.ts` / `flow-panel.ts` / `workflow-panel.ts` / `prompt-handover.ts` / `projects-panel.ts` / `sidebar.ts` / `handoff-panel.ts` / `handoff-entry.ts` / `terminal.ts` / `ccnavi.ts` / `git.ts` / `tour.ts`は、VS CodeのAPIか子プロセスに触れるので単体テストの対象外。次の項目を拡張開発ホストで確かめる。チケットのある状態は、`tests/ticket/test_board.py`の`scene()`と同じ手順（親を承認し、子を着手して閉じ、次の子を提案する）を実際のリポジトリで踏んで作る。
+`extension.ts` / `board-panel.ts` / `settings-panel.ts` / `panel-common.ts` / `rules-panel.ts` / `risk-panel.ts` / `phases-panel.ts` / `templates-panel.ts` / `flow-panel.ts` / `workflow-panel.ts` / `prompt-handover.ts` / `projects-panel.ts` / `sidebar.ts` / `handoff-panel.ts` / `handoff-entry.ts` / `terminal.ts` / `ccnavi.ts` / `git.ts` / `tour.ts`は、VS CodeのAPIか子プロセスに触れるので単体テストの対象外。次の項目を拡張開発ホストで確かめる。チケットのある状態は、`go/internal/clitest/ticket/flow/board_test.go`の`boardSceneBuild`と同じ手順（親を承認し、子を着手して閉じ、次の子を提案する）を実際のリポジトリで踏んで作る。
 
 | # | 確認すること | 手順 | 期待 | ツールで代替できるか | 結果 |
 |---|---|---|---|---|---|

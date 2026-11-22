@@ -28,11 +28,6 @@ const (
 	fieldNotebook  = "notebook_path"
 )
 
-// integrate が統合先に使う名前（受けない）。
-var reservedNames = []string{"main", "master", "develop", "release"}
-
-const releasePrefix = "release-"
-
 // Entry は候補 1 つ。
 type Entry struct {
 	Name string
@@ -57,7 +52,8 @@ func (r row) entry() Entry {
 // IntegrableName は `integrate` が受ける名前か（実行ファイルの land の checkName と同じ検査）。統合先の名前と、
 // 識別子の形でない名前は integrate が断るので、促さない。
 func IntegrableName(name string) bool {
-	if slices.Contains(reservedNames, name) || strings.HasPrefix(name, releasePrefix) {
+	folded := pyfmt.Casefold(name)
+	if slices.Contains(config.ReservedBranchIDs(), folded) || strings.HasPrefix(folded, "release-") {
 		return false
 	}
 	if name == "" || strings.ContainsAny(name[:1], "-.") || strings.Contains(name, "..") || strings.ContainsAny(name, `/\`) {

@@ -105,7 +105,7 @@ ccnavi の文書を足す・直す・動かすときの決まり。要件書・�
 文書だけの変更でも、次を回す。
 
 ```sh
-uv run python -m tests tests/core
+cd go && go test ./internal/clitest/core/ ./internal/clitest/repo/
 ```
 
 リンクの先が実在することは、文書を直したあとに確かめる。

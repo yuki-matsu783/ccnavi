@@ -260,6 +260,17 @@ func TestShellScriptsAreChecked(t *testing.T) {
 	}
 }
 
+// 選ばなかった下書きが変わっても、選んだ分の Expect は変わらない。
+func TestExpectIgnoresUnselectedDrafts(t *testing.T) {
+	other := ".ccnavi/docs/other.md"
+	root, conf := workspace(t, map[string]string{draftRoot + docsRel: "a\n", draftRoot + other: "b\n"})
+	before := Prepare(conf, root, []string{docsRel}).Expect()
+	build(t, root, map[string]string{draftRoot + other: "changed\n"})
+	if after := Prepare(conf, root, []string{docsRel}).Expect(); after != before {
+		t.Errorf("選ばなかった下書きで変わった: %q != %q", after, before)
+	}
+}
+
 // 見せたあとに取り込み先\u304c変わる・途中にリンク\u304c置かれると、何も書かない。
 func TestTargetIsCheckedAgainJustBeforeWriting(t *testing.T) {
 	root, conf := workspace(t, map[string]string{draftRoot + docsRel: "new\n"})

@@ -221,6 +221,8 @@ var (
 	unixTime = regexp.MustCompile(`\b1[789]\d{8}(\d{3})?(\.\d+)?\b`)
 	isoTime  = regexp.MustCompile(`\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(\.\d+)?([+-]\d{2}:?\d{2}|Z)?`)
 	stamped  = regexp.MustCompile(`\d{8}[-T]?\d{6}(\d*)`)
+	// コミットの 40 桁。日時より先に印にする（中の数字の並びが日時に見えて、一部だけ置き換わるのを防ぐ）。
+	commitSha = regexp.MustCompile(`\b[0-9a-f]{40}\b`)
 	// 止めた回の鍵（ルール id と対象の要約）。対象はルートを含むので、要約は回すたびに変わる。
 	deniedKey = regexp.MustCompile(`(\S) [0-9a-f]{16}\b`)
 )
@@ -230,6 +232,7 @@ func normalize(s, root string) string {
 	// 記録の鍵はツリーのルートを畳んで持つ。
 	folded := pathcase.Fold(root)
 	s = strings.ReplaceAll(strings.ReplaceAll(s, jsonInner(folded), rootMark), folded, rootMark)
+	s = commitSha.ReplaceAllString(s, "<sha>")
 	s = isoTime.ReplaceAllString(s, "<time>")
 	s = stamped.ReplaceAllString(s, "<stamp>")
 	s = deniedKey.ReplaceAllString(s, "$1 <digest>")

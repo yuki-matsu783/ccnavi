@@ -4,7 +4,7 @@
  * ものにも投げて比べる。
  *
  * 判定のコアの見本は `test/fixtures/core-scenarios.json`。手元の試験
- * （`tests/ticket/test_swap_points.py`）が、手元で実際に書いたバイト列と同じ答えになることを確かめて
+ * （`go/internal/clitest/ticket/phases/chrome_test.go`）が、手元で実際に書いたバイト列と同じ答えになることを確かめて
  * 書き出したもので、ここでは WASM と手元向けのものがそのとおりの答えを返すことを見る。
  */
 import { after, test } from "node:test";

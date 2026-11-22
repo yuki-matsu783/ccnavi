@@ -10,8 +10,8 @@ import (
 )
 
 // ラッパーで守る場所を消す・別のコミットの中身に戻す形の、止める・通すの表（コマンド全体で見る。居場所の移動・
-// 読み切れない形・レビュー待ちの置き場を含む）。受入テスト（tests/guard/test_wrapguard.py の CorePathTest）が hook を
-// 1 件ずつ起こして見ていた表で、sh の写しが同じく止めることは受入テストの CorePathShAgreesTest が見る。
+// 読み切れない形・レビュー待ちの置き場を含む）。受入テスト（clitest/guard/self の TestCorePath…）が hook を
+// 1 件ずつ起こして見ていた表で、sh の写しが同じく止めることは受入テストの TestShAgreesOnCorePaths が見る。
 func TestCorePathsCommandTable(t *testing.T) {
 	root := workspace(t)
 	conf := testkit.Settings(t, root)
@@ -89,7 +89,7 @@ func TestCorePathsCommandTable(t *testing.T) {
 }
 
 // サブエージェントが子のワークツリーからシェルで親のワークツリーへ書く形の、止める・通すの表。受入テスト
-// （tests/guard/test_wrapguard.py の SubagentParentTreeTest）が hook を 1 件ずつ起こして見ていた表。
+// （clitest/guard/self の TestASubagentCannotWriteIntoTheParentTree など）が hook を 1 件ずつ起こして見ていた表。
 func TestParentTreeShellTable(t *testing.T) {
 	root := workspace(t)
 	conf := testkit.Settings(t, root)

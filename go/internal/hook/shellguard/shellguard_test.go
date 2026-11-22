@@ -395,4 +395,7 @@ func TestTicketRoleIgnoresPlantedFiles(t *testing.T) {
 	if !isParentTree(conf, root, parentTree) || isParentTree(conf, root, config.DefaultTickets) {
 		t.Error("IsParentTree が TicketRole と合わない")
 	}
+	if isParentTree(conf, root, childTree) {
+		t.Error("子が親と判定された")
+	}
 }

@@ -12,7 +12,7 @@ import (
 )
 
 // 止める箇所の分類（承認済みの置き場と操作記録の置き場はどのモードでも止める）と、サブエージェントの役割の表。
-// 受入テスト（tests/guard/test_gate_kinds.py）が hook を 1 件ずつ起こして見ていた組み合わせを、ここで全部見る。
+// 受入テストが hook を 1 件ずつ起こして見ていた組み合わせを、ここで全部見る。
 
 // emptyRulesWorkspace はルールを 1 本も持たない共通レイヤーだけのワークスペース。
 func emptyRulesWorkspace(t *testing.T) string {
@@ -106,6 +106,7 @@ var subagentStopped = []string{
 	"sh .ccnavi/scripts/ccnavi-sync.sh", "sh .ccnavi/scripts/ccnavi-worktree.sh add x",
 	"sh .ccnavi/scripts/ccnavi-clean.sh --worktree i0001-01-01", "sh .ccnavi/scripts/ccnavi-launcher.sh worktree add x",
 	"sh .ccnavi/scripts/ccnavi-launcher.sh review comment 3", "sh .ccnavi/scripts/ccnavi-launcher.sh",
+	"/bin/sh .ccnavi/scripts/ccnavi-ticket.sh finish i0001-01-01", "sh -c 'sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1'",
 }
 
 var subagentPassed = []string{

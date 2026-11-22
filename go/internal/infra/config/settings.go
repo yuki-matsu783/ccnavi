@@ -9,8 +9,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/BurntSushi/toml"
-
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pyjson"
@@ -60,8 +58,8 @@ const (
 	// SkillHeadLimit は SKILL.md（とサブエージェントの md）の frontmatter を探す頭の長さ（バイト）。本文は読まない。
 	SkillHeadLimit = 8 * 1024
 
-	// ownProject は ccnavi 自身のソースツリーを見分ける pyproject.toml の名前。
-	ownProject = "ccnavi"
+	// ownMarker は ccnavi 自身のソースツリーを見分ける目印（root からの相対パス）。scripts/ccnavi-build.sh と同じ見方。
+	ownMarker = "go/cmd/ccnavi/main.go"
 	// localFile は ccnavi 自身のソースツリーでだけ読む上書き設定。
 	localFile = "ccnavi.settings.local.json"
 )
@@ -181,7 +179,7 @@ func Load(root string) (*Settings, []string) {
 	}
 	s.BranchPrefixes, s.BranchPrefixesRejected = branchPrefixes(root)
 
-	if !ownSourceTree(root) {
+	if !OwnSourceTree(root) {
 		return s, nil
 	}
 	// ccnavi 自身を開発しているときだけ、編集を次のツール呼び出しから効かせる。開発の便宜であって
@@ -235,19 +233,10 @@ func resolveBin(root, path string) string {
 	return full
 }
 
-// ownSourceTree は root が ccnavi を開発しているチェックアウトか（pyproject.toml の project.name）。
+// OwnSourceTree は root が ccnavi を開発しているチェックアウトか（go/cmd/ccnavi/main.go の有無）。
 // 安全性の検査ではない。
-func ownSourceTree(root string) bool {
-	data, err := os.ReadFile(filepath.Join(root, "pyproject.toml"))
-	if err != nil {
-		return false
-	}
-	var doc map[string]any
-	if _, err := toml.Decode(string(data), &doc); err != nil {
-		return false
-	}
-	project, ok := doc["project"].(map[string]any)
-	return ok && project["name"] == ownProject
+func OwnSourceTree(root string) bool {
+	return ospath.DiskExists(filepath.Join(root, filepath.FromSlash(ownMarker)))
 }
 
 // 上書き設定を読み飛ばしたときの文。
@@ -320,7 +309,7 @@ func ReadHookView(root string) HookView {
 		}
 	}
 	ticketControl := values[env.TicketControl]
-	if ownSourceTree(root) {
+	if OwnSourceTree(root) {
 		if conf, _ := readLocal(root); conf != nil {
 			if v, ok := conf.Value("ticket_control").(string); ok {
 				ticketControl = v

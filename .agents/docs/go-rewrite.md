@@ -65,9 +65,9 @@ keywords: [Go, 書き直し, 移行, 起動時間, go test, CCNAVI_TEST_EXE, 正
 
 ## テスト
 
-- CLI を通すテスト（`tests.inproc.run_ccnavi` と sh のテスト）は Python のまま残し、Go の実行ファイルを起こす。sh の判断と解釈を Go で実装したら、それは Go の表駆動のテストで確かめ、sh のテストは通しの確認だけにする（[実行ファイルの境界](exe-boundary.md)の「テスト」）。実行ファイルは `tests/exe.py` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う。`tests/` は ccnavi の Python を読まない
+- CLI を通すテストと sh のテストも Go（`go/internal/clitest/`）で、Go の実行ファイルを起こす。sh の判断と解釈を Go で実装したら、それは Go の表駆動のテストで確かめ、sh のテストは通しの確認だけにする（[実行ファイルの境界](exe-boundary.md)の「テスト」）。実行ファイルは `harness/exe` が `go build` で組み、ソースが同じなら組み直さない。`CCNAVI_TEST_EXE=<実行ファイル>` を渡すと、組まずにそれを使う
 - 内部のモジュールを直に import していた単体テストは、`go test`（同じディレクトリの `*_test.go`）へ移した。表で書けるものは表駆動にした
-- `go test ./...` は Python を使わない。Python が無い機械でも、飛ばすテストは増えない
+- `go test ./...` は Python を使わない。テストは全部 Go で、Python が無い機械でも飛ばすテストは増えない
 
 ### 見本（testdata）
 
@@ -90,7 +90,6 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 - 残すもの
   - 不具合を直したときに足した回帰のテスト。何の不具合かをテスト名か 1 行のコメントで言う
   - OS・大文字小文字・改行・文字コードの違いを確かめるもの
-- 消したテストと理由は、移した単位ごとに報告にまとめる。CLI を通す Python のテストも、同じ基準で後でまとめて整理する
 
 ## Python と Go で答えが変わりやすいところ
 
@@ -107,7 +106,7 @@ Python の実装と答えを突き合わせていたテストは、Python を外
 
 ## 進み具合
 
-書き直しは終わった。配る実行ファイルは `scripts/ccnavi-build.sh` が組む Go のバイナリ、Chrome 拡張の判定は Go の WASM（`go/cmd/ccnavi-chrome`）、Python のテストが起こす ccnavi も Go のバイナリ（`tests/exe.py`）。Python の実行ファイル（`src/ccnavi/`）と、それを直に読む白箱のテストは消した。
+書き直しは終わった。配る実行ファイルは `scripts/ccnavi-build.sh` が組む Go のバイナリ、Chrome 拡張の判定は Go の WASM（`go/cmd/ccnavi-chrome`）、テストが起こす ccnavi も Go のバイナリ（`harness/exe`）。Python の実行ファイル（`src/ccnavi/`）と、テストの Python（`tests/`）は消した。
 
 行数は書き直す前の Python（消した `src/ccnavi/<層>` の `*.py`。空行・コメントも含む）の行数。
 
@@ -138,13 +137,8 @@ cd go && go vet ./... && go test ./...
 cd go && go test ./internal/hook/reasons -run TestTextsMatchGolden -update   # golden.Check の見本を書き直す
 ```
 
-`go/cmd/ccnavi/main.go` は標準入出力と引数を `entry/cli` の `Run` に渡して終わるだけ。配る実行ファイルは `scripts/ccnavi-build.sh` が組む（[組み立てと配布物](build-and-dist.md)）。Python の CLI のテストは、次のように Go の実行ファイルに当てる（版のコミットは `-ldflags "-X ccnavi/internal/entry/version.commit=<sha>"` で入れる）。
-
-```sh
-uv run python -m unittest tests.guard.test_permission_mode   # tests/exe.py が組む
-CCNAVI_TEST_EXE=/tmp/ccnavi-go uv run python -m unittest tests.guard.test_permission_mode   # 組んだものを使う
-```
+`go/cmd/ccnavi/main.go` は標準入出力と引数を `entry/cli` の `Run` に渡して終わるだけ。配る実行ファイルは `scripts/ccnavi-build.sh` が組む（[組み立てと配布物](build-and-dist.md)）。テストが使う実行ファイルは `harness/exe` が組む。組んだものを使うときは `CCNAVI_TEST_EXE=<実行ファイル> go test …` を渡す（版のコミットは `-ldflags "-X ccnavi/internal/entry/version.commit=<sha>"` で入れる）。
 
 依存の向きは `go/internal/layers_test.go` が見る。パッケージを足したら、先にその表（`topTiers` と、親のパスごとの `subTiers`）に行を足す。
 
-依存は `go mod tidy` で整える。外の依存は `golang.org/x/text` と `github.com/BurntSushi/toml` だけにする。
+依存は `go mod tidy` で整える。外の依存は `golang.org/x/text` だけにする。

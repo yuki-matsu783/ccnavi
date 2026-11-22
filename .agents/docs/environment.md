@@ -1,9 +1,9 @@
 ---
 type: guide
 title: 実行環境とADRの扱い
-description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と必要な道具の版、sh・Pythonを書くときの決まり、実測で分かった環境固有の落とし穴、コードのコメントの粒度、文書やコメントでのADRへの触れ方
+description: ccnaviの開発で対応する実行環境（Windows、macOS、Linux）と必要な道具の版、shを書くときの決まり、実測で分かった環境固有の落とし穴、コードのコメントの粒度、文書やコメントでのADRへの触れ方
 tags: [sh-scripts, environment]
-keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落とし穴, uv, go, jq, CP932, Docker, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
+keywords: [コメント, 粒度, docstring, 処理フロー, 版, 落とし穴, go, jq, CP932, Docker, gitdir, 大文字小文字, casefold, normcase, pathcase, 実行環境, 環境, Windows, macOS, Linux, Git Bash, WSL, sh, bash, BSD, ADR, ADR番号, コメント]
 ---
 
 # 実行環境とADRの扱い
@@ -12,13 +12,13 @@ keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落と
 
 - 対応する実行環境は、WindowsのGit Bash、WindowsのWSL、Claude Code on the web（Linux）、macOSの4つ。shはどの環境でも動くように書く
 - macOSの`sh`はbash 3.2で、`sed`などのコマンドはBSD版。変数のすぐ後ろに全角文字を続けるときは`${var}`と括る。
-  `$( )`の中には`case`を書かない。この2点は`tests/core/test_sh_portability.py`が検査する
-- shでもPythonでも、ヒアドキュメント（`<<`）でファイルや入力を作らない。複数行のPythonによる書き換えや追記は、
-  Writeでスクリプトをファイルに置いてから、そのファイルを実行する（`python3 <パス>`）。
+  `$( )`の中には`case`を書かない。この2点は`go/internal/clitest/repo/sh_portability_test.go`が検査する
+- shでもほかの言語でも、ヒアドキュメント（`<<`）でファイルや入力を作らない。複数行のスクリプトによる書き換えや追記は、
+  Writeでスクリプトをファイルに置いてから、そのファイルを実行する。
   空のファイルを作るだけのときも同じで、Writeで作る。
   ヒアドキュメントで書いたファイルは、Write / Editに掛かる権限の宣言も、編集後の検査も通らないため
-- 使える道具は`jq` 1.6、Node 22.13.1 以上（pnpm 10）、Python 3.12 以上（uv）、goだけ。これ以外の道具がある前提で書かない。
-  実行ファイルはGo（`go/`）で組み立てる。Pythonはテストを回すのに使い、依存はPyYAML 1本だけ（`pyproject.toml`）。検査の道具（ruff）は開発時にしか要らない。
+- 使える道具は`jq` 1.6、Node 22.13.1 以上（pnpm 10）、goだけ。これ以外の道具がある前提で書かない。
+  実行ファイルとテストはGo（`go/`）で組み立てて回す。例外は、スキル `yomiyasu` の道具（`yomiyasu_lint.py`）で、標準ライブラリだけの`python3`で動く。
   例外は、ホスト（GitHub・GitLab）と話すsh（`ccnavi-review.sh`・`ccnavi-branches.sh`・`ccnavi-start.sh`など）で、
   `gh`・`glab`・`curl`を使う。無ければ何を用意すればよいかを案内して止まる
 - Claude Code on the webには`.ccnavi/bin`が無い。ccnaviのhookを動かすには、
@@ -29,12 +29,9 @@ keywords: [コメント, 粒度, docstring, 処理フロー, 版, PyYAML, 落と
 
 Claude Codeの振る舞いについて測った前提は設計書の付録C（[appendix.md](../../docs/21_design/appendix.md)）にある。ここには環境ごとの落とし穴を置く。
 
-- **ワークツリーが消せない（Windows）。** uvのハードリンクで`.venv`の`_yaml.*.pyd`が全ツリーで同じ実体になり、
-  誰かのテストが読み込んでいる間は消せない。`pyproject.toml`の`link-mode = "copy"`で分けてあるが、
-  ハードリンクで作った`.venv`はそのままなので、テストが走っていないときに作り直す。自分のテストが走っている間は残る。
+- **ワークツリーが消せない（Windows）。** 別のプロセスが読み込んでいる実体（node_modules の`.node`など）は消せない。
   失敗したら残ったディレクトリを`mv`で`.claude/worktrees/`の外へ出して`git worktree prune`。
   先に`sh .ccnavi/scripts/ccnavi-clean.sh <名前>`で生成物を消すとnode_modulesで止まる分は避けられる
-- **Pythonの識別子に空白は入らない。** `def test_warn は…`のように英字と日本語の間に空白を入れると構文エラー
 - **Windowsのコンソール経由で日本語を引数に渡すとCP932になり、`jq --arg`がUTF-8でないJSONを作る。** 本文はファイルで渡す。
   `jq`の実体は`C:\Program Files\jq\jq`で、`"$JQ"`と引用しないと空白で分かれる
 - **Windowsの`gitdir:`の表記**（git 2.39.2、Git BashとPowerShell）。絶対パス、区切りは`/`、ドライブレターは大文字、
@@ -44,10 +41,10 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
 - **macOSの`/etc`・`/tmp`・`/var`は`/private`へのリンク。** `ospath.Realpath`で実体化すると先頭に`private`が付く。
   実体化する関数（`tree.PartsUnder`など）のテストに実在のリンクを渡さない。存在しないパスか、`realpath`を通した一時ディレクトリで組む
 - **macOSのbashは`~/.bash_profile`、Linuxのbashは`~/.bashrc`を読む。** 導入スクリプトの案内は、bashだけ`uname -s`で分ける（zshは`~/.zshrc`）。
-  テストは`uname`のスタブをPATHの先頭に置き、どのOSで回しても両方の分岐を通す（`tests/sh/test_setup.py`の`fake_uname`）
+  テストは`uname`のスタブをPATHの先頭に置き、どのOSで回しても両方の分岐を通す（`go/internal/clitest/sh/setup`の`fakeUname`）
 - **gitのグローバルの無視ファイル（`~/.config/git/ignore`）は`GIT_CONFIG_GLOBAL`で塞がらない。** Claude Codeを使う機械には
   `**/.claude/settings.local.json`が入っており、テストが`git add -A`で作るリポジトリにその設定ファイルが入らなくなる。
-  OSの差ではなく機械の差で、Linuxの開発機でも起きる。`tests/__init__.py`の`_block_host_git_config`が`core.excludesFile`を空のファイルへ向けて塞ぐ。
+  OSの差ではなく機械の差で、Linuxの開発機でも起きる。`go/internal/harness/base`の`Main`が`core.excludesFile`を空のファイルへ向けて塞ぐ。
   テストが作るリポジトリに、機械の設定で落ちるファイルが無いかを疑うときは、まずこれを見る
 - `dist/`、`build/`、`logs/`はgit管理外。記録には絶対パスとコマンド全文が入るのでコミットしない
 
@@ -63,7 +60,7 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
 - ワークツリーの名前は`tree.WorktreePath`で引く。在るディレクトリの実際の表記で返る。
   大文字小文字だけ違う別のワークツリー・識別子・ブランチを作らない。作ろうとしたら拒否または警告する
 - テストで「大文字小文字だけ違うブランチ」をリモートに置くときは、`refs/heads/`の下のファイル（loose ref）にしない。
-  区別しないFSでは同じファイルになって置けない。bareの`packed-refs`に2行並べる（`tests/sh/test_sync_sh.py`の`add_ref_differing_only_in_case`）
+  区別しないFSでは同じファイルになって置けない。bareの`packed-refs`に2行並べる（`go/internal/clitest/sh/start/sync_test.go`の`addRefDifferingOnlyInCase`）
 - 「表記まで同じであること」を求める判定を新しく足さない
 - sh の`case`でパスを比べるときも、同じ場所の別の綴りを通すつもりで書く。ccnavi が自分で組んだ
   `<root>/.claude/worktrees/*`のようなパスは、綴りが決まっているので`case`のままでよい
@@ -79,8 +76,8 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
 
 | 場所 | 書くこと |
 |---|---|
-| パッケージの説明（Go は `doc.go`、テストの Python はモジュール先頭の docstring） | 役割を1文。入出力の契約、触る状態と置き場、失敗したときの振る舞い、呼ぶ側との境界（何をしない・何を呼び側に任せるか） |
-| 公開する関数・型の説明（Go は宣言の直前のコメント、Python は docstring） | 名前と型から読み取れないものだけ。前提条件、戻り値の意味、例外や終了コード、副作用 |
+| パッケージの説明（Go は `doc.go`） | 役割を1文。入出力の契約、触る状態と置き場、失敗したときの振る舞い、呼ぶ側との境界（何をしない・何を呼び側に任せるか） |
+| 公開する関数・型の説明（Go は宣言の直前のコメント） | 名前と型から読み取れないものだけ。前提条件、戻り値の意味、例外や終了コード、副作用 |
 | 手順が複数ある関数の docstring | `処理フロー:` の見出しのあとに、処理を番号つきで並べる（呼ぶ先の名前を添える）。コードを開かなくても、入口から出口までの流れが追える |
 | 関数の中のコメント | 処理のまとまりごとに、何をするかの概要を1行（長い関数の段落の見出しとして、上から読めば流れが分かる）。理由（なぜそうするか）、落とし穴、順序に依存するところは、そこに足す |
 

@@ -146,3 +146,38 @@ func TestOutsideOfSeparatesTicketPlaces(t *testing.T) {
 		t.Errorf("範囲の外 %+v", outside)
 	}
 }
+
+// regex で範囲を書いた子も、実際のパスで子・親・定義の上限を順に当てる。範囲の表記は glob の子と同じく大文字小文字を区別
+// せず、区別したいときは `(?-i:...)` で囲む。
+func TestOfAppliesARegexChild(t *testing.T) {
+	parent := parentOf(t, "  - work\n  - design\n", "src/*", "wip/*")
+	regexChild := func(pattern string) *ticket.Ticket {
+		return parse(t, "---\nversion: 1\nticket: i0001-02-01\nparent: i0001\nphase: 2\n"+
+			"human_review:\n  required: false\n  reason: t\ntitle: 子\nrationale: r\n"+
+			"allow:\n  - match: Write|Edit\n    regex: '"+pattern+"'\n---\n\n本文\n")
+	}
+	tests := []struct {
+		name    string
+		pattern string
+		rel     string
+		want    rules.Decision
+		limit   Limit
+	}{
+		{"3 つの上限の中", "^(wip/design|src/a|docs)/", "wip/design/x.md", rules.Allow, limitNone},
+		{"定義の上限の外は定義を名指す", "^(wip/design|src/a|docs)/", "src/a/x.py", ticket.Outside, LimitType},
+		{"親の範囲の外は親を名指す", "^(wip/design|src/a|docs)/", "docs/x.md", ticket.Outside, LimitParent},
+		{"子の範囲の外", "^(wip/design|src/a|docs)/", "tests/x.py", ticket.Outside, limitTicket},
+		{"大文字小文字を区別しない", "^wip/design/", "wip/Design/x.md", rules.Allow, limitNone},
+		{"(?-i:) で囲めば区別する（同じ表記）", "^wip/(?-i:design)/", "wip/design/x.md", rules.Allow, limitNone},
+		{"(?-i:) で囲めば区別する（綴り違い）", "^wip/(?-i:design)/", "wip/Design/x.md", ticket.Outside, limitTicket},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			child := regexChild(tt.pattern)
+			v := Of(child, parent, TypeFor(child, parent), tt.rel)
+			if v.Decision != tt.want || v.Limit != tt.limit {
+				t.Errorf("Of = %q %q", v.Decision, v.Limit)
+			}
+		})
+	}
+}

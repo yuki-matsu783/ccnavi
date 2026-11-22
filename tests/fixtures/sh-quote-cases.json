@@ -1,5 +1,5 @@
 {
-  "note": "単引用符で囲む写し（sh の ccnavi_sh_quote と Go の shell.SingleQuote）。sh は tests/sh/test_sh_quote_sh.py、Go は go/internal/infra/shell/quote_sh_test.go が同じ表で確かめる。",
+  "note": "単引用符で囲む写し（sh の ccnavi_sh_quote と Go の shell.SingleQuote）。sh は go/internal/clitest/sh/small/shquote_test.go、Go は go/internal/infra/shell/quote_sh_test.go が同じ表で確かめる。",
   "cases": [
     {
       "in": "",

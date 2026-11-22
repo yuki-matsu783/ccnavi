@@ -146,10 +146,10 @@ func nextStep(root, worktree string, ph *phase.Phase) (Step, []string) {
 		if s := ph.States[child.ID]; s != place.Review && s != place.Done {
 			continue
 		}
-		merged := child.MergedSHA != "" && git.IsAncestor(worktree, child.MergedSHA, "HEAD", git.Options{}).OK()
-		if !merged {
+		switch state, _ := closing.MergeOf(root, worktree, child, git.DefaultTimeout); state {
+		case closing.NoMergedSHA, closing.NotAncestor:
 			unmerged = append(unmerged, child.ID)
-		} else if closing.UnmergedFix(root, worktree, child, git.DefaultTimeout) != "" {
+		case closing.LateFix:
 			late = append(late, child.ID)
 		}
 	}

@@ -282,7 +282,7 @@ esac
 out=$(mktemp 2>/dev/null || mktemp -t ccnavi-git) || reject no-temp "一時ファイルを作れないため、git の出力を受けられません。ユーザに伝えてください。"
 trap 'rm -f "$out"' EXIT
 status=0
-git --no-pager "$sub" ${1+"$@"} >"$out" 2>&1 || status=$?
+LC_ALL=C git --no-pager "$sub" ${1+"$@"} >"$out" 2>&1 || status=$?
 
 # fetch を試して失敗した印（worktree add の起点の確認が、オフラインで詰まらないように使う）。
 # 成功すれば消す。FETCH_HEAD の更新時刻は成功した fetch でしか進まない。

@@ -3,7 +3,7 @@ package host
 import "testing"
 
 // origin の URL の読み方。トークンを埋めた形（`https://oauth2:<token>@host/...`）で、ユーザ情報が
-// ホストに入り込まないこと。sh の側は tests/sh/test_review_origin.py が確かめる。
+// ホストに入り込まないこと。sh の側は clitest/sh/review が確かめる。
 func TestClassifyReadsTheHostThroughUserinfoAndPort(t *testing.T) {
 	cases := map[string]Kind{
 		"https://github.com/o/r.git":                           GitHub,

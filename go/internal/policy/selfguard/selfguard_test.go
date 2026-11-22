@@ -37,7 +37,7 @@ func shellHits(t *testing.T) func(string) bool {
 	return func(command string) bool { return rule.Matches("Bash", shell.Read(command).Text) }
 }
 
-// 止める形と通す形の代表（tests/config/test_config_union_holes.py の表から、cd・sh -c の層を要しないもの）。
+// 止める形と通す形の代表（go/internal/hook/judge/testdata/shell_guard.json（TestShellGuardTable）の表から、cd・sh -c の層を要しないもの）。
 func TestShellRuleTable(t *testing.T) {
 	hits := shellHits(t)
 	for _, c := range []struct {
@@ -175,6 +175,8 @@ func TestTooManyRedirects(t *testing.T) {
 	}{
 		{strings.Repeat(">", RedirectLimit), false},
 		{strings.Repeat(">", RedirectLimit+1), true},
+		{strings.Repeat(">>", RedirectLimit/2), false},
+		{strings.Repeat(">>", RedirectLimit/2+1), true},
 		{">" + strings.Repeat("a", RawLengthLimit), true},
 		{">" + strings.Repeat("a", RawLengthLimit-1), false},
 		{strings.Repeat("a", RawLengthLimit*2), false},

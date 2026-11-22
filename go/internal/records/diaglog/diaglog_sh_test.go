@@ -7,7 +7,7 @@ import (
 )
 
 // sh（ccnavi-common-log.sh）と拡張（log.ts）と同じ入力から、同じ行を出す（時刻と pid を除く）。
-// 入力と答えは tests/sh/test_diaglog_sh.py の CASES・EXPECTED と同じ。
+// 入力と答えは sh 側の試験（clitest/sh/small）と同じ。
 func TestSameLinesAsTheShAndTheExtension(t *testing.T) {
 	root := setup(t)
 	t.Setenv(env.LogLevel, "DEBUG")

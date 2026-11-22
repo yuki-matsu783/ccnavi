@@ -21,7 +21,7 @@ type conclusionOf struct {
 }
 
 // 見本から sh が組んだ JSON（expected.json）から出る結論（変更要求と未解決のスレッド）が、見本の
-// conclusion.json と同じ。expected.json は tests/sh/test_review_host_fixture.py が sh で組んで比べる。
+// conclusion.json と同じ。expected.json は clitest/sh/review の試験が sh で組んで比べる。
 // CCNAVI_HOST_FIXTURE=1 を付けて回すと conclusion.json を書き直す（expected.json を録り直した後）。
 func TestHostFixtureConclusions(t *testing.T) {
 	for _, kind := range []Kind{GitHub, GitLab} {

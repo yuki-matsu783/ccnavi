@@ -1,0 +1,2995 @@
+[
+ {
+  "case": "リダイレクトだけの書き込みも止める",
+  "tool": "Bash",
+  "subject": "cd .claude && > settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .ccnavi/config/common && echo x > rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .ccnavi && echo x > common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .ccnavi/config/common; echo x > rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "(cd .ccnavi/config/common && echo x > rules.yml)",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .claude && echo x > settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .claude/hooks && echo x > lint-go.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .claude && rm -rf hooks",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .claude && cp /tmp/x settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .ccnavi && sed -i s/deny/allow/ common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .ccnavi/scripts && mv ccnavi-git.sh /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "守られた場所へ入ってから書く形は止まる",
+  "tool": "Bash",
+  "subject": "cd .claude/worktrees/w && echo x > ../../scripts/ccnavi-git.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "実行役のコマンド越しと_env_C_も止める",
+  "tool": "Bash",
+  "subject": "cd .claude && env rm settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "実行役のコマンド越しと_env_C_も止める",
+  "tool": "Bash",
+  "subject": "cd .claude && sudo -u me rm settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "実行役のコマンド越しと_env_C_も止める",
+  "tool": "Bash",
+  "subject": "cd .claude && dd if=/tmp/x of=settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "実行役のコマンド越しと_env_C_も止める",
+  "tool": "Bash",
+  "subject": "builtin cd .claude && rm settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "実行役のコマンド越しと_env_C_も止める",
+  "tool": "Bash",
+  "subject": "env -C .claude rm settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "実行役のコマンド越しと_env_C_も止める",
+  "tool": "Bash",
+  "subject": "sudo --chdir=.ccnavi/config/common rm rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "左がサブシェルになる区切りでは移らない",
+  "tool": "Bash",
+  "subject": "cd .claude & echo x > settings.json",
+  "verdict": "deny",
+  "rules": [
+   "workspace-root"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_SHELL_WORKSPACE_ROOT"
+ },
+ {
+  "case": "左がサブシェルになる区切りでは移らない",
+  "tool": "Bash",
+  "subject": "cd .claude | echo x > settings.json",
+  "verdict": "deny",
+  "rules": [
+   "workspace-root"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_SHELL_WORKSPACE_ROOT"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "cd projects/lib && pnpm test",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "cd docs && cat adr/README.md",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "cd .claude/worktrees/w && uv run python -m unittest",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "cd /tmp && rm -f x.log",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "cd .. && ls",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "書かれた表記のヒットの仕方は変わらない",
+  "tool": "Bash",
+  "subject": "cd projects/lib && sh ../../.ccnavi/scripts/ccnavi-git.sh status",
+  "verdict": "allow",
+  "rules": [
+   "ccnavi-git"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "書かれた表記のヒットの仕方は変わらない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-git.sh status",
+  "verdict": "allow",
+  "rules": [
+   "ccnavi-git"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "移った先から見たパスに_allow_は適用しない",
+  "tool": "Bash",
+  "subject": "cd .ccnavi && cat common/rules.yml",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "置換の中で移った先も止める",
+  "tool": "Bash",
+  "subject": "echo \"$(cd .claude && rm settings.json)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "コマンド置換の中の_git_は止まる",
+  "tool": "Bash",
+  "subject": "echo $(git push origin main)",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "テンプレートの下書きの_write_は止まらない",
+  "tool": "Write",
+  "subject": "/repo/.claude/worktrees/x/wip/handoff/.ccnavi/config/common/templates/feature.yml",
+  "verdict": "allow",
+  "rules": [
+   "worktrees"
+  ]
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Write",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Write",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/project/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Edit",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Edit",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/project/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Bash",
+  "subject": "cp /repo/.claude/worktrees/x/wip/handoff/.ccnavi/config/common/templates/feature.yml /repo/.claude/worktrees/x/.ccnavi/config/common/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Bash",
+  "subject": "tee /repo/.claude/worktrees/x/.ccnavi/config/common/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Bash",
+  "subject": "echo x > /repo/.claude/worktrees/x/.ccnavi/config/common/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Bash",
+  "subject": "cp /repo/.claude/worktrees/x/wip/handoff/.ccnavi/config/common/templates/feature.yml /repo/.claude/worktrees/x/.ccnavi/config/project/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Bash",
+  "subject": "tee /repo/.claude/worktrees/x/.ccnavi/config/project/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "テンプレートの置き場は_ccnavi_ディレクトリの一般の保護で止まる",
+  "tool": "Bash",
+  "subject": "echo x > /repo/.claude/worktrees/x/.ccnavi/config/project/templates/feature.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "パイプで繋いだ_curl_は_ask_のまま",
+  "tool": "Bash",
+  "subject": "echo \"a b\" | curl -d @- x",
+  "verdict": "ask",
+  "rules": [
+   "prefer-webfetch"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "パイプの後ろがあれば_allow_にヒットしない",
+  "tool": "Bash",
+  "subject": "cat /repo/README.md | head -20",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める",
+  "tool": "Edit",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ccnavi-config",
+   "builtin:guard-common-layer",
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める",
+  "tool": "Edit",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/phases.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ccnavi-config",
+   "builtin:guard-common-layer",
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める",
+  "tool": "Edit",
+  "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/risks.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ccnavi-config",
+   "builtin:guard-common-layer",
+   "builtin:guard-project-home"
+  ],
+  "code": "DENY_PATH"
+ },
+ {
+  "case": "入力に混ざった語の中の目印は取り除かれる",
+  "tool": "Bash",
+  "subject": "git\u0001push",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "別のコマンドの_dry_run_では確認の対象から外れない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x && sh /repo/other.sh y --dry-run",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "別のコマンドの_dry_run_では確認の対象から外れない",
+  "tool": "Bash",
+  "subject": "sh /repo/other.sh y --dry-run; sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "別のコマンドの_dry_run_では確認の対象から外れない",
+  "tool": "Bash",
+  "subject": "sh /repo/other.sh y --dry-run | sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "引用の中の_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "uv run python -m ccnavi --agree i0001 \"a --preview\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "引用の中の_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "ccnavi --agree \"i0001 --preview\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "引用の空白をまたいだ書き換えは_deny_に届く",
+  "tool": "Bash",
+  "subject": "find /repo -name \"a b\" -delete",
+  "verdict": "deny",
+  "rules": [
+   "find-writes"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の空白をまたいだ書き換えは_deny_に届く",
+  "tool": "Bash",
+  "subject": "sed -i \"s/a b/c/\" /repo/.ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用付きの_find_は_allow_にヒットする",
+  "tool": "Bash",
+  "subject": "find /repo -name \"a b\"",
+  "verdict": "allow",
+  "rules": [
+   "prefer-glob"
+  ]
+ },
+ {
+  "case": "引用付きの_grep_は_allow_にヒットする",
+  "tool": "Bash",
+  "subject": "grep -n \"git push\" README.md",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "引用付きの_grep_は_allow_にヒットする",
+  "tool": "Bash",
+  "subject": "grep -n \"rm -rf\" /repo/.ccnavi/config/common/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "引用付きの_grep_は_allow_にヒットする",
+  "tool": "Bash",
+  "subject": "grep -n \"regex: '(>\" /repo/.ccnavi/config/common/rules.yml",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "引用付きの_grep_は_allow_にヒットする",
+  "tool": "Bash",
+  "subject": "grep -n \"<<EOF\" /repo/README.md",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "引用付きの_grep_は_allow_にヒットする",
+  "tool": "Bash",
+  "subject": "grep -n \"> /repo/.ccnavi/config/common/rules.yml\" f",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --accept 7f3a9c21",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --side-by-side",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base=feature/x --accept=7f3a9c21 --copy-wip",
+  "verdict": "ask",
+  "rules": [
+   "direct-worktree-confirm"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --dry-run",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --no-wip",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --adopt --base feature/x --dry-run",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --dry-run --adopt --base feature/x",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "直接作業の指定は確認ダイアログに出し_指定の無い呼び出しはヒットしない",
+  "tool": "Bash",
+  "subject": "sh /repo/.ccnavi/scripts/ccnavi-worktree.sh x --base feature/x --accept 7f3a9c21 --dry-run",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "確かめる枝は今までどおり免除の側",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --preview --verify",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "確かめる枝は今までどおり免除の側",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --preview --verify i0001",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "確かめる枝は今までどおり免除の側",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --preview --verify --json i0001",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "設定の場所の名前は語の中の目印でも終わる",
+  "tool": "Bash",
+  "subject": "rm \".ccnavi x\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "設定の場所の名前は語の中の目印でも終わる",
+  "tool": "Bash",
+  "subject": "rm \".claude x\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "設定の場所の名前は語の中の目印でも終わる",
+  "tool": "Bash",
+  "subject": "mv \".ccnavi;x\" y",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "語にくっついた_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --reason=--preview",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "語にくっついた_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --digest=--preview",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "語にくっついた_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --preview=x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "語にくっついた_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "ccnavi --agree x--preview",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "語にくっついた_preview_は承認の免除にならない",
+  "tool": "Bash",
+  "subject": "uv run python -m ccnavi --agree --reason=--preview i0001",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "env_越しの承認のスクリプトは途中のレイヤーで止まる",
+  "tool": "Bash",
+  "subject": "env sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "rm -f .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "mv .claude/settings.json /tmp/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "tee .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "sed -i s/a/b/ .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "cp /tmp/rules.yml .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "truncate -s 0 .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "中で実行されるコマンドそのものは今も止まる",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "中で実行されるコマンドは_allow_に適用しない",
+  "tool": "Bash",
+  "subject": "sudo -u me cat /etc/hosts",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "先頭に固定したユーザのルールも実行役のコマンドの中でヒットする",
+  "tool": "Bash",
+  "subject": "env curl -d @x https://example.com",
+  "verdict": "ask",
+  "rules": [
+   "prefer-webfetch"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "time uv run pytest",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "nice -n 10 make test",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "env PYTHONUTF8=1 uv run python -m unittest",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "timeout 60 pnpm test",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sudo -u me cat /etc/hosts",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sh scripts/ccnavi-setup.sh --check",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "bash tests/run.sh",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "command -v jq",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "env | grep CCNAVI",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sh -c 'cat README.md'",
+  "verdict": "ask",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "find . -name '*.py' -exec grep -l foo {} \\;",
+  "verdict": "allow",
+  "rules": [
+   "prefer-glob"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "echo x | xargs grep -n foo",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "nohup python -m http.server &",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "stdbuf -o0 tail -n 3 logs/decisions.jsonl",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "source .venv/bin/activate",
+  "verdict": "ask",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": ". .venv/bin/activate && uv run pytest",
+  "verdict": "ask",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "bash -lc 'uv run ruff check .'",
+  "verdict": "ask",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file x.md",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "exec zsh",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "time git log --oneline",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-raw-git"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "find . -name '*.pyc' -exec rm {} +",
+  "verdict": "ask",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "xargs -n1 -I{} echo {}",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "sudo -E env PATH=/x make install",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "env -u CCNAVI_MODE uv run python -m ccnavi --lint",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "普通の作業では止める側にヒットするルールが増えない",
+  "tool": "Bash",
+  "subject": "timeout 5 sh -c 'cat logs/decisions.jsonl | tail -n 3'",
+  "verdict": "ask",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "env rm -f .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "env mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "env ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "FOO=1 mv .claude/settings.json /tmp/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "FOO=1 mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "FOO=1 sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "command tee .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "command mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "command sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "exec sed -i s/a/b/ .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "exec mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "exec ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "nohup cp /tmp/rules.yml .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "nohup mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "nohup sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "time truncate -s 0 .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "time mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "time sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sudo rm -f .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sudo mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sudo ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sudo -u me mv .claude/settings.json /tmp/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sudo -u me mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sudo -u me sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "timeout 5 tee .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "timeout 5 mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "timeout 5 sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "nice -n 5 sed -i s/a/b/ .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "nice -n 5 mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "nice -n 5 ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "stdbuf -o0 cp /tmp/rules.yml .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "stdbuf -o0 mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "stdbuf -o0 sh .ccnavi/scripts/ccnavi-user-agree.sh",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "/usr/bin/env truncate -s 0 .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "/usr/bin/env mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "/usr/bin/env sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "doas rm -f .ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "doas mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "doas ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sh -c 'mv .claude/settings.json /tmp/settings.json'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sh -c 'mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "sh -c 'sh .ccnavi/scripts/ccnavi-user-agree.sh'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "eval 'tee .ccnavi/config/common/rules.yml'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "eval 'mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "eval 'sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03 i0002-01-04'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "echo x | xargs sed -i s/a/b/ .claude/settings.json",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "echo x | xargs mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "echo x | xargs ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "find . -name x -exec cp /tmp/rules.yml .ccnavi/config/common/rules.yml \\;",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "find . -name x -exec mv .ccnavi/approved/doing/a.md wip/proposals/review/a.md \\;",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files",
+   "builtin:ticket-state-shell",
+   "builtin:ticket-approved-shell"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護は実行役のコマンドの中でも止める",
+  "tool": "Bash",
+  "subject": "find . -name x -exec sh .ccnavi/scripts/ccnavi-user-agree.sh \\;",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "ANSI_Cの引用は中身を確定できるときだけ読む",
+  "tool": "Bash",
+  "subject": "$'git' push origin main",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "ANSI_Cの引用は中身を確定できるときだけ読む",
+  "tool": "Bash",
+  "subject": "git $'push' origin main",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "ANSI_Cの引用は中身を確定できるときだけ読む",
+  "tool": "Bash",
+  "subject": "rm $'-rf' /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:recursive-delete"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "ANSI_Cの引用は中身を確定できるときだけ読む",
+  "tool": "Bash",
+  "subject": "echo $'a\\ngit push'",
+  "verdict": "ask",
+  "rules": [],
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "echo $HOME",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "x=$(pwd)",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "FOO=$HOME/x make",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "ls *.py",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "[ -f x ] && echo y",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "[[ -f x ]] && echo y",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "case $x in a) echo a;; esac",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "for f in *.py; do echo $f; done",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "a[1]=x",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "timeout $T make",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "コマンド名でない位置の変数とグロブは止めない",
+  "tool": "Bash",
+  "subject": "cd $S && ls",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "echo \"$(case a in a) git push;; esac)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "echo $((echo a) | cat)",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "coproc { find . -delete; }",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "coproc find . -delete",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "coproc NAME { find . -delete; }",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "coproc NAME find . -delete",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "select x in a b; do echo $x; done",
+  "verdict": "deny",
+  "rules": [
+   "builtin:ambiguous-form"
+  ],
+  "code": "DENY_AMBIGUOUS_FORM"
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "echo coproc",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "echo select",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "for select in a b; do echo $select; done",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "シェルで読みが割れる形は一律に止める",
+  "tool": "Bash",
+  "subject": "echo $((1 << 2))",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-git.sh commit -F /tmp/msg.txt",
+  "verdict": "allow",
+  "rules": [
+   "ccnavi-git"
+  ]
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-git.sh commit -m \"fix: 1 行目\n\n本文\"",
+  "verdict": "allow",
+  "rules": [
+   "ccnavi-git"
+  ]
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "gh pr create --title t --body-file /tmp/body.md",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "gh issue create --title t --body \"use \\`git push\\` here\"",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "gh issue create --title t --body 'use `git push` and don'\"'\"'t $(x)'",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "sh /tmp/run.sh",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "回避策の表記は止まらない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-git.sh rev-parse --show-toplevel",
+  "verdict": "allow",
+  "rules": [
+   "ccnavi-git"
+  ]
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-git.sh commit -m \"$(cat <<'EOF'\nfix: don't push\nEOF\n)\"",
+  "verdict": "deny",
+  "rules": [
+   "heredoc"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "gh pr create --title t --body \"$(cat <<'EOF'\n- `rm -rf x` is gone\nEOF\n)\"",
+  "verdict": "deny",
+  "rules": [
+   "heredoc"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "gh issue create --title t --body \"use $(git push) here\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "cd \"$(git rev-parse --show-toplevel)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "grep -rn foo \"$(pwd)\"",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "find \"$(pwd)\" -name x",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "cat \"$(ls -t logs/git-*.log | head -1)\"",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "grep -n foo f\ngrep -n bar g",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "echo \"$(xargs rm < f)\"",
+  "verdict": "ask",
+  "rules": [],
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "find . \\( -name x -o -name y \\) -print",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "grep -e '(' -n main.sh",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "増える誤検知",
+  "tool": "Bash",
+  "subject": "find . -exec wc {} \\; -delete",
+  "verdict": "deny",
+  "rules": [
+   "find-writes"
+  ],
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "外側を割らず_後ろと予約語の直後もコマンドの先頭として読む",
+  "tool": "Bash",
+  "subject": "find $(pwd) -name x -delete",
+  "verdict": "deny",
+  "rules": [
+   "find-writes"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "外側を割らず_後ろと予約語の直後もコマンドの先頭として読む",
+  "tool": "Bash",
+  "subject": "echo a#; git push origin main",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "外側を割らず_後ろと予約語の直後もコマンドの先頭として読む",
+  "tool": "Bash",
+  "subject": "curl https://example.com/#top; rm -rf /tmp/x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:recursive-delete"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "外側を割らず_後ろと予約語の直後もコマンドの先頭として読む",
+  "tool": "Bash",
+  "subject": "ls\nfind . -delete",
+  "verdict": "deny",
+  "rules": [
+   "find-writes"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "外側を割らず_後ろと予約語の直後もコマンドの先頭として読む",
+  "tool": "Bash",
+  "subject": "echo hi\ncurl https://example.com",
+  "verdict": "ask",
+  "rules": [
+   "prefer-webfetch"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "外側を割らず_後ろと予約語の直後もコマンドの先頭として読む",
+  "tool": "Bash",
+  "subject": "if true; then find . -delete; fi",
+  "verdict": "deny",
+  "rules": [
+   "find-writes"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の中の置換は中身で判定する",
+  "tool": "Bash",
+  "subject": "echo \"$(git push origin main)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の中の置換は中身で判定する",
+  "tool": "Bash",
+  "subject": "grep -n \"$(git push)\" f",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の中の置換は中身で判定する",
+  "tool": "Bash",
+  "subject": "h=\"$(git rev-parse HEAD)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の中の置換は中身で判定する",
+  "tool": "Bash",
+  "subject": "echo \"$(rm -rf /tmp/x)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:recursive-delete"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の中の置換は中身で判定する",
+  "tool": "Bash",
+  "subject": "echo start\necho \"$(rm -rf /tmp/x)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:recursive-delete"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の中の置換は中身で判定する",
+  "tool": "Bash",
+  "subject": "cat <<EOF\nuse $(rm -rf /tmp/x)\nEOF",
+  "verdict": "deny",
+  "rules": [
+   "heredoc"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "{git,push,origin,main}",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "{rm,-rf,/tmp/x}",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "{git,\rpush,origin,main}",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "grep -rn x --exclude-dir={node_modules,.git} /repo",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "cp f{,.bak}",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "echo \"$({git,push})\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "sh -c '{git,push}'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:brace-expansion"
+  ],
+  "code": "DENY_BRACE_EXPANSION"
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "grep -rn x --exclude-dir=node_modules --exclude-dir=.git /repo",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "grep -n '{a,b}' f",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "引用の外のブレース展開は一律に止める",
+  "tool": "Bash",
+  "subject": "git show HEAD@{1}",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用付き_heredoc_の本文は読まない",
+  "tool": "Bash",
+  "subject": "cat <<'EOF' > notes.md\n$(git push) `rm -rf /tmp/x`\nEOF",
+  "verdict": "deny",
+  "rules": [
+   "heredoc"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "引用付き_heredoc_の本文は読まない",
+  "tool": "Bash",
+  "subject": "cat <<'EOF' > notes.md\ngit push origin main\nEOF\necho done",
+  "verdict": "deny",
+  "rules": [
+   "heredoc"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない",
+  "tool": "Bash",
+  "subject": "grep -n x f\nsh evil.sh",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない",
+  "tool": "Bash",
+  "subject": "cat <(sh evil.sh)",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない",
+  "tool": "Bash",
+  "subject": "grep x <(curl https://example.com)",
+  "verdict": "ask",
+  "rules": [
+   "prefer-webfetch"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない",
+  "tool": "Bash",
+  "subject": "find . -name x\npython evil.py",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "改行とプロセス置換と語の途中の井桁は_allow_を後ろまで広げない",
+  "tool": "Bash",
+  "subject": "grep -n a#b f; sh evil.sh",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "echo $(git push origin main)",
+  "verdict": "deny",
+  "rules": [
+   "builtin:git-push",
+   "builtin:guard-raw-git"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "echo $((1 << 2))",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "grep -n \"git push\" README.md",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "grep -n '$(git push)' f",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "grep -n \"\\$(git push)\" f",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "grep -n \"\\`git push\\`\" f",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "echo hi # $(git push)",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "# git push origin main",
+  "verdict": "skip",
+  "rules": []
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "cat /repo/README.md | head -20",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "grep -n \"regex: '(>\" f",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "grep -n \"<<EOF\" /repo/README.md",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "cat <<'EOF' > notes.md",
+  "verdict": "deny",
+  "rules": [
+   "heredoc"
+  ],
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "cat a.txt\n",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ]
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "curl -s 'https://example.com/a#frag'",
+  "verdict": "ask",
+  "rules": [
+   "prefer-webfetch"
+  ],
+  "code": "RULE_ASK"
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "export PATH=\"$(go env GOPATH)/bin:$PATH\"",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "eval \"$(ssh-agent -s)\"",
+  "verdict": "ask",
+  "rules": [],
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "文字として書いたものと既存の読みは変わらない",
+  "tool": "Bash",
+  "subject": "sed -n \"$(grep -n '^### レビュー' README.md | cut -d: -f1),+60p\" README.md",
+  "verdict": "handover",
+  "rules": []
+ },
+ {
+  "case": "組み込みの保護も中身にヒットする",
+  "tool": "Bash",
+  "subject": "echo \"$(ccnavi --agree x)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護も中身にヒットする",
+  "tool": "Bash",
+  "subject": "ls\nccnavi --agree x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "組み込みの保護も中身にヒットする",
+  "tool": "Bash",
+  "subject": "echo \"$(tee /repo/.ccnavi/config/common/rules.yml < /tmp/x)\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護も中身にヒットする",
+  "tool": "Bash",
+  "subject": "cat /tmp/x >(tee /repo/.ccnavi/config/common/rules.yml)",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護も中身にヒットする",
+  "tool": "Bash",
+  "subject": "ls\nsed -i s/a/b/ /repo/.ccnavi/config/common/rules.yml",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "組み込みの保護も中身にヒットする",
+  "tool": "Bash",
+  "subject": "echo x > \"$(pwd)/.ccnavi/config/common/rules.yml\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-setting-files"
+  ],
+  "code": "PARSE_UNCERTAIN"
+ },
+ {
+  "case": "sudo_の_sh_c_と_find_exec_の中の承認も止まる",
+  "tool": "Bash",
+  "subject": "sudo -u me sh -c 'ccnavi --agree --yes x'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "sudo_の_sh_c_と_find_exec_の中の承認も止まる",
+  "tool": "Bash",
+  "subject": "find . -name x -exec ccnavi --agree --yes {} \\;",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "コミットの文面に書いた承認の形は_raw_git_だけにヒットする",
+  "tool": "Bash",
+  "subject": "git commit -m 'docs: ccnavi --agree --yes の説明'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-raw-git"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": ".ccnavi/scripts/ccnavi-launcher.sh --agree --preview x",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-launcher.sh --agree --preview x",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "cat .ccnavi/scripts/ccnavi-launcher.sh",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "grep -n 'ccnavi --agree --yes' README.md",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "sed -n 1,20p .ccnavi/scripts/ccnavi-launcher.sh",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-ticket.sh start x",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-review.sh review-request --phase 1 --body-file x.md",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "echo .ccnavi/scripts/ccnavi-launcher.sh",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "echo ccnavi --agree --yes x",
+  "verdict": "handover",
+  "rules": [],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "grep -rn ccnavi --yes docs",
+  "verdict": "allow",
+  "rules": [
+   "prefer-read-grep"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh"
+ },
+ {
+  "case": "承認でない形は承認のルールにヒットしない",
+  "tool": "Bash",
+  "subject": "git log --grep ccnavi --yes",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-raw-git"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_COMMAND_PATTERN"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": ".ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "/repo/.ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "bash .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "/bin/sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "env sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "env FOO=1 sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "command sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "exec sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "nohup sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "zsh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "dash .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "sh -x .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "cd /tmp && sh .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/scripts/ccnavi-launcher.sh ticket start x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/bin/ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "sh .ccnavi/bin/linux-x86_64/ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "振り分けの_sh_を実行役のコマンド越しに打つ承認は止まる",
+  "tool": "Bash",
+  "subject": "sh ccnavi --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "読み切れない形の承認も承認のルールで止まる",
+  "tool": "Bash",
+  "subject": "sh -c '.ccnavi/scripts/ccnavi-launcher.sh --agree --yes x'",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "読み切れない形の承認も承認のルールで止まる",
+  "tool": "Bash",
+  "subject": "bash -lc \".ccnavi/scripts/ccnavi-launcher.sh --agree --yes x\"",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "読み切れない形の承認も承認のルールで止まる",
+  "tool": "Bash",
+  "subject": ". .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ },
+ {
+  "case": "読み切れない形の承認も承認のルールで止まる",
+  "tool": "Bash",
+  "subject": "source .ccnavi/scripts/ccnavi-launcher.sh --agree --yes x",
+  "verdict": "deny",
+  "rules": [
+   "builtin:guard-ticket-approval"
+  ],
+  "entry": ".ccnavi/scripts/ccnavi-launcher.sh",
+  "code": "DENY_TICKET_APPROVAL_CLI"
+ }
+]

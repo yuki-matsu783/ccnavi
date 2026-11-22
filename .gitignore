@@ -11,12 +11,11 @@ knowledge
 # Go の組み立ての出力（go/ で go build したもの）。
 /go/ccnavi
 /go/ccnavi.exe
+# CLI テストが go test に結果を保存させない目印（go/internal/harness/base が書く）。
+/go/.clitest-uncached
 
-# Python の中間物。
+# yomiyasu の中間物。
 __pycache__/
-*.py[cod]
-.venv/
-.ruff_cache/
 
 # 実行時に書かれる記録。絶対パスとコマンド全文が入るのでコミットしない。
 # 判定の記録（logs/decisions.jsonl）、git のラッパースクリプトの記録のほか、次の 3 つもここに入る。

@@ -265,7 +265,8 @@ func TestLoadReadsLocalFileOnlyInOwnSourceTree(t *testing.T) {
 	if conf, _ := Load(root); conf.Mode != "" {
 		t.Errorf("ccnavi のツリーでないのに上書き設定を読んだ: %q", conf.Mode)
 	}
-	os.WriteFile(filepath.Join(root, "pyproject.toml"), []byte("[project]\nname = \"ccnavi\"\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, "go", "cmd", "ccnavi"), 0o755)
+	os.WriteFile(filepath.Join(root, "go", "cmd", "ccnavi", "main.go"), []byte("package main\n"), 0o644)
 	conf, problems := Load(root)
 	if conf.Mode != "dry-run" || conf.ModeDeclaredInFile != "dry-run" || len(problems) != 0 {
 		t.Errorf("Load = %q %q %q", conf.Mode, conf.ModeDeclaredInFile, problems)

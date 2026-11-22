@@ -1,12 +1,7 @@
 package refusal
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
-
-	"ccnavi/internal/tickets/testkit"
 )
 
 func TestOf(t *testing.T) {
@@ -37,24 +32,21 @@ func TestOverlap(t *testing.T) {
 	}
 }
 
-// sh の写し（ccnavi_no_remote_ref）と同じ表（tests/fixtures/no-remote-ref.json）で、NoRemoteRef を確かめる。
-func TestNoRemoteRefTable(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join(testkit.RepoRoot(t), "tests", "fixtures", "no-remote-ref.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var table struct {
-		Cases []struct {
-			Err   string `json:"err"`
-			NoRef bool   `json:"no_ref"`
-		} `json:"cases"`
-	}
-	if err := json.Unmarshal(data, &table); err != nil || len(table.Cases) == 0 {
-		t.Fatal("表が読めない", err)
-	}
-	for _, c := range table.Cases {
-		if got := NoRemoteRef(c.Err); got != c.NoRef {
-			t.Errorf("%q: %v", c.Err, got)
+func TestNoRemoteRef(t *testing.T) {
+	for _, c := range []struct {
+		err   string
+		noRef bool
+	}{
+		{"fatal: couldn't find remote ref refs/heads/feature-1\n", true},
+		{"fatal: couldn't find remote ref feature-1\n", true},
+		{"warning: x\nfatal: couldn't find remote ref refs/heads/a/b\n", true},
+		{"fatal: unable to access 'https://host.example/g/p.git/': Could not resolve host: host.example\n", false},
+		{"fatal: Authentication failed for 'https://host.example/g/p.git/'\n", false},
+		{"FATAL: COULDN'T FIND REMOTE REF x\n", false},
+		{"", false},
+	} {
+		if got := NoRemoteRef(c.err); got != c.noRef {
+			t.Errorf("%q: %v", c.err, got)
 		}
 	}
 }

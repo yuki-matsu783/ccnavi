@@ -79,4 +79,4 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 次は、同じ条件が別々に書かれている箇所。上の決まりに沿って 1 つに寄せる。
 
-- 子が親に合流済みか: `lifecycle/wapmerge` の `Plan` と `review/request` の `unmetIn`
+- 子が親に合流済みか（finish が書いた `merged_sha` が親の HEAD の祖先か、finish の後の修正が残っていないか）は `closing.MergeOf` に 1 つにした（`review/request` の `unmetIn` と `lifecycle/stop` の `nextStep` が使う）。`lifecycle/wapmerge` の `Plan` と `lifecycle/ops` の `IsAncestor` は、合流の前に子の今の先頭が親に入っているかを見る別の問い（記録の `merged_sha` が無い時点）なので、ここには寄せない

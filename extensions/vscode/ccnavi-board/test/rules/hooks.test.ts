@@ -12,10 +12,10 @@ const SETTINGS = JSON.stringify({
       { matcher: "", hooks: [{ type: "command", command: "ccnavi", timeout: 10 }] },
       {
         matcher: "Write|Edit|NotebookEdit",
-        hooks: [{ type: "command", command: "sh lint-py.sh", timeout: 180 }],
+        hooks: [{ type: "command", command: "sh lint-go.sh", timeout: 180 }],
       },
     ],
-    Stop: [{ hooks: [{ type: "command", command: "sh test-py.sh" }] }],
+    Stop: [{ hooks: [{ type: "command", command: "sh test-go.sh" }] }],
   },
 });
 
@@ -26,8 +26,8 @@ test("CB-T30 hooksをイベント・matcher・コマンドの平らなリスト�
     [
       ["PreToolUse", "", "ccnavi", 10],
       ["PostToolUse", "", "ccnavi", 10],
-      ["PostToolUse", "Write|Edit|NotebookEdit", "sh lint-py.sh", 180],
-      ["Stop", "", "sh test-py.sh", null],
+      ["PostToolUse", "Write|Edit|NotebookEdit", "sh lint-go.sh", 180],
+      ["Stop", "", "sh test-go.sh", null],
     ],
   );
   assert.equal(entries[0].source, "settings");
@@ -51,11 +51,11 @@ test("CB-T32 ツール名で走るhookを絞る。ツール名のないイベン
   const entries = parseHooks(SETTINGS, "settings");
   assert.deepEqual(
     hooksFor(entries, "Bash").map((e) => `${e.event}:${e.command}`),
-    ["PreToolUse:ccnavi", "PostToolUse:ccnavi", "Stop:sh test-py.sh"],
+    ["PreToolUse:ccnavi", "PostToolUse:ccnavi", "Stop:sh test-go.sh"],
   );
   assert.deepEqual(
     hooksFor(entries, "Edit").map((e) => `${e.event}:${e.command}`),
-    ["PreToolUse:ccnavi", "PostToolUse:ccnavi", "PostToolUse:sh lint-py.sh", "Stop:sh test-py.sh"],
+    ["PreToolUse:ccnavi", "PostToolUse:ccnavi", "PostToolUse:sh lint-go.sh", "Stop:sh test-go.sh"],
   );
 });
 

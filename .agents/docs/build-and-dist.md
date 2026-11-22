@@ -3,7 +3,7 @@ type: guide
 title: 組み立てと配布物
 description: scripts/ccnavi-build.sh（Go）での実行ファイルの組み立てと別の機械向けの組み立て、.ccnavi/bin/ へのコピー、ワークツリーとワークスペースルートでの違い、dist/ を直に起動する方法、配布する sh の確かめ方
 tags: [development, build]
-keywords: [ccnavi-build.sh, go build, GOOS, GOARCH, クロスコンパイル, ldflags, dist, .ccnavi/bin, ccnavi-launcher.sh, CCNAVI_ENTRY_PATH, CCNAVI_SH_DIR, CCNAVI_GUARD_CORE_FILES, 配布物, test_e2e_sh, ワークツリー]
+keywords: [ccnavi-build.sh, go build, GOOS, GOARCH, クロスコンパイル, ldflags, dist, .ccnavi/bin, ccnavi-launcher.sh, CCNAVI_ENTRY_PATH, CCNAVI_TEST_SH_DIR, CCNAVI_TEST_DIST, CCNAVI_GUARD_CORE_FILES, 配布物, ワークツリー]
 ---
 
 # 組み立てと配布物
@@ -41,15 +41,15 @@ dist/ は新しい。.ccnavi/bin/<target>/ は前のまま
 ## 実行ファイルの選ばれ方
 
 - `bin/` に実行ファイルが無いときは、振り分けの sh が PATH の `ccnavi` を起動する（`bin/` が先）。`dist/ccnavi/` を PATH に通すと、組み立てたあとのコピーなしで hook が動く
-- PATH の実行ファイルも自己防衛が守る。テストは `tests/__init__.py` が PATH から ccnavi を外して回す
+- PATH の実行ファイルも自己防衛が守る。テストは `harness/base` の `Main` が PATH から ccnavi を外して回す
 - `dist/` を直に起動したいときは、`.claude/settings.local.json`（追跡しない）の `env` で `CCNAVI_ENTRY_PATH` を `dist/ccnavi/ccnavi` にする。自己防衛も同じ env を読むので、守る実体と起動する実体は食い違わない。代償は、その機械では振り分けの sh の不具合に気づけないこと
 - `ccnavi.settings.local.json`（追跡しない）のキー `bin` でも `CCNAVI_ENTRY_PATH` を上書きできる。変わるのは自己防衛が何を守るかだけで、hook が何を起動するかは変わらない
 
 ## 配布する sh を確かめる
 
 ```sh
-uv run python -m unittest tests.e2e.test_e2e_sh -v
+cd go && go test ./internal/clitest/e2e/ -v
 ```
 
-実行の最初に出る `sh =` がワークスペースルート側を指していることを確かめる。実際に使われるのはワークスペース側の 1 本だけ。
-コピーする前の版を測るときは `CCNAVI_SH_DIR=<場所>` で差し替える。組み立て済みの実行ファイルを試すので、`go/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。
+`-v` で出る `sh =` と `dist =` がワークスペースルート側を指していることを確かめる。実際に使われるのはワークスペース側の 1 本だけ。
+コピーする前の版を測るときは `CCNAVI_TEST_SH_DIR=<場所>`、組み立て済みの実行ファイルを差し替えるときは `CCNAVI_TEST_DIST=<場所>` で差し替える。組み立て済みの実行ファイルを試すので、`go/` を直したら組み立て直してから回す（無ければ skip）。モード B（`projects/` を使う形）に触ったら回す。

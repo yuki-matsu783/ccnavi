@@ -122,7 +122,7 @@ func TestMatchesGolden(t *testing.T) {
 			if home == "" {
 				home = f.ID
 			}
-			e["fix"] = UnmergedFix(goRoot, tree.WorktreePath(goRoot, home), f, git.DefaultTimeout)
+			e["fix"] = unmergedFix(goRoot, tree.WorktreePath(goRoot, home), f, git.DefaultTimeout)
 		}
 		got[id] = e
 	}

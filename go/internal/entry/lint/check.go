@@ -69,7 +69,7 @@ func collect(conf *config.Settings, root string, notes []string, mode config.Mod
 // compatFix は実行ファイルと sh が食い違ったときの直し方。ccnavi のリポジトリなら組み立て直し、配布先なら配り直し
 // （配布先には組み立てる元が無い）。
 func compatFix(root string) string {
-	if ospath.IsFile(ospath.Join(root, "scripts", "ccnavi-build.sh")) && ospath.IsFile(ospath.Join(root, "go", "cmd", "ccnavi", "main.go")) {
+	if config.OwnSourceTree(root) {
 		return "scripts/ccnavi-build.sh を実行して組み立て直してください（sh scripts/ccnavi-build.sh）"
 	}
 	return "ccnavi のリポジトリで scripts/ccnavi-build.sh を実行し、scripts/ccnavi-setup.sh <このワークスペース> " +

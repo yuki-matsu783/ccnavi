@@ -440,3 +440,21 @@ func Splitext(p string) (root, ext string) {
 	}
 	return p, ""
 }
+
+// FindRepoRoot は from（"." なら作業ディレクトリ）から上って、go/go.mod を持つ所（リポジトリの根）を返す。
+func FindRepoRoot(from string) (string, error) {
+	dir, err := filepath.Abs(from)
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go", "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", errors.New("リポジトリの根（go/go.mod の親）が見つからない。リポジトリの中で打つ")
+		}
+		dir = parent
+	}
+}

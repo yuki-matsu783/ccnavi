@@ -301,12 +301,3 @@ ccnavi_git_refusal() {
 		printf 'git が拒んだ（%s）' "$(head -n 1 "$2" 2>/dev/null)"
 	fi
 }
-
-# fetch が「origin にその ref が無い」と断ったなら 0。<標準エラーを書いたファイル>
-#
-# 実行ファイルの refusal.NoRemoteRef の写し。実行ファイルを起こさずに動く ccnavi-fetch.sh が、その origin を
-# 失敗したものに数えるかを決めるのに使う（数えると、同じ origin の残りの取得まで止まる）。git は ccnavi_git_timed で
-# LC_ALL=C にして打ったもの。一致は tests/fixtures/no-remote-ref.json で確かめる。
-ccnavi_no_remote_ref() {
-	grep -qF "couldn't find remote ref" "$1" 2>/dev/null
-}

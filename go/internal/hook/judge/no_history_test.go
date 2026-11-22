@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// PreToolUse の判定（judge と failsafe）は git の履歴を読まない（tests/guard/test_gate_kinds.py から移した）。
+// PreToolUse の判定（judge と failsafe）は git の履歴を読まない。
 // 手で done/ に動かした子の決着（phase.AssessManual）と、Stop の依頼の判定（tickets/lifecycle/stop）は履歴を読むので、
 // 判定の期限に収まらない。どちらも参照しないことを、ソースの参照で固定する。
 func TestPreToolUseDoesNotReachTheHistoryReaders(t *testing.T) {

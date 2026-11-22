@@ -25,6 +25,7 @@
 #   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
 #   ccnavi_path_under <パス> <基準>  パスが基準の下なら基準からの相対を出す（大文字小文字を区別しない）
 #   ccnavi_path_pick <一覧>    標準入力のパスのうち一覧にあるものを出す（大文字小文字を区別しない）
+#   ccnavi_same_name <名前> <名前>  2 つの名前が、大文字小文字を区別しなければ同じなら 0
 #   ccnavi_mask_url <URL>      埋まった資格情報を伏せる
 #   ccnavi_is_ident <語>       識別子として受けてよい書き方か（終了コードで返す）
 #   ccnavi_is_branch <語>      親のブランチ名として受けてよい書き方か（終了コードで返す）
@@ -455,6 +456,12 @@ ccnavi_path_pick() {
 	LC_ALL=C awk 'NR == FNR { want[tolower($0)] = 1; next } tolower($0) in want' "$1" -
 }
 
+# 2 つの名前（リポジトリのパスなど）が、大文字小文字を区別せず同じなら 0。畳むのは ASCII の英字だけ（ccnavi_path_pick と同じ）。
+# <名前> <名前>
+ccnavi_same_name() {
+	ccnavi_sn_a=$1 ccnavi_sn_b=$2 LC_ALL=C awk 'BEGIN { exit !(tolower(ENVIRON["ccnavi_sn_a"]) == tolower(ENVIRON["ccnavi_sn_b"])) }'
+}
+
 # URL に埋まった資格情報を伏せる。
 #
 # `user:token@host` の形はよくある。出力にも記録にも残すと、そこから漏れる。伏せ方（scheme の後ろから最後の `@` まで、
@@ -521,7 +528,7 @@ ccnavi_is_branch() {
 #
 # 実行ファイルの `ids.Protected` の写し。実行ファイルを起こさない所（ccnavi_is_branch・ccnavi-user-push-approved.sh）
 # が使う。main・master・develop・release と、release/ か release- で始まる名前で、英字の大文字小文字は区別しない。
-# 一致は tests/fixtures/ident-cases.json の同じ表で、Go（ident_sh_test.go）と Python（tests/sh/test_ident_sh.py）が確かめる。
+# 一致は tests/fixtures/ident-cases.json の同じ表で、Go の試験（clitest/sh/small/ident_test.go と ids のテスト）が確かめる。
 # 規則を変えるときは両方を直す。
 ccnavi_is_protected() {
 	ccnavi_ip_low=$(printf '%s' "$1" | LC_ALL=C tr 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' 'abcdefghijklmnopqrstuvwxyz')

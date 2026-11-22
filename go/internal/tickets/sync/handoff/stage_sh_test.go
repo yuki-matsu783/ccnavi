@@ -22,7 +22,7 @@ func TestImportableAgreesWithTheStageSh(t *testing.T) {
 		".ccnavi/docs/a/b.md":                               true,
 		".ccnavi/CCNAVI.md":                                 true,
 		".ccnavi/scripts/ccnavi-stage.sh":                   true,
-		".claude/hooks/lint-py.sh":                          true,
+		".claude/hooks/lint-go.sh":                          true,
 		".claude/settings.json":                             true,
 		".claude/settings.local.json":                       true,
 		".claude/hooks/a/b/c.py":                            true,

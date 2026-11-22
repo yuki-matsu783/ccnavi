@@ -42,7 +42,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 | 元のパス | 下書きのパス（`wip/handoff/` の下） |
 |---|---|
 | `.claude/settings.json` | `handoff-.claude/settings.json` |
-| `.claude/hooks/lint-py.sh` | `handoff-.claude/hooks/lint-py.sh` |
+| `.claude/hooks/lint-go.sh` | `handoff-.claude/hooks/lint-go.sh` |
 | `projects/<名前>/.claude/settings.json` | `projects/<名前>/handoff-.claude/settings.json` |
 
 - **表は 1 か所。** 読み替える名前（元の階層名 → 下書きでの階層名）は `.ccnavi/scripts/ccnavi-handoff-names.txt` の 1 か所にあり、`ccnavi-stage.sh`（sh）が実行時に読む。実行ファイルは、同じ中身の写し（`go/internal/tickets/model/handoffnames/`）を組み立てに埋め込む。写しが元と違えばテストが落ちる。`ccnavi-stage.sh` は実行ファイルが無くても動くため、sh が実行ファイルに聞く形にはしない。名前を足すときは表に 1 行足し、テストの見本に 1 行足す

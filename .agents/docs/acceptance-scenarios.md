@@ -3,7 +3,7 @@ title: 受入シナリオを claude -p で回す
 type: guide
 description: projects/test-repo などを使い、エージェントの振る舞いを claude -p で回してログで確かめるシナリオの書き方と回し方（run-all での 1 回の確認による続けて回す方法を含む）
 tags: [test, scenario]
-keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, host_stub, hostenv, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, human_run, 人間役, 擬似端末, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fake_gitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い, host-N.json, 相手側の状態, hostsnap]
+keywords: [受入シナリオ, run-all, 続けて回す, 確認の目印, 費用の累計, 評価の相手, host_state, hoststub, シナリオ, claude -p, stream-json, decisions.jsonl, haiku, resume, 人間の操作, human_run, 人間役, 擬似端末, tests/scenarios, test-repo, setup.git, setup.reset, setup.host, bare, fake-gitlab, docker-gitlab, fakegitlab, append, 使い捨てのリポジトリ, ロック, restore, evidence.md, 渡った文脈, 拒否の傾向, messages.md, 反復拒否, 迂回の疑い, host-N.json, 相手側の状態]
 ---
 
 # 受入シナリオを claude -p で回す
@@ -26,7 +26,7 @@ ccnavi の振る舞い（ガードの拒否、チケットの流れ、サブエ�
 
 ## 置き場
 
-シナリオは 1 本 1 ファイルで `tests/scenarios/<ID>-<slug>.yml`（ID は UC の番号を引き継ぐ。例: `UC-01`）、回す道具は `tests/scenarios/runner.py`（入口。中身は責務ごとのモジュールに分けてあり、層の一覧は `runner.py` の docstring）。シナリオの一覧、機能の層、ユースケースの表は `tests/scenarios/README.md`。
+シナリオは 1 本 1 ファイルで `tests/scenarios/<ID>-<slug>.yml`（ID は UC の番号を引き継ぐ。例: `UC-01`）、回す道具は `go/internal/harness/cmd/scenarios`（入口。中身は `go/internal/harness/scenario/` の責務ごとのパッケージ。層の一覧は `go/internal/layers_test.go`）。シナリオの一覧、機能の層、ユースケースの表は `tests/scenarios/README.md`。
 
 ## シナリオの形
 
@@ -94,7 +94,7 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 ```
 
 - `steps` は上から順に回す。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す
-- step に `expect_after`（`decisions`・`state`。書き方は `expect` と同じ）を書くと、実行器はその step を回し終えたあとに評価し、満たさなければ後続の step（人間の操作を含む）に進まず `inconclusive` で止める。「この step の成果が出ていないのに、次の操作を人間に頼む」のを避けるため。欄が無い step はそのまま進む。人間の操作の step には付けない。評価で例外（コマンドのタイムアウトなど）が出たときも、止めて `inconclusive` にする。人間の操作の step に付けたり、`decisions`・`state` 以外の欄を書いたりすると、読み込みの時点で ValueError になる
+- step に `expect_after`（`decisions`・`state`。書き方は `expect` と同じ）を書くと、実行器はその step を回し終えたあとに評価し、満たさなければ後続の step（人間の操作を含む）に進まず `inconclusive` で止める。「この step の成果が出ていないのに、次の操作を人間に頼む」のを避けるため。欄が無い step はそのまま進む。人間の操作の step には付けない。評価で例外（コマンドのタイムアウトなど）が出たときも、止めて `inconclusive` にする。人間の操作の step に付けたり、`decisions`・`state` 以外の欄を書いたりすると、読み込みの時点でエラーになる
 - `expect` の機械で比べる欄（`decisions`・`decisions_none`・`files_unchanged`・`state`・`transcript_forbidden`）は、
   比べられる形で書く。「それらしく見えた」は期待にしない。意味で読むものは `judge` に自然文の基準で書く（下の「判定の 3 つ」）
 - `decisions` の欄の意味と取りうる値は `tests/scenarios/README.md` の「前提」にある。`decision_not` は「その値でない」を比べる
@@ -123,30 +123,32 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 3. **実行器で回す。** 人間の確認が取れたあとだけ、`--confirmed` を付ける。
 
    ```sh
-   uv run python -m tests.scenarios.runner preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・ユーザ確認事項）だけを出す（終了コード 3）
-   uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
-   uv run python -m tests.scenarios.runner run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
+   cd go && go run ./internal/harness/cmd/scenarios preflight tests/scenarios/UC-01-direct-edit-denied.yml    # 回さずに、確認に出す文（概要・モード・事実・ユーザ確認事項）だけを出す（終了コード 3）
+   cd go && go run ./internal/harness/cmd/scenarios run tests/scenarios/UC-01-direct-edit-denied.yml          # 確認の事実を出して止まる（終了コード 3）
+   cd go && go run ./internal/harness/cmd/scenarios run tests/scenarios/UC-01-direct-edit-denied.yml --confirmed
    ```
 
-   台本のあるシナリオを確認を取らずに回すなら、使い捨てのワークスペースでスタブで回す `run-stub` を使う（`uv run python -m tests.scenarios.runner run-stub tests/scenarios`。出力は `logs/scenarios/<ID>-stub-<日時>/`。[claude-contract.md](claude-contract.md) の「使い捨てのワークスペースで回す」）。
+   `go/` で打つが、`tests/`・`logs/`・`--root`・`--out` のパスはリポジトリの根から測る（入口が根へ移る）。`go run` は終了コードを 1 にして `exit status N` を stderr に出すので、N を読む。
 
-   `--agent script` を付けると、`claude -p` の代わりにスタブ（`tests/fake_claude.py`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、スタブが真似る範囲は [claude-contract.md](claude-contract.md)。
+   台本のあるシナリオを確認を取らずに回すなら、使い捨てのワークスペースでスタブで回す `run-stub` を使う（`cd go && go run ./internal/harness/cmd/scenarios run-stub tests/scenarios`。出力は `logs/scenarios/<ID>-stub-<日時>/`。[claude-contract.md](claude-contract.md) の「使い捨てのワークスペースで回す」）。
+
+   `--agent script` を付けると、`claude -p` の代わりにスタブ（`go/internal/harness/fakeclaude`）が step の `script` どおりに打つ。費用はかからず、`judge` は評価しない。台本の書き方と、スタブが真似る範囲は [claude-contract.md](claude-contract.md)。
 
    実行器は step を 1 つずつ `claude -p` で回す（`--model`・`--max-budget-usd`・`--permission-mode`・`--include-hook-events`・
    `--output-format stream-json` を付ける）。`resume: true` の step は、直前の step のセッション ID を `--resume` で渡す。
    続きの step が `resume` でなければ `--no-session-persistence` を付ける。出力は `logs/scenarios/<ID>-<日時>/` に置く
    （`step-N.jsonl`、`report.md`、`report.json`、`evidence.md`、`context-N.md`、`messages.md`、`state.json`。`context-N.md` と `messages.md` は下の「証拠の読み方」。`setup.host` が `fake-gitlab` / `docker-gitlab` なら `host-N.json` も置く。下の「相手側の状態の記録」）。`run-all` の出力は「続けて回す（run-all）」
 4. **人間の操作の step で止める。** 実行器は `instruction` と `check` を出して終了コード 10 で止まる。`human_api` か `human_run` のある step は止まらずに進む（擬似端末を作れない環境の `human_run` は 10 で止まる）。
-   `docker-gitlab` のシナリオで 10 で止まる step は、操作者が `tests/manual/gitlab/scenario_tools.py` で代行する（`<出力の置き場>` は止まった回の `logs/scenarios/<ID>-<日時>/`）。素の shell で承認の sh を打たない。
-   - issue を作る（人間役のトークンで 1 件）: `uv run python tests/manual/gitlab/scenario_tools.py issue <出力の置き場> [--title 題]`
-   - 承認を代行する（スタブの git の環境で擬似端末から y を送る）: `uv run python tests/manual/gitlab/scenario_tools.py agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
-   - 記録にトークンの値が出ていないかを確かめる: `uv run python tests/manual/gitlab/scenario_tools.py leak <出力の置き場>`
-   人間が「次へ」と言ったら `uv run python -m tests.scenarios.runner next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
-   続けずにやめるときは `uv run python -m tests.scenarios.runner restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
+   `docker-gitlab` のシナリオで 10 で止まる step は、操作者が `gitlabmanual tools`（`cd go && go run ./internal/harness/cmd/gitlabmanual tools …`）で代行する（`<出力の置き場>` は止まった回の `logs/scenarios/<ID>-<日時>/`）。素の shell で承認の sh を打たない。
+   - issue を作る（人間役のトークンで 1 件）: `gitlabmanual tools issue <出力の置き場> [--title 題]`
+   - 承認を代行する（スタブの git の環境で擬似端末から y を送る）: `gitlabmanual tools agree <出力の置き場> <識別子>...`（識別子は承認する親・子。何を承認するかは `instruction` に従う）
+   - 記録にトークンの値が出ていないかを確かめる: `gitlabmanual tools leak <出力の置き場>`
+   人間が「次へ」と言ったら `cd go && go run ./internal/harness/cmd/scenarios next <出力の置き場>` で続ける。直す必要があると言われたら、直してから `next` を打つ。
+   続けずにやめるときは `cd go && go run ./internal/harness/cmd/scenarios restore <出力の置き場>`（`setup.reset` の対象は、止めている間 `base` に戻さず残す。「中断・失敗・停止のあと」）
 5. **`expect_after` を満たさず止まった回を扱う。** `expect_after` を満たさず止まった回は `next` で続けられない（終了コード 2）。prompt か期待を直して、`run` からやり直す。止まった回の `report.md` には `expect_after` の行が `inconclusive` で出て、止まった step より後に頼る `decisions`・`state` の判定は載せない
 6. **判定を読む。** `report.md` に期待ごとの判定が出る（下の「判定の 3 つ」）。`judge` がある場合は、`evidence.md` を別のエージェントに読ませる。
    - 別のエージェントは、判定の表（`| 基準 | 判定 | 理由 |`。判定は pass か fail）を、ヒアドキュメントを使わず、編集ツールで `scratchpad/` に書く
-   - その表を `uv run python -m tests.scenarios.runner judge <出力の置き場> <判定の表のファイル>` で報告に足す。足すのは一度だけ
+   - その表を `cd go && go run ./internal/harness/cmd/scenarios judge <出力の置き場> <判定の表のファイル>` で報告に足す。足すのは一度だけ
    - ユーザが判定を受け入れたら、同じ `judge` に `--accept` を付けて打つ。判定の表は変えず、「ユーザの受け入れ」と全体の判定だけを書き直す（受け入れは一度だけ記す）
    - 受け入れまで、全体の判定は「受け入れ待ち」のまま。シナリオの `status` を `verified` にするのは、受け入れのあと
 7. **後片付けをする。** 実行器が `setup.files`（作る形）を消し、`setup.reset` があれば対象を `base` へ戻す。シナリオで作ったワークツリー・ブランチ・MR は、`projects/test-repo` のものだけ残してよい（後でまとめて片付ける）。
@@ -158,15 +160,15 @@ unconfirmed:                     # 初回に実ログと突き合わせて確か
 使い捨てのリポジトリ（`projects/test-repo`）を対象にするシナリオを何本も回すときは、確認を 1 回にして直列に回す。
 
 ```sh
-uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5      # 確認文と目印を出して止まる（終了コード 3）
-uv run python -m tests.scenarios.runner run-all tests/scenarios --max-total-usd 5 --confirmed <目印>
+cd go && go run ./internal/harness/cmd/scenarios run-all tests/scenarios --max-total-usd 5      # 確認文と目印を出して止まる（終了コード 3）
+cd go && go run ./internal/harness/cmd/scenarios run-all tests/scenarios --max-total-usd 5 --confirmed <目印>
 ```
 
 引数はディレクトリ（`*.yml`）・glob・ファイルを複数書ける。`--max-total-usd` は必須。`--out` は要約の置き場（既定は `logs/scenarios/run-all-<日時>/`。各シナリオの出力は、その下の `<ID>/`）。
 
 ### 対象にするもの
 
-「対象の判定」（`require_disposable_repo`・`check_before_run`・`setup_clashes`）を通る、使い捨てのリポジトリを触る setup を持つシナリオだけ。加えて、続けて回すために次の 2 つを満たすこと。
+「対象の判定」（`RequireDisposableRepo`・`CheckBeforeRun`・`SetupClashes`）を通る、使い捨てのリポジトリを触る setup を持つシナリオだけ。加えて、続けて回すために次の 2 つを満たすこと。
 
 - 人間の操作の step が無い（10 で止まると、残し印が次の回を断る）。`human_run` の step も人間の操作の step として数える（`check` が needs-review になり、pass で閉じないため）
 - `setup.reset` を持つ（前の回の状態を次の回に残さない。`reset` が無い `setup.host` だけの回は対象にしない）
@@ -193,7 +195,7 @@ ccnavi 本体に作用しうるシナリオ（`setup` が使い捨てのリポ�
 - 1 本が `fail` / `inconclusive` でも続ける。対象を戻せない・ロックで断られるなどで終了コードが 3 のときは、対象の状態が信用できないので、そこで止める
 - 終了コード: 0 全部 pass / 1 fail がある・回せるシナリオが無い / 2 inconclusive・意味の判定待ちがある・`--max-total-usd` が不正 / 3 確認が要る・止まった
 - 最後に全体の表を出し、`summary.md` と `summary.json` に書く。列は ID、判定、実費、ツール呼び出し数、拒否数、ask 数、出力の置き場。ツール呼び出し数は stream-json の `tool_use`、拒否数と ask 数は回したセッションの `decisions.jsonl` の `deny` と `ask`。実費は各シナリオの `report.json`（`kind: cost` の行）にも残す
-- 全本が同じ `cwd` と `logs/` を使う。各 step は新しい `--session-id` で始め、続きの step でない限り `--no-session-persistence` を付ける（現行のとおり）。hook の once の案内（`hinted`）の記憶はセッションごとなので、前のシナリオの記憶は次に持ち越されない（`test_runner.py` が見張る）
+- 全本が同じ `cwd` と `logs/` を使う。各 step は新しい `--session-id` で始め、続きの step でない限り `--no-session-persistence` を付ける。hook の once の案内（`hinted`）の記憶はセッションごとなので、前のシナリオの記憶は次に持ち越されない（`go/internal/policy/ctxfile` の `TestOnceIsCountedPerSession` が見張る）
 
 ## 使い捨てのリポジトリの事前状態と後片付け
 
@@ -218,7 +220,7 @@ diff -rq .ccnavi/config/common projects/test-repo/.ccnavi/config/common
 
 ### 対象の判定
 
-`setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` / `docker-gitlab` は、すべて `require_disposable_repo(root, target, allowed)` を通る。`test_repo: true` の自己申告は判定に使わない。
+`setup.git`・`setup.reset`・`setup.files` の追記・`setup.host` の `bare` / `fake-gitlab` / `docker-gitlab` は、すべて `RequireDisposableRepo` を通る。`test_repo: true` の自己申告は判定に使わない。
 
 - 比べるのは、`target` の `git rev-parse --show-toplevel` の実体（realpath）と、`allowed`（既定は `projects/test-repo`）の実体。`pathcase.fold` を通して比べる。違えば断る
 - ワークスペースルート（ccnavi 本体）が対象のとき、対象が本体のリンクされたワークツリーのとき（`git rev-parse --git-common-dir` が同じ）、対象の origin が本体の origin と同じとき（`.git` の有無・末尾の `/`・大文字小文字は無視）も断る。どちらかに origin が無いときは origin を比べず、toplevel の比較だけで決める
@@ -236,7 +238,7 @@ setup:
     - [git, commit, --allow-empty, -q, -m, 作りかけ]
 ```
 
-- 先頭は `git` だけ。`-C`・`--git-dir`・`--work-tree`（`=` 付き・`-C<パス>` も）と、サブコマンドより前の `-c`・`--config-env`・`--exec-path` は、読み込みの時点で ValueError。この禁止リストはうっかり防止で、安全境界ではない（`git config`・`git worktree add <外のパス>` などは通る）。シナリオは信頼済みの内容として書く
+- 先頭は `git` だけ。`-C`・`--git-dir`・`--work-tree`（`=` 付き・`-C<パス>` も）と、サブコマンドより前の `-c`・`--config-env`・`--exec-path` は、読み込みの時点でエラー。この禁止リストはうっかり防止で、安全境界ではない（`git config`・`git worktree add <外のパス>` などは通る）。シナリオは信頼済みの内容として書く
 - cwd は判定を通した toplevel に固定する。`GIT_DIR`・`GIT_WORK_TREE`・`GIT_INDEX_FILE`・`GIT_COMMON_DIR` は外して渡す
 - コマンドごとに、ccnavi 本体の `repo_snapshot`（HEAD・ブランチ・ワークツリー）が変わっていないか確かめる。変わったら止めて報告する
 - 実行したコマンドと結果（終了コード・出力の長さ・失敗時の 1 行目）は、診断ログ `logs/diag/scenario-runner.log` に残す（[診断ログを書く](logging.md)）。個々の `reset` のコマンドは DEBUG、`reset` の完了は INFO
@@ -252,7 +254,7 @@ setup:
 | `append: true` | 対象にある、git 管理下のファイルへの追記 | パスが無ければ回さない | 消さない（消すと管理下のファイルを削除するため。戻すのは `setup.reset`） |
 
 - パスはワークスペースルートからの相対（例: `projects/test-repo/README.md`）。追記のパスは realpath にして、判定を通した toplevel の中にあることを確かめる。`..`・絶対パス・外へ出るシンボリックリンクは断る。git 管理下でないファイル・ディレクトリも断る
-- `setup.reset` が無いシナリオで追記や `setup.git` を使うと、読み込みの時点で ValueError
+- `setup.reset` が無いシナリオで追記や `setup.git` を使うと、読み込みの時点でエラー
 - 追記は改行を変換せず、`content` をそのまま末尾に足す
 
 ### `setup.reset`
@@ -263,7 +265,7 @@ setup:
     base: "0123456789abcdef0123456789abcdef01234567"
 ```
 
-`base` は 40 桁の 16 進のコミット SHA だけ（短縮 SHA・ブランチ名・タグ名は ValueError。ブランチやタグは動くので使わない）。次の順で対象を戻す。
+`base` は 40 桁の 16 進のコミット SHA だけ（短縮 SHA・ブランチ名・タグ名は読み込みのエラー。ブランチやタグは動くので使わない）。次の順で対象を戻す。
 
 1. `git worktree remove --force`（本体のワークツリー以外すべて）→ `git worktree prune`
 2. ccnavi 自身の状態を消す。git の共通ディレクトリ直下の `ccnavi-direct/`（直接作業の記録）・`ccnavi-integrate/`（取り込みの marker）・`ccnavi-integrate-done/`、と `refs/ccnavi/` の下のすべての ref（`refs/ccnavi/direct/<名前>/s` など）。前のシナリオの取り込み待ちを、次の SessionStart の文脈や `ccnavi-worktree.sh` の `adopt-recorded` に持ち越さないようにする
@@ -287,33 +289,33 @@ setup:
 | 値 | 相手 | 使う場面 |
 |---|---|---|
 | `bare` | 一時ディレクトリの bare。ホストの API は失敗（「確かめられなかった」） | 直接作業・integrate・レビューなしのチケット作業（毎回） |
-| `fake-gitlab` | bare と `tests/fake_gitlab.py` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
+| `fake-gitlab` | bare と `go/internal/harness/fakegitlab` | レビュー（MR・スレッド・依頼・解決）を含むチケット作業（毎回） |
 | `docker-gitlab` | Docker の本物の GitLab CE に作る使い捨てのプロジェクト | 模擬のずれを避けたい通し確認。応答が本物と同じ形になり、ホストを汚さない（下の節） |
 | `real` | 本物の GitHub / GitLab（`projects/test-repo`）。欄が無いときも同じで、挙動は変わらない | リリース前などの通し確認だけ。本物でしか出ない不具合（例: GraphQL が 403）を拾う |
 
-- `bare` / `fake-gitlab` / `docker-gitlab` は、`setup.git` と同じ `require_disposable_repo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
-- `setup.issue` とは併用できない（読み込みの時点で ValueError）。runner の `gh` / `glab` はスタブを通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
+- `bare` / `fake-gitlab` / `docker-gitlab` は、`setup.git` と同じ `RequireDisposableRepo` を通ったときだけ動く（ccnavi 本体は断る。終了コード 3）。対象に origin が無いときも断る
+- `setup.issue` とは併用できない（読み込みの時点でエラー）。runner の `gh` / `glab` はスタブを通さずに動き、本物のホストに出るため。`fake-gitlab` で issue が要るときは、`setup.host_state`（`project: <namespace>/<project>` を含む dict。足りない欄は `seq`・`issues`・`mrs` の空の初期値）に書く
 - 用意するものは、対象の `refs/remotes/origin/*`（無ければローカルのブランチ）から作る bare（`docker-gitlab` は作らず、GitLab のプロジェクトを使う）、PATH の先頭のスタブ（`git`・`gh`・`glab`、`bare` だけ `curl`）、`fake-gitlab` では模擬。置き場は一時ディレクトリ（`ccnavi-host-*`）。`.git/config` は書き換えない
 - `git` のスタブは、`remote get-url origin` に、ホストの形の URL（`bare` は `https://gitlab.com/acme/widgets.git`、`fake-gitlab` は `http://127.0.0.1:<port>/<project>.git`、`docker-gitlab` は `http://127.0.0.1:8929/root/<プロジェクト>.git`）で答える。答えるのは、対象のリポジトリ（そのワークツリーを含む。共通の `.git` で比べる）だけで、ccnavi 本体には本物の答えを返す。本物へ渡すときは `-c url.<bare>.insteadOf=<本物の origin>` を足すので、fetch・push・ls-remote は bare に届く。`ccnavi-git.sh` は `git` を PATH から呼ぶので、スタブが効く
 - `claude` の環境は、親の環境を継承し、`GITHUB_TOKEN`・`GH_TOKEN`・`GITLAB_TOKEN`・`CCNAVI_PROBE_REVIEWER_TOKEN` など `GH_`・`GITHUB_`・`GLAB_`・`GITLAB_`・`CCNAVI_PROBE_` で始まる `*TOKEN` だけを除く。`fake-gitlab` は `GITLAB_TOKEN` に模擬のトークンを、`docker-gitlab` はエージェント役のトークンを置く。許可リストにしない（HOME・認証・プロキシ・CA が落ちて `claude` が起動しなくなる）。`real` は環境を渡さない（今までどおり継承）
 - ホスト（GitHub / GitLab）へは出ない。`claude -p` 自身の API 通信は要る
 - 確かめたのは、`claude -p` の Bash ツールと hook（SessionStart・PreToolUse）のシェルに、PATH のスタブと `FAKE_*` が届くところまで
 
-**`docker-gitlab`。** 動いている Docker の GitLab（`tests/manual/gitlab/docker_gitlab.py`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
+**`docker-gitlab`。** 動いている Docker の GitLab（`go/internal/harness/gitlabdocker`・`gitlabmanual`。立て方と既知の制約は [gitlab-manual.md](gitlab-manual.md)）に、回すたびに使い捨てのプロジェクトを作り、回したあとに消す。
 
-- 起動: 回す前に `docker_gitlab.py status` で動いているかを見る。止まっていれば `up`（共用の注意は [gitlab-manual.md](gitlab-manual.md) の「ほかの作業が使っているとき」）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
+- 起動: 回す前に `gitlabmanual status` で動いているかを見る。止まっていれば `up`（共用の注意は [gitlab-manual.md](gitlab-manual.md) の「ほかの作業が使っているとき」）。止まっているシナリオは、`run` が `次:` で `up` を案内して止まる（終了コード 3）。`run-all` は、そのシナリオだけを飛ばし、ほかの相手のシナリオは回す
 - 作るもの: プロジェクト `sc-<シナリオ ID を fold した綴り>-<時刻>-<乱数>`（root の名前空間、`main` が既定のブランチ）。人間役 `ccnavi-reviewer` を Developer のメンバーに加え、対象の `main` を push し、続けて `git fetch --prune --no-tags origin` を 1 回打つ（対象に残る本物の origin の古い `refs/remotes/origin/*` が、新規プロジェクトの issue #1 などに番号で当たってブランチ候補になるのを防ぐ。戻すのは後片付けの `refs/remotes/origin/*` の巻き戻し）。push するのは `main` だけで、ほかのブランチ・タグが要るシナリオは対象外
 - origin: `bare` と同じ git のスタブで、`-c url.<プロジェクトの URL>.insteadOf=<本物の origin>` を足す。加えて `credential.http://127.0.0.1:<port>.helper` を、空で打ち消してから、環境変数 `GITLAB_TOKEN` を返す helper にする（利用者の credential helper に root の PAT を渡さない。URL は `127.0.0.1` にそろえる）。runner 自身の git（初回の push と `setup.git`）にも同じ `-c` を足し、`GITLAB_TOKEN` はその git にだけ渡す。`curl` は本物（スタブを置かない）、`gh`・`glab` は失敗するスタブ
 - 後片付け: `bare` と同じ経路でプロジェクトを削除する。GitLab 19 は遅延削除で、`DELETE /projects/:id`（202）のあとも GET が 200（`marked_for_deletion_on` 付き）のまま、パスが `…-deletion_scheduled-<id>` に変わる。そこで、印が付いたら `permanently_remove=true&full_path=<改名後のパス>` で 2 回目を打ち、404 になるまで最大 60 秒待つ。消せなかったときは `案内:` にプロジェクトの URL と ID を出し、`report` に `host-delete` の行（fail）を足して終了コード 3（手作業で消す）。終了コード 10 では残し、ID と URL を出す。`next` が最後まで終わるか `restore` で消える
 - 残ったプロジェクトは、接頭辞 `sc-` で一覧して手で消す。掃除の道具は無いので、GitLab の「プロジェクト」画面で `sc-` を検索する
 - 資格情報: `claude` にはエージェント役 `GITLAB_TOKEN`（root の PAT）を渡し、人間役のトークンは渡さない。トークンは回すたびに `tokens.env` から読み、`state.json` には識別子と URL だけを残す。ccnavi が書く記録（`state.json`・`evidence.md`・`messages.md`・`report.*`・`host-N.json`・診断ログ）には出さない。`step-N.jsonl` は `claude` の出力そのもので、エージェントが `tokens.env` を読めば混ざる
-- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（理由は [gitlab-manual.md](gitlab-manual.md) の「トークン」。確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。人間役の API 操作は `human_api`（下の「人間役の API 操作」）で呼べる。`human_api` に無い操作（issue の作成など）は、操作者が `tokens.env` を読んで `gitlab_api.Client` を呼び、`next` で続ける。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
+- 限界: 同じ uid のエージェントは `tokens.env` を読め、root の PAT で管理者 API から人間役のトークンを作れる。人間役の独立は保証しない（理由は [gitlab-manual.md](gitlab-manual.md) の「トークン」。確かめたいのは ccnavi の振る舞いで、人間役の偽装ではない）。CE に無い機能（変更要求の `request_changes` は 404）は確かめられない。人間役の API 操作は `human_api`（下の「人間役の API 操作」）で呼べる。`human_api` に無い操作（issue の作成など）は、操作者が `tokens.env` を読んで `go/internal/harness/gitlabapi` の `Client` を呼び、`next` で続ける。`setup.issue` とは併用できない（`make_issue` は本物の `projects/test-repo` に立てるため）
 
 **`bare` で許す依頼。** `gh` / `glab` が失敗するので、エージェントが issue や MR を作る依頼は通らない。`bare` を選べるのは、依頼がホストの API を要しないシナリオだけ。`judge` に「`gh` が使えない状況で詰まったのは ccnavi の不具合ではない」を書く。MR・スレッドを読む依頼は `fake-gitlab` にする。
 
 **模擬のずれ。** `bare` / `fake-gitlab` の模擬は、本物と同じ形を返す保証が無い（契約テストは別）。`report.md` の「相手（setup.host）」と `report.json` の `host` の行に、どの相手で回したかと「模擬のずれで見逃した問題がありうる」を出す（`docker-gitlab` は本物の GitLab なのでこの文は付けず、版 `GitLab 19.x` を出す）。
 
-**相手側の状態の記録（`host-N.json`）。** `setup.host` が `fake-gitlab` / `docker-gitlab` のとき、runner が prompt の step の終わりごと（失敗して止めた step も）と、`human_api`・`human_run` の step の終わりに、相手のプロジェクトの状態を API で読み、出力の置き場（`logs/scenarios/<ID>-<日時>/`）の `host-<step の番号>.json` に残す。`bare` / `real` では残さない。止まって人間が操作する step（終了コード 10）では読まない（人間の操作は次の step の記録に出る）。部品は `tests/scenarios/hostsnap.py`（`hostenv.api_access` が相手ごとの接続を返す）。
+**相手側の状態の記録（`host-N.json`）。** `setup.host` が `fake-gitlab` / `docker-gitlab` のとき、runner が prompt の step の終わりごと（失敗して止めた step も）と、`human_api`・`human_run` の step の終わりに、相手のプロジェクトの状態を API で読み、出力の置き場（`logs/scenarios/<ID>-<日時>/`）の `host-<step の番号>.json` に残す。`bare` / `real` では残さない。止まって人間が操作する step（終了コード 10）では読まない（人間の操作は次の step の記録に出る）。部品は `go/internal/harness/scenario/prepare` の `SnapshotHost`（`host.Manager.APIAccess` が相手ごとの接続を返す）。記録を書けなければ step を止めて後片付けする。
 
 - 読むだけ。呼ぶのは GET の API（MR の一覧と 1 件、スレッド、承認、issue）だけで、書き込みはしない
 - 中身: `step`・`taken_at`（秒までの ISO 8601）・`host`・`project`・`summary`（件数）・`mrs`・`issues`・`calls`（呼んだ API と status）・`errors`
@@ -330,7 +332,7 @@ setup:
 - トークンは記録に出さない。認証の情報を含む応答は全文を残さず、取る項目を選ぶ。そのうえで、`tokens.env` の値と模擬のトークンが文字列に混ざっていたら `***` に置き換える
 - `state.json` の `host_snapshots` に step ごとの結果（`step`・`file`・`ok`・`errors`。ここの `errors` は件数）を残し、`report.md` の「相手（setup.host）」の行のあとに件数と、取れなかった step を出す。判定（`pass` / `fail`）には使わない
 
-**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`drive.finish` の `finally`・`drive.continue_scenario` の `BaseException`・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・スタブ・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ OS に決めさせて `案内:` を出す（前の step の記録に古いポートの URL が残りうる）。
+**後片付け。** 模擬の停止、一時ディレクトリの削除、回している間に動いた対象の `refs/remotes/origin/*` の巻き戻しは、`setup.reset` の戻しと同じ経路で行う（`finish`・`continueScenario` の panic 時の戻し・`restore`・失敗の停止）。人間の操作の step（終了コード 10）では、模擬は止め、置き場（bare・スタブ・模擬の状態）は残す。`next` は、同じ置き場で模擬を、残した状態ファイルのまま起こし直す（初期状態で上書きしない）。ポートは同じものを取り直し、取れなければ止まる。
 
 ### 中断・失敗・停止のあと
 
@@ -338,14 +340,14 @@ setup:
 |---|---|---|
 | 最後まで回った（`finish`） | `base` に戻す | 放す |
 | claude の失敗・`expect_after` を満たさない停止・`human_api` と `human_run` の失敗（内部の値 11。`finish` を通る） | `base` に戻す | 放す |
-| `KeyboardInterrupt` など（`drive.continue_scenario` の `BaseException`） | `base` に戻し、元の例外を投げ直す | 放す |
+| Ctrl-C | 入口が受けて捨て、子の claude の失敗として扱う（`finish` を通って `base` に戻し、ロックを放す）。SIGTERM・kill のあとは `restore` | 放す |
 | 人間の操作の step で止まった（10） | **戻さず残す**（人間が操作したあとの `next` で続くため。`setup.host` は模擬を止め、置き場は残す） | 放す |
 | 対象を取る前の拒否（判定・ロック・残し印・`base` が無い・追記の対象が使えない） | 何もしない（出力の置き場だけ作る） | 取っていない |
 | 対象を取ったあとの setup の失敗 | 作ったものを消し、`base` に戻す | 放す |
 
 - 10 で残すとき、出力に「`base` に戻していない」と、`next` と `restore` の打ち方を出す。`next` が最後まで終わると戻す。やめるときは `restore <出力の置き場>`（`setup.files` の作る形を消し、`setup.host` の置き場を消し、`base` に戻す）
 - 残した状態に別のシナリオが入らないよう、対象の `.git/ccnavi-scenario.left` に印を置く。印の中身は、残した回の出力の置き場を `realpath` にした絶対パス（小文字化はしない）。`next` / `restore` に渡す置き場は、相対でも別表記（symlink・末尾の `/`）でも、`realpath` と `pathcase.fold` を通して印と比べ、同じ場所なら同じ回と見なす。印があると、その回の `next` / `restore` 以外の `run` は断る
-- 戻せなかったときは、「手作業で戻す必要がある」ことと対象のパスを出して終了コード 3 で止まる。レポートは書いてから 3 を返す。戻せなかった回も残し印が残るので、次の回は始まらない。手で戻したら `restore` で印を外す。`KeyboardInterrupt` のときも戻せなかったことを出したうえで、元の例外を投げ直す
+- 戻せなかったときは、「手作業で戻す必要がある」ことと対象のパスを出して終了コード 3 で止まる。レポートは書いてから 3 を返す。戻せなかった回も残し印が残るので、次の回は始まらない。手で戻したら `restore` で印を外す。panic のときも戻せなかったことを出したうえで、元の panic を投げ直す
 - 停止（実行器の内部の値 11。終了コードとしては出ない）のあとの `next` は続けられない（終了コード 2）。`finish` に届かず戻っていなければ、ここで戻し、戻せなければ終了コード 3
 
 ### 排他
@@ -353,8 +355,8 @@ setup:
 同じ対象を使う回は、ロックで弾く。ロックは対象の `.git/ccnavi-scenario.lock`。対象のワークツリーに置くと、`git clean` で消えたり、未追跡のファイルとして `status` に現れて「未コミットの変更がある」前提を壊すため。
 
 - 作り方は `O_CREAT|O_EXCL`。中身は PID
-- すでにあれば、その PID が生きているかを見る（POSIX は `os.kill(pid, 0)`。Windows の `os.kill` はプロセスを終わらせるので、`OpenProcess` で見る）。生きている・判定できない（権限など）・中身が PID として読めないときは断り、死んでいれば奪う
-- 取るのは `reset` の前、放すのは `drive.finish` の `finally` と `drive.continue_scenario` の `BaseException`。10 で止めるときは放す（残した状態は残し印が守る）
+- すでにあれば断る。古いロックは奪わない。残っていたら `restore`（またはロックのファイルを消す）で直す
+- 取るのは `reset` の前、放すのは `finish` と、`continueScenario` の panic 時の戻し。10 で止めるときは放す（残した状態は残し印が守る）
 
 ### 出力
 
@@ -415,14 +417,14 @@ hook の応答の文面（拒否・確認・案内）を、重複を除いて 1 
 
 ## 全量テストに入らない仕組み
 
-「全量テストを回して」（`uv run python -m tests`）で、本物の claude でシナリオが回らないようにしてある（スタブで回る分は下の 1 つ目）。
+「全量テストを回して」（`cd go && go test ./...`）で、本物の claude でシナリオが回らないようにしてある（スタブで回る分は下の 1 つ目）。
 
-- **拾われる範囲が違う。** 全量は `test_*.py` を持つグループだけを拾う。シナリオの YAML と実行器のモジュール（`runner.py`・`drive.py`・`commands.py` など）は拾われない。
-  `tests/scenarios/` で拾われるのは `test_runner.py`（実行器の判定部分の単体テスト）と `test_stub_scenarios.py`（台本のあるシナリオを、使い捨てのワークスペースでスタブで回す。[claude-contract.md](claude-contract.md)）だけで、どちらも `claude` を呼ばない
-- **実行器がゲートを持つ。** `claude` を呼ぶ道（`drive.run_step`・`commands.cmd_run`。ゲートは `common.require_entry`）は、`python -m tests.scenarios.runner` で起動されたときだけ開く。スタブで回す step はゲートを通らない（claude を呼ばない）。
-  ほかのモジュールが import して呼ぶと `RuntimeError` で止まる。後で誰かが、実行器を呼ぶテストを足しても動かない
-- **テストが見張る。** `test_runner.py` が、ゲートが閉じていること、全量が上の 2 つのモジュールしか拾わないこと、
-  `tests/scenarios/` にほかの `test_*.py` が無いことを確かめる。本物の `claude` でシナリオを回す道を `test_` のモジュールに置かない
+- **拾われる範囲が違う。** 実行器の部品は `go/internal/harness/scenario/`（core・prepare・judge・world・actors・report・runner）、入口は `go/internal/harness/cmd/scenarios`。
+  シナリオの YAML と見本（`tests/scenarios/`）は `tests/` に置いたまま。テストは各部品の `_test.go` と `go/internal/clitest/scenarios` で、
+  台本のあるシナリオを使い捨てのワークスペースでスタブ（`teststub claude`）で回す分（TestEveryScriptedScenarioPassesInAThrowawayWorkspace。[claude-contract.md](claude-contract.md)）だけが実際に動かし、`claude` は呼ばない
+- **実行器がゲートを持つ。** `claude` を呼ぶ道（`runner.Runner.RunStep`・`Run`・`RunAll`）は、`Runner.Entry` が真のとき（入口の実行ファイル `cmd/scenarios` だけが立てる）だけ開く。
+  差し替え口（`Runner.Step`）かスタブ（`--agent script`）で回す step はゲートを通らない。テストが入口を立てることはなく、後で誰かが実行器を呼ぶテストを足しても本物の claude は動かない
+- **テストが見張る。** `clitest/scenarios` の TestRealClaudeIsNotCalledWithoutTheEntry が、入口が無ければ `run`・`run-all`・`RunStep` が断ることを確かめる
 
 ## 人間の操作
 
@@ -496,7 +498,7 @@ steps:
 - 失敗は `halt`（`kind: human_run`）を立てて止め、`inconclusive` にする
 - 記録: 打つ前に `state.json` の `human_runs` に `started` を書き、終われば `done` か `halted` にする。`started` のまま残った回を `next` で続けると、打ち直さずに止める。出力は `human-run-<step>.log`
 - `check` は、打った step の項目ごとに `human-run-check` の行（needs-review）になる。人間が見ていた項目を誰も見ていないので、全体は pass にならない。ログを見て判断する
-- 擬似端末を作れない環境（Windows の Python）では、従来の human step と同じく `instruction` を出して 10 で止まる
+- 擬似端末を作れない環境（Windows）では、従来の human step と同じく `instruction` を出して 10 で止まる
 - 受け入れた穴: runner はエージェントも Bash から起動できる。開発ワークスペースでは、エージェントが yml を書いて runner を通せば、ユーザの承認を出せる。runner は配布物に入らない（配布先に穴は増えない）ため、この穴を受け入れた。`human_run` を書くことが、その回で runner が test-repo の提案を承認し push することへの同意になる（回す前の確認文の手順に「実行器が打つ」と出る）
 
 ## 見つけたものの扱い

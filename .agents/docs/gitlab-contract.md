@@ -1,15 +1,15 @@
 ---
 title: GitLab の応答の形の契約テスト
 type: guide
-description: 本物の GitLab の応答の形を録った JSON と、Python の模擬（fake_gitlab.py）の応答の形を比べる契約テスト。要求の列・reads・場面・正規化・記録の形・許可リスト・限界・録り直し
+description: 本物の GitLab の応答の形を録った JSON と、Go の模擬（`harness/fakegitlab`）の応答の形を比べる契約テスト。要求の列・reads・場面・正規化・記録の形・許可リスト・限界・録り直し
 tags: [testing]
-keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab, recorded.json, recorded.sample.json, requests.json, reads, expect_status, 正規化, 許可リスト, 模擬, fake_gitlab, 形]
+keywords: [契約テスト, 見本, hostfixture, host_entries, contract, GitLab, recorded.json, recorded.sample.json, requests.json, reads, expect_status, 正規化, 許可リスト, 模擬, fakegitlab, 形]
 ---
 
 # GitLab の応答の形の契約テスト
 
-本物の GitLab（Docker）の応答の**形**を録り、模擬（`tests/fake_gitlab.py`）の応答の形と比べる。値（ID・時刻・SHA）は比べない。
-置き場は `tests/contract/`（テストのグループ `contract`）と、データの `tests/contract/gitlab/`。同じグループにある claude -p のスタブの契約（`tests/contract/claude/`）は [claude-contract.md](claude-contract.md)。
+本物の GitLab（Docker）の応答の**形**を録り、模擬（`go/internal/harness/fakegitlab`）の応答の形と比べる。値（ID・時刻・SHA）は比べない。
+試験は `go/internal/clitest/contract/gitlab/`、データは `tests/contract/gitlab/`。claude -p のスタブの契約（`go/internal/clitest/contract/claude/`）は [claude-contract.md](claude-contract.md)。
 
 ## 何が証明されるか
 
@@ -21,15 +21,15 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 | ファイル | 中身 |
 |---|---|
-| `requests.json` | GitLab API の列（sh が打つもの、Chrome 拡張だけが打つもの、受入シナリオの相手側の記録だけが読むもの）。本物には全部、`fake_gitlab.py` には `sh` と `scenarios` の要求、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
-| `recorded.json` | 本物から録った形。**本物だけ**。`uv run python tests/manual/gitlab/record_contract.py` で作る |
-| `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`uv run python -m tests.contract.fakeside` で作り直す |
-| `normalize-cases.json` | 正規化の入力と期待の対の表。Python のテストと、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
-| `allow.json` | `fake_gitlab.py` の許可リスト（`entries`）、見本（`gitlab_host.py`）の許可リスト（`host_entries`）、Chrome 拡張の `MockGitLab` の許可リスト（`chrome_entries`。Python は読まない）、録らないものの一覧（`not_recorded`） |
-| `tests/contract/test_host_sample.py` | 見本（`tests/sh/gitlab_host.py` とフィクスチャ）の比較。下の「見本」 |
+| `requests.json` | GitLab API の列（sh が打つもの、Chrome 拡張だけが打つもの、受入シナリオの相手側の記録だけが読むもの）。本物には全部、`fakegitlab` には `sh` と `scenarios` の要求、`MockGitLab` には `chrome` の要求だけを送る。各要求に `expect_status` と `reads` を持つ |
+| `recorded.json` | 本物から録った形。**本物だけ**。`cd go && go run ./internal/harness/cmd/gitlabmanual record-contract` で作る（キーは名前順・字下げ 1 字で書く。`requests` も名前順に並ぶ） |
+| `recorded.sample.json` | 模擬から作ったサンプル（`"source": "sample"`）。`cd go && go test ./internal/clitest/contract/gitlab -run TestSampleIsRegeneratedWithoutChange -update-sample` で作り直す |
+| `normalize-cases.json` | 正規化の入力と期待の対の表。Go のテスト（`contractshape`）と、Chrome 拡張の TypeScript の試験（`test/helpers/shape.ts`）が同じ表を読む |
+| `allow.json` | `fakegitlab` の許可リスト（`entries`）、見本（`harness/hostfixture` の GitLab）の許可リスト（`host_entries`）、Chrome 拡張の `MockGitLab` の許可リスト（`chrome_entries`。Go は読まない）、録らないものの一覧（`not_recorded`） |
+| `go/internal/clitest/contract/gitlab/hostsample_test.go` | 見本（`harness/hostfixture` の GitLab とフィクスチャ）の比較。下の「見本」 |
 | `forbidden.json` | 記録に入れない文字列の正規表現 |
 
-比較器と正規化は `tests/contract/shape.py` の 1 本。模擬の側の場面と送り手は `tests/contract/fakeside.py`。本物の側の場面を組むのは `tests/manual/gitlab/record_contract.py`（contract のテストは manual に依存しない。置くか置かないかの判定と `os.replace` は `shape.py` に置き、Docker 無しで試験する）。
+比較器と正規化は `go/internal/harness/contractshape/shape.go` の 1 本。模擬の側の場面と送り手は `go/internal/harness/contractshape/fakeside.go`。本物の側の場面を組むのは `go/internal/harness/contractrecord`（`BuildScene`。contract のテストは contractrecord に依存しない。置くか置かないかの判定（`PlacementProblems`）と原子的な書き込み（`WriteAtomic`）は contractshape に置き、Docker 無しで試験する。契約の録りの通しは模擬を本物の代わりにして contractrecord の単体テストが見る）。
 
 ## 要求の列（requests.json）
 
@@ -45,17 +45,17 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 - `path` は `/api/v4` より後ろ。`query`・`body` は省略できる
 - `token` は `main`（認証あり）か `none`（認証なし）
-- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`extensions/chrome/ccnavi-approval/src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。`scenarios` は、受入シナリオの相手側の記録（`tests/scenarios/hostsnap.py`）だけが読む要求（`approvals_get`）。同じ API を拡張も読む（`approvals`）が、読むキーが違う（`approved` は拡張の `MockGitLab` が返さない）ので、要求を分けてある
-  - 録る側（`record_contract.py`）は全要求を送る（`fakeside.load_all_requests()`）。書式・`reads`・状態の検査も全要求を見る
-  - `fakeside.load_requests()` は `sh` か `scenarios` を持つ要求だけ返す。`fake_gitlab.py` は拡張だけの要求（`repository/branches` など）に答えないので送らない。`RecordedTest` は `recorded.json` も、この名前に絞って比べる（`compare_all` は `recorded` のキーを回し、`actual` に無ければ `missing` を出すため）
+- `used_by` は、その要求を比べる側（`sh`、`chrome`、`scenarios`）。`sh` は sh が打つ要求。`chrome` は、Chrome 拡張が打つ要求（`extensions/chrome/ccnavi-approval/src/core/gitlab.ts` が組む URL）で、TS の契約の試験が `MockGitLab` と比べる。拡張だけが打つ要求は `used_by` が `["chrome"]`。`scenarios` は、受入シナリオの相手側の記録（`go/internal/harness/scenario/prepare` の `SnapshotHost`）だけが読む要求（`approvals_get`）。同じ API を拡張も読む（`approvals`）が、読むキーが違う（`approved` は拡張の `MockGitLab` が返さない）ので、要求を分けてある
+  - 録る側（`gitlabmanual record-contract`）は全要求を送る（`contractshape.LoadAllRequests`）。書式・`reads`・状態の検査も全要求を見る
+  - `contractshape.LoadRequests` は `sh` か `scenarios` を持つ要求だけ返す。`fakegitlab` は拡張だけの要求（`repository/branches` など）に答えないので送らない。`RecordedTest` は `recorded.json` も、この名前に絞って比べる（比較器は `recorded` のキーを回し、`actual` に無ければ `missing` を出すため）
   - TS は `chrome` を持つ要求だけを `MockGitLab` に送る
-- `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404`・`branch_404` は 404、`branch_exists`（既にあるブランチを作る）は 400、ほかは 200 か 201（`test_contract.py` の `ERROR_STATUS` が一覧）。**1 本でも違えば `recorded.json` を置かない**
+- `expect_status` は録るときに本物が返すべきステータス。`error_401` は 401、`error_404`・`branch_404` は 404、`branch_exists`（既にあるブランチを作る）は 400、ほかは 200 か 201（`clitest/contract/gitlab/requests_test.go` の `errorStatus` が一覧）。**1 本でも違えば `recorded.json` を置かない**
 - `reads` は、その要求の応答のうち、sh と拡張が実際に読むキー（下の「reads」）
 - `save` は、応答の本文のキーを後ろの要求の `${…}` に使う（`user` が `user.id` を置く）
 - 状態の宣言は持たない。場面は下に固定し、録る側と比べる側が作る
 - 書き込みは最後にまとめてある（読みの形が前の書き込みで変わらないように）
 - 拡張だけが使う要求（`branches_list`・`branch_get`・`branch_404`・`tree_root`・`tree_recursive`・`blob`・`commits_path`・`commit_get`・`merge_base`・`compare`・`file_get`・`approvals`・`token_self`、書き込みの `branch_create`・`branch_exists`・`commit_create`）は `used_by` が `["chrome"]`。載せていないのは、ページを繰る 2 ページ目以降、`update`・`delete` の action（`last_commit_id` が要る）、GraphQL。`mrs_opened` は `reads` の範囲で答える経路が `MockGitLab` に無いので、`chrome` を付けない
-- 場面から積む置き換えの名前: `sha.main`・`sha.feature`・`blob.sha`（拡張だけの要求が使う。本物は `Scene.build`、TS は `mock()` が積む。`fakeside.scene_context()` には持たず、`test_contract.py` の `CHROME_SCENE` が名前の一覧。`sh` の要求がこれを使うと落ちる）
+- 場面から積む置き換えの名前: `sha.main`・`sha.feature`・`blob.sha`（拡張だけの要求が使う。本物は `contractrecord.BuildScene`、TS は `mock()` が積む。`contractshape.SceneContext` には持たず、`requests_test.go` の `chromeScene` が名前の一覧。`sh` の要求がこれを使うと落ちる）
 
 ### 置き換えの書き方
 
@@ -73,7 +73,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 ### 場面（事前状態）
 
-本物は `record_contract.py` が `gitlab_api.Client` で、模擬は `fakeside.scene_state()` で、同じ場面を作る。
+本物は `contractrecord` が `gitlabapi.Client` で、模擬は `contractshape.SceneState` で、同じ場面を作る。
 
 - プロジェクト 1 つ。`main` に最初のコミット。`feature`・`done`・`fresh` の 3 ブランチ（それぞれ `main` から切り、ファイルを 1 つ足す）
 - issue が 1 件（メモ 1 件）
@@ -82,7 +82,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - `fresh` は存在するブランチで、MR は無い
 - 拡張だけの要求のために、`feature` にもう 1 コミット（`docs/note.txt`。ディレクトリと、2 つの履歴を作る）。`sha.main`（`main` の先頭）・`sha.feature`（`feature` の先頭）・`blob.sha`（`feature.txt` の blob の sha）を `context` に積む
 
-**場面の分担**: 上の最後の項目（拡張だけの要求の場面）は、本物の `record_contract.py` の `Scene.build` と、TS の `mock()`（`gitlab-contract.test.ts`）にだけある。`fakeside.scene_state()` には足さない（`fake_gitlab.py` はこれらの要求に答えない）。それ以外は、本物と fake が同じ前提で書かれている。
+**場面の分担**: 上の最後の項目（拡張だけの要求の場面）は、本物の `contractrecord.BuildScene` と、TS の `mock()`（`gitlab-contract.test.ts`）にだけある。`contractshape.SceneState` には足さない（`fakegitlab` はこれらの要求に答えない）。それ以外は、本物と fake が同じ前提で書かれている。
 - 録る前に、open の MR の `merge_status` が `checking` でなくなり `diff_refs` が入るまで待つ。`related_merge_requests` に MR が出るまでも待つ（参照は非同期に作られる）
 
 ## reads（比べるキー）
@@ -136,7 +136,7 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 {
   "version": 1,
   "source": "gitlab",
-  "gitlab_image": "gitlab/gitlab-ce@sha256:…（docker_gitlab.py の GITLAB_IMAGE）",
+  "gitlab_image": "gitlab/gitlab-ce@sha256:…（`gitlabdocker.Image`）",
   "gitlab_version": "19.4.1",
   "recorded_at": "<録った日>",
   "not_recorded": ["headers", "page2", "error_403"],
@@ -161,9 +161,9 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 `entries`（fake 側）と `chrome_entries` は、録った差を模擬を直して消し、0 件に保つ。版差や EE の機能（直せない差）が出たら、理由つきで足す。見本の許可は別キーの `host_entries`（下の「見本」）。
 
-## 見本（gitlab_host.py）
+## 見本（hostfixture の GitLab）
 
-`tests/sh/gitlab_host.py` と、その読む場面（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答の形も、`recorded.json` と `reads` のキーで比べる。試験は `tests/contract/test_host_sample.py`。`gitlab_host.py` は import せず、パスを指して読み込む（`tests/contract` は `tests/sh` を import しない）。場面の一覧と置き場は `gitlab_host.scene_names()`・`SCENES` から取る。
+`go/internal/harness/hostfixture`（GitLab）と、その読む場面（`extensions/chrome/ccnavi-approval/test/fixtures/host/gitlab/`）の応答の形も、`recorded.json` と `reads` のキーで比べる。試験は `hostsample_test.go`。場面の一覧は `hostfixture.SceneNames` から取る。
 
 ### 場面
 
@@ -206,14 +206,14 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 
 ## Chrome 拡張の模擬（MockGitLab）との比較
 
-`extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は `shape.py` の写しで、名前も規則も同じ。正本は Python で、規則を変えたいときは Python を直し、`normalize-cases.json` を直してから TS を合わせる。
+`extensions/chrome/ccnavi-approval/test/gitlab-contract.test.ts`（`pnpm test`。`--e2e` には入れない）が、`MockGitLab` の `handle` を直接呼び、`used_by` に `chrome` を持つ要求だけを `recorded.json` と `reads` で比べる。比較器 `test/helpers/shape.ts` は Go の `contractshape/shape.go` の写しで、名前も規則も同じ。正本は Go で、規則を変えたいときは Go を直し、`normalize-cases.json` を直してから TS を合わせる。
 
 - 比べる要求（`used_by` に `chrome` を持つもの）: `user`・`project`・`mrs_merged`・`mr_create`・`error_401`・`error_404` と、拡張だけの要求（上の「要求の列」）。`MockGitLab` が 404 か形の違う応答を返す要求（`member` など）は `chrome` を付けず、比べない
 - 場面は `gitlab-contract.test.ts` の `mock()` が組む（上の「場面の分担」）
 - `mrs_opened` は比べない。`source_branch` を付けると `MockGitLab` は `pulls` から `iid`・`source_project_id`・`web_url` だけを返し、場面を付けると見本から返すため、`reads` の範囲で答える経路がない
 - 見本（`test/fixtures/host/gitlab/*`）から返す応答は比べない。手で組んだもので、本物の形を写していない
 - 許可リストは `chrome_entries`（`entries` に混ぜない。`apply_allow` が当たらない項目を古い許可として落とす）
-- 同じ生の入力を Python と TS で正規化して一致することも確かめる。`uv` が無ければ、その試験は skip と出る
+- 同じ `normalize-cases.json` の入力と期待を、Go と TS の両方が読んで確かめる
 
 ## 限界
 
@@ -226,23 +226,23 @@ keywords: [契約テスト, 見本, gitlab_host, host_entries, contract, GitLab,
 - レート制限、競合、実時間の遅延（非同期の判定は録る前に待って確定させる）
 - 値（ID・時刻・SHA）の一致。`state`・`source_branch` の絞り込みが効くか、`order_by`・`sort` の並び、日時の書式は、型が同じなら緑になる
 - `web_url` は sh が読むが、環境で変わる欄として形から落とすので、模擬が返さなくなっても検出できない
-- TS の比較器との既知の差。`1.0` のように小数点以下が 0 の値は、Python では `number`、JS の `JSON.parse` では `integer` になる。`DATETIME` の正規表現は、Python の `\d` が Unicode の数字にも、`$` が末尾の改行の前にも当たるのに対し、JS は ASCII の数字だけに当たり、`$` は末尾だけに当たる（JS の方が厳しい）
+- TS の比較器との既知の差。`1.0` のように小数点以下が 0 の値は、Go の比較器では（`json.Number` の文字に `.` があるので）`number`、JS の `JSON.parse` では `integer` になる。`DATETIME` の正規表現は、Go は ASCII の数字だけに当たり末尾を厳密に見るのに対し、JS の側は別に書いてあるので、規則を変えたら両方を直す
 - Chrome 拡張の比較は `reads` の範囲と、`used_by` に `chrome` を持つ要求だけ。見本由来の応答と、`mrs_opened`、ページを繰る 2 ページ目以降、Commits API の `update`・`delete`、`compare` の `collapsed`・`too_large`（本物は立つときだけ返し、場面で立てていない）、`approvals` で承認が付いた形（`approved_by` が空）は対象外。承認が付いた形は `approvals_get`（merged の MR）が `approved_by[].approved_at` だけ比べる（`approved_by[].user.username` は環境で変わる欄で、`reads` に載せられない）
 - 空の配列の要素の形（録るときに、`NON_EMPTY` の要求が空でないことを確かめる）
 - 録った場面の外（差分への指摘のスレッド、複数ページ、フォークからの MR、グループ配下のプロジェクトで `group_access` が整数になる形など）
 
 ## 模擬を直したとき
 
-回すテスト（`contract` と、Chrome 拡張の `pnpm test`）は[ccnaviのPythonのテストを回す](testing.md)の「どのグループを回すか」に従う。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `uv run python -m tests.contract.fakeside` で作り直す（本物の記録 `recorded.json` は作り直さない）。
+回すテスト（`go test ./internal/clitest/contract/...` と、Chrome 拡張の `pnpm test`）は[ccnaviのテストを回す](testing.md)の「どのパッケージを回すか」に従う。落ちたら、本物に合わせて模擬を直す（基本）。版差・EE など直せない差だけ、意図した差として許可リストに理由つきで足す。サンプルが古くなって落ちたら `go test ./internal/clitest/contract/gitlab -run TestSampleIsRegeneratedWithoutChange -update-sample` で作り直す（本物の記録 `recorded.json` は作り直さない）。
 
 ## 録り直し（本物の GitLab）
 
 録り直すのは「模擬が返すキーを足して `reads` を変えたとき」「sh や拡張が読むキーが変わったとき」「GitLab の版（`GITLAB_IMAGE`）を上げるとき」。録るのは手動で、自動テストは Docker を使わない。GitLab の起動・トークン・他の作業との共用は[手動の GitLab](gitlab-manual.md)に従う。
 
-1. `uv run python tests/manual/gitlab/docker_gitlab.py status` で、コンテナが healthy・トークンが「有効」であることを確かめる。動いていなければ [gitlab-manual.md](gitlab-manual.md) のとおりに起こす（`record_contract.py` は起動も停止もしない。トークンは `tokens.env` から読む）
-2. `uv run python tests/manual/gitlab/record_contract.py --dry-run > /dev/null` で試す（置かない。検査に当たれば理由を標準エラーに出す）
-3. `uv run python tests/manual/gitlab/record_contract.py` で録る。使い捨てのプロジェクト `p551-<乱数>` を作って場面を組み、`requests.json` の列を送り、終わったら消す（自分が作ったものだけ。途中で失敗しても消す。`CCNAVI_PROBE_KEEP=1` で残せる）。**2 回録り（2 回目は別のプロジェクト）、`reads` の各キーの型が一致すること**を確かめる。一致しないキーは、`reads` から外すか、型の和集合で済むかを判断する
-4. 置く前の検査に 1 つでも当たれば `recorded.json` を置かない: 期待のステータスと違う応答、`NON_EMPTY` の配列が空、`reads` のキーが記録に無い、禁止文字列、動いているコンテナのイメージが `GITLAB_IMAGE` と違う。通れば同じ場所の一時ファイルに書いて `os.replace` で置く
-5. `uv run python -m tests tests/contract` を回す。落ちたら、本物に合わせて模擬を直す。意図した差なら許可リストに理由つきで足す
+1. `cd go && go run ./internal/harness/cmd/gitlabmanual status` で、コンテナが healthy・トークンが「有効」であることを確かめる。動いていなければ [gitlab-manual.md](gitlab-manual.md) のとおりに起こす（`record-contract` は起動も停止もしない。トークンは `tokens.env` から読む）
+2. `cd go && go run ./internal/harness/cmd/gitlabmanual record-contract --dry-run > /dev/null` で試す（置かない。検査に当たれば理由を標準エラーに出す）
+3. `cd go && go run ./internal/harness/cmd/gitlabmanual record-contract` で録る。使い捨てのプロジェクト `p551-<乱数>` を作って場面を組み、`requests.json` の列を送り、終わったら消す（自分が作ったものだけ。途中で失敗しても消す。`CCNAVI_PROBE_KEEP=1` で残せる）。**2 回録り（2 回目は別のプロジェクト）、`reads` の各キーの型が一致すること**を確かめる。一致しないキーは、`reads` から外すか、型の和集合で済むかを判断する
+4. 置く前の検査に 1 つでも当たれば `recorded.json` を置かない: 期待のステータスと違う応答、`NON_EMPTY` の配列が空、`reads` のキーが記録に無い、禁止文字列、動いているコンテナのイメージが `GITLAB_IMAGE` と違う。通れば同じ場所の一時ファイルに書いて rename で置く
+5. `cd go && go test ./internal/clitest/contract/...` を回す。落ちたら、本物に合わせて模擬を直す。意図した差なら許可リストに理由つきで足す
 
-場面の組み立てに使う `POST repository/commits` などは、`gitlab_api.Client` の追加のメソッド（`first_commit`・`commit_file`・`create_mr_described`・`get_mr`・`merge_mr`・`create_issue_note`・`create_mr_note`・`wait_mr_checked`）で、録る側だけが使う。`merged` の MR は `PUT merge` で作る（mergeability の判定が非同期なので、`wait_mr_checked` で待ち、405 の間は 5 秒おいて試し、`merged` になるまで待つ）。
+場面の組み立てに使う `POST repository/commits` などは、`gitlabapi.Client` の追加のメソッド（`FirstCommit`・`CommitFile`・`CreateMRDescribed`・`GetMR`・`MergeMR`・`CreateIssueNote`・`CreateMRNote`・`WaitMRChecked`）で、録る側だけが使う。`merged` の MR は `PUT merge` で作る（mergeability の判定が非同期なので、`WaitMRChecked` で待ち、405 の間は 5 秒おいて試し、`merged` になるまで待つ）。

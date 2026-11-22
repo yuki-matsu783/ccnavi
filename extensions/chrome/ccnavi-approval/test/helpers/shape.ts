@@ -1,6 +1,7 @@
 /**
- * GitLab の応答の「形」を作り、比べる。`tests/contract/shape.py` を同じ名前・同じ規則で写したもの。
- * 正本は Python。規則を変えたいときは Python 側を直し、`normalize-cases.json` を直してからここを合わせる。
+ * `go/internal/harness/contractshape/shape.go` を同じ名前・同じ規則で写したもの。
+ * 正本は Go。規則を変えたいときは Go 側を直し、`normalize-cases.json` に件を足してからここを合わせる。
+ * 既知の差（表に入れない）: `1.0` は Go では number、JS では整数に読まれて integer になる。本物の応答に `1.0` の形は出ない。
  * 仕様は `.agents/docs/gitlab-contract.md`。
  */
 import fs from "node:fs";

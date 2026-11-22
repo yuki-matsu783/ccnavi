@@ -110,13 +110,13 @@ error がある間は配点もフェーズ定義も保存できない。
 - `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・実行ファイル・拡張の 3 つの logger で揃える。
-  `tests/sh/test_diaglog_sh.py` が sh と拡張の行を、`go/internal/records/diaglog` の go test が同じ入力と答えで実行ファイルの行を見る
+  `go/internal/clitest/sh/small/diaglog_test.go` が sh の行を、`go/internal/records/diaglog` の go test が同じ入力と答えで実行ファイルの行を、拡張の `test/shared/log.test.ts` が拡張の行を見る
 - Chrome 拡張は、実行ファイルと同じ Go のソースを WASM に組んで同梱する（`go/cmd/ccnavi-chrome`）。拡張が呼ぶのは要求の JSON を 1 つ渡して答えの JSON を受ける 1 つの関数だけで、
   入口の `entry/chrome` が、判定のコア（`tickets/core`。ブランチの中身 → 判定 → 書くもの）と、手元と同じ `--agree --preview --json` を通す。要求と答えの形は `entry/chrome` と拡張の `src/core/ccnavi.ts` が対で定義しており、ここには写さない。
   本体のパッケージを動かすときは `entry/chrome` だけを直す。拡張は同じ版の本体と一緒に組むので、別の版の本体と拡張は組み合わさらない。
   互換の版は、拡張が統合先のデータや出力の形を読み違えるような変更のときに上げ、呼び出しの名前だけを変えるときは上げない
 - 互換の版の書き方: 実行ファイル側は `go/internal/entry/version/version.go` の行頭から始まる 1 行 `const Compat = <整数>` で、Chrome 拡張の組み立てが正規表現で読む。
-  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `tests/core/test_version.py` が見る
+  VS Code 拡張側は `EXTENSION_COMPAT`。3 か所（実行ファイル・sh の `CCNAVI_COMPAT`・拡張）の突き合わせは `go/internal/entry/version` の go test が見る
 
 ### 10.1 `--docs` の索引
 

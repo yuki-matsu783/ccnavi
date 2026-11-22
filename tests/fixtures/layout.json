@@ -1,5 +1,5 @@
 {
-  "note": "置き場の名前（ワークスペースルートかツリーのルートからの相対、/ 区切り）。実行ファイルを起こさずに動く sh（ccnavi-fetch.sh・ccnavi-user-push-approved.sh）が使う ccnavi-common.sh の写し（ccnavi_worktrees_dir など。tests/sh/test_sh_copies_sh.py）と、実行ファイルの既定（tree.WorktreesDir・config.DefaultProjects・DefaultApproved・DefaultTickets。go/internal/tickets/model/place/layout_sh_test.go）が同じ表で一致を確かめる。",
+  "note": "置き場の名前（ワークスペースルートかツリーのルートからの相対、/ 区切り）。実行ファイルを起こさずに動く sh（ccnavi-fetch.sh・ccnavi-user-push-approved.sh）が使う ccnavi-common.sh の写し（ccnavi_worktrees_dir など。go/internal/clitest/sh/small/shcopies_test.go）と、実行ファイルの既定（tree.WorktreesDir・config.DefaultProjects・DefaultApproved・DefaultTickets。go/internal/tickets/model/place/layout_sh_test.go）が同じ表で一致を確かめる。",
   "worktrees": ".claude/worktrees",
   "projects": "projects",
   "approved": ".ccnavi/approved",

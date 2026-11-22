@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// `ccnavi user mirror` の揃え方のうち、mirror_test.go に無い 2 つ（tests/config/test_mirror_sync.py から移した）。
+// `ccnavi user mirror` の揃え方のうち、mirror_test.go に無い 2 つ。
 // 揃えてもコミットは作らない（取り込むのはユーザ）。揃えるものが無ければ、何も書かずにそう言う。
 func TestApplyMakesNoCommitAndSaysWhenNothingDiffers(t *testing.T) {
 	root := workspace(t)

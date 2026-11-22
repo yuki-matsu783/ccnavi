@@ -1,6 +1,6 @@
 /**
- * `--plan-order <親> --json`の答えの実例（`test/fixtures/plan-order.json`）を読む。Python側の
- * `tests/ticket/test_plan_order.py`（`PlanOrderFixtureTest`）が書き出したもので、ここでは書き換えない。
+ * `--plan-order <親> --json`の答えの実例（`test/fixtures/plan-order.json`）を読む。Go の試験
+ * `go/internal/clitest/ticket/phases/planorder_test.go`（`TestShapesMatchTheExtensionFixture`）が書き出したもので、ここでは書き換えない。
  *
  * 並んでいる答えは6つ。開いたとき（`open`。全体計画1〜4とフィードバック計画5〜6、子の提案2本）、
  * 逆向きの線で2と3が入れ替わり子が付け替わるとき（`reverse`）、循環で断るとき（`cycle`）、

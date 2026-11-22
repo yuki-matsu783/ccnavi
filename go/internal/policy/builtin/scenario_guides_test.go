@@ -8,8 +8,7 @@ import (
 	"ccnavi/internal/policy/texts"
 )
 
-// 組み込みの deny の文は、どれも次の一手（`次:` の行）を持つ（tests/scenarios/test_runner.py の
-// test_every_shipped_deny_message_has_a_next_step から移した）。受入シナリオは、案内の無い拒否を弱点として数える。
+// 組み込みの deny の文は、どれも次の一手（`次:` の行）を持つ。受入シナリオは、案内の無い拒否を弱点として数える。
 // git の入口のあるワークスペースと無いワークスペースの両方で見る。
 func TestEveryDenyTextHasANextStep(t *testing.T) {
 	for _, wrapper := range []bool{false, true} {

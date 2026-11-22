@@ -1,20 +1,20 @@
-# 手動の確認用の GitLab CE。起動・停止・確認は docker_gitlab.py が行う（直接 compose を打たない）。
-# 環境変数は docker_gitlab.py が渡す。ポート・版・メモリ上限は docker_gitlab.py の定数で 1 か所に決める。
+# 手動の確認用の GitLab CE。起動・停止・確認は gitlabdocker（go/internal/harness/gitlabdocker）が行う（直接 compose を打たない）。
+# 環境変数は gitlabdocker が渡す。ポート・版・メモリ上限は gitlabdocker の定数で 1 か所に決める。
 name: ccnavi-gitlab
 
 services:
   gitlab:
-    image: ${GITLAB_IMAGE:?docker_gitlab.py の GITLAB_IMAGE で渡す}
+    image: ${GITLAB_IMAGE:?gitlabdocker が渡す}
     container_name: gitlab
     # 起動時に Docker Desktop が勝手に上げないよう、自動では再起動しない
     restart: "no"
     hostname: gitlab.localhost
     # GitLab の共有メモリは既定の 64MB では足りない
     shm_size: 256m
-    # CE は 4GB が要る。OOM で落ちないよう余裕をとった値（docker_gitlab.py の MEM_LIMIT）
-    mem_limit: ${GITLAB_MEM_LIMIT:?docker_gitlab.py の GITLAB_MEM_LIMIT で渡す}
+    # CE は 4GB が要る。OOM で落ちないよう余裕をとった値（gitlabdocker.MemLimit）
+    mem_limit: ${GITLAB_MEM_LIMIT:?gitlabdocker が渡す}
     environment:
-      GITLAB_ROOT_PASSWORD: ${GITLAB_ROOT_PASSWORD:?docker_gitlab.py の GITLAB_ROOT_PASSWORD で渡す}
+      GITLAB_ROOT_PASSWORD: ${GITLAB_ROOT_PASSWORD:?gitlabdocker が渡す}
       # external_url と公開ポートは同じ値にする。ずれると clone URL と web_url が壊れる
       GITLAB_OMNIBUS_CONFIG: |
         external_url 'http://127.0.0.1:${GITLAB_PORT}'
