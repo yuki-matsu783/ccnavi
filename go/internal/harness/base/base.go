@@ -13,11 +13,11 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// 共通レイヤーと config（自身のレイヤー）の 3 本のファイルの置き場。置き場の名前はテストの側に持つ。
+// 共通レイヤーと config（自身のレイヤー）の 4 本のファイルの置き場。置き場の名前はテストの側に持つ。
 // 既定が動いたら、ここを置いた木で実行ファイルが設定を読まなくなり、設定を前提にしたテストが落ちて気づく。
 const projectHome = ".ccnavi"
 
-var layerFileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
+var layerFileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml", "sections": "ticket-sections.yml"}
 
 // tempPrefix は使い捨ての置き場の名前の頭。Windows の MAX_PATH に当たらないよう短くする。
 const tempPrefix = "cc-"

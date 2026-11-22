@@ -25,7 +25,7 @@ func TestDeployWritesTheSettingsAndCopiesThePartsInOneRun(t *testing.T) {
 		t.Error("実行ファイルを配っていない")
 	}
 	eq(t, "振り分けの sh", shkit.Read(t, w.launcher()), shkit.Read(t, launcherPath()))
-	for _, rel := range []string{"config/common/rules.yml", "config/common/risks.yml", "config/common/phases.yml"} {
+	for _, rel := range []string{"config/common/rules.yml", "config/common/risks.yml", "config/common/phases.yml", "config/common/ticket-sections.yml"} {
 		if !shkit.Exists(w.path(".ccnavi", filepath.FromSlash(rel))) {
 			t.Errorf("%s を配っていない", rel)
 		}

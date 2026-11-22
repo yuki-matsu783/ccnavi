@@ -22,9 +22,9 @@ import (
 
 const Home = ".ccnavi"
 
-var fileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml"}
+var fileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml", "sections": "ticket-sections.yml"}
 
-// layerPath はその git プロジェクトルートのレイヤーのファイル（rules / phases / risk）のパス。
+// layerPath はその git プロジェクトルートのレイヤーのファイル（rules / phases / risk / sections）のパス。
 func LayerPath(root, kind string) string {
 	return filepath.Join(root, Home, "config", "project", fileNames[kind])
 }

@@ -247,10 +247,11 @@ func makeSource(t testing.TB, o srcOpts) string {
 	if o.NoParts {
 		return src
 	}
-	// 設定 3 本のひな形は共通レイヤー。自身のレイヤーの phases.yml は配布元にあっても配らない。
+	// 設定 4 本のひな形は共通レイヤー。自身のレイヤーの phases.yml は配布元にあっても配らない。
 	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
 	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
 	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "phases.yml"), "version: 1\nphases: {}\n")
+	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "common", "ticket-sections.yml"), "version: 1\nparent: []\nchild: []\n")
 	shkit.Write(t, filepath.Join(src, ".ccnavi", "config", "project", "phases.yml"), "version: 1\nphases: {}\n")
 	for _, name := range deployScripts {
 		shkit.Write(t, filepath.Join(src, ".ccnavi", "scripts", name), "# "+name+"\n")

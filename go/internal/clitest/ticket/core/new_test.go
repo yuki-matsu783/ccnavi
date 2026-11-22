@@ -25,6 +25,25 @@ var scaffoldPlaceholders = []string{
 	"（ここに計画の理由を書く）",
 }
 
+// 雛形の見出しを決める ticket-sections.yml（このリポジトリの共通レイヤーと同じ見出し）。
+const scaffoldSections = `version: 1
+parent:
+  - name: 目的
+    todo: （ここにこの作業の目的を書く）
+  - name: 範囲
+    todo: （ここにこの作業の範囲を書く）
+  - name: 対象外
+    todo: （ここにこの作業の対象外を書く）
+  - name: 完了の確かめ方
+    todo: （ここに完了をどう確かめるかを書く）
+  - name: 計画の理由
+    todo: （ここに計画の理由を書く）
+child:
+  - name: 担当範囲
+  - name: 親の要求との対応
+  - name: 確認の手順
+`
+
 // scaffold は `ccnavi ticket new` を試す木。cwd は識別子と同名のワークツリー。
 type scaffold struct {
 	*ticketkit.Tree
@@ -35,6 +54,7 @@ type scaffold struct {
 func newScaffold(t *testing.T, phases string) *scaffold {
 	t.Helper()
 	tr := ticketkit.New(t, ticketkit.Options{Phases: phases})
+	ticketkit.Write(t, base.CommonPath(tr.Root, "sections"), scaffoldSections)
 	tree := tr.Worktree(scaffoldIdent, "main")
 	return &scaffold{Tree: tr, tree: tree, todo: tr.TodoPathIn(tree, scaffoldIdent)}
 }

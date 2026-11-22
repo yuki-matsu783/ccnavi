@@ -27,6 +27,7 @@ func layersSource(t *testing.T) string {
 	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "rules.yml"), "deny: []\n")
 	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), layerRisk)
 	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "phases.yml"), layerPhases)
+	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "common", "ticket-sections.yml"), "version: 1\nparent: []\n")
 	shkit.Write(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), ownPhases)
 	shkit.Write(t, filepath.Join(root, ".ccnavi", "CCNAVI.md"), "# ccnavi の作業の決まり\n")
 	shkit.Write(t, filepath.Join(root, ".ccnavi", "docs", "worktree.md"), "# ワークツリー\n")
@@ -37,7 +38,7 @@ func layersSource(t *testing.T) string {
 	return root
 }
 
-// 共通レイヤーに rules.yml・risks.yml・phases.yml のひな形を中身を変えずに配る。自身のレイヤーの phases.yml は、配布元にあっても配らず、
+// 共通レイヤーに rules.yml・risks.yml・phases.yml・ticket-sections.yml のひな形を中身を変えずに配る。自身のレイヤーの phases.yml は、配布元にあっても配らず、
 // 配布先に既にあれば --force でも触らない。
 func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 	t.Parallel()
@@ -46,7 +47,7 @@ func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 		w := newTarget(t)
 		r := w.setup("--mode", "enable", "--deploy", layersSource(t))
 		code(t, r, 0)
-		for _, kind := range []string{"rules.yml", "risks.yml", "phases.yml"} {
+		for _, kind := range []string{"rules.yml", "risks.yml", "phases.yml", "ticket-sections.yml"} {
 			if !shkit.Exists(w.path(".ccnavi", "config", "common", kind)) {
 				t.Errorf("共通レイヤーの %s が配られていない", kind)
 			}
@@ -95,5 +96,5 @@ func TestMissingTemplatesAreNamed(t *testing.T) {
 	w := newTarget(t)
 	r := w.setup("--mode", "enable", "--no-deploy")
 	code(t, r, 0)
-	in(t, r.Stdout, "まだ無いもの", ".ccnavi/config/common/rules.yml", ".ccnavi/config/common/risks.yml", ".ccnavi/config/common/phases.yml")
+	in(t, r.Stdout, "まだ無いもの", ".ccnavi/config/common/rules.yml", ".ccnavi/config/common/risks.yml", ".ccnavi/config/common/phases.yml", ".ccnavi/config/common/ticket-sections.yml")
 }
