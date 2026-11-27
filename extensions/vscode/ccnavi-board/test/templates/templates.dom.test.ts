@@ -118,14 +118,13 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   }
 });
 
-test("CB-D328 下書きは3件出て、error・TODOをバッジで出す。効力がなく読むだけであることを一覧の前に言い、取り込み・編集のボタンを持たない", async () => {
+test("CB-D328 下書きは3件出て、error・TODOをバッジで出す。取り込むまで使われないことを一覧の前に言い、取り込み・編集のボタンを持たない", async () => {
   const dom = await openTemplates();
   try {
     assert.equal(dom.all("li.draft").length, 3);
     assert.match(text(dom.one('li.draft[data-name="broken"]')), /errorあり/);
     assert.match(text(dom.one('li.draft[data-name="login"]')), /TODOが残っています/);
-    assert.match(text(dom.one('[data-tour="drafts"] .hint')), /効力のない下書き/);
-    assert.match(text(dom.one('[data-tour="drafts"] .hint')), /読むだけ/);
+    assert.match(text(dom.one('[data-tour="drafts"] .hint')), /取り込むまでテンプレートとしては使われません/);
     // 取り込み・保存・改名・移動・削除の操作はこの画面に無い
     for (const action of ["open-import", "edit-draft", "rename-draft", "delete-draft", "rename-template", "move-template", "delete-template", "preview-import", "import-yes"]) {
       assert.equal(dom.all(`[data-action="${action}"]`).length, 0, `${action}が残っている`);
