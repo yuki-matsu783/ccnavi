@@ -753,7 +753,7 @@ courses:
         scene: { tab: rules, fold: allow }
       - target: order-hint
         title: 判定の強さ
-        body: 判定は強い順に 拒否 > 確認 > 許可（deny > ask > allow）です。1件でもdenyにヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
+        body: 判定は強い順に 拒否 > 確認 > 許可（deny > ask > allow）です。1件でもdenyにヒットすれば拒否で、弱いタイプは見に行きません。行の並びが強さを決めるのではなく、タイプが決めます。
         scene: { tab: rules }
       - target: rule-no-rm-rf-buttons
         title: 同じタイプの中の順

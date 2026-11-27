@@ -241,7 +241,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               </span>
             </div>
             <div className="controls">
-              {/* 絞り込みと操作は段を分ける。操作の段はボタン3つだけなので、狭い幅でも主ボタン（承認）だけが次の行に落ちず、常に右端に出る */}
+              {/* 絞り込みと操作は段を分ける。操作の段はボタンが3つだけなので、狭い幅でも主ボタン（承認）が次の行に落ちず、常に右端に出る */}
               <div className="filters">
                 {shown.projects.length > 0 ? (
                   <label className="filter" data-tour="filter-project">

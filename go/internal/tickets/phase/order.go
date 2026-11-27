@@ -129,8 +129,7 @@ func PlanFinished(conf *config.Settings, root string, parent *ticket.Ticket) boo
 	return len(seen) == last
 }
 
-// stageLabel は局面の文に並べるフェーズの呼び名。「フェーズ2 設計」のように括弧を使わずに書く（局面の文が
-// 括弧を重ねて読みにくくならないように）。
+// stageLabel は局面の文に並べるフェーズの呼び名。括弧を重ねて読みにくくしないため、「フェーズ2 設計」のように括弧を使わずに書く。
 func stageLabel(p *Phase) string {
 	if title := p.Title(); title != "" {
 		return "フェーズ" + strconv.Itoa(p.Number) + " " + title
