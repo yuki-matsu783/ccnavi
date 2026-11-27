@@ -264,7 +264,13 @@ export function PlanEdit({ part, template, plan, fresh, shownIds, types, picked,
                     aria-label={`${number}番を削除`}
                     disabled={last}
                     title={removeTitle(last, hasFlow)}
-                    onClick={() => onChange(removeItem(template, part, index))}
+                    onClick={() => {
+                      onChange(removeItem(template, part, index));
+                      // 消したステップの印を残さない（idは足し直すと同じ値になりうる）
+                      if (chosen) {
+                        onPick(undefined);
+                      }
+                    }}
                   >
                     削除
                   </button>

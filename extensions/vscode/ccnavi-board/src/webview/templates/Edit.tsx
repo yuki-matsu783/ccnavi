@@ -25,7 +25,7 @@ import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { Problems } from "./Problems.js";
 import { Code } from "../shared/Code.js";
 import { layerLabel } from "./text.js";
-import { historyKey } from "../shared/keys.js";
+import { moveByKey, useDocumentKeys } from "../shared/keys.js";
 import { graphMaximized } from "../shared/Maximize.js";
 
 /** 直して読ませるまでの待ち（ミリ秒）。打つたびに実行ファイルを呼ばない */
@@ -150,6 +150,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         }
         setBaseSha(String(message.sha ?? ""));
         setCreated(false);
+        // 保存した中身が新しい起点になる（`flow-history.ts`の決まり。フェーズ管理画面も同じ）
+        setHistory(emptyHistory<EditTemplate>());
         setSavedKey(sent.current);
         setStatus({ text: "保存しました", error: false });
       }
@@ -171,13 +173,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     return () => clearTimeout(timer);
   }, [tpl, key, fresh, session]);
 
-  // キー入力を受け取る側は1度だけ張り、中身は描くたびに最新へ差し替える
-  const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
-  useEffect(() => {
-    const listener = (event: KeyboardEvent): void => onKey.current(event);
-    document.addEventListener("keydown", listener);
-    return () => document.removeEventListener("keydown", listener);
-  }, []);
+  // キー入力（元に戻す・やり直す）。中身は描くたびに最新へ差し替える
+  const onKey = useDocumentKeys();
 
   /** 閉じる。拡張ホストには、錠を取り直すのをやめてよいと知らせる */
   const finish = (): void => {
@@ -237,13 +234,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
 
   onKey.current = (event: KeyboardEvent): void => {
     // 保存中・閉じる確認の間・図を全画面にしている間（見えない欄）は直さない
-    const moved = busy || confirmClose || graphMaximized() ? undefined : historyKey(event);
-    if (moved === "undo" && canUndo(history)) {
-      event.preventDefault();
-      travel(undo(history, tpl));
-    } else if (moved === "redo" && canRedo(history)) {
-      event.preventDefault();
-      travel(redo(history, tpl));
+    if (!busy && !confirmClose && !graphMaximized()) {
+      travel(moveByKey(event, history, tpl));
     }
   };
 

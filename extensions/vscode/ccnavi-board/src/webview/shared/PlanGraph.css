@@ -107,7 +107,13 @@
 /* 線を引いている最中に、引けない先のステップ。薄くする（理由は載せたときの説明でも言う） */
 .plan-node[data-blocked="1"] { opacity: .45; }
 /* 引けない所で放したときの理由。注意の色は縁にだけ使う */
-.plan-graph-refusal { margin: 4px 0 0; padding: 1px 0 1px 8px; border-left: 3px solid var(--vscode-editorWarning-foreground); font-size: var(--font-md); overflow-wrap: anywhere; }
+/* 図の枠の下端に重ねて出す（全画面の図でも見える）。拡大ボタンと同じ高さのレイヤー */
+.plan-graph-refusal {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: var(--z-popover); margin: 0;
+  padding: 3px 8px; border-left: 3px solid var(--vscode-editorWarning-foreground);
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  font-size: var(--font-md); overflow-wrap: anywhere;
+}
 .plan-graph-canvas .react-flow__node-planItem { cursor: pointer; }
 /* 畳んだらバッジのボタンだけ残す（中身は消さずに隠す） */
 .plan-detail[data-folded="1"] > :not(.plan-detail-toggle) { display: none; }

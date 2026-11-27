@@ -520,6 +520,12 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           <RefitOnChange value={maximized} />
         </ReactFlow>
         <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
+        {/* 図の枠の中に出す（全画面にしても見えるように。枠の外に置くと全画面の枠に覆われる） */}
+        {refusal !== undefined && (
+          <p className="plan-graph-refusal" role="status" data-role="plan-refusal">
+            {refusal}
+          </p>
+        )}
       </div>
       {detail && (
         <aside className="plan-detail" id="plan-detail" aria-label="ステップの詳細" data-folded={folded ? "1" : "0"}>
@@ -539,11 +545,6 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
         </aside>
       )}
       </div>
-      {refusal !== undefined && (
-        <p className="plan-graph-refusal" role="status" data-role="plan-refusal">
-          {refusal}
-        </p>
-      )}
       <Notes plan={plan} />
     </section>
     </RemoveEdge.Provider>
