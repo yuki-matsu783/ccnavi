@@ -35,8 +35,19 @@ func requireFamily(req *pyjson.Object, s *snapshot) (string, error) {
 	return family, nil
 }
 
-// opBoard は親子のチケット 1 つの承認待ち（読み取りだけ）。判定の入力は統合先・P・閉包の P_X だけ。
-func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
+// familyClosure は要求の親子のチケットと、判定の入力になる閉包。undecided が空でなければ判定に使えない理由
+// （閉包が広がりすぎ・持ち主が決まらない・本文を読めないファイルがある）。byIdent は理由が持ち主に関わるもの。
+type familyClosure struct {
+	s         *snapshot
+	family    string
+	c         *closure
+	undecided string
+	byIdent   bool
+}
+
+// readFamilyClosure は要求の family の閉包を決め、判定に使えるかを確かめる。承認待ちを読む（opBoard）のも、
+// 書くために仮のツリーを組む（familyTree）のもこれを通す（誤った承認を出さないため）。閉包を読み足りないときは断る。
+func readFamilyClosure(req *pyjson.Object) (*familyClosure, error) {
 	s, err := readSnapshot(req)
 	if err != nil {
 		return nil, err
@@ -49,24 +60,40 @@ func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	// 1. 判定の入力になる親子のチケットの閉包を決める。広がりすぎ・読み足りない・持ち主が決まらない・
-	// 本文を読めないファイルがあるときは、判定せず理由を返す（誤った承認を出さないため）。
 	c, err := s.closure(family, hints)
 	if err != nil {
 		return nil, err
 	}
+	fc := &familyClosure{s: s, family: family, c: c}
 	if c.over {
-		return pyjson.NewObject("family", family, "undecided", c.message(), "closure", c.json()), nil
+		fc.undecided = c.message()
+		return fc, nil
 	}
 	if len(c.need) > 0 {
 		return nil, refused("閉包の親子チケットをまだ取得していません：" + strings.Join(c.need, ", "))
 	}
-	ident := c.ident(family)
-	if why := firstOf(s.rivalProblem(family, ident), c.ambiguousProblem()); why != "" {
-		return pyjson.NewObject("family", family, "ident", ident, "undecided", why, "closure", c.json()), nil
+	if why := firstOf(s.rivalProblem(family, c.ident(family)), c.ambiguousProblem()); why != "" {
+		fc.undecided, fc.byIdent = why, true
+	} else {
+		fc.undecided = s.unreadable(c)
 	}
-	if why := s.unreadable(c); why != "" {
-		return pyjson.NewObject("family", family, "undecided", why, "closure", c.json()), nil
+	return fc, nil
+}
+
+// opBoard は親子のチケット 1 つの承認待ち（読み取りだけ）。判定の入力は統合先・P・閉包の P_X だけ。
+func opBoard(req *pyjson.Object, root string) (*pyjson.Object, error) {
+	// 1. 判定の入力になる親子のチケットの閉包を決める。判定に使えないときは、判定せず理由を返す。
+	fc, err := readFamilyClosure(req)
+	if err != nil {
+		return nil, err
+	}
+	s, family, c := fc.s, fc.family, fc.c
+	ident := c.ident(family)
+	if fc.undecided != "" {
+		if fc.byIdent {
+			return pyjson.NewObject("family", family, "ident", ident, "undecided", fc.undecided, "closure", c.json()), nil
+		}
+		return pyjson.NewObject("family", family, "undecided", fc.undecided, "closure", c.json()), nil
 	}
 	// 2. 仮のツリーを組み、手元と同じ `--agree --preview` で承認待ちを出す。
 	if err := s.build(root, c.families); err != nil {
@@ -206,35 +233,17 @@ func familyTree(req *pyjson.Object, root string) (*snapshot, string, *closure, e
 	if _, err := stamp(req); err != nil {
 		return nil, "", nil, err
 	}
-	s, err := readSnapshot(req)
+	fc, err := readFamilyClosure(req)
 	if err != nil {
 		return nil, "", nil, err
 	}
-	family, err := requireFamily(req, s)
-	if err != nil {
+	if fc.undecided != "" {
+		return nil, "", nil, refused(fc.undecided)
+	}
+	if err := fc.s.build(root, fc.c.families); err != nil {
 		return nil, "", nil, err
 	}
-	hints, err := hintsOf(req, s)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	c, err := s.closure(family, hints)
-	if err != nil {
-		return nil, "", nil, err
-	}
-	if c.over {
-		return nil, "", nil, refused(c.message())
-	}
-	if len(c.need) > 0 {
-		return nil, "", nil, refused("閉包の親子チケットをまだ取得していません：" + strings.Join(c.need, ", "))
-	}
-	if why := firstOf(s.rivalProblem(family, c.ident(family)), c.ambiguousProblem(), s.unreadable(c)); why != "" {
-		return nil, "", nil, refused(why)
-	}
-	if err := s.build(root, c.families); err != nil {
-		return nil, "", nil, err
-	}
-	return s, family, c, nil
+	return fc.s, fc.family, fc.c, nil
 }
 
 // stamp は要求の時刻（fsio.Stamp と同じ、オフセット付き）。読めなければ断る。
