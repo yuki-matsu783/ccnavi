@@ -181,7 +181,7 @@ src/
     templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「編集」。行は畳んで出す）
     templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）
     templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
-    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビュー・先行ステップの選択、並べ替え、削除、追加）
+    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。ステップを選んで図の右の欄で種類・レビュー・削除・挟む・並べて追加・子のフローへ移る。表で種類・レビュー・先行ステップの選択、並べ替え、削除、追加。点の置き場所はステップの id で覚える）
     templates/FlowEdit.tsx 編集欄の子のフロー 1 本（フロー編集画面の図と右の欄を使い、部品箱でノードを足す）
     templates/Draft.tsx 下書き 1 件（読むだけ。バッジと指摘・計画。取り込みは取り込み待ち画面）
     templates/Plan.tsx  計画の表（番号・種類・レビュー・先行ステップ）
@@ -222,6 +222,7 @@ src/
     shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク管理が置く。直前の 1 行だけ覚える。元に戻す履歴を持つフェーズ管理・フロー編集・テンプレートの編集は置かない）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
     shared/Maximize.css Maximize.tsx の CSS。図の枠は isolation で内側の z-index を外へ及ぼさない
+    shared/keys.ts      元に戻す・やり直すのキーの判定（historyKey）と、文字を打つ欄の中かの判定（inField）。フロー編集・テンプレートの編集・フェーズ管理が使う
     shared/SequenceDiagram.tsx 案内の中の時系列の図（登場者の列と、時間順の矢印。矢印の値は等幅。focus の矢印だけ光らせ、ほかは薄くする）。DOM と CSS だけで描き、VS Code のテーマに従う
     shared/SequenceDiagram.css SequenceDiagram.tsx の CSS。Tour.css が @import する
     shared/PlanGraph.css PlanGraph.tsx の CSS（図・点・仮の線・注意の色。React Flow の色を --vscode-* に置き換える）

@@ -7,6 +7,7 @@
  * ファイルが外で変わっていないときだけ書く。断られたら理由を出して、編集は続けられる。
  *
  * 作業中のチケットがある間は編集はできるが保存できない（錠は拡張ホストが取り直して知らせる。`editLock`）。
+ * 元に戻す・やり直すは、ボタンとCtrl+Z / Ctrl+Shift+Z / Ctrl+Y（欄の中は欄に任せる）で受ける。
  * 未保存のまま閉じようとすると、破棄してよいかを聞く。名前は変えられない（改名は持たない。ファイルを直接操作する）。
  */
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
@@ -24,6 +25,8 @@ import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { Problems } from "./Problems.js";
 import { Code } from "../shared/Code.js";
 import { layerLabel } from "./text.js";
+import { moveByKey, useDocumentKeys } from "../shared/keys.js";
+import { graphMaximized } from "../shared/Maximize.js";
 
 /** 直して読ませるまでの待ち（ミリ秒）。打つたびに実行ファイルを呼ばない */
 const CHECK_DELAY_MS = 300;
@@ -56,6 +59,16 @@ function keyOf(template: EditTemplate): string {
   return JSON.stringify(toData(template));
 }
 
+/** 読ませた中身のステップのid。図の番号を、いまの中身のステップへ引き直すのに使う（`PlanEdit.tsx`） */
+interface ShownIds {
+  readonly plan: readonly number[];
+  readonly feedback: readonly number[];
+}
+
+function idsOf(template: EditTemplate): ShownIds {
+  return { plan: template.plan.map((item) => item.id), feedback: template.feedback.map((item) => item.id) };
+}
+
 export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   const start = useMemo((): EditTemplate | undefined => {
     const read = fromData(opened.data);
@@ -67,11 +80,11 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   }, []);
   const [tpl, setTpl] = useState<EditTemplate | undefined>(start);
   const [history, setHistory] = useState<FlowHistory<EditTemplate>>(() => emptyHistory<EditTemplate>());
-  /** 実行ファイルに読ませた答えと、読ませた中身のキー */
-  const [checked, setChecked] = useState<{ readonly key: string; readonly check: TemplateCheck }>(() => ({
-    key: keyOf(fromData(opened.data) ?? blankTemplate(opened.name, "implement")),
-    check: opened.check,
-  }));
+  /** 実行ファイルに読ませた答えと、読ませた中身のキーとステップのid */
+  const [checked, setChecked] = useState<{ readonly key: string; readonly ids: ShownIds; readonly check: TemplateCheck }>(() => {
+    const read = fromData(opened.data) ?? blankTemplate(opened.name, "implement");
+    return { key: keyOf(read), ids: idsOf(read), check: opened.check };
+  });
   const [checkError, setCheckError] = useState("");
   const [lock, setLock] = useState<Lock>(opened.lock);
   const [created, setCreated] = useState(opened.created);
@@ -84,8 +97,20 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   /** 畳んだフローのステップの番号。フローは図を最初から見せるので、畳んだものだけを覚える */
   const [folded, setFolded] = useState<ReadonlySet<number>>(() => new Set());
   const [confirmClose, setConfirmClose] = useState(false);
+  /** 選んだステップのid（全体計画とフィードバック計画で1つ）。図の点・表の行・子のフローの行で目立たせる */
+  const [picked, setPicked] = useState<number | undefined>(undefined);
+  /** 子のフローへ移るときの行き先（全体計画の添字）。描き直したあとに画面を送る */
+  const [scrollTo, setScrollTo] = useState<{ readonly index: number } | undefined>(undefined);
+  useEffect(() => {
+    if (scrollTo === undefined) {
+      return;
+    }
+    const row = document.querySelector(`section[data-role="flows"] li[data-index="${scrollTo.index}"]`);
+    (row as { scrollIntoView?: (options?: unknown) => void } | null)?.scrollIntoView?.({ block: "start" });
+    setScrollTo(undefined);
+  }, [scrollTo]);
   const seq = useRef(0);
-  const asked = useRef<{ readonly seq: number; readonly key: string }>({ seq: 0, key: "" });
+  const asked = useRef<{ readonly seq: number; readonly key: string; readonly ids: ShownIds }>({ seq: 0, key: "", ids: { plan: [], feedback: [] } });
   const sent = useRef("");
 
   const key = tpl === undefined ? "" : keyOf(tpl);
@@ -110,7 +135,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
           return;
         }
         if (message.check) {
-          setChecked({ key: asked.current.key, check: message.check as TemplateCheck });
+          setChecked({ key: asked.current.key, ids: asked.current.ids, check: message.check as TemplateCheck });
           setCheckError("");
         } else {
           setCheckError(String(message.error ?? "実行ファイルで検査できませんでした"));
@@ -125,6 +150,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         }
         setBaseSha(String(message.sha ?? ""));
         setCreated(false);
+        // 保存した中身が新しい起点になる（`flow-history.ts`の決まり。フェーズ管理画面も同じ）
+        setHistory(emptyHistory<EditTemplate>());
         setSavedKey(sent.current);
         setStatus({ text: "保存しました", error: false });
       }
@@ -140,11 +167,14 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     }
     const timer = setTimeout(() => {
       seq.current += 1;
-      asked.current = { seq: seq.current, key };
+      asked.current = { seq: seq.current, key, ids: idsOf(tpl) };
       post({ type: "editCheck", session, seq: seq.current, data: toData(tpl) });
     }, CHECK_DELAY_MS);
     return () => clearTimeout(timer);
   }, [tpl, key, fresh, session]);
+
+  // キー入力（元に戻す・やり直す）。中身は描くたびに最新へ差し替える
+  const onKey = useDocumentKeys();
 
   /** 閉じる。拡張ホストには、錠を取り直すのをやめてよいと知らせる */
   const finish = (): void => {
@@ -159,6 +189,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   useSaveKey(tpl !== undefined && !confirmClose, () => ({ blocker: saveBlocker, busy, save: () => saveNow.current(), blocked: (reason) => setStatus({ text: reason, error: false }) }));
 
   if (tpl === undefined) {
+    onKey.current = () => undefined;
     return (
       <section className="tpl-edit" data-role="edit">
         <p className="status failed">読み込んだ中身を編集用の形に変換できませんでした。ファイルを直接編集してください。</p>
@@ -177,12 +208,19 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     setTpl(next);
     setStatus(undefined);
   };
-  /** 計画の編集。フローのキーが振り直ったときは、畳んだフローがどのステップのものか分からなくなるので畳みを戻す */
+  /**
+   * 計画の編集。フローのキーが振り直ったときは、畳んだフローがどのステップのものか分からなくなるので畳みを戻す。
+   * ステップと一緒に子のフローが消えたときは、そう知らせる（表の削除ボタンのtitleでも先に言う）
+   */
   const updatePlan = (next: EditTemplate, typing?: string): void => {
     if (next.flows !== tpl.flows) {
       setFolded(new Set());
     }
     update(next, typing);
+    const gone = tpl.plan.map((item, i) => ({ item, index: i + 1 })).filter(({ item, index }) => tpl.flows[String(index)] !== undefined && !next.plan.some((n) => n.id === item.id));
+    if (gone.length > 0) {
+      setStatus({ text: `${gone.map((g) => g.index).join(", ")}番のステップと一緒に、子のフローを消しました。戻すときは「元に戻す」を押してください`, error: false });
+    }
   };
   const travel = (moved: { readonly history: FlowHistory<EditTemplate>; readonly doc: EditTemplate } | undefined): void => {
     if (moved === undefined) {
@@ -192,6 +230,13 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     setTpl(moved.doc);
     setFolded(new Set());
     setStatus(undefined);
+  };
+
+  onKey.current = (event: KeyboardEvent): void => {
+    // 保存中・閉じる確認の間・図を全画面にしている間（見えない欄）は直さない
+    if (!busy && !confirmClose && !graphMaximized()) {
+      travel(moveByKey(event, history, tpl));
+    }
   };
 
   const save = (): void => {
@@ -211,7 +256,26 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   };
 
   const planOf = (part: "plan" | "feedback") => checked.check.plans.find((p) => p.part === part);
-  const typeTitle = (type: string): string => checked.check.types.find((t) => t.id === type)?.title ?? type;
+  /** 型の定義のタイトル。無ければ型の名前 */
+  const typeTitle = (type: string): string => {
+    const title = checked.check.types.find((t) => t.id === type)?.title ?? "";
+    return title === "" ? type : title;
+  };
+  /** 全体計画の`index`番のステップに子のフロー（雛形）を足して開く */
+  const addFlow = (index: number): void => {
+    const item = tpl.plan[index - 1];
+    if (item === undefined || tpl.flows[String(index)] !== undefined) {
+      return;
+    }
+    update(setFlow(tpl, index, templateFlow(`${tpl.name}-${index}`, typeTitle(item.type))));
+    setFolded((f) => without(f, index));
+  };
+  /** 全体計画の`index`番のステップの子のフローを開き、画面をそこまで送る（送るのは描き直したあと） */
+  const goFlow = (index: number): void => {
+    setFolded((f) => without(f, index));
+    setScrollTo({ index });
+  };
+  const stepProps = { picked, onPick: setPicked, onChange: updatePlan, onAddFlow: addFlow, onGoFlow: goFlow };
 
   return (
     <section className="tpl-edit" data-role="edit" data-name={tpl.name} data-layer={opened.layer}>
@@ -271,8 +335,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         <input type="text" className="f-when" value={tpl.when} onChange={(event) => update(setMeta(tpl, { when: event.target.value }), "meta:when")} onBlur={() => setHistory(seal)} />
       </label>
       <Problems problems={created && !touched ? checked.check.problems.filter((p) => p.severity !== "error") : checked.check.problems} />
-      <PlanEdit part="plan" template={tpl} plan={planOf("plan")} fresh={fresh} types={checked.check.types} onChange={updatePlan} />
-      <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} types={checked.check.types} onChange={updatePlan} />
+      <PlanEdit part="plan" template={tpl} plan={planOf("plan")} fresh={fresh} shownIds={checked.ids.plan} types={checked.check.types} {...stepProps} />
+      <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} shownIds={checked.ids.feedback} types={checked.check.types} {...stepProps} />
       <section className="tpl-edit-flows" data-role="flows">
         <h3>子のフロー</h3>
         <p className="hint">全体計画のステップごとに、子のフローを持てます。テンプレートを使うと、ここで書いた子のフローが子の下書きにコピーされます。</p>
@@ -282,20 +346,12 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
             const doc = tpl.flows[String(index)];
             const open = doc !== undefined && !folded.has(index);
             return (
-              <li key={index} className={`row${open ? " open" : ""}`} data-index={index}>
+              <li key={index} className={`row${open ? " open" : ""}`} data-index={index} data-picked={item.id === picked ? "1" : "0"}>
                 <div className="row-head">
-                  <span className="mono">{index}</span> <span className="mono">{item.type}</span>
+                  <span className="tpl-flow-heading">{`${index}:${typeTitle(item.type)} のフロー`}</span>
                   <span className="dim">{doc === undefined ? "フローなし" : `フロー: ${typeof doc.name === "string" && doc.name !== "" ? doc.name : "（名前なし）"}`}</span>
                   {doc === undefined ? (
-                    <button
-                      type="button"
-                      className="action small"
-                      data-action="add-flow"
-                      onClick={() => {
-                        update(setFlow(tpl, index, templateFlow(`${tpl.name}-${index}`, typeTitle(item.type))));
-                        setFolded((f) => without(f, index));
-                      }}
-                    >
+                    <button type="button" className="action small" data-action="add-flow" onClick={() => addFlow(index)}>
                       フローを追加
                     </button>
                   ) : (

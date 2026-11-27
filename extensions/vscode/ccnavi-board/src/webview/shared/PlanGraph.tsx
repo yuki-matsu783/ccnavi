@@ -19,11 +19,15 @@
  *
  * `detail`が真なら、ステップを押すと右に詳細の欄を出す（計画編集タブ）。番号・定義・タイトル・レビューの要否・延期先・固定・
  * 先行と後続・すぐ始まるか・終端に届かないかを、実行ファイルの値のまま読むだけで出す（直すのは線）。欄は畳める
- * （畳んだかは画面が覚える）。
+ * （畳んだかは画面が覚える）。テンプレートの編集欄は、選んだステップを`picked`・`onPick`で自分で持ち（表の行と揃える）、
+ * 欄の上に直す操作（`detailFooter`）を足し、提案の番号を出さない（`proposalNumbers`）。
+ *
+ * **引けない線の理由。** 右の取っ手から線を引いている間は、引けない先のステップを薄くし、載せたときの説明に理由を書く。
+ * ステップの上で放して線ができなかったら、図の下に理由を一言出す（`connectRefusal`。次に図を触るか、少し経つと消える）。
  *
  * 見た目は`PlanGraph.css`。React FlowのCSSは`--xy-*`の変数で出来ているので、そこを`--vscode-*`で上書きする。
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX, type MouseEvent as ReactMouseEvent } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type JSX, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import {
   Background,
   BaseEdge,
@@ -40,7 +44,9 @@ import {
   type Edge,
   type EdgeProps,
   type EdgeTypes,
+  type FinalConnectionState,
   type Node,
+  type OnConnectStartParams,
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react";
@@ -49,6 +55,7 @@ import type { ApprovePlan } from "../../core/approvemodel.js";
 import {
   canConnect,
   canDisconnect,
+  connectRefusal,
   PLAN_FIT_MAX_ZOOM,
   PLAN_FIT_MIN_ZOOM,
   planGraphOf,
@@ -65,6 +72,8 @@ interface ItemData extends Record<string, unknown> {
   readonly node: PlanGraphNode;
   readonly editable: boolean;
   readonly picked: boolean;
+  /** 線を引いている最中に、このステップへ引けない理由。引ける・引いていないならundefined */
+  readonly blocked?: string;
 }
 
 type ItemNode = Node<ItemData, "planItem">;
@@ -95,6 +104,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
     node.type,
     node.loose ? "最後のステップの先行になっていない（終端に届かない）" : "",
     node.locked ? "子が承認された番号です。入る線は変えられません" : "",
+    data.blocked === undefined ? "" : `ここへは線を引けません: ${data.blocked}`,
   ]
     .filter((part) => part !== "")
     .join("\n");
@@ -106,6 +116,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
       data-locked={node.locked ? "1" : "0"}
       data-deferred={node.deferred ? "1" : "0"}
       data-picked={data.picked ? "1" : "0"}
+      data-blocked={data.blocked === undefined ? "0" : "1"}
       title={title}
     >
       <Handle type="target" position={Position.Left} isConnectable={editable && !node.locked} />
@@ -190,14 +201,23 @@ function RemovableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
 const NODE_TYPES: NodeTypes = { planItem: ItemView, planEnd: EndView };
 const EDGE_TYPES: EdgeTypes = { planRemovable: RemovableEdge };
 
-function nodesOf(graph: Graph, editable: boolean, picked: string | undefined): PlanNode[] {
+/** 点を組む。`dragFrom`は線を引いている最中の元のステップ（引けない先を薄くするため） */
+function nodesOf(graph: Graph, editable: boolean, picked: string | undefined, dragFrom: string | undefined): PlanNode[] {
   return graph.nodes.map((node) => ({
     id: node.id,
     type: node.kind === "item" ? ("planItem" as const) : ("planEnd" as const),
     position: { x: node.x, y: node.y },
-    data: { node, editable, picked: node.id === picked },
+    data: {
+      node,
+      editable,
+      picked: node.id === picked,
+      ...(dragFrom !== undefined && node.kind === "item" && node.id !== dragFrom ? { blocked: connectRefusal(graph, dragFrom, node.id) } : {}),
+    },
   }));
 }
+
+/** 引けない線の理由を図の下に出しておく時間（ミリ秒）。次に図を触っても消える */
+const REFUSAL_MS = 5000;
 
 function edgesOf(graph: Graph, removable: boolean): Edge[] {
   return graph.edges.map((edge) => {
@@ -323,7 +343,7 @@ function useDetailFolded(): boolean {
 }
 
 /** 押したステップの詳細。実行ファイルの値を並べるだけ（判定しない） */
-function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly graph: Graph; readonly id: string | undefined }): JSX.Element {
+function Detail({ plan, graph, id, proposalNumbers }: { readonly plan: ApprovePlan; readonly graph: Graph; readonly id: string | undefined; readonly proposalNumbers: boolean }): JSX.Element {
   const node = id === undefined ? undefined : graph.nodes.find((n) => n.id === id);
   if (node === undefined || node.number === null) {
     return <p className="dim small plan-detail-empty">ステップを押すと、ここに詳細を表示します。</p>;
@@ -338,7 +358,7 @@ function Detail({ plan, graph, id }: { readonly plan: ApprovePlan; readonly grap
   const after = graph.edges.filter((e) => e.kind === "after" && e.source === node.id).map((e) => numberOfNode(e.target));
   const rows: readonly (readonly [string, string])[] = [
     ["番号", String(number)],
-    ["提案での番号", node.from === null ? "" : String(node.from)],
+    ...(proposalNumbers ? [["提案での番号", node.from === null ? "" : String(node.from)] as const] : []),
     ["タイトル", node.label],
     ["定義", node.type],
     ["レビュー", node.deferred ? deferText(node.reviewAt) : reviewText(node.review)],
@@ -372,15 +392,37 @@ export interface PlanGraphProps {
   readonly layout?: PlanLayout;
   /** 開いたときの見え方を合わせ直す合図。変わったときだけ全体を枠に収める。無ければ計画が替わるたび */
   readonly fitKey?: unknown;
+  /**
+   * 選んだステップ（点のid）を呼び手が持つとき。`onPick`と一緒に渡す（テンプレートの編集欄は表の行と選んだステップを揃える）。
+   * 渡さなければ図が自分で持つ
+   */
+  readonly picked?: string;
+  readonly onPick?: (id: string | undefined) => void;
+  /** 詳細の欄の下に置くもの（テンプレートの編集欄の操作）。`detail`が真のときだけ出す */
+  readonly detailFooter?: ReactNode;
+  /** 詳細の欄に「提案での番号」を出すか。提案の番号を持たない計画（テンプレート）は偽 */
+  readonly proposalNumbers?: boolean;
 }
 
-export function PlanGraph({ plan, detail = false, editable = false, onConnect, onDisconnect, layout, fitKey }: PlanGraphProps): JSX.Element {
+export function PlanGraph({ plan, detail = false, editable = false, onConnect, onDisconnect, layout, fitKey, picked: pickedProp, onPick, detailFooter, proposalNumbers = true }: PlanGraphProps): JSX.Element {
   const graph = useMemo(() => (layout === undefined ? planGraphOf(plan) : withLayout(planGraphOf(plan), layout)), [plan, layout]);
   const removable = editable && onDisconnect !== undefined;
-  const [picked, setPicked] = useState<string | undefined>(undefined);
+  const [pickedOwn, setPickedOwn] = useState<string | undefined>(undefined);
+  const picked = onPick === undefined ? pickedOwn : pickedProp;
+  const setPicked = onPick ?? setPickedOwn;
   const folded = useDetailFolded();
   const [maximized, toggleMaximize, maxBox] = useMaximize();
-  const nodes = useMemo(() => nodesOf(graph, editable, detail ? picked : undefined), [graph, editable, detail, picked]);
+  // 線を引いている最中の元のステップと、引けなかった理由（図の下に出す）
+  const [dragFrom, setDragFrom] = useState<string | undefined>(undefined);
+  const [refusal, setRefusal] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (refusal === undefined) {
+      return;
+    }
+    const timer = setTimeout(() => setRefusal(undefined), REFUSAL_MS);
+    return () => clearTimeout(timer);
+  }, [refusal]);
+  const nodes = useMemo(() => nodesOf(graph, editable, detail ? picked : undefined, dragFrom), [graph, editable, detail, picked, dragFrom]);
   const edges = useMemo(() => edgesOf(graph, removable), [graph, removable]);
   const numberOf = useCallback((id: string): number | undefined => graph.nodes.find((node) => node.id === id)?.number ?? undefined, [graph]);
 
@@ -409,9 +451,27 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
     [graph, numberOf, onDisconnect, removable],
   );
 
+  // 引き始めは、右の取っ手（source）から引くときだけ引けない先を薄くする。前の理由は消す
+  const handleConnectStart = useCallback((_event: unknown, params: OnConnectStartParams) => {
+    setRefusal(undefined);
+    setDragFrom(editable && params.handleType === "source" && params.nodeId !== null ? params.nodeId : undefined);
+  }, [editable]);
+  // 放したときは、ステップの上で放して線ができなかったら理由を出す（何も無い所で放したら何も言わない）
+  const handleConnectEnd = useCallback(
+    (_event: unknown, state: FinalConnectionState) => {
+      setDragFrom(undefined);
+      if (!editable || state.fromNode === null || state.toNode === null || state.isValid === true) {
+        return;
+      }
+      const [source, target] = state.fromHandle?.type === "target" ? [state.toNode.id, state.fromNode.id] : [state.fromNode.id, state.toNode.id];
+      setRefusal(connectRefusal(graph, source, target));
+    },
+    [editable, graph],
+  );
+
   return (
     <RemoveEdge.Provider value={removeEdge}>
-    <section className="plan-graph" data-part={plan.part} data-ticket={plan.ticket} data-editable={editable ? "1" : "0"}>
+    <section className="plan-graph" data-part={plan.part} data-ticket={plan.ticket} data-editable={editable ? "1" : "0"} data-dragging={dragFrom === undefined ? "0" : "1"}>
       <h3>{headingOf(plan)}</h3>
       <div className="plan-graph-body" data-folded={detail && folded ? "1" : "0"}>
       <div ref={maxBox} className={`graph plan-graph-canvas ${maximizeClass(maximized)}`} data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
@@ -431,15 +491,23 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
             detail
               ? (event, node) => {
                   // 線を引く取っ手の操作では選ばない（取っ手のクリックも点まで泡が上がる）
+                  setRefusal(undefined);
                   if (!(event.target as Element).closest(".react-flow__handle")) {
                     setPicked(node.type === "planItem" ? node.id : undefined);
                   }
                 }
               : undefined
           }
-          onPaneClick={detail ? () => setPicked(undefined) : undefined}
+          onPaneClick={() => {
+            setRefusal(undefined);
+            if (detail) {
+              setPicked(undefined);
+            }
+          }}
           isValidConnection={isValidConnection}
           onConnect={handleConnect}
+          onConnectStart={handleConnectStart}
+          onConnectEnd={handleConnectEnd}
           ariaLabelConfig={FLOW_ARIA_LABELS}
           minZoom={0.2}
           maxZoom={1.6}
@@ -452,6 +520,12 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           <RefitOnChange value={maximized} />
         </ReactFlow>
         <MaximizeButton maximized={maximized} onToggle={toggleMaximize} />
+        {/* 図の枠の中に出す（全画面にしても見えるように。枠の外に置くと全画面の枠に覆われる） */}
+        {refusal !== undefined && (
+          <p className="plan-graph-refusal" role="status" data-role="plan-refusal">
+            {refusal}
+          </p>
+        )}
       </div>
       {detail && (
         <aside className="plan-detail" id="plan-detail" aria-label="ステップの詳細" data-folded={folded ? "1" : "0"}>
@@ -465,7 +539,9 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
           >
             {folded ? "◀ 詳細" : "詳細 ▶"}
           </button>
-          <Detail plan={plan} graph={graph} id={picked} />
+          {/* 直す操作は、読むだけの詳細より上に置く（欄は高さに限りがあり、下に置くとスクロールしないと見えない） */}
+          {detailFooter}
+          <Detail plan={plan} graph={graph} id={picked} proposalNumbers={proposalNumbers} />
         </aside>
       )}
       </div>

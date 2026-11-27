@@ -36,6 +36,7 @@ import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
 import { Code } from "../shared/Code.js";
 import { foldFind } from "../shared/find.js";
+import { moveByKey, useDocumentKeys } from "../shared/keys.js";
 import { COMMON_NOTE, commonIdNote, commonScopeText, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
@@ -223,6 +224,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
   // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
   useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
+  // 元に戻す・やり直すのキー（Ctrl+Z・Ctrl+Y・Ctrl+Shift+Z）。読み込み中と読めなかったときは何もしない（中身は下の`travel`のあとで入れる）
+  const onKey = useDocumentKeys();
+  onKey.current = () => undefined;
 
   if (data.kind === "loading") {
     return (
@@ -273,6 +277,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
     setHistory(moved.history);
     applyDraft(moved.doc);
+  };
+  onKey.current = (event: KeyboardEvent): void => {
+    if (!tour.touring && !busy) {
+      travel(moveByKey(event, history, draft));
+    }
   };
 
   const editRow = (key: string, phase: PhaseForm, typing?: string): void => {

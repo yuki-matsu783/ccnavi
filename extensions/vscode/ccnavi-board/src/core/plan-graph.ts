@@ -12,8 +12,9 @@
  *   線が出る）。フィードバック計画ではstartを「全体計画のレビュー後」、endを「親をクローズする」と名付ける
  * - **置き場所。** startからの最長の階層数で列に分け、列の中は番号順。線が循環していても（計画編集タブで
  *   引いている途中など）止まらず、循環に戻った線は階層数に数えない（循環を言うのは引けない線の検査と実行ファイル）
- * - **引けない線（`canConnect`）。** ステップからステップへだけ引ける。自分へ・startとendに触れる線・固定した番号
- *   （子が承認された番号）へ入る線・循環になる線を断る。線と点だけで決まる形の検査で、計画の良し悪しの判定ではない
+ * - **引けない線（`connectRefusal`・`canConnect`）。** ステップからステップへだけ引ける。自分へ・startとendに触れる線・固定した番号
+ *   （子が承認された番号）へ入る線・すでにある線・循環になる線を断り、断った理由の一言を返す。線と点だけで決まる形の検査で、
+ *   計画の良し悪しの判定ではない
  *
  * - **置き場所を覚える（`layoutOf` / `withLayout`）。** 計画編集タブで線を変えて番号が振り直っても、
  *   点に表示する番号だけが変わり、置き場所は動かさない。置き場所は振り直す前の番号（`from`）で覚え、「並べ直す」で
@@ -223,15 +224,35 @@ function depthsOf(numbers: readonly number[], before: ReadonlyMap<number, readon
  * `source`へ既に辿れる）を断る。React Flowの`isValidConnection`に渡し、引いている最中に断る
  */
 export function canConnect(graph: PlanGraph, source: string, target: string): boolean {
+  return connectRefusal(graph, source, target) === undefined;
+}
+
+/**
+ * `source`から`target`へ線を引けない理由（図の下に出す一言）。引けるならundefined。`canConnect`の断る条件はここだけに置く。
+ * すでにある線も断る（引いても何も変わらないため）
+ */
+export function connectRefusal(graph: PlanGraph, source: string, target: string): string | undefined {
   if (source === target) {
-    return false;
+    return "自分自身へは線を引けません";
   }
   const from = graph.nodes.find((node) => node.id === source);
   const to = graph.nodes.find((node) => node.id === target);
-  if (from === undefined || to === undefined || from.kind !== "item" || to.kind !== "item" || to.locked) {
-    return false;
+  if (from === undefined || to === undefined) {
+    return "線の先のステップが図にありません";
   }
-  return !reaches(graph, target, source);
+  if (from.kind !== "item" || to.kind !== "item") {
+    return "開始と終了への線は図が自動で引きます";
+  }
+  if (to.locked) {
+    return "子が承認された番号です。入る線は変えられません";
+  }
+  if (graph.edges.some((edge) => edge.kind === "after" && edge.source === source && edge.target === target)) {
+    return "この線はもうあります";
+  }
+  if (reaches(graph, target, source)) {
+    return `${from.number}は${to.number}より後に続くステップです。この線を引くと順序が輪になります`;
+  }
+  return undefined;
 }
 
 /** `from`から線を辿って`to`に着くか（afterの線だけ） */
@@ -268,6 +289,33 @@ export function layoutOf(graph: PlanGraph): PlanLayout {
     if (node.kind === "item" && node.from !== null) {
       out[String(node.from)] = { x: node.x, y: node.y };
     }
+  }
+  return out;
+}
+
+/**
+ * 組んだ置き場所（`built`）に、覚えた置き場所（`kept`）を重ねる。覚えているステップはその場所、新しいステップは組んだ場所に置く。
+ * 新しい点が覚えた点と重なるときは、空くまで下へずらす。`built`に無いステップは忘れる。覚えた場所が無ければ組んだまま
+ */
+export function keepLayout(built: PlanLayout, kept: PlanLayout | undefined): PlanLayout {
+  if (kept === undefined) {
+    return built;
+  }
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const key of Object.keys(built)) {
+    if (kept[key] !== undefined) {
+      out[key] = kept[key];
+    }
+  }
+  for (const [key, at] of Object.entries(built)) {
+    if (out[key] !== undefined) {
+      continue;
+    }
+    let y = at.y;
+    while (Object.values(out).some((p) => p.x === at.x && Math.abs(p.y - y) < ROW)) {
+      y += ROW;
+    }
+    out[key] = { x: at.x, y };
   }
   return out;
 }

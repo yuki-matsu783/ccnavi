@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ApprovePlan } from "../../src/core/approvemodel.js";
-import { canConnect, canDisconnect, COLUMN, FIT_START_PAD, fitStalled, layoutOf, PLAN_FIT_MIN_ZOOM, planGraphOf, viewportAtStart, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
+import { canConnect, canDisconnect, COLUMN, connectRefusal, keepLayout, ROW, FIT_START_PAD, fitStalled, layoutOf, PLAN_FIT_MIN_ZOOM, planGraphOf, viewportAtStart, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
 import { plansOf, reorderCases, type RawItem } from "../helpers/plan-reorder.js";
 
 function plan(items: readonly RawItem[], extra: Partial<ApprovePlan> = {}, feedback?: readonly RawItem[]): ApprovePlan {
@@ -224,4 +224,25 @@ test("CB-T1224 下限の倍率で止まったか（fitStalled）を判定し、�
   assert.equal(view.zoom, PLAN_FIT_MIN_ZOOM);
   assert.ok(Math.abs(start.x * view.zoom + view.x - FIT_START_PAD) < 1e-9);
   assert.ok(Math.abs((start.y + start.height / 2) * view.zoom + view.y - 300) < 1e-9);
+});
+
+test("CB-T1274 覚えた置き場所を重ねると、残ったステップは覚えた場所、新しいステップは組んだ場所（重なれば下へずらす）に置き、消えたステップは忘れる", () => {
+  const built = { "1": { x: 210, y: 0 }, "2": { x: 420, y: 0 }, "5": { x: 420, y: 96 } };
+  assert.equal(keepLayout(built, undefined), built);
+  const kept = { "1": { x: 210, y: 0 }, "2": { x: 420, y: 96 }, "9": { x: 630, y: 0 } };
+  assert.deepEqual(keepLayout(built, kept), { "1": { x: 210, y: 0 }, "2": { x: 420, y: 96 }, "5": { x: 420, y: 96 + ROW } });
+});
+
+test("CB-T1276 引けない線には理由が付く（自分へ・開始と終了・子が承認された番号・すでにある線・輪になる線）。引ける線には理由が無い", () => {
+  const graph = planGraphOf(plan(DIAMOND));
+  assert.equal(connectRefusal(graph, "n2", "n3"), undefined);
+  assert.ok(canConnect(graph, "n2", "n3"));
+  assert.equal(connectRefusal(graph, "n2", "n2"), "自分自身へは線を引けません");
+  assert.equal(connectRefusal(graph, "start", "n2"), "開始と終了への線は図が自動で引きます");
+  assert.equal(connectRefusal(graph, "n4", "end"), "開始と終了への線は図が自動で引きます");
+  assert.equal(connectRefusal(graph, "n1", "n2"), "この線はもうあります");
+  assert.ok(!canConnect(graph, "n1", "n2"));
+  assert.equal(connectRefusal(graph, "n4", "n1"), "4は1より後に続くステップです。この線を引くと順序が輪になります");
+  const locked = planGraphOf({ ...plan(DIAMOND), items: plan(DIAMOND).items.map((item) => (item.number === 3 ? { ...item, locked: true } : item)) });
+  assert.equal(connectRefusal(locked, "n2", "n3"), "子が承認された番号です。入る線は変えられません");
 });
