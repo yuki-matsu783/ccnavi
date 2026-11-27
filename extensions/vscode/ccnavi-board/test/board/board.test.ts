@@ -20,9 +20,9 @@ test("CB-T05 列は置き場から引き、親のあとに子が並ぶ。レビ�
       ["archived", []],
     ],
   );
-  assert.deepEqual(board.columns.map((c) => c.label), ["未着手", "作業中", "完了", "取り消し", "アーカイブ"]);
+  assert.deepEqual(board.columns.map((c) => c.label), ["承認待ち", "承認済み", "完了", "取り消し", "アーカイブ"]);
   assert.equal(board.totalCount, 6);
-  // 残りは未着手と作業中（レビュー待ちを含む）
+  // 残りは承認待ちと承認済み（レビュー待ちを含む）
   assert.equal(board.remainingCount, 4);
 });
 

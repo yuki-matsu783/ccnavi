@@ -363,7 +363,7 @@ test("CB-D82 渡された分にだけ動いた表示を出す。渡されなけ�
     );
     const card = page.one('.card[data-id="i0001-02-03"]');
     assert.equal(card.getAttribute("data-moved"), "todo-doing");
-    assert.equal(card.querySelector(".moved-mark")?.textContent, "未着手 → 作業中");
+    assert.equal(card.querySelector(".moved-mark")?.textContent, "承認待ち → 承認済み");
 
     // 承認の文のオーバーレイを出し入れしても、拡張ホストが同じ分を渡し続ける限り動いた表示は消えない
     await page.send({

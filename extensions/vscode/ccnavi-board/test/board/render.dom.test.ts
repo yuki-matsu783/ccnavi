@@ -328,7 +328,7 @@ test("CB-T109 オーバーレイを渡さなければ出ない", async () => {
 test("CB-T12 4列と件数と承認ボタンを出す", async () => {
   const page = await openBoard();
   try {
-    assert.deepEqual(texts(page, ".column button.fold .label"), ["未着手", "作業中", "完了", "取り消し"]);
+    assert.deepEqual(texts(page, ".column button.fold .label"), ["承認待ち", "承認済み", "完了", "取り消し"]);
     assert.equal(page.all(".column").length, 4);
     assert.equal(text(page, ".summary .counts"), "残り4 / 全6");
     assert.equal(text(page, ".summary .pending"), "承認待ち1件");

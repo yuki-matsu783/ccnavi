@@ -57,7 +57,7 @@ export const FILTER_LABELS = {
 const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));
 
 /**
- * 前の読み直しから動いたカードに出す帯の言葉。「未着手 → 作業中」。
+ * 前の読み直しから動いたカードに出す帯の言葉。「承認待ち → 承認済み」。
  * 前には無くて新しく現れたカードは、どこから来たとも言えないので「新規起票」だけ。
  * 行き先は言わない。カードはもうその列に置かれていて、画面から読める。
  */
