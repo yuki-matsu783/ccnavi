@@ -162,7 +162,8 @@ func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *appro
 		for i, label := range labels {
 			parts[i] = label + "・" + strings.Join(groups[label], "、")
 		}
-		return strings.Join(parts, "、")
+		// グループの中のフェーズは「、」で並べるので、グループの間は「／」で分ける（所属を読み違えないように）。
+		return strings.Join(parts, "／")
 	}
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
 	if _, ok := marks.ReadFilledParent(home, parent.ID, marks.CloseEarly); ok {
@@ -179,17 +180,15 @@ func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *appro
 	if len(open) > 0 && open[0].Number <= last {
 		// 子がまだ無く、先行が済んでいないフェーズは作業中に数えない。
 		var working []string
-		hasChild := false
 		for _, p := range open {
 			if p.Number <= last && (len(p.Tickets) > 0 || waitsDone(parent, list, p.Number)) {
 				working = append(working, stageLabel(p))
 			}
-			hasChild = hasChild || len(p.Tickets) > 0
 		}
 		if len(working) == 0 {
 			working = []string{stageLabel(open[0])}
 		}
-		if parent.StartedAt == "" && !hasChild {
+		if parent.StartedAt == "" {
 			// 承認済みで start の前。作業中と言わず、最初に進むフェーズだけを言う（ボードのバッジ「着手待ち」と合わせる）。
 			return stageNotStarted + "・" + working[0]
 		}

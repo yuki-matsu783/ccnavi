@@ -207,6 +207,11 @@ export function isNotStarted(card: StatusCard): boolean {
   return card.copyStatus === "open" && card.startedAt === "";
 }
 
+/** 開いたチケットのバッジ。着手の前なら着手待ち、着手していれば作業中（親も子も同じ） */
+function openStatus(card: StatusCard): Status {
+  return card.startedAt === "" ? { label: "着手待ち", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
+}
+
 function parentStatus(card: StatusCard): Status {
   if (closed(card)) {
     return { label: card.wrapped ? "完了（早めに終了）" : "完了", title: "", tone: "done" };
@@ -218,7 +223,7 @@ function parentStatus(card: StatusCard): Status {
     return { label: "レビュー準備中", title: PREPARING_TITLE, tone: "wait" };
   }
   if (card.copyStatus === "open") {
-    return card.startedAt === "" ? { label: "着手待ち", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
+    return openStatus(card);
   }
   return check(fieldsOf(card));
 }
@@ -243,7 +248,7 @@ function childStatus(card: StatusCard): Status {
     if (card.reviewWaiting || card.gateClosed) {
       return check("作業中なのに、フェーズがレビューで止まっています");
     }
-    return card.startedAt === "" ? { label: "着手待ち", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
+    return openStatus(card);
   }
   return check(fieldsOf(card));
 }
