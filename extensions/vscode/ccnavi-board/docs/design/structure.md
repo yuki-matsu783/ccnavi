@@ -101,6 +101,7 @@ src/
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
+    save-gate.ts      設定を直す画面の［保存］を押せない理由（editSaveBlocker）。ボタンの disabled・ツールチップ・Ctrl+S が同じ答えを使う
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）。取り込み待ち画面は template と layer-config の取り込みに、テンプレート管理画面（templates-panel.ts）は編集の保存に、この錠をそのまま掛ける（handoffmodel.ts の lockForTree が見るツリーに合わせる）
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
@@ -113,6 +114,7 @@ src/
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替えと拡大（body のクラスと zoom の書き換え）。9 画面で 1 本
     useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。9 画面で 1 本
+    useSaveKey.ts     Ctrl+S（Cmd+S）で保存する入口。押せない理由（save-gate.ts）が空のときだけ保存し、そうでなければ理由を見せる
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・タイトル・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
     tours/images.ts   手順の image（名前）から画像の data: URL を引く表。画像は tours/images/<名前>.png に置き、esbuild の dataurl の読み込みでバンドルへ入れる（Webview はファイルを読まず、ボードの CSP だけ img-src data: を許す）。表と置き場と YAML の突き合わせはテストが見る
@@ -216,6 +218,7 @@ src/
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
     shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
+    shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク・フェーズ管理が置く。直前の 1 行だけ覚える）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
     shared/Maximize.css Maximize.tsx の CSS。図の枠は isolation で内側の z-index を外へ及ぼさない
     shared/SequenceDiagram.tsx 案内の中の時系列の図（登場者の列と、時間順の矢印。矢印の値は等幅。focus の矢印だけ光らせ、ほかは薄くする）。DOM と CSS だけで描き、VS Code のテーマに従う
