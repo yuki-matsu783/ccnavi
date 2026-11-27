@@ -24,15 +24,21 @@ export function removal<T extends { readonly key: string }>(rows: readonly T[], 
   return row === undefined ? undefined : { index, row };
 }
 
-export function RemovedBand<D>(props: { readonly removed: Removed<D> | undefined; readonly onUndo: () => void; readonly onDismiss: () => void }): JSX.Element | null {
-  const { removed, onUndo, onDismiss } = props;
+export function RemovedBand<D>(props: {
+  readonly removed: Removed<D> | undefined;
+  /** 保存などの往復の途中。戻すと送った中身と画面の下書きがずれるので押せない */
+  readonly busy: boolean;
+  readonly onUndo: () => void;
+  readonly onDismiss: () => void;
+}): JSX.Element | null {
+  const { removed, busy, onUndo, onDismiss } = props;
   if (removed === undefined) {
     return null;
   }
   return (
     <div className="banner" data-banner="removed" role="status">
       <span>{removed.label}を削除しました（まだ保存していません）。</span>
-      <button type="button" className="action" data-action="undo-remove" onClick={onUndo}>
+      <button type="button" className="action" data-action="undo-remove" disabled={busy} title={busy ? "処理中のため戻せません。終わるまでお待ちください" : undefined} onClick={onUndo}>
         元に戻す
       </button>
       <button type="button" className="action" data-action="dismiss-removed" title="この案内を閉じます" onClick={onDismiss}>

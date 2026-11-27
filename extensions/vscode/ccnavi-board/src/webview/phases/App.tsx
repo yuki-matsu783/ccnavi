@@ -71,6 +71,8 @@ function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
 interface Status {
   readonly text: string;
   readonly error: boolean;
+  /** Ctrl+Sで押せない理由を見せた一言。次の編集で消す（編集すると理由が変わるため） */
+  readonly fleeting?: boolean;
 }
 
 interface Editing {
@@ -206,11 +208,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const draftDup = duplicates(draft);
   const draftClash = commonClashes(draft, page?.common ?? []);
   const saveBlocker = editSaveBlocker({
-        busy,
-        dirty,
-        lock,
-        invalid: draftDup.size > 0 ? duplicateNote(draftDup) : draftClash.titles.size > 0 ? commonTitleNote(draftClash.titles) : "",
-      });
+    busy,
+    dirty,
+    lock,
+    invalid: draftDup.size > 0 ? duplicateNote(draftDup) : draftClash.titles.size > 0 ? commonTitleNote(draftClash.titles) : "",
+  });
   const save = (): void => {
     if (tour.touring) {
       return;
@@ -220,7 +222,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     post({ type: "save", form: formOf(draft) });
   };
   // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
-  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, blocked: (reason) => setStatus({ text: reason, error: false }) }));
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
 
   if (data.kind === "loading") {
     return (
@@ -252,6 +254,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setEditing((now) => ({ ...now, draft: next, open: open ?? now.open }));
     setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
     // idが重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
     if (duplicates(next).size > 0) {
       setStatus(undefined);
@@ -443,7 +446,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       <p id="lock" data-tour="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
-      {!touring && <RemovedBand removed={removed} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
+      {!touring && <RemovedBand removed={removed} busy={busy} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (

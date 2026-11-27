@@ -1552,6 +1552,7 @@ test("CB-D1274 削除した行は帯の［元に戻す］で元の位置へ戻�
     dom.click(dom.one(`${rowSelector("git-push")} button[data-action="remove"]`));
     await dom.settle();
     assert.deepEqual(ids(), ["no-rm"]);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /変更が無い/, "編集したのにCtrl+Sの理由が残っている");
     assert.match(dom.one('[data-banner="removed"]').textContent ?? "", /git-push/);
     dom.click(dom.one('button[data-action="undo-remove"]'));
     await dom.settle();

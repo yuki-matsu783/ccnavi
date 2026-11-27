@@ -77,7 +77,7 @@ import flowTour from "../tours/flow.yml";
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
 /** 読み込む前・読めなかったときのCtrl+S。何もしない */
-const NO_SAVE: SaveKeyTarget = { blocker: "読み込みが終わっていないため、保存できません", save: () => undefined, blocked: () => undefined };
+const NO_SAVE: SaveKeyTarget = { blocker: "読み込みが終わっていないため、保存できません", busy: false, save: () => undefined, blocked: () => undefined };
 /** 編集中のコピーを拡張ホストへ送って覚えさせるまでの間（打つたびに送らない） */
 const DRAFT_MS = 300;
 /** 編集が止まってから実行ファイルに確かめ直させるまでの間 */
@@ -688,7 +688,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const groupableCount = touring ? sampleGroupable.length : groupable.length;
   // ファイルがまだ無いときは、変更が無くても保存（作成）できる
   const saveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty || !shownPage.exists, lock: shownLock }) : editSaveBlocker({ busy, dirty: dirty || !page.exists, lock });
-  saveKey.current = { blocker: saveBlocker, save, blocked: (reason) => setStatus({ text: reason, error: false }) };
+  saveKey.current = { blocker: saveBlocker, busy, save, blocked: (reason) => setStatus({ text: reason, error: false }) };
 
   return (
     <>

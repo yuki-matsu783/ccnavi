@@ -79,6 +79,8 @@ const NO_LOCK: Lock = { locked: true, reason: "", doing: [], turns: [] };
 interface Status {
   readonly text: string;
   readonly error: boolean;
+  /** Ctrl+Sで押せない理由を見せた一言。次の編集で消す（編集すると理由が変わるため） */
+  readonly fleeting?: boolean;
 }
 
 interface Editing {
@@ -321,6 +323,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setEditing((now) => ({ ...now, draft: replace(now.draft, found.section, key, { ...found.row.rule, [field]: path }) }));
     setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
   };
 
   /**
@@ -348,7 +351,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     post({ type: "save", sections: sectionsOf(draft) });
   };
   // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
-  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, blocked: (reason) => setStatus({ text: reason, error: false }) }));
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
 
   if (data.kind === "loading") {
     return (
@@ -382,6 +385,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setEditing((now) => ({ draft: next, open: opened ?? now.open }));
     setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
   };
 
   const editRule = (section: Section, key: string, rule: RuleForm): void => {
@@ -579,7 +583,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <p id="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
-      {!touring && <RemovedBand removed={removed} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
+      {!touring && <RemovedBand removed={removed} busy={busy} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (

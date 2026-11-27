@@ -9,6 +9,8 @@ export function isSaveKey(event: KeyboardEvent): boolean {
 export interface SaveKeyTarget {
   /** 押せない理由（`core/save-gate.ts`の答え）。空なら押せる */
   readonly blocker: string;
+  /** 処理中。押せない理由を見せず、いま出ている「保存中…」などをそのまま残す */
+  readonly busy: boolean;
   readonly save: () => void;
   /** 押せないときに理由を見せる */
   readonly blocked: (reason: string) => void;
@@ -35,7 +37,7 @@ export function useSaveKey(active: boolean, target: () => SaveKeyTarget): void {
       const now = latest.current();
       if (now.blocker === "") {
         now.save();
-      } else {
+      } else if (!now.busy) {
         now.blocked(now.blocker);
       }
     };
