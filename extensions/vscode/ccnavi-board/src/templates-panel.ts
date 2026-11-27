@@ -601,7 +601,7 @@ function askUnsaved(unsaved: Unsaved | undefined): void {
   const asYaml = "YAMLで開く";
   void vscode.window
     .showWarningMessage(
-      `テンプレート${unsaved.name}を未保存のまま閉じました。編集をYAMLで開きますか？`,
+      `テンプレート「${unsaved.name}」を未保存のまま閉じました。編集をYAMLで開きますか？`,
       { modal: true, detail: "名前の無いエディタで開き、ファイルには書きません。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
       asYaml,
       "破棄する",
