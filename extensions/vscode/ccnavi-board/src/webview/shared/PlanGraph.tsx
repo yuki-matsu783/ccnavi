@@ -451,12 +451,12 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
     [graph, numberOf, onDisconnect, removable],
   );
 
-  // 引き始め: 右の取っ手（source）から引くときだけ、引けない先を薄くする。前の理由は消す
+  // 引き始めは、右の取っ手（source）から引くときだけ引けない先を薄くする。前の理由は消す
   const handleConnectStart = useCallback((_event: unknown, params: OnConnectStartParams) => {
     setRefusal(undefined);
     setDragFrom(editable && params.handleType === "source" && params.nodeId !== null ? params.nodeId : undefined);
   }, [editable]);
-  // 放したとき: ステップの上で放して線ができなかったら、理由を出す（何も無い所で放したら何も言わない）
+  // 放したときは、ステップの上で放して線ができなかったら理由を出す（何も無い所で放したら何も言わない）
   const handleConnectEnd = useCallback(
     (_event: unknown, state: FinalConnectionState) => {
       setDragFrom(undefined);
