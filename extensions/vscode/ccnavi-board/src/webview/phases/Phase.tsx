@@ -11,7 +11,6 @@ import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { KIND_LABELS, PHASE_KINDS, REVIEW_OPTIONS, type PhaseForm, type PhaseKind } from "../../core/phases-view.js";
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
-import { moveTitle } from "../shared/find.js";
 
 export interface PhaseProps {
   /** 画面の中だけのキー（`state.ts`）。行を名指しするために`data-key`へ出す */
@@ -31,13 +30,8 @@ export interface PhaseProps {
   readonly disabled: boolean;
   readonly onToggle: () => void;
   readonly onToggleMore: (open: boolean) => void;
-  readonly onChange: (next: PhaseForm) => void;
-  /** 先頭の行は「上へ」、末尾の行は「下へ」を押せないようにする */
-  readonly first: boolean;
-  readonly last: boolean;
-  /** 絞り込み中（検索語が空でない）。並べ替えを止める */
-  readonly finding: boolean;
-  readonly onMove: (delta: number) => void;
+  /** 欄に打った文字は`typing`（どの欄か）が付く。元に戻すで、同じ欄に続けて打った文字を1件にまとめるため */
+  readonly onChange: (next: PhaseForm, typing?: string) => void;
   readonly onRemove: () => void;
   /** 案内が指す行か。真のとき、行と欄に`data-tour`の印を付ける（印は画面に1つだけ。見本の最初の行にだけ付ける） */
   readonly tour?: boolean;
@@ -60,7 +54,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       placeholder={placeholder}
       value={phase[name]}
       disabled={disabled}
-      onChange={(event) => props.onChange({ ...phase, [name]: event.target.value })}
+      onChange={(event) => props.onChange({ ...phase, [name]: event.target.value }, name)}
     />
   );
   const list = (name: ListKey, className: string, placeholder: string): JSX.Element => (
@@ -70,7 +64,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       value={phase[name]}
       disabled={disabled}
       frozen={props.frozen === true}
-      onChange={(next) => props.onChange({ ...phase, [name]: next })}
+      onChange={(next) => props.onChange({ ...phase, [name]: next }, name)}
     />
   );
 
@@ -120,7 +114,11 @@ export function Phase(props: PhaseProps): JSX.Element {
             className="f-kind"
             value={phase.kind}
             disabled={disabled}
-            onChange={(event) => props.onChange({ ...phase, kind: event.target.value as PhaseKind })}
+            onChange={(event) => {
+              const kind = event.target.value as PhaseKind;
+              // feedbackのレビューはtrue固定（falseは--lintがerrorにする）。区分を変えた時点でtrueにする
+              props.onChange(kind === "feedback" ? { ...phase, kind, review: true } : { ...phase, kind });
+            }}
           >
             {PHASE_KINDS.map((kind) => (
               <option key={kind} value={kind}>
@@ -133,7 +131,9 @@ export function Phase(props: PhaseProps): JSX.Element {
           <select
             className="f-review"
             value={String(phase.review)}
-            disabled={disabled}
+            // feedbackのレビューはtrue固定なので選ばせない。ファイルを手で直してfalseになっているときだけは、直せるように選ばせる
+            disabled={disabled || (phase.kind === "feedback" && phase.review)}
+            title={phase.kind === "feedback" && phase.review ? "feedbackの定義のレビューはtrueで固定です" : undefined}
             onChange={(event) => props.onChange({ ...phase, review: event.target.value === "true" })}
           >
             {REVIEW_OPTIONS.map((option) => (
@@ -193,12 +193,6 @@ export function Phase(props: PhaseProps): JSX.Element {
           </div>
         </details>
         <span className="buttons">
-          <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={disabled || props.first || props.finding} onClick={() => props.onMove(-1)}>
-            ↑
-          </button>
-          <button type="button" className="action small" title={moveTitle("下へ", props.finding)} disabled={disabled || props.last || props.finding} onClick={() => props.onMove(1)}>
-            ↓
-          </button>
           <button type="button" className="action small" disabled={disabled} onClick={() => props.onRemove()}>
             削除
           </button>
