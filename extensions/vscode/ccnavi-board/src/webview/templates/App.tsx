@@ -11,7 +11,8 @@ import { LoadError } from "../shared/LoadError.js";
 
 import { defaultSum } from "../../core/sums.js";
 import { NEW_TEMPLATE_NAME_RULE, templateNameTaken, validNewTemplateName } from "../../core/templatesmodel.js";
-import type { EditOpened, TemplateCheck, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
+import type { EditOpened, ProblemSeverity, TemplateCheck, TemplateDetail, TemplateEntry, TemplatesData, TemplatesMessage, TemplatesPage, ToTemplates } from "../../core/templates-view.js";
+import { foldFind } from "../shared/find.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseTemplatesSample } from "../../core/tour-templates.js";
 import { useHostMessages } from "../useHostMessages.js";
@@ -53,8 +54,12 @@ interface Editing {
 export function App({ initial }: { readonly initial: TemplatesData }): JSX.Element {
   const [data, setData] = useState<TemplatesData>(initial);
   const [busy, setBusy] = useState(false);
-  /** 畳んだテンプレートのキー（`layer/name`）。行は最初から開いて図を見せるので、畳んだものだけを覚える */
-  const [foldedTemplates, setFoldedTemplates] = useState<ReadonlySet<string>>(() => new Set());
+  /** 開いているテンプレートのキー（`layer/name`）。行は畳んで出す（件数が増えても一覧を見渡せるように） */
+  const [openTemplates, setOpenTemplates] = useState<ReadonlySet<string>>(() => new Set());
+  /** 一覧の絞り込みの語（名前・説明・使う場面） */
+  const [find, setFind] = useState("");
+  /** 一覧を、この深刻度の苦情を持つテンプレートだけに絞る。無ければ絞らない */
+  const [severity, setSeverity] = useState<ProblemSeverity | undefined>(undefined);
   /** 開いている下書きの名前 */
   const [openDrafts, setOpenDrafts] = useState<ReadonlySet<string>>(() => new Set());
   /** 本文の答え（キーは`layer/name`） */
@@ -147,6 +152,34 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   const layer = layerFor(page.target, page.data.layers);
   const shownTemplates: readonly TemplateEntry[] = layer?.templates ?? [];
   const count = shownTemplates.length;
+  /** 絞り込みのあとに一覧へ出すテンプレート。案内の間は見本をそのまま出す */
+  const query = touring ? "" : foldFind(find.trim());
+  const shownSeverity = touring ? undefined : severity;
+  /** その深刻度の苦情を持つか */
+  const hasSeverity = (entry: TemplateEntry, value: ProblemSeverity): boolean => entry.problems.some((problem) => problem.severity === value);
+  const listed = shownTemplates.filter(
+    (entry) =>
+      (query === "" || foldFind(`${entry.name} ${entry.description} ${entry.when}`).includes(query)) &&
+      (shownSeverity === undefined || hasSeverity(entry, shownSeverity)),
+  );
+  /** 深刻度で絞るボタン。件数はその深刻度の苦情を持つテンプレートの数。押すと絞り、もう1度押すと外す */
+  const severityButton = (value: ProblemSeverity, label: string): JSX.Element => (
+    <button
+      type="button"
+      className={shownSeverity === value ? "action small on" : "action small"}
+      data-action="filter-severity"
+      data-severity={value}
+      aria-pressed={shownSeverity === value}
+      title={`この設定のテンプレートのうち、${label}のものだけを一覧に出します`}
+      onClick={() => {
+        if (!tour.touring) {
+          setSeverity(severity === value ? undefined : value);
+        }
+      }}
+    >
+      {`${label}${shownTemplates.filter((entry) => hasSeverity(entry, value)).length}件`}
+    </button>
+  );
   /** 案内が指すテンプレート（いま見えている一覧の最初の1件）。`data-tour`はこの1件にだけ付く */
   const first: TemplateEntry | undefined = shownTemplates[0];
   const firstKey = first === undefined ? undefined : `${first.layer}/${first.name}`;
@@ -155,7 +188,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
     if (tour.touring) {
       return;
     }
-    setFoldedTemplates((now) => {
+    setOpenTemplates((now) => {
       const next = new Set(now);
       if (next.has(key)) {
         next.delete(key);
@@ -219,7 +252,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       <Template
         key={key}
         entry={entry}
-        open={touring ? sceneOpenTemplates.has(key) : !foldedTemplates.has(key)}
+        open={touring ? sceneOpenTemplates.has(key) : openTemplates.has(key)}
         preview={touring ? undefined : previews[key]?.check}
         previewError={touring ? "" : (previews[key]?.error ?? "")}
         onPreview={touring || !entry.valid ? undefined : () => askPreview(entry)}
@@ -269,8 +302,27 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         </p>
         <section className="templates" data-tour="list">
           <h2>
-            テンプレート <span className="count">{count}</span>
+            テンプレート <span className="count">{listed.length === count ? count : `${listed.length} / ${count}`}</span>
           </h2>
+          {count > 0 && (
+            <div className="find tpl-find" data-role="template-find">
+              <input
+                id="template-find"
+                type="search"
+                placeholder="名前・説明・使う場面で絞り込む"
+                spellCheck={false}
+                value={touring ? "" : find}
+                onChange={(event) => {
+                  if (!tour.touring) {
+                    setFind(event.target.value);
+                  }
+                }}
+              />{" "}
+              {severityButton("error", "errorあり")}{" "}
+              {severityButton("warn", "warnあり")}{" "}
+              {severityButton("info", "infoあり")}
+            </div>
+          )}
           {layer === undefined ? (
             <p className="empty">この設定のテンプレートの置き場を、実行ファイルが返していません。</p>
           ) : (
@@ -297,8 +349,14 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                     title={newName === "" || validNewTemplateName(newName) ? "このレイヤーに新しいテンプレートを作ります。保存するまでファイルは作りません" : NEW_TEMPLATE_NAME_RULE}
                     onClick={() => startEdit({ type: "editNew", name: newName })}
                   >
-                    作成
+                    追加
                   </button>
+                  {newName !== "" && !validNewTemplateName(newName) && (
+                    <span className="hint" role="status" data-role="name-rule">
+                      {" "}
+                      {NEW_TEMPLATE_NAME_RULE}
+                    </span>
+                  )}
                   {validNewTemplateName(newName) && templateNameTaken(page.data.layers, layer.name, newName) !== undefined && (
                     <span className="hint" role="status" data-role="name-taken">
                       {" "}
@@ -310,7 +368,10 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
               {shownTemplates.length === 0 ? (
                 <p className="empty">{"テンプレートがありません。共通は.ccnavi/config/common/templates/、プロジェクトは.ccnavi/config/project/templates/の下に、ファイル名を<名前>.ymlにして置きます。"}</p>
               ) : (
-                <ul className="list">{shownTemplates.map((entry) => templateRow(entry))}</ul>
+                <>
+                  <ul className="list">{listed.map((entry) => templateRow(entry))}</ul>
+                  {listed.length === 0 && <p className="empty">絞り込みに一致するテンプレートがありません。語か深刻度の絞り込みを外してください。</p>}
+                </>
               )}
             </>
           )}

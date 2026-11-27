@@ -77,7 +77,7 @@ src/
     flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-lint.ts      フローの本文を呼ぶたびに別の名前の一時ファイルに書いて実行ファイル（--lint --json --flow）に確かめさせ、(flow) の error を理由にする。通れば実行ファイルが読んだ中身（flow.data）と、(flow) の warn（パスを直したもの）・渡る手順（rendered）・候補（candidates）を返す
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
-    flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
+    flow-history.ts   フロー編集・テンプレートの編集・フェーズ管理の定義の編集の、元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
     bug-report.ts     バグ報告の組み立て。OS ごとの画面の取り方、ffmpeg の録画と gif の引数、スクリーンショットのコマンド、診断ログのうち報告を始めてから足された分の切り出し、zip（依存を足さずに書く）、report.txt。vscode に触れないので単体で試せる
     tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、続けて動かす基本の案内の画面。DOM にも vscode にも触れないので、単体で試せる
@@ -174,12 +174,12 @@ src/
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
-    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
+    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧（語と深刻度の絞り込み）と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
-    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「図を編集」。行は最初から開く）
+    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「編集」。行は畳んで出す）
     templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）
     templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
-    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビューの選択、並べ替え、削除、追加）
+    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビュー・先行ステップの選択、並べ替え、削除、追加）
     templates/FlowEdit.tsx 編集欄の子のフロー 1 本（フロー編集画面の図と右の欄を使い、部品箱でノードを足す）
     templates/Draft.tsx 下書き 1 件（読むだけ。バッジと指摘・計画。取り込みは取り込み待ち画面）
     templates/Plan.tsx  計画の表（番号・種類・レビュー・先行ステップ）

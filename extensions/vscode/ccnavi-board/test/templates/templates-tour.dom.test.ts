@@ -12,8 +12,8 @@ import type { HTMLButtonElement, HTMLSelectElement } from "happy-dom" with { "re
 
 const def = loadTour("templates");
 
-/** 開く前に図の中身を求めた行の数（見本の一覧のselfのレイヤーの4件）。案内の間に増えない */
-const ASKED_BEFORE_TOUR = 4;
+/** 開く前に図の中身を求めた行の数。行は畳んで出し、開くまで求めないので0。案内の間に増えない */
+const ASKED_BEFORE_TOUR = 0;
 
 /** 図の中身の依頼は、案内に入る前に送った分だけ。数が増えていれば、案内の間に送ったことになる */
 function assertNoPreviewDuringTour(dom: { readonly posted: readonly { readonly type?: unknown }[] }): void {

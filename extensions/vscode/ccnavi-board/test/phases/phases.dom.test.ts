@@ -41,7 +41,7 @@ test("CB-D21 編集可能な範囲をinheritに変えるとglobの欄が消え�
     await dom.settle();
     assert.ok(dom.one(rowSelector("p2")).classList.contains("open"));
     assert.equal(dom.all(`${rowSelector("p2")} input.f-scope-globs`).length, 0);
-    assert.equal(dom.one(`${rowSelector("p2")} .sum .mono`).textContent, "inherit");
+    assert.equal(dom.one(`${rowSelector("p2")} .sum .mono`).textContent, "親の範囲を引き継ぐ");
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
@@ -78,7 +78,7 @@ test("CB-D22 絞り込みはtitleとscopeにもヒットし、開いている行
     const added = rows[rows.length - 1];
     assert.ok(added.classList.contains("open"));
     assert.equal(dom.document.activeElement, added.querySelector("input.f-id"));
-    assert.equal(added.querySelector(".sum .mono")?.textContent, "inherit");
+    assert.equal(added.querySelector(".sum .mono")?.textContent, "親の範囲を引き継ぐ");
   } finally {
     await dom.close();
   }
@@ -144,19 +144,94 @@ test("CB-D59 リストの欄は , で区切って打て、打っている途中�
   }
 });
 
-test("CB-D60 定義の並べ替えと削除が保存に渡る形に出る", async () => {
+test("CB-D60 定義の削除が保存に渡る形に出る。並びに意味は無いので、上下に動かすボタンは無い", async () => {
   const dom = await openPhases();
   try {
-    dom.click(dom.all<HTMLButtonElement>(`${rowSelector("p3")} .buttons button`)[0]);
-    await dom.settle();
-    dom.click(dom.all<HTMLButtonElement>(`${rowSelector("p5")} .buttons button`)[2]);
+    assert.deepEqual(
+      dom.all<HTMLButtonElement>(`${rowSelector("p5")} .buttons button`).map((button) => button.textContent),
+      ["削除"],
+    );
+    dom.click(dom.one(`${rowSelector("p5")} .buttons button`));
     await dom.settle();
     dom.click(dom.one("#save"));
     await dom.settle();
     assert.deepEqual(
       savedForm(dom).phases.map((phase) => phase.id),
-      ["research", "acceptance", "design", "implement"],
+      ["research", "design", "acceptance", "implement"],
     );
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1250 元に戻す・やり直すで編集と削除を戻せる。読んだ中身に戻れば未保存の印は消える", async () => {
+  const dom = await openPhases();
+  try {
+    const undoButton = (): HTMLButtonElement => dom.one<HTMLButtonElement>('button[data-action="undo"]');
+    const redoButton = (): HTMLButtonElement => dom.one<HTMLButtonElement>('button[data-action="redo"]');
+    assert.equal(undoButton().disabled, true);
+    assert.equal(redoButton().disabled, true);
+    dom.click(dom.one(`${rowSelector("p1")} .row-head`));
+    await dom.settle();
+    dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる");
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("p5")} .buttons button`));
+    await dom.settle();
+    assert.equal(dom.all(".phase").length, 4);
+    assert.ok(!dom.one("#dirty").classList.contains("hidden"));
+    // 削除を戻す
+    dom.click(undoButton());
+    await dom.settle();
+    assert.equal(dom.all(".phase").length, 5);
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる");
+    // 打った文字を戻すと、読んだ中身と同じになる
+    dom.click(undoButton());
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調査");
+    assert.ok(dom.one("#dirty").classList.contains("hidden"));
+    assert.equal(undoButton().disabled, true);
+    dom.click(redoButton());
+    await dom.settle();
+    assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる");
+    assert.ok(!dom.one("#dirty").classList.contains("hidden"));
+    // 同じ欄に続けて打った文字は1件にまとめるが、欄からフォーカスが外れたら区切る
+    dom.click(undoButton());
+    await dom.settle();
+    const title = (): HTMLInputElement => dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`);
+    dom.type(title(), "調");
+    dom.type(title(), "調べ");
+    await dom.settle();
+    title().dispatchEvent(new dom.window.FocusEvent("focusout", { bubbles: true }));
+    await dom.settle();
+    dom.type(title(), "調べた");
+    await dom.settle();
+    dom.click(undoButton());
+    await dom.settle();
+    assert.equal(title().value, "調べ", "区切った後の打ち込みだけが戻る");
+    dom.click(undoButton());
+    await dom.settle();
+    assert.equal(title().value, "調査", "区切る前の続けた打ち込みは1件で戻る");
+    // 中身が入れ替わったら履歴は空になる
+    await dom.send({ type: "data", data: { kind: "page", page: page() } });
+    assert.equal(undoButton().disabled, true);
+    assert.equal(redoButton().disabled, true);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1251 feedbackの定義のレビューはtrueで固定し、選ばせない。区分をfeedbackにするとtrueになる", async () => {
+  const dom = await openPhases();
+  try {
+    const review = (key: string): HTMLSelectElement => dom.one<HTMLSelectElement>(`${rowSelector(key)} select.f-review`);
+    assert.equal(review("p5").value, "true");
+    assert.equal(review("p5").disabled, true);
+    assert.equal(review("p1").value, "false");
+    assert.equal(review("p1").disabled, false);
+    dom.change(dom.one<HTMLSelectElement>(`${rowSelector("p1")} select.f-kind`), "feedback");
+    await dom.settle();
+    assert.equal(review("p1").value, "true");
+    assert.equal(review("p1").disabled, true);
   } finally {
     await dom.close();
   }

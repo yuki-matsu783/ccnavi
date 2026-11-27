@@ -9,9 +9,8 @@
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
-import { KIND_LABELS, PHASE_KINDS, REVIEW_OPTIONS, type PhaseForm, type PhaseKind } from "../../core/phases-view.js";
+import { KIND_LABELS, kindShort, PHASE_KINDS, REVIEW_OPTIONS, reviewOption, type PhaseForm, type PhaseKind } from "../../core/phases-view.js";
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
-import { moveTitle } from "../shared/find.js";
 
 export interface PhaseProps {
   /** 画面の中だけのキー（`state.ts`）。行を名指しするために`data-key`へ出す */
@@ -31,13 +30,10 @@ export interface PhaseProps {
   readonly disabled: boolean;
   readonly onToggle: () => void;
   readonly onToggleMore: (open: boolean) => void;
-  readonly onChange: (next: PhaseForm) => void;
-  /** 先頭の行は「上へ」、末尾の行は「下へ」を押せないようにする */
-  readonly first: boolean;
-  readonly last: boolean;
-  /** 絞り込み中（検索語が空でない）。並べ替えを止める */
-  readonly finding: boolean;
-  readonly onMove: (delta: number) => void;
+  /** 欄に打った文字には`typing`（どの欄か）が付く。元に戻す操作で、同じ欄に続けて打った文字を1件にまとめるために使う */
+  readonly onChange: (next: PhaseForm, typing?: string) => void;
+  /** 欄からフォーカスが外れた。元に戻すの打ち込みのまとまりを区切る */
+  readonly onSeal?: () => void;
   readonly onRemove: () => void;
   /** 案内が指す行か。真のとき、行と欄に`data-tour`の印を付ける（印は画面に1つだけ。見本の最初の行にだけ付ける） */
   readonly tour?: boolean;
@@ -60,7 +56,8 @@ export function Phase(props: PhaseProps): JSX.Element {
       placeholder={placeholder}
       value={phase[name]}
       disabled={disabled}
-      onChange={(event) => props.onChange({ ...phase, [name]: event.target.value })}
+      onChange={(event) => props.onChange({ ...phase, [name]: event.target.value }, name)}
+      onBlur={props.onSeal}
     />
   );
   const list = (name: ListKey, className: string, placeholder: string): JSX.Element => (
@@ -70,7 +67,8 @@ export function Phase(props: PhaseProps): JSX.Element {
       value={phase[name]}
       disabled={disabled}
       frozen={props.frozen === true}
-      onChange={(next) => props.onChange({ ...phase, [name]: next })}
+      onChange={(next) => props.onChange({ ...phase, [name]: next }, name)}
+      onBlur={props.onSeal}
     />
   );
 
@@ -97,9 +95,11 @@ export function Phase(props: PhaseProps): JSX.Element {
           <span className="clip" title={phase.title}>
             {phase.title}
           </span>
-          <span className={`tag ${phase.kind}`}>{phase.kind}</span>
-          <span className="dim" title="review">
-            レビュー{String(phase.review)}
+          <span className={`tag ${phase.kind}`} title={`kind: ${phase.kind}`}>
+            {kindShort(phase.kind)}
+          </span>
+          <span className="dim" title={`review: ${String(phase.review)}`}>
+            {reviewOption(phase.review).short}
           </span>
           <span className="clip dim mono" title={scopeTitle(phase)}>
             {scopeText(phase)}
@@ -120,20 +120,27 @@ export function Phase(props: PhaseProps): JSX.Element {
             className="f-kind"
             value={phase.kind}
             disabled={disabled}
-            onChange={(event) => props.onChange({ ...phase, kind: event.target.value as PhaseKind })}
+            onChange={(event) => {
+              const kind = event.target.value as PhaseKind;
+              // feedbackのレビューはtrue固定（falseは--lintがerrorにする）。区分を変えた時点でtrueにする
+              props.onChange(kind === "feedback" ? { ...phase, kind, review: true } : { ...phase, kind });
+            }}
           >
             {PHASE_KINDS.map((kind) => (
               <option key={kind} value={kind}>
-                {KIND_LABELS[kind]}
+                {KIND_LABELS[kind].label}
               </option>
             ))}
           </select>
+          <p className="hint">{KIND_LABELS[phase.kind].note}</p>
         </Captioned>
         <Captioned name="レビュー" yamlKey="review" tour={mark("phase-review")}>
           <select
             className="f-review"
             value={String(phase.review)}
-            disabled={disabled}
+            // feedbackのレビューはtrue固定なので選ばせない。ファイルを手で直してfalseになっているときだけは、直せるように選ばせる
+            disabled={disabled || (phase.kind === "feedback" && phase.review)}
+            title={phase.kind === "feedback" && phase.review ? "feedbackの定義のレビューはtrueで固定です" : undefined}
             onChange={(event) => props.onChange({ ...phase, review: event.target.value === "true" })}
           >
             {REVIEW_OPTIONS.map((option) => (
@@ -142,6 +149,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               </option>
             ))}
           </select>
+          <p className="hint">{reviewOption(phase.review).note}</p>
         </Captioned>
         <Captioned name="編集可能な範囲" yamlKey="scope" tour={mark("phase-scope")}>
           <div className="inline">
@@ -151,14 +159,20 @@ export function Phase(props: PhaseProps): JSX.Element {
               disabled={disabled}
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
-              <option value="inherit">inherit（親チケットの編集可能な範囲を引き継ぐ）</option>
+              <option value="inherit">親の範囲を引き継ぐ（inherit）</option>
               <option value="globs">上限を指定する（globのリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角の「,」です")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（区切りは半角の「,」です）")}
           </div>
+          <p className="hint">
+            {phase.inherit
+              ? "子チケットは、親チケットの編集可能な範囲をそのまま使います。"
+              : "ワークツリーのルートからの相対で書きます。子チケットの編集可能な範囲は、この中に収めます。"}
+          </p>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md。クローズする前に存在し、gitに追跡されている必要があります。区切りは半角の「,」です")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md（区切りは半角の「,」です）")}
+          <p className="hint">クローズする前に存在し、gitに追跡されている必要があります。</p>
         </Captioned>
         <details
           className="more"
@@ -182,23 +196,20 @@ export function Phase(props: PhaseProps): JSX.Element {
           </summary>
           <div className="sub">
             <Captioned name="案内するエージェント" yamlKey="agent" tour={mark("phase-agent")}>
-              {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
+              {text("agent", "f-agent narrow", "サブエージェント名")}
+              <p className="hint">案内に出すだけで、割り当てはしません。</p>
             </Captioned>
             <Captioned name="最初に呼ぶ工程スキル" yamlKey="skill">
-              {text("skill", "f-skill narrow", "工程スキル名（例: process-research。案内に出すだけで、呼ぶかは子が決めます）")}
+              {text("skill", "f-skill narrow", "process-research")}
+              <p className="hint">案内に出すだけで、呼ぶかは子チケットが決めます。</p>
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
-              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}
+              {text("when", "f-when", "この定義を計画に入れる場面")}
+              <p className="hint">エージェントへの案内にだけ使い、判定には使いません。</p>
             </Captioned>
           </div>
         </details>
         <span className="buttons">
-          <button type="button" className="action small" title={moveTitle("上へ", props.finding)} disabled={disabled || props.first || props.finding} onClick={() => props.onMove(-1)}>
-            ↑
-          </button>
-          <button type="button" className="action small" title={moveTitle("下へ", props.finding)} disabled={disabled || props.last || props.finding} onClick={() => props.onMove(1)}>
-            ↓
-          </button>
           <button type="button" className="action small" disabled={disabled} onClick={() => props.onRemove()}>
             削除
           </button>
@@ -225,6 +236,7 @@ function ListInput({
   disabled,
   frozen,
   onChange,
+  onBlur,
 }: {
   readonly value: readonly string[];
   readonly className: string;
@@ -233,6 +245,7 @@ function ListInput({
   /** 案内の見本。打っても欄の文字を変えない */
   readonly frozen: boolean;
   readonly onChange: (next: readonly string[]) => void;
+  readonly onBlur?: () => void;
 }): JSX.Element {
   const [text, setText] = useState(() => value.join(", "));
   const typed = useRef(text);
@@ -259,6 +272,7 @@ function ListInput({
         setText(event.target.value);
         onChange(splitList(event.target.value));
       }}
+      onBlur={onBlur}
     />
   );
 }

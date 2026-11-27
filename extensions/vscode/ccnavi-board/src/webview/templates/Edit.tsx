@@ -287,7 +287,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
                         setFolded((f) => without(f, index));
                       }}
                     >
-                      フローを足す
+                      フローを追加
                     </button>
                   ) : (
                     <>

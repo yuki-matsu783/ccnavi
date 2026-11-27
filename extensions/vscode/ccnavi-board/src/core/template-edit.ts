@@ -238,7 +238,7 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
   );
 }
 
-/** 末尾にステップを足す。既定では前の末尾のステップを先行にする（順に進む形）。計画が空なら先行なし */
+/** 末尾にステップを追加する。既定では前の末尾のステップを先行にする（順に進む形）。計画が空なら先行なし */
 export function addItem(template: EditTemplate, part: PlanPart, type: string): EditTemplate {
   const items = partOf(template, part);
   const after = items.length === 0 ? [] : [items.length];
