@@ -454,7 +454,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <input
             id="find"
             type="search"
-            placeholder="id・title・scope・whenで絞り込む"
+            placeholder="id・title・scope・deliverables・whenで絞り込む"
             spellCheck={false}
             value={shownFind}
             onChange={(event) => {
@@ -523,6 +523,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   );
 }
 
+/** 共通の設定の定義の範囲。行の要約（`scopeText`）と同じ言い方にする */
+function commonScopeText(scope: readonly string[]): string {
+  return scope.length === 1 && scope[0] === "inherit" ? "親の範囲を引き継ぐ" : `編集可能な範囲${scope.join(", ")}`;
+}
+
 /** 共通の設定の定義（読み取り専用）。出どころが共通であることを見出しで言い、編集の欄は持たない */
 function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Element {
   return (
@@ -537,7 +542,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
       <ul className="list">
         {props.common.map((phase) => (
           <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
-            <code>{phase.id}</code> {phase.title} <span>（{kindShort(phase.kind)} /{reviewOption(phase.review).short} / 編集可能な範囲{phase.scope.join(", ")}）</span>
+            <code>{phase.id}</code> {phase.title} <span>（{kindShort(phase.kind)} / {reviewOption(phase.review).short} / {commonScopeText(phase.scope)}）</span>
           </li>
         ))}
       </ul>
