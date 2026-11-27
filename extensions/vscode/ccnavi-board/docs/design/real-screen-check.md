@@ -10,7 +10,7 @@ keywords: [実画面, code-server, 日本語, ユーザ目線, 画面確認, Chr
 
 [設計の入口に戻る](../design.md)
 
-ボードの画面だけなら [render-board.js](development.md#画面を-vs-code-なしで描くrender-boardjs)で描ける。ここでは、その先を確かめる。
+チケット管理画面の画面だけなら [render-board.js](development.md#画面を-vs-code-なしで描くrender-boardjs)で描ける。ここでは、その先を確かめる。
 本物のVS Code（左の一覧、タブ、通知、ターミナルを含む）に拡張を入れ、ccnaviを入れたリポジトリを開いて、操作しながら撮る。
 目的は、日本語で読む利用者にとって分かりづらい画面や使いづらい画面を見つけることにある。
 
@@ -99,7 +99,7 @@ test-repo本体に反映するときは`--force`を付けない（付けると�
 
 ### 1.3チケットを並べる（親2・子4）
 
-何も無いリポジトリではボードが空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`go/internal/harness/samples`）で、次の状態を作る。
+何も無いリポジトリではチケット管理画面が空で、確かめられる画面が少ない。ccnaviのテストが使う見本の組み立て（`go/internal/harness/samples`）で、次の状態を作る。
 
 - 親A: 承認済み。調査の子は完了、設計の子は作業中（ワークツリーあり）、実装の子は承認待ち
 - 親B: 承認待ち（子1件も承認待ち）
@@ -177,7 +177,7 @@ curl -s http://127.0.0.1:8080/healthz      # {"status":...} が返る
 ```
 
 別のフォルダを開くには、サーバーは動かしたままにしてURLの`?folder=<絶対パス>`を変える。`?folder=`は任意のパスを開くので、1つのcode-serverで複数のリポジトリを切り替えられる。
-複数のルートを並べた`.code-workspace`は、`?workspace=<.code-workspaceのパス>`で開く（マルチルートの確認用。値が絶対パスでよいかは未確認）。ボードが見るのは1つ目のルートだけなので、2つ目以降のルートは画面に出ない。
+複数のルートを並べた`.code-workspace`は、`?workspace=<.code-workspaceのパス>`で開く（マルチルートの確認用。値が絶対パスでよいかは未確認）。チケット管理画面が見るのは1つ目のルートだけなので、2つ目以降のルートは画面に出ない。
 止めるときは`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill <PID>`する。`[c]`と書くのは、`pgrep -f`・`pkill -f`が自分のコマンドラインにも当たってシェルごと落ちるのを避けるため。
 
 ### 1.6撮影の道具
@@ -262,14 +262,14 @@ fs.writeFileSync(path.join(ud, "languagepacks.json"), JSON.stringify({ ja: { has
 |---|---|---|
 | `pnpm -v`が`Cannot find module '…/corepack/v1/pnpm/12.15.0/bin/pnpm.cjs'`で落ちる | `/opt/node22/bin/pnpm`がcorepackのshimで、指す先のpnpm（12.15.0）がキャッシュに無く、ネットワーク制限で取れない | `npm i -g pnpm@10`。入れたあと`hash -r; pnpm -v`が10.xを返す |
 | `ccnavi-setup.sh --force`のあと、test-repoの`rules.yml`・`risks.yml`が配布元の既定に変わっていた | `--force`は配布先にあるものを置き換える。test-repoの検証用の設定も対象 | 作業は検証用コピーで行う（1.2）。本体は`--force`なしで反映する。上書きしたら差分を見て、必要なものを`git checkout -- <ファイル>`で戻す |
-| 検証用コピーで承認の操作をしたら、コピーの`origin`（test-repoの実物）に親のブランチがpushされた | 承認のあとにボードが送るコミット・pushのshが、コピーの`origin`へpushする | コピーを作った直後に`git remote remove origin`（1.2）。本体へpushしてしまったときは、そのブランチを削除する（ユーザに確かめてから） |
+| 検証用コピーで承認の操作をしたら、コピーの`origin`（test-repoの実物）に親のブランチがpushされた | 承認のあとにチケット管理画面が送るコミット・pushのshが、コピーの`origin`へpushする | コピーを作った直後に`git remote remove origin`（1.2）。本体へpushしてしまったときは、そのブランチを削除する（ユーザに確かめてから） |
 | 最初に開いた画面が「案内のための見本」で、実際のチケットが出ない | 初回起動（その画面の案内をまだ閉じていない）は、案内ツアーが見本のデータで始まる。ツアーは globalState に記録されるので、`--user-data-dir`を作り直すと毎回初回になる | 案内の × を1回押す（`[data-action="tour-skip"]`）。閉じたあとに実データへ替わる。撮るたびに閉じる処理を入れる（`shoot.js`の`skipTour`）。表示が出ない画面もあるので、あるときだけ閉じる形にする |
 | `npm install code-server`が`sh ./postinstall.sh`で失敗する（rootでは`--unsafe-perm`を要求される） | postinstallがネイティブモジュールをビルドする。`--unsafe-perm`を付けても`kerberos`のnode-gypが失敗する | `--ignore-scripts`で入れる。ネイティブモジュールが無くても、画面の確認には足りた |
 | code-serverに繋ぐと500で`Cannot find package '@microsoft/1ds-core-js'` | `--ignore-scripts`では、`lib/vscode/`の依存が入らない | `(cd node_modules/code-server/lib/vscode && npm install --omit=dev --ignore-scripts)`（1.5） |
 | `--install-extension <vsix>`が`Got error from Code`で失敗する | 原因は調べていない（ネイティブモジュールを入れていない影響の可能性）。言語パックは同じCLIで入った（1.7） | vsixを`unzip`で展開し、`extension/`を`--extensions-dir`の下に`local.ccnavi-board-<版>`で置く（1.5）。左の一覧にccnaviが出る |
 | `pkill -f code-server/out/node/entry.js`を、その文字列を含む呼び出しの中で打ったら、シェルごと落ちた（終了コード144） | `pkill -f`が、自分のコマンドラインにも含まれる文字列に当たった | 止めるのと起動は別の呼び出しにし、`pgrep -f "[c]ode-server/out/node/entry"`でPIDを見て`kill`する。起動は`setsid nohup … < /dev/null & disown` |
 | Playwrightが`strict mode violation`（同じplaceholderの入力欄が16個）や`element is not visible`で落ちる | ルールなどの一覧は、行ごとに隠れた入力欄を持つ。新しく足した行は値が空 | `input[placeholder="git-push"][value=""]`や`textarea.f-message:visible`のように、空の値・見えているものに絞る |
-| 画面を開いた直後に撮ると、中身が空や古い | webviewは拡張が中身を渡すまで読み込み中 | 開いてから5秒待つ。ボードは`ccnavi --explain --json`を呼ぶので、遅いときは増やす |
+| 画面を開いた直後に撮ると、中身が空や古い | webviewは拡張が中身を渡すまで読み込み中 | 開いてから5秒待つ。チケット管理画面は`ccnavi --explain --json`を呼ぶので、遅いときは増やす |
 | VS Codeの表示が英語のまま（`locale: ja`を設定しても変わらない） | 日本語言語パックを入れていない（Open VSXに出られない）、または入れたが`languagepacks.json`が無い | Open VSXに出られる環境では1.7。出られない環境は未確認の宿題（5章）。拡張の文言は日本語で出るので、ccnaviの画面の確認には影響しない |
 | 保存したあと、画面上部の警告の帯が撮れない | 保存すると、画面は編集した行の高さのままで、上部の帯が画面の外にある | webviewの中のスクロールする要素を、すべて`scrollTop = 0`にしてから撮る |
 | 「編集中は外から別の対象を開いても切り替えない」通知が出ない | コマンド（`ccnaviBoard.openTemplates`）とサイドパネルは、対象がワークスペース自身（`self`）。画面が`self`を開いていると、対象が同じで切り替えが起きない | テンプレート画面の設定を「共通の設定」か「プロジェクト」にして、新しいテンプレートの編集欄を開き、サイドパネルの「テンプレート管理」を押す。画面内の設定の選択欄は、編集中は押せない |
@@ -278,8 +278,8 @@ fs.writeFileSync(path.join(ud, "languagepacks.json"), JSON.stringify({ ja: { has
 | `webview()`が、画面を替えたあとも前の画面のフレームを返す、または後ろのタブを拾う | `webview()`は、フレームを後ろから探す。webviewのタブが複数残っていると、後ろのタブの中身に当たる | 画面ごとに1つのセッション（ブラウザを開き直す）にするか、画面を替える前に、開いているタブを閉じる（`Ctrl+k` `w`） |
 | モードごとの画面を確かめたいのに、code-serverを起動するときの環境変数を替えても変わらない | 環境変数で起動し直しても効かなかった。`.claude/settings.json`のenvを直すと切り替わった（優先の仕組みは未確認） | 検証用コピー（`cp -a`したもの。ccnavi本体の設定ではない）の`.claude/settings.json`のenvを直し、そのコピーを開く。モードごとにコピーを分ける |
 | 壊れた設定（検証用）を、`.ccnavi/config/project/`に作ろうとして止められる | `.ccnavi/config/project/`は、どのリポジトリの下でも保護対象（guard-project-home）に当たる。dry-runのときは通った（enableでの扱いは未確認） | 保護の外の経路で書けるかを、ユーザに確かめる。止められた操作の書き方を変えて試さない |
-| マルチルートの2つ目以降のルートが、ボードに出ない | ボードは1つ目のルートだけを見る。案内も出ない（T1） | 見られるのは1つ目だけと知って確かめる（回避策は未確認） |
-| ［ターミナルで実行］を押したら、数分間`claude`が動き続けた | 承認後の結果の枠の［ターミナルで実行］は、新しい端末でモデル指定なしの非対話`claude -p --permission-mode auto < prompt.txt`を起動する。確認なしで1回走る。着手まで進んだ回と、実装まで進んだ回があった | 押す前に、検証用コピーであること、`origin`を外したことを確かめる。終わったら（または不要になったら）、そのプロセスを`kill`で止める。費用は計測していない |
+| マルチルートの2つ目以降のルートが、チケット管理画面に出ない | チケット管理画面は1つ目のルートだけを見る。案内も出ない（T1） | 見られるのは1つ目だけと知って確かめる（回避策は未確認） |
+| 「ターミナルで実行」を押したら、数分間`claude`が動き続けた | 承認後の結果の枠の「ターミナルで実行」は、新しい端末でモデル指定なしの非対話`claude -p --permission-mode auto < prompt.txt`を起動する。確認なしで1回走る。着手まで進んだ回と、実装まで進んだ回があった | 押す前に、検証用コピーであること、`origin`を外したことを確かめる。終わったら（または不要になったら）、そのプロセスを`kill`で止める。費用は計測していない |
 | 終わったあと、code-serverの子プロセスが残る | `pgrep -f "[c]ode-server/out/node/entry"`では、ファイル監視の子（`--type=fileWatcher`）が見つからない | 親のPIDに加えて、`--type=fileWatcher`の子プロセスも止める。一時ファイルは`rm -r`で消す（`rm -rf`と`find -delete`はガードに拒否される） |
 | macOSで`setsid`が無い | macOSには`setsid`が標準で無い | `nohup … &`だけで動く（`disown`も不要だった）。Chromiumは、Playwrightのブラウザの置き場の`chromium_headless_shell-*/chrome-headless-shell-*/chrome-headless-shell`を`CCNAVI_CHROMIUM`（`CHROME`）に指す |
 | 拡張を入れ直すたびにvsixを作るのが重い | `package.sh`はinstallとcompileを含む | compile済みの出力（`package.json`、`media/`、`out/extension.js`、`out/webview/`）を、拡張の置き場へコピーするだけでも動いた。コピー元が現在のソースと合っているかは、先にcompileして確かめる |

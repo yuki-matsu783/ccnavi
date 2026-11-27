@@ -438,7 +438,7 @@ async function importPaths(current: PanelState, loaded: Loaded | undefined, path
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "取り込み", "それでも取り込む"))) {
     answer({ ok: false, error: "エージェントの応答中のため取り込みを取りやめました。応答が終わってから取り込んでください。" });
     return;
   }

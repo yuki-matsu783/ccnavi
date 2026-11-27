@@ -452,7 +452,7 @@ async function syncMirror(current: PanelState, names: readonly string[], expect:
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "同期", "それでも同期する"))) {
     return;
   }
   if (state !== current) {

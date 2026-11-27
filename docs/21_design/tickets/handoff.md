@@ -1,9 +1,9 @@
 ---
 type: design
 title: 9.19 保護対象の変更の取り込み（handoff）
-description: エージェントが書けない保護対象の変更を、wip/handoff/ の下書きから ccnavi user handoff で取り込む一本の手順。種類の表（許可リスト）・取り込みの安全・ターミナル要求とボードの経路・ready の止め・検査の共有
+description: エージェントが書けない保護対象の変更を、wip/handoff/ の下書きから ccnavi user handoff で取り込む一本の手順。種類の表（許可リスト）・取り込みの安全・ターミナル要求とチケット管理画面の経路・ready の止め・検査の共有
 tags: [design-doc, ticket, approval, selfguard]
-keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可リスト, 種類の表, expect, ボード, テンプレート, ready]
+keywords: [handoff, 保護対象, 取り込み, 下書き, user handoff, 許可リスト, 種類の表, expect, チケット管理画面, テンプレート, ready]
 ---
 
 [設計書の入口](../../20_design.md) > [9. チケット制御](../tickets.md)
@@ -49,7 +49,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 - **変換の位置。** 元 → 下書きは `ccnavi-stage.sh`（下書きのパスを組む）と `handoff.DraftRel`（テンプレートの下書き）。下書き → 元は `handoff.Walk` と、引数のパスを引く `handoff.wantedKey`。`ccnavi-git.sh integrate` は下書きを起点の同じパスと比べるだけなので、変換をしない
 - **比べ方。** 要素ごとに大文字小文字を区別せず比べる（`.CLAUDE` も `Handoff-.Claude` も表に当たる）。表の名前は ASCII だけで、非 ASCII の要素は表に当てない。sh が ASCII の大文字小文字しか畳めないため、実行ファイルも同じ答えにする。戻した名前は表の元の階層名の綴りになる。置き場にある実際の綴りは `spelled` が引く
 - **予約名。** 下書きでの階層名（`handoff-.claude`）は予約した名前。元のパスにその名前の階層があるファイルは、`ccnavi-stage.sh` が断る（読み替えを逆向きにたどれなくなるため）
-- **JSON。** `user handoff --json` の各対象は、元のパス（`path`）と下書きのパス（`draft`）の両方を持つ。ボードは `path`（元のパス）で引く
+- **JSON。** `user handoff --json` の各対象は、元のパス（`path`）と下書きのパス（`draft`）の両方を持つ。チケット管理画面は `path`（元のパス）で引く
 
 #### 種類の表（許可リスト）
 
@@ -57,7 +57,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 表に該当しないパスと、リンクのディレクトリ（中は読まない）は「対象外」とし、JSON に件数（`ignored`）と、置き場からの相対パスと理由の並び（`ignored_paths: [{path, why}]`。`why` は `not-allowed`（表に無い）か `linked-dir`（リンクのディレクトリ）。`ignored` と件数が一致し、順序は走査順で、各ディレクトリのファイル（名前順）、リンクのディレクトリ、下のディレクトリの順）を出す。拡張はこの欄を必ず出るものとして読む。テキスト版は件数だけ。error には数えない（`wip/handoff/` には ccnavi が書く `learnings/` や、
 再現用のスクリプトも置かれる）。バイナリ（NUL を含む）と、実行ファイル（`.ccnavi/bin/`）は対象外。
 
-| 種類 | パス（ツリーからの相対） | 新規作成 | ボード | 検査 |
+| 種類 | パス（ツリーからの相対） | 新規作成 | チケット管理画面 | 検査 |
 |---|---|---|---|---|
 | `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`ids.IsValidName` と、`proposal/templates` の `nameLimit`） |
 | `messages` | `.ccnavi/messages/<名前>.yml`（ワークスペースルート直下だけ。`projects/<名前>/` の下の `messages/` は読まれないので対象外） | できる | 不可 | 文面ファイルの検査（`policy/texts`。欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script 呼び出し。[文面ファイル](../messages.md)）。error のある下書きは取り込めない |
@@ -65,7 +65,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 | `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | UTF-8 であること |
 | `defense` | `.ccnavi/scripts/**`、`.claude/hooks/**`、`.claude/settings.json`、`.claude/settings.local.json`、`.claude/skills/**/*.md`（スキルの frontmatter は使えるツールや hook を持てる） | できない | 不可（`--via board` は断る。ターミナルの前のユーザだけ） | `.sh` は CRLF を error にして `sh -n`。`settings*.json` は JSON として読めること |
 
-`layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じくターミナルに限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、次の 2 つ。1 つめは `guard-` で始まる id のルールを足す・消す・判定を移す・`except` を含む中身を変える場合で、この id は利用者が防御のルールに付ける印（ccnavi 自身の保護は組み込みの `builtin:guard-*` にあり、共通のルールファイルには無い）。2 つめは今ある deny を消す・中身を変える場合。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないのでターミナルに限る（`handoff.defenseChange`）。共通のルールファイルが読めない間の修復はこの経路になる。エージェントは `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（`builtin:guard-ccnavi-config` が共通のルールファイルへの直接の書き込みを止めるが、置き場のコピーは例外で書ける）、ユーザがターミナルの `ccnavi user handoff` で取り込む。そのため、ボードからの取り込みは断られる。`phases.yml`・`risks.yml` はこの判定の外。
+`layer-config` の `rules.yml` のうち、防御の記述を動かす取り込みは、`defense` と同じくターミナルに限る（`--via board` は断り、`--json` の `board` は偽になる）。防御の記述とみなすのは、次の 2 つ。1 つめは `guard-` で始まる id のルールを足す・消す・判定を移す・`except` を含む中身を変える場合で、この id は利用者が防御のルールに付ける印（ccnavi 自身の保護は組み込みの `builtin:guard-*` にあり、共通のルールファイルには無い）。2 つめは今ある deny を消す・中身を変える場合。deny を足すのは止める側への変更なので数えない。今の中身か下書きが読めなければ、確かめられないのでターミナルに限る（`handoff.defenseChange`）。共通のルールファイルが読めない間の修復はこの経路になる。エージェントは `wip/handoff/.ccnavi/config/common/rules.yml` に下書きを置き（`builtin:guard-ccnavi-config` が共通のルールファイルへの直接の書き込みを止めるが、置き場のコピーは例外で書ける）、ユーザがターミナルの `ccnavi user handoff` で取り込む。そのため、チケット管理画面からの取り込みは断られる。`phases.yml`・`risks.yml` はこの判定の外。
 
 表に足すときは、行を足し、テストで表と docs の食い違いを検出する。
 
@@ -81,18 +81,18 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 | 巻き戻し | 複数の対象を書く途中で失敗したら、書いたものを元に戻し（書く前のバイト列をメモリに持つ）、戻せなかったものを名指しする。複数ファイルの書き込みは、プロセスの途中終了に対して原子的ではない |
 | 下書きの片付け | 取り込めたら、下書きの今のバイト列が取り込んだものと同じときだけ、下書きを消す。違えば消さずにそう言う。リンクは消さない |
 
-#### ターミナル要求とボードの経路
+#### ターミナル要求とチケット管理画面の経路
 
 | 経路 | 要求 |
 |---|---|
 | ターミナル | `--yes` で書くときは、標準入力がターミナルであること（9.18）。見るだけの形はターミナルを求めない |
-| ボード | `--via board` はターミナルを求めない。`--expect` と `--json` が揃うこと、種類のボード欄が「可」であること、hook の止めに頼る。`defense` の種類と、防御の記述を動かす `rules.yml` は断る |
+| チケット管理画面 | `--via board` はターミナルを求めない。`--expect` と `--json` が揃うこと、種類のチケット管理画面欄が「可」であること、hook の止めに頼る。`defense` の種類と、防御の記述を動かす `rules.yml` は断る |
 
 「作業中のチケットがある間は取り込めない」制限は、実行ファイルには無い。拡張の画面だけが持ち、`template` と `layer-config` の種類の取り込みに掛ける。
 
-**ボードの画面。** 拡張に「取り込み待ち」の画面がある。一覧は `user handoff --json`（見るだけ）で作り、`template`・`layer-config`・`docs` の種類を出す。
+**VS Code 拡張の画面。** 拡張に「取り込み待ち」の画面がある。一覧は `user handoff --json`（見るだけ）で作り、`template`・`layer-config`・`docs` の種類を出す。
 取り込みは `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。`defense`（と、防御の記述を動かす `rules.yml`）は一覧に出し、ターミナルで取り込むことと打つコマンド（`ccnavi --root <ツリー> user handoff <パス> --yes --expect <ハッシュ>`。引用は POSIX の sh の形で、PowerShell では単引用符の中の `'\''` を `''` に打ち直す）を案内する。
-テンプレート管理の画面は、一覧・検索・表示のほか、ユーザが図で直したテンプレートを拡張が直接保存する（実行ファイルは読むだけの `--templates --check-file` で保存前に検査する。取り込み済みの本文を書くのはこの保存と、ユーザの手作業だけ）。下書きの取り込みは取り込み待ちの画面。ボードの rules・phases・risks の画面は、拡張が直接書くまま。
+テンプレート管理の画面は、一覧・検索・表示のほか、ユーザが図で直したテンプレートを拡張が直接保存する（実行ファイルは読むだけの `--templates --check-file` で保存前に検査する。取り込み済みの本文を書くのはこの保存と、ユーザの手作業だけ）。下書きの取り込みは取り込み待ちの画面。チケット管理画面の rules・phases・risks の画面は、拡張が直接書くまま。
 
 `tickets/model/useronly` の表が `handoff` の操作と `--handoff` を載せている。
 

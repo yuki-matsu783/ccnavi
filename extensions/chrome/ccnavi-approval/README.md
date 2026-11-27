@@ -2,7 +2,7 @@
 
 承認者がブラウザと PAT だけで使う拡張で、リモートのブランチにある承認待ちを表示し、承認とレビュー済みを親ブランチへ反映する。
 Issue から親ブランチを作成することもできる。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
-GitLab で ccnavi の書き込みが競合したことを検出する処理は、まだ実装していない（実際の GitLab で前提を確かめてから実装する）。
+GitLab で ccnavi の書き込みが競合したことを検出する処理は、まだ実装していません。実際の GitLab で前提を確かめてから実装します。
 PAT に要る権限は、GitHub が Contents の Read and write、GitLab が `api` スコープである。残った指摘の対応方針を確定するときは、さらに GitHub では Pull requests・Issues の Read and write、GitLab では Developer 以上のロールが要る。設定画面の案内と [VERIFY.md](VERIFY.md) の表に、同じ内容を載せている。
 
 承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Go のコードを WASM に組んで同梱して使う。
@@ -61,7 +61,7 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 依頼コメントへの返信の見本（`replies`・`replies-accepted`）は、system のノートを除いたノートから代表のノートと `own` を決め、返信を指摘として数える。実物の GitLab で返信がスレッドになり resolvable になるかは未検証。
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 
-MR のスレッドとレビューを取ってくる処理は 2 か所にある（手元の sh の `.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と、
+MR のスレッドとレビューを取得する処理は 2 か所にあります（手元の sh の `.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と、
 この拡張の service worker が呼ぶ `src/core/github.ts`・`gitlab.ts` の `reviewReplies`）。どちらも取ってきた応答を読まずに ccnavi に渡す。
 読み（スレッドの代表・`own`・解決済み・レビューの状態のそろえ方）は ccnavi の同じ `hostreply`（sh は `ccnavi host copy`、拡張は WASM の `copy`）が持つ。
 拡張の service worker は WASM を動かさないので、ボードが `reviewReplies` の答えを受け取り、WASM の Worker の `copy` に渡す（`src/core/reviewed.ts` の `readCopy`）。

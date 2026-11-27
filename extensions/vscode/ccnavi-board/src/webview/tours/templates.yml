@@ -56,7 +56,7 @@ sample:
           after: []
       dropped:
         reason: conflict
-        detail: "`research`は共通と同じ名前で中身が違う。共通の定義を使う"
+        detail: "`research`は共通設定と同じ名前で中身が違う。共通設定の定義を使う"
       text: |
         name: research
   drafts:
@@ -92,7 +92,7 @@ sample:
           layer: self
           dropped:
             reason: conflict
-            detail: "`research`は共通と同じ名前で中身が違う。共通の定義を使う"
+            detail: "`research`は共通設定と同じ名前で中身が違う。共通設定の定義を使う"
     - name: lib
       layers: [common, lib]
       templates:
@@ -396,7 +396,7 @@ courses:
           sum: self
       - target: sum-table
         title: 由来と破棄した理由
-        body: 名前ごとに、どの設定のものか、使われるかどうか、破棄された場合はその理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
+        body: 名前ごとに、どの設定のものか、使われるかどうか、破棄された場合はその理由が出ます。同じ名前で中身が違うと、共通設定の側が使われます。
         scene:
           sum: self
 

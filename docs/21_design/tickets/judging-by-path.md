@@ -116,7 +116,7 @@ limit: parent i0001: src/*, tests/*
 `comment` / `fetch` / `origin` は sh だけの仕事なので適用していない。
 **hook のほかに保護が無い形**は、実行ファイルの表記によらず、同じ理由コードで止める（`useronly.HumanPathForm`）。
 
-- ボードの経路。`user agree` / `user reviewed` / `user handoff` / `user mirror` と `--yes` の組（実行ファイルを直接実行する `--agree` / `--reviewed` と `--yes` の組も）、
+- チケット管理画面の経路。`user agree` / `user reviewed` / `user handoff` / `user mirror` と `--yes` の組（実行ファイルを直接実行する `--agree` / `--reviewed` と `--yes` の組も）、
   sh の `--choices` と `--digest` の組。`--yes` の経路はターミナルを求めないので、ここが唯一の保護になる。
   `ccnavi-review.sh decide <N> --preview` と `--agree --preview` は通す（何も置かない）
 - ターミナル要求を切る形。実行ファイルは `CCNAVI_GUARD_TICKET_APPROVAL` と `--guard-ticket-approval` でターミナル要求を

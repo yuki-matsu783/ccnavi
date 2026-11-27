@@ -169,7 +169,7 @@ sample:
         expectations:
           - { tool: Bash, subject: git push origin main, why: 同じ呼び出しを繰り返し止めた形 }
         yaml: "rules:\n  deny:\n    - id: git-push\n      match: Bash\n      glob: '*git push*'\n      message: pushはユーザが行う。ccnavi-git.shの入口を使う\nexpectations:\n  deny:\n    - tool: Bash\n      subject: git push origin main\n      why: 同じ呼び出しを繰り返し止めた形\n"
-  save_error: "設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\nerror: db-migrate: ask に message がある"
+  save_error: "設定の検証（--lint）でerrorが見つかりました。内容を修正してから保存してください。\nerror: db-migrate: ask に message がある"
   sums:
     - name: self
       layers: [common, self]
@@ -769,7 +769,7 @@ courses:
         scene: { tab: rules }
 
   - id: save-error
-    title: 保存前の検証エラーを読んで直したいとき
+    title: 保存前のerrorを読んで直したいとき
     summary: 保存が止まったときの理由を読み、直す行を探して直す
     steps:
       - target: save
@@ -778,7 +778,7 @@ courses:
         scene: { tab: rules }
       - target: status
         title: 理由はツールバーの最後の行に出る
-        body: '止まった理由は、ツールバーの最後の行に赤で出ます。一覧をスクロールしても見えたままです。「設定の検証（--lint）でエラーが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
+        body: '止まった理由は、ツールバーの最後の行に赤で出ます。一覧をスクロールしても見えたままです。「設定の検証（--lint）でerrorが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
         scene: { tab: rules, error: true }
       - target: rule-db-migrate
         title: idで直す行を探す

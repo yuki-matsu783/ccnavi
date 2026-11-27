@@ -128,14 +128,14 @@ async function findFfmpeg(capture: Capture): Promise<string | undefined> {
 
 async function startRecording(current: Session): Promise<void> {
   if (current.capture === "none") {
-    current.noRecording = "このOSでは録画できない（対応しているのはWindows・macOS・WSL）";
+    current.noRecording = "このOSでは録画できません（対応しているのはWindows・macOS・WSL）";
     return;
   }
   const ffmpeg = await findFfmpeg(current.capture);
   if (ffmpeg === undefined) {
     current.noRecording = "ffmpegが見つからない";
     void vscode.window.showWarningMessage(
-      "ffmpegが見つからないので、録画できません。スクリーンショットとログは保存します。録画するには、ffmpegを入れるか、設定ccnaviBoard.ffmpegPathにffmpegのパスを指定してください。",
+      "ffmpegが見つからないため、録画できません。スクリーンショットとログは保存します。録画するには、ffmpegを入れるか、設定ccnaviBoard.ffmpegPathにffmpegのパスを指定してください。",
     );
     return;
   }
