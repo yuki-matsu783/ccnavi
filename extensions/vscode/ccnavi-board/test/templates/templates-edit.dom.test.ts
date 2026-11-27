@@ -631,3 +631,23 @@ test("CB-D1255 子のフローの行の見出しは「番号:型のタイトル 
     await dom.close();
   }
 });
+
+test("CB-D1277 未保存の間は中身のコピーを拡張ホストへ送り（editDirty）、保存できたら空（null）を送る。タブを閉じたあとにYAMLで開くため", async () => {
+  const dom = await openList();
+  try {
+    const { session } = await startEdit(dom);
+    const dirties = (): Record<string, unknown>[] => dom.posted.filter((m) => m.type === "editDirty");
+    assert.equal(dirties().at(-1)?.session, session);
+    assert.equal(dirties().at(-1)?.data, null, "開いた直後は未保存ではない");
+    dom.type(dom.one(".f-description"), "閉じる前の説明");
+    await dom.settle();
+    assert.equal((dirties().at(-1)?.data as { description: string } | null)?.description, "閉じる前の説明");
+    dom.click(dom.one('button[data-action="save-edit"]'));
+    await dom.settle();
+    await dom.send({ type: "editSaved", session, sha: "sha-new", error: "" });
+    await dom.settle();
+    assert.equal(dirties().at(-1)?.data, null, "保存できたら未保存ではない");
+  } finally {
+    await dom.close();
+  }
+});
