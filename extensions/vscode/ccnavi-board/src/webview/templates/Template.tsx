@@ -9,7 +9,6 @@ import type { FlowSummary, TemplateCheck, TemplateDetail, TemplateEntry } from "
 import { Diagrams } from "./Diagrams.js";
 import { Plan } from "./Plan.js";
 import { Problems } from "./Problems.js";
-import { Code } from "../shared/Code.js";
 import { droppedLabel, flowText, layerLabel } from "./text.js";
 
 export interface TemplateProps {
@@ -33,7 +32,6 @@ export interface TemplateProps {
 }
 
 export function Template({ entry, open, onToggle, detail, detailError, onShow, tour, onEdit, preview, previewError = "", onPreview }: TemplateProps): JSX.Element {
-  const dropped = entry.dropped;
   const wantPreview = open && preview === undefined && previewError === "" ? onPreview : undefined;
   useEffect(() => {
     wantPreview?.();
@@ -59,11 +57,6 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
         <StateTags entry={entry} />
         {entry.description !== "" && <span className="tpl-desc">{entry.description}</span>}
       </div>
-      {dropped !== null && (
-        <p className="hint tpl-dropped">
-          <Code text={dropped.detail} />
-        </p>
-      )}
       {open && (
         <div className="row-body tpl-body">
           {entry.when !== "" && (
@@ -122,11 +115,16 @@ function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
   return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);
 }
 
-/** 状態のバッジ。有効・無効・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す */
+/**
+ * 状態のバッジ。有効・無効・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す。
+ * 共通と全欄が同じで破棄した行（`duplicate`）は、共通の1本が使われていて直すことは無いので、無効や破棄の色を付けず「共通の側を使用」とだけ出す
+ */
 function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>
-      {entry.dropped !== null ? (
+      {entry.dropped?.reason === "duplicate" ? (
+        <span className="tag">共通の側を使用</span>
+      ) : entry.dropped !== null ? (
         <>
           {!entry.usable && <span className="tag bad">無効</span>}
           <span className="tag warn">{`破棄: ${droppedLabel(entry.dropped.reason)}`}</span>

@@ -24,7 +24,7 @@ async function openRow(dom: DomPage, selector: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D324 一覧は開いている対象のレイヤーのテンプレートだけを出し、破棄した理由と無効のバッジを行に出す。統合結果の枠は別に出す", async () => {
+test("CB-D324 一覧は開いている対象のレイヤーのテンプレートだけを出し、破棄した理由と無効のバッジを行に出す（共通と同じ中身なら「共通の側を使用」）。統合結果の枠は別に出す", async () => {
   const dom = await openTemplates();
   try {
     // 対象はself。一覧はselfのレイヤーの4件（ends / feature / local / research）だけで、共通のレイヤーの行は出さない
@@ -32,7 +32,11 @@ test("CB-D324 一覧は開いている対象のレイヤーのテンプレート
       dom.all("li.template").map((li) => `${li.getAttribute("data-layer")}/${li.getAttribute("data-name")}`),
       ["self/ends", "self/feature", "self/local", "self/research"],
     );
-    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"]')), /破棄: 共通と同じ中身/);
+    // 共通と全欄が同じで破棄した行は、共通の1本が使われるので無効・破棄とは出さない。理由の本文は指摘の一覧に1度だけ出す
+    const feature = text(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
+    assert.match(feature, /共通の側を使用/);
+    assert.doesNotMatch(feature, /無効|破棄/);
+    assert.equal(text(dom.one('li.template[data-name="feature"][data-layer="self"]')).split("全欄が同じなので").length, 2);
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /無効/);
     assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄: 共通と食い違います/);
     assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
