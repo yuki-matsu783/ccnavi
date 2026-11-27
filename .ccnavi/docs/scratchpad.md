@@ -71,11 +71,11 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 
 1. `sh <ワークスペースルート>/.ccnavi/scripts/ccnavi-stage.sh <元のパス>...`で、元のファイルを`wip/handoff/`にコピーする。下書きは、置き場の根からの元と同じ相対パス（`wip/handoff/.ccnavi/config/common/rules.yml`など。`.claude`の階層だけ`handoff-.claude`に読み替える）に置かれ、既にある下書きは上書きしない。新規のテンプレートはコピーする元が無いので、`sh .ccnavi/scripts/ccnavi-launcher.sh --templates --draft <親>`で作る（[templates.md](templates.md)）
 2. `wip/handoff/`の下書きを編集する。複数のファイルを同時に直すときは、すべてそろえてからターンを終える
-3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。`defense`の種類はボードからは取り込めないので、ターミナルのユーザが打つ
+3. ユーザが`ccnavi-user-handoff.sh [<相対パス>...]`で差分を見て、`--yes --expect <ハッシュ>`で取り込む。`ccnavi-user-handoff.sh`はユーザ専用で、見るだけの形もエージェントは打てない。`defense`の種類はチケット管理画面からは取り込めないので、ターミナルのユーザが打つ
 
 コピー先は、下書きがあるツリーの同じ相対パス。取り込める保護対象は次の表の5種類で、表にヒットしない下書き（`learnings/`・`inbox/`・再現用のスクリプトなど）は対象外になる。
 
-| 種類 | 反映する先 | 新規 | ボードから |
+| 種類 | 反映する先 | 新規 | チケット管理画面から |
 |---|---|---|---|
 | `template` | `.ccnavi/config/{common,project}/templates/<名前>.yml` ほか | できる | 可 |
 | `messages` | `.ccnavi/messages/<名前>.yml`（レイヤーごとの`messages/`は読まれないので対象外） | できる | 不可（ターミナルのユーザだけ） |
