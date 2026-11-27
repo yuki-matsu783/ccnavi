@@ -23,6 +23,9 @@ import { LoadError } from "../shared/LoadError.js";
 import { lockClass, type Lock } from "../../core/lock.js";
 import type { CommonPhase, PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { useSaveKey } from "../useSaveKey.js";
+import { insertAt, removal, RemovedBand, type Removed } from "../shared/RemovedBand.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { Phase } from "./Phase.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
@@ -106,6 +109,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
+  /** 直前に削除した定義。［元に戻す］で戻す */
+  const [removed, setRemoved] = useState<Removed<Draft> | undefined>(undefined);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const { draft, open, more } = editing;
@@ -140,6 +145,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       setStatus(undefined);
       setChanged(false);
       setSaveWarns([]);
+      setRemoved(undefined);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
     } else if (message.type === "saved") {
       setSaveWarns(message.warns ?? []);
@@ -195,6 +201,26 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
+
+  // idの重なりは帯と同じ文を理由にする。案内の間のボタンは、見本の様子で下の`shownSaveBlocker`が決める
+  const draftDup = duplicates(draft);
+  const draftClash = commonClashes(draft, page?.common ?? []);
+  const saveBlocker = editSaveBlocker({
+        busy,
+        dirty,
+        lock,
+        invalid: draftDup.size > 0 ? duplicateNote(draftDup) : draftClash.titles.size > 0 ? commonTitleNote(draftClash.titles) : "",
+      });
+  const save = (): void => {
+    if (tour.touring) {
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "検証して保存中…", error: false });
+    post({ type: "save", form: formOf(draft) });
+  };
+  // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, blocked: (reason) => setStatus({ text: reason, error: false }) }));
 
   if (data.kind === "loading") {
     return (
@@ -271,7 +297,25 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const remove = (key: string): void => {
+    if (tour.touring) {
+      return;
+    }
+    const gone = removal(draft.rows, key);
     editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
+    if (gone !== undefined) {
+      const id = gone.row.phase.id.trim();
+      setRemoved({
+        label: id === "" ? "idの無い定義" : `定義「${id}」`,
+        restore: (now) => ({ ...now, rows: insertAt(now.rows, gone.index, gone.row) }),
+      });
+    }
+  };
+
+  const undoRemove = (): void => {
+    if (removed !== undefined) {
+      editDraft(removed.restore(draft));
+      setRemoved(undefined);
+    }
   };
 
   const courses = coursesOf(TOUR, setScene);
@@ -305,6 +349,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"], turns: [] }
       : { locked: false, reason: "", doing: [], turns: [] }
     : lock;
+  const shownSaveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty, lock: shownLock }) : saveBlocker;
   const sceneOpen = sceneList(scene.open);
   const sceneMore = sceneList(scene.more);
   const isShownOpen = (row: { readonly key: string; readonly phase: PhaseForm }): boolean => (touring ? row.key === ADDED_KEY || sceneOpen.has(row.phase.id) : open.has(row.key));
@@ -375,7 +420,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </div>
         <div className="controls">
           <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
-          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} title={shownPage?.exists !== true ? "ファイルがまだないため、開けません" : undefined} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
@@ -387,15 +432,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             id="save"
             data-action="save"
             data-tour="save"
-            disabled={!shownDirty || shownLock.locked || shownBusy || dup.size > 0 || clash.titles.size > 0}
-            onClick={() => {
-              if (tour.touring) {
-                return;
-              }
-              setBusy(true);
-              setStatus({ text: "検証して保存中…", error: false });
-              post({ type: "save", form: formOf(draft) });
-            }}
+            disabled={shownSaveBlocker !== ""}
+            title={saveTitle(shownSaveBlocker)}
+            onClick={save}
           >
             保存
           </button>
@@ -404,6 +443,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       <p id="lock" data-tour="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
+      {!touring && <RemovedBand removed={removed} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (

@@ -1534,3 +1534,36 @@ test("CB-D742 図のある手順は、本文の下に時系列の図を出し、
     await dom.close();
   }
 });
+
+test("CB-D1274 削除した行は帯の［元に戻す］で元の位置へ戻る。Ctrl+Sは押せるときだけ保存を送り、押せないときは理由を出す", async () => {
+  const dom = await openRules();
+  try {
+    const ids = (): string[] => dom.all('.list[data-list="deny"] > .rule').map((row) => row.getAttribute("data-id") ?? "");
+    assert.deepEqual(ids(), ["git-push", "no-rm"]);
+    // 変更が無いうちは押せず、理由をボタンの説明とCtrl+Sの一言に出す
+    assert.match(dom.one("#save").getAttribute("title") ?? "", /変更が無い/);
+    dom.key("s", undefined, { ctrlKey: true });
+    await dom.settle();
+    assert.equal(dom.posted.filter((message) => message.type === "save").length, 0);
+    assert.match(dom.one("#status").textContent ?? "", /変更が無い/);
+
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("git-push")} button[data-action="remove"]`));
+    await dom.settle();
+    assert.deepEqual(ids(), ["no-rm"]);
+    assert.match(dom.one('[data-banner="removed"]').textContent ?? "", /git-push/);
+    dom.click(dom.one('button[data-action="undo-remove"]'));
+    await dom.settle();
+    assert.deepEqual(ids(), ["git-push", "no-rm"], "元の位置へ戻らない");
+    assert.equal(dom.all('[data-banner="removed"]').length, 0);
+
+    // 戻したあとも未保存なので、Ctrl+Sで保存を送る
+    assert.equal(dom.one("#save").getAttribute("title"), "保存します（Ctrl+S）");
+    dom.key("s", undefined, { ctrlKey: true });
+    await dom.settle();
+    assert.deepEqual(savedSections(dom).deny.map((rule) => rule.id), ["git-push", "no-rm"]);
+  } finally {
+    await dom.close();
+  }
+});
