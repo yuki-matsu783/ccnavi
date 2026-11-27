@@ -194,6 +194,23 @@ test("CB-D1250 元に戻す・やり直すで編集と削除を戻せる。読�
     await dom.settle();
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).value, "調べる");
     assert.ok(!dom.one("#dirty").classList.contains("hidden"));
+    // 同じ欄に続けて打った文字は1件にまとめるが、欄からフォーカスが外れたら区切る
+    dom.click(undoButton());
+    await dom.settle();
+    const title = (): HTMLInputElement => dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`);
+    dom.type(title(), "調");
+    dom.type(title(), "調べ");
+    await dom.settle();
+    title().dispatchEvent(new dom.window.FocusEvent("focusout", { bubbles: true }));
+    await dom.settle();
+    dom.type(title(), "調べた");
+    await dom.settle();
+    dom.click(undoButton());
+    await dom.settle();
+    assert.equal(title().value, "調べ", "区切った後の打ち込みだけが戻る");
+    dom.click(undoButton());
+    await dom.settle();
+    assert.equal(title().value, "調査", "区切る前の続けた打ち込みは1件で戻る");
     // 中身が入れ替わったら履歴は空になる
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     assert.equal(undoButton().disabled, true);

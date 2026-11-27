@@ -16,12 +16,20 @@ export function moreNote(phase: PhaseForm): string {
   return hasMore(phase) ? "（設定あり）" : "（未設定）案内するエージェントと、使う場面を設定します";
 }
 
+/** scopeがinheritの定義を要約で言う言葉。行の要約と共通の設定の定義の一覧で同じにする */
+const INHERIT_TEXT = "親の範囲を引き継ぐ";
+
 /** 要約に出す範囲。inheritならその表記、globが無ければ未設定と言う */
 export function scopeText(phase: PhaseForm): string {
   if (phase.inherit) {
-    return "親の範囲を引き継ぐ";
+    return INHERIT_TEXT;
   }
   return phase.scope.length === 0 ? "（scope未設定）" : phase.scope.join(", ");
+}
+
+/** 共通の設定の定義（範囲は`inherit`の1語かglobのリスト）の範囲 */
+export function commonScopeText(scope: readonly string[]): string {
+  return scope.length === 1 && scope[0] === "inherit" ? INHERIT_TEXT : `編集可能な範囲${scope.join(", ")}`;
 }
 
 /** 編集可能な範囲のツールチップ */

@@ -20,7 +20,7 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import { LoadError } from "../shared/LoadError.js";
 
-import { canRedo, canUndo, emptyHistory, record, redo, undo, type FlowHistory } from "../../core/flow-history.js";
+import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
 import { lockClass, type Lock } from "../../core/lock.js";
 import { kindShort, reviewOption, type CommonPhase, type PhaseForm, type PhasesData, type PhasesMessage, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { useHostMessages } from "../useHostMessages.js";
@@ -34,7 +34,7 @@ import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
 import { Code } from "../shared/Code.js";
 import { foldFind } from "../shared/find.js";
-import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
+import { COMMON_NOTE, commonIdNote, commonScopeText, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -500,6 +500,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               onToggle={() => toggle(row.key)}
               onToggleMore={(value) => toggleMore(row.key, value)}
               onChange={(phase, typing) => editRow(row.key, phase, typing)}
+              onSeal={() => setHistory(seal)}
               onRemove={() => remove(row.key)}
             />
           ))}
@@ -521,11 +522,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       </footer>
     </>
   );
-}
-
-/** 共通の設定の定義の範囲。行の要約（`scopeText`）と同じ言い方にする */
-function commonScopeText(scope: readonly string[]): string {
-  return scope.length === 1 && scope[0] === "inherit" ? "親の範囲を引き継ぐ" : `編集可能な範囲${scope.join(", ")}`;
 }
 
 /** 共通の設定の定義（読み取り専用）。出どころが共通であることを見出しで言い、編集の欄は持たない */

@@ -32,6 +32,8 @@ export interface PhaseProps {
   readonly onToggleMore: (open: boolean) => void;
   /** 欄に打った文字には`typing`（どの欄か）が付く。元に戻す操作で、同じ欄に続けて打った文字を1件にまとめるために使う */
   readonly onChange: (next: PhaseForm, typing?: string) => void;
+  /** 欄からフォーカスが外れた。元に戻すの打ち込みのまとまりを区切る */
+  readonly onSeal?: () => void;
   readonly onRemove: () => void;
   /** 案内が指す行か。真のとき、行と欄に`data-tour`の印を付ける（印は画面に1つだけ。見本の最初の行にだけ付ける） */
   readonly tour?: boolean;
@@ -55,6 +57,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       value={phase[name]}
       disabled={disabled}
       onChange={(event) => props.onChange({ ...phase, [name]: event.target.value }, name)}
+      onBlur={props.onSeal}
     />
   );
   const list = (name: ListKey, className: string, placeholder: string): JSX.Element => (
@@ -65,6 +68,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       disabled={disabled}
       frozen={props.frozen === true}
       onChange={(next) => props.onChange({ ...phase, [name]: next }, name)}
+      onBlur={props.onSeal}
     />
   );
 
@@ -232,6 +236,7 @@ function ListInput({
   disabled,
   frozen,
   onChange,
+  onBlur,
 }: {
   readonly value: readonly string[];
   readonly className: string;
@@ -240,6 +245,7 @@ function ListInput({
   /** 案内の見本。打っても欄の文字を変えない */
   readonly frozen: boolean;
   readonly onChange: (next: readonly string[]) => void;
+  readonly onBlur?: () => void;
 }): JSX.Element {
   const [text, setText] = useState(() => value.join(", "));
   const typed = useRef(text);
@@ -266,6 +272,7 @@ function ListInput({
         setText(event.target.value);
         onChange(splitList(event.target.value));
       }}
+      onBlur={onBlur}
     />
   );
 }

@@ -155,13 +155,15 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
   /** 絞り込みのあとに一覧へ出すテンプレート。案内の間は見本をそのまま出す */
   const query = touring ? "" : foldFind(find.trim());
   const shownSeverity = touring ? undefined : severity;
+  /** その深刻度の苦情を持つか */
+  const hasSeverity = (entry: TemplateEntry, value: ProblemSeverity): boolean => entry.problems.some((problem) => problem.severity === value);
   const listed = shownTemplates.filter(
     (entry) =>
       (query === "" || foldFind(`${entry.name} ${entry.description} ${entry.when}`).includes(query)) &&
-      (shownSeverity === undefined || entry.problems.some((problem) => problem.severity === shownSeverity)),
+      (shownSeverity === undefined || hasSeverity(entry, shownSeverity)),
   );
-  /** 件数の要約の1つ。押すと、その深刻度の苦情を持つテンプレートだけに絞る（もう1度押すと外す） */
-  const severityButton = (value: ProblemSeverity, label: string, n: number): JSX.Element => (
+  /** 深刻度で絞るボタン。件数はその深刻度の苦情を持つテンプレートの数。押すと絞り、もう1度押すと外す */
+  const severityButton = (value: ProblemSeverity, label: string): JSX.Element => (
     <button
       type="button"
       className={shownSeverity === value ? "action small on" : "action small"}
@@ -175,7 +177,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         }
       }}
     >
-      {`${label}${n}件`}
+      {`${label}${shownTemplates.filter((entry) => hasSeverity(entry, value)).length}件`}
     </button>
   );
   /** 案内が指すテンプレート（いま見えている一覧の最初の1件）。`data-tour`はこの1件にだけ付く */
@@ -316,9 +318,9 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                   }
                 }}
               />{" "}
-              {severityButton("error", "errorあり", shownTemplates.filter((entry) => entry.problems.some((p) => p.severity === "error")).length)}{" "}
-              {severityButton("warn", "warnあり", shownTemplates.filter((entry) => entry.problems.some((p) => p.severity === "warn")).length)}{" "}
-              {severityButton("info", "infoあり", shownTemplates.filter((entry) => entry.problems.some((p) => p.severity === "info")).length)}
+              {severityButton("error", "errorあり")}{" "}
+              {severityButton("warn", "warnあり")}{" "}
+              {severityButton("info", "infoあり")}
             </div>
           )}
           {layer === undefined ? (
