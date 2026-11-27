@@ -26,6 +26,7 @@ import { Problems } from "./Problems.js";
 import { Code } from "../shared/Code.js";
 import { layerLabel } from "./text.js";
 import { historyKey } from "../shared/keys.js";
+import { graphMaximized } from "../shared/Maximize.js";
 
 /** 直して読ませるまでの待ち（ミリ秒）。打つたびに実行ファイルを呼ばない */
 const CHECK_DELAY_MS = 300;
@@ -235,7 +236,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   };
 
   onKey.current = (event: KeyboardEvent): void => {
-    const moved = busy ? undefined : historyKey(event);
+    // 保存中・閉じる確認の間・図を全画面にしている間（見えない欄）は直さない
+    const moved = busy || confirmClose || graphMaximized() ? undefined : historyKey(event);
     if (moved === "undo" && canUndo(history)) {
       event.preventDefault();
       travel(undo(history, tpl));
