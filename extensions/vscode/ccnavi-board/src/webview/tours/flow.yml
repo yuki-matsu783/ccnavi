@@ -595,7 +595,7 @@ courses:
         scene: {doc: main, dirty: true}
       - target: tour
         title: 案内
-        body: ヘッダ右上の「?」を押すと、基本の案内と、使い方ごとの案内を選べます。
+        body: ヘッダ右上の「? 使い方」を押すと、基本の案内と、使い方ごとの案内を選べます。
         scene: {doc: main}
 
   - id: build

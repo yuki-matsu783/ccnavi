@@ -318,7 +318,7 @@ async function walkTour(dom: DomPage): Promise<string[]> {
 test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後まで進めると閉じてtourDoneを返す。ヘッダ右上の ? からもう一度出せる", async () => {
   const dom = await openWorkflow();
   try {
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "? 使い方");
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();

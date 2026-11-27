@@ -242,7 +242,7 @@ export function TourButton({ courses, onPick }: { readonly courses: readonly Tou
         aria-expanded={many ? open : undefined}
         onClick={click}
       >
-        ?
+        <span aria-hidden="true">?</span> 使い方
       </button>
     </>
   );

@@ -21,7 +21,7 @@ async function startCourse(dom: DomPage, id: string): Promise<void> {
 test("CB-D321 プロジェクト管理画面に「?」があり、初回の案内の依頼で基本の案内が始まる。閉じたらtourDoneを返す", async () => {
   const dom = await openProjects([row()]);
   try {
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "? 使い方");
     await dom.send({ type: "tour" });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, def.courses[0].steps[0].title);

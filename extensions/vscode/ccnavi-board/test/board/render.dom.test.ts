@@ -618,3 +618,15 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
   }
 });
 
+test("CB-D1276 フェーズ行の子が2つ以上なら先頭と件数を出し、全部はツールチップで見せる。取り消しのバッジは打ち消し線を引かない", async () => {
+  const page = await openBoard(fixture());
+  try {
+    const tickets = page.all(".phase-tickets").find((el) => (el.textContent ?? "").includes("ほか"));
+    assert.ok(tickets, "子が2つ以上のフェーズ行が無い");
+    assert.match(tickets.textContent ?? "", /^i0001-02-02 ほか2件$/);
+    assert.equal(tickets.getAttribute("title"), "i0001-02-02, i0001-02-04, i0001-02-05");
+  } finally {
+    await page.close();
+  }
+  assert.doesNotMatch(css(), /\.status-cancel \{[^}]*line-through/);
+});

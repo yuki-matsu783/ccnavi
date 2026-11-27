@@ -682,7 +682,7 @@ test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り
   try {
     assert.ok(dom.one("#tab-hooks").classList.contains("active"));
     // 案内の入口は ? 1文字で、ヘッダ（ツールバー）の最後の子。位置はTour.cssが6画面とも右上に揃える
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "? 使い方");
     await dom.send({ type: "tour" });
     await dom.settle();
     const titles: string[] = [];

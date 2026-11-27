@@ -19,7 +19,7 @@
 #   draft下書きの最初の1件
 #   handoff         「取り込み待ちを開く」
 #   sum / sum-pick / sum-count / sum-table統合結果の枠 / 選ぶ欄 / 件数 / 表
-#   tour            「?」
+#   tour            「? 使い方」
 screen: templates
 
 sample:
@@ -279,7 +279,7 @@ courses:
         scene: {}
       - target: tour
         title: 案内
-        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        body: ヘッダ右上の「? 使い方」を押すと、基本の案内と、使い方ごとの案内を選べます。
         scene: {}
 
   - id: how-drafts-flow

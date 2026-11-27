@@ -413,7 +413,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
   const dom = await openBoard();
   try {
     // 案内の入口は ? 1文字で、ヘッダ（ツールバー）の最後の子。位置はTour.cssが6画面とも右上に揃える
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "? 使い方");
     assert.equal(dom.all(".tour").length, 0, "頼まれるまでは出さない");
     await dom.send({ type: "tour" });
     await dom.settle();

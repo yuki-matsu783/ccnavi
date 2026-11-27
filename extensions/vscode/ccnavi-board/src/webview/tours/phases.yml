@@ -20,7 +20,7 @@
 #   target / path / dirty / open-file / changed / save / lock設定の切り替え / ファイルの場所 / 未保存の印 / 「エディタで開く」 / 外の変更の帯 / 保存 / 作業中の文
 #   phases / phase-count / add / help / help-panel / find / status定義の一覧 / 件数 / 「＋ 定義を追加」 / 「ヘルプ」 / ヘルプの説明 / 絞り込みの欄 / 下の状態の文
 #   phase-row / phase-id / phase-title / phase-kind / phase-review / phase-scope / phase-deliverables / phase-more / phase-agent / phase-when開いた定義の中
-#   tour   「?」
+#   tour   「? 使い方」
 screen: phases
 
 sample:
@@ -322,7 +322,7 @@ courses:
         body: 細かい説明はここから開けます。
       - target: tour
         title: 案内
-        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        body: ヘッダ右上の「? 使い方」を押すと、基本の案内と、使い方ごとの案内を選べます。
 
   - id: how-phase-works
     title: 定義が、保存から計画・承認でどう使われるかを値の例で知りたいとき

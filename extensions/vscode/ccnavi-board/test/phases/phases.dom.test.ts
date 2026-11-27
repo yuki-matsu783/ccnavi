@@ -513,7 +513,7 @@ test("CB-D92 細かい説明はヘルプを押したときだけ出す。ヘッ�
   try {
     assert.equal(dom.all("#help").length, 0, "ヘルプを押すまで説明は出さない");
     // 案内の入口は ? 1文字で、ヘッダ（ツールバー）の最後の子。位置はTour.cssが全画面とも右上に揃える
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "? 使い方");
     dom.click(dom.one('[data-action="help"]'));
     await dom.settle();
     assert.match(dom.one("#help").textContent ?? "", /順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップにafterで先行を指定します/);

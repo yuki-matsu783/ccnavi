@@ -230,7 +230,11 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
           <span className="phase-dot" aria-hidden="true" />
           <span className="phase-name">
             <span className="phase-label">{p.label}</span>
-            {p.tickets.length > 0 ? <span className="phase-tickets">{p.tickets.join(", ")}</span> : null}
+            {p.tickets.length > 0 ? (
+              <span className="phase-tickets" title={p.tickets.join(", ")}>
+                {phaseTicketsText(p.tickets)}
+              </span>
+            ) : null}
           </span>
           <span className="phase-status">{p.status}</span>
           {p.manual !== "" ? <span className="phase-manual">{p.manual}</span> : null}
@@ -391,4 +395,12 @@ function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
       テンプレートの下書きを作る
     </button>
   );
+}
+
+/**
+ * フェーズ行の子の識別子。2つ以上なら先頭と件数にする（全部並べると行の幅で切れ、どこまで見えているか分からない）。
+ * 全部は`title`で見せ、子のカードは同じ列に並んでいる
+ */
+function phaseTicketsText(tickets: readonly string[]): string {
+  return tickets.length <= 1 ? tickets.join("") : `${tickets[0]} ほか${tickets.length - 1}件`;
 }

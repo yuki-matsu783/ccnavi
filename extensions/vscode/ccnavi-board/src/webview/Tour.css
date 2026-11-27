@@ -79,16 +79,16 @@
  * 6画面で同じ位置に出すため、ボタンの列には混ぜない。ツールバーはstickyなので、位置はツールバーが基準になる。
  * 右端はボタンの幅だけ空けて、ほかの操作と重ねない
  */
-.toolbar { padding-right: 34px; }
+.toolbar { padding-right: 88px; }
 
 .toolbar > .tour-button {
   position: absolute;
   top: 8px;
   right: 4px;
-  width: 22px;
   height: 22px;
-  padding: 0;
-  border-radius: var(--radius-round);
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
   border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
   background: transparent;
   color: var(--vscode-descriptionForeground);

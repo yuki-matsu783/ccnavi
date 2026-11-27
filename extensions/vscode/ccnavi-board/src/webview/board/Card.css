@@ -50,7 +50,8 @@
   white-space: normal; overflow: visible; overflow-wrap: anywhere;
 }
 /* 状態のバッジ。色だけに頼らず、言葉を必ず出す。文字と枠の色は文字用の色（`App.css`の`--board-*-text`）で、地に対して4.5:1以上。
-   ユーザ待ち（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ */
+   ユーザ待ち（承認待ち・レビュー待ち）は塗り、確認が要るもの（要確認）は警告の色、それ以外は枠だけ。
+   取り消しは点線の枠で見分ける（小さな文字に打ち消し線を引くと読みにくい） */
 .status {
   margin-left: auto; flex: 0 0 auto; white-space: nowrap;
   font-size: var(--font-xs); padding: 0 8px; border-radius: var(--radius-chip);
@@ -60,7 +61,7 @@
 .status-check { color: var(--board-warn-text); font-weight: 600; }
 .status-work { color: var(--vscode-foreground); }
 .status-done { color: var(--vscode-descriptionForeground); }
-.status-cancel { color: var(--vscode-descriptionForeground); text-decoration: line-through; }
+.status-cancel { color: var(--vscode-descriptionForeground); border-style: dashed; }
 /* 「親 <長い名前> / フェーズ名」はカードより長くなる。折り返して、はみ出さないようにする */
 .where, .stage { margin-top: 2px; min-width: 0; max-width: 100%; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; }
 .card-mr { margin-top: 2px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }

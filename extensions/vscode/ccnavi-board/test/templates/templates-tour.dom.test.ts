@@ -45,7 +45,7 @@ const names = (dom: DomPage): (string | null)[] => dom.all("li.template").map((l
 test("CB-D332 テンプレート管理画面に「?」があり、初回の依頼で基本の案内が始まる。閉じたらtourDoneを返す", async () => {
   const dom = await openTemplates();
   try {
-    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "?");
+    assert.equal(dom.one("header.toolbar > .tour-button:last-child").textContent, "? 使い方");
     await dom.send({ type: "tour" });
     await dom.settle();
     assert.equal(dom.one("#tour-title").textContent, def.courses[0].steps[0].title);

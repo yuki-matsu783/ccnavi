@@ -21,7 +21,7 @@
 #
 # 指す先（target）の印。図の中身は画面が実際のDOMに付ける（図の部品は共通なので触らない）。
 #   graphs図の領域全体controlsボタンの並びrelayout / revert / reload / save各ボタン
-#   summaryタイトルと未保存の印の並びdirty  「未保存」                   tour  「?」
+#   summaryタイトルと未保存の印の並びdirty  「未保存」                   tour  「? 使い方」
 #   status下の一言renumbered番号が変わるステップの一行problems理由の一覧
 #   changed外で変わった帯changed-diff差分の表adopt取り込むgone承認待ちから無くなった帯
 #   review-numbers / review-children / review-note保存の確かめの各欄
@@ -271,7 +271,7 @@ courses:
           保存したあとにエージェントが提案を変更すると、承認の画面に注意が出ます。
       - target: tour
         title: 案内
-        body: ヘッダ右上の ? を押すと、使い方ごとの案内（線のつなぎ変え・並列にする・保存できない理由・外で変わった提案への対応など）の一覧が開きます。
+        body: ヘッダ右上の「? 使い方」を押すと、使い方ごとの案内（線のつなぎ変え・並列にする・保存できない理由・外で変わった提案への対応など）の一覧が開きます。
 
   - id: reorder
     title: ステップの順序（after）をつなぎ変えたいとき

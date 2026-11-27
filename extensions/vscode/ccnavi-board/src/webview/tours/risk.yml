@@ -15,7 +15,7 @@
 #   factor-row / factor-id / factor-points / factor-kind / factor-value / factor-include / factor-exclude / factor-message / factor-buttons開いた項目の中
 #   save / missing / create保存 / ファイルが無いときの帯 / 「作る」ボタン
 #   sum / sum-pick / sum-levels / sum-table統合結果の枠 / 選ぶ欄 / 閾値 / 項目の表
-#   tour   「?」
+#   tour   「? 使い方」
 screen: risk
 
 sample:
@@ -113,7 +113,7 @@ courses:
         body: 保存すると、実行ファイルが検証し、通ればファイルに反映します。通らなければ、下に理由が出ます。
       - target: tour
         title: 案内
-        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        body: ヘッダ右上の「? 使い方」を押すと、基本の案内と、使い方ごとの案内を選べます。
 
   - id: how-score
     title: 点数とレベルが、どの値で決まるのかを例で知りたいとき

@@ -217,8 +217,8 @@ test("CB-T216 案内の ? は案内のある画面（プロジェクト管理画
   // プロジェクト管理画面と、案内を持たない取り込み待ち画面は、この検査から除く
   for (const name of screenNames().filter((n) => n !== "projects" && n !== "handoff")) {
     const style = flatStyle(`<style nonce="x">\n${screenStyle(name)}\n</style>`);
-    assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*width: 22px;/, `${name}の ? が右上に固定されていない`);
-    assert.match(style, /\.toolbar \{ padding-right: 34px; \}/, `${name}のツールバーが ? の幅を空けていない`);
+    assert.match(style, /\.toolbar > \.tour-button \{[^}]*position: absolute;[^}]*top: 8px;[^}]*right: 4px;[^}]*height: 22px;/, `${name}の ? が右上に固定されていない`);
+    assert.match(style, /\.toolbar \{ padding-right: 88px; \}/, `${name}のツールバーが ? の幅を空けていない`);
   }
 });
 

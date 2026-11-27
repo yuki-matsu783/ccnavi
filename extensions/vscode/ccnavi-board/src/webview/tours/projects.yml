@@ -8,7 +8,7 @@
 #   listワークスペース内のプロジェクトの一覧
 #   project / project-check最初のプロジェクトのカード / その検証の欄（プロジェクトが無いときは中ほどに出す）
 #   workspaceワークスペース（プロジェクト外）
-#   tour   「?」
+#   tour   「? 使い方」
 screen: projects
 
 diagrams:
@@ -284,7 +284,7 @@ courses:
         body: 一覧を更新します。cloneや移動をターミナルで済ませたあとに押します。
       - target: tour
         title: 案内
-        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        body: ヘッダ右上の「? 使い方」を押すと、基本の案内と、使い方ごとの案内を選べます。
 
   - id: how-clone
     title: cloneしてから一覧に出るまでの流れを、値の例で知りたいとき
