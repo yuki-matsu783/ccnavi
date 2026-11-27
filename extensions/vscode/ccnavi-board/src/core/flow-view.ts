@@ -55,7 +55,7 @@ export interface FlowTarget {
   readonly flow: FlowJson;
   readonly lock: FlowLock;
   /**
-   * 着手の前（承認待ちか、承認済みで未着手）か。エージェントへの依頼のボタンを出すかだけに使い、
+   * 着手の前（承認待ちか、承認済みで着手待ち）か。エージェントへの依頼のボタンを出すかだけに使い、
    * 保護には使わない（取り込みと保存を止めるのは錠。錠は実行ファイルの答えのまま）
    */
   readonly beforeStart: boolean;
@@ -99,12 +99,12 @@ export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult
 export function flowButtonLabel(flow: FlowJson, closed = false): string {
   if (flow.locked) {
     if (flow.lock_kind === "doing") {
-      return "フロー: 閲覧（着手中）";
+      return "フロー: 閲覧のみ（着手中）";
     }
-    return "フロー: 閲覧（レビュー中）";
+    return "フロー: 閲覧のみ（レビュー中）";
   }
   if (closed) {
-    return "フロー: 閲覧（終了済み）";
+    return "フロー: 閲覧のみ（終了済み）";
   }
   return flow.exists ? "フロー: 編集" : "フロー: 作成";
 }
@@ -114,7 +114,7 @@ export function flowButtonLabel(flow: FlowJson, closed = false): string {
 /**
  * 「エージェントにフローの作成を頼む」ボタンの言葉。出さないならundefined。
  *
- * 出すのは着手の前（承認待ち・承認済みで未着手）で、錠が掛かっていない（着手中・リンク・確認中でない）ときだけ。
+ * 出すのは着手の前（承認待ち・承認済みで着手待ち）で、錠が掛かっていない（着手中・リンク・確認中でない）ときだけ。
  * 着手中は取り込めないので、頼んでも使えない下書きができる。下書きが既に在れば「頼み直す」
  */
 export function requestLabel(state: {

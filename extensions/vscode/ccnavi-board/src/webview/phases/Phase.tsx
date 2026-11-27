@@ -160,7 +160,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
               <option value="inherit">親の範囲を引き継ぐ（inherit）</option>
-              <option value="globs">上限を指定する（globのリスト）</option>
+              <option value="globs">上限をパターン（glob）で指定する</option>
             </select>
             {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（区切りは半角の「,」です）")}
           </div>

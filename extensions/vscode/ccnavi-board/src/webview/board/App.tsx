@@ -241,97 +241,102 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               </span>
             </div>
             <div className="controls">
-              {shown.projects.length > 0 ? (
-                <label className="filter" data-tour="filter-project">
-                  プロジェクト
-                  <select id="project-filter" value={shownProject} onChange={(event) => change((now) => ({ ...now, project: event.target.value }))}>
-                    <option value="*">すべて</option>
-                    <option value="">ワークスペース（プロジェクト外）</option>
-                    {shown.projects.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+              {/* 絞り込みと操作は段を分ける。操作の段はボタンが3つだけなので、狭い幅でも主ボタン（承認）が次の行に落ちず、常に右端に出る */}
+              <div className="filters">
+                {shown.projects.length > 0 ? (
+                  <label className="filter" data-tour="filter-project">
+                    プロジェクト
+                    <select id="project-filter" value={shownProject} onChange={(event) => change((now) => ({ ...now, project: event.target.value }))}>
+                      <option value="*">すべて</option>
+                      <option value="">ワークスペース（プロジェクト外）</option>
+                      {shown.projects.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                {shownParents.length > 0 ? (
+                  <label className="filter" data-tour="filter-parent">
+                    親
+                    <select id="parent-filter" value={shownParent} onChange={(event) => change((now) => ({ ...now, parent: event.target.value }))}>
+                      <option value="*">すべて</option>
+                      {shownParents.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title === "" ? p.id : `${p.id} ${p.title}`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+                <label className="filter attention" data-tour="filter-attention" title={FILTER_LABELS.attentionTitle}>
+                  <input type="checkbox" id="attention-filter" checked={shownAttention} onChange={(event) => change((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
                 </label>
-              ) : null}
-              {shownParents.length > 0 ? (
-                <label className="filter" data-tour="filter-parent">
-                  親
-                  <select id="parent-filter" value={shownParent} onChange={(event) => change((now) => ({ ...now, parent: event.target.value }))}>
-                    <option value="*">すべて</option>
-                    {shownParents.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.title === "" ? p.id : `${p.id} ${p.title}`}
-                      </option>
-                    ))}
-                  </select>
+                <label className="filter archived" data-tour="filter-archived" title={FILTER_LABELS.archivedTitle}>
+                  <input type="checkbox" id="archived-filter" checked={shownArchived} onChange={(event) => {
+                      if (touring) {
+                        return;
+                      }
+                      const checked = event.target.checked;
+                      revealArchived.current = checked;
+                      setView((now) => ({ ...now, archived: checked }));
+                    }} /> {FILTER_LABELS.archived}
                 </label>
-              ) : null}
-              <label className="filter attention" data-tour="filter-attention" title={FILTER_LABELS.attentionTitle}>
-                <input type="checkbox" id="attention-filter" checked={shownAttention} onChange={(event) => change((now) => ({ ...now, attention: event.target.checked }))} /> {FILTER_LABELS.attention}
-              </label>
-              <label className="filter archived" data-tour="filter-archived" title={FILTER_LABELS.archivedTitle}>
-                <input type="checkbox" id="archived-filter" checked={shownArchived} onChange={(event) => {
+              </div>
+              <div className="actions">
+                <button
+                  type="button"
+                  className={refreshing ? "action busy" : "action"}
+                  data-action="refresh"
+                  data-tour="refresh"
+                  disabled={refreshing}
+                  aria-busy={refreshing ? "true" : undefined}
+                  onClick={() => {
                     if (touring) {
                       return;
                     }
-                    const checked = event.target.checked;
-                    revealArchived.current = checked;
-                    setView((now) => ({ ...now, archived: checked }));
-                  }} /> {FILTER_LABELS.archived}
-              </label>
-              <button
-                type="button"
-                className={refreshing ? "action busy" : "action"}
-                data-action="refresh"
-                data-tour="refresh"
-                disabled={refreshing}
-                aria-busy={refreshing ? "true" : undefined}
-                onClick={() => {
-                  if (touring) {
-                    return;
-                  }
-                  setRefreshing(true);
-                  post({ type: "refresh" });
-                }}
-              >
-                <span className="spin" aria-hidden="true" />
-                <span className="label">{refreshing ? "更新中…" : "更新"}</span>
-              </button>
-              <button
-                type="button"
-                className={mergeShown?.checking === true || mergePending ? "action busy" : "action"}
-                data-action="merge-check"
-                data-tour="merge-check"
-                disabled={mergeShown?.checking === true || mergePending}
-                aria-busy={mergeShown?.checking === true || mergePending ? "true" : undefined}
-                title="片付けの記録を持つ親のMRが、マージ済みかを確かめます（読むだけで、何も変えません）"
-                onClick={() => {
-                  if (touring) {
-                    return;
-                  }
-                  setMergePending(true);
-                  post({ type: "mergeCheck" });
-                }}
-              >
-                <span className="spin" aria-hidden="true" />
-                <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "MRの状況を確認"}</span>
-              </button>
-              <button
-                type="button"
-                className="action primary"
-                data-action="approve"
-                data-tour="approve"
-                disabled={visiblePending.length === 0}
-                onClick={() => {
-                  if (!touring) {
-                    post({ type: "approve", tickets: visiblePending, filtered: filtering });
-                  }
-                }}
-              >
-                承認待ち{visiblePending.length}件を承認
-              </button>
+                    setRefreshing(true);
+                    post({ type: "refresh" });
+                  }}
+                >
+                  <span className="spin" aria-hidden="true" />
+                  <span className="label">{refreshing ? "更新中…" : "更新"}</span>
+                </button>
+                <button
+                  type="button"
+                  className={mergeShown?.checking === true || mergePending ? "action busy" : "action"}
+                  data-action="merge-check"
+                  data-tour="merge-check"
+                  disabled={mergeShown?.checking === true || mergePending}
+                  aria-busy={mergeShown?.checking === true || mergePending ? "true" : undefined}
+                  title="片付けの記録を持つ親のMRが、マージ済みかを確かめます（読むだけで、何も変えません）"
+                  onClick={() => {
+                    if (touring) {
+                      return;
+                    }
+                    setMergePending(true);
+                    post({ type: "mergeCheck" });
+                  }}
+                >
+                  <span className="spin" aria-hidden="true" />
+                  <span className="label">{mergeShown?.checking === true || mergePending ? "確認中…" : "MRの状況を確認"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="action primary"
+                  data-action="approve"
+                  data-tour="approve"
+                  disabled={visiblePending.length === 0}
+                  onClick={() => {
+                    if (!touring) {
+                      post({ type: "approve", tickets: visiblePending, filtered: filtering });
+                    }
+                  }}
+                >
+                  承認待ち{visiblePending.length}件を承認
+                </button>
+              </div>
             </div>
           </ScreenHeader>
           {mergeShown !== undefined ? <MergeBand merge={mergeShown} board={shown} touring={touring} /> : null}

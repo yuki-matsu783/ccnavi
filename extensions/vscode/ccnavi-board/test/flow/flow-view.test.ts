@@ -48,14 +48,14 @@ test("CB-T226 ボードの「フロー」ボタンの識別子は、識別子に
   assert.equal(flowTicketOf({}), undefined);
 });
 
-test("CB-T227 カードのボタンの言葉は、在るか・錠の種類（実行ファイルの答え）で 作成 / 編集 / 閲覧（着手中 / レビュー中）", () => {
+test("CB-T227 カードのボタンの言葉は、在るか・錠の種類（実行ファイルの答え）で 作成 / 編集 / 閲覧のみ（着手中 / レビュー中）", () => {
   const base = { path: "/ws/.ccnavi/approved/flows/x.yml", rel: ".ccnavi/approved/flows/x.yml", tree: "/ws", linked: false, draft: null };
   assert.equal(flowButtonLabel({ ...base, exists: false, locked: false, lock_kind: null }), "フロー: 作成");
   assert.equal(flowButtonLabel({ ...base, exists: true, locked: false, lock_kind: null }), "フロー: 編集");
-  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "doing" }), "フロー: 閲覧（着手中）");
-  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "review" }), "フロー: 閲覧（レビュー中）");
+  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "doing" }), "フロー: 閲覧のみ（着手中）");
+  assert.equal(flowButtonLabel({ ...base, exists: true, locked: true, lock_kind: "review" }), "フロー: 閲覧のみ（レビュー中）");
   // 無いまま着手した子も、読むだけ
-  assert.equal(flowButtonLabel({ ...base, exists: false, locked: true, lock_kind: "doing" }), "フロー: 閲覧（着手中）");
+  assert.equal(flowButtonLabel({ ...base, exists: false, locked: true, lock_kind: "doing" }), "フロー: 閲覧のみ（着手中）");
 });
 
 test("CB-T228 錠は実行ファイルのflow.lockedをそのまま使う。親・ない子・欄のない子は引けない", () => {
