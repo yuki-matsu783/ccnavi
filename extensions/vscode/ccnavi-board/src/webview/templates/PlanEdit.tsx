@@ -198,7 +198,7 @@ function AfterPicks({ index, offset, after, onToggle }: { readonly index: number
   );
 }
 
-/** 末尾にステップを追加する。足したステップには前の末尾のステップが先行する（線は図で引き直せる） */
+/** 末尾にステップを追加する。追加したステップには前の末尾のステップが先行する（線は図で引き直せる） */
 function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part" | "template" | "types" | "onChange">): JSX.Element {
   const options = optionsFor(part, types, "");
   const [picked, setPicked] = useState("");

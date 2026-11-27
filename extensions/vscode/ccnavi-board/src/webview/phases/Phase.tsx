@@ -30,7 +30,7 @@ export interface PhaseProps {
   readonly disabled: boolean;
   readonly onToggle: () => void;
   readonly onToggleMore: (open: boolean) => void;
-  /** 欄に打った文字は`typing`（どの欄か）が付く。元に戻すで、同じ欄に続けて打った文字を1件にまとめるため */
+  /** 欄に打った文字には`typing`（どの欄か）が付く。元に戻す操作で、同じ欄に続けて打った文字を1件にまとめるために使う */
   readonly onChange: (next: PhaseForm, typing?: string) => void;
   readonly onRemove: () => void;
   /** 案内が指す行か。真のとき、行と欄に`data-tour`の印を付ける（印は画面に1つだけ。見本の最初の行にだけ付ける） */

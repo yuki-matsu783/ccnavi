@@ -168,7 +168,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       data-action="filter-severity"
       data-severity={value}
       aria-pressed={shownSeverity === value}
-      title={`この設定のテンプレートのうち、${label}を持つものだけを一覧に出します`}
+      title={`この設定のテンプレートのうち、${label}のものだけを一覧に出します`}
       onClick={() => {
         if (!tour.touring) {
           setSeverity(severity === value ? undefined : value);
@@ -368,7 +368,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
               ) : (
                 <>
                   <ul className="list">{listed.map((entry) => templateRow(entry))}</ul>
-                  {listed.length === 0 && <p className="empty">絞り込みにヒットするテンプレートがありません。語か深刻度の選択を外してください</p>}
+                  {listed.length === 0 && <p className="empty">絞り込みに一致するテンプレートがありません。語か深刻度の絞り込みを外してください。</p>}
                 </>
               )}
             </>

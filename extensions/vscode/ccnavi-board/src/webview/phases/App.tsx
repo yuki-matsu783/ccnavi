@@ -233,7 +233,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     }
   };
 
-  /** 定義を直す。直す前のコピーを履歴に積む。欄に打った文字は`typing`（どの欄か）で、続けて打ったものを1件にまとめる */
+  /** 定義を直す。直す前のコピーを履歴に積む。欄に打った文字には`typing`（どの欄か）を付け、続けて打った分を1件にまとめる */
   const editDraft = (next: Draft, open?: ReadonlySet<string>, typing?: string): void => {
     if (tour.touring) {
       return;
