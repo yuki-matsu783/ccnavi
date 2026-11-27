@@ -841,7 +841,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
 
 test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が1つだけでも出す", async () => {
   const targets = [
-    { kind: "workspace", name: "", label: "共通の設定" },
+    { kind: "workspace", name: "", label: "共通設定" },
     { kind: "self", name: "", label: "ワークスペース" },
     { kind: "project", name: "app:x", label: "プロジェクトapp:x" },
   ];
@@ -850,7 +850,7 @@ test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前
     const select = dom.one<HTMLSelectElement>("select#target");
     assert.deepEqual(
       [...select.options].map((o) => o.textContent),
-      ["共通の設定", "ワークスペース", "プロジェクトapp:x"],
+      ["共通設定", "ワークスペース", "プロジェクトapp:x"],
     );
     assert.equal(select.value, "workspace:");
     dom.change(select, "project:app:x");
@@ -874,7 +874,7 @@ test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄
     error: "ファイルを読み込めません",
     target: { kind: "project", name: "app" },
     targets: [
-      { kind: "workspace", name: "", label: "共通の設定" },
+      { kind: "workspace", name: "", label: "共通設定" },
       { kind: "self", name: "", label: "ワークスペース" },
       { kind: "project", name: "app", label: "プロジェクトapp" },
     ],

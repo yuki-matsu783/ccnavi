@@ -821,7 +821,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = validNewTemplateName(name) ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (file === undefined) {
-    postOpened(current, session, null, `「${name}」はテンプレートの名前に使えません。${NEW_TEMPLATE_NAME_RULE}。`);
+    postOpened(current, session, null, `「${name}」はテンプレートの名前に使えません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
   // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通のレイヤーにある名前も、
@@ -911,7 +911,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   const file = templateFile(root, where.layer, name);
   const named = dataOf(data);
   if (file === undefined || named === undefined || named.name !== name) {
-    reply("", "保存できません: テンプレートの名前が不正か、中身の名前と食い違っています");
+    reply("", "保存できません: テンプレートの名前が不正か、中身の名前と食い違っています。");
     return;
   }
   // 1. 書き出す本文を実行ファイルに読ませる。errorが1件でもあれば書かない

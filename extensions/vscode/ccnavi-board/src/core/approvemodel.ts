@@ -272,7 +272,8 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
       ? "承認済みになったチケットはありません。"
       : `承認済みにできたチケット（${placed.length}件）: ${written}。${failed}${sent}`;
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
-  return `承認（ccnavi user agree --yes）が${where}止まりました: ${reason.replace(/。$/, "")}。${what}${done}`;
+  const cause = reason.replace(/。$/, "");
+  return `承認（ccnavi user agree --yes）が${where}止まりました${cause === "" ? "" : `: ${cause}`}。${what}${done}`;
 }
 
 export type ResultParse =

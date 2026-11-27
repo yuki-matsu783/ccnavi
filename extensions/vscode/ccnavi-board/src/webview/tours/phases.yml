@@ -69,7 +69,7 @@ sample:
         title: 実装フィードバック対応
         review: true
         scope: inherit
-        when: フィードバック計画の最後に置き、ほかの対応をまとめる
+        when: フィードバック計画の最後に置き、ほかの対応がすべて先行する
   added:
     security-review:
       kind: work
@@ -516,7 +516,7 @@ courses:
         scene:
           open: design-feedback
       - target: phase-when
-        title: 最後に置いてまとめる
+        title: 最後に置いてほかの対応を受ける
         body: 「使う場面」に、フィードバック計画のどこに置くかを入力します。見本の実装フィードバック対応は最後に置き、ほかの対応がすべて先行するようにしています。互いに独立した対応は、最後の1ステップに合流させるか、一直線に並べてください。
         scene:
           open: implement-feedback

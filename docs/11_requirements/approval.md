@@ -3,7 +3,7 @@ type: requirements
 title: ccnavi 要件書 2.9 チケットの承認
 description: チケットの承認（2.9）と実績で測るリスク（2.9.1）についての要件
 tags: [design-doc, approval, ticket]
-keywords: [要件, REQ-APV, REQ-RSK, 承認, チケット, 承認済み, リスク, 実績, チケット管理画面]
+keywords: [要件, REQ-APV, REQ-RSK, 承認, チケット, 承認済み, リスク, 実績, チケット管理画面, 承認ボード]
 ---
 
 [ccnavi 要件書](../10_requirements.md) に戻る。

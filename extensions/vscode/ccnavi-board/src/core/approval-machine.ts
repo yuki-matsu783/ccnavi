@@ -404,7 +404,7 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
                   kind: "warn",
                   text:
                     `承認済みチケットは、まだコミットされていません。${PUSH_APPROVED_SCRIPT}が入っていないので、` +
-                    "導入スクリプト（scripts/ccnavi-setup.sh）を実行して入れてください。",
+                    "ccnaviの根（配布物を展開したフォルダか、cloneしたリポジトリ）で `sh scripts/ccnavi-setup.sh <ワークスペースルート>` を実行して入れてください。",
                 },
             { kind: "refresh" },
           ];
@@ -676,7 +676,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
         overlay: {
           kind: "prompt",
           title,
-          note: `${note}${HANDOVER_NOTE}${issued}`,
+          note: issued === "" ? `${note}${HANDOVER_NOTE}` : `${note}${HANDOVER_NOTE} ${issued}`,
           prompt: value.prompt,
           what: "対応方針のプロンプト",
           // 続きの子が起きたときのプロンプトは取り返せない。決め直しへ戻れるとき（子が起きていない）は被せてよい

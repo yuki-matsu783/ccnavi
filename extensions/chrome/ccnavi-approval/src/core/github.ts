@@ -136,7 +136,7 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
   const reset = Number(header(res, "x-ratelimit-reset"));
   if (!(res.status === 429 || (res.status === 403 && (after !== "" || remaining === "0")))) return null;
   const seconds = after !== "" && /^\d+$/.test(after) ? Number(after) : null;
-  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `（制限の解除は ${new Date(reset * 1000).toLocaleString("ja-JP")} ごろ）` : "";
+  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `（制限の解除は ${new Date(reset * 1000).toISOString()} ごろ）` : "";
   const kind = after !== "" ? "レート制限（セカンダリ）" : "レート制限";
   return {
     text: `GitHub の${kind}にかかりました（${res.status}）。${seconds !== null ? `${seconds} 秒以上` : "少し"}待ってから${when}、ボードを更新してください`,

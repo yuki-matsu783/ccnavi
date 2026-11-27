@@ -405,6 +405,10 @@ export async function runHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan:
   }
 }
 
+/** issue の検索が上限件数で打ち切られたときの注意（画面の結果と警告で同じ文を使う） */
+export const SEARCH_TRUNCATED_NOTE =
+  "既に作成済みの issue を上限件数まで検索しましたが、見つかりませんでした。検索しきれていないため、作成済みの issue があった場合は重複しています";
+
 const STEP_LABEL: Record<HostStepName, string> = {
   plan: "書き込む内容の検査",
   issue: "issue の作成",
@@ -426,9 +430,9 @@ export function describeHostResult(r: HostStepResult): string {
   if (r.replied.length > 0) done.push(`返信 ${r.replied.length} 件`);
   if (r.resolved.length > 0) done.push(`解決 ${r.resolved.length} 件`);
   if (r.commented) done.push("MR へのコメント");
-  const summary = (done.length > 0 ? `済んだこと：${done.join("、")}` : "ホストには何も書いていません") + (r.searchTruncated ? "。既に作成済みの issue を上限件数まで検索しましたが、見つかりませんでした。検索しきれていないため、作成済みの issue があった場合は重複しています" : "");
+  const summary = (done.length > 0 ? `済んだこと：${done.join("、")}` : "ホストには何も書いていません") + (r.searchTruncated ? `。${SEARCH_TRUNCATED_NOTE}` : "");
   if (r.ok || !r.failed) return summary;
   const f = r.failed;
-  const retry = f.step === "plan" ? "" : "。MR を読み直して残った指摘を決め直すと、続きから再開します（作成済みの issue と投稿済みの返信は重複しません）";
+  const retry = f.step === "plan" ? "" : "。MR を読み直して残った指摘を決め直すと、続きから再開します（同じ印の issue は作り直さず、返信も同じ印があれば付け直しません）";
   return `${STEP_LABEL[f.step]}で止まりました${f.key ? `（${f.key}）` : ""}：${f.reason}。${summary}${retry}`;
 }

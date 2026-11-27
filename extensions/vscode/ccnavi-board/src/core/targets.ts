@@ -44,6 +44,6 @@ export function targetOptions(board: BoardJson | undefined, commonKind: string |
 }
 
 /** 一覧に無い対象の表記。`project`と`self`以外は共通設定（呼び名は画面ごとに違うが、指すものは同じ） */
-function targetLabel(kind: string, name: string): string {
+export function targetLabel(kind: string, name: string): string {
   return kind === "project" ? `プロジェクト${name}` : kind === "self" ? "ワークスペース" : "共通設定";
 }
