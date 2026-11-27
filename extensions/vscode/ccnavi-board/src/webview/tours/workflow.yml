@@ -10,7 +10,7 @@
 #
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。書かなければanswer: openの素の画面。
 #   answer描く答えの名前（sample.answersのキー）。既定はopen
-#   refused断られた線の理由をツールバーの最後の行に出す。この名前の答えのrefusedを読む（図はanswerのまま）
+#   refused断られた線の理由をツールバーの最後の行に出す（この名前の答えのrefusedを読む。図はanswerのまま）
 #   checking真なら、線を変えてccnaviの答えを待っている間の画面（一言を出し、線を変えられない）
 #   changed外で変わった提案の名前（答えのキー）。帯と、answerのbaseとの差分を出す
 #   diff      changedのとき、差分の表を出すか（既定は出す。偽なら帯の文だけ）
