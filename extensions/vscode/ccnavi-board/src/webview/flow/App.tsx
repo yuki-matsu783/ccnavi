@@ -715,7 +715,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           </button>
         </div>
       )}
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: touring ? "" : (status?.text ?? ""), error: !touring && status?.error === true }}>
         <div className="summary">
           <span className="flow-ticket">
             <strong>{shownPage.ticket}</strong> {shownPage.title}
@@ -868,9 +868,6 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       )}
       {!touring && requestText !== undefined && <RequestText prompt={requestText} onClose={() => setRequestText(undefined)} />}
       {touring && sc.requestText && <RequestText prompt={SAMPLE.requestPrompt} onClose={NOOP} />}
-      <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{touring ? "" : status?.text ?? ""}</span>
-      </footer>
     </>
   );
 }

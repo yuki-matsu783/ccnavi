@@ -416,7 +416,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           )}
         </section>
       )}
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: shownStatus?.text ?? "", error: shownStatus?.error === true }}>
         <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
             <strong>{shownTicket}</strong> の作業・レビュー計画の順序
@@ -502,9 +502,6 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         )}
       </div>
       {shownReview && <Review ticket={shownTicket} answer={shownAnswer} focus={!touring} onConfirm={confirmSave} onCancel={() => (touring ? undefined : setReview(false))} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
-        <span id="status">{shownStatus?.text ?? ""}</span>
-      </footer>
       {touring ? <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} /> : null}
     </>
   );

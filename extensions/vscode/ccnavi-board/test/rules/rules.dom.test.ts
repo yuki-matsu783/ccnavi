@@ -463,7 +463,8 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "錠が掛かっていれば保存は押せない");
     await dom.send({ type: "failed", message: "--lintがerrorを報告した" });
     assert.equal(dom.one("#status").textContent, "--lintがerrorを報告した");
-    assert.ok(dom.one("#status").closest(".foot")?.classList.contains("error"));
+    assert.ok(dom.one("#status").classList.contains("error"));
+    assert.ok(dom.one("#status").closest("header.toolbar"), "一言はツールバーの中に出る");
   } finally {
     await dom.close();
   }
@@ -474,9 +475,7 @@ test("CB-D1223 noticeは赤にせずに一言を出す（期待する判定の�
   try {
     await dom.send({ type: "notice", message: "期待する判定のファイルがまだありません: x.yml。" });
     assert.equal(dom.one("#status").textContent, "期待する判定のファイルがまだありません: x.yml。");
-    const foot = dom.one("#status").closest(".foot");
-    assert.ok(foot, "足元の枠がある");
-    assert.ok(!foot.classList.contains("error"));
+    assert.ok(!dom.one("#status").classList.contains("error"));
   } finally {
     await dom.close();
   }
@@ -1367,12 +1366,12 @@ test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見
     await toStep(dom, "save-error", 1);
     assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でエラーが見つかりました/);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
-    assert.ok(dom.one("footer").classList.contains("error"));
+    assert.ok(dom.one("#status").classList.contains("error"));
     await toStep(dom, "save-error", 2);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読むステップの続きで消えた");
     await toStep(dom, "save-error", 4);
     assert.equal(dom.one("#status").textContent, "", "エラーのステップを過ぎても残っている");
-    assert.equal(dom.one("footer").classList.contains("error"), false);
+    assert.equal(dom.one("#status").classList.contains("error"), false);
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.one("#status").textContent, "");

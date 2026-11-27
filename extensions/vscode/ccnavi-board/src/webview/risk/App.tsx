@@ -360,7 +360,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: touring ? "" : (status?.text ?? ""), error: !touring && status?.error === true }}>
         <div className="summary">
           <TargetSelect
             target={touring ? undefined : page?.target}
@@ -529,11 +529,6 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         />
       )}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
-        <span id="status">
-          <Code text={touring ? "" : (status?.text ?? "")} />
-        </span>
-      </footer>
     </>
   );
 }

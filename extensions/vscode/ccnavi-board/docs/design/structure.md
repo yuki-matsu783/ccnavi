@@ -218,6 +218,7 @@ src/
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
     shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
+    shared/StatusLine.tsx 直前の操作の一言の行（ScreenHeader の status に渡すと、貼り付くツールバーの最後の行に出る。error は赤）
     shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク・フェーズ管理が置く。直前の 1 行だけ覚える）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
     shared/Maximize.css Maximize.tsx の CSS。図の枠は isolation で内側の z-index を外へ及ぼさない

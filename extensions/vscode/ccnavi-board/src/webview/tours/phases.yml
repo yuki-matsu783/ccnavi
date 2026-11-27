@@ -13,7 +13,7 @@
 #   add末尾に足す行。blank（「＋ 定義を追加」を押した直後の空の行）かfilled（sample.addedを書いた行）。足した行を開き、phase-* はその行に付く
 #   dirty未保存の印を出し、保存を押せる状態にする
 #   locked作業中のチケットがある状態（lockの文を出し、保存を止める）
-#   error保存の検証が通らなかった文（error）を下に出す
+#   error保存の検証が通らなかった文（error）をツールバーの一言の行に出す
 #   changedファイルが外で変わった帯を出す
 #   helpヘルプの説明を開く
 # `target:`の印（画面のdata-tour）:
@@ -587,7 +587,7 @@ courses:
           dirty: true
       - target: status
         title: 通らなかったとき
-        body: 検証が通らなければ、保存せずに下へ理由を出します。検証に通らない例は、識別子に使えないid、重複したタイトル、feedbackの定義でreviewをfalseにしたことです。同じidが2つあるときは、画面が先に止めます。
+        body: 検証が通らなければ、保存せずに、ツールバーのすぐ下の行へ理由を出します。検証に通らない例は、識別子に使えないid、重複したタイトル、feedbackの定義でreviewをfalseにしたことです。同じidが2つあるときは、画面が先に止めます。
         scene:
           dirty: true
           error: true

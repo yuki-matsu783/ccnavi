@@ -543,7 +543,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </button>
       </div>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: shownStatus?.text ?? "", error: shownStatus?.error === true }}>
         <div className="summary" data-tour="target">
           <TargetSelect
             target={touring ? undefined : page?.target}
@@ -772,11 +772,6 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
-        <span id="status">
-          <Code text={shownStatus?.text ?? ""} />
-        </span>
-      </footer>
     </>
   );
 }

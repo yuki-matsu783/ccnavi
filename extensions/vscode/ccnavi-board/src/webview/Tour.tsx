@@ -16,6 +16,7 @@ import { ESCAPE_LAYER, useEscape } from "./useEscape.js";
 import { INTRO_ID, type DiagramDef, type Scene, type TourDef } from "../core/tour-def.js";
 import { placeBubble, type Rect } from "../core/tour-place.js";
 import { SequenceDiagram } from "./shared/SequenceDiagram.js";
+import { StatusLine, type StatusText } from "./shared/StatusLine.js";
 
 export interface TourStep {
   /** 指す先。`document.querySelector`に渡す */
@@ -121,10 +122,22 @@ const DIAGRAM_BUBBLE_WIDTH = 580;
  * ツールバー（`<header className="toolbar">`）。左に画面ごとの中身（`children`）、右端に「?」（`TourButton`）を置く。
  * 「?」がツールバーの最後の子であることは変えない
  */
-export function ScreenHeader({ courses, onPick, children }: { readonly courses: readonly TourCourse[]; readonly onPick: (course: string) => void; readonly children: ReactNode }): JSX.Element {
+export function ScreenHeader({
+  courses,
+  onPick,
+  status,
+  children,
+}: {
+  readonly courses: readonly TourCourse[];
+  readonly onPick: (course: string) => void;
+  /** 直前の操作の一言。渡した画面だけ、ツールバーの最後の行に出す（`shared/StatusLine.tsx`） */
+  readonly status?: StatusText;
+  readonly children: ReactNode;
+}): JSX.Element {
   return (
     <header className="toolbar">
       {children}
+      {status !== undefined && <StatusLine status={status} />}
       <TourButton courses={courses} onPick={onPick} />
     </header>
   );

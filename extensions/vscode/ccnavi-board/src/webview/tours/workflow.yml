@@ -10,7 +10,7 @@
 #
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。書かなければanswer: openの素の画面。
 #   answer描く答えの名前（sample.answersのキー）。既定はopen
-#   refused断られた線の理由を下の一行に出す。この名前の答えのrefusedを読む（図はanswerのまま）
+#   refused断られた線の理由をツールバーの一言の行に出す。この名前の答えのrefusedを読む（図はanswerのまま）
 #   checking真なら、線を変えてccnaviの答えを待っている間の画面（一言を出し、線を変えられない）
 #   changed外で変わった提案の名前（答えのキー）。帯と、answerのbaseとの差分を出す
 #   diff      changedのとき、差分の表を出すか（既定は出す。偽なら帯の文だけ）
@@ -452,7 +452,7 @@ courses:
         scene: { answer: locked-open }
       - target: status
         title: ccnaviが断る線
-        body: 引けた線でも、ccnaviが番号を振り直せないと断ることがあります。線は引く前の図のままで、断った理由が下の一行に出ます。この例は、子チケットが承認された番号を動かさずに番号を振れない場合です。
+        body: 引けた線でも、ccnaviが番号を振り直せないと断ることがあります。線は引く前の図のままで、断った理由がツールバーのすぐ下の行に出ます。この例は、子チケットが承認された番号を動かさずに番号を振れない場合です。
         scene: { answer: locked-open, refused: unpackable }
       - target: notes-plan
         title: 終端に届かないステップ

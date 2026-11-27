@@ -777,8 +777,8 @@ courses:
         body: 保存を押すと、実行ファイルの--lintでルール全体を検証し、通ればファイルに反映します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるとき、読み込んだあとにファイルが外で変わったときも、保存は止まります。
         scene: { tab: rules }
       - target: status
-        title: 理由は下に出る
-        body: '止まった理由は画面の下に出ます。「設定の検証（--lint）でエラーが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
+        title: 理由はツールバーのすぐ下に出る
+        body: '止まった理由は、ツールバーのすぐ下の行に赤で出ます。一覧をスクロールしても見えたままです。「設定の検証（--lint）でエラーが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
         scene: { tab: rules, error: true }
       - target: rule-db-migrate
         title: idで直す行を探す

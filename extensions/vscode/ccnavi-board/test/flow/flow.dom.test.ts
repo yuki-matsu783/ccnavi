@@ -82,7 +82,7 @@ test("CB-D108 ファイルがなければ雛形を見せ、そのまま保存で
     // 拡張ホストが断った（錠を聞き直したら着手中だった）
     await dom.send({ type: "failed", message: lockedReason("i0001-01-01") });
     assert.match(dom.one("#status").textContent ?? "", /着手中かレビュー中のため、フローを変更できません/);
-    assert.ok(dom.one(".foot").classList.contains("error"));
+    assert.ok(dom.one("#status").classList.contains("error"));
   } finally {
     await dom.close();
   }

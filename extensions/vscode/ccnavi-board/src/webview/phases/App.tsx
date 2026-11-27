@@ -409,7 +409,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: shownStatus?.text ?? "", error: shownStatus?.error === true }}>
         <div className="summary">
           <span data-tour="target">
             <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
@@ -550,11 +550,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       </section>
       {common.length > 0 && <CommonList common={common} />}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
-        <span id="status" data-tour="status">
-          <Code text={shownStatus?.text ?? ""} />
-        </span>
-      </footer>
     </>
   );
 }
