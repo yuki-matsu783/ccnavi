@@ -40,6 +40,7 @@ import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.
 import { sameData } from "./core/template-edit.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
+import { dirtyTitle } from "./core/save-gate.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
@@ -89,6 +90,8 @@ interface PanelState {
   tmpDir?: string;
   /** 編集欄を開いている番号。閉じていればundefined。開いている間だけ、チケットが動いたら錠を取り直して知らせる */
   editing?: number;
+  /** 編集欄の未保存のコピー（画面の`editDirty`）。タブを閉じたあとに、YAMLで開くかを聞くために持つ */
+  unsaved?: Unsaved;
   /** 作業中の錠の監視（チケットの置き場）と、取り直しの待ち・番号 */
   lockWatchers: vscode.FileSystemWatcher[];
   lockTimer?: NodeJS.Timeout;
@@ -98,6 +101,13 @@ interface PanelState {
    * 実行ファイルに聞く間に別の対象へ切り替わると、前の対象の答えが後から届くため
    */
   seq: number;
+}
+
+/** 未保存の編集のコピー */
+interface Unsaved {
+  readonly name: string;
+  /** 画面の`toData`の形 */
+  readonly data: unknown;
 }
 
 /** 開いているパネル。種類ごとに1枚 */
@@ -237,6 +247,7 @@ function registerPanelHandlers(current: PanelState): void {
   });
 
   panel.onDidDispose(() => {
+    askUnsaved(current.unsaved);
     if (current.timer !== undefined) {
       clearTimeout(current.timer);
     }
@@ -409,6 +420,8 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     return;
   }
   if (message.type === "ready") {
+    // 作り直された画面には編集欄が無い（未保存のコピーも持たない）
+    setUnsaved(current, undefined);
     // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
     // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
     // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
@@ -480,7 +493,16 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     case "editClose": {
       if (current.editing === message.session) {
         current.editing = undefined;
+        setUnsaved(current, undefined);
       }
+      return;
+    }
+    case "editDirty": {
+      if (current.editing !== message.session) {
+        return;
+      }
+      const named = message.data === null ? undefined : dataOf(message.data);
+      setUnsaved(current, named === undefined ? undefined : { name: named.name, data: message.data });
       return;
     }
     case "editCheck": {
@@ -519,6 +541,8 @@ function asMessage(message: unknown): TemplatesMessage | undefined {
       return typeof m.session === "number" && typeof m.name === "string" ? { type: "editNew", session: m.session, name: m.name } : undefined;
     case "editClose":
       return typeof m.session === "number" ? { type: "editClose", session: m.session } : undefined;
+    case "editDirty":
+      return typeof m.session === "number" ? { type: "editDirty", session: m.session, data: m.data ?? null } : undefined;
     case "editCheck":
       return typeof m.session === "number" && typeof m.seq === "number" ? { type: "editCheck", session: m.session, seq: m.seq, data: m.data } : undefined;
     case "editSave":
@@ -553,6 +577,37 @@ function dataOf(data: unknown): { readonly name: string } | undefined {
   }
   const name = (data as { name?: unknown }).name;
   return typeof name === "string" ? { name: name.trim() } : undefined;
+}
+
+function setUnsaved(current: PanelState, unsaved: Unsaved | undefined): void {
+  current.unsaved = unsaved;
+  if (alive(current)) {
+    current.panel.title = dirtyTitle(TITLE, unsaved !== undefined);
+  }
+}
+
+/**
+ * 未保存のままタブを閉じた。Webviewは閉じるのを止められない（`onDidDispose`は閉じた後に呼ばれる）ので、
+ * 閉じた後に、編集を名前の無いYAMLのエディタで開くかを聞く。ファイルには書かない
+ */
+function askUnsaved(unsaved: Unsaved | undefined): void {
+  if (unsaved === undefined) {
+    return;
+  }
+  const asYaml = "YAMLで開く";
+  void vscode.window
+    .showWarningMessage(
+      `${unsaved.name === "" ? "テンプレート" : `テンプレート「${unsaved.name}」`}を未保存のまま閉じました。編集をYAMLで開きますか？`,
+      { modal: true, detail: "名前の無いエディタで開き、ファイルには書きません。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
+      asYaml,
+      "破棄する",
+    )
+    .then(async (choice) => {
+      if (choice === asYaml) {
+        const document = await vscode.workspace.openTextDocument({ language: "yaml", content: yamlText(unsaved.data) });
+        await vscode.window.showTextDocument(document);
+      }
+    });
 }
 
 /** 開いている対象に掛ける作業中の錠。確かめられなければ掛かった錠にする */

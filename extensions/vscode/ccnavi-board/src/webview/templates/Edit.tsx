@@ -121,6 +121,12 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   }, [tpl, touched]);
   const dirty = created || key !== savedKey;
   const fresh = checked.key === key;
+  // 未保存の間は中身のコピーを拡張ホストに覚えさせる（タブのタイトルの「●」と、未保存のままタブを閉じたときにYAMLで開くため）
+  // 新規は保存するまで`dirty`のままだが、まだ何も入力していない雛形は失うものが無いので覚えさせない
+  const unsaved = created ? touched : dirty;
+  useEffect(() => {
+    post({ type: "editDirty", session, data: unsaved && tpl !== undefined ? toData(tpl) : null });
+  }, [unsaved, key, session]);
 
   // 拡張ホストの答え（読ませた結果・保存の結果）。自分の番号のものだけ受ける
   useEffect(() => {

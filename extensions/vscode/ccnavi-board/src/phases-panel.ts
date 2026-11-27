@@ -311,7 +311,7 @@ function alive(current: PanelState): boolean {
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } = settingsPanel<PhasesData, PhasesTarget, Loaded, ToPhases>({
+const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, setDirty } = settingsPanel<PhasesData, PhasesTarget, Loaded, ToPhases>({
   accepts: true,
   alive,
   release: (current) => {
@@ -328,6 +328,7 @@ const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget } =
   loading: (current) => ({ kind: "loading", text: loadingText(whatOf(current.target)) }),
   sameTarget,
   targetLabel: targetLabelOf,
+  title: TITLE,
 });
 
 /**
@@ -444,12 +445,12 @@ async function handleMessage(current: PanelState, message: PhasesMessage | undef
     return;
   }
   if (message.type === "dirty") {
-    current.dirty = message.dirty;
+    setDirty(current, message.dirty);
     return;
   }
   if (message.type === "ready") {
     // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
-    current.dirty = false;
+    setDirty(current, false);
     // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
     // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
     // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため

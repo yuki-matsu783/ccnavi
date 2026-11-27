@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { editSaveBlocker, saveTitle } from "../../src/core/save-gate.js";
+import { dirtyTitle, editSaveBlocker, saveTitle } from "../../src/core/save-gate.js";
+
+test("CB-T1279 編集する画面のタブのタイトルは、未保存の間だけ頭に「● 」を付ける", () => {
+  assert.equal(dirtyTitle("ccnaviルール管理", false), "ccnaviルール管理");
+  assert.equal(dirtyTitle("ccnaviルール管理", true), "● ccnaviルール管理");
+});
 
 const OPEN = { locked: false, reason: "" };
 

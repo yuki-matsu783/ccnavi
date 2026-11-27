@@ -16,6 +16,7 @@ import * as vscode from "vscode";
 import { postAppearance } from "./appearance.js";
 import { LoadFailure, type ErrorFile } from "./core/load-failure.js";
 import { lockFromError, type Lock } from "./core/lock.js";
+import { dirtyTitle } from "./core/save-gate.js";
 import type { ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { debounce, watchTickets } from "./panel-common.js";
@@ -82,6 +83,8 @@ export interface SettingsScreen<D, T, L, M> {
   sameTarget(a: T, b: T): boolean;
   /** 確認の文で使う対象の名前 */
   targetLabel(target: T): string;
+  /** タブのタイトル。未保存の間は頭に「●」を付ける（`setDirty`） */
+  readonly title: string;
 }
 
 /** `settingsPanel`が返す、画面のパネルから呼ぶ関数 */
@@ -106,6 +109,11 @@ export interface SettingsPanel<D, T, L> {
    * 前の対象の保存が往復の途中なら、画面の`stale`が破棄する。
    */
   switchTarget(current: SettingsState<D, T, L>, target: T): Promise<void>;
+  /**
+   * 未保存かを覚え、タブのタイトルの頭の「●」を付け外しする。Webviewは閉じるのを止められないので、
+   * 閉じる前に未保存だと気づけるようにする（フロー編集・計画編集・テンプレート管理と同じ印）
+   */
+  setDirty(current: SettingsState<D, T, L>, dirty: boolean): void;
 }
 
 export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): SettingsPanel<D, T, L> {
@@ -238,7 +246,7 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
     current.target = target;
     current.loaded = undefined;
     current.error = undefined;
-    current.dirty = false;
+    setDirty(current, false);
     current.changedPending = false;
     current.lock = lockFromError("確認中…");
     // 前の対象のファイルの監視は外す。切り替え先が読めたら`reload`が張り直す。読めずにエラーのままなら、
@@ -255,5 +263,12 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
     await reload(current);
   }
 
-  return { registerPanelHandlers, scheduleChanged, scheduleLock, reload, redraw, switchTarget };
+  function setDirty(current: S, dirty: boolean): void {
+    current.dirty = dirty;
+    if (screen.alive(current)) {
+      current.panel.title = dirtyTitle(screen.title, dirty);
+    }
+  }
+
+  return { registerPanelHandlers, scheduleChanged, scheduleLock, reload, redraw, switchTarget, setDirty };
 }
