@@ -366,5 +366,12 @@ func IDClash(branch string, names []string) string {
 	return ""
 }
 
+// IsIntegration は、name が統合先とみなす名前か（保護されたブランチか、統合先 integration と同じ名前か）。大文字小文字は
+// 区別しない。integration が空（統合先が決まらない）なら保護されたブランチだけを見る。統合先へ書く・送る・親にするのを断る
+// 判定は、どれもこれを使う。
+func IsIntegration(name, integration string) bool {
+	return Protected(name) || (integration != "" && SameID(name, integration))
+}
+
 // SameID は大文字小文字だけが違う識別子を同じと読む（区別しないファイルシステムではぶつかるため）。
 func SameID(a, b string) bool { return pyfmt.Casefold(a) == pyfmt.Casefold(b) }

@@ -195,7 +195,7 @@ func writeRefusal(s *snapshot, family string) string {
 	if c := compat(s); !c.same {
 		return c.message + "。表示のみとし、承認のボタンは表示しません"
 	}
-	if ids.Protected(family) || pyfmt.Casefold(family) == pyfmt.Casefold(s.integration) {
+	if ids.IsIntegration(family, s.integration) {
 		return family + " は予約された名前か統合先の名前のため、Chrome からは書き込めません"
 	}
 	return ""
@@ -798,7 +798,7 @@ func opAdopt(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	integ := s.integration
 	ident := ids.BranchToID(name)
 	problems := []string{}
-	if pyfmt.Casefold(name) == pyfmt.Casefold(integ) {
+	if integ != "" && ids.SameID(name, integ) {
 		problems = append(problems, "ブランチ "+name+" は統合先の名前です")
 	}
 	if why := ids.BranchProblem(name); why != "" {

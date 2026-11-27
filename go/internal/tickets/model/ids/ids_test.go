@@ -148,6 +148,24 @@ func TestIDsMatchGolden(t *testing.T) {
 	}
 }
 
+func TestIsIntegration(t *testing.T) {
+	for _, c := range []struct {
+		name, integration string
+		want              bool
+	}{
+		{"main", "", true},
+		{"Main", "trunk", true},
+		{"trunk", "trunk", true},
+		{"Trunk", "trunk", true},
+		{"feature-1", "trunk", false},
+		{"feature-1", "", false},
+	} {
+		if got := IsIntegration(c.name, c.integration); got != c.want {
+			t.Errorf("IsIntegration(%q, %q) = %v, want %v", c.name, c.integration, got, c.want)
+		}
+	}
+}
+
 func TestSameID(t *testing.T) {
 	if !SameID("I0001", "i0001") || SameID("i0001", "i0002") {
 		t.Error("SameID")
