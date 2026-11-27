@@ -203,7 +203,7 @@ function retireAsked(state: MergeState, parent: string): MergeStep {
   const row = rowOfParent(state, parent);
   // マージ済みと確認できた親だけ。画面が古いボードのまま押した場合もここで止める
   if (row === undefined || row.result?.kind !== "merged") {
-    return stay(state, { kind: "warn", text: `親${parent}は、マージ済みと確認できていません。もう一度「MRの状況を確認」を押してください` });
+    return stay(state, { kind: "warn", text: `親${parent}は、マージ済みと確認できていません。もう一度「MRの状況を確認」を押してください。` });
   }
   // ダイアログを開いている間・送っている間・送ったあとは再入させない
   if (state.confirming.includes(parent) || state.sent.includes(parent)) {

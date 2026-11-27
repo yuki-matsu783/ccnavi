@@ -32,7 +32,7 @@ export function TargetSelect({ target, targets, disabled, confirms, onSwitch }: 
         data-action="switch-target"
         value={targetValue(target)}
         disabled={disabled === true}
-        title={confirms === false ? "見る設定を切り替えます" : "編集する設定を切り替えます。未保存の変更があれば、破棄してよいかを聞きます"}
+        title={confirms === false ? "見る設定を切り替えます" : "編集する設定を切り替えます。未保存の変更があれば、破棄してよいかを聞きます。"}
         onChange={(event) => {
           const picked = targets.find((t) => targetValue(t) === event.target.value);
           if (picked !== undefined) {

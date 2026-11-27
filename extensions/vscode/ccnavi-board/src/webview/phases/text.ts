@@ -29,7 +29,7 @@ export function scopeText(phase: PhaseForm): string {
 
 /** 共通の設定の定義（範囲は`inherit`の1語かglobのリスト）の範囲 */
 export function commonScopeText(scope: readonly string[]): string {
-  return scope.length === 1 && scope[0] === "inherit" ? INHERIT_TEXT : `編集可能な範囲${scope.join(", ")}`;
+  return scope.length === 1 && scope[0] === "inherit" ? INHERIT_TEXT : `編集可能な範囲: ${scope.join(", ")}`;
 }
 
 /** 編集可能な範囲のツールチップ */
@@ -61,7 +61,7 @@ export function countText(total: number, query: string, shown: number, kept: num
 /** idが重なっているときにツールバーの最後の行へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空のid" : id));
-  return `idが重なっています（${names.join(", ")}）。重なりを直すまで保存できません。`;
+  return `idが重複しています（${names.join(", ")}）。重複を直すまで保存できません。`;
 }
 
 /** 定義が1つも無いときに一覧へ出す文。ファイルの有無で変わる */
@@ -69,19 +69,19 @@ export function emptyNote(exists: boolean): string {
   if (exists) {
     return "定義がありません。定義が空のファイルはccnaviで読み込めません。保存する前に、定義を1つ以上追加してください。";
   }
-  return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます。";
+  return "フェーズ定義ファイルはまだありません（未設定の状態で、エラーではありません）。定義を追加して保存すると、ファイルが作られます。";
 }
 
 /** 共通の設定の定義と表示名が重なっているときにツールバーの最後の行へ出す文 */
 export function commonTitleNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
-  return `共通の設定のフェーズ定義とタイトル（title）が重なっています（${names.join(", ")}）。重なっている定義は使われません。タイトルを変えてから保存してください。`;
+  return `共通設定のフェーズ定義とタイトル（title）が重複しています（${names.join(", ")}）。重複している定義は使われません。タイトルを変えてから保存してください。`;
 }
 
 /** 共通の設定にも同じidがある定義に添える文 */
 export function commonIdNote(ids: ReadonlySet<string>): string {
-  return `共通の設定にも同じidがあります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通の設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別のidにしてください。`;
+  return `共通設定にも同じidがあります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別のidにしてください。`;
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */
-export const COMMON_NOTE = "選択中の設定と組み合わせて適用される共通のフェーズ定義です。この画面では編集できません（.ccnavi/config/common/phases.yml）。";
+export const COMMON_NOTE = "選択中の設定と組み合わせて適用される、共通設定のフェーズ定義です。この画面では編集できません（.ccnavi/config/common/phases.yml）。";

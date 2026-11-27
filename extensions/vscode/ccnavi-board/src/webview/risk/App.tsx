@@ -82,7 +82,7 @@ function editingOf(data: RiskData, nextKey: () => string): Editing {
 }
 
 /** 組み込みの配点を見せているときの［保存］の理由 */
-const READ_ONLY_NOTE = "組み込みの配点を表示しているため、保存できません。先にファイルを作ってください";
+const READ_ONLY_NOTE = "組み込みの配点を表示しているため、保存できません。先にファイルを作ってください。";
 
 export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   // キーは1枚の画面の中で数え上げる。描き直しで配り直さない
@@ -355,8 +355,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       ))}
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" className={changed && !touring ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
+        ファイルの変更を検知しました。「更新」を押してください。
+        <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -380,7 +380,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <button type="button" className="action" data-action="open-risk" disabled={!shownExists} title={!shownExists ? "ファイルがまだないため、開けません" : undefined} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button
@@ -412,7 +412,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       )}
       {shownPage !== undefined && shownReadOnly && (
         <div className="banner missing" data-tour="missing">
-          <span>{shownPage.riskPath}がありません。実行ファイルは組み込みの配点で数えています（画面の値も、その配点によります）。配点を直すには、まずファイルを作ってください。</span>
+          <span>{shownPage.riskPath}がありません。ccnaviは組み込みの配点でリスクを計算しています（この画面にも組み込みの配点を表示しています）。配点を変えるには、まずファイルを作ってください。</span>
           <button
             type="button"
             className="action primary"
@@ -437,11 +437,11 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
-            子チケットをクローズするとき、下の「項目」でヒットした点を合計して、その変更のリスクの点を出します。
+            子チケットをクローズするとき、下の「項目」のうちヒットしたものの点を合計して、その変更のリスクの点を出します。
             合計点が閾値以上になると、リスクレベルがLOW → MEDIUM → HIGH → CRITICALの順に上がっていきます。
             <strong>HIGH以上になったフェーズは、レビューが終わるまで先へ進めません。</strong>
             チケット作成時に「レビュー不要」と宣言していても、ユーザのレビューが必要になります。
-            値はMEDIUM ≤ HIGH ≤ CRITICALとなるように入れてください。空欄にしたリスクレベルは、組み込みの値（
+            値はMEDIUM ≤ HIGH ≤ CRITICALとなるように入れてください。空欄にしたリスクレベルには、組み込みの値（
             {LEVEL_NAMES.map((name) => `${name} ${BUILTIN_LEVELS[name]}`).join(" / ")}）を使います。
           </p>
         </details>
@@ -491,7 +491,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         <details className="help">
           <summary>説明</summary>
           <p className="hint">
-            子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1件につき加点条件は1つです。
+            子チケットをクローズするとき、その子チケットの差分（base_sha..HEAD）で判定して加点します。加点条件は、項目1つにつき1つです。
             <code>script</code>が失敗したときと出力を読み込めないときは、安全を優先して点（points）をそのまま加点します。<code>judge</code>の項目があると、判定が揃うまで子をクローズできません。
           </p>
         </details>
@@ -515,8 +515,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
               onRemove={() => remove(row.key)}
             />
           ))}
-          {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする項目がありません。語を変えるか、絞り込み欄を空にしてください</li>}
-          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子もLOWのままクローズできます</li>}
+          {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする項目がありません。語を変えるか、絞り込み欄を空にしてください。</li>}
+          {shownDraft.rows.length === 0 && <li className="empty">項目がありません。加点する項目がなければ、どの子もLOWのままクローズできます。</li>}
         </ul>
       </section>
       {shownPage?.sums !== undefined && (

@@ -50,9 +50,9 @@ test("CB-T578 親のカードにissue・MR・ブランチ名とリモートと�
 
 test("CB-T579 リモートとの差の言い方。未送信・遅れ。読めない差は不明", () => {
   const board = (remote: RemoteJson | null) => parentCard(buildBoard(withRemote(remote)));
-  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 2, behind: 1 })), ["未送信2件", "遅れ1件"]);
-  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 0, behind: 0 })), ["未送信なし", "遅れなし"]);
-  assert.deepEqual(remoteItems(board({ branch: "a", ahead: null, behind: null })), ["未送信不明", "遅れ不明"]);
+  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 2, behind: 1 })), ["未pushのコミット2件", "未取得のコミット1件"]);
+  assert.deepEqual(remoteItems(board({ branch: "a", ahead: 0, behind: 0 })), ["未pushのコミットなし", "未取得のコミットなし"]);
+  assert.deepEqual(remoteItems(board({ branch: "a", ahead: null, behind: null })), ["未pushのコミット不明", "未取得のコミット不明"]);
   // ワークツリーが無い親（remoteが無い）は出さない
   assert.deepEqual(remoteItems(board(null)), []);
 });
@@ -64,7 +64,7 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
   try {
     const parent = page.one('li.card[data-id="i0001"]');
     // 未送信（aheadが1以上）は注意の行に。遅れはここには出さない
-    assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未送信2件"]);
+    assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未pushのコミット2件"]);
     assert.equal(parent.querySelectorAll(".origin").length, 0, "出どころの行は常時は出さない");
     // 詳細は畳んである（開くまで中身を出さない）
     assert.equal(parent.querySelectorAll("details.card-details").length, 1);
@@ -80,7 +80,7 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
     assert.equal(row("issue"), "#12");
     assert.equal(row("parent-mr"), "!7");
     assert.equal(row("branch"), "feature/12-login");
-    assert.equal(row("remote"), "未送信2件遅れ1件");
+    assert.equal(row("remote"), "未pushのコミット2件未取得のコミット1件");
     // 子のカードには出さない
     const child = opened.one('li.card[data-id="i0001-01-01"]');
     assert.equal(child.querySelectorAll(".notes .badge.unsent").length, 0);

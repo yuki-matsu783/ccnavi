@@ -54,7 +54,7 @@ import { targetOptions, type TargetOption } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
 import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
-import { settingsPanel, type SettingsState } from "./settings-panel.js";
+import { settingsPanel, targetLabelOf, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -69,14 +69,14 @@ const TITLE = "ccnaviフェーズ管理";
 
 /** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# このレイヤーのフェーズ定義。親チケットのproject: がこのレイヤーを指すときに、共通レイヤーの定義に追加して使われる。",
-  "# 共通レイヤーと同じidで中身が違う定義や、titleが重なる定義は --lintがerrorにし、このファイルのその定義だけが使われない。",
+  "# この設定のフェーズ定義。親チケットのproject: がこの設定を指すときに、共通設定の定義に追加して使われる。",
+  "# 共通設定と同じidで中身が違う定義と、titleが重なる定義は、--lintがerrorにする。その定義は使われない（このファイルのほかの定義は使われる）。",
   "",
 ].join("\n");
 /** 共通の設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
 const COMMON_HEADER = [
-  "# フェーズ定義（共通レイヤー）。判定は、このファイルと親チケットのproject: が指すレイヤーのphases.ymlの統合結果で使う。",
-  "# 同じidで中身が違う定義や、titleが重なる定義は --lintがerrorにする。",
+  "# フェーズ定義（共通設定）。判定には、このファイルと、親チケットのproject: が指す設定のphases.ymlを合わせた結果を使う。",
+  "# 同じidで中身が違う定義と、titleが重なる定義は、--lintがerrorにする。",
   "",
 ].join("\n");
 
@@ -118,27 +118,15 @@ function projectOf(target: PhasesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
-function targetLabelOf(target: PhasesTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "共通の設定";
-    case "self":
-      return "ワークスペース";
-    case "project":
-      return `プロジェクト${target.name}`;
-  }
-}
-
 /** 読み込み中の一言で「何を」読んでいるか */
 function whatOf(target: PhasesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "共通の設定のフェーズ";
+      return "共通設定のフェーズ";
     case "self":
       return "ワークスペースの設定のフェーズ";
     case "project":
-      return `${target.name}のフェーズ`;
+      return `プロジェクト「${target.name}」のフェーズ`;
   }
 }
 
@@ -211,7 +199,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   // この画面で保存した定義が承認と着手に反映されなくなる。答えは元リポジトリの版。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
-    throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
+    throw new Error(`設定ファイルの場所をccnaviから取得できません: ${board.error}`);
   }
   const targets = targetOptions(board.board, "workspace", currentKey(target));
   let phasesPath: string;
@@ -226,7 +214,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
       throw new Error(
         target.kind === "self"
           ? "ccnaviの出力にワークスペースの設定がありません"
-          : `プロジェクト${target.name}は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
+          : `プロジェクト「${target.name}」は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
       );
     }
     phasesPath = resolveIn(root, layer.phasesFile.path);
@@ -238,7 +226,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   // 共通の設定のphases.ymlを実行ファイルが読めなければ、共通の定義は空として扱われ、--lintがerrorで言う。画面は開いたまま帯で知らせる。
   const commonFile = commonLayer(board.board);
   if (commonFile !== undefined && commonFile.phasesFile.unreadable !== "") {
-    errors.push(`共通の設定のphases.ymlを読み込めません（${commonFile.phasesFile.path}）。共通の定義は空として扱われています: ${commonFile.phasesFile.unreadable}`);
+    errors.push(`共通設定のphases.ymlを読み込めません（${commonFile.phasesFile.path}）: ${commonFile.phasesFile.unreadable}。共通設定の定義は空として扱われています。`);
   }
   // 判定に使われる和は実行ファイルが組む（`sums[]`）。出どころが共通の定義だけを読み取り専用で見せ、拡張は足し直さない。
   // 共通の設定を開いているときは、編集する定義がそのまま共通の定義なので、読み取り専用の欄は出さない。
@@ -431,7 +419,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "画面を更新したので、この保存は取りやめました。更新後の定義で編集し直してください");
+  fail(current, "画面を更新したので、この保存は取りやめました。更新後の定義で編集し直してください。");
   return true;
 }
 
@@ -605,11 +593,11 @@ async function save(current: PanelState, form: PhasesForm): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）。");
       return;
     }
   } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
+    fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）。");
     return;
   }
 

@@ -56,7 +56,7 @@ export function parseSuggestJson(text: string): Parsed<SuggestJson> {
   if (raw.version !== SUGGEST_VERSION) {
     return {
       ok: false,
-      error: `候補のJSONの版が違います（拡張は${SUGGEST_VERSION}、実行ファイルは${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
+      error: `候補のJSONの版が違います（拡張は${SUGGEST_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   return {

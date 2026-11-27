@@ -345,7 +345,7 @@ test("CB-T508 見本の書き間違いは読み込みで落ちる（知らない
   const ok = { ticket: "t", answers: { open: { plan } } };
   assert.ok(parseWorkflowSample(ok).answers.open.answer.writable);
   const bad: Array<[string, unknown, RegExp]> = [
-    ["オブジェクトでない", [], /オブジェクトではない/],
+    ["オブジェクトでない", [], /オブジェクトではありません/],
     ["ticketがありません", { answers: { open: { plan } } }, /ticket/],
     ["知らないキー（根）", { ...ok, anwsers: {} }, /未知のキーanwsers/],
     ["知らないキー（答え）", { ticket: "t", answers: { open: { plan, writeable: true } } }, /未知のキーwriteable/],
@@ -375,16 +375,16 @@ test("CB-T508 見本の書き間違いは読み込みで落ちる（知らない
 });
 
 test("CB-T509 保存できない理由の言葉は、案内の見本でも実際と同じ関数から出る。断られた線と確認中の一言", () => {
-  assert.equal(CHECKING_TEXT, "線を変えた順序をccnaviで確認しています…");
+  assert.equal(CHECKING_TEXT, "線を変えたあとの順序をccnaviで確認しています…");
   const refused = sample.answers.unpackable.answer.refused;
-  assert.equal(refusedText(refused), `この線は引けません。線は引く前のままです: ${refused[0].text}`);
+  assert.equal(refusedText(refused), `この線は引けません（${refused[0].text}）。線は引く前のままです。`);
   const blocked = (name: string, state = { busy: false, pending: false, changed: false, gone: false }): string => saveBlocker(sample.answers[name].answer, state);
   assert.equal(blocked("open"), "順序を変えていません");
   assert.equal(blocked("swap"), "");
   assert.match(blocked("swap", { busy: false, pending: true, changed: false, gone: false }), /確認しています/);
-  assert.match(blocked("swap", { busy: false, pending: false, changed: true, gone: false }), /外で変わった/);
-  assert.match(blocked("swap", { busy: false, pending: false, changed: false, gone: true }), /承認待ちにありません/);
+  assert.match(blocked("swap", { busy: false, pending: false, changed: true, gone: false }), /外で提案が変更された/);
+  assert.match(blocked("swap", { busy: false, pending: false, changed: false, gone: true }), /もう承認待ちではありません/);
   assert.match(blocked("loose"), /順序の検査/);
-  assert.match(blocked("locked-cut"), /改版で通らない/);
-  assert.match(blocked("child-problems"), /子の提案を付け替えられない/);
+  assert.match(blocked("locked-cut"), /承認済みの子チケットがある番号/);
+  assert.match(blocked("child-problems"), /子チケットの提案を新しい番号に付け替えられない/);
 });

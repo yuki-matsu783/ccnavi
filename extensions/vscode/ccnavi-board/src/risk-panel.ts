@@ -53,7 +53,7 @@ import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-f
 import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
 import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
-import { settingsPanel, type SettingsState } from "./settings-panel.js";
+import { settingsPanel, targetLabelOf, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -102,27 +102,15 @@ function projectOf(target: RiskTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
-function targetLabelOf(target: RiskTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "共通の設定";
-    case "self":
-      return "ワークスペース";
-    case "project":
-      return `プロジェクト${target.name}`;
-  }
-}
-
 /** 読み込み中の一言で「何を」読んでいるか */
 function whatOf(target: RiskTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "リスク";
+      return "共通設定のリスク";
     case "self":
       return "ワークスペースの設定のリスク";
     case "project":
-      return `${target.name}のリスク`;
+      return `プロジェクト「${target.name}」のリスク`;
   }
 }
 
@@ -213,14 +201,14 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi`から自分で組むと、組み方が実行ファイルと
     // 食い違ったときに、この画面で保存した配点が判定に使われなくなる。答えは元リポジトリの版。
     if (!board.ok) {
-      throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
+      throw new Error(`設定ファイルの場所をccnaviから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.risk.path === "") {
       throw new Error(
         target.kind === "self"
           ? "ccnaviの出力にワークスペースの設定がありません"
-          : `プロジェクト${target.name}は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
+          : `プロジェクト「${target.name}」は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
       );
     }
     riskPath = resolveIn(root, layer.risk.path);
@@ -417,7 +405,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, "画面を更新したので、この保存は取りやめました。更新後の配点で編集し直してください");
+  fail(current, "画面を更新したので、この保存は取りやめました。更新後の配点で編集し直してください。");
   return true;
 }
 
@@ -522,7 +510,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   if (fs.existsSync(loaded.riskPath)) {
-    fail(current, `${loaded.riskRel}は既に存在するため、上書きしません。更新してください`);
+    fail(current, `${loaded.riskRel}は既にあるため、上書きしません。更新してください。`);
     return;
   }
   if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
@@ -543,7 +531,7 @@ async function create(current: PanelState): Promise<void> {
     return;
   }
   await reload(current);
-  vscode.window.showInformationMessage(`${loaded.riskRel}を組み込みの配点で作りました。コミットは自分でしてください`);
+  vscode.window.showInformationMessage(`${loaded.riskRel}を組み込みの配点で作成しました。コミットは自分でしてください。`);
 }
 
 /** 保存の前の検証に渡す差し替え。共通の設定は`--risk`、ほかは名前を付けて`--project-risk-file` */
@@ -564,7 +552,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
     return;
   }
   if (loaded.builtin) {
-    fail(current, `${loaded.riskRel}がありません。先に「組み込みの配点でファイルを作る」を押してください`);
+    fail(current, `${loaded.riskRel}がありません。先に「組み込みの配点でファイルを作る」を押してください。`);
     return;
   }
   const root = current.folder.uri.fsPath;
@@ -627,11 +615,11 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "配点のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      fail(current, "配点のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）。");
       return;
     }
   } else if (fs.existsSync(loaded.riskPath)) {
-    fail(current, "配点のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
+    fail(current, "配点のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）。");
     return;
   }
 

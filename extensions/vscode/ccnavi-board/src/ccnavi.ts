@@ -132,13 +132,51 @@ const EXPLAIN_TIMEOUT_MS = 60_000;
  */
 const DIAGNOSE_TIMEOUT_MS = 60_000;
 
-/** 期限で打ち切ったときの文面。標準エラーには何も残らないので、呼び手の代わりにここで組む */
-function cutOff(what: string, ms: number): string {
-  return `${what}を${ms / 1000}秒で中断しました`;
+/** 画面の文に出す操作の名前と、走らせたコマンド。文は操作の名前を先に書き、コマンドは括弧に入れる */
+interface Op {
+  readonly name: string;
+  readonly cmd: string;
 }
 
+/** 期限で打ち切ったときの文面。標準エラーには何も残らないので、呼び手の代わりにここで組む */
+function cutOff(op: Op, ms: number): string {
+  return `${op.name}が${ms / 1000}秒で終わらなかったため中断しました（${op.cmd}）`;
+}
+
+/** 非0終了などで失敗したときの文面。理由が空なら理由を付けない */
+function failed(op: Op, reason = ""): string {
+  return `${op.name}に失敗しました（${op.cmd}）${reason === "" ? "" : `: ${reason}`}`;
+}
+
+/** 出力を読めなかったときの文面 */
+function unreadable(op: Op, detail = ""): string {
+  return `${op.name}の結果を読み込めません（${op.cmd}${detail === "" ? "" : `: ${detail}`}）`;
+}
+
+const EXPLAIN: Op = { name: "チケットの状態の読み込み", cmd: "ccnavi --explain --json" };
+const APPROVE_PREVIEW: Op = { name: "承認する内容の読み込み", cmd: "ccnavi --agree --preview --json" };
+const APPROVE_YES: Op = { name: "承認", cmd: "ccnavi user agree --yes" };
+const DECIDE_PREVIEW: Op = { name: "残った指摘の読み込み", cmd: "ccnavi-review.sh decide --preview" };
+const DECIDE_YES: Op = { name: "指摘の対応方針の反映", cmd: "ccnavi-user-decide.sh" };
+const TEST: Op = { name: "判定の試行", cmd: "ccnavi --test --json" };
+const EXPECTATIONS: Op = { name: "期待する判定の確認", cmd: "ccnavi --test-expectations --json" };
+const SUGGEST: Op = { name: "候補の取得", cmd: "ccnavi --suggest --json" };
+const LINT: Op = { name: "設定の検証", cmd: "ccnavi --lint" };
+const LINT_JSON: Op = { name: "設定の検証", cmd: "ccnavi --lint --json" };
+const FLOW_LINT: Op = { name: "フローの検証", cmd: "ccnavi --lint --json --flow" };
+const PLAN_ORDER: Op = { name: "計画の読み込み", cmd: "ccnavi --plan-order --json" };
+const PLAN_ORDER_WRITE: Op = { name: "計画の保存", cmd: "ccnavi --plan-order --write" };
+const TEMPLATES: Op = { name: "テンプレートの一覧の読み込み", cmd: "ccnavi --templates --json" };
+const TEMPLATE_SHOW: Op = { name: "テンプレートの読み込み", cmd: "ccnavi --templates --show --json" };
+const TEMPLATE_CHECK: Op = { name: "テンプレートの検査", cmd: "ccnavi --templates --check-file --json" };
+const TEMPLATE_DRAFT: Op = { name: "テンプレートの下書きの作成", cmd: "ccnavi --templates --draft --json" };
+const HANDOFF: Op = { name: "取り込み待ちの一覧の読み込み", cmd: "ccnavi user handoff --json" };
+const HANDOFF_YES: Op = { name: "取り込み", cmd: "ccnavi user handoff --yes --json" };
+const MIRROR: Op = { name: "ミラーのずれの確認", cmd: "ccnavi user mirror --json" };
+const MIRROR_YES: Op = { name: "ミラーの同期", cmd: "ccnavi user mirror --yes --json" };
+
 const NOT_FOUND =
-  "ccnaviの実行ファイルが見つかりません。エージェントに「ccnavi を入れて」と頼むか、設定（ccnaviBoard.binPath）で指定してください。ワークツリーを開いている場合は、実行ファイルがそこに無いので、本体のチェックアウトのルートを開いてください。";
+  "ccnaviの実行ファイルが見つかりません。エージェントに「ccnaviを入れて」と頼むか、設定ccnaviBoard.binPathに実行ファイルのパスを指定してください。gitのワークツリーのフォルダを開いている場合、そこには実行ファイルがありません。元のリポジトリのルートフォルダを開いてください。";
 
 /** 見るのはルールだけ。チケット制御とstateの置き場は外し、記録も残さない */
 const RULES_ONLY = ["--ticket-control", "disable", "--state", "", "--log", ""] as const;
@@ -240,10 +278,8 @@ export async function loadBoard(root: string, setting: string): Promise<LoadResu
   }
   const ran = await run(launcher, root, ["--explain", "--json"], EXPLAIN_TIMEOUT_MS);
   if (ran.code !== 0) {
-    const why = ran.killed
-      ? `${EXPLAIN_TIMEOUT_MS / 1000}秒たっても応答がないため中断しました`
-      : ran.stderr;
-    return { ok: false, launcher, error: `ccnavi --explain --jsonが失敗しました: ${why}` };
+    const error = ran.killed ? cutOff(EXPLAIN, EXPLAIN_TIMEOUT_MS) : failed(EXPLAIN, ran.stderr);
+    return { ok: false, launcher, error };
   }
   const parsed = parseBoardJson(ran.stdout);
   if (!parsed.ok) {
@@ -272,13 +308,13 @@ export async function runApprovePreview(
   if (ran.killed) {
     return {
       ok: false,
-      error: `${cutOff("ccnavi --agree --preview --json", APPROVE_TIMEOUT_MS)}。何も承認していません`,
+      error: `${cutOff(APPROVE_PREVIEW, APPROVE_TIMEOUT_MS)}。何も承認していません。`,
     };
   }
   if (ran.code !== 0) {
     // 標準エラーは全部見せる。絞りが通らなかった理由（「親の改版が承認待ちなのに承認の対象に無い」など）は
     // 読めない提案の行より後ろに出るので、1行目だけでは伝わらない。
-    return { ok: false, error: `ccnavi --agree --preview --jsonが失敗しました。\n${ran.stderr.trim()}` };
+    return { ok: false, error: `${failed(APPROVE_PREVIEW)}。\n${ran.stderr.trim()}` };
   }
   const parsed = parseApprovePreview(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
@@ -307,16 +343,16 @@ export async function runApproveYes(
     return {
       ok: false,
       error:
-        `${cutOff("ccnavi user agree --yes", APPROVE_TIMEOUT_MS)}。` +
-        "一部だけ承認済みになっている可能性があります。承認済みチケットをコミット・pushするコマンドは、承認できたときだけターミナルで実行します。今回は実行していません。" +
-        "チケット管理画面を更新して、何が承認されたかを確認してください",
+        `${cutOff(APPROVE_YES, APPROVE_TIMEOUT_MS)}。` +
+        "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットとpushは実行していません。" +
+        "チケット管理画面を更新して、何が承認されたかを確認してください。",
     };
   }
   const parsed = parseApproveResult(ran.stdout);
   if (parsed.ok) {
     return ran.code === 0
       ? parsed
-      : { ok: false, error: `ccnavi user agree --yesが失敗しました: ${firstLine(ran.stderr)}` };
+      : { ok: false, error: failed(APPROVE_YES, firstLine(ran.stderr)) };
   }
   if ("mismatch" in parsed) {
     return parsed;
@@ -327,7 +363,7 @@ export async function runApproveYes(
     return parsed;
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
-  return { ok: false, error: said === "" ? `ccnavi user agree --yesの出力を読み取れません（${parsed.error}）` : said };
+  return { ok: false, error: said === "" ? unreadable(APPROVE_YES, parsed.error) : said };
 }
 
 /**
@@ -350,10 +386,10 @@ export async function runDecidePreview(
 ): Promise<RunResult<DecidePreview>> {
   const ran = await runScript(shell, root, REVIEW_SCRIPT, tree, decidePreviewArgs(phase), DECIDE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: `${cutOff("ccnavi-review.sh decide --preview", DECIDE_TIMEOUT_MS)}。反映していません` };
+    return { ok: false, error: `${cutOff(DECIDE_PREVIEW, DECIDE_TIMEOUT_MS)}。反映していません。` };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi-review.sh decide --previewが失敗しました: ${ran.stderr.trim()}` };
+    return { ok: false, error: failed(DECIDE_PREVIEW, ran.stderr.trim()) };
   }
   // 要求した親・フェーズ・MRの番号と照らして厳しく読む。読めなければ呼び手は件数を出さない
   const parsed = parseDecidePreview(ran.stdout, expect);
@@ -378,8 +414,8 @@ export async function runDecideYes(
     return {
       ok: false,
       error:
-        `${cutOff("ccnavi-user-decide.sh", DECIDE_TIMEOUT_MS)}。` +
-        "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確認してください",
+        `${cutOff(DECIDE_YES, DECIDE_TIMEOUT_MS)}。` +
+        "反映できたか分かりません。チケット管理画面を更新して、フェーズの状態を確認してください。",
     };
   }
   const parsed = parseDecideResult(ran.stdout.trim().split("\n").pop() ?? "");
@@ -387,7 +423,7 @@ export async function runDecideYes(
     return parsed;
   }
   const said = firstLine(ran.stderr) || firstLine(ran.stdout);
-  return { ok: false, error: said === "" ? `ccnavi-user-decide.shの出力を読み取れません（${parsed.error}）` : said };
+  return { ok: false, error: said === "" ? unreadable(DECIDE_YES, parsed.error) : said };
 }
 
 /**
@@ -472,10 +508,10 @@ export async function runTest(
     "--json",
   ], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff("ccnavi --test --json", DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(TEST, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --test --jsonが失敗しました: ${ran.stderr}` };
+    return { ok: false, error: failed(TEST, ran.stderr) };
   }
   const parsed = parseTestJson(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
@@ -500,10 +536,10 @@ export async function runExpectations(
     "--json",
   ], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff("ccnavi --test-expectations --json", DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(EXPECTATIONS, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --test-expectations --jsonが失敗しました: ${firstLine(ran.stderr)}` };
+    return { ok: false, error: failed(EXPECTATIONS, firstLine(ran.stderr)) };
   }
   const parsed = parseExpectationsJson(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
@@ -521,10 +557,10 @@ export async function runSuggest(root: string, setting: string): Promise<RunResu
   }
   const ran = await run(launcher, root, ["--suggest", "--json"], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff("ccnavi --suggest --json", DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(SUGGEST, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `ccnavi --suggest --jsonが失敗しました: ${firstLine(ran.stderr)}` };
+    return { ok: false, error: failed(SUGGEST, firstLine(ran.stderr)) };
   }
   const parsed = parseSuggestJson(ran.stdout);
   return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: parsed.error };
@@ -542,10 +578,10 @@ export async function runLint(
   }
   const ran = await run(launcher, root, [...overrideArgs(override), "--lint"], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff("ccnavi --lint", DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(LINT, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code < 0 || ran.code > 1) {
-    return { ok: false, error: `ccnavi --lintが失敗しました: ${ran.stderr}` };
+    return { ok: false, error: failed(LINT, ran.stderr) };
   }
   return { ok: true, value: { ok: ran.code === 0, report: ran.stdout.trim() } };
 }
@@ -561,7 +597,7 @@ export function firstLine(text: string): string {
 }
 
 export async function runLintJson(root: string, setting: string): Promise<RunResult<LintJson>> {
-  return lintJson(root, setting, [], "ccnavi --lint --json");
+  return lintJson(root, setting, [], LINT_JSON);
 }
 
 /**
@@ -570,21 +606,20 @@ export async function runLintJson(root: string, setting: string): Promise<RunRes
  * SubagentStartと同じもので、答えは`(flow)`の苦情（`problemsOfFlow`）。
  */
 export async function runFlowLint(root: string, setting: string, flowPath: string): Promise<RunResult<LintJson>> {
-  const what = "ccnavi --lint --json --flow";
-  return lintJson(root, setting, ["--flow", flowPath], what);
+  return lintJson(root, setting, ["--flow", flowPath], FLOW_LINT);
 }
 
-async function lintJson(root: string, setting: string, extra: readonly string[], what: string): Promise<RunResult<LintJson>> {
+async function lintJson(root: string, setting: string, extra: readonly string[], op: Op): Promise<RunResult<LintJson>> {
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, ["--lint", "--json", ...extra], DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code < 0 || ran.code > 1) {
-    return { ok: false, error: `${what}が失敗しました: ${firstLine(ran.stderr)}` };
+    return { ok: false, error: failed(op, firstLine(ran.stderr)) };
   }
   const parsed = parseLintJson(ran.stdout);
   if (parsed.ok) {
@@ -593,7 +628,7 @@ async function lintJson(root: string, setting: string, extra: readonly string[],
   // 設定の不備などで実行ファイルがJSONではなくユーザ向けの文面を出したときは、JSON.parseの苦情より
   // その文面（先頭行）のほうが原因を指しているので、そちらを見せる
   const said = firstLine(ran.stdout) || firstLine(ran.stderr);
-  return { ok: false, error: said === "" ? `${what}の出力を読み込めません（${parsed.error}）` : `${what}の出力: ${said}` };
+  return { ok: false, error: said === "" ? unreadable(op, parsed.error) : failed(op, said) };
 }
 
 /**
@@ -616,20 +651,20 @@ export async function runWriteAndPushTarget(root: string, setting: string, paren
  * 失敗（実行ファイルが無い・非0終了・JSONでない）は理由の文にして返し、画面は壊さない
  */
 export async function runPlanOrder(root: string, setting: string, parent: string, order: PlanOrder = {}): Promise<RunResult<PlanOrderAnswer>> {
-  const what = "ccnavi --plan-order --json";
+  const op = PLAN_ORDER;
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, planOrderArgs(parent, order), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${ran.stderr.trim() || firstLine(ran.stdout)}` };
+    return { ok: false, error: failed(op, ran.stderr.trim() || firstLine(ran.stdout)) };
   }
   const parsed = parsePlanOrder(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /**
@@ -639,7 +674,7 @@ export async function runPlanOrder(root: string, setting: string, parent: string
  * 書かなかった理由は実行ファイルの標準エラーの文のまま返す
  */
 export async function runPlanOrderWrite(root: string, setting: string, parent: string, order: PlanOrder, expect: string): Promise<PlanOrderWrite> {
-  const what = "ccnavi --plan-order --write";
+  const op = PLAN_ORDER_WRITE;
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { kind: "error", error: NOT_FOUND };
@@ -648,13 +683,13 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
   if (ran.killed) {
     return {
       kind: "error",
-      error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}。提案を変更したかは分かりません。更新して確認してください`,
+      error: `${cutOff(op, DIAGNOSE_TIMEOUT_MS)}。提案を変更したかは分かりません。更新して確認してください。`,
     };
   }
   const parsed = parsePlanOrder(ran.stdout);
   if (!parsed.ok) {
     const said = ran.stderr.trim() || firstLine(ran.stdout);
-    return { kind: "error", error: `${what}が失敗しました: ${said === "" ? parsed.error : said}` };
+    return { kind: "error", error: failed(op, said === "" ? parsed.error : said) };
   }
   const answer = parsed.value;
   if (answer.written === true && ran.code === 0) {
@@ -666,7 +701,7 @@ export async function runPlanOrderWrite(root: string, setting: string, parent: s
   if (ran.code === 0) {
     return { kind: "unchanged", answer };
   }
-  return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnaviが変更しませんでした" };
+  return { kind: "refused", answer, reason: ran.stderr.trim() || "ccnaviが理由を返しませんでした。提案を更新してやり直してください" };
 }
 
 /** 失敗の答え（`{ok:false,error}`）のerror。読めなければ空 */
@@ -690,56 +725,56 @@ function failureOf(ran: Ran): string {
 
 /** テンプレートの一覧を読む（`--templates --json --layer <名前>`）。何も書かない */
 export async function runTemplates(root: string, setting: string, layer: string): Promise<RunResult<TemplatesJson>> {
-  const what = "ccnavi --templates --json";
+  const op = TEMPLATES;
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, templatesArgs(layer), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf(ran)}` };
+    return { ok: false, error: failed(op, failureOf(ran)) };
   }
   const parsed = parseTemplates(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /** 1件の本文を読む（`--templates --show <名前> --layer <名前> --json`）。何も書かない */
 export async function runTemplateShow(root: string, setting: string, name: string, layer: string): Promise<RunResult<TemplateDetail>> {
-  const what = "ccnavi --templates --show --json";
+  const op = TEMPLATE_SHOW;
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, templatesShowArgs(name, layer), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf(ran)}` };
+    return { ok: false, error: failed(op, failureOf(ran)) };
   }
   const parsed = parseTemplateShow(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /** 編集中の1本を実行ファイルに読ませる（`--templates --check-file <パス> --layer <名前> --json`）。何も書かない */
 export async function runTemplateCheck(root: string, setting: string, file: string, layer: string): Promise<RunResult<TemplateCheck>> {
-  const what = "ccnavi --templates --check-file --json";
+  const op = TEMPLATE_CHECK;
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, templatesCheckArgs(file, layer), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf(ran)}` };
+    return { ok: false, error: failed(op, failureOf(ran)) };
   }
   const parsed = parseTemplateCheck(ran.stdout);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /** 下書きを作った答え */
@@ -752,27 +787,27 @@ export interface DraftMade {
 
 /** 完了した親から下書きを作る（`--templates --draft <親> --json`）。失敗は理由の文にして返す */
 export async function runTemplateDraft(root: string, setting: string, parent: string): Promise<RunResult<DraftMade>> {
-  const what = "ccnavi --templates --draft --json";
+  const op = TEMPLATE_DRAFT;
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, templatesDraftArgs(parent), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   let raw: unknown;
   try {
     raw = JSON.parse(ran.stdout);
   } catch {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf(ran)}` };
+    return { ok: false, error: failed(op, failureOf(ran)) };
   }
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return { ok: false, error: `${what}の出力を読み込めません` };
+    return { ok: false, error: unreadable(op) };
   }
   const r = raw as Record<string, unknown>;
   if (r.ok !== true) {
-    return { ok: false, error: typeof r.error === "string" && r.error !== "" ? r.error : `${what}が失敗しました` };
+    return { ok: false, error: typeof r.error === "string" && r.error !== "" ? r.error : failed(op) };
   }
   return {
     ok: true,
@@ -792,23 +827,23 @@ export async function runTemplateDraft(root: string, setting: string, parent: st
  * 見るだけの答えは、対象にerrorがあっても終了コード0で返る。
  */
 export async function runHandoff(workspace: string, setting: string, tree: string, paths: readonly string[] = []): Promise<RunResult<HandoffList>> {
-  const what = "ccnavi user handoff --json";
+  const op = HANDOFF;
   const launcher = findLauncher(workspace, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, tree, handoffArgs(paths), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(op, DIAGNOSE_TIMEOUT_MS) };
   }
   const parsed = parseHandoffList(ran.stdout);
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf(ran)}` };
+    return { ok: false, error: failed(op, failureOf(ran)) };
   }
-  return { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /**
@@ -817,23 +852,23 @@ export async function runHandoff(workspace: string, setting: string, tree: strin
  * 期限切れのときは、取り込めたかが分からないことを文に足す。
  */
 export async function runHandoffYes(workspace: string, setting: string, tree: string, paths: readonly string[], expect: string): Promise<HandoffResult> {
-  const what = "ccnavi user handoff --yes --json";
+  const op = HANDOFF_YES;
   const launcher = findLauncher(workspace, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, tree, handoffYesArgs(paths, expect), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}（取り込めたかは分かりません。一覧を更新して確認してください）` };
+    return { ok: false, error: `${cutOff(op, DIAGNOSE_TIMEOUT_MS)}。取り込めたかは分かりません。一覧を更新して確認してください。` };
   }
   const parsed = parseHandoffResult(ran.stdout);
   if (parsed.ok) {
     return parsed.value;
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf(ran)}` };
+    return { ok: false, error: failed(op, failureOf(ran)) };
   }
-  return { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /**
@@ -843,28 +878,27 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
  * 読めた結果として返し、理由は呼び手が出す
  */
 export async function runMirror(root: string, setting: string, names: readonly string[] = []): Promise<RunResult<MirrorList>> {
-  const what = "ccnavi user mirror --json";
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, mirrorArgs(names), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: cutOff(what, DIAGNOSE_TIMEOUT_MS) };
+    return { ok: false, error: cutOff(MIRROR, DIAGNOSE_TIMEOUT_MS) };
   }
-  return mirrorListOf(ran, what);
+  return mirrorListOf(ran);
 }
 
 /** 見るだけの結果を読む。標準出力が読めればそれを、読めなければ失敗の理由を返す（`runMirror`の後半。単体で試すために分ける） */
-export function mirrorListOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, what = "ccnavi user mirror --json"): RunResult<MirrorList> {
+export function mirrorListOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, op: Op = MIRROR): RunResult<MirrorList> {
   const parsed = parseMirrorList(ran.stdout);
   if (parsed.ok) {
     return { ok: true, value: parsed.value };
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf({ ...ran, killed: false })}` };
+    return { ok: false, error: failed(op, failureOf({ ...ran, killed: false })) };
   }
-  return { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return { ok: false, error: unreadable(op, parsed.error) };
 }
 
 /**
@@ -873,26 +907,25 @@ export function mirrorListOf(ran: { readonly code: number; readonly stdout: stri
  * 失敗は`{ok:false, error}`の結果で返し、投げない。期限切れのときは、同期できたかが分からないことを文に足す。
  */
 export async function runMirrorYes(root: string, setting: string, names: readonly string[], expect: string): Promise<MirrorResult> {
-  const what = "ccnavi user mirror --yes --json";
   const launcher = findLauncher(root, setting);
   if (launcher === undefined) {
     return { ok: false, error: NOT_FOUND };
   }
   const ran = await run(launcher, root, mirrorYesArgs(names, expect), DIAGNOSE_TIMEOUT_MS);
   if (ran.killed) {
-    return { ok: false, error: `${cutOff(what, DIAGNOSE_TIMEOUT_MS)}（同期できたかは分かりません。画面を更新して確認してください）` };
+    return { ok: false, error: `${cutOff(MIRROR_YES, DIAGNOSE_TIMEOUT_MS)}。同期できたかは分かりません。画面を更新して確認してください。` };
   }
-  return mirrorResultOf(ran, what);
+  return mirrorResultOf(ran);
 }
 
 /** 同期の結果を読む（`runMirrorYes`の後半。単体で試すために分ける） */
-export function mirrorResultOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, what = "ccnavi user mirror --yes --json"): MirrorResult {
+export function mirrorResultOf(ran: { readonly code: number; readonly stdout: string; readonly stderr: string }, op: Op = MIRROR_YES): MirrorResult {
   const parsed = parseMirrorResult(ran.stdout);
   if (parsed.ok) {
     return parsed.value;
   }
   if (ran.code !== 0) {
-    return { ok: false, error: `${what}が失敗しました: ${failureOf({ ...ran, killed: false })}` };
+    return { ok: false, error: failed(op, failureOf({ ...ran, killed: false })) };
   }
-  return { ok: false, error: `${what}の出力を読み込めません（${parsed.error}）` };
+  return { ok: false, error: unreadable(op, parsed.error) };
 }

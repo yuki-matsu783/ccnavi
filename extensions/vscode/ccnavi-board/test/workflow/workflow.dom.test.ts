@@ -184,7 +184,7 @@ test("CB-D179 子の提案を付け替えられない理由・改版の錠・計
     assert.ok(listed.some((text) => text.includes("承認済みチケットと重なる")), String(listed));
     assert.ok(listed.some((text) => text.includes("phase: 9")), String(listed));
     assert.equal(saveButton(dom).disabled, true);
-    assert.match(saveButton(dom).getAttribute("title") ?? "", /子の提案/);
+    assert.match(saveButton(dom).getAttribute("title") ?? "", /子チケットの提案/);
   } finally {
     await dom.close();
   }
@@ -214,7 +214,7 @@ test("CB-D173 提案が外で変わったら差分を出し、取り込むか編
     await dom.send({ type: "answer", seq, answer: planOrderSample("reverse") });
     await dom.send({ type: "changed", answer: planOrderSample("loose", "b".repeat(64)) });
     const banner = dom.one("#changed");
-    assert.match(banner.textContent ?? "", /外で変わりました/);
+    assert.match(banner.textContent ?? "", /この画面の外で提案が変更されました/);
     assert.deepEqual(
       dom.all("#changed-diff tr[data-number]").map((row) => row.getAttribute("data-number")),
       ["4"],

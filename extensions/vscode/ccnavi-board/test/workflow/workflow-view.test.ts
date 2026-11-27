@@ -90,10 +90,10 @@ test("CB-T374 保存できない理由。書けない答え（実行ファイル
   assert.match(saveBlocker(planOrderSample("open"), calm), /変えていません/);
   assert.match(saveBlocker(planOrderSample("loose"), calm), /順序の検査/);
   assert.match(saveBlocker(reverse, { ...calm, pending: true }), /確認/);
-  assert.match(saveBlocker(reverse, { ...calm, changed: true }), /外で変わった/);
+  assert.match(saveBlocker(reverse, { ...calm, changed: true }), /外で提案が変更された/);
   assert.match(saveBlocker(reverse, { ...calm, gone: true }), /承認待ち/);
   const blocked = { ...reverse, writable: false, child_problems: ["i0001-03-01の付け替え先が承認済みチケットと重なる"] };
-  assert.match(saveBlocker(blocked, calm), /子の提案/);
+  assert.match(saveBlocker(blocked, calm), /子チケットの提案/);
 });
 
 test("CB-T375 タブのタイトルは未保存の間だけ頭に ● を付ける", () => {
@@ -145,8 +145,8 @@ test("CB-T387 提案が承認待ちから無くなった理由。新規の親は
   assert.equal(goneReasonOf("i0001", false, { proposal: "todo", approved: false }), undefined);
   assert.equal(goneReasonOf("i0001", true, { proposal: "todo", approved: true }), undefined);
   assert.match(goneReasonOf("i0001", false, { proposal: null, approved: true }) ?? "", /^i0001は承認済みです/);
-  assert.match(goneReasonOf("i0001", false, undefined) ?? "", /取り下げ・削除/);
-  assert.match(goneReasonOf("i0001", false, { proposal: null, approved: false }) ?? "", /取り下げ・削除/);
+  assert.match(goneReasonOf("i0001", false, undefined) ?? "", /取り下げられたか、削除されました/);
+  assert.match(goneReasonOf("i0001", false, { proposal: null, approved: false }) ?? "", /取り下げられたか、削除されました/);
   // 改版は承認済みの親に対して出すので、承認済みチケットがあっても承認されたとは限らない
   const revision = goneReasonOf("i0001", true, { proposal: null, approved: true }) ?? "";
   assert.match(revision, /改版の提案が承認待ちから無くなりました（承認されたか、取り下げ・削除されました）/);

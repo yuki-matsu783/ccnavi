@@ -45,10 +45,10 @@ test("CB-D366 一覧は対象ごとに1行。パス・種類・状態のバッ�
     assert.match(text(dom.one(row(".ccnavi/docs/broken.md"))), /error 1/);
     assert.match(text(dom.one(row(DOCS))), /warn 1/);
     // 要約: 対象6件、取り込める3件（template・layer-configのchanged・docs）、選択0件、対象外2件
-    assert.equal(text(dom.one("#counts")), "対象6件・取り込める3件・選択0件・対象外2件");
+    assert.equal(text(dom.one("#counts")), "対象6件・取り込み可能3件・選択0件・対象外2件");
     const ignored = text(dom.one("#ignored-paths"));
-    assert.match(ignored, /repro\.sh: 取り込める種類の表に無い/);
-    assert.match(ignored, /linked: リンクのディレクトリ/);
+    assert.match(ignored, /repro\.sh: 取り込める種類のファイルではない/);
+    assert.match(ignored, /linked: シンボリックリンクのディレクトリ/);
   } finally {
     await dom.close();
   }
@@ -81,7 +81,7 @@ test("CB-D368 取り込めない対象は選べず、理由を出す。error・u
     const reasons: [string, RegExp][] = [
       [".ccnavi/docs/broken.md", /取り込めません: 検査でerrorがあります/],
       [".ccnavi/docs/same.md", /取り込めません: 取り込み先と同じ内容/],
-      [HOOK, /取り込めません: ボードからは取り込めません。ターミナルで取り込みます/],
+      [HOOK, /取り込めません: この画面からは取り込めません。ターミナルで取り込んでください/],
     ];
     for (const [path, pattern] of reasons) {
       assert.equal(pick(dom, path).disabled, true, `${path}は選べない`);
@@ -100,7 +100,7 @@ test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、
     assert.equal(open.disabled, true, "何も選んでいない間は押せない");
     await check(dom, TEMPLATE);
     await check(dom, DOCS);
-    assert.equal(text(dom.one("#counts")), "対象6件・取り込める3件・選択2件・対象外2件");
+    assert.equal(text(dom.one("#counts")), "対象6件・取り込み可能3件・選択2件・対象外2件");
     dom.click(open);
     await dom.settle();
     assert.deepEqual(
@@ -173,7 +173,7 @@ test("CB-D372 錠が掛かった状態で開いても、templateとlayer-config�
     assert.equal(pick(locked, RULES).disabled, true);
     assert.equal(pick(locked, DOCS).disabled, false);
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
-    assert.equal(text(locked.one("#counts")), "対象6件・取り込める1件・選択0件・対象外2件");
+    assert.equal(text(locked.one("#counts")), "対象6件・取り込み可能1件・選択0件・対象外2件");
   } finally {
     await locked.close();
   }
@@ -191,7 +191,7 @@ test("CB-D373 defenseはターミナルの案内を出す。「ターミナル�
     assert.equal(dom.all('[data-role="terminal-guide"]').length, 0, "閉じている間は出さない");
     dom.click(dom.one(`${row(HOOK)} .row-head`));
     await dom.settle();
-    assert.match(text(dom.one('[data-role="terminal-guide"]')), /ボードから取り込めません/);
+    assert.match(text(dom.one('[data-role="terminal-guide"]')), /この画面から取り込めません/);
     assert.match(text(dom.one('[data-role="terminal-guide"]')), /防御を外せてしまうため/);
     dom.click(dom.one('[data-action="show-terminal"]'));
     await dom.settle();

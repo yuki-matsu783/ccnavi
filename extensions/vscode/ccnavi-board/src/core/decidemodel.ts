@@ -226,7 +226,7 @@ function parseTop(text: string): Top {
   if (version !== DECIDE_VERSION) {
     return {
       ok: false,
-      error: `未解決の指摘のJSONの版が違います（拡張は${DECIDE_VERSION}、実行ファイルは${String(raw.version)}）`,
+      error: `未解決の指摘のJSONの版が違います（拡張は${DECIDE_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   return { ok: true, raw, version };

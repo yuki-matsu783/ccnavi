@@ -69,7 +69,7 @@ test("CB-D734 カードにミラーの状態が出る。ずれの中身は畳ん
       ["更新 .ccnavi/config/common/rules.yml", "追加 .ccnavi/config/common/templates/a.yml", "削除 .ccnavi/config/common/old.yml"],
     );
     assert.equal(dom.all(`${cardSelector("app")} details.mirror-changes`).length, 0);
-    assert.equal(text(dom.one(".summary .mirror-checked")), "ミラーの最終確認14:05");
+    assert.equal(text(dom.one(".summary .mirror-checked")), "ミラーの最終確認: 14:05");
   } finally {
     await dom.close();
   }

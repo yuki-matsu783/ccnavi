@@ -45,7 +45,7 @@ type Json = Record<string, unknown>;
 
 function object(value: unknown, at: string): Json {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Json;
 }
@@ -55,7 +55,7 @@ function array(value: unknown, at: string): unknown[] {
     return [];
   }
   if (!Array.isArray(value)) {
-    throw new Error(`${at}がリストではない`);
+    throw new Error(`${at}がリストではありません`);
   }
   return value;
 }
@@ -64,7 +64,7 @@ function array(value: unknown, at: string): unknown[] {
 function onlyKeys(map: Json, known: readonly string[], at: string): void {
   const unknown = Object.keys(map).find((key) => !known.includes(key));
   if (unknown !== undefined) {
-    throw new Error(`${at}に未知のキー${unknown}`);
+    throw new Error(`${at}に未知のキー${unknown}があります`);
   }
 }
 
@@ -73,7 +73,7 @@ function itemOf(raw: unknown, at: string): Json {
   onlyKeys(item, ITEM_KEYS, at);
   // 実行ファイルの答えの読み取りは、番号の無いステップを黙って落とす。見本では落とさず、書き間違いとして止める
   if (typeof item.number !== "number" || !Number.isInteger(item.number) || item.number < 1) {
-    throw new Error(`${at}.numberは1以上の整数にする`);
+    throw new Error(`${at}.numberは1以上の整数にしてください`);
   }
   if (typeof item.type !== "string" || item.type === "") {
     throw new Error(`${at}.typeがありません`);
@@ -120,7 +120,7 @@ export function completeAnswer(name: string, raw: unknown, ticket: string, known
   const baseName = given.base === undefined ? "" : String(given.base);
   const base = baseName === "" ? undefined : known[baseName];
   if (baseName !== "" && base === undefined) {
-    throw new Error(`${at}.base「${baseName}」は先に定義した答えの名前にする`);
+    throw new Error(`${at}.base「${baseName}」は先に定義した答えの名前にしてください`);
   }
   const basePlans = array(base?.plans, `${at}.base`) as Json[];
   const plans: Json[] = [];

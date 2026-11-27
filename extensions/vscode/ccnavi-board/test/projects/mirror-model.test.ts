@@ -96,7 +96,7 @@ test("CB-T1157 okが偽の答えは読み取りの失敗にせず、理由を持
   assert.deepEqual(failed.projects, []);
 
   const version = parseMirrorList(JSON.stringify({ version: 2, ok: true, projects: [] }));
-  assert.ok(!version.ok && /拡張は1、実行ファイルは2/.test(version.error));
+  assert.ok(!version.ok && /拡張は1、ccnaviは2/.test(version.error));
   const noProjects = parseMirrorList(JSON.stringify({ version: 1, ok: true }));
   assert.ok(!noProjects.ok && /projects/.test(noProjects.error));
   const noName = parseMirrorList(JSON.stringify({ version: 1, ok: true, projects: [{ state: "synced" }] }));
@@ -124,16 +124,16 @@ test("CB-T1159 実行ファイルの出力の読み方: 読める答えは終了
   // 実行ファイルがargparseの苦情を標準エラーに出して2で終わる場合
   const usage = mirrorListOf({ code: 2, stdout: "", stderr: "usage: ccnavi user ...\nccnavi user: error: invalid choice: 'mirror'" });
   assert.ok(!usage.ok);
-  assert.equal(usage.error, "ccnavi user mirror --jsonが失敗しました: usage: ccnavi user ...");
+  assert.equal(usage.error, "ミラーのずれの確認に失敗しました（ccnavi user mirror --json）: usage: ccnavi user ...");
   const garbage = mirrorListOf({ code: 0, stdout: "not json", stderr: "" });
-  assert.ok(!garbage.ok && /出力を読み込めません/.test(garbage.error));
+  assert.ok(!garbage.ok && /結果を読み込めません/.test(garbage.error));
 
   assert.deepEqual(mirrorResultOf({ code: 0, stdout: RESULT_TEXT, stderr: "" }), { ok: true, synced: [{ name: "web", files: [".ccnavi/config/common/rules.yml"] }] });
   // 失敗の結果は非0で返っても、結果のerrorを使う
   const stale = JSON.stringify({ version: 1, ok: false, error: "内容が更新されました" });
   assert.deepEqual(mirrorResultOf({ code: 1, stdout: stale, stderr: "" }), { ok: false, error: "内容が更新されました" });
   const crashed = mirrorResultOf({ code: 1, stdout: "", stderr: "Traceback (most recent call last):" });
-  assert.deepEqual(crashed, { ok: false, error: "ccnavi user mirror --yes --jsonが失敗しました: Traceback (most recent call last):" });
+  assert.deepEqual(crashed, { ok: false, error: "ミラーの同期に失敗しました（ccnavi user mirror --yes --json）: Traceback (most recent call last):" });
 });
 
 test("CB-T1160 行の一言と変更の種類の言い方。名前は大文字小文字を区別せずに引く", () => {

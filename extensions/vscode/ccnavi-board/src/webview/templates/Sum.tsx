@@ -34,7 +34,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
       <summary>統合結果</summary>
       <p className="hint">
-        共通設定とプロジェクト設定を統合した結果を表示します。同じ名前が重なって破棄された側には、その理由を出します。
+        共通設定とプロジェクト設定を統合した結果を表示します。同じ名前があって使われない側には、その理由を表示します。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         統合結果{" "}

@@ -217,7 +217,7 @@ export function consultPrompt(input: {
       `（cwdが${tree}でなければ、先にcdだけを別のBashで実行する。cdや他のコマンドと連結しない）。` +
       "未解決の指摘を1件ずつ要約し、対応方針の案（対応しない／このフェーズで直す／issueに回す）と理由を返す。",
     "対応方針を確定するccnavi-user-decide.sh、ccnavi-review.sh confirm、その他の状態を変える操作は実行しない。" +
-      "決めるのはユーザで、ボードの「レビュー完了」から行う。",
+      "決めるのはユーザで、チケット管理画面の「レビュー完了」から行う。",
     `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確認する（置き場のファイルを自分で探さない）。`,
   );
   return lines.join("\n");
@@ -256,8 +256,8 @@ export function retireCommand(root: string, parent: string): string {
 /** 片付けの確認のダイアログの文。syncが何をするか（リモートの取り込み・マージ済みの確かめ直し・条件を満たすものだけの片付け）を先に言う */
 export function retireConfirmText(parent: string): string {
   return (
-    `ccnavi-sync.sh ${parent}を実行します。syncはリモートの取り込みも行い、MRがマージ済みかを確かめ直したうえで、` +
-    "条件を満たすものだけを片付けます。結果はターミナルで確認してください。"
+    `ccnavi-sync.sh ${parent}をターミナルで実行します。このスクリプトはリモートの変更を取り込み、MRがマージ済みかを確かめ直したうえで、` +
+    "条件を満たすワークツリーとブランチだけを片付けます。結果はターミナルで確認してください。"
   );
 }
 

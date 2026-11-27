@@ -119,7 +119,7 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
   for (const [name, rawDiagram] of Object.entries(map)) {
     const at = `diagrams.${name}`;
     if (!ID.test(name)) {
-      return { ok: false, error: `${at}: 名前は小文字の英字で始まり、英小文字・数字・-だけにする` };
+      return { ok: false, error: `${at}: 名前は小文字の英字で始まり、英小文字・数字・-だけにしてください` };
     }
     const diagram = object(rawDiagram);
     if (diagram === undefined) {
@@ -127,11 +127,11 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
     }
     const unknown = unknownKey(diagram, DIAGRAM_KEYS);
     if (unknown !== undefined) {
-      return { ok: false, error: `${at}に未知のキー${unknown}（actors / stepsだけ）` };
+      return { ok: false, error: `${at}に未知のキー${unknown}があります（actors / stepsだけ）` };
     }
     const actors = Array.isArray(diagram.actors) ? diagram.actors.map((actor) => text(actor)) : [];
     if (actors.length < 2 || actors.length > MAX_ACTORS || actors.some((actor) => actor === undefined) || new Set(actors).size !== actors.length) {
-      return { ok: false, error: `${at}.actorsは重ならない文字列を2〜${MAX_ACTORS}個` };
+      return { ok: false, error: `${at}.actorsは重ならない文字列を2〜${MAX_ACTORS}個にしてください` };
     }
     if (!Array.isArray(diagram.steps) || diagram.steps.length === 0) {
       return { ok: false, error: `${at}.stepsが空です` };
@@ -147,28 +147,28 @@ function parseDiagrams(raw: unknown): { readonly ok: true; readonly value: Recor
       }
       const stepUnknown = unknownKey(step, DIAGRAM_STEP_KEYS);
       if (stepUnknown !== undefined) {
-        return { ok: false, error: `${stepAt}に未知のキー${stepUnknown}（id / from / to / text / valueだけ）` };
+        return { ok: false, error: `${stepAt}に未知のキー${stepUnknown}があります（id / from / to / text / valueだけ）` };
       }
       const id = text(step.id);
       const from = text(step.from);
       const to = step.to === undefined ? from : text(step.to);
       const label = text(step.text);
       if (id === undefined || !ID.test(id)) {
-        return { ok: false, error: `${stepAt}.idは小文字の英字で始まり、英小文字・数字・-だけにする` };
+        return { ok: false, error: `${stepAt}.idは小文字の英字で始まり、英小文字・数字・-だけにしてください` };
       }
       if (seen.has(id)) {
         return { ok: false, error: `${stepAt}.id「${id}」が重複しています` };
       }
       seen.add(id);
       if (from === undefined || to === undefined || !names.includes(from) || !names.includes(to)) {
-        return { ok: false, error: `${stepAt}のfromとtoはactorsにある名前にする（toを書かなければfromの列の覚え書き）` };
+        return { ok: false, error: `${stepAt}のfromとtoはactorsにある名前にしてください（toを書かなければfromの列の覚え書き）` };
       }
       if (label === undefined) {
         return { ok: false, error: `${stepAt}.textが必要です` };
       }
       const value = step.value === undefined ? "" : text(step.value);
       if (value === undefined) {
-        return { ok: false, error: `${stepAt}.valueは空でない文字列にする（書かなければ無し）` };
+        return { ok: false, error: `${stepAt}.valueは空でない文字列にしてください（書かなければ無し）` };
       }
       steps.push({ id, from, to, text: label, value });
     }
@@ -185,7 +185,7 @@ export function parseTour(raw: unknown): TourParsed {
   }
   const rootUnknown = unknownKey(root, ROOT_KEYS);
   if (rootUnknown !== undefined) {
-    return { ok: false, error: `未知のキー${rootUnknown}（screen / sample / courses / diagramsだけ）` };
+    return { ok: false, error: `未知のキー${rootUnknown}があります（screen / sample / courses / diagramsだけ）` };
   }
   const screen = text(root.screen);
   if (screen === undefined) {
@@ -208,18 +208,18 @@ export function parseTour(raw: unknown): TourParsed {
     }
     const courseUnknown = unknownKey(course, COURSE_KEYS);
     if (courseUnknown !== undefined) {
-      return { ok: false, error: `${at}に未知のキー${courseUnknown}` };
+      return { ok: false, error: `${at}に未知のキー${courseUnknown}があります` };
     }
     const id = text(course.id);
     if (id === undefined || !ID.test(id)) {
-      return { ok: false, error: `${at}.idは小文字の英字で始まり、英小文字・数字・-だけにする` };
+      return { ok: false, error: `${at}.idは小文字の英字で始まり、英小文字・数字・-だけにしてください` };
     }
     if (seen.has(id)) {
       return { ok: false, error: `${at}.id「${id}」が重複しています` };
     }
     seen.add(id);
     if (ci === 0 && id !== INTRO_ID) {
-      return { ok: false, error: `${at}.idは先頭の案内として「${INTRO_ID}」にする` };
+      return { ok: false, error: `${at}.idは先頭の案内として「${INTRO_ID}」にしてください` };
     }
     const title = text(course.title);
     const summary = text(course.summary);
@@ -238,7 +238,7 @@ export function parseTour(raw: unknown): TourParsed {
       }
       const stepUnknown = unknownKey(step, STEP_KEYS);
       if (stepUnknown !== undefined) {
-        return { ok: false, error: `${stepAt}に未知のキー${stepUnknown}` };
+        return { ok: false, error: `${stepAt}に未知のキー${stepUnknown}があります` };
       }
       const stepTitle = text(step.title);
       const body = text(step.body);
@@ -246,45 +246,45 @@ export function parseTour(raw: unknown): TourParsed {
         return { ok: false, error: `${stepAt}のtitleとbodyが必要です` };
       }
       if (step.target !== undefined && step.target !== "" && (typeof step.target !== "string" || !TARGET.test(step.target))) {
-        return { ok: false, error: `${stepAt}.targetは小文字の英字で始まり、英小文字・数字・-だけにする（空なら中ほどに出す）` };
+        return { ok: false, error: `${stepAt}.targetは小文字の英字で始まり、英小文字・数字・-だけにしてください（空なら中ほどに出す）` };
       }
       const image = step.image === undefined ? "" : text(step.image);
       if (image === undefined || (image !== "" && !ID.test(image))) {
-        return { ok: false, error: `${stepAt}.imageは小文字の英字で始まり、英小文字・数字・-だけにする（画像の名前）` };
+        return { ok: false, error: `${stepAt}.imageは小文字の英字で始まり、英小文字・数字・-だけにしてください（画像の名前）` };
       }
       const alt = step.alt === undefined ? "" : text(step.alt);
       if (alt === undefined || (image !== "" && alt === "") || (image === "" && alt !== "")) {
-        return { ok: false, error: `${stepAt}はimageとaltを両方書くか、両方書かない` };
+        return { ok: false, error: `${stepAt}はimageとaltを両方書くか、両方省いてください` };
       }
       if (image !== "" && step.target !== undefined && step.target !== "") {
-        return { ok: false, error: `${stepAt}はimageがあるのでtargetは空にする（画像の読み込みで吹き出しの高さが変わる）` };
+        return { ok: false, error: `${stepAt}はimageがあるのでtargetは空にしてください（画像の読み込みで吹き出しの高さが変わる）` };
       }
       const diagram = step.diagram === undefined ? "" : text(step.diagram);
       if (diagram === undefined || (diagram !== "" && diagrams.value[diagram] === undefined)) {
-        return { ok: false, error: `${stepAt}.diagramはdiagramsにある名前にする` };
+        return { ok: false, error: `${stepAt}.diagramはdiagramsにある名前にしてください` };
       }
       if (diagram !== "" && image !== "") {
-        return { ok: false, error: `${stepAt}はimageとdiagramを同時に書かない` };
+        return { ok: false, error: `${stepAt}はimageとdiagramを同時に書かないでください` };
       }
       const focusText = step.focus === undefined ? "" : text(step.focus);
       const focus = focusText === undefined ? undefined : focusText === "" ? [] : focusText.split(",").map((id) => id.trim());
       if (focus === undefined || (focus.length > 0 && diagram === "")) {
-        return { ok: false, error: `${stepAt}.focusはdiagramと一緒に、矢印のidを , で区切って書く` };
+        return { ok: false, error: `${stepAt}.focusはdiagramと一緒に、矢印のidを , で区切って書いてください` };
       }
       const known = diagram === "" ? [] : diagrams.value[diagram].steps.map((entry) => entry.id);
       const missing = focus.find((id) => !known.includes(id));
       if (missing !== undefined) {
-        return { ok: false, error: `${stepAt}.focus「${missing}」はdiagrams.${diagram}の矢印にない` };
+        return { ok: false, error: `${stepAt}.focus「${missing}」はdiagrams.${diagram}の矢印にありません` };
       }
       const scene: Record<string, SceneValue> = {};
       if (step.scene !== undefined) {
         const given = object(step.scene);
         if (given === undefined) {
-          return { ok: false, error: `${stepAt}.sceneはオブジェクトにする` };
+          return { ok: false, error: `${stepAt}.sceneはオブジェクトにしてください` };
         }
         for (const [key, value] of Object.entries(given)) {
           if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
-            return { ok: false, error: `${stepAt}.scene.${key}は文字列・数・真偽のどれかにする` };
+            return { ok: false, error: `${stepAt}.scene.${key}は文字列・数・真偽のどれかにしてください` };
           }
           scene[key] = value;
         }
@@ -300,7 +300,7 @@ export function parseTour(raw: unknown): TourParsed {
 export function tourOf(raw: unknown): TourDef {
   const parsed = parseTour(raw);
   if (!parsed.ok) {
-    throw new Error(`案内の定義が読み込めない: ${parsed.error}`);
+    throw new Error(`案内の定義が読み込めません: ${parsed.error}`);
   }
   return parsed.value;
 }

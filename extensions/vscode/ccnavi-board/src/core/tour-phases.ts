@@ -19,7 +19,7 @@ export interface PhasesSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Record<string, unknown>;
 }
@@ -104,7 +104,7 @@ export function parsePhasesSample(raw: unknown): PhasesSample {
   const lib = pageOf(project.phases, "sample.project.phases", str(project.path), targets[1], targets);
   const added = phasesOf(root.added, "sample.added");
   if (added.length !== 1) {
-    throw new Error("sample.addedは定義1件にする");
+    throw new Error("sample.addedは定義1件にしてください");
   }
   return { page, project: lib, added: { ...added[0], origin: null } };
 }

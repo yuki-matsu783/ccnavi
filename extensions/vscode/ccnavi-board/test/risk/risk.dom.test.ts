@@ -109,7 +109,7 @@ test("CB-D13 ファイルがなければ欄も追加も押せず、「作る」�
 test("CB-T82 ファイルがなければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false, builtin: true });
   try {
-    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.ymlがありません。実行ファイルは組み込みの配点で数えています/);
+    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.ymlがありません。ccnaviは組み込みの配点でリスクを計算しています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
     assert.ok(missing.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
   } finally {
@@ -463,7 +463,7 @@ test("CB-T316 統合結果は読み取り専用で、閾値・項目・由来を
     assert.equal(select.value, "lib");
     assert.match(dom.one("#sum-levels").textContent, /MEDIUM 20.*HIGH 40.*CRITICAL 50/);
     const rows = () => dom.all("#sum tbody tr").map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
-    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通"], ["schema", "30", "プロジェクト（lib）"]]);
+    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通設定"], ["schema", "30", "プロジェクト（lib）"]]);
     dom.change(select, "self");
     await dom.settle();
     assert.match(dom.one("#sum-levels").textContent, /CRITICAL 70/);

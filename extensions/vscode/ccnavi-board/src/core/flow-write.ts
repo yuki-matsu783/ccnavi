@@ -92,7 +92,7 @@ export function linkedSegment(tree: string, file: string): string | undefined {
 function makeDirs(tree: string, dir: string): string | undefined {
   const parts = segments(tree, dir);
   if (parts === undefined) {
-    return `ツリーの外には保存しません（${dir}）`;
+    return `ワークツリーの外には保存できません（${dir}）`;
   }
   let current = tree;
   for (const part of parts) {
@@ -106,14 +106,14 @@ function makeDirs(tree: string, dir: string): string | undefined {
     }
     const stat = fs.lstatSync(current);
     if (stat.isSymbolicLink() || !stat.isDirectory()) {
-      return `${current}がシンボリックリンクか、ディレクトリではないため、保存しません`;
+      return `${current}がシンボリックリンクか、ディレクトリではないため、保存できません`;
     }
   }
   return undefined;
 }
 
 function linkedError(where: string): string {
-  return `${where}がシンボリックリンクのため、保存しません（リンク先は承認済みの領域の外かもしれません）。リンクを解除してから保存してください`;
+  return `${where}がシンボリックリンクのため、保存できません（リンク先は承認済みの領域の外かもしれません）。リンクを解除してから保存してください。`;
 }
 
 /**
@@ -122,7 +122,7 @@ function linkedError(where: string): string {
  */
 export function writeFlowFile(tree: string, file: string, text: string, expect: FlowExpect, noun = "フロー"): FlowWriteResult {
   if (segments(tree, file) === undefined) {
-    return { ok: false, error: `ツリーの外には保存しません（${file}）` };
+    return { ok: false, error: `ワークツリーの外には保存できません（${file}）` };
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
@@ -139,7 +139,7 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
   }
   const size = Buffer.byteLength(text, "utf8");
   if (size > FLOW_FILE_LIMIT) {
-    return { ok: false, error: `${noun}が大きすぎるため、保存しません（${size}バイト、上限${FLOW_FILE_LIMIT}）。実行ファイルはこれより大きい${noun}を読みません` };
+    return { ok: false, error: `${noun}が大きすぎるため、保存できません（${size}バイト、上限${FLOW_FILE_LIMIT}バイト）。ccnaviはこれより大きい${noun}を読み込めません。` };
   }
   const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`);
   let renamed = false;
@@ -185,19 +185,19 @@ function changedSince(file: string, expect: FlowExpect, noun: string): string | 
     }
   }
   if (!expect.exists) {
-    return stat === undefined ? undefined : `${noun}のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）`;
+    return stat === undefined ? undefined : `${noun}のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）。`;
   }
   if (stat === undefined) {
-    return `${noun}のファイルは、読み込んだあとに画面の外で消されています。更新してから編集し直してください`;
+    return `${noun}のファイルは、読み込んだあとに画面の外で消されています。更新してから編集し直してください。`;
   }
   if (stat.isSymbolicLink() || !stat.isFile()) {
-    return `${file}がシンボリックリンクか、ファイルではないため、保存しません`;
+    return `${file}がシンボリックリンクか、ファイルではないため、保存できません`;
   }
   if (stat.nlink > 1) {
-    return hardLinkedError(file, "保存しません");
+    return hardLinkedError(file, "保存できません");
   }
   if (stat.mtimeMs !== expect.mtimeMs) {
-    return `${noun}のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）`;
+    return `${noun}のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）。`;
   }
   return undefined;
 }
@@ -221,11 +221,11 @@ export function decodeFlowBytes(bytes: Uint8Array): { readonly ok: true; readonl
  */
 export function readFlowFile(tree: string, file: string): { readonly bytes: Uint8Array; readonly mtimeMs: number } | undefined {
   if (segments(tree, file) === undefined) {
-    throw new Error(`ツリーの外のファイルは読みません（${file}）`);
+    throw new Error(`ワークツリーの外のファイルは読み込めません（${file}）`);
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
-    throw new Error(`${linked}がシンボリックリンクのため、読み込みも保存もしません`);
+    throw new Error(`${linked}がシンボリックリンクのため、読み込みも保存もできません`);
   }
   let stat: fs.Stats;
   try {
@@ -237,23 +237,23 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
     throw error;
   }
   if (!stat.isFile()) {
-    throw new Error(`${file}はふつうのファイルではない（名前付きパイプやデバイスなど）ため、読みません`);
+    throw new Error(`${file}は通常のファイルではない（名前付きパイプやデバイスなど）ため、読み込めません`);
   }
   if (stat.nlink > 1) {
-    throw new Error(hardLinkedError(file, "読み込みも保存もしません"));
+    throw new Error(hardLinkedError(file, "読み込みも保存もできません"));
   }
   if (stat.size > FLOW_FILE_LIMIT) {
-    throw new Error(`${file}が大きすぎるため、読みません（${stat.size}バイト、上限${FLOW_FILE_LIMIT}）`);
+    throw new Error(`${file}が大きすぎるため、読み込めません（${stat.size}バイト、上限${FLOW_FILE_LIMIT}バイト）`);
   }
   // 確かめてから開くまでに差し替えられても、開いたものを確かめ直す。名前付きパイプでも待たない
   const fd = fs.openSync(file, fs.constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
   try {
     const opened = fs.fstatSync(fd);
     if (!opened.isFile() || opened.ino !== stat.ino || opened.dev !== stat.dev) {
-      throw new Error(`${file}を開いている間に別のファイルに差し替わったため、読みません`);
+      throw new Error(`${file}を開いている間に別のファイルに差し替わったため、読み込めません`);
     }
     if (opened.nlink > 1) {
-      throw new Error(hardLinkedError(file, "読み込みも保存もしません"));
+      throw new Error(hardLinkedError(file, "読み込みも保存もできません"));
     }
     const buffer = Buffer.alloc(FLOW_FILE_LIMIT + 1);
     let length = 0;
@@ -265,7 +265,7 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
       length += got;
     }
     if (length > FLOW_FILE_LIMIT) {
-      throw new Error(`${file}が大きすぎるため、読みません（上限${FLOW_FILE_LIMIT}バイト）`);
+      throw new Error(`${file}が大きすぎるため、読み込めません（上限${FLOW_FILE_LIMIT}バイト）`);
     }
     return { bytes: Uint8Array.from(buffer.subarray(0, length)), mtimeMs: opened.mtimeMs };
   } finally {
@@ -274,7 +274,7 @@ export function readFlowFile(tree: string, file: string): { readonly bytes: Uint
 }
 
 function hardLinkedError(file: string, what: string): string {
-  return `${file}はハードリンク（ほかのパスからも同じ中身を開ける）のため、${what}。承認済みの領域の外のパスから変更できる可能性があります。リンクを解除してから開き直してください`;
+  return `${file}はハードリンク（ほかのパスからも同じ中身を開ける）のため、${what}。承認済みの領域の外のパスから変更できる可能性があります。リンクを解除してから開き直してください。`;
 }
 
 // ---- 取り込んだ下書きを消す
@@ -303,7 +303,7 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
     return { ok: true, removed: false };
   }
   if (crypto.createHash("sha256").update(read.bytes).digest("hex") !== hash) {
-    return { ok: false, error: "下書きは、取り込んだあとに書き直されているため削除できません。新しい案は「提案あり」から確認してください" };
+    return { ok: false, error: "下書きは、取り込んだあとに書き直されているため削除できません。新しい案は「提案あり」から確認してください。" };
   }
   const linked = linkedSegment(tree, file);
   if (linked !== undefined) {
@@ -329,7 +329,7 @@ export function removeDraftFile(tree: string, file: string, hash: string): Draft
     again = "";
   }
   if (again !== hash) {
-    return { ok: false, error: putBack(aside, file, "下書きは、取り込んだあとに書き直されているため削除できません。新しい案は「提案あり」から確認してください") };
+    return { ok: false, error: putBack(aside, file, "下書きは、取り込んだあとに書き直されているため削除できません。新しい案は「提案あり」から確認してください。") };
   }
   try {
     fs.unlinkSync(aside);

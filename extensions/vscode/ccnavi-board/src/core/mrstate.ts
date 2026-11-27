@@ -81,7 +81,7 @@ export function interpretMrState(ran: Ran, expected: number): MrStateResult {
     // 終了コード2は引数の誤りやワークスペース不明。stderrに理由があれば、形の異常ではなく実行の失敗として出す
     const failed = ran.code !== 0 && ran.code !== 1 && (ran.code !== 2 || ran.stderr.trim() !== "");
     return failed
-      ? unknown("failed", `shが終了コード${ran.code}で終わりました${tail(ran.stderr)}`)
+      ? unknown("failed", `MRの状況を確認するスクリプトが、終了コード${ran.code}で失敗しました${tail(ran.stderr)}`)
       : format(lines.length === 0 ? "出力が空です" : "1行目がmr-state 1ではありません");
   }
   if (lines.length !== 2) {

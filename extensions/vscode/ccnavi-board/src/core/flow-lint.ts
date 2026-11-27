@@ -72,13 +72,13 @@ export async function lintFlowText(
     const errors = problems.filter((p) => p.severity === "error");
     if (errors.length > 0) {
       const said = truncateLines(errors.map((p) => rename(p.detail)), LINT_MORE_HINT).join("\n");
-      return { ok: false, error: `実行ファイル（--lint --flow）が、フローを読み込めないと返しました: ${said}` };
+      return { ok: false, error: `ccnaviの検査（--lint --flow）で、フローを読み込めませんでした: ${said}` };
     }
     const flow = ran.value.flow;
     if (flow === undefined || flow.data === null || flow.data === undefined) {
       return {
         ok: false,
-        error: "実行ファイル（--lint --flow）が、読んだ中身（flow）を返しません。確認できないため、先へ進めません。実行ファイルを更新してください",
+        error: "ccnaviの検査（--lint --flow）の結果に、読み込んだ内容（flow）がありません。フローを確認できないため、処理を中止しました。ccnaviを更新してください。",
       };
     }
     const checks: FlowChecks = {

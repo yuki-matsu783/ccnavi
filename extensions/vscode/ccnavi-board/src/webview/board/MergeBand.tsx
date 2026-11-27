@@ -20,14 +20,14 @@ import { isHttpUrl } from "./text.js";
 
 /** 確認できなかった理由の種類の呼び名。画面の言葉（shの種類の文字列はそのまま出さない） */
 const REASON_LABELS: Readonly<Record<string, string>> = {
-  "no-tool": "ツールが無い",
-  auth: "認証",
-  network: "ネットワーク",
-  api: "ホストのAPI",
-  "not-found": "見つかりません",
+  "no-tool": "必要なコマンドが無い",
+  auth: "認証エラー",
+  network: "ネットワークエラー",
+  api: "GitHub / GitLabのAPIエラー",
+  "not-found": "MRが見つからない",
   timeout: "タイムアウト",
-  format: "出力の形が想定外",
-  failed: "実行できません",
+  format: "出力の形式が想定外",
+  failed: "実行エラー",
   "no-number": "MRの番号が無い",
 };
 
@@ -95,7 +95,7 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
           <span>マージ済み</span>{" "}
           {row.sent ? (
             <span className="merge-sent" role="status">
-              片付けのコマンドをターミナルに送りました。結果はターミナルで確認してください
+              片付けのコマンドをターミナルに送りました。結果はターミナルで確認してください。
             </span>
           ) : (
             <button
@@ -126,8 +126,8 @@ function State({ row, touring }: { readonly row: MergeViewRow; readonly touring:
       return (
         <>
           <span>
-            マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルで
-            <code className="merge-command">{row.abandon}</code>を実行すると消えます
+            MRはマージされずに閉じられています。ccnaviは自動では片付けません。この親の記録を消すには、ターミナルで
+            <code className="merge-command">{row.abandon}</code>を実行してください。
           </span>
           <MrLink url={row.url} />{" "}
           <button

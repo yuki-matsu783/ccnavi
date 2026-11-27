@@ -40,7 +40,7 @@ test("CB-D1237 絞り込み中は上下ボタンを止め、titleに理由を出
     assert.match(down().title, /絞り込み中は並べ替えできません/);
     const typeSelect = (): HTMLSelectElement => dom.one<HTMLSelectElement>('.rule[data-id="git-push"] select.f-section');
     assert.equal(typeSelect().disabled, true);
-    assert.match(typeSelect().title, /絞り込み中は並べ替えできません/);
+    assert.match(typeSelect().title, /絞り込み中はタイプを変更できません/);
     dom.type(dom.one("#find"), "");
     await dom.settle();
     assert.equal(down().disabled, false);
@@ -80,7 +80,7 @@ test("CB-D1238 期待確認の「ヒットしたルール」に、ルールフ�
     };
     await dom.send({ type: "expectationsChecked", result });
     const cell = dom.all("#expectations-result tbody tr td")[4].textContent ?? "";
-    assert.match(cell, /deny:builtin-protect（ルールファイル外の根拠）/);
+    assert.match(cell, /deny:builtin-protect（ルールファイル以外に由来）/);
     assert.match(cell, /deny:no-rm(?!（)/);
   } finally {
     await dom.close();

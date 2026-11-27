@@ -88,7 +88,7 @@ test("CB-T1104 見るだけの答えを読む。対象の欄・対象外の件�
 test("CB-T1105 見るだけの答えが読めないとき、文面で失敗する（版違い・欄の型違い・pathの無い対象・JSONでない）", () => {
   assert.deepEqual(parseHandoffList(listText({ version: 2 })), {
     ok: false,
-    error: `取り込み待ちのJSONの版が違います（拡張は${HANDOFF_VERSION}、実行ファイルは2）`,
+    error: `取り込み待ちのJSONの版が違います（拡張は${HANDOFF_VERSION}、ccnaviは2）。拡張かccnaviを更新して、版を揃えてください。`,
   });
   assert.equal(parseHandoffList(listText({ entries: "x" })).ok, false);
   assert.equal(parseHandoffList(listText({ expect: 1 })).ok, false);
@@ -167,13 +167,13 @@ test("CB-T1109 取り込めるのはboardが真・状態がnewかchanged・error
 
 test("CB-T1110 取り込めない対象には理由を言う。ターミナルのみ・rejected・unchanged・error・知らない状態", () => {
   assert.equal(refusalReason(entry()), "");
-  assert.match(refusalReason(entry({ board: false, kind: "defense" })), /ボードからは取り込めません。ターミナルで取り込みます/);
+  assert.match(refusalReason(entry({ board: false, kind: "defense" })), /この画面からは取り込めません。ターミナルで取り込んでください/);
   assert.match(refusalReason(entry({ state: "rejected" })), /rejected/);
   assert.match(refusalReason(entry({ state: "unchanged" })), /同じ内容/);
   assert.match(refusalReason(entry({ errors: ["x"] })), /error/);
   assert.match(refusalReason(entry({ state: "later" })), /未知の状態です（later）/);
   // ターミナルのみの対象は、状態より先にターミナルで取り込むことを言う
-  assert.match(refusalReason(entry({ board: false, state: "rejected" })), /ターミナルで取り込みます/);
+  assert.match(refusalReason(entry({ board: false, state: "rejected" })), /ターミナルで取り込んでください/);
 });
 
 test("CB-T1111 作業中の錠はtemplateとlayer-configにだけ掛かる。docsとdefenseには掛けない", () => {

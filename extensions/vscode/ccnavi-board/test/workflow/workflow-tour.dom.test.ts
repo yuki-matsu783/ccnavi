@@ -311,7 +311,7 @@ test("CB-D287 外で変わった提案の案内は、帯と差分（開いたと
       if (index <= 3) {
         assert.equal(banner, 1, at);
         assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true, `${at}: 外で変わったのに保存できる`);
-        assert.match(dom.one("#save").getAttribute("title") ?? "", /外で変わった/, at);
+        assert.match(dom.one("#save").getAttribute("title") ?? "", /外で提案が変更された/, at);
         assert.match(dom.one('[data-action="adopt"]').textContent ?? "", /編集を破棄する/, at);
       }
       if (index <= 2) {
@@ -354,7 +354,7 @@ test("CB-D288 保存できない理由の案内は、断られた線の一言・
           assert.equal(dom.all('button[data-action="plan-remove-edge"][data-edge="after-1-2"]').length, 1, at);
           break;
         case 3:
-          assert.match(dom.one("#status").textContent ?? "", /この線は引けません。線は引く前のままです: 子が承認された番号を動かさずに/, at);
+          assert.match(dom.one("#status").textContent ?? "", /この線は引けません（子が承認された番号を動かさずに/, at);
           assert.ok(dom.one("#status").classList.contains("error"), at);
           break;
         case 4:
@@ -364,11 +364,11 @@ test("CB-D288 保存できない理由の案内は、断られた線の一言・
           assert.match(dom.one('[data-tour="notes-plan"]').textContent ?? "", /最後のステップ/, at);
           break;
         case 5:
-          assert.match(titleOf(), /改版で通らない/, at);
+          assert.match(titleOf(), /承認済みの子チケットがある番号/, at);
           assert.match(dom.one('#workflow-problems li[data-kind="revision"]').textContent ?? "", /先行を変えられない/, at);
           break;
         case 6:
-          assert.match(titleOf(), /子の提案を付け替えられない/, at);
+          assert.match(titleOf(), /子チケットの提案を新しい番号に付け替えられない/, at);
           assert.equal(dom.all('#workflow-problems li[data-kind="child"]').length, 1, at);
           assert.equal(dom.all('#workflow-problems li[data-kind="mismatched"]').length, 1, at);
           break;

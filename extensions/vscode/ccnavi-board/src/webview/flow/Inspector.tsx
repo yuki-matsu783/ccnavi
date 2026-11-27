@@ -144,7 +144,7 @@ export function Inspector({ doc, selected, readOnly, onChange, onSeal, onSelect,
       <p className="hint">
         ノードを押すと、ここに欄が出ます。ノードの右の点から左の点へドラッグすると、線でつながります。線を押すと条件を入力できます。ノードや線にポインタを載せると×が出て、押すと削除できます。
         {noGrouping
-          ? "元に戻すときは、画面上の「元に戻す」を押します。"
+          ? "元に戻すときは、画面上の「元に戻す」を押してください。"
           : "Shiftを押しながらノードを選ぶと、「グループ化」で枠にまとめられます。Ctrl+Zで元に戻せます。選んだノードはCtrl+Cでコピー、Ctrl+Vで貼り付け、Ctrl+Dで複製できます。"}
       </p>
     </aside>
@@ -193,7 +193,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
         )}
         {list !== undefined && value !== "" && (
           <span className={found === undefined ? "candidate-source missing" : "candidate-source"} data-source={found?.source ?? "missing"}>
-            {found === undefined ? "候補にありません（ユーザやプラグインのものなら気にしなくてかまいません）" : sourceLabel(found.source)}
+            {found === undefined ? "候補にありません（ユーザ設定やプラグインで定義したものなら、問題ありません）" : sourceLabel(found.source)}
           </span>
         )}
       </label>
@@ -266,7 +266,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
       {host !== undefined && <p className="dim small">グループ「{nodeName(host) || host.id}」の中にあります。枠の外へドラッグすると、グループから出ます。</p>}
       {group && (
         <>
-          <p className="hint">図の上の枠です。手順には入りません（線はつなぎません）。中のノードは{members}個です。枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。</p>
+          <p className="hint">図の上の枠です。手順には入りません（枠には線をつなげません）。中のノードは{members}個です。枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。</p>
           <div className="buttons">
             <button
               type="button"

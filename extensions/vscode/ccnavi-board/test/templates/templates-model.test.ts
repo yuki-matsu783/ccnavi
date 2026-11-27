@@ -103,7 +103,7 @@ test("CB-T536 版が違う答えは、版の文で失敗する", () => {
   });
   assert.deepEqual(parseTemplates(text), {
     ok: false,
-    error: `テンプレートのJSONの版が違います（拡張は${TEMPLATES_VERSION}、実行ファイルは${TEMPLATES_VERSION + 1}）`,
+    error: `テンプレートのJSONの版が違います（拡張は${TEMPLATES_VERSION}、ccnaviは${TEMPLATES_VERSION + 1}）。拡張かccnaviを更新して、版を揃えてください。`,
   });
 });
 

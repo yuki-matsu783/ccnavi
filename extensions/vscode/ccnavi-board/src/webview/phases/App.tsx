@@ -400,8 +400,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       ))}
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
+        ファイルの変更を検知しました。「更新」を押してください。
+        <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={shownBusy} onClick={reload}>
           更新
         </button>
       </div>
@@ -422,7 +422,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} title={shownPage?.exists !== true ? "ファイルがまだないため、開けません" : undefined} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={shownBusy} onClick={reload}>
             更新
           </button>
           <button type="button" className="action" data-action="undo" disabled={touring || shownBusy || !canUndo(history)} onClick={() => travel(undo(history, draft))}>
@@ -487,7 +487,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <input
             id="find"
             type="search"
-            placeholder="id・title・scope・deliverables・whenで絞り込む"
+            placeholder="id・タイトル・編集可能な範囲・必須成果物・使う場面で絞り込む"
             spellCheck={false}
             value={shownFind}
             onChange={(event) => {
@@ -500,19 +500,19 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         {shownHelp && (
           <div className="help-panel" id="help" data-tour="help-panel">
             <p className="hint">
-              区分が<code>work</code>の定義を親チケットの計画に並べたものが全体計画で、ユーザが合意すると確定します。レビューのあとは、区分が<code>feedback</code>の定義を並べて計画を改訂します。<code>id</code>と<code>title</code>はどちらも一意です。<code>scope</code>
-              は子チケットの編集可能な範囲の上限（ワークツリーのルートからのglob。<code>inherit</code>なら親の編集可能な範囲そのまま）、<code>deliverables</code>は必須成果物で、クローズする前に存在し、gitに追跡されているべきものです。
+              区分が<code>work</code>の定義を親チケットの計画に並べたものが全体計画で、承認すると確定します。レビューのあとは、区分が<code>feedback</code>の定義を並べて計画を改訂します。<code>id</code>と<code>title</code>はどちらも一意です。<code>scope</code>
+              は子チケットの編集可能な範囲の上限（ワークツリーのルートからのglob。<code>inherit</code>なら親の編集可能な範囲そのまま）、<code>deliverables</code>は必須成果物で、クローズする前に存在し、gitで追跡されている必要があります。
               <code>agent</code>・<code>skill</code>・<code>when</code>はエージェントへの案内にだけ使い、判定には使いません。編集可能な範囲と必須成果物は<code>,</code>で区切ります。
             </p>
             <details className="help">
               <summary>計画と合意のコマンド・キー</summary>
               <p className="hint">
-                全体計画は親チケットの<code>plan:</code>に、計画の改訂は<code>feedback:</code>に書きます。合意は<code>ccnavi user agree</code>が通ったときに成立します。
+                全体計画は親チケットの<code>plan:</code>に、計画の改訂は<code>feedback:</code>に書きます。承認は、<code>ccnavi user agree</code>が通ったときに成立します。
               </p>
             </details>
             <p className="hint">
               順序（どのフェーズにどのフェーズが先行するか）はこのファイルには記載しません。親チケットの計画のステップに<code>after</code>で先行を指定します（最後のステップにほかの全部が先行するようにします）。
-              親チケットは承認のときに使う定義のコピー（<code>phases:</code>）を持つので、あとでここを直しても進行中の親には反映されません。
+              親チケットは、承認された時点のフェーズ定義のコピー（<code>phases:</code>）を持ちます。あとでここを直しても、進行中の親には反映されません。
             </p>
           </div>
         )}
@@ -537,7 +537,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               onRemove={() => remove(row.key)}
             />
           ))}
-          {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする定義がありません。語を変えるか、絞り込み欄を空にしてください</li>}
+          {rows.length > 0 && shown + kept === 0 && <li className="empty">絞り込みにヒットする定義がありません。語を変えるか、絞り込み欄を空にしてください。</li>}
           {shownDraft.rows.length === 0 && <li className="empty">{emptyNote(shownPage?.exists === true)}</li>}
         </ul>
         {clash.ids.size > 0 && (
@@ -557,7 +557,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
   return (
     <section className="block" id="common-phases">
       <h2>
-        共通の設定の定義{" "}
+        共通設定の定義{" "}
         <span className="count" id="common-count">
           {props.common.length}
         </span>

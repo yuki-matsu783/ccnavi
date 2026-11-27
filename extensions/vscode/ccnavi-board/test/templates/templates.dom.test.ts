@@ -35,11 +35,11 @@ test("CB-D324 一覧は開いている対象のレイヤーのテンプレート
     // 共通と全欄が同じで破棄した行は、共通の1本が使われるので無効・破棄とは出さない。理由の本文は指摘の一覧に1度だけ出す
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
     const feature = text(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
-    assert.match(feature, /共通の側を使用/);
+    assert.match(feature, /共通設定の側を使用/);
     assert.doesNotMatch(feature, /無効|破棄/);
     assert.equal(text(dom.one('li.template[data-name="feature"][data-layer="self"]')).split("全欄が同じなので").length, 2);
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /無効/);
-    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄: 共通と食い違います/);
+    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄: 共通設定と内容が違う/);
     assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
     assert.equal(dom.all("details#sum").length, 1);
   } finally {
@@ -55,10 +55,10 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     const rows = dom.all("details#sum tbody tr").map((tr) => `${tr.getAttribute("data-layer")}/${tr.getAttribute("data-name")}`);
     assert.deepEqual(rows, ["common/broken", "common/feature", "common/research", "self/ends", "self/feature", "self/local", "self/research"]);
-    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めません/);
+    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込み不可/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
-    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違います/);
-    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは4件（共通 \+ ワークスペース）/);
+    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通設定と内容が違う/);
+    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは4件（共通設定 \+ ワークスペース）/);
     dom.change(dom.one<HTMLSelectElement>("select#sum-select"), "lib");
     await dom.settle();
     assert.deepEqual(
@@ -104,9 +104,9 @@ test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が
   const dom = await openTemplates();
   try {
     const summary = text(dom.one('[data-tour="summary"]'));
-    assert.match(summary, /エラー3/);
-    assert.match(summary, /警告2/);
-    assert.match(summary, /情報1/);
+    assert.match(summary, /error3/);
+    assert.match(summary, /warn2/);
+    assert.match(summary, /info1/);
     await openRow(dom, 'li.template[data-name="ends"][data-layer="self"]');
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[error\]/);
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
@@ -214,7 +214,7 @@ test("CB-D348 統合結果で破棄された行の本文は、レイヤーかsha
     // レイヤーが違う本文は出さない（shaは同じでも）
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...common, text: "共通の本文" }, error: "" });
     assert.equal(dom.all("pre.tpl-text").length, 0);
-    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /この行の本文は読み込めません/);
+    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /このテンプレートの本文は、この画面では表示できません/);
     assert.match(text(dom.one('[data-role="detail-mismatch"]')), /feature\.yml/);
     // レイヤーが同じでもshaが違う本文は出さない
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...self, sha: "f".repeat(64), text: "別の本文" }, error: "" });

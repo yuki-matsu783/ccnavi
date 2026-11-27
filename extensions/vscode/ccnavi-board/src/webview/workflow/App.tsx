@@ -239,7 +239,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   useEscape(review, ESCAPE_LAYER.overlay, () => setReview(false));
   /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す。押すと［この順序に決める］と同じく確認を出す */
   const saveKey = useRef<SaveKeyTarget | undefined>(undefined);
-  useSaveKey(!tour.touring && data.kind === "page" && !review, () => saveKey.current ?? { blocker: "読み込みが終わっていないため、決められません", busy: false, save: () => undefined, blocked: () => undefined });
+  useSaveKey(!tour.touring && data.kind === "page" && !review, () => saveKey.current ?? { blocker: "読み込みが終わっていないため、保存できません", busy: false, save: () => undefined, blocked: () => undefined });
 
   if (data.kind === "loading") {
     saveKey.current = undefined;
@@ -337,7 +337,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     }
     setReview(false);
     setBusy(true);
-    setStatus({ text: "提案を変更しています…", error: false });
+    setStatus({ text: "提案を保存しています…", error: false });
     post({ type: "save", order: changedOrder(answer), expect: page.answer.source_sha });
   };
 
@@ -355,8 +355,8 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         <div id="changed" className="banner warn" role="status" data-tour="changed">
           <span className="workflow-banner-text">
             {shownDiff
-              ? "提案が外で変わりました（エージェントが変更した可能性があります）。下の差分を見て、取り込むか編集を続けるかを選んでください。"
-              : "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください（いまの編集は破棄します）。"}
+              ? "この画面の外で提案が変更されました（エージェントが変更した可能性があります）。下の差分を見て、取り込むか編集を続けるかを選んでください。"
+              : "この画面の外で提案が変更されたため、保存できません。「取り込む」を押して、新しい提案から編集し直してください（いまの編集は破棄されます）。"}
           </span>
           <button
             type="button"
@@ -419,14 +419,14 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
-            <strong>{shownTicket}</strong> の作業・レビュー計画の順序
+            <strong>{shownTicket}</strong>の計画（全体計画・フィードバック計画）の順序
           </span>
           <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
             未保存
           </span>
         </div>
         <div className="controls" data-tour="controls">
-          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="いまの線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
+          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="いまの線に合わせて、ステップの配置を整えます（番号は変わりません）" onClick={relayout}>
             並べ直す
           </button>
           <button
@@ -450,7 +450,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             data-action="save"
             data-tour="save"
             disabled={blocker !== ""}
-            title={blocker === "" ? "提案の計画と、番号の変わるステップを指す子の提案を変更します（承認はしません。Ctrl+S）" : blocker}
+            title={blocker === "" ? "提案の計画を書き換えます。番号が変わるステップを指している子の提案も、合わせて書き換えます（承認はしません。Ctrl+S）。" : blocker}
             onClick={() => {
               if (!touring) {
                 setReview(true);
@@ -463,7 +463,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
       </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">
-        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップに、元のステップが先行として加わります（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびにccnaviが番号を振り直します。循環になる線と、子が承認された番号へ入る線は引けません。
+        ステップの右の点から別のステップの左の点へドラッグすると、線の先のステップに、元のステップが先行として加わります（逆向きでも引けます）。線の真ん中の × で先行を外せます。線を変えるたびにccnaviが番号を振り直します。循環になる線と、子チケットが承認済みのステップへ入る線は引けません。
       </p>
       {moved.length > 0 && (
         <p id="workflow-renumbered" className="small" data-tour="renumbered">

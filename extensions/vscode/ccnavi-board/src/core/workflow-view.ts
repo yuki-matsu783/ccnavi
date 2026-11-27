@@ -162,14 +162,14 @@ export function goneReasonOf(ticket: string, revision: boolean, now: ParentNow |
   if (now?.proposal === "todo") {
     return undefined;
   }
-  const readOnly = "この図は閲覧専用です";
+  const readOnly = "この図は閲覧専用です。";
   if (revision && now?.approved === true) {
     return `${ticket}の改版の提案が承認待ちから無くなりました（承認されたか、取り下げ・削除されました）。順序を変えるには、改版の提案を出してからこのタブを開き直してください。${readOnly}`;
   }
   if (now?.approved === true) {
     return `${ticket}は承認済みです（承認待ちの提案はもうありません）。順序を変えるには、改版の提案を出してからこのタブを開き直してください。${readOnly}`;
   }
-  return `${ticket}の提案が承認待ちの置き場から無くなりました（取り下げ・削除）。${readOnly}`;
+  return `${ticket}の提案が承認待ちから無くなりました（取り下げられたか、削除されました）。${readOnly}`;
 }
 
 /**
@@ -360,16 +360,16 @@ export interface SaveState {
  */
 export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
   if (state.busy) {
-    return "処理中のため決められません。終わるまでお待ちください";
+    return "処理中のため保存できません。終わるまでお待ちください。";
   }
   if (state.gone) {
-    return "提案が承認待ちにありません";
+    return "この提案は、もう承認待ちではありません";
   }
   if (state.changed) {
-    return "提案が外で変わったため、保存できません。「取り込む」で新しい提案から始めてください";
+    return "この画面の外で提案が変更されたため、保存できません。「取り込む」を押して、新しい提案から編集し直してください。";
   }
   if (state.pending) {
-    return "線を変えた順序をccnaviで確認しています";
+    return "線を変えたあとの順序をccnaviで確認しています";
   }
   if (!isDirty(answer)) {
     return "順序を変えていません";
@@ -378,20 +378,20 @@ export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
     return "";
   }
   if (answer.child_problems.length > 0) {
-    return "子の提案を付け替えられないため、保存できません";
+    return "子チケットの提案を新しい番号に付け替えられないため、保存できません";
   }
   if (answer.revision_problems.length > 0) {
-    return "改版で通らない形（承認済みの子がその番号を固定しているので、その番号のステップは変えられない）のため、保存できません";
+    return "承認済みの子チケットがある番号のステップは変えられないため、保存できません";
   }
   return "順序の検査にerrorがあるため、保存できません";
 }
 
 /** 線を変えて、実行ファイルの答えを待つ間に出す一言 */
-export const CHECKING_TEXT = "線を変えた順序をccnaviで確認しています…";
+export const CHECKING_TEXT = "線を変えたあとの順序をccnaviで確認しています…";
 
 /** 実行ファイルが断った線（`refused`）を言う一言。線は引く前の答えのまま、理由を実行ファイルの文で並べる */
 export function refusedText(refused: readonly PlanOrderRefusal[]): string {
-  return `この線は引けません。線は引く前のままです: ${refused.map((r) => r.text).join("、")}`;
+  return `この線は引けません（${refused.map((r) => r.text).join("、")}）。線は引く前のままです。`;
 }
 
 /** 最初の中身を埋める`<script type="application/json">`のid */

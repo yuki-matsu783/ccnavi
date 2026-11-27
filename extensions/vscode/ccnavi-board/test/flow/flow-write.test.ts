@@ -151,7 +151,7 @@ test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない
   if (made.status !== 0) {
     return; // mkfifoがない機械
   }
-  assert.throws(() => readFlowFile(tree, file), /ふつうのファイルではない/);
+  assert.throws(() => readFlowFile(tree, file), /通常のファイルではない/);
   const written = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
   assert.equal(written.ok, false);
 });

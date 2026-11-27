@@ -187,9 +187,9 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     lines: ["  i0001 のフェーズ 1 のマーカーを削除した"],
   });
   assert.ok(stopped.includes("i0001-01-01で止まりました"));
-  assert.ok(stopped.includes("書けた承認済みチケット（1件）: .ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
-  assert.ok(stopped.includes("書き込めませんでした: i0001-01-01"), "書けなかった提案を名指しする");
-  assert.ok(stopped.includes("コミット・pushするコマンドは実行していません"), "送れていなければ未実行と言う");
+  assert.ok(stopped.includes("承認済みにできたチケット（1件）: .ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
+  assert.ok(stopped.includes("承認済みにできなかったチケット: i0001-01-01"), "書けなかった提案を名指しする");
+  assert.ok(stopped.includes("コミット・pushするコマンドは、push用のスクリプトが無いため実行していません"), "送れていなければ未実行と言う");
   const sent = partialMessage({
     placed: ["i0001"],
     paths: [".ccnavi/approved/doing/i0001.md"],
@@ -198,13 +198,13 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
     reason: "書けない",
     lines: [],
   }, true);
-  assert.ok(sent.includes("書けたぶんだけをコミット・pushするコマンドをターミナルに送りました"), sent);
+  assert.ok(sent.includes("承認済みにできた分をコミット・pushするコマンドをターミナルに送りました"), sent);
   assert.ok(stopped.includes("マーカーを削除した"), "ターミナルに出ていた行も渡す");
 
   // 1 件も置かれなかったときは「一部だけ置かれた」と言わない
   const none = partialMessage({ placed: [], paths: [], written: [], ticket: "i0001", reason: "書けない", lines: [] });
   assert.ok(none.includes("承認済みになったチケットはありません"));
-  assert.ok(!none.includes("書けた承認済みチケット"));
+  assert.ok(!none.includes("承認済みにできたチケット"));
 
   // 書けたあとの後始末（マーカーを置く）で失敗したときは、言い方を変える
   const after = partialMessage({
@@ -219,13 +219,13 @@ test("CB-T159 途中で止まったことを伝える文（置いた件数・後
   assert.ok(!after.includes("i0001で止まりました"));
 
   // 「が」と識別子の間に空白を入れない。止まった識別子が分からない（空）ときも「が」の直後に「止まりました」が続く
-  assert.ok(stopped.startsWith("ccnavi user agree --yesがi0001-01-01で止まりました: 書けない (…)。"), stopped);
-  assert.ok(after.startsWith("ccnavi user agree --yesがi0001の後始末で止まりました: "), after);
+  assert.ok(stopped.startsWith("承認（ccnavi user agree --yes）がi0001-01-01で止まりました: 書けない (…)。"), stopped);
+  assert.ok(after.startsWith("承認（ccnavi user agree --yes）がi0001の後始末で止まりました: "), after);
   const unknown = partialMessage({ placed: [], paths: [], written: [], ticket: "", reason: "書けない", lines: [] });
-  assert.ok(unknown.startsWith("ccnavi user agree --yesが止まりました: 書けない。"), unknown);
+  assert.ok(unknown.startsWith("承認（ccnavi user agree --yes）が止まりました: 書けない。"), unknown);
   // 継ぎ目だけを見る。識別子があっても無くても、「が」のあとに空白は入らない
-  assert.match(stopped, /--yesがi0001-01-01で止まりました/, stopped);
-  assert.match(unknown, /--yesが止まりました/, unknown);
+  assert.match(stopped, /--yes）がi0001-01-01で止まりました/, stopped);
+  assert.match(unknown, /--yes）が止まりました/, unknown);
 });
 
 test("CB-T398 承認した子のワークツリーの計画を読む（欠けた欄は空として読む）", () => {
@@ -266,8 +266,8 @@ test("CB-T399 作れなかった子のワークツリーは、名前と手で打
   assert.equal(
     text,
     "子チケットi0001-01-01のワークツリー.claude/worktrees/i0001-01-01を作成できませんでした（fatal: already exists）。" +
-      "手で作るなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001。" +
-      "ブランチi0001-01-01が既にあるなら: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
+      "手で作るコマンド: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 -b i0001-01-01 i0001 ／ " +
+      "ブランチi0001-01-01が既にあるときのコマンド: sh '/ws/.ccnavi/scripts/ccnavi-git.sh' worktree add .claude/worktrees/i0001-01-01 i0001-01-01",
   );
   assert.equal(childWorktreeFailureText([], "sh x"), "");
 });

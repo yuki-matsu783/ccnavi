@@ -643,7 +643,7 @@ test("CB-T170 絞り込みは見えている識別子だけを絞りに通す。
 
   const none = approvalStep(CLOSED, { kind: "approve", tickets: [], filtered: true, pending: ["i0001"] });
   assert.equal(none.state.overlay, undefined);
-  assert.deepEqual(none.effects, [{ kind: "warn", text: "絞り込みで見えている承認待ちがありません" }]);
+  assert.deepEqual(none.effects, [{ kind: "warn", text: "絞り込んだ結果に、承認待ちのチケットがありません" }]);
 });
 
 test("CB-T171 一覧が返ったら見せる。読めなければ、そう見せる", () => {
@@ -710,7 +710,7 @@ test("CB-T173 承認できたら渡す文を見せ、承認のpushのshをター
   assert.deepEqual(kinds(noScript.effects), ["warn", "refresh"], "ターミナルには送らず、何をすればよいかを言う");
   assert.match(
     noScript.effects[0]?.kind === "warn" ? noScript.effects[0].text : "",
-    /ccnavi-user-push-approved\.shが配られていないので/,
+    /ccnavi-user-push-approved\.shが入っていないので/,
   );
 
   const zero = approvalStep(approving, {
@@ -737,7 +737,7 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで更新し、返っ
   assert.equal(shown.state.overlay?.kind, "preview");
   assert.equal(
     shown.state.overlay?.kind === "preview" ? shown.state.overlay.notice : "",
-    "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください",
+    "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください。",
     "識別子が同じなら、変わったのは提案ファイルの中身",
   );
   assert.equal(shown.state.recheck, undefined);
@@ -755,7 +755,7 @@ test("CB-T174 食い違いは、見せたまま同じ絞りで更新し、返っ
   });
   assert.equal(
     otherShown.state.overlay?.kind === "preview" ? otherShown.state.overlay.notice : "",
-    "内容が更新されました（表示したあとに承認待ちの提案が増えたか減りました）。何も承認していません。最新の一覧を表示し直したので、見直してからもう一度承認してください",
+    "内容が更新されました（表示したあとに承認待ちの提案が増えたか減りました）。何も承認していません。最新の一覧を表示し直したので、見直してからもう一度承認してください。",
   );
 });
 
@@ -808,13 +808,13 @@ test("CB-T176b 親だけ書けて子が止まった承認は、書けた分の�
   assert.equal(carried.state.overlay?.kind, "error");
   const text = carried.state.overlay?.kind === "error" ? carried.state.overlay.error : "";
   assert.ok(text.includes(".ccnavi/approved/doing/i0001.md"), "書けたパスを言う");
-  assert.ok(text.includes("書き込めませんでした: i0001-01-01"), "書けなかった子を言う");
+  assert.ok(text.includes("承認済みにできなかったチケット: i0001-01-01"), "書けなかった子を言う");
   assert.deepEqual(kinds(carried.effects), ["carry", "refresh"], "書けた分は送る");
 
   // pushのshが無ければ送れない。未実行と言う
   const missing = approvalStep(approving, { kind: "approved", outcome: { ok: false, partial }, carrier: false });
   assert.deepEqual(kinds(missing.effects), ["refresh"]);
-  assert.ok((missing.state.overlay?.kind === "error" ? missing.state.overlay.error : "").includes("未実行"));
+  assert.ok((missing.state.overlay?.kind === "error" ? missing.state.overlay.error : "").includes("実行していません"));
 
   // 1件も書けていなければ送らない
   const none = approvalStep(approving, {
@@ -850,7 +850,7 @@ test("CB-T177 ［レビュー完了］は残った指摘を読む。待ちでな
   const notWaiting = approvalStep(CLOSED, { ...input, chip: chipOf({ reviewWaiting: false }) } as ApprovalInput);
   assert.equal(notWaiting.state.overlay, undefined);
   assert.deepEqual(notWaiting.effects, [
-    { kind: "warn", text: "親i0001のフェーズ1設計はユーザのレビュー待ちではありません。チケット管理画面を更新しました" },
+    { kind: "warn", text: "親i0001のフェーズ1設計は、レビュー待ちではありません。チケット管理画面を更新しました。" },
     { kind: "refresh" },
   ]);
 });
@@ -931,7 +931,7 @@ test("CB-T177d 確定した結果は実行ファイルの答えに従う。revie
   // 答えが「レビュー済みでない」のに理由が見ヒットしないときは、レビュー済みになったとは言わない
   const odd = overlayOf({ reviewed: false });
   assert.doesNotMatch(odd?.title ?? "", /をレビュー済みにしました/);
-  assert.match(odd?.note ?? "", /レビュー済みになっていません/);
+  assert.match(odd?.note ?? "", /「更新」を押して、状態を確かめてください/);
 });
 
 test("CB-T178 文を渡したら閉じる。コピー・新しいセッション・ターミナルで実行で、呼び名は同じ文に付く", () => {
@@ -1029,7 +1029,7 @@ test("CB-T204 置けたら渡す文を見せて更新する。投稿の警告は
   assert.equal(done.state.overlay?.kind === "prompt" ? done.state.overlay.prompt : "", "決めた文");
   // fixのスレッドはホスト上で未解決のまま残る。resolveするのはユーザ（keep・issueの返信と解決は対象外）
   const note = done.state.overlay?.kind === "prompt" ? done.state.overlay.note : "";
-  assert.match(note, /MR上の指摘を解決済みにする作業は、ユーザが行います/);
+  assert.match(note, /MR上の指摘を解決済みにする作業は、自分で行ってください/);
   assert.deepEqual(kinds(done.effects), ["warn", "refresh"]);
   const copied = approvalStep(done.state, { kind: "handOver", how: "promptCopy" });
   assert.deepEqual(copied.effects, [{ kind: "copy", prompt: "決めた文", what: "対応方針のプロンプト" }]);
@@ -1048,7 +1048,7 @@ test("CB-T378 未保存の計画編集タブがある親を含む一覧は、承
   assert.equal(blocked.state, shown, "一覧を見せたまま");
   assert.equal(blocked.redraw, false);
   assert.deepEqual(blocked.effects, [
-    { kind: "warn", text: "親i0001の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
+    { kind: "warn", text: "親i0001の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください。" },
   ]);
   // 別の親のタブだけが未保存なら、この一覧は打てる
   const other = approvalStep(shown, { kind: "confirm", digest: "d1", unsaved: ["i0002"], tickets: ["i0001"] });
@@ -1064,7 +1064,7 @@ test("CB-T378 未保存の計画編集タブがある親を含む一覧は、承
   // 2つの親が未保存なら、両方を名指しする
   const two = approvalStep(toPlanPreview(approvalStep, { i0001: "s1", i0002: "s2" }), { kind: "confirm", digest: "d1", unsaved: ["i0002", "i0001"], tickets: ["i0001", "i0002"] });
   assert.deepEqual(two.effects, [
-    { kind: "warn", text: "親i0001, i0002の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください" },
+    { kind: "warn", text: "親i0001, i0002の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください。" },
   ]);
 });
 

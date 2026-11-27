@@ -191,7 +191,7 @@ test("CB-D111 入れ子が子の下2階層を超えるときだけ注意を出�
   const dom = await openFlow({ doc: deep });
   try {
     const notices = dom.all("#flow-notices li").map((li) => li.textContent ?? "");
-    assert.ok(notices.some((n) => /子の下に3階層重なっています/.test(n)), notices.join("\n"));
+    assert.ok(notices.some((n) => /子チケットの担当の下に3階層あります/.test(n)), notices.join("\n"));
     assert.ok(notices.some((n) => /サブフロー（subAgentFlows）が2本/.test(n)));
     // サブフローのノードにも入れ子の目印
     assert.equal(dom.one('.react-flow__node[data-id="outer"]').querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");

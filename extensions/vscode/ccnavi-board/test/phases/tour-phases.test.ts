@@ -188,7 +188,7 @@ test("CB-T466 定義の中を指す手順は開いた定義を持ち、補足の
 test("CB-T467 見本の形が壊れていれば、読み取りが名指しして落ちる", () => {
   const base = def.sample as Record<string, unknown>;
   assert.throws(() => parsePhasesSample({ ...base, added: { a: { kind: "work" }, b: { kind: "work" } } }), /sample\.addedは定義1件/);
-  assert.throws(() => parsePhasesSample({ ...base, phases: [] }), /sample\.phasesがオブジェクトではない/);
+  assert.throws(() => parsePhasesSample({ ...base, phases: [] }), /sample\.phasesがオブジェクトではありません/);
   assert.throws(() => parsePhasesSample({ ...base, project: undefined }), /sample\.project/);
   // 区分と既定のレビューは、実際の読み取りと同じ既定（work / mr / inherit）に落ちる
   const one = parsePhasesSample({ ...base, phases: { version: 1, phases: { x: { kind: "nonsense" } } } });

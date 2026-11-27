@@ -109,7 +109,7 @@ export function Phase(props: PhaseProps): JSX.Element {
       <div className="row-body">
         <Captioned name="id" yamlKey="id" tour={mark("phase-id")}>
           {text("id", "f-id narrow", "implement")}
-          <p className="hint">英数字で始まり、使えるのは英数字と「.」「_」「-」です。</p>
+          <p className="hint">英数字で始めます。使える文字は、英数字と「.」「_」「-」です。</p>
         </Captioned>
         <Captioned name="タイトル" yamlKey="title" tour={mark("phase-title")}>
           {text("title", "f-title narrow", "実装とテスト")}
@@ -172,7 +172,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
           {list("deliverables", "f-deliverables", "wip/design/*.md（区切りは半角の「,」です）")}
-          <p className="hint">クローズする前に存在し、gitに追跡されている必要があります。</p>
+          <p className="hint">クローズする前に存在し、gitで追跡されている必要があります。</p>
         </Captioned>
         <details
           className="more"
@@ -201,7 +201,7 @@ export function Phase(props: PhaseProps): JSX.Element {
             </Captioned>
             <Captioned name="最初に呼ぶ工程スキル" yamlKey="skill">
               {text("skill", "f-skill narrow", "process-research")}
-              <p className="hint">案内に出すだけで、呼ぶかは子チケットが決めます。</p>
+              <p className="hint">案内に出すだけです。呼ぶかどうかは、子チケットを担当するエージェントが決めます。</p>
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
               {text("when", "f-when", "この定義を計画に入れる場面")}

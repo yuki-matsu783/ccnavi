@@ -48,7 +48,7 @@ import { targetOptions, type TargetOption } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
 import { assertRetained, openInEditor, watchGlobs, workspaceFolder } from "./panel-common.js";
-import { settingsPanel, type SettingsState } from "./settings-panel.js";
+import { settingsPanel, targetLabelOf, type SettingsState } from "./settings-panel.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
@@ -99,27 +99,15 @@ function projectOf(target: RulesTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
-function targetLabelOf(target: RulesTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "共通の設定";
-    case "self":
-      return "ワークスペース";
-    case "project":
-      return `プロジェクト${target.name}`;
-  }
-}
-
 /** 読み込み中の一言で「何を」読んでいるか */
 function whatOf(target: RulesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "ルール";
+      return "共通設定のルール";
     case "self":
       return "ワークスペースの設定のルール";
     case "project":
-      return `${target.name}のルール`;
+      return `プロジェクト「${target.name}」のルール`;
   }
 }
 
@@ -195,7 +183,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   // 切り替えの一覧のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧が縮むだけ
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
-    notices.push(`実行ファイルから動作モードを取得できないため、判定が実行を止めるかを表示していません: ${board.error}`);
+    notices.push(`ccnaviから動作モードを取得できないため、denyやaskの判定でツールの実行が実際に止まるかどうかを表示していません: ${board.error}`);
   }
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
   if (target.kind === "workspace") {
@@ -207,14 +195,14 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     // 食い違ったときに、この画面で保存したルールが判定に使われなくなる。答えは元リポジトリの版で、
     // ワークツリーの中の版は指さない。
     if (!board.ok) {
-      throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
+      throw new Error(`設定ファイルの場所をccnaviから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.rules.path === "") {
       throw new Error(
         target.kind === "self"
           ? "ccnaviの出力にワークスペースの設定がありません"
-          : `プロジェクト${target.name}は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
+          : `プロジェクト「${target.name}」は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
       );
     }
     rulesPath = resolveIn(root, layer.rules.path);
@@ -427,7 +415,7 @@ function stale(current: PanelState, loaded: Loaded, what: string): boolean {
   if (!sameTarget(loaded.target, current.target)) {
     return true;
   }
-  fail(current, `画面を更新したので、${what}は取りやめました。更新後のルールでやり直してください`);
+  fail(current, `画面を更新したので、${what}は取りやめました。更新後のルールでやり直してください。`);
   return true;
 }
 
@@ -579,7 +567,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         return;
       }
       const result = await runTest(root, binSetting(), rules, message.tool, message.subject);
-      if (!alive(current) || stale(current, loaded, "この判定")) {
+      if (!alive(current) || stale(current, loaded, "判定の試行")) {
         return;
       }
       if (!result.ok) {
@@ -597,7 +585,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       if (!fs.existsSync(loaded.expectationsPath)) {
         current.host.post({
           type: "notice",
-          message: `期待する判定のファイルがまだありません: ${loaded.expectationsRel}。作ると、ここで一括で確かめられます。書き方は /ccnavi-config（.claude/skills/ccnavi-config/references/common/check.md）`,
+          message: `期待する判定のファイル（${loaded.expectationsRel}）がまだありません。作ると、ここで一括で確かめられます。書き方は、エージェントに /ccnavi-config と頼むか、.claude/skills/ccnavi-config/references/common/check.md を見てください。`,
         } satisfies ToRules);
         return;
       }
@@ -609,7 +597,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         return;
       }
       const result = await runExpectations(root, binSetting(), rules, loaded.expectationsPath);
-      if (!alive(current) || stale(current, loaded, "この期待する判定の確認")) {
+      if (!alive(current) || stale(current, loaded, "期待する判定の確認")) {
         return;
       }
       if (!result.ok) {
@@ -625,7 +613,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
         return;
       }
       const result = await runSuggest(root, binSetting());
-      if (!alive(current) || stale(current, loaded, "この候補")) {
+      if (!alive(current) || stale(current, loaded, "候補の取得")) {
         return;
       }
       if (!result.ok) {
@@ -701,11 +689,11 @@ async function save(current: PanelState, sections: Sections): Promise<void> {
       return;
     }
     if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "ルールファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
+      fail(current, "ルールファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）。");
       return;
     }
   } else if (fs.existsSync(loaded.rulesPath)) {
-    fail(current, "ルールファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
+    fail(current, "ルールファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）。");
     return;
   }
 

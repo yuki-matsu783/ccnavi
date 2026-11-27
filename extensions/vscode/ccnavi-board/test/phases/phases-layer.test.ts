@@ -105,7 +105,7 @@ test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並
     // 編集の欄は持たない
     assert.equal(dom.all("#common-phases input, #common-phases select, #common-phases button").length, 0);
     // 見本にもimplementがあるので、同じidの一文が出る（中身の比べは保存の --lintに任せ、保存は止めない）
-    assert.match(dom.one("#common-same-id").textContent, /共通の設定にも同じidがあります（implement）/);
+    assert.match(dom.one("#common-same-id").textContent, /共通設定にも同じidがあります（implement）/);
   } finally {
     await dom.close();
   }
@@ -122,7 +122,7 @@ test("CB-T529 共通の設定の別のidと表示名が重なる定義は、id�
   // 共通のplanと、見本のresearch（p1）の表示名「調査」が重なる
   const dom = await openPhases({ common: [COMMON_PLAN] });
   try {
-    assert.match(dom.one("#status").textContent, /共通の設定のフェーズ定義とタイトル（title）が重なっています（research）/);
+    assert.match(dom.one("#status").textContent, /共通設定のフェーズ定義とタイトル（title）が重複しています（research）/);
     assert.ok(dom.one("#status").className.includes("error"));
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
@@ -133,7 +133,7 @@ test("CB-T529 共通の設定の別のidと表示名が重なる定義は、id�
     dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる");
     await dom.settle();
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
-    assert.doesNotMatch(dom.one("#status").textContent ?? "", /重なっています/);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /重複しています/);
   } finally {
     await dom.close();
   }
@@ -149,13 +149,13 @@ test("CB-T530 idが空の行（打っている途中）は、共通の設定の�
     dom.type(titles[titles.length - 1], "計画");
     await dom.settle();
     assert.equal(dom.all(".phase input.f-id.duplicate").length, 0);
-    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通の設定のフェーズ定義とタイトル（title）が重なっています/);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通設定のフェーズ定義とタイトル（title）が重複しています/);
     // idを打てば重なりとして止める
     const ids = dom.all(".phase input.f-id");
     dom.type(ids[ids.length - 1], "planning");
     await dom.settle();
     assert.equal(dom.all(".phase input.f-id.duplicate").length, 1);
-    assert.match(dom.one("#status").textContent ?? "", /共通の設定のフェーズ定義とタイトル（title）が重なっています（planning）/);
+    assert.match(dom.one("#status").textContent ?? "", /共通設定のフェーズ定義とタイトル（title）が重複しています（planning）/);
   } finally {
     await dom.close();
   }

@@ -90,7 +90,7 @@ function removeTitle(last: boolean, hasFlow: boolean): string | undefined {
   if (last) {
     return "全体計画の最後の1ステップは消せません";
   }
-  return hasFlow ? "このステップの子のフローも消えます（元に戻すで戻せます）" : undefined;
+  return hasFlow ? "このステップの子のフローも消えます（「元に戻す」で戻せます）" : undefined;
 }
 
 export function PlanEdit({ part, template, plan, fresh, shownIds, types, picked, onPick, onChange, onAddFlow, onGoFlow }: PlanEditProps): JSX.Element {
@@ -147,7 +147,7 @@ export function PlanEdit({ part, template, plan, fresh, shownIds, types, picked,
           className="action small"
           data-action="add-item"
           disabled={first === undefined}
-          title={first === undefined ? "このレイヤーで指定できる型（phases.ymlの定義）が見つかりません" : undefined}
+          title={first === undefined ? "この設定で指定できる種類（phases.ymlの定義）がありません" : undefined}
           onClick={() => first !== undefined && onChange(addItem(template, part, first))}
         >
           {part === "feedback" ? "フィードバック計画を追加" : "ステップを追加"}
@@ -188,19 +188,19 @@ export function PlanEdit({ part, template, plan, fresh, shownIds, types, picked,
             fitKey={`${part}:${items.length}:${tidy}`}
           />
           <p className="tpl-edit-graph-foot">
-            <button type="button" className="action small" data-action="relayout" title="いまの線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
+            <button type="button" className="action small" data-action="relayout" title="いまの線に合わせて、ステップの配置を整えます（番号は変わりません）" onClick={relayout}>
               並べ直す
             </button>{" "}
             {!fresh && (
               <span className="hint" data-role="graph-stale">
-                実行ファイルで読んでいます。図は読み終えると新しくなります（その間も線は引けます）。
+                ccnaviで計画を確認しています。確認が終わると図を更新します（その間も線は引けます）。
               </span>
             )}
           </p>
         </>
       ) : (
         <>
-          <p className="hint">図は、実行ファイルが読み終えると出ます。</p>
+          <p className="hint">ccnaviの確認が終わると、図を表示します。</p>
           {footer !== undefined && <div className="plan-detail tpl-edit-detail-alone">{footer}</div>}
         </>
       )}

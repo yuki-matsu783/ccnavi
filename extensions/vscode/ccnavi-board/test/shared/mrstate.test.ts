@@ -85,13 +85,13 @@ test("CB-T623 mr-state: URLがhttp(s)でなくても状態は出す（リンク�
   // シェルが無い・shが落ちた（想定外の終了コードで、先頭の行が無い）
   const failed = interpretMrState(ran("", { code: 127, stderr: "sh: not found" }), 12);
   assert.equal(failed.kind === "unknown" ? failed.reason : "", "failed");
-  assert.match(failed.kind === "unknown" ? failed.detail : "", /終了コード127で終わりました: sh: not found/);
+  assert.match(failed.kind === "unknown" ? failed.detail : "", /終了コード127で失敗しました: sh: not found/);
   const spawn = interpretMrState(ran("", { code: -1, stderr: "spawn sh ENOENT" }), 12);
   assert.equal(spawn.kind === "unknown" ? spawn.reason : "", "failed");
   // 終了コード2でもstderrに理由があれば（ワークスペースが見つからないなど）、形の異常と言わず失敗として出す
   const refused = interpretMrState(ran("", { code: 2, stderr: "ccnavi: ワークスペースが見つかりません" }), 12);
   assert.equal(refused.kind === "unknown" ? refused.reason : "", "failed");
-  assert.match(refused.kind === "unknown" ? refused.detail : "", /終了コード2で終わりました/);
+  assert.match(refused.kind === "unknown" ? refused.detail : "", /終了コード2で失敗しました/);
 });
 
 test("CB-T624 引数の誤り（終了コード2）は、実行できなかったこととしてshの言葉を添える", () => {

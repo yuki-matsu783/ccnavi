@@ -43,11 +43,11 @@ test("CB-T252 場所はnodesの中ならノードのidと欄のパスで言い�
   const found = flowMismatch(screen, exec);
   assert.deepEqual(found, { where: 'ノード"p-1"のdata.branches[0].label', screen: '文字列"yes"', executable: "真偽値true" });
   assert.ok(found !== undefined);
-  assert.match(openMismatchText(found), /ノード"p-1"のdata\.branches\[0\]\.label。画面: 文字列"yes"、実行ファイル: 真偽値true/);
+  assert.match(openMismatchText(found), /ノード"p-1"のdata\.branches\[0\]\.label。画面: 文字列"yes"、ccnavi: 真偽値true/);
   assert.match(openMismatchText(found), /エディタで引用符を付ける/);
   // 「開きません」は呼び手（flow-panel.ts）が頭に付ける。ここでも言うと1文に2度出る
   assert.doesNotMatch(openMismatchText(found), /開きません/);
-  assert.match(saveMismatchText(found), /保存しません/);
+  assert.match(saveMismatchText(found), /保存できません/);
   assert.equal(flowMismatch({ connections: [{ condition: "y" }] }, { connections: [{ condition: "x" }] })?.where, "connections[0].condition");
   assert.equal(flowMismatch({ "a b": 1 }, { "a b": 2 })?.where, '["a b"]');
   assert.equal(flowMismatch("x", { nodes: [] })?.where, "最上位");

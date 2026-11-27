@@ -27,7 +27,7 @@ export function targetValue(target: { readonly kind: string; readonly name: stri
  */
 export function targetOptions(board: BoardJson | undefined, commonKind: string | undefined, current: { readonly kind: string; readonly name: string }): TargetOption[] {
   const options: TargetOption[] = [
-    ...(commonKind === undefined ? [] : [{ kind: commonKind, name: "", label: "共通の設定" }]),
+    ...(commonKind === undefined ? [] : [{ kind: commonKind, name: "", label: "共通設定" }]),
     { kind: "self", name: "", label: "ワークスペース" },
   ];
   if (board !== undefined) {
@@ -38,7 +38,12 @@ export function targetOptions(board: BoardJson | undefined, commonKind: string |
     }
   }
   if (!options.some((o) => o.kind === current.kind && o.name === current.name)) {
-    options.push({ kind: current.kind, name: current.name, label: current.kind === "project" ? `プロジェクト${current.name}` : current.kind });
+    options.push({ kind: current.kind, name: current.name, label: targetLabel(current.kind, current.name) });
   }
   return options;
+}
+
+/** 一覧に無い対象の表記。`project`と`self`以外は共通設定（呼び名は画面ごとに違うが、指すものは同じ） */
+function targetLabel(kind: string, name: string): string {
+  return kind === "project" ? `プロジェクト${name}` : kind === "self" ? "ワークスペース" : "共通設定";
 }

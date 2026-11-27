@@ -20,10 +20,11 @@ export async function copyPrompt(prompt: string, what: string): Promise<string |
     await vscode.env.clipboard.writeText(prompt);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    void vscode.window.showWarningMessage(`${what}をコピーできませんでした: ${reason}`);
-    return reason === "" ? "理由は不明です" : reason;
+    const why = reason === "" ? "理由は不明です" : reason;
+    void vscode.window.showWarningMessage(`${what}をコピーできませんでした: ${why}`);
+    return why;
   }
-  vscode.window.setStatusBarMessage(`${what}をコピーしました。Claude Codeに貼って送ってください`, 5000);
+  vscode.window.setStatusBarMessage(`${what}をコピーしました。Claude Codeに貼って送ってください。`, 5000);
   return undefined;
 }
 
@@ -48,7 +49,7 @@ export async function runPromptInTerminal(root: string, prompt: string): Promise
     runInNewTerminal(root, CLAUDE_TERMINAL_NAME, claudeRunCommand(file));
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    void vscode.window.showWarningMessage(`プロンプトのファイルを書けなかったため、実行できませんでした: ${reason}`);
+    void vscode.window.showWarningMessage(`プロンプトのファイルを作成できなかったため、実行できませんでした: ${reason}`);
   }
 }
 
@@ -61,9 +62,10 @@ export async function copyCommand(command: string, what: string): Promise<string
     await vscode.env.clipboard.writeText(command);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    void vscode.window.showWarningMessage(`${what}をコピーできませんでした: ${reason}`);
-    return reason === "" ? "理由は不明です" : reason;
+    const why = reason === "" ? "理由は不明です" : reason;
+    void vscode.window.showWarningMessage(`${what}をコピーできませんでした: ${why}`);
+    return why;
   }
-  vscode.window.setStatusBarMessage(`${what}をコピーしました。ターミナルに貼って実行してください`, 5000);
+  vscode.window.setStatusBarMessage(`${what}をコピーしました。ターミナルに貼って実行してください。`, 5000);
   return undefined;
 }

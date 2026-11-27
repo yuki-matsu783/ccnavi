@@ -95,7 +95,7 @@ export function CardItem({
       {where !== "" ? <div className={card.isParent ? "stage" : "where"}>{where}</div> : null}
       <MrLink card={card} />
       {moved !== undefined ? (
-        <div className="moved-mark" data-tour="moved" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります">
+        <div className="moved-mark" data-tour="moved" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります。">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -298,7 +298,7 @@ function ReviewButtons({ action }: { readonly action: ReviewAction }): JSX.Eleme
   return (
     <>
       {isHttpUrl(action.mrUrl) ? (
-        <a className="card-button" data-action="open-mr" data-tour="mr" href={action.mrUrl} title="MRを開きます。指摘はそこにコメントで書きます">
+        <a className="card-button" data-action="open-mr" data-tour="mr" href={action.mrUrl} title="MRを開きます。指摘は、MRにコメントで書いてください。">
           MRを開く
         </a>
       ) : null}
@@ -309,7 +309,7 @@ function ReviewButtons({ action }: { readonly action: ReviewAction }): JSX.Eleme
         data-tour="review-done"
         data-parent={action.parent}
         data-phase={action.phase}
-        title="レビューを終えたことを記録します。未解決の指摘を読み、無ければレビュー済みにします。あれば対応方針を決めます"
+        title="レビューを終えたことを記録します。未解決の指摘を読み込んで表示します。無ければレビュー済みにでき、あれば対応方針を決められます。"
         onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
       >
         レビュー完了
@@ -327,7 +327,7 @@ function ApproveButton({ id }: { readonly id: string }): JSX.Element {
       data-action="approve-one"
       data-tour="approve-one"
       data-ticket={id}
-      title={`このチケットだけを承認します（ccnavi user agree ${id}）。まとめて承認するなら上部のボタンを使ってください`}
+      title={`このチケットだけを承認します（ccnavi user agree ${id}）。まとめて承認するなら上部のボタンを使ってください。`}
       onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
     >
       承認
@@ -349,7 +349,7 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
       data-tour={`flow-${state}`}
       data-ticket={id}
       data-flow={state}
-      title={`子チケットの作業の手順（フロー）を図で${closed && !flow.locked ? "見ます。終了済みのため変更する必要はありません" : flow.locked ? "見ます。着手中・レビュー中は変更できません" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで変更できなくなります`}（${flow.rel}）`}
+      title={`子チケットの作業の手順（フロー、${flow.rel}）を図で${closed && !flow.locked ? "見ます。終了済みのため、変更しても使われません。" : flow.locked ? "見ます。着手中・レビュー中は変更できません。" : `${flow.exists ? "直します" : "作ります"}。着手すると、終わるまで変更できなくなります。`}`}
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow, closed)}
@@ -369,7 +369,7 @@ function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
       data-action="workflow"
       data-tour="workflow-button"
       data-ticket={id}
-      title="計画のステップどうしの順序（どのステップにどのステップが先行するか）を図で直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。"
+      title="計画編集タブを開きます。ステップの順序（どのステップが先行するか）を図で直せます。保存すると提案の内容が変わるので、承認画面を開き直してください。"
       onClick={() => post({ type: "workflow", ticket: id })}
     >
       計画編集
@@ -385,7 +385,7 @@ function TemplateDraftButton({ id }: { readonly id: string }): JSX.Element {
       className="card-button"
       data-action="template-draft"
       data-ticket={id}
-      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きに効力はなく、取り込み待ち画面で取り込むまで使われません。親をreadyでクローズする前に作ってください"
+      title="この親の計画とフローから、テンプレートの下書きを作ります。下書きのままでは使われません。取り込み待ち画面で取り込むと使えるようになります。親チケットをクローズする（ccnavi-review.sh ready）前に作ってください。"
       onClick={() => post({ type: "templateDraft", ticket: id })}
     >
       テンプレートの下書きを作る

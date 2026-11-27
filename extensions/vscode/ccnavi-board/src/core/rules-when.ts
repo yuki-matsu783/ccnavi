@@ -255,7 +255,7 @@ export function condProblems(root: CondNode): CondProblem[] {
       case "all":
       case "any":
         if (node.children.length === 0) {
-          problems.push({ path, message: `${node.op}の中が空です（1個以上）` });
+          problems.push({ path, message: `${node.op}の中が空です（条件が1個以上必要です）` });
         }
         node.children.forEach((child, i) => walk(child, [...path, i]));
         return;
@@ -274,7 +274,7 @@ export function condProblems(root: CondNode): CondProblem[] {
     problems.push({ path: [], message: `深さが${depth}階層あります（上限${COND_MAX_DEPTH}階層）` });
   }
   if (nodes > COND_MAX_NODES) {
-    problems.push({ path: [], message: `条件が${nodes}個あります（上限${COND_MAX_NODES}）` });
+    problems.push({ path: [], message: `条件が${nodes}個あります（上限${COND_MAX_NODES}個）` });
   }
   return problems;
 }
@@ -407,7 +407,7 @@ export function comparePaths(a: CondPath, b: CondPath): number {
  */
 export function toWhenBlocker(rule: { readonly bothPatterns?: boolean; readonly exceptNodes?: readonly CondNode[] }): string | undefined {
   if (rule.bothPatterns === true) {
-    return "globとregexを両方指定しています。ルールファイルでどちらか1つにしてから変換してください";
+    return "globとregexを両方指定しています。ルールファイルでどちらか1つにしてから変換してください。";
   }
   return exceptBlocker(rule.exceptNodes);
 }
@@ -422,17 +422,17 @@ export function exceptBlocker(excepts: readonly CondNode[] | undefined): string 
     return undefined;
   }
   if (excepts.length === 0) {
-    return "exceptが空のリストです。ルールファイルで直してから変換してください";
+    return "exceptが空のリストです。ルールファイルで直してから変換してください。";
   }
   for (const [i, node] of excepts.entries()) {
     if (node.op === "invalid") {
-      return `exceptの${i + 1}件目が読み込めません（${node.reason}）。ルールファイルで直してから変換してください`;
+      return `exceptの${i + 1}件目が読み込めません（${node.reason}）。ルールファイルで直してから変換してください。`;
     }
     if (node.op !== "glob" && node.op !== "regex") {
-      return `exceptの${i + 1}件目がglob / regex 1つのマップではありません。ルールファイルで直してから変換してください`;
+      return `exceptの${i + 1}件目がglob / regex 1つのマップではありません。ルールファイルで直してから変換してください。`;
     }
     if (node.pattern === "") {
-      return `exceptの${i + 1}件目の${node.op}が空です。ルールファイルで直してから変換してください`;
+      return `exceptの${i + 1}件目の${node.op}が空です。ルールファイルで直してから変換してください。`;
     }
   }
   return undefined;
