@@ -55,6 +55,7 @@ import { sameFlowIgnoringLayout } from "./core/flow-diff.js";
 import { flowMismatch, openMismatchText, saveMismatchText } from "./core/flow-match.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
+import { dirtyTitle } from "./core/save-gate.js";
 import { renderFlowPage } from "./core/flow-render.js";
 import { decodeFlowBytes, readFlowFile, removeDraftFile, writeFlowFile } from "./core/flow-write.js";
 import {
@@ -159,7 +160,7 @@ function binSetting(): string {
 }
 
 function titleOf(ticket: string, dirty = false): string {
-  return `${dirty ? "● " : ""}ccnaviフロー: ${ticket}`;
+  return dirtyTitle(`ccnaviフロー: ${ticket}`, dirty);
 }
 
 /** 保存の前に差分を確かめるか（設定。既定は確かめる） */

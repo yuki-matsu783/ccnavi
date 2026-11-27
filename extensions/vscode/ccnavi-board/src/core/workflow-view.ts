@@ -23,6 +23,7 @@
 import type { AppearanceMessage } from "./appearance.js";
 import type { ApprovePlan } from "./approvemodel.js";
 import type { PlanOrder, PlanOrderAnswer, PlanOrderRefusal, PlanOrderWrite } from "./planordermodel.js";
+import { dirtyTitle } from "./save-gate.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 import { isTicketId } from "./ticket-id.js";
 
@@ -186,7 +187,7 @@ export function savedShaOf(result: PlanOrderWrite): string | undefined {
 
 /** タブのタイトル。未保存の間は頭に「●」 */
 export function workflowTitle(ticket: string, dirty = false): string {
-  return `${dirty ? "● " : ""}ccnavi計画編集: ${ticket}`;
+  return dirtyTitle(`ccnavi計画編集: ${ticket}`, dirty);
 }
 
 // ---- 答えを画面の状態に整える

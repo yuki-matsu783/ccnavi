@@ -38,6 +38,14 @@ export function editSaveBlocker(state: EditSaveState): string {
   return "";
 }
 
+/**
+ * 編集する画面のタブのタイトル。未保存の間は頭に「●」を付ける。Webviewは閉じるのを止められないので、
+ * 閉じる前に未保存だと気づけるようにする（フロー編集・計画編集・テンプレート管理・ルール・リスク・フェーズ管理で同じ印）
+ */
+export function dirtyTitle(title: string, dirty: boolean): string {
+  return `${dirty ? "● " : ""}${title}`;
+}
+
 /** 押せるときのツールチップ。押せないときは理由を出す */
 export function saveTitle(blocker: string): string {
   return blocker === "" ? "保存します（Ctrl+S）" : blocker;

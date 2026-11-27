@@ -16,6 +16,7 @@ import * as vscode from "vscode";
 import { postAppearance } from "./appearance.js";
 import { LoadFailure, type ErrorFile } from "./core/load-failure.js";
 import { lockFromError, type Lock } from "./core/lock.js";
+import { dirtyTitle } from "./core/save-gate.js";
 import type { ScreenHost } from "./core/screen-host.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { debounce, watchTickets } from "./panel-common.js";
@@ -265,7 +266,7 @@ export function settingsPanel<D, T, L, M>(screen: SettingsScreen<D, T, L, M>): S
   function setDirty(current: S, dirty: boolean): void {
     current.dirty = dirty;
     if (screen.alive(current)) {
-      current.panel.title = `${dirty ? "● " : ""}${screen.title}`;
+      current.panel.title = dirtyTitle(screen.title, dirty);
     }
   }
 
