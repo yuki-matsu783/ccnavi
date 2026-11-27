@@ -273,6 +273,33 @@ export function layoutOf(graph: PlanGraph): PlanLayout {
 }
 
 /**
+ * 組んだ置き場所（`built`）に、覚えた置き場所（`kept`）を重ねる。覚えているステップはその場所、新しいステップは組んだ場所に置く。
+ * 新しい点が覚えた点と重なるときは、空くまで下へずらす。`built`に無いステップは忘れる。覚えた場所が無ければ組んだまま
+ */
+export function keepLayout(built: PlanLayout, kept: PlanLayout | undefined): PlanLayout {
+  if (kept === undefined) {
+    return built;
+  }
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const key of Object.keys(built)) {
+    if (kept[key] !== undefined) {
+      out[key] = kept[key];
+    }
+  }
+  for (const [key, at] of Object.entries(built)) {
+    if (out[key] !== undefined) {
+      continue;
+    }
+    let y = at.y;
+    while (Object.values(out).some((p) => p.x === at.x && Math.abs(p.y - y) < ROW)) {
+      y += ROW;
+    }
+    out[key] = { x: at.x, y };
+  }
+  return out;
+}
+
+/**
  * 覚えた置き場所にステップを置き直す。覚えていないステップは組んだ場所のまま。startは先頭の列、endは右端のステップの次の列に置く
  * （線を変えて階層数が変わっても、endがステップに重ならないように）。覚えた場所が1つもヒットしなければ組んだ図のまま
  */

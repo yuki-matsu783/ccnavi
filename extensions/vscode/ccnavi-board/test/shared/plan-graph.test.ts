@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ApprovePlan } from "../../src/core/approvemodel.js";
-import { canConnect, canDisconnect, COLUMN, FIT_START_PAD, fitStalled, layoutOf, PLAN_FIT_MIN_ZOOM, planGraphOf, viewportAtStart, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
+import { canConnect, canDisconnect, COLUMN, keepLayout, ROW, FIT_START_PAD, fitStalled, layoutOf, PLAN_FIT_MIN_ZOOM, planGraphOf, viewportAtStart, withLayout, type PlanGraph } from "../../src/core/plan-graph.js";
 import { plansOf, reorderCases, type RawItem } from "../helpers/plan-reorder.js";
 
 function plan(items: readonly RawItem[], extra: Partial<ApprovePlan> = {}, feedback?: readonly RawItem[]): ApprovePlan {
@@ -224,4 +224,11 @@ test("CB-T1224 下限の倍率で止まったか（fitStalled）を判定し、�
   assert.equal(view.zoom, PLAN_FIT_MIN_ZOOM);
   assert.ok(Math.abs(start.x * view.zoom + view.x - FIT_START_PAD) < 1e-9);
   assert.ok(Math.abs((start.y + start.height / 2) * view.zoom + view.y - 300) < 1e-9);
+});
+
+test("CB-T1274 覚えた置き場所を重ねると、残ったステップは覚えた場所、新しいステップは組んだ場所（重なれば下へずらす）に置き、消えたステップは忘れる", () => {
+  const built = { "1": { x: 210, y: 0 }, "2": { x: 420, y: 0 }, "5": { x: 420, y: 96 } };
+  assert.equal(keepLayout(built, undefined), built);
+  const kept = { "1": { x: 210, y: 0 }, "2": { x: 420, y: 96 }, "9": { x: 630, y: 0 } };
+  assert.deepEqual(keepLayout(built, kept), { "1": { x: 210, y: 0 }, "2": { x: 420, y: 96 }, "5": { x: 420, y: 96 + ROW } });
 });

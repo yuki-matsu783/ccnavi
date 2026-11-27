@@ -13,6 +13,7 @@
 .tpl-edit-ops { white-space: nowrap; }
 .tpl-edit-ops button.action.small { margin-left: 0; margin-right: var(--gap-2); }
 .tpl-edit-add { margin: 6px 0 0; }
+.tpl-edit-graph-foot { margin: 4px 0 8px; }
 .tpl-new { margin: 4px 0 10px; }
 .tpl-new input[type=text] { width: 16em; max-width: 100%; }
 .tpl-flow-edit { margin-top: 6px; }

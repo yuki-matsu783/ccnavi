@@ -2,12 +2,19 @@
  * 編集欄の計画1つ（全体計画かフィードバック計画）。上に線を引ける図、下にステップの表（種類・レビューを選び、並べ替え・削除・追加）。
  *
  * 図に描く中身（番号・始まるステップ・終端に届かないステップ・順序のerror）は実行ファイルが読んで返した答え（`plan`）のまま描き、
- * ここは判定しない。**図が古い間は（編集した直後で、まだ読ませた答えが戻っていない間）線を引けない**。古い図の番号で線を引くと、
- * 別のステップを指してしまうため。
+ * ここは判定しない。
+ *
+ * **図が古い間も線を引ける。** 直した直後は、まだ読ませた答えが戻っていない（図は少し前の中身のまま）。図の番号は読ませたときの
+ * 中身の添字なので、そのときのステップのid（`shownIds`）に置き換えてから、いまの中身の添字へ引き直す（`numberOfId`）。
+ * 番号が振り直っても、別のステップを指さない。
+ *
+ * **点の置き場所は動かさない。** 線を引いて番号が振り直っても、点はその場に残り、表示する番号だけが変わる。置き場所はステップの
+ * idで覚え（`PlanGraph`の`layout`。図の`from`をidに置き換えて渡す）、新しいステップだけ組んだ場所に置く。「並べ直す」で今の線から組み直す。
  */
-import { useState, type JSX } from "react";
+import { useMemo, useRef, useState, type JSX } from "react";
 
 import type { ApprovePlan } from "../../core/approvemodel.js";
+import { keepLayout, layoutOf, planGraphOf, type PlanLayout } from "../../core/plan-graph.js";
 import {
   addItem,
   canMove,
@@ -17,6 +24,7 @@ import {
   modeOf,
   type ItemMode,
   moveItem,
+  numberOfId,
   removeItem,
   setItem,
   type EditTemplate,
@@ -42,6 +50,8 @@ export interface PlanEditProps {
   readonly plan: ApprovePlan | undefined;
   /** 図の中身が、いまの編集の中身を読ませたものか */
   readonly fresh: boolean;
+  /** 図の中身を読ませたときの、この計画のステップのid（添字の順） */
+  readonly shownIds: readonly number[];
   readonly types: readonly PhaseTypeInfo[];
   readonly onChange: (next: EditTemplate, typing?: string) => void;
 }
@@ -56,8 +66,42 @@ function optionsFor(part: PlanPart, types: readonly PhaseTypeInfo[], current: st
   return options;
 }
 
-export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanEditProps): JSX.Element {
+/** 図の`from`を、読ませたときのステップのidに置き換える。番号（`number`）と描く中身は実行ファイルの答えのまま */
+function withIds(plan: ApprovePlan, ids: readonly number[]): ApprovePlan {
+  const order = [...plan.items].map((item) => item.number).sort((a, b) => a - b);
+  return { ...plan, items: plan.items.map((item) => ({ ...item, from: ids[order.indexOf(item.number)] ?? item.from })) };
+}
+
+export function PlanEdit({ part, template, plan, fresh, shownIds, types, onChange }: PlanEditProps): JSX.Element {
   const items = template[part];
+  const shown = useMemo(() => (plan === undefined ? undefined : withIds(plan, shownIds)), [plan, shownIds]);
+  // 置き場所は描くたびに覚え直す（次の答えで、残ったステップをその場所に置くため）。「並べ直す」で忘れる
+  const kept = useRef<PlanLayout | undefined>(undefined);
+  const [tidy, setTidy] = useState(0);
+  const layout = useMemo(() => {
+    if (shown === undefined) {
+      return undefined;
+    }
+    kept.current = keepLayout(layoutOf(planGraphOf(shown)), kept.current);
+    return kept.current;
+    // tidyは「並べ直す」で組み直す合図
+  }, [shown, tidy]);
+  const relayout = (): void => {
+    kept.current = undefined;
+    setTidy((n) => n + 1);
+  };
+  /** 図の番号（読ませたときの添字）を、いまの中身の図の番号に引き直す。消えたステップならundefined */
+  const nowNumber = (shownNumber: number): number | undefined => {
+    const id = shown?.items.find((item) => item.number === shownNumber)?.from;
+    return id === undefined ? undefined : numberOfId(template, id);
+  };
+  const link = (edit: typeof connectItems) => (from: number, to: number) => {
+    const a = nowNumber(from);
+    const b = nowNumber(to);
+    if (a !== undefined && b !== undefined) {
+      onChange(edit(template, a, b));
+    }
+  };
   const title = PART_TITLE[part];
   const first = optionsFor(part, types, "")[0]?.id;
   const offset = part === "plan" ? 0 : template.plan.length;
@@ -82,16 +126,19 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
   return (
     <section className="tpl-edit-plan" data-part={part}>
       <h3>{title}</h3>
-      {plan !== undefined && plan.items.length === items.length ? (
+      {shown !== undefined ? (
         <>
-          <PlanGraph
-            plan={plan}
-            editable={fresh}
-            onConnect={(from, to) => onChange(connectItems(template, from, to))}
-            onDisconnect={(from, to) => onChange(disconnectItems(template, from, to))}
-            fitKey={`${part}:${items.length}`}
-          />
-          {!fresh && <p className="hint">実行ファイルで読んでいます。終わるまで線は引けません。</p>}
+          <PlanGraph plan={shown} editable onConnect={link(connectItems)} onDisconnect={link(disconnectItems)} layout={layout} fitKey={`${part}:${items.length}:${tidy}`} />
+          <p className="tpl-edit-graph-foot">
+            <button type="button" className="action small" data-action="relayout" title="いまの線で点の置き場所を並べ直します（番号は変わりません）" onClick={relayout}>
+              並べ直す
+            </button>{" "}
+            {!fresh && (
+              <span className="hint" data-role="graph-stale">
+                実行ファイルで読んでいます。図は読み終えると新しくなります（その間も線は引けます）。
+              </span>
+            )}
+          </p>
         </>
       ) : (
         <p className="hint">図は、実行ファイルが読み終えると出ます。</p>
@@ -111,6 +158,8 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
           {items.map((item, i) => {
             const index = i + 1;
             const options = optionsFor(part, types, item.type);
+            const hasFlow = part === "plan" && template.flows[String(index)] !== undefined;
+            const last = part === "plan" && items.length <= 1;
             return (
               <tr key={index} data-index={index}>
                 <td className="mono">{offset + index}</td>
@@ -155,8 +204,8 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                     className="action small"
                     data-action="remove-item"
                     aria-label={`${offset + index}番を削除`}
-                    disabled={part === "plan" && items.length <= 1}
-                    title={part === "plan" && items.length <= 1 ? "全体計画の最後の1ステップは消せません" : undefined}
+                    disabled={last}
+                    title={last ? "全体計画の最後の1ステップは消せません" : hasFlow ? "このステップの子のフローも消えます（元に戻すで戻せます）" : undefined}
                     onClick={() => onChange(removeItem(template, part, index))}
                   >
                     削除

@@ -70,6 +70,7 @@ import { Preview } from "./Preview.js";
 import { ProposalReview, RequestText, type ProposalView } from "./Proposal.js";
 import { SaveReview } from "./SaveReview.js";
 import { badgeOf } from "./text.js";
+import { historyKey, inField } from "../shared/keys.js";
 import flowTour from "../tours/flow.yml";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -121,16 +122,6 @@ function sameIds(a: readonly string[], b: readonly string[]): boolean {
 function now(): number {
   const clock = (window as { ccnaviClock?: unknown }).ccnaviClock;
   return typeof clock === "function" ? Number((clock as () => number)()) : Date.now();
-}
-
-/** キーを押した先が欄の中か（欄の中のCtrl+ZやCtrl+Cは欄に任せる） */
-function inField(target: EventTarget | null): boolean {
-  const element = target as { tagName?: unknown; isContentEditable?: unknown } | null;
-  if (element === null || typeof element.tagName !== "string") {
-    return false;
-  }
-  const tag = element.tagName.toLowerCase();
-  return tag === "input" || tag === "textarea" || tag === "select" || element.isContentEditable === true;
 }
 
 /** 案内（`tours/flow.yml`）と、案内の間だけ描く見本。実際のフローにも、画面が持つ編集中の内容にも触れない */
@@ -634,10 +625,11 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       return;
     }
     const key = event.key.toLowerCase();
-    if (key === "z" && !event.shiftKey) {
+    const moved = historyKey(event);
+    if (moved === "undo") {
       event.preventDefault();
       undoEdit();
-    } else if ((key === "z" && event.shiftKey) || key === "y") {
+    } else if (moved === "redo") {
       event.preventDefault();
       redoEdit();
     } else if (key === "c" && !event.shiftKey) {

@@ -12,6 +12,10 @@
  * ステップの`after`は「その計画の中の添字」のまま持つ。**番号の付け直しを伴う編集（ステップの削除・並べ替え・線を引く）は、先行が必ず
  * 自分より小さい添字になるように、ここで添字を振り直す**（実行ファイルの`after`の決まり。守らなければerrorになる）。
  *
+ * **ステップのid。** 各ステップは、添字とは別に、編集の間だけ変わらない`id`を持つ（ファイルには書かない）。添字が振り直っても
+ * 同じステップを指せるので、画面は少し前の図（読ませた答えが戻る前の図）の上で線を引いても、点の置き場所を覚えても、
+ * 別のステップを取り違えない。idは編集のコピーの中で重ならない（`fromData`・`blankTemplate`が付け、`addItem`が続きを付ける）。
+ *
  * 書き出しは中身から組み直す（コメントや書き方は残らない）。書いたものが実行ファイルに同じ中身で読まれるかは、保存の前に
  * 実行ファイルに読ませて見比べる（`sameData`）。読めるか・計画とフローの形が正しいかは実行ファイルが言い、画面は判定しない。
  *
@@ -25,6 +29,8 @@ export type PlanPart = "plan" | "feedback";
 
 /** 計画の1ステップ。`after`は計画の中の添字（1始まり） */
 export interface EditItem {
+  /** 編集の間だけ変わらない番号。ファイルには書かない（モジュールの冒頭の「ステップのid」） */
+  readonly id: number;
   readonly type: string;
   /** ステップの`review`。trueは要る、falseは要らない（どちらも定義より優先）。nullは書かない（定義に従う） */
   readonly review: boolean | null;
@@ -63,7 +69,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readItems(value: unknown): EditItem[] | undefined {
+function readItems(value: unknown, firstId: number): EditItem[] | undefined {
   if (value === undefined || value === null) {
     return [];
   }
@@ -73,11 +79,11 @@ function readItems(value: unknown): EditItem[] | undefined {
   const out: EditItem[] = [];
   for (const entry of value) {
     if (typeof entry === "string") {
-      out.push({ type: entry, review: null, deferred: false, after: [] });
+      out.push({ id: firstId + out.length, type: entry, review: null, deferred: false, after: [] });
     } else if (isRecord(entry) && typeof entry.type === "string") {
       const after = Array.isArray(entry.after) ? entry.after.filter((n): n is number => typeof n === "number") : [];
       const review = typeof entry.review === "boolean" ? entry.review : null;
-      out.push({ type: entry.type, review, deferred: entry.deferred === true && review === null, after: [...new Set(after)].sort((a, b) => a - b) });
+      out.push({ id: firstId + out.length, type: entry.type, review, deferred: entry.deferred === true && review === null, after: [...new Set(after)].sort((a, b) => a - b) });
     } else {
       return undefined;
     }
@@ -90,8 +96,8 @@ export function fromData(raw: unknown): EditTemplate | undefined {
   if (!isRecord(raw) || typeof raw.name !== "string") {
     return undefined;
   }
-  const plan = readItems(raw.plan);
-  const feedback = readItems(raw.feedback);
+  const plan = readItems(raw.plan, 1);
+  const feedback = readItems(raw.feedback, 1 + (plan?.length ?? 0));
   if (plan === undefined || feedback === undefined) {
     return undefined;
   }
@@ -123,7 +129,7 @@ export function fromData(raw: unknown): EditTemplate | undefined {
 
 /** 空の名前から始める新しいテンプレート。`type`は最初のステップの型 */
 export function blankTemplate(name: string, type: string): EditTemplate {
-  return { name, description: "", when: "", plan: [{ type, review: null, deferred: false, after: [] }], feedback: [], flows: {}, extra: {} };
+  return { name, description: "", when: "", plan: [{ id: 1, type, review: null, deferred: false, after: [] }], feedback: [], flows: {}, extra: {} };
 }
 
 /** まだ何も入力していないか。`blank`は`blankTemplate`で作った開いた直後の中身。書き出す形で比べる */
@@ -238,11 +244,22 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
   );
 }
 
-/** 末尾にステップを足す。既定では前の末尾のステップを先行にする（順に進む形）。計画が空なら先行なし */
+/** 末尾にステップを足す。既定では前の末尾のステップを先行にする（順に進む形）。計画が空なら先行なし。idは両方の計画の続き */
 export function addItem(template: EditTemplate, part: PlanPart, type: string): EditTemplate {
   const items = partOf(template, part);
   const after = items.length === 0 ? [] : [items.length];
-  return withPart(template, part, [...items, { type, review: null, deferred: false, after }]);
+  const id = 1 + Math.max(0, ...[...template.plan, ...template.feedback].map((item) => item.id));
+  return withPart(template, part, [...items, { id, type, review: null, deferred: false, after }]);
+}
+
+/** idのステップの図の番号（フィードバック計画は全体計画の続き）。無ければundefined */
+export function numberOfId(template: EditTemplate, id: number): number | undefined {
+  const inPlan = template.plan.findIndex((item) => item.id === id);
+  if (inPlan >= 0) {
+    return inPlan + 1;
+  }
+  const inFeedback = template.feedback.findIndex((item) => item.id === id);
+  return inFeedback >= 0 ? template.plan.length + inFeedback + 1 : undefined;
 }
 
 /** ステップを`order`（新しい添字の順に、古い添字を並べたもの。入れない古い添字は落とす）で並べ直す。全体計画ならフローのキーも合わせる */

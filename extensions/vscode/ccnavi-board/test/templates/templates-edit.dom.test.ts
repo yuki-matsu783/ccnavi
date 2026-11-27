@@ -97,7 +97,7 @@ test("CB-D382 編集を押すとeditOpenを送り、答えが届くまで読み�
   }
 });
 
-test("CB-D383 説明を直すと「未保存」が出て、少し待つと直した中身をeditCheckで読ませる。答えが届くまでは古い図に線を引けない", async () => {
+test("CB-D383 説明を直すと「未保存」が出て、少し待つと直した中身をeditCheckで読ませる。答えが届くまでは古い図のままで、読んでいる旨を出す（線は引ける）", async () => {
   const dom = await openList();
   try {
     const { session } = await startEdit(dom);
@@ -108,13 +108,15 @@ test("CB-D383 説明を直すと「未保存」が出て、少し待つと直し
     const asked = await checkAsked(dom);
     assert.equal(asked.session, session);
     assert.equal((asked.data as { description: string }).description, "新しい説明");
-    assert.equal(dom.all('section.plan-graph[data-part="plan"][data-editable="0"]').length, 1, "読ませている間は線を引けない");
+    assert.equal(dom.all('section.plan-graph[data-part="plan"][data-editable="1"]').length, 1, "読ませている間も線を引ける");
+    assert.equal(dom.all('section.tpl-edit-plan[data-part="plan"] [data-role="graph-stale"]').length, 1);
     // 答えが届くと図は引ける形に戻る
     const check = fixtureCheck();
     await dom.send({ type: "editChecked", session, seq: asked.seq, check: { ...check, problems: [{ severity: "warn", detail: "検査の指摘です" }] }, error: "" });
     await dom.settle();
     assert.match(text(dom.one(".tpl-problems")), /\[warn\] 検査の指摘です/);
     assert.equal(dom.all('section.plan-graph[data-part="plan"][data-editable="1"]').length, 1);
+    assert.equal(dom.all('[data-role="graph-stale"]').length, 0, "答えが届いたら読んでいる旨は消える");
   } finally {
     await dom.close();
   }
@@ -426,6 +428,82 @@ test("CB-D740 図の中身を読めなかったときは、理由を出す", asy
     assert.match(text(dom.one(`${row} [data-role="preview-error"]`)), /検査できません/);
     assert.equal(dom.all(`${row} table.tpl-plan`).length, 0);
     assert.equal(dom.posted.filter((m) => m.type === "preview" && m.name === "feature").length, 1, "失敗しても頼み直さない");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1250 答えが戻る前の図でも、線の × はそのときのステップを指す。番号が振り直ったあとでも別のステップの線を消さず、消えたステップの線は何もしない", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    const plan = 'section.tpl-edit-plan[data-part="plan"]';
+    const rows = () => dom.all(`${plan} tbody tr`);
+    const afterOf = () => rows().map((tr) => text(tr.querySelectorAll("td")[3]));
+    // 末尾にdocsを足す（3番。2が先行）。図はまだ2ステップのまま
+    dom.click(dom.one(`${plan} button[data-action="add-item"]`));
+    await dom.settle();
+    assert.deepEqual(afterOf(), ["なし", "1", "2"]);
+    // 古い図の1→2の線を消すと、2番（implement）の先行だけが外れる
+    dom.click(dom.one(`${plan} button[data-action="plan-remove-edge"][data-edge="after-1-2"]`));
+    await dom.settle();
+    assert.deepEqual(afterOf(), ["なし", "なし", "2"]);
+    // 1番（design）を消すと番号が繰り上がる（implementが1、docsが2で、docsの先行は1）。古い図の1→2の線はもう無いステップを指すので、何もしない
+    dom.click(dom.one<HTMLButtonElement>(`${plan} tbody tr button[data-action="remove-item"]`));
+    await dom.settle();
+    assert.deepEqual(afterOf(), ["なし", "1"]);
+    assert.equal(dom.all(`${plan} [data-role="graph-stale"]`).length, 1, "図はまだ読ませる前の中身");
+    dom.click(dom.one(`${plan} button[data-action="plan-remove-edge"][data-edge="after-1-2"]`));
+    await dom.settle();
+    assert.deepEqual(afterOf(), ["なし", "1"], "番号で引き直すと、docsの先行（いまの1→2）を取り違えて消してしまう");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1251 編集欄はCtrl+Zで元に戻し、Ctrl+Y・Ctrl+Shift+Zでやり直す。欄の中のCtrl+Zは欄に任せる", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    const description = () => dom.one<HTMLTextAreaElement>(".f-description").value;
+    const before = description();
+    dom.type(dom.one(".f-description"), "直した説明");
+    await dom.settle();
+    dom.key("z", dom.one(".f-description"), { ctrlKey: true });
+    await dom.settle();
+    assert.equal(description(), "直した説明", "欄の中のキーは受けない");
+    dom.key("z", undefined, { ctrlKey: true });
+    await dom.settle();
+    assert.equal(description(), before);
+    dom.key("y", undefined, { ctrlKey: true });
+    await dom.settle();
+    assert.equal(description(), "直した説明");
+    dom.key("z", undefined, { ctrlKey: true });
+    await dom.settle();
+    dom.key("z", undefined, { ctrlKey: true, shiftKey: true });
+    await dom.settle();
+    assert.equal(description(), "直した説明");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1252 子のフローがあるステップの削除ボタンは、フローも消えることを先に言い、消したあとは元に戻せることを知らせる", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    const rows = dom.all('section.tpl-edit-plan[data-part="plan"] tbody tr');
+    const first = rows[0].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement;
+    const second = rows[1].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement;
+    assert.equal(first.getAttribute("title"), null, "フローの無いステップは何も言わない");
+    assert.match(second.getAttribute("title") ?? "", /子のフローも消えます/);
+    dom.click(second);
+    await dom.settle();
+    assert.match(text(dom.one('[data-role="edit-status"]')), /2番のステップと一緒に、子のフローを消しました/);
+    dom.click(dom.one('button[data-action="undo-edit"]'));
+    await dom.settle();
+    assert.equal(dom.all('[data-role="edit-status"]').length, 0);
+    assert.match(text(dom.one('section[data-role="flows"] li[data-index="2"]')), /フロー: 実装の手順/);
   } finally {
     await dom.close();
   }
