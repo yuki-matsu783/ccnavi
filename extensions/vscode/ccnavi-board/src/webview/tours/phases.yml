@@ -1,7 +1,7 @@
 # フェーズ管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際の定義ではない）。
 #   path見本のファイルの場所（画面には「（見本）」を付けて出す）
 #   lock作業中のチケットがあるときに画面が出す文（sceneのlockedで見せる）
-#   error保存の検証が通らなかったときに下へ出る文（sceneのerrorで見せる）
+#   error保存の検証が通らなかったときにツールバーの最後の行へ出す文（sceneのerrorで見せる）
 #   phases見本の定義。phases.ymlと同じ書き方（versionとphases）
 #   added    「＋ 定義を追加」で足した定義の見本。phasesと同じ書き方で、phasesの外に置く（sceneのadd: filledで末尾に足す）
 #   projectプロジェクトの設定の見本（name・path・lock・phases）。sceneのtarget: libで切り替える
@@ -13,7 +13,7 @@
 #   add末尾に足す行。blank（「＋ 定義を追加」を押した直後の空の行）かfilled（sample.addedを書いた行）。足した行を開き、phase-* はその行に付く
 #   dirty未保存の印を出し、保存を押せる状態にする
 #   locked作業中のチケットがある状態（lockの文を出し、保存を止める）
-#   error保存の検証が通らなかった文（error）を下に出す
+#   error保存の検証が通らなかった文を、ツールバーの最後の行に出す
 #   changedファイルが外で変わった帯を出す
 #   helpヘルプの説明を開く
 # `target:`の印（画面のdata-tour）:
@@ -336,7 +336,7 @@ courses:
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるときは、進行中の作業の判定が途中で変わるため保存できません。エージェントが応答中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるときは、進行中の作業の判定が途中で変わるため保存できません。エージェントが応答中なら、確認が出ます。Ctrl+Sでも保存でき、押せないときは理由をボタンの説明に出します。
         scene: { open: research, dirty: true }
         diagram: phase-save
         focus: save, lock
@@ -587,7 +587,7 @@ courses:
           dirty: true
       - target: status
         title: 通らなかったとき
-        body: 検証が通らなければ、保存せずに下へ理由を出します。検証に通らない例は、識別子に使えないid、重複したタイトル、feedbackの定義でreviewをfalseにしたことです。同じidが2つあるときは、画面が先に止めます。
+        body: 検証が通らなければ、保存せずに、ツールバーの最後の行へ理由を出します。検証に通らない例は、識別子に使えないid、重複したタイトル、feedbackの定義でreviewをfalseにしたことです。同じidが2つあるときは、画面が先に止めます。
         scene:
           dirty: true
           error: true

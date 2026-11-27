@@ -42,6 +42,7 @@ import {
 } from "../../core/workflow-view.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { useSaveKey, type SaveKeyTarget } from "../useSaveKey.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import workflowTour from "../tours/workflow.yml";
@@ -236,8 +237,12 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   }, [answer, dirty]);
 
   useEscape(review, ESCAPE_LAYER.overlay, () => setReview(false));
+  /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す。押すと［この順序に決める］と同じく確認を出す */
+  const saveKey = useRef<SaveKeyTarget | undefined>(undefined);
+  useSaveKey(!tour.touring && data.kind === "page" && !review, () => saveKey.current ?? { blocker: "読み込みが終わっていないため、決められません", busy: false, save: () => undefined, blocked: () => undefined });
 
   if (data.kind === "loading") {
+    saveKey.current = undefined;
     return (
       <p className="empty" id="ccnavi-loading">
         {data.text}
@@ -245,6 +250,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     );
   }
   if (data.kind === "error" || answer === undefined) {
+    saveKey.current = undefined;
     return (
       <LoadError
         heading="計画編集タブを読み込めませんでした。原因を直してから「更新」を押してください。"
@@ -278,7 +284,8 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
     : status;
   const shownLayouts = touring ? SAMPLE_LAYOUTS[shownName][scene.tidy === true ? "tidy" : "kept"] : layouts;
   const editable = !shownPending && !shownBusy && shownGone === undefined && !shownReview;
-  const blocker = saveBlocker(shownAnswer, { pending: shownPending, changed: shownChanged !== undefined, gone: shownGone !== undefined });
+  const blocker = saveBlocker(shownAnswer, { busy: shownBusy, pending: shownPending, changed: shownChanged !== undefined, gone: shownGone !== undefined });
+  saveKey.current = { blocker, busy: shownBusy, save: () => setReview(true), blocked: (reason) => setStatus({ text: reason, error: false }) };
   const moved = renumbered(shownAnswer);
   const notes = [
     ...shownAnswer.revision_problems.map((text) => ({ text, kind: "revision" })),
@@ -409,7 +416,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           )}
         </section>
       )}
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
             <strong>{shownTicket}</strong> の作業・レビュー計画の順序
@@ -442,8 +449,8 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             id="save"
             data-action="save"
             data-tour="save"
-            disabled={shownBusy || blocker !== ""}
-            title={blocker === "" ? "提案の計画と、番号の変わるステップを指す子の提案を変更します（承認はしません）" : blocker}
+            disabled={blocker !== ""}
+            title={blocker === "" ? "提案の計画と、番号の変わるステップを指す子の提案を変更します（承認はしません。Ctrl+S）" : blocker}
             onClick={() => {
               if (!touring) {
                 setReview(true);
@@ -495,9 +502,6 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         )}
       </div>
       {shownReview && <Review ticket={shownTicket} answer={shownAnswer} focus={!touring} onConfirm={confirmSave} onCancel={() => (touring ? undefined : setReview(false))} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
-        <span id="status">{shownStatus?.text ?? ""}</span>
-      </footer>
       {touring ? <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} /> : null}
     </>
   );

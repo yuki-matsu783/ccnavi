@@ -16,25 +16,25 @@ function withFlow(ticket: string, change: { exists?: boolean; locked?: boolean; 
   };
 }
 
-test("CB-D115 レビュー中の子のカードの「フロー」ボタンは、着手中と別の言葉で「閲覧（レビュー中）」", async () => {
+test("CB-D115 レビュー中の子のカードの「フロー」ボタンは、着手中と別の言葉で「閲覧のみ（レビュー中）」", async () => {
   const dom = await openBoard(withFlow("i0001-02-04", { locked: true, lock_kind: "review" }));
   try {
     const button = dom.one('[data-action="flow"][data-ticket="i0001-02-04"]');
-    assert.equal(button.textContent, "フロー: 閲覧（レビュー中）");
+    assert.equal(button.textContent, "フロー: 閲覧のみ（レビュー中）");
     assert.equal(button.getAttribute("data-flow"), "locked");
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D113 子のカードに「フロー」ボタン。言葉は 作成 / 編集 / 閲覧（着手中・終了済み）で、親のカードにはありません", async () => {
+test("CB-D113 子のカードに「フロー」ボタン。言葉は 作成 / 編集 / 閲覧のみ（着手中・終了済み）で、親のカードにはありません", async () => {
   const dom = await openBoard(withFlow("i0001-02-03", { exists: true }));
   try {
     const label = (ticket: string): string => dom.one(`[data-action="flow"][data-ticket="${ticket}"]`).textContent ?? "";
     assert.equal(label("i0001-02-04"), "フロー: 作成");
     // 完了の子でもファイルが在れば中身を見られる。終わった手順を「編集」とは言わない
-    assert.equal(label("i0001-01-01"), "フロー: 閲覧（終了済み）");
-    assert.equal(label("i0001-02-02"), "フロー: 閲覧（着手中）");
+    assert.equal(label("i0001-01-01"), "フロー: 閲覧のみ（終了済み）");
+    assert.equal(label("i0001-02-02"), "フロー: 閲覧のみ（着手中）");
     assert.equal(label("i0001-02-03"), "フロー: 編集");
     assert.equal(dom.one('[data-action="flow"][data-ticket="i0001-02-02"]').getAttribute("data-flow"), "locked");
     // 親のカードには出ない

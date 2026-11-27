@@ -344,6 +344,8 @@ export function planDiff(before: readonly ApprovePlan[], after: readonly Approve
 
 /** 画面の状態のうち、保存を止めるもの */
 export interface SaveState {
+  /** 実行ファイルへの往復の途中 */
+  readonly busy: boolean;
   /** 線を変えて、実行ファイルの答えを待っている */
   readonly pending: boolean;
   /** 提案が外で変わった（取り込むまで保存できない） */
@@ -356,6 +358,9 @@ export interface SaveState {
  * 保存できない理由。空なら保存できる。書けるかは実行ファイルの`writable`のまま読み、理由の言葉を選ぶだけ
  */
 export function saveBlocker(answer: PlanOrderAnswer, state: SaveState): string {
+  if (state.busy) {
+    return "処理中のため決められません。終わるまでお待ちください";
+  }
   if (state.gone) {
     return "提案が承認待ちにありません";
   }

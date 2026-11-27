@@ -378,12 +378,12 @@ test("CB-T509 保存できない理由の言葉は、案内の見本でも実際
   assert.equal(CHECKING_TEXT, "線を変えた順序をccnaviで確認しています…");
   const refused = sample.answers.unpackable.answer.refused;
   assert.equal(refusedText(refused), `この線は引けません。線は引く前のままです: ${refused[0].text}`);
-  const blocked = (name: string, state = { pending: false, changed: false, gone: false }): string => saveBlocker(sample.answers[name].answer, state);
+  const blocked = (name: string, state = { busy: false, pending: false, changed: false, gone: false }): string => saveBlocker(sample.answers[name].answer, state);
   assert.equal(blocked("open"), "順序を変えていません");
   assert.equal(blocked("swap"), "");
-  assert.match(blocked("swap", { pending: true, changed: false, gone: false }), /確認しています/);
-  assert.match(blocked("swap", { pending: false, changed: true, gone: false }), /外で変わった/);
-  assert.match(blocked("swap", { pending: false, changed: false, gone: true }), /承認待ちにありません/);
+  assert.match(blocked("swap", { busy: false, pending: true, changed: false, gone: false }), /確認しています/);
+  assert.match(blocked("swap", { busy: false, pending: false, changed: true, gone: false }), /外で変わった/);
+  assert.match(blocked("swap", { busy: false, pending: false, changed: false, gone: true }), /承認待ちにありません/);
   assert.match(blocked("loose"), /順序の検査/);
   assert.match(blocked("locked-cut"), /改版で通らない/);
   assert.match(blocked("child-problems"), /子の提案を付け替えられない/);

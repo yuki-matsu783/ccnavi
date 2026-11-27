@@ -160,7 +160,7 @@ test("CB-T605 子のバッジ: copyStatusがreviewのときは自分のフェー
   assert.deepEqual(cards.get("c3")!.actions, []);
 });
 
-test("CB-T606 子のバッジ: copyStatusがopenのとき、フェーズがレビューで止まっていれば要確認、そうでなければ開始前／作業中", () => {
+test("CB-T606 子のバッジ: copyStatusがopenのとき、フェーズがレビューで止まっていれば要確認、そうでなければ着手待ち／作業中", () => {
   const json = boardOf(
     [
       ticketJson("i0001"),
@@ -176,7 +176,7 @@ test("CB-T606 子のバッジ: copyStatusがopenのとき、フェーズがレ�
     ])],
   );
   const cards = cardsOf(json);
-  assert.equal(label(cards.get("early")), "開始前");
+  assert.equal(label(cards.get("early")), "着手待ち");
   assert.equal(label(cards.get("working")), "作業中");
   for (const id of ["held", "waiting"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
@@ -207,7 +207,7 @@ test("CB-T607 子のバッジ: どの規則にもヒットしなければ要確�
 
 // --- 親のバッジ ---
 
-test("CB-T608 親のバッジ: 要確認 → 承認待ち（改版は「承認待ち（改版）」）→ 取り消し → 完了（早めに終了）→ フェーズのレビュー → 開始前／作業中 → 要確認", () => {
+test("CB-T608 親のバッジ: 要確認 → 承認待ち（改版は「承認待ち（改版）」）→ 取り消し → 完了（早めに終了）→ フェーズのレビュー → 着手待ち／作業中 → 要確認", () => {
   const json = pending(
     boardOf(
       [
@@ -244,7 +244,7 @@ test("CB-T608 親のバッジ: 要確認 → 承認待ち（改版は「承認�
     early: "完了（早めに終了）",
     waiting: "レビュー待ち",
     preparing: "レビュー準備中",
-    "fresh-open": "開始前",
+    "fresh-open": "着手待ち",
     busy: "作業中",
     odd: "要確認",
   };
@@ -297,7 +297,7 @@ test("CB-T610 操作: 子の承認待ち + レビュー待ちは承認だけ。�
   assert.deepEqual(p.actions, [{ kind: "approve" }]);
 });
 
-test("CB-T1247 開始前・作業中・レビュー準備中のバッジは、ツールチップに次の一手（誰の番か）を添える", () => {
+test("CB-T1247 着手待ち・作業中・レビュー準備中のバッジは、ツールチップに次の一手（誰の番か）を添える", () => {
   const open: StatusCard = {
     isParent: true, column: "doing", copyStatus: "open", blocked: "", scattered: [], pendingApproval: false, cancelledAt: "",
     startedAt: "", revision: false, wrapped: false, gateClosed: false, reviewWaiting: false, phaseStatus: "", phases: [],

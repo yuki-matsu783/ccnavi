@@ -237,7 +237,7 @@ test("CB-T1225 untouchedは開いた直後の雛形と同じ内容のときだ�
   assert.equal(untouched(setMeta(blank, { description: "x" }), blank), false);
 });
 
-test("CB-T1273 ステップのidは添字を振り直しても同じステップに付いたまま。足したステップは両方の計画に無いidを持ち、idから図の番号が引ける", () => {
+test("CB-T1277 ステップのidは添字を振り直しても同じステップに付いたまま。足したステップは両方の計画に無いidを持ち、idから図の番号が引ける", () => {
   const t = sample();
   // 3→2の線で、docsが2番へ繰り上がる。idはステップに付いて動く
   const reordered = connectItems(t, 3, 2);
@@ -253,7 +253,7 @@ test("CB-T1273 ステップのidは添字を振り直しても同じステップ
   assert.ok(!("id" in ((toData(t) as { plan: unknown[] }).plan[1] as object)));
 });
 
-test("CB-T1275 選んだステップの後に挟むと、後続は新しいステップを待つ。並べて足すと、同じ先行を持ち、後続は新しいステップも待つ。フローのキーも振り直り、足したステップのidが返る", () => {
+test("CB-T1278 選んだステップの後に挟むと、後続は新しいステップを待つ。並べて足すと、同じ先行を持ち、後続は新しいステップも待つ。フローのキーも振り直り、足したステップのidが返る", () => {
   // 1(design) → 2(implement), 1 → 3(docs), 2・3 → 4(acceptance)。2番と4番にフロー
   const t = sample();
   const after = insertItem(t, "plan", 2, "review", "after");

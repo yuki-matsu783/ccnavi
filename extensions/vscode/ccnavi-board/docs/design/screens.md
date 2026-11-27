@@ -29,11 +29,11 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 | 3 | 取り消し（`cancelledAt`あり。アーカイブも同じ）→ 取り消し | 同左 |
 | 4 | 完了の列か、取り消しでないアーカイブ → 完了 | 完了・アーカイブ → 完了（早めに閉じていれば「完了（早めに終了）」） |
 | 5 | `copyStatus === "review"`: 自分のフェーズの一言（レビュー待ち／レビュー準備中／レビュー予定）。それ以外は要確認 | どれかのフェーズがレビュー待ち → レビュー待ち |
-| 6 | `copyStatus === "open"`: フェーズが`reviewWaiting`か`gateClosed`なら要確認。`startedAt`が空なら開始前、あれば作業中 | どれかのフェーズがレビュー準備中 → レビュー準備中 |
-| 7 | どれにもヒットしない → 要確認（読めた欄をツールチップに出す） | `copyStatus === "open"` → 開始前／作業中 |
+| 6 | `copyStatus === "open"`: フェーズが`reviewWaiting`か`gateClosed`なら要確認。`startedAt`が空なら着手待ち、あれば作業中 | どれかのフェーズがレビュー準備中 → レビュー準備中 |
+| 7 | どれにもヒットしない → 要確認（読めた欄をツールチップに出す） | `copyStatus === "open"` → 着手待ち／作業中 |
 | 8 | — | どれにもヒットしない → 要確認 |
 
-開始前・作業中・レビュー準備中のバッジには、ツールチップ（title）にだけ、次に誰が何をするかを書く。画面の見える位置には出さない。開始前はユーザがClaude Codeに着手を頼むこと、作業中とレビュー準備中はエージェントの番でユーザの操作が要らないこと。
+着手待ち・作業中・レビュー準備中のバッジには、ツールチップ（title）にだけ、次に誰が何をするかを書く。画面の見える位置には出さない。着手待ちはユーザがClaude Codeに着手を頼むこと、作業中とレビュー準備中はエージェントの番でユーザの操作が要らないこと。
 
 フェーズ行の一言（`phaseStatusOf`）。使う欄はPhaseJsonのもの。
 
@@ -52,7 +52,7 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 ユーザ待ちは、ユーザができることがあるときだけ出し、主ボタンは1つ。親は承認待ちなら「内容を確認して承認してください」と［承認］で、レビューの操作は置かない（子のカードだけ）。子は承認待ちなら［承認］、バッジが「レビュー待ち」なら「MRでレビューしてください」と［MRを開く］（リンク）と［レビュー完了］（主ボタン）の順で1つだけ出す。承認は`pendingApproval`だけを条件にし、バッジが「要確認」でも出す。
 
-注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止中・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・開始前の子）・ワークツリーが見つからない（作業中・レビュー中）・未送信）。理由の全文、issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由、リスクの文言（JSONのまま）、人間レビューの要否と理由は詳細に畳む。base / 合流のsha、マーカー名は画面に出さない。詳細の開閉はカードごと（プロジェクトとIDの組）に`webview/board/state.ts`の状態へ覚え、更新や列の移動でも閉じない。案内の見本では、開閉を実際の状態に書き込まない（案内は`scene.details`で見本のカードを開く）。
+注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止中・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・着手待ちの子）・ワークツリーが見つからない（作業中・レビュー中）・未送信）。理由の全文、issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由、リスクの文言（JSONのまま）、人間レビューの要否と理由は詳細に畳む。base / 合流のsha、マーカー名は画面に出さない。詳細の開閉はカードごと（プロジェクトとIDの組）に`webview/board/state.ts`の状態へ覚え、更新や列の移動でも閉じない。案内の見本では、開閉を実際の状態に書き込まない（案内は`scene.details`で見本のカードを開く）。
 
 カードを押す（または焦点を当ててEnter）とチケットのファイルが開く。ボタン・リンク・詳細（開閉と開いた本文）の上では開かない（`NOT_OPENING`）。
 
@@ -91,7 +91,7 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 | ユーザが押せる操作 | `core/board-view.ts`の`BoardMessage` → 画面のボタン → `board-panel.ts`の`KNOWN`（形の確認の一覧）と`asMessage`（形の確認）と`handleMessage`（処理）。`KNOWN`か処理を書き忘れると型が合わなくなる（どちらも型で網羅を強制してある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
-**画面を1つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は関数の側が付ける）、`poster<M>()`、`core/screen-host.ts`（`screenHost` / `retainedHost`と`embedJson`）、共通の部品`@ccnavi/shared`（`extensions/shared/styles/`の`button.css`・`page.css`・`list.css`。画面のstyle.cssで`button.css`・`../styles/appearance.css`・`page.css`の順に @importする）、`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、`webview/useHostMessages.ts`（拡張ホストからのメッセージの受信。見た目もここで受け、`ready`は呼ぶ側が渡す）・`webview/useEscape.ts`（Escは最も手前の面だけが受ける。レイヤーは`ESCAPE_LAYER`、CSSの`z-index`と同じ順）・`webview/Tour.tsx`の`ScreenHeader`（ツールバーと「?」を組む）、テストの共通部品（`test/helpers/dom.ts`・`test/helpers/bundle.ts`）。
+**画面を1つ足すとき、使い回せるもの。** `webviewScript` / `webviewStyle`（画面の名前で読む。拡張子は関数の側が付ける）、`poster<M>()`、`core/screen-host.ts`（`screenHost` / `retainedHost`と`embedJson`）、共通の部品`@ccnavi/shared`（`extensions/shared/styles/`の`button.css`・`page.css`・`list.css`。画面のstyle.cssで`button.css`・`../styles/appearance.css`・`page.css`の順に @importする）、`webview/vscode.ts`・`webview/initial.ts`・`webview/appearance.ts`、`webview/useHostMessages.ts`（拡張ホストからのメッセージの受信。見た目もここで受け、`ready`は呼ぶ側が渡す）・`webview/useEscape.ts`（Escは最も手前の面だけが受ける。レイヤーは`ESCAPE_LAYER`、CSSの`z-index`と同じ順）・`webview/useSaveKey.ts`（Ctrl+Sでの保存）と`core/save-gate.ts`の`editSaveBlocker`・`saveTitle`（［保存］を押せない理由。ボタンとCtrl+Sが同じ答えを使う）・`webview/shared/RemovedBand.tsx`（削除した行を［元に戻す］帯）・`webview/shared/StatusLine.tsx`（直前の操作の一言。`ScreenHeader`の`status`に渡すとツールバーの最後の行に出る）・`webview/Tour.tsx`の`ScreenHeader`（ツールバーと「?」を組む）、テストの共通部品（`test/helpers/dom.ts`・`test/helpers/bundle.ts`）。
 
 画面ごとに要るのは、契約（`*-view.ts`）・入れ物を組む関数・画面のCSS（`webview/<名前>/style.css`と部品ごとのCSS）・`useHostMessages(handler, ready)`の引数（handlerと`ready`）・テストの入口（`test/helpers/<名前>.ts`）と、`test/shared/style.test.ts`の`reactPages`への1行（足し忘れはCB-T127 が止める）。
 

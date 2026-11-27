@@ -77,7 +77,7 @@ src/
     flow-render.ts    フロー編集の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-lint.ts      フローの本文を呼ぶたびに別の名前の一時ファイルに書いて実行ファイル（--lint --json --flow）に確かめさせ、(flow) の error を理由にする。通れば実行ファイルが読んだ中身（flow.data）と、(flow) の warn（パスを直したもの）・渡る手順（rendered）・候補（candidates）を返す
     flow-match.ts     画面の中身と実行ファイルが読んだ中身（flow.data）の見比べ（整数と浮動小数の揃え方、食い違った場所と両者の値の言い方）
-    flow-history.ts   フロー編集（とテンプレートの編集）の元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
+    flow-history.ts   フロー編集・テンプレートの編集・フェーズ管理の定義の編集の、元に戻す・やり直すの履歴（直す前の中身の複製を積む。同じ欄への打ち込みをまとめる。上限 100）
     flow-diff.ts      読み込んだフローと編集中のフローの見比べ（未保存の判定と、保存前に見せる足した・消した・変えたノードと線）。下書きの取り込みの前に見せる、値の前後まで並べた差分（textDiff）
     bug-report.ts     バグ報告の組み立て。OS ごとの画面の取り方、ffmpeg の録画と gif の引数、スクリーンショットのコマンド、診断ログのうち報告を始めてから足された分の切り出し、zip（依存を足さずに書く）、report.txt。vscode に触れないので単体で試せる
     tour-sidebar.ts   左パネルの案内（ウォークスルー）の ID と、続けて動かす基本の案内の画面。DOM にも vscode にも触れないので、単体で試せる
@@ -101,6 +101,7 @@ src/
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     hooks.ts          settings.json の hooks の読み取りと、ツール名で走る hook の絞り込み
+    save-gate.ts      設定を直す画面の［保存］を押せない理由（editSaveBlocker）。ボタンの disabled・ツールチップ・Ctrl+S が同じ答えを使う
     lock.ts           保存できるか（doing のチケットの有無。プロジェクトのルールならそのプロジェクトの分だけ）。取り込み待ち画面は template と layer-config の取り込みに、テンプレート管理画面（templates-panel.ts）は編集の保存に、この錠をそのまま掛ける（handoffmodel.ts の lockForTree が見るツリーに合わせる）
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
@@ -113,6 +114,7 @@ src/
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替えと拡大（body のクラスと zoom の書き換え）。9 画面で 1 本
     useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。9 画面で 1 本
+    useSaveKey.ts     Ctrl+S（Cmd+S）で保存する入口。理由（save-gate.ts）が空のときだけ保存し、空でなければ理由を表示する
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・タイトル・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
     tours/images.ts   手順の image（名前）から画像の data: URL を引く表。画像は tours/images/<名前>.png に置き、esbuild の dataurl の読み込みでバンドルへ入れる（Webview はファイルを読まず、ボードの CSP だけ img-src data: を許す）。表と置き場と YAML の突き合わせはテストが見る
@@ -174,12 +176,12 @@ src/
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
-    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
+    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧（語と深刻度の絞り込み）と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
-    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「図を編集」。行は最初から開く）
+    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「編集」。行は畳んで出す）
     templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）
     templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
-    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビューの選択、並べ替え、削除、追加）
+    templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビュー・先行ステップの選択、並べ替え、削除、追加）
     templates/FlowEdit.tsx 編集欄の子のフロー 1 本（フロー編集画面の図と右の欄を使い、部品箱でノードを足す）
     templates/Draft.tsx 下書き 1 件（読むだけ。バッジと指摘・計画。取り込みは取り込み待ち画面）
     templates/Plan.tsx  計画の表（番号・種類・レビュー・先行ステップ）
@@ -216,6 +218,8 @@ src/
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
     shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
+    shared/StatusLine.tsx 直前の操作の一言の行（ScreenHeader の status に渡すと、貼り付くツールバーの最後の行に出る。error は赤）
+    shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク管理が置く。直前の 1 行だけ覚える。元に戻す履歴を持つフェーズ管理・フロー編集・テンプレートの編集は置かない）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
     shared/Maximize.css Maximize.tsx の CSS。図の枠は isolation で内側の z-index を外へ及ぼさない
     shared/SequenceDiagram.tsx 案内の中の時系列の図（登場者の列と、時間順の矢印。矢印の値は等幅。focus の矢印だけ光らせ、ほかは薄くする）。DOM と CSS だけで描き、VS Code のテーマに従う

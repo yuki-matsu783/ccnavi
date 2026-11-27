@@ -16,12 +16,20 @@ export function moreNote(phase: PhaseForm): string {
   return hasMore(phase) ? "（設定あり）" : "（未設定）案内するエージェントと、使う場面を設定します";
 }
 
+/** scopeがinheritの定義を要約で言う言葉。行の要約と共通の設定の定義の一覧で同じにする */
+const INHERIT_TEXT = "親の範囲を引き継ぐ";
+
 /** 要約に出す範囲。inheritならその表記、globが無ければ未設定と言う */
 export function scopeText(phase: PhaseForm): string {
   if (phase.inherit) {
-    return "inherit";
+    return INHERIT_TEXT;
   }
   return phase.scope.length === 0 ? "（scope未設定）" : phase.scope.join(", ");
+}
+
+/** 共通の設定の定義（範囲は`inherit`の1語かglobのリスト）の範囲 */
+export function commonScopeText(scope: readonly string[]): string {
+  return scope.length === 1 && scope[0] === "inherit" ? INHERIT_TEXT : `編集可能な範囲${scope.join(", ")}`;
 }
 
 /** 編集可能な範囲のツールチップ */
@@ -50,7 +58,7 @@ export function countText(total: number, query: string, shown: number, kept: num
   return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept}件）` : ""}`;
 }
 
-/** idが重なっているときに下部へ出す文 */
+/** idが重なっているときにツールバーの最後の行へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空のid" : id));
   return `idが重なっています（${names.join(", ")}）。重なりを直すまで保存できません。`;
@@ -64,7 +72,7 @@ export function emptyNote(exists: boolean): string {
   return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます。";
 }
 
-/** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
+/** 共通の設定の定義と表示名が重なっているときにツールバーの最後の行へ出す文 */
 export function commonTitleNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
   return `共通の設定のフェーズ定義とタイトル（title）が重なっています（${names.join(", ")}）。重なっている定義は使われません。タイトルを変えてから保存してください。`;

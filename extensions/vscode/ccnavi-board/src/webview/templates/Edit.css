@@ -29,6 +29,8 @@
 .tpl-edit-plan .plan-detail { max-height: 420px; }
 /* 図がまだ無いときに、選んだステップの操作だけを出す枠 */
 .tpl-edit-detail-alone { margin: 4px 0 8px; }
+.tpl-after-picks { display: inline-flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-4); }
+.tpl-after-picks label { white-space: nowrap; }
 .tpl-new { margin: 4px 0 10px; }
 .tpl-new input[type=text] { width: 16em; max-width: 100%; }
 .tpl-flow-edit { margin-top: 6px; }

@@ -404,7 +404,7 @@ courses:
         scene: { tab: rules }
       - target: rules
         title: ルール
-        body: deny（止める）・ask（確認する）・allow（通す）のタイプごとに並びます。判定は強い順にdeny > ask > allowです。行を押すと欄が開き、「＋ ルールを追加」で追加できます。見出しの ▾ でタイプを畳めます。
+        body: deny（止める）・ask（確認する）・allow（通す）のタイプごとに並びます。判定は強い順に 拒否 > 確認 > 許可（deny > ask > allow）です。行を押すと欄が開き、「＋ ルールを追加」で追加できます。見出しの ▾ でタイプを畳めます。
         scene: { tab: rules, open: git-push }
       - target: find
         title: 絞り込み
@@ -485,7 +485,7 @@ courses:
         focus: edit
       - target: save
         title: 保存すると、まず検証される
-        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントが応答中なら、確認が出ます。
+        body: ［保存］を押すと、編集中の内容を一時ファイルに書いて、実行ファイルが検証します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるときは保存できません。エージェントが応答中なら、確認が出ます。Ctrl+Sでも保存でき、押せないときは理由をボタンの説明に出します。
         scene: { tab: rules, open: git-push }
         diagram: rule-save
         focus: save, lock
@@ -753,11 +753,11 @@ courses:
         scene: { tab: rules, fold: allow }
       - target: order-hint
         title: 判定の強さ
-        body: 判定は強い順にdeny > ask > allowです。1件でもdenyにヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
+        body: 判定は強い順に 拒否 > 確認 > 許可（deny > ask > allow）です。1件でもdenyにヒットすれば拒否で、弱いタイプは見に行きません。行の並びが強さを決めるのではなく、タイプが決めます。
         scene: { tab: rules }
       - target: rule-no-rm-rf-buttons
         title: 同じタイプの中の順
-        body: 行を開いた右下の ↑ ↓ で、同じタイプの中の順を替えます。同じタイプに複数ヒットすれば全部の文を並べて返すので、順は返す文の並びに出ます。ヒットするかどうかは変わりません。「削除」で行を削除できます。
+        body: 行を開いた右下の ↑ ↓ で、同じタイプの中の順を替えます。同じタイプに複数ヒットしたときは、ヒットした文をすべて並べて返すので、順はその並びに表れます。ヒットするかどうかは変わりません。「削除」で行を削除できます。削除した直後は、上の帯の［元に戻す］で戻せます。
         scene: { tab: rules, open: no-rm-rf }
       - target: rule-no-rm-rf-type
         title: タイプを移す
@@ -777,8 +777,8 @@ courses:
         body: 保存を押すと、実行ファイルの--lintでルール全体を検証し、通ればファイルに反映します。errorが1件でもあれば、何も保存しません。作業中のチケットがあるとき、読み込んだあとにファイルが外で変わったときも、保存は止まります。
         scene: { tab: rules }
       - target: status
-        title: 理由は下に出る
-        body: '止まった理由は画面の下に出ます。「設定の検証（--lint）でエラーが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
+        title: 理由はツールバーの最後の行に出る
+        body: '止まった理由は、ツールバーの最後の行に赤で出ます。一覧をスクロールしても見えたままです。「設定の検証（--lint）でエラーが見つかりました」に続けて、lintの報告が1行ずつ並び、1行は「error: ルールのid: 内容」の形です。見本は、askのdb-migrateにmessageを入力して保存したときの報告です。'
         scene: { tab: rules, error: true }
       - target: rule-db-migrate
         title: idで直す行を探す

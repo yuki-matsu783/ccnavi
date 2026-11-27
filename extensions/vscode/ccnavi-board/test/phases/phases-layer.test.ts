@@ -118,12 +118,12 @@ test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並
   }
 });
 
-test("CB-T529 共通の設定の別のidと表示名が重なる定義は、idの重なりと同じく保存を止めて下部にerrorの文を出す。直せば保存できる", async () => {
+test("CB-T529 共通の設定の別のidと表示名が重なる定義は、idの重なりと同じく保存を止めてツールバーの最後の行にerrorの文を出す。直せば保存できる", async () => {
   // 共通のplanと、見本のresearch（p1）の表示名「調査」が重なる
   const dom = await openPhases({ common: [COMMON_PLAN] });
   try {
     assert.match(dom.one("#status").textContent, /共通の設定のフェーズ定義とタイトル（title）が重なっています（research）/);
-    assert.ok(dom.one(".foot").className.includes("error"));
+    assert.ok(dom.one("#status").className.includes("error"));
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
     dom.type(dom.one(`${rowSelector("p2")} input.f-title`), "設計する");

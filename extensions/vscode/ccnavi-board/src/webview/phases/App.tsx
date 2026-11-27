@@ -20,9 +20,12 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 import { LoadError } from "../shared/LoadError.js";
 
+import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHistory } from "../../core/flow-history.js";
 import { lockClass, type Lock } from "../../core/lock.js";
-import type { CommonPhase, PhaseForm, PhasesData, PhasesMessage, PhasesPage, ToPhases } from "../../core/phases-view.js";
+import { kindShort, reviewOption, type CommonPhase, type PhaseForm, type PhasesData, type PhasesMessage, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { useSaveKey } from "../useSaveKey.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { Phase } from "./Phase.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
@@ -33,7 +36,7 @@ import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
 import { Code } from "../shared/Code.js";
 import { foldFind } from "../shared/find.js";
-import { COMMON_NOTE, commonIdNote, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
+import { COMMON_NOTE, commonIdNote, commonScopeText, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -68,6 +71,8 @@ function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
 interface Status {
   readonly text: string;
   readonly error: boolean;
+  /** Ctrl+Sで押せない理由を見せた一言。次の編集で消す（編集すると理由が変わるため） */
+  readonly fleeting?: boolean;
 }
 
 interface Editing {
@@ -96,7 +101,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const nextKey = useRef(keyer()).current;
   const [data, setData] = useState<PhasesData>(initial);
   const [editing, setEditing] = useState<Editing>(() => editingOf(initial, nextKey));
-  const [dirty, setDirty] = useState(false);
+  /** 元に戻す・やり直すの履歴。中身が入れ替わったら（更新・保存・作成）空にする */
+  const [history, setHistory] = useState<FlowHistory<Draft>>(() => emptyHistory<Draft>());
   /** 保存や作成の往復の間。欄を止める（通ると中身が入れ替わり、その間の編集は消えるため） */
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status | undefined>(undefined);
@@ -110,6 +116,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
 
   const { draft, open, more } = editing;
   const page = pageOf(data);
+  /** 未保存か。読んだ中身と比べる（元に戻して読んだときと同じになれば、未保存ではない） */
+  const dirty = page !== undefined && JSON.stringify(formOf(draft).phases) !== JSON.stringify(page.model.form.phases);
   /**
    * 案内の間は見本を描き、手順ごとの様子（開く定義・絞り込み・設定の切り替えなど）は`scene`に入れる。実際の編集中の定義や開いた行は
    * 動かさないので、閉じたあとに戻すものは無い。
@@ -135,7 +143,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       const next = message.data;
       setData(next);
       setEditing(editingOf(next, nextKey));
-      setDirty(false);
+      setHistory(emptyHistory<Draft>());
       setBusy(false);
       setStatus(undefined);
       setChanged(false);
@@ -196,6 +204,26 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     post({ type: "reload", dirty });
   };
 
+  // idの重なりは帯と同じ文を理由にする。案内の間のボタンは、見本の状態で下の`shownSaveBlocker`が決める
+  const draftDup = duplicates(draft);
+  const draftClash = commonClashes(draft, page?.common ?? []);
+  const saveBlocker = editSaveBlocker({
+    busy,
+    dirty,
+    lock,
+    invalid: draftDup.size > 0 ? duplicateNote(draftDup) : draftClash.titles.size > 0 ? commonTitleNote(draftClash.titles) : "",
+  });
+  const save = (): void => {
+    if (tour.touring) {
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "検証して保存中…", error: false });
+    post({ type: "save", form: formOf(draft) });
+  };
+  // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
+
   if (data.kind === "loading") {
     return (
       <p className="empty" id="ccnavi-loading">
@@ -219,21 +247,36 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     );
   }
 
-  const editDraft = (next: Draft, open?: ReadonlySet<string>): void => {
-    if (tour.touring) {
-      return;
-    }
+  /** 編集中の定義を入れ替える。履歴には触れない（積むのは`editDraft`、戻すのは`travel`） */
+  const applyDraft = (next: Draft, open?: ReadonlySet<string>): void => {
     setEditing((now) => ({ ...now, draft: next, open: open ?? now.open }));
-    setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
     // idが重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
     if (duplicates(next).size > 0) {
       setStatus(undefined);
     }
   };
 
-  const editRow = (key: string, phase: PhaseForm): void => {
-    editDraft({ ...draft, rows: draft.rows.map((row) => (row.key === key ? { ...row, phase } : row)) });
+  /** 定義を直す。直す前のコピーを履歴に積む。欄に打った文字には`typing`（どの欄か）を付け、続けて打った分を1件にまとめる */
+  const editDraft = (next: Draft, open?: ReadonlySet<string>, typing?: string): void => {
+    if (tour.touring) {
+      return;
+    }
+    setHistory((now) => record(now, draft, typing === undefined ? {} : { key: typing }));
+    applyDraft(next, open);
+  };
+
+  const travel = (moved: { readonly history: FlowHistory<Draft>; readonly doc: Draft } | undefined): void => {
+    if (tour.touring || moved === undefined) {
+      return;
+    }
+    setHistory(moved.history);
+    applyDraft(moved.doc);
+  };
+
+  const editRow = (key: string, phase: PhaseForm, typing?: string): void => {
+    editDraft({ ...draft, rows: draft.rows.map((row) => (row.key === key ? { ...row, phase } : row)) }, undefined, typing === undefined ? undefined : `${key}:${typing}`);
   };
 
   const toggle = (key: string): void => {
@@ -257,20 +300,11 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     setEditing((now) => ({ ...now, more: new Map(now.more).set(key, value) }));
   };
 
-  const move = (key: string, delta: number): void => {
-    const rows = draft.rows.slice();
-    const from = rows.findIndex((row) => row.key === key);
-    const to = from + delta;
-    if (from < 0 || to < 0 || to >= rows.length) {
+  const remove = (key: string): void => {
+    if (tour.touring) {
       return;
     }
-    const moved = rows[from];
-    rows[from] = rows[to];
-    rows[to] = moved;
-    editDraft({ ...draft, rows });
-  };
-
-  const remove = (key: string): void => {
+    // 消した定義は、見出しの「元に戻す」で戻せる（履歴に積む）
     editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
   };
 
@@ -305,6 +339,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"], turns: [] }
       : { locked: false, reason: "", doing: [], turns: [] }
     : lock;
+  const shownSaveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty, lock: shownLock }) : saveBlocker;
   const sceneOpen = sceneList(scene.open);
   const sceneMore = sceneList(scene.more);
   const isShownOpen = (row: { readonly key: string; readonly phase: PhaseForm }): boolean => (touring ? row.key === ADDED_KEY || sceneOpen.has(row.phase.id) : open.has(row.key));
@@ -361,7 +396,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary">
           <span data-tour="target">
             <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
@@ -375,11 +410,17 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </div>
         <div className="controls">
           <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
-          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} title={shownPage?.exists !== true ? "ファイルがまだないため、開けません" : undefined} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
             更新
+          </button>
+          <button type="button" className="action" data-action="undo" disabled={touring || shownBusy || !canUndo(history)} onClick={() => travel(undo(history, draft))}>
+            元に戻す
+          </button>
+          <button type="button" className="action" data-action="redo" disabled={touring || shownBusy || !canRedo(history)} onClick={() => travel(redo(history, draft))}>
+            やり直す
           </button>
           <button
             type="button"
@@ -387,15 +428,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             id="save"
             data-action="save"
             data-tour="save"
-            disabled={!shownDirty || shownLock.locked || shownBusy || dup.size > 0 || clash.titles.size > 0}
-            onClick={() => {
-              if (tour.touring) {
-                return;
-              }
-              setBusy(true);
-              setStatus({ text: "検証して保存中…", error: false });
-              post({ type: "save", form: formOf(draft) });
-            }}
+            disabled={shownSaveBlocker !== ""}
+            title={saveTitle(shownSaveBlocker)}
+            onClick={save}
           >
             保存
           </button>
@@ -443,7 +478,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           <input
             id="find"
             type="search"
-            placeholder="id・title・scope・whenで絞り込む"
+            placeholder="id・title・scope・deliverables・whenで絞り込む"
             spellCheck={false}
             value={shownFind}
             onChange={(event) => {
@@ -473,7 +508,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           </div>
         )}
         <ul className="list" id="phases" data-tour="phases">
-          {rows.map((row, index) => (
+          {rows.map((row) => (
             <Phase
               key={row.key}
               phaseKey={row.key}
@@ -488,11 +523,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
               frozen={touring}
               onToggle={() => toggle(row.key)}
               onToggleMore={(value) => toggleMore(row.key, value)}
-              onChange={(phase) => editRow(row.key, phase)}
-              finding={query !== ""}
-              first={index === 0}
-              last={index === rows.length - 1}
-              onMove={(delta) => move(row.key, delta)}
+              onChange={(phase, typing) => editRow(row.key, phase, typing)}
+              onSeal={() => setHistory(seal)}
               onRemove={() => remove(row.key)}
             />
           ))}
@@ -507,11 +539,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       </section>
       {common.length > 0 && <CommonList common={common} />}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
-        <span id="status" data-tour="status">
-          <Code text={shownStatus?.text ?? ""} />
-        </span>
-      </footer>
     </>
   );
 }
@@ -530,7 +557,7 @@ function CommonList(props: { readonly common: readonly CommonPhase[] }): JSX.Ele
       <ul className="list">
         {props.common.map((phase) => (
           <li key={phase.id} className="common-phase" data-id={phase.id} data-source="common">
-            <code>{phase.id}</code> {phase.title} <span>（区分{phase.kind} / レビュー{String(phase.review)} / 編集可能な範囲{phase.scope.join(", ")}）</span>
+            <code>{phase.id}</code> {phase.title} <span>（{kindShort(phase.kind)} / {reviewOption(phase.review).short} / {commonScopeText(phase.scope)}）</span>
           </li>
         ))}
       </ul>

@@ -135,6 +135,9 @@ select { background: var(--vscode-dropdown-background); color: var(--vscode-drop
 input:disabled, select:disabled, textarea:disabled { opacity: .6; }
 .foot { white-space: pre-wrap; bottom: 0; margin-top: 12px; padding: 4px 0; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); min-height: 1.2em; overflow-wrap: anywhere; }
 .foot.error { color: var(--error-text); }
+/* 直前の操作の一言（StatusLine）。ツールバーの最後に1行ぶん全幅で置く。検証の報告が長いときは、ツールバーが画面を覆わないよう高さを抑えて中でスクロールする */
+.toolbar > .status-line { flex: 1 0 100%; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); max-height: 30vh; overflow-y: auto; }
+.toolbar > .status-line.error { color: var(--error-text); }
 pre.load-error { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 12px; }
 /* ハイコントラストのテーマでは背景が変わらないので、VS Code の作法どおり点線の縁でホバーを見せ、
    無効なボタンは枠を消さず点線にする。contrast の変数は HC でしか定義されないので、他のテーマでは適用されない */

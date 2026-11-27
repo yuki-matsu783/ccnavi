@@ -59,6 +59,35 @@ export const KNOWN_TOOLS = [
 ] as const;
 
 /**
+ * 判定を試す画面の「対象」欄の下に出す、選んだツールの書き方の例（1行）。入力を始めても消えないよう、
+ * プレースホルダーではなく欄の外に出す。候補に無いツールは、候補から選ぶよう促す。
+ */
+export function subjectExample(tool: string): string {
+  switch (tool) {
+    case "Bash":
+    case "PowerShell":
+      return "コマンドを書きます。例: git push origin main";
+    case "Read":
+    case "Grep":
+    case "Glob":
+    case "Edit":
+    case "MultiEdit":
+    case "Write":
+    case "NotebookEdit":
+      return "絶対パスを書きます。例: /home/me/repo/src/main.ts";
+    case "Skill":
+      return "スキル名を書きます。例: commit";
+    case "Agent":
+    case "Task":
+      return "サブエージェントの見出し（description）を書きます。例: 調査";
+    case "WebFetch":
+      return "URLを書きます。例: https://example.com/docs";
+    default:
+      return "書き方はツールで変わります。ツールを候補から選ぶと例が出ます";
+  }
+}
+
+/**
  * ツール名として受け付ける形。英字で始まり、英数字・`_`・`-`だけ（`Bash`、`mcp__server__tool`など）。
  * `match`は名前を`|`で並べたものなので`|`を含めない。ccnaviの`--test`には名前を引数で渡すので、
  * 先頭の`-`も弾く。一覧にない名前は、判定が対象を取り出せないだけで、形が正しければ受け付ける。

@@ -9,7 +9,7 @@ export const BOARD_VERSION = 1;
 
 /**
  * ボードの列。置き場は4つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
- * 列は 未着手（`todo/`）/ 作業中（`approved/doing/`と`review/`）/ 完了（`approved/done/`）/ 取り消し
+ * 列は 承認待ち（`todo/`）/ 進行中（`approved/doing/`と`review/`）/ 完了（`approved/done/`）/ 取り消し
  * （`approved/done/`で`cancelled_at`を持つ）の4つ。レビュー待ちは列ではなくカードの属性で分かる。
  * 5つめのアーカイブは置き場ではなく、手元の退避（`logs/archive/`。`ccnavi-review.sh ready`が閉じた
  * 親子のチケットを移した先）にあるもの。表示するだけで、既定では隠す

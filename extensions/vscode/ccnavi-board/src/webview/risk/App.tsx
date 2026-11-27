@@ -14,6 +14,9 @@ import { LoadError } from "../shared/LoadError.js";
 import { lockClass, type Lock } from "../../core/lock.js";
 import { BUILTIN_LEVELS, LEVEL_NAMES, type FactorForm, type LevelName, type RiskData, type RiskMessage, type RiskPage, type ToRisk } from "../../core/risk-view.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { useSaveKey } from "../useSaveKey.js";
+import { insertAt, removal, RemovedBand, type Removed } from "../shared/RemovedBand.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { TargetSelect } from "../TargetSelect.js";
 import { HandoffLink } from "../shared/HandoffLink.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
@@ -58,6 +61,8 @@ function sceneList(value: Scene[string] | undefined): readonly string[] {
 interface Status {
   readonly text: string;
   readonly error: boolean;
+  /** Ctrl+Sで押せない理由を見せた一言。次の編集で消す（編集すると理由が変わるため） */
+  readonly fleeting?: boolean;
 }
 
 interface Editing {
@@ -76,6 +81,9 @@ function editingOf(data: RiskData, nextKey: () => string): Editing {
   return { draft, open: openedFromIds(draft, loadOpen()) };
 }
 
+/** 組み込みの配点を見せているときの［保存］の理由 */
+const READ_ONLY_NOTE = "組み込みの配点を表示しているため、保存できません。先にファイルを作ってください";
+
 export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   // キーは1枚の画面の中で数え上げる。描き直しで配り直さない
   const nextKey = useRef(keyer()).current;
@@ -93,6 +101,8 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const [find, setFind] = useState("");
   /** 足した直後の行。idの欄に焦点を移したら忘れる */
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
+  /** 直前に削除した項目。［元に戻す］で戻す */
+  const [removed, setRemoved] = useState<Removed<Draft> | undefined>(undefined);
 
   const { draft, open } = editing;
   const page = pageOf(data);
@@ -139,6 +149,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       setStatus(undefined);
       setChanged(false);
       setSaveWarns([]);
+      setRemoved(undefined);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
     } else if (message.type === "saved") {
       setSaveWarns(message.warns ?? []);
@@ -182,6 +193,24 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     post({ type: "reload", dirty });
   };
 
+  // 案内の間のボタンは、見本の状態で下の`shownSaveBlocker`が決める（Ctrl+Sには反応しない）
+  const saveBlocker = editSaveBlocker({
+    busy,
+    dirty,
+    lock,
+    readOnly: page?.builtin === true ? READ_ONLY_NOTE : "",
+  });
+  const save = (): void => {
+    if (tour.touring) {
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "検証して保存中…", error: false });
+    post({ type: "save", form: formOf(draft) });
+  };
+  // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
+
   if (data.kind === "loading") {
     return (
       <p className="empty" id="ccnavi-loading">
@@ -212,6 +241,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     setEditing((now) => ({ draft: next, open: open ?? now.open }));
     setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
   };
 
   const editRow = (key: string, factor: FactorForm): void => {
@@ -246,7 +276,25 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   };
 
   const remove = (key: string): void => {
+    if (tour.touring) {
+      return;
+    }
+    const gone = removal(draft.rows, key);
     editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
+    if (gone !== undefined) {
+      const id = gone.row.factor.id.trim();
+      setRemoved({
+        label: id === "" ? "idの無い項目" : `項目「${id}」`,
+        restore: (now) => ({ ...now, rows: insertAt(now.rows, gone.index, gone.row) }),
+      });
+    }
+  };
+
+  const undoRemove = (): void => {
+    if (removed !== undefined) {
+      editDraft(removed.restore(draft));
+      setRemoved(undefined);
+    }
   };
 
   const add = (): void => {
@@ -277,6 +325,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
   const shownDirty = touring ? false : dirty;
   const shownBusy = touring ? false : busy;
   const shownLock: Lock = touring ? { locked: false, reason: "", doing: [], turns: [] } : lock;
+  const shownSaveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty, lock: shownLock, readOnly: shownReadOnly ? READ_ONLY_NOTE : "" }) : saveBlocker;
   const sceneOpen = new Set(sceneList(scene.open));
   const isShownOpen = (row: { readonly key: string; readonly factor: FactorForm }): boolean => (touring ? sceneOpen.has(row.factor.id) : open.has(row.key));
   const shownFind = touring ? (typeof scene.find === "string" ? scene.find : "") : find;
@@ -311,7 +360,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={touring ? null : (status ?? null)}>
         <div className="summary">
           <TargetSelect
             target={touring ? undefined : page?.target}
@@ -328,7 +377,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         </div>
         <div className="controls">
           <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
-          <button type="button" className="action" data-action="open-risk" disabled={!shownExists} onClick={() => act({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-risk" disabled={!shownExists} title={!shownExists ? "ファイルがまだないため、開けません" : undefined} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
@@ -340,15 +389,9 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
             id="save"
             data-action="save"
             data-tour="save"
-            disabled={!shownDirty || shownLock.locked || shownBusy || shownReadOnly}
-            onClick={() => {
-              if (tour.touring) {
-                return;
-              }
-              setBusy(true);
-              setStatus({ text: "検証して保存中…", error: false });
-              post({ type: "save", form: formOf(draft) });
-            }}
+            disabled={shownSaveBlocker !== ""}
+            title={saveTitle(shownSaveBlocker)}
+            onClick={save}
           >
             保存
           </button>
@@ -357,6 +400,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
       <p id="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
+      {!touring && <RemovedBand removed={removed} busy={busy} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
@@ -448,7 +492,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <summary>説明</summary>
           <p className="hint">
             子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1件につき加点条件は1つです。
-            <code>script</code>が失敗したときと出力を読み込めないときは、安全を優先してpointsをそのまま加点します。<code>judge</code>の項目があると、判定が揃うまで子をクローズできません。
+            <code>script</code>が失敗したときと出力を読み込めないときは、安全を優先して点（points）をそのまま加点します。<code>judge</code>の項目があると、判定が揃うまで子をクローズできません。
           </p>
         </details>
         <ul className="list" id="factors" data-tour="factors">
@@ -485,11 +529,6 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
         />
       )}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
-        <span id="status">
-          <Code text={touring ? "" : (status?.text ?? "")} />
-        </span>
-      </footer>
     </>
   );
 }

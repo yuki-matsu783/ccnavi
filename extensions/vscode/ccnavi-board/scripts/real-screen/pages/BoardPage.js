@@ -42,11 +42,11 @@ class BoardPage {
     return (await this.frame()).evaluate(() => document.body.innerText);
   }
 
-  /** 列（未着手・作業中・完了・取り消し）ごとのカード数。 */
+  /** 列（承認待ち・進行中・完了・取り消し）ごとのカード数。 */
   async columnCounts() {
     const t = await this.text();
     const out = {};
-    for (const name of ["未着手", "作業中", "完了", "取り消し"]) {
+    for (const name of ["承認待ち", "進行中", "完了", "取り消し"]) {
       const m = t.match(new RegExp(`${name}\\n(\\d+)\\n`));
       out[name] = m ? Number(m[1]) : null;
     }
