@@ -139,13 +139,12 @@ test("CB-D242 案内の間は、画面の編集・ボタン・設定の切り替
     await goto(dom, "add-phase", 1);
     assert.equal(dom.all(".phase").length, 7);
     const added = '.phase[data-key="s-add"]';
-    // 見本の上の操作は何も起こさない（打つ・押す・足す・並べ替える・消す・保存する・読み直す・開く・切り替える）
+    // 見本の上の操作は何も起こさない（打つ・押す・足す・消す・保存する・読み直す・開く・切り替える）
     dom.type(dom.one<HTMLInputElement>(`${added} input.f-id`), "zzz");
     dom.type(dom.one<HTMLInputElement>("#find"), "zzz");
     dom.change(dom.one<HTMLSelectElement>(`${added} select.f-kind`), "feedback");
     dom.click(dom.one('[data-action="add"]'));
     dom.click(dom.one(".phase .row-head"));
-    dom.click(dom.one(`${added} .buttons button[title='上へ']`));
     dom.click(dom.one(`${added} .buttons button:last-child`));
     dom.click(dom.one('[data-action="save"]'));
     dom.click(dom.one('[data-action="open-phases"]'));

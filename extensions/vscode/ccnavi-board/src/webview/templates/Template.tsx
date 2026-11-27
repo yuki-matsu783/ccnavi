@@ -1,5 +1,5 @@
 /**
- * テンプレート1件。見出しに名前・レイヤー・状態のバッジ・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
+ * テンプレート1件。見出しに名前・レイヤー・状態のバッジ・説明を出し、開くと計画とフローの図・本文の取り出しを出す。
  * 判定（有効・無効・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
 import { useEffect, type JSX } from "react";
@@ -9,7 +9,6 @@ import type { FlowSummary, TemplateCheck, TemplateDetail, TemplateEntry } from "
 import { Diagrams } from "./Diagrams.js";
 import { Plan } from "./Plan.js";
 import { Problems } from "./Problems.js";
-import { Code } from "../shared/Code.js";
 import { droppedLabel, flowText, layerLabel } from "./text.js";
 
 export interface TemplateProps {
@@ -23,7 +22,7 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の1件だけ） */
   readonly tour: boolean;
-  /** 編集を始める。渡さなければ「図を編集」は出さない（読み取り専用のレイヤー・読めない行・案内の間） */
+  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用のレイヤー・読めない行・案内の間） */
   readonly onEdit?: () => void;
   /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければundefined。読めなかったときは`previewError`に理由 */
   readonly preview?: TemplateCheck | undefined;
@@ -33,7 +32,6 @@ export interface TemplateProps {
 }
 
 export function Template({ entry, open, onToggle, detail, detailError, onShow, tour, onEdit, preview, previewError = "", onPreview }: TemplateProps): JSX.Element {
-  const dropped = entry.dropped;
   const wantPreview = open && preview === undefined && previewError === "" ? onPreview : undefined;
   useEffect(() => {
     wantPreview?.();
@@ -59,11 +57,6 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
         <StateTags entry={entry} />
         {entry.description !== "" && <span className="tpl-desc">{entry.description}</span>}
       </div>
-      {dropped !== null && (
-        <p className="hint tpl-dropped">
-          <Code text={dropped.detail} />
-        </p>
-      )}
       {open && (
         <div className="row-body tpl-body">
           {entry.when !== "" && (
@@ -91,7 +84,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           </button>
           {onEdit !== undefined && (
             <button type="button" className="action small" data-action="edit-template" onClick={onEdit}>
-              図を編集
+              編集
             </button>
           )}
           {detail !== undefined && detailMatches(detail, entry) && (
@@ -122,11 +115,16 @@ function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
   return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);
 }
 
-/** 状態のバッジ。有効・無効・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す */
+/**
+ * 状態のバッジ。有効・無効・使われない・破棄した理由・読み取り専用・読めない。色と文字の両方で出す。
+ * 共通と全欄が同じで破棄した行（`duplicate`）は、共通の1本が使われていて直すことは無いので、無効や破棄の色を付けず「共通の側を使用」とだけ出す
+ */
 function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>
-      {entry.dropped !== null ? (
+      {entry.dropped?.reason === "duplicate" ? (
+        <span className="tag">共通の側を使用</span>
+      ) : entry.dropped !== null ? (
         <>
           {!entry.usable && <span className="tag bad">無効</span>}
           <span className="tag warn">{`破棄: ${droppedLabel(entry.dropped.reason)}`}</span>

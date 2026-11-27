@@ -1,5 +1,5 @@
 /**
- * フェーズ管理画面の絞り込み・並べ替え・保存後のwarn・文言（#743）をhappy-domで見る。
+ * フェーズ管理画面の絞り込み・保存後のwarn・文言（#743）をhappy-domで見る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -14,23 +14,6 @@ test("CB-D1240 全角英数字でも絞り込める（NFKCで正規化して比�
     await dom.settle();
     const shown = dom.all(".phase").filter((row) => !row.classList.contains("hidden-by-find"));
     assert.deepEqual(shown.map((row) => row.querySelector(".sum-id")?.textContent), ["design"]);
-  } finally {
-    await dom.close();
-  }
-});
-
-test("CB-D1241 絞り込み中は上下ボタンを止め、titleに理由を出す", async () => {
-  const dom = await openPhases();
-  try {
-    const buttons = (): HTMLButtonElement[] => dom.all<HTMLButtonElement>(".phase .buttons button").filter((b) => b.textContent === "↑" || b.textContent === "↓");
-    assert.ok(buttons().some((b) => !b.disabled));
-    dom.type(dom.one("#find"), "design");
-    await dom.settle();
-    assert.ok(buttons().every((b) => b.disabled));
-    assert.ok(buttons().every((b) => /絞り込み中は並べ替えできません/.test(b.title)));
-    dom.type(dom.one("#find"), "");
-    await dom.settle();
-    assert.ok(buttons().some((b) => !b.disabled));
   } finally {
     await dom.close();
   }

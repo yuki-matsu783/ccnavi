@@ -8,7 +8,6 @@
 /* レイヤーのバッジ（span）と、レイヤーごとの見出しの箱（div.tpl-layer。App.css）は別の要素なので、選択子を分ける */
 span.tpl-layer { font-size: var(--font-sm); }
 .tpl-desc { color: var(--vscode-descriptionForeground); overflow-wrap: anywhere; font-size: var(--font-md); }
-.tpl-dropped { margin: 0; padding: 0 8px 6px 36px; overflow-wrap: anywhere; }
 .row.open > .tpl-body.row-body { display: block; padding: 8px 10px 10px 36px; }
 .tpl-body > p, .tpl-body > .tpl-plan-wrap, .tpl-body > .tpl-problems, .tpl-body > .tpl-flows { overflow-wrap: anywhere; }
 .tpl-flows { margin: 0 0 10px; padding-left: 20px; }
@@ -21,7 +20,6 @@ span.tpl-layer { font-size: var(--font-sm); }
 }
 @media (max-width: 520px) {
   .row.open > .tpl-body.row-body { padding: 8px 14px 10px 14px; }
-  .tpl-dropped { padding-left: 14px; }
 }
 .tpl-diagram { margin: 0 0 12px; }
 .tpl-diagram h3 { margin: 6px 0; }
