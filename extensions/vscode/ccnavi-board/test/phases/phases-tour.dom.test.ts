@@ -261,7 +261,7 @@ test("CB-D243 手順のsceneが画面の様子を替える（開く定義・補�
     assert.equal(dom.one<HTMLButtonElement>("#save").disabled, false);
     await next(dom);
     assert.match(dom.one("#status").textContent ?? "", /design-feedbackはfeedbackなのでreviewはtrue/);
-    assert.ok(dom.one(".foot").classList.contains("error"));
+    assert.ok(dom.one("#status").classList.contains("error"));
     await next(dom);
     assert.equal(dom.one("#status").textContent, "", "手順をまたいで検証の文が残った");
     assert.match(dom.one("#lock").textContent ?? "", /作業中のチケットがあります/);

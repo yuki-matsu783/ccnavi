@@ -463,7 +463,8 @@ test("CB-D71 ファイルが外で変わったら帯を出す。錠と操作の�
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled, "錠が掛かっていれば保存は押せない");
     await dom.send({ type: "failed", message: "--lintがerrorを報告した" });
     assert.equal(dom.one("#status").textContent, "--lintがerrorを報告した");
-    assert.ok(dom.one("#status").closest(".foot")?.classList.contains("error"));
+    assert.ok(dom.one("#status").classList.contains("error"));
+    assert.ok(dom.one("#status").closest("header.toolbar"), "一言はツールバーの中に出る");
   } finally {
     await dom.close();
   }
@@ -474,9 +475,7 @@ test("CB-D1223 noticeは赤にせずに一言を出す（期待する判定の�
   try {
     await dom.send({ type: "notice", message: "期待する判定のファイルがまだありません: x.yml。" });
     assert.equal(dom.one("#status").textContent, "期待する判定のファイルがまだありません: x.yml。");
-    const foot = dom.one("#status").closest(".foot");
-    assert.ok(foot, "足元の枠がある");
-    assert.ok(!foot.classList.contains("error"));
+    assert.ok(!dom.one("#status").classList.contains("error"));
   } finally {
     await dom.close();
   }
@@ -1367,12 +1366,12 @@ test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見
     await toStep(dom, "save-error", 1);
     assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でエラーが見つかりました/);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
-    assert.ok(dom.one("footer").classList.contains("error"));
+    assert.ok(dom.one("#status").classList.contains("error"));
     await toStep(dom, "save-error", 2);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate/, "検証エラーを読むステップの続きで消えた");
     await toStep(dom, "save-error", 4);
     assert.equal(dom.one("#status").textContent, "", "エラーのステップを過ぎても残っている");
-    assert.equal(dom.one("footer").classList.contains("error"), false);
+    assert.equal(dom.one("#status").classList.contains("error"), false);
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
     assert.equal(dom.one("#status").textContent, "");
@@ -1530,6 +1529,40 @@ test("CB-D742 図のある手順は、本文の下に時系列の図を出し、
         dom.click(dom.one('[data-action="tour-next"]'));
       }
     }
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1274 削除した行は帯の［元に戻す］で元の位置へ戻る。Ctrl+Sは押せるときだけ保存を送り、押せないときは理由を出す", async () => {
+  const dom = await openRules();
+  try {
+    const ids = (): string[] => dom.all('.list[data-list="deny"] > .rule').map((row) => row.getAttribute("data-id") ?? "");
+    assert.deepEqual(ids(), ["git-push", "no-rm"]);
+    // 変更が無いうちは押せず、理由をボタンの説明とCtrl+Sの一言に出す
+    assert.match(dom.one("#save").getAttribute("title") ?? "", /変更が無い/);
+    dom.key("s", undefined, { ctrlKey: true });
+    await dom.settle();
+    assert.equal(dom.posted.filter((message) => message.type === "save").length, 0);
+    assert.match(dom.one("#status").textContent ?? "", /変更が無い/);
+
+    dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
+    await dom.settle();
+    dom.click(dom.one(`${rowSelector("git-push")} button[data-action="remove"]`));
+    await dom.settle();
+    assert.deepEqual(ids(), ["no-rm"]);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /変更が無い/, "編集したのにCtrl+Sの理由が残っている");
+    assert.match(dom.one('[data-banner="removed"]').textContent ?? "", /git-push/);
+    dom.click(dom.one('button[data-action="undo-remove"]'));
+    await dom.settle();
+    assert.deepEqual(ids(), ["git-push", "no-rm"], "元の位置へ戻らない");
+    assert.equal(dom.all('[data-banner="removed"]').length, 0);
+
+    // 戻したあとも未保存なので、Ctrl+Sで保存を送る
+    assert.equal(dom.one("#save").getAttribute("title"), "保存します（Ctrl+S）");
+    dom.key("s", undefined, { ctrlKey: true });
+    await dom.settle();
+    assert.deepEqual(savedSections(dom).deny.map((rule) => rule.id), ["git-push", "no-rm"]);
   } finally {
     await dom.close();
   }

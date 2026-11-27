@@ -255,7 +255,7 @@ export function Rule(props: RuleProps): JSX.Element {
           <button type="button" className="action small" title={moveTitle("下へ", props.finding)} disabled={props.last || props.finding} onClick={() => props.onMove(1)}>
             ↓
           </button>
-          <button type="button" className="action small" onClick={() => props.onRemove()}>
+          <button type="button" className="action small" data-action="remove" onClick={() => props.onRemove()}>
             削除
           </button>
         </span>

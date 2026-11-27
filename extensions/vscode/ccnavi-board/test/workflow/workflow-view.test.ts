@@ -85,7 +85,7 @@ test("CB-T373 外で提案が変わったときの差分。番号ごとに、定
 
 test("CB-T374 保存できない理由。書けない答え（実行ファイルのwritable）・未保存でない・確認している途中・外で変わった・提案が無くなった", () => {
   const reverse = planOrderSample("reverse");
-  const calm = { pending: false, changed: false, gone: false };
+  const calm = { busy: false, pending: false, changed: false, gone: false };
   assert.equal(saveBlocker(reverse, calm), "");
   assert.match(saveBlocker(planOrderSample("open"), calm), /変えていません/);
   assert.match(saveBlocker(planOrderSample("loose"), calm), /順序の検査/);

@@ -24,6 +24,8 @@ import { canRedo, canUndo, emptyHistory, record, redo, seal, undo, type FlowHist
 import { lockClass, type Lock } from "../../core/lock.js";
 import { kindShort, reviewOption, type CommonPhase, type PhaseForm, type PhasesData, type PhasesMessage, type PhasesPage, type ToPhases } from "../../core/phases-view.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { useSaveKey } from "../useSaveKey.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { Phase } from "./Phase.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
@@ -69,6 +71,8 @@ function sceneList(value: Scene[string] | undefined): ReadonlySet<string> {
 interface Status {
   readonly text: string;
   readonly error: boolean;
+  /** Ctrl+Sで押せない理由を見せた一言。次の編集で消す（編集すると理由が変わるため） */
+  readonly fleeting?: boolean;
 }
 
 interface Editing {
@@ -200,6 +204,26 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     post({ type: "reload", dirty });
   };
 
+  // idの重なりは帯と同じ文を理由にする。案内の間のボタンは、見本の状態で下の`shownSaveBlocker`が決める
+  const draftDup = duplicates(draft);
+  const draftClash = commonClashes(draft, page?.common ?? []);
+  const saveBlocker = editSaveBlocker({
+    busy,
+    dirty,
+    lock,
+    invalid: draftDup.size > 0 ? duplicateNote(draftDup) : draftClash.titles.size > 0 ? commonTitleNote(draftClash.titles) : "",
+  });
+  const save = (): void => {
+    if (tour.touring) {
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "検証して保存中…", error: false });
+    post({ type: "save", form: formOf(draft) });
+  };
+  // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
+
   if (data.kind === "loading") {
     return (
       <p className="empty" id="ccnavi-loading">
@@ -227,6 +251,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   const applyDraft = (next: Draft, open?: ReadonlySet<string>): void => {
     setEditing((now) => ({ ...now, draft: next, open: open ?? now.open }));
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
     // idが重なっている間はその文面だけを出す。直前の失敗の文面は今のことではない
     if (duplicates(next).size > 0) {
       setStatus(undefined);
@@ -276,6 +301,10 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
 
   const remove = (key: string): void => {
+    if (tour.touring) {
+      return;
+    }
+    // 消した定義は、見出しの「元に戻す」で戻せる（履歴に積む）
     editDraft({ ...draft, rows: draft.rows.filter((row) => row.key !== key) });
   };
 
@@ -310,6 +339,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       ? { locked: true, reason: sampleLib ? TEXTS.locks.lib : TEXTS.locks.self, doing: [sampleLib ? "2026-10-05-lib-parser" : "2026-10-03-search-api"], turns: [] }
       : { locked: false, reason: "", doing: [], turns: [] }
     : lock;
+  const shownSaveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty, lock: shownLock }) : saveBlocker;
   const sceneOpen = sceneList(scene.open);
   const sceneMore = sceneList(scene.more);
   const isShownOpen = (row: { readonly key: string; readonly phase: PhaseForm }): boolean => (touring ? row.key === ADDED_KEY || sceneOpen.has(row.phase.id) : open.has(row.key));
@@ -366,7 +396,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary">
           <span data-tour="target">
             <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />
@@ -380,7 +410,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
         </div>
         <div className="controls">
           <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => act({ type: "openHandoff" })} />
-          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} onClick={() => act({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-phases" data-tour="open-file" disabled={shownPage?.exists !== true} title={shownPage?.exists !== true ? "ファイルがまだないため、開けません" : undefined} onClick={() => act({ type: "openFile" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={shownBusy} onClick={reload}>
@@ -398,15 +428,9 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
             id="save"
             data-action="save"
             data-tour="save"
-            disabled={!shownDirty || shownLock.locked || shownBusy || dup.size > 0 || clash.titles.size > 0}
-            onClick={() => {
-              if (tour.touring) {
-                return;
-              }
-              setBusy(true);
-              setStatus({ text: "検証して保存中…", error: false });
-              post({ type: "save", form: formOf(draft) });
-            }}
+            disabled={shownSaveBlocker !== ""}
+            title={saveTitle(shownSaveBlocker)}
+            onClick={save}
           >
             保存
           </button>
@@ -515,11 +539,6 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
       </section>
       {common.length > 0 && <CommonList common={common} />}
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"}>
-        <span id="status" data-tour="status">
-          <Code text={shownStatus?.text ?? ""} />
-        </span>
-      </footer>
     </>
   );
 }

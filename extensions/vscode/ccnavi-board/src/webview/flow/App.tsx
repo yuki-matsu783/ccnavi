@@ -60,6 +60,8 @@ import { lockedReason, OPEN_LOCK, type FlowChecks, type FlowData, type FlowLock,
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { parseFlowSample, sceneOf } from "../../core/tour-flow.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { useSaveKey, type SaveKeyTarget } from "../useSaveKey.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { graphMaximized } from "../shared/Maximize.js";
 import { mergeState, readState } from "../vscode.js";
@@ -74,6 +76,8 @@ import flowTour from "../tours/flow.yml";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
 const NO_LOCK: FlowLock = { locked: true, reason: "" };
+/** 読み込む前・読めなかったときのCtrl+S。何もしない */
+const NO_SAVE: SaveKeyTarget = { blocker: "読み込みが終わっていないため、保存できません", busy: false, save: () => undefined, blocked: () => undefined };
 /** 編集中のコピーを拡張ホストへ送って覚えさせるまでの間（打つたびに送らない） */
 const DRAFT_MS = 300;
 /** 編集が止まってから実行ファイルに確かめ直させるまでの間 */
@@ -386,9 +390,14 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     document.addEventListener("keydown", listener);
     return () => document.removeEventListener("keydown", listener);
   }, []);
+  /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す */
+  const saveKey = useRef<SaveKeyTarget>(NO_SAVE);
+  // 提案・依頼文・保存前の確認が出ている間は、その面の操作を待つ（Ctrl+Zなどと同じ）
+  useSaveKey(!tour.touring && data.kind === "page" && proposal === undefined && requestText === undefined && review === undefined, () => saveKey.current);
 
   if (data.kind === "loading") {
     onKey.current = () => undefined;
+    saveKey.current = NO_SAVE;
     return (
       <p className="empty" id="ccnavi-loading">
         {data.text}
@@ -397,6 +406,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   }
   if (data.kind === "error" || doc === undefined || base === undefined) {
     onKey.current = () => undefined;
+    saveKey.current = NO_SAVE;
     return (
       <LoadError
         heading="フロー編集画面を読み込めませんでした。原因を直してから「更新」を押してください。"
@@ -676,6 +686,9 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const copyableNow = touring ? sc.picked.length > 0 : copyable;
   const hasClipNow = touring ? sc.clip : hasClip;
   const groupableCount = touring ? sampleGroupable.length : groupable.length;
+  // ファイルがまだ無いときは、変更が無くても保存（作成）できる
+  const saveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty || !shownPage.exists, lock: shownLock }) : editSaveBlocker({ busy, dirty: dirty || !page.exists, lock });
+  saveKey.current = { blocker: saveBlocker, busy, save, blocked: (reason) => setStatus({ text: reason, error: false }) };
 
   return (
     <>
@@ -702,7 +715,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           </button>
         </div>
       )}
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={touring ? null : (status ?? null)}>
         <div className="summary">
           <span className="flow-ticket">
             <strong>{shownPage.ticket}</strong> {shownPage.title}
@@ -758,13 +771,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
               {shownRequest}
             </button>
           )}
-          <button type="button" className="action" data-action="open-flow" disabled={!shownPage.exists} onClick={() => post({ type: "openFile" })}>
+          <button type="button" className="action" data-action="open-flow" disabled={!shownPage.exists} title={!shownPage.exists ? "ファイルがまだないため、開けません" : undefined} onClick={() => post({ type: "openFile" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
             更新
           </button>
-          <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={shownLock.locked || shownBusy || (!shownDirty && shownPage.exists)} onClick={save}>
+          <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={saveBlocker !== ""} title={saveTitle(saveBlocker)} onClick={save}>
             保存
           </button>
         </div>
@@ -855,9 +868,6 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
       )}
       {!touring && requestText !== undefined && <RequestText prompt={requestText} onClose={() => setRequestText(undefined)} />}
       {touring && sc.requestText && <RequestText prompt={SAMPLE.requestPrompt} onClose={NOOP} />}
-      <footer className={!touring && status?.error === true ? "foot error" : "foot"}>
-        <span id="status">{touring ? "" : status?.text ?? ""}</span>
-      </footer>
     </>
   );
 }

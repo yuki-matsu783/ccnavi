@@ -355,7 +355,7 @@ test("CB-D288 保存できない理由の案内は、断られた線の一言・
           break;
         case 3:
           assert.match(dom.one("#status").textContent ?? "", /この線は引けません。線は引く前のままです: 子が承認された番号を動かさずに/, at);
-          assert.ok(dom.one(".foot").classList.contains("error"), at);
+          assert.ok(dom.one("#status").classList.contains("error"), at);
           break;
         case 4:
           assert.equal(dom.one<HTMLButtonElement>("#save").disabled, true, at);

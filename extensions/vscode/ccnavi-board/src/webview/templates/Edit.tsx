@@ -19,6 +19,8 @@ import type { EditOpened, TemplateCheck, ToTemplates } from "../../core/template
 import { FlowEdit } from "./FlowEdit.js";
 import { PlanEdit } from "./PlanEdit.js";
 import { post } from "./post.js";
+import { useSaveKey } from "../useSaveKey.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { Problems } from "./Problems.js";
 import { Code } from "../shared/Code.js";
 import { layerLabel } from "./text.js";
@@ -150,6 +152,12 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     onClose();
   };
 
+  const saveBlocker = editSaveBlocker({ busy, dirty, lock });
+  /** 保存。中身（`tpl`）が無いときは下の分岐で編集欄を表示しないので、Ctrl+Sもここで止める */
+  const saveNow = useRef<() => void>(() => undefined);
+  // 早く返す分岐より前に置く（フックの順番を変えない）。閉じる確認が出ている間は、その答えを待つ
+  useSaveKey(tpl !== undefined && !confirmClose, () => ({ blocker: saveBlocker, busy, save: () => saveNow.current(), blocked: (reason) => setStatus({ text: reason, error: false }) }));
+
   if (tpl === undefined) {
     return (
       <section className="tpl-edit" data-role="edit">
@@ -193,6 +201,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     sent.current = key;
     post({ type: "editSave", session, name: tpl.name, layer: opened.layer, expect: baseSha, data: toData(tpl) });
   };
+  saveNow.current = save;
   const close = (): void => {
     if (dirty && !confirmClose) {
       setConfirmClose(true);
@@ -219,7 +228,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
           <button type="button" className="action" data-action="redo-edit" disabled={busy || !canRedo(history)} title="やり直す" onClick={() => travel(redo(history, tpl))}>
             やり直す
           </button>
-          <button type="button" className="action primary" data-action="save-edit" disabled={busy || !dirty || lock.locked} title={lock.locked ? lock.reason : undefined} onClick={save}>
+          <button type="button" className="action primary" data-action="save-edit" disabled={saveBlocker !== ""} title={saveTitle(saveBlocker)} onClick={save}>
             保存
           </button>
           <button type="button" className="action" data-action="close-edit" disabled={busy} onClick={close}>

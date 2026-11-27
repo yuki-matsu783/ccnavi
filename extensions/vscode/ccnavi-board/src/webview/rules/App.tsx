@@ -14,11 +14,14 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type JSX } f
 import { LoadError } from "../shared/LoadError.js";
 
 import { lockClass, type Lock } from "../../core/lock.js";
+import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { isToolName, KNOWN_TOOLS, subjectExample, SECTIONS, SECTION_LABELS, bareRuleId, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import { ModeBand } from "../shared/ModeBand.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
+import { useSaveKey } from "../useSaveKey.js";
+import { insertAt, removal, RemovedBand, type Removed } from "../shared/RemovedBand.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
@@ -76,6 +79,8 @@ const NO_LOCK: Lock = { locked: true, reason: "", doing: [], turns: [] };
 interface Status {
   readonly text: string;
   readonly error: boolean;
+  /** Ctrl+Sで押せない理由を見せた一言。次の編集で消す（編集すると理由が変わるため） */
+  readonly fleeting?: boolean;
 }
 
 interface Editing {
@@ -129,6 +134,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [pickerKey, setPickerKey] = useState<string | undefined>(undefined);
   /** 足した直後の行。idの欄に焦点を移したら忘れる */
   const [focusKey, setFocusKey] = useState<string | undefined>(undefined);
+  /** 直前に削除したルール。［元に戻す］で戻す */
+  const [removed, setRemoved] = useState<Removed<Draft> | undefined>(undefined);
 
   const { draft, open } = editing;
   const page = pageOf(data);
@@ -208,6 +215,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setStatus(undefined);
       setChanged(false);
       setSaveWarns([]);
+      setRemoved(undefined);
       setLock(pageOf(next)?.lock ?? NO_LOCK);
       if (next.kind === "loading") {
         // 別の対象へ切り替わった。前の対象のルールで出た判定を、いまのルールの結果として残さない
@@ -315,6 +323,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setEditing((now) => ({ ...now, draft: replace(now.draft, found.section, key, { ...found.row.rule, [field]: path }) }));
     setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
   };
 
   /**
@@ -330,6 +339,19 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setStatus(undefined);
     post({ type: "reload", dirty });
   };
+
+  // 案内の間のボタンは、見本の状態で下の`shownSaveBlocker`が決める（Ctrl+Sには反応しない）
+  const saveBlocker = editSaveBlocker({ busy, dirty, lock });
+  const save = (): void => {
+    if (tour.touring) {
+      return;
+    }
+    setBusy(true);
+    setStatus({ text: "検証して保存中…", error: false });
+    post({ type: "save", sections: sectionsOf(draft) });
+  };
+  // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
+  useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
 
   if (data.kind === "loading") {
     return (
@@ -363,6 +385,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     setEditing((now) => ({ draft: next, open: opened ?? now.open }));
     setDirty(true);
     setSaveWarns([]);
+    setStatus((now) => (now?.fleeting === true ? undefined : now));
   };
 
   const editRule = (section: Section, key: string, rule: RuleForm): void => {
@@ -411,7 +434,25 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   };
 
   const remove = (section: Section, key: string): void => {
+    if (tour.touring) {
+      return;
+    }
+    const gone = removal(draft[section], key);
     editDraft({ ...draft, [section]: draft[section].filter((row) => row.key !== key) });
+    if (gone !== undefined) {
+      const id = gone.row.rule.id.trim();
+      setRemoved({
+        label: id === "" ? `${section}のidの無いルール` : `ルール「${id}」`,
+        restore: (now) => ({ ...now, [section]: insertAt(now[section], gone.index, gone.row) }),
+      });
+    }
+  };
+
+  const undoRemove = (): void => {
+    if (removed !== undefined) {
+      editDraft(removed.restore(draft));
+      setRemoved(undefined);
+    }
   };
 
   const add = (section: Section): void => {
@@ -472,6 +513,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   // 保存前の検証エラーの見本（`sample.save_error`）。実際の直前の操作の一言は、案内の間は出さない
   const shownStatus: Status | undefined = touring ? (scene.error === true && SAMPLE.saveError !== "" ? { text: SAMPLE.saveError, error: true } : undefined) : status;
   const shownLock: Lock = touring ? { locked: false, reason: "", doing: [], turns: [] } : lock;
+  const shownSaveBlocker = touring ? editSaveBlocker({ busy: false, dirty: shownDirty, lock: shownLock }) : saveBlocker;
   const shownTool = touring ? (typeof scene.tool === "string" ? scene.tool : KNOWN_TOOLS[0]) : tool;
   const shownSubject = touring ? (typeof scene.subject === "string" ? scene.subject : "") : subject;
   const isShownOpen = (row: { readonly key: string; readonly rule: RuleForm }): boolean => (touring ? sceneOpen.has(row.rule.id) : isOpen(row.key));
@@ -501,7 +543,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </button>
       </div>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-      <ScreenHeader courses={courses} onPick={tour.start}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary" data-tour="target">
           <TargetSelect
             target={touring ? undefined : page?.target}
@@ -518,7 +560,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </div>
         <div className="controls">
           <HandoffLink entry={touring ? undefined : page?.handoff} disabled={touring} onOpen={() => post({ type: "openHandoff" })} />
-          <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} onClick={() => post({ type: "openFile", which: "rules" })}>
+          <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} title={page?.exists === false ? "ファイルがまだないため、開けません" : undefined} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
           <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
@@ -530,12 +572,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             id="save"
             data-tour="save"
             data-action="save"
-            disabled={!shownDirty || shownLock.locked || busy}
-            onClick={() => {
-              setBusy(true);
-              setStatus({ text: "検証して保存中…", error: false });
-              post({ type: "save", sections: sectionsOf(draft) });
-            }}
+            disabled={shownSaveBlocker !== ""}
+            title={saveTitle(shownSaveBlocker)}
+            onClick={save}
           >
             保存
           </button>
@@ -544,6 +583,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <p id="lock" className={lockClass(shownLock)}>
         {shownLock.reason}
       </p>
+      {!touring && <RemovedBand removed={removed} busy={busy} onUndo={undoRemove} onDismiss={() => setRemoved(undefined)} />}
       {!touring && page !== undefined && page.model.problems.length > 0 && (
         <ul className="problems">
           {page.model.problems.map((problem, index) => (
@@ -735,11 +775,6 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
       </section>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
-      <footer className={shownStatus?.error === true ? "foot error" : "foot"} data-tour="status">
-        <span id="status">
-          <Code text={shownStatus?.text ?? ""} />
-        </span>
-      </footer>
     </>
   );
 }
