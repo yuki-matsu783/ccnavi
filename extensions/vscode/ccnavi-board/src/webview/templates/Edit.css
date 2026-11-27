@@ -14,6 +14,21 @@
 .tpl-edit-ops button.action.small { margin-left: 0; margin-right: var(--gap-2); }
 .tpl-edit-add { margin: 6px 0 0; }
 .tpl-edit-graph-foot { margin: 4px 0 8px; }
+/* 選んだステップ。図の点（PlanGraph.css）と同じ縁の色で、表の行と子のフローの行も目立たせる */
+.tpl-edit-items tr[data-picked="1"] td, .tpl-edit-flows li[data-picked="1"] > .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
+.tpl-edit-items tr[data-picked="1"] td:not(:first-child) { box-shadow: none; }
+.tpl-edit-pick { font: inherit; }
+/* 詳細の欄の下の、選んだステップの操作 */
+.tpl-step-actions { display: flex; flex-direction: column; gap: var(--gap-2); padding-bottom: 8px; border-bottom: 1px solid var(--vscode-panel-border); }
+.tpl-step-actions h4 { margin: 0; }
+.tpl-step-actions .field { margin: 0; }
+.tpl-step-actions select { max-width: 100%; }
+.tpl-step-row { margin: 0; display: flex; flex-wrap: wrap; gap: var(--gap-2); }
+/* 編集欄の図は、右の欄に直す操作が載るぶん高くする */
+.tpl-edit-plan .plan-graph-canvas { height: 320px; }
+.tpl-edit-plan .plan-detail { max-height: 420px; }
+/* 図がまだ無いときに、選んだステップの操作だけを出す枠 */
+.tpl-edit-detail-alone { margin: 4px 0 8px; }
 .tpl-new { margin: 4px 0 10px; }
 .tpl-new input[type=text] { width: 16em; max-width: 100%; }
 .tpl-flow-edit { margin-top: 6px; }

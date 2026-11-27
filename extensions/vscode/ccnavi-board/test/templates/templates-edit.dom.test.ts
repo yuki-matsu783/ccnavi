@@ -508,3 +508,97 @@ test("CB-D1252 子のフローがあるステップの削除ボタンは、フ�
     await dom.close();
   }
 });
+
+const PLAN = 'section.tpl-edit-plan[data-part="plan"]';
+
+/** 全体計画の表の行の、番号のボタンを押してステップを選ぶ */
+async function pickRow(dom: DomPage, row: number): Promise<void> {
+  dom.click(dom.all(`${PLAN} tbody tr button[data-action="pick-step"]`)[row - 1]);
+  await dom.settle();
+}
+
+test("CB-D1253 表の番号を押すとステップを選び、表の行と図の点を目立たせ、図の右の詳細の欄に答えのままの詳細と直す操作を出す。詳細の欄で種類を直すと表も変わる。もう1度押すと選ぶのをやめる", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    assert.equal(dom.all('[data-role="step-actions"]').length, 0);
+    await pickRow(dom, 2);
+    assert.deepEqual(dom.all(`${PLAN} tbody tr`).map((tr) => tr.getAttribute("data-picked")), ["0", "1"]);
+    assert.equal(dom.all(`${PLAN} .plan-node[data-picked="1"]`).map((n) => n.getAttribute("data-number")).join(","), "2");
+    assert.match(text(dom.one(`${PLAN} .plan-detail-list`)), /実装とテスト/, "詳細は実行ファイルの答えのまま");
+    assert.doesNotMatch(text(dom.one(`${PLAN} .plan-detail-list`)), /提案での番号/, "テンプレートには提案の番号が無い");
+    assert.match(text(dom.one(`${PLAN} [data-role="step-actions"] h4`)), /2番を直す/);
+    assert.equal(dom.all('section[data-role="flows"] li[data-picked="1"]').map((li) => li.getAttribute("data-index")).join(","), "2");
+    dom.change(dom.one<HTMLSelectElement>(`${PLAN} [data-role="step-actions"] select.f-step-type`), "research");
+    await dom.settle();
+    assert.equal(dom.all<HTMLSelectElement>(`${PLAN} tbody tr select.f-item-type`)[1].value, "research");
+    await pickRow(dom, 2);
+    assert.equal(dom.all('[data-role="step-actions"]').length, 0);
+    // 図の点を押しても選べる
+    dom.click(dom.one(`${PLAN} .react-flow__node[data-id="n1"] .plan-node`));
+    await dom.settle();
+    assert.deepEqual(dom.all(`${PLAN} tbody tr`).map((tr) => tr.getAttribute("data-picked")), ["1", "0"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1254 「この後に挟む」は選んだステップと後続の間に入れ、「これと並べて足す」は同じ先行を持たせて後続に待たせる。足したステップを選んだ状態になり、番号は振り直る", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    const afterOf = () => dom.all(`${PLAN} tbody tr`).map((tr) => text(tr.querySelectorAll("td")[3]));
+    const typeOf = () => dom.all<HTMLSelectElement>(`${PLAN} tbody tr select.f-item-type`).map((s) => s.value);
+    // 1(design) → 2(implement)。1の後に research を挟む
+    await pickRow(dom, 1);
+    dom.change(dom.one<HTMLSelectElement>(`${PLAN} select.f-insert-type`), "research");
+    await dom.settle();
+    dom.click(dom.one(`${PLAN} button[data-action="insert-after"]`));
+    await dom.settle();
+    assert.deepEqual(typeOf(), ["design", "research", "implement"]);
+    assert.deepEqual(afterOf(), ["なし", "1", "2"]);
+    assert.deepEqual(dom.all(`${PLAN} tbody tr`).map((tr) => tr.getAttribute("data-picked")), ["0", "1", "0"], "足したステップを選ぶ");
+    assert.match(text(dom.one('section[data-role="flows"] li[data-index="3"]')), /フロー: 実装の手順/, "implementのフローは振り直った3番に付いていく");
+    // 選んだresearch（2）と並べて chores を足す。implementは両方を待つ
+    dom.change(dom.one<HTMLSelectElement>(`${PLAN} select.f-insert-type`), "chores");
+    await dom.settle();
+    dom.click(dom.one(`${PLAN} button[data-action="insert-beside"]`));
+    await dom.settle();
+    assert.deepEqual(typeOf(), ["design", "research", "chores", "implement"]);
+    assert.deepEqual(afterOf(), ["なし", "1", "1", "2, 3"]);
+    assert.equal(dom.all(`${PLAN} tbody tr`)[2].getAttribute("data-picked"), "1");
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-D1255 子のフローの行の見出しは「番号:型のタイトル のフロー」。詳細の欄から、フローのあるステップは畳んだ図を開いて移り、無いステップには足せる", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    const flowRow = (index: number) => `section[data-role="flows"] li[data-index="${index}"]`;
+    assert.equal(text(dom.one(`${flowRow(1)} .tpl-flow-heading`)), "1:設計 のフロー");
+    assert.equal(text(dom.one(`${flowRow(2)} .tpl-flow-heading`)), "2:実装とテスト のフロー");
+    dom.click(dom.one(`${flowRow(2)} button[data-action="toggle-flow"]`));
+    await dom.settle();
+    assert.equal(dom.all(`${flowRow(2)}.open`).length, 0);
+    await pickRow(dom, 2);
+    assert.equal(dom.all(`${PLAN} button[data-action="add-step-flow"]`).length, 0);
+    dom.click(dom.one(`${PLAN} button[data-action="go-flow"]`));
+    await dom.settle();
+    assert.equal(dom.all(`${flowRow(2)}.open`).length, 1, "移ると図を開く");
+    await pickRow(dom, 1);
+    dom.click(dom.one(`${PLAN} button[data-action="add-step-flow"]`));
+    await dom.settle();
+    assert.match(text(dom.one(flowRow(1))), /フロー: /);
+    assert.equal(dom.all(`${PLAN} button[data-action="go-flow"]`).length, 1, "足したあとは移る操作になる");
+    // フィードバック計画のステップには子のフローの操作が無い
+    dom.click(dom.one('section.tpl-edit-plan[data-part="feedback"] tbody tr button[data-action="pick-step"]'));
+    await dom.settle();
+    assert.equal(dom.all('section.tpl-edit-plan[data-part="feedback"] [data-role="step-actions"]').length, 1);
+    assert.equal(dom.all('section.tpl-edit-plan[data-part="feedback"] button[data-action="go-flow"], section.tpl-edit-plan[data-part="feedback"] button[data-action="add-step-flow"]').length, 0);
+    assert.equal(dom.all(`${PLAN} [data-role="step-actions"]`).length, 0, "選べるのは1つ");
+  } finally {
+    await dom.close();
+  }
+});

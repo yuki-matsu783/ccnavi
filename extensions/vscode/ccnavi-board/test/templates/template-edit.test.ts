@@ -16,6 +16,7 @@ import {
   fromData,
   modeOf,
   locate,
+  insertItem,
   moveItem,
   numberOfId,
   removeFlow,
@@ -250,4 +251,28 @@ test("CB-T1273 ステップのidは添字を振り直しても同じステップ
   const read = fromData(toData(t));
   assert.deepEqual([...(read?.plan ?? []), ...(read?.feedback ?? [])].map((i) => i.id), [1, 2, 3, 4, 5, 6]);
   assert.ok(!("id" in ((toData(t) as { plan: unknown[] }).plan[1] as object)));
+});
+
+test("CB-T1275 選んだステップの後に挟むと、後続は新しいステップを待つ。並べて足すと、同じ先行を持ち、後続は新しいステップも待つ。フローのキーも振り直り、足したステップのidが返る", () => {
+  // 1(design) → 2(implement), 1 → 3(docs), 2・3 → 4(acceptance)。2番と4番にフロー
+  const t = sample();
+  const after = insertItem(t, "plan", 2, "review", "after");
+  assert.equal(after.id, 7);
+  assert.deepEqual(
+    after.template.plan.map((i) => [i.type, [...i.after]]),
+    [["design", []], ["implement", [1]], ["docs", [1]], ["review", [2]], ["acceptance", [3, 4]]],
+  );
+  assert.deepEqual(Object.keys(after.template.flows), ["2", "5"], "4番のフローは振り直った5番へ付いていく");
+  const beside = insertItem(t, "plan", 3, "chores", "beside");
+  assert.deepEqual(
+    beside.template.plan.map((i) => [i.type, [...i.after]]),
+    [["design", []], ["implement", [1]], ["docs", [1]], ["chores", [1]], ["acceptance", [2, 3, 4]]],
+  );
+  // 最後のステップに並べると合流先が無い（終端に届かないと言うのは実行ファイル）
+  const tail = insertItem(t, "plan", 4, "chores", "beside");
+  assert.deepEqual(tail.template.plan[4].after, [2, 3]);
+  assert.equal(tail.template.plan.filter((i) => i.after.includes(5)).length, 0);
+  // フィードバック計画でも足せる。範囲外は元のまま
+  assert.deepEqual(insertItem(t, "feedback", 1, "x", "after").template.feedback.map((i) => [i.type, [...i.after]]), [["implement-feedback", []], ["x", [1]], ["docs-feedback", [2]]]);
+  assert.deepEqual(insertItem(t, "plan", 9, "x", "after"), { template: t, id: undefined });
 });

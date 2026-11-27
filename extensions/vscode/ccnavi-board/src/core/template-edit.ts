@@ -248,8 +248,42 @@ export function setItem(template: EditTemplate, part: PlanPart, index: number, p
 export function addItem(template: EditTemplate, part: PlanPart, type: string): EditTemplate {
   const items = partOf(template, part);
   const after = items.length === 0 ? [] : [items.length];
-  const id = 1 + Math.max(0, ...[...template.plan, ...template.feedback].map((item) => item.id));
-  return withPart(template, part, [...items, { id, type, review: null, deferred: false, after }]);
+  return withPart(template, part, [...items, { id: nextId(template), type, review: null, deferred: false, after }]);
+}
+
+/** 次に足すステップのid。両方の計画のidの続き */
+function nextId(template: EditTemplate): number {
+  return 1 + Math.max(0, ...[...template.plan, ...template.feedback].map((item) => item.id));
+}
+
+/** 選んだステップに対するステップの足し方。`after`は直後に挟む、`beside`は並べる */
+export type InsertMode = "after" | "beside";
+
+/**
+ * 計画の`index`番のステップに対して、`type`のステップを足す。足したステップのidも返す（画面が選ぶため）。範囲外なら元のままで、idは無い。
+ *
+ * - `after`（この後に挟む）: 新しいステップは選んだステップを先行にする。選んだステップを先行にしていたステップは、代わりに新しいステップを先行にする
+ * - `beside`（これと並べて足す）: 新しいステップは選んだステップと同じ先行を持つ。選んだステップを先行にしていたステップは、新しいステップも先行にする（合流する）
+ *
+ * 足したステップはいったん末尾に置き、先行が自分より小さい添字になるよう並べ直す（`renumber`。元の順をなるべく保つ）
+ */
+export function insertItem(template: EditTemplate, part: PlanPart, index: number, type: string, mode: InsertMode): { readonly template: EditTemplate; readonly id: number | undefined } {
+  const items = partOf(template, part);
+  if (index < 1 || index > items.length) {
+    return { template, id: undefined };
+  }
+  const id = nextId(template);
+  const added = items.length + 1;
+  const item: EditItem = { id, type, review: null, deferred: false, after: mode === "after" ? [index] : [...items[index - 1].after] };
+  const rewired = items.map((it) => {
+    if (!it.after.includes(index)) {
+      return it;
+    }
+    const after = mode === "after" ? it.after.map((n) => (n === index ? added : n)) : [...it.after, added];
+    return { ...it, after: [...new Set(after)].sort((a, b) => a - b) };
+  });
+  const next = renumber(withPart(template, part, [...rewired, item]), part);
+  return next === undefined ? { template, id: undefined } : { template: next, id };
 }
 
 /** idのステップの図の番号（フィードバック計画は全体計画の続き）。無ければundefined */

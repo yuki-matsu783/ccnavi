@@ -104,6 +104,10 @@
 .plan-detail-row dd { margin: 0; overflow-wrap: anywhere; }
 .plan-detail-empty { margin: 0; }
 .plan-node[data-picked="1"] { outline: 2px solid var(--vscode-focusBorder); }
+/* 線を引いている最中に、引けない先のステップ。薄くする（理由は載せたときの説明でも言う） */
+.plan-node[data-blocked="1"] { opacity: .45; }
+/* 引けない所で放したときの理由。注意の色は縁にだけ使う */
+.plan-graph-refusal { margin: 4px 0 0; padding: 1px 0 1px 8px; border-left: 3px solid var(--vscode-editorWarning-foreground); font-size: var(--font-md); overflow-wrap: anywhere; }
 .plan-graph-canvas .react-flow__node-planItem { cursor: pointer; }
 /* 畳んだらバッジのボタンだけ残す（中身は消さずに隠す） */
 .plan-detail[data-folded="1"] > :not(.plan-detail-toggle) { display: none; }

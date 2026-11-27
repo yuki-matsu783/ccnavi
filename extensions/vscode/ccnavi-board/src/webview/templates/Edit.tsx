@@ -94,6 +94,18 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   /** 畳んだフローのステップの番号。フローは図を最初から見せるので、畳んだものだけを覚える */
   const [folded, setFolded] = useState<ReadonlySet<number>>(() => new Set());
   const [confirmClose, setConfirmClose] = useState(false);
+  /** 選んだステップのid（全体計画とフィードバック計画で1つ）。図の点・表の行・子のフローの行で目立たせる */
+  const [picked, setPicked] = useState<number | undefined>(undefined);
+  /** 子のフローへ移るときの行き先（全体計画の添字）。描き直したあとに画面を送る */
+  const [scrollTo, setScrollTo] = useState<{ readonly index: number } | undefined>(undefined);
+  useEffect(() => {
+    if (scrollTo === undefined) {
+      return;
+    }
+    const row = document.querySelector(`section[data-role="flows"] li[data-index="${scrollTo.index}"]`);
+    (row as { scrollIntoView?: (options?: unknown) => void } | null)?.scrollIntoView?.({ block: "start" });
+    setScrollTo(undefined);
+  }, [scrollTo]);
   const seq = useRef(0);
   const asked = useRef<{ readonly seq: number; readonly key: string; readonly ids: ShownIds }>({ seq: 0, key: "", ids: { plan: [], feedback: [] } });
   const sent = useRef("");
@@ -241,7 +253,26 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   };
 
   const planOf = (part: "plan" | "feedback") => checked.check.plans.find((p) => p.part === part);
-  const typeTitle = (type: string): string => checked.check.types.find((t) => t.id === type)?.title ?? type;
+  /** 型の定義のタイトル。無ければ型の名前 */
+  const typeTitle = (type: string): string => {
+    const title = checked.check.types.find((t) => t.id === type)?.title ?? "";
+    return title === "" ? type : title;
+  };
+  /** 全体計画の`index`番のステップに子のフロー（雛形）を足して開く */
+  const addFlow = (index: number): void => {
+    const item = tpl.plan[index - 1];
+    if (item === undefined || tpl.flows[String(index)] !== undefined) {
+      return;
+    }
+    update(setFlow(tpl, index, templateFlow(`${tpl.name}-${index}`, typeTitle(item.type))));
+    setFolded((f) => without(f, index));
+  };
+  /** 全体計画の`index`番のステップの子のフローを開き、画面をそこまで送る（送るのは描き直したあと） */
+  const goFlow = (index: number): void => {
+    setFolded((f) => without(f, index));
+    setScrollTo({ index });
+  };
+  const stepProps = { picked, onPick: setPicked, onChange: updatePlan, onAddFlow: addFlow, onGoFlow: goFlow };
 
   return (
     <section className="tpl-edit" data-role="edit" data-name={tpl.name} data-layer={opened.layer}>
@@ -301,8 +332,8 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         <input type="text" className="f-when" value={tpl.when} onChange={(event) => update(setMeta(tpl, { when: event.target.value }), "meta:when")} onBlur={() => setHistory(seal)} />
       </label>
       <Problems problems={created && !touched ? checked.check.problems.filter((p) => p.severity !== "error") : checked.check.problems} />
-      <PlanEdit part="plan" template={tpl} plan={planOf("plan")} fresh={fresh} shownIds={checked.ids.plan} types={checked.check.types} onChange={updatePlan} />
-      <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} shownIds={checked.ids.feedback} types={checked.check.types} onChange={updatePlan} />
+      <PlanEdit part="plan" template={tpl} plan={planOf("plan")} fresh={fresh} shownIds={checked.ids.plan} types={checked.check.types} {...stepProps} />
+      <PlanEdit part="feedback" template={tpl} plan={planOf("feedback")} fresh={fresh} shownIds={checked.ids.feedback} types={checked.check.types} {...stepProps} />
       <section className="tpl-edit-flows" data-role="flows">
         <h3>子のフロー</h3>
         <p className="hint">全体計画のステップごとに、子のフローを持てます。テンプレートを使うと、ここで書いた子のフローが子の下書きにコピーされます。</p>
@@ -312,20 +343,12 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
             const doc = tpl.flows[String(index)];
             const open = doc !== undefined && !folded.has(index);
             return (
-              <li key={index} className={`row${open ? " open" : ""}`} data-index={index}>
+              <li key={index} className={`row${open ? " open" : ""}`} data-index={index} data-picked={item.id === picked ? "1" : "0"}>
                 <div className="row-head">
-                  <span className="mono">{index}</span> <span className="mono">{item.type}</span>
+                  <span className="tpl-flow-heading">{`${index}:${typeTitle(item.type)} のフロー`}</span>
                   <span className="dim">{doc === undefined ? "フローなし" : `フロー: ${typeof doc.name === "string" && doc.name !== "" ? doc.name : "（名前なし）"}`}</span>
                   {doc === undefined ? (
-                    <button
-                      type="button"
-                      className="action small"
-                      data-action="add-flow"
-                      onClick={() => {
-                        update(setFlow(tpl, index, templateFlow(`${tpl.name}-${index}`, typeTitle(item.type))));
-                        setFolded((f) => without(f, index));
-                      }}
-                    >
+                    <button type="button" className="action small" data-action="add-flow" onClick={() => addFlow(index)}>
                       フローを足す
                     </button>
                   ) : (

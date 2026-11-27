@@ -223,15 +223,35 @@ function depthsOf(numbers: readonly number[], before: ReadonlyMap<number, readon
  * `source`へ既に辿れる）を断る。React Flowの`isValidConnection`に渡し、引いている最中に断る
  */
 export function canConnect(graph: PlanGraph, source: string, target: string): boolean {
+  return connectRefusal(graph, source, target) === undefined;
+}
+
+/**
+ * `source`から`target`へ線を引けない理由（図の下に出す一言）。引けるならundefined。`canConnect`の断る条件はここだけに置く。
+ * すでにある線も断る（引いても何も変わらないため）
+ */
+export function connectRefusal(graph: PlanGraph, source: string, target: string): string | undefined {
   if (source === target) {
-    return false;
+    return "自分自身へは線を引けません";
   }
   const from = graph.nodes.find((node) => node.id === source);
   const to = graph.nodes.find((node) => node.id === target);
-  if (from === undefined || to === undefined || from.kind !== "item" || to.kind !== "item" || to.locked) {
-    return false;
+  if (from === undefined || to === undefined) {
+    return "線の先のステップが図にありません";
   }
-  return !reaches(graph, target, source);
+  if (from.kind !== "item" || to.kind !== "item") {
+    return "開始と終了への線は図が自動で引きます";
+  }
+  if (to.locked) {
+    return "子が承認された番号です。入る線は変えられません";
+  }
+  if (graph.edges.some((edge) => edge.kind === "after" && edge.source === source && edge.target === target)) {
+    return "この線はもうあります";
+  }
+  if (reaches(graph, target, source)) {
+    return `${from.number}は${to.number}より後に続くステップです。この線を引くと順序が輪になります`;
+  }
+  return undefined;
 }
 
 /** `from`から線を辿って`to`に着くか（afterの線だけ） */
