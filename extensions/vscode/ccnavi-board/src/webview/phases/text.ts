@@ -19,7 +19,7 @@ export function moreNote(phase: PhaseForm): string {
 /** 要約に出す範囲。inheritならその表記、globが無ければ未設定と言う */
 export function scopeText(phase: PhaseForm): string {
   if (phase.inherit) {
-    return "inherit";
+    return "親の範囲を引き継ぐ";
   }
   return phase.scope.length === 0 ? "（scope未設定）" : phase.scope.join(", ");
 }

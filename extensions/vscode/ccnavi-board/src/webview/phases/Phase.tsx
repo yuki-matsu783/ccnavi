@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
-import { KIND_LABELS, PHASE_KINDS, REVIEW_OPTIONS, type PhaseForm, type PhaseKind } from "../../core/phases-view.js";
+import { KIND_LABELS, kindShort, PHASE_KINDS, REVIEW_OPTIONS, reviewOption, type PhaseForm, type PhaseKind } from "../../core/phases-view.js";
 import { moreNote, scopeText, scopeTitle, splitList } from "./text.js";
 
 export interface PhaseProps {
@@ -91,9 +91,11 @@ export function Phase(props: PhaseProps): JSX.Element {
           <span className="clip" title={phase.title}>
             {phase.title}
           </span>
-          <span className={`tag ${phase.kind}`}>{phase.kind}</span>
-          <span className="dim" title="review">
-            レビュー{String(phase.review)}
+          <span className={`tag ${phase.kind}`} title={`kind: ${phase.kind}`}>
+            {kindShort(phase.kind)}
+          </span>
+          <span className="dim" title={`review: ${String(phase.review)}`}>
+            {reviewOption(phase.review).short}
           </span>
           <span className="clip dim mono" title={scopeTitle(phase)}>
             {scopeText(phase)}
@@ -122,10 +124,11 @@ export function Phase(props: PhaseProps): JSX.Element {
           >
             {PHASE_KINDS.map((kind) => (
               <option key={kind} value={kind}>
-                {KIND_LABELS[kind]}
+                {KIND_LABELS[kind].label}
               </option>
             ))}
           </select>
+          <p className="hint">{KIND_LABELS[phase.kind].note}</p>
         </Captioned>
         <Captioned name="レビュー" yamlKey="review" tour={mark("phase-review")}>
           <select
@@ -142,6 +145,7 @@ export function Phase(props: PhaseProps): JSX.Element {
               </option>
             ))}
           </select>
+          <p className="hint">{reviewOption(phase.review).note}</p>
         </Captioned>
         <Captioned name="編集可能な範囲" yamlKey="scope" tour={mark("phase-scope")}>
           <div className="inline">
@@ -151,14 +155,20 @@ export function Phase(props: PhaseProps): JSX.Element {
               disabled={disabled}
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
-              <option value="inherit">inherit（親チケットの編集可能な範囲を引き継ぐ）</option>
+              <option value="inherit">親の範囲を引き継ぐ（inherit）</option>
               <option value="globs">上限を指定する（globのリスト）</option>
             </select>
-            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角の「,」です")}
+            {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*（区切りは半角の「,」です）")}
           </div>
+          <p className="hint">
+            {phase.inherit
+              ? "子チケットは、親チケットの編集可能な範囲をそのまま使います。"
+              : "ワークツリーのルートからの相対で書きます。子チケットの編集可能な範囲は、この中に収めます。"}
+          </p>
         </Captioned>
         <Captioned name="必須成果物" yamlKey="deliverables" tour={mark("phase-deliverables")}>
-          {list("deliverables", "f-deliverables", "wip/design/*.md。クローズする前に存在し、gitに追跡されている必要があります。区切りは半角の「,」です")}
+          {list("deliverables", "f-deliverables", "wip/design/*.md（区切りは半角の「,」です）")}
+          <p className="hint">クローズする前に存在し、gitに追跡されている必要があります。</p>
         </Captioned>
         <details
           className="more"
@@ -182,13 +192,16 @@ export function Phase(props: PhaseProps): JSX.Element {
           </summary>
           <div className="sub">
             <Captioned name="案内するエージェント" yamlKey="agent" tour={mark("phase-agent")}>
-              {text("agent", "f-agent narrow", "サブエージェント名（案内に出すだけで、割り当てはしません）")}
+              {text("agent", "f-agent narrow", "サブエージェント名")}
+              <p className="hint">案内に出すだけで、割り当てはしません。</p>
             </Captioned>
             <Captioned name="最初に呼ぶ工程スキル" yamlKey="skill">
-              {text("skill", "f-skill narrow", "工程スキル名（例: process-research。案内に出すだけで、呼ぶかは子が決めます）")}
+              {text("skill", "f-skill narrow", "process-research")}
+              <p className="hint">案内に出すだけで、呼ぶかは子チケットが決めます。</p>
             </Captioned>
             <Captioned name="使う場面" yamlKey="when" tour={mark("phase-when")}>
-              {text("when", "f-when", "この定義を計画に入れる場面（エージェントへの案内にだけ使います）")}
+              {text("when", "f-when", "この定義を計画に入れる場面")}
+              <p className="hint">エージェントへの案内にだけ使い、判定には使いません。</p>
             </Captioned>
           </div>
         </details>

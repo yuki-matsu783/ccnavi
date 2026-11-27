@@ -72,17 +72,33 @@ export interface PhasesModel {
   readonly problems: readonly string[];
 }
 
-/** 区分の説明。selectのラベル */
-export const KIND_LABELS: Readonly<Record<PhaseKind, string>> = {
-  work: "work（全体計画plan: に並べる定義）",
-  feedback: "feedback（フィードバック計画feedback: に並べる定義。レビューはtrue固定）",
+/**
+ * 区分の言葉。`label`はselectと行の要約に出す短い名前（YAMLの値を括弧で添える）、`note`は欄の下に出す説明。
+ * 長い説明をselectに入れると、選択肢が欄の幅を越えて切れるため分ける
+ */
+export const KIND_LABELS: Readonly<Record<PhaseKind, { readonly label: string; readonly short: string; readonly note: string }>> = {
+  work: { label: "全体計画用（work）", short: "全体計画用", note: "親チケットの全体計画（plan:）に並べる定義です。" },
+  feedback: { label: "フィードバック用（feedback）", short: "フィードバック用", note: "レビューのあとのフィードバック計画（feedback:）に並べる定義です。レビューはtrueで固定です。" },
 };
 
-/** レビューの説明。selectのラベル（`value`はselectの値）。追加した定義の既定はtrueで、falseは既定ではない */
-export const REVIEW_OPTIONS: readonly { readonly value: "true" | "false"; readonly label: string }[] = [
-  { value: "false", label: "false（レビューを求めない。ただし実績のリスクがHIGH以上ならレビューが必要です）" },
-  { value: "true", label: "true（MRのレビューを受ける）" },
+/**
+ * レビューの言葉（`value`はselectの値）。`label`と`short`は短い名前、`note`は欄の下に出す説明。
+ * 追加した定義の既定はtrueで、falseは既定ではない（falseの説明に「既定」と書かない）
+ */
+export const REVIEW_OPTIONS: readonly { readonly value: "true" | "false"; readonly label: string; readonly short: string; readonly note: string }[] = [
+  { value: "false", label: "なし（false）", short: "レビューなし", note: "レビューを求めません。ただし実績のリスクがHIGH以上ならレビューが必要です。" },
+  { value: "true", label: "あり（true）", short: "レビューあり", note: "MRのレビューを受けます。" },
 ];
+
+/** 区分の短い名前。知らない値（共通の設定の定義はkindを文字のまま持つ）はそのまま返す */
+export function kindShort(kind: string): string {
+  return Object.hasOwn(KIND_LABELS, kind) ? KIND_LABELS[kind as PhaseKind].short : kind;
+}
+
+/** レビューの値に当たる言葉 */
+export function reviewOption(review: boolean): (typeof REVIEW_OPTIONS)[number] {
+  return REVIEW_OPTIONS.find((option) => option.value === String(review)) ?? REVIEW_OPTIONS[1];
+}
 
 // ---- 画面に見せる形
 
