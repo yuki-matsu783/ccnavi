@@ -73,8 +73,8 @@ type Res = Awaited<ReturnType<Fetch>>;
 /** 権限が足りないときの文面。decide のホスト書き込みは api スコープ（read_api では書けない）と、書けるロールを言う */
 export function lacking(decide: boolean): string {
   return decide
-    ? "PAT に api スコープ（read_api では書けません）が要ります。プロジェクトのロールも、返信・解決・issue の作成ができる Developer 以上にしてください"
-    : "PAT の権限（api スコープ・プロジェクトのメンバー）を見直してください";
+    ? "PAT に api スコープが必要です（read_api では書き込めません）。プロジェクトのロールも、返信・解決・issue の作成ができる Developer 以上にしてください"
+    : "PAT の権限が足りません。PAT に api スコープがあるか、PAT のアカウントがプロジェクトのメンバーかを確認してください";
 }
 
 function header(res: Res, name: string): string {
@@ -91,7 +91,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
   for (let attempt = 0; ; attempt += 1) {
     // 別のホストへの転送を追わない（PAT を載せた要求を通信先の一覧の外へ出さない）
     const res = await fetchNoRedirect(client, url, init, what);
-    if (res.status === 401) throw new HostError("PAT で認証できません（401）。設定画面で差し替えてください", 401);
+    if (res.status === 401) throw new HostError("PAT で認証できません（401）。設定画面で PAT を登録し直してください", 401);
     if (res.status === 429) {
       const after = header(res, "retry-after");
       const seconds = /^\d+$/.test(after) ? Number(after) : null;
@@ -157,11 +157,11 @@ async function pages(client: Client, path: string, limit: number, what: string):
   for (let page = 1; ; page += 1) {
     const { status, body } = await get(client, `${path}${sep}per_page=100&page=${page}`);
     // 404 や配列でない答えを「無い」と読むと、見落として通してしまう
-    if (status === 404) throw new HostError(`${what} を取得できません（404）`, 404);
-    if (!Array.isArray(body)) throw new HostError(`${what} の応答が配列ではありません`);
+    if (status === 404) throw new HostError(`${what}を取得できません（404）`, 404);
+    if (!Array.isArray(body)) throw new HostError(`${what}の応答が配列ではありません`);
     all.push(...body);
     if (body.length < 100) return all;
-    if (page + 1 > limit) throw new HostError(`${what} が多すぎて読み切れません`);
+    if (page + 1 > limit) throw new HostError(`${what}が多すぎて読み切れません`);
   }
 }
 
@@ -223,7 +223,7 @@ async function listTree(client: Client, owner: string, repo: string, commit: str
     if (!Array.isArray(body)) throw new HostError("tree の応答が配列ではありません");
     all.push(...(body as TreeItem[]));
     if (body.length < 100) return all;
-    if (page >= TREE_PAGES) throw new HostError("置き場の tree が大きすぎて取得しきれません。Chrome では読み取れません");
+    if (page >= TREE_PAGES) throw new HostError("チケットを置くディレクトリのファイルが多すぎて、一覧を取得しきれません。このリポジトリは Chrome 拡張では表示できません");
   }
 }
 
@@ -273,15 +273,15 @@ function fromBase64(text: string): Uint8Array {
  * NUL を含むか UTF-8 として読めなければバイナリ。大きさが `size` と合わなければ止める
  */
 export async function blobs(client: Client, owner: string, repo: string, oids: readonly string[]): Promise<Record<string, BlobText>> {
-  if (oids.length > BLOB_BATCH) throw new HostError(`blob は 1 回に ${BLOB_BATCH} 件まで`);
+  if (oids.length > BLOB_BATCH) throw new HostError(`blob は 1 回に ${BLOB_BATCH} 件までです`);
   const out: Record<string, BlobText> = {};
   for (const oid of oids) {
     const { status, body } = await get(client, `${project(owner, repo)}/repository/blobs/${checkOid(oid)}`);
-    if (status === 404) throw new HostError(`blob ${oid} を取れませんでした`);
+    if (status === 404) throw new HostError(`ファイルの内容（blob ${oid}）を取得できませんでした`);
     const b = (body ?? {}) as { content?: unknown; encoding?: unknown; size?: unknown };
     if (b.encoding !== "base64" || typeof b.content !== "string") throw new HostError(`blob ${oid} の応答を解釈できません`);
     const bytes = fromBase64(b.content);
-    if (typeof b.size === "number" && bytes.length !== b.size) throw new HostError(`blob ${oid} の本文が大きさと合いません（取り切れていません）`);
+    if (typeof b.size === "number" && bytes.length !== b.size) throw new HostError(`ファイルの内容（blob ${oid}）のサイズが、ホストの示すサイズと一致しません（全部を取得できていません）`);
     if (bytes.includes(0)) {
       out[oid] = { text: null, binary: true };
       continue;
@@ -506,7 +506,7 @@ export async function createCommit(
   const res = await post(client, `${project(owner, repo)}/repository/commits`, payload);
   if (res.status === 400 || res.status === 409 || res.status === 422) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab が書き込みを拒否しました（${res.status}）：${typeof why === "string" ? why : "?"}`, HOST_REFUSED);
+    throw new HostError(`GitLab が書き込みを拒否しました（${res.status}）${typeof why === "string" ? `：${why}` : ""}`, HOST_REFUSED);
   }
   if (res.status < 200 || res.status >= 300) throw new HostError(`GitLab が ${res.status} を返しました：POST repository/commits`, res.status);
   const c = (res.body ?? {}) as { id?: unknown; parent_ids?: unknown };
@@ -555,10 +555,10 @@ export async function createBranch(client: Client, owner: string, repo: string, 
   const res = await post(client, `${project(owner, repo)}/repository/branches?${q.toString()}`, {});
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab がブランチを作りませんでした（${res.status}）：${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`ブランチを作成できませんでした（GitLab の応答：${res.status}）${typeof why === "string" ? `：${why}` : ""}`, res.status);
   }
   const made = (res.body ?? {}) as { name?: unknown; commit?: { id?: unknown } };
-  if (made.name !== name) throw new HostError("作ったブランチの名前が、頼んだ名前と違います");
+  if (made.name !== name) throw new HostError("作成されたブランチの名前が、指定した名前と違います");
   return checkOid(made.commit?.id);
 }
 
@@ -584,7 +584,7 @@ export interface MrInfo {
 /** 開いた MR の全部。フォークから出たものは `fork` を立てる（元ブランチがこのプロジェクトに無い）。読むだけ */
 export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
   const pid = await projectId(client, owner, repo);
-  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened`, MR_PAGES, "開いたマージリクエスト一覧");
+  const all = await pages(client, `${project(owner, repo)}/merge_requests?state=opened`, MR_PAGES, "オープン状態のマージリクエストの一覧");
   const out: MrInfo[] = [];
   for (const m of all as { iid?: unknown; source_branch?: unknown; target_branch?: unknown; title?: unknown; description?: unknown; web_url?: unknown; source_project_id?: unknown }[]) {
     if (!m || typeof m.iid !== "number" || typeof m.source_branch !== "string") continue;
@@ -628,7 +628,7 @@ export async function createDraftMr(client: Client, owner: string, repo: string,
   const res = await post(client, `${project(owner, repo)}/merge_requests`, { source_branch: checkBranch(head), target_branch: checkBranch(base), title: `Draft: ${title}`, description: body });
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitLab が Draft のマージリクエストを作りませんでした（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`Draft のマージリクエストを作成できませんでした（GitLab の応答：${res.status}）${typeof why === "string" ? `：${why}` : ""}`, res.status);
   }
   const made = (res.body ?? {}) as { iid?: unknown; web_url?: unknown };
   if (typeof made.iid !== "number") throw new HostError("作ったマージリクエストの番号を取得できません");
@@ -641,7 +641,7 @@ const DISCUSSION_ID = /^[0-9a-f]{8,64}$/;
 
 /** discussion の id（GitLab は 40 桁の 16 進）。経路に使うので、この字に限る */
 export function checkDiscussionId(value: unknown): string {
-  if (typeof value !== "string" || !DISCUSSION_ID.test(value)) throw new HostError(`discussion の id の形が正しくありません: ${String(value)}`);
+  if (typeof value !== "string" || !DISCUSSION_ID.test(value)) throw new HostError(`スレッドの id の形が正しくありません：${String(value)}`);
   return value;
 }
 
@@ -651,36 +651,36 @@ function mrPath(owner: string, repo: string, number: number): string {
 
 function failure(what: string, res: { status: number; body: unknown }): HostError {
   const why = (res.body as { message?: unknown; error?: unknown } | null)?.message ?? (res.body as { error?: unknown } | null)?.error;
-  return new HostError(`${what}（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+  return new HostError(`${what}（GitLab の応答：${res.status}）${typeof why === "string" ? `：${why}` : ""}`, res.status);
 }
 
 /** discussion へ返信する（`POST …/discussions/:id/notes`） */
 export async function replyDiscussion(client: Client, owner: string, repo: string, number: number, discussion: string, body: string): Promise<{ url: string }> {
   const res = await post(client, `${mrPath(owner, repo, number)}/discussions/${checkDiscussionId(discussion)}/notes`, { body: checkWriteText(body, "返信の本文") }, true);
-  if (res.status === 404) throw new HostError("返信できませんでした（404）。discussion が見えないか、PAT のロールが足りません（Developer 以上・api スコープ）", 404);
-  if (res.status < 200 || res.status >= 300) throw failure("GitLab が返信を受け付けなかった", res);
+  if (res.status === 404) throw new HostError("返信できませんでした（404）。スレッドが見つからないか、権限が足りません（Developer 以上のロールと、PAT の api スコープが必要です）", 404);
+  if (res.status < 200 || res.status >= 300) throw failure("返信を投稿できませんでした", res);
   const id = (res.body as { id?: unknown } | null)?.id;
-  if (typeof id !== "number") throw new HostError("GitLab が作ったノートの id を返しませんでした");
+  if (typeof id !== "number") throw new HostError("作成したコメントの id を、GitLab の応答から取得できません");
   return { url: "" };
 }
 
 /** discussion を解決済みにする（`PUT …/discussions/:id` の `resolved=true`）。解決済みになったことまで確かめる */
 export async function resolveDiscussion(client: Client, owner: string, repo: string, number: number, discussion: string): Promise<void> {
   const res = await put(client, `${mrPath(owner, repo, number)}/discussions/${checkDiscussionId(discussion)}`, { resolved: true });
-  if (res.status === 404) throw new HostError("解決できませんでした（404）。discussion が見えないか、PAT のロールが足りません（Developer 以上・api スコープ）", 404);
-  if (res.status < 200 || res.status >= 300) throw failure("GitLab が discussion を解決しなかった", res);
+  if (res.status === 404) throw new HostError("解決できませんでした（404）。スレッドが見つからないか、権限が足りません（Developer 以上のロールと、PAT の api スコープが必要です）", 404);
+  if (res.status < 200 || res.status >= 300) throw failure("スレッドを解決済みにできませんでした", res);
   const notes = (res.body as { notes?: unknown } | null)?.notes;
   const resolvable = (Array.isArray(notes) ? (notes as Note[]) : []).filter((n) => n?.system !== true && alt(n?.resolvable, false) !== false);
   if (resolvable.length === 0 || !resolvable.every((n) => alt(n.resolved, false) !== false)) {
-    throw new HostError("GitLab の応答が、discussion の解決済みを示していません");
+    throw new HostError("スレッドを解決済みにできませんでした（GitLab の応答が解決済みになっていません）");
   }
 }
 
 /** issue を作る（`POST projects/:id/issues`）。タイトルと本文だけを送る。assignee・labels・milestone は入れない */
 export async function createIssue(client: Client, owner: string, repo: string, title: string, body: string): Promise<IssueRef> {
   const res = await post(client, `${project(owner, repo)}/issues`, { title: checkTitle(title), description: checkWriteText(body, "issue の本文") }, true);
-  if (res.status === 404) throw new HostError(`issue を作れませんでした（404）。プロジェクト ${owner}/${repo} が見えないか、PAT のロールが足りません（Reporter 以上・api スコープ）`, 404);
-  if (res.status < 200 || res.status >= 300) throw failure("GitLab が issue を作らなかった", res);
+  if (res.status === 404) throw new HostError(`issue を作成できませんでした（404）。プロジェクト ${owner}/${repo} が見つからないか、権限が足りません（Reporter 以上のロールと、PAT の api スコープが必要です）`, 404);
+  if (res.status < 200 || res.status >= 300) throw failure("issue を作成できませんでした", res);
   const made = (res.body ?? {}) as { iid?: unknown; web_url?: unknown };
   if (typeof made.iid !== "number" || !Number.isInteger(made.iid) || made.iid <= 0) throw new HostError("作った issue の番号を取得できません");
   return { number: made.iid, url: checkWebUrl(client, made.web_url) };
@@ -713,11 +713,11 @@ export async function issueComments(client: Client, owner: string, repo: string,
   const out: string[] = [];
   for (let page = 1; page <= 5; page += 1) {
     const { status, body } = await get(client, `${project(owner, repo)}/issues/${checkNumber(number, "issue の番号")}/notes?sort=asc&per_page=100&page=${page}`);
-    if (status === 404 || !Array.isArray(body)) throw new HostError(`issue !${number} のメモを読めません`, status === 404 ? 404 : 0);
+    if (status === 404 || !Array.isArray(body)) throw new HostError(`issue #${number} のコメントを取得できません`, status === 404 ? 404 : 0);
     for (const n of body as { body?: unknown }[]) out.push(typeof n.body === "string" ? n.body : "");
     if (body.length < 100) return out;
   }
-  throw new HostError(`issue #${number} のメモが多すぎて読み切れません`);
+  throw new HostError(`issue #${number} のコメントが多すぎて読み切れません`);
 }
 
 /** PAT の持ち主の数の id */
@@ -731,16 +731,16 @@ async function viewerId(client: Client): Promise<number> {
 /** MR にメモ（コメント）を付ける（`POST …/merge_requests/:iid/notes`） */
 export async function mrNote(client: Client, owner: string, repo: string, number: number, body: string): Promise<{ url: string }> {
   const res = await post(client, `${mrPath(owner, repo, number)}/notes`, { body: checkWriteText(body, "コメントの本文") }, true);
-  if (res.status === 404) throw new HostError("コメントを付けられませんでした（404）。MR が見えないか、PAT のロールが足りません（api スコープ）", 404);
-  if (res.status < 200 || res.status >= 300) throw failure("GitLab がコメントを受け付けなかった", res);
+  if (res.status === 404) throw new HostError("コメントを投稿できませんでした（404）。MR が見つからないか、PAT に api スコープがありません", 404);
+  if (res.status < 200 || res.status >= 300) throw failure("コメントを投稿できませんでした", res);
   return { url: "" };
 }
 
 /** issue にメモ（コメント）を付ける（`POST …/issues/:iid/notes`。issue の続きのコメント） */
 export async function issueNote(client: Client, owner: string, repo: string, number: number, body: string): Promise<{ url: string }> {
   const res = await post(client, `${project(owner, repo)}/issues/${checkNumber(number, "issue の番号")}/notes`, { body: checkWriteText(body, "コメントの本文") }, true);
-  if (res.status === 404) throw new HostError("コメントを付けられませんでした（404）。issue が見えないか、PAT のロールが足りません（api スコープ）", 404);
-  if (res.status < 200 || res.status >= 300) throw failure("GitLab がコメントを受け付けなかった", res);
+  if (res.status === 404) throw new HostError("コメントを投稿できませんでした（404）。issue が見つからないか、PAT に api スコープがありません", 404);
+  if (res.status < 200 || res.status >= 300) throw failure("コメントを投稿できませんでした", res);
   return { url: "" };
 }
 

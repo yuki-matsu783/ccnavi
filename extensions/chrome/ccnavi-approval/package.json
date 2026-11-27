@@ -1,7 +1,7 @@
 {
   "name": "ccnavi-approval",
   "displayName": "ccnavi 承認ボード",
-  "description": "リモートのブランチの承認待ちを、ブラウザと PAT だけで見せ、承認・レビュー済みを親のブランチへ書き、issue から親のブランチを始める Chrome 拡張（GitHub と GitLab）。判定は同梱の ccnavi（Go の WASM）を動かして出す",
+  "description": "リモートのブランチにある承認待ちを表示し、承認とレビュー済みを親ブランチへ反映します。Issue から親ブランチを作成することもできます（GitHub と GitLab）。判定は、同梱の ccnavi（Go の WASM）で行います。",
   "version": "0.4.0",
   "private": true,
   "license": "MIT",

@@ -137,7 +137,7 @@ test("CX-T050 ボードの DOM: 承認などのボタンを出さず、悪意の
   const md = createRenderer(dom.window as unknown as Parameters<typeof createRenderer>[0]);
   renderBoard(doc, md, board);
   assert.equal(doc.querySelectorAll("button, form, input").length, 0);
-  assert.match(doc.querySelector("[data-testid=integration]")?.textContent ?? "", /^統合先: main（ホストのデフォルトブランチ）/);
+  assert.match(doc.querySelector("[data-testid=integration]")?.textContent ?? "", /^統合先：main（ホストのデフォルトブランチ）/);
   const hostile = doc.querySelector('[data-ticket="i0002"] .markdown');
   assert.ok(hostile);
   assert.equal(hostile.querySelectorAll("script, img, svg, iframe, form").length, 0);

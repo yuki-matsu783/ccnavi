@@ -1,9 +1,9 @@
 # ccnavi 承認ボード（Chrome 拡張）
 
-承認者がブラウザと PAT だけで、リモートのブランチの承認待ちを見て、承認・レビュー済みを親のブランチへ書き、
-issue から親のブランチを始める拡張。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
-GitLab での ccnavi の書き込みどうしの競合の検出は、実際の GitLab で前提を確かめるまで未実装。
-PAT に要る権限は、GitHub が Contents の Read and write、GitLab が `api` スコープである。残った指摘の対応方針を確定するときは、さらに GitHub が Pull requests・Issues の Read and write、GitLab が Developer 以上のロールを要る。設定画面の案内と [VERIFY.md](VERIFY.md) の表に、同じ内容を載せている。
+承認者がブラウザと PAT だけで使う拡張で、リモートのブランチにある承認待ちを表示し、承認とレビュー済みを親ブランチへ反映する。
+Issue から親ブランチを作成することもできる。GitHub と GitLab の、ワークスペースとプロジェクトのリポジトリを扱う。
+GitLab で ccnavi の書き込みが競合したことを検出する処理は、まだ実装していない（実際の GitLab で前提を確かめてから実装する）。
+PAT に要る権限は、GitHub が Contents の Read and write、GitLab が `api` スコープである。残った指摘の対応方針を確定するときは、さらに GitHub では Pull requests・Issues の Read and write、GitLab では Developer 以上のロールが要る。設定画面の案内と [VERIFY.md](VERIFY.md) の表に、同じ内容を載せている。
 
 承認者の操作を、作業者の開発環境やセッションの外に置くための入口で、判定のコアは手元の ccnavi と同じ Go のコードを WASM に組んで同梱して使う。
 同期はリアルタイムではなく、書いた結果は作業側の次の fetch / sync で届く（ccnavi の docs/50_guide/multi-pc.md）。
@@ -44,7 +44,7 @@ node scripts/render-scene.js --repo <ccnavi を配布済みのリポジトリ> -
 
 ローカルブランチの許可リストのファイルを模擬のホストに載せ、ボードを描いて `board.png`・`board.txt`・`board.dom.json`・`board.log` を出す。
 `--out` は `--repo` を含むリポジトリ全体の外に指定する（`--repo` がリポジトリの途中のディレクトリでも、git は上のリポジトリを読む）。
-`node scripts/test.js --e2e` は組み立てのあと e2e の試験全体も回す。`CCNAVI_CHROMIUM` で Chromium を指す環境では、組み立てのあとに 3 で終わるが、`dist-e2e/` と `out/` は組み上がっている。
+`node scripts/test.js --e2e` は組み立てのあと e2e の試験全体も回す。`CCNAVI_CHROMIUM` で Chromium を指定している環境では、組み立てのあとに終了コード 3 で終わるが、`dist-e2e/` と `out/` は組み上がっている。
 配布物には入らない。使い方・前提・確かめられること・確かめられないことは [VERIFY.md](VERIFY.md) の 4.0。
 
 ### ホストの応答の見本（レビュー済み）
@@ -57,12 +57,12 @@ sh の読み方と合うことを確かめた（1 アカウントだけ。`CHANG
 親のブランチ・依頼を投稿したアカウントの id `poster`、ホストの応答は `mrs.json`・`discussions.<N>.json`・`reviewers.<N>.json`・`user.json`）。
 スタブは sh の試験の `go/internal/harness/hostfixture`（GitLab） と拡張の試験の `test/helpers/gitlab-fixture.ts`、試験は `go/internal/clitest/sh/review/gitlabhost_test.go` の
 `TestGitLabHostFixtureCopyMatchesEachRecordedScene` と拡張の CX-T144。結論（`conclusion.json`）を出すときは、`poster` が投稿した ccnavi の依頼のスレッドを数えない（目印は誰でも書けるので、書いたアカウントで見分ける）。
-拡張はホストの種類を自動判定しない（設定画面で種類を手で選ぶ）。自動判定の表（`github.com`・`ghe.com`・`*.ghe.com` は GitHub、それ以外は GitLab）は sh と実行ファイルだけが持ち、`tests/fixtures/host-kinds.json` で突き合わせる。拡張が持つのは、GHE.com の接続先を組むための `ghe.com` とそのサブドメインの照合（`src/core/custom-hosts.ts` の `isGheHost`）だけ。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
+拡張はホストの種類を自動判定しない（設定画面で種類を手で選ぶ）。自動判定の表（`github.com`・`ghe.com`・`*.ghe.com` は GitHub、それ以外は GitLab）は sh と ccnavi だけが持ち、`tests/fixtures/host-kinds.json` で突き合わせる。拡張が持つのは、GHE.com の接続先を組むための `ghe.com` とそのサブドメインの照合（`src/core/custom-hosts.ts` の `isGheHost`）だけ。GHE.com を GitHub として登録すると API は `https://api.<ホスト>`（GraphQL は `/graphql`）、許可は画面と API の origin の両方に取る。それ以外の GitHub の登録は Enterprise Server（`/api/v3`・`/api/graphql`）。未登録のホストへ自動で通信したり PAT を送ったりしない。GHE.com の URL の規則は未検証。
 依頼コメントへの返信の見本（`replies`・`replies-accepted`）は、system のノートを除いたノートから代表のノートと `own` を決め、返信を指摘として数える。実物の GitLab で返信がスレッドになり resolvable になるかは未検証。
 更新の手順は下の GitHub と同じ（実物は `glab api` で取る）。
 
-MR のスレッドとレビューを取ってくる処理は、手元の sh（`.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews`）と
-この拡張の service worker が呼ぶ `src/core/github.ts`・`gitlab.ts` の `reviewReplies`（2 か所）は、取ってきた応答を読まずに ccnavi に渡し、
+MR のスレッドとレビューを取ってくる処理は 2 か所にある（手元の sh の `.ccnavi/scripts/ccnavi-review.sh` の `find_mr`・`threads`・`reviews` と、
+この拡張の service worker が呼ぶ `src/core/github.ts`・`gitlab.ts` の `reviewReplies`）。どちらも取ってきた応答を読まずに ccnavi に渡す。
 読み（スレッドの代表・`own`・解決済み・レビューの状態のそろえ方）は ccnavi の同じ `hostreply`（sh は `ccnavi host copy`、拡張は WASM の `copy`）が持つ。
 拡張の service worker は WASM を動かさないので、ボードが `reviewReplies` の答えを受け取り、WASM の Worker の `copy` に渡す（`src/core/reviewed.ts` の `readCopy`）。
 2 つが同じ問い合わせとページの切り方をしているかは、手で組んだホストの応答の見本で確かめる。
@@ -79,7 +79,7 @@ MR のスレッドとレビューを取ってくる処理は、手元の sh（`.
    該当の場面のファイルを置き換えるか、形の変わった欄だけを手で直す。トークン・個人の名前・社内の URL は見本に残さない
 2. `go/` で `go test ./internal/clitest/sh/review -run HostFixture -update-host-fixture` を回し、sh が組んだ結果で
    `expected.json` を書き直す。続けて `go/` で `CCNAVI_HOST_FIXTURE=1 go test ./internal/tickets/model/host -run HostFixture` を回し、
-   実行ファイルが出す結論で `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
+   ccnavi が出す結論で `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
    読めていなければ `ccnavi-review.sh` を直す
 3. `pnpm test` を回す。CX-T129 が失敗したら、問い合わせかページの切り方（`src/core/github.ts`）か、読み（`go/internal/tickets/model/hostreply`）を直して sh と同じ結果にする
 4. 見本・期待値・sh・TS の変更を同じコミットに入れる（片方だけ変えると、もう片方の試験が失敗する）

@@ -259,7 +259,7 @@ async function commitOnce(
   }
   try {
     const now = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
-    if (now === null) return { kind: "failed", message: `親のブランチ ${family} がホストから見つかりません（${text}）` };
+    if (now === null) return { kind: "failed", message: `親ブランチ ${family} がリモートに見つかりません（${text}）` };
     if (now === read.head) return { kind: "failed", message: text };
     for (let i = 0; i < VERIFY_TRIES; i += 1) {
       const found = await findWritten(deps, repo, now, read, rows);
@@ -269,14 +269,14 @@ async function commitOnce(
     if ((await verifyWritten(deps, repo, now, rows)).length === 0) {
       return {
         kind: "attention",
-        message: `${family} への書き込みの応答が返ってきませんでした。反映した内容は先頭にありますが、この拡張が作成したコミットかどうかを判別できませんでした（${text}）。ホストの履歴を確認してください。`,
+        message: `${family} への書き込みの応答が返ってきませんでした。反映した内容は先頭にありますが、この拡張が作成したコミットかどうかを判別できませんでした（${text}）。ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください。`,
       };
     }
     return { kind: "moved" };
   } catch (err) {
     return {
       kind: "attention",
-      message: `${family} への書き込みの応答が返ってこず（${text}）、反映されたかどうか確認できませんでした（${(err as Error).message ?? String(err)}）。ホストの履歴を確認してください。`,
+      message: `${family} への書き込みの応答が返ってこず（${text}）、反映されたかどうか確認できませんでした（${(err as Error).message ?? String(err)}）。ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください。`,
     };
   }
 }
@@ -289,18 +289,18 @@ async function finish(deps: WriteDeps, repo: RepoConfig, oid: string, rows: read
   } catch (err) {
     return {
       kind: "attention",
-      message: `反映しました（${oid.slice(0, 7)}）が、反映後の内容を確認できませんでした（${(err as Error).message ?? String(err)}）。ホストの履歴を確認してください。`,
+      message: `反映しました（${oid.slice(0, 7)}）が、反映後の内容を確認できませんでした（${(err as Error).message ?? String(err)}）。ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください。`,
     };
   }
   if (wrong.length > 0) {
-    return { kind: "attention", message: `反映後の内容が、反映したものと異なります（${oid.slice(0, 7)}：${wrong.join(", ")}）。ホストの履歴を確認してください。` };
+    return { kind: "attention", message: `反映後の内容が、反映したものと異なります（${oid.slice(0, 7)}：${wrong.join(", ")}）。ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください。` };
   }
   return { kind: "written", oid, rounds, lines };
 }
 
 /** ccnavi の Changes から、この親子のチケット P に書く行を取り出す。P の外・置き場の外に及べば理由 */
 export function rowsOf(res: Written, family: string, read: Pick<FamilyRead, "place">): readonly ChangeRow[] | string {
-  if (res.stopped) return `${res.stopped.ticket}: ${res.stopped.reason}`;
+  if (res.stopped) return `${res.stopped.ticket}：${res.stopped.reason}`;
   const names = Object.keys(res.changes ?? {});
   if (names.some((n) => n !== family)) return `反映する内容が親ブランチ ${family} の外に及んでいます（${names.join(", ")}）`;
   const rows = res.changes?.[family] ?? [];
@@ -369,7 +369,7 @@ export const REVERT_TRIES = 2;
 function attention(family: string, done: Committed, why: string): Outcome {
   return {
     kind: "attention",
-    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、反映した内容を確認しきれなかったか、元に戻せませんでした（${why}）。ホストの履歴を確認してください。`,
+    message: `${family} への書き込み（${done.oid.slice(0, 7)}）の後に別の書き込みが入り、反映した内容を確認しきれなかったか、元に戻せませんでした（${why}）。ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください。`,
   };
 }
 
@@ -387,7 +387,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
   const message = commitMessage([family], "への書き込みを元に戻す", "元に戻した", deps.version);
   for (let attempt = 1; attempt <= REVERT_TRIES; attempt += 1) {
     const cur = (await deps.call("branchHead", [repo.owner, repo.repo, family])) as string | null;
-    if (cur === null) return human(`親ブランチ ${family} がホストから見つかりません`);
+    if (cur === null) return human(`親ブランチ ${family} がリモートに見つかりません`);
     const touched = await verifyWritten(deps, repo, cur, rows);
     if (touched.length > 0) return human(`後から別の書き込みが同じファイルを変更しました：${touched.join(", ")}`);
     let res: Committed;
@@ -408,7 +408,7 @@ async function revert(deps: WriteDeps, repo: RepoConfig, family: string, done: C
     }
     // 戻した後に中身を確かめる（バイト列が元と同じか）
     const wrong = await verifySettled(deps, repo, res.oid, undo);
-    if (wrong.length > 0) return human(`元に戻した後の内容が、戻したものと異なります：${wrong.join(", ")}`);
+    if (wrong.length > 0) return human(`元に戻した後の内容が、書き込む前の内容と一致しません：${wrong.join(", ")}`);
     if (res.parent === cur) return { kind: "reverted" };
     // 元に戻すあいだにも別の書き込みが入った。それが同じパスを変えていなければ、元に戻すコミットは反映されている
     if ((await verifyWritten(deps, repo, res.parent, rows)).length === 0) return { kind: "reverted" };
@@ -578,7 +578,7 @@ export type DecideOutcome =
   | (Exclude<Outcome, { readonly kind: "written" }> & { readonly hostWritten?: boolean });
 
 /** 決める判断の内側で、書かずに終える答え（コミットを積む中身が無い） */
-const NO_COMMIT: Outcome = { kind: "refused", message: "親のブランチへ反映する内容がありません" };
+const NO_COMMIT: Outcome = { kind: "refused", message: "親ブランチへ反映する内容がありません" };
 
 /** ccnavi の `CORE_DECIDE_MISMATCH`（見せた指摘と今の指摘が違う） */
 const DECIDE_MISMATCH = "CORE_DECIDE_MISMATCH";
@@ -704,7 +704,7 @@ export async function decidePhase(
       const copy = await readCopy(deps.ccnavi, ask, family);
       mr = copy.mr.number;
       const res = await askDecide(deps.ccnavi, ask, { ...base, snapshot: read.input, copy, stamp: localStamp(deps.now()), carry: [] });
-      if (res.code === DECIDE_MISMATCH || res.mismatch) return { kind: "mismatch", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います" };
+      if (res.code === DECIDE_MISMATCH || res.mismatch) return { kind: "mismatch", message: res.problems.join("\n") || "表示した後に指摘が変わりました" };
       if (res.problems.length > 0 || !res.host_plan) {
         return { kind: "refused", message: res.problems.join("\n") || "残った指摘の対応方針を反映できません", ...codeOf(res) };
       }
@@ -732,7 +732,7 @@ export async function decidePhase(
         }
         carry = plan.resolves.map((r) => r.key);
         const reused = made.filter((i) => i.reused).length;
-        hostNote = `ホストへの書き込み（issue ${made.length - reused} 件${reused > 0 ? `・既にあった issue ${reused} 件` : ""}・返信 ${done.replied.length} 件・解決 ${done.resolved.length} 件）は済んでいますが、親のブランチへ反映できませんでした。MR のコメントは投稿していません。ボードを読み直して、残った指摘だけ決め直してください。`;
+        hostNote = `ホストへの書き込み（issue の作成 ${made.length - reused} 件${reused > 0 ? `・既存の issue の利用 ${reused} 件` : ""}・返信 ${done.replied.length} 件・スレッドの解決 ${done.resolved.length} 件）は済みましたが、親ブランチへ反映できませんでした。対応方針のまとめのコメントは MR に投稿していません。ボードを更新して、残った指摘だけ対応方針を決め直してください。`;
       }
     }
   } catch (err) {
@@ -755,16 +755,16 @@ export async function decidePhase(
           kind: "stop",
           outcome: {
             kind: "attention",
-            message: `書いた結果がホストの読み直しに反映されず、確かめられませんでした。ホストには書けています。読み直してから決め直してください（${res.problems.join("\n") || DECIDE_CHOICES}）`,
+            message: `書き込んだ結果が、読み直した内容にまだ反映されておらず、確認できませんでした。ボードを更新してから、対応方針を決め直してください${res.problems.length > 0 ? `（${res.problems.join("\n")}）` : ""}`,
           },
         };
       }
     }
     if (res.code === DECIDE_MISMATCH || res.mismatch) {
-      return { kind: "stop", outcome: { kind: "changed", message: res.problems.join("\n") || "見せた指摘が今の指摘と違います", code: DECIDE_MISMATCH } };
+      return { kind: "stop", outcome: { kind: "changed", message: res.problems.join("\n") || "表示した後に指摘が変わりました", code: DECIDE_MISMATCH } };
     }
     if (res.problems.length > 0 || res.stopped) {
-      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || (res.stopped ? `${res.stopped.ticket}: ${res.stopped.reason}` : "残った指摘の対応方針を反映できません"), ...codeOf(res) } };
+      return { kind: "stop", outcome: { kind: "refused", message: res.problems.join("\n") || (res.stopped ? `${res.stopped.ticket}：${res.stopped.reason}` : "残った指摘の対応方針を反映できません"), ...codeOf(res) } };
     }
     last = res;
     if (!res.changes || Object.keys(res.changes).length === 0) return { kind: "stop", outcome: NO_COMMIT };
@@ -788,7 +788,7 @@ export async function decidePhase(
   // (5) 決めた内容のコメント。0 件の確定では投稿しない。失敗はコミットを戻さず警告にする
   const decided = last as Awaited<ReturnType<typeof askDecide>> | null;
   const warnings: string[] = [];
-  if (truncated) warnings.push("issue の検索が上限まで読んでも見つからず、探し切れていません（既に作った issue があれば重複します）");
+  if (truncated) warnings.push("既に作成済みの issue を上限件数まで検索しましたが、見つかりませんでした。検索しきれていないため、作成済みの issue があった場合は重複しています");
   let comment = planned ? planned.comment : (decided?.host_plan?.comment ?? null);
   if (comment && decided) {
     // 続きの子の名前と増えた指摘は、コミットを積んだ側（2 周目）の値にそろえる
@@ -799,7 +799,7 @@ export async function decidePhase(
     try {
       await ops.postComment(target, mr, comment.split(ISSUE_LINKS_SLOT).join(made.map((i) => `- ${i.url}`).join("\n")));
     } catch (err) {
-      warnings.push(`決めた内容のコメントだけ MR に投稿できませんでした（${reasonOf(err)}）。反映は済んでいて同じ入口から再送できないため、必要なら MR に手で書いてください`);
+      warnings.push(`対応方針のまとめのコメントだけ、MR に投稿できませんでした（${reasonOf(err)}）。対応方針の反映は済んでいます。この画面からは投稿し直せないので、必要な場合は MR に直接コメントしてください`);
     }
   }
   return {

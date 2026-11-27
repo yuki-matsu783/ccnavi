@@ -202,7 +202,7 @@ test("CX-T135 スレッドの悪意のある本文は描いても実行されず
   const hrefs = [...box.querySelectorAll(".markdown a")].map((a) => a.getAttribute("href")).filter((h) => h !== null);
   assert.deepEqual(hrefs, []);
   const text = box.textContent ?? "";
-  for (const seen of ["畳んで隠した指摘", "〈HTML コメント: 隠したつもりの指摘〉", "hidden で隠した指摘", "白文字の指摘", "style で隠した指摘"]) {
+  for (const seen of ["畳んで隠した指摘", "〈HTML コメント：隠したつもりの指摘〉", "hidden で隠した指摘", "白文字の指摘", "style で隠した指摘"]) {
     assert.ok(text.includes(seen), seen);
   }
   for (const a of box.querySelectorAll("a")) (a as HTMLElement).click();

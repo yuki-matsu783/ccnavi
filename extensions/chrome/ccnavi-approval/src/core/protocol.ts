@@ -179,7 +179,7 @@ function hostWriteArgs(op: string, lab: boolean, rest: readonly unknown[]) {
     case "commentIssue":
       return { issue: github.checkNumber(rest[0], "issue の番号"), body: text(rest[1], "コメントの本文") };
     default:
-      throw new Error(`未対応の操作:${op}`);
+      throw new Error(`未対応の操作です：${op}`);
   }
 }
 
@@ -212,7 +212,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
         }
         const manual = msg.expires === undefined || msg.expires === "" ? "" : parseManual(msg.expires);
         if (msg.expires !== undefined && msg.expires !== "" && !manual) {
-          return { ok: false, error: "期限は YYYY-MM-DD の形の日付で入れてください" };
+          return { ok: false, error: "期限は YYYY-MM-DD の形式で入力してください" };
         }
         await deps.setToken(host.id, msg.token);
         // 差し替えたら、前のトークンの期限は破棄する（ホストの応答で読み直す）
@@ -231,7 +231,7 @@ export async function dispatch(message: unknown, sender: Sender, deps: Deps): Pr
       case "host":
         return await hostCall(host, msg.op, msg.args, deps);
       default:
-        return { ok: false, error: "未対応の種類の要求" };
+        return { ok: false, error: "未対応の種類の要求です" };
     }
   } catch (err) {
     const e = err as { message?: string; status?: number };
@@ -316,7 +316,7 @@ function commitArgs(args: unknown[]) {
     if (typeof e.contents !== "string" || e.contents.length > MAX_CONTENTS || !BASE64.test(e.contents)) {
       throw new Error("contents が base64 ではないか、大きすぎます");
     }
-    if (e.op !== undefined && e.op !== "create" && e.op !== "update") throw new Error("op は create か update");
+    if (e.op !== undefined && e.op !== "create" && e.op !== "update") throw new Error("op は create か update を指定してください");
     return { path: github.checkPath(e.path), contents: e.contents, ...(e.op ? { op: e.op } : {}), ...(e.last !== undefined ? { last: github.checkOid(e.last) } : {}) };
   });
   const dels = deletions.map((p: unknown) =>
@@ -398,7 +398,7 @@ async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, in
   const text = await fileAt(ws.client, ws.cfg, ws.head, COMPAT_FILE);
   const theirs = text === null ? null : Number(/^CCNAVI_COMPAT=(\d+)\s*$/m.exec(text)?.[1] ?? NaN);
   if (deps.compat === undefined || theirs === null || theirs !== deps.compat) {
-    return `統合先の互換の版（${theirs ?? "なし"}）と拡張の互換の版（${deps.compat ?? "不明"}）が異なるため、作成できません`;
+    return `統合先の ccnavi の互換の版（${theirs ?? "なし"}）と、この拡張の互換の版（${deps.compat ?? "不明"}）が異なるため、親ブランチを作成できません。拡張か、リポジトリの ccnavi を更新してください`;
   }
   const a = api(client);
   const done = `${DEFAULT_PLACES.approved}/done`;
@@ -447,7 +447,7 @@ function startName(name: unknown, cfg: RepoConfig): string {
 
 function text(value: unknown, what: string, max: number): string {
   if (typeof value !== "string" || value === "" || value.length > max || /[\x00-\x1f\x7f]/.test(value)) {
-    throw new github.HostError(`${what} を取得できません`);
+    throw new github.HostError(`${what}を取得できません`);
   }
   return value;
 }
@@ -505,7 +505,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
     }
     case "pathObjects": {
       if (!Array.isArray(b) || b.length > 20) {
-        return { ok: false, error: "paths は 20 件までの配列" };
+        return { ok: false, error: "paths は 20 件までの配列で指定してください" };
       }
       value = await x.pathObjects(client, o, r, github.checkOid(a), b.map(github.checkPath));
       break;
@@ -578,16 +578,16 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "reviewReplies":
       // レビュー済み: MR のスレッドとレビューを取得する。読むだけ。登録したリポジトリだけ
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録されていないリポジトリのため、読み取れません` };
       value = await x.reviewReplies(client, o, r, github.checkBranch(a));
       break;
     case "compareFiles":
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録されていないリポジトリのため、読み取れません` };
       value = await x.compareFiles(client, o, r, github.checkOid(a), github.checkOid(b));
       break;
     case "pathCommitTime":
       // 手で done/ に動かした子の移動の時刻: ブランチ a のパス b を最初に加えたコミットの時刻。読むだけ
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録されていないリポジトリのため、読み取れません` };
       value = await x.pathCommitTime(client, o, r, github.checkBranch(a), github.checkPath(b));
       break;
     case "branchNames":
@@ -595,13 +595,13 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       break;
     case "issues":
       // 「始める」: 開いた issue の一覧。読むだけ。登録したリポジトリだけ
-      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録していないリポジトリなので読みません` };
+      if (!(await registered(deps, client, o, r))) return { ok: false, error: `${o}/${r} は設定画面に登録されていないリポジトリのため、読み取れません` };
       value = await x.issues(client, o, r);
       break;
     case "createBranch": {
       // 「始める」: 親のブランチを統合先の今の先頭から作る。初期コミットと Draft の MR は別の操作（startCommit・createDraftMr）
       const cfg = await registeredRepo(deps, client, o, r);
-      if (!cfg) return refuse(`${o}/${r} は設定画面に登録していないリポジトリなのでブランチを作りません`);
+      if (!cfg) return refuse(`${o}/${r} は設定画面に登録されていないリポジトリのため、ブランチを作成できません`);
       let name: string;
       try {
         name = startName(a, cfg);
@@ -610,7 +610,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので作りません`);
+        return refuse(`${name} は保護されたブランチまたは統合先の名前のため、作成できません`);
       }
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに見つかりません`);
@@ -645,7 +645,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       // GitHub のスレッドは node id だけで指せるので、登録したリポジトリのこの MR のものかを確かめてから書く
       if (!lab && (op === "replyThread" || op === "resolveThread")) {
         const wt = w as { mr: number; thread: string };
-        if (!(await github.threadBelongs(client, wt.thread, o, r, wt.mr))) return refuse(`スレッドが ${o}/${r} の #${wt.mr} のものではないため、書き込みません`);
+        if (!(await github.threadBelongs(client, wt.thread, o, r, wt.mr))) return refuse(`スレッドが ${o}/${r} の #${wt.mr} のものではないため、書き込めません`);
       }
       value = await hostWrite(client, op, o, r, w as Record<string, unknown>);
       break;
@@ -677,11 +677,11 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので書き込みません`);
+        return refuse(`${name} は保護されたブランチまたは統合先の名前のため、書き込めません`);
       }
       // 積んでよいのは、作ったばかりの（統合先の先頭のまま動いていない）ブランチだけ
       const now = await x.branchHead(client, o, r, name);
-      if (now === null || now !== github.checkOid(b)) return refuse(`${name} の先頭が作った時点から動いているため、初期コミットを積みません`);
+      if (now === null || now !== github.checkOid(b)) return refuse(`${name} の先頭が、作成した時点から更新されているため、初期コミットを作成できません`);
       value = await x.startCommit(client, o, r, name, "chore: 作業を開始する");
       break;
     }
@@ -696,7 +696,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       }
       const integ = cfg.integration || (await x.repoInfo(client, o, r)).defaultBranch;
       if (PROTECTED.test(name) || name.toLowerCase() === integ.toLowerCase()) {
-        return refuse(`${name} は保護されたブランチか統合先の名前なので MR を作りません`);
+        return refuse(`${name} は保護されたブランチまたは統合先の名前のため、MR を作成できません`);
       }
       if (b !== integ) return refuse(`MR のマージ先は統合先 ${integ} に限ります（${String(b)} は指定できません）`);
       const title = text(c, "MR のタイトル", 250);

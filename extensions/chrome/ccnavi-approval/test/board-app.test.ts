@@ -229,7 +229,7 @@ test("CX-T228 ページの決まった枠: 本物の controller が出す状態�
   assert.equal($("#result").getAttribute("class"), null);
   await act(async () => c.refresh());
   assert.equal(doc.body.dataset.state, "done");
-  assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-violations="0">ccnavi 0.test（WASM）：起動 10 ms</p>');
+  assert.equal($("#status").outerHTML, '<p id="status" role="status" data-boot-ms="10" data-violations="0">読み込みが終わりました（ccnavi 0.test・起動 10 ms）</p>');
   assert.equal($("#banner").innerHTML, '<p class="notice warn" data-level="soon">あと 3 日で切れる</p>');
   assert.equal($("#result").getAttribute("class"), null);
   const press = async () => {

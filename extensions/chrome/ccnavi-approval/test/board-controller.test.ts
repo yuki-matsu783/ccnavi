@@ -100,8 +100,8 @@ test("CX-T219 書いた結果の一言: 結果の種類ごとの文面と data-k
     [WRITTEN, "written", "承認を反映しました（コミット：0123456）。反映後の内容も確認しました。"],
     [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を反映しました（コミット：0123456。途中で親のブランチの先頭が動いたので、3 回目で反映しました）。反映後の内容も確認しました。"],
     [{ kind: "changed", message: "動いた" }, "changed", "承認は反映されていません：動いた"],
-    [{ kind: "conflict", message: "競合" }, "conflict", "承認を反映できませんでした。自動再試行は行いません：競合"],
-    [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：残った"],
+    [{ kind: "conflict", message: "競合" }, "conflict", "承認を反映できませんでした（自動ではやり直しません）：競合"],
+    [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認が反映されたかどうかを確認できませんでした。残った"],
     [{ kind: "refused", message: "断った" }, "refused", "承認は反映されていません：断った"],
     [{ kind: "failed", message: "落ちた" }, "failed", "承認は反映されていません：落ちた"],
   ];
@@ -124,7 +124,7 @@ test("CX-T220 読み直し: document と chrome の無いところで、差し�
   assert.equal(s.state, "done");
   assert.deepEqual([...s.sections.keys()], [KEY]);
   assert.deepEqual(s.sections.get(KEY)?.attention, {});
-  assert.deepEqual(s.status, { text: "ccnavi 0.test（WASM）：起動 10 ms", bootMs: 10, violations: 0 });
+  assert.deepEqual(s.status, { text: "読み込みが終わりました（ccnavi 0.test・起動 10 ms）", bootMs: 10, violations: 0 });
   assert.deepEqual(s.banner, [{ level: "soon", className: "notice warn", text: "あと 3 日で切れる" }]);
   assert.equal(s.repos.length, 1);
   assert.ok(s.boards.has(KEY));
@@ -370,7 +370,7 @@ test("CX-T273 決める: 開くとプレビューを読み、確定はキー→�
   await until(() => h.c.snapshot().result.kind === "written" && !h.c.snapshot().busy, "確定");
   assert.deepEqual(seen.at(-1), ["decide", "i0001", 1, { k0: "issue" }, "v2.aaa"]);
   assert.equal(h.c.snapshot().decide, undefined);
-  assert.match(h.c.snapshot().result.text, /対応方針を反映しました。続きの子：i0001-f1。作った issue：https:\/\/example.test\/issues\/9（コミット：0123456）/);
+  assert.match(h.c.snapshot().result.text, /対応方針を反映しました。続きの子チケット：i0001-f1。作った issue：https:\/\/example.test\/issues\/9（コミット：0123456）/);
   // 見せた指摘が変わった: 画面は開いたまま読み直して選び直させる
   out = { kind: "mismatch", message: "指摘が増えました" };
   h.c.actions.decideOpen?.(b, family(), 1);
@@ -409,7 +409,7 @@ test("CX-T274 決める: ホストへの書き込みが途中で止まったら�
   assert.equal(decides, 1);
   const r = h.c.snapshot().result;
   assert.equal(r.className, "notice error");
-  assert.match(r.text, /作った issue：https:\/\/example.test\/issues\/9。返信 1 件・解決 0 件）。止まった理由：解決に失敗（403）。.*未解決の指摘だけ決め直してください。済んだ分は MR の返信と issue に残りますが、決めた内容のまとめのコメントには載りません/);
+  assert.match(r.text, /途中で止まりました（解決に失敗（403））。ここまでに済んだ書き込みは、issue の作成 1 件（https:\/\/example.test\/issues\/9）・返信 1 件・スレッドの解決 0 件です。.*未解決の指摘だけ対応方針を決め直してください。済んだ分は MR の返信と issue に残りますが、まとめのコメントには載りません/);
   assert.equal(h.c.snapshot().decide, undefined);
 });
 
@@ -436,11 +436,11 @@ test("CX-T295 決める: ホストへ書き込み済みの失敗（conflict・re
 
 test("CX-T296 決める: 再利用した issue は『作った』に数えず、増えた指摘が判断待ちなら文面で言う", () => {
   const text = sayDecide({ kind: "written", oid: "", reviewed: false, followup: "", issues: [], reusedIssues: ["https://example.test/issues/3"], pendingExtra: 2 }).text;
-  assert.match(text, /対応方針は反映しましたが、見せた後に増えた指摘 2 件が判断待ちで、フェーズはレビュー済みにしていません/);
+  assert.match(text, /対応方針は反映しました。画面に表示した後に指摘が 2 件増えたため、フェーズはまだレビュー済みにしていません/);
   assert.match(text, /既にあった issue 1 件：https:\/\/example.test\/issues\/3/);
   assert.ok(!text.includes("作った issue"));
   const halted = sayDecide({ kind: "halted", done: { issues: [], reusedIssues: ["https://example.test/issues/3"], replied: 0, resolved: 0 }, message: "x" }).text;
-  assert.match(halted, /作った issue：なし。既にあった issue 1 件/);
+  assert.match(halted, /issue の作成 0 件・既存の issue の利用 1 件/);
 });
 
 const settled = (h: ReturnType<typeof harness>) => !h.c.snapshot().busy && h.c.snapshot().state === "done";
@@ -522,7 +522,7 @@ test("CX-T277 決める: 確認文に内訳と続きの子の注意が入る。0
   await until(() => h.c.snapshot().decide?.preview !== null, "0 件");
   h.c.actions.decideConfirm?.(b, family(), 1, {}, "v2.aaa");
   await until(() => called.length === 2 && settled(h), "0 件の確定");
-  assert.match(h.log.confirm.at(-1) ?? "", /^i0001 のフェーズ 1 をレビュー済みにする。レビュー待ちの子チケットを done\/ に移動し/);
+  assert.match(h.log.confirm.at(-1) ?? "", /^i0001 のフェーズ 1 をレビュー済みにします。レビュー待ちの子チケットを done\/ に移動し/);
   assert.equal(h.c.snapshot().decide, undefined);
   // 要確認のあいだは開かない
   h.store.attention = { [KEY]: { i0001: "競合が残った" } };
@@ -549,6 +549,6 @@ test("CX-T278 決める: キーが空・重複の指摘は画面を出さず読�
   h.c.actions.decideConfirm?.(b, family(), 1, { a: "keep", b: "issue" }, "v2.aaa");
   await until(() => h.c.snapshot().decide?.preview?.digest === "v2.next" && settled(h), "見せ直し");
   assert.deepEqual(h.c.snapshot().decide?.inherited, { a: "keep" });
-  assert.match(h.c.snapshot().decide?.notice ?? "", /新しい指摘は「このフェーズで直す」に戻っています/);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /新しい指摘は「このフェーズで直す」になっているので/);
   out = { kind: "written", oid: "0123456789abcdef", reviewed: true, followup: "", issues: [] };
 });

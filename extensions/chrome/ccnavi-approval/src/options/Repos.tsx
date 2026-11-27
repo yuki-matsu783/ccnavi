@@ -13,9 +13,9 @@ import { Status } from "./Status.js";
 
 function describe(r: RepoConfig): string {
   const integ = r.integration === "" ? "デフォルトブランチ" : r.integration;
-  const extra = r.extraBranches.length > 0 ? `・指定 ${r.extraBranches.join(", ")}` : "";
+  const extra = r.extraBranches.length > 0 ? `・追加で表示するブランチ ${r.extraBranches.join(", ")}` : "";
   const proj = r.project ? `・プロジェクト ${r.project}（ワークスペース ${r.workspace}）` : "";
-  return `${repoKey(r)}（統合先 ${integ}・直近 ${r.recentDays} 日${extra}${proj}）`;
+  return `${repoKey(r)}（統合先 ${integ}・検索期間 ${r.recentDays} 日${extra}${proj}）`;
 }
 
 /** `revision` は通信先の一覧が変わった回数。変わったら読み直す（ホストの選び先が変わるため） */
@@ -131,7 +131,7 @@ export function Repos({ revision }: { readonly revision: number }): JSX.Element 
       </p>
       <p className="hint">
         {
-          "プロジェクトのリポジトリ（ローカルの projects/<名前> にクローンするリポジトリ）を登録するときは、プロジェクト名を入れ、先に登録したワークスペースのリポジトリを選びます。共通レイヤー、設定ファイル、互換性確認用のマーカーは、ワークスペースの統合先から取得します。保存先のパスは既定値（wip/proposals・.ccnavi/approved）に固定されており、.claude/settings.json の env では変更できません。GitLab の入れ子のグループは、「オーナー／グループ」欄に group/sub の形式で入力してください。"
+          "プロジェクトのリポジトリ（ローカルの projects/<名前> にクローンするリポジトリ）を登録するときは、プロジェクト名を入力し、先に登録したワークスペースのリポジトリを選びます。共通設定、設定ファイル、互換性確認用のマーカーは、ワークスペースの統合先から取得します。保存先のパスは既定値（wip/proposals・.ccnavi/approved）に固定されており、.claude/settings.json の env では変更できません。GitLab の入れ子のグループは、「オーナー／グループ」欄に group/sub の形式で入力してください。"
         }
       </p>
     </section>

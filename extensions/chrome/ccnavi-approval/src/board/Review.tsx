@@ -28,7 +28,7 @@ export function Review({ panel, writable, onReview, decide }: { panel: ReviewPan
     <h4>
       {`フェーズ ${panel.phase} のレビュー（`}
       {panel.copy ? <Link href={panel.copy.mr.url} text={`${noun} ${mark}${panel.copy.mr.number}`} /> : `${noun} ${mark}${panel.mr}`}
-      {`）: ${panel.children.join(", ")}`}
+      {`）：${panel.children.join(", ")}`}
     </h4>
   );
   if (panel.error) {

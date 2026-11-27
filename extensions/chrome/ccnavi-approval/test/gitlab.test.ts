@@ -197,7 +197,7 @@ test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じフ�
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /ホストの履歴を確認してください/);
+  assert.match(out.kind === "attention" ? out.message : "", /ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください/);
   // 元に戻すコミットは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
   assert.deepEqual(mock.glCommits.map((c) => c.result), ["written", "error"]);
   assert.equal(mock.files("i0001")[DOING], "別の書き手が書いた\n");
@@ -368,7 +368,7 @@ test("CX-T153 GitLab のスレッドの悪意のある本文は描いても実�
   const attrs = [...box.querySelectorAll(".markdown *")].flatMap((e) => [...e.attributes].map((a) => a.name));
   assert.ok(!attrs.some((n) => /^on/i.test(n) || ["style", "hidden", "class"].includes(n)), attrs.join(","));
   const text = box.textContent ?? "";
-  for (const seen of ["隠れた本文", "畳んだ", "〈HTML コメント: 見えないコメント〉"]) assert.ok(text.includes(seen), seen);
+  for (const seen of ["隠れた本文", "畳んだ", "〈HTML コメント：見えないコメント〉"]) assert.ok(text.includes(seen), seen);
   for (const a of box.querySelectorAll("a")) (a as HTMLElement).click();
   assert.equal((dom.window as unknown as { __pwned?: string }).__pwned, undefined);
   assert.equal(box.querySelectorAll("button").length, 0);

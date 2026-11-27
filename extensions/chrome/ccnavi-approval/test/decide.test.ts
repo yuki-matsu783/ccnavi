@@ -229,7 +229,7 @@ for (const kind of KINDS) {
     if (first.kind === "halted") {
       assert.equal(first.done.issues.length, 1);
       assert.deepEqual([first.done.replied, first.done.resolved], [2, 1]);
-      assert.match(first.message, /スレッドの解決で止まりました/);
+      assert.match(first.message, /スレッドの解決の段階/);
     }
     assert.equal(commits(w), 0);
     assert.equal(w.mock.w.comments.length, 0);
@@ -274,7 +274,7 @@ for (const kind of KINDS) {
     w.mock.w.failures.push({ op: "comment", status: 500, message: "boom" });
     const out = written(await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "issue", "fix"), pv.digest, w.d));
     assert.equal(commits(w), 1);
-    assert.match(out.warning ?? "", /コメントだけ MR に投稿できませんでした/);
+    assert.match(out.warning ?? "", /まとめのコメントだけ、MR に投稿できませんでした/);
     assert.equal(w.mock.w.comments.length, 0);
     assert.ok(w.mock.w.threads.slice(0, 2).every((t) => t.resolved));
   });
@@ -309,7 +309,7 @@ for (const kind of KINDS) {
     w.mock.w.failures.push({ op: "comment", status: 403, message: "Resource not accessible" });
     const out = written(await decidePhase(w.repo, FAMILY, 1, pick(pv), pv.digest, w.d));
     assert.equal(commits(w), 1);
-    assert.match(out.warning ?? "", /コメントだけ MR に投稿できませんでした/);
+    assert.match(out.warning ?? "", /まとめのコメントだけ、MR に投稿できませんでした/);
     assert.equal(sayDecide(out).className, "notice error");
   });
 
@@ -320,7 +320,7 @@ for (const kind of KINDS) {
     const out = written(await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "fix"), pv.digest, w.d));
     assert.equal(commits(w), 1);
     assert.deepEqual([out.reviewed, out.followup, out.pendingExtra], [false, "i0004-01-02", 1]);
-    assert.match(sayDecide(out).text, /増えた指摘 1 件は判断待ちで、フェーズはレビュー済みにしていません/);
+    assert.match(sayDecide(out).text, /指摘が 1 件増えたため、フェーズはまだレビュー済みにしていません/);
     assert.equal(w.mock.w.threads[2].resolved, false);
     // MR のコメントにも、続きの子と増えた指摘がコミットした側の値で載る
     assert.ok(w.mock.w.comments[0].includes(`\`${out.followup}\``));
@@ -333,7 +333,7 @@ for (const kind of KINDS) {
     w.mock.w.threads.push(threadsOf(kind, 3)[2]);
     const out = written(await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "keep"), pv.digest, w.d));
     assert.equal(out.pendingExtra, 1);
-    assert.match(sayDecide(out).text, /対応方針は反映しましたが、見せた後に増えた指摘 1 件が判断待ちで、フェーズはレビュー済みにしていません/);
+    assert.match(sayDecide(out).text, /対応方針は反映しました。画面に表示した後に指摘が 1 件増えたため、フェーズはまだレビュー済みにしていません/);
   });
 
   test(`CX-T364 ${label}: ホストの読み取りが遅れて、書いた解決が次の取得に映らなくても、短く待って取り直して完了する`, async () => {
@@ -353,8 +353,8 @@ for (const kind of KINDS) {
     const out = await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "issue", "fix"), pv.digest, w.d);
     assert.equal(out.kind, "attention", JSON.stringify(out));
     const message = out.kind === "attention" ? out.message : "";
-    assert.match(message, /ホストには書けています。読み直してから決め直してください/);
-    assert.match(message, /MR のコメントは投稿していません/);
+    assert.match(message, /読み直した内容にまだ反映されておらず、確認できませんでした。ボードを更新してから、対応方針を決め直してください/);
+    assert.match(message, /まとめのコメントは MR に投稿していません/);
     assert.equal("hostWritten" in out && out.hostWritten, true);
     assert.equal(commits(w), 0);
     assert.equal(w.mock.w.comments.length, 0);
@@ -379,8 +379,8 @@ test("CX-T366 ホスト書き込みの後で先頭が動き続けたら conflict
   const out = await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "issue", "fix"), pv.digest, w.d);
   assert.equal(out.kind, "conflict", JSON.stringify(out));
   const message = out.kind === "conflict" ? out.message : "";
-  assert.match(message, /^ホストへの書き込み（issue 1 件・返信 2 件・解決 2 件）は済んでいますが/);
-  assert.match(message, /MR のコメントは投稿していません/);
+  assert.match(message, /^ホストへの書き込み（issue の作成 1 件・返信 2 件・スレッドの解決 2 件）は済みましたが/);
+  assert.match(message, /まとめのコメントは MR に投稿していません/);
   assert.equal("hostWritten" in out && out.hostWritten, true);
   assert.deepEqual(ops(w), ["issue", "reply", "reply", "resolve", "resolve"]);
   assert.equal(w.mock.w.comments.length, 0);
@@ -392,7 +392,7 @@ test("CX-T367 ホスト書き込みの後の 2 周目でレビュー済みのマ
   w.mock.beforeCommit = (b) => void w.mock.push(b, { [MARK]: '{"mr": 7, "accepted": [], "actor": "x", "via": "chrome", "at": "2026-09-29T00:00:00+0000"}\n' }, "別のブラウザでレビュー済み");
   const out = await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "issue", "fix"), pv.digest, w.d);
   assert.equal(out.kind, "refused", JSON.stringify(out));
-  assert.match(out.kind === "refused" ? out.message : "", /^ホストへの書き込み.*は済んでいますが/);
+  assert.match(out.kind === "refused" ? out.message : "", /^ホストへの書き込み.*は済みましたが/);
   assert.equal("hostWritten" in out && out.hostWritten, true);
   assert.equal(w.mock.w.comments.length, 0);
 });
@@ -407,7 +407,7 @@ test("CX-T368 ホスト書き込みの後の 2 周目で、見せた指摘が変
   const out = await decidePhase(w.repo, FAMILY, 1, pick(pv, "keep", "issue", "fix"), pv.digest, w.d);
   assert.equal(out.kind, "changed", JSON.stringify(out));
   assert.equal(out.kind === "changed" && out.code, "CORE_DECIDE_MISMATCH");
-  assert.match(out.kind === "changed" ? out.message : "", /^ホストへの書き込み.*は済んでいます/);
+  assert.match(out.kind === "changed" ? out.message : "", /^ホストへの書き込み.*は済みました/);
   assert.equal("hostWritten" in out && out.hostWritten, true);
   assert.equal(commits(w), 0);
 });
@@ -429,7 +429,7 @@ test("CX-T360 結果の一言: コミットが無いときはその旨を、コ�
   const base = { kind: "written", reviewed: false, followup: "", issues: [] } as const;
   const none = sayDecide({ ...base, oid: "" });
   assert.equal(none.className, "notice ok");
-  assert.match(none.text, /親のブランチへ積むものはありませんでした/);
+  assert.match(none.text, /親ブランチへ反映する内容はありませんでした/);
   const warned = sayDecide({ ...base, oid: "0123456789abcdef", warning: "コメントだけ MR に投稿できませんでした（boom）" });
   assert.equal(warned.className, "notice error");
   assert.match(warned.text, /コミット：0123456）/);

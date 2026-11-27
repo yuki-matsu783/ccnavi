@@ -137,9 +137,9 @@ const running = new Set<string>();
 export function planProblems(plan: unknown): string[] {
   const out: string[] = [];
   const p = plan as Partial<Record<keyof HostPlan, unknown>> | null;
-  if (!p || typeof p !== "object") return ["計画がオブジェクトでない"];
-  if (!Array.isArray(p.issues) || !Array.isArray(p.replies) || !Array.isArray(p.resolves)) return ["計画の issues・replies・resolves が配列でない"];
-  if (p.comment !== null && p.comment !== undefined && (!text(p.comment) || p.comment.length > MAX_REPLY)) out.push("コメントが空か長すぎる（null か本文にしてください）");
+  if (!p || typeof p !== "object") return ["計画がオブジェクトではありません"];
+  if (!Array.isArray(p.issues) || !Array.isArray(p.replies) || !Array.isArray(p.resolves)) return ["計画の issues・replies・resolves が配列ではありません"];
+  if (p.comment !== null && p.comment !== undefined && (!text(p.comment) || p.comment.length > MAX_REPLY)) out.push("コメントが空か長すぎます（null か本文にしてください）");
   const issueKeys = new Set<string>();
   const ops = new Set<string>();
   for (const i of p.issues as Partial<PlanIssue>[]) {
@@ -147,41 +147,41 @@ export function planProblems(plan: unknown): string[] {
       out.push("issue のキーが文字列ではありません");
       continue;
     }
-    if (issueKeys.has(i.key)) out.push(`issue のキーが重なっています: ${i.key}`);
+    if (issueKeys.has(i.key)) out.push(`issue のキーが重なっています：${i.key}`);
     issueKeys.add(i.key);
-    if (typeof i.title !== "string" || oneLine(i.title) === "") out.push(`issue のタイトルが空です: ${i.key}`);
+    if (typeof i.title !== "string" || oneLine(i.title) === "") out.push(`issue のタイトルが空です：${i.key}`);
     if (!text(i.body)) {
-      out.push(`issue の本文が空か長すぎます: ${i.key}`);
+      out.push(`issue の本文が空か長すぎます：${i.key}`);
       continue;
     }
     const op = markerOf(i.body);
-    if (op === "") out.push(`issue の本文の 1 行目に操作 ID の印（<!-- ccnavi:issue op=… -->）がありません: ${i.key}`);
-    else if (i.op !== undefined && i.op !== op) out.push(`issue の操作 ID が本文の印と違います: ${i.key}`);
-    else if (ops.has(op)) out.push(`issue の操作 ID が重なっています: ${i.key}`);
+    if (op === "") out.push(`issue の本文の 1 行目に操作 ID の印（<!-- ccnavi:issue op=… -->）がありません：${i.key}`);
+    else if (i.op !== undefined && i.op !== op) out.push(`issue の操作 ID が本文の印と違います：${i.key}`);
+    else if (ops.has(op)) out.push(`issue の操作 ID が重なっています：${i.key}`);
     ops.add(op);
-    if (i.comments !== undefined && (!Array.isArray(i.comments) || !i.comments.every(text))) out.push(`issue の続きのコメントが文字列の配列ではありません: ${i.key}`);
+    if (i.comments !== undefined && (!Array.isArray(i.comments) || !i.comments.every(text))) out.push(`issue の続きのコメントが文字列の配列ではありません：${i.key}`);
   }
   const replied = new Set<string>();
   const repliedThreads = new Set<string>();
   for (const r of p.replies as Partial<PlanReply>[]) {
     if (!plainKey(r?.key) || typeof r.thread_id !== "string" || !THREAD_ID.test(r.thread_id)) {
-      out.push(`返信のキーかスレッドの id の形が正しくありません: ${String(r?.key)}`);
+      out.push(`返信のキーかスレッドの id の形が正しくありません：${String(r?.key)}`);
       continue;
     }
-    if (replied.has(r.key) || repliedThreads.has(r.thread_id)) out.push(`返信が重なっています: ${r.key}`);
+    if (replied.has(r.key) || repliedThreads.has(r.thread_id)) out.push(`返信が重なっています：${r.key}`);
     replied.add(r.key);
     repliedThreads.add(r.thread_id);
-    if (!text(r.body) || r.body.length > MAX_REPLY) out.push(`返信の本文が空か長すぎます: ${r.key}`);
-    else if (r.body.includes(ISSUE_URL_SLOT) && !issueKeys.has(r.key)) out.push(`返信が issue の URL を求めているが、同じキーの issue が計画にありません: ${r.key}`);
+    if (!text(r.body) || r.body.length > MAX_REPLY) out.push(`返信の本文が空か長すぎます：${r.key}`);
+    else if (r.body.includes(ISSUE_URL_SLOT) && !issueKeys.has(r.key)) out.push(`返信が issue の URL を必要としていますが、同じキーの issue が計画にありません：${r.key}`);
   }
   const resolved = new Set<string>();
   const resolvedThreads = new Set<string>();
   for (const r of p.resolves as Partial<PlanResolve>[]) {
     if (!plainKey(r?.key) || typeof r.thread_id !== "string" || !THREAD_ID.test(r.thread_id)) {
-      out.push(`解決のキーかスレッドの id の形が正しくありません: ${String(r?.key)}`);
+      out.push(`解決のキーかスレッドの id の形が正しくありません：${String(r?.key)}`);
       continue;
     }
-    if (resolved.has(r.key) || resolvedThreads.has(r.thread_id)) out.push(`解決が重なっています: ${r.key}`);
+    if (resolved.has(r.key) || resolvedThreads.has(r.thread_id)) out.push(`解決が重なっています：${r.key}`);
     resolved.add(r.key);
     resolvedThreads.add(r.thread_id);
   }
@@ -217,12 +217,12 @@ function reasonOf(err: unknown): string {
  */
 export async function precheckHostPlan(wasm: CcnaviCall, ops: HostOps, repo: RepoRef, mr: number, plan: HostPlan): Promise<Precheck> {
   const problems = planProblems(plan);
-  if (problems.length > 0) return { ok: false, kind: "plan", reason: `ホストへ書く計画の形が正しくないため、何も書きませんでした: ${problems.join(" / ")}`, missing: [], keys: [] };
+  if (problems.length > 0) return { ok: false, kind: "plan", reason: `ホストへ書き込む内容に不備があるため、何も書き込みませんでした（拡張の不具合の可能性があります）：${problems.join(" / ")}`, missing: [], keys: [] };
   let info: WriteInfo;
   try {
     info = await ops.writeInfo(repo, mr);
   } catch (err) {
-    return { ok: false, kind: "unreadable", reason: `書く前の確認ができなかったため、何も書きませんでした: ${reasonOf(err)}`, missing: [], keys: [] };
+    return { ok: false, kind: "unreadable", reason: `書き込む前の確認ができなかったため、何も書き込みませんでした：${reasonOf(err)}`, missing: [], keys: [] };
   }
   const got = await ccnavi.precheck(wasm, plan, info);
   if (got.ok) return { ok: true, unknown: got.unknown };
@@ -272,7 +272,7 @@ export interface HostStepEvent {
 /** ホストが返した URL を、本文にそのまま入れてよい形に限る（空白・引用符・括弧・< > ` ・`-->` を含まない https/http） */
 function safeUrl(url: unknown): string {
   if (typeof url !== "string" || !/^https?:\/\/[^\s`<>"'()\[\]{}\\]{1,2000}$/.test(url) || url.includes("-->")) {
-    throw new Error(`ホストが返した URL を本文に入れられません: ${String(url).slice(0, 100)}`);
+    throw new Error(`ホストが返した URL を本文に入れられません：${String(url).slice(0, 100)}`);
   }
   return url;
 }
@@ -303,12 +303,12 @@ export async function runHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan:
   };
 
   const problems = planProblems(plan);
-  if (problems.length > 0) return stop("plan", null, new Error(`ホストへ書く計画の形が正しくないため、何も書きませんでした: ${problems.join(" / ")}`));
+  if (problems.length > 0) return stop("plan", null, new Error(`ホストへ書き込む内容に不備があるため、何も書き込みませんでした（拡張の不具合の可能性があります）：${problems.join(" / ")}`));
 
   // 同じ計画の再入を断る
   const where = `${repo.owner}/${repo.repo}`.toLowerCase();
   const claims = [...plan.issues.map((i) => `${where}#op:${markerOf(i.body)}`), ...plan.replies.map((r) => `${where}#thread:${r.thread_id}`), ...plan.resolves.map((r) => `${where}#thread:${r.thread_id}`)];
-  if (claims.some((c) => running.has(c))) return stop("plan", null, new Error("同じ計画を実行中です。終わるまで待ってください（何も書きませんでした）"));
+  if (claims.some((c) => running.has(c))) return stop("plan", null, new Error("同じ対応方針の反映を実行中です。終わるまで待ってください（何も書き込んでいません）"));
   for (const c of claims) running.add(c);
   try {
     return await execute();
@@ -357,7 +357,7 @@ export async function runHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan:
       try {
         known = new Map((await ops.writeInfo(repo, mr)).threads.map((t) => [t.id, t.replyOps ?? []]));
       } catch (err) {
-        return stop("reply", null, new Error(`既存の返信を確かめられないため、返信を付けません: ${reasonOf(err)}`));
+        return stop("reply", null, new Error(`既存の返信を確かめられないため、返信できません：${reasonOf(err)}`));
       }
     }
     for (const reply of plan.replies) {
@@ -406,7 +406,7 @@ export async function runHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan:
 }
 
 const STEP_LABEL: Record<HostStepName, string> = {
-  plan: "計画の検査",
+  plan: "書き込む内容の検査",
   issue: "issue の作成",
   "issue-comment": "issue の続きのコメント",
   reply: "スレッドへの返信",
@@ -416,7 +416,7 @@ const STEP_LABEL: Record<HostStepName, string> = {
 
 /** 止まった理由だけを日本語にする（済んだ分は呼び手が別に出す） */
 export function describeHostFailure(f: HostStepFailure): string {
-  return `${STEP_LABEL[f.step]}で止まりました${f.key ? `（${f.key}）` : ""}: ${f.reason}`;
+  return `${STEP_LABEL[f.step]}の段階${f.key ? `（${f.key}）` : ""}。理由：${f.reason}`;
 }
 
 /** 結果を画面に出す日本語にする（止まったときは、済んだことと、続きの進め方まで言う） */
@@ -426,9 +426,9 @@ export function describeHostResult(r: HostStepResult): string {
   if (r.replied.length > 0) done.push(`返信 ${r.replied.length} 件`);
   if (r.resolved.length > 0) done.push(`解決 ${r.resolved.length} 件`);
   if (r.commented) done.push("MR へのコメント");
-  const summary = (done.length > 0 ? `済んだこと: ${done.join("、")}` : "ホストには何も書いていません") + (r.searchTruncated ? "。issue の検索が上限まで読んでも見つからず、探し切れていません（既に作った issue があれば重複します）" : "");
+  const summary = (done.length > 0 ? `済んだこと：${done.join("、")}` : "ホストには何も書いていません") + (r.searchTruncated ? "。既に作成済みの issue を上限件数まで検索しましたが、見つかりませんでした。検索しきれていないため、作成済みの issue があった場合は重複しています" : "");
   if (r.ok || !r.failed) return summary;
   const f = r.failed;
-  const retry = f.step === "plan" ? "" : "。MR を読み直して残った指摘を決め直せば、続きから進みます（同じ印の issue は作り直さず、返信も同じ印があれば付け直しません）";
-  return `${STEP_LABEL[f.step]}で止まりました${f.key ? `（${f.key}）` : ""}: ${f.reason}。${summary}${retry}`;
+  const retry = f.step === "plan" ? "" : "。MR を読み直して残った指摘を決め直すと、続きから再開します（作成済みの issue と投稿済みの返信は重複しません）";
+  return `${STEP_LABEL[f.step]}で止まりました${f.key ? `（${f.key}）` : ""}：${f.reason}。${summary}${retry}`;
 }
