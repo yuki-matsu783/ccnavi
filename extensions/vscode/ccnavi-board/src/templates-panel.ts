@@ -40,6 +40,7 @@ import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.
 import { sameData } from "./core/template-edit.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
+import { dirtyTitle } from "./core/save-gate.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { TemplatesTarget } from "./core/screens.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
@@ -107,11 +108,6 @@ interface Unsaved {
   readonly name: string;
   /** 画面の`toData`の形 */
   readonly data: unknown;
-}
-
-/** タブのタイトル。未保存の編集があれば頭に「●」を付ける（フロー編集と同じ） */
-function titleOf(unsaved: boolean): string {
-  return `${unsaved ? "● " : ""}${TITLE}`;
 }
 
 /** 開いているパネル。種類ごとに1枚 */
@@ -586,7 +582,7 @@ function dataOf(data: unknown): { readonly name: string } | undefined {
 function setUnsaved(current: PanelState, unsaved: Unsaved | undefined): void {
   current.unsaved = unsaved;
   if (alive(current)) {
-    current.panel.title = titleOf(unsaved !== undefined);
+    current.panel.title = dirtyTitle(TITLE, unsaved !== undefined);
   }
 }
 
@@ -601,7 +597,7 @@ function askUnsaved(unsaved: Unsaved | undefined): void {
   const asYaml = "YAMLで開く";
   void vscode.window
     .showWarningMessage(
-      `テンプレート「${unsaved.name}」を未保存のまま閉じました。編集をYAMLで開きますか？`,
+      `${unsaved.name === "" ? "テンプレート" : `テンプレート「${unsaved.name}」`}を未保存のまま閉じました。編集をYAMLで開きますか？`,
       { modal: true, detail: "名前の無いエディタで開き、ファイルには書きません。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
       asYaml,
       "破棄する",
