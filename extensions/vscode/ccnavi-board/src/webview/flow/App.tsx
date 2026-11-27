@@ -72,7 +72,7 @@ import { Preview } from "./Preview.js";
 import { ProposalReview, RequestText, type ProposalView } from "./Proposal.js";
 import { SaveReview } from "./SaveReview.js";
 import { badgeOf } from "./text.js";
-import { historyKey, inField } from "../shared/keys.js";
+import { historyKey, inField, useDocumentKeys } from "../shared/keys.js";
 import flowTour from "../tours/flow.yml";
 
 /** 中身が読めなかったときの錠。画面は保存させない */
@@ -375,12 +375,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
   const notices = useMemo(() => (doc === undefined ? [] : flowNotices(doc, { exe: checks !== undefined })), [doc, checks]);
 
   // キー入力を受け取る側は1度だけ張り、中身は描くたびに最新へ差し替える
-  const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
-  useEffect(() => {
-    const listener = (event: KeyboardEvent): void => onKey.current(event);
-    document.addEventListener("keydown", listener);
-    return () => document.removeEventListener("keydown", listener);
-  }, []);
+  const onKey = useDocumentKeys();
   /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す */
   const saveKey = useRef<SaveKeyTarget>(NO_SAVE);
   // 提案・依頼文・保存前の確認が出ている間は、その面の操作を待つ（Ctrl+Zなどと同じ）

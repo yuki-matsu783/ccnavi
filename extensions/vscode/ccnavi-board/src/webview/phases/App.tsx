@@ -36,7 +36,7 @@ import { HandoffLink } from "../shared/HandoffLink.js";
 import { post } from "./post.js";
 import { Code } from "../shared/Code.js";
 import { foldFind } from "../shared/find.js";
-import { historyKey } from "../shared/keys.js";
+import { moveByKey, useDocumentKeys } from "../shared/keys.js";
 import { COMMON_NOTE, commonIdNote, commonScopeText, commonTitleNote, countText, duplicateNote, emptyNote, findText, hasMore } from "./text.js";
 import { commonClashes, draftOf, duplicates, emptyPhase, formOf, keyer, loadOpen, openedFromIds, saveOpen, type Draft } from "./state.js";
 
@@ -224,14 +224,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
   };
   // 早く返す分岐（読み込み中・読めなかった）より前に置く（フックの順番を変えない）
   useSaveKey(!tour.touring && page !== undefined, () => ({ blocker: saveBlocker, save, busy, blocked: (reason) => setStatus({ text: reason, error: false, fleeting: true }) }));
-  // 元に戻す・やり直すのキー（Ctrl+Z・Ctrl+Y・Ctrl+Shift+Z）。受ける側は1度だけ張り、中身は描くたびに差し替える。
-  // 読み込み中と読めなかったときは何もしない（中身は下の`travel`のあとで入れる）
-  const onKey = useRef<(event: KeyboardEvent) => void>(() => undefined);
-  useEffect(() => {
-    const listener = (event: KeyboardEvent): void => onKey.current(event);
-    document.addEventListener("keydown", listener);
-    return () => document.removeEventListener("keydown", listener);
-  }, []);
+  // 元に戻す・やり直すのキー（Ctrl+Z・Ctrl+Y・Ctrl+Shift+Z）。読み込み中と読めなかったときは何もしない（中身は下の`travel`のあとで入れる）
+  const onKey = useDocumentKeys();
   onKey.current = () => undefined;
 
   if (data.kind === "loading") {
@@ -285,13 +279,8 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     applyDraft(moved.doc);
   };
   onKey.current = (event: KeyboardEvent): void => {
-    const moved = tour.touring || busy ? undefined : historyKey(event);
-    if (moved === "undo" && canUndo(history)) {
-      event.preventDefault();
-      travel(undo(history, draft));
-    } else if (moved === "redo" && canRedo(history)) {
-      event.preventDefault();
-      travel(redo(history, draft));
+    if (!tour.touring && !busy) {
+      travel(moveByKey(event, history, draft));
     }
   };
 
