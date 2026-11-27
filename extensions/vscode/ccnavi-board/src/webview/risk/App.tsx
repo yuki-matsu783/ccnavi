@@ -360,7 +360,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: touring ? "" : (status?.text ?? ""), error: !touring && status?.error === true }}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={touring ? null : (status ?? null)}>
         <div className="summary">
           <TargetSelect
             target={touring ? undefined : page?.target}

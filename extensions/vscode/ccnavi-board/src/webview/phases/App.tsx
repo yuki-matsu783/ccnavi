@@ -396,7 +396,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
           更新
         </button>
       </div>
-      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: shownStatus?.text ?? "", error: shownStatus?.error === true }}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary">
           <span data-tour="target">
             <TargetSelect target={shownPage?.target} targets={shownPage?.targets} disabled={shownBusy} onSwitch={(kind, name) => act({ type: "switchTarget", kind, name })} />

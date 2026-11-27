@@ -543,7 +543,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </button>
       </div>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
-      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: shownStatus?.text ?? "", error: shownStatus?.error === true }}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary" data-tour="target">
           <TargetSelect
             target={touring ? undefined : page?.target}

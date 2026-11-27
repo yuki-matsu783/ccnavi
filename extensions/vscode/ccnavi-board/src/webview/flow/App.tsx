@@ -715,7 +715,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           </button>
         </div>
       )}
-      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: touring ? "" : (status?.text ?? ""), error: !touring && status?.error === true }}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={touring ? null : (status ?? null)}>
         <div className="summary">
           <span className="flow-ticket">
             <strong>{shownPage.ticket}</strong> {shownPage.title}

@@ -1,7 +1,7 @@
 # フェーズ管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際の定義ではない）。
 #   path見本のファイルの場所（画面には「（見本）」を付けて出す）
 #   lock作業中のチケットがあるときに画面が出す文（sceneのlockedで見せる）
-#   error保存の検証が通らなかったときに下へ出る文（sceneのerrorで見せる）
+#   error保存の検証が通らなかったときにツールバーの最後の行へ出す文（sceneのerrorで見せる）
 #   phases見本の定義。phases.ymlと同じ書き方（versionとphases）
 #   added    「＋ 定義を追加」で足した定義の見本。phasesと同じ書き方で、phasesの外に置く（sceneのadd: filledで末尾に足す）
 #   projectプロジェクトの設定の見本（name・path・lock・phases）。sceneのtarget: libで切り替える

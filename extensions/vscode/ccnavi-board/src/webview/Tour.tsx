@@ -130,14 +130,17 @@ export function ScreenHeader({
 }: {
   readonly courses: readonly TourCourse[];
   readonly onPick: (course: string) => void;
-  /** 直前の操作の一言。渡した画面だけ、ツールバーの最後の行に出す（`shared/StatusLine.tsx`） */
-  readonly status?: StatusText;
+  /**
+   * 直前の操作の一言（`shared/StatusLine.tsx`）。一言の行を持つ画面は、いまの一言（無ければ`null`）を渡す。
+   * 渡さない画面（`undefined`）は行を持たない
+   */
+  readonly status?: StatusText | null;
   readonly children: ReactNode;
 }): JSX.Element {
   return (
     <header className="toolbar">
       {children}
-      {status !== undefined && <StatusLine status={status} />}
+      {status !== undefined && <StatusLine status={status ?? undefined} />}
       <TourButton courses={courses} onPick={onPick} />
     </header>
   );

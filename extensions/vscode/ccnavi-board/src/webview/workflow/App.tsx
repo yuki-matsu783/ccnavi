@@ -416,7 +416,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
           )}
         </section>
       )}
-      <ScreenHeader courses={courses} onPick={tour.start} status={{ text: shownStatus?.text ?? "", error: shownStatus?.error === true }}>
+      <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
         <div className="summary" data-tour="summary">
           <span className="workflow-ticket">
             <strong>{shownTicket}</strong> の作業・レビュー計画の順序

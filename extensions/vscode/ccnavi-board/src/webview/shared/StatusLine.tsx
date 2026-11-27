@@ -11,17 +11,19 @@ export interface StatusText {
   readonly error: boolean;
 }
 
-export function StatusLine({ status }: { readonly status: StatusText }): JSX.Element {
+/** 一言が無い（`undefined`か空の文）ときは行を隠す。案内の間に何を出すかは、画面が`status`を決めるときに決める */
+export function StatusLine({ status }: { readonly status: StatusText | undefined }): JSX.Element {
+  const text = status?.text ?? "";
   const classes = ["status-line"];
-  if (status.error) {
+  if (status?.error === true) {
     classes.push("error");
   }
-  if (status.text === "") {
+  if (text === "") {
     classes.push("hidden");
   }
   return (
     <p id="status" className={classes.join(" ")} role="status" aria-live="polite" data-tour="status">
-      <Code text={status.text} />
+      <Code text={text} />
     </p>
   );
 }
