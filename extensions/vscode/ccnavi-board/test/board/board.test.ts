@@ -8,7 +8,7 @@ function cardsOf(board: ReturnType<typeof buildBoard>): Map<string, Card> {
   return new Map(board.columns.flatMap((c) => c.cards).map((card) => [card.id, card]));
 }
 
-test("CB-T05 列は置き場から引き、親のあとに子が並ぶ。レビュー待ちは作業中、取り消しは取り消しの列", () => {
+test("CB-T05 列は置き場から引き、親のあとに子が並ぶ。レビュー待ちは承認済み、取り消しは取り消しの列", () => {
   const board = buildBoard(fixture());
   assert.deepEqual(
     board.columns.map((c) => [c.state, c.cards.map((card) => card.id)]),
@@ -52,7 +52,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.equal(waiting.worktreeExists, false);
   assert.equal(waiting.seenIn.length, 2);
 
-  // レビュー待ちは提案の側（wip/proposals/review/）にあり、承認済みチケットでもある。列は作業中で、待ちは属性
+  // レビュー待ちは提案の側（wip/proposals/review/）にあり、承認済みチケットでもある。列は承認済みで、待ちは属性
   const review = cards.get("i0001-02-04")!;
   assert.equal(review.column, "doing");
   assert.equal(review.proposalState, "review");
@@ -70,7 +70,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.match(cancelled.openPath, /\.ccnavi\/approved\/done\/i0001-02-05\.md$/);
 });
 
-test("CB-T07 提案がなければ承認済みチケットの置き場が列。どちらにもなければ未着手に置き、不備の文は実行ファイルのものを出す", () => {
+test("CB-T07 提案がなければ承認済みチケットの置き場が列。どちらにもなければ承認待ちの列に置き、不備の文は実行ファイルのものを出す", () => {
   const base = fixture();
   const doing: TicketJson = {
     ...base.tickets[1],

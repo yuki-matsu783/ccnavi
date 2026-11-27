@@ -58,7 +58,7 @@ export function countText(total: number, query: string, shown: number, kept: num
   return `${shown} / ${total}${kept > 0 ? `（絞り込み外で開いている項目: ${kept}件）` : ""}`;
 }
 
-/** idが重なっているときに下部へ出す文 */
+/** idが重なっているときにツールバーの最後の行へ出す文 */
 export function duplicateNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空のid" : id));
   return `idが重なっています（${names.join(", ")}）。重なりを直すまで保存できません。`;
@@ -72,7 +72,7 @@ export function emptyNote(exists: boolean): string {
   return "フェーズ定義ファイルはまだ作成されていません。未設定のため、エラーではありません。定義を追加して保存すると、ファイルが作られます。";
 }
 
-/** 共通の設定の定義と表示名が重なっているときに下部へ出す文 */
+/** 共通の設定の定義と表示名が重なっているときにツールバーの最後の行へ出す文 */
 export function commonTitleNote(ids: ReadonlySet<string>): string {
   const names = Array.from(ids).map((id) => (id === "" ? "空" : id));
   return `共通の設定のフェーズ定義とタイトル（title）が重なっています（${names.join(", ")}）。重なっている定義は使われません。タイトルを変えてから保存してください。`;

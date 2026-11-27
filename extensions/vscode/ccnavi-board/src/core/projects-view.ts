@@ -36,7 +36,7 @@ export interface ProjectRow {
   readonly originKey: string;
   readonly worktrees: readonly string[];
   readonly tickets: number;
-  /** 作業中（ボードの作業中の列と同じ。`.ccnavi/approved/doing/`にあるものと、レビュー待ち`wip/proposals/review/`） */
+  /** 作業中（ボードの承認済みの列と同じ。`.ccnavi/approved/doing/`にあるものと、レビュー待ち`wip/proposals/review/`） */
   readonly doing: number;
   readonly problems: readonly LintProblem[];
 }
