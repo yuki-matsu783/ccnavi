@@ -191,7 +191,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
     post({ type: "reload", dirty });
   };
 
-  // 案内の間のボタンは、見本の様子で下の`shownSaveBlocker`が決める（Ctrl+Sは受けない）
+  // 案内の間のボタンは、見本の状態で下の`shownSaveBlocker`が決める（Ctrl+Sには反応しない）
   const saveBlocker = editSaveBlocker({
         busy,
         dirty,

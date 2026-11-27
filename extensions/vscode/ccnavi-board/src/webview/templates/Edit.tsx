@@ -153,7 +153,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   };
 
   const saveBlocker = editSaveBlocker({ busy, dirty, lock });
-  /** 保存。中身（`tpl`）が無いときは下の分岐で編集欄を出さないので、Ctrl+Sもここで止める */
+  /** 保存。中身（`tpl`）が無いときは下の分岐で編集欄を表示しないので、Ctrl+Sもここで止める */
   const saveNow = useRef<() => void>(() => undefined);
   // 早く返す分岐より前に置く（フックの順番を変えない）。閉じる確認が出ている間は、その答えを待つ
   useSaveKey(tpl !== undefined && !confirmClose, () => ({ blocker: saveBlocker, save: () => saveNow.current(), blocked: (reason) => setStatus({ text: reason, error: false }) }));

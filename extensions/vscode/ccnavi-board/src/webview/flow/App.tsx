@@ -390,7 +390,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     document.addEventListener("keydown", listener);
     return () => document.removeEventListener("keydown", listener);
   }, []);
-  /** Ctrl+Sの答え。保存の様子は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す */
+  /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す */
   const saveKey = useRef<SaveKeyTarget>(NO_SAVE);
   // 提案・依頼文・保存前の確認が出ている間は、その面の操作を待つ（Ctrl+Zなどと同じ）
   useSaveKey(!tour.touring && data.kind === "page" && proposal === undefined && requestText === undefined && review === undefined, () => saveKey.current);

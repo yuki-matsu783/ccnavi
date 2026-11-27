@@ -202,7 +202,7 @@ export function App({ initial }: { readonly initial: PhasesData }): JSX.Element 
     post({ type: "reload", dirty });
   };
 
-  // idの重なりは帯と同じ文を理由にする。案内の間のボタンは、見本の様子で下の`shownSaveBlocker`が決める
+  // idの重なりは帯と同じ文を理由にする。案内の間のボタンは、見本の状態で下の`shownSaveBlocker`が決める
   const draftDup = duplicates(draft);
   const draftClash = commonClashes(draft, page?.common ?? []);
   const saveBlocker = editSaveBlocker({

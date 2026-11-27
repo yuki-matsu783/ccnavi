@@ -237,7 +237,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   }, [answer, dirty]);
 
   useEscape(review, ESCAPE_LAYER.overlay, () => setReview(false));
-  /** Ctrl+Sの答え。保存の様子は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す。押すと［この順序に決める］と同じく確認を出す */
+  /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す。押すと［この順序に決める］と同じく確認を出す */
   const saveKey = useRef<SaveKeyTarget | undefined>(undefined);
   useSaveKey(!tour.touring && data.kind === "page" && !review, () => saveKey.current ?? { blocker: "読み込みが終わっていないため、決められません", save: () => undefined, blocked: () => undefined });
 

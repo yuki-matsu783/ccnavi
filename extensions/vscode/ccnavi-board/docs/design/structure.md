@@ -114,7 +114,7 @@ src/
     initial.ts        埋め込みの JSON（最初の 1 枚）を読む。画面ごとの契約に依存しない
     appearance.ts     見た目の切り替えと拡大（body のクラスと zoom の書き換え）。9 画面で 1 本
     useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。9 画面で 1 本
-    useSaveKey.ts     Ctrl+S（Cmd+S）で保存する入口。押せない理由（save-gate.ts）が空のときだけ保存し、そうでなければ理由を見せる
+    useSaveKey.ts     Ctrl+S（Cmd+S）で保存する入口。理由（save-gate.ts）が空のときだけ保存し、空でなければ理由を表示する
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
     tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・タイトル・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
     tours/images.ts   手順の image（名前）から画像の data: URL を引く表。画像は tours/images/<名前>.png に置き、esbuild の dataurl の読み込みでバンドルへ入れる（Webview はファイルを読まず、ボードの CSP だけ img-src data: を許す）。表と置き場と YAML の突き合わせはテストが見る
