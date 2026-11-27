@@ -59,7 +59,7 @@ export function samePlacement(before: Placement, after: Placement): boolean {
 
 /**
  * 列が変わったカードと、新しく現れたカード。消えたカードは出さない（動いた表示を付ける先が無い）。
- * 順序は`after`の並び順で、`placementOf`が作ったものなら列の順（承認待ち → 承認済み → …）。
+ * 順序は`after`の並び順で、`placementOf`が作ったものなら列の順（承認待ち → 進行中 → …）。
  */
 export function movedCards(before: Placement, after: Placement): readonly Moved[] {
   const moved: Moved[] = [];

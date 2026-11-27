@@ -639,7 +639,7 @@ test("CB-T124 欄名は日本語で、YAMLのキー名は欄名のtitleに載せ
     assert.equal(caps.get("additionalContext"), "YAMLのキー: additionalContext");
     assert.equal(caps.get("additionalContextOnceFile"), "YAMLのキー: additionalContextOnceFile");
     assert.equal(caps.get("every"), "YAMLのキー: every");
-    assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), "--testのsubject");
+    assert.equal(dom.one("#subject").closest("label")?.getAttribute("title"), null);
   } finally {
     await dom.close();
   }

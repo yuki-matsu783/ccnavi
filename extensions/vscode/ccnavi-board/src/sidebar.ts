@@ -25,7 +25,15 @@ interface Entry {
   readonly needsTickets: boolean;
 }
 
+/** 並びは使う頻度の順。毎日開くチケット管理を先頭に、設定の画面をその後に置く */
 const ENTRIES: readonly Entry[] = [
+  {
+    label: "チケット管理",
+    description: "チケットのカンバン表示、承認とレビューの進行",
+    command: "ccnaviBoard.open",
+    icon: "checklist",
+    needsTickets: true,
+  },
   {
     label: "プロジェクト管理",
     description: "projects/の一覧、clone・fetch・pullの実行",
@@ -59,13 +67,6 @@ const ENTRIES: readonly Entry[] = [
     description: "作業・レビュー計画のテンプレートと下書きの一覧と、テンプレートの編集",
     command: "ccnaviBoard.openTemplates",
     icon: "files",
-    needsTickets: true,
-  },
-  {
-    label: "チケット管理",
-    description: "チケットのカンバン表示、承認とレビューの進行",
-    command: "ccnaviBoard.open",
-    icon: "checklist",
     needsTickets: true,
   },
 ];

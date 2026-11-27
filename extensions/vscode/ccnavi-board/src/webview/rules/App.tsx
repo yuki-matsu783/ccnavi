@@ -15,7 +15,7 @@ import { LoadError } from "../shared/LoadError.js";
 
 import { lockClass, type Lock } from "../../core/lock.js";
 import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
-import { isToolName, KNOWN_TOOLS, SECTIONS, SECTION_LABELS, bareRuleId, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, subjectExample, SECTIONS, SECTION_LABELS, bareRuleId, tmpName, type FileField, type RuleForm, type RulesData, type RulesPage, type Section, type ToRules } from "../../core/rules-view.js";
 import { ModeBand } from "../shared/ModeBand.js";
 import type { SuggestJson } from "../../core/suggestmodel.js";
 import type { ExpectationsJson } from "../../core/testmodel.js";
@@ -607,7 +607,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
           <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
-          <span className="hint" data-tour="order-hint">判定は強い順にdeny &gt; ask &gt; allow</span>
+          <span className="hint" data-tour="order-hint">判定は強い順に 拒否 &gt; 確認 &gt; 許可（deny &gt; ask &gt; allow）</span>
         </div>
         {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください</p>}
         {SECTIONS.map((section) => {
@@ -687,7 +687,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       </section>
       <section id="tab-judge" className={shownTab === "judge" ? "pane active" : "pane"}>
         <p className="hint">
-          いまのモードがdry-run（記録だけ）でも、ここではenable（実際に止める）のときの判定を返します。
+          いまのモードが記録だけ（dry-run）でも、ここでは実際に止めるとき（enable）の判定を返します。
         </p>
         <div className="judge-form" data-tour="judge-form">
           <label>
@@ -707,12 +707,12 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
               ))}
             </datalist>
           </label>
-          <label className="grow" title="--testのsubject">
+          <label className="grow">
             対象{" "}
             <input
               id="subject"
               type="text"
-              placeholder="Bash / PowerShellならコマンド、Read / Grep / Glob / Edit / Writeなら絶対パス、Skillならスキル名、Agentなら見出し、WebFetchならURL"
+              aria-describedby="subject-example"
               spellCheck={false}
               value={shownSubject}
               onChange={(event) => setSubject(event.target.value)}
@@ -728,6 +728,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             判定
           </button>
         </div>
+        <p className="hint subject-example" id="subject-example">
+          {subjectExample(shownTool)}
+        </p>
         {shownJudged !== undefined && <JudgeResult judged={shownJudged} />}
         <div className="expectations-head" data-tour="expectations">
           <button

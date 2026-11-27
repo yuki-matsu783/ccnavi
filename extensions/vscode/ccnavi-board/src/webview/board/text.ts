@@ -57,7 +57,7 @@ export const FILTER_LABELS = {
 const COLUMN_LABELS: Readonly<Record<string, string>> = Object.fromEntries(COLUMNS.map((c) => [c.state, c.label]));
 
 /**
- * 前の読み直しから動いたカードに出す帯の言葉。「承認待ち → 承認済み」。
+ * 前の読み直しから動いたカードに出す帯の言葉。「承認待ち → 進行中」。
  * 前には無くて新しく現れたカードは、どこから来たとも言えないので「新規起票」だけ。
  * 行き先は言わない。カードはもうその列に置かれていて、画面から読める。
  */
@@ -67,7 +67,7 @@ export function movedLabel(moved: Moved): string {
 
 /**
  * カードの注意の行。例外のときだけ短い言葉で出す（理由の全文は詳細）。
- * 不備・書き込み停止・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・開始前の子）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
+ * 不備・書き込み停止・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・着手待ちの子）・ワークツリーが見つからない（作業中・レビュー中）・未送信。
  * ユーザが動く必要がある状態だけで、普通のことは出さない。先行待ちは識別子の途中で折り返さないよう、`PredecessorNote`で別に出す
  */
 export interface Note {
@@ -86,7 +86,7 @@ export function notesOf(card: Card): Note[] {
     notes.push({ key: "blocked", text: "書き込み停止中", kind: "blocked" });
   }
   if (!card.worktreeExists && card.copyStatus !== "closed" && card.copyStatus !== "archived") {
-    // 承認待ち（none）と開始前はまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
+    // 承認待ち（none）と着手待ちはまだ作っていないだけ。作業中・レビュー中に無いのは異常（warnの見た目）
     const pending = card.copyStatus === "none" || isNotStarted(card);
     notes.push({ key: "worktree", text: pending ? "ワークツリー未作成" : "ワークツリーが見つからない", kind: pending ? "worktree" : "worktree none" });
   }

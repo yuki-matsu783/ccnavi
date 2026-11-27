@@ -4,7 +4,7 @@ import { editSaveBlocker, saveTitle } from "../../src/core/save-gate.js";
 
 const OPEN = { locked: false, reason: "" };
 
-test("CB-T1273 保存を押せない理由は重い順に1つだけ返し、押せるときは空。ツールチップは理由かCtrl+Sの案内", () => {
+test("CB-T1275 保存を押せない理由は重い順に1つだけ返し、押せるときは空。ツールチップは理由かCtrl+Sの案内", () => {
   assert.equal(editSaveBlocker({ busy: false, dirty: true, lock: OPEN }), "");
   assert.match(editSaveBlocker({ busy: true, dirty: true, lock: { locked: true, reason: "作業中" } }), /処理中/);
   assert.equal(editSaveBlocker({ busy: false, dirty: true, lock: OPEN, readOnly: "読み取り専用", invalid: "重複" }), "読み取り専用");

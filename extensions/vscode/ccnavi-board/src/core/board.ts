@@ -1,8 +1,8 @@
 /**
  * 実行ファイルのJSONを、列とカードを持つボードに組み立てる。VS CodeのAPIには依存しない。
  *
- * 列は 承認待ち / 承認済み / 完了 / 取り消し / アーカイブ。置き場との対応は、承認待ち = `wip/proposals/todo/`、
- * 承認済み = `.ccnavi/approved/doing/`と`wip/proposals/review/`（開始前・作業中・レビュー待ちは同じ列。違いはカードのバッジで言う）、
+ * 列は 承認待ち / 進行中 / 完了 / 取り消し / アーカイブ。置き場との対応は、承認待ち = `wip/proposals/todo/`、
+ * 進行中 = `.ccnavi/approved/doing/`と`wip/proposals/review/`（レビュー待ちも進行中の列。待ちはカードのバッジで言う）、
  * 完了 = `.ccnavi/approved/done/`、取り消し = 同じ`done/`で`cancelled_at`を持つもの、アーカイブ = 手元の退避
  * （`logs/archive/`。JSONの`archived`の欄。既定では画面が隠す）。カードの状況は状態のバッジ（`status.ts`）、
  * ユーザができること（承認・レビュー完了）は操作（`actions`）で言う。この2つは別の規則で決める。
@@ -32,7 +32,7 @@ export interface ColumnDef {
 /** 列の順序。ヒットが0件でも省かない */
 export const COLUMNS: readonly ColumnDef[] = [
   { state: "todo", label: "承認待ち" },
-  { state: "doing", label: "承認済み" },
+  { state: "doing", label: "進行中" },
   { state: "done", label: "完了" },
   { state: "cancelled", label: "取り消し" },
   { state: "archived", label: "アーカイブ" },
@@ -437,7 +437,7 @@ function mrOf(phases: readonly PhaseChip[]): { url: string; number: number | nul
 }
 
 /**
- * 列は置き場から引く。提案の側にあれば`todo/`は承認待ち、`review/`は承認済み（レビュー待ちはバッジで言う）。
+ * 列は置き場から引く。提案の側にあれば`todo/`は承認待ち、`review/`は進行中（レビュー待ちはバッジで言う）。
  * 無ければ承認済みチケットから。クローズした承認済みチケット（`done/`）は取り消しの時刻があればcancelled、無ければdone。
  * 開いている承認済みチケット（`doing/`）はdoing。どちらにも無いのは食い違いなのでtodoに置く（不備の文は実行ファイルの`issues`）。
  */

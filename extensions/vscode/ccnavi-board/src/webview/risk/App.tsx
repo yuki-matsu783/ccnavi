@@ -492,7 +492,7 @@ export function App({ initial }: { readonly initial: RiskData }): JSX.Element {
           <summary>説明</summary>
           <p className="hint">
             子チケットの完了時、その子の差分（base_sha..HEAD）で判定して加点します。1件につき加点条件は1つです。
-            <code>script</code>が失敗したときと出力を読み込めないときは、安全を優先してpointsをそのまま加点します。<code>judge</code>の項目があると、判定が揃うまで子をクローズできません。
+            <code>script</code>が失敗したときと出力を読み込めないときは、安全を優先して点（points）をそのまま加点します。<code>judge</code>の項目があると、判定が揃うまで子をクローズできません。
           </p>
         </details>
         <ul className="list" id="factors" data-tour="factors">

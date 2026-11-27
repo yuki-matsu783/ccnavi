@@ -39,7 +39,7 @@ func issues(r *ticketRow, ids map[string]bool) []string {
 }
 
 // attention はチケット 1 件が要対応か。次のどれかで真: 承認待ち（新規と親の改版）、子で自分のフェーズがレビュー準備中・
-// レビュー待ち、承認待ち・承認済みの列なのにワークツリーが無い、実績のリスクが HIGH 以上、どれが正か決まらない、不備がある、
+// レビュー待ち、承認待ち・進行中の列なのにワークツリーが無い、実績のリスクが HIGH 以上、どれが正か決まらない、不備がある、
 // 親でフェーズのどれかが止まっている・レビュー待ち・リスクでレビュー必須。
 func attention(r *ticketRow, parents map[string]*parentRow, pending map[string]bool, hasIssues bool) bool {
 	// 自分の親子のチケットのフェーズ表を引く。子なら親の行、親なら自分の行。
@@ -62,7 +62,7 @@ func attention(r *ticketRow, parents map[string]*parentRow, pending map[string]b
 			}
 		}
 	}
-	// 提案が無く閉じた承認済みチケットは完了・取り消しの列。それ以外は承認待ちか承認済みの列。
+	// 提案が無く閉じた承認済みチケットは完了・取り消しの列。それ以外は承認待ちか進行中の列。
 	openColumn := r.hasProposal || r.status != statusClosed
 	if pending[r.id] || (own != nil && (own.gateClosed || own.reviewWaiting)) || (openColumn && !r.worktree) ||
 		highRisk(r) || r.scattered || hasIssues {

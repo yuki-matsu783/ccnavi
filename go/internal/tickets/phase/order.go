@@ -3,6 +3,7 @@ package phase
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"ccnavi/internal/infra/config"
@@ -28,6 +29,7 @@ const (
 	StageFeedbackWaiting = "フィードバック計画待ち"
 	stageCloseEarly      = "閉じられる（ユーザが早めにクローズした）"
 	stageWorking         = "作業中"
+	stageNotStarted      = "着手待ち"
 	stageFeedback        = "フィードバック対応中"
 	stageClosable        = "クローズ可"
 	stageClosableFed     = "クローズ可（フィードバック対応済み）"
@@ -127,6 +129,14 @@ func PlanFinished(conf *config.Settings, root string, parent *ticket.Ticket) boo
 	return len(seen) == last
 }
 
+// stageLabel は局面の文に並べるフェーズの呼び名。括弧を重ねて読みにくくしないため、「フェーズ2 設計」のように括弧を使わずに書く。
+func stageLabel(p *Phase) string {
+	if title := p.Title(); title != "" {
+		return "フェーズ" + strconv.Itoa(p.Number) + " " + title
+	}
+	return "フェーズ" + strconv.Itoa(p.Number)
+}
+
 // Stage は親がいまどの局面にいるか。計画が無ければ空。raw は Phases と同じ。止まっているフェーズを呼び名ごとに
 // 並べ、無ければ早めに閉じた印・作業中・フィードバック対応中・フィードバック計画待ち・クローズ可の順に見る。
 func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *approval.Raw) string {
@@ -145,14 +155,15 @@ func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *appro
 		if _, ok := groups[label]; !ok {
 			labels = append(labels, label)
 		}
-		groups[label] = append(groups[label], p.Label())
+		groups[label] = append(groups[label], stageLabel(p))
 	}
 	if len(labels) > 0 {
 		parts := make([]string, len(labels))
 		for i, label := range labels {
-			parts[i] = label + "（" + strings.Join(groups[label], "、") + "）"
+			parts[i] = label + "・" + strings.Join(groups[label], "、")
 		}
-		return strings.Join(parts, "、")
+		// グループの中のフェーズは「、」で並べるので、グループの間は「／」で分ける（所属を読み違えないように）。
+		return strings.Join(parts, "／")
 	}
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
 	if _, ok := marks.ReadFilledParent(home, parent.ID, marks.CloseEarly); ok {
@@ -171,20 +182,24 @@ func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *appro
 		var working []string
 		for _, p := range open {
 			if p.Number <= last && (len(p.Tickets) > 0 || waitsDone(parent, list, p.Number)) {
-				working = append(working, p.Label())
+				working = append(working, stageLabel(p))
 			}
 		}
 		if len(working) == 0 {
-			working = []string{open[0].Label()}
+			working = []string{stageLabel(open[0])}
 		}
-		return stageWorking + "（" + strings.Join(working, "、") + "）"
+		if parent.StartedAt == "" {
+			// 承認済みで start の前。作業中と言わず、最初に進むフェーズだけを言う（ボードのバッジ「着手待ち」と合わせる）。
+			return stageNotStarted + "・" + working[0]
+		}
+		return stageWorking + "・" + strings.Join(working, "、")
 	}
 	if len(open) > 0 {
 		where := stageWorking
 		if open[0].Number > last {
 			where = stageFeedback
 		}
-		return where + "（" + open[0].Label() + "）"
+		return where + "・" + stageLabel(open[0])
 	}
 	switch {
 	case !parent.FeedbackPlanned:

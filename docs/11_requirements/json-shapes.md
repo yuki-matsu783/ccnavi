@@ -196,13 +196,13 @@ ccnavi --explain --json
 | `flow` | 子のフロー。親と、フローが無い閉じた子（終わった・取り消した）は `null`（ボードはこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、ボードはパスを組まずにこれを読み、いまのフローと違えば「提案あり」を出す。読むのは承認済みチケット（無ければ提案）の欄。ボードは `locked` をそのままコピーし、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 | `issues[]` | 読み手が気づくべき不備の文。この順に入る。`blocked` が空でなければ `書き込みが止まっています: <blocked>`、提案が無く `copy.status` が `open` でも `closed` でもなければ `提案が見つかりません（承認済みチケットだけがあります）`、子で親の識別子のチケットが `tickets[]` に無ければ `親 <親> が見つかりません`。無ければ空。ボードはこれをそのまま出し、自分では組み直さない |
-| `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、ボードの承認待ち・承認済みの列（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき。ボードの「ユーザ待ちのみ」はこれで絞るだけ |
+| `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、ボードの承認待ち・進行中の列（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき。ボードの「ユーザ待ちのみ」はこれで絞るだけ |
 
 `parents[]` の 1 件。
 
 | キー | 何 |
 |---|---|
-| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（レビュー準備中・レビュー待ちなど、ユーザに見せる言葉。閉じた親は空文字） |
+| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（「着手待ち・フェーズ1 調査」「作業中・フェーズ2 設計」「レビュー待ち・フェーズ1 設計」など、ユーザに見せる言葉。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_required` は、そのフェーズの終わりにユーザのレビューが要るかを表す（真偽値）。定義・ステップ・引き受けた延期のどれか 1 つでも要ると言えば真。子の宣言か実績のリスクが要ると言う場合も真。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれをコピーするだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |

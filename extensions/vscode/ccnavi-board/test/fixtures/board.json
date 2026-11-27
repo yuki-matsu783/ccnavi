@@ -699,7 +699,7 @@
   {
    "ticket": "i0001",
    "closed": false,
-   "stage": "作業中（2（設計））",
+   "stage": "作業中・フェーズ2 設計",
    "plan": [
     "research",
     {
