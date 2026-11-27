@@ -129,7 +129,7 @@ diagrams:
         text: ワークツリーとチケットも、同じ答えから数える。チケット制御がdisableなら、チケットは出ない
         value: |-
           ワークツリー: feature-12-web-app-login
-          チケット: 3 件、作業中 1 件
+          チケット: 3 件、進行中 1 件
       - id: lint
         from: プロジェクト管理画面
         to: ccnavi
