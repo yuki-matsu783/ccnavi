@@ -74,7 +74,7 @@ func TestAPlanIsApprovedAndCopied(t *testing.T) {
 	text := ticketkit.Read(t, w.doing(parentName))
 	contains(t, "承認済みチケット", text, "plan:", "research", "deferred: true")
 	r := w.ccnavi("--explain")
-	contains(t, "--explain", r.Stdout, "局面: 作業中・フェーズ1 調査", "フェーズ 2（設計）: 未計画", "レビューは 3 と一緒に")
+	contains(t, "--explain", r.Stdout, "局面: 着手待ち・フェーズ1 調査", "フェーズ 2（設計）: 未計画", "レビューは 3 と一緒に")
 }
 
 func TestAPlanThatBreaksTheRulesIsRefused(t *testing.T) {

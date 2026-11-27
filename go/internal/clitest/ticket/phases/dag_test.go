@@ -360,7 +360,7 @@ func TestExplainNamesEveryBranchAtWork(t *testing.T) {
 	for _, p := range body["parents"].([]any) {
 		owner := p.(map[string]any)
 		if owner["ticket"] == parentName {
-			contains(t, "stage", owner["stage"].(string), "2（受入）", "3（実装）")
+			contains(t, "stage", owner["stage"].(string), "作業中・", "フェーズ2 受入", "フェーズ3 実装")
 			return
 		}
 	}

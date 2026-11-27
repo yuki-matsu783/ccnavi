@@ -1,6 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isToolName, tmpName, TMP_RULES_PREFIX } from "../../src/core/rules-view.js";
+import { isToolName, KNOWN_TOOLS, subjectExample, tmpName, TMP_RULES_PREFIX } from "../../src/core/rules-view.js";
+
+test("CB-T1273 判定を試す欄の下の例は、候補のツールごとに書き方を言い、候補に無いツールでは候補から選ぶよう促す", () => {
+  const fallback = subjectExample("");
+  assert.match(fallback, /候補から選ぶ/);
+  assert.equal(subjectExample("UnknownTool"), fallback);
+  for (const tool of KNOWN_TOOLS) {
+    assert.notEqual(subjectExample(tool), fallback, tool);
+    assert.match(subjectExample(tool), /例: /, tool);
+  }
+  assert.match(subjectExample("Bash"), /コマンド/);
+  assert.match(subjectExample("Read"), /絶対パス/);
+  assert.match(subjectExample("WebFetch"), /URL/);
+});
 
 test("CB-T555 ツール名は英字で始まり英数字・_・- だけを受け付ける（MCPの名前も通る）", () => {
   for (const name of ["Bash", "Read", "NotebookEdit", "mcp__github__get_me", "Tool-2", "A"]) {

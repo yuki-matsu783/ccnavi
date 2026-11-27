@@ -392,7 +392,7 @@ test("CB-D710 詳細の開閉はカードごと（プロジェクトとIDの組�
     // 更新（新しい中身が届く）でも閉じない
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(json) } });
     assert.equal(open("web"), true);
-    // 列の移動（作業中 → 完了）でも閉じない
+    // 列の移動（進行中 → 完了）でも閉じない
     const moved = boardOf([same(""), { ...closedJson("dup", { project: "web", title: "タイトルweb" }) }], [], { projects: ["web"] });
     await page.send({ type: "data", data: { kind: "board", board: buildBoard(moved) } });
     assert.equal(page.one('li.card[data-id="dup"][data-project="web"]').closest(".column")?.getAttribute("data-state"), "done");
