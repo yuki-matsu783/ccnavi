@@ -243,8 +243,8 @@ export type TemplatesMessage =
   /** 編集欄を閉じた。拡張ホストは作業中の錠を取り直すのをやめる */
   | { readonly type: "editClose"; readonly session: number }
   /**
-   * 編集欄が未保存かと、未保存なら中身（`toData`の形）のコピー。保存済みと同じなら`data`はnull。
-   * 拡張ホストはタブのタイトルに「●」を付け、未保存のままタブを閉じたらコピーをYAMLで開けるようにする
+   * 編集欄が未保存かどうか。未保存なら中身（`toData`の形）のコピーを入れる。保存済みと同じなら`data`はnull。
+   * 拡張ホストはこれでタブのタイトルに「●」を付け、未保存のままタブを閉じたときにコピーをYAMLで開く
    */
   | { readonly type: "editDirty"; readonly session: number; readonly data: unknown }
   /** 編集中の中身（`toData`の形）を実行ファイルに読ませる */
