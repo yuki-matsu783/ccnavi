@@ -16,7 +16,7 @@ function text(element: { textContent: string | null } | null | undefined): strin
   return (element?.textContent ?? "").trim();
 }
 
-/** 行を開く。行は最初から開いているので、畳んでいるときだけ見出しを押す */
+/** 行を開く。行は畳んで出すので、畳んでいるときだけ見出しを押す */
 async function openRow(dom: DomPage, selector: string): Promise<void> {
   if (dom.all(`${selector}.open`).length === 0) {
     dom.click(dom.one(`${selector} .row-head`));
@@ -33,6 +33,7 @@ test("CB-D324 一覧は開いている対象のレイヤーのテンプレート
       ["self/ends", "self/feature", "self/local", "self/research"],
     );
     // 共通と全欄が同じで破棄した行は、共通の1本が使われるので無効・破棄とは出さない。理由の本文は指摘の一覧に1度だけ出す
+    await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
     const feature = text(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
     assert.match(feature, /共通の側を使用/);
     assert.doesNotMatch(feature, /無効|破棄/);

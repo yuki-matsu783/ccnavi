@@ -74,7 +74,7 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
           title={first === undefined ? "このレイヤーで指定できる型（phases.ymlの定義）が見つかりません" : undefined}
           onClick={() => first !== undefined && onChange(addItem(template, part, first))}
         >
-          {part === "feedback" ? "フィードバック計画を作る" : "ステップを足す"}
+          {part === "feedback" ? "フィードバック計画を追加" : "ステップを追加"}
         </button>
       </section>
     );
@@ -142,7 +142,14 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
                     ))}
                   </select>
                 </td>
-                <td className="mono">{item.after.length === 0 ? "なし" : item.after.map((n) => offset + n).join(", ")}</td>
+                <td className="tpl-edit-after">
+                  <AfterPicks
+                    index={index}
+                    offset={offset}
+                    after={item.after}
+                    onToggle={(from, on) => onChange(on ? connectItems(template, offset + from, offset + index) : disconnectItems(template, offset + from, offset + index))}
+                  />
+                </td>
                 <td className="tpl-edit-ops">
                   <button type="button" className="action small" data-action="move-up" aria-label={`${offset + index}番を前へ`} disabled={!canMove(template, part, index, -1)} onClick={() => onChange(moveItem(template, part, index, -1))}>
                     ↑
@@ -172,7 +179,26 @@ export function PlanEdit({ part, template, plan, fresh, types, onChange }: PlanE
   );
 }
 
-/** 末尾にステップを足す。足したステップには前の末尾のステップが先行する（線は図で引き直せる） */
+/**
+ * 先行ステップの選び。自分より前のステップの番号をチェックで選ぶ（図に線を引くのと同じ`connectItems`・`disconnectItems`）。
+ * 計画のステップは先行が必ず前にあるので、選べるのは前のステップだけ。図を使わず、キーボードでも直せる
+ */
+function AfterPicks({ index, offset, after, onToggle }: { readonly index: number; readonly offset: number; readonly after: readonly number[]; readonly onToggle: (from: number, on: boolean) => void }): JSX.Element {
+  if (index === 1) {
+    return <span className="dim">なし</span>;
+  }
+  return (
+    <span className="tpl-after-picks" role="group" aria-label={`${offset + index}番の先行ステップ`}>
+      {Array.from({ length: index - 1 }, (_, i) => i + 1).map((from) => (
+        <label key={from} className="mono">
+          <input type="checkbox" className="f-item-after" data-from={offset + from} checked={after.includes(from)} onChange={(event) => onToggle(from, event.target.checked)} /> {offset + from}
+        </label>
+      ))}
+    </span>
+  );
+}
+
+/** 末尾にステップを追加する。足したステップには前の末尾のステップが先行する（線は図で引き直せる） */
 function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part" | "template" | "types" | "onChange">): JSX.Element {
   const options = optionsFor(part, types, "");
   const [picked, setPicked] = useState("");
@@ -181,7 +207,7 @@ function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part"
   return (
     <p className="tpl-edit-add">
       <label htmlFor={id} className="dim">
-        足すステップの種類
+        追加するステップの種類
       </label>{" "}
       <select id={id} className="f-add-type" value={type} disabled={options.length === 0} onChange={(event) => setPicked(event.target.value)}>
         {options.map((o) => (
@@ -191,7 +217,7 @@ function AddItem({ part, template, types, onChange }: Pick<PlanEditProps, "part"
         ))}
       </select>{" "}
       <button type="button" className="action small" data-action="add-item" disabled={type === ""} onClick={() => onChange(addItem(template, part, type))}>
-        ステップを足す
+        ステップを追加
       </button>
     </p>
   );

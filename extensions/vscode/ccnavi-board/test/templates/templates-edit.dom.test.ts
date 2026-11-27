@@ -32,13 +32,20 @@ async function openList(): Promise<DomPage> {
   return dom;
 }
 
-/** 編集を始めて、拡張ホストの答え（editOpened）を届ける。送った依頼を返す */
-async function startEdit(dom: DomPage, opened: EditOpened = openedOf(fixtureCheck())): Promise<{ readonly session: number }> {
-  const row = 'li.template[data-name="feature"][data-layer="self"]';
-  if (dom.all(`${row}.open`).length === 0) {
-    dom.click(dom.one(`${row} .row-head`));
+const FEATURE = 'li.template[data-name="feature"][data-layer="self"]';
+
+/** featureの行を開く（行は畳んで出し、「編集」は開いた行の中にある） */
+async function openFeature(dom: DomPage): Promise<void> {
+  if (dom.all(`${FEATURE}.open`).length === 0) {
+    dom.click(dom.one(`${FEATURE} .row-head`));
     await dom.settle();
   }
+}
+
+/** 編集を始めて、拡張ホストの答え（editOpened）を届ける。送った依頼を返す */
+async function startEdit(dom: DomPage, opened: EditOpened = openedOf(fixtureCheck())): Promise<{ readonly session: number }> {
+  const row = FEATURE;
+  await openFeature(dom);
   const before = dom.posted.filter((m) => m.type === "editOpen").length;
   dom.click(dom.one(`${row} button[data-action="edit-template"]`));
   await dom.settle();
@@ -67,7 +74,8 @@ const text = (element: { textContent: string | null } | null | undefined): strin
 test("CB-D382 編集を押すとeditOpenを送り、答えが届くまで読み込み中を出す。答えが届くと一覧の代わりに編集欄を出し、説明・使う場面・計画の表・フローの欄が見本どおりに入る", async () => {
   const dom = await openList();
   try {
-    dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] button[data-action="edit-template"]'));
+    await openFeature(dom);
+    dom.click(dom.one(`${FEATURE} button[data-action="edit-template"]`));
     await dom.settle();
     assert.match(text(dom.one("#edit-loading")), /featureを読み込み中/);
     const session = dom.posted.find((m) => m.type === "editOpen")?.session as number;
@@ -131,7 +139,17 @@ test("CB-D384 計画の表でステップを足す・動かす・消す。足し
     dom.click(dom.one('section.tpl-edit-plan[data-part="plan"] button[data-action="add-item"]'));
     await dom.settle();
     assert.equal(rows("plan").length, 3);
-    assert.equal(text(rows("plan")[2].querySelectorAll("td")[3]), "2");
+    const afterOf = (row: number, from: number): HTMLInputElement =>
+      rows("plan")[row].querySelector<HTMLInputElement>(`input.f-item-after[data-from="${from}"]`) as HTMLInputElement;
+    assert.equal(afterOf(2, 2).checked, true);
+    assert.equal(afterOf(2, 1).checked, false);
+    // 先行ステップは表のチェックでも直せる（図に線を引くのと同じ）
+    dom.click(afterOf(2, 1));
+    await dom.settle();
+    assert.equal(afterOf(2, 1).checked, true);
+    dom.click(afterOf(2, 1));
+    await dom.settle();
+    assert.equal(afterOf(2, 1).checked, false);
     assert.equal(rows("feedback")[0].querySelector("td.mono")?.textContent, "4", "フィードバック計画の番号が続きになる");
     // 動かす: 1は2の先行なので前にも後ろにも動かせない。足した3は2の後続なので前へ動かせない
     assert.equal(rows("plan")[0].querySelector<HTMLButtonElement>('button[data-action="move-up"]')?.disabled, true);
@@ -148,7 +166,7 @@ test("CB-D384 計画の表でステップを足す・動かす・消す。足し
     // 消した2番のフローはステップと一緒になくなる
     assert.equal(dom.all('section[data-role="flows"] li.row').length, 1);
     assert.match(text(dom.one('section[data-role="flows"] li[data-index="1"]')), /フローなし/);
-    // フィードバック計画のステップは全部消せて、「作る」入口に戻る
+    // フィードバック計画のステップは全部消せて、「フィードバック計画を追加」の入口に戻る
     dom.click(rows("feedback")[0].querySelector<HTMLButtonElement>('button[data-action="remove-item"]') as HTMLButtonElement);
     await dom.settle();
     assert.equal(rows("feedback").length, 0);
@@ -234,7 +252,8 @@ test("CB-D386 未保存のまま閉じようとすると破棄してよいかを
 test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用のレイヤーでは編集と作るの入口を出さない", async () => {
   const dom = await openList();
   try {
-    dom.click(dom.one('li.template[data-name="feature"][data-layer="self"] button[data-action="edit-template"]'));
+    await openFeature(dom);
+    dom.click(dom.one(`${FEATURE} button[data-action="edit-template"]`));
     await dom.settle();
     const session = dom.posted.find((m) => m.type === "editOpen")?.session as number;
     await dom.send({ type: "editOpened", session, opened: null, error: "実行ファイルが古い版です" });
@@ -321,7 +340,7 @@ test("CB-D1224 作った直後はerrorの苦情を隠し（warnは出す）、�
   }
 });
 
-test("CB-D389 ステップのフローは最初から図を開いていて、部品箱でノードを足すと未保存になり、答えを読み直す。「フローを足す」は雛形を置き、「フローを外す」で消える", async () => {
+test("CB-D389 ステップのフローは最初から図を開いていて、部品箱でノードを足すと未保存になり、答えを読み直す。「フローを追加」は雛形を置き、「フローを外す」で消える", async () => {
   const dom = await openList();
   try {
     await startEdit(dom);
@@ -383,11 +402,13 @@ test("CB-D390 作業中のチケットがある間は編集はできるが保存
   }
 });
 
-test("CB-D739 一覧の行は最初から開き、図の中身を求める（preview）。答えが届くと計画の図と子のフローの図を読むだけで出し、「図を編集」で編集欄に進める", async () => {
+test("CB-D739 一覧の行は畳んで出し、開くと図の中身を求める（preview）。答えが届くと計画の図と子のフローの図を読むだけで出し、「編集」で編集欄に進める", async () => {
   const dom = await openList();
   try {
-    const row = 'li.template[data-name="feature"][data-layer="self"]';
-    assert.equal(dom.all(`${row}.open`).length, 1, "最初から開いている");
+    const row = FEATURE;
+    assert.equal(dom.all("li.template.open").length, 0, "最初は畳んでいる");
+    assert.equal(dom.posted.filter((m) => m.type === "preview").length, 0, "開くまで求めない");
+    await openFeature(dom);
     const asked = dom.posted.filter((m) => m.type === "preview" && m.name === "feature");
     assert.equal(asked.length, 1, "1行につき1度だけ求める");
     assert.equal(asked[0].layer, "self");
@@ -420,7 +441,8 @@ test("CB-D739 一覧の行は最初から開き、図の中身を求める（pre
 test("CB-D740 図の中身を読めなかったときは、理由を出す", async () => {
   const dom = await openList();
   try {
-    const row = 'li.template[data-name="feature"][data-layer="self"]';
+    const row = FEATURE;
+    await openFeature(dom);
     await dom.send({ type: "preview", name: "feature", layer: "self", check: null, error: "検査できません" });
     await dom.settle();
     assert.match(text(dom.one(`${row} [data-role="preview-error"]`)), /検査できません/);

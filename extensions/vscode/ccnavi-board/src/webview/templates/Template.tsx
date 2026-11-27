@@ -1,5 +1,5 @@
 /**
- * テンプレート1件。見出しに名前・レイヤー・状態のバッジ・説明を出し、最初から開いていて、計画とフローの図・本文の取り出しを出す（畳める）。
+ * テンプレート1件。見出しに名前・レイヤー・状態のバッジ・説明を出し、開くと計画とフローの図・本文の取り出しを出す。
  * 判定（有効・無効・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
 import { useEffect, type JSX } from "react";
@@ -22,7 +22,7 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の1件だけ） */
   readonly tour: boolean;
-  /** 編集を始める。渡さなければ「図を編集」は出さない（読み取り専用のレイヤー・読めない行・案内の間） */
+  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用のレイヤー・読めない行・案内の間） */
   readonly onEdit?: () => void;
   /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければundefined。読めなかったときは`previewError`に理由 */
   readonly preview?: TemplateCheck | undefined;
@@ -84,7 +84,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           </button>
           {onEdit !== undefined && (
             <button type="button" className="action small" data-action="edit-template" onClick={onEdit}>
-              図を編集
+              編集
             </button>
           )}
           {detail !== undefined && detailMatches(detail, entry) && (

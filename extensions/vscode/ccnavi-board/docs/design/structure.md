@@ -176,7 +176,7 @@ src/
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
     templates/App.tsx   帯・ツールバー・開いている対象の層の一覧と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
-    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「図を編集」。行は最初から開く）
+    templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「編集」。行は畳んで出す）
     templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）
     templates/Edit.tsx  編集欄（説明・使う場面・計画・フロー、元に戻す、保存、作業中の錠の帯、未保存の確認。直すたびに実行ファイルに読ませる）
     templates/PlanEdit.tsx 編集欄の計画 1 つ（共有の計画の図で線を引く。種類・レビューの選択、並べ替え、削除、追加）
