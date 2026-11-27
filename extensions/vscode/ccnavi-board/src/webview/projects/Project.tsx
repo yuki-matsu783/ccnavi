@@ -24,7 +24,7 @@ export interface ProjectProps {
 export function Project({ row, ticketsEnabled, tour = false, mirror, act }: ProjectProps): JSX.Element {
   const problems = row.problems;
   const flags = [
-    row.doing > 0 ? { key: "doing", className: "badge doing", text: `作業中${row.doing}` } : undefined,
+    row.doing > 0 ? { key: "doing", className: "badge doing", text: `進行中${row.doing}` } : undefined,
     problems.some((p) => p.severity === "error") ? { key: "error", className: "badge error", text: "error" } : undefined,
     problems.some((p) => p.severity === "warn") ? { key: "warn", className: "badge warn", text: "warn" } : undefined,
   ].filter((f) => f !== undefined);
@@ -78,7 +78,7 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
           <div className="field">
             <dt>チケット</dt>
             <dd>
-              {row.tickets}件{row.doing > 0 && <span className="dim">、作業中{row.doing}件</span>}
+              {row.tickets}件{row.doing > 0 && <span className="dim">、進行中{row.doing}件</span>}
             </dd>
           </div>
         )}

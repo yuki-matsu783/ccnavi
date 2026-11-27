@@ -24,9 +24,9 @@ test("CB-T192 列が変わったカードと新規起票のカードだけを出
     "i0001-02-05": "cancelled",
   });
 
-  // 承認は 未着手 → 作業中。着手も完了も同じ形で出る
+  // 承認は 承認待ち → 進行中。着手も完了も同じ形で出る
   const after: Placement = { ...before, "i0001-02-03": "doing", "i0001-02-02": "done" };
-  // 順序は`after`の並び順。`placementOf`が作ったものなら列の順（未着手 → 作業中 → …）
+  // 順序は`after`の並び順。`placementOf`が作ったものなら列の順（承認待ち → 進行中 → …）
   assert.deepEqual(movedCards(before, after), [
     { id: "i0001-02-03", from: "todo", to: "doing" },
     { id: "i0001-02-02", from: "doing", to: "done" },
@@ -87,7 +87,7 @@ test("CB-T192c 1枚目は動いた表示を付けず、列が動かない更新�
   assert.deepEqual(first.moved, []);
   assert.notEqual(first.placement, undefined);
 
-  // 承認された（未着手 → 作業中）
+  // 承認された（承認待ち → 進行中）
   const approved = movedStep(first, moveTo(board, "i0001-02-03", "doing"));
   assert.deepEqual(approved.moved, [{ id: "i0001-02-03", from: "todo", to: "doing" }]);
 
@@ -99,7 +99,7 @@ test("CB-T192c 1枚目は動いた表示を付けず、列が動かない更新�
 
   // 次に何かが動いたら、前の動いた表示は消えて新しい動きに入れ替わる
   const next = movedStep(again, moveTo(board, "i0001-02-02", "done"));
-  // 順序は列の順（未着手 → 作業中 → 完了）
+  // 順序は列の順（承認待ち → 進行中 → 完了）
   assert.deepEqual(next.moved, [
     { id: "i0001-02-03", from: "doing", to: "todo" },
     { id: "i0001-02-02", from: "doing", to: "done" },

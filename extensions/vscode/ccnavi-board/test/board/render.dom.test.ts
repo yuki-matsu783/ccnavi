@@ -328,7 +328,7 @@ test("CB-T109 オーバーレイを渡さなければ出ない", async () => {
 test("CB-T12 4列と件数と承認ボタンを出す", async () => {
   const page = await openBoard();
   try {
-    assert.deepEqual(texts(page, ".column button.fold .label"), ["未着手", "作業中", "完了", "取り消し"]);
+    assert.deepEqual(texts(page, ".column button.fold .label"), ["承認待ち", "進行中", "完了", "取り消し"]);
     assert.equal(page.all(".column").length, 4);
     assert.equal(text(page, ".summary .counts"), "残り4 / 全6");
     assert.equal(text(page, ".summary .pending"), "承認待ち1件");
@@ -583,7 +583,7 @@ test("CB-T264 先行を満たしていないカードに「先行待ち（先行
   }
 });
 
-test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認待ちは承認と着手、未着手は着手、着手済み・レビュー待ちは止まらないと言う", async () => {
+test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認待ちは承認と着手、着手待ちは着手、着手済み・レビュー待ちは止まらないと言う", async () => {
   const base = fixture();
   const unmet = [{ ticket: "i0001-01-09", state: "doing", label: "作業中（doing/）" }];
   const at = (id: string) => base.tickets.find((t) => t.ticket === id)!;
@@ -592,7 +592,7 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
       return { ...t, predecessors_unmet: unmet }; // 承認待ち
     }
     if (t.ticket === "i0001-02-02") {
-      return { ...t, started_at: "", predecessors_unmet: unmet }; // 承認済み・未着手
+      return { ...t, started_at: "", predecessors_unmet: unmet }; // 承認済み・着手待ち
     }
     if (t.ticket === "i0001-02-04") {
       return { ...t, predecessors_unmet: unmet }; // レビュー待ち

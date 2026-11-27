@@ -404,7 +404,7 @@ courses:
         scene: { tab: rules }
       - target: rules
         title: ルール
-        body: deny（止める）・ask（確認する）・allow（通す）のタイプごとに並びます。判定は強い順にdeny > ask > allowです。行を押すと欄が開き、「＋ ルールを追加」で追加できます。見出しの ▾ でタイプを畳めます。
+        body: deny（止める）・ask（確認する）・allow（通す）のタイプごとに並びます。判定は強い順に 拒否 > 確認 > 許可（deny > ask > allow）です。行を押すと欄が開き、「＋ ルールを追加」で追加できます。見出しの ▾ でタイプを畳めます。
         scene: { tab: rules, open: git-push }
       - target: find
         title: 絞り込み
@@ -753,7 +753,7 @@ courses:
         scene: { tab: rules, fold: allow }
       - target: order-hint
         title: 判定の強さ
-        body: 判定は強い順にdeny > ask > allowです。1件でもdenyにヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
+        body: 判定は強い順に 拒否 > 確認 > 許可（deny > ask > allow）です。1件でもdenyにヒットすれば拒否で、弱いタイプは確認しません。行の並びが強さを決めるのではなく、タイプが決めます。
         scene: { tab: rules }
       - target: rule-no-rm-rf-buttons
         title: 同じタイプの中の順

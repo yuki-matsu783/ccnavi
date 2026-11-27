@@ -162,7 +162,7 @@ function fieldsOf(card: StatusCard): string {
  * 4. 完了の列（`done/`）か、取り消しでないアーカイブ → 完了
  * 5. `copyStatus === "review"`: 自分のフェーズの状態を使う（レビュー待ち／レビュー準備中／レビュー予定。それ以外は要確認）
  * 6. `copyStatus === "open"`: 自分のフェーズが`reviewWaiting`か`gateClosed`なら要確認。そうでなければ
- *    `startedAt`が空なら開始前、あれば作業中
+ *    `startedAt`が空なら着手待ち、あれば作業中
  * 7. 上のどれにもヒットしない → 要確認（読めた欄をツールチップに出す）
  *
  * 親（親のレビュー状態はフェーズ一覧から見る。親カードの`gateClosed`は使わない）
@@ -172,7 +172,7 @@ function fieldsOf(card: StatusCard): string {
  * 4. 完了・アーカイブ → 完了（早めに閉じていれば「完了（早めに終了）」）
  * 5. フェーズのどれかがレビュー待ち → レビュー待ち
  * 6. フェーズのどれかがレビュー準備中 → レビュー準備中
- * 7. `copyStatus === "open"` → 開始前／作業中
+ * 7. `copyStatus === "open"` → 着手待ち／作業中
  * 8. 上のどれにもヒットしない → 要確認
  */
 export function statusOf(card: StatusCard): Status {
@@ -196,7 +196,7 @@ export function statusOf(card: StatusCard): Status {
 /** 「レビュー準備中」のツールチップ。ユーザの番ではない */
 const PREPARING_TITLE = "エージェントがレビュー依頼を出す番です";
 
-/** 「開始前」のツールチップ。ユーザが次に頼むこと */
+/** 「着手待ち」のツールチップ。ユーザが次に頼むこと */
 const NOT_STARTED_TITLE = "承認済みで、まだ着手していません。Claude Codeに着手を頼むと、エージェントがワークツリーを作って作業を始めます";
 
 /** 「作業中」のツールチップ。エージェントの番 */
@@ -218,7 +218,7 @@ function parentStatus(card: StatusCard): Status {
     return { label: "レビュー準備中", title: PREPARING_TITLE, tone: "wait" };
   }
   if (card.copyStatus === "open") {
-    return card.startedAt === "" ? { label: "開始前", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
+    return card.startedAt === "" ? { label: "着手待ち", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
   }
   return check(fieldsOf(card));
 }
@@ -243,7 +243,7 @@ function childStatus(card: StatusCard): Status {
     if (card.reviewWaiting || card.gateClosed) {
       return check("作業中なのに、フェーズがレビューで止まっています");
     }
-    return card.startedAt === "" ? { label: "開始前", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
+    return card.startedAt === "" ? { label: "着手待ち", title: NOT_STARTED_TITLE, tone: "wait" } : { label: "作業中", title: WORKING_TITLE, tone: "work" };
   }
   return check(fieldsOf(card));
 }

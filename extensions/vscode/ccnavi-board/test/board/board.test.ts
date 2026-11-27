@@ -20,9 +20,9 @@ test("CB-T05 列は置き場から引き、親のあとに子が並ぶ。レビ�
       ["archived", []],
     ],
   );
-  assert.deepEqual(board.columns.map((c) => c.label), ["未着手", "作業中", "完了", "取り消し", "アーカイブ"]);
+  assert.deepEqual(board.columns.map((c) => c.label), ["承認待ち", "進行中", "完了", "取り消し", "アーカイブ"]);
   assert.equal(board.totalCount, 6);
-  // 残りは未着手と作業中（レビュー待ちを含む）
+  // 残りは承認待ちと進行中（レビュー待ちを含む）
   assert.equal(board.remainingCount, 4);
 });
 
@@ -70,7 +70,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.match(cancelled.openPath, /\.ccnavi\/approved\/done\/i0001-02-05\.md$/);
 });
 
-test("CB-T07 提案がなければ承認済みチケットの置き場が列。どちらにもなければ未着手に置き、不備の文は実行ファイルのものを出す", () => {
+test("CB-T07 提案がなければ承認済みチケットの置き場が列。どちらにもなければ承認待ちの列に置き、不備の文は実行ファイルのものを出す", () => {
   const base = fixture();
   const doing: TicketJson = {
     ...base.tickets[1],

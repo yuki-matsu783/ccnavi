@@ -151,8 +151,8 @@ export function Phase(props: PhaseProps): JSX.Element {
               disabled={disabled}
               onChange={(event) => props.onChange({ ...phase, inherit: event.target.value === "inherit" })}
             >
-              <option value="inherit">inherit（親チケットの編集可能な範囲を引き継ぐ）</option>
-              <option value="globs">上限を指定する（globのリスト）</option>
+              <option value="inherit">親チケットの編集可能な範囲を引き継ぐ（inherit）</option>
+              <option value="globs">上限をパターン（glob）で指定する</option>
             </select>
             {!phase.inherit && list("scope", "f-scope-globs", "src/*, tests/*。ワークツリーのルートからの相対で、子チケットの編集可能な範囲はこの中に収めます。区切りは半角の「,」です")}
           </div>

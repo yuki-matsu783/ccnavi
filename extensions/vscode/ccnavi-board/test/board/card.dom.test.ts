@@ -317,7 +317,7 @@ test("CB-D707a 承認待ち（ワークツリー未作成）は警告色にせ�
     };
     assert.deepEqual(badge("wait"), { text: "ワークツリー未作成", warn: false });
     assert.deepEqual(badge("busy"), { text: "ワークツリーが見つからない", warn: true });
-    // 開始前の子（着手するとワークツリーを作る）も異常ではない
+    // 着手待ちの子（着手するとワークツリーを作る）も異常ではない
     assert.deepEqual(badge("fresh"), { text: "ワークツリー未作成", warn: false });
   } finally {
     await page.close();
@@ -470,7 +470,7 @@ test("CB-D712 ユーザ待ちのみの絞り込み・畳んだ列・幅と同じ
   }
 });
 
-test("CB-D713 カードの言葉は用語の表のとおり（承認待ち・開始前・作業中・レビュー準備中・レビュー待ち・レビュー予定・レビュー済み・レビュー省略・完了・取り消し・要確認）", async () => {
+test("CB-D713 カードの言葉は用語の表のとおり（承認待ち・着手待ち・作業中・レビュー準備中・レビュー待ち・レビュー予定・レビュー済み・レビュー省略・完了・取り消し・要確認）", async () => {
   const json = boardOf(
     [
       ticketJson("p"),
@@ -492,7 +492,7 @@ test("CB-D713 カードの言葉は用語の表のとおり（承認待ち・開
   const page = await openBoard(json);
   try {
     const statuses = page.all("li.card").map((c) => `${c.getAttribute("data-id")}:${c.getAttribute("data-status")}`);
-    assert.deepEqual(statuses.sort(), ["early:開始前", "later:レビュー予定", "p:レビュー待ち", "prep:レビュー準備中", "wait:レビュー待ち", "work:作業中"]);
+    assert.deepEqual(statuses.sort(), ["early:着手待ち", "later:レビュー予定", "p:レビュー待ち", "prep:レビュー準備中", "wait:レビュー待ち", "work:作業中"]);
     const rows = page.all('li.card[data-id="p"] .phase-status').map((e) => e.textContent);
     assert.deepEqual(rows, ["進行中", "レビュー準備中", "レビュー予定", "レビュー待ち", "進行中", "これから"]);
   } finally {
