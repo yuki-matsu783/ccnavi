@@ -368,7 +368,7 @@ func IDClash(branch string, names []string) string {
 
 // IsIntegration は、name が統合先とみなす名前か（保護されたブランチか、統合先 integration と同じ名前か）。大文字小文字は
 // 区別しない。integration が空（統合先が決まらない）なら保護されたブランチだけを見る。統合先へ書く・送る・親にするのを断る
-// 判定は、どれもこの関数を使う。
+// 判定は、どれもこの関数を使う。保護されたブランチを BranchProblem で別に断る所は、統合先との比べだけ SameID で行う。
 func IsIntegration(name, integration string) bool {
 	return Protected(name) || (integration != "" && SameID(name, integration))
 }
