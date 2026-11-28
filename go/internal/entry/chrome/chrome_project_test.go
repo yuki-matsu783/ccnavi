@@ -11,9 +11,9 @@ import (
 	"ccnavi/internal/infra/pyjson"
 )
 
-// プロジェクトの親子のチケットの仮のツリーでは、プロジェクトのレイヤーは統合先の .ccnavi/config/project/ を
+// プロジェクトの親子のチケットの仮のツリーでは、プロジェクトの設定は統合先の .ccnavi/config/project/ を
 // そのまま写す。同期が配るミラー（プロジェクトの .ccnavi/config/common/）と config の外のファイルは写さず、
-// 共通レイヤーはワークスペースの統合先のものだけを読む。
+// 共通設定はワークスペースの統合先のものだけを読む。
 func TestTheProjectLayerIsTheIntegrationConfigAsItIs(t *testing.T) {
 	const (
 		rules  = "{\"version\": 1, \"deny\": []}\n"
@@ -76,6 +76,6 @@ func TestTheProjectLayerIsTheIntegrationConfigAsItIs(t *testing.T) {
 		t.Errorf("プロジェクトに写したもの: %v", got)
 	}
 	if body, err := os.ReadFile(filepath.Join(root, ".ccnavi", "config", "common", "risks.yml")); err != nil || string(body) != common {
-		t.Errorf("共通レイヤーがワークスペースの統合先のものでない: %q %v", body, err)
+		t.Errorf("共通設定がワークスペースの統合先のものでない: %q %v", body, err)
 	}
 }

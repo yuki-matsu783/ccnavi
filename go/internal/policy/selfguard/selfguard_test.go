@@ -370,7 +370,7 @@ func TestLayerKeyAndCopyKey(t *testing.T) {
 		{config.OriginCommon, config.LayerCommon, config.KindPhases, "phases"},
 		{config.OriginSelf, config.LayerSelf, config.KindRules, "rules:self"},
 		{config.OriginProject, "lib", config.KindRisk, "risk:lib"},
-		// 予約名のプロジェクトは置き場を付ける（共通レイヤーと自身のレイヤーの key とぶつけない）。
+		// 予約名のプロジェクトは置き場を付ける（共通設定とワークスペースの設定の key とぶつけない）。
 		{config.OriginProject, "common", config.KindRules, "rules:projects/common"},
 		{config.OriginProject, "Self", config.KindRules, "rules:projects/Self"},
 		{config.OriginMirror, "lib", config.KindRules, "rules:mirror/lib"},
@@ -461,7 +461,7 @@ func TestHandoffExempt(t *testing.T) {
 	}
 }
 
-// 報告は状況ごとに注意を足す（ワークツリー側・共通レイヤーのルールファイル・取り直し・ユーザへの依頼）。
+// 報告は状況ごとに注意を足す（ワークツリー側・共通設定のルールファイル・取り直し・ユーザへの依頼）。
 func TestReport(t *testing.T) {
 	root := t.TempDir()
 	copyMessages(t, root)

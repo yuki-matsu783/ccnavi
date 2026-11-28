@@ -236,7 +236,7 @@ test("CB-D346 一覧にない新しいツール名を追加欄に打つと、選
     dom.type(dom.one<HTMLInputElement>(`${adder} input`), "2bad name");
     dom.click(dom.one(`${adder} button`));
     await dom.settle();
-    assert.match(dom.one(`${adder} .add-error`).textContent, /英字で始まり/);
+    assert.match(dom.one(`${adder} .add-error`).textContent, /英字で始め/);
     assert.ok(!dom.one(`${rowSelector("no-rm")} .picker`).textContent?.includes("2bad"), "形の違う名前は選択肢に出ない");
 
     dom.type(dom.one<HTMLInputElement>(`${adder} input`), "mcp__github__get_me");
@@ -378,7 +378,7 @@ test("CB-D124 「記録から候補を出す」はsuggestを送り、届いた�
     assert.equal(dom.all("#judge-pane #suggest-result").length, 1);
     assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
     assert.equal(dom.all("#suggest-result .candidate").length, 1);
-    assert.match(dom.one("#suggest-result").textContent ?? "", /除いたもの2件/);
+    assert.match(dom.one("#suggest-result").textContent ?? "", /検証を通らなかった2件は除いています/);
     assert.match(dom.one('#suggest-result .candidate[data-id="suggest-npm-install"] pre').textContent ?? "", /^# ルールを追加する候補/);
     // 候補はルールに足さない（下書きを見せるだけ）
     assert.equal(dom.all('.rule[data-id="suggest-npm-install"]').length, 0);
@@ -842,7 +842,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
 
 test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が1つだけでも出す", async () => {
   const targets = [
-    { kind: "workspace", name: "", label: "共通の設定" },
+    { kind: "workspace", name: "", label: "共通設定" },
     { kind: "self", name: "", label: "ワークスペース" },
     { kind: "project", name: "app:x", label: "プロジェクトapp:x" },
   ];
@@ -851,7 +851,7 @@ test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前
     const select = dom.one<HTMLSelectElement>("select#target");
     assert.deepEqual(
       [...select.options].map((o) => o.textContent),
-      ["共通の設定", "ワークスペース", "プロジェクトapp:x"],
+      ["共通設定", "ワークスペース", "プロジェクトapp:x"],
     );
     assert.equal(select.value, "workspace:");
     dom.change(select, "project:app:x");
@@ -869,13 +869,13 @@ test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前
   }
 });
 
-test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通の設定へ戻れる", async () => {
+test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通設定へ戻れる", async () => {
   const dom = await openPage({
     kind: "error",
     error: "ファイルを読み込めません",
     target: { kind: "project", name: "app" },
     targets: [
-      { kind: "workspace", name: "", label: "共通の設定" },
+      { kind: "workspace", name: "", label: "共通設定" },
       { kind: "self", name: "", label: "ワークスペース" },
       { kind: "project", name: "app", label: "プロジェクトapp" },
     ],
@@ -899,13 +899,13 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する1�
     // 開いている対象（lib）の統合結果が最初に出る。折りたたみは閉じてあるので、押して開く
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
-    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通 + ワークスペース", "共通 + プロジェクト（lib）"]);
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bashなど）が適用するのは、この結果ではなく、全プロジェクトの設定を足した和です/);
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通設定 + ワークスペース", "共通設定 + プロジェクト（lib）"]);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bashなど）には、全プロジェクトの設定を足したルールが適用されます/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
-    assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通"], ["lib:no-tmp", "Write", "プロジェクト（lib）"]]);
+    assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通設定"], ["lib:no-tmp", "Write", "プロジェクト（lib）"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
     assert.equal(dom.all('#sum .sum-section[data-section="allow"] tbody tr').length, 0);
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3件（共通 + プロジェクト（lib））");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3件（共通設定 + プロジェクト（lib））");
     // 統合結果を切り替えても、拡張ホストへは何も送らない（見せるだけ。判定も合成もしない）
     dom.change(select, "self");
     await dom.settle();
@@ -919,14 +919,14 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する1�
   }
 });
 
-test("CB-T311 共通の設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は、共通の設定のルールだけが効いていると言う", async () => {
+test("CB-T311 共通設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
   const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAMLとして読み込めない", deny: [], ask: [] } : s));
   const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     dom.change(dom.one("select#sum-select"), "lib");
     await dom.settle();
-    assert.match(dom.one("#sum .banner.warn").textContent, /rules\.ymlを読み込めませんでした。（共通の設定のルールだけが効いています）: YAMLとして読み込めない/);
+    assert.match(dom.one("#sum .banner.warn").textContent, /読み込めず、その設定を空として扱っています.*YAMLとして読み込めない/);
   } finally {
     await dom.close();
   }
@@ -972,7 +972,7 @@ deny:
   const dom = await openRules({ model: readRules(text).model });
   try {
     const row = rowSelector("workspace-root");
-    assert.equal(dom.one(`${row} .sum-except`).textContent, "除外2");
+    assert.equal(dom.one(`${row} .sum-except`).textContent, "除外2件");
     dom.click(dom.one(`${row} .row-head`));
     await dom.settle();
     const shown = dom.all(`${row} .f-except code`).map((el) => el.textContent);
@@ -1048,10 +1048,10 @@ test("CB-D155 組み合わせ条件のルールは、畳んだ行に組み合わ
   const bad = await openRules({ model: readRules(BROKEN_WHEN).model }, undefined, { measure: true });
   try {
     const row = rowSelector("workspace-root");
-    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "組み合わせ条件に誤り1");
+    assert.equal(bad.one(`${row} .sum-when-error`).textContent, "組み合わせ条件に誤り1件");
     bad.click(bad.one(`${row} .row-head`));
     await bad.settle();
-    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["anyの中が空です（1個以上）"]);
+    assert.deepEqual(bad.all(`${row} .cond-problems li`).map((li) => li.textContent), ["anyの中が空です（条件が1個以上必要です）"]);
     assert.ok(bad.one(`${row} .cond-node[data-key="r.1.0"]`).classList.contains("broken"));
     // 誤りを押すとその点が選ばれ、子を足せば誤りが入れ替わる
     bad.click(bad.one(`${row} .cond-problems button`));
@@ -1318,7 +1318,7 @@ test("CB-D301 案内の間の統合結果は見本を出し、手順のsceneが�
       dom.all('#sum .sum-section[data-section="deny"] tbody tr').map((tr) => tr.querySelector("td")?.textContent),
       ["git-push", "no-rm-rf", "web:no-prod-deploy"],
     );
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5件（共通 + プロジェクト（web））");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "5件（共通設定 + プロジェクト（web））");
     await toStep(dom, "read-sum", 4);
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     assert.ok(dom.all('#sum .sum-section[data-section="deny"] tbody tr').some((tr) => tr.querySelector("td")?.textContent === "self:protect-secrets"));
@@ -1326,7 +1326,7 @@ test("CB-D301 案内の間の統合結果は見本を出し、手順のsceneが�
     await dom.settle();
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "lib", "閉じたあと案内で選んだ統合結果が残る");
     assert.equal(dom.one<HTMLDetailsElement>("#sum").open, false);
-    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3件（共通 + プロジェクト（lib））");
+    assert.equal(dom.one('#sum [data-count="sum"]').textContent, "3件（共通設定 + プロジェクト（lib））");
     assert.deepEqual(dom.posted.filter((message) => message.type !== "ready" && message.type !== "tourDone"), []);
   } finally {
     await dom.close();
@@ -1363,7 +1363,7 @@ test("CB-D303 保存前の検証エラーの案内は、その手順にだけ見
     await startCourse(dom, "save-error");
     assert.equal(dom.one("#status").textContent, "");
     await toStep(dom, "save-error", 1);
-    assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でエラーが見つかりました/);
+    assert.match(dom.one("#status").textContent ?? "", /設定の検証（--lint）でerrorが見つかりました/);
     assert.match(dom.one("#status").textContent ?? "", /error: db-migrate: ask に message がある/);
     assert.ok(dom.one("#status").classList.contains("error"));
     await toStep(dom, "save-error", 2);

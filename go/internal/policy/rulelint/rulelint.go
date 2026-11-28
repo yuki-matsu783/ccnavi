@@ -18,12 +18,12 @@ import (
 
 // Options は検査の対象の性質。
 type Options struct {
-	// Home はルールが指すファイル（additionalContextFile・{script:…}）を探す起点。レイヤーのルールなら
-	// そのレイヤーの git プロジェクトルート。空ならワークスペースルート、それも無ければルールファイルの隣。
+	// Home はルールが指すファイル（additionalContextFile・{script:…}）を探す起点。設定のルールなら
+	// その設定の git プロジェクトルート。空ならワークスペースルート、それも無ければルールファイルの隣。
 	Home string
-	// Layer は共通レイヤーより後ろのレイヤー（共通に足すものなので、deny や allow が空でも穴にならない）。
+	// Layer は共通設定より後ろの設定（共通に足すものなので、deny や allow が空でも穴にならない）。
 	Layer bool
-	// Project はプロジェクトのレイヤー（ターンの終わりのルールを読まない）。
+	// Project はプロジェクトの設定（ターンの終わりのルールを読まない）。
 	Project bool
 }
 
@@ -195,8 +195,8 @@ func stopProblems(rule *rules.Rule, name string, project bool) []rules.Problem {
 			rules.StopMatch+" は allow の別のルールに分けて置いてください")}
 	}
 	if project {
-		return []rules.Problem{warn(name, "プロジェクトのレイヤーの "+rules.StopMatch+" のルールは使われない。"+
-			"ターンの終わりには共通レイヤーと自身のレイヤーしか読まない"+
+		return []rules.Problem{warn(name, "プロジェクトの設定の "+rules.StopMatch+" のルールは使われない。"+
+			"ターンの終わりには共通設定とワークスペースの設定しか読まない"+
 			"（外のリポジトリの 1 行でメインのターンを止めさせないため）")}
 	}
 	var problems []rules.Problem

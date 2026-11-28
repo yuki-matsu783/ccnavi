@@ -20,12 +20,12 @@ import (
 
 // 作業・レビュー計画のテンプレート（読む側）の受入テスト。
 //
-// 読み込み・2 層の統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
+// 読み込み・統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
 // go/internal/tickets/proposal/templates の見本（TestMatchesGolden）が 1 字単位で見る。リンク・ハードリンクを読まない保護は
 // links_test.go（TestLinksAreNotRead）が見る。ここで見るのは見本が持たない次の 3 つ。
 //  1. `ccnavi --templates` のテキストの出方、`--json` の答えの形（tests/fixtures/templates-json.json と
 //     templates-check-json.json。拡張と共有する）、使い方の誤りの拒否
-//  2. `ccnavi --lint` への出方（レイヤーの名前と重さ）
+//  2. `ccnavi --lint` への出方（設定の名前と重さ）
 //  3. 型の定義が変わったときの扱い
 
 const templatesJSONVersion = 1
@@ -199,7 +199,7 @@ func TestTheTextOutputs(t *testing.T) {
 	if tmpl["name"] != "feature" || tmpl["text"] != featureTemplate || tmpl["sha"] != hex.EncodeToString(sum[:]) {
 		t.Errorf("--show --json の template = %v", tmpl)
 	}
-	// 使わない理由を言う。統合結果の相手でないレイヤーの置き場の苦情は混ぜない。
+	// 使わない理由を言う。統合結果の相手でない設定の置き場の苦情は混ぜない。
 	r.common("broken", "name: [\n")
 	ticketkit.Write(t, filepath.Join(filepath.Dir(r.path("self", "x")), "notes.txt"), "x")
 	ticketkit.Write(t, r.path("lib", "lib"), templateText("lib", "  - design\n", "", ""))

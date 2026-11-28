@@ -12,7 +12,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 各 sh の引数・出力・終了コードの細かい決まりは、その sh の先頭の説明に書いてある。ここには役割と、誰が打つかだけを書く。
 打ち方の手引きがあるものは各ページ（[git](git.md)・[チケット](tickets.md)・[レビュー](review.md)）にある。
 
-「ユーザ」とあるものは、エージェントからは止まる。ターミナルで人が打つか、ボードの操作が送る。
+「ユーザ」とあるものは、エージェントからは止まる。ターミナルで人が打つか、チケット管理画面の操作が送る。
 「hook」は settings.json に登録され、セッションの節目で自動で走る。
 
 ## hook が起動する
@@ -49,12 +49,12 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | sh | 役割 | 打つ人 |
 |---|---|---|
 | `ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する | ユーザ |
-| `ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。承認・ボードの保存・ユーザの判断のあとに呼ばれる | ユーザ |
+| `ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。承認・チケット管理画面の保存・ユーザの判断のあとに呼ばれる | ユーザ |
 | `ccnavi-user-decide.sh` | 残った指摘（未解決のスレッド）の対応方針を決めて置く | ユーザ |
 | `ccnavi-user-close-early.sh` | 残りがあるまま親を早めに閉じる判断を置く。残りを issue に書き出す | ユーザ |
 | `ccnavi-user-clean-branch.sh` | 親を閉じたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
 | `ccnavi-user-handoff.sh` | 保護対象の下書き（`wip/handoff/`）を、本来の場所へ取り込む。引数なしは取り込み待ちを見せるだけ | ユーザ |
-| `ccnavi-user-mirror.sh` | 共通レイヤーのミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
+| `ccnavi-user-mirror.sh` | 共通設定のミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
 | `ccnavi-user-prune.sh` | 判定ログと state を整理する。`--preview` は動かすものを並べるだけ | ユーザ |
 
 ## 直接は打たないファイル

@@ -9,11 +9,11 @@ import { layerLabel as coreLayerLabel } from "../../core/sums.js";
 export function droppedLabel(reason: string): string {
   switch (reason) {
     case "invalid":
-      return "読み込めません";
+      return "読み込み不可";
     case "duplicate":
-      return "共通と同じ中身";
+      return "共通設定と同じ内容";
     case "conflict":
-      return "共通と食い違います";
+      return "共通設定と内容が違う";
     default:
       return reason;
   }
@@ -24,10 +24,10 @@ export function treeLabel(tree: string): string {
   return tree === "" ? "ワークスペース" : tree;
 }
 
-/** レイヤーの言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は`core/sums.ts`と同じ */
+/** 設定の言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は`core/sums.ts`と同じ */
 export const layerLabel = coreLayerLabel;
 
-/** 対象が見せるレイヤー。実行ファイルが返していなければundefined */
+/** 対象が見せる設定。実行ファイルが返していなければundefined */
 export function layerFor(target: { readonly kind: string; readonly name: string }, layers: readonly TemplateLayer[]): TemplateLayer | undefined {
   const name = shownLayerOf(target);
   return layers.find((layer) => layer.name === name);

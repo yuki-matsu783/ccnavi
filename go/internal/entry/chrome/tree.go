@@ -21,7 +21,7 @@ const headPrefix = "ref: refs/heads/"
 
 // build は統合先をワークスペースルートに、親子のチケットをワークツリーに置いた仮のツリーを組む。プロジェクトの
 // リポジトリは、ワークスペースの統合先をワークスペースルートに、プロジェクトの統合先（done/ とプロジェクトの
-// レイヤー）を projects/<名前>/ に置き、親子のチケットをそのプロジェクトのワークツリーにする。HEAD はブランチの
+// 設定）を projects/<名前>/ に置き、親子のチケットをそのプロジェクトのワークツリーにする。HEAD はブランチの
 // 名前を読む先（承認の記録の source_tree はブランチ名）。
 func (s *snapshot) build(root string, families []string) error {
 	// 前の要求の仮のツリーを消して、組み直す。
@@ -42,7 +42,7 @@ func (s *snapshot) build(root string, families []string) error {
 		}
 		return nil
 	}
-	// 1. ワークスペースルートとプロジェクトに、統合先の中身（done/ とレイヤー）を置く。
+	// 1. ワークスペースルートとプロジェクトに、統合先の中身（done/ と設定）を置く。
 	integ := s.branch(s.integration)
 	stamped := []string{settingsFile, config.CompatFile}
 	if s.project == "" {
@@ -66,9 +66,9 @@ func (s *snapshot) build(root string, families []string) error {
 		if err := head(ospath.Join(owner, tree.DotGit), s.integration); err != nil {
 			return err
 		}
-		// プロジェクトのレイヤーは統合先の .ccnavi/config/project/ をそのまま写す。共通レイヤーはワークスペースの
+		// プロジェクトの設定は統合先の .ccnavi/config/project/ をそのまま写す。共通設定はワークスペースの
 		// 統合先のものだけで、プロジェクトの .ccnavi/config/common/（同期が配るミラー）は読まない。ミラーを共通として
-		// 読むと、ずれている間ワークスペースと違う判定になる。P の上のレイヤーも読まない（P の上で書き換えて承認や
+		// 読むと、ずれている間ワークスペースと違う判定になる。P の上の設定も読まない（P の上で書き換えて承認や
 		// レビューを外せないように）。
 		if err := keep(integ, owner, []string{doneDir, ownLayer}, nil); err != nil {
 			return err

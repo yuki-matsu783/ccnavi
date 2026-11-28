@@ -101,6 +101,8 @@ func TestRoute(t *testing.T) {
 			map[string]string{"problem": "not-open merged"}},
 		{"採用する MR のブランチが統合先そのもの", candidates(true, cand("feature-4-w", true, withMR(func(m map[string]any) { m["base"] = "feature-4-w" }))),
 			func() RouteArgs { a := issue("4"); a.Integration = "feature-4-w"; return a }(), map[string]string{"route": "adopt", "problem": "protected"}},
+		{"採用する MR のブランチが統合先と綴りだけ違う", candidates(true, cand("feature-4-w", true, withMR(func(m map[string]any) { m["base"] = "Feature-4-W" }))),
+			func() RouteArgs { a := issue("4"); a.Integration = "Feature-4-W"; return a }(), map[string]string{"route": "adopt", "problem": "protected"}},
 		{"統合先より進んでいないブランチは古い", candidates(true, cand("stale-1", true)), issue("1"), map[string]string{"route": "nomr", "after": "stale"}},
 		{"初期コミットだけなら作りかけ", candidates(true, cand("feature-2-y", true)), issue("2"), map[string]string{"route": "nomr", "after": "resume"}},
 		{"作りかけでも --mr で来たら続けない", candidates(true, cand("feature-2-y", true)), RouteArgs{What: "mr", Number: "2", HasMR: true, Integration: "main"},

@@ -25,7 +25,8 @@ const gitCheckUsage = "ccnavi: git check <自分の呼び方> <ccnavi-sync.sh �
 // 通すかを答える。1 行目は `allow`・`pass`（続きの判定はラッパーが持つ）、または `deny <識別子>` と次の行の拒否の文。
 // allow に続けて、`prepend <語>`（git の引数の前に足す）・`warn <文>`（出力の後ろに出す）・`gate-top <パス>` と
 // `gate-branch <ブランチ>`（push の前に、リモートに親のブランチが在るかを確かめる）・`target <統合先>`（統合先を
-// チェックアウトしているユーザのチェックアウト）の行が付くことがある。
+// チェックアウトしているユーザのチェックアウト）の行が付くことがある。`integrate`・`integrate-done` には、ロックを分ける
+// 名前の `repo <名前>` の行が付く。
 // 引数を ccnavi の引数として受けないのは、`-m` のような語を ccnavi 自身のオプションとして読まないため。
 func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.Settings, words []string) int {
 	if len(words) != 5 {
@@ -59,6 +60,12 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 		if kv[1] != "" {
 			lines = append(lines, kv[0]+" "+kv[1])
 		}
+	}
+	// 直接作業の取り込みは、ラッパーがロックを取ってから `git integrate` を呼ぶ。ロックを分ける名前（cwd のツリーの
+	// プロジェクト。ワークスペースは self）をここで答える。
+	if len(args) > 0 && (args[0] == "integrate" || args[0] == "integrate-done") {
+		here, _ := tree.TreeOf(root, cwd, integrate.ProjectsDir(conf, root))
+		lines = append(lines, "repo "+tree.RepoKey(here.Project))
 	}
 	fmt.Fprintln(stdout, strings.Join(lines, "\n"))
 	return config.ExitOK

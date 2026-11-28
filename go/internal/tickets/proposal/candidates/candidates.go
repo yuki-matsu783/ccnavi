@@ -69,7 +69,7 @@ func Candidates(conf *config.Settings, root string, pending, revisions, approved
 	fams := standing.NewFamilies(conf, root)
 	mixed := feedbackWithPlanChildren(revisions, pending, openIndex)
 
-	// 定義と見出しはチケットごとにレイヤーが違いうるので、プロジェクトごとに 1 回だけ読む。
+	// 定義と見出しはチケットごとに設定が違いうるので、プロジェクトごとに 1 回だけ読む。
 	load := func(t *ticket.Ticket) string {
 		name := ProjectOf(t, pool)
 		if !cached[name] {
@@ -255,7 +255,7 @@ func typesFrom(t *ticket.Ticket, pool map[string]*ticket.Ticket) *phases.Types {
 	return phases.TypesOf(t)
 }
 
-// ProjectOf はこのチケットのレイヤーを決める project:。子は親のプロジェクトを使う（食い違えば ProjectProblems が
+// ProjectOf はこのチケットの設定を決める project:。子は親のプロジェクトを使う（食い違えば ProjectProblems が
 // 外す）。親が対応表に居ないときだけ、子の置き場の値を読む。
 func ProjectOf(t *ticket.Ticket, pool map[string]*ticket.Ticket) string {
 	if t.IsChild() {

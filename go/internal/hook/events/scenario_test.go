@@ -53,7 +53,7 @@ func childText(id, phase, entries string, extra ...string) string {
 	return text + "---\n\n本文\n"
 }
 
-// selfRules は自身のレイヤーのルール。保護領域（deny・ask）と、ターンの終わりの振り返り（match: Stop）を置く。
+// selfRules はワークスペースの設定のルール。保護領域（deny・ask）と、ターンの終わりの振り返り（match: Stop）を置く。
 const selfRules = `version: 1
 deny:
   - id: no-curl
@@ -80,7 +80,7 @@ allow:
     regex: '^(ls|pwd|echo)\b'
 `
 
-// workspace は判定の材料を一通り置き、コミットしたワークスペース。共通レイヤー・sh・作業の決まり（CCNAVI.md）は
+// workspace は判定の材料を一通り置き、コミットしたワークスペース。共通設定・sh・作業の決まり（CCNAVI.md）は
 // リポジトリのものを写す。チケットは親 1 本と、着手済みの子（ワークツリーあり）・未着手の子。直接作業のワークツリーも
 // 1 つ置く。
 func workspace(t *testing.T, root string) {

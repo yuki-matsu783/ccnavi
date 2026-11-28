@@ -3,7 +3,6 @@
  */
 import type { JSX } from "react";
 
-import { severityText } from "../../core/lint-summary.js";
 import { Code } from "../shared/Code.js";
 import type { TemplateProblem } from "../../core/templates-view.js";
 
@@ -15,7 +14,7 @@ export function Problems({ problems }: { readonly problems: readonly TemplatePro
     <ul className="tpl-problems">
       {problems.map((p, index) => (
         <li key={index} className={`sev-${p.severity}`}>
-          <span className="sev-label" title={p.severity}>[{severityText(p.severity)}]</span> <span>
+          <span className="sev-label">[{p.severity}]</span> <span>
             <Code text={p.detail} />
           </span>
         </li>

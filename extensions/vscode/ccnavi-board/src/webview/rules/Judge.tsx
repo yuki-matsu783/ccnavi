@@ -54,7 +54,7 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
           {rules.map((rule, index) => (
             <tr key={index}>
               <td>{rule.section !== "" && <span className={`verdict ${rule.section}`}>{rule.section}</span>}</td>
-              <td>{tmpName(rule.id) + (rule.source === "outside" ? "（ルールファイル外の根拠）" : "")}</td>
+              <td>{tmpName(rule.id) + (rule.source === "outside" ? "（ルールファイル以外に由来）" : "")}</td>
               <td>{rule.kind !== "" && <code>{`${rule.kind} ${rule.written}`}</code>}</td>
               <td>{rule.pattern !== "" && <code>{rule.pattern}</code>}</td>
             </tr>
@@ -124,7 +124,7 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
               ["subject", result.subject],
               ["resolved", result.resolved],
               ["reason", tmpName(result.reason)],
-              ["degraded", result.degraded === "" ? "" : `${result.degraded}（生の文字列に対して判定）`],
+              ["degraded", result.degraded === "" ? "" : `${result.degraded}（コマンドを解析できず、文字列のまま判定）`],
               ["fallback", result.fallback === "" ? "" : `${result.fallback}（組み込みの既定で判定）`],
             ]}
           />
@@ -135,7 +135,7 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
         </>
       ) : (
         <p>
-          <Verdict verdict="" /> {result.tool}は判定の対象を取り出せないツールです。ルールを作成してもヒットせず、呼び出しはそのまま通ります
+          <Verdict verdict="" /> {result.tool}は、ルールで判定できないツールです。ルールを作ってもヒットせず、呼び出しはそのまま通ります。
         </p>
       )}
       <h3>このツールで実行されるhook</h3>
@@ -190,7 +190,7 @@ export function ExpectationsResult({ result }: { readonly result: ExpectationsJs
                 </td>
                 <td>
                   {expectation.rules
-                    .map((rule) => `${rule.section}:${tmpName(rule.id)}${rule.source === "outside" ? "（ルールファイル外の根拠）" : ""}`)
+                    .map((rule) => `${rule.section}:${tmpName(rule.id)}${rule.source === "outside" ? "（ルールファイル以外に由来）" : ""}`)
                     .join(", ")}
                 </td>
                 <td className="why">{tmpName(expectation.why)}</td>
@@ -213,8 +213,8 @@ export function SuggestResult({ result }: { readonly result: SuggestJson }): JSX
   return (
     <div id="suggest-result" className="result" data-tour="suggest-result">
       <p>
-        記録{result.logs.length}本・{result.records}行から、候補{result.candidates.length}件
-        （検証を通らず除いたもの{result.dropped}件）。候補はすべて下書きです。確認して設定に反映するのはユーザです。
+        記録{result.logs.length}本・{result.records}行から、候補を{result.candidates.length}件作りました（検証を通らなかった
+        {result.dropped}件は除いています）。候補はすべて下書きです。内容を確認して、必要なものを設定に反映してください。
       </p>
       {result.candidates.length === 0 ? (
         <p className="empty">候補はありません</p>

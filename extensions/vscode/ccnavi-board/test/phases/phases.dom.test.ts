@@ -46,7 +46,7 @@ test("CB-D21 編集可能な範囲をinheritに変えるとglobの欄が消え�
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
     assert.ok(dom.one<HTMLButtonElement>("#save").disabled);
-    assert.match(dom.one("#status").textContent ?? "", /idが重なっています（research）/);
+    assert.match(dom.one("#status").textContent ?? "", /idが重複しています（research）/);
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p2")} input.f-id`).classList.contains("duplicate"));
     // 直せば保存できるようになり、文面も消える
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "design2");
@@ -319,7 +319,7 @@ test("CB-D68 往復の間は帯の更新も止め、更新を押した時点で�
     dom.click(dom.one('#changed button[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: true }]);
-    // レイヤーの置き場を実行ファイルに聞く間、欄は止まっている
+    // 設定の置き場を実行ファイルに聞く間、欄は止まっている
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
     await dom.send({ type: "cancelled" });
     assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);

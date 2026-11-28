@@ -7,17 +7,17 @@
  * `retainContextWhenHidden`が真で、入れ物（HTML）は1度しか入らない。入れ直すと画面が作り直され、開いた行が閉じるため。
  * 中身を渡すのは、ユーザが「更新」を押したときと、ファイルが外で変わったのを読み直したときだけ。
  *
- * 対象は3種。共通の設定のテンプレート（`.ccnavi/config/common/templates/`）、ワークスペースの設定のテンプレート、
- * プロジェクト1つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象のレイヤーのテンプレートの編集（計画のステップと線・子のフロー）。
- * 読んだ中身（一覧・レイヤーごとの中身・統合結果の索引・下書き）は`ccnavi --templates --json`の答えをそのまま渡す。
+ * 対象は3種。共通設定のテンプレート（`.ccnavi/config/common/templates/`）、ワークスペースの設定のテンプレート、
+ * プロジェクト1つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象の設定のテンプレートの編集（計画のステップと線・子のフロー）。
+ * 読んだ中身（一覧・設定ごとの中身・統合結果の索引・下書き）は`ccnavi --templates --json`の答えをそのまま渡す。
  *
  * **編集。** 編集中の中身は画面が持つ。拡張ホストが受け持つのは、実行ファイルでの検査（`--templates --check-file`）と保存だけ。
  * 読めるか・計画の順序・フローの形・図に描く中身は、実行ファイルの答えのまま。保存は、(1)書き出す本文を実行ファイルで検査してerrorが無い、
  * (2)実行ファイルが読み返した中身が、画面が書こうとした中身と同じ（食い違えば書かない）、(3)開いたときからファイルが外で変わっていない
  * （ハッシュが同じ。新規はまだ無い）、(4)リンクを辿らず一時ファイルの入れ替えで書く（`core/flow-write.ts`）、を満たしたときだけ書く。
- * 編集できるのは、開いている対象のレイヤーで、実行ファイルが書ける（`writable`）と答えたレイヤーのテンプレートだけ。
+ * 編集できるのは、開いている対象の設定で、実行ファイルが書ける（`writable`）と答えた設定のテンプレートだけ。
  * **作業中の錠。** 作業中のチケットがある間は、編集はできるが保存できない（取り込み待ち画面がテンプレートの取り込みを止めるのと同じ決まり。
- * 共通の設定とワークスペースはどのツリーの作業中でも、プロジェクトはそのプロジェクトの作業中だけ。確かめられなければ止める）。
+ * 共通設定とワークスペースはどのツリーの作業中でも、プロジェクトはそのプロジェクトの作業中だけ。確かめられなければ止める）。
  * 錠は編集を始めたときと、チケットが動いたときと、保存を押した時点で取り直す。実行ファイルには錠を足さない。
  * 改名・移動・削除は持たない（ユーザがファイルを直接操作する）。
  * 下書き（`wip/handoff/`の`template`）の取り込みと編集は「取り込み待ち」の画面が受け持つ。ここからはそちらを開く入口だけを持つ。
@@ -36,20 +36,20 @@ import { loadBoard, runTemplateCheck, runTemplates, runTemplateShow } from "./cc
 import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
 import { yamlText } from "./core/flow-doc.js";
-import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, readFlowFile, writeTreeFile } from "./core/flow-write.js";
 import { sameData } from "./core/template-edit.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { dirtyTitle } from "./core/save-gate.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import type { LayerTarget } from "./core/screens.js";
-import { rememberLayer, layerToOpen } from "./layer-memory.js";
-import { layerFrom, layerKey, layerName, sameLayer, targetOptions, type TargetOption } from "./core/targets.js";
+import type { SettingsTarget } from "./core/screens.js";
+import { rememberTarget, targetToOpen } from "./target-memory.js";
+import { sameTarget, targetFrom, targetKey, targetOptions, type TargetOption } from "./core/targets.js";
 import { NEW_TEMPLATE_NAME_RULE, shownLayerOf, templateNameTaken, templatesLayerOf, validNewTemplateName, validTemplateName } from "./core/templatesmodel.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, debounce, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
+import { assertRetained, debounce, toGlob, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -59,15 +59,15 @@ import { confirmDuringTurn } from "./turn-confirm.js";
 const SCREEN = "templates";
 const TITLE = "ccnaviテンプレート管理";
 
-/** 1枚の画面の「どの対象か」を画面の欄の値にコピーするための、対象の一覧の既定（共通の設定の欄のkind） */
+/** 1枚の画面の「どの対象か」を画面の欄の値にコピーするための、対象の一覧の既定（共通設定の欄のkind） */
 const COMMON_KIND = "workspace";
 
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを見る */
-  readonly target: LayerTarget;
+  readonly target: SettingsTarget;
   /** `ccnavi --templates --json`の答え */
   readonly data: TemplatesJson;
-  /** 切り替えられる対象（共通の設定・ワークスペース・設定のあるプロジェクト） */
+  /** 切り替えられる対象（共通設定・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
   /** 取り込み待ち画面を開けるか。実行ファイルが`handoff`の機能を持たなければ理由 */
   readonly handoff: HandoffEntry;
@@ -77,11 +77,11 @@ interface Loaded {
 
 interface PanelState {
   /** いま見せている対象。別の対象を開くと入れ替わる（タブは1枚） */
-  target: LayerTarget;
+  target: SettingsTarget;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<TemplatesData>;
-  /** テンプレートの置き場と設定ファイルの監視。対象のレイヤーが変わるので、更新のたびに張り直す */
+  /** テンプレートの置き場と設定ファイルの監視。対象の設定が変わるので、更新のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   loaded?: Loaded;
@@ -116,14 +116,14 @@ let state: PanelState | undefined;
 
 
 /** 読み込み中の一言で使う対象の名前 */
-function whatOf(target: LayerTarget): string {
+function whatOf(target: SettingsTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "共通の設定";
+      return "共通設定";
     case "self":
-      return "ワークスペース";
+      return "ワークスペースの設定";
     case "project":
-      return `プロジェクト${target.name}`;
+      return `プロジェクト「${target.name}」の設定`;
   }
 }
 
@@ -131,7 +131,7 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openTemplates`の本体。開いていれば前面に出すだけ。開くときは最後に選んだレイヤーで、無ければワークスペースで開く */
+/** `ccnaviBoard.openTemplates`の本体。開いていれば前面に出すだけ。開くときは最後に選んだ対象で、無ければワークスペースの設定で開く */
 export async function openTemplates(): Promise<void> {
   if (!requireTickets("テンプレート管理画面")) {
     return;
@@ -164,7 +164,7 @@ export async function openTemplates(): Promise<void> {
     // 開いたテンプレートの行や本文を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
-  const target = layerToOpen({ kind: "self" });
+  const target = targetToOpen({ kind: "self" });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
@@ -186,7 +186,7 @@ export async function openTemplates(): Promise<void> {
  * 開いているタブの対象を入れ替える。読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない
  * （`loaded`を空にする）。
  */
-async function switchTarget(current: PanelState, target: LayerTarget): Promise<void> {
+async function switchTarget(current: PanelState, target: SettingsTarget): Promise<void> {
   current.target = target;
   current.loaded = undefined;
   current.error = undefined;
@@ -204,13 +204,13 @@ async function switchTarget(current: PanelState, target: LayerTarget): Promise<v
   await reload(current);
 }
 
-async function readPage(root: string, target: LayerTarget): Promise<Loaded> {
-  // 一覧の中身（レイヤー・統合結果・下書き）は実行ファイルの答えをそのまま使う。レイヤーの場所も拡張は組まない。
+async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
+  // 一覧の中身（設定・統合結果・下書き）は実行ファイルの答えをそのまま使う。設定の場所も拡張は組まない。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
-    throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);
+    throw new Error(`チケットとワークツリーの状態をccnaviから取得できません: ${board.error}`);
   }
-  const key = layerKey(target);
+  const key = targetKey(target);
   const targets = targetOptions(board.board, COMMON_KIND, key);
   const result = await runTemplates(root, binSetting(), templatesLayerOf(key));
   if (!result.ok) {
@@ -268,7 +268,7 @@ function registerPanelHandlers(current: PanelState): void {
 
 /**
  * テンプレートの置き場と下書きの置き場（`wip/handoff/`）、設定ファイルが変わったら、読み直す。
- * レイヤーの場所は読んだ答えから決まるので、更新のたびに張り直す。
+ * 設定の場所は読んだ答えから決まるので、更新のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
@@ -288,10 +288,6 @@ function watchFiles(current: PanelState): void {
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.json"));
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.local.json"));
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {
@@ -319,7 +315,7 @@ function show(current: PanelState): void {
     page: {
       root: current.folder.uri.fsPath,
       generatedAt: new Date().toISOString(),
-      target: layerKey(loaded.target),
+      target: targetKey(loaded.target),
       targets: loaded.targets,
       data: loaded.data,
       handoff: loaded.handoff,
@@ -332,7 +328,7 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
-  const target = layerKey(current.target);
+  const target = targetKey(current.target);
   current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, COMMON_KIND, target) });
 }
 
@@ -437,25 +433,25 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, COMMON_KIND, layerKey(current.target))).find(
+      const option = (current.loaded?.targets ?? targetOptions(undefined, COMMON_KIND, targetKey(current.target))).find(
         (t) => t.kind === message.kind && t.name === message.name,
       );
       if (option === undefined) {
         return;
       }
-      const target = layerFrom(option);
-      if (target !== undefined && !sameLayer(current.target, target)) {
+      const target = targetFrom(option);
+      if (target !== undefined && !sameTarget(current.target, target)) {
         await switchTarget(current, target);
         // 切り替わったときだけ覚える（未保存の確認でやめたら覚えない）
-        if (sameLayer(current.target, target)) {
-          rememberLayer(target);
+        if (sameTarget(current.target, target)) {
+          rememberTarget(target);
         }
       }
       return;
     }
     case "showTemplate": {
-      // 1件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前とレイヤーで突き合わせる
-      const result = await runTemplateShow(current.folder.uri.fsPath, binSetting(), message.name, templatesLayerOf(layerKey(current.target)));
+      // 1件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前と設定で突き合わせる
+      const result = await runTemplateShow(current.folder.uri.fsPath, binSetting(), message.name, templatesLayerOf(targetKey(current.target)));
       if (!alive(current)) {
         return;
       }
@@ -588,7 +584,7 @@ function askUnsaved(unsaved: Unsaved | undefined): void {
   void vscode.window
     .showWarningMessage(
       `${unsaved.name === "" ? "テンプレート" : `テンプレート「${unsaved.name}」`}を未保存のまま閉じました。編集をYAMLで開きますか？`,
-      { modal: true, detail: "名前の無いエディタで開き、ファイルには書きません。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
+      { modal: true, detail: "無題のYAMLファイルとして開きます（保存はしません）。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
       asYaml,
       "破棄する",
     )
@@ -601,7 +597,7 @@ function askUnsaved(unsaved: Unsaved | undefined): void {
 }
 
 /** 開いている対象に掛ける作業中の錠。確かめられなければ掛かった錠にする */
-async function lockOf(current: PanelState, target: LayerTarget = current.target): Promise<Lock> {
+async function lockOf(current: PanelState, target: SettingsTarget = current.target): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
   if (!result.ok) {
     return lockFromError(result.error);
@@ -637,30 +633,30 @@ function postOpened(current: PanelState, session: number, opened: Extract<ToTemp
   current.host.post({ type: "editOpened", session, opened, error } satisfies ToTemplates);
 }
 
-/** 編集してよいレイヤー。開いている対象のレイヤーで、実行ファイルが書けると答えたものだけ。理由は画面にそのまま出す */
+/** 編集してよい設定。開いている対象の設定で、実行ファイルが書けると答えたものだけ。理由は画面にそのまま出す */
 function editableLayer(current: PanelState, layerName: string): { readonly ok: true; readonly layer: TemplateLayer } | { readonly ok: false; readonly error: string } {
   const data = current.loaded?.data;
   if (data === undefined) {
     return { ok: false, error: "一覧を読めていないため、編集できません" };
   }
-  const shown = shownLayerOf(layerKey(current.target));
+  const shown = shownLayerOf(targetKey(current.target));
   if (layerName !== shown) {
-    return { ok: false, error: "開いている対象のレイヤーのテンプレートだけ編集できます。対象を切り替えてください" };
+    return { ok: false, error: "いま選んでいる設定のテンプレートだけ編集できます。「設定」を切り替えてください。" };
   }
   const layer = data.layers.find((l) => l.name === shown);
   if (layer === undefined) {
-    return { ok: false, error: "この設定のテンプレートの置き場を、実行ファイルが返していません" };
+    return { ok: false, error: "この設定のテンプレートの置き場が分かりません（ccnaviが返しませんでした）。更新してやり直してください。" };
   }
   if (layer.unreadable !== "") {
-    return { ok: false, error: `このレイヤーの置き場を読めないため、編集できません: ${layer.unreadable}` };
+    return { ok: false, error: `この設定のテンプレートの置き場を読み込めないため、編集できません: ${layer.unreadable}` };
   }
   if (!layer.writable) {
-    return { ok: false, error: "このレイヤーは読み取り専用です。実行ファイルが書き込めないと判定したため、置き場の権限を確かめてください" };
+    return { ok: false, error: "この設定のテンプレートは読み取り専用です（ccnaviが、置き場に書き込めないと判定しました）。置き場のフォルダの権限を確かめてください。" };
   }
   return { ok: true, layer };
 }
 
-/** レイヤーの置き場のテンプレートのファイル。名前は形を確かめてから使う（ファイル名になるため） */
+/** 設定の置き場のテンプレートのファイル。名前は形を確かめてから使う（ファイル名になるため） */
 function templateFile(root: string, layer: TemplateLayer, name: string): string | undefined {
   if (!validTemplateName(name)) {
     return undefined;
@@ -674,7 +670,7 @@ function templateFile(root: string, layer: TemplateLayer, name: string): string 
 /** 一時の置き場に`<名前>.yml`として書き、実行ファイルに読ませる。ファイル名が名前の期待値になる */
 async function checkBytes(
   current: PanelState,
-  target: LayerTarget,
+  target: SettingsTarget,
   name: string,
   bytes: string | Uint8Array,
 ): Promise<{ readonly ok: true; readonly check: TemplateCheck } | { readonly ok: false; readonly error: string }> {
@@ -688,10 +684,10 @@ async function checkBytes(
     dir = fs.mkdtempSync(path.join(current.tmpDir, "check-"));
     fs.writeFileSync(path.join(dir, `${name}.yml`), bytes);
   } catch (error) {
-    return { ok: false, error: `検査のための一時ファイルを書けません: ${(error as Error).message}` };
+    return { ok: false, error: `検査用の一時ファイルを作成できません: ${(error as Error).message}` };
   }
   try {
-    const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), path.join(dir, `${name}.yml`), templatesLayerOf(layerKey(target)));
+    const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), path.join(dir, `${name}.yml`), templatesLayerOf(targetKey(target)));
     return result.ok ? { ok: true, check: result.value } : { ok: false, error: result.error };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -704,14 +700,14 @@ function sha256(bytes: string | Uint8Array): string {
 
 /**
  * 読ませている間に、対象が別に切り替わった（またはパネルが閉じた）か。切り替わっていたら`reply`で理由を返して真を返す。
- * レイヤー・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別のレイヤーの錠で通さない）
+ * 設定・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別の設定の錠で通さない）
  */
-function abandoned(current: PanelState, target: LayerTarget, reply: (error: string) => void): boolean {
+function abandoned(current: PanelState, target: SettingsTarget, reply: (error: string) => void): boolean {
   if (!alive(current)) {
     return true;
   }
-  if (!sameLayer(current.target, target)) {
-    reply("対象が切り替わったため、中止しました。開き直してください");
+  if (!sameTarget(current.target, target)) {
+    reply("設定が切り替わったため、中止しました。開き直してください。");
     return true;
   }
   return false;
@@ -719,7 +715,7 @@ function abandoned(current: PanelState, target: LayerTarget, reply: (error: stri
 
 /**
  * 一覧の1行を図で見せるため、そのファイルを実行ファイルに読ませて答えを返す。読むだけで、錠も編集の番号も取らない。
- * レイヤーは開いている対象のどのレイヤーでもよい（読み取り専用のレイヤーも図は見られる）
+ * 編集する設定は、開いている対象のどの設定でもよい（読み取り専用の設定も図は見られる）
  */
 async function preview(current: PanelState, name: string, layerName: string): Promise<void> {
   const target = current.target;
@@ -729,12 +725,12 @@ async function preview(current: PanelState, name: string, layerName: string): Pr
   const layer = current.loaded?.data.layers.find((l) => l.name === layerName);
   const file = layer === undefined ? undefined : templateFile(current.folder.uri.fsPath, layer, name);
   if (layer === undefined || file === undefined) {
-    reply(null, `テンプレート${name}の置き場が分かりません`);
+    reply(null, `テンプレート「${name}」の置き場が分かりません`);
     return;
   }
   const read = readFlowFile(current.folder.uri.fsPath, file);
   if (read === undefined) {
-    reply(null, `${name}.ymlがありません。更新してください`);
+    reply(null, `${name}.ymlがありません。更新してください。`);
     return;
   }
   const decoded = decodeFlowBytes(read.bytes);
@@ -758,7 +754,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
   const where = editableLayer(current, layerName);
   const file = where.ok ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (!where.ok || file === undefined) {
-    postOpened(current, session, null, where.ok ? `テンプレートの名前${name}は指定できません` : where.error);
+    postOpened(current, session, null, where.ok ? `「${name}」はテンプレートの名前に使えません` : where.error);
     return;
   }
   let read: ReturnType<typeof readFlowFile>;
@@ -769,7 +765,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
     return;
   }
   if (read === undefined) {
-    postOpened(current, session, null, `${name}.ymlがありません。更新してから開き直してください`);
+    postOpened(current, session, null, `${name}.ymlがありません。更新してから開き直してください。`);
     return;
   }
   const decoded = decodeFlowBytes(read.bytes);
@@ -787,7 +783,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
   }
   if (!checked.check.valid) {
     const why = checked.check.problems.map((p) => p.detail).join(" / ");
-    postOpened(current, session, null, `読み込めないため、画面では編集できません。ファイルを直接直してください: ${why}`);
+    postOpened(current, session, null, `読み込めないため、画面では編集できません。ファイルを直接直してください: ${why}。`);
     return;
   }
   const lock = await lockOf(current, target);
@@ -803,7 +799,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
-  const layerName = shownLayerOf(layerKey(current.target));
+  const layerName = shownLayerOf(targetKey(current.target));
   const where = editableLayer(current, layerName);
   if (!where.ok) {
     postOpened(current, session, null, where.error);
@@ -811,19 +807,19 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = validNewTemplateName(name) ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前${name}は指定できません。${NEW_TEMPLATE_NAME_RULE}`);
+    postOpened(current, session, null, `「${name}」はテンプレートの名前に使えません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
-  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通のレイヤーにある名前も、
+  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通設定にある名前も、
   // 同名で中身が違うと統合結果で破棄されるので作らない
   const taken = current.loaded === undefined ? undefined : templateNameTaken(current.loaded.data.layers, layerName, name);
   if (taken !== undefined) {
-    postOpened(current, session, null, `名前${name}は、${taken.layer === "common" ? "共通" : "このレイヤー"}の${taken.name}と同じです（大文字小文字は区別しません）。別の名前にしてください`);
+    postOpened(current, session, null, `「${name}」は、${taken.layer === "common" ? "共通設定" : "この設定"}の「${taken.name}」と同じ名前です（大文字と小文字は区別しません）。別の名前にしてください。`);
     return;
   }
   try {
     if (readFlowFile(current.folder.uri.fsPath, file) !== undefined) {
-      postOpened(current, session, null, `${name}.ymlは既にあります。一覧から開いて編集してください`);
+      postOpened(current, session, null, `${name}.ymlは既にあります。一覧から開いて編集してください。`);
       return;
     }
   } catch (error) {
@@ -855,7 +851,7 @@ async function editCheck(current: PanelState, session: number, seq: number, data
   };
   const named = dataOf(data);
   if (named === undefined || !validTemplateName(named.name)) {
-    reply(null, "テンプレートの名前は指定できません（英数字で始め、英数字と「.」「_」「-」のみ、64字まで）");
+    reply(null, "この名前はテンプレートの名前に使えません。英数字で始め、英数字と「.」「_」「-」だけを使い、64字までにしてください。");
     return;
   }
   const checked = await checkBytes(current, target, named.name, yamlText(data));
@@ -873,7 +869,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   };
   const root = current.folder.uri.fsPath;
   if (session !== current.editing) {
-    reply("", "保存しません: この編集は開いていません。開き直してください");
+    reply("", "保存できません: この編集は既に閉じられています。テンプレートを開き直してください。");
     return;
   }
   const where = editableLayer(current, layerName);
@@ -888,11 +884,11 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   if (lock.locked) {
     current.host.post({ type: "editLock", session, lock } satisfies ToTemplates);
-    reply("", `保存しません: ${lock.reason}`);
+    reply("", `保存できません: ${lock.reason}`);
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    reply("", "保存しません。エージェントの応答中です。応答が終わってから保存してください");
+    reply("", "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (abandoned(current, target, (e) => reply("", e))) {
@@ -901,7 +897,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   const file = templateFile(root, where.layer, name);
   const named = dataOf(data);
   if (file === undefined || named === undefined || named.name !== name) {
-    reply("", "保存しません: テンプレートの名前が不正か、中身の名前と食い違っています");
+    reply("", "保存できません: テンプレートの名前が不正か、中身の名前と食い違っています。");
     return;
   }
   // 1. 書き出す本文を実行ファイルに読ませる。errorが1件でもあれば書かない
@@ -911,17 +907,17 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   if (!checked.ok) {
-    reply("", `保存しません: ${checked.error}`);
+    reply("", `保存できません: ${checked.error}`);
     return;
   }
   const errors = checked.check.problems.filter((p) => p.severity === "error");
   if (!checked.check.valid || errors.length > 0) {
-    reply("", `保存しません: ${errors.map((p) => p.detail).join(" / ") || "実行ファイルが読み込めませんでした"}`);
+    reply("", `保存できません: ${errors.map((p) => p.detail).join(" / ") || "ccnaviが読み込めませんでした"}`);
     return;
   }
   // 2. 実行ファイルが読み返した中身が、画面が書こうとした中身と同じときだけ書く
   if (!sameData(data, checked.check.data)) {
-    reply("", "保存しません: 実行ファイルが読み返した中身が、画面の中身と食い違いました（YAMLの読み方の違い）。食い違う欄を直してから、保存し直してください");
+    reply("", "保存できません: 保存する内容をccnaviが読み返すと、画面の入力と違う値になりました（YAMLの読み方の違い）。入力した値を見直してから、保存し直してください。");
     return;
   }
   // 錠は、読ませている間に着手されたチケットを見逃さないよう、読んで書く直前（同期の区間の手前）にもう一度取り直す
@@ -931,7 +927,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   if (final.locked) {
     current.host.post({ type: "editLock", session, lock: final } satisfies ToTemplates);
-    reply("", `保存しません: ${final.reason}`);
+    reply("", `保存できません: ${final.reason}`);
     return;
   }
   // 3. 開いたときからファイルが外で変わっていない（新規はまだ無い）
@@ -943,11 +939,11 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   if (expect === "" ? read !== undefined : read === undefined || sha256(read.bytes) !== expect) {
-    reply("", expect === "" ? `${name}.ymlは、開いたあとに画面の外で作られています。更新してからやり直してください（上書きしません）` : `${name}.ymlは、開いたあとに画面の外で変わっています。この編集は上書きしません。更新して開き直してください`);
+    reply("", expect === "" ? `${name}.ymlは、開いたあとに画面の外で作られています。更新してからやり直してください（上書きはしません）。` : `${name}.ymlは、開いたあとに画面の外で変わっています。この編集では上書きできません。更新して開き直してください。`);
     return;
   }
   // 4. リンクを辿らず、一時ファイルの入れ替えで書く
-  const written = writeFlowFile(root, file, text, { exists: read !== undefined, mtimeMs: read?.mtimeMs ?? 0 }, "テンプレート");
+  const written = writeTreeFile(root, file, text, { exists: read !== undefined, mtimeMs: read?.mtimeMs ?? 0 }, "テンプレート", FLOW_FILE_LIMIT);
   if (!written.ok) {
     reply("", written.error);
     return;

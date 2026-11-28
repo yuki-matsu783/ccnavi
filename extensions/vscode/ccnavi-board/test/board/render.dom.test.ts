@@ -630,7 +630,7 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
     assert.match(title("i0001-02-02"), /着手はできません/);
     assert.doesNotMatch(title("i0001-02-02"), /承認/);
     assert.equal(text(page, '.card[data-id="i0001-02-04"] .badge.preds'), "先行チケットの条件が未達成（i0001-01-09）");
-    assert.match(title("i0001-02-04"), /作業を始めています/);
+    assert.match(title("i0001-02-04"), /このチケットは着手済みです/);
     assert.match(title("i0001-02-04"), /作業とfinishコマンドの実行は制限されません/);
   } finally {
     await page.close();

@@ -66,7 +66,7 @@ test("CB-D781 clone の例の図は、ターミナルへ送る 1 行と、止ま
       await dom.settle();
     }
     const stop = dom.one('.tour-bubble .tour-diagram-step[data-step="cred-stop"]');
-    assert.ok((stop.textContent ?? "").includes("URL に資格情報（user:token@）が入っています。"));
+    assert.ok((stop.textContent ?? "").includes("URLに資格情報（user:token@）が入っています。"));
     assert.equal(stop.className.includes("focus"), true);
   } finally {
     await dom.close();

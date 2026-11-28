@@ -47,7 +47,7 @@ const (
 	originType   = "フェーズ定義"
 )
 
-// Reject は却下された要求 1 件。origin は退けた側の名指し（「ルール no-secret（レイヤー common）」
+// Reject は却下された要求 1 件。origin は退けた側の名指し（「ルール no-secret（設定 common）」
 // 「親 i0001」「フェーズ定義 research」のどれか）。
 type Reject struct {
 	ticket   string
@@ -73,7 +73,7 @@ func probeOf(e ticket.Entry) string {
 	return e.Glob
 }
 
-// ruleSetFor はこのツリーへの書き込みに適用するルール集合（共通レイヤーに行き先のレイヤーを足した和）。苦情は
+// ruleSetFor はこのツリーへの書き込みに適用するルール集合（共通設定に行き先の設定を足した和）。苦情は
 // 判定の経路が言うので捨てる。ccnavi 自身の保護と承認済みの置き場の保護は組み込みにある（ルールファイルに無い）
 // ので、実行後の保護範囲と同じ条件で足す。足さないと、それらが退けた項として出なくなる。
 func ruleSetFor(conf *config.Settings, root string, target tree.Tree) (*rules.RuleSet, error) {
@@ -95,7 +95,7 @@ func ruleSetFor(conf *config.Settings, root string, target tree.Tree) (*rules.Ru
 	return rs, nil
 }
 
-// deniedBy はこのパスへの書き込みを止める deny。レイヤーの deny を土台より先に採る（判定の名指しと同じ）。
+// deniedBy はこのパスへの書き込みを止める deny。設定の deny を土台より先に採る（判定の名指しと同じ）。
 func deniedBy(rs *rules.RuleSet, full string) *rules.Rule {
 	var hits []*rules.Rule
 	for _, r := range rs.Deny {
@@ -182,7 +182,7 @@ func rejectOf(t *ticket.Ticket, e ticket.Entry, rs *rules.RuleSet, target tree.T
 		if source == "" {
 			source = "?"
 		}
-		origin := originRule + " " + rules.RecordName(rule) + "（レイヤー " + source + "）"
+		origin := originRule + " " + rules.RecordName(rule) + "（設定 " + source + "）"
 		return Reject{t.ID, e.Decision, e.Glob, texts.Spoken(rule), origin}, true
 	}
 	// 統合の子には親の範囲の上限を適用しない（判定の scope と同じ）。

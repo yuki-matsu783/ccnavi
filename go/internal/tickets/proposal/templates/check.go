@@ -35,7 +35,7 @@ func (t *Template) parts() []part {
 	}
 }
 
-// Check は計画とフローの検査。types はそのときのフェーズ定義（共通 + レイヤー。nil は無い）、cat はフローで
+// Check は計画とフローの検査。types はそのときのフェーズ定義（共通 + 設定。nil は無い）、cat はフローで
 // 選べる名前（nil なら名前を確かめない）。順序の誤り・flows の添字・フローの形は error。型が定義に無い、kind が
 // 置き場と合わない、延期の引き受け手にレビューが無い、は warn（定義は後から変わりうる。使うときの承認で
 // 改めて error になる）。description か when に TodoMark が残っているのも warn。
@@ -96,7 +96,7 @@ func planConfig(t *Template, known *phases.Types) (*yaml.Map, *phases.Types, []r
 			copies.Put(item.Type, pt.AsCopy())
 			placeholders = append(placeholders, pt)
 			if known != nil {
-				said.add(rules.Warn, fmt.Sprintf("`%s[%d]` の型 `%s` が phases.yml にありません（定義が変わったか、このレイヤーにありません。使う前に直す）",
+				said.add(rules.Warn, fmt.Sprintf("`%s[%d]` の型 `%s` が phases.yml に無い（定義が変わったか、この設定に無い。使う前に直す）",
 					p.key, i+1, item.Type))
 			}
 		}

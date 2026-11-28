@@ -1,7 +1,7 @@
 /**
  * テンプレート管理画面（React）をhappy-domで動かす。一覧のバッジと破棄した理由、統合結果の枠、
  * 1件の計画と本文、下書き（読むだけ）と取り込み待ちへの入口、エラー・読み込み中、見た目、対象の切り替えを見る。
- * 見本は`tests/fixtures/templates-json.json`の`expect`（selfのレイヤー）。
+ * 見本は`tests/fixtures/templates-json.json`の`expect`（selfの設定）。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,10 +24,10 @@ async function openRow(dom: DomPage, selector: string): Promise<void> {
   await dom.settle();
 }
 
-test("CB-D324 一覧は開いている対象のレイヤーのテンプレートだけを出し、破棄した理由と無効のバッジを行に出す（共通と同じ中身なら「共通の側を使用」）。統合結果の枠は別に出す", async () => {
+test("CB-D324 一覧は開いている対象の設定のテンプレートだけを出し、破棄した理由と無効のバッジを行に出す（共通と同じ中身なら「共通の側を使用」）。統合結果の枠は別に出す", async () => {
   const dom = await openTemplates();
   try {
-    // 対象はself。一覧はselfのレイヤーの4件（ends / feature / local / research）だけで、共通のレイヤーの行は出さない
+    // 対象はself。一覧はselfの設定の4件（ends / feature / local / research）だけで、共通設定の行は出さない
     assert.deepEqual(
       dom.all("li.template").map((li) => `${li.getAttribute("data-layer")}/${li.getAttribute("data-name")}`),
       ["self/ends", "self/feature", "self/local", "self/research"],
@@ -35,11 +35,11 @@ test("CB-D324 一覧は開いている対象のレイヤーのテンプレート
     // 共通と全欄が同じで破棄した行は、共通の1本が使われるので無効・破棄とは出さない。理由の本文は指摘の一覧に1度だけ出す
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
     const feature = text(dom.one('li.template[data-name="feature"][data-layer="self"] .row-head'));
-    assert.match(feature, /共通の側を使用/);
+    assert.match(feature, /共通設定の側を使用/);
     assert.doesNotMatch(feature, /無効|破棄/);
     assert.equal(text(dom.one('li.template[data-name="feature"][data-layer="self"]')).split("全欄が同じなので").length, 2);
     assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"]')), /無効/);
-    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄: 共通と食い違います/);
+    assert.match(text(dom.one('li.template[data-name="research"][data-layer="self"]')), /破棄: 共通設定と内容が違う/);
     assert.equal(dom.all('button[data-action="view-sum"], button[data-action="view-raw"]').length, 0);
     assert.equal(dom.all("details#sum").length, 1);
   } finally {
@@ -55,10 +55,10 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     const rows = dom.all("details#sum tbody tr").map((tr) => `${tr.getAttribute("data-layer")}/${tr.getAttribute("data-name")}`);
     assert.deepEqual(rows, ["common/broken", "common/feature", "common/research", "self/ends", "self/feature", "self/local", "self/research"]);
-    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込めません/);
+    assert.match(text(dom.one('details#sum tr[data-layer="common"][data-name="broken"]')), /読み込み不可/);
     assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="feature"]')), /使われない/);
-    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通と食い違います/);
-    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは4件（共通 \+ ワークスペース）/);
+    assert.match(text(dom.one('details#sum tr[data-layer="self"][data-name="research"]')), /共通設定と内容が違う/);
+    assert.match(text(dom.one('[data-count="sum"]')), /使われるのは4件（共通設定 \+ ワークスペース）/);
     dom.change(dom.one<HTMLSelectElement>("select#sum-select"), "lib");
     await dom.settle();
     assert.deepEqual(
@@ -73,7 +73,7 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
 });
 
 test("CB-D326 見出しを押すと開き、計画の表が番号と種類を出す。本文は依頼を送り、返った本文の見えない文字を \\uで見せる", async () => {
-  // 共通のレイヤーの行を開くので、対象は共通の設定（workspace）にする（一覧は開いている対象のレイヤーだけ）
+  // 共通設定の行を開くので、対象は共通設定（workspace）にする（一覧は開いている対象の設定だけ）
   const dom = await openPage({ kind: "page", page: page({ target: { kind: "workspace", name: "" } }) });
   try {
     await openRow(dom, 'li.template[data-name="feature"][data-layer="common"]');
@@ -100,22 +100,22 @@ test("CB-D326 見出しを押すと開き、計画の表が番号と種類を出
   }
 });
 
-test("CB-D327 苦情の件数と深刻度の文字（[エラー] [警告] [情報]）が出る。要約の件数は見本の数と合い、指摘の数とテンプレートの数を書き分ける", async () => {
+test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が出る。要約の件数は見本の数と合い、指摘の数とテンプレートの数を書き分ける", async () => {
   const dom = await openTemplates();
   try {
     const summary = text(dom.one('[data-tour="summary"]'));
-    assert.match(summary, /エラー3/);
-    assert.match(summary, /警告2/);
-    assert.match(summary, /情報1/);
+    assert.match(summary, /error3/);
+    assert.match(summary, /warn2/);
+    assert.match(summary, /info1/);
     assert.match(summary, /^指摘 6件（/);
     // 絞り込みの札はテンプレートの数。何の数かを札の前に書く
     assert.match(text(dom.one('[data-role="template-find"]')), /指摘のあるテンプレートの数:/);
     await openRow(dom, 'li.template[data-name="ends"][data-layer="self"]');
-    assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[エラー\]/);
+    assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[error\]/);
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
-    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"] .sev-label')), /\[情報\]/);
+    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"] .sev-label')), /\[info\]/);
     await openRow(dom, 'li.template[data-name="local"][data-layer="self"]');
-    assert.match(text(dom.one('li.template[data-name="local"][data-layer="self"] .sev-label')), /\[警告\]/);
+    assert.match(text(dom.one('li.template[data-name="local"][data-layer="self"] .sev-label')), /\[warn\]/);
   } finally {
     await dom.close();
   }
@@ -125,7 +125,7 @@ test("CB-D328 下書きは3件出て、error・TODOをバッジで出す。取�
   const dom = await openTemplates();
   try {
     assert.equal(dom.all("li.draft").length, 3);
-    assert.match(text(dom.one('li.draft[data-name="broken"]')), /エラーあり/);
+    assert.match(text(dom.one('li.draft[data-name="broken"]')), /errorあり/);
     assert.match(text(dom.one('li.draft[data-name="login"]')), /TODOが残っています/);
     assert.match(text(dom.one('[data-tour="drafts"] .hint')), /取り込むまでテンプレートとしては使われません/);
     // 取り込み・保存・改名・移動・削除の操作はこの画面に無い
@@ -183,7 +183,7 @@ test("CB-D330 読み込みのエラーは文面を出し、読み込み中は読
   }
 });
 
-test("CB-D331 対象を切り替えるとswitchTargetを送る。共通の設定を開いたときは共通のレイヤーのテンプレートだけを出す", async () => {
+test("CB-D331 対象を切り替えるとswitchTargetを送る。共通設定を開いたときは共通設定のテンプレートだけを出す", async () => {
   const dom = await openTemplates();
   try {
     dom.change(dom.one<HTMLSelectElement>("select#target"), "workspace:");
@@ -203,7 +203,7 @@ test("CB-D331 対象を切り替えるとswitchTargetを送る。共通の設定
   }
 });
 
-test("CB-D348 統合結果で破棄された行の本文は、レイヤーかshaが違えば出さず、読み込めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
+test("CB-D348 統合結果で破棄された行の本文は、設定かshaが違えば出さず、読み込めない理由と直接開く先を出す。一致すれば本文を出す", async () => {
   const dom = await openTemplates();
   try {
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
@@ -214,16 +214,16 @@ test("CB-D348 統合結果で破棄された行の本文は、レイヤーかsha
     const common = fixtureJson().templates.find((t) => t.name === "feature" && t.layer === "common");
     assert.ok(self !== undefined && common !== undefined);
     assert.equal(self.sha, common.sha);
-    // レイヤーが違う本文は出さない（shaは同じでも）
+    // 設定が違う本文は出さない（shaは同じでも）
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...common, text: "共通の本文" }, error: "" });
     assert.equal(dom.all("pre.tpl-text").length, 0);
-    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /この行の本文は読み込めません/);
+    assert.match(text(dom.one('[data-role="detail-mismatch"]')), /このテンプレートの本文は、この画面では表示できません/);
     assert.match(text(dom.one('[data-role="detail-mismatch"]')), /feature\.yml/);
-    // レイヤーが同じでもshaが違う本文は出さない
+    // 設定が同じでもshaが違う本文は出さない
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...self, sha: "f".repeat(64), text: "別の本文" }, error: "" });
     assert.equal(dom.all("pre.tpl-text").length, 0);
     assert.equal(dom.all('[data-role="detail-mismatch"]').length, 1);
-    // レイヤーとshaが一致する本文は出す
+    // 設定とshaが一致する本文は出す
     await dom.send({ type: "detail", name: "feature", layer: "self", template: { ...self, text: "自分の本文" }, error: "" });
     assert.equal(dom.all('[data-role="detail-mismatch"]').length, 0);
     assert.equal(text(dom.one("pre.tpl-text")), "自分の本文");

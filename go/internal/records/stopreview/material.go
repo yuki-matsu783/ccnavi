@@ -33,7 +33,7 @@ const (
 	criteriaFile = "stop-review.md"
 )
 
-// criteriaHead・criteriaTail は組み込みの判定用 Markdown の R2 の前と後。R2 は提案に求める見出し（共通レイヤーの
+// criteriaHead・criteriaTail は組み込みの判定用 Markdown の R2 の前と後。R2 は提案に求める見出し（共通設定の
 // ticket-sections.yml）から builtinCriteria が組む。ワークスペースに `.ccnavi/config/stop-review.md` があれば
 // 見出しを差し込まず、そちらをそのまま使う。
 const criteriaHead = `# Stop の AI 判定の基準

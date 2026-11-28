@@ -147,18 +147,18 @@ export function isImportable(entry: HandoffEntry): boolean {
  */
 export function refusalReason(entry: HandoffEntry): string {
   if (!entry.board) {
-    return "ボードからは取り込めません。ターミナルで取り込みます";
+    return "この画面からは取り込めません。ターミナルで取り込んでください。";
   }
   switch (entry.state) {
     case "rejected":
-      return "取り込み先として受け付けない対象です（rejected）。errorsを直してください";
+      return "取り込み先として受け付けられない対象です（rejected）。表示されているerrorを直してください。";
     case "unchanged":
       return "取り込み先と同じ内容なので、取り込むものがありません";
     case "new":
     case "changed":
-      return entry.errors.length > 0 ? "検査でエラーがあります。直してから取り込みます" : "";
+      return entry.errors.length > 0 ? "検査でerrorがあります。直してから取り込んでください。" : "";
     default:
-      return `未知の状態です（${entry.state}）。実行ファイルを更新してください`;
+      return `未知の状態です（${entry.state}）。ccnaviを更新してください。`;
   }
 }
 
@@ -350,7 +350,7 @@ function parseRecord(text: string): { readonly ok: true; readonly value: Record<
 }
 
 function versionMismatch(version: unknown): string {
-  return `取り込み待ちのJSONの版が違います（拡張は${HANDOFF_VERSION}、実行ファイルは${String(version)}）`;
+  return `取り込み待ちのJSONの版が違います（拡張は${HANDOFF_VERSION}、ccnaviは${String(version)}）。拡張かccnaviを更新して、版を揃えてください。`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

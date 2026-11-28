@@ -103,7 +103,7 @@ func (f *familyView) describe(e *entry, revision bool) []string {
 	file := f.files[t.Path]
 	if t.State == place.Todo {
 		return append(lines, "    置き場のファイル: "+file.label(),
-			"    次の操作: ユーザの承認を待つ（VS Code のボード、Chrome のボード、ターミナルの "+
+			"    次の操作: ユーザの承認を待つ（VS Code のチケット管理画面、Chrome の承認ボード、ターミナルの "+
 				"ccnavi-user-agree.sh、GitLab や GitHub の画面などで doing/ へ動かす、のどれか）")
 	}
 	when := "不明"

@@ -73,7 +73,7 @@ test("CB-D261 基本の案内は、今のタイトルと順序のまま（部品
     await dom.settle();
     const titles: string[] = [];
     await walk(dom, () => titles.push(dom.one("#tour-title").textContent ?? ""));
-    assert.deepEqual(titles, ["部品箱", "図", "欄", "保存", "案内"]);
+    assert.deepEqual(titles, ["部品箱", "図", "右の欄", "保存", "案内"]);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
   } finally {
     await dom.close();

@@ -111,7 +111,7 @@ func runExpectations(stderr io.Writer, conf *config.Settings, root, path string)
 		return nil, err
 	}
 	body := &expectations{root: root, rulesPath: conf.Rules, path: path}
-	// 期待ごとに判定するので、共通レイヤーの苦情は期待の数だけ出る。行き先で読むレイヤーは期待ごとに違うので、
+	// 期待ごとに判定するので、共通設定の苦情は期待の数だけ出る。行き先で読む設定は期待ごとに違うので、
 	// まとめて捨てずに、まだ書いていない行だけを書く。
 	said := map[string]bool{}
 	for _, e := range list {

@@ -110,7 +110,7 @@ test("CB-T1127 defenseはターミナルのみ。錠が空いていてもボー�
   const r = rig();
   const outcome = await importSelected(r.deps, shown, [HOOK]);
   assert.equal(outcome.attempted, false);
-  assert.match(outcome.result.ok ? "" : outcome.result.error, /ボードからは取り込めません。ターミナルで取り込みます/);
+  assert.match(outcome.result.ok ? "" : outcome.result.error, /この画面からは取り込めません。ターミナルで取り込んでください/);
   assert.deepEqual(r.calls, ["lock"]);
   // docsと混ぜても、defenseが混じれば全体を止める
   const mixed = rig();
@@ -120,7 +120,7 @@ test("CB-T1127 defenseはターミナルのみ。錠が空いていてもボー�
 
 test("CB-T1128 取り込めない対象（error・unchanged）と、一覧にない対象と、空の選択は、実行ファイルを呼ばずに理由を返す", async () => {
   const cases: [string, readonly string[], RegExp][] = [
-    ["errorあり", [".ccnavi/docs/broken.md"], /エラー/],
+    ["errorあり", [".ccnavi/docs/broken.md"], /error/],
     ["unchanged", [".ccnavi/docs/same.md"], /同じ内容/],
     ["一覧にない", [".ccnavi/docs/none.md"], /一覧にない対象です/],
     ["空", [], /選ばれていません/],
@@ -147,17 +147,17 @@ test("CB-T1129 見せたあとに下書きか取り込み先が変わった（en
   const r = rig({ view: changed });
   const outcome = await importSelected(r.deps, shown, [DOCS]);
   assert.equal(outcome.attempted, false);
-  assert.match(outcome.result.ok ? "" : outcome.result.error, /見せたあとに下書きか取り込み先が変わりました/);
+  assert.match(outcome.result.ok ? "" : outcome.result.error, /表示したあとに下書きか取り込み先が変わりました/);
   assert.deepEqual(r.applied, []);
 });
 
 test("CB-T1130 もう一度の見るだけが食い違う（選んだ集合が違う・検査を通らない・expectが空・失敗）ときは取り込まない", async () => {
   const bad: [string, (paths: readonly string[]) => ViewAnswer, RegExp][] = [
-    ["集合が違う", (paths) => ({ ok: true, value: list(sampleEntries().map((e) => ({ ...e, selected: paths.includes(e.path) || e.path === DOCS })), { expect: "e" }) }), /見せた一覧と違います/],
+    ["集合が違う", (paths) => ({ ok: true, value: list(sampleEntries().map((e) => ({ ...e, selected: paths.includes(e.path) || e.path === DOCS })), { expect: "e" }) }), /表示した一覧と違います/],
     ["okが偽", (paths) => ({ ok: true, value: list(sampleEntries().map((e) => ({ ...e, selected: paths.includes(e.path) })), { expect: "e", ok: false }) }), /検査を通らない/],
     ["expectが空", (paths) => ({ ok: true, value: list(sampleEntries().map((e) => ({ ...e, selected: paths.includes(e.path) })), { expect: "" }) }), /expectを返しませんでした/],
     ["呼び出しの失敗", () => ({ ok: false, error: "実行ファイルが返らない" }), /実行ファイルが返らない/],
-    ["選んだ対象が消えた", () => ({ ok: true, value: list([], { expect: "e" }) }), /見せた一覧と違います/],
+    ["選んだ対象が消えた", () => ({ ok: true, value: list([], { expect: "e" }) }), /表示した一覧と違います/],
   ];
   for (const [name, view, pattern] of bad) {
     const r = rig({ view });
@@ -186,7 +186,7 @@ test("CB-T1132 ターミナルの案内は、そのパスだけを指して見�
 
 test("CB-T1133 ターミナルの案内を出さない場合。ボードから取り込める対象・error・一覧にない・見せたあとの変更・見るだけの失敗", async () => {
   const r = rig();
-  assert.match((await terminalGuide(r.deps, shown, DOCS)).error, /ボードから取り込むため/);
+  assert.match((await terminalGuide(r.deps, shown, DOCS)).error, /この画面から取り込むため/);
   assert.match((await terminalGuide(r.deps, shown, "none")).error, /一覧にない対象です/);
   const errorHook = list([entry({ path: HOOK, kind: "defense", board: false, errors: ["CRLF"] })]);
   assert.match((await terminalGuide(r.deps, errorHook, HOOK)).error, /error/);

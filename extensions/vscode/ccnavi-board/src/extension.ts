@@ -14,15 +14,15 @@ import { openRules } from "./rules-panel.js";
 import { openTemplates } from "./templates-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
-import { initLayerMemory } from "./layer-memory.js";
+import { initTargetMemory } from "./target-memory.js";
 import { initTours, openSidebarTour, openSidebarTourOnNewVersion, runBasicTours, runScreenTour } from "./tour.js";
 import { openWorkflow } from "./workflow-panel.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
   initTours(context);
-  // 設定の4画面で最後に選んだレイヤーの置き場（`workspaceState`）
-  initLayerMemory(context);
+  // 設定の4画面で最後に選んだ設定の置き場（`workspaceState`）
+  initTargetMemory(context);
   // 画面の入口はここに集める。画面どうしは互いをimportせず、ここで登録した一覧を通して互いを開く。
   registerScreens({
     board: openBoard,

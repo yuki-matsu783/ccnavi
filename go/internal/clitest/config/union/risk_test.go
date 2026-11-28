@@ -10,22 +10,22 @@ import (
 	"testing"
 )
 
-// 設定の受入テスト。risk は共通 + 1 レイヤーの和。
-// risk は共通レイヤーに `big-diff`、lib のレイヤーに `schema` と `levels: {critical: 50}` がある。
+// 設定の受入テスト。risk は共通設定に1 つの設定を足した統合結果。
+// risk は共通設定に `big-diff`、lib の設定に `schema` と `levels: {critical: 50}` がある。
 // 親と子は lib の `work`（範囲の上限が無くレビュー不要）を使う。
 
-// 共通レイヤーに足す項目。どれも `factors:` の続きなので、commonRiskText の後ろに繋げる。
+// 共通設定に足す項目。どれも `factors:` の続きなので、commonRiskText の後ろに繋げる。
 const (
 	commonScriptFactor        = "  - {id: common-counted, points: 5, script: .ccnavi/config/common/scripts/count.sh, message: 共通で数えた}\n"
 	commonMissingScriptFactor = "  - {id: gone, points: 5, script: .ccnavi/config/common/scripts/gone.sh, message: 無い}\n"
 	commonJudgeFactor         = "  - {id: outward, points: 10, judge: 外に出す変更か, message: 外向き}\n"
-	// lib のレイヤーに足す定性の項目。judge.json の source がレイヤーごとに分かれることを見る。
+	// lib の設定に足す定性の項目。judge.json の source が設定ごとに分かれることを見る。
 	libJudgeFactor = "  - {id: untested, points: 10, judge: テストの無い変更か, message: テスト無し}\n"
 )
 
 const tenLines = "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n"
 
-// riskProblems は risk の Problem。layer を渡すと、そのレイヤーのものだけ。
+// riskProblems は risk の Problem。layer を渡すと、その設定のものだけ。
 func (w *ws) riskProblems(severity, layer string) []configws.Problem {
 	w.T.Helper()
 	where := ""
@@ -101,7 +101,7 @@ func (w *ws) riskRecord() riskRecord {
 	return rec
 }
 
-// judgeSources は `<子>.judge.json` の項目名 → その項目のレイヤー（source）。
+// judgeSources は `<子>.judge.json` の項目名 → その項目の設定（source）。
 func (w *ws) judgeSources() map[string]string {
 	w.T.Helper()
 	var rec map[string]struct {
@@ -152,7 +152,7 @@ func TestFactorsConcatenateAndLevelsTakeTheMinimum(t *testing.T) {
 	if by["big-diff"].Source != "common" || by["schema"].Source != "lib" {
 		t.Errorf("source: %+v", by)
 	}
-	// critical は min(70, 50) = 50。55 点は CRITICAL。共通レイヤーだけなら HIGH。
+	// critical は min(70, 50) = 50。55 点は CRITICAL。共通設定だけなら HIGH。
 	if !strings.Contains(out, "(CRITICAL)") {
 		t.Errorf("CRITICAL でない: %s", out)
 	}
@@ -160,7 +160,7 @@ func TestFactorsConcatenateAndLevelsTakeTheMinimum(t *testing.T) {
 
 func TestUnwrittenLevelKeysDoNotTakePart(t *testing.T) {
 	t.Parallel()
-	// 書かれていないキーは参加しない。lib が書かない medium / high は共通レイヤーの値。
+	// 書かれていないキーは参加しない。lib が書かない medium / high は共通設定の値。
 	w := newWS(t, configws.KindRisk)
 	tree, _ := w.oneChild()
 	w.commit(tree, "src/a.py", tenLines)
@@ -177,8 +177,8 @@ func TestUnwrittenLevelKeysDoNotTakePart(t *testing.T) {
 
 func TestSameFactorIdAcrossLayersCountsBothUnderTheLayerName(t *testing.T) {
 	t.Parallel()
-	// 同 id で中身が違えば両方を数え、後ろのレイヤーは `<レイヤー>:<id>`。--lint は warn。
-	// レイヤーを空にすると、プロジェクトが共通レイヤーと同じ名前の項目を 1 本書くだけで、そのレイヤーの項目と閾値が全部消えて
+	// 同 id で中身が違えば両方を数え、後ろの設定は `<設定>:<id>`。--lint は warn。
+	// 設定を空にすると、プロジェクトが共通設定と同じ名前の項目を 1 本書くだけで、その設定の項目と閾値が全部消えて
 	// 点が下がる。両方を数えれば、衝突しても点は増える向きにしか変わらない。
 	w := newWS(t, configws.KindRisk)
 	configws.WriteRisk(t, w.Lib, "version: 1\nlevels: {critical: 50}\nfactors:\n"+
@@ -208,7 +208,7 @@ func TestSameFactorIdAcrossLayersCountsBothUnderTheLayerName(t *testing.T) {
 
 func TestACollidingJudgeItemIsRecordedUnderTheLayerName(t *testing.T) {
 	t.Parallel()
-	// 同 id の定性項目は、後ろのレイヤーの側を `<レイヤー>:<id>` で record-risk する。
+	// 同 id の定性項目は、後ろの設定を `<設定>:<id>` で record-risk する。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, w.Risk, configws.CommonRiskText+commonJudgeFactor)
 	configws.WriteRisk(t, w.Lib, configws.LibRiskText+"  - {id: outward, points: 15, judge: 公開の API を変えるか, message: 外向き（lib）}\n")
@@ -277,7 +277,7 @@ func TestRiskLintRefusesWhatTheLayersMustNotSay(t *testing.T) {
 
 func TestAScriptInTheProjectLayerRunsFromTheProjectRoot(t *testing.T) {
 	t.Parallel()
-	// レイヤーの `script:` はそのプロジェクトの git プロジェクトルートから解く。
+	// 設定の `script:` はそのプロジェクトの git プロジェクトルートから解く。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, p(w.Lib, ".ccnavi", "scripts", "count.sh"), "printf '{\"points\": 30, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
 	configws.WriteRisk(t, w.Lib, "version: 1\nfactors:\n  - {id: counted, points: 5, script: .ccnavi/scripts/count.sh, message: 数えた}\n")
@@ -297,7 +297,7 @@ func TestAScriptInTheProjectLayerRunsFromTheProjectRoot(t *testing.T) {
 
 func TestAScriptInTheCommonLayerRunsThroughTheMerge(t *testing.T) {
 	t.Parallel()
-	// 合成を通しても、共通レイヤーの `script:` はワークスペースルートから解いて走る。
+	// 合成を通しても、共通設定の `script:` はワークスペースルートから解いて走る。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, p(w.Root, ".ccnavi", "config", "common", "scripts", "count.sh"), "printf '{\"points\": 7, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n")
 	configws.Write(t, w.Risk, configws.CommonRiskText+commonScriptFactor)
@@ -315,7 +315,7 @@ func TestAScriptInTheCommonLayerRunsThroughTheMerge(t *testing.T) {
 
 func TestABrokenProjectRiskIsEmptyAndNamedInTheFallback(t *testing.T) {
 	t.Parallel()
-	// 不正な risk のレイヤーは空 + `fallback` にレイヤーの名前 + --lint error。
+	// 不正な risk の設定は空 + `fallback` に設定の名前 + --lint error。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, configws.LayerPath(w.Lib, "risk"), "version: 1\nfactors: [\n")
 	if len(w.riskProblems("error", "lib")) == 0 {
@@ -326,18 +326,18 @@ func TestABrokenProjectRiskIsEmptyAndNamedInTheFallback(t *testing.T) {
 	w.commit(tree, "schema/x.sql", tenLines)
 	out := w.mustFinish()
 	rec := w.riskRecord()
-	// 共通レイヤーの factors だけで点が付く。levels も共通レイヤーのまま。
+	// 共通設定の factors だけで点が付く。levels も共通設定のまま。
 	if len(rec.Hits) != 1 || rec.Hits[0].ID != "big-diff" || rec.Points != 25 || rec.Fallback != "lib" {
 		t.Errorf("record = %+v", rec)
 	}
 	if !strings.Contains(out, "lib") {
-		t.Errorf("閉じた出力がレイヤーを言わない: %s", out)
+		t.Errorf("閉じた出力が設定を言わない: %s", out)
 	}
 }
 
 func TestTheJudgeRecordNamesTheLayerOfEachItem(t *testing.T) {
 	t.Parallel()
-	// `<子>.judge.json` の各項目に、その項目のレイヤーの `source`。
+	// `<子>.judge.json` の各項目に、その項目の設定の `source`。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, w.Risk, configws.CommonRiskText+commonJudgeFactor)
 	configws.WriteRisk(t, w.Lib, configws.LibRiskText+libJudgeFactor)
@@ -375,7 +375,7 @@ func (w *ws) skippedMark(parentTree string) string {
 
 func TestTheMarkThatRestsOnATypeNamesItsLayer(t *testing.T) {
 	t.Parallel()
-	// 定義を根拠に置くマーカー（`review: false` の skipped）には、その定義のレイヤー。
+	// 定義を根拠に置くマーカー（`review: false` の skipped）には、その定義の設定。
 	w := newWS(t, configws.KindRisk)
 	tree, parentTree := w.oneChild()
 	w.commit(tree, "src/a.py", "1\n")
@@ -387,8 +387,8 @@ func TestTheMarkThatRestsOnATypeNamesItsLayer(t *testing.T) {
 
 func TestTheMarkNamesCommonWhenTheTypeComesFromCommon(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの定義をコピーした親のマーカーは、source が common。`--explain --json` の和と同じ。lib の `work` は共通レイヤーの
-	// `work` と全欄が同じなので、和では共通の側が残る。コピーは出どころを持たないが、共通レイヤーの定義と中身が同じなら
+	// 共通設定のフェーズ定義をコピーした親のマーカーは、source が common。`--explain --json` の統合結果と同じ。lib の `work` は共通設定の
+	// `work` と全欄が同じなので、統合結果では共通の側が残る。コピーは出どころを持たないが、共通設定のフェーズ定義と中身が同じなら
 	// 共通の定義として記す。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, w.Phases, configws.LibPhasesWork)
@@ -403,12 +403,12 @@ func TestTheMarkNamesCommonWhenTheTypeComesFromCommon(t *testing.T) {
 	}
 }
 
-// レイヤーを探す先を動かすフラグも、診断の外では有効でない（issue #65）。`--projects` と `--project-home` は、共通レイヤーの
-// 中身を差し替えるのと結果が同じ。外すとプロジェクトのレイヤーがまるごと消えるので、そのレイヤーが足していた配点もフェーズ定義も
+// 設定を探す先を動かすフラグも、診断の外では有効でない（issue #65）。`--projects` と `--project-home` は、共通設定の
+// 中身を差し替えるのと結果が同じ。外すとプロジェクトの設定がまるごと消えるので、その設定が足していた配点もフェーズ定義も
 // 無くなる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数をそのまま渡すので、この形はエージェントが Bash で打てる。
 //
-// 土台の子は共通レイヤーの `big-diff`（25）と lib の `schema`（30）で 55 点、lib の critical は 50 なので CRITICAL。
-// `review: true` のフェーズなのでレビュー待ちへ動く。lib のレイヤーが消えると 25 点の MEDIUM になり、レビューを飛ばして閉じられる。
+// 土台の子は共通設定の `big-diff`（25）と lib の `schema`（30）で 55 点、lib の critical は 50 なので CRITICAL。
+// `review: true` のフェーズなのでレビュー待ちへ動く。lib の設定が消えると 25 点の MEDIUM になり、レビューを飛ばして閉じられる。
 func TestLayerPlaceFlagsAreDiagnosisOnly(t *testing.T) {
 	t.Parallel()
 	for _, flag := range []string{"--project-home", "--projects"} {
@@ -432,7 +432,7 @@ func TestLayerPlaceFlagsAreDiagnosisOnly(t *testing.T) {
 			}
 			rec := w.riskRecord()
 			if rec.Points != 55 {
-				t.Errorf("lib のレイヤーが落ちた: points = %d", rec.Points)
+				t.Errorf("lib の設定が落ちた: points = %d", rec.Points)
 			}
 			if _, ok := rec.byID()["schema"]; !ok {
 				t.Error("schema の配点が無い")

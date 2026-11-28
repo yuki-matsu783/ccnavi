@@ -18,12 +18,12 @@
 # 終了コード 1 にする。親のブランチへの push は、共通の push のゲート（ccnavi_push_gate）が止める。
 # 破棄した親子のチケットは、親のワークツリーを片付ければ、この sh の対象から外れ、ゲートも掛からない。
 #
-# リポジトリ（ワークスペース自身と、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
+# リポジトリ（ワークスペースと、親子のチケットの元のプロジェクト）ごとに 1 回、次の順に行う。
 #
 #   1. `ls-remote --heads origin` で全ブランチの有無を得る。失敗したら（オフライン・認証）止める
 #   2. 統合先の名前を決める。ホストのデフォルトブランチ（`ls-remote --symref origin HEAD`）、
 #      読めなければ手元の origin/HEAD、それも無ければ一覧にある main・master。決まらなければ止める
-#   3. 統合先を fetch する（取り込みの後の検査が、レイヤーのずれを origin/<統合先> と比べるため）。
+#   3. 統合先を fetch する（取り込みの後の検査が、設定のずれを origin/<統合先> と比べるため）。
 #      成功した後、手元の origin/HEAD がホストに聞いた名前と違えば向け直す（fetch の前には向け直さない）
 #
 # 親子のチケットごとに次を行う（ロックを待って取る）。
@@ -136,10 +136,7 @@ trap 'cleanup; exit 130' INT TERM HUP
 
 log_info 受け付けた -- "args=$#"
 
-if ! bin=$(ccnavi_bin "$root"); then
-	printf 'ccnavi-sync: 実行ファイルが見つからない。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' >&2
-	exit 2
-fi
+bin=$(ccnavi_bin "$root") || ccnavi_no_bin ccnavi-sync
 
 # ---- 実行ファイルに聞く（段取り）
 #

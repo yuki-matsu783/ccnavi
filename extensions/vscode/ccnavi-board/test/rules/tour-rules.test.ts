@@ -105,7 +105,7 @@ test("CB-T520 ルールの案内は、使い方ごとの案内が4〜9手順で�
   }
 });
 
-test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取りと同じRulesSumになり、共通の設定と別のレイヤーの由来を持つ", () => {
+test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取りと同じRulesSumになり、共通設定と別の設定の由来を持つ", () => {
   const raw = (loadTour("rules").sample as { sums: unknown }).sums;
   const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
   assert.ok(parsed.ok);
@@ -116,7 +116,7 @@ test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取�
     assert.ok(rules.some((rule) => rule.source === "common"), sum.name);
     const own = rules.filter((rule) => rule.source !== "common");
     assert.ok(own.length >= 1, sum.name);
-    // 共通以外のidにはレイヤー名が付く
+    // 共通以外のidには設定の名前が付く
     for (const rule of own) {
       assert.ok(rule.id.startsWith(`${rule.source}:`), `${sum.name}: ${rule.id}`);
     }
@@ -172,9 +172,9 @@ test("CB-T525 候補の見本は、下書きのYAMLが候補のid・タイプ・
   }
 });
 
-test("CB-T526 保存前の検証エラーの見本は、lintの報告の形（設定の検証（--lint）でエラーが見つかりました…、続けて「error: id: 内容」）で、見本の行のidを名指しする", () => {
+test("CB-T526 保存前の検証エラーの見本は、lintの報告の形（設定の検証（--lint）でerrorが見つかりました…、続けて「error: id: 内容」）で、見本の行のidを名指しする", () => {
   const lines = sample.saveError.split("\n");
-  assert.match(lines[0], /^設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください:$/);
+  assert.match(lines[0], /^設定の検証（--lint）でerrorが見つかりました。内容を修正してから保存してください。$/);
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   assert.ok(lines.length >= 2);
   for (const line of lines.slice(1)) {

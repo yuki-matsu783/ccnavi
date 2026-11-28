@@ -156,7 +156,7 @@ test("CB-T1235 報告の説明には録画の結果・枚数・ログ・エラ�
   });
   assert.match(text, /録画: ffmpegが見つからない/);
   assert.match(text, /スクリーンショット: 2枚/);
-  assert.match(text, /ログ: この間に書かれた行は無い/);
+  assert.match(text, /ログ: この間に書かれた行はありません/);
   assert.match(text, /エラー:\n- スクリーンショット: 失敗\n$/);
   assert.equal(reportStamp(new Date(2026, 9, 29, 15, 30, 12)), "20261029-153012");
 });

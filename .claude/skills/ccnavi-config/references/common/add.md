@@ -103,7 +103,7 @@ allow:
   `Agent`（見出し）、`WebFetch`（URL）。`Bash` のルールは `PowerShell` に及ばない。
   及ぼすなら `Bash|PowerShell`。ツールでない名前は `Stop`（メインエージェントのターンの終わり）だけで、
   `allow` に `glob: "*"` と `every: N` を添えて置く。渡す回にターンの終わりを止めて文を渡す。
-  `every` が 2 より小さいもの、プロジェクトのレイヤーに置いたものは使われない（`--lint` が warn）。
+  `every` が 2 より小さいもの、プロジェクトの設定に置いたものは使われない（`--lint` が warn）。
   ヒットするかは `sh .ccnavi/scripts/ccnavi-launcher.sh --test Stop "(stop)"` か期待の `tool: Stop` で確かめる
 
 Bash は実行される部分にヒットする。`$( )` の中や `&&` の先も 1 本ずつヒットし、ヒアドキュメントの中身はヒットしない
@@ -159,7 +159,7 @@ allow:
 フェーズ定義を書く。親チケットの `plan:` にフェーズ定義の名前を並べ、項に `after: [番号]` で先行を書いたものが
 全体計画で、子は `phase: N` で番号を指す。フェーズ定義は順序を持たない（順序は計画のステップの `after` で書く）。
 計画を持つ親は、計画が使う定義のコピーを `phases:` に持ち（`sh .ccnavi/scripts/ccnavi-launcher.sh --plan-order <親> --fill-phases` で差し込む）、
-承認のあとの判定はそのコピーを読む。使う定義は共通レイヤーと親の `project:` のレイヤーの phases.yml の和で、どちらにも無ければ
+承認のあとの判定はそのコピーを読む。使う定義は共通設定に、親の `project:` が指すプロジェクトの設定の phases.yml を足した統合結果で、どちらにも無ければ
 計画を持つ親は承認できない。どのプロジェクトでも同じ構成を前提にできる定義は共通に、`scope` がレイアウトに依存する定義は
 config に置く。共通にある定義と同じ `id` を config で別の中身にはできない（error）ので、変えたいときは別の `id` と `title` を付ける。
 
@@ -239,7 +239,7 @@ factors:
 |---|---|---|
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る。生成物やロックファイルが差分を膨らませるなら `exclude: ["*.lock"]` のように外し、一部のディレクトリだけ測るなら `include: ["src/**"]` を書く（どちらも既定は無指定＝全パス。`exclude` は `include` にヒットしていても外す。バイナリは行数 0）。`*` は `/` をまたぐので `*.lock` は下の階層の `x.lock` にもヒットする。`**/*.lock` はルート直下の `x.lock` にヒットしない。末尾が `/` の glob はディレクトリ（`src/` は `src/**`）。`include` にワイルドカードの無い名前（`src`）を書くとそのファイルにしかヒットせず点が 0 になるので、lint が warn する。rename は元のパスも見る（`include` は旧新どちらか、`exclude` は両方にヒットしたときだけ外す） |
 | `glob` | ヒットしたファイルごとに加点。`max` で上限 | 触ったらユーザが見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対（`.github/**` のように書く） |
-| `script` | レイヤーの `scripts/` の下の sh（共通レイヤーは `.ccnavi/config/common/scripts/`（プロジェクトの `.ccnavi/config/common/` のミラーも同じ表記）、自身のレイヤーとプロジェクトのレイヤーは `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
+| `script` | 各設定の `scripts/` の下の sh（共通設定は `.ccnavi/config/common/scripts/`（プロジェクトの `.ccnavi/config/common/` のミラーも同じ表記）、ワークスペースの設定とプロジェクトの設定は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
 | `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。リスクレベルの名前は増やせない（知らない名前は warn）。
@@ -252,7 +252,7 @@ factors:
 
 新しい親と子の提案の本文に求める `## ` の見出し。欠けると承認と `--lint` が warn で名指しし、`ticket new` は親の雛形に
 `parent` の見出しを並べて、`todo` を見出しの下に置く（目印が残った新規の提案は承認で止まる）。Stop の判定（R2）は
-共通レイヤーの見出しを求める（`.ccnavi/config/stop-review.md` があればそちらをそのまま使う）。
+共通設定の見出しを求める（`.ccnavi/config/stop-review.md` があればそちらをそのまま使う）。
 
 ```yaml
 version: 1
@@ -264,7 +264,7 @@ child:
   - name: 担当範囲
 ```
 
-- レイヤーのファイルに `parent`（`child`）があれば、その種類は共通の並びと置き換わる。足し合わせない
+- config 側のファイルに `parent`（`child`）があれば、その種類は共通の並びと置き換わる。足さない
 - `name` は並びの中で一意（大文字小文字は区別しない）。知らないキーや形の誤りがあれば、そのファイルは使われない
 - `todo` は本文に普通は現れない文にする。提案に残っていると承認が止まるので、本文に書く語と同じにしない
 - 渡す前に、置き場に置いた形で `--lint` の error が 0 件になるかを確かめる（下書きのパスを差し替えるフラグはない。取り込み `ccnavi-user-handoff.sh` の検査も同じ基準で見る）

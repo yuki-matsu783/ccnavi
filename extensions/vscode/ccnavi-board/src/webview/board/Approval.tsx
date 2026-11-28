@@ -198,7 +198,7 @@ function Body({
                     data-action="edit-workflow"
                     data-tour="edit-workflow"
                     data-ticket={ticket}
-                    title={`このオーバーレイを閉じて、${ticket}の計画の順序を直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。`}
+                    title={`承認画面を閉じて、${ticket}の計画編集タブを開きます。保存すると提案の内容が変わるので、承認画面を開き直してください。`}
                     onClick={() => post({ type: "editWorkflow", ticket })}
                   >
                     計画を編集
@@ -231,7 +231,7 @@ function Body({
                 ))}
               </li>
             ))}
-            {rejectedGroups.more > 0 ? <li>ほか{rejectedGroups.more}組の理由があります</li> : null}
+            {rejectedGroups.more > 0 ? <li>ほかに{rejectedGroups.more}組あります（理由が同じ提案を1組にまとめています）</li> : null}
           </ul>
         </>
       ) : null}
@@ -294,11 +294,11 @@ function Body({
 const LEGEND: readonly (readonly [string, string])[] = [
   ["allow", "確認なしで編集できる場所"],
   ["ask", "実行時に確認が必要な場所"],
-  ["deny", "このチケットでも編集できない場所"],
-  ["after", "先にクローズし、レビューも済んでいるべきステップ（先行。自分より小さい番号だけ）"],
+  ["deny", "このチケットの作業中も編集できない場所"],
+  ["after", "先行ステップ（このステップより先にクローズとレビューを済ませるステップ。小さい番号だけを指定できます）"],
   ["scope", "そのフェーズで編集できる範囲（inheritは親の範囲を引き継ぐ）"],
   ["review", "フェーズが終わったあとの人間のレビュー（falseは不要、trueはMRで見る）"],
-  ["phases:", "この親に固定するフェーズ定義（承認のあとの判定はこれを読む）"],
+  ["phases:", "この親に固定するフェーズ定義（承認のあとは、この定義で判定します）"],
 ];
 
 function Legend(): JSX.Element {
@@ -369,7 +369,7 @@ function HandOver({ retry }: { readonly retry?: { readonly parent: string; reado
         type="button"
         className="action risky"
         data-action="prompt-run"
-        title="ボードのターミナルでclaude -pを実行します（autoモード）。押すと確認なしですぐ実行されます。止めるときはターミナルでCtrl+C"
+        title="新しいターミナル（ccnavi claude）でclaude -pを実行します（autoモード）。押すと確認なしですぐ実行されます。止めるときは、ターミナルでCtrl+Cを押してください。"
         onClick={() => post({ type: "promptRun" })}
       >
         {PROMPT_RUN_LABEL}

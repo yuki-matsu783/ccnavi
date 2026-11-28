@@ -34,7 +34,7 @@ function removeEdge(dom: DomPage, edge: string): { readonly seq: number; readonl
   return { seq: sent.seq as number, order: sent.order };
 }
 
-test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提案のままなので未保存ではなく、保存と案に戻すは押せない", async () => {
+test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提案のままなので未保存ではなく、保存と提案の順序に戻すは押せない", async () => {
   const dom = await openWorkflow();
   try {
     assert.deepEqual(
@@ -184,13 +184,13 @@ test("CB-D179 子の提案を付け替えられない理由・改版の錠・計
     assert.ok(listed.some((text) => text.includes("承認済みチケットと重なる")), String(listed));
     assert.ok(listed.some((text) => text.includes("phase: 9")), String(listed));
     assert.equal(saveButton(dom).disabled, true);
-    assert.match(saveButton(dom).getAttribute("title") ?? "", /子の提案/);
+    assert.match(saveButton(dom).getAttribute("title") ?? "", /子チケットの提案/);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-D172 案に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
+test("CB-D172 提案の順序に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -214,7 +214,7 @@ test("CB-D173 提案が外で変わったら差分を出し、取り込むか編
     await dom.send({ type: "answer", seq, answer: planOrderSample("reverse") });
     await dom.send({ type: "changed", answer: planOrderSample("loose", "b".repeat(64)) });
     const banner = dom.one("#changed");
-    assert.match(banner.textContent ?? "", /外で変わりました/);
+    assert.match(banner.textContent ?? "", /この画面の外で提案が変更されました/);
     assert.deepEqual(
       dom.all("#changed-diff tr[data-number]").map((row) => row.getAttribute("data-number")),
       ["4"],
@@ -324,7 +324,7 @@ test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後ま
     await dom.settle();
     // 計画のあるタブでも、案内の間は見本を出す（今の計画には触れない）
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序に決める", "承認との関係", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序で保存", "承認との関係", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
     // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の手順から始まる
@@ -415,7 +415,7 @@ test("CB-D187 ステップを押すと右の欄に詳細を出す。欄は畳め
   }
 });
 
-test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・Escで戻す", async () => {
+test("CB-D189 図の全画面ボタンで図だけを全画面にし、閉じる・Escで戻す", async () => {
   const dom = await openWorkflow();
   try {
     const canvas = '.plan-graph[data-part="plan"] .plan-graph-canvas';
@@ -448,11 +448,11 @@ function barOrder(dom: DomPage, scope: string): string[] {
   return order.filter((item, index) => index === 0 || order[index - 1] !== item);
 }
 
-test("CB-D1300 計画編集の上部は、対象の名前と状態 → 補助の操作 → この順序に決めるの順に並ぶ（元に戻す・やり直すは持たない）", async () => {
+test("CB-D1300 計画編集の上部は、対象の名前と状態 → 補助の操作 → この順序で保存の順に並ぶ（元に戻す・やり直すは持たない）", async () => {
   const dom = await openWorkflow();
   try {
     assert.deepEqual(barOrder(dom, "header.toolbar"), ["name", "aux", "primary"]);
-    assert.equal(dom.one(".editor-controls > :last-child").textContent, "この順序に決める");
+    assert.equal(dom.one(".editor-controls > :last-child").textContent, "この順序で保存");
     assert.equal(dom.all(".editor-history").length, 0);
     assert.deepEqual(dom.all(".editor-state:not(.hidden)").map((s) => s.textContent), []);
   } finally {

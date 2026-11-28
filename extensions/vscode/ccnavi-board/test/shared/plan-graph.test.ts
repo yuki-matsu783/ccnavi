@@ -238,11 +238,11 @@ test("CB-T1276 引けない線には理由が付く（自分へ・開始と終�
   assert.equal(connectRefusal(graph, "n2", "n3"), undefined);
   assert.ok(canConnect(graph, "n2", "n3"));
   assert.equal(connectRefusal(graph, "n2", "n2"), "自分自身へは線を引けません");
-  assert.equal(connectRefusal(graph, "start", "n2"), "開始と終了への線は図が自動で引きます");
-  assert.equal(connectRefusal(graph, "n4", "end"), "開始と終了への線は図が自動で引きます");
-  assert.equal(connectRefusal(graph, "n1", "n2"), "この線はもうあります");
+  assert.equal(connectRefusal(graph, "start", "n2"), "開始と終了への線は自動で引かれます");
+  assert.equal(connectRefusal(graph, "n4", "end"), "開始と終了への線は自動で引かれます");
+  assert.equal(connectRefusal(graph, "n1", "n2"), "この線はすでにあります");
   assert.ok(!canConnect(graph, "n1", "n2"));
-  assert.equal(connectRefusal(graph, "n4", "n1"), "4は1より後に続くステップです。この線を引くと順序が輪になります");
+  assert.equal(connectRefusal(graph, "n4", "n1"), "ステップ4はステップ1より後のステップです。この線を引くと順序が循環します。");
   const locked = planGraphOf({ ...plan(DIAMOND), items: plan(DIAMOND).items.map((item) => (item.number === 3 ? { ...item, locked: true } : item)) });
-  assert.equal(connectRefusal(locked, "n2", "n3"), "子が承認された番号です。入る線は変えられません");
+  assert.equal(connectRefusal(locked, "n2", "n3"), "このステップは子チケットが承認済みのため、入る線を変えられません");
 });

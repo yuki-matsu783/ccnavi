@@ -6,7 +6,7 @@
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の状態で判定し直し、同じなら残し、違えば元に戻して読み直す。元に戻すコミットも収まらなければユーザの対応に切り替える
  * - 「始める」: issue から `feature-<番号>-<slug>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
- * - プロジェクトのリポジトリ: ワークスペースの統合先の共通レイヤーで判定し、プロジェクトの親のブランチへ書く
+ * - プロジェクトのリポジトリ: ワークスペースの統合先の共通設定で判定し、プロジェクトの親のブランチへ書く
  * - PAT は画面に渡らない。GitLab のスレッドの本文は承認の画面と同じ規則で描く
  */
 import { after, before, test } from "node:test";
@@ -197,7 +197,7 @@ test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じフ�
   };
   const out = await approveFamily(GITLAB_REPO, "i0001", shown, d);
   assert.equal(out.kind, "attention", JSON.stringify(out));
-  assert.match(out.kind === "attention" ? out.message : "", /ホストの履歴を確認してください/);
+  assert.match(out.kind === "attention" ? out.message : "", /ホストのコミット履歴で、反映されたかどうかと現在の内容を確認してください/);
   // 元に戻すコミットは last_commit_id で断られ、割り込み 2 の変更は残る（PROBE-1）
   assert.deepEqual(mock.glCommits.map((c) => c.result), ["written", "error"]);
   assert.equal(mock.files("i0001")[DOING], "別の書き手が書いた\n");
@@ -368,7 +368,7 @@ test("CX-T153 GitLab のスレッドの悪意のある本文は描いても実�
   const attrs = [...box.querySelectorAll(".markdown *")].flatMap((e) => [...e.attributes].map((a) => a.name));
   assert.ok(!attrs.some((n) => /^on/i.test(n) || ["style", "hidden", "class"].includes(n)), attrs.join(","));
   const text = box.textContent ?? "";
-  for (const seen of ["隠れた本文", "畳んだ", "〈HTML コメント: 見えないコメント〉"]) assert.ok(text.includes(seen), seen);
+  for (const seen of ["隠れた本文", "畳んだ", "〈HTML コメント：見えないコメント〉"]) assert.ok(text.includes(seen), seen);
   for (const a of box.querySelectorAll("a")) (a as HTMLElement).click();
   assert.equal((dom.window as unknown as { __pwned?: string }).__pwned, undefined);
   assert.equal(box.querySelectorAll("button").length, 0);
@@ -399,7 +399,7 @@ function twoHosts(name = "web") {
   return { hub, lab, project, make };
 }
 
-test("CX-T154 プロジェクトのリポジトリ: ワークスペースの統合先の共通レイヤーで判定し、プロジェクトの親のブランチへ書く。ワークスペースが無ければ止める", async () => {
+test("CX-T154 プロジェクトのリポジトリ: ワークスペースの統合先の共通設定で判定し、プロジェクトの親のブランチへ書く。ワークスペースが無ければ止める", async () => {
   const { lab, project, make } = twoHosts();
   const b = await collectRepo(project, make());
   assert.equal(b.error, "", b.error);

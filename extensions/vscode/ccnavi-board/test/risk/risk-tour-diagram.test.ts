@@ -39,7 +39,7 @@ function globMatch(glob: string, path: string): boolean {
   return g.endsWith("/**") ? p.startsWith(g.slice(0, -2)) : g === p;
 }
 
-/** 見本の配点（共通の設定）の項目 */
+/** 見本の配点（共通設定）の項目 */
 function commonRules(): Map<string, Rule> {
   return new Map(
     form.factors.map((factor) => [
@@ -131,10 +131,10 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
     assert.ok(diff.includes(`${change.path}`) && diff.includes(`+${change.added} -${change.deleted}`), `diff に ${change.path} の行数がありません`);
   }
   const counted = big.filter((change) => change.path.startsWith("src/") && !change.path.startsWith("src/generated/")).map((change) => change.added + change.deleted);
-  assert.equal(valueOf("risk-score-high", "c-lines"), `${counted.join(" + ")} = ${counted.reduce((a, b) => a + b, 0)} 行 > ${rules.get("big-diff")!.value}\n→ +${hits["big-diff"]}`);
+  assert.equal(valueOf("risk-score-high", "c-lines"), `${counted.join(" + ")} = ${counted.reduce((a, b) => a + b, 0)}行 > ${rules.get("big-diff")!.value}\n→ +${hits["big-diff"]}`);
   assert.ok(valueOf("risk-score-high", "c-glob").endsWith(`→ +${hits.ci}`));
   assert.ok(big.length <= Number(rules.get("many-files")!.value), "many-files はヒットしない例");
-  assert.ok(valueOf("risk-score-high", "c-skip").includes(`${big.length} ファイル ≤ ${rules.get("many-files")!.value}`));
+  assert.ok(valueOf("risk-score-high", "c-skip").includes(`${big.length}ファイル ≤ ${rules.get("many-files")!.value}`));
   assert.equal(valueOf("risk-score-high", "sum"), `${Object.values(hits).join(" + ")} = ${total}\n${total} ≥ ${SAMPLE_LEVELS.high} かつ ${total} < ${SAMPLE_LEVELS.critical} → HIGH`);
   assert.ok(valueOf("risk-score-high", "write").includes(`points: ${total}, level: HIGH`));
   assert.ok(valueOf("risk-score-high", "judge").startsWith("no-tests:"));
@@ -147,7 +147,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   assert.deepEqual(score(rules, small, { "no-tests": 0 }), {});
   assert.equal(levelOf(0, SAMPLE_LEVELS), "LOW");
   assert.ok(valueOf("risk-score-low", "diff").includes("+9 -3"));
-  assert.ok(valueOf("risk-score-low", "c-all").includes("12 行 ≤ 300"));
+  assert.ok(valueOf("risk-score-low", "c-all").includes("12行 ≤ 300"));
   assert.ok(valueOf("risk-score-low", "sum").includes("0 < 20 → LOW"));
   assert.equal(valueOf("risk-score-low", "load"), levelsText(SAMPLE_LEVELS));
 
@@ -169,7 +169,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   assert.equal(valueOf("risk-save", "edit"), levelsText(raised));
 });
 
-test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果の見本（閾値は小さいほう、項目は連結）の数え方と一致する", () => {
+test("CB-T1181 共通設定に lib の設定を足した図は、統合結果の見本（閾値は小さいほう、項目は連結）の数え方と一致する", () => {
   const lib = (sample.page.sums ?? []).find((entry) => entry.name === "lib")!;
   const levels = { medium: lib.levels.medium!, high: lib.levels.high!, critical: lib.levels.critical! };
   const common = commonRules();
@@ -186,15 +186,15 @@ test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果
 
   assert.equal(valueOf("risk-sum-lib", "common"), `${levelsText(SAMPLE_LEVELS)}\n項目: ${[...common.keys()].join(", ")}`);
   assert.equal(valueOf("risk-sum-lib", "layer"), `${levelsText(levels)}\n項目: ${[...added.keys()].join(", ")}`);
-  assert.equal(valueOf("risk-sum-lib", "merge"), `medium ${levels.medium} / high ${levels.high} / critical ${levels.critical}\n項目 ${common.size} + ${added.size} = ${merged.size} 件`);
+  assert.equal(valueOf("risk-sum-lib", "merge"), `medium ${levels.medium} / high ${levels.high} / critical ${levels.critical}\n項目: ${common.size} + ${added.size} = ${merged.size}件`);
   assert.equal(levels.high, Math.min(SAMPLE_LEVELS.high, levels.high));
   assert.equal(valueOf("risk-sum-lib", "diff"), "src/api/v1.py  +100 -20");
   assert.equal(
     valueOf("risk-sum-lib", "score"),
     [
-      `big-diff（共通）: 120 行 ≤ ${common.get("big-diff")!.value} → 0`,
-      `lib:big-diff: 120 行 > ${added.get("lib:big-diff")!.value} → +${hits["lib:big-diff"]}`,
-      `public-api: src/api/v1.py の 1 ファイル → +${hits["public-api"]}`,
+      `big-diff（共通設定）: 120行 ≤ ${common.get("big-diff")!.value} → 0`,
+      `lib:big-diff: 120行 > ${added.get("lib:big-diff")!.value} → +${hits["lib:big-diff"]}`,
+      `public-api: src/api/v1.pyの1ファイル → +${hits["public-api"]}`,
       "no-tests: no → 0",
     ].join("\n"),
   );

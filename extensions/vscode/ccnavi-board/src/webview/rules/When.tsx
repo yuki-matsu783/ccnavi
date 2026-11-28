@@ -47,11 +47,11 @@ type CondFlowNode = Node<CondData, "cond">;
 const OP_TITLES: Readonly<Record<string, string>> = {
   all: "all: 中のすべてにヒットすればヒットします",
   any: "any: 中のどれかにヒットすればヒットします",
-  not: "not: 中にヒットしなければヒットします",
+  not: "not: 中の条件にヒットしないときに、ヒットします",
   glob: "glob: 対象をこのglobで照合します",
   regex: "regex: 対象をこの正規表現で照合します",
   invalid: "読み込めない条件",
-  empty: "空。押して中に入れるものを選びます",
+  empty: "空です。押して、中に入れる条件を選びます",
 };
 
 function CondNodeView({ data }: NodeProps<CondFlowNode>): JSX.Element {
@@ -248,7 +248,7 @@ function Inspector({
       )}
       {node.op === "not" && (
         <span className="inline">
-          <span className="dim">not（中にヒットしなければヒットする）</span>
+          <span className="dim">not（中の条件にヒットしないときにヒットする）</span>
           {node.child === null && adders(path, 0)}
           {node.child !== null && (
             <button type="button" className="action small" data-op-action="unwrap" onClick={() => edit(unwrapNot(tree, path), path)}>
@@ -268,10 +268,10 @@ function Inspector({
         </span>
       )}
       <span className="buttons">
-        <button type="button" className="action small" data-op-action="wrap-all" title="この条件をallで包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-all" title="この条件をallの中に入れます。allの中に条件を追加して組み合わせられます。" onClick={() => edit(wrapGroup(tree, path, "all"), path)}>
           allで包む
         </button>
-        <button type="button" className="action small" data-op-action="wrap-any" title="この条件をanyで包みます。隣に子を足して組み合わせにできます" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
+        <button type="button" className="action small" data-op-action="wrap-any" title="この条件をanyの中に入れます。anyの中に条件を追加して組み合わせられます。" onClick={() => edit(wrapGroup(tree, path, "any"), path)}>
           anyで包む
         </button>
         <button type="button" className="action small" data-op-action="wrap" onClick={() => edit(wrapNot(tree, path), path)}>

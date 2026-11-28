@@ -8,7 +8,7 @@ import (
 
 // ルールの `when:`（組み合わせ条件）と `except:`（本体にヒットしても、除くものにヒットすればヒットしない扱い）を、
 // hook の判定・`--explain`・`--test-expectations` で見る。どのルールも言及しない呼び出しが確認になることもここで見る。
-// 読み込み・組み合わせの評価・lint・レイヤーのマージ・提案が書き戻す形は go/internal/policy と go/internal/entry/suggest の go test が見る。
+// 読み込み・組み合わせの評価・lint・設定のマージ・提案が書き戻す形は go/internal/policy と go/internal/entry/suggest の go test が見る。
 // 強さの順（deny > ask > allow）と読み切れないコマンドの扱いは go/internal/hook/judge/sections_test.go が見る。
 
 // vaultRule は「*.crt か、vault/ の下で .md でないもの」。組み込みの認証情報の土台（builtin:credentials）にヒットしない名前にしてある

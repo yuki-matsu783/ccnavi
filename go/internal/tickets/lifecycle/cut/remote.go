@@ -226,7 +226,7 @@ func (r *run) done(rs remoteState, c6 bool, s, sShort string, wip bool) {
 		}
 	}
 	// ワークスペースのルートで実行され、projects/ の下にリポジトリがあるときは、projects/ の変更なら cd してから実行し直す
-	// よう案内する。断らない（ワークスペース自身の作業もルートから実行するのが正しく、どのプロジェクトの話かは分からない）。
+	// よう案内する。断らない（ワークスペースの作業もルートから実行するのが正しく、どのプロジェクトの話かは分からない）。
 	if samePath(phys(r.top), phys(r.in.Root)) {
 		names, _ := ospath.DiskListdir(ospath.Join(r.in.Root, "projects"))
 		for _, n := range names {

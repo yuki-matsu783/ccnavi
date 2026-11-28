@@ -29,7 +29,7 @@ type repoRuleRow struct {
 	Code    string   `json:"code"`
 }
 
-// repoRulesWorkspace は共通レイヤーのルールにリポジトリの rules.yml だけを置いたワークスペース。ほかのレイヤーと
+// repoRulesWorkspace は共通設定のルールにリポジトリの rules.yml だけを置いたワークスペース。ほかの設定と
 // 承認済みチケットは置かない。
 func repoRulesWorkspace(t *testing.T) string {
 	t.Helper()

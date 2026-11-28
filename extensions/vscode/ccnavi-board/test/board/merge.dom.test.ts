@@ -124,7 +124,7 @@ test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じ�
     row("b-draft", { state: "open", draft: true }),
     row("c-merged", { state: "merged" }),
     row("d-closed", { state: "closed", abandon: "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon d-closed" }),
-    row("e-unknown", { state: "unknown", url: "", reason: "auth", detail: "認証に失敗した（トークンかghの認証を確かめる）" }),
+    row("e-unknown", { state: "unknown", url: "", reason: "auth", detail: "認証に失敗しました（トークンか gh / glab の認証を確かめてください）" }),
     row("f-timeout", { state: "unknown", url: "", reason: "timeout", detail: "時間内に終わりませんでした" }),
     row("g-format", { state: "unknown", url: "", reason: "format", detail: "出力の形が想定外です（要求したMR（#5）と番号が違います（6））" }),
     row("h-failed", { state: "unknown", url: "", reason: "failed", detail: "shが終了コード127で終わりました" }),
@@ -137,11 +137,11 @@ test("CB-D722 マージ待ち（Draftなら付記）・マージ済み・閉じ�
     assert.equal(state("a-open"), "マージ待ち MRを開く");
     assert.equal(state("b-draft"), "マージ待ち（Draft） MRを開く");
     assert.equal(state("c-merged"), "マージ済み 片付ける");
-    assert.match(state("d-closed"), /^マージせず閉じました。自動では片付けません。破棄した親の記録は、ターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行すると消えます/);
-    assert.equal(state("e-unknown"), "確認できません（認証: 認証に失敗した（トークンかghの認証を確かめる））");
+    assert.match(state("d-closed"), /^MRはマージされずに閉じられています。ccnaviは自動では片付けません。この親の記録を消すには、ターミナルでsh \/ws\/\.ccnavi\/scripts\/ccnavi-launcher\.sh worktree retire --abandon d-closedを実行してください。/);
+    assert.equal(state("e-unknown"), "確認できません（認証エラー: 認証に失敗しました（トークンか gh / glab の認証を確かめてください））");
     assert.equal(state("f-timeout"), "確認できません（タイムアウト: 時間内に終わりませんでした）");
-    assert.match(state("g-format"), /^確認できません（出力の形が想定外: 出力の形が想定外です/);
-    assert.equal(state("h-failed"), "確認できません（実行できません: shが終了コード127で終わりました）");
+    assert.match(state("g-format"), /^確認できません（出力の形式が想定外: 出力の形が想定外です/);
+    assert.equal(state("h-failed"), "確認できません（実行エラー: shが終了コード127で終わりました）");
     assert.equal(state("i-incomplete"), "確認できません（記録が不完全: 記録を読めない（壊れている））");
     assert.equal(state("j-wait"), "確認中…");
     // 確認した時刻
@@ -201,7 +201,7 @@ test("CB-D724 ［片付ける］はmergeRetireを送る。ダイアログ中（b
   // 送ったあと: 「片付けのコマンドをターミナルに送りました。結果はターミナルで確認してください」。ボタンは出さない
   const sent = await openBoard(json(), { merge: view([row("c-merged", { sent: true })]) });
   try {
-    assert.equal(text(sent, ".merge-sent"), "片付けのコマンドをターミナルに送りました。結果はターミナルで確認してください");
+    assert.equal(text(sent, ".merge-sent"), "片付けのコマンドをターミナルに送りました。結果はターミナルで確認してください。");
     assert.equal(sent.all('button[data-action="merge-retire"]').length, 0);
   } finally {
     await sent.close();

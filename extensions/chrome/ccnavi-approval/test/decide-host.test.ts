@@ -97,7 +97,7 @@ test("CX-T320 順序は issue → 返信 → 解決 → コメント。返信の
   assert.deepEqual(out.resolved, ["k1", "k2", "k3"]);
   assert.equal(out.commented, true);
   assert.deepEqual(events.filter((e) => e.state === "done").map((e) => e.step), ["issue", "issue", "reply", "reply", "reply", "resolve", "resolve", "resolve", "comment"]);
-  assert.match(describeHostResult(out), /済んだこと: issue .*返信 3 件.*解決 3 件.*MR へのコメント/);
+  assert.match(describeHostResult(out), /済んだこと：issue .*返信 3 件.*解決 3 件.*MR へのコメント/);
 });
 
 test("CX-T321 GitLab も同じ順序で書く（discussion への返信は notes、解決は PUT、issue は projects/:id/issues、コメントは MR のメモ）", async () => {
@@ -147,7 +147,7 @@ test("CX-T323 途中で失敗したらそこで止まり、済んだ分（作っ
   assert.deepEqual(r1.issues.map((i) => i.number), [500, 501]);
   assert.deepEqual([r1.replied, r1.resolved, r1.commented], [["k1"], [], false]);
   assert.deepEqual(a.mock.w.log.filter((x) => x.startsWith("resolve") || x === "comment"), []);
-  assert.match(describeHostResult(r1), /スレッドへの返信で止まりました（k2）.*済んだこと: issue .*返信 1 件.*決め直せば/);
+  assert.match(describeHostResult(r1), /スレッドへの返信で止まりました（k2）.*済んだこと：issue .*返信 1 件.*決め直すと/);
 
   // 解決で失敗: 返信は済み、コメントは書かない
   const b = hub();
@@ -253,7 +253,7 @@ test("CX-T335 issue の検索: 404 だけが『無い』。5xx・429・読めな
   for (let i = 0; i < 300; i += 1) big.mock.seedIssue(`別の issue ${i}`);
   const out = await runHostPlan(big.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
   assert.deepEqual([out.ok, out.issues[0].reused, out.searchTruncated], [true, false, true]);
-  assert.match(describeHostResult(out), /探し切れていません/);
+  assert.match(describeHostResult(out), /検索しきれていない/);
   // 閉じた issue も印で見つかる（state=all）
   const closed = hub();
   closed.mock.seedIssue(`${MARK1}\n閉じた`).closed = true;
@@ -361,8 +361,8 @@ test("CX-T340 権限不足の文面は decide のホスト書き込みだけ。c
   await assert.rejects(gh.createBranch(ghc, "acme", "widgets", "feature-1-x", "a".repeat(40)), (e: Error) => e.message.includes("PAT の権限（リポジトリ・Contents など）を見直してください") && !e.message.includes("Read and write"));
   await assert.rejects(gh.createDraftMr(ghc, "acme", "widgets", "feature-1-x", "main", "t", "Closes #1"), /Contents など/);
   const glc = { host: HOSTS[1], token: TOKEN, fetch: forbidden, counter: { rest: 0, graphql: 0 }, sleep: noWait };
-  await assert.rejects(gl.createBranch(glc, "acme", "widgets", "feature-1-x", "a".repeat(40)), (e: Error) => e.message.includes("PAT の権限（api スコープ・プロジェクトのメンバー）を見直してください"));
-  await assert.rejects(gl.replyDiscussion(glc, "acme", "widgets", 7, D1, "b"), /read_api では書けません/);
+  await assert.rejects(gl.createBranch(glc, "acme", "widgets", "feature-1-x", "a".repeat(40)), (e: Error) => e.message.includes("PAT の権限が足りません。PAT に api スコープがあるか、PAT のアカウントがプロジェクトのメンバーかを確認してください"));
+  await assert.rejects(gl.replyDiscussion(glc, "acme", "widgets", 7, D1, "b"), /read_api では書き込めません/);
 });
 
 test("CX-T326 ホストが返した URL が通信先の外や不正な形なら、返信に入れず止まる", async () => {
@@ -372,7 +372,7 @@ test("CX-T326 ホストが返した URL が通信先の外や不正な形なら�
   const out = await runHostPlan(ops, REPO, 7, plan());
   assert.equal(out.ok, false);
   assert.equal(out.failed?.step, "issue");
-  assert.match(out.failed?.reason ?? "", /通信先の画面の外/);
+  assert.match(out.failed?.reason ?? "", /登録した通信先とは別のサイト/);
   assert.equal(mock.w.threads.every((t) => t.replies.length === 0), true);
   // 直接も: 空白・引用符・括弧を含む URL は本文に入れない
   const fake = { ...callOps(async () => null, wasm), createIssue: async () => ({ number: 1, url: "https://github.com/a b)" }), findIssue: async () => ({ issue: null, truncated: false }) };
@@ -489,7 +489,7 @@ test("CX-T331 権限が足りないときの 403 は、書く操作ごとに要�
   await assert.rejects(gh.resolveThread(ghc(graphqlForbidden), T1), /Pull requests: Read and write/);
   const glc = (fetch: gh.Fetch) => ({ host: HOSTS[1], token: TOKEN, fetch, counter: { rest: 0, graphql: 0 }, sleep: noWait });
   await assert.rejects(gl.createIssue(glc(forbidden("x")), "acme", "widgets", "t", "b"), /api スコープ.*Developer/);
-  await assert.rejects(gl.repoInfo(glc(forbidden("x")), "acme", "widgets"), /api スコープ・プロジェクトのメンバー/);
+  await assert.rejects(gl.repoInfo(glc(forbidden("x")), "acme", "widgets"), /api スコープがあるか、PAT のアカウントがプロジェクトのメンバーか/);
 });
 
 test("CX-T332 protocol: 新しい書き込みはボードからだけ、登録したリポジトリだけ。形の悪い引数は 400 で断り、ホストには出ない", async () => {
@@ -541,7 +541,7 @@ test("CX-T332 protocol: 新しい書き込みはボードからだけ、登録�
   }
   // GitLab の discussion の id は 16 進だけ（GitHub の node id は通らない）
   const lres = await call("gitlab.com", "resolveThread", ["acme", "widgets", 7, T1]);
-  assert.ok(!lres.ok && lres.status === 400 && /discussion の id/.test(lres.error));
+  assert.ok(!lres.ok && lres.status === 400 && /スレッドの id/.test(lres.error));
   assert.equal(mock.calls.length, before, "断った頼みはホストに出ない");
   // 通る形は通る
   mock.w.threads = [thread(T1)];

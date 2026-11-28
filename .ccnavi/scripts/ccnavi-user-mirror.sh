@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-mirror 共通レイヤーのミラーと工程スキル（skills/）がずれていないかを見て、プロジェクトへ揃える。ユーザが端末で打つ。
+# ccnavi-user-mirror 共通設定のミラーと工程スキル（skills/）がずれていないかを見て、プロジェクトへ揃える。ユーザが端末で打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-user-mirror.sh [<プロジェクト名>…] [--yes --expect <値>]
 #
@@ -20,7 +20,7 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-user-mirror.sh [<プロジェクト名>…] [--yes --expect <値>]
 
-  共通レイヤーのミラーと工程スキル（skills/）がずれていないかを見て、プロジェクトへ揃える。
+  共通設定のミラーと工程スキル（skills/）がずれていないかを見て、プロジェクトへ揃える。
   実行ファイルの `user mirror` を、入口の印を付けて起こす。ユーザが端末で実行します。
 USAGE
 }
@@ -41,5 +41,4 @@ root=$(ccnavi_workspace_anywhere) || ccnavi_no_workspace ccnavi-user-mirror
 if bin=$(ccnavi_bin "$root"); then
 	exec "$bin" --entry sh user mirror "$@"
 fi
-printf 'ccnavi-user-mirror: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-exit 2
+ccnavi_no_bin ccnavi-user-mirror

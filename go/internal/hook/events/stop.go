@@ -228,7 +228,7 @@ func subagentNudge(conf *config.Settings, root string, in hookio.Input, record *
 }
 
 // stopRulesNudge は、`match: Stop` の allow のルールが、このターンの終わりで止めて渡す文を返す。何を言うか・何回に 1 度かは
-// 設定が持ち、ここは当てて数えるだけ。ルールは共通レイヤーとワークスペース自身のレイヤーからだけ引き、本文は
+// 設定が持ち、ここは当てて数えるだけ。ルールは共通設定とワークスペースの設定からだけ引き、本文は
 // ワークスペースルートの版だけを読む（プロジェクトやワークツリーの版はエージェントが書き換えられるため）。数えを
 // 覚えられない回は言わない（覚えられないまま止めると毎回止まる）。文の頭には振り返りの前置きを必ず付ける。
 func stopRulesNudge(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) string {

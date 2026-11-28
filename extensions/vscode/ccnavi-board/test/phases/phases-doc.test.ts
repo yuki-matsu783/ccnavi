@@ -167,10 +167,10 @@ test("CB-T91 idが重なれば書き戻さない（実行ファイルは後ろ�
 
 test("CB-T92a review: chatは読めない値で、苦情が出てtrueとして出る", () => {
   const doc = readPhases("version: 1\nphases:\n  quick:\n    kind: work\n    review: chat\n    scope: inherit\n");
-  assert.ok(doc.model.problems.some((p) => p.includes("review `chat`はtrueかfalseではありません")));
+  assert.ok(doc.model.problems.some((p) => p.includes("review `chat`はtrueでもfalseでもありません")));
   assert.equal(doc.model.form.phases[0].review, true);
   const bad = readPhases("version: 1\nphases:\n  q:\n    review: Mr\n    scope: inherit\n");
-  assert.ok(bad.model.problems.some((p) => p.includes("review `Mr`はtrueかfalseではありません")));
+  assert.ok(bad.model.problems.some((p) => p.includes("review `Mr`はtrueでもfalseでもありません")));
 });
 
 test("CB-T92 versionがなければ苦情を出し、保存で先頭に追加する。読み込めない値は苦情にして既定で出す", () => {
@@ -178,7 +178,7 @@ test("CB-T92 versionがなければ苦情を出し、保存で先頭に追加す
   assert.equal(doc.model.version, null);
   assert.ok(doc.model.problems.some((p) => p.startsWith("versionがありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("kind `strange`")));
-  assert.ok(doc.model.problems.some((p) => p.includes("review `maybe`はtrueかfalseではありません")));
+  assert.ok(doc.model.problems.some((p) => p.includes("review `maybe`はtrueでもfalseでもありません")));
   assert.ok(doc.model.problems.some((p) => p.includes("scope `everything`")));
   // 順序の欄は読まないので、形が崩れていても苦情にしない
   assert.ok(!doc.model.problems.some((p) => p.includes("overlap")), doc.model.problems.join("\n"));

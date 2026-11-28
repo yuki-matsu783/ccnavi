@@ -24,7 +24,7 @@ function find(nodes: readonly SidebarNode[], id: string): SidebarNode | undefine
   return undefined;
 }
 
-test("CB-T1282 見出しはユーザ待ち・進行中の親・画面の順。種類は件数つきで、0件の種類は出さない。バッジは出した件数の合計", () => {
+test("CB-T1307 見出しはユーザ待ち・進行中の親・画面の順。種類は件数つきで、0件の種類は出さない。バッジは出した件数の合計", () => {
   const tree = sidebarTree({
     board: withInbox({
       approval: ["i0001-02-03"],
@@ -58,7 +58,7 @@ test("CB-T1282 見出しはユーザ待ち・進行中の親・画面の順。�
   assert.equal(find(tree.nodes, "flow-draft"), undefined);
 });
 
-test("CB-T1283 行を押すと、該当の画面と場所を開く（承認・レビュー完了・カード・取り込み待ちのツリー・フロー編集・MRの状況を確認）", () => {
+test("CB-T1308 行を押すと、該当の画面と場所を開く（承認・レビュー完了・カード・取り込み待ちのツリー・フロー編集・MRの状況を確認）", () => {
   const tree = sidebarTree({
     board: withInbox({
       approval: ["i0001-02-03"],

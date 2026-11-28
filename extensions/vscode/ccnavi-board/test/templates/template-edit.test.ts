@@ -221,13 +221,13 @@ test("CB-T1147 実行ファイルの検査の答えを読む。図の中身・�
   assert.equal(invalid.value.data, null);
   assert.deepEqual(invalid.value.plans, []);
   assert.equal(invalid.value.problems[0].severity, "error");
-  assert.deepEqual(parseTemplateCheck(JSON.stringify({ version: 1, ok: false, error: "レイヤー 'x' はありません" })), { ok: false, error: "レイヤー 'x' はありません" });
+  assert.deepEqual(parseTemplateCheck(JSON.stringify({ version: 1, ok: false, error: "設定 'x' はありません" })), { ok: false, error: "設定 'x' はありません" });
   const old = parseTemplateCheck(JSON.stringify({ version: 1, ok: true, valid: true, problems: [], plans: [], types: [] }));
   assert.ok(!old.ok && /data/.test(old.error));
   assert.ok(!parseTemplateCheck(JSON.stringify({ version: 2 })).ok);
 });
 
-test("CB-T1148 テンプレートの名前はファイル名になるので、実行ファイルと同じ形（英数字で始め、英数字と . _ - だけ、64字まで）だけ通す。編集できるレイヤーは対象から決める", () => {
+test("CB-T1148 テンプレートの名前はファイル名になるので、実行ファイルと同じ形（英数字で始め、英数字と . _ - だけ、64字まで）だけ通す。編集できる設定は対象から決める", () => {
   for (const ok of ["feature", "a", "full-phases", "v1.2_x", "A".repeat(64)]) {
     assert.ok(validTemplateName(ok), ok);
   }
@@ -239,7 +239,7 @@ test("CB-T1148 テンプレートの名前はファイル名になるので、�
   assert.equal(shownLayerOf({ kind: "project", name: "lib" }), "lib");
 });
 
-test("CB-T1149 新しい名前は、共通のレイヤーとこのレイヤーの既存の名前と、大文字小文字を区別せず重なるかを見る。ほかのレイヤーの名前は見ない", () => {
+test("CB-T1149 新しい名前は、共通設定とこの設定の既存の名前と、大文字小文字を区別せず重なるかを見る。ほかの設定の名前は見ない", () => {
   const layer = (name: string, names: string[]) => ({ name, path: "", exists: true, unreadable: "", writable: true, problems: [], templates: names.map((n) => ({ name: n })) }) as never;
   const layers = [layer("common", ["Review"]), layer("self", ["impl"]), layer("lib", ["libonly"])];
   assert.deepEqual(templateNameTaken(layers, "self", "review"), { layer: "common", name: "Review" });

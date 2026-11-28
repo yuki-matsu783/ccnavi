@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// 共通レイヤーと config（自身のレイヤー）の 4 本のファイルの置き場。置き場の名前はテストの側に持つ。
+// 共通設定と config（ワークスペースの設定）の 4 本のファイルの置き場。置き場の名前はテストの側に持つ。
 // 既定が動いたら、ここを置いた木で実行ファイルが設定を読まなくなり、設定を前提にしたテストが落ちて気づく。
 const projectHome = ".ccnavi"
 
@@ -83,16 +83,16 @@ func TempDir(t testing.TB) string {
 	return dir
 }
 
-// CommonRelpath は共通レイヤーのファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。
+// CommonRelpath は共通設定ファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。
 func CommonRelpath(kind string) string {
 	return filepath.Join(projectHome, "config", "common", layerFileNames[kind])
 }
 
-// CommonPath はそのワークスペースルートの共通レイヤーのファイルのパス。
+// CommonPath はそのワークスペースルートの共通設定ファイルのパス。
 func CommonPath(root, kind string) string { return filepath.Join(root, CommonRelpath(kind)) }
 
-// ConfigPath はワークスペースルートの config（自身のレイヤー）のファイルのパス。
-// フェーズ定義は共通レイヤーと config の両方に置け、判定は 2 本の和を読む。
+// ConfigPath はワークスペースルートの config（ワークスペースの設定）のファイルのパス。
+// フェーズ定義は共通設定と config の両方に置け、判定は共通設定に config を足した統合結果を読む。
 func ConfigPath(root, kind string) string {
 	return filepath.Join(root, projectHome, "config", "project", layerFileNames[kind])
 }
@@ -102,9 +102,9 @@ var (
 	fixtureWS = map[string]string{}
 )
 
-// FixtureWorkspace は tests/fixtures/<name> を共通レイヤーのルールに据えたワークスペースルート。
+// FixtureWorkspace は tests/fixtures/<name> を共通設定のルールに据えたワークスペースルート。
 // `--rules` は診断でだけ有効なので、見本のルールを指すのには使わず、`--root` にここを渡す。
-// リポジトリ自身をルートにしないので、走った機械の共通レイヤーが判定に入り込まない。
+// リポジトリ自身をルートにしないので、走った機械の共通設定が判定に入り込まない。
 // 組むのは見本ごとにプロセスで 1 度。中身は読むだけなので使い回してよい（Main が後片付けする）。
 func FixtureWorkspace(t testing.TB, name string) string {
 	t.Helper()

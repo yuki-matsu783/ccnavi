@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/harness/configws"
 )
 
-// 共通レイヤーのミラーを調べ、ずれを同期する `ccnavi user mirror` の入口。
+// 共通設定のミラーを調べ、ずれを同期する `ccnavi user mirror` の入口。
 //
 // 着手済みの親のワークツリーのミラーは発言のたびに揃うが、ユーザのチェックアウトは対象外なので、間が空くとミラーが古いまま残る。
 // `user mirror` は、プロジェクトのユーザのチェックアウトのミラーを、見たいときに調べ（書かない）、押したときに揃える
@@ -53,7 +53,7 @@ func decodeObject(t testing.TB, text string) map[string]any {
 	return out
 }
 
-// syncAll は全プロジェクトのミラーを、共通レイヤーに揃える（ボードの経路）。
+// syncAll は全プロジェクトのミラーを、共通設定に揃える（ボードの経路）。
 func (w mirrorWS) syncAll() {
 	w.T.Helper()
 	expect := w.view()["expect"].(string)

@@ -95,7 +95,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     assert.match(n1.textContent ?? "", /子が承認済み/);
     const n2 = dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n2"] .plan-node');
     // 延期したステップは、本文の先行の一覧と同じ言い方で引き受け手を言い、レビューの要否は出さない（本文も出さない）
-    assert.match(n2.textContent ?? "", /レビューは4と一緒に/);
+    assert.match(n2.textContent ?? "", /レビューはステップ4でまとめて行う/);
     assert.doesNotMatch(n2.textContent ?? "", /レビュー必須/);
     assert.match(dom.one('.plan-graph[data-part="plan"] .react-flow__node[data-id="n3"] .plan-node').textContent ?? "", /レビュー必須（MR）/);
     assert.equal(n2.getAttribute("data-locked"), "0");
@@ -112,7 +112,7 @@ test("CB-D160 計画を持つ親があれば、本文の上に計画ごとの図
     // 図の下。すぐ始まるステップ・終端に届かないステップ・順序の検査の理由
     const plain = dom.one('.plan-graph[data-part="plan"] .plan-graph-notes').textContent ?? "";
     assert.doesNotMatch(plain, /すぐ始まる/); // 1つだけなら出さない（実行ファイルの一覧と同じ）
-    assert.match(plain, /延期したレビュー: 2は4と一緒に/);
+    assert.match(plain, /後ろへ回したレビュー: 2のレビューは4でまとめて行う/);
     assert.doesNotMatch(plain, /最後のステップの先行になっていない/);
     const notes = dom.one('.plan-graph[data-part="feedback"] .plan-graph-notes').textContent ?? "";
     assert.match(notes, /すぐ始まる: 5, 6/);
@@ -231,7 +231,7 @@ test("CB-D180 計画編集タブに未保存の変更がある親を含む一覧
     assert.equal(note.textContent, "計画編集タブに保存していない変更があります。変更を保存または破棄するまで、表示中のチケットは承認できません。");
     const confirm = dom.one<HTMLButtonElement>('[data-action="approve-confirm"]');
     assert.equal(confirm.disabled, true);
-    assert.equal(dom.one("#approval-blocked").textContent, "親i0001の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください");
+    assert.equal(dom.one("#approval-blocked").textContent, "親i0001の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください。");
     assert.equal(confirm.getAttribute("title"), dom.one("#approval-blocked").textContent);
     // 未保存のままでも、タブへの入口は押せる（保存しに行く）
     assert.equal(dom.one<HTMLButtonElement>('[data-action="edit-workflow"]').disabled, false);

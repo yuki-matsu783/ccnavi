@@ -114,7 +114,7 @@ export function parseTemplateCheck(text: string): TemplateCheckParse {
   const valid = bool(raw.valid);
   // 読めたと言うのに中身が無い答えは、見比べる相手が無いので受けない
   if (valid && !isRecord(raw.data)) {
-    return { ok: false, error: "テンプレートの検査のJSONのdata欄がありません。ccnaviが古い可能性があります。実行ファイルを更新してください" };
+    return { ok: false, error: "テンプレートの検査のJSONのdata欄がありません。ccnaviが古い可能性があります。ccnaviを更新してください。" };
   }
   return {
     ok: true,
@@ -146,12 +146,12 @@ export function revealControls(text: string): string {
   return out;
 }
 
-/** 本文を読むときのレイヤー。`project`の対象はレイヤーの名前（そのレイヤー）、それ以外は共通との統合結果のself */
+/** 本文を読むときの設定。`project`の対象は設定の名前（その設定）、それ以外は共通との統合結果のself */
 export function templatesLayerOf(target: { readonly kind: string; readonly name: string }): string {
   return target.kind === "project" ? target.name : "self";
 }
 
-/** 対象が見せるレイヤーの名前。共通の設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこのレイヤーのテンプレートだけ） */
+/** 対象が見せる設定の名前。共通設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこの設定のテンプレートだけ） */
 export function shownLayerOf(target: { readonly kind: string; readonly name: string }): string {
   if (target.kind === "workspace") {
     return "common";
@@ -171,7 +171,7 @@ export function validTemplateName(name: string): boolean {
 export const WINDOWS_RESERVED_NAMES: readonly string[] = ["con", "prn", "aux", "nul", ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((n) => [`com${n}`, `lpt${n}`])];
 
 /** 新しい名前を断るときに画面へ出す、決まりの説明 */
-export const NEW_TEMPLATE_NAME_RULE = "英数字で始め、英数字と「.」「_」「-」だけを使い、64字までです。末尾に「.」は使えません。Windowsの予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）";
+export const NEW_TEMPLATE_NAME_RULE = "名前は英数字で始め、英数字と「.」「_」「-」だけで、64字以内で付けてください。末尾に「.」は使えません。Windowsの予約名は使えません（con・prn・aux・nul・com1〜9・lpt1〜9。拡張子を付けても同じです）。";
 
 /**
  * 新しく作るテンプレートの名前に使えるか。`validTemplateName`に加えて、末尾の`.`とWindowsの予約名を断る
@@ -185,7 +185,7 @@ export function validNewTemplateName(name: string): boolean {
 }
 
 /**
- * 新しいテンプレートの名前が、共通のレイヤーか`layer`のレイヤーの既存の名前と重なるか。大文字小文字は区別しない（別の機械で2本が1本に重なる）。
+ * 新しいテンプレートの名前が、共通設定か`layer`の設定の既存の名前と重なるか。大文字小文字は区別しない（別の機械で2本が1本に重なる）。
  * 重なる既存の1件を返す。無ければundefined
  */
 export function templateNameTaken(layers: readonly TemplateLayer[], layer: string, name: string): { readonly layer: string; readonly name: string } | undefined {
@@ -335,7 +335,7 @@ function parseRecord(text: string): { readonly ok: true; readonly value: Record<
 }
 
 function versionMismatch(version: unknown): string {
-  return `テンプレートのJSONの版が違います（拡張は${TEMPLATES_VERSION}、実行ファイルは${String(version)}）`;
+  return `テンプレートのJSONの版が違います（拡張は${TEMPLATES_VERSION}、ccnaviは${String(version)}）。拡張かccnaviを更新して、版を揃えてください。`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -49,8 +49,8 @@ function FamilyBody({ f, actions, decide }: { f: FamilyBoard; actions?: FamilyAc
   const others = r.closure.families.filter((n) => n !== f.family.name);
   const closure = (
     <>
-      {others.length > 0 ? <p className="closure">{`判定に使用した関連チケット（先行チケットの依存関係をたどって参照した親子チケット）: ${others.join(", ")}`}</p> : null}
-      {r.closure.absent.length > 0 ? <Notice kind="warn" text={`先行チケットの親ブランチがリモートに見つかりません。${r.closure.absent.join(", ")}`} /> : null}
+      {others.length > 0 ? <p className="closure">{`判定に使った関連チケット（先行チケットの依存をたどって読んだ親子のチケット）：${others.join(", ")}`}</p> : null}
+      {r.closure.absent.length > 0 ? <Notice kind="warn" text={`先行チケットの親ブランチがリモートに見つかりません：${r.closure.absent.join(", ")}`} /> : null}
     </>
   );
   if (r.undecided || r.refused) {
@@ -97,7 +97,7 @@ function FamilyBody({ f, actions, decide }: { f: FamilyBoard; actions?: FamilyAc
         ) : actions ? (
           <div className="actions">
             <ActionButton action="approve" onClick={() => actions.approve()}>{`承認する（${batch.map((e) => e.ticket).join(", ")}）`}</ActionButton>
-            <span className="digest">{`ダイジェスト ${r.digest.slice(0, 12)}`}</span>
+            <span className="digest">{`承認内容のダイジェスト ${r.digest.slice(0, 12)}`}</span>
           </div>
         ) : null
       ) : null}

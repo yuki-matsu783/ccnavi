@@ -246,7 +246,7 @@ var pathSubjects = [][2]string{
 	{"Read", "/nonexistent/ws/.ccnavi/config/common/rules.yml"},
 }
 
-// guardConfigs は設定の組（既定・動かした ccnavi ディレクトリ・ルートの外の共通レイヤー・振り分けの sh など）。
+// guardConfigs は設定の組（既定・動かした ccnavi ディレクトリ・ルートの外の共通設定・振り分けの sh など）。
 func guardConfigs() []guardCase {
 	common := func(dir string) []string {
 		return []string{dir + "/rules.yml", dir + "/phases.yml", dir + "/risks.yml"}

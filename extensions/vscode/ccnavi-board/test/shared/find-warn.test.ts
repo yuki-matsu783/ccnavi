@@ -56,7 +56,7 @@ test("CB-T1241 warnの帯は先頭MAX_WARN_LINES件までで、超えた分は�
   const over = warnLinesOf(warns(MAX_WARN_LINES + 3), "/tmp/x", "y");
   assert.equal(over.length, MAX_WARN_LINES + 1);
   assert.equal(over[0], "warn: w0: 本文");
-  assert.equal(over[MAX_WARN_LINES], "ほか3件。`ccnavi --lint`で全部見られます");
+  assert.equal(over[MAX_WARN_LINES], "ほか3件。`ccnavi --lint`で全部見られます。");
 });
 
 test("CB-T1244 保存拒否のerror行は日本語の行頭にし、今保存するファイルの行を先頭に出して件数で切り詰める", () => {
@@ -64,8 +64,8 @@ test("CB-T1244 保存拒否のerror行は日本語の行頭にし、今保存す
   const report = [...others, "error: r1: /tmp/x/rules.ymlの条件が不正", "warn: w: 警告は含めない", "error 10件、warn 1件、info 0件"].join("\n");
   const lines = errorLinesOf(report, "/tmp/x/rules.yml", ".ccnavi/rules.yml");
   assert.equal(lines.length, MAX_WARN_LINES + 1);
-  assert.equal(lines[0], "エラー: r1: .ccnavi/rules.ymlの条件が不正");
-  assert.ok(lines.slice(1, MAX_WARN_LINES).every((l) => l.startsWith("エラー: ")));
+  assert.equal(lines[0], "error: r1: .ccnavi/rules.ymlの条件が不正");
+  assert.ok(lines.slice(1, MAX_WARN_LINES).every((l) => l.startsWith("error: ")));
   assert.match(lines[MAX_WARN_LINES], /^ほか5件/);
 });
 

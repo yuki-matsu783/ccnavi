@@ -115,7 +115,7 @@ function binSetting(): string {
 export async function openWorkflow(ticket: unknown): Promise<void> {
   const parent = workflowTicketOf(ticket);
   if (parent === undefined) {
-    void vscode.window.showWarningMessage("計画編集タブを開く親の識別子が渡されていません（ボードの親の提案から開きます）");
+    void vscode.window.showWarningMessage("計画編集を開く親チケットが指定されていません。チケット管理画面で、親の提案から開いてください。");
     return;
   }
   await openWorkflowPanel(parent, undefined);
@@ -134,7 +134,7 @@ async function openWorkflowPanel(ticket: string, restore: Restore | undefined): 
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
       // 既に開いている画面の編集を何も言わずに差し替えない
-      void vscode.window.showWarningMessage(`${ticket}の計画編集タブは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${ticket}の計画編集タブは既に開いているため、閉じる前の編集を画面に戻せませんでした。代わりに、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
     return;
@@ -379,14 +379,14 @@ async function reload(current: PanelState): Promise<void> {
   const got = await runPlanOrder(rootPath, binSetting(), current.ticket);
   if (!alive(current) || current.seq !== seq) {
     if (restore !== undefined) {
-      void vscode.window.showWarningMessage(`${current.ticket}の計画編集タブを読み直せなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}の計画編集タブを読み直せなかったので、閉じる前の編集を画面に戻せませんでした。代わりに、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
     return;
   }
   if (!got.ok) {
     if (restore !== undefined) {
-      void vscode.window.showWarningMessage(`${current.ticket}の提案を読めなかったので、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}の提案を読み込めなかったので、閉じる前の編集を画面に戻せませんでした。代わりに、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
     showError(current, got.error);
@@ -398,7 +398,7 @@ async function reload(current: PanelState): Promise<void> {
       current.shownDraft = restore.draft;
     } else {
       // 閉じた後に提案が変わった。前の線を戻すと、変わった提案に古い順序を重ねることになる
-      void vscode.window.showWarningMessage(`${current.ticket}の提案は閉じた後に変わったので、閉じる前の編集を戻しませんでした。閉じる前の編集は、無題のJSONファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}の提案は閉じた後に変わったので、閉じる前の編集は画面に戻しませんでした。代わりに、無題のJSONファイルとして開きます。`);
       void openDraftAsJson(restore.draft);
     }
   }
@@ -444,7 +444,7 @@ async function handleMessage(current: PanelState, message: WorkflowMessage | und
       return;
     case "reload": {
       if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage("未保存の順序があります。破棄して更新しますか？", { modal: true }, "更新する");
+        const choice = await vscode.window.showWarningMessage("未保存の変更があります。破棄して更新しますか？", { modal: true }, "更新する");
         if (choice !== "更新する") {
           current.host.post({ type: "cancelled" } satisfies ToWorkflow);
           return;
@@ -495,7 +495,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
   }
   if (expect !== loaded.source_sha) {
     // 画面が別の読み込みのハッシュを送ってきた（読み直しと行き違った）。書かない
-    fail(current, "提案を更新したため、この保存は取りやめました。更新した提案で線を引き直してください");
+    fail(current, "提案を更新したため、この保存は取りやめました。更新した提案で線を引き直してください。");
     return;
   }
   const log = diaglog.get("ccnavi-board", root(current));
@@ -518,14 +518,14 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       const moved = result.answer.children.filter((child) => child.ticket !== child.new_ticket).length;
       await reload(current);
       vscode.window.showInformationMessage(
-        `${current.ticket}の計画の順序を提案に反映しました${moved === 0 ? "" : `（子の提案${moved}本の識別子とphase: を付け替えました）`}。` +
-          "承認の画面はボードから開き直してください。変更した提案はコミットしていません",
+        `${current.ticket}の計画の順序を提案に反映しました${moved === 0 ? "" : `（子の提案${moved}件の識別子とフェーズの番号を付け替えました）`}。` +
+          "承認の画面は、チケット管理画面から開き直してください。変更した提案はコミットしていません。",
       );
       return;
     }
     case "unchanged":
       await reload(current);
-      vscode.window.showInformationMessage(`${current.ticket}の計画は振り直しても変わらないので、反映しませんでした`);
+      vscode.window.showInformationMessage(`${current.ticket}の計画は、いまの順序のままで変更が無いため、反映しませんでした`);
       return;
     case "changed": {
       current.wroteAt = 0;
@@ -533,7 +533,7 @@ async function save(current: PanelState, order: PlanOrder, expect: string): Prom
       if (!alive(current)) {
         return;
       }
-      fail(current, "提案が外で変わっていたため、反映しませんでした（何も変更していません）");
+      fail(current, "提案が画面の外で変わっていたため、反映しませんでした（何も変更していません）");
       current.changed = fresh.ok ? fresh.value : result.answer;
       current.host.post({ type: "changed", answer: current.changed } satisfies ToWorkflow);
       return;

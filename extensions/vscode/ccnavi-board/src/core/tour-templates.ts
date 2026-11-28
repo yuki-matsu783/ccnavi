@@ -7,7 +7,7 @@
 import type { DraftEntry, FlowSummary, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
 
 export interface TemplatesSample {
-  /** 見本の画面（対象はワークスペース、見せるレイヤーはself） */
+  /** 見本の画面（対象はワークスペース、見せる設定はself） */
   readonly page: TemplatesPage;
   /** テンプレートの名前 → 本文（「本文を見る」の見本） */
   readonly texts: Readonly<Record<string, string>>;
@@ -15,7 +15,7 @@ export interface TemplatesSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Record<string, unknown>;
 }
@@ -25,7 +25,7 @@ function list(value: unknown, at: string): unknown[] {
     return [];
   }
   if (!Array.isArray(value)) {
-    throw new Error(`${at}がリストではない`);
+    throw new Error(`${at}がリストではありません`);
   }
   return value;
 }

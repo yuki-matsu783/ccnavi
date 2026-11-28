@@ -17,7 +17,7 @@ func sectionRule(id, match, glob, message string) map[string]any {
 	return map[string]any{"id": id, "match": match, "glob": glob, "message": message}
 }
 
-// sectionsWorkspace は共通レイヤーのルールにこの表の rules だけを置いたワークスペース。YAML は JSON の上位互換なので JSON で書く。
+// sectionsWorkspace は共通設定のルールにこの表の rules だけを置いたワークスペース。YAML は JSON の上位互換なので JSON で書く。
 func sectionsWorkspace(t *testing.T, sections map[string]any) string {
 	t.Helper()
 	root := testkit.TempRoot(t)

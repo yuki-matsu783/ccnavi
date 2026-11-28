@@ -47,7 +47,7 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
       {count > 0 ? <p className="decide-note">「このフェーズで直す」を 1 件でも選ぶと、続きの子チケットを作り、このフェーズを再開します。</p> : null}
       {supported.length >= 2 && count >= 2 ? (
         <div className="decide-bulk">
-          <span>すべて:</span>
+          <span>すべて：</span>
           {DECIDE_CHOICES.map((c) => (
             <button key={c} type="button" className="decide-bulk-button" data-bulk={c} disabled={busy} onClick={() => chooseAll(c)}>
               {DECIDE_LABELS[c]}
@@ -60,7 +60,7 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
           {preview.threads.map((t) => (
             <li key={t.key} className="decide-thread" data-key={t.key}>
               <div className="decide-where">
-                <span className="decide-path">{t.path ? `${t.path}:${t.line}` : "（場所なし）"}</span>
+                <span className="decide-path">{t.path ? `${t.path}:${t.line}` : "行の指定なし"}</span>
                 {t.url ? (
                   ALLOWED_URI.test(t.url.trim()) && /^https?:/i.test(t.url.trim()) ? (
                     <a className="decide-url" href={t.url} target="_blank" rel="noopener noreferrer">

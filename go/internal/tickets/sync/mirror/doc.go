@@ -1,4 +1,4 @@
-// Package mirror は、ワークスペースにしか無い共通のもの（共通レイヤー `.ccnavi/config/common/` と工程スキルの
+// Package mirror は、ワークスペースにしか無い共通のもの（共通設定 `.ccnavi/config/common/` と工程スキルの
 // `.claude/skills/<工程>/`）を、プロジェクトのツリー（ミラー `.ccnavi/config/common/` と `skills/<工程>/`）へ写す。
 //
 // 写し方は 1 つである。元の中身と先の中身を比べて変更（Change）の一覧を作る。改行の違いは見ない。書くときは、

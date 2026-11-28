@@ -12,23 +12,23 @@ import (
 // `--project-phases-file <名前>=<パス>` と `--project-risk-file <名前>=<パス>` の受入テスト
 // 。
 //
-// VS Code 拡張のフェーズ管理画面とリスク管理画面が、編集中のレイヤー（自身かプロジェクト）の定義を保存せずに、
-// 共通レイヤーと合わせて検証するための差し替え。config 単体の形式だけでなく、合成したあとの
-// 表示名の重なり・同じ id で中身が違う定義・閾値の逆転・同 id の衝突・`script:` の存在確認（解決先はそのレイヤーの git プロジェクトルート）を見る。
-// 土台は configws の雛形（自身のレイヤーに `docs`「文書」、lib のレイヤーに `design`「設計」/ `build` / `release`。
-// 共通レイヤーに `big-diff` と `levels: {medium: 20, high: 40, critical: 70}`、lib のレイヤーに `schema` と `levels: {critical: 50}`。
-// 自身のレイヤーと app は risks.yml を持たない）。
+// VS Code 拡張のフェーズ管理画面とリスク管理画面が、編集中の設定（ワークスペースかプロジェクト）の定義を保存せずに、
+// 共通設定に足して検証するための差し替え。config 単体の形式だけでなく、合成したあとの
+// 表示名の重なり・同じ id で中身が違う定義・閾値の逆転・同 id の衝突・`script:` の存在確認（解決先はその設定の git プロジェクトルート）を見る。
+// 土台は configws の雛形（ワークスペースの設定に `docs`「文書」、lib の設定に `design`「設計」/ `build` / `release`。
+// 共通設定に `big-diff` と `levels: {medium: 20, high: 40, critical: 70}`、lib の設定に `schema` と `levels: {critical: 50}`。
+// ワークスペースの設定と app は risks.yml を持たない）。
 
-// lib のレイヤーの build の表示名を、同じ 1 本の中の design と同じ「設計」にしたもの。
+// lib の設定の build の表示名を、同じ 1 本の中の design と同じ「設計」にしたもの。
 var libTitleOverlap = strings.Replace(configws.LibPhasesText, "title: ビルド", "title: 設計", 1)
 
 const (
 	// 同じ 1 本の定義と id も表示名も重ならない定義。`phases:` の続きに繋げる。
 	notesType = "  notes:\n    kind: work\n    title: メモ\n    review: false\n    scope: inherit\n"
-	// 定義の無いレイヤー。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
+	// 定義の無い設定。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
 	emptyLayer = "version: 1\nphases: {}\n"
 
-	// config 単体では読めるが、共通の medium 20 と合わせると high 10 < medium 20 で逆転する。
+	// config 単体では読めるが、共通の medium 20 に足すと high 10 < medium 20 で逆転する。
 	invertingRisk = "version: 1\nlevels: {high: 10}\n"
 	// 共通の `big-diff` と同じ id で中身が違う。
 	clashingRisk = "version: 1\nfactors:\n  - {id: big-diff, points: 99, lines_over: 1, message: 別の行数}\n"
@@ -52,7 +52,7 @@ func (w fileWS) layerProblems(kind, severity, where string, args ...string) []co
 	return out
 }
 
-// edited は診断に渡す差し替えファイルを置く。置き場は ws/tmp（レイヤーの git プロジェクトルートの外）。
+// edited は診断に渡す差し替えファイルを置く。置き場は ws/tmp（設定の git プロジェクトルートの外）。
 func (w fileWS) edited(name, text string) string {
 	return configws.Write(w.T, filepath.Join(w.Root, "tmp", name), text)
 }
@@ -62,13 +62,13 @@ func detailHas(ps []configws.Problem, sub string) bool { return configws.AnyDeta
 func TestProjectPhasesFileSwapsOneLayersPhaseTypesAndLintsTheOneFile(t *testing.T) {
 	t.Parallel()
 	w := newFileWS(t)
-	// 差し替えなしなら lib のレイヤーは読める。
+	// 差し替えなしなら lib の設定は読める。
 	if errs := w.layerProblems("phases", "error", "(projects/lib)"); len(errs) != 0 {
 		t.Fatalf("差し替えなしで error: %v", errs)
 	}
 	edited := w.edited("lib-phases.yml", libTitleOverlap)
 	if errs := w.layerProblems("phases", "error", "(projects/lib)", "--project-phases-file", "lib="+edited); len(errs) == 0 {
-		t.Error("表示名の重なりが lib のレイヤーの error として出ない")
+		t.Error("表示名の重なりが lib の設定の error として出ない")
 	}
 	// 差し替えは診断の中だけ。本来のファイルは書き換えない。
 	if got := configws.Read(t, configws.LayerPath(w.Lib, "phases")); got != configws.LibPhasesText {
@@ -84,21 +84,21 @@ func TestProjectPhasesFileSelfNamesTheWorkspacesOwnLayer(t *testing.T) {
 
 	clash := w.edited("self-phases.yml", own+"  clash:\n    kind: work\n    title: 文書\n    review: true\n    scope: inherit\n")
 	if len(w.layerProblems("phases", "error", "(self)", args(clash)...)) == 0 {
-		t.Error("自身のレイヤーの差し替えが検証に届かない")
+		t.Error("ワークスペースの設定の差し替えが検証に届かない")
 	}
 	// 重ならない定義を足しただけなら通る。
 	added := w.edited("self-added.yml", own+notesType)
 	if errs := w.layerProblems("phases", "error", "(self)", args(added)...); len(errs) != 0 {
 		t.Errorf("重ならない定義で error: %v", errs)
 	}
-	// 定義の無いレイヤーは error。拡張がレイヤーのファイルを最初の保存まで作らないのはこのため。
+	// 定義の無い設定は error。拡張が設定ファイルを最初の保存まで作らないのはこのため。
 	empty := w.edited("empty.yml", emptyLayer)
 	if len(w.layerProblems("phases", "error", "(self)", args(empty)...)) == 0 {
-		t.Error("定義の無いレイヤーが error にならない")
+		t.Error("定義の無い設定が error にならない")
 	}
 }
 
-// 差し替えた 1 本は共通レイヤーの定義と足して確かめる。共通の design と中身が違う design は error。
+// 差し替えた 1 本は共通設定のフェーズ定義と足して確かめる。共通の design と中身が違う design は error。
 func TestProjectPhasesFileIsCheckedTogetherWithTheCommonLayer(t *testing.T) {
 	t.Parallel()
 	w := newFileWS(t)
@@ -133,8 +133,8 @@ func TestProjectRiskFileALayerThatInvertsLevelsOnlyAfterTheMergeIsAnError(t *tes
 	if strings.Contains(configws.Read(t, configws.LayerPath(w.Lib, "risk")), "high") {
 		t.Error("本来のファイルが変わった")
 	}
-	// 共通の差し替え（--risk）に同じ中身を渡す形では、合成後の逆転は見えない。共通レイヤー単体の `levels` が逆転していないため。
-	// レイヤーの側として渡すと見える。
+	// 共通の差し替え（--risk）に同じ中身を渡す形では、合成後の逆転は見えない。共通設定単体の `levels` が逆転していないため。
+	// その設定として渡すと見える。
 	if old := w.layerProblems("risk", "error", "(projects/lib)", "--risk", tmp); len(old) != 0 {
 		t.Errorf("--risk で逆転が見えた: %v", old)
 	}
@@ -145,9 +145,9 @@ func TestProjectRiskFileSelfAndAProjectWithoutARiskFileAreNamedToo(t *testing.T)
 	w := newFileWS(t)
 	tmp := w.edited("risks.yml", invertingRisk)
 	if own := w.layerProblems("risk", "error", "(self)", "--project-risk-file", "self="+tmp); !detailHas(own, "high") {
-		t.Errorf("自身のレイヤーの逆転が出ない: %v", own)
+		t.Errorf("ワークスペースの設定の逆転が出ない: %v", own)
 	}
-	// ファイルの無い app でも、渡せばそのレイヤーの配点として合成される。lib は巻き込まない。
+	// ファイルの無い app でも、渡せばその設定の配点として合成される。lib は巻き込まない。
 	args := []string{"--project-risk-file", "app=" + tmp}
 	if app := w.layerProblems("risk", "error", "(projects/app)", args...); !detailHas(app, "high") {
 		t.Errorf("app の逆転が出ない: %v", app)
@@ -163,7 +163,7 @@ func TestProjectRiskFileAClashingIDIsAWarnNamingTheLayer(t *testing.T) {
 	args := []string{"--project-risk-file", "lib=" + w.edited("lib-risks.yml", clashingRisk)}
 	warns := w.layerProblems("risk", "warn", "(projects/lib)", args...)
 	if !detailHas(warns, "big-diff") || !detailHas(warns, "lib:big-diff") {
-		t.Errorf("同 id の衝突の warn がレイヤー名を言わない: %v", warns)
+		t.Errorf("同 id の衝突の warn が設定の名前を言わない: %v", warns)
 	}
 	// error ではない（両方を数える）。
 	if errs := w.layerProblems("risk", "error", "(projects/lib)", args...); len(errs) != 0 {
@@ -181,7 +181,7 @@ func TestProjectRiskFileScriptIsLookedUpUnderTheLayersOwnProjectRoot(t *testing.
 	if !detailHas(lintLib(), "count.sh") {
 		t.Error("script が無いのに通る")
 	}
-	// ワークスペースルートに置いても lib の基準には効かない（レイヤーごとに解決先が違う）。
+	// ワークスペースルートに置いても lib の基準には効かない（設定ごとに解決先が違う）。
 	configws.Write(t, filepath.Join(w.Root, ".ccnavi", "scripts", "count.sh"), "true\n")
 	if !detailHas(lintLib(), "count.sh") {
 		t.Error("ワークスペースルートの script が lib の基準に効いた")
@@ -191,10 +191,10 @@ func TestProjectRiskFileScriptIsLookedUpUnderTheLayersOwnProjectRoot(t *testing.
 	if errs := lintLib(); len(errs) != 0 {
 		t.Errorf("lib の置き場にあるのに error: %v", errs)
 	}
-	// 自身のレイヤーはワークスペースルートが基準。上で置いたものが引かれる。
+	// ワークスペースの設定はワークスペースルートが基準。上で置いたものが引かれる。
 	own := []string{"--project-risk-file", "self=" + w.edited("self-risks.yml", scriptFactor)}
 	if errs := w.layerProblems("risk", "error", "(self)", own...); len(errs) != 0 {
-		t.Errorf("自身のレイヤーで error: %v", errs)
+		t.Errorf("ワークスペースの設定で error: %v", errs)
 	}
 	if err := configws.RemoveFile(filepath.Join(w.Root, ".ccnavi", "scripts", "count.sh")); err != nil {
 		t.Fatal(err)

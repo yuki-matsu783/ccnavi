@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	// workspaceName は案内と標準エラーでワークスペース自身を指す名前。
+	// workspaceName は案内と標準エラーでワークスペースを指す名前。
 	workspaceName = "ワークスペース"
 	// docsDir は ccnavi ディレクトリの下で、使い方の文書を置く場所。ccnavi ディレクトリの中でここだけは載せる。
 	docsDir = "docs"

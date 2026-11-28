@@ -151,7 +151,7 @@ test("CB-T605 子のバッジ: copyStatusがreviewのときは自分のフェー
   assert.equal(label(cards.get("c3")), "レビュー予定");
   for (const id of ["c4", "c6"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
-    assert.equal(cards.get(id)!.status.title, "レビュー待ちの置き場にありますが、フェーズの状態と合いません", id);
+    assert.equal(cards.get(id)!.status.title, "チケットはレビュー待ちの場所にありますが、フェーズの状態と合っていません", id);
     assert.deepEqual(cards.get(id)!.actions, [], `${id}: 要確認の子にはレビューの操作を出さない`);
   }
   // 操作はバッジが「レビュー待ち」の子だけ。MRのURLは断片を除いたMR自体
@@ -180,7 +180,7 @@ test("CB-T606 子のバッジ: copyStatusがopenのとき、フェーズがレ�
   assert.equal(label(cards.get("working")), "作業中");
   for (const id of ["held", "waiting"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
-    assert.equal(cards.get(id)!.status.title, "作業中なのに、フェーズがレビューで止まっています", id);
+    assert.equal(cards.get(id)!.status.title, "チケットは作業中ですが、フェーズがレビューで止まっています", id);
     // open + レビュー待ちの子にレビューの操作は出さない
     assert.deepEqual(cards.get(id)!.actions, [], id);
   }
@@ -303,6 +303,6 @@ test("CB-T1247 着手待ち・作業中・レビュー準備中のバッジは�
     startedAt: "", revision: false, wrapped: false, gateClosed: false, reviewWaiting: false, phaseStatus: "", phases: [],
   };
   assert.match(statusOf(open).title, /Claude Codeに着手を頼む/);
-  assert.match(statusOf({ ...open, startedAt: "2026-01-01" }).title, /エージェントが作業中.*ユーザの操作は要りません/);
+  assert.match(statusOf({ ...open, startedAt: "2026-01-01" }).title, /エージェントが作業中.*操作は要りません/);
   assert.match(statusOf({ ...open, phases: [{ status: "レビュー準備中" }] }).title, /エージェントがレビュー依頼を出す番/);
 });

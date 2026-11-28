@@ -109,7 +109,7 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
 }
 
 /**
- * `user mirror [<プロジェクト名>…] --json`。共通レイヤーのミラーのずれを見る（`--yes`を付けない。何も書かない）。
+ * `user mirror [<プロジェクト名>…] --json`。共通設定のミラーのずれを見る（`--yes`を付けない。何も書かない）。
  * 名前を省くと全プロジェクト。結果の`expect`は差分のある全プロジェクトの、各プロジェクトの`expect`はそのプロジェクトだけのハッシュ。
  * `--root`は`run()`が付ける。
  */
@@ -217,7 +217,7 @@ export function consultPrompt(input: {
       `（cwdが${tree}でなければ、先にcdだけを別のBashで実行する。cdや他のコマンドと連結しない）。` +
       "未解決の指摘を1件ずつ要約し、対応方針の案（対応しない／このフェーズで直す／issueに回す）と理由を返す。",
     "対応方針を確定するccnavi-user-decide.sh、ccnavi-review.sh confirm、その他の状態を変える操作は実行しない。" +
-      "決めるのはユーザで、ボードの「レビュー完了」から行う。",
+      "決めるのはユーザで、チケット管理画面の「レビュー完了」から行う。",
     `前の会話が無くても、状況は '${scriptCommand(root, "ccnavi-ticket.sh")} status ${parent}' で確認する（置き場のファイルを自分で探さない）。`,
   );
   return lines.join("\n");
@@ -256,8 +256,8 @@ export function retireCommand(root: string, parent: string): string {
 /** 片付けの確認のダイアログの文。syncが何をするか（リモートの取り込み・マージ済みの確かめ直し・条件を満たすものだけの片付け）を先に言う */
 export function retireConfirmText(parent: string): string {
   return (
-    `ccnavi-sync.sh ${parent}を実行します。syncはリモートの取り込みも行い、MRがマージ済みかを確かめ直したうえで、` +
-    "条件を満たすものだけを片付けます。結果はターミナルで確認してください。"
+    `ccnavi-sync.sh ${parent}をターミナルで実行します。このスクリプトはリモートの変更を取り込み、MRがマージ済みかを確かめ直したうえで、` +
+    "条件を満たすワークツリーとブランチだけを片付けます。結果はターミナルで確認してください。"
   );
 }
 
@@ -315,9 +315,9 @@ export function writeAndPushTargetOf(stdout: string): string {
 }
 
 /**
- * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは`--rules`で、
+ * 判定と検証に掛けるルールファイルの差し替え。共通設定のルールは`--rules`で、
  * プロジェクト1つのルールは`--project-rules-file <名前>=<パス>`で（docs/11_requirements/json-shapes.md「lintのJSON」）。
- * ワークスペースの設定は同じオプションに名前`self`で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
+ * ワークスペースの設定は同じオプションに名前`self`で渡す。実行ファイルは設定（layer）の名前で差し替えを引き、
  * `self`という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）でだけ有効で、
  * hookからの判定にもチケットとレビューのサブコマンドにも届かない（実行ファイルが診断以外では断る）。
@@ -329,11 +329,11 @@ export type RulesOverride =
   | { readonly kind: "self"; readonly path: string };
 
 /**
- * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、共通の設定のリスクの配点を`--risk`で、
- * ワークスペースの設定（`self`）かプロジェクトの設定の配点を`--project-risk-file <名前>=<パス>`で（共通の設定と合わせて検証される）、
+ * 検証（`--lint`）に掛ける設定の差し替え。ルールに加えて、共通設定のリスクの配点を`--risk`で、
+ * ワークスペースの設定（`self`）かプロジェクトの設定の配点を`--project-risk-file <名前>=<パス>`で（共通設定に足して検証される）、
  * 同じくフェーズ定義を`--project-phases-file <名前>=<パス>`で差し替えられる。
- * 実行ファイルは差し替えた定義を共通の設定の定義と足した形で確かめる（同じidで中身が違う、表示名の重なり）。
- * 共通の設定の定義そのものは、この画面からは差し替えない（`--phases`は使わない）。
+ * 実行ファイルは差し替えた定義を共通設定のフェーズ定義と足した形で確かめる（同じidで中身が違う、表示名の重なり）。
+ * 共通設定のフェーズ定義そのものは、この画面からは差し替えない（`--phases`は使わない）。
  * 判定（`--test`）には配点も定義も関係ないので、そちらはRulesOverrideだけを受ける。
  */
 export type LintOverride =

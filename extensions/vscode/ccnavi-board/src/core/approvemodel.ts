@@ -110,7 +110,7 @@ export function summarize(preview: ApprovePreview): ApproveSummary {
   }
   const parents = batch.filter((b) => b.parent === null).length;
   const revisions = batch.filter((b) => b.revision).length;
-  const kinds = [`親${parents}件`, `子${batch.length - parents}件`, ...(revisions > 0 ? [`改版${revisions}件`] : [])];
+  const kinds = `親${parents}件・子${batch.length - parents}件${revisions > 0 ? `。うち改版${revisions}件` : ""}`;
   const revised = new Set(batch.filter((b) => b.revision).map((b) => b.ticket));
   const plans = preview.plans.map((plan) => {
     // 番号順に並べるだけにする。計画は先行関係で並列のステップもあるため、矢印では書かない
@@ -118,7 +118,7 @@ export function summarize(preview: ApprovePreview): ApproveSummary {
     const label = PART_LABELS[plan.part] ?? plan.part;
     return `${plan.ticket}${revised.has(plan.ticket) ? "（改版）" : ""}の${label}${names.length}ステップ${names.length === 0 ? "" : `（${names.join("・")}）`}`;
   });
-  return { tickets: `承認するチケット${batch.length}件（${kinds.join("・")}）`, plans };
+  return { tickets: `承認するチケット${batch.length}件（${kinds}）`, plans };
 }
 
 /**
@@ -132,7 +132,7 @@ export function unsavedParents(preview: ApprovePreview, unsaved: readonly string
 
 /** 未保存のタブがあるので承認できない理由 */
 export function unsavedText(parents: readonly string[]): string {
-  return `親${parents.join(", ")}の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください`;
+  return `親${parents.join(", ")}の計画編集タブに未保存の変更があります。保存するか破棄してから承認してください。`;
 }
 
 /**
@@ -207,8 +207,8 @@ export function childWorktreeFailureText(failed: readonly ChildWorktreeFailure[]
   return failed
     .map(({ worktree: w, reason }) =>
       `子チケット${w.ticket}のワークツリー${w.path}を作成できませんでした（${reason}）。` +
-      `手で作るなら: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base}。` +
-      `ブランチ${w.branch}が既にあるなら: ${gitCommand} worktree add ${w.path} ${w.branch}`,
+      `手で作るコマンド: ${gitCommand} worktree add ${w.path} -b ${w.branch} ${w.base} ／ ` +
+      `ブランチ${w.branch}が既にあるときのコマンド: ${gitCommand} worktree add ${w.path} ${w.branch}`,
     )
     .join("\n");
 }
@@ -263,16 +263,17 @@ export function partialMessage(partial: ApprovePartial, carried = false): string
   const { placed, paths, ticket, reason, lines } = partial;
   const where = ticket === "" ? "" : placed.includes(ticket) ? `${ticket}の後始末で` : `${ticket}で`;
   const written = paths.length === 0 ? placed.join(", ") : paths.join(", ");
-  const failed = ticket === "" || placed.includes(ticket) ? "" : `書き込めませんでした: ${ticket}。`;
+  const failed = ticket === "" || placed.includes(ticket) ? "" : `承認済みにできなかったチケット: ${ticket}。`;
   const sent = carried
-    ? "書けたぶんだけをコミット・pushするコマンドをターミナルに送りました。結果はターミナルで確認してください。送れていなければ未実行です"
-    : "承認済みチケットをコミット・pushするコマンドは実行していません（push用のスクリプトがありません）。未実行です";
+    ? "承認済みにできた分をコミット・pushするコマンドをターミナルに送りました。結果はターミナルで確認してください。ターミナルに送れていなければ、コマンドは未実行です。"
+    : "承認済みチケットをコミット・pushするコマンドは、push用のスクリプトが無いため実行していません。";
   const what =
     placed.length === 0
-      ? "承認済みになったチケットはありません"
-      : `書けた承認済みチケット（${placed.length}件）: ${written}。${failed}${sent}`;
+      ? "承認済みになったチケットはありません。"
+      : `承認済みにできたチケット（${placed.length}件）: ${written}。${failed}${sent}`;
   const done = lines.length === 0 ? "" : `\n${lines.join("\n")}`;
-  return `ccnavi user agree --yesが${where}止まりました: ${reason}。${what}${done}`;
+  const cause = reason.replace(/。$/, "");
+  return `承認（ccnavi user agree --yes）が${where}止まりました${cause === "" ? "" : `: ${cause}`}。${what}${done}`;
 }
 
 export type ResultParse =
@@ -306,7 +307,7 @@ export function parseApprovePreview(text: string): PreviewParse {
 }
 
 const WRITTEN_MISSING =
-  "実行ファイルの出力に`written`がありません。承認のpushの対象を絞れないため、送りません。ccnaviを更新してから、承認を打ち直してください";
+  "ccnaviの出力に`written`がありません。pushする対象を絞れないため、pushのコマンドを送れません。ccnaviを更新してから、もう一度承認してください。";
 
 /** `--yes`の答え。承認できたか、一覧が変わっていたか、読めなかったか */
 export function parseApproveResult(text: string): ResultParse {
@@ -386,7 +387,7 @@ function parseTop(text: string): Top {
   if (version !== APPROVE_VERSION) {
     return {
       ok: false,
-      error: `承認のJSONの版が違います（拡張は${APPROVE_VERSION}、実行ファイルは${String(raw.version)}）`,
+      error: `承認のJSONの版が違います（拡張は${APPROVE_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   return { ok: true, raw, version };
@@ -475,7 +476,7 @@ function str(value: unknown): string {
  * 承認や対応方針の確定のあと、Claude Codeに文を渡す方法の案内。主なのは「新しいセッションで開く」で、進行中のセッションには「コピー」して貼る。
  * 「ターミナルで実行」が確認なしで動くことは、この文とボタンの名前（`PROMPT_RUN_LABEL`）とツールチップの3か所で言う
  */
-export const HANDOVER_NOTE = "Claude Codeへの依頼文を用意しました。「新しいセッションで開く」を押すか、「コピー」して進行中のセッションに貼ってください。送るときは、自分でEnterを押します。「ターミナルで実行」は、確認なしですぐ非対話で1回だけ実行します。";
+export const HANDOVER_NOTE = "Claude Codeへの依頼文を用意しました。「新しいセッションで開く」を押すか、「コピー」を押して進行中のセッションに貼り付けてください。どちらも自動では送信されないので、Enterを押して送ってください。「ターミナルで実行」は、確認なしですぐに1回だけ実行します（途中の質問には答えられません）。";
 
 /** 「ターミナルで実行」のボタンの名前。確認なしで動くことを名前に入れる（押すとすぐ`claude -p`が無人で動く） */
 export const PROMPT_RUN_LABEL = "ターミナルで実行（確認なしで動きます）";

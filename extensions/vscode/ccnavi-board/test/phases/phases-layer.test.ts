@@ -1,6 +1,6 @@
 /**
- * ワークスペースの設定とプロジェクトの設定の定義。ファイルが無いときの見せ方と、無いファイルへの書き戻し、共通の設定のphases.ymlを読めないときのerrorの帯、
- * 共通の設定から足される定義（読み取り専用の欄）と、それとの重なり。
+ * ワークスペースの設定とプロジェクトの設定のフェーズ定義。ファイルが無いときの見せ方と、無いファイルへの書き戻し、共通設定のphases.ymlを読めないときのerrorの帯、
+ * 共通設定から足される定義（読み取り専用の欄）と、それとの重なり。
  * 画面の側はReactなのでhappy-domで動かして見る。
  */
 import { test } from "node:test";
@@ -19,7 +19,7 @@ test("CB-T114 定義のファイルがないのは正常で、不備の帯も作
   try {
     assert.equal(dom.all(".banner.missing").length, 0, "ファイルがないことを不備として出さない");
     assert.equal(dom.all('button[data-action="create"]').length, 0, "雛形は置かない");
-    assert.equal(dom.all('button[data-action="open-self"]').length, 0, "共通向けの「自身のレイヤーを開く」はありません");
+    assert.equal(dom.all('button[data-action="open-self"]').length, 0, "共通向けの「ワークスペースの設定を開く」はありません");
     // 文面はそのまま出る（Reactが文字として入れるので、実体参照に変わらない）
     assert.equal(dom.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(dom.one(".banner.warn:not(#changed)").textContent, "読み込めない <理由>");
@@ -34,10 +34,10 @@ test("CB-T114 定義のファイルがないのは正常で、不備の帯も作
   }
 });
 
-test("CB-T239 共通の設定のphases.ymlを読み込めないときはerrorの帯を出し、画面は開いたまま触れる。画面から削除する・直す手段は出さない", async () => {
-  const dom = await openPhases({ errors: ["共通の設定のphases.ymlを読み込めません（.ccnavi/config/common/phases.yml）。共通の定義は空として扱われています: 壊れている"] });
+test("CB-T239 共通設定のphases.ymlを読み込めないときはerrorの帯を出し、画面は開いたまま触れる。画面から削除する・直す手段は出さない", async () => {
+  const dom = await openPhases({ errors: ["共通設定のphases.ymlを読み込めません（.ccnavi/config/common/phases.yml）。共通の定義は空として扱われています: 壊れている"] });
   try {
-    assert.match(dom.one(".banner.error").textContent, /共通の設定のphases.ymlを読み込めません/);
+    assert.match(dom.one(".banner.error").textContent, /共通設定のphases.ymlを読み込めません/);
     assert.equal(dom.all(".banner.error").length, 1);
     // 画面は開いている。欄は触れる（保存を止めるのは作業中のチケットだけ）
     assert.ok(!dom.one<HTMLButtonElement>('button[data-action="add"]').disabled);
@@ -77,7 +77,7 @@ test("CB-T116 ないファイル（空の本文）に定義を追加して書き
 const COMMON_PLAN = { id: "plan", title: "調査", kind: "work", review: true, scope: ["wip/plan/*"] };
 const COMMON_IMPL = { id: "implement", title: "実装とテスト", kind: "work", review: true, scope: ["src/*", "tests/*"] };
 
-test("CB-T527 共通の設定の定義は、統合結果（sums[].phases.types）のうち出どころがcommonのものだけを取る。統合結果がなければ空", () => {
+test("CB-T527 共通設定のフェーズ定義は、統合結果（sums[].phases.types）のうち出どころがcommonのものだけを取る。統合結果がなければ空", () => {
   const sum = {
     name: "self",
     layers: ["common", "self"],
@@ -94,7 +94,7 @@ test("CB-T527 共通の設定の定義は、統合結果（sums[].phases.types�
   assert.deepEqual(commonPhases(undefined), []);
 });
 
-test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並び、出どころが共通だと分かる。なければ欄を出さない", async () => {
+test("CB-T528 共通設定のフェーズ定義は一覧の下に読み取り専用で並び、出どころが共通だと分かる。なければ欄を出さない", async () => {
   const dom = await openPhases({ common: [COMMON_IMPL] });
   try {
     const items = dom.all("#common-phases li.common-phase");
@@ -105,7 +105,7 @@ test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並
     // 編集の欄は持たない
     assert.equal(dom.all("#common-phases input, #common-phases select, #common-phases button").length, 0);
     // 見本にもimplementがあるので、同じidの一文が出る（中身の比べは保存の --lintに任せ、保存は止めない）
-    assert.match(dom.one("#common-same-id").textContent, /共通の設定にも同じidがあります（implement）/);
+    assert.match(dom.one("#common-same-id").textContent, /共通設定にも同じidがあります（implement）/);
   } finally {
     await dom.close();
   }
@@ -118,11 +118,11 @@ test("CB-T528 共通の設定の定義は一覧の下に読み取り専用で並
   }
 });
 
-test("CB-T529 共通の設定の別のidと表示名が重なる定義は、idの重なりと同じく保存を止めてツールバーの最後の行にerrorの文を出す。直せば保存できる", async () => {
+test("CB-T529 共通設定の別のidと表示名が重なる定義は、idの重なりと同じく保存を止めてツールバーの最後の行にerrorの文を出す。直せば保存できる", async () => {
   // 共通のplanと、見本のresearch（p1）の表示名「調査」が重なる
   const dom = await openPhases({ common: [COMMON_PLAN] });
   try {
-    assert.match(dom.one("#status").textContent, /共通の設定のフェーズ定義とタイトル（title）が重なっています（research）/);
+    assert.match(dom.one("#status").textContent, /共通設定のフェーズ定義とタイトル（title）が重複しています（research）/);
     assert.ok(dom.one("#status").className.includes("error"));
     dom.click(dom.one(`${rowSelector("p1")} .row-head`));
     await dom.settle();
@@ -133,13 +133,13 @@ test("CB-T529 共通の設定の別のidと表示名が重なる定義は、id�
     dom.type(dom.one(`${rowSelector("p1")} input.f-title`), "調べる");
     await dom.settle();
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
-    assert.doesNotMatch(dom.one("#status").textContent ?? "", /重なっています/);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /重複しています/);
   } finally {
     await dom.close();
   }
 });
 
-test("CB-T530 idが空の行（打っている途中）は、共通の設定の定義と表示名が重なっても重なりの印を付けない。idを打てば止める", async () => {
+test("CB-T530 idが空の行（打っている途中）は、共通設定のフェーズ定義と表示名が重なっても重なりの印を付けない。idを打てば止める", async () => {
   const dom = await openPhases({ common: [{ id: "plan", title: "計画", kind: "work", review: true, scope: ["wip/plan/*"] }] });
   try {
     dom.click(dom.one('button[data-action="add"]'));
@@ -149,13 +149,13 @@ test("CB-T530 idが空の行（打っている途中）は、共通の設定の�
     dom.type(titles[titles.length - 1], "計画");
     await dom.settle();
     assert.equal(dom.all(".phase input.f-id.duplicate").length, 0);
-    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通の設定のフェーズ定義とタイトル（title）が重なっています/);
+    assert.doesNotMatch(dom.one("#status").textContent ?? "", /共通設定のフェーズ定義とタイトル（title）が重複しています/);
     // idを打てば重なりとして止める
     const ids = dom.all(".phase input.f-id");
     dom.type(ids[ids.length - 1], "planning");
     await dom.settle();
     assert.equal(dom.all(".phase input.f-id.duplicate").length, 1);
-    assert.match(dom.one("#status").textContent ?? "", /共通の設定のフェーズ定義とタイトル（title）が重なっています（planning）/);
+    assert.match(dom.one("#status").textContent ?? "", /共通設定のフェーズ定義とタイトル（title）が重複しています（planning）/);
   } finally {
     await dom.close();
   }

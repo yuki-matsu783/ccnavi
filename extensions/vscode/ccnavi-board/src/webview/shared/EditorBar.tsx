@@ -16,7 +16,7 @@ export interface EditorBarProps {
   readonly history?: ReactNode;
   /** 補助の操作 */
   readonly aux?: ReactNode;
-  /** 主ボタン（保存・この順序に決める）。1つだけ */
+  /** 主ボタン（保存・この順序で保存）。1つだけ */
   readonly primary: ReactNode;
   /** 右の操作の並び全体を指す案内の印（`data-tour`） */
   readonly controlsTour?: string;

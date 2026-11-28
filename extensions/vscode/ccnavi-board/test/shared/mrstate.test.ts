@@ -34,8 +34,8 @@ test("CB-T620 mr-state: 4つの状態を読む（openはDraftかも、merged / c
 
 test("CB-T621 mr-state: unknownは種類ごとに読み、理由（空白を含む）を残す。終了コード1のときだけ", () => {
   for (const kind of ["no-tool", "auth", "network", "api", "not-found"]) {
-    const result = state(`unknown ${kind} ホストに届かない（ネットワーク）`, { code: 1 });
-    assert.deepEqual(result, { kind: "unknown", reason: kind, detail: "ホストに届かない（ネットワーク）" });
+    const result = state(`unknown ${kind} ホストに届きません（ネットワークか、ホスト名を確かめてください）`, { code: 1 });
+    assert.deepEqual(result, { kind: "unknown", reason: kind, detail: "ホストに届きません（ネットワークか、ホスト名を確かめてください）" });
   }
   // 種類を知らない・終了コードが合わない・理由が無い: 形が想定外
   assert.match(formatError(state("unknown frobnicate 理由", { code: 1 })), /unknownの種類が想定外です（frobnicate）/);
@@ -85,13 +85,13 @@ test("CB-T623 mr-state: URLがhttp(s)でなくても状態は出す（リンク�
   // シェルが無い・shが落ちた（想定外の終了コードで、先頭の行が無い）
   const failed = interpretMrState(ran("", { code: 127, stderr: "sh: not found" }), 12);
   assert.equal(failed.kind === "unknown" ? failed.reason : "", "failed");
-  assert.match(failed.kind === "unknown" ? failed.detail : "", /終了コード127で終わりました: sh: not found/);
+  assert.match(failed.kind === "unknown" ? failed.detail : "", /終了コード127で失敗しました: sh: not found/);
   const spawn = interpretMrState(ran("", { code: -1, stderr: "spawn sh ENOENT" }), 12);
   assert.equal(spawn.kind === "unknown" ? spawn.reason : "", "failed");
   // 終了コード2でもstderrに理由があれば（ワークスペースが見つからないなど）、形の異常と言わず失敗として出す
   const refused = interpretMrState(ran("", { code: 2, stderr: "ccnavi: ワークスペースが見つかりません" }), 12);
   assert.equal(refused.kind === "unknown" ? refused.reason : "", "failed");
-  assert.match(refused.kind === "unknown" ? refused.detail : "", /終了コード2で終わりました/);
+  assert.match(refused.kind === "unknown" ? refused.detail : "", /終了コード2で失敗しました/);
 });
 
 test("CB-T624 引数の誤り（終了コード2）は、実行できなかったこととしてshの言葉を添える", () => {

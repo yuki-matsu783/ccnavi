@@ -29,7 +29,7 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 - `sh .ccnavi/scripts/ccnavi-launcher.sh --templates` で一覧を見る。`--keyword <語>` で名前・説明・使う場面を検索し、`--show <名前>` で中身を見る
 - `sh .ccnavi/scripts/ccnavi-launcher.sh --templates --json` が機械向けの答え。`sh .ccnavi/scripts/ccnavi-launcher.sh --lint` もテンプレートを検査する
 - `sh .ccnavi/scripts/ccnavi-launcher.sh --templates --check-file <パス> [--layer <名前>] --json` は、任意のパスのテンプレートを置き場に入れずに検査する（読むだけ。保存前の確かめに使う）
-- `--layer <名前>` で、統合結果の相手のレイヤー（プロジェクト名）を選ぶ。省けば自身のレイヤー
+- `--layer <名前>` で、統合結果の相手の設定（プロジェクト名）を選ぶ。省けばワークスペースの設定
 - `--docs` の索引には載らない。yml なので `--templates` で探す
 
 ## 溜める
@@ -44,8 +44,8 @@ keywords: [テンプレート, 雛形, 作業・レビュー計画, plan, feedba
 `--draft` の主なオプションは次のとおりです。
 
 - `--name <名前>`: 下書きの名前。既定は親の識別子。日本語など名前に使えない識別子の親では、`--name` で英数字の名前を付ける（英数字で始め、英数字と `.` `_` `-` だけ）
-- `--to common|project`: 取り込み先。`common` は共通（他のプロジェクトへ配られる。ワークスペースルートのツリーでだけ書ける）、`project` はプロジェクトの層。既定は `project`
-- `--layer <名前>`: `--to project` のときに、取り込み先のプロジェクトのレイヤーを選ぶ（省けば自身のレイヤー）。`--templates` の一覧・`--show` でも、統合結果の相手のレイヤーを選ぶ
+- `--to common|project`: 取り込み先。`common` は共通（他のプロジェクトへ配られる。ワークスペースルートのツリーでだけ書ける）、`project` はプロジェクトの設定。既定は `project`
+- `--layer <名前>`: `--to project` のときに、取り込み先のプロジェクトの設定を選ぶ（省けばワークスペースの設定）。`--templates` の一覧・`--show` でも、統合結果の相手の設定を選ぶ
 
 取り込み先に同名のテンプレートが既にあるときは、`--draft` は断る。同名の下書きがあるときも上書きしない。既存のテンプレートを直すときは、`ccnavi-stage.sh <パス>` で既存のファイルを `wip/handoff/` にコピーして編集する。
 

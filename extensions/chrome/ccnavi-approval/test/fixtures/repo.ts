@@ -1,7 +1,7 @@
 /**
  * 見本のリポジトリ。模擬の GitHub（test/helpers/mock-github.ts）がこれを API で返す。
  *
- * - `main`（統合先）: 共通レイヤー、互換のマーカー、文面ファイル、クローズ済みの親子のチケット i0005 の `done/`
+ * - `main`（統合先）: 共通設定、互換のマーカー、文面ファイル、クローズ済みの親子のチケット i0005 の `done/`
  * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01-01（開いた親子のチケット。直近の外なので閉包で読む）と
  *   i0005-01-01（統合先で閉じている。そこで止まる）
  * - `i0002`（直近）: 悪意のある Markdown を本文に持つ親の提案と、範囲が親の外に出る子（承認の対象にしない）。
@@ -173,7 +173,7 @@ export interface FixtureBranch {
 const MAIN_FILES: Record<string, string> = {
   ".claude/settings.json": JSON.stringify({ env: { CCNAVI_TICKET_CONTROL: "enable" } }, null, 2) + "\n",
   ".ccnavi/scripts/ccnavi-common.sh": COMMON_SH(1),
-  // フェーズ定義は共通レイヤーと config の和。この見本は自身の config にだけ置き、ワークスペースの親はその定義を使う
+  // フェーズ定義は共通設定に config を足した統合結果。この見本はワークスペースの config にだけ置き、ワークスペースの親はその定義を使う
   ".ccnavi/config/project/phases.yml": PHASES,
   ".ccnavi/config/common/rules.yml": RULES,
   ...MESSAGES,
@@ -271,9 +271,9 @@ export function requestedMark(head: string, mr = 42, host: "github" | "gitlab" =
 /**
  * プロジェクトのリポジトリ（手元では `projects/web` に clone されるもの）。模擬の GitLab に載せる。
  *
- * - `main`（プロジェクトの統合先）: クローズ済みの親子のチケット web-i0003 の `done/` とプロジェクトのレイヤー（rules.yml と phases.yml。
- *   フェーズ定義は、ワークスペースの共通レイヤーと、親の `project:` が指すこのプロジェクトの config の和が使われる）。
- *   共通レイヤー・設定・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）。
+ * - `main`（プロジェクトの統合先）: クローズ済みの親子のチケット web-i0003 の `done/` とプロジェクトの設定（rules.yml と phases.yml。
+ *   フェーズ定義は、ワークスペースの共通設定と、親の `project:` が指すこのプロジェクトの config を足した統合結果が使われる）。
+ *   共通設定・ccnavi の設定ファイル・互換のマーカーはワークスペース（`fixture()` の `main`）から読む（置き場のパスは既定に固定）。
  *   プロジェクトの `.ccnavi/config/common/`（同期が配るミラー）はワークスペースの中では共通として読まない
  * - `web-i0012`（直近）: issue #12 から始めた親と子の提案
  * - `web-i0012` の上の `.ccnavi/config/project/phases.yml` は読まない（置き場の外）

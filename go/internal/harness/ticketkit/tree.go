@@ -19,7 +19,7 @@ const ParentName = "i0001"
 
 // Options は New の指定。
 type Options struct {
-	// Phases は共通レイヤーの phases.yml の本文。空なら samples.PlainPhases（TicketText の親が使う最小の定義）。
+	// Phases は共通設定の phases.yml の本文。空なら samples.PlainPhases（TicketText の親が使う最小の定義）。
 	Phases string
 	// Under があれば、木の根をその下に作る（パスの形を試すとき。既定は base.TempDir）。
 	Under string
@@ -29,7 +29,7 @@ type Options struct {
 
 // Tree は git のリポジトリ（main に 1 コミット）と、親のワークツリー i0001 を組んだ使い捨ての木。
 //
-// ルートに共通レイヤーのルールとフェーズ定義を置き、状態の置き場は Root/logs/state。承認済みチケットとマーカーは
+// ルートに共通設定のルールとフェーズ定義を置き、状態の置き場は Root/logs/state。承認済みチケットとマーカーは
 // 親のツリーに置かれ、親のブランチに乗る（Approved）。木はテストごとに作るので、並行に回せる。
 type Tree struct {
 	T          testing.TB
@@ -73,7 +73,7 @@ func initTree(t testing.TB, root string, o Options) *Tree {
 	Write(t, filepath.Join(root, ".gitignore"), ".claude/\nwip/tmp/\n")
 	Git(t, root, "add", "-A")
 	Git(t, root, "commit", "--quiet", "-m", "init")
-	// 共通レイヤーは既定の置き場に置く（--rules・--phases は診断でだけ有効で、hook の判定には渡せない）。
+	// 共通設定は既定の置き場に置く（--rules・--phases は診断でだけ有効で、hook の判定には渡せない）。
 	Write(t, base.CommonPath(root, "rules"), samples.Rules)
 	if o.Phases == "" {
 		samples.WritePlainPhases(t, root)

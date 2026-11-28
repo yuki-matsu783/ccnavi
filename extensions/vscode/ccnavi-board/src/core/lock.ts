@@ -22,15 +22,15 @@ export interface Lock {
 }
 
 /** 応答中の保存の前に見せる文。応答中のセッションが無ければ空 */
-export function turnWarning(lock: Lock): string {
+export function turnWarning(lock: Lock, what = "保存"): string {
   if (lock.turns.length === 0) {
     return "";
   }
-  return `エージェントが応答の途中です（セッション${lock.turns.join(", ")}）。いま保存すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから保存すると確実です。`;
+  return `エージェントが応答の途中です（セッション${lock.turns.join(", ")}）。いま${what}すると、次のツール呼び出しで元に戻されることがあります。応答が終わってから${what}すると確実です。`;
 }
 
 /**
- * 共通の設定とワークスペースの設定のルール（`project`を渡さない）は、どのツリーのdoingでも保存を止める（Bashの和に影響するため）。
+ * 共通設定とワークスペースの設定のルール（`project`を渡さない）は、どのツリーのdoingでも保存を止める（Bashの統合結果に影響するため）。
  * プロジェクトのルール（`project`を渡す）は、そのプロジェクトのdoingだけを見る。
  * 作業中かは実行ファイルが答える（チケットの`in_progress`）。承認しただけで着手していないもの・レビュー待ち・閉じたものは
  * 実行ファイルが作業中に数えない。

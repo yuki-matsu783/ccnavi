@@ -46,7 +46,7 @@ type Target struct {
 	Label string
 	// heavy は毎回読むには大きすぎる対象（実行ファイル）。開始でバックアップし、照合は大きさと更新時刻で行う。
 	heavy bool
-	// top は git から戻すときに渡すルート。空なら root の側。ワークツリー側の設定とプロジェクトのレイヤーは、
+	// top は git から戻すときに渡すルート。空なら root の側。ワークツリー側の設定とプロジェクトの設定は、
 	// それを追跡している自分の git に聞く（ワークスペースの git は持っていない）。
 	top string
 	// copy はワークツリー側の設定であること（今は誰も読まないが、統合で反映される。報告の文が分かれる）。
@@ -57,7 +57,7 @@ type Target struct {
 type place struct{ key, home, path string }
 
 // Targets は守る対象を組み立てる。rulesPath と binPath は解決済みのパスで、空ならその対象を持たない。
-// layers はレイヤーごとの設定ファイルを渡す。共通レイヤーの rules は rulesPath が渡すので、重ねない。
+// layers は設定ごとの設定ファイルを渡す。共通設定の rules は rulesPath が渡すので、ここでは渡さない。
 func Targets(root, rulesPath, binPath string, layers []config.LayerFile, projectsDir string) []Target {
 	places := collectPlaces(root, projectsDir, rulesPath, layers)
 	var found []Target
@@ -91,7 +91,7 @@ func Targets(root, rulesPath, binPath string, layers []config.LayerFile, project
 	return append(found, worktreeCopies(root, projectsDir, places)...)
 }
 
-// collectPlaces は設定ファイルと各レイヤーの場所。同じ key が二度来たら後ろを捨てる（同じバックアップを書き換え合う）。
+// collectPlaces は設定ファイルと各設定の場所。同じ key が二度来たら後ろを捨てる（同じバックアップを書き換え合う）。
 func collectPlaces(root, projectsDir, rulesPath string, layers []config.LayerFile) []place {
 	var found []place
 	for _, f := range settingsFiles {
@@ -118,7 +118,7 @@ func collectPlaces(root, projectsDir, rulesPath string, layers []config.LayerFil
 	return places
 }
 
-// layerKey はレイヤーのバックアップの key。名前ではなく種別で決める。`projects/common/` が共通レイヤーと同じ key に
+// layerKey は設定のバックアップの key。名前ではなく種別で決める。`projects/common/` が共通設定と同じ key に
 // なると、重なりの排除でその 4 本が保護から外れるため。予約名のプロジェクトとミラーは置き場の前置きを付ける。
 func layerKey(origin config.Origin, layer string, kind config.LayerKind) string {
 	switch {
@@ -132,7 +132,7 @@ func layerKey(origin config.Origin, layer string, kind config.LayerKind) string 
 	return string(kind) + ":" + layer
 }
 
-// layerHome はそのレイヤーを追跡している git プロジェクトルート。プロジェクトとミラーはそのプロジェクト、ほかはルート。
+// layerHome はその設定を追跡している git プロジェクトルート。プロジェクトとミラーはそのプロジェクト、ほかはルート。
 func layerHome(root, projectsDir string, origin config.Origin, layer string) string {
 	if origin != config.OriginProject && origin != config.OriginMirror {
 		return root

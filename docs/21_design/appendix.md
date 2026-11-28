@@ -57,7 +57,7 @@ keywords: [付録, 理由コード, 記録, 実測, 前提]
 | `CORE_CONFIRM_NO_PARENT` / `CORE_CONFIRM_NO_PHASE` / `CORE_CONFIRM_ALREADY_REVIEWED` / `CORE_CONFIRM_NOT_REQUESTED` | レビュー済み（`review confirm` と Chrome の「レビュー済み」）が通らなかった。親の承認済みチケットが作業中に無い / そのフェーズの子が無い / もうレビュー済み / 依頼の記録が無い |
 | `CORE_CONFIRM_MOVED` / `CORE_CONFIRM_UNSHARED` / `CORE_CONFIRM_RESULT_MISMATCH` / `CORE_CONFIRM_REVIEW_OPEN` | レビュー済みが通らなかった。依頼の後にユーザが見るものが動いた / 手で `done/` へ動かした子の移動が未コミットか未 push（指摘が無くても確定しない）/ 取得した結果が依頼したマージリクエストと照合できない / 変更要求のレビューか未解決のスレッドが残っている |
 | `CORE_DECIDE_NO_DIGEST` / `CORE_DECIDE_MISMATCH` / `CORE_DECIDE_CHOICES` / `CORE_DECIDE_THREAD_ID` / `CORE_DECIDE_FOLLOWUP` / `CORE_DECIDE_STOPPED` | Chrome 拡張の decide（入口の `decide`）が通らなかった。親・フェーズ・依頼の記録・変更要求などは `CORE_CONFIRM_*` と同じコードで返す。見せた指摘のダイジェストが無い・読めない / 見せた指摘と今の指摘が違う（`mismatch` に内訳。何も積まない）/ 選択か受け入れ済みのキーが見せた指摘と合わない / 返信と解決をするスレッドの id が無い / 続きの子を起こせない / 書くものを並べる途中で止まった。通らなければ書くものもホストへの書き込みの計画も返さない |
-| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | ボードの承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認と同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`tickets/core` の `verdict.refusal` で 1 か所で決める） |
+| `CORE_APPROVE_NO_DIGEST` / `CORE_APPROVE_LIST_CHANGED` / `CORE_APPROVE_DIGEST_CHANGED` / `CORE_APPROVE_NOTHING` / `CORE_APPROVE_STOPPED` | チケット管理画面の承認（`ccnavi user agree --yes`）が通らなかった。`--digest` が無い / 見せた一覧（識別子）と今の一覧が違う / 識別子は同じで見せた提案ファイルのバイト列が今と違う（この2つは「内容が更新されました」で、最新を表示し直す） / 承認するものが無い / 書く途中で止まった（置いたものは残る）。確認と同じく、標準エラーの文の頭に `[<コード>]` で載せる。Chrome 拡張の承認（入口の `plan`）も、見せたものと違う・承認するものが無いときに同じコードを答えの `code` で返す（`tickets/core` の `verdict.refusal` で 1 か所で決める） |
 | `NOTICE_DOC_FRONTMATTER` | `PostToolUse`。Write で新しく作った md に frontmatter か `type` が無い。止めずに `additionalContext` で 1 度だけ書き方を案内する。索引に載らない md（git が無視するもの・ccnavi ディレクトリの下）と、決まりの文書で付けないとされている md（`README.md`・`CLAUDE.md`・`CHANGELOG.md` と、`.ccnavi/docs/frontmatter.md` の対象外の表の置き場。チケットの置き場・チケットの下書き `wip/design/scripts/i*.md`・`wip/handoff/`・`.claude/skills/yomiyasu/**`）には出さない。案内しても記録（`decisions.jsonl`）の `code` には残らない |
 | `NOTICE_PROPOSAL_PARENT_KEY` / `NOTICE_PROPOSAL_PARENT_FIELDS` | `PostToolUse`。Write で新しく作った提案（`wip/proposals/todo/` の直下の md）の書式の誤り。識別子が子の形でないのに `parent:` がある（`parent:` と `phase:` を消すよう言う）/ `parent:` の無い親に `mr:`・`plan:`・`phases:` が欠けている（欠けた欄を名指しし、`ccnavi ticket new` の雛形を勧める）。止めずに `additionalContext` で案内する。Edit・上書きでは出さない。案内しても記録の `code` には残らない |
 | `NOTICE_DIRECT_COMMIT` | `PostToolUse`。メインのエージェントが直接作業のワークツリーで `ccnavi-git.sh commit` を成功させた、またはメインの Agent ツールが返ったとき（サブエージェントのコミットを拾う）に、直接作業のワークツリーの HEAD が動いていた。止めずに `additionalContext` で、レビュー手順の次の一手を、ワークツリーごとにセッションで 1 度だけ言う（6.6） |
@@ -126,7 +126,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `rules` | ヒットしたルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由（上の一覧）。`stop-review-judge` は `allow`・`deny` の行にも、`stop-review-worker` は `deny` の行に付く。`worktree-unreadable` は `detail` に理由 |
 | `hinted` | この呼び出しで `additionalContextOnce` の案内を渡した回だけ `true`。渡した後の呼び出しと、毎回渡す案内だけの呼び出しには出ない（案内がどの呼び出しに付いたかは hook の応答から分からないので残す） |
-| `guarded` | ccnavi 自身の設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`missing`・`failed`。変わっていない回は残さない |
+| `guarded` | `.claude/settings*.json` と、共通設定・ワークスペースの設定・プロジェクトの設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`missing`・`failed`。変わっていない回は残さない |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
 | `paths` | 実行後チェックが検知した「種類とパス」 |
@@ -134,11 +134,11 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `degraded` | コマンドを読み切れずに生の文字列で判定した回。`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote`、`expanded-redirect-target`（`ambiguous-substitution` と `backquote` は `DENY_AMBIGUOUS_FORM` / `DENY_BACKQUOTE` で止めた回） |
 | `quoted` | 引用の中から切り出したコマンドにだけヒットしたルールの id |
 | `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（6.3.2）でヒットしたときの、そのコマンド。複数なら `\x00` でつなぐ |
-| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。自身のレイヤーやプロジェクトのレイヤーが読めなかった回は、そのレイヤーの名前（`self`、`lib` など）が入り、そのレイヤーを空として判定している |
-| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の名前にはレイヤーの前置きが付かない（相対パスで出どころが分かる） |
+| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。ワークスペースの設定やプロジェクトの設定が読めなかった回は、その設定の名前（`self`、`lib` など）が入り、その設定を空として判定している |
+| `source` | 判定を下したルールの設定。`common` / `self` / プロジェクトの名前。`rules` の名前には設定の前置きが付かない（相対パスで出どころが分かる） |
 
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
-フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義のレイヤーが入る。
+フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義の設定が入る。
 
 #### 秘密の伏せ方
 

@@ -78,15 +78,15 @@ export async function importSelected(deps: HandoffDeps, shown: HandoffList, path
   }
   const chosen = viewed.value.entries.filter((e) => e.selected);
   if (chosen.length !== entries.length) {
-    return refuse("取り込む対象が、見せた一覧と違います。更新して読み直してください");
+    return refuse("取り込む対象が、表示した一覧と違います。「更新」を押して読み直してください。");
   }
   for (const before of entries) {
     const now = entryOf(chosen, before.path);
     if (now === undefined) {
-      return refuse(`${before.path}: 見せたあとに一覧から外れました。更新して読み直してください`);
+      return refuse(`${before.path}: 表示したあとに一覧から外れました。「更新」を押して読み直してください。`);
     }
     if (now.entry_sha !== before.entry_sha) {
-      return refuse(`${before.path}: 見せたあとに下書きか取り込み先が変わりました。更新して読み直してください`);
+      return refuse(`${before.path}: 表示したあとに下書きか取り込み先が変わりました。「更新」を押して読み直してください。`);
     }
     const reason = blockReason(now, lock);
     if (reason !== "") {
@@ -94,11 +94,11 @@ export async function importSelected(deps: HandoffDeps, shown: HandoffList, path
     }
   }
   if (!viewed.value.ok) {
-    return refuse("選んだ対象に、検査を通らないものがあります。更新して読み直してください");
+    return refuse("選んだ対象に、検査を通らないものがあります。「更新」を押して読み直してください。");
   }
   const expect = viewed.value.expect;
   if (expect === "") {
-    return refuse("実行ファイルがexpectを返しませんでした。実行ファイルを更新してください");
+    return refuse("ccnaviがexpectを返しませんでした。ccnaviを更新してください。");
   }
 
   return { result: await deps.apply(wanted, expect), attempted: true };
@@ -126,14 +126,14 @@ export async function terminalGuide(
     return { command: "", error: `一覧にない対象です: ${path}` };
   }
   if (entry.board) {
-    return { command: "", error: "この対象はボードから取り込むため、ターミナルのコマンドはありません" };
+    return { command: "", error: "この対象はこの画面から取り込むため、ターミナルのコマンドはありません" };
   }
   const state = entry.state;
   if (state !== "new" && state !== "changed") {
     return { command: "", error: refusalOfState(entry) };
   }
   if (entry.errors.length > 0) {
-    return { command: "", error: "検査でerrorがあります。直してから取り込みます" };
+    return { command: "", error: "検査でerrorがあります。直してから取り込んでください。" };
   }
   const viewed = await deps.view([entry.path]);
   if (!viewed.ok) {
@@ -141,10 +141,10 @@ export async function terminalGuide(
   }
   const now = entryOf(viewed.value.entries.filter((e) => e.selected), entry.path);
   if (now === undefined || viewed.value.entries.filter((e) => e.selected).length !== 1) {
-    return { command: "", error: "取り込む対象が、見せた一覧と違います。更新して読み直してください" };
+    return { command: "", error: "取り込む対象が、表示した一覧と違います。「更新」を押して読み直してください。" };
   }
   if (now.entry_sha !== entry.entry_sha) {
-    return { command: "", error: "見せたあとに下書きか取り込み先が変わりました。更新して読み直してください" };
+    return { command: "", error: "表示したあとに下書きか取り込み先が変わりました。「更新」を押して読み直してください。" };
   }
   if (!viewed.value.ok || viewed.value.expect === "") {
     return { command: "", error: "検査を通らないので、取り込めません" };

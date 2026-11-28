@@ -25,7 +25,7 @@ function openedOf(check: TemplateCheck, extra: Partial<EditOpened> = {}): EditOp
   return { name: "feature", layer: "self", created: false, sha: "sha-opened", data: check.data, check, lock: { locked: false, reason: "", doing: [], turns: [] }, ...extra };
 }
 
-/** 見本の画面（図の大きさを測れる細工つき）。selfのレイヤーのfeatureの行を開いた状態 */
+/** 見本の画面（図の大きさを測れる細工つき）。selfの設定のfeatureの行を開いた状態 */
 async function openList(): Promise<DomPage> {
   const dom = await loadPage(templatesHtml({ kind: "page", page: page() }), undefined, { measure: true });
   await dom.settle();
@@ -130,7 +130,7 @@ test("CB-D383 説明を直すと「未保存」が出て、少し待つと直し
     const check = fixtureCheck();
     await dom.send({ type: "editChecked", session, seq: asked.seq, check: { ...check, problems: [{ severity: "warn", detail: "検査の指摘です" }] }, error: "" });
     await dom.settle();
-    assert.match(text(dom.one(".tpl-problems")), /\[警告\] 検査の指摘です/);
+    assert.match(text(dom.one(".tpl-problems")), /\[warn\] 検査の指摘です/);
     assert.equal(dom.all('section.plan-graph[data-part="plan"][data-editable="1"]').length, 1);
     assert.equal(dom.all('[data-role="graph-stale"]').length, 0, "答えが届いたら読んでいる旨は消える");
   } finally {
@@ -259,7 +259,7 @@ test("CB-D386 未保存のまま閉じようとすると破棄してよいかを
   }
 });
 
-test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用のレイヤーでは編集と作るの入口を出さない", async () => {
+test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用の設定では編集と作るの入口を出さない", async () => {
   const dom = await openList();
   try {
     await openFeature(dom);
@@ -431,7 +431,7 @@ test("CB-D739 一覧の行は畳んで出し、開くと図の中身を求める
     assert.equal(dom.all(`${row} .plan-graph[data-editable="1"]`).length, 0, "一覧の図は読むだけ");
     assert.equal(dom.all(`${row} [data-role="flow-diagram"] .react-flow__node`).length >= 2, true, "子のフローの図が出る");
     const heading = dom.one(`${row} [data-role="flow-diagram"] h3`).textContent ?? "";
-    assert.equal(heading, "2:実装とテスト のフロー", "子のフローの見出しは「番号:フェーズ名 のフロー」の形で、フローの名前（実装の手順）は出さない");
+    assert.equal(heading, "2番（実装とテスト）のフロー", "子のフローの見出しは「番号番（フェーズ名）のフロー」の形で、フローの名前（実装の手順）は出さない");
     assert.equal(dom.all(`${row} table.tpl-plan`).length, 0, "図が出たら表は出さない");
     // 畳むと消え、押し直すと戻る。求め直さない
     dom.click(dom.one(`${row} .row-head`));
@@ -606,8 +606,8 @@ test("CB-D1255 子のフローの行の見出しは「番号:型のタイトル 
   try {
     await startEdit(dom);
     const flowRow = (index: number) => `section[data-role="flows"] li[data-index="${index}"]`;
-    assert.equal(text(dom.one(`${flowRow(1)} .tpl-flow-heading`)), "1:設計 のフロー");
-    assert.equal(text(dom.one(`${flowRow(2)} .tpl-flow-heading`)), "2:実装とテスト のフロー");
+    assert.equal(text(dom.one(`${flowRow(1)} .tpl-flow-heading`)), "1番（設計）のフロー");
+    assert.equal(text(dom.one(`${flowRow(2)} .tpl-flow-heading`)), "2番（実装とテスト）のフロー");
     dom.click(dom.one(`${flowRow(2)} button[data-action="toggle-flow"]`));
     await dom.settle();
     assert.equal(dom.all(`${flowRow(2)}.open`).length, 0);

@@ -18,13 +18,13 @@ import (
 	"ccnavi/internal/harness/samples"
 )
 
-// 設定の和を見るテストの土台。
+// 統合結果を見るテストの土台。
 
 const Home = ".ccnavi"
 
 var fileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml", "sections": "ticket-sections.yml"}
 
-// layerPath はその git プロジェクトルートのレイヤーのファイル（rules / phases / risk / sections）のパス。
+// layerPath はその git プロジェクトルートの設定ファイル（rules / phases / risk / sections）のパス。
 func LayerPath(root, kind string) string {
 	return filepath.Join(root, Home, "config", "project", fileNames[kind])
 }
@@ -71,7 +71,7 @@ func WriteRules(t testing.TB, root string, v any) { Write(t, LayerPath(root, "ru
 func WritePhases(t testing.TB, root, text string) { Write(t, LayerPath(root, "phases"), text) }
 func WriteRisk(t testing.TB, root, text string)   { Write(t, LayerPath(root, "risk"), text) }
 
-// buildProject は git 初期化したプロジェクトを 1 つ置く。レイヤーは空でない分だけ置く。
+// buildProject は git 初期化したプロジェクトを 1 つ置く。設定は空でない分だけ置く。
 func buildProject(t testing.TB, root string, rules any, phases, risk string) string {
 	t.Helper()
 	if err := os.MkdirAll(root, 0o755); err != nil {
@@ -195,7 +195,7 @@ func baseTemplate(t testing.TB, ws string) {
 	buildProject(t, filepath.Join(ws, "projects", "app"), nil, "", "")
 }
 
-// 雛形の種類。guard は設定ファイルの保護を見る土台（何でも通すルール + 共通レイヤーの phases）、
+// 雛形の種類。guard は設定ファイルの保護を見る土台（何でも通すルール + 共通設定の phases）、
 // risk は risk を見る土台（lib のフェーズに `work` を足したもの）。
 const (
 	KindBase  = "base"
@@ -217,7 +217,7 @@ phases:
 
 func prepareGuard(t testing.TB, ws string) {
 	Write(t, base.CommonPath(ws, "rules"), Body(OpenRules))
-	// 共通レイヤーの phases.yml も守る対象。守ることを見るために置き、ワークツリー側の設定ができるようコミットしておく。
+	// 共通設定の phases.yml も守る対象。守ることを見るために置き、ワークツリー側の設定ができるようコミットしておく。
 	Write(t, base.CommonPath(ws, "phases"), CommonPhasesText)
 	run.Git(t, ws, "add", "-A")
 	run.Git(t, ws, "commit", "--quiet", "-m", "common phases")
@@ -236,7 +236,7 @@ func prepareRisk(t testing.TB, ws string) {
 type WS struct {
 	T                        testing.TB
 	Root, Projects, Lib, App string
-	// 共通レイヤーの 3 本
+	// 共通設定の 3 本
 	Rules, Phases, Risk string
 	Log                 string
 	// Env は子の環境に足す分（run.Opts.Env）。ワークスペースの写しごとに持つ。
@@ -342,7 +342,7 @@ func (w *WS) Propose(name, text, project string) string {
 		treeName = m[1]
 	}
 	tree := w.Worktree(owner, treeName)
-	// 計画を持つ親には、共通レイヤーとそのレイヤーの phases.yml の和から、計画が使う定義のコピー（`phases:`）を足す
+	// 計画を持つ親には、共通設定にその設定の phases.yml を足した統合結果から、計画が使う定義のコピー（`phases:`）を足す
 	// （`ccnavi --plan-order <親> --fill-phases` と同じ）。どちらにも無ければ空のコピー。
 	var texts []string
 	for _, path := range []string{w.Phases, LayerPath(owner, "phases")} {
@@ -385,8 +385,8 @@ func (w *WS) ApprovedCopy(name string) string { return w.ApprovedPath("doing", n
 
 // ---- 起動
 
-// Exec は実行ファイルを 1 回起動する。レイヤーの置き場はフラグで渡さない。共通レイヤーの 3 本（--rules / --phases / --risk）も
-// レイヤーを探す先の 2 本（--projects / --project-home）も、診断（--lint / --test / --explain）でだけ有効で、
+// Exec は実行ファイルを 1 回起動する。設定の置き場はフラグで渡さない。共通設定の 3 本（--rules / --phases / --risk）も
+// 設定を探す先の 2 本（--projects / --project-home）も、診断（--lint / --test / --explain）でだけ有効で、
 // hook の判定とチケットのサブコマンドでは無視する。差し替えたいテストは w.rules / w.phases / w.risk に書く。
 func (w *WS) Exec(guard, input string, args ...string) run.Result {
 	w.T.Helper()
@@ -471,7 +471,7 @@ func (w *WS) LintProblems(args ...string) []Problem {
 
 // problems はその深刻度の Problem。where を渡すと、その出どころで先に絞る。
 // detail の部分一致だけで見ると、`self` や `lib` のようなありふれた語が別の苦情の文面に紛れていても通ってしまう。
-// どのレイヤーの話かは where が持つ。
+// どの設定の話かは where が持つ。
 func (w *WS) Problems(severity, where string, args ...string) []Problem {
 	w.T.Helper()
 	var out []Problem
@@ -557,7 +557,7 @@ func (r Record) Names() []string {
 	return out
 }
 
-// ids は記録の rules を、書いた表記（レイヤーの前置きつき）にしたもの。
+// ids は記録の rules を、書いた表記（設定の前置きつき）にしたもの。
 func (r Record) Ids() []string {
 	var out []string
 	for _, n := range r.Names() {
@@ -566,7 +566,7 @@ func (r Record) Ids() []string {
 	return out
 }
 
-// hits は記録の rules のうち、レイヤーのルール。組み込みの deny（`builtin:` で始まる id。共通レイヤーと config の有無によらず
+// hits は記録の rules のうち、設定のルール。組み込みの deny（`builtin:` で始まる id。共通設定と config の有無によらず
 // 常にヒットする）は数えない。
 func (r Record) Hits() []string {
 	var out []string
@@ -623,7 +623,7 @@ func recordOf(id string) string {
 	return "projects/" + layer + "/" + selfRuleFile + ":" + bare
 }
 
-// layerID は記録名を、書いた表記（レイヤーの前置きつき）に戻す。この 3 つの場所以外は名前のまま。
+// layerID は記録名を、書いた表記（設定の前置きつき）に戻す。この 3 つの場所以外は名前のまま。
 func layerID(name string) string {
 	if strings.HasPrefix(name, "builtin:") {
 		return name
@@ -679,7 +679,7 @@ type TicketOpts struct {
 	Allow   []string
 }
 
-// ticketText は提案の本文。親は plan を、子は parent と phase を持つ。project は行き先のレイヤーを決める。
+// ticketText は提案の本文。親は plan を、子は parent と phase を持つ。project は行き先の設定を決める。
 func TicketText(name string, o TicketOpts) string {
 	lines := []string{"---", "version: 1", "ticket: " + name}
 	if o.Parent == "" {

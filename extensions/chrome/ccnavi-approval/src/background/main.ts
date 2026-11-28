@@ -77,7 +77,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   dispatch(message, sender, deps).then(sendResponse, (err: unknown) => {
     // dispatch は投げない作りだが、投げたときに画面が応答を待ち続けないよう、失敗として返す
     console.error(`ccnavi: 要求を処理できなかった: ${describe(err)}`);
-    sendResponse({ ok: false, error: "service worker で予期しない失敗が起きた" });
+    sendResponse({ ok: false, error: "service worker で予期しないエラーが起きました" });
   });
   return true;
 });

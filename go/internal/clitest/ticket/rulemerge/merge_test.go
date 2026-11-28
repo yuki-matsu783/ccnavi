@@ -120,7 +120,7 @@ func checkPre(t *testing.T, w *ws, r run.Result, section, column string, want ve
 	}
 
 	if want.text == "ticket" {
-		// 判定を下したのがレイヤーを持たないチケットなら、レイヤーの欄は空。
+		// 判定を下したのが設定を持たないチケットなら、設定の欄は空。
 		if src, _ := record["source"].(string); src != "" {
 			t.Errorf("source = %q, want 空", src)
 		}

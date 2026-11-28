@@ -66,7 +66,7 @@ allow:
 	broken = "- version: 1\n"
 )
 
-// scenario は fixture の組み方。common は共通レイヤーの中身（空なら置かない）、layers は置くかどうか。
+// scenario は fixture の組み方。common は共通設定の中身（空なら置かない）、layers は置くかどうか。
 type scenario struct {
 	Name   string `json:"name"`
 	Common string `json:"common"`
@@ -208,7 +208,7 @@ func goResult(t *testing.T, root string) result {
 	return res
 }
 
-// レイヤーの重ね方・出所・記録・診断の見え方・守る対象を、答えの見本（testdata）と突き合わせる。
+// 設定の足し方・出所・記録・診断の見え方・守る対象を、答えの見本（testdata）と突き合わせる。
 func TestMatchesGolden(t *testing.T) {
 	cases := slices.Clone(scenarios)
 	for i := range cases {
@@ -246,15 +246,15 @@ func TestUnreadableNamesOnlyALayerThatExistsAndCannotBeRead(t *testing.T) {
 	conf, _ := config.Load(root)
 	path := conf.LayerPath(root, config.KindRules, config.LayerSelf)
 	if got := Unreadable(conf, root); len(got) != 0 {
-		t.Fatalf("無いレイヤー: %v", got)
+		t.Fatalf("無い設定: %v", got)
 	}
 	write(t, path, "version: 1\ndeny: [: broken\n")
 	if got := Unreadable(conf, root); !slices.Equal(got, []string{config.LayerSelf}) {
-		t.Fatalf("壊れたレイヤー: %v", got)
+		t.Fatalf("壊れた設定: %v", got)
 	}
 	write(t, path, "version: 1\ndeny: []\n")
 	if got := Unreadable(conf, root); len(got) != 0 {
-		t.Fatalf("直したレイヤー: %v", got)
+		t.Fatalf("直した設定: %v", got)
 	}
 }
 
@@ -281,7 +281,7 @@ func severities(problems []rules.Problem) []rules.Severity {
 	return out
 }
 
-// 重ねても except と when は落ちず、それだけが違う定義は別の定義（warn）、全欄が同じなら後ろを捨てる（info）。
+// 足しても except と when は落ちず、それだけが違う定義は別の定義（warn）、全欄が同じなら後ろを捨てる（info）。
 func TestMergeKeepsExceptAndWhen(t *testing.T) {
 	const plain = `{id: a, match: Write, glob: "*", message: m}`
 	const withExcept = `{id: a, match: Write, glob: "*", message: m, except: [{glob: "*.md"}]}`
@@ -294,7 +294,7 @@ func TestMergeKeepsExceptAndWhen(t *testing.T) {
 	prefixIDs(extra, "lib")
 	merge(base, extra, "lib")
 	if got := base.Deny[1]; got.ID != "lib:b" || len(got.Excepts) != 1 || got.When == nil || got.Matches("Write", "/r/wip/a.crt") || !got.Matches("Write", "/r/a.crt") {
-		t.Errorf("重ねたルール: %+v", got)
+		t.Errorf("足したルール: %+v", got)
 	}
 
 	for _, c := range []struct {
@@ -316,7 +316,7 @@ func TestMergeKeepsExceptAndWhen(t *testing.T) {
 	}
 }
 
-// レイヤーの前置きは id に付き、記録名（ルールファイルの相対パスと書いた id）には付かない。
+// 設定の前置きは id に付き、記録名（ルールファイルの相対パスと書いた id）には付かない。
 func TestPrefixKeepsTheRecordName(t *testing.T) {
 	rs := parse(t, "version: 1\ndeny:\n  - {id: raw-git, match: Bash, glob: \"*git*\", message: m}\n")
 	markFile(rs, "projects/lib/.ccnavi/config/project/rules.yml")

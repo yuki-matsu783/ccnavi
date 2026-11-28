@@ -40,14 +40,14 @@ func collect(conf *config.Settings, root string, notes []string, mode config.Mod
 		shCompat(root, compat),
 		ccnaviMD(conf, root),
 		afterCheck(root),
-		// 共通レイヤーの 4 本。検査の中身は取り込み（user handoff）と同じ関数。
+		// 共通設定の 4 本。検査の中身は取り込み（user handoff）と同じ関数。
 		check.CommonRules(conf, root),
 		check.CommonPhases(conf),
 		check.CommonRisk(conf, root),
 		check.CommonSections(conf),
 		ticketProblems(conf, root),
 		projectPlaces(conf, root),
-		// 読めないレイヤーの苦情は判定と同じ経路が標準エラーにも書くので、受け皿で捨てて二重に言わない。
+		// 読めない設定の苦情は判定と同じ経路が標準エラーにも書くので、受け皿で捨てて二重に言わない。
 		check.LayerRules(io.Discard, conf, root, ""),
 		check.LayerConfigs(conf, root, "", ""),
 		check.UnmatchedScopes(conf, root),

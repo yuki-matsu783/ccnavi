@@ -18,7 +18,6 @@ import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
 import { lastUpdatedText } from "../shared/format.js";
-import { severityText } from "../../core/lint-summary.js";
 import { isTrackedProjectsDir, isUnignoredProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
@@ -142,7 +141,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             className="action primary"
             data-action="clone"
             data-tour="clone-run"
-            title="git cloneを「ccnavi」ターミナルで実行します。認証が必要ならターミナルで入力してください"
+            title="git cloneを「ccnavi」ターミナルで実行します。認証が必要ならターミナルで入力してください。"
             onClick={() => act({ type: "clone", url: clone.url, name: clone.name })}
           >
             取得
@@ -215,7 +214,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
   for (const [index, p] of dirProblems.entries()) {
     banners.push(
       <div key={`dir:${index}`} className={`banner ${p.severity}`}>
-        {severityText(p.severity)}: {p.detail}
+        {p.severity}: {p.detail}
       </div>,
     );
   }

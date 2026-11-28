@@ -127,10 +127,10 @@ test("CB-T485 実際の編集の関数（addNode・groupNodes・pasteNodes）の
 test("CB-T486 画面の注意（flowNotices）は、入れ子の見本（deep）で上限を言い、完成した見本（main）では何も言わない", () => {
   assert.deepEqual(flowNotices(sample.flows.main.doc, { exe: true }), []);
   const deep = flowNotices(sample.flows.deep.doc, { exe: true });
-  assert.ok(deep.some((notice) => notice.includes("子の下に3階層重なっています")), deep.join("\n"));
+  assert.ok(deep.some((notice) => notice.includes("子チケットの担当の下に3階層あります")), deep.join("\n"));
   // 開始が無い見本（broken）の注意は、実行ファイルの warn（start が無い）に任せ、画面は言わない
   assert.deepEqual(flowNotices(sample.flows.broken.doc, { exe: true }), []);
-  assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("start がありません")));
+  assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("開始（start）が無い")));
 });
 
 test("CB-T487 保存前の差分と下書きの差分は、見本どうしで意味のある違いになる（追加した・削除した・変えた）", () => {
@@ -188,7 +188,7 @@ test("CB-T488 フローの案内は、基本の案内が先頭で、使い方ご
   assert.equal(tour.courses[0].id, INTRO_ID);
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
-    ["部品箱", "図", "欄", "保存", "案内"],
+    ["部品箱", "図", "右の欄", "保存", "案内"],
   );
   const uses = tour.courses.slice(1);
   assert.ok(uses.length >= 5 && uses.length <= 8, `使い方ごとの案内が ${uses.length} 本`);

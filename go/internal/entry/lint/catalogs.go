@@ -15,7 +15,7 @@ import (
 
 const (
 	whereTemplates = "(templates)"
-	// whereTemplateDrafts は下書きの苦情の出どころ。レイヤーの名前（`(templates/<名前>)`）と紛れない表記にする。
+	// whereTemplateDrafts は下書きの苦情の出どころ。設定の名前（`(templates/<名前>)`）と紛れない表記にする。
 	whereTemplateDrafts = "(template-drafts)"
 	whereMessages       = "(messages)"
 )
@@ -47,7 +47,7 @@ func templateProblems(conf *config.Settings, root string) []rules.Problem {
 	return found
 }
 
-// messageProblems は文面ファイル（`.ccnavi/messages/*.yml`。レイヤーごとの messages/ は読まない）の苦情。
+// messageProblems は文面ファイル（`.ccnavi/messages/*.yml`。設定ごとの messages/ は読まない）の苦情。
 func messageProblems(root string) []rules.Problem {
 	var out []rules.Problem
 	for _, p := range texts.Load(root).Problems {
@@ -57,7 +57,7 @@ func messageProblems(root string) []rules.Problem {
 }
 
 // wikiProblems は学びの蓄積の wiki（`docs/wiki/`）の frontmatter が壊れたファイル（--learnings はそれを数えない）。
-// ワークスペース自身と各プロジェクトのユーザのチェックアウトを見る。
+// ワークスペースと各プロジェクトのユーザのチェックアウトを見る。
 func wikiProblems(conf *config.Settings, root string) []rules.Problem {
 	var out []rules.Problem
 	for _, main := range mainTrees(conf, root) {
@@ -74,7 +74,7 @@ func wikiProblems(conf *config.Settings, root string) []rules.Problem {
 	return out
 }
 
-// mainTrees はワークスペース自身と各プロジェクトのユーザのチェックアウト。
+// mainTrees はワークスペースと各プロジェクトのユーザのチェックアウト。
 func mainTrees(conf *config.Settings, root string) []tree.Tree {
 	return append([]tree.Tree{tree.MainTree(root)}, tree.Projects(conf.Projects)...)
 }

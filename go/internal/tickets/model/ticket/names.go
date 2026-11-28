@@ -31,7 +31,7 @@ func (t *Ticket) BranchNameProblems(integration string, prefixes []string) []str
 	if ids.Protected(name) {
 		found = append(found, "識別子が統合先や保護されたブランチの名前（main・master・develop・release・release-*）"+
 			"と同じ。親のブランチ名が統合先と同じになる")
-	} else if integration != "" && folded == pyfmt.Casefold(integration) {
+	} else if ids.IsIntegration(name, integration) {
 		found = append(found, "識別子が統合先の名前（"+integration+"）と同じ。親のブランチ名が統合先と同じになる")
 	}
 	return append(found, t.formProblems(prefixes)...)

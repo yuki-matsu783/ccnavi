@@ -31,9 +31,9 @@ const (
 
 var unsafeName = regexp.MustCompile(`[^A-Za-z0-9._-]`)
 
-// learningStatePath は通知済みの記録の場所。name はプロジェクトの名前（ワークスペース自身は空）。名前は大文字小文字を
+// learningStatePath は通知済みの記録の場所。name はプロジェクトの名前（ワークスペースは空）。名前は大文字小文字を
 // 区別せずに比べる。ファイル名に使えない字は `_` になるので、衝突しないよう畳んだ名前の短いハッシュを足す。
-// ワークスペース自身とプロジェクトは別のキーにする（`_self` という名前のプロジェクトと紛れない）。
+// ワークスペースとプロジェクトは別のキーにする（`_self` という名前のプロジェクトと紛れない）。
 func learningStatePath(conf *config.Settings, name string) string {
 	key, hashed := learningSelfName, "self"
 	if name != "" {
@@ -139,7 +139,7 @@ func learningMessage(label string, rows []wiki.Row, threshold int) string {
 }
 
 // Learning は学びの蓄積の「提案の候補」が新しく現れたことをユーザに知らせる文。通知が無ければ空。リポジトリごと
-// （ワークスペース自身と projects/<名前>/）に統合先の手元の参照（origin/<統合先>）が指すコミットの docs/wiki/ を
+// （ワークスペースと projects/<名前>/）に統合先の手元の参照（origin/<統合先>）が指すコミットの docs/wiki/ を
 // チェックアウトせずに読む。決められない・読めないリポジトリはその回を見送り、通知済みの記録も変えない。
 // deadline のゼロ値は期限なし。
 func Learning(conf *config.Settings, root string, deadline time.Time) string {

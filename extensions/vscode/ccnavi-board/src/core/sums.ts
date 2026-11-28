@@ -1,9 +1,9 @@
 /**
- * ルール管理とリスク管理が見せる「統合結果」（共通の設定 + 1つの設定）の読み取り用の表示と、フェーズ管理が見せる共通の設定の定義を、
+ * ルール管理とリスク管理が見せる「統合結果」（共通設定 + 1つの設定）の読み取り用の表示と、フェーズ管理が見せる共通設定のフェーズ定義を、
  * ボードのJSON（`sums[]`）から取り出す。
  *
- * 統合結果は実行ファイルが判定と同じ関数で組んで出す。ここは形を整えて渡すだけ。ワークスペースの統合結果は「共通の設定 + ワークスペースの設定」、プロジェクトの統合結果は
- * 「共通の設定 + そのプロジェクトの設定」で、パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した和ではない。
+ * 統合結果は実行ファイルが判定と同じ関数で組んで出す。ここは形を整えて渡すだけ。ワークスペースの統合結果は「共通設定 + ワークスペースの設定」、プロジェクトの統合結果は
+ * 「共通設定 + そのプロジェクトの設定」で、パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した統合結果ではない。
  *
  * ここはvscodeにもDOMにも触れない。拡張ホストと画面の両方から読まれる。
  */
@@ -17,11 +17,11 @@ export interface RulesSum {
   /** 欄に出す名前 */
   readonly label: string;
   readonly layers: readonly string[];
-  /** そのレイヤーのルールファイル（ワークスペースルートからの相対のこともある。実行ファイルが出したまま） */
+  /** その設定のルールファイル（ワークスペースルートからの相対のこともある。実行ファイルが出したまま） */
   readonly path: string;
   /** 実行ファイルがそのファイルを読めず、空として扱っている理由。空なら読めた */
   readonly unreadable: string;
-  /** そのレイヤーのファイルが無い（「設定が無い」正常な状態） */
+  /** その設定ファイルが無い（「設定が無い」正常な状態） */
   readonly missing: boolean;
   readonly deny: readonly SumRuleJson[];
   readonly ask: readonly SumRuleJson[];
@@ -43,15 +43,15 @@ export interface RiskSum {
 
 /** 統合結果を選ぶ欄の表記 */
 export function sumLabel(name: string): string {
-  return name === "self" ? "共通 + ワークスペース" : `共通 + プロジェクト（${name}）`;
+  return name === "self" ? "共通設定 + ワークスペース" : `共通設定 + プロジェクト（${name}）`;
 }
 
-/** レイヤーの名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
+/** 設定の名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
 export function layerLabel(name: string): string {
-  return name === "common" ? "共通" : name === "self" ? "ワークスペース" : `プロジェクト（${name}）`;
+  return name === "common" ? "共通設定" : name === "self" ? "ワークスペース" : `プロジェクト（${name}）`;
 }
 
-/** 統合結果のレイヤーを「共通 + ワークスペース」の形に並べる */
+/** 統合結果の設定を「共通 + ワークスペース」の形に並べる */
 export function layersText(layers: readonly string[]): string {
   return layers.map(layerLabel).join(" + ");
 }
@@ -83,7 +83,7 @@ export function riskSums(board: BoardJson | undefined): readonly RiskSum[] {
 }
 
 /**
- * 最初に見せる統合結果の名前。開いている対象が自身かプロジェクトならその統合結果、共通の設定なら（共通だけの統合結果は無いので）
+ * 最初に見せる統合結果の名前。開いている対象がワークスペースかプロジェクトならその統合結果、共通設定なら（共通だけの統合結果は無いので）
  * ワークスペースの統合結果。一覧に無ければ先頭。空なら空文字。
  */
 export function defaultSum(sums: readonly { readonly name: string }[], target: { readonly kind: string; readonly name: string } | undefined): string {
@@ -91,11 +91,11 @@ export function defaultSum(sums: readonly { readonly name: string }[], target: {
   return sums.find((s) => s.name === want)?.name ?? sums[0]?.name ?? "";
 }
 
-/** 出どころが共通の設定であることを言う`source`の値 */
+/** 出どころが共通設定であることを言う`source`の値 */
 const COMMON_SOURCE = "common";
 
 /**
- * フェーズ管理が見せる、共通の設定の定義（読み取り専用）。統合結果（`sums[].phases.types`）のうち出どころが共通のもの。
+ * フェーズ管理が見せる、共通設定のフェーズ定義（読み取り専用）。統合結果（`sums[].phases.types`）のうち出どころが共通のもの。
  * 統合結果が無い（その設定が対象でない）なら空。
  */
 export function commonPhases(sum: SumJson | undefined): readonly CommonPhase[] {

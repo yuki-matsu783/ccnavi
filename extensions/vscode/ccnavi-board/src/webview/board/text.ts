@@ -98,7 +98,7 @@ export function notesOf(card: Card): Note[] {
     notes.push({ key: "seen", text: `複数の場所にある（${card.scattered.length}か所）`, kind: "seen" });
   }
   if (card.remote !== null && card.remote.ahead !== null && card.remote.ahead > 0) {
-    notes.push({ key: "unsent", text: `未送信${card.remote.ahead}件`, kind: "unsent" });
+    notes.push({ key: "unsent", text: `未pushのコミット${card.remote.ahead}件`, kind: "unsent" });
   }
   return notes;
 }
@@ -183,7 +183,7 @@ export function remoteItems(card: Card): string[] {
     return [];
   }
   const count = (n: number | null): string => (n === null ? "不明" : n === 0 ? "なし" : `${n}件`);
-  return [`未送信${count(r.ahead)}`, `遅れ${count(r.behind)}`];
+  return [`未pushのコミット${count(r.ahead)}`, `未取得のコミット${count(r.behind)}`];
 }
 
 export function riskText(card: Card): string {
@@ -271,7 +271,7 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
       text: `先行チケットの条件が未達成（${ids}）`,
       lead: "先行チケットの条件が未達成",
       ids: list,
-      title: `作業を始めています。先行チケットがdone/にないか取り消されているため、開始条件を満たしていません。ただし、作業とfinishコマンドの実行は制限されません。\n${detail}`,
+      title: `このチケットは着手済みです。先行チケットが完了していないか取り消されているため、開始条件を満たしていません。ただし、作業とfinishコマンドの実行は制限されません。\n${detail}`,
     };
   }
   const what = card.copyStatus === "none" ? "承認・着手は" : "着手は";
@@ -279,6 +279,6 @@ export function predecessorsBadge(card: Card): { readonly text: string; readonly
     text: `先行待ち（${ids}）`,
     lead: "先行待ち",
     ids: list,
-    title: `先行チケットが取り消されずに完了し、done/に移動するまで、${what}できません\n${detail}`,
+    title: `先行チケットが取り消されずに完了するまで、${what}できません\n${detail}`,
   };
 }

@@ -1,6 +1,6 @@
 package post
 
-// ccnavi 自身の保護（hook 本体・設定・sh・共通の設定）と、承認済みチケットの置き場の保護が組み込みにあることの受入テスト。
+// ccnavi 自身の保護（hook 本体・設定・sh・共通設定）と、承認済みチケットの置き場の保護が組み込みにあることの受入テスト。
 // 実行前（PreToolUse）と実行後（PostToolUse など）の両方を、実際の git リポジトリ（ワークスペース・ワークツリー・
 // プロジェクト・プロジェクトのワークツリー）で見る。共通のルールは最小の組にして、検知を支えるのが組み込みだけであることを、
 // 記録に残る `rules` の集合で確かめる。止める・通すの表（パスごとの判定）は Go の hook/judge が持つので、ここに残すのは
@@ -211,7 +211,7 @@ func TestGuidanceNamesTheWorkspaceScriptEvenWhenTheRootHasASpace(t *testing.T) {
 
 // fixture は 4 種類のツリーを持つワークスペース。
 //
-// 自己防衛の既定は dry-run にしてある。enable だと、設定ファイルを守る側（selfguard）が settings と共通の設定 3 本を先に
+// 自己防衛の既定は dry-run にしてある。enable だと、設定ファイルを守る側（selfguard）が settings と共通設定 3 本を先に
 // 戻してしまい、組み込みの 4 本の検知を単独で見られない。dry-run は disable ではないので 4 本は足され、selfguard は
 // 戻さず報告するだけになる。enable との組み合わせは TestWithTheSelfGuardEnabledTheFilesEndUpRestored が見る。
 type fixture struct {

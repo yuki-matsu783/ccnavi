@@ -133,7 +133,7 @@ deny:
   assert.equal(messages.length, 5, messages.join("\n"));
   assert.match(messages[0], /^0 ノードのキーはちょうど1つです（2個あります）/);
   assert.match(messages[1], /^1 anyの中が空です/);
-  assert.match(messages[2], /^2 nopeは知らないキーです/);
+  assert.match(messages[2], /^2 nopeは使えないキーです/);
   assert.match(messages[3], /^3 notの中が空です/);
   assert.match(messages[4], /^4 ノードはマップ/);
   // 読めなかったノードは、組み合わせ条件の他を直しても読んだ値のまま書き戻る
@@ -152,7 +152,7 @@ deny:
   assert.deepEqual(condProblems(deep).map((p) => p.message), ["深さが9階層あります（上限8階層）"]);
   assert.deepEqual(condProblems((deep as { child: CondNode }).child), []);
   const wide = group("any", Array.from({ length: 64 }, (_, i) => leaf("glob", String(i))));
-  assert.deepEqual(condProblems(wide).map((p) => p.message), ["条件が65個あります（上限64）"]);
+  assert.deepEqual(condProblems(wide).map((p) => p.message), ["条件が65個あります（上限64個）"]);
   assert.deepEqual(condProblems(group("any", Array.from({ length: 63 }, () => leaf("glob", "x")))), []);
 });
 

@@ -75,7 +75,7 @@ export function MaximizeButton({ maximized, onToggle }: { readonly maximized: bo
       title={maximized ? "全画面表示を閉じる（Esc）" : "図を全画面で表示"}
       onClick={onToggle}
     >
-      {maximized ? "✕ 閉じる" : "⛶ 拡大"}
+      {maximized ? "✕ 閉じる" : "⛶ 全画面"}
     </button>
   );
 }

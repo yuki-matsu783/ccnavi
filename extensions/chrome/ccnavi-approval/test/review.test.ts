@@ -60,9 +60,9 @@ test("CX-T120 レート制限: Retry-After が短ければ 1 回待ち直し、�
   assert.deepEqual(await gh.repoInfo(c, "acme", "widgets"), { defaultBranch: "main" });
   assert.deepEqual(waited, [2000]);
   mock.limits.push({ match: /^GET \/repos\/acme\/widgets$/, status: 429, headers: { "retry-after": "600" } });
-  await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /二次のレート制限.*600 秒/);
+  await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /レート制限（セカンダリ）.*600 秒/);
   mock.limits.push({ match: /^GET \/repos\/acme\/widgets$/, status: 403, headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1790000000" } });
-  await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /レート制限.*制限が解けるのは/);
+  await assert.rejects(gh.repoInfo(c, "acme", "widgets"), /レート制限.*制限の解除は .* ごろ/);
   mock.limits.push({ match: /^POST \/graphql$/, status: 200, headers: {}, graphql: true });
   await assert.rejects(gh.viewer(c), /RATE_LIMITED/);
   mock.limits.push({ match: /^POST \/graphql$/, status: 200, headers: { "retry-after": "1" }, graphql: true });
@@ -146,7 +146,7 @@ test("CX-T126 承認の画面: ccnavi の本文を承認のボタンの上に開
   assert.ok(screen.compareDocumentPosition(box.querySelector(".entry") as Node) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING, "範囲を最初に");
   const body = box.querySelector('.entry[data-ticket="i0001"] .markdown') as HTMLElement;
   for (let i = 1; i <= 8; i += 1) assert.ok(body.textContent?.includes(`秘密${i}`), `秘密${i}`);
-  assert.match(body.textContent ?? "", /〈HTML コメント: 秘密6〉/);
+  assert.match(body.textContent ?? "", /〈HTML コメント：秘密6〉/);
   assert.equal(body.querySelectorAll("details, summary, font, [hidden], [class], [style], [id], [color]").length, 0);
 });
 

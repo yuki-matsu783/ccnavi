@@ -83,7 +83,7 @@ export function subjectExample(tool: string): string {
     case "WebFetch":
       return "URLを書きます。例: https://example.com/docs";
     default:
-      return "書き方はツールで変わります。ツールを候補から選ぶと例が出ます";
+      return "書き方はツールで変わります。ツールを候補から選ぶと例が出ます。";
   }
 }
 
@@ -196,8 +196,8 @@ export interface RulesPage {
   readonly target?: { readonly kind: string; readonly name: string };
   readonly targets?: readonly TargetOption[];
   /**
-   * 読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト）。実行ファイルが出した結果で、拡張は合成しない。
-   * 保存済みの内容の和で、編集中の内容は含まない。ボードを読めなかったときは無い
+   * 読み取り専用の統合結果（共通設定 + ワークスペース、共通設定 + 各プロジェクト）。実行ファイルが出した結果で、拡張は合成しない。
+   * 保存済みの内容で、編集中の内容は含まない。ボードを読めなかったときは無い
    */
   readonly sums?: readonly RulesSum[];
 }

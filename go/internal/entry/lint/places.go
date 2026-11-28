@@ -54,7 +54,7 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 				Kind: kindProjectsUnignored})
 		}
 	}
-	// 2. プロジェクトごとの検査。予約名のプロジェクトはレイヤーとして数えないので error にする。
+	// 2. プロジェクトごとの検査。予約名のプロジェクトは設定として数えないので error にする。
 	quoted := make([]string, len(config.ReservedLayerNames()))
 	for i, name := range config.ReservedLayerNames() {
 		quoted[i] = "`" + name + "`"
@@ -63,10 +63,10 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 		where := "(projects/" + p.Name + ")"
 		if config.IsReservedLayerName(p.Name) {
 			out = append(out, rules.Problem{Severity: rules.Error, Rule: where, Detail: fmt.Sprintf(
-				"%s はレイヤーの名前として予約してある（`%s` は共通レイヤー、`%s` はワークスペース自身のレイヤー）。"+
-					"このプロジェクトはレイヤーとして数えていない（id の `%s:` がどちらのレイヤーを指すか決まらないため。"+
+				"%s は設定の名前として予約してある（`%s` は共通設定、`%s` はワークスペースの設定）。"+
+					"このプロジェクトは設定として数えていない（id の `%s:` がどちらの設定を指すか決まらないため。"+
 					"大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も使われておらず、このプロジェクトを行き先にするパスを持つ"+
-					"ツール（Read / Grep / Glob / Write / Edit / MultiEdit / NotebookEdit）は共通レイヤーだけで判定している。"+
+					"ツール（Read / Grep / Glob / Write / Edit / MultiEdit / NotebookEdit）は共通設定だけで判定している。"+
 					"プロジェクトを別の名前に変えてください",
 				strings.Join(quoted, " と "), config.LayerCommon, config.LayerSelf, p.Name)})
 		}
@@ -158,7 +158,7 @@ func shWord(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
-// inIndex は置き場が索引に載っているなら、その苦情の文。通常のファイルがあればぶつかり（ワークスペース自身のソースに
+// inIndex は置き場が索引に載っているなら、その苦情の文。通常のファイルがあればぶつかり（ワークスペースのソースに
 // projects/ がある。.gitignore に足すとソースが追跡から外れるので改名を案内する）、gitlink だけなら載せ忘れ（索引から
 // 外して無視に入れる 2 手を案内する）。導入スクリプトが同じ条件と同じ文を持つので、変えるならそちらも直す。
 func inIndex(root, rel string) (string, bool) {

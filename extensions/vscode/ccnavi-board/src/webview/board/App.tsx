@@ -383,7 +383,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                   data-tour="merge-check"
                   disabled={mergeShown?.checking === true || mergePending}
                   aria-busy={mergeShown?.checking === true || mergePending ? "true" : undefined}
-                  title="片付けの記録を持つ親のMRが、マージ済みかを確かめます（読むだけで、何も変えません）"
+                  title="片付けが済んでいない親チケットのMRが、マージ済みかどうかを確認します（読み取るだけで、何も変更しません）"
                   onClick={() => {
                     if (touring) {
                       return;
@@ -425,7 +425,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             <>
               <p className="board-empty">チケットなし</p>
               {/* finish済みでマージ待ちの親は、MRの状況を確認するまでボードに出ない。空のボードと区別できるよう一言添える */}
-              {mergeShown === undefined && !touring ? <p className="merge-note" data-merge="hint">マージ待ちのチケットを見たい場合は、［MRの状況を確認］をクリックしてください</p> : null}
+              {mergeShown === undefined && !touring ? <p className="merge-note" data-merge="hint">マージ待ちのチケットを見るには、「MRの状況を確認」を押してください</p> : null}
             </>
           ) : null}
           <div className={panelCard !== undefined && !narrow ? "board-area with-panel" : "board-area"}>

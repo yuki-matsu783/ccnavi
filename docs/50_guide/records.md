@@ -30,7 +30,7 @@ ccnaviは判定した呼び出しを記録し、その記録から次のルー�
 | `code` | 判定の根拠の種別。よく出るのは`DENY_COMMAND_PATTERN`、`DENY_PATH`、`RULE_ASK`、`UNDECLARED`、`PARSE_UNCERTAIN`、`DENY_TICKET_SCOPE`。実行後チェックの行は`POST_VIOLATION`などで、複数の件がヒットした回は強いほう 1 つ |
 | `reason` | 主に`skip`の行。判定まで進まなかった理由（`mode-disabled`、`no-turn-baseline`、`internal-error`など）。Stopの判定役まわりでは`allow`・`deny`の行にも付く（`stop-review-judge`、`stop-review-worker`） |
 | `rules` | ヒットしたルールの名前（ルールファイル由来は`<相対パス>:<id>`、組み込みはid）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review`など。判定ごとに分かれる） |
-| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前 |
+| `source` | 判定を下したルールの設定。`common` / `self` / プロジェクトの名前 |
 
 `jq`で数える。
 
@@ -40,7 +40,7 @@ jq -r 'select(.decision == "deny") | .source' logs/decisions.jsonl | sort | uniq
 ```
 
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json`と`.judge.json`）にも項目ごとに`source`が入る。
-フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義のレイヤーが入る。
+フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義の設定が入る。
 
 `subject`・`unwrapped`・`detail`は、書く直前に秘密の形（認証ヘッダーの値、`token=`や`password=`などの値、主なサービスのトークン、
 URLに埋めた資格情報、コマンドのパスワード引数など）を伏せる。判定は伏せる前の文字列で下す。

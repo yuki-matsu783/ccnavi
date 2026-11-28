@@ -23,7 +23,7 @@ function slowLoader(): { readonly load: () => Promise<number>; readonly release:
   };
 }
 
-test("CB-T1280 読めた答えを残し、聞き手みんなに同じ答えを渡す。聞くのをやめた聞き手には渡さない", async () => {
+test("CB-T1305 読めた答えを残し、聞き手みんなに同じ答えを渡す。聞くのをやめた聞き手には渡さない", async () => {
   const feed = makeFeed(async () => "答え");
   assert.equal(feed.latest(), undefined);
   const a: string[] = [];
@@ -40,7 +40,7 @@ test("CB-T1280 読めた答えを残し、聞き手みんなに同じ答えを�
   assert.deepEqual(b, ["答え", "答え"]);
 });
 
-test("CB-T1281 読んでいる最中の頼みは、終わってからの1回にまとめる。返るのは頼んだ後の読み込みが終わったとき", async () => {
+test("CB-T1306 読んでいる最中の頼みは、終わってからの1回にまとめる。返るのは頼んだ後の読み込みが終わったとき", async () => {
   const loader = slowLoader();
   const feed = makeFeed(loader.load);
   const seen: number[] = [];

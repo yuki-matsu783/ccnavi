@@ -53,9 +53,9 @@ export function readRules(text: string): RulesDocument {
       }
       const form = formOf(section, index, item);
       if (form.when !== undefined && (item.has("glob") || item.has("regex"))) {
-        problems.push(`タイプ${section}の${index + 1}件目（${form.id || "id未設定"}）はwhenとglob / regexを両方指定しています。どちらか1つにしてください`);
+        problems.push(`タイプ${section}の${index + 1}件目（${form.id || "id未設定"}）はwhenとglob / regexを両方指定しています。どちらか1つにしてください。`);
       } else if (form.bothPatterns === true) {
-        problems.push(`タイプ${section}の${index + 1}件目（${form.id || "id未設定"}）はglobとregexを両方指定しています。どちらか1つにしてください`);
+        problems.push(`タイプ${section}の${index + 1}件目（${form.id || "id未設定"}）はglobとregexを両方指定しています。どちらか1つにしてください。`);
       }
       sections[section].push(form);
     });
@@ -140,7 +140,7 @@ export function condOfYaml(value: unknown, depth = 1): CondNode {
       // 引用符の無い`yes` `on` `0755`などは、実行ファイル（YAML 1.1）が文字列以外に読み、
       // 読み込みがerrorにする。ここ（YAML 1.2）では文字列に見えるので、誤りとして揃えて挙げる
       if (inner.type === Scalar.PLAIN && yaml11Ambiguous(inner.value)) {
-        return invalid(value, `${key}の値${inner.value}は引用符で囲んでください（実行ファイルは文字列として読みません）`);
+        return invalid(value, `${key}の値${inner.value}は引用符で囲んでください（このままではccnaviが文字列として読みません）`);
       }
       return { op: key, pattern: inner.value };
     case "all":
@@ -155,7 +155,7 @@ export function condOfYaml(value: unknown, depth = 1): CondNode {
       }
       return { op: "not", child: condOfYaml(inner, depth + 1) };
     default:
-      return invalid(value, `${key}は知らないキーです（glob / regex / all / any / not）`);
+      return invalid(value, `${key}は使えないキーです（使えるのはglob / regex / all / any / not）`);
   }
 }
 

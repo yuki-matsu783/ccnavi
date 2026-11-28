@@ -115,7 +115,7 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
           {lock.locked && <p className="proposal-locked">着手中のため取り込めません。{lock.reason}</p>}
           {!lock.locked && dirty && (
             <p className="proposal-dirty" id="proposal-dirty">
-              未保存の変更があります。取り込むと、編集中の内容は下書きの中身に置き換わります（元に戻すで戻せます）。
+              未保存の変更があります。取り込むと、編集中の内容は下書きの中身に置き換わります（「元に戻す」で戻せます）。
             </p>
           )}
         </>

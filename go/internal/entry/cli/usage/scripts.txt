@@ -1,4 +1,4 @@
-共通レイヤーの3つのファイルは --rules、--phases、--risk で、レイヤーを探す場所は --projects と
+共通設定の3つのファイルは --rules、--phases、--risk で、設定を探す場所は --projects と
 --project-home で変更します。この5つはいずれも同じ制限が適用され、診断専用で、
 それ以外の実行では無視されます。
 
@@ -100,7 +100,7 @@
     ccnavi sync check <parent> [<repo>]
         （<parent> を取り込んだ後の検査です（ccnavi-sync.sh は sync recheck で同じ判定をします）。ファミリーの承認済みチケットと
          その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を
-         1行ずつ出力します（warn には、手元のレイヤーが取得済みの origin/<統合先> のレイヤーと
+         1行ずつ出力します（warn には、手元の設定が取得済みの origin/<統合先> の設定と
          違うことを含みます。git show でローカルの参照を読むだけで、ネットワークには出ません）。
          error がある場合は終了コード1になります）
     ccnavi fetch plan|forward|track|retarget|base|advance|auth <args>...
@@ -108,7 +108,7 @@
          update-ref・origin/HEAD の向け直し、認証に失敗して取ってこられなかったときの案内を行います。"fetch 1" の行に続いて、表示する "out <行>" と
          次の一手の "next <語>"（fetch・lock）を出力します。ネットワークには出ません）
     ccnavi sync retired
-        （ボード用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
+        （チケット管理画面用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
          （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
          形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
          です。ネットワークにも git にも触れません）
@@ -215,7 +215,10 @@
          0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）
     ccnavi start args -- <ccnavi-start.sh の引数>...
         （ccnavi-start.sh 用。引数を確かめ、依頼のリポジトリ（--repo）と origin を比べ、値を 1 行 1 項目で
-         出力します。誤りは "fail <識別子> <終了コード>" と "msg <文>"。読み取り専用）
+         出力します。今いる場所のプロジェクトは "project <名前>"。誤りは "fail <識別子> <終了コード>" と "msg <文>"。読み取り専用）
+    ccnavi start api-failed what=<何の問い合わせか> status=<HTTP の番号> body=<応答の本文> why=<届かなかった理由>
+        （ccnavi-start.sh 用。ホストの API が失敗した理由を "reason <文>" で出力します。ホストに届いて断られた
+         （401・403・404・410）ときだけ "refused <文>" も出力します）
     ccnavi start branch-ok <branch> strict|lenient [heads=<file>] [err=…] [hint=…] [exit=<n>]
         （ccnavi-start.sh 用。識別子が親に使えるかと、同じ識別子になる別のブランチが無いかを確かめます）
     ccnavi start merged github|gitlab <branch> <file>
@@ -269,7 +272,7 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 レビューを取得し、--result <json> として渡します。
 
 未解決のレビュースレッドは、人が親のワークツリーのターミナルから、次のコマンドで受け入れます
-（VS Code のボードの「決める」も、同じ判定を通ります）。
+（VS Code のチケット管理画面の「レビュー完了」も、同じ判定を通ります）。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-decide.sh N
 

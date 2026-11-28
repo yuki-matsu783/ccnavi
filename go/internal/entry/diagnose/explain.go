@@ -30,10 +30,10 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// layerLabels はレイヤーの見出し。共通と自身だけ日本語で出す。プロジェクトは名前そのもの（id の前置きと同じ表記）。
+// layerLabels は設定の見出し。共通とワークスペースだけ日本語で出す。プロジェクトは名前そのもの（id の前置きと同じ表記）。
 var layerLabels = map[string]string{
-	config.LayerCommon: "共通レイヤー",
-	config.LayerSelf:   "ワークスペースのレイヤー",
+	config.LayerCommon: "共通設定",
+	config.LayerSelf:   "ワークスペースの設定",
 }
 
 func layerLabel(name string) string {
@@ -43,8 +43,8 @@ func layerLabel(name string) string {
 	return name
 }
 
-// layerCol はレイヤー列の表示幅（全角は 2 桁）。「ワークスペースのレイヤー」が収まる幅。
-const layerCol = 26
+// layerCol は設定列の表示幅（全角は 2 桁）。「ワークスペースの設定」が収まる幅。
+const layerCol = 22
 
 // undeclaredCol は、どのルールにも一致しない呼び出しの表の、モードの列の表示幅。
 const undeclaredCol = 19
@@ -91,14 +91,14 @@ func shown(root, path string) string {
 // 「チケットの範囲が有効か」まで（パスごとの実効権限は、宣言済み領域という概念がまだ無いので言わない）。
 func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int, error) {
 	p := func(format string, a ...any) { fmt.Fprintf(stdout, format, a...) }
-	// 1. レイヤーごとのルールを調べる。共通レイヤーが読めなければ、判定は組み込みの既定で動くので、出所をそう表示する。
+	// 1. 設定ごとのルールを調べる。共通設定が読めなければ、判定は組み込みの既定で動くので、出所をそう表示する。
 	views := ruleload.Survey(stderr, conf, root)
 	source := conf.Rules
 	if views[0].Unreadable != "" {
 		source = string(builtin.Source)
 	}
 	p("ccnavi: いま有効な宣言（出所 %s）\n", source)
-	p("  パスを持つツールは共通レイヤー + 対象のレイヤー、持たないツールは全部のレイヤーを組み合わせて判定する\n")
+	p("  パスを持つツールは共通設定 + 対象の設定、持たないツールは全部の設定を足して判定する\n")
 	// 2. ルール・フェーズ・リスク・宣言の無い領域・モードの順に、節ごとに書く。
 	for _, view := range views {
 		explainRules(stdout, root, view)
@@ -136,7 +136,7 @@ func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int,
 	return config.ExitOK, nil
 }
 
-// explainRules は 1 つのレイヤーのルールを、タイプの順に 1 行ずつ書く。
+// explainRules は 1 つの設定のルールを、タイプの順に 1 行ずつ書く。
 func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 	p := func(format string, a ...any) { fmt.Fprintf(w, format, a...) }
 	counts := make([]string, len(rules.Sections()))
@@ -145,11 +145,11 @@ func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 	}
 	p("\n■ rules %s（%s、%s）\n", layerLabel(view.Name), shown(root, view.Path), strings.Join(counts, " / "))
 	if view.Unreadable != "" {
-		p("  読めない: %s。このレイヤーは空として扱う\n", view.Unreadable)
+		p("  読めない: %s。この設定は空として扱う\n", view.Unreadable)
 		return
 	}
 	if view.Missing {
-		p("  このレイヤーの設定ファイルはありません。設定なしとして扱います。\n")
+		p("  この設定ファイルはありません。設定なしとして扱います。\n")
 		return
 	}
 	for _, name := range rules.Sections() {
@@ -187,7 +187,7 @@ func leaves(c *rules.Condition) int {
 	return n
 }
 
-// explainPhases は共通レイヤーと、親チケットの project: で指すレイヤーのフェーズ定義を表にして書く。
+// explainPhases は共通設定と、親チケットの project: で指す設定のフェーズ定義を表にして書く。
 func explainPhases(w io.Writer, conf *config.Settings, root string, views []ruleload.LayerView) {
 	type table struct {
 		name       string
@@ -201,13 +201,13 @@ func explainPhases(w io.Writer, conf *config.Settings, root string, views []rule
 		tables[i] = table{v.Name, items, why}
 		counts[i] = fmt.Sprintf("%s %d 種", layerLabel(v.Name), len(items))
 	}
-	fmt.Fprintf(w, "\n■ phases（%s。共通レイヤーと、親チケットの project: で指定されたレイヤーを組み合わせて適用します）\n",
+	fmt.Fprintf(w, "\n■ phases（%s。共通設定に、親チケットの project: で指定された設定を足して適用します）\n",
 		strings.Join(counts, "、"))
-	fmt.Fprintf(w, "  %s%s%s%s%sscope\n", ljust("id", 16), pad("レイヤー", layerCol), ljust("kind", 8), ljust("title", 16),
+	fmt.Fprintf(w, "  %s%s%s%s%sscope\n", ljust("id", 16), pad("設定", layerCol), ljust("kind", 8), ljust("title", 16),
 		ljust("review", 8))
 	for _, t := range tables {
 		if t.unreadable != "" {
-			fmt.Fprintf(w, "  %s: 読めない: %s。このレイヤーは空として扱う\n", layerLabel(t.name), t.unreadable)
+			fmt.Fprintf(w, "  %s: 読めない: %s。この設定は空として扱う\n", layerLabel(t.name), t.unreadable)
 		}
 		for _, pt := range t.items {
 			fmt.Fprintf(w, "  %s%s%s%s%s%s\n", ljust(pt.ID, 16), pad(layerLabel(t.name), layerCol), ljust(string(pt.Kind), 8),
@@ -227,14 +227,14 @@ func explainRisk(w io.Writer, conf *config.Settings, root string, views []rulelo
 		items, why := layerRisk(conf, v.Name, layerConfig(conf, root, v.Name, config.KindRisk))
 		tables[i] = table{v.Name, items, why}
 	}
-	// 共通レイヤーの側の既定の閾値。レイヤーの levels はキーごとに小さいほうを採るので、実際の値はチケットのレイヤーで決まる。
+	// 共通その設定の既定の閾値。設定の levels はキーごとに小さいほうを採るので、実際の値はチケットの設定で決まる。
 	common, _ := risk.Load(conf.Risk)
 	t := risk.EffectiveLevels(common.Levels)
 	fmt.Fprintf(w, "\n■ risk（levels: medium %d / high %d / critical %d）\n", t.Medium, t.High, t.Critical)
-	fmt.Fprintf(w, "  %s%s%s%smessage\n", ljust("id", 16), pad("レイヤー", layerCol), ljust("加点条件", 20), ljust("points", 8))
+	fmt.Fprintf(w, "  %s%s%s%smessage\n", ljust("id", 16), pad("設定", layerCol), ljust("加点条件", 20), ljust("points", 8))
 	for _, tb := range tables {
 		if tb.unreadable != "" {
-			fmt.Fprintf(w, "  %s: 読めない: %s。このレイヤーは空として扱う\n", layerLabel(tb.name), tb.unreadable)
+			fmt.Fprintf(w, "  %s: 読めない: %s。この設定は空として扱う\n", layerLabel(tb.name), tb.unreadable)
 		}
 		for _, f := range tb.items {
 			how := fmt.Sprintf("%s %s", f.Kind, pyfmt.Str(factorValue(f)))

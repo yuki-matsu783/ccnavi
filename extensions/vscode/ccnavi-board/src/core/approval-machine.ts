@@ -274,7 +274,7 @@ function opened(
   let only: readonly string[] = [];
   if (input.filtered) {
     if (input.tickets.length === 0) {
-      return stay(state, { kind: "warn", text: "絞り込みで見えている承認待ちがありません" });
+      return stay(state, { kind: "warn", text: "絞り込んだ結果に、承認待ちのチケットがありません" });
     }
     // 1つでもいまのボードで承認待ちでなければ、ボードが古い。外して送ると「見せた2件の
     // つもりが1件」になるので、削らずに止める
@@ -282,7 +282,7 @@ function opened(
     if (!input.tickets.every((id) => pending.has(id))) {
       return stay(
         state,
-        { kind: "warn", text: "表示が古く、承認待ちが変わっています。チケット管理画面を更新したので、もう一度承認してください" },
+        { kind: "warn", text: "表示が古く、承認待ちが変わっています。チケット管理画面を更新したので、もう一度承認してください。" },
         { kind: "refresh" },
       );
     }
@@ -339,7 +339,7 @@ function changedOf(preview: ApprovePreview, saved: Readonly<Record<string, strin
 
 /** 押した画面の一覧と、手元の最新の一覧が違ったときに言うこと */
 export const SHOWN_STALE =
-  "内容が更新されました（押したときに表示していた一覧は最新ではありませんでした）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください";
+  "内容が更新されました（押したときに表示していた一覧は最新ではありませんでした）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください。";
 
 /**
  * 「このN件を承認する」。見せた識別子とダイジェストをそのまま渡す。実行ファイルが一覧と本文の一致を
@@ -403,8 +403,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
               : {
                   kind: "warn",
                   text:
-                    `承認済みチケットはまだコミットされていません。${PUSH_APPROVED_SCRIPT}が配られていないので、` +
-                    "導入スクリプト（scripts/ccnavi-setup.sh）で配布してください",
+                    `承認済みチケットは、まだコミットされていません。${PUSH_APPROVED_SCRIPT}が入っていないので、` +
+                    "ccnaviの根（配布物を展開したフォルダか、cloneしたリポジトリ）で `sh scripts/ccnavi-setup.sh <ワークスペースルート>` を実行して入れてください。",
                 },
             { kind: "refresh" },
           ];
@@ -419,8 +419,8 @@ function answered(state: ApprovalState, outcome: ApproveOutcome, carrier: boolea
     // 押し続けて全部を承認しかねない。見せているのは`approving`のままで、返ったら差し替える
     const sameIds = outcome.mismatch.expected.join(",") === outcome.mismatch.current.join(",");
     const notice = sameIds
-      ? "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください"
-      : "内容が更新されました（表示したあとに承認待ちの提案が増えたか減りました）。何も承認していません。最新の一覧を表示し直したので、見直してからもう一度承認してください";
+      ? "内容が更新されました（表示したあとに提案ファイルが書き換えられました）。何も承認していません。最新の内容を表示し直したので、見直してからもう一度承認してください。"
+      : "内容が更新されました（表示したあとに承認待ちの提案が増えたか減りました）。何も承認していません。最新の一覧を表示し直したので、見直してからもう一度承認してください。";
     return move(
       state,
       { overlay: state.overlay, only: state.only, recheck: { notice, dropped: false } },
@@ -539,7 +539,7 @@ function decideOpened(
   if (chip.reviewWaiting !== true) {
     return stay(
       state,
-      { kind: "warn", text: `親${parent}のフェーズ${chip.label}はユーザのレビュー待ちではありません。チケット管理画面を更新しました` },
+      { kind: "warn", text: `親${parent}のフェーズ${chip.label}は、レビュー待ちではありません。チケット管理画面を更新しました。` },
       { kind: "refresh" },
     );
   }
@@ -628,7 +628,7 @@ function consultCopied(state: ApprovalState, error: string | undefined): Approva
   const overlay = state.overlay;
   const consult =
     error === undefined
-      ? { ok: true, text: "相談のプロンプトをコピーしました。エージェントに貼って送ってください" }
+      ? { ok: true, text: "相談のプロンプトをコピーしました。Claude Codeの入力欄に貼り付けて送ってください。" }
       : { ok: false, text: `コピーできませんでした（${error}）` };
   return move(state, { overlay: { ...overlay, consult }, only: state.only });
 }
@@ -647,8 +647,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
       effects.unshift({ kind: "warn", text: value.warning });
     }
     const extra = value.pending_extra.length;
-    const issued = value.issue_url ? ` issueに回した分: ${value.issue_url}` : "";
-    const handover = ` ${HANDOVER_NOTE}`;
+    const issued = value.issue_url ? `issueに回した指摘: ${value.issue_url}` : "";
     const overlay = state.overlay;
     const where = overlay?.kind === "deciding" ? { parent: overlay.preview.parent, phase: overlay.preview.phase } : { parent: value.parent, phase: value.phase };
     let title: string;
@@ -656,19 +655,19 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
     if (value.followup) {
       title = "対応方針を確定しました";
       note =
-        `直す指摘は、子チケット${value.followup}に載せました（承認済み）。フェーズ${value.phase}は再開します。` +
+        `直す指摘は、子チケット${value.followup}に載せました（承認済み）。フェーズ${value.phase}を再開します。` +
         // fixのスレッドはホスト上で未解決のまま残る。keep・issueのときにshが返信してresolveする仕組みは対象外
-        "直したあとの確認と、MR上の指摘を解決済みにする作業は、ユーザが行います。" +
+        "直したあとの確認と、MR上の指摘を解決済みにする作業は、自分で行ってください。" +
         (extra > 0 ? `表示した後に増えた指摘${extra}件は、今回は判断していません。` : "");
     } else if (value.reviewed) {
       title = `フェーズ${value.phase}をレビュー済みにしました`;
-      note = "フェーズはレビュー済みになりました。";
+      note = "";
     } else if (extra > 0) {
       title = "指摘が増えたため、レビュー済みにしていません";
       note = `今回の判断は反映しました。表示した後に増えた指摘${extra}件は未判断です。「指摘を読み直して決め直す」を押してください。`;
     } else {
       title = `フェーズ${value.phase}は、まだレビュー済みになっていません`;
-      note = "フェーズはレビュー済みになっていません。「更新」を押して、状態を確かめてください。";
+      note = "「更新」を押して、状態を確かめてください。";
     }
     const retry = !value.followup && !value.reviewed && extra > 0;
     return move(
@@ -677,7 +676,7 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
         overlay: {
           kind: "prompt",
           title,
-          note: `${note}${issued}${handover}`,
+          note: issued === "" ? `${note}${HANDOVER_NOTE}` : `${note}${HANDOVER_NOTE} ${issued}`,
           prompt: value.prompt,
           what: "対応方針のプロンプト",
           // 続きの子が起きたときのプロンプトは取り返せない。決め直しへ戻れるとき（子が起きていない）は被せてよい
@@ -702,13 +701,13 @@ function decided(state: ApprovalState, outcome: DecideOutcome): ApprovalStep {
           phase: preview.phase,
           tree,
           mr: preview.mr.number,
-          notice: "表示した指摘といまの指摘が違います（増えたか、変わりました）。見直してから決めてください",
+          notice: "表示した指摘といまの指摘が違います（増えたか、変わりました）。見直してから決めてください。",
         },
         only: state.only,
       },
       { kind: "loadDecide", tree, parent: preview.parent, phase: preview.phase, mr: preview.mr.number },
     );
   }
-  const error = "mismatch" in outcome ? "表示した指摘といまの指摘が違います。チケット管理画面を更新したので、もう一度「レビュー完了」を押して決め直してください" : outcome.error;
+  const error = "mismatch" in outcome ? "表示した指摘といまの指摘が違います。チケット管理画面を更新したので、もう一度「レビュー完了」を押して決め直してください。" : outcome.error;
   return move(state, { overlay: { kind: "error", error }, only: state.only }, { kind: "refresh" });
 }

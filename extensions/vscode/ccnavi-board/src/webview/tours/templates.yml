@@ -1,8 +1,8 @@
 # テンプレート管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際のテンプレートではない）。
-#   path見本のレイヤーの置き場（画面には「（見本）」を付けて出す）
-#   templates見本のレイヤー（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（破棄した理由。あれば「使われない」）・text（本文）
+#   path見本の設定の置き場（画面には「（見本）」を付けて出す）
+#   templates見本の設定（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（破棄した理由。あれば「使われない」）・text（本文）
 #   drafts見本の下書き。name・description・problems・plan・feedback・flows
-#   sums       「統合結果」の見本。実行ファイルが出す索引の形（共通の設定 + 1つの設定の和）
+#   sums       「統合結果」の見本。実行ファイルが出す索引の形（共通設定に1つの設定を足した統合結果）
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   open開くテンプレートの名前（, で区切って複数）
 #   body     trueなら、開いたテンプレートに見本の本文を出す
@@ -10,7 +10,7 @@
 #   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sumsのname）
 # `diagrams:`は手順が引く時系列の図（形と`diagram:` / `focus:`の使い方はcore/tour-def.tsの冒頭）。値は見本（sample）の名前・説明・パスと揃える。
 # `target:`の印（画面のdata-tour）:
-#   summary件数の行（エラー・警告・情報）
+#   summary件数の行（error・warn・info）
 #   target対象の切り替えとパス
 #   refresh         「更新」
 #   listテンプレートの一覧
@@ -56,7 +56,7 @@ sample:
           after: []
       dropped:
         reason: conflict
-        detail: "`research`は共通と同じ名前で中身が違う。共通の定義を使う"
+        detail: "`research`は共通設定と同じ名前で中身が違う。共通設定のフェーズ定義を使う"
       text: |
         name: research
   drafts:
@@ -92,7 +92,7 @@ sample:
           layer: self
           dropped:
             reason: conflict
-            detail: "`research`は共通と同じ名前で中身が違う。共通の定義を使う"
+            detail: "`research`は共通設定と同じ名前で中身が違う。共通設定のフェーズ定義を使う"
     - name: lib
       layers: [common, lib]
       templates:
@@ -114,12 +114,12 @@ diagrams:
       - id: notice
         from: ccnavi
         to: エージェント
-        text: クローズした出力の最後に、テンプレートにする案内を1行足す
+        text: クローズのときの出力の最後に、テンプレートにするための案内を1行足す
         value: "テンプレートにするなら、`ready` の前に `ccnavi --templates --draft login` で下書きを作る（…）"
       - id: draft
         from: エージェント
         to: ccnavi
-        text: readyの前に、下書きを作らせる
+        text: readyの前に、下書きの作成を頼む
         value: ccnavi --templates --draft login
       - id: write
         from: ccnavi
@@ -135,11 +135,11 @@ diagrams:
       - id: fix
         from: エージェント
         to: wip/handoff/
-        text: 固有名を一般化し、試して失敗した手順を削り、TODOを消す
+        text: 固有名を一般化し、試して失敗した手順を削り、TODOの印を消す
         value: "description: ログイン画面を追加する親の計画"
       - id: hold
         from: wip/handoff/
-        text: 下書きに効力は無い。取り込むか消すまで、親のreadyは止まる
+        text: 下書きに効力は無い。取り込むか消すまで、親のreadyは止まる。
 
   # 取り込み待ちの画面で、下書きを取り込むまで
   template-import:
@@ -148,7 +148,7 @@ diagrams:
       - id: pick
         from: ユーザ
         to: 取り込み待ち画面
-        text: loginの下書きを選び、［選んだ対象を取り込む…］から［この内容で取り込む］を押す
+        text: loginの下書きを選び、「選んだ対象を取り込む…」から「この内容で取り込む」を押す
         value: .ccnavi/config/project/templates/login.yml
       - id: lock
         from: 取り込み待ち画面
@@ -156,7 +156,7 @@ diagrams:
       - id: look
         from: 取り込み待ち画面
         to: ccnavi
-        text: そのパスだけを指して、書き込まずにもう一度読み、ハッシュ（expect）を受け取る
+        text: そのパスだけを指定して、書き込まずにもう一度読み、ハッシュ（expect）を受け取る
         value: ccnavi user handoff .ccnavi/config/project/templates/login.yml --json
       - id: apply
         from: 取り込み待ち画面
@@ -166,7 +166,7 @@ diagrams:
       - id: write
         from: ccnavi
         to: templates/
-        text: 下書きの中身を書く。取り込んだ下書きは消える
+        text: 下書きの中身を書く。取り込んだ下書きは消える。
         value: .ccnavi/config/project/templates/login.yml
       - id: result
         from: ccnavi
@@ -175,7 +175,7 @@ diagrams:
         value: "取り込めた: .ccnavi/config/project/templates/login.yml"
       - id: use
         from: templates/
-        text: 以後は、ticket newの--template loginで引ける
+        text: 以後は、ticket newの--template loginで使える
 
   # テンプレートで次の親の提案を始める（フィードバック計画は書かない）
   template-propose:
@@ -189,7 +189,7 @@ diagrams:
       - id: found
         from: ccnavi
         to: エージェント
-        text: 共通の設定に自分のレイヤーを重ねたものから、名前・説明・使う場面を返す
+        text: 共通設定に、エージェントがいる場所の設定（ワークスペースかプロジェクト）を足したものから、名前・説明・使う場面を返す
         value: |-
           ccnavi: テンプレート（共通 + ワークスペース）
             feature  [self]  機能を追加する親の計画
@@ -202,7 +202,7 @@ diagrams:
       - id: read
         from: ccnavi
         to: templates/
-        text: 名前で引く。破棄された・errorがある・種類がphases.ymlに無いときは、何も書かずに止まる
+        text: 名前で探す。破棄された・errorがある・phases.ymlに無いフェーズ定義（type）を含むときは、何も書かずに止まる。
         value: .ccnavi/config/project/templates/feature.yml
       - id: write
         from: ccnavi
@@ -219,7 +219,7 @@ diagrams:
         value: テンプレートにはフィードバック計画（1 ステップ）がある。…`--with-feedback` を付けて作り直すか、提案を改版で追加します。
       - id: approve
         from: エージェント
-        text: 提案は通常どおり承認を通る。フローの下書きは、ユーザがフロー編集画面で取り込むまで子に渡らない
+        text: 提案は、通常どおりユーザの承認を受ける。フローの下書きは、ユーザがフロー編集画面で取り込むまで子に渡らない。
 
   # 同じテンプレートに --with-feedbackを付ける（値を変えると結果が変わる例）
   template-propose-feedback:
@@ -244,63 +244,63 @@ diagrams:
 courses:
   - id: intro
     title: 基本の案内
-    summary: 画面の見方。テンプレートの一覧、統合結果、下書き
+    summary: 画面の見方。テンプレートの一覧、統合結果、下書き。
     steps:
       - target: summary
         title: 件数と検査の結果
-        body: テンプレートと下書きの数、そして検査のerror・warn・infoの数が出ます。errorがあるテンプレートは無効になります。
+        body: テンプレートと下書きの数と、検査のerror・warn・infoの件数が出ます。errorがあるテンプレートは無効になります。
         scene: {}
       - target: target
         title: 対象を切り替える
-        body: 共通の設定・ワークスペース・プロジェクトを切り替えて、どの設定のテンプレートを見るかを選びます。パスは、いま見ているレイヤーの置き場です。
+        body: 共通設定・ワークスペース・プロジェクトを切り替えて、どの設定のテンプレートを見るかを選びます。パスは、いま見ている設定の置き場です。
         scene: {}
       - target: list
         title: テンプレートの一覧
-        body: 選んだレイヤーのテンプレートが並びます。各テンプレートに、有効・無効を示すバッジや、適用対象から除外された理由が表示されます。破棄した理由は、共通と食い違っているか、読み込めないかなどです。共通と全欄が同じ行は「共通の側を使用」と出ます。上の欄で、語と深刻度（errorありなど）で絞り込めます。
+        body: 選んだ設定のテンプレートが並びます。各テンプレートに、有効・無効のバッジと、破棄された場合はその理由が出ます。破棄されるのは、共通設定と中身が食い違うときや、読み込めないときです。共通設定とすべての欄が同じものには「共通の側を使用」と出ます。上の欄では、語句と深刻度（「errorあり」など）で絞り込めます。
         scene: {}
       - target: template
         title: 1件を開く
-        body: 行は畳んで出ます。見出しを押して開くと、通常は計画の図と子チケットのフローの図が出ます（この案内の見本では表で見せます）。「本文を見る」を押すと本文も読めます。本文では、見えない文字を \uXXXXの形で出します。
+        body: 行は畳まれた状態で出ます。見出しを押して開くと、通常は計画の図と子チケットのフローの図が出ます（この案内の見本では表で表示します）。「本文を見る」を押すと本文も読めます。本文では、見えない文字を\uXXXXの形で表示します。
         scene:
           open: feature
           body: true
       - target: sum
         title: 統合結果
-        body: 実際に使われるのは、共通の設定に選んだレイヤーを重ねたものです。枠を開くと、どの名前がどのレイヤーから使われ、どれが破棄されたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
+        body: 実際に使われるのは、共通設定に選んだ設定を足したものです。枠を開くと、どの名前がどの設定から使われ、どれが破棄されたかの一覧が出ます。読み取り専用で、中身は上の一覧で読みます。
         scene:
           sum: self
       - target: drafts
         title: 下書き
-        body: エージェントが作成した下書きです。効力は無く、取り込むまでテンプレートとしては使われません。この画面では読むだけで、取り込みは「取り込み待ち」の画面で行います。
+        body: エージェントが作成した下書きです。効力は無く、取り込むまでテンプレートとしては使われません。この画面では読むだけで、取り込みは取り込み待ち画面で行います。
         scene: {}
       - target: refresh
         title: 更新
-        body: 一覧を読み直します。ファイルを外で変更したあとに押します。
+        body: 一覧を読み直します。ファイルを外で変更したあとに押してください。
         scene: {}
       - target: tour
         title: 案内
-        body: ヘッダ右上の ? を押すと、基本の案内と、使い方ごとの案内を選べます。
+        body: ヘッダ右上の「?」を押すと、基本の案内と、使い方ごとの案内を選べます。
         scene: {}
 
   - id: how-drafts-flow
-    title: 完了した作業からテンプレートを溜めたいとき
-    summary: 親をクローズしてから、下書きができて、取り込むまで。値の例つきの図で見る
+    title: 完了した作業をテンプレートにして残したいとき
+    summary: 親をクローズしてから、下書きができて、取り込むまで。値の例つきの図で見る。
     steps:
       - target: drafts
         title: 親をクローズすると案内が出る
-        body: 計画を持つ親チケットをクローズすると、ccnaviがクローズした出力の最後に、テンプレートにする案内を1行出します。出るのは、同じ識別子の下書きがまだ無く、同じ計画の形のテンプレートも取り込まれていないときだけです。
+        body: 計画を持つ親チケットをクローズすると、ccnaviはクローズのときの出力の最後に、テンプレートにするための案内を1行出します。出るのは、同じ識別子の下書きがまだ無く、計画の形が同じテンプレートも取り込まれていないときだけです。
         scene: {}
         diagram: template-draft
         focus: close,notice
       - target: drafts
         title: readyの前に下書きを作る
-        body: readyでクローズすると下書きの材料が退避されて、拾えなくなります。下書きはエージェントが作り、取り込み先と同じ相対パスでwip/handoff/に書かれます。既定の取り込み先はプロジェクトのレイヤーです（--to commonで共通のレイヤー）。
+        body: readyを実行すると、下書きのもとになる計画とフローが片付けられ、下書きを作れなくなります。下書きはエージェントが作り、取り込み先と同じ相対パスでwip/handoff/に書かれます。既定の取り込み先はプロジェクトの設定です（--to commonで共通設定）。
         scene: {}
         diagram: template-draft
         focus: draft,write
       - target: draft
         title: TODOの印を直す
-        body: 説明と使う場面にTODOの印が付きます。固有名を一般化し、効かなかった手順を削って、印を消します。印が残っていると、この画面の下書きにwarnが出ます。
+        body: 説明と使う場面にTODOの印が付きます。エージェントが固有名を一般化し、試して失敗した手順を削って、印を消します。印が残っていると、この画面の下書きにwarnが出ます。
         scene: { draft: login }
         diagram: template-draft
         focus: todo,fix
@@ -311,31 +311,31 @@ courses:
         diagram: template-draft
         focus: hold
       - target: handoff
-        title: 取り込み待ちの画面で取り込む
-        body: 取り込みは「取り込み待ち」の画面で、ユーザが行います。errorのある下書きは選べません。作業中のチケットがあるあいだは、テンプレートの取り込みも止まります。
+        title: 取り込み待ち画面で取り込む
+        body: 取り込みは、取り込み待ち画面で行ってください。errorのある下書きは選べません。作業中のチケットがあるあいだは、テンプレートの取り込みも止まります。
         scene: {}
         diagram: template-import
         focus: pick,lock
       - target: handoff
         title: 押すと何が書かれるか
-        body: 「この内容で取り込む」を押すと、画面は選んだパスだけをもう一度読んでハッシュを受け取り、そのハッシュ付きでccnaviに取り込ませます。ファイルを書くのはccnaviで、画面は書きません。見せたあとに下書きが変わっていたら書きません。
+        body: 「この内容で取り込む」を押すと、画面は選んだパスだけをもう一度読んでハッシュを受け取り、そのハッシュ付きでccnaviに取り込ませます。ファイルを書くのはccnaviで、画面は書きません。差分を表示したあとに下書きが変わっていたら、取り込めません。
         scene: {}
         diagram: template-import
         focus: look,apply,write
       - target: list
         title: 取り込んだあと
-        body: 取り込んだ下書きは消え、プロジェクトのレイヤーのテンプレートとして一覧に出ます。以後は、エージェントが--template loginで引けます。
+        body: 取り込んだ下書きは消え、プロジェクトの設定のテンプレートとして一覧に出ます。以後は、エージェントが--template loginで指定して使えます。
         scene: {}
         diagram: template-import
         focus: result,use
 
   - id: how-templates-used
     title: テンプレートで次の親の提案を始めたいとき
-    summary: テンプレートがいつ、どう引かれて、提案に何が書かれるか。値の例つきの図で見る
+    summary: テンプレートがいつ、どう使われて、提案に何が書かれるか。値の例つきの図で見る。
     steps:
       - target: list
         title: 利用できるテンプレートを探す
-        body: エージェントはccnavi --templatesで、共通の設定に自分のレイヤーを重ねたものを引きます。この画面の一覧と統合結果と同じ内容です。名前・説明・使う場面で絞れます。
+        body: エージェントはccnavi --templatesで、共通設定に、エージェントがいる場所の設定（ワークスペースかプロジェクト）を足した一覧を取得します。この画面の一覧と統合結果と同じ内容です。名前・説明・使う場面で絞れます。
         scene: {}
         diagram: template-propose
         focus: list,found
@@ -346,20 +346,20 @@ courses:
         diagram: template-propose
         focus: found
       - target: template
-        title: テンプレートを指して提案を始める
-        body: ccnavi ticket newに--templateと名前を渡すと、親チケットの提案を始められます。破棄されたテンプレートや、errorのあるテンプレート、phases.ymlに無い種類を含むテンプレートでは、何も書かずに止まります。
+        title: テンプレートを指定して提案を始める
+        body: ccnavi ticket newに--templateと名前を渡すと、親チケットの提案を始められます。破棄されたテンプレートや、errorのあるテンプレート、phases.ymlに無いフェーズ定義（type）を含むテンプレートでは、何も書かずに止まります。
         scene: { open: feature }
         diagram: template-propose
         focus: new,read
       - target: template
         title: 計画と子のフローの下書きが書かれる
-        body: 全体計画（plan）はテンプレートからコピーし、先行ステップの番号は提案の番号に付け直されます。子チケットのフローは下書きとして書かれ、ユーザがフロー編集画面で取り込むまで効きません。
+        body: 全体計画（plan）はテンプレートからコピーされ、先行ステップの番号は提案の番号に付け直されます。子チケットのフローは下書きとして書かれ、フロー編集画面で取り込むまで効きません。
         scene: { open: feature }
         diagram: template-propose
         focus: write
       - target: template
         title: フィードバック計画は書かれない
-        body: フィードバック計画は、全体計画の最後のレビューのあとに、改版で1回だけ足す決まりです。--with-feedbackを付けなければ書かず、あることだけを知らせます。提案は通常の承認を通ります。
+        body: フィードバック計画は、全体計画の最後のレビューのあとに、改版で1回だけ足す決まりです。--with-feedbackを付けなければ書かず、あることだけを知らせます。提案は、通常どおりユーザの承認を受けます。
         scene: { open: feature }
         diagram: template-propose
         focus: skip,approve
@@ -370,8 +370,8 @@ courses:
         diagram: template-propose-feedback
         focus: write,number
       - target: sum
-        title: 破棄されたものは引けない
-        body: 統合結果で破棄されたテンプレートは使われません。引けるかどうかは、表の「破棄した理由」で確かめます。
+        title: 破棄されたものは使えない
+        body: 統合結果で破棄されたテンプレートは使われません。使えるかどうかは、表の「状態」と「破棄した理由」で確かめてください。
         scene:
           sum: self
 
@@ -381,7 +381,7 @@ courses:
     steps:
       - target: sum
         title: 統合結果の枠
-        body: 枠を開くと、共通の設定と選んだ設定を追加した結果が出ます。
+        body: 枠を開くと、共通設定に、選んだ設定を足した結果が出ます。
         scene:
           sum: self
       - target: sum-pick
@@ -391,34 +391,34 @@ courses:
           sum: lib
       - target: sum-count
         title: 使われる件数
-        body: 統合結果に入るレイヤーと、実際に使われる件数が出ます。
+        body: 統合結果に入る設定と、実際に使われる件数が出ます。
         scene:
           sum: self
       - target: sum-table
         title: 由来と破棄した理由
-        body: 名前ごとに、どのレイヤーのものか、使われるか、破棄されたときの理由が出ます。同じ名前で中身が違うと、共通の側が使われます。
+        body: 名前ごとに、どの設定のものか、使われるかどうか、破棄された場合はその理由が出ます。同じ名前で中身が違うと、共通設定の側が使われます。
         scene:
           sum: self
 
   - id: read-drafts
     title: 下書きを確認するとき
-    summary: 下書きの検査を見て、取り込み待ちの画面へ進む
+    summary: 下書きの検査を見て、取り込み待ち画面へ進む
     steps:
       - target: drafts
         title: 下書きとは
-        body: 親チケットの中で作成された、まだ効力の無いテンプレートです。ここで検査の指摘と計画を読めます。
+        body: クローズした親チケットの計画とフローから作った、まだ効力の無いテンプレートです。ここで検査の指摘と計画を読めます。
         scene:
           draft: login
       - target: draft
         title: 検査の指摘
-        body: errorがあるものは取り込めません。TODOが残っているものは、直してから取り込みます。この画面で下書きは直せません。
+        body: errorがあるものは取り込めません。TODOが残っているものは、直してから取り込んでください。この画面で下書きは直せません。
         scene:
           draft: login
       - target: handoff
-        title: 取り込み待ちの画面へ
-        body: 下書きの取り込みは「取り込み待ち」の画面で行います。差分を読んで、取り込む対象を選びます。
+        title: 取り込み待ち画面へ
+        body: 下書きの取り込みは、取り込み待ち画面で行います。差分を読んで、取り込む対象を選んでください。
         scene: {}
       - target: refresh
         title: 読み直す
-        body: 下書きを直したあとは、更新を押して読み直します。
+        body: 下書きを直したあとは、「更新」を押して読み直してください。
         scene: {}

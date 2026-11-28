@@ -192,7 +192,7 @@ test("CB-D111 入れ子が子の下2階層を超えるときだけ注意を出�
   const dom = await openFlow({ doc: deep });
   try {
     const notices = dom.all("#flow-notices li").map((li) => li.textContent ?? "");
-    assert.ok(notices.some((n) => /子の下に3階層重なっています/.test(n)), notices.join("\n"));
+    assert.ok(notices.some((n) => /子チケットの担当の下に3階層あります/.test(n)), notices.join("\n"));
     assert.ok(notices.some((n) => /サブフロー（subAgentFlows）が2本/.test(n)));
     // サブフローのノードにも入れ子の目印
     assert.equal(dom.one('.react-flow__node[data-id="outer"]').querySelector(".flow-badge.nest")?.textContent, "入れ子（上限なら戻る）");
@@ -441,7 +441,7 @@ test("CB-D121 グループの縁を押して離すだけなら未保存にしな
   }
 });
 
-test("CB-D122 読むだけのときは、グループの縁を出さず、「グループを解く」「グループ化」を押せない", async () => {
+test("CB-D122 読むだけのときは、グループの縁を出さず、「グループを解除」「グループ化」を押せない", async () => {
   const dom = await openFlow({ doc: grouped(), lock: { locked: true, reason: lockedReason("i0001-01-01") } });
   try {
     dom.click(dom.one('.react-flow__node[data-id="g"]'));
@@ -449,7 +449,7 @@ test("CB-D122 読むだけのときは、グループの縁を出さず、「グ
     assert.equal(dom.one("#inspector").getAttribute("data-type"), "group");
     assert.equal(dom.all(".react-flow__resize-control").length, 0);
     assert.ok(dom.one<HTMLButtonElement>('#inspector [data-action="ungroup"]').disabled);
-    assert.ok(dom.one<HTMLButtonElement>('#inspector [data-action="remove-node"]').disabled);
+    assert.equal(dom.all('#inspector [data-action="remove-node"]').length, 0, "グループの欄に削除のボタンは無い（解除に一本化）");
     // 2つ選んでもグループ化は押せない
     dom.click(dom.one('.react-flow__node[data-id="start"]'));
     await dom.settle();
@@ -499,7 +499,7 @@ test("CB-D188 部品箱と右の欄は畳める。畳んでも中身は残し（
   }
 });
 
-test("CB-D190 図の拡大ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
+test("CB-D190 図の全画面ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
     dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));

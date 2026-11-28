@@ -74,11 +74,11 @@ const (
 	where = "(risk)"
 	// levelsWhere は合成した閾値の苦情の出どころ。
 	levelsWhere = "(levels)"
-	// scriptsDir は script: の置き場の名前。レイヤーをまたいで同じ項目かを、ここからの相対で比べる。
+	// scriptsDir は script: の置き場の名前。設定をまたいで同じ項目かを、ここからの相対で比べる。
 	scriptsDir = "/scripts/"
 )
 
-// scriptHomes は共通レイヤーの script: を置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
+// scriptHomes は共通設定の script: を置いてよい場所（ワークスペースルートからの相対の先頭）。guard の内側。
 // エージェントが書ける場所のスクリプトを許すと、自分のリスクを自分で決められる。
 var scriptHomes = []string{config.DefaultProjectHome + "/" + config.CommonDir + "/" + config.ScriptsDir + "/"}
 
@@ -101,8 +101,8 @@ type Factor struct {
 	// Include・Exclude は数える対象のパス（glob。lines_over・files_over・deleted_over だけ）。Include が空なら
 	// 全パス、あればヒットしたパスだけ。Exclude にヒットしたパスは常に外す。
 	Include, Exclude []string
-	// Source はこの項目が書いてあるレイヤー（記録の hit と judge の項目に残す）。home は script: を解く基準
-	// ディレクトリ（共通レイヤーと自身のレイヤーはワークスペースルート、プロジェクトはそのプロジェクトの git
+	// Source はこの項目が書いてある設定（記録の hit と judge の項目に残す）。home は script: を解く基準
+	// ディレクトリ（共通設定とワークスペースの設定はワークスペースルート、プロジェクトはそのプロジェクトの git
 	// プロジェクトルート）。読んだ側が埋める。
 	Source, home string
 
@@ -142,8 +142,8 @@ func anyMatch(patterns []*pyre.Regexp, paths []string) bool {
 	return false
 }
 
-// key はレイヤーをまたいで「同じ項目か」を比べる全欄。Source と home は含めない。script: は書かれたパスでは
-// なく、スクリプトの置き場からの相対と指す先の中身で比べる（同期で共通レイヤーをコピーした配点はパスが違い、
+// key は設定をまたいで「同じ項目か」を比べる全欄。Source と home は含めない。script: は書かれたパスでは
+// なく、スクリプトの置き場からの相対と指す先の中身で比べる（同期で共通設定をコピーした配点はパスが違い、
 // パスで比べると同じ項目を 2 回数える。中身まで見るのは、名前だけ同じ別のスクリプトを破棄しないため）。
 func (f *Factor) key() string {
 	value := fmt.Sprint(f.Limit)
@@ -194,14 +194,14 @@ func fileDigest(home, rel string) string {
 // Definition は配点。
 type Definition struct {
 	// Levels は書かれた閾値だけ（medium・high・critical）。書かれていない名前は既定で読む。既定で埋めて保持すると、
-	// 合成のときに「書いていないレイヤー」が共通レイヤーの緩めた閾値を気づかないうちに戻す。
+	// 合成のときに「書いていない設定」が共通設定の緩めた閾値を気づかないうちに戻す。
 	Levels  map[string]int
 	Factors []*Factor
 	// Source はどこから読んだか（組み込みなら Builtin）。
 	Source string
-	// Fallback は読めなかった理由（組み込みに戻ったとき、レイヤーを空として扱ったとき）。
+	// Fallback は読めなかった理由（組み込みに戻ったとき、設定を空として扱ったとき）。
 	Fallback string
-	// Dropped は空として扱ったレイヤーの名前（記録の fallback にそのまま入る）。
+	// Dropped は空として扱った設定の名前（記録の fallback にそのまま入る）。
 	Dropped []string
 }
 
@@ -289,7 +289,7 @@ func builtin() *Definition {
 	factors, _ := readFactors([]any{
 		spec("id", "big-diff", "points", 25, "lines_over", 300, "message", "行数が多い"),
 		spec("id", "many-files", "points", 15, "files_over", 10, "message", "ファイルが多い"),
-		spec("id", "ci", "points", 35, "glob", ".github/**", "max", 35, "message", "CI やエージェント定義に触った"),
+		spec("id", "ci", "points", 35, "glob", ".github/**", "max", 35, "message", "CIやエージェント定義に触った"),
 		spec("id", "deletes", "points", 20, "deleted_over", 3, "message", "削除したファイルが多い"),
 	}, Builtin, scriptHomes)
 	return &Definition{Levels: map[string]int{}, Factors: factors, Source: Builtin}
@@ -307,7 +307,7 @@ func readFile(path string) (string, bool, string) {
 	return text, true, ""
 }
 
-// Load は共通レイヤーの配点を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す
+// Load は共通設定の配点を読む。無ければ組み込み。壊れていれば組み込みに戻り、苦情を返す
 // （UTF-8 として読めないものも同じ）。
 func Load(path string) (*Definition, []rules.Problem) {
 	if path == "" {
@@ -331,8 +331,8 @@ func Load(path string) (*Definition, []rules.Problem) {
 	return d, problems
 }
 
-// LoadLayer はレイヤーの配点を読む。無ければ nil（無いレイヤー = 空）。壊れていても組み込みには戻さない
-// （共通レイヤーが在るのに組み込みに戻すと、共通レイヤーの配点が消える側になる）。
+// LoadLayer は設定の配点を読む。無ければ nil（無い設定 = 空）。壊れていても組み込みには戻さない
+// （共通設定が在るのに組み込みに戻すと、共通設定の配点が消える側になる）。
 func LoadLayer(path string, homes []string) (*Definition, []rules.Problem) {
 	if path == "" {
 		return nil, nil
@@ -347,8 +347,8 @@ func LoadLayer(path string, homes []string) (*Definition, []rules.Problem) {
 	return Parse(text, path, homes)
 }
 
-// Parse は配点 1 本を読む。homes はこのレイヤーで script: に書けるパスの先頭（共通レイヤーは ScriptHomes、
-// 各レイヤーはその ccnavi ディレクトリの scripts/ だけ。たがいの側を指す定義は error にする）。error が 1 つでも
+// Parse は配点 1 本を読む。homes はこの設定で script: に書けるパスの先頭（共通設定は ScriptHomes、
+// 各設定はその ccnavi ディレクトリの scripts/ だけ。たがいの側を指す定義は error にする）。error が 1 つでも
 // あれば nil、warn だけなら定義と苦情。
 func Parse(text, where string, homes []string) (*Definition, []rules.Problem) {
 	// 1. YAML として読み、最上位がマップで、版が合うことを確かめる。
@@ -452,9 +452,9 @@ func readFactors(raw []any, where string, homes []string) ([]*Factor, []rules.Pr
 		}
 		id := ospath.Strip(item.Text("id"))
 		if strings.Contains(id, rules.IDSeparator) {
-			// レイヤーの名前をつけた形（lib:schema）と見分けが付かず、記録を読んだユーザが直すファイルを決められない。
+			// 設定の名前をつけた形（lib:schema）と見分けが付かず、記録を読んだユーザが直すファイルを決められない。
 			problems = append(problems, problem(rules.Error, where, fmt.Sprintf(
-				"`factors[%d].id` に `%s` は書けない。レイヤーの名前を添えた形（`self%sid` / `<プロジェクト名>%sid`）と見分けが付かない",
+				"`factors[%d].id` に `%s` は書けない。設定の名前を添えた形（`self%sid` / `<プロジェクト名>%sid`）と見分けが付かない",
 				i, rules.IDSeparator, rules.IDSeparator, rules.IDSeparator)))
 			continue
 		}
@@ -551,7 +551,7 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 			return nil, "`glob` を式にできない: " + err.Error(), nil
 		}
 		f.compiled = compiled
-	// script は、そのレイヤーの scripts/ の下の相対パスだけ。絶対パスと `..` は、守られた場所の外を指せるので断る。
+	// script は、その設定の scripts/ の下の相対パスだけ。絶対パスと `..` は、守られた場所の外を指せるので断る。
 	case KindScript:
 		s, _ := value.(string)
 		if ospath.Strip(s) == "" {
@@ -563,9 +563,9 @@ func readFactor(id string, item *yaml.Map, homes []string) (*Factor, string, []r
 			for i, h := range homes {
 				quoted[i] = "`" + h + "`"
 			}
-			return nil, "`script` の `" + rel + "` はこのレイヤーから指せない。" + strings.Join(quoted, " か ") +
-				" の下に、そのレイヤーの git プロジェクトルートからの相対で置く" +
-				"（守られた場所。レイヤーと共通レイヤーはたがいの側を指せない）", nil
+			return nil, "`script` の `" + rel + "` はこの設定から指せない。" + strings.Join(quoted, " か ") +
+				" の下に、その設定の git プロジェクトルートからの相対で置く" +
+				"（守られた場所。設定と共通設定はたがいの側を指せない）", nil
 		}
 		f.Text = rel
 	case KindJudge:
@@ -623,17 +623,17 @@ func scopeGlobs(raw any) ([]string, []*pyre.Regexp, string) {
 	return globs, compiled, ""
 }
 
-// markLayer はこの配点の項目に、レイヤーの名前と script: を解く基準ディレクトリを持たせる。
+// markLayer はこの配点の項目に、設定の名前と script: を解く基準ディレクトリを持たせる。
 func (d *Definition) markLayer(name, home string) {
 	for _, f := range d.Factors {
 		f.Source, f.home = name, home
 	}
 }
 
-// merge は共通レイヤーの配点に、行き先のレイヤーの配点を足す。factors は連結で、同じ id で全欄が一致すれば
-// 後ろを捨て（info）、中身が違えば両方を数え、後ろを `<レイヤー>:<id>` にする（warn。空にすると点が小さく
+// merge は共通設定の配点に、行き先の設定の配点を足す。factors は連結で、同じ id で全欄が一致すれば
+// 後ろを捨て（info）、中身が違えば両方を数え、後ろを `<設定>:<id>` にする（warn。空にすると点が小さく
 // なる側になるので、衝突は点を増やす向きにだけ効かせる）。levels は書かれたキーごとに小さいほう。合成後の
-// levels の順が崩れたら（error）、そのレイヤーを空として共通レイヤーだけを返す。
+// levels の順が崩れたら（error）、その設定を空として共通設定だけを返す。
 func merge(common, extra *Definition, name string) (*Definition, []rules.Problem) {
 	// 1. 項目を足す。全欄が同じ項目は二重に数えないよう捨て、id だけ同じで中身が違う項目は両方数える（名前を変えて）。
 	var problems []rules.Problem
@@ -644,13 +644,13 @@ func merge(common, extra *Definition, name string) (*Definition, []rules.Problem
 	var added []*Factor
 	for _, f := range extra.Factors {
 		if keys[f.key()] {
-			problems = append(problems, problem(rules.Info, f.ID, "`"+f.ID+"` は前のレイヤーと全欄が同じなので、"+
-				name+" の側を破棄した。点は前のレイヤーの 1 本で数える"))
+			problems = append(problems, problem(rules.Info, f.ID, "`"+f.ID+"` は前の設定と全欄が同じなので、"+
+				name+" の側を破棄した。点は前の設定の 1 本で数える"))
 			continue
 		}
 		if ids[f.ID] {
 			qualified := name + rules.IDSeparator + f.ID
-			problems = append(problems, problem(rules.Warn, f.ID, "`"+f.ID+"` が前のレイヤーと同じ id で中身が違う。"+
+			problems = append(problems, problem(rules.Warn, f.ID, "`"+f.ID+"` が前の設定と同じ id で中身が違う。"+
 				"両方を数え、"+name+" の側は `"+qualified+"` という名前にする（記録と record-risk もこの名前）。"+
 				"同じ項目のつもりなら全欄を揃え、別の項目なら id を変えてください"))
 			renamed := *f
@@ -671,10 +671,10 @@ func merge(common, extra *Definition, name string) (*Definition, []rules.Problem
 	if !ordered(levels) {
 		t := EffectiveLevels(levels)
 		problems = append(problems, problem(rules.Error, levelsWhere, fmt.Sprintf(
-			"合成後の `levels` が medium %d <= high %d <= critical %d になっていない。%s のレイヤーは空として扱う",
+			"合成後の `levels` が medium %d <= high %d <= critical %d になっていない。%s の設定は空として扱う",
 			t.Medium, t.High, t.Critical, name)))
 	}
-	// 3. 合成後に閾値の大小が崩れたら、そのレイヤーを空として扱い、共通レイヤーだけを返す。
+	// 3. 合成後に閾値の大小が崩れたら、その設定を空として扱い、共通設定だけを返す。
 	out := &Definition{
 		Levels: levels, Factors: append(append([]*Factor{}, common.Factors...), added...),
 		Source: common.Source, Fallback: common.Fallback, Dropped: append([]string{}, common.Dropped...),
@@ -695,8 +695,8 @@ func copyLevels(levels map[string]int) map[string]int {
 	return out
 }
 
-// ScriptProblems は script: が指す先が、そのレイヤーの git プロジェクトルートに在るか。name を渡すと、その
-// レイヤーから来た項目だけを見る。走らせるときは「測れなかった」で重いほうになるが、--lint は先に言う。
+// ScriptProblems は script: が指す先が、その設定の git プロジェクトルートに在るか。name を渡すと、その
+// 設定から来た項目だけを見る。走らせるときは「測れなかった」で重いほうになるが、--lint は先に言う。
 func ScriptProblems(d *Definition, name string) []rules.Problem {
 	var problems []rules.Problem
 	for _, f := range d.Factors {
@@ -715,21 +715,21 @@ func ScriptProblems(d *Definition, name string) []rules.Problem {
 	return problems
 }
 
-// CommonDefinition は共通レイヤーの配点を読み、項目に共通レイヤーの印を付ける（script: はワークスペースルートで解く）。
-// 戻りの苦情は共通レイヤー自身のもの（--lint の共通レイヤーの項が言う）。
+// CommonDefinition は共通設定の配点を読み、項目に共通設定の印を付ける（script: はワークスペースルートで解く）。
+// 戻りの苦情は共通設定自身のもの（--lint の共通設定の項が言う）。
 func CommonDefinition(conf *config.Settings, root string) (*Definition, []rules.Problem) {
 	d, notes := Load(conf.Risk)
 	d.markLayer(config.LayerCommon, root)
 	return d, notes
 }
 
-// LayerDefinition は共通レイヤー + 親の project: が指すレイヤーの配点と、そのレイヤーの苦情。共通レイヤー自身の
-// 苦情は返さない（--lint の共通レイヤーの項と二重に言わない）。共通レイヤーが壊れていれば組み込みに戻り、
-// レイヤーを足さない。共通レイヤーにもレイヤーにも risks.yml が無ければ組み込み、共通レイヤーだけが無ければ
-// レイヤーの項目だけを数える。
+// LayerDefinition は共通設定 + 親の project: が指す設定の配点と、その設定の苦情。共通設定自身の
+// 苦情は返さない（--lint の共通設定の項と二重に言わない）。共通設定が壊れていれば組み込みに戻り、
+// 設定を足さない。共通設定にも設定にも risks.yml が無ければ組み込み、共通設定だけが無ければ
+// 設定の項目だけを数える。
 func LayerDefinition(conf *config.Settings, root, project string) (*Definition, []rules.Problem) {
 	home, name := layer.Home(conf, root, project), layer.Name(project)
-	// 共通レイヤーの配点を土台にする。共通レイヤーの risks.yml が無く、レイヤーの risks.yml だけがあるなら、土台は空にしてレイヤーの項目だけを数える。
+	// 共通設定の配点を土台にする。共通設定の risks.yml が無く、設定の risks.yml だけがあるなら、土台は空にして設定の項目だけを数える。
 	path := layer.File(conf, root, project, config.KindRisk)
 	present := path != "" && ospath.DiskExists(path)
 	var d *Definition
@@ -742,7 +742,7 @@ func LayerDefinition(conf *config.Settings, root, project string) (*Definition, 
 	} else {
 		d, _ = Load(conf.Risk)
 	}
-	// 項目に由来するレイヤーを記録する。script: はこの基準ディレクトリで解く。
+	// 項目に由来する設定を記録する。script: はこの基準ディレクトリで解く。
 	d.markLayer(config.LayerCommon, root)
 	if d.Fallback != "" || !present {
 		return d, nil
@@ -750,19 +750,19 @@ func LayerDefinition(conf *config.Settings, root, project string) (*Definition, 
 	extra, notes := LoadLayer(path, []string{conf.LayerScriptHome()})
 	if extra == nil {
 		d.Dropped = append(d.Dropped, name)
-		d.Fallback = name + " の配点が不正。このレイヤーは空として数える"
+		d.Fallback = name + " の配点が不正。この設定は空として数える"
 		return d, notes
 	}
 	extra.markLayer(name, home)
-	// 合成して、閾値が逆転したレイヤーは空として数える。
+	// 合成して、閾値が逆転した設定は空として数える。
 	merged, problems := merge(d, extra, name)
 	if len(merged.Dropped) > 0 {
-		merged.Fallback = strings.Join(merged.Dropped, ", ") + " の配点の閾値が合成で逆転している。このレイヤーは空として数える"
+		merged.Fallback = strings.Join(merged.Dropped, ", ") + " の配点の閾値が合成で逆転している。この設定は空として数える"
 	}
 	return merged, append(notes, problems...)
 }
 
-// LoadDefinition は判定が使う配点（共通レイヤー + 親の project: が指すレイヤー）。
+// LoadDefinition は判定が使う配点（共通設定 + 親の project: が指す設定）。
 func LoadDefinition(conf *config.Settings, root, project string) *Definition {
 	d, _ := LayerDefinition(conf, root, project)
 	return d

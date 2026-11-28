@@ -49,7 +49,7 @@ const (
 const (
 	lastFeedbackHead = "フィードバック対応の最後のレビューです。選べるのは 2 つ。"
 	lastFeedbackRedo = "  - 同じフェーズ %d に子を追加して承認を受け、やり直す（差し戻し）"
-	lastFeedbackUser = "  - ユーザが '%s decide %d'（ボードの「決める」）で残りを受け入れるか、別の issue に回す"
+	lastFeedbackUser = "  - ユーザが '%s decide %d'（チケット管理画面の「レビュー完了」）で残りを受け入れるか、別の issue に回す"
 	lastFeedbackTail = "新しいフィードバック作業フェーズは足せません。"
 )
 

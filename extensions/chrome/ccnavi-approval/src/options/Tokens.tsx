@@ -18,8 +18,16 @@ interface Row {
 
 function describe({ host, status }: Row): string {
   const set = status?.set === true;
-  const when = status?.notice ? `（${status.notice.text}）` : "";
-  return `${host.id}（${host.kind === "gitlab" ? "GitLab" : "GitHub"}）: ${set ? "登録済み" : "未登録"}${when}`;
+  return `${host.id}（${host.kind === "gitlab" ? "GitLab" : "GitHub"}）：${set ? "登録済み" : "未登録"}${status?.notice ? `・${expiry(status.notice)}` : ""}`;
+}
+
+/** 一覧の行に出す期限（文面の全文はボードのバナーとアイコンのツールチップに出す） */
+function expiry(notice: NonNullable<TokenStatus["notice"]>): string {
+  const day = notice.expiresAt.slice(0, 10);
+  if (notice.level === "unknown") return "期限不明";
+  if (notice.level === "expired") return `期限切れ（${day}）`;
+  if (notice.level === "soon") return `あと ${notice.daysLeft ?? 0} 日で期限切れ（${day}）`;
+  return `期限 ${day}`;
 }
 
 function createUrl(h: Host): string {
@@ -109,9 +117,16 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
         </div>
       </form>
       <Status id="token-msg" said={said} />
+      <p className="hint">使いみち：承認とレビュー済みを親ブランチに反映するとき、「始める」で Issue から親ブランチを作成するとき、残った指摘の対応方針を確定するときに使います。</p>
       <p className="hint">
-        PAT は、承認とレビュー完了の状態を親ブランチに反映するときと、「始める」で Issue から親ブランチを作成するときに使います。GitHub では fine-grained token を作り、対象のリポジトリを限定して、Contents: Read and write（ブランチの作成にも使用）・Metadata: Read-only・Pull requests: Read and write（残った指摘の対応方針を決めるときの、指摘への返信と解決、MR へのコメント）・Issues: Read and write（同じく issue の作成と検索）を選びます。classic の PAT なら repo スコープです。GitLab では api スコープを選び（Commits API は write_repository では書き込めないため）、ロールは、残った指摘の対応方針を決める操作のために Developer 以上にします（指摘の解決に要ります）。残った指摘の対応方針を決める操作は、書く前に権限を確かめ、足りなければ何も書かずに必要な権限の名前を出して止まります。プロジェクトアクセストークンを作成できる場合は、アクセス対象をそのプロジェクトに限定できます。作成できない場合は個人の PAT になり、プロジェクトを限定できません。期限は 90 日を選びます。エージェント用のトークンとは別に作ります。PAT は、このブラウザのプロファイル内に暗号化されずに保存され、同じ OS ユーザのプロセスから読み取れます。リポジトリを限定した最小権限のトークンにしてください。期限はホストの応答から取得します。取得できない場合は上の欄の日付を使用し、有効期限の7日前から、ボードと拡張機能のアイコンで通知します。
+        GitHub：fine-grained token を作り、対象のリポジトリを限定して、次の権限を選んでください。Contents: Read and write（ブランチの作成にも使用）・Metadata: Read-only・Pull requests: Read and write（指摘への返信と解決、プルリクエストへのコメント）・Issues: Read and write（issue の作成と検索）。classic の PAT の場合は repo スコープです。
       </p>
+      <p className="hint">
+        GitLab：api スコープを選んでください（write_repository では Commits API に書き込めません）。指摘を解決するには、Developer 以上のロールが必要です。プロジェクトアクセストークンを作成できる場合は、対象をそのプロジェクトに限定できます。作成できない場合は個人の PAT になり、プロジェクトを限定できません。
+      </p>
+      <p className="hint">作成時の注意：有効期限は 90 日にし、エージェント用のトークンとは別に作成してください。残った指摘の対応方針を確定するときは、書き込む前に権限を確かめ、足りなければ何も書き込まずに必要な権限の名前を表示して止まります。</p>
+      <p className="hint">保存：PAT は、このブラウザのプロファイルに暗号化せずに保存します。同じ OS ユーザで動くほかのプログラムから読み取れるため、リポジトリを限定した最小権限のトークンにしてください。</p>
+      <p className="hint">有効期限の通知：有効期限はホストの応答から取得します。取得できない場合は上の欄の日付を使います。有効期限の 7 日前から、ボードと拡張機能のアイコンで通知します。</p>
       <ul id="token-links" className="links">
         {hosts.map((h) => (
           <li key={h.id}>

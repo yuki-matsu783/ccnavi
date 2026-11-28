@@ -25,7 +25,7 @@ var (
 	DirectTmpDir  = filepath.Join("logs", "direct-tmp")
 	defaultPhases = filepath.Join(DefaultProjectHome, ConfigDir, "common", "phases.yml")
 	defaultRisk   = filepath.Join(DefaultProjectHome, ConfigDir, "common", "risks.yml")
-	// defaultSections は提案の本文に求める見出しの共通レイヤーの置き場。
+	// defaultSections は提案の本文に求める見出しの共通設定の置き場。
 	defaultSections = filepath.Join(DefaultProjectHome, ConfigDir, "common", "ticket-sections.yml")
 
 	// LocalClaudeSettings は個人の上書き設定。`env` は Claude Code が起こしたプロセスに渡る。
@@ -117,7 +117,7 @@ type Settings struct {
 	Projects    string
 	ProjectHome string
 
-	// Project*Files は名前で指したレイヤーの設定の差し替え（名前 → 絶対パス）。診断のフラグだけが入れ、
+	// Project*Files は名前で指した設定の差し替え（名前 → 絶対パス）。診断のフラグだけが入れ、
 	// hook からの判定では空のまま。
 	ProjectRulesFiles  map[string]string
 	ProjectPhasesFiles map[string]string

@@ -10,10 +10,10 @@
  */
 
 /**
- * 設定の4画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理）が開くレイヤー。共通の設定、ワークスペースの設定、プロジェクト1つの設定。
- * 開くときのレイヤーは拡張が覚えた最後の選択で決める（`layer-memory.ts`）。
+ * 設定の4画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理）が開く対象。共通設定、ワークスペースの設定、プロジェクト1つの設定。
+ * 開くときの対象は拡張が覚えた最後の選択で決める（`target-memory.ts`）。
  */
-export type LayerTarget =
+export type SettingsTarget =
   | { readonly kind: "workspace" }
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
@@ -39,8 +39,8 @@ export interface Screens {
   /** ボード。`target`は開いたあとに進む場所。未指定なら開くだけ（絞り込みは前回のまま） */
   readonly board: (target?: BoardTarget) => Promise<void>;
   /**
-   * 設定の4画面。開いていれば前面に出すだけで、レイヤーは切り替えない。開くときは拡張が覚えた最後のレイヤーで開き、
-   * その画面の選択肢に無ければ画面の既定（ルールとリスクは共通の設定、フェーズとテンプレートはワークスペース）で開く
+   * 設定の4画面。開いていれば前面に出すだけで、対象は切り替えない。開くときは拡張が覚えた最後の対象で開き、
+   * その画面の選択肢に無ければ画面の既定（ルールとリスクは共通設定、フェーズとテンプレートはワークスペースの設定）で開く
    */
   readonly rules: () => Promise<void>;
   readonly risk: () => Promise<void>;

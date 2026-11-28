@@ -94,7 +94,7 @@ function reviewText(review: boolean | null): string {
 
 /** 延期したステップの言葉。本文の先行の一覧（「レビューは4と一緒に」）と同じ言い方 */
 function deferText(reviewAt: number | null): string {
-  return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューは${reviewAt}と一緒に`;
+  return reviewAt === null ? "レビューを受け持つステップがありません" : `レビューはステップ${reviewAt}でまとめて行う`;
 }
 
 /** ステップの点。番号・定義のタイトル・レビューの要否と、延期・固定・終端に届かない印 */
@@ -103,7 +103,7 @@ function ItemView({ data }: NodeProps<ItemNode>): JSX.Element {
   const title = [
     node.type,
     node.loose ? "最後のステップの先行になっていない（終端に届かない）" : "",
-    node.locked ? "子が承認された番号です。入る線は変えられません" : "",
+    node.locked ? "子チケットが承認済みのステップです。このステップに入る線（先行）は変えられません" : "",
     data.blocked === undefined ? "" : `ここへは線を引けません: ${data.blocked}`,
   ]
     .filter((part) => part !== "")
@@ -281,17 +281,17 @@ function headingOf(plan: ApprovePlan): string {
 
 /** 図の下の一言。実行ファイルの値を並べるだけ */
 function Notes({ plan }: { readonly plan: ApprovePlan }): JSX.Element | null {
-  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number}はレビューを受け持つステップがありません` : `${item.number}は${item.review_at}と一緒に`));
+  const deferred = plan.items.filter((item) => item.deferred).map((item) => (item.review_at === null ? `${item.number}はレビューを受け持つステップがありません` : `${item.number}のレビューは${item.review_at}でまとめて行う`));
   const lines: { readonly text: string; readonly warn: boolean }[] = [];
   if (plan.ready.length >= 2) {
     lines.push({ text: `すぐ始まる: ${plan.ready.join(", ")}`, warn: false });
   }
   if (deferred.length > 0) {
-    lines.push({ text: `延期したレビュー: ${deferred.join("、")}`, warn: false });
+    lines.push({ text: `後ろへ回したレビュー: ${deferred.join("、")}`, warn: false });
   }
   if (plan.loose.length > 0) {
     // 本文の先行の一覧（「最後のステップの先行になっていない: …」）と同じ言い方に、直し方を添える
-    lines.push({ text: `最後のステップの先行になっていない: ${plan.loose.join(", ")}。最後のステップへ線を引くか、合流のステップを置いてください`, warn: true });
+    lines.push({ text: `最後のステップの先行になっていない: ${plan.loose.join(", ")}。最後のステップへ線を引くか、合流のステップを置いてください。`, warn: true });
   }
   for (const problem of plan.problems) {
     lines.push({ text: problem, warn: true });
@@ -366,7 +366,7 @@ function Detail({ plan, graph, id, proposalNumbers }: { readonly plan: ApprovePl
     ["後続ステップ", listOf(after)],
     ["すぐ始まる", plan.ready.includes(number) ? "はい" : "いいえ"],
     ["最後のステップの先行になっていない", node.loose ? "はい（終端に届かない）" : "いいえ"],
-    ["番号の固定", node.locked ? "固定（子が承認済み。入る線は変えられません）" : "なし"],
+    ["番号の固定", node.locked ? "固定（子チケットが承認済みのため、先行は変えられません）" : "なし"],
   ];
   return (
     <dl className="plan-detail-list" data-number={number}>

@@ -120,22 +120,22 @@ DEPLOY_RULES=".ccnavi/config/common/rules.yml"
 # セッションの開始（SessionStart）で ccnavi がモデルに渡す作業の決まり。文面はこの md にあり、
 # 実行ファイルは条件と差し込みを解くだけ。無いと、決まりが渡らないことを 1 行で言うだけになる。
 DEPLOY_CCNAVI_MD=".ccnavi/CCNAVI.md"
-# 設定 4 本のひな形。rules・phases・risk・ticket-sections はどれも共通レイヤー（.ccnavi/config/common/）へ配る。
-# phases の判定は、共通レイヤーと自身のレイヤー（.ccnavi/config/project/）の和を読む。自身のレイヤーの
+# 設定 4 本のひな形。rules・phases・risk・ticket-sections はどれも共通設定（.ccnavi/config/common/）へ配る。
+# phases の判定は、共通設定とワークスペースの設定（.ccnavi/config/project/）を足した統合結果を読む。ワークスペースの設定の
 # phases.yml は配らない。そこに置くのはワークスペースのレイアウト（scope のパス）に依存する定義で、
 # 配布元のものは配布元のレイアウトに合わせてあるため。配布先に既にあれば触らない。
 DEPLOY_RISK=".ccnavi/config/common/risks.yml"
 DEPLOY_COMMON_PHASES=".ccnavi/config/common/phases.yml"
 # 提案の本文に求める見出し（親の雛形の見出しと承認の検査・Stop の判定の R2）。
 DEPLOY_SECTIONS=".ccnavi/config/common/ticket-sections.yml"
-# 点検でだけ見る。共通レイヤーにも自身のレイヤーにも無いときだけ「まだ無いもの」に出す。
+# 点検でだけ見る。共通設定にもワークスペースの設定にも無いときだけ「まだ無いもの」に出す。
 DEPLOY_PHASES=".ccnavi/config/project/phases.yml"
 DEPLOY_SCRIPT_DIR=".ccnavi/scripts"
 # ccnavi の使い方の文書（md）の置き場。配布元にある *.md を全部配る。--docs の索引はここだけ
 # .ccnavi/ の下で載せるので、配った先でも `ccnavi --docs` で引ける。rules.yml の
 # additionalContextFile（スキルの振り返りの手順）と、sh の案内が指す先でもある。
 DEPLOY_DOCS_DIR=".ccnavi/docs"
-# 共通の作業・レビュー計画のテンプレートの置き場。配布元にある *.yml を全部配る。共通レイヤーの
+# 共通の作業・レビュー計画のテンプレートの置き場。配布元にある *.yml を全部配る。共通設定の
 # 一部なので、設定 4 本と同じく .ccnavi/config/common/ の下へ配る。配布元に置き場が無い、または
 # *.yml が 1 本も無いのは正常（共通のテンプレートはまだ無いことがある）で、何も言わずに飛ばす。
 DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
@@ -246,8 +246,8 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 
 CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 4 本（.ccnavi/config/common/rules.yml、
-.ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml、.ccnavi/config/common/ticket-sections.yml。自身のレイヤーの .ccnavi/config/project/phases.yml は
-配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
+.ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml、.ccnavi/config/common/ticket-sections.yml。ワークスペースの設定の .ccnavi/config/project/phases.yml は
+配らず、既にあれば触らない。フェーズ定義は共通設定に config を足した統合結果で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
 （.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・文面ファイル
 （.ccnavi/messages/*.yml。拒否・促し・次の一手の文。無いと短い既定の文に落ちる）・共通の工程スキルと配るだけのスキル
@@ -1064,7 +1064,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 書き込めてしまう。
 #
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
-# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通レイヤーの
+# 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通設定の
 # 3 本も同じ）。読まれない語を設定項目の一覧に混ぜると、そこを直せば置き場が
 # 動くと読める。`--all` は今は足すものが無い。打ち慣れた手順が断られないように、
 # オプションとしては受ける。
@@ -2026,9 +2026,9 @@ fi
 if [ ! -f "$root/$DEPLOY_SECTIONS" ]; then
 	note_missing "${DEPLOY_SECTIONS}（提案の本文に求める見出し。無いと見出しを確かめず、親の雛形にも見出しを置かない）"
 fi
-# フェーズ定義は共通レイヤーと自身のレイヤーの和。どちらか片方があれば足りるので、両方無いときだけ言う。
+# フェーズ定義は共通設定にワークスペースの設定を足した統合結果。どちらか片方があれば足りるので、両方無いときだけ言う。
 if [ ! -f "$root/$DEPLOY_PHASES" ] && [ ! -f "$root/$DEPLOY_COMMON_PHASES" ]; then
-	note_missing "${DEPLOY_COMMON_PHASES}（フェーズ定義。自身のレイヤーの ${DEPLOY_PHASES} にも無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
+	note_missing "${DEPLOY_COMMON_PHASES}（フェーズ定義。ワークスペースの設定の ${DEPLOY_PHASES} にも無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
 fi
 # 配るものの一覧（DEPLOY_SCRIPTS）を使って確かめる。ここで名前を決め打ちすると、配る sh を
 # 足したときに、その sh が無いことをこの一覧だけが報告しなくなる。

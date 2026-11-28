@@ -52,21 +52,21 @@ const SAMPLE_HASH = "0".repeat(64);
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Record<string, unknown>;
 }
 
 function text(value: unknown, at: string): string {
   if (typeof value !== "string" || value === "") {
-    throw new Error(`${at}が空か文字列ではない`);
+    throw new Error(`${at}が空か文字列ではありません`);
   }
   return value;
 }
 
 function candidates(value: unknown, at: string): readonly LintFlowCandidate[] {
   if (!Array.isArray(value)) {
-    throw new Error(`${at}がリストではない`);
+    throw new Error(`${at}がリストではありません`);
   }
   return value.map((item, index) => {
     const entry = object(item, `${at}[${index}]`);
@@ -78,10 +78,10 @@ function candidates(value: unknown, at: string): readonly LintFlowCandidate[] {
 export function parseFlowChecks(raw: unknown, at = "checks"): FlowChecks {
   const map = object(raw, at);
   if (!Array.isArray(map.warns) || !map.warns.every((warn) => typeof warn === "string")) {
-    throw new Error(`${at}.warnsは文字列のリスト`);
+    throw new Error(`${at}.warnsは文字列のリストにしてください`);
   }
   if (!Array.isArray(map.rendered) || !map.rendered.every((line) => typeof line === "string")) {
-    throw new Error(`${at}.renderedは文字列のリスト`);
+    throw new Error(`${at}.renderedは文字列のリストにしてください`);
   }
   const cands = object(map.candidates, `${at}.candidates`);
   return {
@@ -101,7 +101,7 @@ export function parseFlowSample(raw: unknown): FlowSample {
     const entry = object(value, `sample.flows.${name}`);
     const doc = asFlowDoc(entry.doc);
     if (doc === undefined) {
-      throw new Error(`sample.flows.${name}.docをFlowDocとして読み込めない（ノードのリストとidが必要です）`);
+      throw new Error(`sample.flows.${name}.docをFlowDocとして読み込めません（ノードのリストとidが必要です）`);
     }
     flows[name] = { doc, checks: parseFlowChecks(entry.checks, `sample.flows.${name}.checks`) };
   }

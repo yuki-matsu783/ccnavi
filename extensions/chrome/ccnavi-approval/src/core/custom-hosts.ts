@@ -45,11 +45,11 @@ export function customHost(kind: unknown, value: unknown): Host {
     throw new Error("種類は GitHub か GitLab を選んでください");
   }
   if (typeof value !== "string" || value.trim() === "") {
-    throw new Error("ホストの URL を入れてください（例 https://gitlab.example.com）");
+    throw new Error("ホストの URL を入力してください（例：https://gitlab.example.com）");
   }
   const url = endpoint(value.trim(), "ホストの URL");
   if (url.pathname !== "/" && url.pathname !== "") {
-    throw new Error("ホストの URL はオリジンのみ指定してください（パスは含められません。例 https://gitlab.example.com）");
+    throw new Error("ホストの URL はオリジンのみ指定してください（パスは含められません。例：https://gitlab.example.com）");
   }
   if (url.hostname.startsWith("[") || url.hostname.includes(":")) {
     throw new Error("IPv6 のアドレスは登録できません（ホスト名か 127.0.0.1 で指定してください）");

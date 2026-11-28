@@ -19,8 +19,8 @@ import { Result } from "./Result.js";
 
 /** 対象外の理由。知らない値はそのまま出す */
 const IGNORED_WHY: Readonly<Record<string, string>> = {
-  "not-allowed": "取り込める種類の表に無い",
-  "linked-dir": "リンクのディレクトリ（中は読まない）",
+  "not-allowed": "取り込める種類のファイルではない",
+  "linked-dir": "シンボリックリンクのディレクトリ（中は読まない）",
 };
 
 /** 中身が無いときの錠。止めていない扱いにする */
@@ -178,7 +178,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={busy} onClick={refresh}>
             更新
           </button>
         </div>
@@ -188,7 +188,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
       </p>
       <p className="count" id="counts">
         {/* どれもファイルの数。対象は取り込める分と取り込めない分の和で、対象外はその外（下の折りたたみに名前と理由） */}
-        <span>対象のファイル{entries.length}件（取り込める{selectable.length}件・取り込めない{entries.length - selectable.length}件）</span>・<span>選択{chosen.length}件</span>・<span>対象外のパス{page.list.ignored}件</span>
+        <span>対象のファイル{entries.length}件（取り込み可能{selectable.length}件・取り込めない{entries.length - selectable.length}件）</span>・<span>選択{chosen.length}件</span>・<span>対象外のパス{page.list.ignored}件</span>
       </p>
       {page.list.ignored_paths.length > 0 && (
         <details id="ignored-paths">
@@ -208,11 +208,11 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           取り込み待ち <span className="count">{entries.length}</span>
         </h2>
         <p className="hint">
-          wip/handoff/に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、エラーが無い対象です。
+          wip/handoff/に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、errorが無い対象です。
         </p>
         {entries.length === 0 ? (
           <p className="empty" data-role="empty">
-            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/にコピーして編集します。
+            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/にコピーして編集してください。
           </p>
         ) : (
           <>
@@ -283,7 +283,7 @@ function TreeSelect({
 }): JSX.Element {
   return (
     <label className="tree-select">
-      ツリー{" "}
+      ワークツリー{" "}
       <select id="tree" data-action="switch-tree" value={tree} disabled={disabled} onChange={(event) => onSwitch(event.target.value)}>
         {trees.map((t) => (
           <option key={t.key} value={t.key}>

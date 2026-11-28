@@ -66,7 +66,7 @@ test("CB-T441 組み込みの配点の見本は、実際の組み込みの配点
   assert.equal(sample.missing.sums, undefined);
 });
 
-test("CB-T442 統合結果の見本は、共通の設定の項目に追加した設定の項目が続き、閾値は小さいほう、同じidの別の項目はレイヤー名が付く", () => {
+test("CB-T442 統合結果の見本は、共通設定の項目に追加した設定の項目が続き、閾値は小さいほう、同じidの別の項目は設定の名前が付く", () => {
   const sums = sample.page.sums ?? [];
   assert.deepEqual(sums.map((sum) => sum.name), ["self", "lib"]);
   const common = sample.page.model.form.factors.map((factor) => factor.id);
@@ -77,9 +77,9 @@ test("CB-T442 統合結果の見本は、共通の設定の項目に追加した
     const added = sum.factors.filter((f) => f.source !== "common");
     assert.ok(added.length >= 1 && added.every((f) => f.source === layer));
     assert.equal(new Set(sum.factors.map((f) => f.id)).size, sum.factors.length, `${sum.name}: idが重なっている`);
-    // 後ろの設定が共通と同じidを使うときは、`<レイヤー>:<id>`にする
+    // 後ろの設定が共通と同じidを使うときは、`<設定>:<id>`にする
     for (const f of added) {
-      assert.ok(!common.includes(f.id), `${sum.name}: ${f.id}が共通のidと重なる（レイヤー名を付ける）`);
+      assert.ok(!common.includes(f.id), `${sum.name}: ${f.id}が共通のidと重なる（設定の名前を付ける）`);
     }
     for (const name of LEVEL_NAMES) {
       assert.equal(typeof sum.levels[name], "number");

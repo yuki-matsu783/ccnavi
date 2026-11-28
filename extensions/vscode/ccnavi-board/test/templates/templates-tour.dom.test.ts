@@ -162,7 +162,7 @@ test("CB-D361 統合結果の案内は、見本の統合結果を選び、閉じ
   try {
     // 下書きの案内の3番目の手順（0始まりで2）は「取り込み待ちを開く」を指す。案内の間は押せず、何も送らない
     await goto(dom, "read-drafts", 2);
-    assert.equal(dom.one("#tour-title").textContent, "取り込み待ちの画面へ");
+    assert.equal(dom.one("#tour-title").textContent, "取り込み待ち画面へ");
     assert.equal(dom.one<HTMLButtonElement>(`[data-tour="handoff"]`).disabled, true);
     dom.click(dom.one(`[data-tour="handoff"]`));
     await dom.settle();

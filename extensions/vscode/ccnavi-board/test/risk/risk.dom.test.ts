@@ -109,7 +109,7 @@ test("CB-D13 ファイルがなければ欄も追加も押せず、「作る」�
 test("CB-T82 ファイルがなければ組み込みだと言って作るボタンを出し、あれば出さない", async () => {
   const missing = await openRisk({ exists: false, builtin: true });
   try {
-    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.ymlがありません。実行ファイルは組み込みの配点で数えています/);
+    assert.match(missing.one(".banner.missing").textContent, /\.ccnavi\/config\/common\/risks\.ymlがありません。ccnaviは組み込みの配点でリスクを計算しています/);
     assert.equal(missing.all('button[data-action="create"]').length, 1);
     assert.ok(missing.one<HTMLButtonElement>('button[data-action="open-risk"]').disabled);
   } finally {
@@ -383,14 +383,14 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の基本の案内（
 
 test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が1つだけでも出す。読み込み中と、読み込めなかった画面にも出る", async () => {
   const targets = [
-    { kind: "workspace", name: "", label: "共通の設定" },
+    { kind: "workspace", name: "", label: "共通設定" },
     { kind: "self", name: "", label: "ワークスペース" },
     { kind: "project", name: "lib", label: "プロジェクトlib" },
   ];
   const dom = await openRisk({ target: { kind: "workspace", name: "" }, targets });
   try {
     const select = dom.one<HTMLSelectElement>("select#target");
-    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通の設定", "ワークスペース", "プロジェクトlib"]);
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通設定", "ワークスペース", "プロジェクトlib"]);
     assert.equal(select.value, "workspace:");
     dom.change(select, "project:lib");
     await dom.settle();
@@ -463,7 +463,7 @@ test("CB-T316 統合結果は読み取り専用で、閾値・項目・由来を
     assert.equal(select.value, "lib");
     assert.match(dom.one("#sum-levels").textContent, /MEDIUM 20.*HIGH 40.*CRITICAL 50/);
     const rows = () => dom.all("#sum tbody tr").map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
-    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通"], ["schema", "30", "プロジェクト（lib）"]]);
+    assert.deepEqual(rows().map((r) => [r[0], r[2], r[3]]), [["big-diff", "25", "共通設定"], ["schema", "30", "プロジェクト（lib）"]]);
     dom.change(select, "self");
     await dom.settle();
     assert.match(dom.one("#sum-levels").textContent, /CRITICAL 70/);

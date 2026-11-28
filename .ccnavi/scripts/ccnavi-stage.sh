@@ -44,8 +44,5 @@ set -eu
 . "$(dirname "$0")/ccnavi-common.sh"
 
 root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-stage
-bin=$(ccnavi_bin "$root") || {
-	printf 'ccnavi-stage: ccnavi の実行ファイルが見つかりません。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' >&2
-	exit 2
-}
+bin=$(ccnavi_bin "$root") || ccnavi_no_bin ccnavi-stage
 exec "$bin" --root "$root" stage -- "$@"

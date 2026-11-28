@@ -108,7 +108,7 @@ func NewNoParentError(reason string) *NoParentError {
 
 // HomeDir は、この識別子の承認済みチケットを置く置き場を返す。返すのは親のワークツリーの置き場だけ。
 // 書く先も読む先も 1 つに決めるため。子のワークツリーにも checkout されるが、そこへ書くと同じ識別子が 2 通りになる。
-// project はチケットのリポジトリ（ワークスペース自身なら空）。決まらなければ *NoParentError を返す。
+// project はチケットのリポジトリ（ワークスペースなら空）。決まらなければ *NoParentError を返す。
 func HomeDir(conf *config.Settings, root, id, parent, project string) (string, error) {
 	return homeDir(conf, root, homeOf(id, parent), func(f *standing.Families, home string) standing.Standing {
 		return f.Standing(home, project)

@@ -35,10 +35,10 @@ export const BUILTIN_RISK_TEXT = `# 実績で測るリスクの配点。子を�
 #                    無指定なら差分全体。includeがあればヒットしたパスだけ、excludeにヒットしたパスは数えない
 #   定量（スクリプト）: script: <.ccnavi/config/common/scripts/ の下>。cwdは子のワークツリー、
 #                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENTを受け取り、
-#                      標準出力に整数か {"points": N, "message": "..."}を出す。失敗は重い側（pointsを加点）
+#                      標準出力に整数か {"points": N, "message": "..."}を出す。失敗したときは安全側に倒し、pointsを加点する
 #   定性（サブエージェント）: judge: <問い>。親がサブエージェントに判断させ、
 #                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
-#                      判定が揃うまで子はクローズできない。子のHEADが動けば取り直し
+#                      判定が揃うまで子はクローズできない。子のHEADが変わったら判定を取り直す
 #
 # このファイルがなければ組み込み（big-diff・many-files・ci・deletesと同じ値）。不正なら組み込みを使い、--lintが指摘する。
 version: 1
@@ -59,7 +59,7 @@ factors:
     points: 35
     glob: ".github/**"
     max: 35
-    message: CI やエージェント定義に触った
+    message: CIやエージェント定義に触った
   - id: deletes
     points: 20
     deleted_over: 3
@@ -80,9 +80,9 @@ export function readRisk(text: string): RiskDocument {
   const blocking = blockingProblems(doc);
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`versionがありません。保存するとversion: ${RISK_VERSION}を先頭に追加します`);
+    problems.push(`versionがありません。保存するとversion: ${RISK_VERSION}を先頭に追加します。`);
   } else if (version !== RISK_VERSION) {
-    problems.push(`version ${String(version)}は実行ファイルが読み込めません（読み込むのは${RISK_VERSION}）。組み込みの配点を使います`);
+    problems.push(`version ${String(version)}はccnaviが読み込めません（読み込むのは${RISK_VERSION}）。組み込みの配点を使います。`);
   }
 
   const levels = { medium: "", high: "", critical: "" } as Record<LevelName, string>;
@@ -111,7 +111,7 @@ export function readRisk(text: string): RiskDocument {
         const present = KINDS.filter((k) => item.has(k));
         if (present.length > 1) {
           problems.push(
-            `factorsの${index + 1}件目に加点条件が${present.length}個あります（${present.join(", ")}）。画面は${present[0]}だけを出し、保存すると他は消えます`,
+            `factorsの${index + 1}件目に加点条件が${present.length}個あります（${present.join(", ")}）。この画面では${present[0]}だけを表示し、保存すると他は消えます。`,
           );
         }
         factors.push(formOf(index, item, present[0] ?? "lines_over"));
@@ -206,7 +206,7 @@ function applyTo(doc: Document, edited: RiskForm): string {
   for (const form of edited.factors) {
     if (form.origin !== null && seen.has(form.origin)) {
       // 同じ元ノードを2か所に置くと、後から書いた欄が両方に出る。
-      throw new Error(`${form.origin + 1}件目の項目が2回送られました。更新してから編集し直してください`);
+      throw new Error(`${form.origin + 1}件目の項目が2回送られました。更新してから編集し直してください。`);
     }
     if (form.origin !== null) {
       seen.add(form.origin);

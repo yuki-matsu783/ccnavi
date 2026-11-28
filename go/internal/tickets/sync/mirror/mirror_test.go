@@ -205,7 +205,7 @@ func TestApplyWritesOnlyTheChosenMirror(t *testing.T) {
 	}
 	lib := project(root, "lib")
 	if read(t, commonPath(lib, "risks.yml")) != commonRisk || read(t, own) != "version: 1\n" {
-		t.Error("ミラーかレイヤーの中身が違う")
+		t.Error("ミラーか設定の中身が違う")
 	}
 	if exists(commonPath(project(root, "app"), "rules.yml")) {
 		t.Error("選んでいない app に書いた")
@@ -417,7 +417,7 @@ func TestSkillSourcesStopAtALink(t *testing.T) {
 	}
 }
 
-// ---- 共通レイヤーの中身
+// ---- 共通設定の中身
 
 func TestCommonPlanCopiesScriptsAndTemplates(t *testing.T) {
 	root := workspace(t)
@@ -555,7 +555,7 @@ func TestSyncCopiesToTheStartedParentOnce(t *testing.T) {
 	lines := Sync(conf, root)
 	joined := strings.Join(lines, "\n")
 	for _, want := range []string{
-		"共通レイヤーとプロジェクト lib のミラー（.ccnavi/config/common/）が違っていたので",
+		"共通設定とプロジェクト lib のミラー（.ccnavi/config/common/）が違っていたので",
 		"  - .ccnavi/config/common/rules.yml（新しく置いた）",
 		"共通の工程スキルとプロジェクト lib の skills/ が違っていたので、共通の中身に揃えた:",
 		"  - skills/process-test/SKILL.md（新しく置いた）",
@@ -577,7 +577,7 @@ func TestSyncCopiesToTheStartedParentOnce(t *testing.T) {
 	if lines := Sync(conf, root); !slices.Contains(lines, "  - .ccnavi/config/common/risks.yml（上書き）") {
 		t.Errorf("%q", lines)
 	}
-	// 共通レイヤーが直されれば、次の発言で届く。
+	// 共通設定が直されれば、次の発言で届く。
 	testkit.Put(t, commonPath(root, "risks.yml"), commonRisk+"# 直した\n")
 	Sync(conf, root)
 	if read(t, commonPath(worktree, "risks.yml")) != commonRisk+"# 直した\n" {
@@ -592,7 +592,7 @@ func TestAFailedSyncIsSaidEveryTime(t *testing.T) {
 	conf := settingsOf(root)
 	for range 2 {
 		lines := Sync(conf, root)
-		if len(lines) != 1 || !strings.HasPrefix(lines[0], "ccnavi: i0001 の共通レイヤーをミラーできない: 共通レイヤーの risks.yml を、ミラーとして読めない: ") {
+		if len(lines) != 1 || !strings.HasPrefix(lines[0], "ccnavi: i0001 の共通設定をミラーできない: 共通設定の risks.yml を、ミラーとして読めない: ") {
 			t.Errorf("%q", lines)
 		}
 	}
@@ -626,7 +626,7 @@ func TestSplitLabelsTheMirroredPaths(t *testing.T) {
 	for i := range many {
 		many[i] = string(rune('a' + i))
 	}
-	if got := Label(many); got != "共通レイヤーのコピーとのずれ: a、b、c、d、e、f、g、h、i、j ほか 2 件" {
+	if got := Label(many); got != "共通設定のコピーとのずれ: a、b、c、d、e、f、g、h、i、j ほか 2 件" {
 		t.Errorf("%q", got)
 	}
 	if OthersNote(nil) != "" || OthersNote([]string{"src/a.go"}) != "ずれ以外の変更が 1 件ある（src/a.go）。そちらは作業の変更として扱う。" {

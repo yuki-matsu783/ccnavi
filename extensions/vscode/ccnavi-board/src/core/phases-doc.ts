@@ -12,7 +12,7 @@
  * 順序は親チケットの計画のステップの`after`で決めるので、定義は順序の欄を持たない。
  *
  * 組み込みの既定は持たない（実行ファイルも持たない。既定を組み込むと、意図せずレビューの
- * 要否が決まる）。雛形も持たない（共通レイヤーに雛形を置くと、レイヤーの同じidと中身が食い違い、そのレイヤーが
+ * 要否が決まる）。雛形も持たない（共通設定に雛形を置くと、設定の同じidと中身が食い違い、その設定が
  * 空として扱われる）。
  */
 import { isMap, isNode, isSeq, parseDocument, Scalar, YAMLMap, YAMLSeq, type Document, type Pair } from "yaml";
@@ -53,15 +53,15 @@ export function readPhases(text: string): PhasesDocument {
   const blocking = blockingProblems(doc);
   const version = doc.get("version");
   if (version === undefined || version === null) {
-    problems.push(`versionがありません。保存するとversion: ${PHASES_VERSION}を先頭に追加します`);
+    problems.push(`versionがありません。保存するとversion: ${PHASES_VERSION}を先頭に追加します。`);
   } else if (version !== PHASES_VERSION) {
-    problems.push(`version ${String(version)}は実行ファイルが読み込めません（読み込むのは${PHASES_VERSION}）。フェーズ定義は使われず、番号だけで扱われます`);
+    problems.push(`version ${String(version)}はccnaviが読み込めません（読み込むのは${PHASES_VERSION}）。フェーズ定義は使われず、番号だけで扱われます。`);
   }
 
   const phases: PhaseForm[] = [];
   const raw = doc.get("phases", true);
   if (raw === undefined || raw === null) {
-    problems.push("phasesがありません。実行ファイルは「`phases`がないか空か、マップではない」と報告します。定義を1つ以上追加して保存してください");
+    problems.push("phasesがありません。このままではccnaviの検査（--lint）でerrorになります。定義を1つ以上追加して保存してください。");
   } else if (!isMap(raw)) {
     blocking.push("phasesがマップ（キーと値の組の集まり）ではありません");
   } else {
@@ -74,7 +74,7 @@ export function readPhases(text: string): PhasesDocument {
       phases.push(formOf(index, id, pair.value, problems));
     });
     if (phases.length === 0 && problems.length === 0) {
-      problems.push("定義が1つもありません。実行ファイルは「`phases`がないか空か、マップではない」と報告します");
+      problems.push("定義が1つもありません。このままではccnaviの検査（--lint）でerrorになります。定義を1つ以上追加してください。");
     }
   }
 
@@ -103,12 +103,12 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
   const kindText = scalarText(map, "kind") || "work";
   const kind: PhaseKind = (PHASE_KINDS as readonly string[]).includes(kindText) ? (kindText as PhaseKind) : "work";
   if (kind !== kindText) {
-    problems.push(`定義${id}のkind \`${kindText}\`は${PHASE_KINDS.join("・")}のどれでもありません。画面はworkとして出し、保存するとworkになります`);
+    problems.push(`定義${id}のkind \`${kindText}\`は${PHASE_KINDS.join("・")}のどれでもありません。この画面ではworkとして表示し、保存するとworkに書き換わります。`);
   }
   const rawReview = map.get("review");
   const review = typeof rawReview === "boolean" ? rawReview : true;
   if (rawReview !== undefined && rawReview !== null && typeof rawReview !== "boolean") {
-    problems.push(`定義${id}のreview \`${String(rawReview)}\`はtrueかfalseではありません。画面はtrueとして出し、保存するとtrueになります（\`none\`や\`mr\`などの文字列は、trueとして扱われます。falseにしたいときは書き直してください）`);
+    problems.push(`定義${id}のreview \`${String(rawReview)}\`はtrueでもfalseでもありません。この画面ではtrueとして表示し、保存するとtrueに書き換わります（\`none\`や\`mr\`などの文字列は、trueとして扱われます。falseにしたいときは書き直してください）。`);
   }
 
   const rawScope = map.get("scope", true);
@@ -118,14 +118,14 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     inherit = true;
   } else if (rawScope instanceof Scalar) {
     if (rawScope.value !== INHERIT && rawScope.value !== null) {
-      problems.push(`定義${id}のscope \`${String(rawScope.value)}\`はglobのリストかinheritではありません。画面はinheritとして出します`);
+      problems.push(`定義${id}のscope \`${String(rawScope.value)}\`はglobのリストでもinheritでもありません。この画面ではinheritとして表示します。`);
     }
     inherit = true;
   } else if (isSeq(rawScope)) {
     inherit = false;
     scope = seqTexts(rawScope);
   } else {
-    problems.push(`定義${id}のscopeがリストでもinheritでもありません。画面はinheritとして出します`);
+    problems.push(`定義${id}のscopeがリストでもinheritでもありません。この画面ではinheritとして表示します。`);
   }
 
   const lists = {} as Record<ListKey, string[]>;
@@ -136,7 +136,7 @@ function formOf(index: number, id: string, map: YAMLMap, problems: string[]): Ph
     } else if (isSeq(raw)) {
       lists[key] = seqTexts(raw);
     } else {
-      problems.push(`定義${id}の${key}がリストではありません。画面は空として出し、保存すると欄が消えます`);
+      problems.push(`定義${id}の${key}がリストではありません。この画面では空として表示し、保存すると欄が消えます。`);
       lists[key] = [];
     }
   }
@@ -183,13 +183,13 @@ function applyTo(doc: Document, edited: PhasesForm): string {
     const id = form.id.trim();
     if (seen.has(id)) {
       // 同じキーを2つ書くと、実行ファイル（yaml.safe_load）は後ろで何も出さずに上書きし、定義が1つ消える。
-      throw new Error(`id \`${id}\`が2つあります。同じidの定義は1つにしてください`);
+      throw new Error(`id \`${id}\`が2つあります。同じidの定義は1つにしてください。`);
     }
     seen.add(id);
     if (form.origin !== null) {
       if (seenOrigins.has(form.origin)) {
         // 同じ元ノードを2か所に置くと、後から書いた欄が両方に出て、キーも重なる。
-        throw new Error(`${form.origin + 1}件目の定義が2回送られました。更新してから編集し直してください`);
+        throw new Error(`${form.origin + 1}件目の定義が2回送られました。更新してから編集し直してください。`);
       }
       seenOrigins.add(form.origin);
     }

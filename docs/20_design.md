@@ -130,7 +130,7 @@ ccnavi は Claude Code の hook から呼ばれ、危ないツール呼び出し
 | 8 | [21_design/self-guard.md](21_design/self-guard.md) | ルールの外で守るコアファイル、止める側と戻す側 |
 | 9 | [21_design/tickets.md](21_design/tickets.md) | チケット制御を使うかどうかと、置き場・提案・承認・状態遷移・フェーズ・レビューなどの各節 |
 | 10 | [21_design/diagnostics.md](21_design/diagnostics.md) | 診断のオプションと機械可読な出力 |
-| 11 | [21_design/multi-repo.md](21_design/multi-repo.md) | ワークスペースとプロジェクトのレイヤー、置き場・ツリー・ルールの合成・守るもの・共通レイヤーの配布などの各節 |
+| 11 | [21_design/multi-repo.md](21_design/multi-repo.md) | ワークスペースとプロジェクトの設定、置き場・ツリー・ルールの合成・守るもの・共通設定の配布などの各節 |
 | 12 | [21_design/limits.md](21_design/limits.md) | 保証しないこと、許容する誤検知、未実装、最終防衛線 |
 | 13 | [21_design/messages.md](21_design/messages.md) | 拒否・促し・次の一手の文を条件から分けて置く文面ファイル。形式、置き場、識別子、差し込み、読み出し口、上書き、壊れたときの扱い、点検 |
 | モジュール構成 | [21_design/modules.md](21_design/modules.md) | 実行ファイル（`go/`）のパッケージ 7 まとまりと、その中の役割のまとまり。層の順 |

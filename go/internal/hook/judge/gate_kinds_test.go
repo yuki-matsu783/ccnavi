@@ -14,7 +14,7 @@ import (
 // 止める箇所の分類（承認済みの置き場と操作記録の置き場はどのモードでも止める）と、サブエージェントの役割の表。
 // 受入テストが hook を 1 件ずつ起こして見ていた組み合わせを、ここで全部見る。
 
-// emptyRulesWorkspace はルールを 1 本も持たない共通レイヤーだけのワークスペース。
+// emptyRulesWorkspace はルールを 1 本も持たない共通設定だけのワークスペース。
 func emptyRulesWorkspace(t *testing.T) string {
 	t.Helper()
 	root := testkit.TempRoot(t)

@@ -9,12 +9,12 @@
  * 一覧は実行ファイルの答え（`--explain --json`のtreesとlayers、`--lint --json`の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルのgitを読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
  * `.gitignore`の本文、プロジェクトになっていない`.git`の探索だけ。
- * そのルールファイルの場所はlayers（レイヤー）の答えを使い、`.ccnavi`から自分で組まない（組み方を実行ファイルとずらさない）。
+ * そのルールファイルの場所はlayers（設定の一覧）の答えを使い、`.ccnavi`から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * cloneは統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は`projects/<名前>/.git`
  * の出現を監視して拾う。拡張が書くのは、ユーザがボタンを押したときの`.gitignore`だけ。
  *
- * 共通レイヤーのミラー（各プロジェクトの`.ccnavi/config/common/`）のずれは、開いた時と5分ごと（`MIRROR_INTERVAL_MS`）に
+ * 共通設定のミラー（各プロジェクトの`.ccnavi/config/common/`）のずれは、開いた時と5分ごと（`MIRROR_INTERVAL_MS`）に
  * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は`ProjectsData`の`mirror`に載せる。
  * 処理の流れ:
  *
@@ -50,7 +50,7 @@ import { showLoading } from "./loading.js";
 import type { MirrorData, ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
-import { assertRetained, debounce, watchGlobs, workspaceFolder } from "./panel-common.js";
+import { assertRetained, debounce, resolveIn, watchGlobs, workspaceFolder } from "./panel-common.js";
 import { runInTerminal } from "./terminal.js";
 import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -62,7 +62,7 @@ const DEBOUNCE_MS = 300;
 const SCREEN = "projects";
 const TITLE = "ccnaviプロジェクト管理";
 /**
- * ミラーのずれを調べ直す間隔。ずれは共通レイヤーを直したときにしか生じず、急ぐものではない。
+ * ミラーのずれを調べ直す間隔。ずれは共通設定を直したときにしか生じず、急ぐものではない。
  * 1回ごとに実行ファイルを2度（`--version --json`と`user mirror --json`）起こすので、短くしすぎない
  */
 const MIRROR_INTERVAL_MS = 5 * 60 * 1000;
@@ -247,10 +247,6 @@ function isFile(filePath: string): boolean {
 
 function toPosix(p: string): string {
   return p.split(path.sep).join("/");
-}
-
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
 // ---- パネル
@@ -448,11 +444,11 @@ async function readMirror(root: string): Promise<MirrorStatus> {
 async function syncMirror(current: PanelState, names: readonly string[], expect: string): Promise<void> {
   if (current.syncing || current.seenSeq < current.syncSeq) {
     // 画面はボタンを押せなくしているので、来るのは押した直後の二度押しくらい。黙って破棄すると何も起きないように見えるので言う
-    void vscode.window.showInformationMessage("ミラーを同期しています。終わるまで待ってください");
+    void vscode.window.showInformationMessage("ミラーを同期しています。終わるまで待ってください。");
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "同期", "それでも同期する"))) {
     return;
   }
   if (state !== current) {
@@ -586,7 +582,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     const unknown = unknownSyncNames(current.mirror, message.names);
     if (unknown.length > 0) {
       // 画面が見せていない名前は、実行ファイルに渡さない。一覧を読み直して、もう一度押してもらう
-      void vscode.window.showWarningMessage(`同期の対象を確かめられませんでした: ${unknown.join("、")}。最新の状態に更新します`);
+      void vscode.window.showWarningMessage(`同期の対象（${unknown.join("、")}）が一覧に見つからないため、同期していません。一覧を最新の状態に更新します。`);
       void refreshMirror();
       return;
     }
@@ -608,7 +604,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   }
   const twin = duplicateOf(page.rows, remote.remote.key);
   if (twin !== undefined) {
-    fail(current, `同じリポジトリを${twin.name}として既にcloneしています（origin ${twin.origin}）`);
+    fail(current, `同じリポジトリを「${twin.name}」として既にcloneしています（origin ${twin.origin}）`);
     return;
   }
   const target = path.join(page.projectsDir, name.name);
@@ -619,7 +615,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   runInTerminal(root, cloneCommand(root, page.projectsDir, remote.remote.url, name.name));
   info(
     current,
-    `git cloneを「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます`,
+    `git cloneを「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます。`,
     "cloned",
   );
 }
@@ -633,7 +629,7 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
     fail(current, `.gitignoreに保存できません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignoreに「/${page.projectsRel}/」を追加しました。コミットは自分でしてください`);
+  info(current, `.gitignoreに「/${page.projectsRel}/」を追加しました。コミットは自分でしてください。`);
   void update();
 }
 

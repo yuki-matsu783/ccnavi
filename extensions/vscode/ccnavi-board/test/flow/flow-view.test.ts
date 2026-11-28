@@ -175,7 +175,7 @@ test("CB-T1287 「提案あり」は実行ファイルのflow.draft.differsの�
 test("CB-T294 依頼のボタンは着手の前で錠がないときだけ。フローがなければ作成、在れば直し、下書きが在れば頼み直す", () => {
   const open = { beforeStart: true, locked: false, flowExists: false, draftExists: false };
   assert.equal(requestLabel(open), "エージェントにフローの作成を頼む");
-  assert.equal(requestLabel({ ...open, flowExists: true }), "エージェントにフローの直しを頼む");
+  assert.equal(requestLabel({ ...open, flowExists: true }), "エージェントにフローの修正を頼む");
   assert.equal(requestLabel({ ...open, draftExists: true }), "エージェントにフローを頼み直す");
   assert.equal(requestLabel({ ...open, flowExists: true, draftExists: true }), "エージェントにフローを頼み直す");
   // 着手中・クローズした子（着手の前でない）・錠の確認中やリンク（錠が掛かっている）には出さない

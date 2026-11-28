@@ -282,7 +282,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを更新します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" data-tour="refresh" title="ファイルを読み込み直します" disabled={shownBusy || editing !== undefined} onClick={refresh}>
             更新
           </button>
         </div>
@@ -299,7 +299,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
         <>
         <p className="count" id="counts" data-tour="summary">
           {/* 指摘を1件ずつ数えた数。下の絞り込みの札はテンプレートの数なので、何を数えたかを書き分ける */}
-          指摘 {page.data.errors + page.data.warns + page.data.infos}件（<span>エラー{page.data.errors}件</span>・<span>警告{page.data.warns}件</span>・<span>情報{page.data.infos}件</span>）
+          指摘 {page.data.errors + page.data.warns + page.data.infos}件（<span>error{page.data.errors}件</span>・<span>warn{page.data.warns}件</span>・<span>info{page.data.infos}件</span>）
           <span className="hint"> 指摘を1件ずつ数えた数</span>
         </p>
         <section className="templates" data-tour="list">
@@ -321,16 +321,16 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 }}
               />{" "}
               <span className="hint">指摘のあるテンプレートの数:</span>{" "}
-              {severityButton("error", "エラー")}{" "}
-              {severityButton("warn", "警告")}{" "}
-              {severityButton("info", "情報")}
+              {severityButton("error", "error")}{" "}
+              {severityButton("warn", "warn")}{" "}
+              {severityButton("info", "info")}
             </div>
           )}
           {layer === undefined ? (
-            <p className="empty">この設定のテンプレートの置き場を、実行ファイルが返していません。</p>
+            <p className="empty">この設定のテンプレートのフォルダを取得できませんでした。「更新」を押してください。</p>
           ) : (
             <>
-              {!layer.exists && <p className="hint">置き場がありません</p>}
+              {!layer.exists && <p className="hint">テンプレートのフォルダがまだありません</p>}
               {layer.unreadable !== "" && <p className="status failed">読み込めません: {layer.unreadable}</p>}
               <Problems problems={layer.problems} />
               {editError !== "" && (
@@ -349,7 +349,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                     className="action small"
                     data-action="new-template"
                     disabled={!validNewTemplateName(newName) || templateNameTaken(page.data.layers, layer.name, newName) !== undefined}
-                    title={newName === "" || validNewTemplateName(newName) ? "このレイヤーに新しいテンプレートを作ります。保存するまでファイルは作りません" : NEW_TEMPLATE_NAME_RULE}
+                    title={newName === "" || validNewTemplateName(newName) ? "この設定に新しいテンプレートを作ります。保存するまでファイルは作りません。" : NEW_TEMPLATE_NAME_RULE}
                     onClick={() => startEdit({ type: "editNew", name: newName })}
                   >
                     追加
@@ -369,11 +369,11 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                 </p>
               )}
               {shownTemplates.length === 0 ? (
-                <p className="empty">{"テンプレートがありません。共通は.ccnavi/config/common/templates/、プロジェクトは.ccnavi/config/project/templates/の下に、ファイル名を<名前>.ymlにして置きます。"}</p>
+                <p className="empty">{"テンプレートがありません。共通設定は.ccnavi/config/common/templates/、プロジェクトの設定は.ccnavi/config/project/templates/の下に、ファイル名を<名前>.ymlにして置いてください。"}</p>
               ) : (
                 <>
                   <ul className="list">{listed.map((entry) => templateRow(entry))}</ul>
-                  {listed.length === 0 && <p className="empty">絞り込みに一致するテンプレートがありません。語か深刻度の絞り込みを外してください。</p>}
+                  {listed.length === 0 && <p className="empty">絞り込みにヒットするテンプレートがありません。語を変えるか、絞り込み欄を空にするか、深刻度の絞り込みを外してください。</p>}
                 </>
               )}
             </>

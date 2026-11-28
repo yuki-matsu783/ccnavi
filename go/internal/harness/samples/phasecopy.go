@@ -45,8 +45,8 @@ func Definitions(phasesYML string) []Definition {
 
 func textOf(k any) string { return fmt.Sprint(k) }
 
-// CombinedPhases は共通レイヤーとレイヤーの phases.yml を足した本文。同じ id は前のものを残す。
-// 判定は共通レイヤー + 親の project: が指すレイヤーの和を読むので、コピーもその和から取る。定義が 1 つも無ければ空。
+// CombinedPhases は共通設定とプロジェクトの設定の phases.yml を足した本文。同じ id は前のものを残す。
+// 判定は共通設定に親の project: が指す設定を足した統合結果を読むので、コピーもその統合結果から取る。定義が 1 つも無ければ空。
 func CombinedPhases(phasesYMLs ...string) string {
 	merged := &yaml.Map{}
 	for _, text := range phasesYMLs {

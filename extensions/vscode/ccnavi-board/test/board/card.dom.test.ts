@@ -349,7 +349,7 @@ test("CB-D707 注意の行は例外のときだけ短い言葉でカードに出
     assert.equal(rows("risk"), "リスクCRITICAL（90点）");
     // 普通のこと（LOW・MEDIUMのリスク、未送信0件）は注意に出さない。LOWはパネルの詳細にだけある
     assert.equal(page.all(`${card("calm")} .notes`).length, 0);
-    assert.deepEqual(notes("p"), ["未送信3件"]);
+    assert.deepEqual(notes("p"), ["未pushのコミット3件"]);
   } finally {
     await page.close();
   }
@@ -404,7 +404,7 @@ test("CB-D709 パネルの詳細は畳まない。MRは位置の下にある。i
     assert.equal(row("issue"), "#12");
     assert.equal(row("parent-mr"), "!7");
     assert.equal(row("branch"), "feature/x");
-    assert.equal(row("remote"), "未送信2件遅れ1件");
+    assert.equal(row("remote"), "未pushのコミット2件未取得のコミット1件");
     assert.equal(row("worktree"), "busy");
     assert.equal(row("phase-1"), "レビュー不要 · リスク: 0 (LOW)");
     assert.equal(row("phase-2"), "レビュー必須 · リスク: 60 (HIGH)");

@@ -291,7 +291,7 @@ export interface LayerFileJson {
 }
 
 /**
- * レイヤー（layer）1つ（共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
+ * 設定（layer）1つ（共通・ワークスペース・プロジェクトの設定のどれか）。拡張が使うのはルール・配点・フェーズ定義の
  * ファイルの場所と、読めなかった理由だけなので、それだけを読む。宣言の中身は読まない（統合結果の表示は`sums`から読む）。
  */
 export interface LayerJson {
@@ -308,10 +308,10 @@ export interface LayerJson {
 
 /** 統合結果に入ったルール1件（`sums[].rules`の`deny` / `ask` / `allow`の要素）。実行ファイルが出した値をそのまま持つ */
 export interface SumRuleJson {
-  /** レイヤー名付きのid（共通は裸、ほかは`<レイヤー>:<id>`） */
+  /** 設定の名前を付けたid（共通は裸、ほかは`<設定>:<id>`） */
   readonly id: string;
   readonly section: string;
-  /** どのレイヤーから来たか */
+  /** どの設定から来たか */
   readonly source: string;
   readonly match: string;
   /** 書いた形式（`glob` / `regex`）と、書いたままの式 */
@@ -344,17 +344,17 @@ export interface SumPhaseJson {
 }
 
 /**
- * 統合結果（`sums[]`）の1件。「共通の設定 + そのレイヤー」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
+ * 統合結果（`sums[]`）の1件。「共通設定 + その設定」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
  * 拡張はこれを足し直さず、そのまま見せる。順は ワークスペース（`self`）→ プロジェクト（名前順）。
- * パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した和ではない。
+ * パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した統合結果ではない。
  */
 export interface SumJson {
   /** `self` / プロジェクトの名前 */
   readonly name: string;
-  /** 足したレイヤー。`["common", <name>]` */
+  /** 足した設定。`["common", <name>]` */
   readonly layers: readonly string[];
   readonly rules: {
-    /** そのレイヤーのルールファイルの場所 */
+    /** その設定のルールファイルの場所 */
     readonly path: string;
     /** 読めなかった理由。空なら読めた（無いファイルは空として読めた扱い） */
     readonly unreadable: string;
@@ -373,8 +373,8 @@ export interface SumJson {
     readonly problems: readonly string[];
   };
   /**
-   * 共通の設定 + そのレイヤーの定義（判定に使う和）。`path`と`unreadable`はそのレイヤーのファイル。
-   * 各定義の`source`が出どころ（`common`かそのレイヤーの名前）
+   * 共通設定 + その設定のフェーズ定義（判定に使う和）。`path`と`unreadable`はその設定ファイル。
+   * 各定義の`source`が出どころ（`common`かその設定の名前）
    */
   readonly phases: {
     readonly path: string;
@@ -400,7 +400,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
+  /** 順序は 共通設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
   /** 順序は、ワークスペースの統合結果 → プロジェクトの統合結果（名前順） */
   readonly sums: readonly SumJson[];
@@ -442,7 +442,7 @@ export function parseBoardJson(text: string): ParseResult {
   if (version !== BOARD_VERSION) {
     return {
       ok: false,
-      error: `ccnavi --explain --jsonの版が違います（拡張は${BOARD_VERSION}、実行ファイルは${String(raw.version)}）`,
+      error: `ccnavi --explain --jsonの版が違います（拡張は${BOARD_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   const settings = isRecord(raw.settings) ? raw.settings : {};

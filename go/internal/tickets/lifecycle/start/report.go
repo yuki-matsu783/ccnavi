@@ -11,7 +11,7 @@ import (
 
 // ReportArgs は Report・DryRun の材料（ccnavi-start.sh が <名前>=<値> で渡す）。
 type ReportArgs struct {
-	// Repo は対象リポジトリ（ホストのパスか、読めなければ git のトップ）、Project はプロジェクトの名前（ワークスペース自身なら空）。
+	// Repo は対象リポジトリ（ホストのパスか、読めなければ git のトップ）、Project はプロジェクトの名前（ワークスペースなら空）。
 	Repo, Project                                                                   string
 	WT, Branch, MRURL, MRNumber, FF, Remote, SyncNote, Issue, Title, SyncNext, Real string
 	// HostUnseen はホストを見ずに続けた、SyncNoTicket は ccnavi-sync.sh が親チケットも提案も無いと答えた、SyncOK は取り込んだ。

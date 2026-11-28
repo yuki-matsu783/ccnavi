@@ -15,7 +15,7 @@ import (
 	"ccnavi/internal/policy/rules"
 )
 
-// 置き場はワークスペースルートの `.ccnavi/messages/*.yml` だけ。レイヤーごとの messages は読まない
+// 置き場はワークスペースルートの `.ccnavi/messages/*.yml` だけ。設定ごとの messages は読まない
 // （文だけを替える口は持たない）。
 const (
 	MessagesDir = "messages"

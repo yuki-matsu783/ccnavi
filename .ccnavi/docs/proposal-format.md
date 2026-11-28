@@ -95,7 +95,7 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 
 新しい親と子の提案の本文には、`ticket-sections.yml` が求める `## <見出し>` を書く。欠けると承認と `--lint` が warn で名指しし、Stop の判定も同じ見出しを求める。
 
-- 置き場は共通の `.ccnavi/config/common/ticket-sections.yml` と、親の `project:` が指すレイヤーの `.ccnavi/config/project/ticket-sections.yml`。レイヤーに `parent`（`child`）があれば、その種類はレイヤーの並びに置き換わる
+- 置き場は共通の `.ccnavi/config/common/ticket-sections.yml` と、親の `project:` が指すプロジェクトの設定の `.ccnavi/config/project/ticket-sections.yml`。そこに `parent`（`child`）があれば、その種類はそちらの並びに置き換わる
 - 既定の見出しは配布する共通の `ticket-sections.yml` に書いてある。親が `目的`・`範囲`・`対象外`・`完了の確かめ方`・`計画の理由`、子が `担当範囲`・`親の要求との対応`・`確認の手順`
 - 見出しの名前は大文字小文字を区別せずに探す。コードフェンスの中の見出しは数えない
 - ユーザの設定で、エージェントは書き換えない。見出しを変えたいときはユーザに頼む
@@ -157,8 +157,8 @@ allow:
 
 子には、担当のサブエージェントが作業中に読む手順書（フロー）を持たせられる。任意で、頼まれたときだけ書く。
 
-- 下書きは `wip/proposals/flows/<子の識別子>.yml` に置く。効力は無く、ユーザがボードのフロー編集画面で取り込んで保存したものだけが効く。効力のある場所（承認済みの領域の `flows/`）にエージェントは書けない
-- 形は YAML の 1 文書で、`id` `name` `version` `nodes` `connections` を持つ。ノードの種類と読む欄は、ボードのフロー編集画面で保存される形に合わせる。手で一から書かない
+- 下書きは `wip/proposals/flows/<子の識別子>.yml` に置く。効力はなく、ユーザがチケット管理画面のフロー編集画面で取り込んで保存したものだけが効く。効力のある場所（承認済みの領域の `flows/`）にエージェントは書けない
+- 形は YAML の 1 文書で、`id` `name` `version` `nodes` `connections` を持つ。ノードの種類と読む欄は、チケット管理画面のフロー編集画面で保存される形に合わせる。手で一から書かない
 - 渡す前に `sh .ccnavi/scripts/ccnavi-launcher.sh --lint --flow <パス>` で読めるかを確かめる
 
 ## 書いたあとに打つ検査
@@ -168,7 +168,7 @@ sh .ccnavi/scripts/ccnavi-launcher.sh --lint
 sh .ccnavi/scripts/ccnavi-ticket.sh approval-request <識別子> --check
 ```
 
-- `--lint` は提案と設定の形を検査する。`approval-request --check` は、何も送らずに、ユーザに承認を頼める状態かを確かめる。承認の画面と同じ規則で提案を調べ、承認の対象に入るかを見る。さらに、親のワークツリーの未コミットの変更と、ホストの API・git のリモートが使えるかも見る。本番の `approval-request` も同じ検査を送る前に通すため、`--check` が通れば本番も通る。`--agree --preview --verify` は、ユーザとボードが使う入口で、同じ検査の実装を共有する
+- `--lint` は提案と設定の形を検査する。`approval-request --check` は、何も送らずに、ユーザに承認を頼める状態かを確かめる。承認の画面と同じ規則で提案を調べ、承認の対象に入るかを見る。さらに、親のワークツリーの未コミットの変更と、ホストの API・git のリモートが使えるかも見る。本番の `approval-request` も同じ検査を送る前に通すため、`--check` が通れば本番も通る。`--agree --preview --verify` は、ユーザとチケット管理画面が使う入口で、同じ検査の実装を共有する
 - error が出たら直して、同じコマンドを打ち直す。「通る」（終了コード 0）は警告が無いという意味ではない。警告のうち、承認のあとに取り返せなくなるもの（提案を識別子と違う名前のワークツリーに書いた、など）は、承認を頼む前に直す
 - 通ったら `ccnavi-ticket.sh approval-request <識別子>` で親のブランチへ送り、ユーザに承認を頼む（[ticket-flow.md](ticket-flow.md)）。`approval-request` は、送る前に親の提案の計画の `after` の形と終端だけを検査し、誤りがあれば何も送らずに止まる
 - 空欄の目印の残り、`allow` と計画の型の `scope` が重ならない、`phases:` のコピーが `phases.yml` と食い違う、といった問題は、ここで名指しされる。出力の案内を読んで直す

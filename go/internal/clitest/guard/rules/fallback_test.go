@@ -11,13 +11,13 @@ import (
 // ルールファイルを読めないときの受入テスト。「ガードが機能しなくなったときの振る舞い」という独立した関心。
 //
 // ルールは `--rules` では渡さない（診断でだけ有効で、hook の判定には届かない）。読めないルールは `--root` の下の
-// 共通レイヤーに置く。コアファイルのバックアップと復元は切る（一時の木なのでリポジトリは汚さないが、見たいものは
+// 共通設定に置く。コアファイルのバックアップと復元は切る（一時の木なのでリポジトリは汚さないが、見たいものは
 // 組み込みの既定で、設定に依らない）。
 
 // YAML として不正である。閉じていないリスト 1 つ。書き損じの典型。
 const brokenRules = "version: 2\ndeny: [\n  - id: x\n"
 
-// brokenRoot は共通レイヤーのルールが読めないワークスペースと、そのルールのパス。
+// brokenRoot は共通設定のルールが読めないワークスペースと、そのルールのパス。
 func brokenRoot(t testing.TB) (root, broken string) {
 	t.Helper()
 	root = base.TempDir(t)
@@ -148,7 +148,7 @@ func TestTheDefaultsStopShellWritesInAnySpelling(t *testing.T) {
 
 func TestTheDefaultShellProtectionHitsAMovedPlace(t *testing.T) {
 	t.Parallel()
-	// 実行ファイルは設定で動く（ccnavi ディレクトリと共通レイヤーは固定）。既定の側だけ空の設定で組んでいると、動かした
+	// 実行ファイルは設定で動く（ccnavi ディレクトリと共通設定は固定）。既定の側だけ空の設定で組んでいると、動かした
 	// ワークスペースではルールファイルが不正になったときにだけそこへの書き込みが止まらない（issue #14）。
 	// 絶対パスは `/` で書いて引用する。bash は引用されない `\` を取り除くので、`\` の表記のまま埋め込むと行き先が変わる。
 	root, broken := brokenRoot(t)

@@ -16,7 +16,7 @@ import (
 	"ccnavi/internal/tickets/notice"
 )
 
-// 直接作業（ccnavi-worktree.sh で切るワークツリー）の記録の検査。見るのは、ワークスペース自身と各プロジェクトの
+// 直接作業（ccnavi-worktree.sh で切るワークツリー）の記録の検査。見るのは、ワークスペースと各プロジェクトの
 // ユーザのチェックアウトの git の共通ディレクトリ（ccnavi-direct/・ccnavi-integrate/）、refs/ccnavi/direct/、
 // 一時ワークツリーの置き場。git を起こすのは ref の一覧とブランチの有無だけ。
 

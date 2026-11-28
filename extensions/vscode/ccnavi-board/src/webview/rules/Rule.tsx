@@ -124,7 +124,7 @@ export function Rule(props: RuleProps): JSX.Element {
             {rule.when !== undefined ? (
               <>
                 <code className="sum-when">{condSummary(rule.when)}</code>
-                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">組み合わせ条件に誤り{condProblems(rule.when).length}</span>}
+                {condProblems(rule.when).length > 0 && <span className="sum-note sum-when-error">組み合わせ条件に誤り{condProblems(rule.when).length}件</span>}
               </>
             ) : rule.pattern === "" ? (
               <span className="dim">（{rule.kind}未設定）</span>
@@ -134,7 +134,7 @@ export function Rule(props: RuleProps): JSX.Element {
             {summaryNote(section, rule) !== "" && <span className="sum-note">{summaryNote(section, rule)}</span>}
             {rule.excepts !== undefined && rule.excepts.length > 0 && (
               <span className="sum-note sum-except" title={`except: ${rule.excepts.join(" / ")}`}>
-                除外{rule.excepts.length}
+                除外{rule.excepts.length}件
               </span>
             )}
           </span>
@@ -159,7 +159,7 @@ export function Rule(props: RuleProps): JSX.Element {
           </Picker>
         </Captioned>
         <Captioned name="タイプ" yamlKey="deny / ask / allow" tour={tour("type")}>
-          <select className="f-section" value={section} disabled={props.finding} title={props.finding ? moveTitle("上へ", true) : undefined} onChange={(event) => props.onMoveSection(event.target.value as Section)}>
+          <select className="f-section" value={section} disabled={props.finding} title={props.finding ? "絞り込み中はタイプを変更できません。絞り込み欄を空にしてください。" : undefined} onChange={(event) => props.onMoveSection(event.target.value as Section)}>
             {SECTIONS.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -186,7 +186,7 @@ export function Rule(props: RuleProps): JSX.Element {
                 data-action="to-when"
                 data-tour={tour("to-when")}
                 disabled={blocker !== undefined}
-                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換します。除外はnotの中へ移ります"}
+                title={blocker ?? "このパターン（と除外）を、同じ意味の組み合わせ条件（when）に変換します。除外はnotの中へ移ります。"}
                 onClick={() => props.onChange(toWhen(rule))}
               >
                 組み合わせ条件に変換
@@ -205,7 +205,7 @@ export function Rule(props: RuleProps): JSX.Element {
               ))}
               <span className="dim">
                 {rule.when !== undefined ? "組み合わせ条件" : "パターン"}にヒットした操作でも、除外にヒットしたものは対象から外れます。画面では編集できません。ルールファイルで直すか、
-                {rule.when !== undefined ? "組み合わせ条件のnotに移してください" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください"}
+                {rule.when !== undefined ? "組み合わせ条件のnotに移してください。" : "「組み合わせ条件に変換」で組み合わせ条件の中へ移してください。"}
               </span>
             </div>
           </Captioned>
@@ -314,7 +314,7 @@ function Picker({
       return;
     }
     if (!isToolName(name)) {
-      setAddError("英字で始まり、英数字・_・-だけの名前を入れてください");
+      setAddError("英字で始め、英数字・_・-だけを使った名前を入れてください");
       return;
     }
     setAddError("");

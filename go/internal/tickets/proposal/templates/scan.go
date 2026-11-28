@@ -63,7 +63,7 @@ func (e *Entry) drop(why dropped, detail string) {
 	e.dropped, e.droppedDetail = why, detail
 }
 
-// LayerRead は 1 つのレイヤーの置き場。problems は置き場そのものの苦情（読めない、.yml でないファイル）。
+// LayerRead は 1 つの設定の置き場。problems は置き場そのものの苦情（読めない、.yml でないファイル）。
 type LayerRead struct {
 	Name       string
 	directory  string
@@ -75,7 +75,7 @@ type LayerRead struct {
 	problems   []rules.Problem
 }
 
-// Scan は共通と各レイヤー（自身のレイヤーが先、プロジェクトは名前順）。Catalog はフローの検査の候補。
+// Scan は共通と各設定（ワークスペースの設定が先、プロジェクトは名前順）。Catalog はフローの検査の候補。
 type Scan struct {
 	root    string
 	common  *LayerRead
@@ -83,7 +83,7 @@ type Scan struct {
 	Catalog flow.Catalog
 }
 
-// layer は名前のレイヤー。無ければ nil。
+// layer は名前の設定。無ければ nil。
 func (s *Scan) layer(name string) *LayerRead {
 	for _, l := range s.layers {
 		if l.Name == name {
@@ -93,7 +93,7 @@ func (s *Scan) layer(name string) *LayerRead {
 	return nil
 }
 
-// All は共通レイヤーと、続くレイヤーの読み（この順）。
+// All は共通設定と、続く設定の読み（この順）。
 func (s *Scan) All() []*LayerRead { return append([]*LayerRead{s.common}, s.layers...) }
 
 // Relative は root からの相対（/ 区切り）。root の外なら path を / 区切りにしたもの。
@@ -159,7 +159,7 @@ func osReason(err error) string {
 	return "読めない (" + line(cmp.Or(fsio.StrError(err), "OSError")) + ")"
 }
 
-// ReadLayer はレイヤーの置き場の <名前>.yml を全部読む（名前順）。置き場が無いのは正常（空）。
+// ReadLayer は設定の置き場の <名前>.yml を全部読む（名前順）。置き場が無いのは正常（空）。
 func ReadLayer(layer, root, dir string, writable bool) *LayerRead {
 	l := &LayerRead{Name: layer, directory: dir, rel: Relative(root, dir), writable: writable}
 	before, err := os.Lstat(dir)
@@ -201,8 +201,8 @@ func (l *LayerRead) readEntries(root string, names []string) {
 	}
 }
 
-// merge は共通にレイヤーを足す。同名で全欄が同じならレイヤーの側を破棄して info、中身が違えば error で
-// レイヤーの側を使わない。共通の側が読めていないものは無いものとして扱う。苦情は返し、レイヤーの側の Notes にも足す。
+// merge は共通に設定を足す。同名で全欄が同じなら足した設定を破棄して info、中身が違えば error で
+// 足した設定を使わない。共通の側が読めていないものは無いものとして扱う。苦情は返し、その設定の Notes にも足す。
 func merge(common, extra *LayerRead) []rules.Problem {
 	base := map[string]*Entry{}
 	for _, e := range common.Entries {
@@ -255,14 +255,14 @@ func differing(a, b *Template) []string {
 	return out
 }
 
-// CommonWritable は共通レイヤーの置き場を書き換えてよいか。着手済みの親のワークツリーの中の共通レイヤーは
+// CommonWritable は共通設定の置き場を書き換えてよいか。着手済みの親のワークツリーの中の共通設定は
 // 同期が配ったミラーで、誰も編集しないので読み取り専用。
 func CommonWritable(conf *config.Settings, root string) bool {
 	where, ok := tree.TreeOf(root, root, conf.Projects)
 	return !ok || where.IsMain() || where.Project == ""
 }
 
-// TypesFor はそのレイヤーの検査に使うフェーズ定義（共通 + レイヤー）。共通は共通だけ。
+// TypesFor はその設定の検査に使うフェーズ定義（共通 + 設定）。共通は共通だけ。
 func TypesFor(conf *config.Settings, root, layer string) *phases.Types {
 	if layer == config.LayerCommon {
 		types, _ := phases.CommonTypes(conf)
@@ -286,8 +286,8 @@ func Recheck(e *Entry, types *phases.Types, cat *flow.Catalog) *Entry {
 	return &again
 }
 
-// Load は共通と全レイヤーのテンプレートを読んで検査する。各 Entry の検査はそのレイヤーのフェーズ定義で行い、
-// 統合結果の印はレイヤーの側に付く。読むのは設定の置き場だけで、承認済みチケットの置き場は読まない。
+// Load は共通と全設定のテンプレートを読んで検査する。各 Entry の検査はその設定のフェーズ定義で行い、
+// 統合結果の印は足した設定に付く。読むのは設定の置き場だけで、承認済みチケットの置き場は読まない。
 func Load(conf *config.Settings, root string) *Scan {
 	cat := flow.LoadCatalog(root)
 	common := ReadLayer(config.LayerCommon, root, conf.CommonTemplatesDir(root), CommonWritable(conf, root))
@@ -322,7 +322,7 @@ func (s *Scan) adopted(layer string) []*Entry {
 	return append(slices.Clone(s.common.Entries), view.Entries...)
 }
 
-// LayerProblem は苦情とそのレイヤー。
+// LayerProblem は苦情とその設定。
 type LayerProblem struct {
 	Layer   string
 	Problem rules.Problem

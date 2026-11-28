@@ -436,7 +436,7 @@
   "rules": []
  },
  {
-  "case": "ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める",
+  "case": "ワークツリー側の共通設定は_guard_ccnavi_config_が止める",
   "tool": "Edit",
   "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/rules.yml",
   "verdict": "deny",
@@ -448,7 +448,7 @@
   "code": "DENY_PATH"
  },
  {
-  "case": "ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める",
+  "case": "ワークツリー側の共通設定は_guard_ccnavi_config_が止める",
   "tool": "Edit",
   "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/phases.yml",
   "verdict": "deny",
@@ -460,7 +460,7 @@
   "code": "DENY_PATH"
  },
  {
-  "case": "ワークツリー側の共通レイヤーの設定は_guard_ccnavi_config_が止める",
+  "case": "ワークツリー側の共通設定は_guard_ccnavi_config_が止める",
   "tool": "Edit",
   "subject": "/repo/.claude/worktrees/x/.ccnavi/config/common/risks.yml",
   "verdict": "deny",
@@ -800,7 +800,7 @@
   "code": "DENY_TICKET_APPROVAL_CLI"
  },
  {
-  "case": "env_越しの承認のスクリプトは途中のレイヤーで止まる",
+  "case": "env_越しの承認のスクリプトは途中の設定で止まる",
   "tool": "Bash",
   "subject": "env sh .ccnavi/scripts/ccnavi-user-agree.sh",
   "verdict": "deny",

@@ -268,13 +268,13 @@ test("CB-T223 入れ子の階層はsubAgentとsubAgentFlowで1階層ずつ数え
   assert.deepEqual(flowNotices(single), []);
   // サブフロー（1階層）の中のsubAgent（2階層）。子の下2階層で、まだ上限の中
   assert.equal(nesting(nested(1)).depth, 2);
-  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("階層重なっています")));
+  assert.ok(!flowNotices(nested(1)).some((n) => n.includes("子チケットの担当の下に")));
   // もう1階層重ねると3階層。既定の上限（メインの下3階層、子は1階層目）を超える
   assert.equal(nesting(nested(2)).depth, 3);
-  const warned = flowNotices(nested(2)).find((n) => n.includes("階層重なっています"));
+  const warned = flowNotices(nested(2)).find((n) => n.includes("子チケットの担当の下に"));
   assert.ok(warned !== undefined);
-  assert.match(warned, /子の下に3階層重なっています/);
-  assert.match(warned, /メインの下3階層/);
+  assert.match(warned, /子チケットの担当の下に3階層あります/);
+  assert.match(warned, /メインのエージェントから数えて3階層/);
   assert.match(warned, /そのノードで止まってメインへ戻ります/);
   // 巡るサブフローは数えきれないと言う
   const loop = nested(2, true);
@@ -385,7 +385,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.deepEqual(absolutePosition(fresh.doc, "x"), { x: 700, y: 500 });
 });
 
-test("CB-T255 グループを解く・削除すると、中のノードは図の上の同じ位置で外へ出て残る。中のノードを削除してもグループは残る", () => {
+test("CB-T255 グループを解除（削除）すると、中のノードは図の上の同じ位置で外へ出て残る。中のノードを削除してもグループは残る", () => {
   const grouped = groupNodes(three(), ["a", "b"]);
   assert.ok(grouped !== undefined);
   for (const next of [ungroup(grouped.doc, "group-1"), removeNode(grouped.doc, "group-1")]) {

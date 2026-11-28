@@ -93,7 +93,7 @@ test("CX-T071 設定画面で PAT とリポジトリを登録する。PAT は画
   await page.fill("#repo-form [name=repo]", "widgets");
   await page.click("#repo-form button[type=submit]");
   await page.waitForSelector("#repo-list li");
-  assert.match((await page.textContent("#repo-list")) ?? "", /github\.com\/acme\/widgets（統合先 デフォルトブランチ・直近 7 日）/);
+  assert.match((await page.textContent("#repo-list")) ?? "", /github\.com\/acme\/widgets（統合先 デフォルトブランチ・検索期間 7 日）/);
   await page.fill("#token-value", TOKEN);
   await page.click("#token-form button[type=submit]");
   await page.waitForFunction(() => document.getElementById("token-list")?.textContent?.includes("登録済み"));
@@ -115,7 +115,7 @@ test("CX-T072 ボード: Worker の ccnavi（WASM）が CSP の下で起き、�
   assert.equal(await status.getAttribute("data-violations"), "0");
   console.log(`# ccnavi（WASM）起動 ${boot} ms・ボードが描けるまで ${took} ms`);
 
-  assert.match((await page.textContent("[data-testid=integration]")) ?? "", /^統合先: main（ホストのデフォルトブランチ）/);
+  assert.match((await page.textContent("[data-testid=integration]")) ?? "", /^統合先：main（ホストのデフォルトブランチ）/);
   const families = await page.locator("[data-family]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.family));
   assert.deepEqual(families, ["i0001", "i0002"]);
   assert.equal(await page.locator('[data-family="i0001"] [data-ticket="i0001"].entry').count(), 1);
@@ -213,7 +213,7 @@ test("CX-T078 PAT の期限: service worker が応答ヘッダ（CORS に公開�
   const page = await openBoard();
   const banner = page.locator('#banner [data-level="soon"]');
   assert.equal(await banner.count(), 1);
-  assert.match((await banner.textContent()) ?? "", /あと 3 日で切れます/);
+  assert.match((await banner.textContent()) ?? "", /あと 3 日で期限が切れます/);
   const [sw] = ctx.serviceWorkers();
   const badge = await sw.evaluate(() => (globalThis as unknown as { chrome: { action: { getBadgeText(d: object): Promise<string> } } }).chrome.action.getBadgeText({}));
   assert.equal(badge, "3d");
@@ -245,7 +245,7 @@ test("CX-T138 レビュー済み: スレッドの悪意のある本文を描い�
   assert.equal(await box.locator(".thread").count(), 8);
   assert.equal(await box.locator("script, img, svg, iframe, form, style, details, summary, font").count(), 0);
   const text = (await box.textContent()) ?? "";
-  for (const seen of ["畳んで隠した指摘", "〈HTML コメント: 隠したつもりの指摘〉", "hidden で隠した指摘", "白文字の指摘", "style で隠した指摘"]) {
+  for (const seen of ["畳んで隠した指摘", "〈HTML コメント：隠したつもりの指摘〉", "hidden で隠した指摘", "白文字の指摘", "style で隠した指摘"]) {
     assert.ok(text.includes(seen), seen);
   }
   for (const seen of ["畳んで隠した指摘", "hidden で隠した指摘", "style で隠した指摘"]) {
@@ -291,7 +291,7 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   await setup.selectOption("#token-host", "gitlab.e2e");
   await setup.fill("#token-value", TOKEN);
   await setup.click("#token-form button[type=submit]");
-  await setup.waitForFunction(() => document.getElementById("token-list")?.textContent?.includes("gitlab.e2e（GitLab）: 登録済み"));
+  await setup.waitForFunction(() => document.getElementById("token-list")?.textContent?.includes("gitlab.e2e（GitLab）：登録済み"));
   await setup.close();
 
   lab.branch("i0004", "main");

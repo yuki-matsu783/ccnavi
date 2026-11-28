@@ -21,7 +21,7 @@ export function kindLabel(kind: string): string {
 
 /** 防御の説明。何が防御か、なぜターミナルのみか（`docs/requirements/handoff.md`） */
 export const DEFENSE_NOTE =
-  "防御は、エージェントを止める仕組み（hookやラッパースクリプトなど）のファイルです。ボードから取り込むと防御を外せてしまうため、ユーザのターミナルで打って取り込みます。";
+  "防御は、エージェントを止める仕組み（hookやラッパースクリプトなど）のファイルです。この画面から取り込めると、エージェントが防御を外せてしまうため、ターミナルでコマンドを実行して取り込んでください。";
 
 /** 状態の言葉 */
 export function stateLabel(state: string): string {
@@ -33,7 +33,7 @@ export function stateLabel(state: string): string {
     case "unchanged":
       return "変更なし";
     case "rejected":
-      return "受け付けない";
+      return "取り込み不可";
     default:
       return state === "" ? "（状態なし）" : state;
   }

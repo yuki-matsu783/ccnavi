@@ -167,7 +167,7 @@ test("CB-T19d 相談のプロンプトは、親・フェーズ・MR・親のワ�
   assert.ok(text.includes("対応しない／このフェーズで直す／issueに回す"));
   // 確定の操作は禁じる。決めるのはユーザで、ボードの「レビュー完了」から
   assert.ok(text.includes("ccnavi-user-decide.sh、ccnavi-review.sh confirm、その他の状態を変える操作は実行しない"));
-  assert.ok(text.includes("ボードの「レビュー完了」から行う"));
+  assert.ok(text.includes("チケット管理画面の「レビュー完了」から行う"));
   // 実行してよい形として書いた行（'sh …' で囲んだもの）はpreviewとticket statusだけ
   const runnable = [...text.matchAll(/'(sh [^']+)'/g)].map((m) => m[1]);
   assert.deepEqual(runnable, [
@@ -201,8 +201,8 @@ test("CB-T19e マージ状況の引数と片付けのコマンド。mr-stateとs
   assert.equal(abandonCommand("/my ws", "i0001"), 'sh "/my ws/.ccnavi/scripts/ccnavi-launcher.sh" worktree retire --abandon i0001');
   // ダイアログはsyncが何をするかを先に言う
   const text = retireConfirmText("i0001");
-  assert.ok(text.startsWith("ccnavi-sync.sh i0001を実行します。"));
-  assert.ok(text.includes("リモートの取り込みも行い、MRがマージ済みかを確かめ直したうえで、条件を満たすものだけを片付けます"));
+  assert.ok(text.startsWith("ccnavi-sync.sh i0001をターミナルで実行します。"));
+  assert.ok(text.includes("リモートの変更を取り込み、MRがマージ済みかを確かめ直したうえで、条件を満たすワークツリーとブランチだけを片付けます"));
   assert.ok(text.includes("結果はターミナルで確認してください"));
 });
 
@@ -224,7 +224,7 @@ test("CB-T317 リスクの配点の差し替え: 共通は --risk、ワークス
   ]);
 });
 
-test("CB-T531 フェーズ定義の共通の差し替え: 共通の設定は --phases、ワークスペースとプロジェクトは --project-phases-fileの名前=", () => {
+test("CB-T531 フェーズ定義の共通の差し替え: 共通設定は --phases、ワークスペースとプロジェクトは --project-phases-fileの名前=", () => {
   assert.deepEqual(overrideArgs({ kind: "phases", path: "/tmp/p.yml" }), ["--phases", "/tmp/p.yml"]);
   assert.deepEqual(overrideArgs({ kind: "layerPhases", name: "self", path: "/tmp/p.yml" }), [
     "--project-phases-file",

@@ -223,7 +223,7 @@ function WorkflowHeadButton({ id }: { readonly id: string }): JSX.Element {
       className="card-button"
       data-action="workflow"
       data-ticket={id}
-      title="計画のステップどうしの順序を図で直す計画編集タブを開きます。保存すると提案内容が変更されるため、承認画面を開き直してください。"
+      title="計画編集タブを開きます。ステップの順序（どのステップが先行するか）を図で直せます。保存すると提案の内容が変わるので、承認画面を開き直してください。"
       onClick={() => post({ type: "workflow", ticket: id })}
     >
       計画編集

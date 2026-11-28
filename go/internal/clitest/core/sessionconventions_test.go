@@ -15,7 +15,7 @@ import (
 //
 //  1. 起動のたびに、ワークツリー・git の入口・下書きの置き場・サブエージェント・合意の要る変更が 1 行ずつ届く。
 //     git の入口は打てる絶対パスで、詳しいことは --help と拒否の案内に聞く形
-//  2. ワークツリーの行は `workspace-root` の deny がワークスペースのルール（共通レイヤーか自身のレイヤー）にあるときだけ載る。
+//  2. ワークツリーの行は `workspace-root` の deny がワークスペースのルール（共通設定かワークスペースの設定）にあるときだけ載る。
 //     ルールが読めず既定に戻ったときは載らない。git の行は、生の git を組み込みがいつも止めるので常に載る。
 //     文は、ラッパーがあれば打つ形を名指しし、無ければユーザに頼む形にする
 //  3. チケット制御が有効なときだけ、承認済みチケットの状態の確かめ方（`status`）が載る
@@ -138,7 +138,7 @@ func TestConventionsWorktreeLineNeedsTheWorkspaceRootDeny(t *testing.T) {
 	mustNotContain(t, "ask の id", text, worktreeLine)
 	mustContain(t, "ask の id", text, gitLine, "wip/handoff/") // ほかの行は残る
 
-	// ワークスペース自身のレイヤーの deny は数える。
+	// ワークスペースの設定の deny は数える。
 	e.writeOwnRules(map[string]any{"version": 1, "deny": []rule{conventionsWorkspaceRule}})
 	mustContain(t, "自身の deny", e.block(), worktreeLine)
 

@@ -6,7 +6,6 @@
  */
 import type { JSX } from "react";
 
-import { severityText } from "../../core/lint-summary.js";
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { MirrorData, ProjectRow, ProjectsMessage } from "../../core/projects-view.js";
 import { PathText } from "../shared/PathText.js";
@@ -27,8 +26,8 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
   const problems = row.problems;
   const flags = [
     row.doing > 0 ? { key: "doing", className: "badge doing", text: `進行中${row.doing}` } : undefined,
-    problems.some((p) => p.severity === "error") ? { key: "error", className: "badge error", text: severityText("error") } : undefined,
-    problems.some((p) => p.severity === "warn") ? { key: "warn", className: "badge warn", text: severityText("warn") } : undefined,
+    problems.some((p) => p.severity === "error") ? { key: "error", className: "badge error", text: "error" } : undefined,
+    problems.some((p) => p.severity === "warn") ? { key: "warn", className: "badge warn", text: "warn" } : undefined,
   ].filter((f) => f !== undefined);
   return (
     <li className={`project${problems.length > 0 ? " has-problem" : ""}`} data-name={row.name} data-tour={tour ? "project" : undefined}>
@@ -106,7 +105,7 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
 /** プロジェクトの設定のルールファイル。プロジェクトの設定として数えられていない（予約名）なら、置く先も出さない */
 function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesRel === "") {
-    return <span className="dim">設定の対象になっていません（検証のエラーを確認してください）</span>;
+    return <span className="dim">設定の対象になっていません（検証のerrorを確認してください）</span>;
   }
   if (row.rulesExists) {
     return (
@@ -127,7 +126,7 @@ function Problems({ problems }: { readonly problems: readonly LintProblem[] }): 
     <ul className="lint">
       {problems.map((p, index) => (
         <li key={`${p.severity}:${index}`} className={p.severity}>
-          {severityText(p.severity)}: {p.detail}
+          {p.severity}: {p.detail}
         </li>
       ))}
     </ul>

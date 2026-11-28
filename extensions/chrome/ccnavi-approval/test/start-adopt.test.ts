@@ -119,7 +119,7 @@ test("CX-T252 issue を閉じる開いた MR が 1 本あれば、その元ブ�
 
 test("CX-T253 採用の確認に引っかかったら、何も作らずに止める（open でない・フォーク・マージ先・保護されたブランチ・識別子・識別子の重なり・マージ済み）", async () => {
   const cases: [string, Partial<MockMr>, (m: MockGitHub) => void, RegExp][] = [
-    ["フォーク", { fork: true }, () => undefined, /フォークから出た MR/],
+    ["フォーク", { fork: true }, () => undefined, /フォークから作成された MR/],
     ["マージ先", { base: "develop" }, () => undefined, /マージ先が develop で、統合先 main ではありません/],
     ["保護されたブランチ", { branch: "release/1.0" }, () => undefined, /採用できません/],
     ["識別子が長い", { branch: `feature/${"a".repeat(60)}` }, () => undefined, /識別子 .* は指定できません/],
@@ -154,7 +154,7 @@ test("CX-T254 issue を閉じる開いた MR が複数あれば、何も作ら�
     withMr(mock, { number: 6, branch: "fix/20-other", title: "別の #20" });
     const out = await start(mock, host);
     assert.equal(out.kind, "refused", host);
-    assert.match(message(out), /オープン状態のマージリクエストが 2 本あります（!5 feature\/20-login、!6 fix\/20-other）/, host);
+    assert.match(message(out), /オープン状態のマージリクエストが 2 件あります（!5 feature\/20-login、!6 fix\/20-other）/, host);
     assert.equal(mock.createdBranches.length + mock.createdMrs.length, 0, host);
   }
 });
@@ -189,7 +189,7 @@ test("CX-T256 書く操作（startCommit・createDraftMr）の保護: ボード�
     ["startCommit", ["acme", "widgets", "feature-20-x", head], OPTIONS, /ボードからのみ/],
     ["startCommit", ["acme", "other", "feature-20-x", head], BOARD, /登録されていない/],
     ["startCommit", ["acme", "widgets", "main", head], BOARD, /issue から作る/],
-    ["startCommit", ["acme", "widgets", "feature-20-x", "f".repeat(40)], BOARD, /動いているため/],
+    ["startCommit", ["acme", "widgets", "feature-20-x", "f".repeat(40)], BOARD, /更新されているため/],
     ["createDraftMr", ["acme", "widgets", "feature-20-x", "main", "タイトル", "Closes #20"], OPTIONS, /ボードからのみ/],
     ["createDraftMr", ["acme", "other", "feature-20-x", "main", "タイトル", "Closes #20"], BOARD, /登録されていない/],
     ["createDraftMr", ["acme", "widgets", "main", "main", "タイトル", "Closes #20"], BOARD, /issue から作る/],

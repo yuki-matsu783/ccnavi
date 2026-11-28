@@ -145,7 +145,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
           setChecked({ key: asked.current.key, ids: asked.current.ids, check: message.check as TemplateCheck });
           setCheckError("");
         } else {
-          setCheckError(String(message.error ?? "実行ファイルで検査できませんでした"));
+          setCheckError(String(message.error ?? "ccnaviで検査できませんでした"));
         }
       } else if (message.type === "editLock") {
         setLock(message.lock as Lock);
@@ -226,7 +226,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
     update(next, typing);
     const gone = tpl.plan.map((item, i) => ({ item, index: i + 1 })).filter(({ item, index }) => tpl.flows[String(index)] !== undefined && !next.plan.some((n) => n.id === item.id));
     if (gone.length > 0) {
-      setStatus({ text: `${gone.map((g) => g.index).join(", ")}番のステップと一緒に、子のフローを消しました。戻すときは「元に戻す」を押してください`, error: false });
+      setStatus({ text: `${gone.map((g) => g.index).join(", ")}番のステップと一緒に、子のフローを消しました。戻すときは「元に戻す」を押してください。`, error: false });
     }
   };
   const travel = (moved: { readonly history: FlowHistory<EditTemplate>; readonly doc: EditTemplate } | undefined): void => {
@@ -351,7 +351,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
       )}
       {checkError !== "" && (
         <p className="status failed" data-role="check-error">
-          実行ファイルで検査できません: {checkError}
+          ccnaviで検査できません: {checkError}
         </p>
       )}
       <label className="field">
@@ -359,7 +359,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
         <textarea className="f-description" rows={2} value={tpl.description} onChange={(event) => update(setMeta(tpl, { description: event.target.value }), "meta:description")} onBlur={() => setHistory(seal)} />
       </label>
       <label className="field">
-        <span className="dim">使う場面（when。選ぶ手がかり。省略できます）</span>
+        <span className="dim">使う場面（when。テンプレートを選ぶ手がかりになります。省略できます）</span>
         <input type="text" className="f-when" value={tpl.when} onChange={(event) => update(setMeta(tpl, { when: event.target.value }), "meta:when")} onBlur={() => setHistory(seal)} />
       </label>
       <Problems problems={created && !touched ? checked.check.problems.filter((p) => p.severity !== "error") : checked.check.problems} />
@@ -376,7 +376,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
             return (
               <li key={index} className={`row${open ? " open" : ""}`} data-index={index} data-picked={item.id === picked ? "1" : "0"}>
                 <div className="row-head">
-                  <span className="tpl-flow-heading">{`${index}:${typeTitle(item.type)} のフロー`}</span>
+                  <span className="tpl-flow-heading">{`${index}番（${typeTitle(item.type)}）のフロー`}</span>
                   <span className="dim">{doc === undefined ? "フローなし" : `フロー: ${typeof doc.name === "string" && doc.name !== "" ? doc.name : "（名前なし）"}`}</span>
                   {doc === undefined ? (
                     <button type="button" className="action small" data-action="add-flow" onClick={() => addFlow(index)}>

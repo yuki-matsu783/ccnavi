@@ -10,7 +10,7 @@
 //
 // 上の層が直書きしがちな名前もここに置く。sh の名前は ReviewWrapper・StartWrapper・WorktreeWrapper・StageWrapper・
 // LauncherScript、Artifact のツール名は ToolArtifact、dry-run の報告の頭（`[ccnavi dry-run] enable would have …`）は
-// DryRunWould、`logs/direct-tmp` は DirectTmpDir。common 層の置き場は Settings.CommonLayerDir、
+// DryRunWould、`logs/direct-tmp` は DirectTmpDir。共通設定の置き場は Settings.CommonLayerDir、
 // 秒数や整数の設定値の読みは Tunable.Value（time.Duration）と Int・Finite、
 // 止める側に倒す判定は FailClosedEvent・FailClosed。
 package config

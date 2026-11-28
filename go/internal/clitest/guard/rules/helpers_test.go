@@ -58,7 +58,7 @@ func jsonText(t testing.TB, v any) string {
 	return string(b)
 }
 
-// withRules は tests/fixtures の見本のルールを共通レイヤーに据えた、テストごとの作業場所。
+// withRules は tests/fixtures の見本のルールを共通設定に据えた、テストごとの作業場所。
 // base.FixtureWorkspace は読むだけの共有の木なので、記録を読むテストは並行するテストと取り合わないようこちらを使う。
 func withRules(t testing.TB, fixture string) string {
 	t.Helper()
@@ -67,7 +67,7 @@ func withRules(t testing.TB, fixture string) string {
 	return root
 }
 
-// withRuleText はルールの本文を置いた作業場所（共通レイヤーの rules.yml）。
+// withRuleText はルールの本文を置いた作業場所（共通設定の rules.yml）。
 func withRuleText(t testing.TB, text string) string {
 	t.Helper()
 	root := base.TempDir(t)

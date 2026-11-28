@@ -105,7 +105,7 @@ export function CardItem({
       </div>
       {card.isParent && card.stage !== "" ? <div className="stage">{card.stage}</div> : null}
       {moved !== undefined ? (
-        <div className="moved-mark" data-tour="moved" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります">
+        <div className="moved-mark" data-tour="moved" title="前回の更新から列が変わりました。この表示は、次にどれかのカードの列が変わるまで残ります。">
           {movedLabel(moved)}
         </div>
       ) : null}
@@ -197,7 +197,7 @@ export function ReviewDoneButton({ action, tour = false }: { readonly action: Re
       data-tour={tour ? "review-done" : undefined}
       data-parent={action.parent}
       data-phase={action.phase}
-      title="レビューを終えたことを記録します。未解決の指摘を読み、無ければレビュー済みにします。あれば対応方針を決めます"
+      title="レビューを終えたことを記録します。未解決の指摘を読み込んで表示します。無ければレビュー済みにでき、あれば対応方針を決められます。"
       onClick={() => post({ type: "decide", parent: action.parent, phase: action.phase })}
     >
       レビュー完了
@@ -214,7 +214,7 @@ export function ApproveButton({ id, tour = false }: { readonly id: string; reado
       data-action="approve-one"
       data-tour={tour ? "approve-one" : undefined}
       data-ticket={id}
-      title={`このチケットだけを承認します（ccnavi user agree ${id}）。まとめて承認するなら上部のボタンを使ってください`}
+      title={`このチケットだけを承認します（ccnavi user agree ${id}）。まとめて承認するなら上部のボタンを使ってください。`}
       onClick={() => post({ type: "approve", tickets: [id], filtered: true })}
     >
       承認
