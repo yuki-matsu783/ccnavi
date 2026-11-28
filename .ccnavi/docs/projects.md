@@ -14,7 +14,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 
 - プロジェクトで作業するときは、`cd projects/<名前>`してから`ccnavi-git.sh`を実行する。gitの操作はそのリポジトリに対して行われる
 - チケットは`project:`キーを持つ。値は`projects/`の下の名前で、ユーザが承認するときに決まる。エージェントが申告した値は判定に使われない
-- プロジェクトのissueから始める親の識別子は`feature-<番号>-<プロジェクト名>-<slug>`にする。issueの番号はリポジトリごとなので、slugの頭のプロジェクト名でワークスペースのissueと名前を分ける。識別子の一般の決まりは[worktree-start.md](worktree-start.md)と[worktree.md](worktree.md)
+- プロジェクトのissueから始める親の識別子は`feature-<番号>-<プロジェクト名>-<slug>`にする。issueの番号はリポジトリごとなので、slugの頭のプロジェクト名でワークスペースのissueと名前を分ける。`ccnavi-start.sh --slug <語>`でも、プロジェクト名は実行ファイルが付けるので、語には含めない。識別子の一般の決まりは[worktree-start.md](worktree-start.md)と[worktree.md](worktree.md)
 
 ## 何がどこに置かれるか
 

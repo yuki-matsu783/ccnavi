@@ -97,6 +97,7 @@ func newParser() *argparse.Parser {
 	str("--body-file")
 	str("--reason")
 	str("--title")
+	str("--slug")
 	str("--plan")
 	none("--issue")
 	integer("--mr")

@@ -124,7 +124,7 @@ func TestIDsMatchGolden(t *testing.T) {
 	got.Warning = append(got.Warning, DirectNameWarning("x", p, "/ws"))
 	got.Serial = []int{NextSerial(idsNames, p, true), NextSerial(idsNames, p, false)}
 	for _, a := range idsIssues {
-		ident, short, err := IssueIdentifier(a[0].(int), a[1].(string), a[2].(string), a[3].(string))
+		ident, short, err := IssueIdentifier(a[0].(int), a[1].(string), "", a[2].(string), a[3].(string))
 		msg := ""
 		if err != nil {
 			msg = err.Error()
@@ -162,6 +162,18 @@ func TestIsIntegration(t *testing.T) {
 	} {
 		if got := IsIntegration(c.name, c.integration); got != c.want {
 			t.Errorf("IsIntegration(%q, %q) = %v, want %v", c.name, c.integration, got, c.want)
+		}
+	}
+}
+
+func TestIssueIdentifierWithSlugKeepsTheWordAndAddsTheProject(t *testing.T) {
+	for _, c := range []struct{ project, want string }{
+		{"", "feature-5-login-fix"},
+		{"web", "feature-5-web-login-fix"},
+	} {
+		got, short, err := IssueIdentifier(5, "無視されるタイトル", "login-fix", c.project, "feature")
+		if err != nil || short || got != c.want {
+			t.Errorf("project=%q: %q %v %v", c.project, got, short, err)
 		}
 	}
 }

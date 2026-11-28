@@ -742,7 +742,7 @@ func opStart(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	}
 	// 識別子の候補を決め、使えない理由（名前の形・クローズ済み・大文字小文字だけが違うブランチ・
 	// 未クローズの同じ識別子・互換の版）を集める。1 つでもあれば手動の指定へ案内する。
-	ident, _, err := ids.IssueIdentifier(number, title, s.project, prefix)
+	ident, _, err := ids.IssueIdentifier(number, title, "", s.project, prefix)
 	if err != nil {
 		return nil, refused(err.Error())
 	}

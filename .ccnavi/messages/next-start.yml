@@ -131,12 +131,6 @@ messages:
     note: |-
       名前はワークツリーのパス・子の識別子・ログのパスに何度も出るので、短く保つ。--slug は小文字・数字・ハイフンだけ（日本語は使えない）
 
-  NOTE_START_SLUG_PROJECT:
-    kind: note
-    values: [project]
-    note: |-
-      プロジェクト {project} の issue なので、--slug の語は {project}- から始める（issue の番号はリポジトリごとなので、名前を分ける）。長さは 48 文字に収める
-
   NEXT_START_LONG_SLUG:
     kind: next
     values: [real_args_q]
