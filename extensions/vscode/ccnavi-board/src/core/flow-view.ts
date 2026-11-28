@@ -170,12 +170,19 @@ export function flowRequestPrompt(request: FlowRequest): string {
   return lines.join("\n");
 }
 
-/** 「提案あり」。下書きが在り、中身がいまのフローと違う（`sameFlowIgnoringLayout`が偽）か、読めない */
+/**
+ * 「提案あり」。下書きが在り、読めないか中身がいまのフローと違う。判定は実行ファイルの`tickets[].flow.draft.differs`で、
+ * 画面は見比べない。読めない理由は、開いたときに言う
+ */
 export interface FlowOffer {
   /** 下書きのファイル（ワークスペースルートからの相対で見せる。外なら絶対） */
   readonly draftPath: string;
-  /** 読めない理由（リンク・ハードリンク・YAMLとして読めない など）。読めれば無い */
-  readonly problem?: string;
+}
+
+/** 「提案あり」を出すか。実行ファイルの`differs`のまま。`shown`は下書きのパスを見せる形に直す関数 */
+export function flowOfferOf(target: FlowTarget, shown: (filePath: string) => string): FlowOffer | undefined {
+  const draft = target.flow.draft;
+  return draft !== null && draft.differs ? { draftPath: shown(draft.path) } : undefined;
 }
 
 /** 開いた下書き。実行ファイルの`--lint --flow`が通り、画面の読みとも食い違わなかった中身 */

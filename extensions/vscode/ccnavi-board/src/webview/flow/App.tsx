@@ -695,7 +695,6 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         <div id="offer" data-tour="offer" className="banner missing" role="status">
           <span>
             提案あり: エージェントの下書き（{shownOffer.draftPath}）が、いまのフローと違います。
-            {shownOffer.problem !== undefined && <span className="dim">（読み込めません: {shownOffer.problem}）</span>}
           </span>
           <button type="button" className="action" data-action="open-proposal" disabled={shownBusy} onClick={openProposal}>
             提案を見る

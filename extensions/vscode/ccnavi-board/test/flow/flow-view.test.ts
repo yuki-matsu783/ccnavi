@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildBoard, flowCardOf } from "../../src/core/board.js";
 import { bareFlow } from "../helpers/flow.js";
-import { asFlowMessage, flowButtonLabel, flowRequestPrompt, flowTargetOf, flowTicketOf, lockFromFailure, requestLabel } from "../../src/core/flow-view.js";
+import { asFlowMessage, flowButtonLabel, flowOfferOf, flowRequestPrompt, flowTargetOf, flowTicketOf, lockFromFailure, requestLabel } from "../../src/core/flow-view.js";
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture, fixtureText } from "../helpers/fixture.js";
 
@@ -151,6 +151,25 @@ test("CB-T293 下書きの置き場は実行ファイルのflow.draftのコピ�
     linked: false,
     differs: false,
   });
+});
+
+test("CB-T1287 「提案あり」は実行ファイルのflow.draft.differsのまま出す。画面は下書きを読んで見比べない", () => {
+  const board = fixture();
+  const withDraft = (differs: boolean): BoardJson => ({
+    ...board,
+    tickets: board.tickets.map((t) =>
+      t.ticket === "i0001-02-03" && t.flow !== null && t.flow.draft !== null ? { ...t, flow: { ...t.flow, draft: { ...t.flow.draft, exists: true, differs } } } : t,
+    ),
+  });
+  const target = (json: BoardJson) => {
+    const found = flowTargetOf(json, "i0001-02-03");
+    assert.ok(found.ok);
+    return found.target;
+  };
+  const shown = (filePath: string): string => filePath.replace("<root>/", "");
+  assert.deepEqual(flowOfferOf(target(withDraft(true)), shown), { draftPath: ".claude/worktrees/i0001/wip/proposals/flows/i0001-02-03.yml" });
+  assert.equal(flowOfferOf(target(withDraft(false)), shown), undefined);
+  assert.equal(flowOfferOf(target(board), shown), undefined);
 });
 
 test("CB-T294 依頼のボタンは着手の前で錠がないときだけ。フローがなければ作成、在れば直し、下書きが在れば頼み直す", () => {
