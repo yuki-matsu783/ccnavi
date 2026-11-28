@@ -29,6 +29,7 @@ src/
   prompt-handover.ts  Claude Code に文を渡す経路（コピー / 新しいセッションで開く / 専用ターミナルで claude -p を実行）。ボードとフロー編集画面が使う（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信。作った直後はシェル統合が立ち上がるのを待って送る（vscode に依存する）
+  layer-memory.ts     設定の 4 画面で最後に選んだレイヤーを workspaceState に覚え、開くときのレイヤーを拡張全体の答えから決める（決め方は core/targets.ts の openingLayer）（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）。左パネルの案内（package.json の walkthroughs。本文は media/tour/）を、拡張の版が変わった最初の起動と、パネルのタイトルバーの ? で開き、プロジェクト管理 → チケット管理の基本の案内を続けて動かす（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / user agree --yes … --json / --templates --json / --templates --show <名前> --json / user handoff [<パス>…] --json（取り込み先行の一覧。見るだけ）と user handoff <パス…> --yes --expect --via board --json（取り込み）/ --templates --draft <親> --json（ボードの親のカードの「テンプレートの下書きを作る」）/ --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起動する（origin を読む。Node の子プロセス）
@@ -96,7 +97,7 @@ src/
     load-failure.ts   設定を読めなかった失敗（LoadFailure）。読めなかったファイルのパスを持ち、エラー画面の［エディタで開く］に使う
     mode-banner.ts    動作モード（dry-run・disable）の帯の文。ルール管理とチケット管理の画面が共通で使う（enable と空は出さない）
     workspace-folder.ts 画面の対象にするフォルダの案内の文（フォルダが無いとき・複数のとき。対象は最初のフォルダ）
-    targets.ts        ルール管理・リスク管理・フェーズ管理・テンプレート管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。4 画面とも同じ 3 種）の一覧と、欄の値
+    targets.ts        ルール管理・リスク管理・フェーズ管理・テンプレート管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。4 画面とも同じ 3 種）の一覧と、欄の値。開くときのレイヤー（覚えた最後の選択が選択肢にあればそれ、無ければ画面の既定と 1 行の知らせ）を決める openingLayer
     sums.ts           ルール管理とリスク管理の統合結果（読み取り専用）の表示用の形。ボードの JSON の sums[] を並べ直すだけで、足し直さない
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin のキー、clone の行、プロジェクトになっていない .git の探索、.gitignore の行の有無と追記、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
@@ -225,6 +226,7 @@ src/
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
     shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
+    shared/EditorBar.tsx 図の編集（フロー編集・計画編集・テンプレート管理の編集欄）の上部の並び。「対象の名前 → 状態 → 元に戻す・やり直す → 補助の操作 → 主ボタン」の順をここ 1 か所で決める（CSS は EditorBar.css）
     shared/StatusLine.tsx 直前の操作の一言の行（ScreenHeader の status に渡すと、貼り付くツールバーの最後の行に出る。error は赤）
     shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク管理が置く。直前の 1 行だけ覚える。元に戻す履歴を持つフェーズ管理・フロー編集・テンプレートの編集は置かない）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
@@ -239,18 +241,18 @@ src/
     flow/Preview.tsx  担当に渡る手順のプレビュー（実行ファイルが並べた行をそのまま出す）
     flow/text.ts      ノードの目印（メインに戻る・入れ子）と 1 行の要約
     rules/style.css   ルール管理画面の CSS の入口
-    rules/App.css     App.tsx の CSS（タブ・節・判定の欄・判定を試す・hook の 2 つのタブが共有する表）
+    rules/App.css     App.tsx の CSS（タブと右の判定を試す欄の並び・節・判定の欄・判定を試す欄と hook のタブが共有する表。940px 以下は欄をタブの上に積んで畳める）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
     rules/When.css    When.tsx の CSS（組み合わせ条件の図。React Flow の色を --vscode-* に置き換える）
     rules/Judge.css   Judge.tsx の CSS（判定の結果）
     rules/post.ts     ルール管理の送り口。契約に無いものは型で止まる
     rules/main.tsx    ルール管理画面の入口。埋め込みの JSON を読んでマウントする
-    rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
+    rules/App.tsx     帯・ツールバー・2 つのタブ（ルール・hook）と右の常設の「判定を試す」欄、拡張ホストからのメッセージの受け
     rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄。「組み合わせ条件に変換」）
     rules/When.tsx    組み合わせ条件（when）の図（React Flow）と、選んだノードの操作の欄・誤りの一覧
     rules/Judge.tsx   判定の結果とサンプルの一括判定の表。実行ファイルが返した判定を読むだけ
     rules/Hooks.tsx   hook の一覧（表示するだけ）
-    rules/state.ts    編集中のルール（行ごとのキー）・開いている行（id で保持する）・開いているタブ
+    rules/state.ts    編集中のルール（行ごとのキー）・開いている行（id で保持する）・開いているタブ・判定を試す欄を畳んだか
     rules/text.ts     要約の文・絞り込みが適用する文字列・件数の出し方
 media/
   icon.svg            アクティビティバーのアイコン
