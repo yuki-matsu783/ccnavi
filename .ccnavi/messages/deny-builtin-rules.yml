@@ -101,8 +101,6 @@ messages:
         変更が必要な理由を伝えてユーザに依頼する。直すときは '{script:ccnavi-stage.sh} <元のパス>' で wip/handoff/ に写し（cp で写すと止まる）、写しを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む。テスト用のフィクスチャは wip/handoff/ の下に作る
       noroot: |-
         変更が必要な理由を伝えてユーザに依頼する。直すときは ccnavi-stage.sh で wip/handoff/ に写し（cp で写すと止まる）、写しを直して、ユーザに ccnavi-user-handoff.sh での取り込みを頼む。テスト用のフィクスチャは wip/handoff/ の下に作る
-    no_bypass: |-
-      保護された場所そのものは、Python など別の手段でも書き換えないでください。
     note: |-
       読むだけなら cat や grep はそのまま通ります。
 
@@ -269,10 +267,9 @@ messages:
       承認はユーザが VS Code のチケット管理画面・Chrome の承認ボード・'{script:ccnavi-user-agree.sh}'・置き場のファイルの移動のどれかで行います。残った指摘の対応方針はユーザが VS Code のチケット管理画面かターミナルで決めます。承認済みチケットのコミットと push（'{script:ccnavi-user-push-approved.sh}'）は、チケット管理画面で承認するとターミナルで実行され、エージェントは実行しません。
     next: |-
       状態の移動とレビューは '{script:ccnavi-ticket.sh}' と '{script:ccnavi-review.sh}' を使う。承認が済んだかどうかは '{script:ccnavi-ticket.sh} status' で確かめ、置き場のファイルを自分で探さず、承認を頼み直す前に status を実行する
-    no_bypass: |-
-      ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・handoff・mirror）にまとめてあり、エージェントは実行しません。
     note: |-
-      放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、ユーザの判断の入口（'{script:ccnavi-user-close-early.sh}'）もユーザが実行します。
-      保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通設定のミラーと工程スキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
-      親をクローズしたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです（案内されたコマンドをユーザに見せて、打ってもらってください）。
+      ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・handoff・mirror）で、エージェントは実行しません。
+      放棄した親の記録を消す 'ccnavi worktree retire --abandon <親>' もユーザが実行します。
+      下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、設定のミラーとスキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
+      親のクローズ後の片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が呼びます。残ったブランチは、案内のコマンドを先頭に ! を付けてユーザに打ってもらいます。
       下書きは '{script:ccnavi-stage.sh} --commands <パス>'、承認先行の一覧は '{script:ccnavi-launcher.sh} --agree --preview' なら通ります。

@@ -28,20 +28,19 @@ const (
 	kindNote    kind = "note"
 	// kindNotice は止めない通知。見出しと状態の行はコードに残し、文面ファイルには本文だけを書く。
 	kindNotice kind = "notice"
-	// kindError は読み手に届くエラーの文。拒否から no_bypass を除いた形で、境界が SayFault で引く。
+	// kindError は読み手に届くエラーの文。拒否と同じ欄を持ち、境界が SayFault で引く。
 	kindError kind = "error"
 )
 
 // 欄の名前。
 const (
-	fieldWhat     = "what"
-	fieldWhy      = "why"
-	fieldNext     = "next"
-	fieldNoBypass = "no_bypass"
-	fieldNote     = "note"
-	fieldItems    = "items"
-	keyKind       = "kind"
-	keyValues     = "values"
+	fieldWhat  = "what"
+	fieldWhy   = "why"
+	fieldNext  = "next"
+	fieldNote  = "note"
+	fieldItems = "items"
+	keyKind    = "kind"
+	keyValues  = "values"
 )
 
 // fields は種類ごとの（必須の欄, 任意の欄）。並びは出力の行の順。
@@ -51,8 +50,8 @@ type fields struct {
 }
 
 var kindFields = map[kind]fields{
-	kindDeny:    {[]string{fieldWhat, fieldWhy, fieldNext, fieldNoBypass}, []string{fieldNote}},
-	kindNudge:   {[]string{fieldWhat, fieldNext}, []string{fieldWhy, fieldNoBypass, fieldNote}},
+	kindDeny:    {[]string{fieldWhat, fieldWhy, fieldNext}, []string{fieldNote}},
+	kindNudge:   {[]string{fieldWhat, fieldNext}, []string{fieldWhy, fieldNote}},
 	kindNext:    {[]string{fieldNext}, []string{fieldNote}},
 	kindChoices: {[]string{fieldItems}, nil},
 	kindNote:    {[]string{fieldNote}, nil},
@@ -65,7 +64,7 @@ var kindOrder = []kind{kindDeny, kindNudge, kindNext, kindChoices, kindNote, kin
 
 // ruleLooseFields は `RULE_` の文（組み込みルールの文）の欄。what だけが必須で、言うことが無い欄は作り足さない。
 // ruleAsk とその場合は、記録の code と同じ識別子を持ち、ほかの拒否と同じ 4 欄を必ず持つ。
-var ruleLooseFields = fields{[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNoBypass, fieldNote}}
+var ruleLooseFields = fields{[]string{fieldWhat}, []string{fieldWhy, fieldNext, fieldNote}}
 
 const (
 	// rulePrefix は組み込みルールの文の識別子の頭。
@@ -85,14 +84,13 @@ var prefixes = []struct {
 
 // 出力で欄の前に付ける語。what と items には付けない（items は番号を付ける）。
 const (
-	whyLabel      = "なぜ: "
-	NextLabel     = "次: "
-	noBypassLabel = "迂回しない: "
-	NoteLabel     = "案内: "
-	choicesHead   = "次の手:"
+	whyLabel    = "なぜ: "
+	NextLabel   = "次: "
+	NoteLabel   = "案内: "
+	choicesHead = "次の手:"
 )
 
-var labels = map[string]string{fieldWhy: whyLabel, fieldNext: NextLabel, fieldNoBypass: noBypassLabel}
+var labels = map[string]string{fieldWhy: whyLabel, fieldNext: NextLabel}
 
 const (
 	// ShownSubjectLimit は、理由や報告に載せる対象の文字列の長さの上限。ヒアドキュメントの全文で本体を押し出さないため。

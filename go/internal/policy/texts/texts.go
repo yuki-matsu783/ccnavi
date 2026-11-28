@@ -255,7 +255,7 @@ func Render(e *Entry, values Values, variants Variants, root string) (string, er
 		}
 		lines = append(lines, text)
 	}
-	for _, name := range []string{fieldWhy, fieldNext, fieldNoBypass} {
+	for _, name := range []string{fieldWhy, fieldNext} {
 		if e.has(name) {
 			text, err := one(name)
 			if err != nil {
@@ -290,11 +290,7 @@ func Fallback(id string) string {
 	case kindNext:
 		return NextLabel + ask + "（" + gone + "）"
 	}
-	lines := []string{gone + "止めた判定は変わらず、短い既定の文で伝えます。", NextLabel + ask}
-	if kind == kindDeny {
-		lines = append(lines, noBypassLabel+"言い換えや別の経路でも、同じゲートに当たります。")
-	}
-	return strings.Join(lines, "\n")
+	return gone + "止めた判定は変わらず、短い既定の文で伝えます。\n" + NextLabel + ask
 }
 
 // Say は識別子の文を組み立てる。引けなければ既定の文（Fallback）。失敗しない。

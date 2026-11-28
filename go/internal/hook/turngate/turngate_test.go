@@ -364,7 +364,6 @@ messages:
       no_user_turn: "{first_name} を打ったあと、発言が無いまま {second_name} を打とうとしました{where}。"
     why: コピーの中身をユーザが見るためです。
     next: ユーザに見せて返事を待ち、あとで {second_name} {key} を打ち直す
-    no_bypass: 分けても同じゲートに当たります。
 `
 
 func messageRoot(t *testing.T) string {
@@ -380,10 +379,9 @@ func TestMessage(t *testing.T) {
 	f := newFixture(t)
 	f.a("copy-in foo")
 	lines := strings.Split(Message(f.b("copy-out foo"), root), "\n")
-	if len(lines) != 4 || !strings.Contains(lines[0], "copy-in を打ったあと") || !strings.Contains(lines[0], "宣言 copy-out") ||
+	if len(lines) != 3 || !strings.Contains(lines[0], "copy-in を打ったあと") || !strings.Contains(lines[0], "宣言 copy-out") ||
 		!strings.Contains(lines[0], "キー foo") || !strings.HasPrefix(lines[1], "なぜ: ") ||
-		!strings.HasPrefix(lines[2], "次: ") || !strings.Contains(lines[2], "copy-out foo を打ち直す") ||
-		!strings.HasPrefix(lines[3], "迂回しない: ") {
+		!strings.HasPrefix(lines[2], "次: ") || !strings.Contains(lines[2], "copy-out foo を打ち直す") {
 		t.Fatalf("段階が違う: %q", lines)
 	}
 	if got := Message(f.b("copy-out $name"), root); !strings.Contains(got, "copy-out <名前> を打ち直す") {
@@ -558,7 +556,7 @@ func TestReviewConfirmForms(t *testing.T) {
 	ok(t)(Note(builtin, []string{review + rr + " --phase 3"}, g.state, session, "c1", time.Time{}))
 	stop := ok(t)(Check(builtin, []string{review + "confirm --phase 3"}, g.state, session, false))
 	lines := strings.Split(Message(stop, root), "\n")
-	if len(lines) != 4 || !strings.Contains(lines[0], "ccnavi-review.sh review-request を打ったあと") ||
+	if len(lines) != 3 || !strings.Contains(lines[0], "ccnavi-review.sh review-request を打ったあと") ||
 		!strings.Contains(lines[2], "confirm --phase <N>") || !strings.Contains(lines[2], "ユーザのレビュー") {
 		t.Errorf("文面: %q", lines)
 	}

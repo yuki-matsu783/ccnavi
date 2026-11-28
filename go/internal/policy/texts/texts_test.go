@@ -20,7 +20,6 @@ messages:
     what: "{name} を止めました。"
     why: 理由です。
     next: "` + "`{script:ccnavi-git.sh} status {dir:sh}`" + ` を打つ"
-    no_bypass: 迂回しません。
   NEXT_SAMPLE:
     kind: next
     values: [args_q]
@@ -68,10 +67,10 @@ func problemText(c *Catalog) string {
 	return strings.Join(lines, "\n")
 }
 
-func TestRenderFourFieldsAndOneNextLine(t *testing.T) {
+func TestRenderThreeFieldsAndOneNextLine(t *testing.T) {
 	out := Say(sample(t), "DENY_SAMPLE", Values{"name": "x", "dir": "a b"}, nil)
 	lines := strings.Split(out, "\n")
-	if lines[0] != "x を止めました。" || !strings.HasPrefix(lines[1], whyLabel) || !strings.HasPrefix(lines[3], noBypassLabel) {
+	if lines[0] != "x を止めました。" || !strings.HasPrefix(lines[1], whyLabel) {
 		t.Fatalf("%q", out)
 	}
 	if len(LinesOf(out)) != 1 || !strings.Contains(out, `status "a b"`) {

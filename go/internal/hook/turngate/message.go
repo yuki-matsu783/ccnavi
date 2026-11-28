@@ -33,7 +33,7 @@ func AskMessage(stop *Stop, root string) string {
 	}, nil)
 }
 
-// Message は止めた文（何が起きたか・なぜ・次の一手・迂回しない、の順に 1 行ずつ）。宣言の文面（Gate.message）は
+// Message は止めた文（何が起きたか・なぜ・次の一手、の順に 1 行ずつ）。宣言の文面（Gate.message）は
 // 止めた理由が「同じコマンド」か「発言が無い」のときに使い、記録を読み書きできないときは共通の文を使う。
 func Message(stop *Stop, root string) string {
 	g := stop.Gate

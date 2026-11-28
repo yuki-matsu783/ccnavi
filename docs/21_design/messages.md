@@ -47,7 +47,6 @@ messages:
     what: 親チケット {ticket}（{title}）のワークツリー {worktree} に {path} を書こうとしたため、止めました。
     why: 親のワークツリーは作業の場ではありません。…
     next: …
-    no_bypass: …
     note: |
       承認の前に…
 ```
@@ -56,8 +55,8 @@ messages:
 
 | 種類 | 使う場面 | 必須の欄 | 任意の欄 | 組み立てる出力 |
 |---|---|---|---|---|
-| `deny` | 拒否・確認 | `what` `why` `next` `no_bypass`（`RULE_*` は `what` だけ） | `note`（`RULE_*` は `why` `next` `no_bypass` も） | `what` / `なぜ: why` / `次: next` / `迂回しない: no_bypass` / `案内: note` |
-| `nudge` | Stop の促し | `what` `next` | `why` `no_bypass` `note` | `what` / `なぜ: why` / `次: next` / `迂回しない: no_bypass` / `案内: note` |
+| `deny` | 拒否・確認 | `what` `why` `next`（`RULE_*` は `what` だけ） | `note`（`RULE_*` は `why` `next` も） | `what` / `なぜ: why` / `次: next` / `案内: note` |
+| `nudge` | Stop の促し | `what` `next` | `why` `note` | `what` / `なぜ: why` / `次: next` / `案内: note` |
 | `next` | 出力の次の一手 | `next` | `note` | `次: next` / `案内: note` |
 | `choices` | 次の一手が 1 つに決まらないとき | `items`（2 件以上） | | `次の手:` と `  1. …` の番号つき |
 | `note` | 条件つきで足す 1 件の補足 | `note` | | `案内: note` |
@@ -65,10 +64,10 @@ messages:
 | `error` | 読み手に届くエラー（13.9） | `what` `why` `next` | `note` | `what` / `なぜ: why` / `次: next` / `案内: note` |
 
 - どの種類も `values` を持つ（空でもよい）。文面に書いた差し込みの名前の全部と一致する
-- `what` `why` `next` `no_bypass` は 1 行。`note` は複数行でよく、1 行ごとに `案内: ` を付けて出す。`items` の 1 件は 1 行
+- `what` `why` `next` は 1 行。`note` は複数行でよく、1 行ごとに `案内: ` を付けて出す。`items` の 1 件は 1 行
 - `next` の値は `次:` で始めない。出力に `次: ` を付けるのは組み立てる側で、出力の `次:` の行はちょうど 1 行になる
 - 欄の値は、文字列か、`{名前: 文字列}` の表（場合分け。13.4）
-- `RULE_*`（組み込みルールの文。`RULE_ASK` と `RULE_ASK__*` を除く）は `what` だけが必須。ほかの欄は省くか、空にしてよい（空の欄は省いたものとして読み、見出しの行は出さない）。ルールごとに止める対象が違い、言うことが無い部分を作り足すと偽の文になるため。`RULE_ASK` の系統と `DENY_*` は、行き止まりを作らないよう 4 欄を必ず持つ
+- `RULE_*`（組み込みルールの文。`RULE_ASK` と `RULE_ASK__*` を除く）は `what` だけが必須。ほかの欄は省くか、空にしてよい（空の欄は省いたものとして読み、見出しの行は出さない）。ルールごとに止める対象が違い、言うことが無い部分を作り足すと偽の文になるため。`RULE_ASK` の系統と `DENY_*` は、行き止まりを作らないよう `what` `why` `next` を必ず持つ
 
 ### 13.4 識別子・差し込み・場合分け
 
@@ -181,7 +180,7 @@ ccnavi のリポジトリのテストは、次も見る（呼ぶ側が手元の�
 | `policy/texts` の `SayFault` | エラーから `Detail` を取り、識別子の文を組む。識別子が空なら `What`、引けない・値が合わないときは `What` と既定の文（`texts.Fallback`。13.8）を返す | 判定 |
 | 出力の境界（`entry`・`hook`） | `SayFault` を呼んで出す | エラーごとの文 |
 
-- 種類は `error`。識別子の頭は `ERROR_`。`what`・`why`・`next` が必須、`note` が任意。`次:` の行は 1 行（13.7 の点検がそのまま掛かる）。`no_bypass` は持たない
+- 種類は `error`。識別子の頭は `ERROR_`。`what`・`why`・`next` が必須、`note` が任意。`次:` の行は 1 行（13.7 の点検がそのまま掛かる）
 - 文面ファイルから引くのは読み手に届くエラーだけ。届かないもの（`infra` の読み込み失敗など）は識別子を空にする。`SayFault` は識別子が空なら `What` を返す。識別子があって引けないときは、`What` に既定の文（`texts.Fallback`。13.8）を足して返す。`entry/cli` の `finish` は、識別子のあるエラーだけを `SayFault` で言い、識別子の無いエラーは「想定外の失敗」として `What` を添えて出す
 - ccnavi のリポジトリのテストは、`fault.New` が受ける識別子を、`texts.Say` の識別子と同じに点検する（13.7）
 

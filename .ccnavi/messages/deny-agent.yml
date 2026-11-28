@@ -10,8 +10,6 @@ messages:
       作業場所は ccnavi が決めます。isolation のワークツリーでは、チケットの範囲は適用されないので、値によらず使えません。
     next: |-
       チケットの子の作業なら、その子の識別子を description（作業名の欄）に書いて起動し直す（ccnavi がその子の範囲とフローの案内をプロンプトに書き足す）。直接作業なら、`{script:ccnavi-worktree.sh}` で切ったワークツリーの名前（.claude/worktrees/<名前> の <名前>）を description に書いて起動し直す
-    no_bypass: |-
-      担当以外の子の識別子やワークツリーの名前を description に書いても、値を変えて isolation を付けても、同じゲートに当たります。
 
   DENY_AGENT_MULTI_TARGET:
     kind: deny
@@ -22,8 +20,6 @@ messages:
       サブエージェント 1 体の担当は 1 つのワークツリーだけです。「触れない」と書いた子の識別子も、言及として数えます。担当は description だけで決めます（プロンプトは担当の決定に使いません）。
     next: |-
       1 体に 1 つを割り当て、担当以外の子の識別子を description に書かずに、別々に起動し直す
-    no_bypass: |-
-      言い換えや、担当以外を否定する書き方をしても、言及として数えるので同じゲートに当たります。
 
   DENY_AGENT_PARENT_TREE:
     kind: deny
@@ -37,8 +33,6 @@ messages:
         作業を任せたいときは、子の識別子を description に 1 つ書いて起動し直す（作業中の子: {listed}）。子が全部クローズしているときは、先に子を提案して承認を得る
       none: |-
         作業を任せたいときは、子の識別子を description に 1 つ書いて起動し直す。子が全部クローズしているときは、先に子を提案して承認を得る
-    no_bypass: |-
-      親のワークツリーの名前を言い換えても、別の経路で起動しても、同じゲートに当たります。
 
   DENY_AGENT_NO_CHILD:
     kind: deny
@@ -52,8 +46,6 @@ messages:
       編集するサブエージェントは、担当の子のワークツリーで動かないと、子の範囲とフローの案内を受け取れません。
     next: |-
       担当の子の識別子を 1 つ、description に書いて起動し直す（ccnavi がその子のワークツリーで案内する）。調べるだけなら、読み取り専用の種類（Explore など）で起動する
-    no_bypass: |-
-      子を指さない言い換えや、別の経路での起動でも、編集する種類は同じゲートに当たります。
 
   DENY_AGENT_CHILD_UNAVAILABLE:
     kind: deny
@@ -67,8 +59,6 @@ messages:
         `{script:ccnavi-ticket.sh} start {name:sh}` で着手してから起動し直す
       wait: |-
         子の状態を動かすのはユーザの判断なので、ユーザに状態を伝えて指示を待つ
-    no_bypass: |-
-      ワークツリーの名前で指しても、言い換えても、同じゲートに当たります。
 
   DENY_AGENT_CWD_CONFLICT:
     kind: deny
@@ -79,5 +69,3 @@ messages:
       担当先は description の言及で決まります。cwd が食い違うと、サブエージェントが担当以外のワークツリーで動きます。
     next: |-
       cwd は付けずに、担当の子の識別子かワークツリーの名前を description に 1 つ書いて起動し直す
-    no_bypass: |-
-      別の cwd を付け直しても、同じゲートに当たります。
