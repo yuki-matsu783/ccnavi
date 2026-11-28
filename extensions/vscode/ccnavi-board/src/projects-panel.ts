@@ -15,7 +15,7 @@
  * の出現を監視して拾う。拡張が書くのは、ユーザがボタンを押したときの`.gitignore`だけ。
  *
  * 共通設定のミラー（各プロジェクトの`.ccnavi/config/common/`）のずれは、開いた時と5分ごと（`MIRROR_INTERVAL_MS`）に
- * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は`ProjectsData`の`mirror`に載せる。
+ * 実行ファイルに聞く（`user mirror --preview --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は`ProjectsData`の`mirror`に載せる。
  * 処理の流れ:
  *
  * 1. `refreshMirror`が`runMirror`で実行ファイルに聞き、終わったら次の回を予約する。
@@ -63,7 +63,7 @@ const SCREEN = "projects";
 const TITLE = "ccnaviプロジェクト管理";
 /**
  * ミラーのずれを調べ直す間隔。ずれは共通設定を直したときにしか生じず、急ぐものではない。
- * 1回ごとに実行ファイルを2度（`--version --json`と`user mirror --json`）起こすので、短くしすぎない
+ * 1回ごとに実行ファイルを2度（`--version --json`と`user mirror --preview --json`）起こすので、短くしすぎない
  */
 const MIRROR_INTERVAL_MS = 5 * 60 * 1000;
 

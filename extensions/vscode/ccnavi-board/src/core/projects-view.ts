@@ -65,7 +65,7 @@ export interface ProjectsPage {
 }
 
 /**
- * 共通設定のミラーの状態（`user mirror --json`の結果）。一覧（`ProjectsPage`）とは別に、拡張ホストが5分ごとに調べ直す。
+ * 共通設定のミラーの状態（`user mirror --preview --json`の結果）。一覧（`ProjectsPage`）とは別に、拡張ホストが5分ごとに調べ直す。
  * 状態の形とボタンの判断は`mirrormodel.ts`が持つ。
  */
 export interface MirrorData {

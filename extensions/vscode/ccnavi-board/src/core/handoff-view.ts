@@ -1,5 +1,5 @@
 /**
- * 取り込み待ち画面の、拡張ホストとWebviewの間の契約。見せるのは`ccnavi user handoff --json`（見るだけ）の答えで、
+ * 取り込み待ち画面の、拡張ホストとWebviewの間の契約。見せるのは`ccnavi user handoff --preview --json`（見るだけ）の答えで、
  * `wip/handoff/<相対パス>`に置いた下書きを、同じツリーの元のパス（`.claude`の階層は`handoff-.claude`に読み替えて置かれ、取り込みで戻る）へ取り込むもの。
  *
  * 判定（取り込み先の種類・状態・検査・差分・ハッシュ）は実行ファイルが答え、画面は読むだけにする。
@@ -10,7 +10,7 @@ import type { AppearanceMessage } from "./appearance.js";
 import type { Lock } from "./lock.js";
 import { embedJson, type DataMessage } from "./screen-host.js";
 
-// ---- 答えの形（`user handoff --json`）
+// ---- 答えの形（`user handoff --preview --json`）
 
 /** 取り込み先の種類。知らない値も通す（実行ファイルが新しい種類を足しても、画面は止めない） */
 export type HandoffKind = "template" | "layer-config" | "docs" | "defense" | (string & {});
@@ -42,7 +42,7 @@ export interface HandoffIgnored {
   readonly why: string;
 }
 
-/** `user handoff [<パス>…] --json`の答えの全体 */
+/** `user handoff [<パス>…] --preview --json`の答えの全体 */
 export interface HandoffList {
   readonly version: number;
   /** 見たツリーの絶対パス */

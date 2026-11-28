@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面が読む、共通設定のミラーの結果（`user mirror --json`）の読み取りと、画面の判断の部分。
+ * プロジェクト管理画面が読む、共通設定のミラーの結果（`user mirror --preview --json`）の読み取りと、画面の判断の部分。
  *
  * ミラーは、ワークスペースの`.ccnavi/config/common/`（共通設定）を各プロジェクトの`.ccnavi/config/common/`にコピーしたもの。
  * ずれの有無・中身・ハッシュ（`expect`）は実行ファイルが決めて返し、同期で書くのも実行ファイル。ここで決めるのは次の3つだけ。
@@ -38,7 +38,7 @@ export interface MirrorProject {
   readonly expect: string;
 }
 
-/** 見るだけの結果（`user mirror [<名前>…] --json`）の全体 */
+/** 見るだけの結果（`user mirror [<名前>…] --preview --json`）の全体 */
 export interface MirrorList {
   readonly version: number;
   /** 偽なら`error`に理由（共通設定が読めないなど）。そのとき`projects`は空 */

@@ -22,7 +22,7 @@ export type ViewAnswer = { readonly ok: true; readonly value: HandoffList } | { 
 
 /** 実行ファイルへの窓口。本物は`ccnavi.ts`、試験では差し替える */
 export interface HandoffDeps {
-  /** `user handoff [<パス>…] --json`（見るだけ）。パスを渡すと、そのパスが`selected`になり、`expect`はその集合のものになる */
+  /** `user handoff [<パス>…] --preview --json`（見るだけ）。パスを渡すと、そのパスが`selected`になり、`expect`はその集合のものになる */
   view(paths: readonly string[]): Promise<ViewAnswer>;
   /** `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`。失敗は`{ok:false}`の結果で返す（投げない） */
   apply(paths: readonly string[], expect: string): Promise<HandoffResult>;

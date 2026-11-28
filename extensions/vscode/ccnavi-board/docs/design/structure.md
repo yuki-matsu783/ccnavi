@@ -23,7 +23,7 @@ src/
   settings-panel.ts   ルール管理・リスク管理・フェーズ管理の 3 画面のパネルが共通で持つ段取り（受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替えと切り替えた対象を覚えること、錠の取り直し、3画面で同じ操作の受け付け、保存の流れ）。画面ごとの仕事（読む・見せる・見張る・検証に渡す差し替え・画面だけの操作）は `settingsPanel` に渡すコールバックで注入し、残す仕事は画面ごとに持つ（vscode に依存する）
   panel-common.ts     画面（*-panel.ts）が共通で使う小さな部品。`retainContextWhenHidden` の前提の確かめ（assertRetained）、監視の張り方（watchPattern・watchGlobs・watchTickets）、監視の反応を束ねる debounce、`switch` の網羅検査 assertNever、エディタで開く（openInEditor）、画面の対象フォルダ（workspaceFolder・firstWorkspaceFolder）（vscode に依存する）
   handoff-entry.ts    各画面（ルール・リスク・フェーズ・テンプレート管理）の「取り込み待ちを開く」の拡張ホスト側の共通部分（開けるかの確認と、見ている対象に合わせたツリーで開く）。実行ファイルを呼ぶので単体テストの対象外
-  handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、ターミナルの案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。チケット管理画面のカードの下書きの通知からも開く（vscode に依存する）
+  handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --preview --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、ターミナルの案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。チケット管理画面のカードの下書きの通知からも開く（vscode に依存する）
   flow-panel.ts       フロー編集画面の Webview パネル（子ごとに 1 枚。チケット管理画面のカードから開く）。置き場と錠を実行ファイルに聞き、保存を受け付ける。エージェントの下書きの「提案あり」・取り込み・保存のあとの削除と、依頼の文もここ（vscode に依存する）
   workflow-panel.ts   計画編集タブの Webview パネル（親の提案ごとに 1 枚。識別子を渡すコマンドと、チケット管理画面の親の提案のカードの「計画編集」、承認のオーバーレイの「計画を編集」から開く）。線を変えるたびの --plan-order --json --order と、保存の --plan-order --write --expect を実行ファイルに打たせる（拡張はファイルを書かない）。提案の監視（外で変わった・承認待ちから無くなった）、未保存の「●」と閉じた後の聞き方、初回の案内もここ。未保存と、保存したあとのハッシュ（source_sha）を帳面（core/workflow-tabs.ts）に書く（vscode に依存する）
   prompt-handover.ts  Claude Code に文を渡す経路（コピー / 新しいセッションで開く / 専用ターミナルで claude -p を実行）。チケット管理画面とフロー編集画面が使う（vscode に依存する）
@@ -31,7 +31,7 @@ src/
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信。作った直後はシェル統合が立ち上がるのを待って送る（vscode に依存する）
   target-memory.ts    設定の 4 画面で最後に選んだ設定を workspaceState に覚え、開くときの設定を拡張全体の答えから決める（決め方は core/targets.ts の openingTarget）（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）。左パネルの案内（package.json の walkthroughs。本文は media/tour/）を、拡張の版が変わった最初の起動と、パネルのタイトルバーの ? で開き、プロジェクト管理 → チケット管理の基本の案内を続けて動かす（vscode に依存する）
-  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / user agree --yes … --json / --templates --json / --templates --show <名前> --json / user handoff [<パス>…] --json（取り込み先行の一覧。見るだけ）と user handoff <パス…> --yes --expect --via board --json（取り込み）/ --templates --draft <親> --json（チケット管理画面の親のカードの「テンプレートの下書きを作る」）/ --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
+  ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / user agree --yes … --json / --templates --json / --templates --show <名前> --json / user handoff [<パス>…] --preview --json（取り込み先行の一覧。見るだけ）と user handoff <パス…> --yes --expect --via board --json（取り込み）/ --templates --draft <親> --json（チケット管理画面の親のカードの「テンプレートの下書きを作る」）/ --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起動する（origin を読む。Node の子プロセス）
   webview-asset.ts    バンドルした画面（out/webview/<名前>.js）と CSS（同 .css）を読む。渡すのは画面の名前で、拡張が <script nonce> と <style nonce> に流し込む
   core/
@@ -68,7 +68,7 @@ src/
     template-edit.ts  テンプレートの編集の手元のコピー（EditTemplate）と編集の関数（ステップの追加・削除・並べ替え・線・フロー。先行が小さい添字になるよう振り直す）、書き出しと見比べ。vscode も DOM も node も入れない
     handoff-entry.ts  各画面の「取り込み待ちを開く」の契約（開けるか HandoffEntry・メッセージ openHandoff・開くツリーのキー）。VS Code にも node にも触れない
     handoff-view.ts   取り込み待ちの拡張ホストと画面の契約（答えの形 HandoffList / HandoffEntry / HandoffResult、見せる形 HandoffPage / HandoffData、押した操作 HandoffMessage）
-    handoffmodel.ts   user handoff --json の出力（見るだけ・取り込み。対象外の名前と理由 `ignored_paths` は形が正しいときだけ読み、無ければ件数だけ）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・ターミナルのコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
+    handoffmodel.ts   user handoff --preview --json の出力（見るだけ・取り込み。対象外の名前と理由 `ignored_paths` は形が正しいときだけ読み、無ければ件数だけ）の読み取りと、画面の判断（取り込めるか・取り込めない理由・作業中の錠の掛かり方（template と layer-config）・ターミナルのコマンド・読み直しのあとの選択・見るツリー）。VS Code にも node にも触れない
     handoff-import.ts 取り込みの手順（錠を取り直す → 選んだパスを指して見るだけをもう一度呼び expect を取る → entry_sha を見せたものと比べる → 取り込む）と defense のターミナルの案内。実行ファイルの呼び出しは HandoffDeps として受け取る（試験で差し替える）
     handoff-render.ts 取り込み待ちの入れ物の HTML（外部資源なし）。中身は画面（React）が作る
     flow-doc.ts       子のフロー（YAML）の読み書きと編集（知らない欄・種類を失わない）、雛形、入れ子の階層の数え方と注意。正しいかは決めない（描けないときだけ断る）

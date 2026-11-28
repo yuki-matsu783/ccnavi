@@ -1,5 +1,5 @@
 /**
- * 取り込み待ち画面が読む実行ファイルの答えの読み取り（`user handoff --json`）と、画面の判断の部分。
+ * 取り込み待ち画面が読む実行ファイルの答えの読み取り（`user handoff --preview --json`）と、画面の判断の部分。
  * 形の契約は`handoff-view.ts`。
  *
  * 判定は実行ファイルが決めて答える（種類・状態・検査・差分・ハッシュ）。ここで決めるのは次の3つだけで、
@@ -33,7 +33,7 @@ export type HandoffResultParse = { readonly ok: true; readonly value: HandoffRes
 // ---- 読み取り
 
 /**
- * 見るだけの答え（`user handoff [<パス>…] --json`）を読む。版が違う・欄が足りないときは文面を返す。
+ * 見るだけの答え（`user handoff [<パス>…] --preview --json`）を読む。版が違う・欄が足りないときは文面を返す。
  * `entries`を持たない失敗の答え（`{version, ok:false, error}`）はerrorをそのまま返す。
  */
 export function parseHandoffList(text: string): HandoffListParse {

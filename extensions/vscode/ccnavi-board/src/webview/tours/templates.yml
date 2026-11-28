@@ -157,7 +157,7 @@ diagrams:
         from: 取り込み待ち画面
         to: ccnavi
         text: そのパスだけを指定して、書き込まずにもう一度読み、ハッシュ（expect）を受け取る
-        value: ccnavi user handoff .ccnavi/config/project/templates/login.yml --json
+        value: ccnavi user handoff .ccnavi/config/project/templates/login.yml --preview --json
       - id: apply
         from: 取り込み待ち画面
         to: ccnavi

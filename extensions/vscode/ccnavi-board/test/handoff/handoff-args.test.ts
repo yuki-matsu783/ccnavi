@@ -6,9 +6,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { handoffArgs, handoffYesArgs } from "../../src/core/commands.js";
 
-test("CB-T1120 見るだけの引数はuser handoff [<パス>…] --json。--yesは付けない", () => {
-  assert.deepEqual(handoffArgs(), ["--entry", "board", "user", "handoff", "--json"]);
-  assert.deepEqual(handoffArgs([".ccnavi/docs/a.md", ".claude/hooks/x.sh"]), ["--entry", "board", "user", "handoff", ".ccnavi/docs/a.md", ".claude/hooks/x.sh", "--json"]);
+test("CB-T1120 見るだけの引数はuser handoff [<パス>…] --preview --json。--yesは付けない", () => {
+  assert.deepEqual(handoffArgs(), ["--entry", "board", "user", "handoff", "--preview", "--json"]);
+  assert.deepEqual(handoffArgs([".ccnavi/docs/a.md", ".claude/hooks/x.sh"]), ["--entry", "board", "user", "handoff", ".ccnavi/docs/a.md", ".claude/hooks/x.sh", "--preview", "--json"]);
   assert.equal(handoffArgs([".ccnavi/docs/a.md"]).includes("--yes"), false);
 });
 

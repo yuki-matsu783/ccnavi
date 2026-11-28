@@ -90,13 +90,13 @@ export function templatesDraftArgs(parent: string): readonly string[] {
 }
 
 /**
- * `user handoff [<パス>…] --json`。`wip/handoff/`に置いた下書きの一覧を見る（`--yes`を付けない）。
+ * `user handoff [<パス>…] --preview --json`。`wip/handoff/`に置いた下書きの一覧を見る（`--yes`を付けない。何も書かない）。
  * パスは`--root`で指したツリーからの相対（`/`区切り）。パスを渡すと、そのパスが選んだ対象になり、
  * 答えの`expect`はその集合のハッシュになる。パスを省くと、許可リストにヒットしunchangedでないもの全部が対象。
  * `--root`は`run()`が付ける。
  */
 export function handoffArgs(paths: readonly string[] = []): readonly string[] {
-  return [...USER_ENTRY, "user", "handoff", ...paths, "--json"];
+  return [...USER_ENTRY, "user", "handoff", ...paths, "--preview", "--json"];
 }
 
 /**
@@ -109,12 +109,12 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
 }
 
 /**
- * `user mirror [<プロジェクト名>…] --json`。共通設定のミラーのずれを見る（`--yes`を付けない。何も書かない）。
+ * `user mirror [<プロジェクト名>…] --preview --json`。共通設定のミラーのずれを見る（`--yes`を付けない。何も書かない）。
  * 名前を省くと全プロジェクト。結果の`expect`は差分のある全プロジェクトの、各プロジェクトの`expect`はそのプロジェクトだけのハッシュ。
  * `--root`は`run()`が付ける。
  */
 export function mirrorArgs(names: readonly string[] = []): readonly string[] {
-  return [...USER_ENTRY, "user", "mirror", ...names, "--json"];
+  return [...USER_ENTRY, "user", "mirror", ...names, "--preview", "--json"];
 }
 
 /**

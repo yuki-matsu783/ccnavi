@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面が読む、共通設定のミラーの結果（`user mirror --json`）の読み取りと、画面の判断
+ * プロジェクト管理画面が読む、共通設定のミラーの結果（`user mirror --preview --json`）の読み取りと、画面の判断
  * （`src/core/mirrormodel.ts`）、子プロセスに渡す引数（`src/core/commands.ts`の`mirror*Args`）、
  * 実行ファイルの出力の読み方（`src/ccnavi.ts`の`mirrorListOf` / `mirrorResultOf`）を確かめる。
  * 実行ファイルの実物は無くても試せる。結果は実行ファイルとの取り決めの例をそのまま使う。
@@ -65,9 +65,9 @@ function ok(list: MirrorList = listOf()): MirrorStatus {
   return { kind: "ok", list };
 }
 
-test("CB-T1155 見るだけの引数はuser mirror [<名前>…] --json、同期は --yes --expect <値> --via board --jsonを足す", () => {
-  assert.deepEqual(mirrorArgs(), ["--entry", "board", "user", "mirror", "--json"]);
-  assert.deepEqual(mirrorArgs(["web", "app"]), ["--entry", "board", "user", "mirror", "web", "app", "--json"]);
+test("CB-T1155 見るだけの引数はuser mirror [<名前>…] --preview --json、同期は --yes --expect <値> --via board --jsonを足す", () => {
+  assert.deepEqual(mirrorArgs(), ["--entry", "board", "user", "mirror", "--preview", "--json"]);
+  assert.deepEqual(mirrorArgs(["web", "app"]), ["--entry", "board", "user", "mirror", "web", "app", "--preview", "--json"]);
   assert.equal(mirrorArgs(["web"]).includes("--yes"), false);
   assert.deepEqual(mirrorYesArgs([], "all-sha"), ["--entry", "board", "user", "mirror", "--yes", "--expect", "all-sha", "--via", "board", "--json"]);
   assert.deepEqual(mirrorYesArgs(["web"], "web-sha"), ["--entry", "board", "user", "mirror", "web", "--yes", "--expect", "web-sha", "--via", "board", "--json"]);
@@ -124,7 +124,7 @@ test("CB-T1159 実行ファイルの出力の読み方: 読める答えは終了
   // 実行ファイルがargparseの苦情を標準エラーに出して2で終わる場合
   const usage = mirrorListOf({ code: 2, stdout: "", stderr: "usage: ccnavi user ...\nccnavi user: error: invalid choice: 'mirror'" });
   assert.ok(!usage.ok);
-  assert.equal(usage.error, "ミラーのずれの確認に失敗しました（ccnavi user mirror --json）: usage: ccnavi user ...");
+  assert.equal(usage.error, "ミラーのずれの確認に失敗しました（ccnavi user mirror --preview --json）: usage: ccnavi user ...");
   const garbage = mirrorListOf({ code: 0, stdout: "not json", stderr: "" });
   assert.ok(!garbage.ok && /結果を読み込めません/.test(garbage.error));
 

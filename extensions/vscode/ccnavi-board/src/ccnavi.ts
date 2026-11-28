@@ -11,10 +11,10 @@
  * `--plan-order <親> --json [--order <JSON>]`（親の提案の計画の順序を振り直した答え。計画編集タブが読む）と
  * `--plan-order <親> --order <JSON> --expect <ハッシュ> --write --json`（その保存。提案を書き換えるのは実行ファイル）と、
  * `--templates --json`（テンプレートの一覧。テンプレート管理画面が読む）、`--templates --show <名前> --json`（1件の本文）、`--templates --check-file <パス> --json`（1本を読ませる。編集中の検査と、一覧の図の中身に使う）、
- * `user handoff [<パス>…] --json`（`wip/handoff/`の下書きの一覧を見る。取り込み待ち画面が読む。`--root`で指したツリー1本だけを見る）と
+ * `user handoff [<パス>…] --preview --json`（`wip/handoff/`の下書きの一覧を見る。取り込み待ち画面が読む。`--root`で指したツリー1本だけを見る）と
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
  * `expect`は取り込むパスを指して見るだけをもう一度呼んだ結果のもの）、
- * `user mirror [<名前>…] --json`（共通設定のミラーのずれを見る。プロジェクト管理画面が5分ごとに読む）と
+ * `user mirror [<名前>…] --preview --json`（共通設定のミラーのずれを見る。プロジェクト管理画面が5分ごとに読む）と
  * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
  * ユーザが画面で押したときだけ）。
  * 判定と検証はルールファイルを差し替えられる。
@@ -170,9 +170,9 @@ const TEMPLATES: Op = { name: "テンプレートの一覧の読み込み", cmd:
 const TEMPLATE_SHOW: Op = { name: "テンプレートの読み込み", cmd: "ccnavi --templates --show --json" };
 const TEMPLATE_CHECK: Op = { name: "テンプレートの検査", cmd: "ccnavi --templates --check-file --json" };
 const TEMPLATE_DRAFT: Op = { name: "テンプレートの下書きの作成", cmd: "ccnavi --templates --draft --json" };
-const HANDOFF: Op = { name: "取り込み待ちの一覧の読み込み", cmd: "ccnavi user handoff --json" };
+const HANDOFF: Op = { name: "取り込み待ちの一覧の読み込み", cmd: "ccnavi user handoff --preview --json" };
 const HANDOFF_YES: Op = { name: "取り込み", cmd: "ccnavi user handoff --yes --json" };
-const MIRROR: Op = { name: "ミラーのずれの確認", cmd: "ccnavi user mirror --json" };
+const MIRROR: Op = { name: "ミラーのずれの確認", cmd: "ccnavi user mirror --preview --json" };
 const MIRROR_YES: Op = { name: "ミラーの同期", cmd: "ccnavi user mirror --yes --json" };
 
 const NOT_FOUND =
@@ -820,7 +820,7 @@ export async function runTemplateDraft(root: string, setting: string, parent: st
 }
 
 /**
- * `wip/handoff/`の下書きの一覧を見る（`user handoff [<パス>…] --json`）。何も書かない。
+ * `wip/handoff/`の下書きの一覧を見る（`user handoff [<パス>…] --preview --json`）。何も書かない。
  * `workspace`は実行ファイルを探すワークスペースのルート、`tree`は見るツリーのルート（`--root`に渡す）。
  * ワークスペースのルートのツリーなら二つは同じ。実行ファイルは`workspace`の側で探す
  * （プロジェクトやワークツリーには`dist/ccnavi/`が無いため）。
@@ -872,7 +872,7 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
 }
 
 /**
- * 共通設定のミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
+ * 共通設定のミラーのずれを見る（`user mirror [<名前>…] --preview --json`）。何も書かない。
  * `--root`はワークスペースのルート（ミラーの元の共通設定と、コピーする先の`projects/`を持つ側）。
  * 見るだけの結果は、プロジェクトにずれやerrorがあっても終了コード0で返る。`ok`が偽の結果（共通設定が読めないなど）も
  * 読めた結果として返し、理由は呼び手が出す
