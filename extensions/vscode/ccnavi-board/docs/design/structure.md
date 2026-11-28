@@ -108,7 +108,7 @@ src/
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
     screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
-    watch.ts          拡張全体の答え（board-feed.ts）と 7 つの画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob。取り込み待ちの場所（HANDOFF_PATTERNS）と、拡張全体の答えを読み直す場所（FEED_PATTERNS）も
+    watch.ts          拡張全体の答え（board-feed.ts）と 7 つの画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob。取り込み待ちの場所（HANDOFF_PATTERNS）と、拡張全体の答えを読み直す場所（FEED_PATTERNS）も置く
     feed.ts           1 つの答えを読み直して聞き手みんなに配る仕組み（読んでいる最中の頼みは 1 回にまとめる）。board-feed.ts が使う
     sidebar-tree.ts   サイドパネルのツリーの中身（ユーザ待ち・進行中の親・画面の行、押したときに開くもの、バッジの数）。件数と分類は inbox のまま
     locate.ts         実行ファイルの探索順
@@ -217,7 +217,7 @@ src/
     flow/main.tsx     フロー編集画面の入口。埋め込みの JSON を読んでマウントする
     flow/App.tsx      錠の帯・ツールバー・注意・部品箱と、拡張ホストからのメッセージの受け
     flow/Canvas.tsx   図（ノード・出口・線）。動かす・繋ぐ・選ぶは呼び手に返す
-    shared/PlanGraph.tsx 計画の流れの図の部品（React Flow）。承認のオーバーレイとチケット管理画面の計画の流れ（board/PlanFlow.tsx）が読むだけで、計画編集タブが編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
+    shared/PlanGraph.tsx 計画の流れの図の部品（React Flow）。承認のオーバーレイとチケット管理画面の計画の流れ（board/PlanFlow.tsx）は読むだけで使い、計画編集タブは編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
     workflow/style.css 計画編集タブの CSS の入口（先頭で React Flow の CSS を @import し、shared/PlanGraph.css と Tour.css も読む）
     workflow/App.css   App.tsx の CSS（図の枠の高さ・外で変わった差分の表）
     workflow/Review.css Review.tsx の CSS（保存の前の確かめ）
