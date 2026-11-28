@@ -228,7 +228,7 @@ src/
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
     shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
-    shared/EditorBar.tsx 図の編集（フロー編集・計画編集・テンプレート管理の編集欄）の上部の並び。「対象の名前 → 状態 → 元に戻す・やり直す → 補助の操作 → 主ボタン」の順をここ 1 か所で決める（CSS は EditorBar.css）
+    shared/EditorBar.tsx 図の編集（フロー編集・計画編集・テンプレート管理の編集欄）の上部の並び。「対象の名前 → 状態 → 元に戻す・やり直す → 補助の操作 → 主ボタン」の順をここ 1 か所で決める（CSS は EditorBar.css。名前の欄は 16em を基準に縮み、長い名前は「…」で切って広い幅で 1 行に収める）
     shared/StatusLine.tsx 直前の操作の一言の行（ScreenHeader の status に渡すと、貼り付くツールバーの最後の行に出る。error は赤）
     shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク管理が置く。直前の 1 行だけ覚える。元に戻す履歴を持つフェーズ管理・フロー編集・テンプレートの編集は置かない）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
