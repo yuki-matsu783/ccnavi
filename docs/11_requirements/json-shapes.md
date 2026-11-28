@@ -215,6 +215,7 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（「着手待ち・フェーズ1 調査」「作業中・フェーズ2 設計」「レビュー待ち・フェーズ1 設計」など、ユーザに見せる言葉。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
+| `plans[]` | 計画の流れ（図の中身）。計画ごとに 1 件（全体計画、フィードバック計画の順）。形は「承認の JSON」の `plans[]` と同じで、同じ関数で組む。承認済みチケットの計画をそのまま描くので、番号は振り直さない（`from` は `number` と同じ）。`locked` は子が承認された番号（開いていても閉じていても）。提案ではないので `current` は `null`、`source_sha` は空文字。計画を持たない親は空。ボードは開いた親の行の「計画の流れを見る」で、承認のオーバーレイと同じ図の部品で読むだけで描き、計画から図を組み直さない |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_required` は、そのフェーズの終わりにユーザのレビューが要るかを表す（真偽値）。定義・ステップ・引き受けた延期のどれか 1 つでも要ると言えば真。子の宣言か実績のリスクが要ると言う場合も真。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、ボードはこれをコピーするだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |
 
@@ -245,7 +246,7 @@ VS Code の拡張が、承認をボードのオーバーレイで行うための
 | `digest` | 承認の対象の提案の識別子の一覧と、各提案ファイルの元のバイト列全体から作るダイジェスト（SHA-256 の 16 進）。`--yes` の `--digest` にそのまま渡す。承認画面の本文は入らない |
 | `rejected[]` | 承認の対象にしない提案。`{ticket, problems[]}`。載るのは形の不正な提案（親が承認されていない、計画に無い番号、順序、先行（`predecessors`）が `done/` に無いか取り消し済みなど）だけで、範囲の超過だけの子は `batch[]` に載る |
 | `problems[]` | 読めない提案や承認済みチケットの説明 |
-| `plans[]` | 承認の対象に入った計画を持つ親の、計画ごとの図の中身。`ccnavi --plan-order <親> --json` の `plans` と同じ関数で作る（`--order` は渡さないので、承認する提案そのものの順序）。`{ticket, part, source_sha, items[], after, proposed, current, loose, ready, problems}`。`items[]` は `{number, from, type, title, review, deferred, review_at, locked}` |
+| `plans[]` | 承認の対象に入った計画を持つ親の、計画ごとの図の中身。`ccnavi --plan-order <親> --json` の `plans`、`--explain --json` の `parents[].plans` と同じ関数で作る（`--order` は渡さないので、承認する提案そのものの順序）。`{ticket, part, source_sha, items[], after, proposed, current, loose, ready, problems}`。`items[]` は `{number, from, type, title, review, deferred, review_at, locked}` |
 
 `--preview` 自身は、対象にしない提案があっても 0 で返る。答えが要るときだけ `--verify` を足す。
 `--verify` の答えは `--preview` の答えに `verify` を足したもの。終了コードが答えそのもの（0 = はい、3 = いいえ。1 は使い方か設定の誤り）。
