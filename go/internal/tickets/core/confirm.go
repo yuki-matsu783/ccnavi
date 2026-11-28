@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
@@ -16,6 +17,7 @@ import (
 	"ccnavi/internal/tickets/lifecycle/ops"
 	"ccnavi/internal/tickets/model/host"
 	"ccnavi/internal/tickets/model/place"
+	"ccnavi/internal/tickets/model/standing"
 	"ccnavi/internal/tickets/model/ticket"
 	"ccnavi/internal/tickets/model/via"
 	"ccnavi/internal/tickets/phase"
@@ -46,7 +48,7 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 	// 1. 対象のフェーズと前提を確かめる。親が作業中で、フェーズに子があり、依頼済みで、依頼の後に見るものが動いていないこと。
 	parent := openParent(conf, root, parentID)
 	if parent == nil {
-		return refusedCheck(codeConfirmNoParent, []string{"ccnavi: 親 " + parentID + " の承認済みチケットが作業中にありません。"}), nil
+		return refusedCheck(codeConfirmNoParent, noParentLines(parentID)), nil
 	}
 	p := request.PhaseOf(conf, root, parent, number)
 	if p == nil {
@@ -105,17 +107,38 @@ func confirm(conf *config.Settings, root string, actor Actor, stamp, parentID st
 	return checked{planned: planned}, nil
 }
 
-// precondition はホストの結果を見ずに分かる前提（レビュー済みでない・依頼の記録が在る・依頼のあとに見たものが
-// 動いていない・手で動かした子の移動が共有済み）。confirm と confirmGate が同じものを通る。通れば nil。manual は
-// 手動の移動の判定で、nil なら見ない。
-func precondition(root string, p *phase.Phase, number int, changed string, moved request.Moved, manual *phase.Manual) *checked {
+// refusal は review confirm が断る理由の、コード（種別）と文（タグ・`次:` なし）。
+type refusal struct {
+	code  code
+	lines []string
+}
+
+func (r refusal) checked() checked { return refusedCheck(r.code, r.lines) }
+
+func noParentLines(parentID string) []string {
+	return []string{"ccnavi: 親 " + parentID + " の承認済みチケットが作業中にありません。"}
+}
+
+// stateRefusal は review confirm が、チケットと記録だけで決まる理由で断るもの（レビュー済みでない・依頼の記録が在る）。
+// git もホストも見ない。confirmGate（precondition）と、ボードの「レビュー完了にできるか」（ConfirmableByState）が
+// 同じものを通る。通れば nil。
+func stateRefusal(p *phase.Phase, number int) *refusal {
 	if _, ok := p.Marks[marks.Reviewed]; ok {
 		// 重ね打ちでマーカーを書き直さない。
-		c := refusedCheck(codeConfirmAlreadyReviewed, []string{fmt.Sprintf("ccnavi: フェーズ %d はレビュー済み", number)})
-		return &c
+		return &refusal{codeConfirmAlreadyReviewed, []string{fmt.Sprintf("ccnavi: フェーズ %d はレビュー済み", number)}}
 	}
 	if p.Marks[marks.Requested] == nil {
-		c := refusedCheck(codeConfirmNotRequested, []string{"ccnavi: 依頼の記録がありません。先に review-request してください"})
+		return &refusal{codeConfirmNotRequested, []string{"ccnavi: 依頼の記録がありません。先に review-request してください"}}
+	}
+	return nil
+}
+
+// precondition はホストの結果を見ずに分かる前提（レビュー済みでない・依頼の記録が在る・依頼のあとに見たものが
+// 動いていない・手で動かした子の移動が共有済み）。confirm と confirmGate が同じものを通る。通れば nil。manual は
+// 手動の移動の判定で、nil なら見ない。前の 2 つ（チケットと記録だけで決まるもの）は stateRefusal に置く。
+func precondition(root string, p *phase.Phase, number int, changed string, moved request.Moved, manual *phase.Manual) *checked {
+	if r := stateRefusal(p, number); r != nil {
+		c := r.checked()
 		return &c
 	}
 	if changed != "" {
@@ -257,6 +280,36 @@ func CheckConfirm(stdout, stderr io.Writer, conf *config.Settings, root, cwd str
 	}
 	io.WriteString(stdout, "確認: ok（confirm を打てる状態。何も変えていません）\n")
 	return 0
+}
+
+// Confirmability はフェーズを review confirm でレビュー済みにできるかの、状態だけで決まる答え（ボードの
+// `review_confirm`）。ok が偽のとき、Code は断る種別（`CORE_CONFIRM_*`）、Reason は理由（ユーザ向けの文）。
+// 見るのは、親が作業中か・親子のチケットが決まるか（どちらも `CORE_CONFIRM_NO_PARENT`。closing.FamilyStopText）・stateRefusal。依頼のあとに見るものが
+// 動いたか・手で動かした移動が共有済みか（git）と、MR の指摘が残っているか（ホスト）は、ボードの答えを重くしないために
+// 見ない。それらは操作の側（confirmGate・confirm）が断る。
+type Confirmability struct {
+	OK     bool
+	Code   string
+	Reason string
+}
+
+// ConfirmableByState は親 parent のフェーズ p を、ボードがレビュー完了にできるかを答える。closed は親がクローズ済みか。
+// fams は親子の立ち位置の窓口（親をまたいで使い回してよい。nil なら作る）。
+func ConfirmableByState(conf *config.Settings, root string, parent *ticket.Ticket, closed bool, p *phase.Phase, fams *standing.Families) Confirmability {
+	if closed {
+		return confirmability(refusal{codeConfirmNoParent, noParentLines(parent.ID)})
+	}
+	if text := closing.FamilyStopText(conf, root, parent, fams); text != "" {
+		return confirmability(refusal{codeConfirmNoParent, []string{text}})
+	}
+	if r := stateRefusal(p, p.Number); r != nil {
+		return confirmability(*r)
+	}
+	return Confirmability{OK: true}
+}
+
+func confirmability(r refusal) Confirmability {
+	return Confirmability{Code: string(r.code), Reason: strings.TrimPrefix(strings.Join(r.lines, "\n"), linePrefix)}
 }
 
 // nextAfterConfirm は、レビュー済みを書いたあとの出力を組む。親をクローズできる状態（closing.CloseProblems が空）になったら、親をクローズする流れを言う。まだなら status を促す。

@@ -23,6 +23,7 @@ import (
 	"ccnavi/internal/tickets/approval/marks"
 	"ccnavi/internal/tickets/config/phases"
 	"ccnavi/internal/tickets/config/risk"
+	"ccnavi/internal/tickets/core"
 	"ccnavi/internal/tickets/flow"
 	"ccnavi/internal/tickets/model/archive"
 	"ccnavi/internal/tickets/model/oplog"
@@ -207,9 +208,10 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	parents := slices.Clone(slices.Concat(openCopies, closedCopies))
 	sort.SliceStable(parents, func(i, j int) bool { return parents[i].ID < parents[j].ID })
 	var families []*parentRow
+	fams := standing.NewFamilies(conf, root) // 親子の立ち位置は親ごとに 1 度だけ読む（レビュー完了にできるかの判定が引く）
 	for _, p := range parents {
 		if !p.IsChild() {
-			families = append(families, parentRecord(conf, root, p, idx.closed, raw, settled))
+			families = append(families, parentRecord(conf, root, p, idx.closed, raw, settled, fams))
 		}
 	}
 	markAttention(rows, families, waiting)
@@ -604,12 +606,14 @@ type parentRow struct {
 type phaseRow struct {
 	number                               int
 	gateClosed, reviewWaiting, escalates bool
+	// confirm は review confirm でレビュー済みにできるか（状態だけで決まる分。core.ConfirmableByState）。
+	confirm core.Confirmability
 }
 
 func (p phaseRow) needsUser() bool { return p.gateClosed || p.reviewWaiting || p.escalates }
 
 // phaseRecord はフェーズ 1 つ。判定と同じ Phase から組む。manual は手で done/ に動かされた子の確認待ちなど（無ければ空）。
-func phaseRecord(ph *phase.Phase, manual string) (*pyjson.Object, phaseRow) {
+func phaseRecord(ph *phase.Phase, manual string, confirm core.Confirmability) (*pyjson.Object, phaseRow) {
 	state := phaseActive
 	switch {
 	case len(ph.Tickets) == 0:
@@ -660,15 +664,21 @@ func phaseRecord(ph *phase.Phase, manual string) (*pyjson.Object, phaseRow) {
 		"risk_escalates", ph.RiskEscalates(),
 		"risk_line", ph.RiskLine(),
 		"manual", manual,
+		"review_confirm", confirmObject(confirm),
 	)
 	return obj, phaseRow{number: ph.Number, gateClosed: ph.GateClosed(), reviewWaiting: ph.ReviewWaiting(),
-		escalates: ph.RiskEscalates()}
+		escalates: ph.RiskEscalates(), confirm: confirm}
+}
+
+// confirmObject は「レビュー完了にできるか」の JSON。断るときだけ code と reason を持つ（できるなら空文字）。
+func confirmObject(c core.Confirmability) *pyjson.Object {
+	return pyjson.NewObject("ok", c.OK, "code", c.Code, "reason", c.Reason)
 }
 
 // parentRecord は親 1 件。局面、計画、計画の流れ（図の中身）、親のマーカー、フェーズの並び。クローズした親は局面を持たない
 // （「クローズ可」と言っても意味が無い）。
 func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, closedIndex map[string]*ticket.Ticket,
-	raw *approval.Raw, settled []*ticket.Ticket) *parentRow {
+	raw *approval.Raw, settled []*ticket.Ticket, fams *standing.Families) *parentRow {
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
 	_, closed := closedIndex[parent.ID]
 	stage := ""
@@ -695,7 +705,7 @@ func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, clo
 		if ph.ReviewRequired() {
 			line = phase.AssessManual(conf, root, parent, ph, list, phase.ManualOptions{}).Line()
 		}
-		obj, row := phaseRecord(ph, line)
+		obj, row := phaseRecord(ph, line, core.ConfirmableByState(conf, root, parent, closed, ph, fams))
 		phaseObjs = append(phaseObjs, obj)
 		rows = append(rows, row)
 	}

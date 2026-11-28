@@ -22,6 +22,8 @@ ccnavi の開発で、操作を止める条件を足す・直すとき、実装�
 
 `review-request` の前提は `go/internal/tickets/review/request` の `gate`、`decide` の依頼の記録・動きの検査は `go/internal/tickets/review/decide` の `gate` に置く。本体と `--check`（`ccnavi --check review prepare`・`ccnavi --entry sh user reviewed N --check --accept-unresolved`。sh がロック・取り込みの前に呼ぶ）が同じ関数を通る。`approval-request`・`review confirm`・`ready` も同じ型で、sh がロック・取り込みの前に `--check` を呼び、本体と同じ関数で断る（`go/internal/tickets/core` の `confirmGate`、`review/closeout` の `readyGate`。断るときは `次:` を足す。`ready --check` は、前の回が退避を始めている打ち直しなら通して本体に任せる。Draft かどうかはホストの結果が要る）。マージリクエストの有無など、ホストの API が要る条件は事前には判断しない。
 
+ボード（`--explain --json`）も `review confirm` の条件を同じ関数で調べる。フェーズごとの `review_confirm`（`inbox.review[]` にも付く）は、`core.ConfirmableByState` が `confirmGate` と同じ `stateRefusal` を通って返す。チケットと記録だけで決まる条件（親が作業中・親子のチケットが決まる・レビュー済みでない・依頼の記録が在る）だけを見る。git に聞く条件（依頼のあとに見るものが動いたか・手で動かした移動の共有）とホストの条件は、ボードの答えを重くしないために見ず、押したあとに `confirmGate`・`confirm` が断る。拡張は `ok` を読むだけで、条件を組み直さない。条件を足すときは、状態だけで決まるなら `stateRefusal` に置く（ボードも変わる）。
+
 親のワークツリーの未コミットの変更と親ブランチの未 push は、`go/internal/tickets/lifecycle/treegate` の `Check` に寄せた。操作が見る条件は `watches` に宣言する（confirm・decide の未 push の確かめ直しも `Reviewed` として宣言する）。git の呼び出しが重複していないことは `treegate` の `single_source_test.go`、操作ごとの拒否は `treegate_test.go` が守る。置き場の判定は `place.IsTicketPlace`（`go/internal/tickets/model/place`）に一本化した。
 
 ## ユーザに頼む操作は、後のゲートで止まる条件を先に拒否する

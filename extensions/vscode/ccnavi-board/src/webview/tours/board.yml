@@ -177,6 +177,7 @@ sample:
             review_required: true
             gate_closed: true
             review_waiting: true
+            review_confirm: { ok: true, code: "", reason: "" }
             risk: { points: 60, level: HIGH }
             risk_line: "リスク: 60 (HIGH)"
     # 手元の退避（アーカイブの列）。マージ状況の帯のタイトルは、ここの同じ親から取る

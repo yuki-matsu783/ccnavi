@@ -96,6 +96,7 @@ export function phaseJson(number: number, over: Partial<PhaseJson> = {}): PhaseJ
     risk_escalates: false,
     risk_line: "",
     manual: "",
+    review_confirm: { ok: false, code: "CORE_CONFIRM_NOT_REQUESTED", reason: "依頼の記録がありません。先に review-request してください" },
     ...over,
   };
 }
@@ -108,6 +109,7 @@ export function waitingPhase(number: number, mr = 12, url = `https://example.com
     gate_closed: true,
     review_waiting: true,
     marks: { pending: {}, requested: { head: "abc", mr, url, host: "example", since: "t" } },
+    review_confirm: { ok: true, code: "", reason: "" },
     ...over,
   });
 }

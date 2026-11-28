@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"ccnavi/internal/infra/pyjson"
+	"ccnavi/internal/tickets/core"
 )
 
 func inboxIDs(o *pyjson.Object, key string) []string {
@@ -25,7 +26,7 @@ func TestInboxPutsEachTicketInTheFirstKindItMatches(t *testing.T) {
 		calmRow("i0001-03-03", "i0001", 3, nil),
 		calmRow("i0002", "", 0, func(r *ticketRow) { r.attention = true }),
 	}
-	parents := []*parentRow{{id: "i0001", phases: []phaseRow{{number: 1}, {number: 2, gateClosed: true, reviewWaiting: true}, {number: 3}}}}
+	parents := []*parentRow{{id: "i0001", phases: []phaseRow{{number: 1}, {number: 2, gateClosed: true, reviewWaiting: true, confirm: core.Confirmability{Code: "CORE_CONFIRM_NO_PARENT", Reason: "親が作業中にありません"}}, {number: 3}}}}
 	got := inboxRecord(rows, parents, []string{"i0001-03-02", "i0002"}, []any{})
 	if want := []string{"i0001-03-02", "i0002"}; !slices.Equal(inboxIDs(got, "approval"), want) {
 		t.Errorf("approval = %v", got.Value("approval"))
@@ -33,6 +34,10 @@ func TestInboxPutsEachTicketInTheFirstKindItMatches(t *testing.T) {
 	review, _ := got.Value("review").([]any)
 	if len(review) != 1 || review[0].(*pyjson.Object).String("parent") != "i0001" || review[0].(*pyjson.Object).Value("phase") != 2 {
 		t.Errorf("review = %v", review)
+	}
+	// 完了にできるかの答え（フェーズの review_confirm と同じもの）を、理由つきでそのまま持つ。
+	if c, _ := review[0].(*pyjson.Object).Value("review_confirm").(*pyjson.Object); c == nil || c.Value("ok") != false || c.String("code") != "CORE_CONFIRM_NO_PARENT" {
+		t.Errorf("review_confirm = %v", review[0].(*pyjson.Object).Value("review_confirm"))
 	}
 	if want := []string{"i0001-01-01"}; !slices.Equal(inboxIDs(got, "notice"), want) {
 		t.Errorf("notice = %v", got.Value("notice"))

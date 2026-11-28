@@ -154,7 +154,7 @@ test("CB-T605 子のバッジ: copyStatusがreviewのときは自分のフェー
     assert.equal(cards.get(id)!.status.title, "チケットはレビュー待ちの場所にありますが、フェーズの状態と合っていません", id);
     assert.deepEqual(cards.get(id)!.actions, [], `${id}: 要確認の子にはレビューの操作を出さない`);
   }
-  // 操作はバッジが「レビュー待ち」の子だけ。MRのURLは断片を除いたMR自体
+  // 操作は、フェーズが review_confirm.ok の子だけ（バッジの言葉は見ない）。MRのURLは断片を除いたMR自体
   assert.deepEqual(cards.get("c1")!.actions, [{ kind: "review", parent: "i0001", phase: 1, mrUrl: "https://example.com/o/r/pull/12" }]);
   assert.deepEqual(cards.get("c2")!.actions, []);
   assert.deepEqual(cards.get("c3")!.actions, []);
@@ -181,9 +181,11 @@ test("CB-T606 子のバッジ: copyStatusがopenのとき、フェーズがレ�
   for (const id of ["held", "waiting"]) {
     assert.equal(label(cards.get(id)), "要確認", id);
     assert.equal(cards.get(id)!.status.title, "チケットは作業中ですが、フェーズがレビューで止まっています", id);
-    // open + レビュー待ちの子にレビューの操作は出さない
-    assert.deepEqual(cards.get(id)!.actions, [], id);
   }
+  // レビューの操作はバッジでなく実行ファイルの答え（review_confirm.ok）で決める。サイドパネルと同じく、
+  // レビュー待ちで完了にできるフェーズの子には、バッジが要確認でも出す
+  assert.deepEqual(cards.get("held")!.actions, []);
+  assert.deepEqual(cards.get("waiting")!.actions, [{ kind: "review", parent: "i0001", phase: 3, mrUrl: "https://example.com/o/r/pull/12" }]);
 });
 
 test("CB-T607 子のバッジ: どの規則にもヒットしなければ要確認で、読めた欄をツールチップに出す（承認待ちでない提案、フェーズが引けない子）", () => {
@@ -305,4 +307,26 @@ test("CB-T1247 着手待ち・作業中・レビュー準備中のバッジは�
   assert.match(statusOf(open).title, /Claude Codeに着手を頼む/);
   assert.match(statusOf({ ...open, startedAt: "2026-01-01" }).title, /エージェントが作業中.*操作は要りません/);
   assert.match(statusOf({ ...open, phases: [{ status: "レビュー準備中" }] }).title, /エージェントがレビュー依頼を出す番/);
+});
+
+test("CB-T1310 ［レビュー完了］は、実行ファイルの review_confirm.ok だけで出す。バッジが要確認でも出し、okでなければレビュー待ちでも出さない", () => {
+  const phases = [
+    waitingPhase(1), // 完了にできる
+    waitingPhase(2, 13, undefined, { review_confirm: { ok: false, code: "CORE_CONFIRM_NO_PARENT", reason: "親のワークツリーの外にしか無い" } }),
+  ];
+  const json = boardOf(
+    [
+      ticketJson("i0001"),
+      // 子が書き込み停止中でバッジは要確認だが、フェーズは完了にできる
+      reviewJson("c1", { parent: "i0001", phase: 1, blocked: "停止中" }),
+      reviewJson("c2", { parent: "i0001", phase: 2 }),
+    ],
+    [parentJson("i0001", phases)],
+  );
+  const cards = cardsOf(json);
+  assert.equal(label(cards.get("c1")), "要確認");
+  assert.deepEqual(cards.get("c1")!.actions, [{ kind: "review", parent: "i0001", phase: 1, mrUrl: "https://example.com/o/r/pull/12" }]);
+  assert.equal(label(cards.get("c2")), "レビュー待ち");
+  assert.deepEqual(cards.get("c2")!.actions, []);
+  assert.equal(cards.get("c2")!.confirmReviewReason, "親のワークツリーの外にしか無い");
 });

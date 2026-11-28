@@ -28,7 +28,7 @@ test("CB-T1307 見出しはユーザ待ち・進行中の親・画面の順。�
   const tree = sidebarTree({
     board: withInbox({
       approval: ["i0001-02-03"],
-      review: [{ parent: "i0001", phase: 2 }],
+      review: [{ parent: "i0001", phase: 2, review_confirm: { ok: true, code: "", reason: "" } }],
       notice: ["i0001-02-02"],
       handoff: [
         { tree: "<root>", count: 2 },
@@ -62,7 +62,7 @@ test("CB-T1308 行を押すと、該当の画面と場所を開く（承認・�
   const tree = sidebarTree({
     board: withInbox({
       approval: ["i0001-02-03"],
-      review: [{ parent: "i0001", phase: 2 }],
+      review: [{ parent: "i0001", phase: 2, review_confirm: { ok: true, code: "", reason: "" } }],
       notice: ["i0001-02-02"],
       handoff: [{ tree: "<ROOT>/.claude/worktrees/i0001", count: 1 }],
       flow_draft: ["i0001-02-04"],
@@ -112,7 +112,7 @@ test("CB-T1285 チケット制御が無効なら、チケットに関わる行�
   const tree = sidebarTree({
     board: withInbox({
       approval: ["i0001-02-03"],
-      review: [{ parent: "i0001", phase: 2 }],
+      review: [{ parent: "i0001", phase: 2, review_confirm: { ok: true, code: "", reason: "" } }],
       notice: ["i0001-02-02"],
       handoff: [{ tree: "<root>", count: 1 }],
       flow_draft: ["i0001-02-04"],
@@ -152,4 +152,15 @@ test("CB-T1286 答えがまだ無い・読めないときは、ユーザ待ち�
   assert.equal(failed.nodes[0].children[0].tooltip, "ccnavi --explain --jsonが失敗しました: x");
   assert.equal(failed.nodes[1].label, "画面");
   assert.equal(failed.nodes[1].children.length, 7);
+});
+
+test("CB-T1311 レビュー待ちのうちレビュー完了にできないフェーズは、理由をツールチップに出す（行は残す）", () => {
+  const reason = "親のワークツリーの外にしか無い";
+  const tree = sidebarTree({
+    board: withInbox({ review: [{ parent: "i0001", phase: 2, review_confirm: { ok: false, code: "CORE_CONFIRM_NO_PARENT", reason } }] }),
+    tickets: true,
+  });
+  const review = find(tree.nodes, "review:i0001:2");
+  assert.equal(review?.description, "完了にできません");
+  assert.ok(review?.tooltip.includes(reason));
 });

@@ -109,10 +109,23 @@ export interface FlowDraftJson {
   readonly differs: boolean;
 }
 
-/** レビュー待ちのフェーズ1つ */
+/**
+ * フェーズをレビュー完了（`review confirm`）にできるかの、実行ファイルの答え。チケットと記録だけで決まる分
+ * （git・ホストに聞く条件は含まない）。サイドパネルとカードは、これを読んで操作を出し分ける
+ */
+export interface ReviewConfirmJson {
+  readonly ok: boolean;
+  /** できないときの種別（`CORE_CONFIRM_*`）。できるときは空 */
+  readonly code: string;
+  /** できないときの理由（ユーザ向けの文）。できるときは空 */
+  readonly reason: string;
+}
+
+/** レビュー待ちのフェーズ1つ。完了にできないものも理由を付けて入る */
 export interface InboxReviewJson {
   readonly parent: string;
   readonly phase: number;
+  readonly review_confirm: ReviewConfirmJson;
 }
 
 /** 取り込み待ちのあるツリー1つ。`tree`は`trees[].root` */
@@ -264,6 +277,8 @@ export interface PhaseJson {
   readonly risk_line: string;
   /** 手でdone/ に動かされた子の確認待ち・移動が未共有など。判定が出す1行。無ければ空 */
   readonly manual: string;
+  /** このフェーズをレビュー完了にできるか。判定は実行ファイルが持ち、拡張は組み直さない */
+  readonly review_confirm: ReviewConfirmJson;
 }
 
 export interface ParentJson {
@@ -479,13 +494,18 @@ function inboxOf(raw: Record<string, unknown>): InboxJson {
     approval: list(raw.approval).map(str),
     review: list(raw.review)
       .filter(isRecord)
-      .map((r) => ({ parent: str(r.parent), phase: typeof r.phase === "number" ? r.phase : 0 })),
+      .map((r) => ({ parent: str(r.parent), phase: typeof r.phase === "number" ? r.phase : 0, review_confirm: reviewConfirmOf(r.review_confirm) })),
     notice: list(raw.notice).map(str),
     handoff: list(raw.handoff)
       .filter(isRecord)
       .map((h) => ({ tree: str(h.tree), count: typeof h.count === "number" ? h.count : 0 })),
     flow_draft: list(raw.flow_draft).map(str),
   };
+}
+
+function reviewConfirmOf(raw: unknown): ReviewConfirmJson {
+  const r = isRecord(raw) ? raw : {};
+  return { ok: r.ok === true, code: str(r.code), reason: str(r.reason) };
 }
 
 function tree(raw: Record<string, unknown>): TreeJson {
@@ -715,6 +735,7 @@ function phase(raw: Record<string, unknown>): PhaseJson {
     risk_escalates: raw.risk_escalates === true,
     risk_line: str(raw.risk_line),
     manual: str(raw.manual),
+    review_confirm: reviewConfirmOf(raw.review_confirm),
   };
 }
 

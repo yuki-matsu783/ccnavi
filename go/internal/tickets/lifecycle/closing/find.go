@@ -180,26 +180,36 @@ func MisplacedHome(stderr io.Writer, conf *config.Settings, root string, t *tick
 // FamilyStopped は親子のチケットが決まらない（親のワークツリーが無いなど）か、引いたチケットが親の
 // ワークツリーの外にしか無ければ、言って真。信頼しないチケットの状態は動かさない。
 func FamilyStopped(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
-	st := approval.FamilyStanding(conf, root, t, nil)
+	text := FamilyStopText(conf, root, t, nil)
+	if text == "" {
+		return false
+	}
+	io.WriteString(stderr, text+"\n")
+	return true
+}
+
+// FamilyStopText は FamilyStopped が言う文（末尾の改行なし）。止めないなら空。ボードも同じ文で「動かせない」理由を出す。
+// fams は親子の立ち位置の窓口で、nil なら作る（呼び出しをまたいで使い回すと、同じ親子を読み直さない）。
+func FamilyStopText(conf *config.Settings, root string, t *ticket.Ticket, fams *standing.Families) string {
+	st := approval.FamilyStanding(conf, root, t, fams)
 	if st.Stop != "" {
-		fmt.Fprintf(stderr, "ccnavi: %s: %s。この親子のチケットの状態は動かさない\n", t.ID, st.Stop)
+		lines := []string{fmt.Sprintf("ccnavi: %s: %s。この親子のチケットの状態は動かさない", t.ID, st.Stop)}
 		for _, line := range standing.Guidance(root, st) {
-			fmt.Fprintf(stderr, "  %s\n", line)
+			lines = append(lines, "  "+line)
 		}
-		return true
+		return strings.Join(lines, "\n")
 	}
 	if st.Home != nil && !standing.SameTree(t.TreeRoot, st.Home.Root) {
 		shown := t.Tree
 		if shown == "" {
 			shown = "ワークスペースルート"
 		}
-		fmt.Fprintf(stderr, "ccnavi: %s: チケットが親のブランチ %s のワークツリーの外（%s）にしか無い。"+
+		return fmt.Sprintf("ccnavi: %s: チケットが親のブランチ %s のワークツリーの外（%s）にしか無い。"+
 			"取り込み済みの親子のチケットでは親のブランチ上のチケットだけが正なので、このチケットは動かさない。\n"+
-			"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/%s）へ移してコミットと push をしてから再実行します。\n",
+			"  ユーザがそのチケットを親のワークツリー（.claude/worktrees/%s）へ移してコミットと push をしてから再実行します。",
 			t.ID, st.Family, shown, st.Family)
-		return true
 	}
-	return false
+	return ""
 }
 
 // ParentNotStarted は子に着手してはいけないとき（親が承認されていない・作業中でない・未着手）に言って真。

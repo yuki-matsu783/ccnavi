@@ -8,7 +8,8 @@ import (
 )
 
 // inboxRecord はユーザ待ちの分類（チケット管理画面の inbox）。形は docs/11_requirements/json-shapes.md「ボードの JSON」。
-// チケットは上から最初に当てはまる 1 種類だけに入る: approval（承認待ち）→ review（レビュー待ちのフェーズ）→
+// チケットは上から最初に当てはまる 1 種類だけに入る: approval（承認待ち）→ review（レビュー待ちのフェーズ。レビュー完了にできるかを
+// `review_confirm` に持つ。完了にできないものも、理由を付けて review に残す。除くと、ユーザが待っている事実が見えなくなる）→
 // notice（attention のうち上の 2 つに入らないもの）→ flow_draft（attention ではなく、フローの下書きが「提案あり」。クローズした子は flow.DraftDiffers が偽にする）。
 // handoff はチケットではなくツリーごとの取り込み待ちの数。拡張は数を並べるだけにする（分類を 2 か所に持たない）。
 func inboxRecord(rows []*ticketRow, parents []*parentRow, pending []string, handoffs []any) *pyjson.Object {
@@ -21,7 +22,7 @@ func inboxRecord(rows []*ticketRow, parents []*parentRow, pending []string, hand
 			if !ph.reviewWaiting {
 				continue
 			}
-			review = append(review, pyjson.NewObject("parent", p.id, "phase", ph.number))
+			review = append(review, pyjson.NewObject("parent", p.id, "phase", ph.number, "review_confirm", confirmObject(ph.confirm)))
 			reviewing[p.id] = true
 			if waitingPhase[p.id] == nil {
 				waitingPhase[p.id] = map[int]bool{}

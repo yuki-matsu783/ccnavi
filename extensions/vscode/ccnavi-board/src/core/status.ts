@@ -6,6 +6,9 @@
  * ここは実行ファイルのJSONが判定した欄（`gate_closed`・`review_waiting`・`blocked`・`pending_approval`・
  * マーカー）を表示の言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない。
  *
+ * 「レビュー完了」の操作を出すかは、ここでは決めない。フェーズの`review_confirm`（実行ファイルの答え）を`board.ts`が読む。
+ * ここの「レビュー待ち」は言葉と色の言い換えだけで、操作の出し分けには使わない。
+ *
  * 規則は上から見て、最初にヒットしたものを採る。表は`docs/design/screens.md`の「状態のバッジ」と同じ。
  */
 import type { CopyStatus, PhaseJson } from "./model.js";

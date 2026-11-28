@@ -133,6 +133,7 @@ function chipOf(overrides: Partial<PhaseChip> = {}): PhaseChip {
     hold: "review",
     gateClosed: false,
     reviewWaiting: true,
+    reviewConfirm: { ok: true, code: "", reason: "" },
     reviewRequired: true,
     riskLevel: "",
     riskLine: "",

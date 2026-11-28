@@ -274,6 +274,7 @@ function waitingWithMr(url: string): BoardJson {
             gate_closed: true,
             review_required: true,
             review_waiting: true,
+            review_confirm: { ok: true, code: "", reason: "" },
             marks: { requested: { head: "abc", mr: 18, url, host: "github", since: "t", at: "t" } },
           }
         : p,

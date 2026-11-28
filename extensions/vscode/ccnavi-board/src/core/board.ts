@@ -16,6 +16,7 @@ import type {
   ParentJson,
   PredecessorUnmetJson,
   PhaseJson,
+  ReviewConfirmJson,
   ProposalState,
   ProposalJson,
   RemoteJson,
@@ -66,6 +67,8 @@ export interface PhaseChip {
   readonly gateClosed: boolean;
   /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSONの`review_waiting`をそのまま持つ */
   readonly reviewWaiting: boolean;
+  /** このフェーズをレビュー完了にできるか。JSONの`review_confirm`をそのまま持つ */
+  readonly reviewConfirm: ReviewConfirmJson;
   readonly reviewRequired: boolean;
   /** 実績のリスクの水準（LOW / MEDIUM / HIGH / CRITICAL）。測っていなければ空 */
   readonly riskLevel: string;
@@ -114,6 +117,10 @@ export interface Card {
   readonly gateClosed: boolean;
   /** 子なら自分のフェーズがユーザのレビュー待ちか、親ならfalse */
   readonly reviewWaiting: boolean;
+  /** 子なら自分のフェーズをレビュー完了にできるか（JSONの`review_confirm.ok`）、親ならfalse。［レビュー完了］を出すかはこれだけで決める */
+  readonly canConfirmReview: boolean;
+  /** 子で完了にできないとき、その理由（JSONの`review_confirm.reason`）。できるとき・親は空 */
+  readonly confirmReviewReason: string;
   readonly pendingApproval: boolean;
   /** 親だけ。承認済みの親に改版の提案が出ているか（承認待ちで、承認済みチケットも在る） */
   readonly revision: boolean;
@@ -285,6 +292,7 @@ function toCard(
   const riskLevel = typeof t.risk?.level === "string" ? t.risk.level : "";
   const gateClosed = !isParent && (ownPhase?.gate_closed ?? false);
   const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
+  const reviewConfirm = !isParent ? ownPhase?.review_confirm : undefined;
   const pendingApproval = pending.has(t.ticket);
 
   const base: Omit<Card, "status" | "hold" | "actions"> = {
@@ -315,6 +323,8 @@ function toCard(
     scattered: t.scattered,
     gateClosed,
     reviewWaiting,
+    canConfirmReview: reviewConfirm?.ok ?? false,
+    confirmReviewReason: reviewConfirm !== undefined && !reviewConfirm.ok ? reviewConfirm.reason : "",
     pendingApproval,
     revision: isParent && pendingApproval && t.copy.status !== "none",
     phaseLabel: !isParent && ownPhase ? ownPhase.label : "",
@@ -341,17 +351,23 @@ function toCard(
   return withStatus(base);
 }
 
+/** クローズした（完了・取り消し・退避した）カードの列か */
+function isClosedColumn(column: string): boolean {
+  return column === "done" || column === "cancelled" || column === "archived";
+}
+
 /**
  * 状態のバッジと、ユーザ待ちの操作を付ける。操作はバッジと別の規則で決める。
- * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。レビュー完了はバッジが「レビュー待ち」の子だけ
- * （承認待ちの子には出さない）。親には付けない（親のフェーズ行にはレビューの操作を置かない）
+ * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。レビュー完了は、実行ファイルが「このフェーズは
+ * レビュー完了にできる」と答えた（`review_confirm.ok`）子だけ。バッジの言葉は見ない（バッジが「要確認」でも出す）。
+ * クローズした子と承認待ちの子には出さない。親には付けない（親のフェーズ行にはレビューの操作を置かない）
  */
 function withStatus(base: Omit<Card, "status" | "hold" | "actions">): Card {
   const status = statusOf(base);
   const actions: Action[] = [];
   if (base.pendingApproval) {
     actions.push({ kind: "approve" });
-  } else if (!base.isParent && status.label === "レビュー待ち" && base.phase !== null) {
+  } else if (!base.isParent && base.canConfirmReview && base.phase !== null && !isClosedColumn(base.column)) {
     actions.push({ kind: "review", parent: base.parent, phase: base.phase, mrUrl: mrPage(base.mrUrl) });
   }
   return { ...base, status, hold: holdOf(status.label), actions };
@@ -391,6 +407,8 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     scattered: [],
     gateClosed: false,
     reviewWaiting: false,
+    canConfirmReview: false,
+    confirmReviewReason: "",
     pendingApproval: false,
     revision: false,
     phaseLabel: "",
@@ -482,6 +500,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     hold: holdOf(status),
     gateClosed: p.gate_closed,
     reviewWaiting: p.review_waiting,
+    reviewConfirm: p.review_confirm,
     reviewRequired: p.review_required,
     riskLevel: typeof p.risk?.level === "string" ? p.risk.level : "",
     riskLine: p.risk_line,
