@@ -29,7 +29,7 @@ import (
 
 const (
 	// issueURLSlot は返信の本文の、issue の URL を入れる枠。issue を作った呼び手が置き換える。
-	issueURLSlot = "{issue_url}"
+	issueURLSlot = host.IssueURLSlot
 	// issueLinksSlot は決めた内容のコメントの、作った issue の一覧を入れる枠。issue に回す指摘があるときだけ入る。
 	issueLinksSlot = "{issue_links}"
 	// maxIssues は 1 回の apply で issue にできる指摘の上限（ホストへの書き込みを 1 回の操作に収める）。
@@ -113,8 +113,9 @@ func DecidePreviewOf(conf *config.Settings, root, parentID string, number int, r
 // 増えた指摘は食い違いに数えず、未対応として残す。carry はホストで受け入れ済みと確かめたキーで、結果で解決済みで
 // なければならず、fix にはできない。HostPlan からは外れる（もう書かない）。
 //
-// HostPlan は {"issues": [{key, op, title, body, comments}], "replies": [{key, thread_id, body}],
-// "resolves": [{key, thread_id}], "comment"}。書く順は issues、replies、resolves、changes のコミット、comment。
+// HostPlan は {"steps": [{kind, key, part, after_commit}]（書く順。host.WriteOrder が決める。呼び手は並びのとおりに
+// 送るだけ）, "issues": [{key, op, title, body, comments}], "replies": [{key, thread_id, body}],
+// "resolves": [{key, thread_id}], "comment"}。書く順は steps（issue と続きのコメント、返信、解決。changes のコミットのあとに comment）。
 // 続きの子（fix）の識別子は親のブランチ上の既存のチケットだけを見て決め、直す指摘も追加分も無ければマーカーを置く。
 func Decide(conf *config.Settings, root string, actor Actor, stamp, parentID string, number int, result host.Result, changed string, moved request.Moved, choices *pyjson.Object, shownDigest string, carry []string) (Decided, error) {
 	// 1. 決められる状態か（decision）と、ユーザに見せた内容（ダイジェスト・選択）が読めるか。
@@ -370,7 +371,7 @@ func issueTitle(head string, t host.Thread) string {
 }
 
 // issuePlan は指摘 1 件の issue の計画。本文の頭に、操作ID の隠しコメントを入れる。
-func issuePlan(d *decide.Decision, t host.Thread) *pyjson.Object {
+func issuePlan(d *decide.Decision, t host.Thread) (*pyjson.Object, host.IssueWrite) {
 	key := host.ThreadKey(t)
 	op := oplog.IDFor(opDecideIssue, d.Parent.ID, strconv.Itoa(d.Phase.Number), key, host.ThreadVersion(t))
 	main, parts := decide.IssueTexts(d, []host.Thread{t}, op)
@@ -379,7 +380,7 @@ func issuePlan(d *decide.Decision, t host.Thread) *pyjson.Object {
 		"key", key, "op", op, "title", issueTitle(head, t),
 		"body", host.IssueMarker(op)+"\n\n"+strings.TrimLeft(rest, "\n"),
 		"comments", list(parts),
-	)
+	), host.IssueWrite{Key: key, Parts: len(parts)}
 }
 
 // hostPlan はホストへの書き込みの計画。返信と解決は accepted（ホストにまだ書いていない受け入れ）からだけ組む。
@@ -390,9 +391,14 @@ func hostPlan(d *decide.Decision, accepted []accepting, picked map[decide.Choice
 		byKey[host.ThreadKey(t)] = t
 	}
 	issues, replies, resolves := []any{}, []any{}, []any{}
+	var writes []host.IssueWrite
+	var threads []string
 	for _, a := range accepted {
+		threads = append(threads, a.key)
 		if a.choice == decide.Issue {
-			issues = append(issues, issuePlan(d, byKey[a.key]))
+			plan, write := issuePlan(d, byKey[a.key])
+			issues = append(issues, plan)
+			writes = append(writes, write)
 		}
 	}
 	for _, a := range accepted {
@@ -409,5 +415,9 @@ func hostPlan(d *decide.Decision, accepted []accepting, picked map[decide.Choice
 	if len(issues) > 0 {
 		comment += "\nissue に回した分:\n" + issueLinksSlot + "\n"
 	}
-	return pyjson.NewObject("issues", issues, "replies", replies, "resolves", resolves, "comment", comment)
+	steps := []any{}
+	for _, st := range host.WriteOrder(writes, threads, comment != "") {
+		steps = append(steps, pyjson.NewObject("kind", string(st.Kind), "key", st.Key, "part", st.Part, "after_commit", st.AfterCommit()))
+	}
+	return pyjson.NewObject("steps", steps, "issues", issues, "replies", replies, "resolves", resolves, "comment", comment)
 }

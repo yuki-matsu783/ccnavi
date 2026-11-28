@@ -1,14 +1,14 @@
 /**
- * decide のホスト書き込みを、順序を守って実行する。ネットワークには `HostOps` を通してしか出ない。
- * 画面は service worker 経由の `callOps` を渡す。PAT はここに来ない。
+ * decide のホスト書き込みを、ccnavi（WASM の decide）が決めた並び（計画の `steps`）のとおりに送る。ネットワークには
+ * `HostOps` を通してしか出ない。画面は service worker 経由の `callOps` を渡す。PAT はここに来ない。
  *
- * 実行の順序は固定である。
- * (1) 全 issue の作成。作る前に、同じ操作 ID の印を本文の 1 行目に持つ issue を探す。あれば作らず、それを使う。
- *     探すのが失敗したら、作り直さずに止める。続きのコメントには `part=<i>` の印を付け、使い回した issue でも足りない分だけ付ける。
- * (2) 全返信。`{issue_url}` は作った issue の URL に置き換える。末尾に操作 ID の印を付け、同じ印の返信が既にあるスレッドには付けない。
- * (3) 全解決。
- * (4) MR へのコメント。計画の `comment` があるときだけ行い、`{issue_links}` は作った issue の URL の一覧に置き換える。
- *     `decidePhase` は `comment` を null で渡し、親のブランチへのコミットが済んでから自分で投稿する。
+ * 何をどの順で書くかは Go の `host.WriteOrder` が決める（ターミナルの sh も同じ並びを使う）。ここは並びを変えず、
+ * 1 つずつ送って結果を返すだけである。並びは issue の作成と続きのコメント、返信、解決、MR へのコメントの順。
+ * - issue: 作る前に、同じ操作 ID の印を本文の 1 行目に持つ issue を探す。あれば作らず、それを使う。
+ *   探すのが失敗したら、作り直さずに止める。続きのコメントには `part=<i>` の印を付け、使い回した issue でも足りない分だけ付ける。
+ * - 返信: `{issue_url}` は作った issue の URL に置き換える。末尾に操作 ID の印を付け、同じ印の返信が既にあるスレッドには付けない。
+ * - MR へのコメント: 計画の `comment` があるときだけ行い、`{issue_links}` は作った issue の URL の一覧に置き換える。
+ *   `decidePhase` は `comment` を null で渡し、親のブランチへのコミットが済んでから自分で投稿する。
  * どこかで失敗したら、その時点で止めて、済ませたことと失敗の理由を返す。例外にはしない。同じキーは二度書かない。
  *
  * 呼ぶ側は、1 回の確定につき 1 度だけ呼ぶ。`writeLoop` の周の中では呼ばない。操作の記録は持たない。
@@ -22,11 +22,25 @@ import type { IssueRef } from "./github.js";
 
 /** ccnavi の `decide` が返す、ホストへ書く計画（`host_plan`） */
 export interface HostPlan {
+  /** 書く順（Go の `host.WriteOrder`）。並びを変えずに送る */
+  readonly steps: readonly PlanStep[];
   readonly issues: readonly PlanIssue[];
   readonly replies: readonly PlanReply[];
   readonly resolves: readonly PlanResolve[];
   /** 決めた内容のコメント。無ければ null */
   readonly comment: string | null;
+}
+
+export type PlanStepKind = "issue" | "issue-part" | "reply" | "resolve" | "note";
+
+export interface PlanStep {
+  readonly kind: PlanStepKind;
+  /** 指摘のキー（note は空） */
+  readonly key: string;
+  /** issue-part の番号（1 始まり） */
+  readonly part: number;
+  /** 親のブランチへのコミットのあとに書く */
+  readonly after_commit: boolean;
 }
 
 export interface PlanIssue {
@@ -185,7 +199,30 @@ export function planProblems(plan: unknown): string[] {
     resolved.add(r.key);
     resolvedThreads.add(r.thread_id);
   }
+  out.push(...stepProblems(p as HostPlan));
   return out;
+}
+
+/** `steps` が、計画の issue・返信・解決を 1 度ずつ並べているか（並び自体は Go が決める） */
+function stepProblems(p: HostPlan): string[] {
+  if (!Array.isArray(p.steps)) return ["計画の steps が配列ではありません"];
+  const want = new Map<string, number>();
+  const add = (k: string) => want.set(k, (want.get(k) ?? 0) + 1);
+  for (const i of p.issues) {
+    add(`issue\0${i.key}`);
+    for (let n = 1; n <= (i.comments?.length ?? 0); n++) add(`issue-part\0${i.key}\0${n}`);
+  }
+  for (const r of p.replies) add(`reply\0${r.key}`);
+  for (const r of p.resolves) add(`resolve\0${r.key}`);
+  for (const s of p.steps) {
+    if (s.kind === "note") continue; // コメントは呼び手が null にして自分で投稿することがある
+    const k = s.kind === "issue-part" ? `issue-part\0${s.key}\0${s.part}` : `${s.kind}\0${s.key}`;
+    const left = want.get(k);
+    if (left === undefined || left === 0) return [`steps に計画に無い（か重なった）書き込みがあります：${s.kind} ${s.key}`];
+    want.set(k, left - 1);
+  }
+  const missing = [...want].filter(([, n]) => n > 0).map(([k]) => k.split("\0").slice(0, 2).join(" "));
+  return missing.length > 0 ? [`steps に並んでいない書き込みがあります：${missing.join(" / ")}`] : [];
 }
 
 // ---- 書く前の確かめ ----------------------------------------------------------------
@@ -317,89 +354,109 @@ export async function runHostPlan(ops: HostOps, repo: RepoRef, mr: number, plan:
   }
 
   async function execute(): Promise<HostStepResult> {
-    // (1) issue。作る前に同じ印の issue を探す。探すのが失敗したら、作り直さずに止める
     const urlOf = new Map<string, string>();
-    for (const issue of plan.issues) {
-      notify("issue", issue.key, "start");
-      const op = markerOf(issue.body);
-      let made: IssueRef;
-      let reused = false;
-      try {
-        const found = await ops.findIssue(repo, `<!-- ccnavi:issue op=${op} -->`);
-        if (found.truncated) searchTruncated = true;
-        reused = found.issue !== null;
-        made = found.issue ?? (await ops.createIssue(repo, oneLine(issue.title), issue.body));
-        urlOf.set(issue.key, safeUrl(made.url));
-      } catch (err) {
-        return stop("issue", issue.key, err);
-      }
-      issues.push({ key: issue.key, number: made.number, url: made.url, reused });
-      notify("issue", issue.key, reused ? "reused" : "done");
-      // 続きのコメント: 印（part=<i>）が無い分だけ付ける。使い回した issue では、コメントを読めなければ止める
-      const parts = issue.comments ?? [];
-      if (parts.length > 0) {
-        try {
-          const have = reused ? await ops.listIssueComments(repo, made.number) : [];
-          for (const [i, part] of parts.entries()) {
-            const mark = partMarker(op, i + 1);
-            if (have.some((c) => c.split("\n", 1)[0].replace(/\r$/, "") === mark)) continue;
-            await ops.commentIssue(repo, made.number, `${mark}\n${part}`);
+    const issueByKey = new Map(plan.issues.map((i) => [i.key, i]));
+    const replyByKey = new Map(plan.replies.map((r) => [r.key, r]));
+    const resolveByKey = new Map(plan.resolves.map((r) => [r.key, r]));
+    /** 作った（使い回した）issue。続きのコメントが引く */
+    const madeByKey = new Map<string, { number: number; reused: boolean; have?: readonly string[] }>();
+    /** 返信の印が既にあるスレッド（最初の返信の前に 1 度だけ読む） */
+    let known: Map<string, readonly string[]> | null = null;
+
+    for (const step of plan.steps) {
+      const issue = issueByKey.get(step.key);
+      switch (step.kind) {
+        case "issue": {
+          // 作る前に同じ印の issue を探す。探すのが失敗したら、作り直さずに止める
+          if (!issue) break;
+          notify("issue", issue.key, "start");
+          const op = markerOf(issue.body);
+          let made: IssueRef;
+          let reused = false;
+          try {
+            const found = await ops.findIssue(repo, `<!-- ccnavi:issue op=${op} -->`);
+            if (found.truncated) searchTruncated = true;
+            reused = found.issue !== null;
+            made = found.issue ?? (await ops.createIssue(repo, oneLine(issue.title), issue.body));
+            urlOf.set(issue.key, safeUrl(made.url));
+          } catch (err) {
+            return stop("issue", issue.key, err);
           }
-        } catch (err) {
-          return stop("issue-comment", issue.key, err);
+          madeByKey.set(issue.key, { number: made.number, reused });
+          issues.push({ key: issue.key, number: made.number, url: made.url, reused });
+          notify("issue", issue.key, reused ? "reused" : "done");
+          break;
+        }
+        case "issue-part": {
+          // 続きのコメント: 印（part=<i>）が無い分だけ付ける。使い回した issue では、コメントを読めなければ止める
+          const made = madeByKey.get(step.key);
+          const part = issue?.comments?.[step.part - 1];
+          if (!issue || !made || part === undefined) break;
+          try {
+            if (made.reused && made.have === undefined) made.have = await ops.listIssueComments(repo, made.number);
+            const mark = partMarker(markerOf(issue.body), step.part);
+            if ((made.have ?? []).some((c) => c.split("\n", 1)[0].replace(/\r$/, "") === mark)) break;
+            await ops.commentIssue(repo, made.number, `${mark}\n${part}`);
+          } catch (err) {
+            return stop("issue-comment", issue.key, err);
+          }
+          break;
+        }
+        case "reply": {
+          // 返信（issue の URL を置き換え、末尾に操作 ID の印を付ける。同じ印が既にあれば飛ばす）
+          const reply = replyByKey.get(step.key);
+          if (!reply) break;
+          if (known === null) {
+            try {
+              known = new Map((await ops.writeInfo(repo, mr)).threads.map((t) => [t.id, t.replyOps ?? []]));
+            } catch (err) {
+              return stop("reply", null, new Error(`既存の返信を確かめられないため、返信できません：${reasonOf(err)}`));
+            }
+          }
+          notify("reply", reply.key, "start");
+          try {
+            const url = urlOf.get(reply.key);
+            if (reply.body.includes(ISSUE_URL_SLOT) && url === undefined) throw new Error("返信に入れる issue の URL がありません");
+            const base = reply.body.split(ISSUE_URL_SLOT).join(url ?? "").trimEnd();
+            const op = await replyOp(reply.key, reply.thread_id, base);
+            if (!(known.get(reply.thread_id) ?? []).includes(op)) {
+              await ops.replyThread(repo, mr, reply.thread_id, `${base}\n\n<!-- ccnavi:reply op=${op} key=${encodeURIComponent(reply.key).slice(0, 200)} -->\n`);
+            }
+          } catch (err) {
+            return stop("reply", reply.key, err);
+          }
+          replied.push(reply.key);
+          notify("reply", reply.key, "done");
+          break;
+        }
+        case "resolve": {
+          const r = resolveByKey.get(step.key);
+          if (!r) break;
+          notify("resolve", r.key, "start");
+          try {
+            await ops.resolveThread(repo, mr, r.thread_id);
+          } catch (err) {
+            return stop("resolve", r.key, err);
+          }
+          resolved.push(r.key);
+          notify("resolve", r.key, "done");
+          break;
+        }
+        case "note": {
+          // MR へのコメント（作った issue の一覧を入れる）。計画に無ければ（decidePhase は null で渡す）書かない
+          if (!plan.comment) break;
+          notify("comment", null, "start");
+          try {
+            const links = issues.map((i) => `- ${i.url}`).join("\n");
+            await ops.postComment(repo, mr, plan.comment.split(ISSUE_LINKS_SLOT).join(links));
+          } catch (err) {
+            return stop("comment", null, err);
+          }
+          commented = true;
+          notify("comment", null, "done");
+          break;
         }
       }
-    }
-
-    // (2) 返信（issue の URL を置き換え、末尾に操作 ID の印を付ける。同じ印が既にあれば飛ばす）
-    let known = new Map<string, readonly string[]>();
-    if (plan.replies.length > 0) {
-      try {
-        known = new Map((await ops.writeInfo(repo, mr)).threads.map((t) => [t.id, t.replyOps ?? []]));
-      } catch (err) {
-        return stop("reply", null, new Error(`既存の返信を確かめられないため、返信できません：${reasonOf(err)}`));
-      }
-    }
-    for (const reply of plan.replies) {
-      notify("reply", reply.key, "start");
-      try {
-        const url = urlOf.get(reply.key);
-        if (reply.body.includes(ISSUE_URL_SLOT) && url === undefined) throw new Error("返信に入れる issue の URL がありません");
-        const base = reply.body.split(ISSUE_URL_SLOT).join(url ?? "").trimEnd();
-        const op = await replyOp(reply.key, reply.thread_id, base);
-        if (!(known.get(reply.thread_id) ?? []).includes(op)) {
-          await ops.replyThread(repo, mr, reply.thread_id, `${base}\n\n<!-- ccnavi:reply op=${op} key=${encodeURIComponent(reply.key).slice(0, 200)} -->\n`);
-        }
-      } catch (err) {
-        return stop("reply", reply.key, err);
-      }
-      replied.push(reply.key);
-      notify("reply", reply.key, "done");
-    }
-
-    // (3) 解決
-    for (const r of plan.resolves) {
-      notify("resolve", r.key, "start");
-      try {
-        await ops.resolveThread(repo, mr, r.thread_id);
-      } catch (err) {
-        return stop("resolve", r.key, err);
-      }
-      resolved.push(r.key);
-      notify("resolve", r.key, "done");
-    }
-
-    // (4) MR へのコメント（作った issue の一覧を入れる）
-    if (plan.comment) {
-      notify("comment", null, "start");
-      try {
-        const links = issues.map((i) => `- ${i.url}`).join("\n");
-        await ops.postComment(repo, mr, plan.comment.split(ISSUE_LINKS_SLOT).join(links));
-      } catch (err) {
-        return stop("comment", null, err);
-      }
-      commented = true;
-      notify("comment", null, "done");
     }
     return result();
   }

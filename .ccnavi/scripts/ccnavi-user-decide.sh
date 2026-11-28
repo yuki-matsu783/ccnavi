@@ -154,7 +154,9 @@ if [ -n "$resuming" ]; then
 fi
 review_host
 
-# decide: 選択を置く前に、受け入れる指摘（対応しない・issue に回す）へ返信を残して解決する。
+# decide: 選択を置く前に、issue を作り、受け入れる指摘（対応しない・issue に回す）へ返信を残して解決する。
+# 順は実行ファイルが決める（host.WriteOrder。issue と続きのコメント → 返信 → 解決 → 置く → 決めた内容のコメント）。
+# issue を先に作るのは、解決したのに issue が無い状態を作らないため（Chrome 拡張と同じ順）。作れなければ、返信も解決もしない。
 # <選択の JSON> <ダイジェスト>。計画の段階（置く側の事前検査とダイジェストの照合を含む。何も置かない）
 # が通れば、返信と解決をして結果を取り直す。失敗したら（ダイジェストの不一致を含む）答えを出して抜ける。
 accept_before_place() {
@@ -164,6 +166,7 @@ accept_before_place() {
 		# 保存した判断から計画を書き直す。返信・解決が済んでいれば繰り返さず、結果を取り直して置く側へ渡す。
 		ccnavi ops resume-plan "$resume_op" "$accept_plan" || exit 1
 		op_use_plan "$accept_plan"
+		issue_first "$accept_plan" || exit 1
 		if [ "$(op_field reply state)" = sent ] || [ "$(accept_count "$accept_plan")" = 0 ]; then
 			accept_file="$accept_plan"
 			refetch
@@ -180,7 +183,18 @@ accept_before_place() {
 		exit 1
 	fi
 	op_use_plan "$accept_plan"
+	issue_first "$accept_plan" || exit 1
 	accept_execute "$accept_plan"
+}
+
+# コミット（置く）の前に書く issue と続きのコメントを送る。<計画のファイル>
+# 先に、計画が書いてよい形か（id の字・取り直した結果に在るか。ホストには触れない）を確かめる。
+# 送れなければ理由を言って 1（返信も解決もしていない）。
+issue_first() {
+	accept_precheck "$1" || return 1
+	post_decision_staged before && return 0
+	printf '%s: issue を作れなかった。返信も解決もせず、何も置いていない: %s\n' "$review_label" "$post_warning" >&2
+	return 1
 }
 
 # ---- 決めた対応方針を投稿する。exe が state の置き場に書いた下書きから、issue を作ってコメントを残す。
@@ -190,7 +204,7 @@ accept_before_place() {
 
 post_decision() {
 	# 取れなければ post_warning で知らせる（置いたあとなので、決めたことは戻さない）
-	post_decision_staged || :
+	post_decision_staged after || :
 }
 
 # --resume の終わりに言うこと。

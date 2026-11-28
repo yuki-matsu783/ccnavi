@@ -23,7 +23,7 @@ keywords: [設計, 構成, service worker, WASM, Web Worker, hosts.json, ccnavi-
 ## decide のホスト書き込み
 
 残った指摘の対応方針を確定するとき、同梱の ccnavi の `decide` が返すホストへの書き込みの計画（issue・返信・解決・コメント）を、
-`src/core/decide-host.ts` が順序を守って実行する。
+`src/core/decide-host.ts` が、計画の `steps`（ccnavi が決めた並び。ターミナルの sh と同じ `host.WriteOrder`）のとおりに送る。順は持たない。
 
 - ホストへの操作は `HostOps` を通す。ボードは service worker 経由の `callOps` を渡し、PAT は service worker だけが持つ。
   service worker は操作ごとに、送り手がボードか、登録したリポジトリか、引数の形（thread id は API の経路と GraphQL に使える字、

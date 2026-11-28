@@ -32,9 +32,9 @@ func TestDecideAMismatchAfterTheHostWriteKeepsTheResolvedPartAndPlacesNothing(t 
 	if failed.Code != 1 || answerOf(t, failed.Stdout)["mismatch"] != true || !strings.Contains(failed.Stderr, "何も置いていない") {
 		t.Fatalf("code = %d\n%s%s", failed.Code, failed.Stdout, failed.Stderr)
 	}
-	// ホストで解決した分は残る。issue もコメントも作らない
+	// ホストで解決した分と、先に作った issue は残る。コメントは作らない
 	issues, notes := d.gl.stored()
-	if fmt.Sprint(d.gl.kinds()) != "[reply resolve]" || !d.gl.resolved("d1") || len(issues) != 0 || len(notes) != 0 {
+	if fmt.Sprint(d.gl.kinds()) != "[issue reply resolve]" || !d.gl.resolved("d1") || len(issues) != 1 || len(notes) != 0 {
 		t.Errorf("書き込み = %v, 解決 = %v", d.gl.kinds(), d.gl.resolved("d1"))
 	}
 	// 記録に解決した分が残り、適用（local）は立たない。計画も残す
@@ -50,7 +50,7 @@ func TestDecideAFailedPlacementThenResumeRepliesOnceAndPlacesOnce(t *testing.T) 
 	t.Parallel()
 	d := newDecideSite(t)
 	failed := d.decide(dOpts{env: map[string]string{"STUB_FAIL_YES": "1"}}, "1", "--choices", `{"u1":"issue"}`, "--digest", "d0")
-	if failed.Code != 1 || fmt.Sprint(d.gl.kinds()) != "[reply resolve]" || d.record()["applied"].(map[string]any)["local"] == true {
+	if failed.Code != 1 || fmt.Sprint(d.gl.kinds()) != "[issue reply resolve]" || d.record()["applied"].(map[string]any)["local"] == true {
 		t.Fatalf("code = %d, 書き込み = %v\n%s", failed.Code, d.gl.kinds(), failed.Stderr)
 	}
 	if again := d.decide(dOpts{input: "y\n", env: map[string]string{"STUB_FAIL_YES": "1"}}, "--resume"); again.Code != 1 {
@@ -152,7 +152,7 @@ func TestDecideTwoResumesOfTheSameOperationDoNotPostTwice(t *testing.T) {
 	t.Parallel()
 	d := newDecideSite(t)
 	d.rejecting("issue", true)
-	d.choose(nil)
+	d.chooseStoppedAtTheIssue()
 	rec := d.record()
 	id := fmt.Sprint(rec["id"])
 	d.rejecting("issue", false)
@@ -163,7 +163,7 @@ func TestDecideTwoResumesOfTheSameOperationDoNotPostTwice(t *testing.T) {
 	now := time.Now().Unix()
 	pid := base.LiveShPid(t)
 	shkit.Write(t, filepath.Join(lock, "owner"), fmt.Sprintf("%s %d %d %d-%d\n", host, pid, now, pid, now))
-	// 最初の判断で issue 以外の段階（note）は送り済み。--resume でも増えないことを確かめる
+	// 最初の判断は issue で止まったので、何も送っていない。ロック中の --resume でも増えないことを確かめる
 	_, notesBefore := d.gl.stored()
 	callsBefore := len(d.calls())
 	// 待つ秒を縮める（既定の 30 秒を待たずに、取れないと分かる）
@@ -196,7 +196,7 @@ func TestDecideTheOperationLockIsReleasedAfterANewDecisionAndAfterResume(t *test
 	}
 	// 投稿が拒まれて止まった判断を --resume で通す
 	d.rejecting("issue", true)
-	d.choose(nil)
+	d.chooseStoppedAtTheIssue()
 	rec := d.record()
 	if l := locks(); len(l) != 0 {
 		t.Fatalf("投稿に失敗した判断がロックを残した: %v", l)

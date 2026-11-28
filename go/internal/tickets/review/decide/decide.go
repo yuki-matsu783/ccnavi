@@ -463,7 +463,7 @@ func acceptedThreads(d *Decision, choices *pyjson.Object) []host.AcceptItem {
 	for _, t := range d.Unresolved {
 		c, _ := choices.Value(host.ThreadKey(t)).(string)
 		if Choice(c) == Keep || Choice(c) == Issue {
-			out = append(out, host.AcceptItem{Thread: t, Reply: host.AcceptReply(why, Choice(c) == Issue, "")})
+			out = append(out, host.AcceptItem{Thread: t, Reply: host.AcceptReply(why, Choice(c) == Issue, host.IssueURLSlot)})
 		}
 	}
 	return out
@@ -507,21 +507,19 @@ func beginOp(stderr io.Writer, conf *config.Settings, d *Decision, choices *pyjs
 		fmt.Fprint(stderr, msgNoStateOp)
 		return ""
 	}
-	// 1. 段階を組む。返信（残す指摘か issue にする指摘があるとき）→ issue の起票と、その分割コメント → 最後に総括のコメント。
+	// 1. 段階を組む。順は host.WriteOrder が決める（issue の起票と、その分割コメント → 返信と解決 → 最後に総括のコメント）。
 	// 2. 見せた指摘を、版つきで操作記録に控える。送るときに、見せた時点と変わっていないかを確かめるため。
 	picked := pick(d.Unresolved, choices)
-	var stages []oplog.StageSpec
-	if len(picked[Keep]) > 0 || len(picked[Issue]) > 0 {
-		stages = append(stages, oplog.StageSpec{ID: stageReply, Kind: oplog.StageReply})
-	}
+	var issues []host.IssueWrite
 	if len(picked[Issue]) > 0 {
-		stages = append(stages, oplog.StageSpec{ID: stageIssue, Kind: oplog.StageIssue})
 		_, parts := IssueTexts(d, picked[Issue], "")
-		for n := range parts {
-			stages = append(stages, oplog.StageSpec{ID: stagePartPrefix + strconv.Itoa(n+1), Kind: oplog.StageComment})
-		}
+		issues = append(issues, host.IssueWrite{Parts: len(parts)})
 	}
-	stages = append(stages, oplog.StageSpec{ID: stageNote, Kind: oplog.StageComment})
+	var accepted []string
+	for _, t := range append(slices.Clone(picked[Keep]), picked[Issue]...) {
+		accepted = append(accepted, host.ThreadKey(t))
+	}
+	stages := stageSpecs(host.WriteOrder(issues, accepted, true))
 	shown := make([]any, 0, len(d.Unresolved))
 	for _, t := range d.Unresolved {
 		shown = append(shown, pyjson.NewObject(

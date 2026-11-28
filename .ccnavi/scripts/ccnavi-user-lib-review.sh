@@ -111,7 +111,7 @@ accept_threads() {
 	accept_rfile="$2"
 	accept_dir="$state/review-accept-replies-$$"
 	rm -rf "$accept_dir"
-	accept_ans=$(ccnavi accept threads "$accept_file" "$accept_rfile" "$kind" "$accept_dir" 2>/dev/null) || :
+	accept_ans=$(ccnavi accept threads "$accept_file" "$accept_rfile" "$kind" "$accept_dir" "${issue_url:-}" 2>/dev/null) || :
 	if [ "$(printf '%s\n' "$accept_ans" | head -n 1)" != "accept 1" ] || { ! ccnavi_has mr "$accept_ans" && ! ccnavi_has stop "$accept_ans"; }; then
 		printf '%s: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$review_label" "$accept_file" >&2
 		accept_done_files
@@ -162,6 +162,24 @@ accept_threads() {
 		fi
 	done 3<"$accept_dir/threads"
 	accept_done_files
+}
+
+# ホストに書く前の確かめだけをする（issue を先に作るので、計画が悪いのに issue だけを作らないため）。<計画のファイル>
+# issue の URL の枠は仮の値で埋め、返信の本文は捨てる。止めるなら理由を標準エラーへ出して 1。
+accept_precheck() {
+	apc_dir="$state/review-accept-pre-$$"
+	rm -rf "$apc_dir"
+	apc_ans=$(ccnavi accept threads "$1" "$result" "$kind" "$apc_dir" "-" 2>/dev/null) || :
+	rm -rf "$apc_dir"
+	if [ "$(printf '%s\n' "$apc_ans" | head -n 1)" != "accept 1" ]; then
+		printf '%s: 受け入れの計画を読めない（%s）。何も置いていない。\n' "$review_label" "$1" >&2
+		return 1
+	fi
+	apc_stop=$(ccnavi_val1 stop "$apc_ans")
+	[ -z "$apc_stop" ] || {
+		printf '%s: %s\n' "$review_label" "$apc_stop" >&2
+		return 1
+	}
 }
 
 # accept_threads が使った返信の本文の置き場を消す。
@@ -371,31 +389,38 @@ op_lock_release() {
 	ccnavi_lock_drop_aside op_lk
 }
 
+# 段階を送る。<範囲>: before（コミットの前。issue と続きのコメント）・after（コミットのあと。決めた内容のコメント）・
+# all（全部。--resume）。段階の並びと、どれがコミットの前かは実行ファイルが決めた記録（host.WriteOrder）による。
+# issue を先に作る（返信に URL を書き、解決したのに issue が無い状態を作らない）ので、decide は before を
+# 返信と解決の前に、after を置いたあとに呼ぶ。issue_url は before で決まり、after でも残す。
 post_decision_staged() {
-	issue_url=""
+	pl_scope="${1:-all}"
+	[ "$pl_scope" = after ] || issue_url=""
 	post_warning=""
 	# すでに持っている（--resume が先に取った）ときは、ここで取らず外さない。外すのは自分が取ったときだけ。
 	pl_had="$op_lk_dir"
 	op_lock_take "$op_id" || return 1
-	post_decision_staged_locked
+	post_decision_staged_locked "$pl_scope"
 	pl_rc=$?
 	[ -n "$pl_had" ] || op_lock_release
 	return "$pl_rc"
 }
 
 post_decision_staged_locked() {
-	issue_url=""
+	pd_scope="$1"
 	post_warning=""
 	# MR の番号と URL は、$result を取ってきた fetch_all が残したもの（ccnavi-common-review.sh）
 	pd_mr="$number"
 	pd_mr_url="$url"
 	pd_ids=$(ccnavi_val stage "$(ccnavi ops get "$op_id" 2>/dev/null)")
 	pd_issue_no=""
+	[ -z "${issue_url:-}" ] || pd_issue_no="${issue_url##*/}"
 	pd_failed=""
 	for pd_stage in $pd_ids; do
 		case "$pd_stage" in
 		reply) continue ;;
 		issue)
+			[ "$pd_scope" != after ] || continue
 			if issue_url=$(post_staged issue issue "$pd_mr" "$pd_mr_url"); then
 				pd_issue_no="${issue_url##*/}"
 			else
@@ -404,6 +429,7 @@ post_decision_staged_locked() {
 			fi
 			;;
 		issue-part-*)
+			[ "$pd_scope" != after ] || continue
 			[ -n "$pd_issue_no" ] || {
 				pd_failed="$pd_failed $pd_stage"
 				continue
@@ -411,13 +437,16 @@ post_decision_staged_locked() {
 			post_staged "$pd_stage" issue-note "$pd_issue_no" "$issue_url" >/dev/null || pd_failed="$pd_failed $pd_stage"
 			;;
 		note)
+			[ "$pd_scope" != before ] || continue
 			post_staged note note "$pd_mr" "$pd_mr_url" >/dev/null || pd_failed="$pd_failed note"
 			;;
 		esac
 	done
 	if [ -n "$pd_failed" ]; then
 		post_warning="引き継ぎ未完了（送れなかった段階:${pd_failed}）。ユーザが 'sh .ccnavi/scripts/ccnavi-user-decide.sh --resume $op_id' で続きを送れる"
-	else
+	elif [ "$pd_scope" != before ]; then
 		ccnavi ops done "$op_id" >/dev/null 2>&1 || :
 	fi
+	# 失敗を返すのは before だけ（issue を作れないうちは、返信も解決もしない）。after と all は、置いたあとなので警告で足りる
+	[ "$pd_scope" != before ] || [ -z "$pd_failed" ]
 }

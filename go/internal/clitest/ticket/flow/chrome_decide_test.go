@@ -283,6 +283,14 @@ func TestAMixOfKeepIssueAndFix(t *testing.T) {
 	ticketkit.Has(t, js(replies[1], "body"), issueURLSlot)
 	ticketkit.Has(t, js(plan, "comment"), issueLinksSlot)
 	ticketkit.Has(t, js(plan, "comment"), "u-t3")
+	// 書く順は host.WriteOrder が決めて steps に載せる（拡張はそのとおりに送る）。issue が先、解決のあとにコメント。
+	var order []string
+	for _, st := range jl(plan, "steps") {
+		order = append(order, js(st, "kind")+" "+js(st, "key"))
+	}
+	if want := []string{"issue u-t2", "issue-part u-t2", "reply u-t1", "reply u-t2", "resolve u-t1", "resolve u-t2", "note "}; !slices.Equal(order, want) && !slices.Equal(order, slices.DeleteFunc(slices.Clone(want), func(x string) bool { return x == "issue-part u-t2" })) {
+		t.Errorf("steps = %v", order)
+	}
 	// 続きの子を起こし、マーカーは置かない。レビュー待ちの子は done/ へ。
 	rows := k.rows(a)
 	if jb(a, "reviewed") || js(a, "followup") != "i0001-01-02" {

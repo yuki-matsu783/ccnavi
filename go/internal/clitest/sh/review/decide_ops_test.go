@@ -92,6 +92,17 @@ func (d *decideSite) choose(env map[string]string) {
 	}
 }
 
+// chooseStoppedAtTheIssue は、issue を作れずに止まる選び方。issue を先に作るので、返信も解決も置くこともせず、
+// 何も解決していない状態で止まる（記録は残り、--resume で続きを送れる）。
+func (d *decideSite) chooseStoppedAtTheIssue() {
+	d.t.Helper()
+	before := len(d.gl.kinds())
+	stopped := d.decide(dOpts{}, "1", "--choices", `{"u1":"issue"}`, "--digest", "d0")
+	if stopped.Code != 1 || !strings.Contains(stopped.Stderr, "issue を作れなかった") || len(d.gl.kinds()) != before {
+		d.t.Fatalf("issue で止まっていない: code = %d, 書き込み = %v\n%s%s", stopped.Code, d.gl.kinds(), stopped.Stdout, stopped.Stderr)
+	}
+}
+
 func (d *decideSite) rejecting(kind string, on bool) {
 	d.gl.do(func() { d.gl.reject[kind] = on })
 }
@@ -163,7 +174,7 @@ func TestDecideResumeSendsTheIssueAfterTheIssuePostFailed(t *testing.T) {
 	t.Parallel()
 	d := newDecideSite(t)
 	d.rejecting("issue", true)
-	d.choose(nil)
+	d.chooseStoppedAtTheIssue()
 	rec := d.record()
 	if rec == nil || strings.Contains(stageStates(rec), "issue:sent") {
 		t.Fatalf("送れなかった段階が記録に残っていない: %v", rec)

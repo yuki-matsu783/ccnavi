@@ -326,8 +326,8 @@ func decideBegin(mrURL string) map[string]any {
 		"shown":   []any{map[string]any{"key": "u1", "id": "d1", "url": "u1", "path": "a.py", "line": 3, "version": "v1", "body": "指摘の本文\n```py\nx\n```"}},
 		"choices": map[string]any{"u1": "issue"},
 		"plan":    map[string]any{"digest": "d0"},
-		"stages":  [][]string{{"reply", "reply"}, {"issue", "issue"}, {"note", "comment"}},
-	}, planOf("d0", map[string]any{"id": "d1", "key": "u1", "reply": acceptMarker + "\nok\n"}))
+		"stages":  [][]string{{"issue", "issue"}, {"reply", "reply"}, {"note", "comment"}},
+	}, planOf("d0", map[string]any{"id": "d1", "key": "u1", "reply": acceptMarker + "\nissue: {issue_url}\n"}))
 }
 
 // 子の PATH に並べる標準コマンド。PATH は偽の道具の bin とシェル本体の置き場だけで組む。sh が使うコマンドはここに足す。

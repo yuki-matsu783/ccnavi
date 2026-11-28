@@ -24,6 +24,10 @@ const (
 	markerIssue = "<!-- ccnavi:issue op=%s -->"
 )
 
+// IssueURLSlot は返信の本文の、issue の URL を入れる枠。issue を作った呼び手が置き換える（issue を先に作るので、
+// 返信を書く時には URL が決まっている。順は WriteOrder）。
+const IssueURLSlot = "{issue_url}"
+
 // IssueMarker は操作ID op の issue に入れる目印。
 func IssueMarker(op string) string { return fmt.Sprintf(markerIssue, op) }
 

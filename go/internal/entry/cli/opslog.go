@@ -278,7 +278,10 @@ func opsPostText(stderr io.Writer, state string, words []string) (int, bool, err
 	if r == nil {
 		return config.ExitError, true, err
 	}
-	if r.Kind != oplog.KindDecide || r.Applied == nil || !pyfmt.Truthy(r.Applied.Value("local")) {
+	// issue と続きのコメントは、置く前に送る（host.WriteOrder）ので、適用が済んでいなくても作れる。決めた内容のコメントは、
+	// 起こした続きの子の名前が要るので、置いたあと（適用が済んだあと）に作る。
+	needApplied := words[2] == decide.StageNote
+	if r.Kind != oplog.KindDecide || (needApplied && (r.Applied == nil || !pyfmt.Truthy(r.Applied.Value("local")))) {
 		fmt.Fprintln(stderr, "ccnavi: この記録は、まだ適用が済んでいない（投稿の本文は作れない）")
 		return config.ExitError, true, nil
 	}

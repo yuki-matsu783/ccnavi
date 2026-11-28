@@ -65,6 +65,9 @@ const (
 	stageReply      = "reply"
 )
 
+// StageNote は決めた内容のコメントの段階の名前。起こした続きの子の名前が要るので、置いたあとにだけ本文を作れる。
+const StageNote = stageNote
+
 // countLabels は渡す文で数える行き先の呼び名。
 var countLabels = map[Choice]string{Keep: "対応しない", Fix: "このフェーズで直す", Issue: "issue に回す"}
 
@@ -390,6 +393,27 @@ func fromRecord(r *oplog.Record) (*Decision, map[Choice][]host.Thread) {
 	return d, pick(threads, r.Choices)
 }
 
+// stageSpecs は書き込みの並び（host.WriteOrder）を、操作記録の段階にする。返信と解決は 1 つの段階（reply）にまとめる
+// （sh が全部に返信してから全部を解決する）。issue は 1 つにまとめて起こすので、段階は 1 つ。
+func stageSpecs(steps []host.WriteStep) []oplog.StageSpec {
+	var out []oplog.StageSpec
+	for _, s := range steps {
+		switch s.Kind {
+		case host.WriteIssue:
+			out = append(out, oplog.StageSpec{ID: stageIssue, Kind: oplog.StageIssue})
+		case host.WriteIssuePart:
+			out = append(out, oplog.StageSpec{ID: stagePartPrefix + strconv.Itoa(s.Part), Kind: oplog.StageComment})
+		case host.WriteReply:
+			if len(out) == 0 || out[len(out)-1].ID != stageReply {
+				out = append(out, oplog.StageSpec{ID: stageReply, Kind: oplog.StageReply})
+			}
+		case host.WriteNote:
+			out = append(out, oplog.StageSpec{ID: stageNote, Kind: oplog.StageComment})
+		}
+	}
+	return out
+}
+
 // PostText は、段階 stageID で投稿する本文を、保存した判断から作り直す。作れなければ偽を返す。
 //   - issue: issue の下書き（1 行目がタイトル、空行のあとが本文）
 //   - issue-part-<N>: issue の続きのコメント
@@ -456,7 +480,7 @@ func ResumePlan(r *oplog.Record, outPath string) int {
 			continue
 		}
 		thread := host.Thread{ID: recordText(row, "id"), URL: recordText(row, "url")}
-		items = append(items, host.AcceptItem{Thread: thread, Reply: host.AcceptReply(why, Choice(c) == Issue, "")})
+		items = append(items, host.AcceptItem{Thread: thread, Reply: host.AcceptReply(why, Choice(c) == Issue, host.IssueURLSlot)})
 	}
 	if failed := host.WriteAcceptPlan(outPath, items, recordText(r.Plan, "digest"), r.ID); failed != "" {
 		return config.ExitError

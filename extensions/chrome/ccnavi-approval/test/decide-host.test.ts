@@ -11,7 +11,7 @@
 import { before, test } from "node:test";
 import assert from "node:assert/strict";
 
-import { callOps, describeHostResult, markerOf, oneLine, partMarker, planProblems, precheckHostPlan, runHostPlan, type HostPlan, type HostStepEvent } from "../src/core/decide-host.js";
+import { callOps, describeHostResult, markerOf, oneLine, partMarker, planProblems, precheckHostPlan, runHostPlan, type HostPlan, type HostStepEvent, type PlanStep } from "../src/core/decide-host.js";
 import * as gh from "../src/core/github.js";
 import * as gl from "../src/core/gitlab.js";
 import { dispatch } from "../src/core/protocol.js";
@@ -56,6 +56,25 @@ function lab(): { mock: WriteGitLab; ops: ReturnType<typeof callOps> } {
   return { mock, ops: callOps(hostCall(d, newStats(), "gitlab.com"), wasm) };
 }
 
+/** 計画の中身（並びの `steps` は、ccnavi の decide が決める。ここでは Go の `host.WriteOrder` と同じ並びを組む） */
+type PlanBody = Omit<HostPlan, "steps">;
+
+function ordered(p: PlanBody): HostPlan {
+  const steps: PlanStep[] = [];
+  const at = (kind: PlanStep["kind"], key: string, part = 0) => steps.push({ kind, key, part, after_commit: kind === "note" });
+  for (const i of p.issues) {
+    at("issue", i.key);
+    (i.comments ?? []).forEach((_, n) => at("issue-part", i.key, n + 1));
+  }
+  for (const r of p.replies) at("reply", r.key);
+  for (const r of p.resolves) at("resolve", r.key);
+  if (p.comment) at("note", "");
+  return { ...p, steps };
+}
+
+/** 並びを付けて `runHostPlan` を呼ぶ */
+const run = (ops: Parameters<typeof runHostPlan>[0], repo: Parameters<typeof runHostPlan>[1], mr: number, p: PlanBody, onStep?: (e: HostStepEvent) => void) => runHostPlan(ops, repo, mr, ordered(p), onStep);
+
 const reply = (key: string, id: string, issue = false) => ({
   key,
   thread_id: id,
@@ -63,7 +82,7 @@ const reply = (key: string, id: string, issue = false) => ({
 });
 
 /** issue 2 件（キー k1・k2）、k3 は対応しない。返信 3 件、解決 3 件、コメント */
-function plan(ids: [string, string, string] = [T1, T2, T3]): HostPlan {
+function plan(ids: [string, string, string] = [T1, T2, T3]): PlanBody {
   return {
     issues: [
       { key: "k1", op: "0123456789abcdef0123456789abcdef", title: "指摘 1 の対応", body: `${MARK1}\n\n本文 1`, comments: ["続き 1"] },
@@ -82,7 +101,7 @@ function plan(ids: [string, string, string] = [T1, T2, T3]): HostPlan {
 test("CX-T320 順序は issue → 返信 → 解決 → コメント。返信の {issue_url} は同じキーの issue の URL に、コメントの {issue_links} は一覧に置き換わる（GitHub）", async () => {
   const { mock, ops } = hub();
   const events: HostStepEvent[] = [];
-  const out = await runHostPlan(ops, REPO, 7, plan(), (e) => void events.push(e));
+  const out = await run(ops, REPO, 7, plan(), (e) => void events.push(e));
   assert.equal(out.ok, true, JSON.stringify(out));
   assert.deepEqual(mock.w.log, ["issue 指摘 1 の対応", "issueComment 500", "issue 指摘 2 の対応", `reply ${T1}`, `reply ${T2}`, `reply ${T3}`, `resolve ${T1}`, `resolve ${T2}`, `resolve ${T3}`, "comment"]);
   assert.deepEqual(out.issues.map((i) => [i.key, i.number, i.reused]), [["k1", 500, false], ["k2", 501, false]]);
@@ -102,7 +121,7 @@ test("CX-T320 順序は issue → 返信 → 解決 → コメント。返信の
 
 test("CX-T321 GitLab も同じ順序で書く（discussion への返信は notes、解決は PUT、issue は projects/:id/issues、コメントは MR のメモ）", async () => {
   const { mock, ops } = lab();
-  const p: HostPlan = {
+  const p: PlanBody = {
     issues: [{ key: "k1", title: "タイトル", body: `${MARK1}\n\n本文`, comments: ["続き"] }],
     replies: [reply("k1", D1, true), reply("k2", D2)],
     resolves: [
@@ -111,7 +130,7 @@ test("CX-T321 GitLab も同じ順序で書く（discussion への返信は notes
     ],
     comment: "決めた\n{issue_links}",
   };
-  const out = await runHostPlan(ops, REPO, 7, p);
+  const out = await run(ops, REPO, 7, p);
   assert.equal(out.ok, true, JSON.stringify(out));
   assert.deepEqual(mock.w.log, ["issue タイトル", "issueComment 500", `reply ${D1}`, `reply ${D2}`, `resolve ${D1}`, `resolve ${D2}`, "comment"]);
   assert.ok(mock.w.threads[0].replies[0].includes("https://gitlab.com/acme/widgets/-/issues/500。"));
@@ -126,8 +145,8 @@ test("CX-T322 issue にはタイトルと本文だけを送る（assignee・labe
     { ...lab(), field: "description" },
   ];
   for (const { mock, ops, field } of targets) {
-    const p: HostPlan = { issues: [{ key: "k", title: "タイトル\n二行目\u2028 `x`", body: `${MARK1}\n本文` }], replies: [], resolves: [], comment: null };
-    assert.equal((await runHostPlan(ops, REPO, 7, p)).ok, true);
+    const p: PlanBody = { issues: [{ key: "k", title: "タイトル\n二行目\u2028 `x`", body: `${MARK1}\n本文` }], replies: [], resolves: [], comment: null };
+    assert.equal((await run(ops, REPO, 7, p)).ok, true);
     const sent = (mock.w.writes[0].raw ?? {}) as Record<string, unknown>;
     assert.deepEqual(Object.keys(sent).sort(), field === "body" ? ["body", "title"] : ["description", "title"]);
     assert.equal(sent.title, "タイトル 二行目 `x`");
@@ -139,7 +158,7 @@ test("CX-T323 途中で失敗したらそこで止まり、済んだ分（作っ
   // 2 件目の返信で失敗: issue は 2 件作成済み、返信は 1 件、解決は 0、コメントなし
   const a = hub();
   a.mock.w.failures.push({ op: "reply", status: 502, nth: 2, message: "bad gateway" });
-  const r1 = await runHostPlan(a.ops, REPO, 7, plan());
+  const r1 = await run(a.ops, REPO, 7, plan());
   assert.equal(r1.ok, false);
   assert.equal(r1.failed?.step, "reply");
   assert.equal(r1.failed?.key, "k2");
@@ -152,37 +171,37 @@ test("CX-T323 途中で失敗したらそこで止まり、済んだ分（作っ
   // 解決で失敗: 返信は済み、コメントは書かない
   const b = hub();
   b.mock.w.failures.push({ op: "resolve", status: 502, nth: 2 });
-  const r2 = await runHostPlan(b.ops, REPO, 7, plan());
+  const r2 = await run(b.ops, REPO, 7, plan());
   assert.deepEqual([r2.failed?.step, r2.failed?.key, r2.replied, r2.resolved, r2.commented], ["resolve", "k2", ["k1", "k2", "k3"], ["k1"], false]);
 
   // 1 件目の issue で失敗: 何も済んでいない
   const c = hub();
   c.mock.w.failures.push({ op: "issue", status: 404 });
-  const r3 = await runHostPlan(c.ops, REPO, 7, plan());
+  const r3 = await run(c.ops, REPO, 7, plan());
   assert.deepEqual([r3.failed?.step, r3.failed?.key, r3.issues.length, c.mock.w.log.length], ["issue", "k1", 0, 0]);
   assert.match(r3.failed?.reason ?? "", /Issues: Read and write/);
 
   // issue の続きのコメントで失敗: issue は済みとして返す
   const d = hub();
   d.mock.w.failures.push({ op: "issueComment", status: 502 });
-  const r4 = await runHostPlan(d.ops, REPO, 7, plan());
+  const r4 = await run(d.ops, REPO, 7, plan());
   assert.deepEqual([r4.failed?.step, r4.failed?.key, r4.issues.map((i) => i.key)], ["issue-comment", "k1", ["k1"]]);
 
   // コメントで失敗: 返信も解決も済んでいる
   const e = hub();
   e.mock.w.failures.push({ op: "comment", status: 502 });
-  const r5 = await runHostPlan(e.ops, REPO, 7, plan());
+  const r5 = await run(e.ops, REPO, 7, plan());
   assert.deepEqual([r5.failed?.step, r5.resolved.length, r5.commented], ["comment", 3, false]);
 });
 
 test("CX-T324 同じキー・同じスレッドを二度書かない（重なった計画は何も書かずに止める）。形の悪い計画も同じ", async () => {
   const { mock, ops } = hub();
   const dup = plan();
-  const bad: HostPlan = { ...dup, replies: [...dup.replies, reply("k1", T2)] };
-  const out = await runHostPlan(ops, REPO, 7, bad);
+  const bad: PlanBody = { ...dup, replies: [...dup.replies, reply("k1", T2)] };
+  const out = await run(ops, REPO, 7, bad);
   assert.deepEqual([out.ok, out.failed?.step, mock.w.log.length], [false, "plan", 0]);
   assert.match(out.failed?.reason ?? "", /返信が重なっています/);
-  const cases: [Partial<Record<keyof HostPlan, unknown>>, RegExp][] = [
+  const cases: [Partial<Record<keyof PlanBody, unknown>>, RegExp][] = [
     [{ issues: [{ key: "k", title: "t", body: "印が無い" }] }, /操作 ID の印/],
     [{ issues: [{ key: "k", op: "x", title: "t", body: `${MARK1}\nb` }] }, /操作 ID が本文の印と違います/],
     [{ issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }, { key: "k", title: "u", body: `${MARK2}\nb` }] }, /キーが重なっています/],
@@ -195,9 +214,9 @@ test("CX-T324 同じキー・同じスレッドを二度書かない（重なっ
   ];
   for (const [patch, want] of cases) {
     const p = { issues: [], replies: [], resolves: [], comment: null, ...patch };
-    assert.match(planProblems(p).join(" / "), want, JSON.stringify(patch).slice(0, 80));
+    assert.match(planProblems(ordered(p as PlanBody)).join(" / "), want, JSON.stringify(patch).slice(0, 80));
   }
-  assert.deepEqual(planProblems({ issues: [], replies: [], resolves: [], comment: null }), []);
+  assert.deepEqual(planProblems(ordered({ issues: [], replies: [], resolves: [], comment: null })), []);
 });
 
 test("CX-T325 操作 ID の印の issue が既にあれば作らずに使い、続きのコメントは足りない part だけ付ける。他人が書いた印・PR・1 行目以外の印は拾わない", async () => {
@@ -205,7 +224,7 @@ test("CX-T325 操作 ID の印の issue が既にあれば作らずに使い、�
   const mine = mock.seedIssue(`${MARK1}\n\n前の回に作った`);
   mock.seedIssue(`${MARK2}\n\n他人が印だけ書いた`, "mallory");
   mock.seedPr(`${MARK2}\n\nPR の本文`);
-  const out = await runHostPlan(ops, REPO, 7, plan());
+  const out = await run(ops, REPO, 7, plan());
   assert.equal(out.ok, true, JSON.stringify(out));
   const k2 = out.issues[1];
   assert.deepEqual(out.issues.map((i) => [i.key, i.reused]), [["k1", true], ["k2", false]]);
@@ -217,13 +236,13 @@ test("CX-T325 操作 ID の印の issue が既にあれば作らずに使い、�
   assert.ok(mock.w.threads[0].replies[0].includes(`issues/${mine.number}。`));
   assert.match(describeHostResult(out), /うち既にあったものを使用/);
   // 2 回目: part=1 が付いているので、何も足さない
-  const again = await runHostPlan(ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
+  const again = await run(ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
   assert.equal(again.ok, true);
   assert.equal(mine.comments.length, 1);
   // 印が 1 行目でない issue は拾わない
   const b = hub();
   b.mock.seedIssue(`前置き\n${MARK1}\n本文`);
-  const r = await runHostPlan(b.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
+  const r = await run(b.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
   assert.equal(r.issues[0].reused, false);
   assert.equal(markerOf(`前置き\n${MARK1}`), "");
   assert.equal(markerOf(`${MARK1}\r\n本文`), "0123456789abcdef0123456789abcdef");
@@ -231,7 +250,7 @@ test("CX-T325 操作 ID の印の issue が既にあれば作らずに使い、�
   const l = lab();
   const own = l.mock.seedIssue(`${MARK1}\n前の回`, 7);
   l.mock.seedIssue(`${MARK2}\n偽物`, 99);
-  const lo = await runHostPlan(l.ops, REPO, 7, { issues: plan().issues, replies: [], resolves: [], comment: null });
+  const lo = await run(l.ops, REPO, 7, { issues: plan().issues, replies: [], resolves: [], comment: null });
   assert.deepEqual(lo.issues.map((i) => [i.number === own.number, i.reused]), [[true, true], [false, false]]);
 });
 
@@ -239,44 +258,44 @@ test("CX-T335 issue の検索: 404 だけが『無い』。5xx・429・読めな
   for (const status of [500, 502, 429]) {
     const { mock, ops } = hub();
     mock.w.failures.push({ op: "find", status });
-    const out = await runHostPlan(ops, REPO, 7, plan());
+    const out = await run(ops, REPO, 7, plan());
     assert.equal(out.ok, false, String(status));
     assert.deepEqual([out.failed?.step, out.failed?.key, mock.w.log.length], ["issue", "k1", 0], String(status));
   }
   const gone = hub();
   gone.mock.w.failures.push({ op: "find", status: 404 });
-  const ok404 = await runHostPlan(gone.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
+  const ok404 = await run(gone.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
   assert.deepEqual([ok404.ok, ok404.issues[0].reused, ok404.searchTruncated], [true, false, false]);
   // 300 件を超えて古い側にある印は見えない: 作るが、探し切れていないと言う
   const big = hub();
   big.mock.seedIssue(`${MARK1}\n古い`);
   for (let i = 0; i < 300; i += 1) big.mock.seedIssue(`別の issue ${i}`);
-  const out = await runHostPlan(big.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
+  const out = await run(big.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null });
   assert.deepEqual([out.ok, out.issues[0].reused, out.searchTruncated], [true, false, true]);
   assert.match(describeHostResult(out), /検索しきれていない/);
   // 閉じた issue も印で見つかる（state=all）
   const closed = hub();
   closed.mock.seedIssue(`${MARK1}\n閉じた`).closed = true;
-  assert.equal((await runHostPlan(closed.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null })).issues[0].reused, true);
+  assert.equal((await run(closed.ops, REPO, 7, { issues: plan().issues.slice(0, 1), replies: [], resolves: [], comment: null })).issues[0].reused, true);
   // 使い回した issue のコメントを読めなければ止める（読めないまま足りない part を決めない）
   const c = hub();
   c.mock.seedIssue(`${MARK1}\n前の回`);
   c.mock.w.failures.push({ op: "listComments", status: 502 });
-  const r = await runHostPlan(c.ops, REPO, 7, plan());
+  const r = await run(c.ops, REPO, 7, plan());
   assert.deepEqual([r.ok, r.failed?.step, r.failed?.key, r.replied.length], [false, "issue-comment", "k1", 0]);
   // GitLab
   const l = lab();
   l.mock.w.failures.push({ op: "find", status: 500 });
-  const lr = await runHostPlan(l.ops, REPO, 7, plan());
+  const lr = await run(l.ops, REPO, 7, plan());
   assert.equal(lr.failed?.step, "issue");
 });
 
 test("CX-T336 再実行: 1 回目が返信の途中で失敗しても、2 回目は issue を作り直さず、返信済みのスレッドに返信を重ねず、続きを足りない分だけ付ける（GitHub・GitLab）", async () => {
   const a = hub();
   a.mock.w.failures.push({ op: "reply", status: 502, nth: 2 });
-  const first = await runHostPlan(a.ops, REPO, 7, plan());
+  const first = await run(a.ops, REPO, 7, plan());
   assert.equal(first.failed?.step, "reply");
-  const second = await runHostPlan(a.ops, REPO, 7, plan());
+  const second = await run(a.ops, REPO, 7, plan());
   assert.equal(second.ok, true, JSON.stringify(second));
   assert.deepEqual(second.issues.map((i) => i.reused), [true, true]);
   assert.equal(a.mock.w.issues.length, 2);
@@ -286,7 +305,7 @@ test("CX-T336 再実行: 1 回目が返信の途中で失敗しても、2 回目
   assert.equal(a.mock.w.issues[0].comments.length, 1);
   assert.equal(a.mock.w.comments.length, 1);
 
-  const gp: HostPlan = {
+  const gp: PlanBody = {
     issues: [{ key: "k1", title: "タイトル", body: `${MARK1}\n\n本文`, comments: ["続き"] }],
     replies: [reply("k1", D1, true), reply("k2", D2)],
     resolves: [{ key: "k1", thread_id: D1 }, { key: "k2", thread_id: D2 }],
@@ -294,8 +313,8 @@ test("CX-T336 再実行: 1 回目が返信の途中で失敗しても、2 回目
   };
   const l = lab();
   l.mock.w.failures.push({ op: "resolve", status: 502, nth: 1 });
-  assert.equal((await runHostPlan(l.ops, REPO, 7, gp)).failed?.step, "resolve");
-  const again = await runHostPlan(l.ops, REPO, 7, gp);
+  assert.equal((await run(l.ops, REPO, 7, gp)).failed?.step, "resolve");
+  const again = await run(l.ops, REPO, 7, gp);
   assert.equal(again.ok, true, JSON.stringify(again));
   assert.deepEqual(l.mock.w.threads.map((t) => t.replies.length), [1, 1]);
   assert.equal(l.mock.w.issues.length, 1);
@@ -305,13 +324,13 @@ test("CX-T336 再実行: 1 回目が返信の途中で失敗しても、2 回目
 test("CX-T337 同じ計画の二重実行（連打）は、実行中なら何も書かずに断る。終われば再び実行できる", async () => {
   const { mock, ops } = hub();
   const p = plan();
-  const first = runHostPlan(ops, REPO, 7, p);
-  const second = await runHostPlan(ops, REPO, 7, p);
+  const first = run(ops, REPO, 7, p);
+  const second = await run(ops, REPO, 7, p);
   assert.deepEqual([second.ok, second.failed?.step], [false, "plan"]);
   assert.match(second.failed?.reason ?? "", /実行中/);
   assert.equal((await first).ok, true);
   assert.equal(mock.w.issues.length, 2, "二重に作らない");
-  const third = await runHostPlan(ops, REPO, 7, p);
+  const third = await run(ops, REPO, 7, p);
   assert.equal(third.ok, true);
   assert.equal(mock.w.issues.length, 2);
 });
@@ -320,7 +339,7 @@ test("CX-T338 外から来た本文の無害化: フェンスの外の行頭 / �
   const body = "<!-- ccnavi:accept -->\n/close\n  /assign @bob\n```text\n/close\n@alice\n```\n@carol と a@b.com と `@x`\n~~~~\n/merge\n~~~\n/unlock\n~~~~\n/after";
   const ZW = "\u200b";
   const g = lab();
-  await runHostPlan(g.ops, REPO, 7, { issues: [], replies: [{ key: "k", thread_id: D1, body }], resolves: [], comment: null });
+  await run(g.ops, REPO, 7, { issues: [], replies: [{ key: "k", thread_id: D1, body }], resolves: [], comment: null });
   const sent = g.mock.w.threads[0].replies[0];
   assert.ok(sent.includes(`${ZW}/close\n`));
   assert.ok(sent.includes(`${ZW}  /assign @${ZW}bob`));
@@ -331,7 +350,7 @@ test("CX-T338 外から来た本文の無害化: フェンスの外の行頭 / �
   assert.ok(sent.startsWith("<!-- ccnavi:accept -->\n"));
   // GitHub は行頭 / を変えず、メンションだけ直す
   const h = hub();
-  await runHostPlan(h.ops, REPO, 7, { issues: [{ key: "k", title: "タイトル @dave", body: `${MARK1}\n/close @eve\n\`\`\`\n@frank\n\`\`\`` }], replies: [], resolves: [], comment: "/x @gina" });
+  await run(h.ops, REPO, 7, { issues: [{ key: "k", title: "タイトル @dave", body: `${MARK1}\n/close @eve\n\`\`\`\n@frank\n\`\`\`` }], replies: [], resolves: [], comment: "/x @gina" });
   assert.equal(h.mock.w.writes[0].title, `タイトル @${ZW}dave`);
   assert.ok(h.mock.w.issues[0].body.includes(`\n/close @${ZW}eve\n\`\`\`\n@frank`));
   assert.equal(h.mock.w.comments[0], `/x @${ZW}gina`);
@@ -369,48 +388,48 @@ test("CX-T326 ホストが返した URL が通信先の外や不正な形なら�
   const { mock, ops } = hub();
   // 模擬の応答の URL を、別のホストのものに差し替える
   (mock as unknown as { web: string }).web = "https://evil.example.com";
-  const out = await runHostPlan(ops, REPO, 7, plan());
+  const out = await run(ops, REPO, 7, plan());
   assert.equal(out.ok, false);
   assert.equal(out.failed?.step, "issue");
   assert.match(out.failed?.reason ?? "", /登録した通信先とは別のサイト/);
   assert.equal(mock.w.threads.every((t) => t.replies.length === 0), true);
   // 直接も: 空白・引用符・括弧を含む URL は本文に入れない
   const fake = { ...callOps(async () => null, wasm), createIssue: async () => ({ number: 1, url: "https://github.com/a b)" }), findIssue: async () => ({ issue: null, truncated: false }) };
-  const r = await runHostPlan(fake, REPO, 7, { issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }], replies: [], resolves: [], comment: null });
+  const r = await run(fake, REPO, 7, { issues: [{ key: "k", title: "t", body: `${MARK1}\nb` }], replies: [], resolves: [], comment: null });
   assert.match(r.failed?.reason ?? "", /URL を本文に入れられません/);
 });
 
 test("CX-T327 事前検査: 全部の権限があれば通り、fine-grained の PAT の権限は『確かめられなかった』として残す", async () => {
   const { mock, ops } = hub();
-  const ok = await precheckHostPlan(wasm, ops, REPO, 7, plan());
+  const ok = await precheckHostPlan(wasm, ops, REPO, 7, ordered(plan()));
   assert.equal(ok.ok, true);
   assert.deepEqual(ok.ok && ok.unknown, ["Issues: Read and write", "Pull requests: Read and write"]);
   assert.deepEqual(mock.w.log, [], "確かめるだけで何も書かない");
   mock.scopes = "repo, read:org";
-  const classic = await precheckHostPlan(wasm, ops, REPO, 7, plan());
+  const classic = await precheckHostPlan(wasm, ops, REPO, 7, ordered(plan()));
   assert.deepEqual(classic.ok && classic.unknown, []);
 });
 
 test("CX-T328 事前検査（GitHub）: 返信・解決の権限が無いスレッド、classic の repo スコープ無し、Issues 無効は、何も書かずに必要な権限名を言う", async () => {
   const a = hub();
   a.mock.w.threads[1].canResolve = false;
-  const r1 = await precheckHostPlan(wasm, a.ops, REPO, 7, plan());
+  const r1 = await precheckHostPlan(wasm, a.ops, REPO, 7, ordered(plan()));
   assert.equal(r1.ok, false);
   assert.ok(!r1.ok && r1.kind === "permission" && r1.missing.includes("Pull requests: Read and write") && r1.keys.includes("k2"));
   assert.match(!r1.ok ? r1.reason : "", /何も書きませんでした。必要な権限: Pull requests: Read and write/);
 
   const b = hub();
   b.mock.scopes = "read:user";
-  const r2 = await precheckHostPlan(wasm, b.ops, REPO, 7, plan());
+  const r2 = await precheckHostPlan(wasm, b.ops, REPO, 7, ordered(plan()));
   assert.ok(!r2.ok && r2.kind === "permission" && r2.missing.some((m) => /repo スコープ/.test(m)));
 
   const c = hub();
   c.mock.hasIssues = false;
-  const r3 = await precheckHostPlan(wasm, c.ops, REPO, 7, plan());
+  const r3 = await precheckHostPlan(wasm, c.ops, REPO, 7, ordered(plan()));
   assert.ok(!r3.ok && r3.kind === "permission" && r3.missing.includes("リポジトリの Issues の有効化"));
   // issue を作らない計画なら、Issues の無効は関係ない
-  const noIssue: HostPlan = { issues: [], replies: [reply("k3", T3)], resolves: [{ key: "k3", thread_id: T3 }], comment: null };
-  assert.equal((await precheckHostPlan(wasm, c.ops, REPO, 7, noIssue)).ok, true);
+  const noIssue: PlanBody = { issues: [], replies: [reply("k3", T3)], resolves: [{ key: "k3", thread_id: T3 }], comment: null };
+  assert.equal((await precheckHostPlan(wasm, c.ops, REPO, 7, ordered(noIssue))).ok, true);
   for (const m of [a.mock, b.mock, c.mock]) assert.deepEqual(m.w.log, []);
 });
 
@@ -418,60 +437,60 @@ test("CX-T329 事前検査（GitHub）: 保留中のレビューのスレッド�
   const { mock, ops } = hub();
   mock.w.threads[0].pending = true;
   mock.w.threads[1].canReply = false;
-  const r = await precheckHostPlan(wasm, ops, REPO, 7, plan());
+  const r = await precheckHostPlan(wasm, ops, REPO, 7, ordered(plan()));
   assert.ok(!r.ok && r.kind === "unsupported");
   assert.match(!r.ok ? r.reason : "", /Chrome では扱えない。VS Code で.*保留中のレビューのスレッド/);
   assert.deepEqual(!r.ok && r.keys, ["k1"]);
   // スレッドが MR に無い（消えた）なら読み直しを促す
-  const gone = await precheckHostPlan(wasm, ops, REPO, 7, plan(["PRRT_missing", T2, T3]));
+  const gone = await precheckHostPlan(wasm, ops, REPO, 7, ordered(plan(["PRRT_missing", T2, T3])));
   assert.ok(!gone.ok && gone.kind === "unreadable");
   assert.deepEqual(mock.w.log, []);
 });
 
 test("CX-T330 事前検査（GitLab）: 差分以外の discussion・resolvable でない note は Chrome では扱えない。api スコープ無し・ロール不足・Issues 無効は権限として言う", async () => {
-  const gp: HostPlan = {
+  const gp: PlanBody = {
     issues: [{ key: "k1", title: "t", body: `${MARK1}\nb` }],
     replies: [reply("k1", D1, true), reply("k2", D2)],
     resolves: [{ key: "k1", thread_id: D1 }, { key: "k2", thread_id: D2 }],
     comment: "c",
   };
   const ok = lab();
-  assert.equal((await precheckHostPlan(wasm, ok.ops, REPO, 7, gp)).ok, true);
+  assert.equal((await precheckHostPlan(wasm, ok.ops, REPO, 7, ordered(gp))).ok, true);
 
   const non = lab();
   non.mock.w.threads[0].nonDiff = true;
-  const r1 = await precheckHostPlan(wasm, non.ops, REPO, 7, gp);
+  const r1 = await precheckHostPlan(wasm, non.ops, REPO, 7, ordered(gp));
   assert.ok(!r1.ok && r1.kind === "unsupported");
   assert.match(!r1.ok ? r1.reason : "", /Chrome では扱えない。VS Code で.*差分以外の discussion/);
 
   const nr = lab();
   nr.mock.w.threads[1].notResolvable = true;
-  const r2 = await precheckHostPlan(wasm, nr.ops, REPO, 7, gp);
+  const r2 = await precheckHostPlan(wasm, nr.ops, REPO, 7, ordered(gp));
   assert.ok(!r2.ok && r2.kind === "unsupported" && /解決できない種類のスレッド/.test(r2.reason));
 
   const scope = lab();
   scope.mock.scopes = ["read_api"];
-  const r3 = await precheckHostPlan(wasm, scope.ops, REPO, 7, gp);
+  const r3 = await precheckHostPlan(wasm, scope.ops, REPO, 7, ordered(gp));
   assert.ok(!r3.ok && r3.kind === "permission" && r3.missing.some((m) => /api スコープ/.test(m)));
 
   const role = lab();
   role.mock.role = 20;
-  const r4 = await precheckHostPlan(wasm, role.ops, REPO, 7, gp);
+  const r4 = await precheckHostPlan(wasm, role.ops, REPO, 7, ordered(gp));
   assert.ok(!r4.ok && r4.kind === "permission");
   assert.ok(!r4.ok && r4.missing.some((m) => /Developer/.test(m)));
   // Reporter でも、解決しない計画（issue だけ）なら通る
-  const only: HostPlan = { issues: gp.issues, replies: [], resolves: [], comment: null };
-  assert.equal((await precheckHostPlan(wasm, role.ops, REPO, 7, only)).ok, true);
+  const only: PlanBody = { issues: gp.issues, replies: [], resolves: [], comment: null };
+  assert.equal((await precheckHostPlan(wasm, role.ops, REPO, 7, ordered(only))).ok, true);
 
   const noIssues = lab();
   noIssues.mock.issuesEnabled = false;
-  const r5 = await precheckHostPlan(wasm, noIssues.ops, REPO, 7, gp);
+  const r5 = await precheckHostPlan(wasm, noIssues.ops, REPO, 7, ordered(gp));
   assert.ok(!r5.ok && r5.missing.includes("プロジェクトの Issues の有効化"));
 
   // プロジェクトのトークンなど、スコープを読めないときは通して『確かめられなかった』に残す
   const unknown = lab();
   unknown.mock.scopes = null;
-  const r6 = await precheckHostPlan(wasm, unknown.ops, REPO, 7, gp);
+  const r6 = await precheckHostPlan(wasm, unknown.ops, REPO, 7, ordered(gp));
   assert.deepEqual(r6.ok && r6.unknown, ["api スコープ"]);
   for (const m of [non.mock, nr.mock, scope.mock, role.mock, noIssues.mock]) assert.deepEqual(m.w.log, []);
 });

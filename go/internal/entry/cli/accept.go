@@ -17,13 +17,14 @@ import (
 // acceptHead は `accept` の答えの頭の行。sh はこれが無ければ計画を読めなかったと読む。
 const acceptHead = "accept 1"
 
-// runAccept は `accept plan <計画>` と `accept threads <計画> <取り直した結果> <github|gitlab> <置き場>`。受け入れの
+// runAccept は `accept plan <計画>` と `accept threads <計画> <取り直した結果> <github|gitlab> <置き場> [<issue の URL>]`。受け入れの
 // 計画（`--accept-plan` が書く）を、sh（ccnavi-user-lib-review.sh・ccnavi-user-decide.sh）が jq を使わずに読む形。
 // 返信と解決をホストに書くのは sh。
 //
 //   - plan: `op <操作ID>`・`count <スレッドの数>`
 //   - threads: 書く前の確かめ（host.AcceptCheck）に通れば `mr <MR の番号>` と、スレッドごとに `thread <番号> <id> <キー>`。
-//     返信の本文は <置き場>/<番号>.reply に書く（本文は複数行なので答えの行に入れない）。止めるなら `stop <文>`
+//     返信の本文は <置き場>/<番号>.reply に書く（本文は複数行なので答えの行に入れない）。本文の issue の URL の枠
+//     （host.IssueURLSlot）は、issue の URL（issue を先に作ってから返信する）に置き換える。URL が無ければ止める。止めるなら `stop <文>`
 //   - decided <置いた答え> <issue の URL> <警告>: 置いた答え（`user reviewed --yes --json` の出力）の JSON に `issue_url`・`warning`
 //     を足した 1 行の JSON（ccnavi-user-decide.sh がボードに返す）。答えが空なら何も出さない
 //
@@ -37,7 +38,7 @@ func runAccept(stdout, stderr io.Writer, words []string) int {
 		}
 		fmt.Fprintf(stdout, "%s\nop %s\ncount %d\n", acceptHead, ospath.Squeeze(op), len(threads))
 		return config.ExitOK
-	case len(words) == 5 && words[0] == "threads":
+	case (len(words) == 5 || len(words) == 6) && words[0] == "threads":
 		_, threads, ok := host.ReadAcceptThreads(words[1])
 		if !ok {
 			return config.ExitError
@@ -57,9 +58,20 @@ func runAccept(stdout, stderr io.Writer, words []string) int {
 			fmt.Fprintf(stderr, "ccnavi: 返信の本文の置き場 %s を作れない（%s）\n", words[4], fsio.ErrorText(err))
 			return config.ExitError
 		}
+		issueURL := ""
+		if len(words) == 6 {
+			issueURL = words[5]
+		}
+		for _, t := range threads {
+			if strings.Contains(t.Reply, host.IssueURLSlot) && issueURL == "" {
+				fmt.Fprintln(stdout, "stop 返信に書く issue の URL が無い（issue を作ってから返信する）。ホストには何も書いていない。")
+				return config.ExitOK
+			}
+		}
 		for i, t := range threads {
 			name := strconv.Itoa(i)
-			if err := os.WriteFile(ospath.Join(words[4], name+".reply"), []byte(t.Reply), 0o600); err != nil {
+			reply := strings.ReplaceAll(t.Reply, host.IssueURLSlot, issueURL)
+			if err := os.WriteFile(ospath.Join(words[4], name+".reply"), []byte(reply), 0o600); err != nil {
 				fmt.Fprintf(stderr, "ccnavi: 返信の本文を書けない（%s）\n", fsio.ErrorText(err))
 				return config.ExitError
 			}

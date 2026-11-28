@@ -66,10 +66,14 @@ func TestDecideChoicesCreateTheIssueAndPostTheDecision(t *testing.T) {
 		!strings.Contains(place, "--accept-done") || d.gl.fetched() != 2 {
 		t.Errorf("計画 = %q, 置く = %q, 取り直し = %d", plan, place, d.gl.fetched())
 	}
-	if kinds := d.gl.kinds(); fmt.Sprint(kinds) != "[reply resolve issue note]" {
+	if kinds := d.gl.kinds(); fmt.Sprint(kinds) != "[issue reply resolve note]" {
 		t.Fatalf("書き込み = %v", kinds)
 	}
 	reply, resolve := d.gl.postedOf("reply")[0], d.gl.postedOf("resolve")[0]
+	// issue を先に作るので、返信には作った issue の URL を書く（枠は残さない）
+	if body := fmt.Sprint(reply["body"]); !strings.Contains(body, "/issues/1") || strings.Contains(body, "{issue_url}") {
+		t.Errorf("返信の本文 = %q", body)
+	}
 	if !strings.HasSuffix(fmt.Sprint(reply["path"]), "/merge_requests/1/discussions/d1/notes") || !strings.HasPrefix(fmt.Sprint(reply["body"]), acceptMarker) ||
 		!strings.HasSuffix(fmt.Sprint(resolve["path"]), "/merge_requests/1/discussions/d1") || resolve["resolved"] != true {
 		t.Errorf("返信 = %v, 解決 = %v", reply, resolve)
@@ -110,7 +114,7 @@ func TestDecideAFailedReplyStopsBeforeAnythingIsPlaced(t *testing.T) {
 	d := newDecideSite(t)
 	d.gl.do(func() { d.gl.failReply = true })
 	stopped := d.decide(dOpts{}, "1", "--choices", `{"u1":"issue"}`, "--digest", "d0")
-	// 置く呼び出し（--yes）は打たない。issue もコメントも作らない
+	// 置く呼び出し（--yes）は打たない。issue は先に作ってあるが、コメントは作らない
 	var placing []string
 	for _, c := range d.calls() {
 		if !strings.Contains(c, "--accept-plan") {
@@ -118,7 +122,7 @@ func TestDecideAFailedReplyStopsBeforeAnythingIsPlaced(t *testing.T) {
 		}
 	}
 	if stopped.Code != 1 || !strings.Contains(stopped.Stderr, "受け入れを完了できない") || !strings.Contains(stopped.Stderr, "返信を残せなかった") ||
-		strings.Contains(strings.Join(placing, " "), "--yes") || len(d.gl.kinds()) != 0 || len(d.leftovers()) != 0 {
+		strings.Contains(strings.Join(placing, " "), "--yes") || fmt.Sprint(d.gl.kinds()) != "[issue]" || len(d.leftovers()) != 0 {
 		t.Errorf("code = %d, 置く呼び出し = %v, 書き込み = %v, 残り = %v\n%s", stopped.Code, placing, d.gl.kinds(), d.leftovers(), stopped.Stderr)
 	}
 }
@@ -135,7 +139,7 @@ func TestDecideAllRepliesComeBeforeAnyResolveAndAPartialFailureStops(t *testing.
 		allPlans = allPlans && strings.Contains(c, "--accept-plan")
 	}
 	// ホストに書いたので、計画は残す（打ち直すと d1 は見せる指摘から外れる）
-	if stopped.Code != 1 || fmt.Sprint(d.gl.kinds()) != "[reply reply resolve]" || !strings.Contains(stopped.Stderr, "解決できなかった") ||
+	if stopped.Code != 1 || fmt.Sprint(d.gl.kinds()) != "[issue reply reply resolve]" || !strings.Contains(stopped.Stderr, "解決できなかった") ||
 		!strings.Contains(stopped.Stderr, "先に解決した分は残る") || !allPlans || !strings.Contains(stopped.Stderr, "計画を残した") ||
 		fmt.Sprint(d.leftovers()) != "[review-accept-i0001-1.json]" {
 		t.Errorf("code = %d, 書き込み = %v, 残り = %v\n%s", stopped.Code, d.gl.kinds(), d.leftovers(), stopped.Stderr)
@@ -157,7 +161,7 @@ func TestDecideAFailedPlacementAfterTheHostWasWrittenKeepsThePlan(t *testing.T) 
 	t.Parallel()
 	d := newDecideSite(t)
 	failed := d.decide(dOpts{env: map[string]string{"STUB_FAIL_YES": "1"}}, "1", "--choices", `{"u1":"keep"}`, "--digest", "d0")
-	if failed.Code != 1 || fmt.Sprint(d.gl.kinds()) != "[reply resolve]" || !strings.Contains(failed.Stderr, "置けなかった") ||
+	if failed.Code != 1 || fmt.Sprint(d.gl.kinds()) != "[issue reply resolve]" || !strings.Contains(failed.Stderr, "置けなかった") ||
 		fmt.Sprint(d.leftovers()) != "[review-accept-i0001-1.json]" {
 		t.Errorf("code = %d, 書き込み = %v, 残り = %v\n%s", failed.Code, d.gl.kinds(), d.leftovers(), failed.Stderr)
 	}
