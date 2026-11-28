@@ -12,12 +12,12 @@ messages:
     what: |-
       [ccnavi] the rule file at {path} could not be read, so ccnavi is judging with its built-in defaults. The project's own rules are not in force right now. Neither the shell nor the Write or Edit tool can write to that file while the defaults are in force. Put a draft at wip/handoff/.ccnavi/config/common/rules.yml and ask the user to import it with 'ccnavi-user-handoff.sh' (or to fix the file by hand).
 
-  # セッションの開始のたびに（起動・再開・compact・clear）。読めないレイヤーは空として扱われ、そのレイヤーの deny が黙って効かなくなる。
+  # セッションの開始のたびに（起動・再開・compact・clear）。読めない設定は空として扱われ、その設定の deny が黙って効かなくなる。
   NOTICE_LAYER_UNREADABLE:
     kind: notice
     values: [layers]
     what: |-
-      [ccnavi] レイヤー {layers} のルールのファイルを読めません。そのレイヤーの deny は効いていません。`{script:ccnavi-launcher.sh} --lint` で原因を確かめ、ユーザに直してもらってください（下書きは wip/handoff/ に置き、ユーザが `ccnavi-user-handoff.sh` で取り込みます）。
+      [ccnavi] 設定 {layers} のルールのファイルを読めません。その設定の deny は効いていません。`{script:ccnavi-launcher.sh} --lint` で原因を確かめ、ユーザに直してもらってください（下書きは wip/handoff/ に置き、ユーザが `ccnavi-user-handoff.sh` で取り込みます）。
 
   # どのルールも言及しなかった呼び出し。結末（ask／deny）と、読み切れたか、組み込みの既定に退避したかで分ける。
   # 危険だと判定したわけではない。判定できないので権限モードに委ねている。
@@ -321,12 +321,12 @@ messages:
     what: |-
       ワークツリー側の設定は、その場では誰も読みませんが、統合すれば統合先の hook の登録とルールになります。
 
-  # 共通レイヤーのルールファイルを戻した。`draft` は下書きの置き場。
+  # 共通設定のルールファイルを戻した。`draft` は下書きの置き場。
   NOTICE_SELFGUARD__COMMON_RULES:
     kind: notice
     values: [draft]
     what: |-
-      共通レイヤーのルールファイルを直すときは、下書きを {draft} に置き、ユーザにターミナルの ccnavi-user-handoff.sh での取り込みを頼んでください。読めない間も同じです。
+      共通設定のルールファイルを直すときは、下書きを {draft} に置き、ユーザにターミナルの ccnavi-user-handoff.sh での取り込みを頼んでください。読めない間も同じです。
 
   # 実行ファイルを新しい版を基準に取り直した。
   NOTICE_SELFGUARD__REBASED:

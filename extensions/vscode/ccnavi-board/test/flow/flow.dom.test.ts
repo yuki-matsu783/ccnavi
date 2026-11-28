@@ -498,7 +498,7 @@ test("CB-D188 部品箱と右の欄は畳める。畳んでも中身は残し（
   }
 });
 
-test("CB-D190 図の拡大ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
+test("CB-D190 図の全画面ボタンで図だけを全画面にし、もう一度押すと戻す", async () => {
   const dom = await openFlow({ doc: marked() });
   try {
     dom.click(dom.one('#flow-graph button[data-action="toggle-maximize"]'));

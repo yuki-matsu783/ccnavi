@@ -735,7 +735,7 @@ courses:
         body: 枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。
         scene: {doc: grouped, select: group-1}
       - target: inspector-ungroup
-        title: 枠を解く
+        title: グループを解除する
         body: 枠を選ぶと、右の欄で名前を直せます。「グループを解除」は枠だけを消し、中のノードはその場に残します。
         scene: {doc: grouped, select: group-1}
       - target: copy

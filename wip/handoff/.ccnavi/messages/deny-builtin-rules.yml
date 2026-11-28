@@ -118,7 +118,7 @@ messages:
   RULE_GUARD_COMMON_LAYER:
     kind: deny
     what: |-
-      ccnavi の共通レイヤーの設定（ルール・フェーズ定義・リスクの配点）です。
+      ccnavi の共通設定（ルール・フェーズ定義・リスクの配点）です。
     why: |-
       どのツリーの判定にも使われるので、エージェントが書き換えると自分の判定を緩められます。
     next: |-
@@ -159,7 +159,7 @@ messages:
   RULE_GUARD_PROJECT_HOME:
     kind: deny
     what: |-
-      レイヤーの設定の置き場です。
+      設定の置き場です。
     why: |-
       ここに入っているルール・フェーズ定義・リスクの配点がこのツリーへの判定を決めるので、エージェントが書き換えると自分の判定を緩められます。承認済みチケット・フェーズのマーカー・子のフロー（approved/ の下）もここにあり、書くのはユーザです。
     next: |-
@@ -273,6 +273,6 @@ messages:
       ユーザ専用の操作は 'ccnavi user <操作>'（agree・reviewed・close-early・prune・handoff・mirror）にまとめてあり、エージェントは実行しません。
     note: |-
       放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、ユーザの判断の入口（'{script:ccnavi-user-close-early.sh}'）もユーザが実行します。
-      保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通レイヤーのミラーと工程スキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
+      保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通設定のミラーと工程スキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
       親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです（案内されたコマンドをユーザに見せて、打ってもらってください）。
       下書きは '{script:ccnavi-stage.sh} --commands <パス>'、承認先行の一覧は '{script:ccnavi-launcher.sh} --agree --preview' なら通ります。

@@ -215,7 +215,7 @@ function GroupView({ id, data, selected }: NodeProps<GroupNode>): JSX.Element {
       <div className="flow-group" data-type="group" data-tour={data.mark}>
         <span className="flow-group-label">{data.name}</span>
       </div>
-      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを解除" onRemove={() => actions.removeNode(id)} />}
+      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを解除（中のノードは残す）" onRemove={() => actions.removeNode(id)} />}
     </>
   );
 }

@@ -106,7 +106,7 @@ func syncProblems(conf *config.Settings, root string) []rules.Problem {
 	}
 	if len(unchecked) > 0 {
 		out = append(out, rules.Problem{Severity: rules.Info, Rule: whereLayers, Detail: "統合先のブランチ（origin/<統合先>）が手元に無く、" +
-			"レイヤーのずれを確かめていない（" + strings.Join(unchecked, ", ") + "）。取得すると確かめる"})
+			"設定のずれを確かめていない（" + strings.Join(unchecked, ", ") + "）。取得すると確かめる"})
 	}
 	return out
 }

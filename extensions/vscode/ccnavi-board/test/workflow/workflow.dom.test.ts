@@ -415,7 +415,7 @@ test("CB-D187 ステップを押すと右の欄に詳細を出す。欄は畳め
   }
 });
 
-test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・Escで戻す", async () => {
+test("CB-D189 図の全画面ボタンで図だけを全画面にし、閉じる・Escで戻す", async () => {
   const dom = await openWorkflow();
   try {
     const canvas = '.plan-graph[data-part="plan"] .plan-graph-canvas';
