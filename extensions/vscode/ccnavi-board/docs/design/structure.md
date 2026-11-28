@@ -129,20 +129,22 @@ src/
     styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する。欄の幅の名前（--w-field・--w-field-wide・--w-grow）は page.css の :root にあり、画面の CSS は 320px・360px を直書きせずそれを参照する（CB-T439 が検査する）
     （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T585 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
     board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
-    board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
+    board/App.css     App.tsx の CSS（ツールバー・絞り込み）
+    board/Lanes.tsx   列の見出しと親ごとの行（親は行の見出し、子は列ごとのセル。フェーズを表示で開く行・列の畳みと幅）
+    board/Lanes.css   Lanes.tsx の CSS（列の幅を揃える grid・取っ手・畳んだ列・940px 以下で行を縦に積む）
     board/Card.css    Card.tsx の CSS（カード 1 枚。操作ボタン card-button の寸法もここ）
     board/MergeBand.tsx マージ状況の帯（親ごとの 1 行、［MR を開く］［片付ける］、コマンドのコピー）
     board/MergeBand.css MergeBand.tsx の CSS
     board/Approval.css Approval.tsx の CSS（承認のオーバーレイ）
     board/post.ts     ボードの送り口。契約に無いものは型で止まる
     board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
-    board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
+    board/App.tsx     ツールバー・絞り込み・選んだカードの置き場・脚注と、拡張ホストからのメッセージの受け
     board/Card.tsx    カード 1 枚（見出し・局面・動いた表示・注意・主な操作）
     board/Panel.tsx   選んだカードの右のパネル（位置・MR・ユーザ待ち・フェーズ行・チケットを開く・補助の操作・詳細）
     board/Toc.tsx     承認のオーバーレイと対応方針の画面の目次（位置へ送るだけ）
     board/Approval.tsx 承認のオーバーレイ（要約・一覧・計画の図（読むだけ）・凡例・本文・対象外・渡す文）
     board/Decide.tsx   レビュー完了のオーバーレイの中身（0 件は「レビュー済みにする」、1 件以上は指摘ごとの選択と相談のプロンプトのコピー）
-    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅・選んだカード）の読み書き
+    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列（既定は完了と取り消し）・列の幅・選んだカード・開いた親の行）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
     projects/style.css   プロジェクト管理画面の CSS の入口
     projects/App.css     App.tsx の CSS（節・clone の欄・一覧の入れ物）
