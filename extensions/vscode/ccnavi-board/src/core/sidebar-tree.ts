@@ -196,7 +196,7 @@ function waitingNode(board: BoardJson, tickets: boolean): { readonly node: Sideb
       notice.map((id) =>
         node(`notice:${id}`, named(id), {
           description: issuesOf.get(id)?.[0] ?? "",
-          tooltip: [...(issuesOf.get(id) ?? []), "押すと、チケット管理でこのカードを選びます"].join("\n"),
+          tooltip: [...(issuesOf.get(id) ?? []), "押すと、チケット管理画面でこのカードを選びます"].join("\n"),
           action: { kind: "board", target: { kind: "select", ticket: id } },
         }),
       ),
@@ -235,7 +235,7 @@ function waitingNode(board: BoardJson, tickets: boolean): { readonly node: Sideb
           node("retire", "片付け", {
             description: "MRの状況を確認",
             icon: "git-merge",
-            tooltip: "押すと、チケット管理で「MRの状況を確認」を始めます（リモートのMRを見に行きます）。結果はチケット管理に出ます",
+            tooltip: "押すと、チケット管理画面で「MRの状況を確認」を始めます（リモートのMRを見に行きます）。結果はチケット管理画面に出ます",
             action: { kind: "board", target: { kind: "mergeCheck" } },
           }),
         ]
@@ -263,7 +263,7 @@ function progressNode(board: BoardJson): SidebarNode {
         : parents.map((card) =>
             node(`progress:${card.project}:${card.id}`, card.title === "" ? card.id : `${card.id} ${card.title}`, {
               description: card.stage === "" ? card.status.label : card.stage,
-              tooltip: "押すと、チケット管理でこのカードを選びます",
+              tooltip: "押すと、チケット管理画面でこのカードを選びます",
               action: { kind: "board", target: { kind: "select", ticket: card.id } },
             }),
           ),

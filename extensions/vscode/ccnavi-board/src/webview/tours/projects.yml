@@ -25,7 +25,7 @@ diagrams:
           名前: web-app
       - id: check
         from: プロジェクト管理画面
-        text: 「取得」を押すと、まず画面の中で入力を検査する
+        text: 「取得」を押すと、まず入力を画面で検査する
         value: |-
           URLの形（https / ssh / git@host:path） ✓
           資格情報（user:token@）なし ✓
