@@ -20,6 +20,7 @@ import { TOUR_IMAGES } from "../tours/images.js";
 import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
+import { PlanFlow } from "./PlanFlow.js";
 import { CardPanel } from "./Panel.js";
 import { LaneBoard, laneKey } from "./Lanes.js";
 import { lastUpdatedText } from "../shared/format.js";
@@ -246,6 +247,10 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const selectedOf = (card: Card): boolean => (touring ? typeof scene.select === "string" && scene.select === card.id : selected === cardKey(card));
   const selectCard = (card: Card): void => change((now) => ({ ...now, selected: cardKey(card) }));
   const closePanel = (): void => change((now) => ({ ...now, selected: EMPTY.selected }));
+  // 計画の流れを開いた親（`cardKey`）。画面だけが持つ。更新で親が消えたか図の中身が無くなったら出さない
+  const [planFlowKey, setPlanFlowKey] = useState<string | undefined>(undefined);
+  const planFlowCard =
+    planFlowKey === undefined || touring ? undefined : board?.columns.flatMap((column) => column.cards).find((card) => card.isParent && cardKey(card) === planFlowKey && card.plans.length > 0);
   const narrow = useNarrow();
   const shownParents = shown === undefined ? [] : shownArchived ? [...shown.parents, ...shown.archivedParents] : shown.parents;
   // マージ状況の帯。実際の結果は拡張ホストが持ち（ボードが開いている間だけ）、ここは出すだけ。案内の間は見本の結果を、
@@ -457,6 +462,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 opened: opened ? [...now.opened, lane] : now.opened.filter((o) => o !== lane),
               }))
             }
+            onPlanFlow={(parent) => setPlanFlowKey(cardKey(parent))}
           />
           {panelCard !== undefined && !narrow ? panelOf(panelCard) : null}
           </div>
@@ -464,6 +470,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
         </>
       )}
       {overlay !== undefined ? <Approval overlay={overlay} unsaved={touring ? [] : (data.unsaved ?? [])} /> : null}
+      {overlay === undefined && planFlowCard !== undefined ? <PlanFlow card={planFlowCard} onClose={() => setPlanFlowKey(undefined)} /> : null}
       {touring && board !== undefined ? <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} /> : null}
     </>
   );

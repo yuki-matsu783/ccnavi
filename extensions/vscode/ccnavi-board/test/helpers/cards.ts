@@ -113,7 +113,7 @@ export function waitingPhase(number: number, mr = 12, url = `https://example.com
 }
 
 export function parentJson(ticket: string, phases: readonly PhaseJson[], over: Partial<ParentJson> = {}): ParentJson {
-  return { ticket, closed: false, stage: "作業中", plan: [], feedback: null, close_early: null, ready: null, phases, ...over };
+  return { ticket, closed: false, stage: "作業中", plan: [], feedback: null, plans: [], close_early: null, ready: null, phases, ...over };
 }
 
 /** 見本の殻（設定・レイヤー・統合結果）に、指定したチケットと親だけを入れたボード */

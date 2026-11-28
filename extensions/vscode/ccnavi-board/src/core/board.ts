@@ -22,6 +22,7 @@ import type {
   SeenInJson,
   TicketJson,
 } from "./model.js";
+import type { ApprovePlan } from "./approvemodel.js";
 import { phaseStatusOf, statusOf, type PhaseStatus, type Status } from "./status.js";
 
 export interface ColumnDef {
@@ -125,6 +126,8 @@ export interface Card {
   readonly wrapped: boolean;
   readonly ready: boolean;
   readonly phases: readonly PhaseChip[];
+  /** 親だけ。計画の流れ（図の中身。`parents[].plans`のまま）。空なら「計画の流れを見る」を出さない */
+  readonly plans: readonly ApprovePlan[];
   readonly actions: readonly Action[];
   /** 読み手が気づくべき食い違い。実行ファイルの`issues`をそのまま持つ */
   readonly issues: readonly string[];
@@ -316,6 +319,7 @@ function toCard(
     wrapped: isParent && wrapped,
     ready: isParent && ownParent?.ready !== null && ownParent?.ready !== undefined,
     phases,
+    plans: isParent && ownParent ? ownParent.plans : [],
     issues: t.issues,
     blocked: t.blocked,
     mrUrl: mr.url,
@@ -391,6 +395,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     wrapped: false,
     ready: false,
     phases: [],
+    plans: [],
     issues: [],
     blocked: "",
     mrUrl: "",

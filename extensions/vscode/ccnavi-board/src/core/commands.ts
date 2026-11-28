@@ -58,7 +58,7 @@ export function approveArgs(
 }
 
 /**
- * `--plan-order <親> --json [--order <JSON>]`。計画編集タブが計画の図を読む。
+ * `--plan-order <親> --json [--order <JSON>]`。計画編集タブが計画の流れを読む。
  * `order`は元の番号（いま提案に書いてある番号）での直接の先行で、線を変えたときだけ付ける（空なら提案のまま）。
  * 番号の振り直しと順序の検査は実行ファイルが答える
  */

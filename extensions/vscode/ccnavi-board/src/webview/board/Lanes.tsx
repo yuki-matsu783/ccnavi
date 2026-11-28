@@ -1,7 +1,8 @@
 /**
  * ボードの本体。列（承認待ち・進行中・完了・取り消し、アーカイブを表示すれば5つめ）を横に、親ごとの行を縦に並べる。
  * 親は必ず行の見出し（`CardItem`の`head`）に置き、列の中には子だけを置く。列の見出しの件数は子だけを数える。
- * 「フェーズを表示」で親の行を開くと、フェーズごとの状態と子の一覧を出す（順序は矢印で描かない）。
+ * 「フェーズを表示」で親の行を開くと、フェーズごとの状態と子の一覧を出す（順序は矢印で描かない）。順序は、開いた行の
+ * 「計画の流れを見る」で、承認のオーバーレイと同じ図の部品を読むだけで開いて見せる（`PlanFlow.tsx`）。
  *
  * どの親の行に入るかは、カードの`family`（親なら自分、子なら親の識別子）とプロジェクトの組で決める。
  * 親のカードがボードに無い子（親のチケットが読めない・別の場所にある）は、親の識別子だけを見出しにした行に入る。
@@ -69,6 +70,8 @@ export interface LaneBoardProps {
   readonly onFold: (state: string, folded: boolean) => void;
   readonly onWidth: (state: string, width: number | undefined) => void;
   readonly onOpen: (lane: string, opened: boolean) => void;
+  /** 開いた親の行の「計画の流れを見る」を押したとき */
+  readonly onPlanFlow: (parent: Card) => void;
 }
 
 export function LaneBoard(props: LaneBoardProps): JSX.Element {
@@ -107,7 +110,7 @@ export function laneKey(lane: { readonly project: string; readonly family: strin
   return JSON.stringify([lane.project, lane.family]);
 }
 
-function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf, onSelect, panelOf, onOpen }: LaneBoardProps & { readonly lane: Lane }): JSX.Element {
+function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf, onSelect, panelOf, onOpen, onPlanFlow }:LaneBoardProps & { readonly lane: Lane }): JSX.Element {
   const parent = lane.parent;
   const open = parent !== undefined && parent.phases.length > 0 && opened.includes(lane.key);
   // 行は、親か子のどれかが見えている間は出す（子だけが絞り込みに残っても、見出しの親で分かるように）。
@@ -140,7 +143,7 @@ function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf,
           <span className="lane-orphan-note">親のチケットはボードにありません</span>
         </div>
       )}
-      {open && parent !== undefined ? <LanePhases parent={parent} childCards={lane.children} /> : null}
+      {open && parent !== undefined ? <LanePhases parent={parent} childCards={lane.children} onPlanFlow={() => onPlanFlow(parent)} /> : null}
       {parent !== undefined && lane.children.length === 0 ? <p className="lane-empty">子はまだありません</p> : null}
       {columns.map((column) => {
         const own = lane.children.filter((card) => card.column === column.state);
@@ -179,11 +182,19 @@ function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf,
 
 /**
  * 開いた親の行。フェーズごとに、状態の一言と、そのフェーズの子（識別子とバッジの言葉）を1行で並べる。
- * 計画のステップの先行関係は一直線とは限らないので、矢印で順序を描かない
+ * 計画のステップの先行関係は一直線とは限らないので、矢印で順序を描かない。順序は「計画の流れを見る」で図にして見せる
+ * （図の中身`card.plans`が空の親では出さない）
  */
-function LanePhases({ parent, childCards }: { readonly parent: Card; readonly childCards: readonly Card[] }): JSX.Element {
+function LanePhases({ parent, childCards, onPlanFlow }: { readonly parent: Card; readonly childCards: readonly Card[]; readonly onPlanFlow: () => void }): JSX.Element {
   return (
     <div className="lane-phases" data-tour="lane-phase-list">
+      {parent.plans.length > 0 ? (
+        <div className="lane-phases-actions">
+          <button type="button" className="card-button" data-action="plan-flow" data-tour="lane-plan-flow" data-ticket={parent.id} title="計画のステップの順序を図で見ます（見るだけで、直せません）" onClick={onPlanFlow}>
+            計画の流れを見る
+          </button>
+        </div>
+      ) : null}
       <ul className="phases">
         {parent.phases.map((p) => {
           const own = childCards.filter((card) => card.phase === p.number);

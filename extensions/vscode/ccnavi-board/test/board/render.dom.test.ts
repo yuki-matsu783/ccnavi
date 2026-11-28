@@ -58,7 +58,7 @@ test("CB-T107 承認のオーバーレイに一覧・本文・対象外を出し
     assert.ok(body.startsWith("チケットの承認リクエスト"));
     assert.ok(body.includes("編集対象としているが"));
     assert.ok(body.includes("超えている"));
-    // 対象にしないのは形の正しくない子（計画に無い番号）。計画の図の見出し（`.plan-graph h3`）は数えない
+    // 対象にしないのは形の正しくない子（計画に無い番号）。計画の流れの図の見出し（`.plan-graph h3`）は数えない
     assert.deepEqual(texts(page, ".approval .overlay-main > h3"), ["承認対象外の提案"]);
     assert.ok(text(page, ".approval-rejected").includes("i0001-05-05"));
     assert.ok(text(page, ".approval-rejected").includes("計画にありません"));
@@ -634,7 +634,7 @@ test("CB-T265 先行のバッジの言葉はカードの今で分ける。承認
 });
 
 
-test("CB-D1292 承認の一覧の左に目次（要約・承認するチケット・計画の図（親ごと）・凡例・本文・対象外・読めない提案・承認）。押すとその位置へ送るだけで、本文は1本のまま、承認のボタンはページの最後", async () => {
+test("CB-D1292 承認の一覧の左に目次（要約・承認するチケット・計画の流れ（親ごと）・凡例・本文・対象外・読めない提案・承認）。押すとその位置へ送るだけで、本文は1本のまま、承認のボタンはページの最後", async () => {
   const preview = approvePreview();
   const scrolled: string[] = [];
   const page = await openBoard(fixture(), {
@@ -653,7 +653,7 @@ test("CB-D1292 承認の一覧の左に目次（要約・承認するチケッ�
     assert.deepEqual(labels, [
       "要約",
       `承認するチケット${preview.batch.length}`,
-      ...families.map((t) => `計画の図: ${t}`),
+      ...families.map((t) => `計画の流れ: ${t}`),
       "凡例",
       "本文",
       `対象外${preview.rejected.length}`,

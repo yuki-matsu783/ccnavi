@@ -3,6 +3,7 @@
  * 形の定義はccnaviのdocs/11_requirements/json-shapes.md「ボードのJSON」。同じ例がtest/fixtures/board.jsonにあり、
  * Goのテスト（go/internal/clitest/ticket/flow/board_test.go）が同じ例で形を確かめる。
  */
+import { readPlans, type ApprovePlan } from "./approvemodel.js";
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
 export const BOARD_VERSION = 1;
@@ -271,6 +272,11 @@ export interface ParentJson {
   readonly stage: string;
   readonly plan: readonly unknown[];
   readonly feedback: readonly unknown[] | null;
+  /**
+   * 計画の流れ（図の中身。計画ごとに1件）。承認のpreviewの`plans`と同じ形で、実行ファイルの同じ関数が組む。
+   * 計画を持たない親は空で、ボードは「計画の流れを見る」を出さない
+   */
+  readonly plans: readonly ApprovePlan[];
   readonly close_early: Record<string, unknown> | null;
   readonly ready: Record<string, unknown> | null;
   readonly phases: readonly PhaseJson[];
@@ -669,6 +675,7 @@ function parent(raw: Record<string, unknown>): ParentJson {
     stage: str(raw.stage),
     plan: list(raw.plan),
     feedback: Array.isArray(raw.feedback) ? raw.feedback : null,
+    plans: readPlans(raw.plans),
     close_early: isRecord(raw.close_early) ? raw.close_early : null,
     ready: isRecord(raw.ready) ? raw.ready : null,
     phases: list(raw.phases).filter(isRecord).map(phase),

@@ -141,6 +141,21 @@ sample:
       - ticket: sample-b
         stage: 作業中・フェーズ2 設計
         plan: [research, { type: design, after: [1] }, { type: implement, after: [2] }]
+        # 計画の流れ（図の中身）。「計画の流れを見る」のボタンを出すためだけに置く（案内の間は開かない）
+        plans:
+          - ticket: sample-b
+            part: plan
+            source_sha: ""
+            items:
+              - { number: 1, from: 1, type: research, title: 調査, review: false, deferred: false, review_at: null, locked: true }
+              - { number: 2, from: 2, type: design, title: 設計, review: true, deferred: false, review_at: null, locked: true }
+              - { number: 3, from: 3, type: implement, title: 実装とテスト, review: false, deferred: false, review_at: null, locked: false }
+            after: { "2": [1], "3": [2] }
+            proposed: { "2": [1], "3": [2] }
+            current: null
+            loose: []
+            ready: [1]
+            problems: []
         phases:
           - { number: 1, type: research, title: 調査, label: 1（調査）, state: ended, tickets: [sample-b-01-01], states: { sample-b-01-01: done }, marks: { skipped: {} }, risk: { points: 0, level: LOW }, risk_line: "リスク: 0 (LOW)" }
           - { number: 2, type: design, title: 設計, label: 2（設計）, state: active, tickets: [sample-b-02-01], states: { sample-b-02-01: doing }, review_required: true }
@@ -262,7 +277,7 @@ courses:
         body: 子チケットは「承認待ち → 進行中 → 完了（または取り消し）」の順に列を移ります。行は親チケットごとに分かれ、親は行の見出しに出ます。列の見出しの件数は子だけを数えます。完了と取り消しの列は最初から畳んであり、見出しを押すと広げます（畳んだ列には件数だけが出ます）。列の見出しの右端をドラッグすると幅を変えられます（ダブルクリックで元に戻ります）。
       - target: lane-phase-list
         title: 親ごとの行
-        body: 親の行の見出しには、親の状態のバッジと局面が出ます。承認待ちの親なら［承認］と［計画編集］も見出しにあります。「フェーズを表示」を押すと、フェーズごとの状態と、そのフェーズの子の一覧が見出しの下に開きます。計画の順序は一直線とは限らないので、ここでは矢印で描きません。
+        body: 親の行の見出しには、親の状態のバッジと局面が出ます。承認待ちの親なら［承認］と［計画編集］も見出しにあります。「フェーズを表示」を押すと、フェーズごとの状態と、そのフェーズの子の一覧が見出しの下に開きます。計画の順序は一直線とは限らないので、ここでは矢印で描きません。順序は「計画の流れを見る」で図にして見られます（見るだけで、直せません）。
         scene: { open: sample-b }
       - target: status
         title: 状態のバッジ
@@ -479,7 +494,7 @@ courses:
         scene: { overlay: approval }
       - target: approval-plan
         title: 計画の順序を見る
-        body: 計画を持つ親には、全体計画の図が出ます。線は「どのステップにどのステップが先行するか」を表し、承認すると、この順序で進めることに合意したことになります。
+        body: 計画を持つ親には、計画の流れが図で出ます（全体計画とフィードバック計画は別の図）。線は「どのステップにどのステップが先行するか」を表し、承認すると、この順序で進めることに合意したことになります。
         scene: { overlay: approval }
       - target: approve-confirm
         title: 承認する

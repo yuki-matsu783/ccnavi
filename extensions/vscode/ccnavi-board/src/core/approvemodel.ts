@@ -27,7 +27,7 @@ export interface ApproveRejected {
 }
 
 /**
- * 計画の図のステップ1つ（`plans[].items[]`）。値は実行ファイルが組んだもの。図は印を付けて描くだけで、
+ * 計画の流れの図のステップ1つ（`plans[].items[]`）。値は実行ファイルが組んだもの。図は印を付けて描くだけで、
  * レビューの要否・延期の引き受け手・固定したかを自分で決めない
  */
 export interface ApprovePlanItem {

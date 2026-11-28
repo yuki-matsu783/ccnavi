@@ -1,0 +1,3 @@
+/* 承認済みの親の計画の流れ（`PlanFlow.tsx`）。図は承認のオーバーレイと同じ部品（`../shared/PlanGraph.css`） */
+.plan-flow { --overlay-w: 920px; }
+.plan-flow-name { margin-left: 8px; font-weight: normal; color: var(--vscode-descriptionForeground); }

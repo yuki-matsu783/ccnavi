@@ -58,6 +58,7 @@ button.fold:focus-visible { outline: 1px solid var(--vscode-focusBorder); outlin
 .lane-empty { margin: 4px 0 0 12px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
 /* 開いた親の行。フェーズごとに 状態 と 子の一覧。矢印は描かない */
 .lane-phases { margin: 4px 0 0 12px; }
+.lane-phases-actions { display: flex; margin-bottom: 4px; }
 .lane-phases .phases { margin-top: 0; border-top: none; padding-top: 0; }
 /* 名前と状態の列は行ごとに幅が変わらないよう固定する（子の一覧の始まりを揃える） */
 .lane-phases .phase { grid-template-columns: 12px minmax(0, 16em) minmax(0, 1fr); }

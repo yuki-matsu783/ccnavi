@@ -4,7 +4,7 @@
  * 左の目次（`Toc.tsx`）は、1本のページの中の位置へ送るだけ。承認のボタンはページの最後に置く
  * （下に貼り付けると、本文を最後まで読まずに承認できてしまう）。
  *
- * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身はpreviewの
+ * 計画を持つ親が一覧にあれば、本文の上にその計画の流れを図で読むだけで出す（`PlanGraph`。中身はpreviewの
  * `plans`で、承認する提案そのものの順序）。図は実行ファイルの答えを描くだけ。図は親ごとにまとめ、
  * その前に順序を直す計画編集タブへの入口（「計画を編集」）を置く。押すと拡張ホストがオーバーレイを
  * 閉じてからタブを開く（タブで保存すると、この一覧はもう承認できないため）。
@@ -139,7 +139,7 @@ function Body({
       : [
           ...(summary.tickets === "" ? [] : [{ target: "approval-summary", label: "要約" }]),
           { target: "approval-tickets", label: "承認するチケット", count },
-          ...planFamilies.map(([ticket]) => ({ target: `approval-plan-${ticket}`, label: `計画の図: ${ticket}` })),
+          ...planFamilies.map(([ticket]) => ({ target: `approval-plan-${ticket}`, label: `計画の流れ: ${ticket}` })),
           { target: "approval-legend", label: "凡例" },
           { target: "approval-body", label: "本文" },
           { target: "approval-rejected", label: "対象外", count: preview.rejected.length },
@@ -314,7 +314,7 @@ function Legend(): JSX.Element {
   );
 }
 
-/** 計画の図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の2つの図）。並びは届いた順 */
+/** 計画の流れの図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の2つの図）。並びは届いた順 */
 function families(plans: readonly ApprovePlan[]): [string, ApprovePlan[]][] {
   const out = new Map<string, ApprovePlan[]>();
   for (const plan of plans) {

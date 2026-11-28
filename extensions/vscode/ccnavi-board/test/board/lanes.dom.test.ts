@@ -1,6 +1,7 @@
 /**
  * ボードの行を親ごとに分ける（`webview/board/Lanes.tsx`）。親は必ず行の見出しにあり、列の中には子だけが並ぶ。
- * 列の件数は子だけ。「フェーズを表示」で親の行を開くと、フェーズごとの状態と子の一覧が出る（矢印は描かない）。
+ * 列の件数は子だけ。「フェーズを表示」で親の行を開くと、フェーズごとの状態と子の一覧が出る（矢印は描かない）。順序は
+ * 開いた行の「計画の流れを見る」で、図を見るだけで開く。
  * 親のカードがボードに無い子は、親の識別子だけを見出しにした行に入る。
  */
 import { test } from "node:test";
@@ -11,6 +12,7 @@ import type { BoardJson } from "../../src/core/model.js";
 import { boardOf, closedJson, parentJson, phaseJson, proposalJson, reviewJson, ticketJson, waitingPhase } from "../helpers/cards.js";
 import { boardPage, openBoard } from "../helpers/board.js";
 import { flatStyle } from "../helpers/bundle.js";
+import { plansOf } from "../helpers/plan-reorder.js";
 
 const laneKey = (project: string, family: string): string => JSON.stringify([project, family]);
 
@@ -137,6 +139,50 @@ test("CB-D1296 「フェーズを表示」で親の行を開くと、フェー�
     assert.equal(again.all('.lane[data-lane="p1"] .lane-phases').length, 1);
   } finally {
     await again.close();
+  }
+});
+
+test("CB-D1302 開いた親の行の「計画の流れを見る」は、図の中身（parents[].plans）を持つ親にだけ出し、押すと同じ図の部品を見るだけで開く（承認・編集の操作は無い）。Escと［閉じる］で閉じる", async () => {
+  // 図の中身が無い親には出さない
+  const bare = await openBoard(scene(), { state: { opened: [laneKey("", "p1")] } });
+  try {
+    assert.equal(bare.all('.lane[data-lane="p1"] .lane-phases').length, 1);
+    assert.equal(bare.all('[data-action="plan-flow"]').length, 0);
+  } finally {
+    await bare.close();
+  }
+  const withPlans = scene();
+  const plans = plansOf(["research", { type: "design", after: [1] }, { type: "implement", after: [2] }], undefined, [1]).map((plan) => ({ ...plan, ticket: "p1", source_sha: "" }));
+  const data: BoardJson = { ...withPlans, parents: withPlans.parents.map((p) => ({ ...p, plans })) };
+  const page = await openBoard(data, { state: { opened: [laneKey("", "p1")] }, measure: true });
+  try {
+    // 閉じた行には出さない（フェーズの一覧の中に置く）
+    assert.equal(page.all('.lane[data-lane="p1"] .lane-phases [data-action="plan-flow"]').length, 1);
+    const button = page.one('[data-action="plan-flow"]');
+    assert.equal(button.textContent, "計画の流れを見る");
+    page.click(button);
+    await page.settle();
+    const dialog = page.one(".plan-flow");
+    assert.equal(dialog.getAttribute("role"), "dialog");
+    assert.match(page.one("#plan-flow-title").textContent, /計画の流れ: p1/);
+    // 承認のオーバーレイと同じ図の部品。点はステップとstart・end、子が承認された番号は固定の印
+    assert.deepEqual(page.all(".plan-flow .plan-graph").map((g) => g.getAttribute("data-part")), ["plan"]);
+    assert.equal(page.all('.plan-flow .plan-graph .react-flow__node').length, 5);
+    assert.equal(page.one('.plan-flow .react-flow__node[data-id="n1"] .plan-node').getAttribute("data-locked"), "1");
+    // 見るだけ: ボタンは［閉じる］（と図の拡大・縮小）だけで、承認・計画編集は無い。押しても拡張ホストへは送らない
+    assert.deepEqual(page.all(".plan-flow .overlay-actions button").map((b) => b.getAttribute("data-action")), ["plan-flow-close"]);
+    assert.equal(page.all('.plan-flow [data-action="edit-workflow"], .plan-flow [data-action^="approve"]').length, 0);
+    assert.equal(page.posted.filter((m) => m.type !== "ready").length, 0);
+    page.key("Escape");
+    await page.settle();
+    assert.equal(page.all(".plan-flow").length, 0);
+    page.click(page.one('[data-action="plan-flow"]'));
+    await page.settle();
+    page.click(page.one('[data-action="plan-flow-close"]'));
+    await page.settle();
+    assert.equal(page.all(".plan-flow").length, 0);
+  } finally {
+    await page.close();
   }
 });
 

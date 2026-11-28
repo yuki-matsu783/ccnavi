@@ -15,7 +15,7 @@ import type { DomPage } from "../helpers/dom.js";
 import { planOrderSample } from "../helpers/plan-order.js";
 import { lastPosted, openWorkflow, openWorkflowData } from "../helpers/workflow.js";
 
-/** その計画の図の中の、点の番号（React Flowのdata-idがn<番号> のもの） */
+/** その計画の流れの図の中の、点の番号（React Flowのdata-idがn<番号> のもの） */
 function numbers(dom: DomPage, part: string): string[] {
   return dom
     .all(`.plan-graph[data-part="${part}"] .plan-node`)
