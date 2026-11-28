@@ -41,7 +41,7 @@ func formsOK(stderr io.Writer, verb, kind string, checks ...formCheck) bool {
 	return true
 }
 
-// Retired は `sync retired`。親を閉じた後の片付けの列挙元（`state/retire/<親>.json`）。読めない・mr が無いものは
+// Retired は `sync retired`。親をクローズした後の片付けの列挙元（`state/retire/<親>.json`）。読めない・mr が無いものは
 // incomplete で、読む側は一覧の案内だけを出し、自動では片付けない。
 func Retired(stdout io.Writer, conf *config.Settings) int {
 	fmt.Fprintln(stdout, retiredHead)

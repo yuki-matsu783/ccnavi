@@ -9,7 +9,7 @@ import (
 )
 
 // フェーズ 0（統合の子 <親>-00-NN）を指定したときは、フェーズ 0 の子だけが片付けの候補になる。0 を指定なしと
-// 読み違えると、閉じた子すべてが候補になる。
+// 読み違えると、クローズした子すべてが候補になる。
 func TestTidyTargetsPhaseZero(t *testing.T) {
 	root := testkit.ShapedWorkspace(t)
 	parent := testkit.AddWorktree(t, root, "i0001", "main")

@@ -59,7 +59,7 @@ func headText(treeRoot, rel string) (string, bool) {
 }
 
 // RecordBlocked は子の finish の学びの検査。止めたなら理由を stderr に書いて真。
-// 親の finish と同じ読み取りの検査と整合の検査を子の HEAD の記録に当てる。親で初めて断ると、閉じた子へ戻って直す手間が出る。
+// 親の finish と同じ読み取りの検査と整合の検査を子の HEAD の記録に当てる。親で初めて断ると、クローズした子へ戻って直す手間が出る。
 func RecordBlocked(stderr io.Writer, conf *config.Settings, root string, found *ticket.Ticket) bool {
 	if !Applies(conf, root, found) {
 		return false
@@ -70,7 +70,7 @@ func RecordBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 		write(stderr, "ccnavi: "+found.ID+" の気づきの記録（"+rel+"）が、子のブランチの HEAD に無いか、"+
 			"空か、リンクになっている（コミットが必要です）。"+
 			"'"+config.ScriptCommand(root, config.TicketWrapper)+" learn' を実行して記録を書き、"+
-			"git add と git commit をしてから閉じてください"+
+			"git add と git commit をしてからクローズしてください"+
 			"（気づきが無ければ learnings: none のままでよい）\n")
 		return true
 	}
@@ -82,7 +82,7 @@ func RecordBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 	} else {
 		return false
 	}
-	write(stderr, "  記録を直してコミットしてから閉じてください"+
+	write(stderr, "  記録を直してコミットしてからクローズしてください"+
 		"（`learnings:` は `none` か件数の数値、気づきは `## ` 見出しの節に書く）\n")
 	return true
 }
@@ -115,7 +115,7 @@ func ParentBlocked(stderr io.Writer, conf *config.Settings, root string, found *
 	for _, item := range pending.Items {
 		write(stderr, "  - "+item.Describe()+"\n")
 	}
-	write(stderr, "  '"+ticketSh+" consolidate "+found.ID+"' で統合の子を作り、その子を処理して閉じたあと、"+
+	write(stderr, "  '"+ticketSh+" consolidate "+found.ID+"' で統合の子を作り、その子を処理してクローズしたあと、"+
 		"'"+ticketSh+" finish "+found.ID+"' を打ち直してください\n")
 	write(stderr, texts.Say(root, "NOTE_LEARN_PROCESS_FORM", nil, nil)+"\n")
 	return true

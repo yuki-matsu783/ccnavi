@@ -34,7 +34,7 @@ test("CB-T06 カードに承認済みチケット・ワークツリー・マー�
   assert.equal(parent.worktreeExists, true);
   assert.match(parent.stage, /作業中/);
   assert.equal(parent.phases.length, 2);
-  // 早めに閉じる操作（close-early）は拡張からは出さない。ターミナルで打つ
+  // 早めにクローズする操作（close-early）は拡張からは出さない。ターミナルで打つ
   assert.deepEqual(parent.actions, []);
   assert.equal(parent.family, "i0001");
 
@@ -122,7 +122,7 @@ test("CB-T09 依頼済みで止まったフェーズにdecide、早めにクロ�
     phases: base.parents[0].phases.map((p): PhaseJson => {
       const marks: Record<string, Record<string, unknown>> =
         p.number === 2 ? { requested: { at: "t" } } : {};
-      // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは依頼済の閉じたフェーズだけ
+      // 判定が出す形に揃える。止まるのはレビュー要のときで、レビュー待ちは依頼済のクローズしたフェーズだけ
       return {
         ...p,
         state: p.number === 2 ? "ended" : p.state,
@@ -138,7 +138,7 @@ test("CB-T09 依頼済みで止まったフェーズにdecide、早めにクロ�
   assert.deepEqual(card.actions, []);
   assert.equal(card.wrapped, true);
   assert.equal(card.phases[1].status, "レビュー待ち");
-  // ユーザのレビュー待ちはJSONのreview_waitingをそのまま使う。依頼していないフェーズ1は閉じていても待ちではない
+  // ユーザのレビュー待ちはJSONのreview_waitingをそのまま使う。依頼していないフェーズ1はクローズしていても待ちではない
   assert.equal(card.phases[0].reviewWaiting, false);
   assert.equal(card.phases[1].reviewWaiting, true);
   // 子のカードには自分のフェーズの、止まっているかとレビュー待ちが反映される。親はfalse
@@ -350,7 +350,7 @@ test("CB-T138 止まっているチケットは、理由と実行ファイルが
   // ままなので、列からも承認済みのバッジからも分からない。
   const base = fixture();
   const child = base.tickets.find((t) => t.ticket === "i0001-02-02")!;
-  const blocked = "親i0001の承認済みチケットが作業中にない（未承認か、閉じている）";
+  const blocked = "親i0001の承認済みチケットが作業中にない（未承認か、クローズしている）";
   const stopped: TicketJson = { ...child, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true };
   const parent = base.tickets.find((t) => t.ticket === "i0001")!;
   const card = cardsOf(buildBoard({ ...base, tickets: [parent, stopped] })).get("i0001-02-02")!;

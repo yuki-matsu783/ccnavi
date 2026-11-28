@@ -117,7 +117,7 @@ func (w *ws) judgeSources() map[string]string {
 	return out
 }
 
-// finish は子を閉じる。
+// finish は子をクローズする。
 func (w *ws) finish(extra ...string) (code int, stdout, stderr string) {
 	w.T.Helper()
 	r := w.Ccnavi(append([]string{"ticket", "finish", "i0001-01-01"}, extra...)...)
@@ -217,7 +217,7 @@ func TestACollidingJudgeItemIsRecordedUnderTheLayerName(t *testing.T) {
 	w.commit(tree, "src/a.py", "1\n")
 	code, out, errOut := w.finish()
 	if code == 0 || !strings.Contains(errOut, "lib:outward") {
-		t.Fatalf("判定が済むまで閉じられず、lib:outward を言う: code %d\n%s%s", code, out, errOut)
+		t.Fatalf("判定が済むまでクローズできず、lib:outward を言う: code %d\n%s%s", code, out, errOut)
 	}
 	for _, factor := range []string{"outward", "lib:outward"} {
 		w.MustOK(w.Ccnavi("ticket", "record-risk", "i0001-01-01", factor, "yes", "--reason", "そう"), "record-risk "+factor)
@@ -331,7 +331,7 @@ func TestABrokenProjectRiskIsEmptyAndNamedInTheFallback(t *testing.T) {
 		t.Errorf("record = %+v", rec)
 	}
 	if !strings.Contains(out, "lib") {
-		t.Errorf("閉じた出力が設定を言わない: %s", out)
+		t.Errorf("クローズした出力が設定を言わない: %s", out)
 	}
 }
 
@@ -345,7 +345,7 @@ func TestTheJudgeRecordNamesTheLayerOfEachItem(t *testing.T) {
 	tree, _ := w.oneChild()
 	w.commit(tree, "src/a.py", "1\n")
 	if code, out, _ := w.finish(); code == 0 {
-		t.Fatalf("判定が済むまで閉じられない: %s", out)
+		t.Fatalf("判定が済むまでクローズできない: %s", out)
 	}
 	for _, factor := range []string{"outward", "untested"} {
 		w.MustOK(w.Ccnavi("ticket", "record-risk", "i0001-01-01", factor, "yes", "--reason", "そう"), "record-risk "+factor)
@@ -408,7 +408,7 @@ func TestTheMarkNamesCommonWhenTheTypeComesFromCommon(t *testing.T) {
 // 無くなる。`.ccnavi/scripts/ccnavi-ticket.sh` は引数をそのまま渡すので、この形はエージェントが Bash で打てる。
 //
 // 土台の子は共通設定の `big-diff`（25）と lib の `schema`（30）で 55 点、lib の critical は 50 なので CRITICAL。
-// `review: true` のフェーズなのでレビュー待ちへ動く。lib の設定が消えると 25 点の MEDIUM になり、レビューを飛ばして閉じられる。
+// `review: true` のフェーズなのでレビュー待ちへ動く。lib の設定が消えると 25 点の MEDIUM になり、レビューを飛ばしてクローズできる。
 func TestLayerPlaceFlagsAreDiagnosisOnly(t *testing.T) {
 	t.Parallel()
 	for _, flag := range []string{"--project-home", "--projects"} {

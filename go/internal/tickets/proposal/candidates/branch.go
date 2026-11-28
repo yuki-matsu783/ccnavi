@@ -45,7 +45,7 @@ func ParentElsewhereText(conf *config.Settings, root string, t *ticket.Ticket, e
 
 // ExistingBranchWarnings は新規の提案（親）の識別子になるブランチ（"/" を "-" にして識別子と一致するもの）が
 // 手元か origin に既にあるときの文。提案がそのブランチの上で書かれている（自分の識別子の名前のワークツリーが
-// そのブランチを checkout していて、提案がその中にある）ときは言わない。settled（承認済み・閉じた・レビュー中）の
+// そのブランチを checkout していて、提案がその中にある）ときは言わない。settled（承認済み・クローズした・レビュー中）の
 // 識別子は新規ではないので見ない。
 func ExistingBranchWarnings(conf *config.Settings, root string, proposals, settled []*ticket.Ticket) []string {
 	done := map[string]bool{}

@@ -182,7 +182,7 @@ func TestSelfParentAndLoopsAreErrorsThatNameTheCause(t *testing.T) {
 			t.Errorf("--lint が %q を言わない", fragment)
 		}
 	}
-	// 閉じた先行の先は辿らない（満たしているので輪は切れている）。
+	// クローズした先行の先は辿らない（満たしているので輪は切れている）。
 	if got := boardEntryOf(tr, "i0001-01-05").PredecessorsUnmet; len(got) != 1 || got[0].State != "cycle" {
 		t.Errorf("predecessors_unmet = %v", got)
 	}
@@ -299,7 +299,7 @@ func TestTheBoardNamesTheUnmetPredecessors(t *testing.T) {
 	}
 	finishAndCommit(tr, "i0001-01-01")
 	if got := boardEntryOf(tr, "i0001-01-03").PredecessorsUnmet; len(got) != 1 || got[0].Ticket != "i0001-01-02" {
-		t.Errorf("1 本閉じた後 = %v", got)
+		t.Errorf("1 本クローズした後 = %v", got)
 	}
 	// 先行を持たないチケットは空。
 	if got := boardEntryOf(tr, "i0001-01-02").PredecessorsUnmet; len(got) != 0 {

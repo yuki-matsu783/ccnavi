@@ -17,17 +17,17 @@ import (
 // 承認の順序の苦情と、親の局面の呼び名。
 const (
 	brokenPlanText = "親 %s の計画が不正なので、順序を数えない（%s）"
-	notClosedText  = "%d 番目の子は、%s が閉じるまで承認しない（%s）。作業が終わるまで次の計画は立てない"
+	notClosedText  = "%d 番目の子は、%s がクローズするまで承認しない（%s）。作業が終わるまで次の計画は立てない"
 	notReviewText  = "%d 番目の子は、%s のレビューが済むまで承認しない"
 	reopenedText   = "同じ承認で %s を追加するので再び開く"
-	stillOpenText  = "同じ承認で %s を追加するが、まだ閉じていない"
+	stillOpenText  = "同じ承認で %s を追加するが、まだクローズしていない"
 	noChildText    = "子がまだ無い"
 	openChildText  = "子が開いている"
 
-	// StageFeedbackWaiting は全体計画が全部閉じてレビューも済み、フィードバック計画がまだ無い局面。親を閉じる
+	// StageFeedbackWaiting は全体計画が全部クローズしてレビューも済み、フィードバック計画がまだ無い局面。親をクローズする
 	// 前に改版で出す。Stop の促しとボードがこの名前で見分ける。
 	StageFeedbackWaiting = "フィードバック計画待ち"
-	stageCloseEarly      = "閉じられる（ユーザが早めにクローズした）"
+	stageCloseEarly      = "クローズ可（ユーザが早めにクローズした）"
 	stageWorking         = "作業中"
 	stageNotStarted      = "着手待ち"
 	stageFeedback        = "フィードバック対応中"
@@ -35,12 +35,12 @@ const (
 	stageClosableFed     = "クローズ可（フィードバック対応済み）"
 )
 
-// OrderProblems は、N 番目の子を承認してよいかを返す。承認してよいのは、先行のフェーズが閉じてレビューが済んでいるとき。
-// 苦情は KindNotYet にする。承認は通さないが、書いた側が直すものは無い。前のフェーズが閉じれば、同じ提案が通るため。
+// OrderProblems は、N 番目の子を承認してよいかを返す。承認してよいのは、先行のフェーズがクローズしてレビューが済んでいるとき。
+// 苦情は KindNotYet にする。承認は通さないが、書いた側が直すものは無い。前のフェーズがクローズすれば、同じ提案が通るため。
 // 親の計画が壊れていれば、壊れた先行で数えずに落とす。
 //
 // adding は、同じ承認で先に通った、同じ親の子。承認されればそのフェーズは開き、マーカーも消える。
-// ディスクの上では閉じていても、開いたフェーズとして読む。読まないと、1 本ずつなら外れる組み合わせが、まとめて承認すると
+// ディスクの上ではクローズしていても、開いたフェーズとして読む。読まないと、1 本ずつなら外れる組み合わせが、まとめて承認すると
 // 通ってしまう。raw は Phases と同じ。
 func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Ticket, adding []*ticket.Ticket, raw *approval.Raw) []rules.Problem {
 	number, isChild := child.ChildPhase()
@@ -51,7 +51,7 @@ func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Tic
 		return []rules.Problem{{Severity: rules.Error, Rule: child.ID,
 			Detail: fmt.Sprintf(brokenPlanText, parent.ID, broken[0].Detail)}}
 	}
-	// 1. 先行するフェーズの番号（推移的に閉じたもの）を、小さい順に重複なしで並べる。
+	// 1. 先行するフェーズの番号（推移的にクローズしたもの）を、小さい順に重複なしで並べる。
 	waits := slices.Clone(phases.WaitsOf(parent, number))
 	slices.Sort(waits)
 	waits = slices.Compact(waits)
@@ -69,7 +69,7 @@ func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Tic
 	notYet := func(detail string) []rules.Problem {
 		return []rules.Problem{{Severity: rules.Error, Rule: child.ID, Detail: detail, Kind: rules.KindNotYet}}
 	}
-	// 3. 先行のフェーズを順に見て、閉じていない・レビューが済んでいないものを最初の 1 つだけ言う。
+	// 3. 先行のフェーズを順に見て、クローズしていない・レビューが済んでいないものを最初の 1 つだけ言う。
 	for _, m := range waits {
 		if m >= number {
 			break
@@ -104,7 +104,7 @@ func OrderProblems(conf *config.Settings, root string, child, parent *ticket.Tic
 	return nil
 }
 
-// PlanFinished は全体計画のフェーズが全部閉じ、最後までレビューが済んでいるか（フィードバック計画を初めて足す
+// PlanFinished は全体計画のフェーズが全部クローズし、最後までレビューが済んでいるか（フィードバック計画を初めて足す
 // 改版を承認できる条件）。依頼しただけでは足りない。ユーザの応えが決まる前にレビューの状態を動かさないため。
 func PlanFinished(conf *config.Settings, root string, parent *ticket.Ticket) bool {
 	if !parent.HasPlan() {
@@ -138,7 +138,7 @@ func stageLabel(p *Phase) string {
 }
 
 // Stage は親がいまどの局面にいるか。計画が無ければ空。raw は Phases と同じ。止まっているフェーズを呼び名ごとに
-// 並べ、無ければ早めに閉じた印・作業中・フィードバック対応中・フィードバック計画待ち・クローズ可の順に見る。
+// 並べ、無ければ早めにクローズした印・作業中・フィードバック対応中・フィードバック計画待ち・クローズ可の順に見る。
 func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *approval.Raw) string {
 	if !parent.HasPlan() {
 		return ""
@@ -167,7 +167,7 @@ func Stage(conf *config.Settings, root string, parent *ticket.Ticket, raw *appro
 	}
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
 	if _, ok := marks.ReadFilledParent(home, parent.ID, marks.CloseEarly); ok {
-		// 残りは別の issue に書き出してあるので、閉じられる。
+		// 残りは別の issue に書き出してあるので、クローズできる。
 		return stageCloseEarly
 	}
 	last := len(parent.Plan)

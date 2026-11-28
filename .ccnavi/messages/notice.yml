@@ -219,7 +219,7 @@ messages:
   NOTICE_PHASE_NEXT__DONE:
     kind: notice
     what: |-
-      計画のフェーズは全部終わりました。親チケットを閉じられます。
+      計画のフェーズは全部終わりました。親チケットをクローズできます。
 
   # 次に始められるフェーズが無い。
   NOTICE_PHASE_NEXT__WAITING:
@@ -242,28 +242,28 @@ messages:
     what: |-
       {lead}フェーズ {label} はレビュー済み。ユーザの操作（confirm / decide、Chrome 拡張のレビュー済み）で {done} へ動く
 
-  # 依頼済みだが、この子が依頼より後に閉じた。
+  # 依頼済みだが、この子が依頼より後にクローズした。
   NOTICE_REVIEW_NEXT__REREQUEST:
     kind: notice
     values: [lead, label, phase, done]
     what: |-
-      {lead}フェーズ {label} は依頼済みだが、この子は前回の依頼より後に閉じた。依頼し直すまで、この子の分はユーザに回らない。親が合流を済ませて push し、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' で依頼し直す。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
+      {lead}フェーズ {label} は依頼済みだが、この子は前回の依頼より後にクローズした。依頼し直すまで、この子の分はユーザに回らない。親が合流を済ませて push し、'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' で依頼し直す。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
 
-  # 依頼済みで、この子は依頼より前に閉じた。
+  # 依頼済みで、この子は依頼より前にクローズした。
   NOTICE_REVIEW_NEXT__REQUESTED:
     kind: notice
     values: [lead, label, waiting]
     what: |-
       {lead}フェーズ {label} は依頼済み（{waiting}）。ユーザのレビューを待つ（ユーザが confirm / decide か Chrome 拡張のレビュー済みで done/ へ動かす）
 
-  # 未依頼で、閉じていない子がまだある。`left` は「このフェーズ」か「フェーズ <名前>」。
+  # 未依頼で、クローズしていない子がまだある。`left` は「このフェーズ」か「フェーズ <名前>」。
   NOTICE_REVIEW_NEXT__PREPARING_OPEN:
     kind: notice
     values: [lead, preparing, left, phase, done]
     what: |-
-      {lead}まだ{preparing}。{left}にはまだ閉じていない子がある。全部閉じてから、親が合流・'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を済ませるまで、ユーザには回らない。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
+      {lead}まだ{preparing}。{left}にはまだクローズしていない子がある。全部クローズしてから、親が合流・'{script:ccnavi-review.sh} review-request --phase {phase} --body-file <依頼文>' を済ませるまで、ユーザには回らない。依頼の後、ユーザがレビューを終えて confirm / decide か Chrome 拡張のレビュー済みを実行すると {done} へ動く
 
-  # 未依頼で、子は全部閉じている。
+  # 未依頼で、子は全部クローズしている。
   NOTICE_REVIEW_NEXT__PREPARING:
     kind: notice
     values: [lead, preparing, phase, done]

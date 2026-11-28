@@ -121,7 +121,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 		"inbox", inboxRecord(nil, nil, nil, handoffs),
 		"tickets", []any{},
 		"parents", []any{},
-		// 手元の退避にある閉じたチケット。表示のためだけに載せ、判定には混ぜない。
+		// 手元の退避にあるクローズしたチケット。表示のためだけに載せ、判定には混ぜない。
 		"archived", []any{},
 		// いまターンの途中にいるセッション。ターン中に設定ファイルを直すと次の呼び出しで戻されうるので、拡張は保存の前に知らせる。
 		"turns", turns,
@@ -171,7 +171,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	pendingIDs := nonNil(slices.Sorted(maps.Keys(waiting)))
 	payload.Set("pending_approval", pendingIDs)
 
-	// 4. 識別子ごとの行を組む。状態（提案・承認済み・閉じた）ごとに、同じ識別子のチケットを引く表を用意する。
+	// 4. 識別子ごとの行を組む。状態（提案・承認済み・クローズした）ごとに、同じ識別子のチケットを引く表を用意する。
 	worktrees := map[string]tree.Tree{}
 	for _, t := range trees {
 		if t.Kind == tree.KindWorktree {
@@ -261,7 +261,7 @@ func objOrNil(o *pyjson.Object, ok bool) any {
 	return o
 }
 
-// archivedRecords は手元の退避にある閉じたチケット（表示用）。skip の（プロジェクト, 識別子）は tickets の側に出すので出さない。
+// archivedRecords は手元の退避にあるクローズしたチケット（表示用）。skip の（プロジェクト, 識別子）は tickets の側に出すので出さない。
 func archivedRecords(root string, skip map[[2]string]bool) []any {
 	out := []any{}
 	for _, t := range archive.ClosedTickets(root) {
@@ -523,7 +523,7 @@ func ticketRecord(conf *config.Settings, root, id string, idx indexes, worktrees
 		"branch", branch,
 		"remote", remote,
 		"predecessors", nonNil(source.Predecessors),
-		// 満たしていない先行。承認と着手はこれが空でなければ止まる。閉じたチケットは空。
+		// 満たしていない先行。承認と着手はこれが空でなければ止まる。クローズしたチケットは空。
 		"predecessors_unmet", unmet,
 		"human_review", pyjson.NewObject("required", needValue(source.ReviewRequired), "reason", source.ReviewReason),
 		"proposal", proposalObj,
@@ -665,7 +665,7 @@ func phaseRecord(ph *phase.Phase, manual string) (*pyjson.Object, phaseRow) {
 		escalates: ph.RiskEscalates()}
 }
 
-// parentRecord は親 1 件。局面、計画、計画の流れ（図の中身）、親のマーカー、フェーズの並び。閉じた親は局面を持たない
+// parentRecord は親 1 件。局面、計画、計画の流れ（図の中身）、親のマーカー、フェーズの並び。クローズした親は局面を持たない
 // （「クローズ可」と言っても意味が無い）。
 func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, closedIndex map[string]*ticket.Ticket,
 	raw *approval.Raw, settled []*ticket.Ticket) *parentRow {

@@ -63,7 +63,7 @@ func (tr *Tree) ApproveChild(name string, phase int, allow ...string) {
 	ticketkit.OK(tr.T, tr.Approve())
 }
 
-// CloseChild は子を閉じる（ticket finish）。
+// CloseChild は子をクローズする（ticket finish）。
 func (tr *Tree) CloseChild(name string) run.Result { return tr.Ccnavi("ticket", "finish", name) }
 
 // MergeChild は子を親へ合流し、合流の記録を書く（merge）。
@@ -92,7 +92,7 @@ func (tr *Tree) ConfirmFor(f ticketkit.Fixture, phase string) run.Result {
 	return tr.Ccnavi("--cwd", tr.ParentTree, "--phase", phase, "review", "confirm", "--result", f.Path)
 }
 
-// Phase1Requested はデザイン 1 ステップの全体計画のフェーズ 1 を閉じて合流し、レビューを依頼したところまで進める。
+// Phase1Requested はデザイン 1 ステップの全体計画のフェーズ 1 をクローズして合流し、レビューを依頼したところまで進める。
 // 返すのは結果ファイル。
 func (tr *Tree) Phase1Requested(plan ...string) ticketkit.Fixture {
 	tr.T.Helper()

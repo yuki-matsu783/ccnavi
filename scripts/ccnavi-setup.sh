@@ -164,7 +164,7 @@ DEPLOY_SKILLS_DIR=".claude/skills"
 # ccnavi-user-agree.sh はターミナルから承認するための sh。承認の案内（go/internal/tickets/phase）がこのパスを表示するので、
 # 配らないと、案内どおりに実行しても動かない。ccnavi-user-decide.sh・
 # ccnavi-user-close-early.sh・ccnavi-user-clean-branch.sh は、残った指摘の対応方針・
-# 早めに閉じる判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
+# 早めにクローズする判断・残った子のブランチの削除。ccnavi-user-lib-review.sh は、decide と close-early が読む、
 # ユーザの判断をホストに書く部品（読む 2 本より先に配る）。
 # ccnavi-user-handoff.sh・ccnavi-user-mirror.sh・ccnavi-user-prune.sh は、実行ファイルの `user handoff` / `user mirror` /
 # `user prune` を入口の印つきで起こす薄い sh。印が無い `user` の入口は実行ファイルが断るので、配らないと打つ手が無くなる。

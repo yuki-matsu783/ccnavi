@@ -129,7 +129,7 @@ func parentTreesOffBranch(conf *config.Settings, root string) []rules.Problem {
 		out = append(out, rules.Problem{Severity: rules.Warn, Rule: worktreesWhere(work.Name), Detail: "親 " + work.Name +
 			" のワークツリーが " + on + " の上にある。親のブランチ名の `/` を `-` に置き換えたものがフォルダ名（" + work.Name +
 			"）になる。取り込み（ccnavi-sync.sh）と正とする側の検査は、そのブランチだけを見る。" +
-			"親が閉じるのを待ってから、ブランチを切り替えてください"})
+			"親がクローズするのを待ってから、ブランチを切り替えてください"})
 	}
 	return out
 }

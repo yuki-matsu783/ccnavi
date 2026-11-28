@@ -6,7 +6,7 @@
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
 #   sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
 #
-# 親を閉じたときに残した子の手元のブランチを消す入口は、ユーザ専用の ccnavi-user-clean-branch.sh。
+# 親をクローズしたときに残した子の手元のブランチを消す入口は、ユーザ専用の ccnavi-user-clean-branch.sh。
 #
 # --worktree は生成物の掃除と `git worktree remove`（--force なし）を 1 本で行う。ccnavi が ready の
 # 最後や confirm の後に消せなかったワークツリー（cwd が中にあった、など）を、外から消し直すための入口。

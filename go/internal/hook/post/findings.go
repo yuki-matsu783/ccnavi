@@ -289,7 +289,7 @@ func (s scan) scriptWrites() map[string]bool {
 			if before.present && place.LeavesOpenState(p.rel, s.places.Tickets, s.places.Approved) {
 				gone = append(gone, left{p.change, before, drop})
 			}
-		// 3) 前は無く、閉じた状態の置き場に現れた。移動の行き先の候補（arrived）に取っておく。
+		// 3) 前は無く、クローズした状態の置き場に現れた。移動の行き先の候補（arrived）に取っておく。
 		case !beforeShaped && place.LandsInFinishedState(p.rel, s.places.Tickets, s.places.Approved):
 			arrived = append(arrived, landed{p.change, now})
 		}

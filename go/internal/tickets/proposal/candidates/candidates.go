@@ -16,7 +16,7 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// Candidate は承認の対象の 1 件。新規の提案か、親の改版か。リスクの点は持たない（子を閉じるときに実績で数える）。
+// Candidate は承認の対象の 1 件。新規の提案か、親の改版か。リスクの点は持たない（子をクローズするときに実績で数える）。
 type Candidate struct {
 	Ticket     *ticket.Ticket
 	Complaints []rules.Problem

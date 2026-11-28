@@ -309,9 +309,9 @@ func TestAClosedIdentifierIsRefused(t *testing.T) {
 	problems := jl(body, "problems")
 	ticketkit.Has(t, problems[len(problems)-1].(string), "フォールバック")
 	if !hasProblem(startBody(t, startOpts{issue: 55, done: []string{"Feature-55-Login-Form"}}), "done/ でクローズ済み") {
-		t.Error("大文字小文字違いで閉じた名前を通した")
+		t.Error("大文字小文字違いでクローズした名前を通した")
 	}
-	// 前の形（i0055）で閉じていても、新しい名前とは重ならない。
+	// 前の形（i0055）でクローズしていても、新しい名前とは重ならない。
 	if got := jl(startBody(t, startOpts{issue: 55, done: []string{"i0055"}}), "problems"); len(got) != 0 {
 		t.Errorf("problems = %v", got)
 	}

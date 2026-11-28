@@ -17,7 +17,7 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// ParentStillBusy は親を閉じられない理由（CloseProblems）があれば、全部言って真。子なら偽。
+// ParentStillBusy は親をクローズできない理由（CloseProblems）があれば、全部言って真。子なら偽。
 func ParentStillBusy(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	if t.IsChild() {
 		return false
@@ -29,7 +29,7 @@ func ParentStillBusy(stderr io.Writer, conf *config.Settings, root string, t *ti
 	return len(problems) > 0
 }
 
-// CloseProblems は、親を閉じられない理由を返す。空なら閉じてよく、マージに進んでもよい。ユーザが早めに閉じていれば、開いている子以外は問わない。
+// CloseProblems は、親をクローズできない理由を返す。空ならクローズしてよく、マージに進んでもよい。ユーザが早めにクローズしていれば、開いている子以外は問わない。
 // raw は、呼び手が approval.ReadRaw で読んだ置き場である。読んでから動かしていないときだけ渡す。nil ならここで読む。
 func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.Raw) []string {
 	// 1. 開いている子（承認済みの doing/ などにある子）が残っていないか。
@@ -41,9 +41,9 @@ func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.R
 		}
 	}
 	if len(open) > 0 {
-		return []string{fmt.Sprintf("%s には開いている子がある（%s）。子を先に閉じてください", parentID, strings.Join(open, ", "))}
+		return []string{fmt.Sprintf("%s には開いている子がある（%s）。子を先にクローズしてください", parentID, strings.Join(open, ", "))}
 	}
-	// 2. 早めに閉じる操作（close-early）の印があれば、残りの検査は通さない（残りを承知で閉じる操作のため）。
+	// 2. 早めにクローズする操作（close-early）の印があれば、残りの検査は通さない（残りを承知でクローズする操作のため）。
 	var home string
 	if own := approval.ByID(copies)[parentID]; own != nil {
 		home = approval.HomeDirRead(conf, root, parentID, "", own.Project)
@@ -72,7 +72,7 @@ func CloseProblems(conf *config.Settings, root, parentID string, raw *approval.R
 			}
 		}
 		if len(unfinished) > 0 {
-			problems = append(problems, fmt.Sprintf("%s には終わっていないフェーズがある（%s）。全部閉じてから", parentID, strings.Join(unfinished, ", ")))
+			problems = append(problems, fmt.Sprintf("%s には終わっていないフェーズがある（%s）。全部クローズしてから", parentID, strings.Join(unfinished, ", ")))
 		}
 	}
 	return problems
@@ -113,7 +113,7 @@ func DeliverablesInWip(conf *config.Settings, root string, t *ticket.Ticket) []s
 	return out
 }
 
-// DeliverablesMissing は、フェーズの最後の子を閉じる前に、定義の成果物が親か子のワークツリーで追跡されていなければ、その名前を言って真を返す。
+// DeliverablesMissing は、フェーズの最後の子をクローズする前に、定義の成果物が親か子のワークツリーで追跡されていなければ、その名前を言って真を返す。
 // 同じフェーズに作業中の別の子があれば、その子が成果物を出すかもしれないので通す。成果物は在って追跡されていることだけを見る。空でも在れば通る。
 func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	pt := PhaseType(conf, root, t)
@@ -142,7 +142,7 @@ func DeliverablesMissing(stderr io.Writer, conf *config.Settings, root string, t
 		return false
 	}
 	fmt.Fprintf(stderr, "ccnavi: フェーズ %d（%s）の成果物が無い: %s。"+
-		"親か子のワークツリーに置いて追跡（git add）してから閉じてください\n", t.Phase, pt.Title, strings.Join(missing, ", "))
+		"親か子のワークツリーに置いて追跡（git add）してからクローズしてください\n", t.Phase, pt.Title, strings.Join(missing, ", "))
 	return true
 }
 

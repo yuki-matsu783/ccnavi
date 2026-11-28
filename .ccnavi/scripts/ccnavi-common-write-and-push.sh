@@ -252,7 +252,7 @@ ccnavi_wap_take_in() {
 	fi
 	# 取り込みが、マージ済みの親のワークツリーを片付けて 0 で終わることがある。無いツリーには書かずに止める。
 	if [ ! -d "$ccnavi_wap_tree" ]; then
-		ccnavi_wap_say "親のワークツリーが取り込みの後に無い。親子のチケット ${ccnavi_wap_family_id} は閉じた（マージ済み）か、ワークツリーが無い。何も反映していません"
+		ccnavi_wap_say "親のワークツリーが取り込みの後に無い。親子のチケット ${ccnavi_wap_family_id} はクローズした（マージ済み）か、ワークツリーが無い。何も反映していません"
 		log_info write-and-push で止めた -- "family=$ccnavi_wap_family_id" "reason=parent-tree-gone"
 		return 1
 	fi

@@ -29,13 +29,13 @@ var kinds = []Kind{Requested, Reviewed, Skipped, Pending}
 func Kinds() []Kind { return slices.Clone(kinds) }
 
 // Parent は親ごとのマーカー（フェーズの番号に付かないもの）。closed が要るのは、提案（wip/）が統合先に
-// 取り込む前に消え、全フェーズが `review: false` の進め方では親を閉じた事実がここにしか残らないから。
+// 取り込む前に消え、全フェーズが `review: false` の進め方では親をクローズした事実がここにしか残らないから。
 type Parent string
 
 const (
 	Ready      Parent = "ready"       // Draft を外した。「マージに進んでよい」の合図
-	CloseEarly Parent = "close-early" // ユーザが早めに閉じた。残りは別の issue へ
-	Closed     Parent = "closed"      // 親を閉じた（`ticket finish <親>`）
+	CloseEarly Parent = "close-early" // ユーザが早めにクローズした。残りは別の issue へ
+	Closed     Parent = "closed"      // 親をクローズした（`ticket finish <親>`）
 	// Ledger は受け入れ台帳。ホストで未解決のまま受け入れた指摘を親ごとに記録する（フェーズを開き直しても残る）。
 	Ledger Parent = "accepted"
 )

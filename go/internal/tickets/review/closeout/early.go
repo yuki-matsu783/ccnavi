@@ -22,50 +22,50 @@ import (
 	"ccnavi/internal/tickets/review/request"
 )
 
-// 早めに閉じたときの、残りを書き出す issue の下書きと、マージリクエストへ残すコメントの下書き（sh が拾う）。
+// 早めにクローズしたときの、残りを書き出す issue の下書きと、マージリクエストへ残すコメントの下書き（sh が拾う）。
 const (
 	earlyIssueFile = "review-close-early-issue-%s.md"
 	earlyNoteFile  = "review-close-early-note-%s.md"
 )
 
-// 早めに閉じるときの文。ユーザのターミナルと sh が読むので変えない。
+// 早めにクローズするときの文。ユーザのターミナルと sh が読むので変えない。
 const (
 	msgNoReason      = "ccnavi: user close-early には --reason <理由> が必要です。\n"
 	msgNoStateDraft  = "ccnavi: state の置き場が空。下書きを置く場所がありません。\n"
 	msgChanges       = "ccnavi: %s。ターミナルからも通せない。変更要求があるため、レビュー済みにはできません。修正する場合は同じフェーズに新しい子を提案し、ユーザの承認を受けてください\n"
-	msgBusyChildren  = "ccnavi: 作業中の子がいる（%s）。子を閉じるか取り消してから、親を早めに閉じてください\n"
+	msgBusyChildren  = "ccnavi: 作業中の子がいる（%s）。子をクローズするか取り消してから、親を早めにクローズしてください\n"
 	msgPlanUnread    = "ccnavi: 受け入れの計画 %s を読めない。先に --accept-plan を打つ\n"
 	msgPlanChanged   = "ccnavi: 計画のあとで、未解決の指摘が変わった。ホストには何も書いていない。打ち直してください\n"
 	msgNotAccepted   = "ccnavi: 受け入れが済んでいない: %s。何も置いていない\n"
-	msgDeclined      = "ccnavi: 早めに閉じなかった\n"
-	msgEarlyOK       = "OK: %s を早めに閉じた。あとは親に、状態の移動をコミットし、'ticket finish %s' で閉じて push し、'%s' で Draft を解除させる（`%s/` の追跡済みのファイルは ready が削除します）\n"
+	msgDeclined      = "ccnavi: 早めにクローズしなかった\n"
+	msgEarlyOK       = "OK: %s を早めにクローズした。あとは親に、状態の移動をコミットし、'ticket finish %s' でクローズして push し、'%s' で Draft を解除させる（`%s/` の追跡済みのファイルは ready が削除します）\n"
 	msgThreadMissing = "スレッド %s が結果に無い"
 	msgThreadOpen    = "スレッド %s がホストで解決済みになっていない"
 	msgOthersOpen    = "計画のほかに未解決の指摘が残っている（%s）"
 	msgPlanBlocked   = "ccnavi: 受け入れを始められない: %s\n"
 	msgPlanSaveFail  = "ccnavi: 受け入れの計画を %s に保存できませんでした（%s）\n"
-	acceptWhy        = "ユーザが親を早めに閉じた"
+	acceptWhy        = "ユーザが親を早めにクローズした"
 	cancelPrefix     = "close-early: "
 	japaneseComma    = "、"
 )
 
 // 残りを見せる文。
 const (
-	showHead       = "%s（%s）を早めに閉じる。残っているもの:\n"
+	showHead       = "%s（%s）を早めにクローズする。残っているもの:\n"
 	showTodo       = "  - 未着手の子 %s（%s）→ 取り消す\n"
 	showUntouched  = "  - フェーズ %s: 手を付けていない → 残りとして issue に書き出す\n"
 	showUnreviewed = "  - フェーズ %s: レビューが済んでいない → 済んだ扱い\n"
 	showUnplanned  = "  - フィードバック計画: 未計画 → 対応なしの扱い\n"
 	showUnresolved = "  - 未解決 %s → 受け入れる\n"
 	showNothing    = "  （何も残っていない。ready で足りる）\n"
-	showAsk        = "残りは別の issue に書き出す。早めに閉じてよいなら y、やめるならそれ以外: "
+	showAsk        = "残りは別の issue に書き出す。早めにクローズしてよいなら y、やめるならそれ以外: "
 )
 
 // 下書きの文。
 const (
 	issueTitle      = "%s の残り"
 	issueOrigin     = "元のマージリクエスト: %s（チケット `%s`）"
-	issueReason     = "早めに閉じた理由: %s"
+	issueReason     = "早めにクローズした理由: %s"
 	issueRestHead   = "## 残した作業"
 	issueTodo       = "- %s: %s"
 	issueUntouched  = "- フェーズ %s: 手を付けていない"
@@ -265,13 +265,13 @@ func writeClosePlan(stderr io.Writer, left *leftovers, outPath string, issue boo
 	return config.ExitOK
 }
 
-// leftovers は早めに閉じるときに残っているもの。見せるものと、閉じたあとに issue へ書き出すもの。
+// leftovers は早めにクローズするときに残っているもの。見せるものと、クローズしたあとに issue へ書き出すもの。
 type leftovers struct {
 	// todo は未着手の子（承認されたが着手していない）。取り消す。
 	todo []*ticket.Ticket
 	// notEnded は終わっていないフェーズ。手を付けたもの（取り消すと終わる）には省略のマーカーを置く。
 	notEnded []*phase.Phase
-	// untouched は notEnded のうち、レビュー待ちも閉じた子も無いもの。マーカーは置かず issue に書き出す。
+	// untouched は notEnded のうち、レビュー待ちもクローズした子も無いもの。マーカーは置かず issue に書き出す。
 	untouched []*phase.Phase
 	// unreviewed は終わったがレビューが済んでいないフェーズ。済んだ扱いにする。
 	unreviewed []*phase.Phase
@@ -304,7 +304,7 @@ func leftoversOf(parent *ticket.Ticket, phases []*phase.Phase, result host.Resul
 			continue
 		}
 		left.notEnded = append(left.notEnded, p)
-		// 取り消し済みの子が混ざっていても、レビュー待ちか閉じた子が無ければ終わらない。打ち直しでもここに入る。
+		// 取り消し済みの子が混ざっていても、レビュー待ちかクローズした子が無ければ終わらない。打ち直しでもここに入る。
 		touched := false
 		for _, s := range p.States {
 			if s == place.Review || s == place.Done {
@@ -318,7 +318,7 @@ func leftoversOf(parent *ticket.Ticket, phases []*phase.Phase, result host.Resul
 	return left
 }
 
-// showLeftovers は残っているものと、早めに閉じたら何が起きるかを見せて y/N を促す。
+// showLeftovers は残っているものと、早めにクローズしたら何が起きるかを見せて y/N を促す。
 func showLeftovers(stdout io.Writer, parent *ticket.Ticket, left *leftovers) {
 	fmt.Fprintf(stdout, showHead, parent.ID, parent.Title)
 	for _, t := range left.todo {
@@ -361,7 +361,7 @@ func settle(stdout, stderr io.Writer, conf *config.Settings, root string, parent
 		}
 		out.cancelled = append(out.cancelled, t.ID)
 	}
-	// 手を付けていないフェーズは、子を取り消しても終わらない。ゲートも告知も動かないので、マーカーは置かない。親を閉じる判定は close-early.json が迂回する。一方、閉じた子の居るフェーズは、取り消すと終わる。
+	// 手を付けていないフェーズは、子を取り消しても終わらない。ゲートも告知も動かないので、マーカーは置かない。親をクローズする判定は close-early.json が迂回する。一方、クローズした子の居るフェーズは、取り消すと終わる。
 	// マーカーが無いと、次の hook が「レビューを頼め」と言い出すので、省略のマーカーで抑える。
 	untouched := map[int]bool{}
 	for _, p := range left.untouched {

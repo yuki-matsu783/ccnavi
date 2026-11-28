@@ -115,7 +115,7 @@ export interface StatusCard {
   readonly startedAt: string;
   /** 親だけ。承認済みの親に改版が出ているか */
   readonly revision: boolean;
-  /** 親だけ。早めに閉じたか */
+  /** 親だけ。早めにクローズしたか */
   readonly wrapped: boolean;
   /** 子だけ。自分のフェーズが止まっているか（JSONの`gate_closed`） */
   readonly gateClosed: boolean;
@@ -180,7 +180,7 @@ function fieldsOf(card: StatusCard): string {
  * 1. `blocked`か`scattered` → 要確認
  * 2. `pendingApproval` → 承認待ち（承認済みの親に改版が出ていれば「承認待ち（改版）」）
  * 3. 取り消し → 取り消し
- * 4. 完了・アーカイブ → 完了（早めに閉じていれば「完了（早めに終了）」）
+ * 4. 完了・アーカイブ → 完了（早めにクローズしていれば「完了（早めに終了）」）
  * 5. フェーズのどれかがレビュー待ち → レビュー待ち
  * 6. フェーズのどれかがレビュー準備中 → レビュー準備中
  * 7. `copyStatus === "open"` → 着手待ち／作業中

@@ -26,16 +26,16 @@ messages:
       confirm: |-
         {parent} の{phase_name}は、ユーザが子 {children} を done/ へ手で動かして共有しています（レビュー完了確認待ち）。
       merge: |-
-        {parent} の{phase_name}は子が全部閉じていますが、レビューの依頼（review-request）がまだです。子 {children} が親のブランチに合流済みと確かめられません（合流した先頭 merged_sha が無いか、親の HEAD に入っていません）。
+        {parent} の{phase_name}は子が全部クローズしていますが、レビューの依頼（review-request）がまだです。子 {children} が親のブランチに合流済みと確かめられません（合流した先頭 merged_sha が無いか、親の HEAD に入っていません）。
       late_fix: |-
-        {parent} の{phase_name}は子が全部閉じていますが、レビューの依頼（review-request）がまだです。子 {children} の手元のブランチに、合流されていない修正があります（finish の後に積んだコミットは親のブランチに入りません）。
+        {parent} の{phase_name}は子が全部クローズしていますが、レビューの依頼（review-request）がまだです。子 {children} の手元のブランチに、合流されていない修正があります（finish の後に積んだコミットは親のブランチに入りません）。
       request: |-
         {parent} の{phase_name}は、レビューの依頼（review-request）がまだです。
     why: |-
       これは決まった道の途中なので、ユーザの許可は要りません。進めてよいかを聞かずに、次を実行します。
     next:
       finish: |-
-        作業が済んでいる子には {finish_cmds_q} を実行する。まだ作業が残っているなら、確認を取らずに続ける。子が全部閉じて（合流は finish が済ませる）、すべての子が合流済みと確かめたら、レビューの依頼（review-request）へ進む
+        作業が済んでいる子には {finish_cmds_q} を実行する。まだ作業が残っているなら、確認を取らずに続ける。子が全部クローズして（合流は finish が済ませる）、すべての子が合流済みと確かめたら、レビューの依頼（review-request）へ進む
       confirm: |-
         `{script:ccnavi-review.sh} confirm --phase {phase}` を実行して確定する。未解決の指摘は、移動の前に付いたものだけが版つきで受け入れられ、移動の後に付いたものが残っていれば止まるので、その分は decide をユーザに頼む
       merge: |-
@@ -57,7 +57,7 @@ messages:
       proposed: |-
         フィードバック計画の改版は {proposal} にあります。送っていなければ `{script:ccnavi-ticket.sh} approval-request {parent}` で送り、ユーザに承認を頼んで返事を待つ。送り済みかは `{script:ccnavi-ticket.sh} status {parent}` で確かめる
       drafting: |-
-        全体計画のレビューが済み、親を閉じる前にフィードバック計画が要る。指摘が無ければ `{script:ccnavi-launcher.sh} ticket revise {parent} --feedback` で `feedback: []` の改版の雛形を {todo} に作る（承認済みチケットのコピーで、スクリプトだけが書く欄は外してある。親のワークツリーで打つ）。対応のフェーズを並べる改版も、この雛形の `feedback:` を直して作る。そのあと `{script:ccnavi-ticket.sh} approval-request {parent} --check` が通ったら `{script:ccnavi-ticket.sh} approval-request {parent}` で送り、ユーザに承認を頼んで返事を待つ
+        全体計画のレビューが済み、親をクローズする前にフィードバック計画が要る。指摘が無ければ `{script:ccnavi-launcher.sh} ticket revise {parent} --feedback` で `feedback: []` の改版の雛形を {todo} に作る（承認済みチケットのコピーで、スクリプトだけが書く欄は外してある。親のワークツリーで打つ）。対応のフェーズを並べる改版も、この雛形の `feedback:` を直して作る。そのあと `{script:ccnavi-ticket.sh} approval-request {parent} --check` が通ったら `{script:ccnavi-ticket.sh} approval-request {parent}` で送り、ユーザに承認を頼んで返事を待つ
     note: |-
       {user_stop_note}
       この案内は同じ状態では 1 回だけで、作業が進むまで次に終えるときは止めません。

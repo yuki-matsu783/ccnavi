@@ -67,7 +67,7 @@ func Run(stdout, stderr io.Writer, root string, conf *config.Settings, args []st
 // run は状態を出す。family が空なら作業中の親すべて、あればその親だけ。
 //
 // 処理フロー:
-//  1. 置き場の全チケット（作業中・レビュー待ち・閉じた・提案）を読む
+//  1. 置き場の全チケット（作業中・レビュー待ち・クローズした・提案）を読む
 //  2. 識別子ごとにまとめ、出す親（family）を決める
 //  3. 親ごとに、子と手で動かされた子の状態を出す
 //  4. 送り終えていない操作を最後に出す
@@ -114,7 +114,7 @@ func run(stdout, stderr io.Writer, root string, conf *config.Settings, family st
 		}
 	}
 
-	// 出す親を決める。指定があれば存在を確かめ、無ければ閉じていない状態のチケットがある親を名前順に出す。
+	// 出す親を決める。指定があれば存在を確かめ、無ければクローズしていない状態のチケットがある親を名前順に出す。
 	var families []string
 	if family != "" {
 		if !slices.ContainsFunc(order, func(e *entry) bool { return e.home() == family }) {

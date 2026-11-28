@@ -253,7 +253,7 @@ func (p *probe) steps() {
 	p.record("改版の承認を push（ユーザの役）", revisedPush.code == 0, "")
 	p.record("承認済みのコピーの feedback 欄が空の計画になる", regexp.MustCompile(`(?m)^feedback: \[\]\s*$`).MatchString(readText(current)), "")
 
-	// ---- 4. 親を閉じて ready（Draft を外す）。親の start は冒頭で済ませている
+	// ---- 4. 親をクローズして ready（Draft を外す）。親の start は冒頭で済ませている
 	// 追跡済みの wip/ は ready が消すので、手で消さない（ready の動きを probe でそのまま通す）
 	closed := p.sh(ticketSh, parentTree, "finish", "i0001")
 	p.record("親の done", closed.code == 0, head(closed.both(), 200))
@@ -298,9 +298,9 @@ func (p *probe) steps() {
 		}
 		return false
 	}
-	p.record("閉じた親子が logs/archive/ へ移った（ローカル）", hasSuffix("done/i0001.md") && hasSuffix("ready/i0001.json"), head(fmt.Sprint(archived), 160))
+	p.record("クローズした親子が logs/archive/ へ移った（ローカル）", hasSuffix("done/i0001.md") && hasSuffix("ready/i0001.json"), head(fmt.Sprint(archived), 160))
 
-	// ---- 5. 別の親をユーザが早めに閉じる（close-early）
+	// ---- 5. 別の親をユーザが早めにクローズする（close-early）
 	p.closeEarly(pid)
 	p.decide(pid)
 
@@ -327,16 +327,16 @@ func (p *probe) closeEarly(pid int) {
 	gitSh := p.script("ccnavi-git.sh")
 	parent2 := p.worktree("i0002", "main")
 	// 親の提案には issue が要る（agree は issue が無いと承認しない）
-	status, issue2 := c.CreateIssue(rt, pid, "途中で早めに閉じる親", "実測の 2 本目")
+	status, issue2 := c.CreateIssue(rt, pid, "途中で早めにクローズする親", "実測の 2 本目")
 	p.record("課題 2 を立てる", status == 201, "")
-	p.propose(parent2, "i0002", TicketOpts{Allow: []string{"src/*", "wip/*"}, Review: true, Title: "途中で早めに閉じる親", Issue: intOf(gitlabapi.AsMap(issue2)["iid"])})
+	p.propose(parent2, "i0002", TicketOpts{Allow: []string{"src/*", "wip/*"}, Review: true, Title: "途中で早めにクローズする親", Issue: intOf(gitlabapi.AsMap(issue2)["iid"])})
 	p.propose(parent2, "i0002-01-01", TicketOpts{Parent: "i0002", Phase: 1, Allow: []string{"src/c/*"}, Review: true, Title: "c を書く"})
 	p.commitAll(parent2, "tickets")
 	approved := p.exe("y\n", "user", "agree")
 	p.record("--agree（i0002）", approved.code == 0, head(p.redact(approved.err), 200))
 	p.record("i0002 の push", p.sh(gitSh, parent2, "push", "-u", "origin", "i0002").code == 0, "")
 	p.waitBranch(pid, "i0002")
-	status, mr2 := c.CreateMR(rt, pid, "i0002", "main", "Draft: 途中で早めに閉じる親")
+	status, mr2 := c.CreateMR(rt, pid, "i0002", "main", "Draft: 途中で早めにクローズする親")
 	p.record("ユーザが i0002 の MR を作る", status == 201, "")
 	if status != 201 {
 		return

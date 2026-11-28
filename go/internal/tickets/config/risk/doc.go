@@ -1,4 +1,4 @@
-// Package risk は、実績で測るリスク（risks.yml の配点）を読み、子を閉じるときに差分を数えて点を付ける。
+// Package risk は、実績で測るリスク（risks.yml の配点）を読み、子をクローズするときに差分を数えて点を付ける。
 //
 // 数えるのは、宣言（チケットの範囲や required: false）ではなく、子の仕事の始まりから先頭までの実際の差分である。
 // 点が HIGH 以上（Escalates）なら、定義が review: false でも子が required: false でも、そのフェーズは人間のレビューが要る。

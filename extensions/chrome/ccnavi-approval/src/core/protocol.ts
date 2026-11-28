@@ -390,7 +390,7 @@ function fold(text: string): string {
 const COMPAT_FILE = ".ccnavi/scripts/ccnavi-common.sh";
 
 /**
- * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（二重の確認）: 閉じた識別子（`done/` の名前を
+ * 「始める」の前に service worker が統合先の今の先頭で確かめ直すもの（二重の確認）: クローズした識別子（`done/` の名前を
  * 大文字小文字をそろえて）と互換の版（ワークスペースの統合先の CCNAVI_COMPAT と同梱の版）。空なら作ってよい
  */
 async function startGuard(deps: Deps, client: github.Client, cfg: RepoConfig, integ: string, head: string, name: string): Promise<string> {
@@ -615,7 +615,7 @@ async function hostOp(client: github.Client, op: unknown, args: unknown[], count
       const head = await x.branchHead(client, o, r, integ);
       if (head === null) return refuse(`統合先 ${integ} がリモートに見つかりません`);
       if (github.checkOid(b) !== head) return refuse(`統合先 ${integ} の先頭が、ボードで取得した時点から更新されています。ボードを更新してから、もう一度開始してください`);
-      // 統合先の今の先頭で確かめ直す（ccnavi の答えを信頼しない）: 大文字小文字をそろえた重なり・閉じた識別子・互換の版
+      // 統合先の今の先頭で確かめ直す（ccnavi の答えを信頼しない）: 大文字小文字をそろえた重なり・クローズした識別子・互換の版
       const folded = fold(name);
       const same = (await x.branchNames(client, o, r)).filter((n) => fold(n) === folded);
       if (same.length > 0) return refuse(`${name} は既にあります（${same.join(", ")}）`);

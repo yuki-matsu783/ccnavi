@@ -83,7 +83,7 @@ allow:
 `
 
 // workspace は判定の材料を一通り置いたワークスペース。共通設定と sh はリポジトリのものを写し、ワークスペースの設定に
-// selfRules を置く。チケットは親 1 本と、着手済みの子（ワークツリーとフローあり）・未着手の子・閉じた子。
+// selfRules を置く。チケットは親 1 本と、着手済みの子（ワークツリーとフローあり）・未着手の子・クローズした子。
 func workspace(t *testing.T) string {
 	t.Helper()
 	repo := testkit.RepoRoot(t)

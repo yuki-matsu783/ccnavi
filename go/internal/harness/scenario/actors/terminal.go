@@ -34,7 +34,7 @@ var ErrTimeout = errors.New("時間切れ")
 type Ticket struct {
 	ID      string
 	Project string
-	// Open は承認済みで閉じていない。
+	// Open は承認済みでクローズしていない。
 	Open bool
 }
 
@@ -71,7 +71,7 @@ func (b Board) pending() []core.Proposal {
 // Proposals は承認待ちの提案（識別子, プロジェクト）。複数のツリーに同じ識別子が出るので畳む。
 func (b Board) Proposals() []core.Proposal { return b.pending() }
 
-// approved は承認済みで閉じていないチケットの識別子（全ツリー）。
+// approved は承認済みでクローズしていないチケットの識別子（全ツリー）。
 func (b Board) approved() map[string]bool {
 	out := map[string]bool{}
 	for _, t := range b.Tickets {
@@ -272,7 +272,7 @@ func (tm Terminal) Run(st *core.State, idx int, spec RunSpec, root, outDir strin
 // RunOnTerminal は argv を擬似端末に付けて起動し、（終了コード, 出力）を返す。出力の CR は落とす。
 // 擬似端末は `script` で包む（Linux は `script -qec <コマンド> /dev/null`、macOS は `script -q /dev/null <argv…>`）。
 // 答えは標準入力から送る（端末は行単位の入力で、sh が読むまで溜まる）。時間切れは ErrTimeout で、script だけを殺す。
-// 子（sh）と孫は、擬似端末の master が閉じて SIGHUP を受けて終わる。env が nil なら親の環境。
+// 子（sh）と孫は、擬似端末の master がクローズして SIGHUP を受けて終わる。env が nil なら親の環境。
 func RunOnTerminal(argv []string, dir string, env []string, answers []string, timeout time.Duration) (int, string, error) {
 	args, err := scriptArgs(argv, exec.LookPath)
 	if err != nil {

@@ -29,7 +29,7 @@ func closedText(name, parent string, phase int) string {
 
 type fixture struct{ root, approved string }
 
-// newFixture は閉じた親 2 つ（i0001・old）と、開いた親（open）の子がある承認済みの領域を作る。git は使わない。
+// newFixture はクローズした親 2 つ（i0001・old）と、開いた親（open）の子がある承認済みの領域を作る。git は使わない。
 func newFixture(t *testing.T) fixture {
 	t.Helper()
 	root := t.TempDir()
@@ -172,7 +172,7 @@ func TestLinksAreNotFollowed(t *testing.T) {
 	if !ospath.IsFile(f.rel("done/i0001.md")) {
 		t.Error("止まったのに親を消した")
 	}
-	// done/ のリンクは閉じた親として拾わない。
+	// done/ のリンクはクローズした親として拾わない。
 	_ = os.Symlink(f.rel("done/old.md"), f.rel("done/lnk.md"))
 	if slices.Contains(ClosedParents(f.approved), "lnk") {
 		t.Error("リンクを拾った")

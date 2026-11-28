@@ -50,7 +50,7 @@ func TestAnAbsentFamilyStopsAndItsStaleCopyIsUndecided(t *testing.T) {
 	t.Parallel()
 	tr := chromeTree(t)
 	tr.FamilyPlan(planOf("research"), nil)
-	// P の上に古いチケット（閉じた i0009-01-01）があっても、i0009 がホストに無ければ決まらない。
+	// P の上に古いチケット（クローズした i0009-01-01）があっても、i0009 がホストに無ければ決まらない。
 	text := strings.Replace(childNoReview("i0009-01-01", 1, "wip/research/*"), "parent: i0001", "parent: i0009", 1)
 	text = strings.Replace(text, `completed_at: ""`, `completed_at: "2026-01-01T00:00:00+0000"`, 1)
 	ticketkit.Write(t, tr.ApprovedPath("done", "i0009-01-01"), text)

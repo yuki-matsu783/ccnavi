@@ -22,7 +22,7 @@ import (
 var (
 	// layerOverrides は設定の置き場を動かすフラグ。前の 3 本は共通設定の中身、後の 2 本は設定を探す先を
 	// 指す。どれを外しても、プロジェクトの設定が丸ごと消える。そうなると実績リスクが下がり、レビュー待ちを
-	// 飛ばして閉じられてしまう。
+	// 飛ばしてクローズできてしまう。
 	layerOverrides = []string{"--rules", "--phases", "--risk", "--projects", "--project-home"}
 	// placeOverrides は記録と状態とチケットの置き場を動かすフラグ。
 	placeOverrides = []string{"--log", "--state", "--approved", "--tickets"}

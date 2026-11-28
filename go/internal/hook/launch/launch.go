@@ -77,7 +77,7 @@ func (t *target) key() string {
 	return pathcase.Fold(t.name)
 }
 
-// book は承認済みチケットの索引。作業中・レビュー待ち・閉じたの 3 つを 1 度ずつ読む。
+// book は承認済みチケットの索引。作業中・レビュー待ち・クローズしたの 3 つを 1 度ずつ読む。
 type book struct {
 	open, review, closed      []*ticket.Ticket
 	index, reviewIx, closedIx map[string]*ticket.Ticket
@@ -108,7 +108,7 @@ func (b *book) find(name string) (*ticket.Ticket, place.State) {
 	return nil, ""
 }
 
-// children は言及に数える子（作業中・レビュー待ち・閉じたのどれかにある子チケット）の識別子。識別子の順。
+// children は言及に数える子（作業中・レビュー待ち・クローズしたのどれかにある子チケット）の識別子。識別子の順。
 func (b *book) children() []string {
 	var ids []string
 	for _, pool := range [][]*ticket.Ticket{b.open, b.review, b.closed} {
@@ -306,7 +306,7 @@ func unavailable(t *target) string {
 		if c.CancelledAt != "" {
 			return "取り消された子です"
 		}
-		return "閉じた子です"
+		return "クローズした子です"
 	case t.state == place.Review || c.CompletedAt != "":
 		return "完了してレビュー待ちの子です"
 	case c.Blocked != "":

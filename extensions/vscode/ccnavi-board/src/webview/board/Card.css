@@ -17,7 +17,7 @@
 .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
 .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
 .card.review-hold { border-left: 3px solid var(--vscode-editorError-foreground); }
-/* 前の読み直しから列が変わった（承認された、レビュー不要で閉じた、レビューが済んだ、取り消された）
+/* 前の読み直しから列が変わった（承認された、レビュー不要でクローズした、レビューが済んだ、取り消された）
    カードと、新しく現れたカード。着手（`ticket start`）は列を動かさないので動いた表示は出ない。
    **時間では消さない。** 承認の直後は渡す文のオーバーレイがボードを覆っていて、動く瞬間そのものを
    ユーザが見られないので、次に何かが動くまで動いた表示を残す（`core/board-moved.ts`）。

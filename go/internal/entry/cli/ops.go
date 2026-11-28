@@ -96,7 +96,7 @@ func finishOK(stderr io.Writer, root string, code int, err error) int {
 	return okIf(code == 0)
 }
 
-// closeEarly はユーザがターミナルで打つ、親を早めに閉じる操作。`--agree`・`--reviewed` と同じくターミナルを求める。
+// closeEarly はユーザがターミナルで打つ、親を早めにクローズする操作。`--agree`・`--reviewed` と同じくターミナルを求める。
 func closeEarly(in *input, stdout, stderr io.Writer, conf *config.Settings, root string, a opts, cwd string) int {
 	if a.Str("result") == "" {
 		fmt.Fprintln(stderr, "ccnavi: --close-early を実行するには、--reason <理由> と --result <json> を指定してください。")
@@ -306,7 +306,7 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 	case verb == "issue-id" && (len(words) == 4 || len(words) == 5):
 		return issueID(stdout, stderr, root, a, words)
 	case verb == "branch" && (len(words) == 3 || len(words) == 4 && words[3] == "confirmed"):
-		// 親を閉じたときに片付ける子として記録したブランチを、条件を確かめ直して消す。
+		// 親をクローズしたときに片付ける子として記録したブランチを、条件を確かめ直して消す。
 		if !ids.IsValidID(words[2]) {
 			fmt.Fprintf(stderr, "ccnavi: worktree branch の %s は有効な識別子の形式ではありません。\n", pyfmt.Repr(words[2]))
 			return config.ExitError

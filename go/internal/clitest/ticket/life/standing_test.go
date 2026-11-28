@@ -244,7 +244,7 @@ func TestAPredecessorOfAFamilyWithoutItsParentTreeIsNotMet(t *testing.T) {
 			text := strings.Replace(samples.ChildText("i0002-01-01", "i0002", 1, []string{"src/*"}), `completed_at: ""`, `completed_at: "2026-09-01T00:00:00+0900"`, 1)
 			ticketkit.Write(t, filepath.Join(tr.Root, ".ccnavi", "approved", "done", "i0002-01-01.md"), text)
 		}, []string{"親子のチケットが決まらない"}},
-		// 閉じて片付いた別の親子のチケットの子は、どの置き場にも無い。取り込み済みなので predecessors から消してもらう。
+		// クローズして片付いた別の親子のチケットの子は、どの置き場にも無い。取り込み済みなので predecessors から消してもらう。
 		{"nowhere", "i0009-01-01", func(*ticketkit.Tree) {}, []string{"にもありません", "predecessors から削除してください"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -318,12 +318,12 @@ func TestTheSiblingsKeepWorkingAndTheCheckNamesTheUnreadableCopy(t *testing.T) {
 	ticketkit.Has(t, check.Stdout, "i0001-01-02.md")
 }
 
-// 承認では、閉じた識別子の再利用を検知しない（検知は開始時のホストへの照会だけ）。
+// 承認では、クローズした識別子の再利用を検知しない（検知は開始時のホストへの照会だけ）。
 func TestAProposalThatReusesAnArchivedIdentifierIsApproved(t *testing.T) {
 	t.Parallel()
 	tr := authority(t)
 	ticketkit.Write(t, filepath.Join(tr.Root, "logs", "archive", "self", "done", "i0002.md"),
-		"---\nversion: 1\nticket: i0002\ntitle: 閉じた親\ncompleted_at: 2026-01-01T00:00:00+0900\n---\n")
+		"---\nversion: 1\nticket: i0002\ntitle: クローズした親\ncompleted_at: 2026-01-01T00:00:00+0900\n---\n")
 	other := tr.Worktree("i0002", "main")
 	tr.Propose("i0002", samples.ParentText("i0002", samples.Plan("research"), samples.ParentOpts{Copy: tr.Phases}), other)
 	ticketkit.OK(t, tr.Approve())

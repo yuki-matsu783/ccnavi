@@ -41,7 +41,7 @@ func ReadyCommand(root, parentID string) string {
 	return config.ScriptCommand(root, config.ReviewWrapper) + " ready --parent " + parentID
 }
 
-// Finish は doing/ から review/（レビューが要る）か done/（要らない）へ動かし、完了の時刻を書く。子は閉じる前に実績のリスクを数える。定性の判定がそろわなければ閉じない。
+// Finish は doing/ から review/（レビューが要る）か done/（要らない）へ動かし、完了の時刻を書く。子はクローズする前に実績のリスクを数える。定性の判定がそろわなければクローズしない。
 // 動かす前に、打ったセッションのコンテキストに乗ったファイルを本文の最後に書く（records/reads の記録。無ければ書かない）。
 // 成果物の追跡と親の学びの置き場は、子の合流のあとでないと分からないので、finishGate のあとに見る。
 func Finish(stdout, stderr io.Writer, conf *config.Settings, root, id string) int {
@@ -135,7 +135,7 @@ func mergingHead(root string, found *ticket.Ticket) string {
 	return ""
 }
 
-// needsReview は、この子を閉じたとき、ユーザが見る対象になるかを返す。フェーズのレビューを、この子を閉じたものとして数え直す。
+// needsReview は、この子をクローズしたとき、ユーザが見る対象になるかを返す。フェーズのレビューを、この子をクローズしたものとして数え直す。
 // 実績のリスクは scoreChild が記録した直後なので、宣言に関わらず上がった分も入る。延期したフェーズの子も、レビュー待ちに置く。次にレビューがあるフェーズの番だが、ユーザが見るまでは見られていないことになる。
 func needsReview(conf *config.Settings, root string, found *ticket.Ticket) bool {
 	number, child := found.ChildPhase()
@@ -153,8 +153,8 @@ func needsReview(conf *config.Settings, root string, found *ticket.Ticket) bool 
 	return found.ReviewRequired != ticket.Unneeded
 }
 
-// closeParent は、親を閉じたあとの記録と案内を組む。記録（closed.json）は、どのフェーズをどこで見たかを親のブランチに残す。
-// 提案は統合先に取り込む前に wip/ ごと消えるので、閉じた事実が残る先はここしか無い。案内は Draft を外す合図までである。ready は、閉じたチケットとこの記録を手元の退避へ移してから外す。
+// closeParent は、親をクローズしたあとの記録と案内を組む。記録（closed.json）は、どのフェーズをどこで見たかを親のブランチに残す。
+// 提案は統合先に取り込む前に wip/ ごと消えるので、クローズした事実が残る先はここしか無い。案内は Draft を外す合図までである。ready は、クローズしたチケットとこの記録を手元の退避へ移してから外す。
 func closeParent(stdout, stderr io.Writer, conf *config.Settings, root string, found *ticket.Ticket) {
 	where, err := approval.HomeDir(conf, root, found.ID, "", found.Project)
 	if err != nil {

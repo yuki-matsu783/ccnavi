@@ -5,7 +5,7 @@
  *   見分けられなければユーザの対応に切り替える
  * - 事後確認は周ごとに 1 つの時刻で判定し直す（時計が進んでも、無関係な割り込みでは元に戻さない）
  * - 事後確認と元に戻すコミットの途中でホストが動かなくなったら、書いたが確認できなかったとしてユーザの対応に切り替える
- * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭で閉じた識別子と互換の版を確かめ直す
+ * - service worker: 読み取りも登録したリポジトリだけ。「始める」は統合先の先頭でクローズした識別子と互換の版を確かめ直す
  * - GitLab の compare は、折りたたまれた・大きすぎる・時間切れ・上限に近い一覧を読めないとする
  * - GitLab の tree と discussions のページの上限、429 と 403、転送を追わない、シンボリックリンク
  * - 元に戻すコミットはバイト列のまま戻す（CRLF も）
@@ -182,11 +182,11 @@ test("CX-T166 service worker の読み取りも、設定画面で登録したリ
   assert.equal(mock.calls.length, 0);
 });
 
-test("CX-T167 「始める」: service worker も統合先の先頭で閉じた識別子と互換の版を確かめ直す", async () => {
+test("CX-T167 「始める」: service worker も統合先の先頭でクローズした識別子と互換の版を確かめ直す", async () => {
   const mock = new MockGitLab(fixture());
   const d: Deps = deps(mock, TOKENS, new Map(), () => new Date(NOW), [GITLAB_REPO]);
   const closedText = mock.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
-  mock.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた親子のチケット");
+  mock.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "クローズした親子のチケット");
   const now = mock.head("main");
   const ask = (dd: Deps, name: string) => dispatch({ kind: "host", host: "gitlab.com", op: "createBranch", args: ["acme", "widgets", name, now] }, BOARD, dd);
   const closed = await ask(d, "feature-5-closed");

@@ -53,10 +53,10 @@ func TestAttention(t *testing.T) {
 		{"順調", nil, false},
 		{"承認待ち・進行中の列でワークツリーが無い", gone, true},
 		{"レビュー待ちでワークツリーが無い", func(r *ticketRow) { gone(r); r.hasProposal, r.status = true, statusReview }, true},
-		// 閉じた（完了・取り消し）子はワークツリーが無くても要対応ではない
-		{"閉じた子のワークツリーが無い", func(r *ticketRow) { gone(r); r.status = statusClosed }, false},
-		// 提案が残っていれば閉じていても承認待ち・進行中の列
-		{"提案の残る閉じた子のワークツリーが無い", func(r *ticketRow) { gone(r); r.status, r.hasProposal = statusClosed, true }, true},
+		// クローズした（完了・取り消し）子はワークツリーが無くても要対応ではない
+		{"クローズした子のワークツリーが無い", func(r *ticketRow) { gone(r); r.status = statusClosed }, false},
+		// 提案が残っていればクローズしていても承認待ち・進行中の列
+		{"提案の残るクローズした子のワークツリーが無い", func(r *ticketRow) { gone(r); r.status, r.hasProposal = statusClosed, true }, true},
 		{"どれが正か決まらない", func(r *ticketRow) { r.scattered = true }, true},
 	}
 	for _, level := range []risk.Level{risk.High, risk.Critical, risk.Medium, risk.Low} {

@@ -38,7 +38,7 @@ func learnFamily(t *testing.T, phases string, allow []string) (*ticketkit.Tree, 
 	return tr, tr.Worktree(child, "i0001")
 }
 
-// consolidateFamily は、子が記録を書いて閉じ、親へ合流した木。child_finish_ok が false なら子の finish の結果を返す。
+// consolidateFamily は、子が記録を書いてクローズし、親へ合流した木。child_finish_ok が false なら子の finish の結果を返す。
 func consolidateFamily(t *testing.T, rec string) *ticketkit.Tree {
 	t.Helper()
 	tr, _ := consolidateFamilyUnclosed(t, rec)
@@ -327,7 +327,7 @@ func TestConsolidate(t *testing.T) {
 	})
 }
 
-// 完成の条件を 1 本で通す。子が記録を書く → 親の finish が止まる → consolidate → 統合の子が処理を書いて閉じる → 親が閉じる →
+// 完成の条件を 1 本で通す。子が記録を書く → 親の finish が止まる → consolidate → 統合の子が処理を書いてクローズする → 親がクローズする →
 // 統合先に入った後、候補が条件を満たすと通知が出る → 提案を延期 → 観測元が増えると再び通知が出る。
 func TestLearningCycle(t *testing.T) {
 	t.Parallel()
@@ -335,14 +335,14 @@ func TestLearningCycle(t *testing.T) {
 	ticketkit.OK(t, ccn(tr, learnOn, "ticket", "finish", child))
 	merge(tr, child)
 
-	// 1. 子が記録を書いて閉じ、親の finish が止まる。
+	// 1. 子が記録を書いてクローズし、親の finish が止まる。
 	ticketkit.Has(t, parentFinish(tr), "consolidate")
 	// 2. consolidate が統合の子を作る。
 	if code, out, errText := consolidate(tr, learnOn); code != 0 {
 		t.Fatal(out + errText)
 	}
 	tr.CommitParent("consolidate child")
-	// 3. 統合の子が、パターンに観測元を足し、記録に処理の行を書いて閉じる。
+	// 3. 統合の子が、パターンに観測元を足し、記録に処理の行を書いてクローズする。
 	ctree := tr.Worktree(cons, "i0001")
 	ticketkit.OK(t, ccn(tr, learnOn, "ticket", "start", cons))
 	writeIn(t, ctree, pattern, samples.Pattern([]string{"x1", "x2", child}, "docs"))
@@ -352,7 +352,7 @@ func TestLearningCycle(t *testing.T) {
 	tr.Git(ctree, "commit", "--quiet", "-m", "process")
 	ticketkit.OK(t, ccn(tr, learnOn, "ticket", "finish", cons))
 	merge(tr, cons)
-	// 4. 親が閉じる。
+	// 4. 親がクローズする。
 	if msg := parentFinish(tr); msg != "" {
 		t.Fatal(msg)
 	}

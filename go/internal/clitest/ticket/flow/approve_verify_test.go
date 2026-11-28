@@ -286,22 +286,22 @@ func TestLintSaysWhatTheVerifySays(t *testing.T) {
 	ticketkit.Has(t, ticketkit.Out(lint), "計画にありません")
 }
 
-// 順序で外れる子は --lint では warn（前が閉じれば通るので、書いた側に直すものが無い）。
+// 順序で外れる子は --lint では warn（前がクローズすれば通るので、書いた側に直すものが無い）。
 func TestLintSaysTheOrderProblemAsAWarn(t *testing.T) {
 	t.Parallel()
 	tr := newTree(t)
 	soundProposal(tr)
 	tr.Approve()
-	// フェーズ 1 が閉じていないのに、フェーズ 2 の子を先回りして書く。
+	// フェーズ 1 がクローズしていないのに、フェーズ 2 の子を先回りして書く。
 	tr.Propose("i0001-02-02", child("i0001-02-02", 2, "wip/design/*"), "")
 	tr.CommitParent("tickets")
 	v := tr.verify()
 	wantCode(t, v, answerNo)
-	ticketkit.Has(t, v.Stdout, "が閉じるまで承認しない")
+	ticketkit.Has(t, v.Stdout, "がクローズするまで承認しない")
 	lint := tr.Ccnavi("--lint")
 	said := ticketkit.Out(lint)
 	ticketkit.Has(t, said, "i0001-02-02: ")
-	ticketkit.Has(t, said, "が閉じるまで承認しない")
+	ticketkit.Has(t, said, "がクローズするまで承認しない")
 	ticketkit.Has(t, said, "warn: (ticket): i0001-02-02: ")
 	ticketkit.Lacks(t, said, "error: (ticket): i0001-02-02: ")
 	wantCode(t, lint, 0)

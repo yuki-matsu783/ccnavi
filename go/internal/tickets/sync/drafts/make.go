@@ -45,7 +45,7 @@ const todoPrefix = templates.TodoMark + " 一般化する: "
 const (
 	msgBadID       = "%s は親の識別子として読めない"
 	msgStillDoing  = "%s はまだ作業中（doing/）。完了した（done/ に在る）親だけから作る"
-	msgArchived    = "%s は ready で閉じて退避済み（%s/）で、退避した親は読まない。ready の前に（done/ に在るうちに）下書きを作る"
+	msgArchived    = "%s は ready でクローズして退避済み（%s/）で、退避した親は読まない。ready の前に（done/ に在るうちに）下書きを作る"
 	msgNotFound    = "%s の完了した計画（done/）が見つからない"
 	msgManyTrees   = "%s が複数のツリーにある（%s）。決められない"
 	msgCancelled   = "%s は取り消した親。完了した親だけから下書きを作る"

@@ -19,7 +19,7 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// TidyTargets は片付けの候補。閉じた（done/ の。完了も取り消しも）子のうち、phaseNo が nil でなければそのフェーズ
+// TidyTargets は片付けの候補。クローズした（done/ の。完了も取り消しも）子のうち、phaseNo が nil でなければそのフェーズ
 // （延期を引き受けた分を含む）の子。0 は統合の子のフェーズ（ticket.ConsolidatePhase）で、指定なしとは別。
 // 作業中・レビュー待ちの子は入らない。識別子の順で、重複は 1 つにする。
 func TidyTargets(conf *config.Settings, root, family string, phaseNo *int) []*ticket.Ticket {
@@ -66,7 +66,7 @@ func FamilyFor(approved *approval.Approved, ident string) string {
 	return ident
 }
 
-// RunTidy は `worktree tidy <親> [--phase <N>]`（phaseNo の nil は指定なし）。閉じた子のワークツリーを消す。
+// RunTidy は `worktree tidy <親> [--phase <N>]`（phaseNo の nil は指定なし）。クローズした子のワークツリーを消す。
 // 消さなかったものが 1 本でもあれば 1。何も無ければ黙って 0。
 func RunTidy(stdout io.Writer, conf *config.Settings, root, family string, phaseNo *int, cwd string) int {
 	code := 0
@@ -119,7 +119,7 @@ func leftoverFacts(path string) (why, check []string) {
 
 // remaining は ready の最後の `drop <親>` の後に、まだ残っている親子のワークツリー。見るだけで消さない。
 // 名前が親と違うがその親のチケットがあるワークツリー（drop は名前で消すので拾えない）と、未保存の下書きがあって
-// Drop が消さなかった閉じた子のワークツリー。
+// Drop が消さなかったクローズした子のワークツリー。
 func remaining(conf *config.Settings, root, family string) []left {
 	// 親は正とするツリーの側で引き、親子のチケットはどのツリーのコピーも拾う（コピーの持ち主のワークツリーを探すため）。
 	raw := approval.ReadRaw(conf, root)

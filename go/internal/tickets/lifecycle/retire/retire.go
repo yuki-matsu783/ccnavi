@@ -160,7 +160,7 @@ func confirmCommand(root, name string) string {
 	return config.ScriptCommand(root, cleanBranchScript) + " " + name + " --confirmed"
 }
 
-// parentOf はそのチケットの parent。承認済みの置き場（作業中・閉じた・レビュー待ち）を先に、無ければ手元の退避を
+// parentOf はそのチケットの parent。承認済みの置き場（作業中・クローズした・レビュー待ち）を先に、無ければ手元の退避を
 // 見る。見つからなければ空。
 func parentOf(approved *approval.Approved, root, project, ident string) string {
 	for _, t := range approved.All() {
@@ -211,7 +211,7 @@ func RunRetire(stdout, stderr io.Writer, conf *config.Settings, root, family, cw
 		fmt.Fprintf(stderr, "%s\n", parentRefusal(root, family, *refused))
 		return 1
 	}
-	// 3. 片付ける子を集める。記録の子を先に採り、閉じた子の一覧は記録に無いものだけを足す。
+	// 3. 片付ける子を集める。記録の子を先に採り、クローズした子の一覧は記録に無いものだけを足す。
 	children := map[string]child{}
 	for _, c := range childrenFrom(held) {
 		children[c.ticket] = c
@@ -301,7 +301,7 @@ func RunBranch(stdout, stderr io.Writer, conf *config.Settings, root, name strin
 		}
 	}
 	if found == nil {
-		fmt.Fprintf(stderr, "ccnavi: %s は、親を閉じたときに片付ける子として記録したブランチではない。任意のブランチは消さない\n", name)
+		fmt.Fprintf(stderr, "ccnavi: %s は、親をクローズしたときに片付ける子として記録したブランチではない。任意のブランチは消さない\n", name)
 		return 1
 	}
 	name = found.ticket // 以降は記録の綴りで扱う（ブランチは git が大文字小文字を区別する）

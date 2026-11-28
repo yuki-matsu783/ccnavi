@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 閉じた子と Draft を外した親のワークツリーの片付け（`ccnavi worktree drop|tidy|remaining`）と、レビューを頼む前後の案内
+// クローズした子と Draft を外した親のワークツリーの片付け（`ccnavi worktree drop|tidy|remaining`）と、レビューを頼む前後の案内
 // （finish の出力・status の次の一手・最後の confirm の知らせ）。
 
 // plainParentText は計画が work だけの親（定義は PlainPhases）。レビューの要否は定義と子の宣言で決まる。
@@ -39,7 +39,7 @@ func approveChild(tr *ticketkit.Tree, name string, review samples.Flag) {
 	ticketkit.OK(tr.T, tr.Approve())
 }
 
-// closedChild は子を提案・承認・着手して閉じ、親へ合流する。子のワークツリーと finish の結果を返す。
+// closedChild は子を提案・承認・着手してクローズし、親へ合流する。子のワークツリーと finish の結果を返す。
 func closedChild(tr *ticketkit.Tree, name string) (string, run.Result) {
 	tr.T.Helper()
 	approveChild(tr, name, samples.On)
@@ -85,7 +85,7 @@ func branchExists(tr *ticketkit.Tree, name string) bool {
 }
 
 // finish で子を review/ へ動かしただけでは「ユーザのレビューを待つ」と言わない。依頼の前は「レビュー準備中」と親の次の一手（request）を言い、
-// 依頼の後は待つと言う。依頼の後に子を足して閉じたら、またレビュー準備中と言う。status の次の一手も同じ。
+// 依頼の後は待つと言う。依頼の後に子を足してクローズしたら、またレビュー準備中と言う。status の次の一手も同じ。
 func TestFinishAndStatusSayWhoMovesBeforeAndAfterTheRequest(t *testing.T) {
 	t.Parallel()
 	tr := plainTree(t, "work-mr")
@@ -114,7 +114,7 @@ func TestFinishAndStatusSayWhoMovesBeforeAndAfterTheRequest(t *testing.T) {
 	after := nextStep(tr, "i0001-01-01")
 	ticketkit.Has(t, after, "依頼済み（レビュー待ち）")
 	ticketkit.Has(t, after, "ユーザのレビューを待つ")
-	// 依頼の後に同じフェーズへ子を足して閉じた。依頼の記録は外れ、またレビュー準備中になる。
+	// 依頼の後に同じフェーズへ子を足してクローズした。依頼の記録は外れ、またレビュー準備中になる。
 	_, again := closedChild(tr, "i0001-01-02")
 	ticketkit.Has(t, again.Stdout, "レビュー準備中")
 	if n := strings.Count(again.Stdout, "done/ へ動"); n != 1 {
@@ -163,7 +163,7 @@ func TestAConfirmThatIsNotTheLastSaysNothingMore(t *testing.T) {
 	ticketkit.Lacks(t, confirmed.Stdout, "全部のフェーズのレビューが済み")
 }
 
-// ---- tidy（閉じた子のワークツリーの片付け。消さないときは名指しする）
+// ---- tidy（クローズした子のワークツリーの片付け。消さないときは名指しする）
 
 func TestTidyRemovesTheWorktreesOfCancelledChildrenButNotOfDoingOnes(t *testing.T) {
 	t.Parallel()
@@ -177,7 +177,7 @@ func TestTidyRemovesTheWorktreesOfCancelledChildrenButNotOfDoingOnes(t *testing.
 	gone := tr.RunChild("i0001-01-02")
 	ticketkit.OK(t, tr.Ccnavi("ticket", "cancel", "i0001-01-02", "--reason", "やめた"))
 	done := ticketkit.OK(t, tidy(tr, ""))
-	// 片付けの候補は閉じた（done/ の）子だけ。作業中の子と取り消した子が並んでいるとき、候補に入るのは取り消した子だけ。
+	// 片付けの候補はクローズした（done/ の）子だけ。作業中の子と取り消した子が並んでいるとき、候補に入るのは取り消した子だけ。
 	ticketkit.Has(t, done.Stdout, "ワークツリー i0001-01-02 を削除しました")
 	ticketkit.Lacks(t, done.Stdout, "i0001-01-01")
 	if !ticketkit.Exists(doing) || ticketkit.Exists(gone) {

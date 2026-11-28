@@ -2,7 +2,7 @@ package testkit
 
 import "strings"
 
-// 親が閉じる側のテスト（lifecycle の stop・closing・integrate）が使う見本。成果物を書いた定義と、着手・完了の時刻の行を
+// 親がクローズする側のテスト（lifecycle の stop・closing・integrate）が使う見本。成果物を書いた定義と、着手・完了の時刻の行を
 // 置く。
 
 // ClosingClock はこの見本を使うテストのコミットの時刻（testdata の写しの sha がこれで決まる）。

@@ -90,7 +90,7 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 		io.WriteString(stdout, texts.Say(root, textStartParent, texts.Values{}, nil)+"\n")
 	}
 	if learning.Applies(conf, root, found) {
-		fmt.Fprintf(stdout, "学びの蓄積: 閉じる前に '%s learn' を実行し、"+
+		fmt.Fprintf(stdout, "学びの蓄積: クローズする前に '%s learn' を実行し、"+
 			"%s/%s.md に気づきを書いて git add と git commit をする（無ければ learnings: none）\n",
 			config.ScriptCommand(root, config.TicketWrapper), learning.LearningDir, found.ID)
 	}

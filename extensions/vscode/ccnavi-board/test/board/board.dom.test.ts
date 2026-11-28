@@ -107,7 +107,7 @@ test("CB-D46 書き込みが止まっているカードは「ユーザ待ちの�
   // 信頼できない理由（`blocked`）は、実行ファイルが不備として積み`attention`を真にする。素の版では
   // i0001-02-02は隠れる（CB-D42）ので、実行ファイルがそう言ったときだけ残ることが確かめられる。
   const base = fixture();
-  const blocked = "親i0001の承認済みチケットが作業中にない（未承認か、閉じている）";
+  const blocked = "親i0001の承認済みチケットが作業中にない（未承認か、クローズしている）";
   const stopped = base.tickets.map((t) =>
     t.ticket === "i0001-02-02" ? { ...t, blocked, issues: [`書き込みが止まっています: ${blocked}`], attention: true } : t,
   );

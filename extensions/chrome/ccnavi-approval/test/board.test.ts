@@ -50,13 +50,13 @@ test("CX-T040 直近のブランチから親子のチケットを見分ける。
   assert.equal(board.compat?.same, true);
 });
 
-test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み足し、統合先で閉じた親子のチケットは読まない", async () => {
+test("CX-T041 先行の閉包の親子のチケット（直近の外）を読み足し、統合先でクローズした親子のチケットは読まない", async () => {
   const { board, mock } = await run();
   const f = family(board, "i0001");
   assert.deepEqual(f?.result?.closure.families, ["i0001", "i0003"]);
   assert.ok(mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0003"));
-  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "閉じた親子のチケットは読まない");
-  // 今の ccnavi の答え: 先行 i0003-01-01 が閉じていないので子は承認の対象にしない
+  assert.ok(!mock.calls.includes("GET /repos/acme/widgets/git/ref/heads/i0005"), "クローズした親子のチケットは読まない");
+  // 今の ccnavi の答え: 先行 i0003-01-01 がクローズしていないので子は承認の対象にしない
   assert.deepEqual(f?.result?.batch?.map((e) => e.ticket), ["i0001"]);
   assert.equal(f?.result?.rejected?.[0].ticket, "i0001-01-01");
   assert.match((f?.result?.rejected?.[0].problems ?? []).join("\n"), /先行 i0003-01-01 が完了していない/);

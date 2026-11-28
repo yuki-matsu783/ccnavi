@@ -14,7 +14,7 @@ import (
 // feedbackStep はフィードバック計画（implement-feedback の 1 ステップ）。
 var feedbackStep = samples.Plan("implement-feedback")
 
-// buildRequested は、フェーズ 1 の子を閉じて合流し、レビューを依頼して push したところまで組む。
+// buildRequested は、フェーズ 1 の子をクローズして合流し、レビューを依頼して push したところまで組む。
 func buildRequested(tr *ticketkit.Tree) {
 	t := tr.T
 	t.Helper()

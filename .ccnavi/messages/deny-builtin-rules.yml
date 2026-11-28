@@ -131,7 +131,7 @@ messages:
     what: |-
       ccnavi の記録と state の置き場（logs/decisions*.jsonl と logs/state/）か、クローズ済みのチケットの退避（logs/archive/）です。
     why: |-
-      判定が読み、「ccnavi が何を判定したか」・「何が閉じたか」を後から確かめるための材料なので、エージェントは書き換えません。
+      判定が読み、「ccnavi が何を判定したか」・「何をクローズしたか」を後から確かめるための材料なので、エージェントは書き換えません。
     next: |-
       記録を直す必要があるときは、理由を伝えてユーザに依頼する
     note: |-
@@ -274,5 +274,5 @@ messages:
     note: |-
       放棄した親の片付けの記録を消す 'ccnavi worktree retire --abandon <親>' と、ユーザの判断の入口（'{script:ccnavi-user-close-early.sh}'）もユーザが実行します。
       保護対象の下書き（wip/handoff/）の取り込み（'ccnavi-user-handoff.sh'。見るだけの形も含む）と、共通設定のミラーと工程スキルの同期（'ccnavi-user-mirror.sh'。見るだけの形も含む）も、ユーザが実行します。
-      親を閉じたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです（案内されたコマンドをユーザに見せて、打ってもらってください）。
+      親をクローズしたときの片付け（'ccnavi sync tidy'・'ccnavi worktree retire'・'ccnavi worktree branch'・'{script:ccnavi-user-clean-branch.sh}'）は、ccnavi-review.sh ready と ccnavi-sync.sh が中で呼びます。残ったブランチを消すのは、ユーザが先頭に ! を付けて打つコマンドです（案内されたコマンドをユーザに見せて、打ってもらってください）。
       下書きは '{script:ccnavi-stage.sh} --commands <パス>'、承認先行の一覧は '{script:ccnavi-launcher.sh} --agree --preview' なら通ります。

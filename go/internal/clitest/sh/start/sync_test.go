@@ -17,21 +17,21 @@ import (
 
 // ccnavi-sync.sh の受入テスト。
 //
-// ccnavi-sync.sh は親のブランチを取り込み（早送りか merge）、リモートから消えた親のブランチは MR がマージ済みかで「閉じた」か「消えた」かを言う。
-// 親子ごとの取り込み状態や統合先のコピーは書かない。親を閉じた後の片付けは、`ready` が書く `retire/<P>.json`（実行ファイルの
+// ccnavi-sync.sh は親のブランチを取り込み（早送りか merge）、リモートから消えた親のブランチは MR がマージ済みかで「クローズした」か「消えた」かを言う。
+// 親子ごとの取り込み状態や統合先のコピーは書かない。親をクローズした後の片付けは、`ready` が書く `retire/<P>.json`（実行ファイルの
 // `sync retired` が列挙する）が元になる。
 //
 // 使い捨てのワークスペースと bare のリモートを組み、sh を外から呼ぶ。リモートを動かすのは別に clone した押し手で、ワークスペースからは
 // 「他の機械が push した」「ホストがブランチを消した」ように見える。読み返すのは終了コード・標準出力と、git に残った ref、片付けの記録
 // （logs/state/retire/）の有無だけ。MR がマージ済みかの問い合わせ（ccnavi-review.sh merged）は、答えを決めたスタブの sh に差し替える。
 //
-// 親のワークツリーかどうか・閉じたかは sh がチケットの YAML を読まず、実行ファイル（ccnavi tree parent）と ccnavi-review.sh merged に聞く。
+// 親のワークツリーかどうか・クローズしたかは sh がチケットの YAML を読まず、実行ファイル（ccnavi tree parent）と ccnavi-review.sh merged に聞く。
 
 const (
 	syncParent    = "i0001"
 	syncCopy      = ".ccnavi/approved/doing/" + syncParent + ".md"
 	syncBaseSHA   = "1111111111111111111111111111111111111111"
-	syncNoMR      = "mr 欄に MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない"
+	syncNoMR      = "mr 欄に MR の番号が無いので、クローズしたか（MR がマージ済みか）判断できない"
 	syncStartedAt = "2026-09-02T00:00:00+09:00"
 	// syncAllow は読める承認済みチケットにするための範囲（取り込みの後の検査は読めないチケットで親子のチケットを止める）。
 	syncAllow = "allow:\n  - match: Write\n    glob: \"wip/*\"\n"
@@ -243,7 +243,7 @@ func (s *syncEnv) launcher(body string) string {
 }
 
 func (s *syncEnv) env(extra map[string]string) map[string]string {
-	// sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、閉じたか）ので、ソースの実行ファイルを既定で渡す。
+	// sh はチケットを読まず実行ファイルに聞く（親のワークツリーか、クローズしたか）ので、ソースの実行ファイルを既定で渡す。
 	// 実行ファイルの無い形を見るテストは自分で上書きする。
 	return merge(map[string]string{"CCNAVI_ENTRY_PATH": s.sourceExe()}, extra)
 }
@@ -553,8 +553,8 @@ func assertGone(t testing.TB, done run.Result) {
 	has(t, done.Stdout, "戻し方 1")
 }
 
-// 閉じたかは MR がマージ済みかだけで決める（マージされていなければ、消えた親として止める）。統合先の done/ にある同じ識別子の親チケット・
-// 手元の退避（ready が移した先）の親・前方一致するブランチ（i0001-x）は、どれも閉じた根拠にも、在る根拠にもしない。
+// クローズしたかは MR がマージ済みかだけで決める（マージされていなければ、消えた親として止める）。統合先の done/ にある同じ識別子の親チケット・
+// 手元の退避（ready が移した先）の親・前方一致するブランチ（i0001-x）は、どれもクローズした根拠にも、在る根拠にもしない。
 func TestSyncADoneCopyOnTheIntegrationBranchIsNotConsulted(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
@@ -589,7 +589,7 @@ func (s *syncEnv) backToTodo() {
 	git(s.t, s.tree, "push", "-q", "origin", syncParent)
 }
 
-// 承認前の提案だけが残る親のワークツリー（この親子のチケットは閉じようがない）。
+// 承認前の提案だけが残る親のワークツリー（この親子のチケットはクローズしようがない）。
 func TestSyncAParentMissingInTheParentTreeIsNotClosed(t *testing.T) {
 	t.Parallel()
 	s := newSync(t)
@@ -642,7 +642,7 @@ func TestSyncAnUnknownMergeAnswerStopsWithoutCallingItGone(t *testing.T) {
 	lacks(t, done.Stdout, "戻し方")
 }
 
-// 統合先には閉じたチケットを残さない（ready が退避して消し、squash でマージする）ので、MR がマージ済みと分かれば閉じたと読み、
+// 統合先にはクローズしたチケットを残さない（ready が退避して消し、squash でマージする）ので、MR がマージ済みと分かればクローズしたと読み、
 // 手元の親のブランチを片付ける。MR の番号は親チケットの mr 欄から引く。
 func TestSyncAMergedRequestCleansUpWithoutADoneCopy(t *testing.T) {
 	t.Parallel()
@@ -718,7 +718,7 @@ func TestSyncARetiredFamilyIsCleanedWhenItsRequestIsMerged(t *testing.T) {
 	code(t, s.sync(), 0)
 }
 
-// ---- リモートにブランチが残っていても、MR がマージ済みなら閉じている
+// ---- リモートにブランチが残っていても、MR がマージ済みならクローズしている
 
 func TestSyncAMergedRequestWhoseBranchIsLeftOnTheRemoteIsCleaned(t *testing.T) {
 	t.Parallel()

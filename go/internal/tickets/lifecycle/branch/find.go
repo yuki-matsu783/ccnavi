@@ -217,7 +217,7 @@ func checkedOutIn(conf *config.Settings, root string, repo tree.Tree) map[string
 	return out
 }
 
-// ticketsOf はこのリポジトリの承認済みチケット（作業中・レビュー待ち・閉じた）と、承認待ちの提案。
+// ticketsOf はこのリポジトリの承認済みチケット（作業中・レビュー待ち・クローズした）と、承認待ちの提案。
 func ticketsOf(conf *config.Settings, root, project string) []*ticket.Ticket {
 	doing, _ := approval.Scan(conf, root, false, nil)
 	for _, t := range doing {

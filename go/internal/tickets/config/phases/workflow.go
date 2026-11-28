@@ -68,7 +68,7 @@ func Compute(parent *ticket.Ticket) *ticket.Workflow {
 	for i, item := range parent.Plan {
 		n := i + 1
 		found := map[int]bool{}
-		// 前の番号の先行は推移的に閉じているので、直接の先行ごとに 1 度足せば済む。
+		// 前の番号の先行は推移的にクローズしているので、直接の先行ごとに 1 度足せば済む。
 		for _, m := range item.After {
 			if 1 <= m && m < n {
 				found[m] = true
@@ -113,7 +113,7 @@ func Compute(parent *ticket.Ticket) *ticket.Workflow {
 }
 
 // deferTarget は延期した n 番目を引き受ける番号。後ろで n が先行する、延期していない最小の番号。
-// n が先行していない番号が引き受けると、延期した作業が閉じる前にそのレビューが済んでしまう。
+// n が先行していない番号が引き受けると、延期した作業がクローズする前にそのレビューが済んでしまう。
 func deferTarget(wf *ticket.Workflow, steps []ticket.Step, n int) (int, bool) {
 	for _, s := range steps {
 		if s.Number <= n || s.Item.Deferred {

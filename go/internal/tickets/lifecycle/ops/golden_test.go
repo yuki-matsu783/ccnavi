@@ -53,7 +53,7 @@ func recordNone(id, parent string) string {
 //	i0001  計画のある親。子 01-01（気づき 1 件を書く）と 01-02（取り消す）
 //	i0002  計画のある親。子 01-01 は重要なパスを変え、実績のリスクでレビュー待ちに入る
 //	i0003  提案（todo/）だけの親
-//	i0004  計画のある親。子 01-01 は気づき無しで閉じ、親も閉じる
+//	i0004  計画のある親。子 01-01 は気づき無しでクローズし、親もクローズする
 func fixture(t *testing.T) string {
 	root := testkit.ShapedWorkspace(t)
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "common", "risks.yml"), risks)

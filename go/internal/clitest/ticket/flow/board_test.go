@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-// boardSceneBuild は親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、同じフェーズに未承認の子が 1 枚ある。
+// boardSceneBuild は親 1 本（research → design）。フェーズ 1 はクローズし、フェーズ 2 は着手済みで、同じフェーズに未承認の子が 1 枚ある。
 // その子は着手済みの子のワークツリーにも入っている。
 func boardSceneBuild(t *testing.T) *Tree {
 	t.Helper()
@@ -113,7 +113,7 @@ func TestBoardTicketsCarryProposalCopyMarksAndWorktree(t *testing.T) {
 		t.Errorf("waiting = %v", waiting)
 	}
 	parent := by["i0001"]
-	// 親も着手していて閉じていなければ作業中。
+	// 親も着手していてクローズしていなければ作業中。
 	if js(parent, "parent") != "" || js(parent, "copy", "status") != "open" || !jb(parent, "in_progress") {
 		t.Errorf("parent = %v", parent)
 	}
@@ -222,7 +222,7 @@ func TestATicketWaitingForReviewIsNotScattered(t *testing.T) {
 	tr := boardSceneBuild(t)
 	for _, tk := range jl(tr.board(), "tickets") {
 		if js(tk, "copy", "status") == "review" {
-			t.Errorf("閉じる前にレビュー待ちがある: %v", js(tk, "ticket"))
+			t.Errorf("クローズする前にレビュー待ちがある: %v", js(tk, "ticket"))
 		}
 	}
 	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
@@ -263,14 +263,14 @@ func TestAStaleTodoCopyLeftInAWorktreeIsNotWaitingAfterApproval(t *testing.T) {
 	ticketkit.Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-02-02/wip/proposals/todo/i0001-02-03.md")
 }
 
-// 場面 B。review/ の古いチケットが残ったワークツリーがあっても、閉じたものは閉じたまま。
+// 場面 B。review/ の古いチケットが残ったワークツリーがあっても、クローズしたものはクローズしたまま。
 func TestAStaleReviewCopyLeftInAWorktreeIsNotInProgressAfterClosing(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
 	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	tr.CommitParent("close")
 	tr.Worktree("i0001-01-09", "i0001") // review/i0001-02-02 を持ったまま切る
-	// 親のツリーで閉じる（レビューを終えて done/ へ）。
+	// 親のツリーでクローズする（レビューを終えて done/ へ）。
 	review := tr.childPath("i0001-02-02", "review")
 	text := ticketkit.Read(t, review)
 	removeFile(t, review)
@@ -464,7 +464,7 @@ func TestAttentionAndIssuesFollowTheScene(t *testing.T) {
 	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	by = tr.boardByID()
 	if !jb(by["i0001-02-02"], "attention") || !jb(by["i0001"], "attention") || jb(by["i0001-01-01"], "attention") {
-		t.Errorf("閉じた後の attention: %v %v %v", by["i0001-02-02"]["attention"], by["i0001"]["attention"], by["i0001-01-01"]["attention"])
+		t.Errorf("クローズした後の attention: %v %v %v", by["i0001-02-02"]["attention"], by["i0001"]["attention"], by["i0001-01-01"]["attention"])
 	}
 }
 
@@ -509,8 +509,8 @@ func TestInboxSortsWaitingTicketsAndDrafts(t *testing.T) {
 	}
 }
 
-// 閉じた子（ここでは終わった i0001-01-01）の下書きは、フローが在っても「提案あり」にせず、flow_draft にも入れない
-// （フロー編集の画面は読むだけ）。置き場は i0001-02-02 の欄と同じディレクトリに組む（閉じてフローが無い子は flow が null）。
+// クローズした子（ここでは終わった i0001-01-01）の下書きは、フローが在っても「提案あり」にせず、flow_draft にも入れない
+// （フロー編集の画面は読むだけ）。置き場は i0001-02-02 の欄と同じディレクトリに組む（クローズしてフローが無い子は flow が null）。
 func TestAClosedChildsDraftIsNotOffered(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
@@ -555,7 +555,7 @@ func TestTheMergedHeadOfAChildIsShown(t *testing.T) {
 	if js(by["i0001-02-02"], "merged_sha") != strings.Repeat("a", 40) {
 		t.Errorf("merged_sha = %v", by["i0001-02-02"]["merged_sha"])
 	}
-	// finish で閉じた子は、合流した先頭を持つ。
+	// finish でクローズした子は、合流した先頭を持つ。
 	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(js(by["i0001-01-01"], "merged_sha")) {
 		t.Errorf("merged_sha = %v", by["i0001-01-01"]["merged_sha"])
 	}

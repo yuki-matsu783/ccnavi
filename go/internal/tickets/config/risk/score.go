@@ -209,7 +209,7 @@ type hit struct {
 }
 
 // Score は差分と判定から出した点。unmeasured は測れなかった項目（重いほうとして加点済み）、Pending は判定の
-// 無い定性の項目（点にはまだ含まれない。揃うまで子は閉じられない）。
+// 無い定性の項目（点にはまだ含まれない。揃うまで子はクローズできない）。
 type Score struct {
 	points     int
 	Level      Level

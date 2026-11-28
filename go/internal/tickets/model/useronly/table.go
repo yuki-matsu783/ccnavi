@@ -80,7 +80,7 @@ var subs = []sub{
 	{[]string{"ticket", "review"}, []string{
 		"start", "finish", "cancel", "approval-request", "consolidate", "record-risk", "prepare", "requested", "confirm", "ready",
 	}},
-	// 親を閉じたときの片付け。ブランチを `branch -D` で消すので、呼ぶのは sh の中か、ユーザが `!` を付けて打つときだけ
+	// 親をクローズしたときの片付け。ブランチを `branch -D` で消すので、呼ぶのは sh の中か、ユーザが `!` を付けて打つときだけ
 	// （sh の中の呼び出しは hook を通らない）。`merged` は ccnavi-sync.sh の段取りで、同じ片付けをする。
 	{[]string{"sync"}, []string{"tidy", "merged"}},
 	// 操作記録の書き込み。偽の送信済みを書かせない。読む副命令（pending・show）は止めない。

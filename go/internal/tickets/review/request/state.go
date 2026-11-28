@@ -62,7 +62,7 @@ const (
 )
 
 // Parent は cwd の親。引けない・親子のチケットが決まらない（FamilyStopped）なら言って nil。
-// 取り込み済みの親子が決まらないなら、依頼・確認・行き先・早めに閉じたことのマーカーも置かない。
+// 取り込み済みの親子が決まらないなら、依頼・確認・行き先・早めにクローズしたことのマーカーも置かない。
 func Parent(stderr io.Writer, conf *config.Settings, root, cwd string) *ticket.Ticket {
 	parent, _ := phase.ParentAt(conf, root, cwd, nil)
 	if parent == nil {
@@ -75,7 +75,7 @@ func Parent(stderr io.Writer, conf *config.Settings, root, cwd string) *ticket.T
 	return parent
 }
 
-// ParentAny は Parent と同じで、閉じた承認済みチケットも引く（親を閉じたあとに Draft を外す ready のため）。
+// ParentAny は Parent と同じで、クローズした承認済みチケットも引く（親をクローズしたあとに Draft を外す ready のため）。
 func ParentAny(stderr io.Writer, conf *config.Settings, root, cwd string) *ticket.Ticket {
 	if parent, _ := phase.ParentAt(conf, root, cwd, nil); parent != nil {
 		if closing.FamilyStopped(stderr, conf, root, parent) {

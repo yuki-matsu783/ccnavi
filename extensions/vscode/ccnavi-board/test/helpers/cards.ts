@@ -44,7 +44,7 @@ export function ticketJson(ticket: string, over: Partial<TicketJson> = {}): Tick
   };
 }
 
-/** 閉じた（完了）チケット */
+/** クローズした（完了）チケット */
 export function closedJson(ticket: string, over: Partial<TicketJson> = {}): TicketJson {
   return ticketJson(ticket, {
     copy: { status: "closed", approved_at: "2026-10-01T00:00:00+0900", approved_from: "commit", path: `/ws/.ccnavi/approved/done/${ticket}.md` },

@@ -5,7 +5,7 @@
  * - GitLab のボードは、GitHub と同じ見本のリポジトリから同じ親子のチケット・承認待ち・ダイジェストを出す（読み取りの一致）
  * - GitLab への書き込みは Commits API の 1 コミット。事後確認: 書いたコミットの親が読んだ先頭と
  *   違えば、直前の状態で判定し直し、同じなら残し、違えば元に戻して読み直す。元に戻すコミットも収まらなければユーザの対応に切り替える
- * - 「始める」: issue から `feature-<番号>-<slug>` のブランチを統合先の先頭に作る。閉じた識別子・既にある名前は拒否
+ * - 「始める」: issue から `feature-<番号>-<slug>` のブランチを統合先の先頭に作る。クローズした識別子・既にある名前は拒否
  * - プロジェクトのリポジトリ: ワークスペースの統合先の共通設定で判定し、プロジェクトの親のブランチへ書く
  * - PAT は画面に渡らない。GitLab のスレッドの本文は承認の画面と同じ規則で描く
  */
@@ -220,15 +220,15 @@ test("CX-T149 連鎖競合: 元に戻す前・元に戻すあいだに同じフ�
   assert.equal(late.files("i0001")[DOING], "後から変えた\n");
 });
 
-test("CX-T150 「始める」: issue から feature-<番号>-<slug> のブランチを統合先の先頭に作る（GitHub と GitLab）。閉じた識別子・既にある名前は作らない", async () => {
+test("CX-T150 「始める」: issue から feature-<番号>-<slug> のブランチを統合先の先頭に作る（GitHub と GitLab）。クローズした識別子・既にある名前は作らない", async () => {
   for (const [mock, repo, host] of [
     [new MockGitHub(fixture()), GH_REPO, "github.com"],
     [new MockGitLab(fixture()), GITLAB_REPO, "gitlab.com"],
   ] as const) {
     mock.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "Closed" }, { number: 1, title: "open" }, { number: 30, title: "PR", pull: true });
-    // 閉じた親子のチケット（feature-5-closed）と既にあるブランチ（feature-1-open）を統合先に足す
+    // クローズした親子のチケット（feature-5-closed）と既にあるブランチ（feature-1-open）を統合先に足す
     const closedText = mock.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
-    mock.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた親子のチケット");
+    mock.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "クローズした親子のチケット");
     mock.branch("feature-1-open", "main");
     const d = glDeps(mock, host);
     const list = await listIssues(repo, d);

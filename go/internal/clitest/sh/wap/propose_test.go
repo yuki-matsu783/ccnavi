@@ -169,7 +169,7 @@ func TestAProposalThatApprovalWouldRefuseIsRefusedBeforeItIsSent(t *testing.T) {
 		{"計画の中を指すフィードバックの手順", []string{"design", "implement"}, []samples.Step{{Type: "implement-feedback", After: []int{1}}},
 			[]string{"`feedback[0]` の `after` の 1 は読めない", "フィードバック計画の番号だけを指せる"}, true},
 		{"全体計画のレビューが済む前のフィードバック計画", []string{"design", "implement"}, []samples.Step{{Type: "implement-feedback", After: []int{}}},
-			[]string{"全体計画のフェーズが全部閉じてレビューが済んでから"}, false},
+			[]string{"全体計画のフェーズが全部クローズしてレビューが済んでから"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

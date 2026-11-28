@@ -134,7 +134,7 @@ func (s *syncRun) plan(wants []string) {
 				continue
 			}
 			if e.Incomplete != "" {
-				s.a.out("%s: ready の後の片付けの記録（retire/%s.json）が利用できない（%s）。閉じたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、破棄した親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください",
+				s.a.out("%s: ready の後の片付けの記録（retire/%s.json）が利用できない（%s）。クローズしたか判断できないので手元は片付けない。MR がマージ済みならブランチとログを手で片付け、破棄した親ならユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で記録を消してください",
 					name, name, e.Incomplete, s.here, name)
 			} else if !has(name) {
 				retired = append(retired, e)
@@ -320,7 +320,7 @@ func (s *syncRun) fetched(key string, hasFamily bool, name string, host bool, rc
 // ---- 親子のチケットごと（sh がロックを取った後）
 
 // family は、親子のチケット 1 つの最初の判定。親のブランチがリモートにあれば `next fetch <ブランチ>`（取ってきたら
-// pull）、無ければ送った形跡を見て、閉じたかを聞く `next ask <MR>`（聞いたら merged absent）か、今のままと言う。
+// pull）、無ければ送った形跡を見て、クローズしたかを聞く `next ask <MR>`（聞いたら merged absent）か、今のままと言う。
 func (s *syncRun) family(name, branch, headsFile string) {
 	path := tree.WorktreePath(s.root, name)
 	if here, _ := tree.BranchOf(path); here != branch {
@@ -360,7 +360,7 @@ func isNumber(text string) bool {
 
 // noMRNote は MR の番号が無いときの 1 行。
 func noMRNote(name, tail string) string {
-	return name + ": 親チケットの mr 欄に MR の番号が無いので、閉じたか（MR がマージ済みか）判断できない" + tail
+	return name + ": 親チケットの mr 欄に MR の番号が無いので、クローズしたか（MR がマージ済みか）判断できない" + tail
 }
 
 // pull は、親のブランチを取ってきた後。早送りできれば早送り、分かれていれば merge する。merge が失敗したら、この
@@ -527,10 +527,10 @@ func (s *syncRun) mergedFamily(where, name, key, branch string, isMerged, none b
 			name, branch)
 		s.a.out("  戻し方 1（改名・消し間違い）: ユーザが手元の親のワークツリーで git push origin %s を一度打つ（ホストの MR の画面から戻してもよい）。戻したら sh %s/ccnavi-sync.sh %s を打ち直す",
 			branch, s.here, name)
-		s.a.out("  戻し方 2（破棄した）: sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s で親のワークツリーを片付ける。ready の後に閉じた親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは打たない）",
+		s.a.out("  戻し方 2（破棄した）: sh %s/ccnavi-git.sh worktree remove .claude/worktrees/%s で親のワークツリーを片付ける。ready の後にクローズした親の記録は、ユーザが sh %s/ccnavi-launcher.sh worktree retire --abandon %s で消す（エージェントは打たない）",
 			s.here, name, s.here, name)
 	case present:
-		s.a.out("%s: マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった）。閉じていれば次の取り込みで片付ける", name)
+		s.a.out("%s: マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった）。クローズしていれば次の取り込みで片付ける", name)
 	default:
 		s.a.fail("%s: 親のブランチがリモートに無い。マージリクエストがマージ済みかを確かめられなかった（ccnavi-review.sh merged が結果を返さなかった。gh・glab か、curl とトークンが必要です）。止めた。確かめられる道具を用意して再実行するか、ユーザが確かめてください", name)
 	}

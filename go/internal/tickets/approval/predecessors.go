@@ -23,7 +23,7 @@ const (
 	predScattered PredState = "scattered"
 	// 形の上で満たせない先行。待っても通らないので、ふつうの error にする。
 	predSelf     PredState = "self"     // 自分自身
-	predAncestor PredState = "ancestor" // 自分の親（親は子より先に閉じない）
+	predAncestor PredState = "ancestor" // 自分の親（親は子より先にクローズしない）
 	predCycle    PredState = "cycle"    // 先行を辿ると自分に戻る
 	// predUndecided は取り込み済みの親子のチケットの先行で、その親子のチケットが決まらない・親のブランチ上に無い。
 	predUndecided PredState = "undecided"
@@ -34,7 +34,7 @@ var predLabels = map[PredState]string{
 	predDoing:     "作業中（doing/）",
 	predReview:    "レビュー待ち（review/）",
 	predCancelled: "取り消し済み（done/ で cancelled_at を持つ）",
-	predMissing: "どの置き場にもありません。閉じて片付いた親子のチケットなら、" +
+	predMissing: "どの置き場にもありません。クローズして片付いた親子のチケットなら、" +
 		"取り込み済みなので predecessors から削除してください",
 	predScattered: "複数の場所にある",
 	predSelf:      "自分自身",
@@ -54,7 +54,7 @@ type Predecessor struct {
 // met は満たしているか。
 func (p Predecessor) met() bool { return p.State == predDone }
 
-// Waiting は先行が閉じれば満たす状態か。取り消し・無い・複数の場所は、待っても満たさない。
+// Waiting は先行がクローズすれば満たす状態か。取り消し・無い・複数の場所は、待っても満たさない。
 func (p Predecessor) Waiting() bool {
 	return p.State == predTodo || p.State == predDoing || p.State == predReview
 }
@@ -89,7 +89,7 @@ func (h poolHit) state() PredState {
 }
 
 // PoolOf は、先行を引く対応表を組む。
-// 承認済みチケット（作業中・レビュー待ち・閉じた）は、どれも数える。
+// 承認済みチケット（作業中・レビュー待ち・クローズした）は、どれも数える。
 // todo/ の提案は、同じ識別子の承認済みチケットがどこにも無いときだけ数える。在れば、改版の候補か書き損じのため。
 // 2 つ以上残れば、どれが正かが決まらない。
 // 手元の退避（logs/archive/）は PC ごとのもので答えが割れるので、読まない。
@@ -113,7 +113,7 @@ func PoolOf(open, review, closed, proposals []*ticket.Ticket) Pool {
 // Chrome は参照の閉包の親子のチケットから引くので、手元もそれに揃える。
 // 通る向きには読み替えず、厳しくする向きだけを読み替える。
 // 親子のチケットが決まらないとき、または親のワークツリーにその識別子が無いときは「決まらない」になる。
-// 親のワークツリーのチケットが 1 つで閉じていなければ、それを採る。閉じている、または 2 つ以上あるときは、元の答えのまま使う。
+// 親のワークツリーのチケットが 1 つでクローズしていなければ、それを採る。クローズしている、または 2 つ以上あるときは、元の答えのまま使う。
 func (pool Pool) AlignImported(conf *config.Settings, root string) {
 	fams := standing.NewFamilies(conf, root)
 	for ident, hits := range pool {
@@ -169,7 +169,7 @@ func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 			out = append(out, Predecessor{Ticket: ident, State: predAncestor})
 			continue
 		}
-		// 1 つに決まり、まだ閉じていない先行だけ、自分に戻る循環を調べる。閉じた先行はそこで循環が切れる。
+		// 1 つに決まり、まだクローズしていない先行だけ、自分に戻る循環を調べる。クローズした先行はそこで循環が切れる。
 		if len(hits) == 1 && hits[0].state() != predDone {
 			if loop := loopBack(t.ID, ident, pool); loop != nil {
 				out = append(out, Predecessor{ident, predCycle, strings.Join(append([]string{t.ID}, loop...), " → ")})
@@ -204,7 +204,7 @@ func predecessorStates(t *ticket.Ticket, pool Pool) []Predecessor {
 }
 
 // loopBack は first から先行を辿って origin に戻る経路（戻らなければ nil）。辿るのは対応表で 1 つに決まる子だけ
-// （決まらないものは別の苦情になる）。閉じたチケットは満たしているので、そこで循環が切れる。
+// （決まらないものは別の苦情になる）。クローズしたチケットは満たしているので、そこで循環が切れる。
 func loopBack(origin, first string, pool Pool) []string {
 	type frame struct {
 		ident string
@@ -249,7 +249,7 @@ func UnmetPredecessors(t *ticket.Ticket, pool Pool) []Predecessor {
 }
 
 // PredecessorProblems は、承認を通さない先行の苦情を返す。
-// 先行が閉じれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は rules.KindNotYet にする。--lint は warn で言う。
+// 先行がクローズすれば同じ提案が通るもの（承認待ち・作業中・レビュー待ち）は rules.KindNotYet にする。--lint は warn で言う。
 // 取り消し・自分自身・親・循環・決まらない・どこにも無い・複数の場所は、待っても満たされないので error にする。
 // approvedRel は承認済みの置き場で、文に出す。
 func PredecessorProblems(t *ticket.Ticket, pool Pool, approvedRel string) []rules.Problem {
@@ -270,10 +270,10 @@ func PredecessorProblems(t *ticket.Ticket, pool Pool, approvedRel string) []rule
 				"predecessors から削除して出し直してください"
 		case predSelf, predAncestor, predCycle:
 			why := map[PredState]string{
-				predSelf: "自分自身を先行に挙げている。自分が閉じるのを待つことはできない",
-				predAncestor: "自分の親を先行に挙げている。親は子が全部閉じてから閉じるので、" +
+				predSelf: "自分自身を先行に挙げている。自分がクローズするのを待つことはできない",
+				predAncestor: "自分の親を先行に挙げている。親は子が全部クローズしてからクローズするので、" +
 					"待っても満たされない",
-				predCycle: "先行が循環している（" + p.where + "）。どれも他が閉じるのを待つので、" +
+				predCycle: "先行が循環している（" + p.where + "）。どれも他がクローズするのを待つので、" +
 					"待っても満たされない",
 			}[p.State]
 			detail = "先行 " + p.Ticket + " は" + predLabels[p.State] + "。" + why + "。" +
@@ -285,7 +285,7 @@ func PredecessorProblems(t *ticket.Ticket, pool Pool, approvedRel string) []rule
 				"'ccnavi-sync.sh' で取り込み直してから出し直してください"
 		case predMissing:
 			detail = "先行 " + p.Ticket + " がどの置き場（todo/・doing/・review/・done/）にもありません。" +
-				"閉じて片付いた親子のチケットなら、取り込み済みなので predecessors から" +
+				"クローズして片付いた親子のチケットなら、取り込み済みなので predecessors から" +
 				"削除してください。表記の誤りなら直して出し直してください"
 		default:
 			detail = "先行 " + p.Ticket + " が" + p.Label() + "。" +

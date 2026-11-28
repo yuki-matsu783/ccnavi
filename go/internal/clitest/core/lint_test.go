@@ -128,7 +128,7 @@ func TestLintReports(t *testing.T) {
 		},
 		{
 			// 動かす途中で止まった形跡（コピーできたが消せなかった）。状態の操作は「複数の場所にある」で止まるので、CI が先に名指しする。
-			// 作業中とレビュー待ちだけを横断して数えると、閉じた側との重複だけが通る。
+			// 作業中とレビュー待ちだけを横断して数えると、クローズした側との重複だけが通る。
 			name: "同じ識別子がdoingとdoneの両方に在ればerrorになる", wantCode: 1, errors: -1, warns: -1,
 			setup: func(t *testing.T, root string) {
 				for _, state := range []string{"doing", "done"} {
@@ -147,7 +147,7 @@ func TestLintReports(t *testing.T) {
 			contains: []string{"i0001 が複数の場所にある", "(ワークスペースルート):review"},
 		},
 		{
-			// 閉じた記録が 1 つ在るだけの、いちばん普通の形。
+			// クローズした記録が 1 つ在るだけの、いちばん普通の形。
 			name: "doneに1つだけ在るのは指摘しない", wantCode: 0, errors: -1, warns: -1,
 			setup: func(t *testing.T, root string) {
 				writeFile(t, root, filepath.Join(approved("done"), "i0001.md"), ticketOf(copyText, "i0001"))
@@ -164,7 +164,7 @@ func TestLintReports(t *testing.T) {
 		},
 		{
 			// 読めないファイルが置き場に残っていること自体は書いたユーザの思い違いで、承認済みチケットは親のブランチに乗って
-			// 他の機械へそのまま届く。閉じた側の苦情を破棄すると、届いた先でも何も言われないままになる。
+			// 他の機械へそのまま届く。クローズした側の苦情を破棄すると、届いた先でも何も言われないままになる。
 			name: "BOMの付いた承認済みチケットはdoneに在ってもerrorになる", wantCode: 1, errors: -1, warns: -1,
 			setup: func(t *testing.T, root string) {
 				writeFile(t, root, filepath.Join(approved("done"), "i0001.md"), "\ufeff"+ticketOf(copyText, "i0001"))

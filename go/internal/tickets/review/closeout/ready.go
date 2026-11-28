@@ -37,12 +37,12 @@ const (
 	msgNotYet        = "ccnavi: まだ Draft を解除できません:\n"
 	msgNotYetAgain   = "ccnavi: まだ Draft を解除できません（クローズ済みのチケットは logs/archive/ へ退避済み）:\n"
 	msgProblemLine   = "  - %s\n"
-	msgEarlyHint     = "まだ残るものを承知で早めに閉じるなら、ユーザがターミナルで '%s --parent %s --reason <理由>' を実行します。\n"
-	msgParentNotDone = "親 %s の承認済みチケットが %s/%s/ にありません（いまは %s/）。先に '%s finish %s' で親を閉じ、" +
+	msgEarlyHint     = "まだ残るものを承知で早めにクローズするなら、ユーザがターミナルで '%s --parent %s --reason <理由>' を実行します。\n"
+	msgParentNotDone = "親 %s の承認済みチケットが %s/%s/ にありません（いまは %s/）。先に '%s finish %s' で親をクローズし、" +
 		"コミットして push してから再実行してください"
 	msgReadyCheckOK = "確認: ok（ready を打てる状態。何も変えていません）\n"
 	msgFailed       = "ccnavi: %s\n"
-	msgRetireFailed = "ccnavi: 親を閉じた後の片付けの記録を書けないので止めました: %s。直してから ready を打ち直してください\n"
+	msgRetireFailed = "ccnavi: 親をクローズした後の片付けの記録を書けないので止めました: %s。直してから ready を打ち直してください\n"
 	msgArchiveFail  = "ccnavi: クローズ済みのチケットを logs/archive/ へ退避できなかった: %s\n"
 	msgWipFailed    = "ccnavi: `%s/` を片付けられなかった: %s\n"
 	msgMisplaced    = "。クローズ済みのチケットの退避は親のワークツリーの置き場からだけ行う" +
@@ -68,9 +68,9 @@ const (
 // sayWipGone は wip/ から消したものの報告の見出し（件数と、消す前のコミットの先頭 12 字）。
 const sayWipGone = "wip/ の追跡済みのファイルを削除しました（%d 件。削除する前のコミット %s から戻せる）:"
 
-// Ready は、Draft を外してよいかを確かめる。確かめたうえで、マーカーとコメントの下書きを置き、閉じた親子のチケットを手元の `logs/archive/` へ退避し、wip/ の追跡済みのファイルを消す。
+// Ready は、Draft を外してよいかを確かめる。確かめたうえで、マーカーとコメントの下書きを置き、クローズした親子のチケットを手元の `logs/archive/` へ退避し、wip/ の追跡済みのファイルを消す。
 // Draft を外すのは sh の仕事である（write-and-push がコミットして push してから外す）。
-// 条件は、親を閉じられること（closing.CloseProblems）に、親が done/ に在ることを足したものである。
+// 条件は、親をクローズできること（closing.CloseProblems）に、親が done/ に在ることを足したものである。
 //
 // 同じ親に 2 度打っても通る。前の回が退避を始めていれば（MR がまだ Draft）、ワークツリーの側の条件だけを見て、下書きを書き直し、途中で止まった残りを移す。
 func Ready(stdout, stderr io.Writer, conf *config.Settings, root, cwd, resultPath string) (int, error) {
@@ -111,7 +111,7 @@ func Ready(stdout, stderr io.Writer, conf *config.Settings, root, cwd, resultPat
 }
 
 // readyGate は ready の、ホストに聞かずに分かる前提。通れば親。本体と CheckReady が同じものを通る。断るときは
-// 理由のあとに早めに閉じる道と `次:` を足す。MR が Draft かは見ない（sh が取ってくる）。
+// 理由のあとに早めにクローズする道と `次:` を足す。MR が Draft かは見ない（sh が取ってくる）。
 func readyGate(stderr io.Writer, conf *config.Settings, root, cwd string) *ticket.Ticket {
 	parent := request.ParentAny(stderr, conf, root, cwd)
 	if parent == nil {
@@ -148,7 +148,7 @@ func CheckReady(stdout, stderr io.Writer, conf *config.Settings, root, cwd strin
 	return config.ExitOK
 }
 
-// archiveClosed は閉じた親子のチケットを退避へ移し、標準出力に下書きのパスと退避したツリーと wip/ から消したものを
+// archiveClosed はクローズした親子のチケットを退避へ移し、標準出力に下書きのパスと退避したツリーと wip/ から消したものを
 // 出す。拾う親は done/ に在る親と、手元の退避に在る親（前の回が途中で止まった残り）。
 func archiveClosed(stdout, stderr io.Writer, conf *config.Settings, root string, parent *ticket.Ticket, where, notePath string, mr any) int {
 	if misplaced := archivePlaceProblem(conf, root, parent, where); misplaced != "" {
@@ -162,7 +162,7 @@ func archiveClosed(stdout, stderr io.Writer, conf *config.Settings, root string,
 	parents := slices.Concat(archive.ClosedParents(where), archive.ArchivedParents(root, parent.Project))
 	slices.Sort(parents)
 	parents = slices.Compact(parents)
-	// 閉じた子は退避へ移って見えなくなるので、片付けの記録（親のワークツリーを片付けた後の列挙元）を先に書く。
+	// クローズした子は退避へ移って見えなくなるので、片付けの記録（親のワークツリーを片付けた後の列挙元）を先に書く。
 	// 書けなければ退避へ進まない（記録が無いと片付け待ちの親を見失う）。打ち直せる。
 	if noted := retire.Note(conf, root, parent.ID, parent.Project, treeRoot, mr); noted != "" {
 		fmt.Fprintf(stderr, msgRetireFailed, noted)
@@ -215,7 +215,7 @@ func archivePlaceProblem(conf *config.Settings, root string, parent *ticket.Tick
 	return approval.MisplacedHomeText(root, parent.ID, shown) + msgMisplaced
 }
 
-// earlyMark は早めに閉じたマーカーの中身。無い・空なら nil。
+// earlyMark は早めにクローズしたマーカーの中身。無い・空なら nil。
 func earlyMark(approvedDir, parentID string) *pyjson.Object {
 	if mark, ok := marks.ReadFilledParent(approvedDir, parentID, marks.CloseEarly); ok {
 		return mark
@@ -298,7 +298,7 @@ func readyAgain(stdout, stderr io.Writer, conf *config.Settings, root string, pa
 		fmt.Fprint(stderr, msgNoStateNote)
 		return config.ExitError
 	}
-	// 早めに閉じたマーカーは、途中で止まった回ならツリーに、移し終えていれば退避に在る。
+	// 早めにクローズしたマーカーは、途中で止まった回ならツリーに、移し終えていれば退避に在る。
 	where := conf.ApprovedDir(treeRoot)
 	early := earlyMark(where, parent.ID)
 	if early == nil {

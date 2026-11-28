@@ -137,7 +137,7 @@ func applyOne(stage *fsio.Stage, conf *config.Settings, root string, c *candidat
 				names[i] = string(k)
 			}
 			lines := []string{fmt.Sprintf("  %s のフェーズ %d のマーカー（%s）を削除しました。"+
-				"全部閉じたらレビューをもう一度頼むことになる", parent, number, strings.Join(names, ", "))}
+				"全部クローズしたらレビューをもう一度頼むことになる", parent, number, strings.Join(names, ", "))}
 			return append(lines, phase.ReopenImpact(conf, root, parent, number)...)
 		})
 	}

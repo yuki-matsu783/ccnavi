@@ -83,7 +83,7 @@ func revisionProblems(conf *config.Settings, root string, revised, current *tick
 				"設計書を持つ場合は同様です）。収まらない場合は、ユーザによる定義の変更か、" +
 				"別作業への切り出しが必要です。切り出す場合は、" + elsewhere)
 		} else if !phase.PlanFinished(conf, root, current) {
-			errorf("フィードバック計画は、全体計画のフェーズが全部閉じてレビューが済んでから出す。" +
+			errorf("フィードバック計画は、全体計画のフェーズが全部クローズしてレビューが済んでから出す。" +
 				"作業が終わるまで対応は計画できない")
 		}
 	}
@@ -116,7 +116,7 @@ func unreadable(t *ticket.Ticket, why string) rules.Problem {
 	return rules.Problem{Severity: rules.Error, Rule: t.ID, Detail: "範囲の節に、判定が読めない項がある改版は出せない: " + why}
 }
 
-// openChildren はこの親の子で作業中（doing/）のもの。閉じた子とレビュー待ちの子は数えない。数えるのは正とする
+// openChildren はこの親の子で作業中（doing/）のもの。クローズした子とレビュー待ちの子は数えない。数えるのは正とする
 // ツリーの側だけ（子のワークツリーに残った版を数えると、取り消しても改版が通らなくなる）。
 func openChildren(conf *config.Settings, root, parentID string) []string {
 	opened, _ := approval.Scan(conf, root, false, nil)
@@ -130,7 +130,7 @@ func openChildren(conf *config.Settings, root, parentID string) []string {
 	return out
 }
 
-// FixedNumbers はこの親で子が承認された（開いていても閉じていても）番号。改版の錠が固定する番号。
+// FixedNumbers はこの親で子が承認された（開いていてもクローズしていても）番号。改版の錠が固定する番号。
 func FixedNumbers(conf *config.Settings, root, parentID string) map[int]bool {
 	return FixedIn(approval.ReadRaw(conf, root).Everything(), parentID)
 }

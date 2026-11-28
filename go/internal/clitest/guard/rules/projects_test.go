@@ -531,7 +531,7 @@ func TestAChildPlacedApartFromItsParentIsNotApproved(t *testing.T) {
 func TestAProposalInsideAProjectWorktreeIsReadWithoutComplaint(t *testing.T) {
 	t.Parallel()
 	// 提案はそのツリーの wip/proposals/ に置く。プロジェクトのワークツリーの中も普通の置き場で、承認をプロジェクトの git で
-	// 共有するために、そこに置く。置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから引くので閉じられる。
+	// 共有するために、そこに置く。置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから引くのでクローズできる。
 	p := newProjects(t)
 	tree := p.worktree(p.lib, "i0010")
 	// 計画のある親だけが着手できる。定義はプロジェクトの設定（config）に置く。

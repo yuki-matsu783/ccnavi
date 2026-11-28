@@ -662,14 +662,14 @@ func frontmatter(source string) (*yaml.Map, string, []rules.Problem) {
 	return front, body, nil
 }
 
-// DoneCopy は閉じたチケットのコピーの識別子と親。親かどうかは Parent が空かで決める。
+// DoneCopy はクローズしたチケットのコピーの識別子と親。親かどうかは Parent が空かで決める。
 type DoneCopy struct {
 	Ticket string
 	Parent string
 }
 
-// CopyFields は閉じたチケットのコピー（手元の退避・承認済みの done/）から識別子と親だけを取り出す。チケットとしての
-// 検査は掛けない（検査に失敗するチケットでも閉じた記録として読む）。frontmatter が読めなければ偽。
+// CopyFields はクローズしたチケットのコピー（手元の退避・承認済みの done/）から識別子と親だけを取り出す。チケットとしての
+// 検査は掛けない（検査に失敗するチケットでもクローズした記録として読む）。frontmatter が読めなければ偽。
 func CopyFields(source string) (DoneCopy, bool) {
 	front, _, problems := frontmatter(source)
 	if front == nil || len(problems) > 0 {

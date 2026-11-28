@@ -132,7 +132,7 @@ test("CB-T140 blockedは欄がなければ空。失敗しない", () => {
   // 欄が無いのは、この欄より前の実行ファイルの出力。空なら止まっていないと読む。
   const base = JSON.parse(fixtureText()) as Record<string, unknown>;
   const tickets = (base.tickets as Record<string, unknown>[]).map((t) => ({ ...t }));
-  tickets[0].blocked = "親i0001の承認済みチケットが作業中にない（未承認か、閉じている）";
+  tickets[0].blocked = "親i0001の承認済みチケットが作業中にない（未承認か、クローズしている）";
   delete tickets[1].blocked;
 
   const parsed = parseBoardJson(JSON.stringify({ ...base, tickets }));

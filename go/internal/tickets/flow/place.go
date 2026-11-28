@@ -118,7 +118,7 @@ type Info struct {
 	Exists, Linked  bool
 	// LockKind は錠の種類。レビュー中（Review）は着手の有無によらず止め、着手中は Doing。空なら錠は無い。
 	LockKind place.State
-	// Closed は子が閉じている（終わった・取り消した）か。閉じた子の下書きは「提案あり」にしない（DraftDiffers）。
+	// Closed は子がクローズしている（終わった・取り消した）か。クローズした子の下書きは「提案あり」にしない（DraftDiffers）。
 	Closed bool
 	Draft  DraftInfo
 }
@@ -132,7 +132,7 @@ type DraftInfo struct {
 // Locked は錠がかかっているか。
 func (i *Info) Locked() bool { return i.LockKind != "" }
 
-// FlowInfo はボードに出すフローの欄。子でなければ nil。閉じた子でフローが無ければ nil（作っても読まれる
+// FlowInfo はボードに出すフローの欄。子でなければ nil。クローズした子でフローが無ければ nil（作っても読まれる
 // 場面が無い）。Linked はツリーのルートからファイルまでの途中にリンクがあるか（在るときだけ見る）。
 func FlowInfo(conf *config.Settings, root string, child *ticket.Ticket) *Info {
 	if !child.IsChild() {

@@ -73,17 +73,17 @@ func ticketProblems(conf *config.Settings, root string) []rules.Problem {
 		// なる。送信の途中で止まった操作は、チケットが無くても言う。
 		return operationProblems(conf, root, nil, nil)
 	}
-	// 2. 承認済み・閉じた・審査中のチケットを読む。読めないファイルは error にする。
+	// 2. 承認済み・クローズした・審査中のチケットを読む。読めないファイルは error にする。
 	problems := approvedGuarded(conf)
 	raw := approval.ReadRaw(conf, root)
 	copies, notes := approval.Scan(conf, root, false, raw)
 	closed, closedNotes := approval.Scan(conf, root, true, raw)
 	review, reviewNotes := approval.ScanReview(conf, root, raw)
-	// 閉じた承認済みチケットの苦情も拾う。判定は閉じたものを読まないが、読めないファイルが残っていると他の機械へそのまま届く。
+	// クローズした承認済みチケットの苦情も拾う。判定はクローズしたものを読まないが、読めないファイルが残っていると他の機械へそのまま届く。
 	for _, note := range slices.Concat(notes, closedNotes, reviewNotes) {
 		problems = append(problems, ticketProblem(rules.Error, note))
 	}
-	// done は閉じた・審査中の識別子。todo/ に同じ識別子が残っていないかを見るために使う。
+	// done はクローズした・審査中の識別子。todo/ に同じ識別子が残っていないかを見るために使う。
 	index := approval.ByID(copies)
 	done := map[string]bool{}
 	for _, t := range slices.Concat(closed, review) {
@@ -96,7 +96,7 @@ func ticketProblems(conf *config.Settings, root string) []rules.Problem {
 	problems = append(problems, read.Problems...)
 	problems = append(problems, staleProblems(conf, root, read.Stale, index, done)...)
 	problems = append(problems, copyProblems(conf, root, copies, index, closed, raw)...)
-	// 閉じた・レビュー待ちの親にも issue と MR のセットを求める（doing の親は copyProblems が見る）。
+	// クローズした・レビュー待ちの親にも issue と MR のセットを求める（doing の親は copyProblems が見る）。
 	for _, t := range slices.Concat(review, closed) {
 		for _, p := range approval.MRProblems(t) {
 			problems = append(problems, ticketProblem(rules.Error, t.ID+": "+p.Detail))
@@ -257,7 +257,7 @@ func operationProblems(conf *config.Settings, root string, copies, review []*tic
 	for _, child := range review {
 		if child.IsChild() && child.FinishedTo == "" {
 			out = append(out, ticketProblem(rules.Info, child.ID+": review/ の子に `finished_to` が無い（`finish` を通らずに"+
-				"閉じた子）。手で done/ に動かしても確定できないので、confirm か decide を使う"))
+				"クローズした子）。手で done/ に動かしても確定できないので、confirm か decide を使う"))
 		}
 	}
 	if conf.GuardTicketApproval == string(config.Disable) && conf.GuardCoreFiles == string(config.Disable) {
@@ -320,7 +320,7 @@ func approvedGuarded(conf *config.Settings) []rules.Problem {
 }
 
 // approvalProblems は承認で失敗するものを承認の前に名指しする。承認と同じ関数（candidates.Candidates）を通し、
-// 同じ事実を数える経路を 2 本にしない。「まだ承認できない」（前のフェーズが閉じていない子）だけは warn にする。
+// 同じ事実を数える経路を 2 本にしない。「まだ承認できない」（前のフェーズがクローズしていない子）だけは warn にする。
 // --lint の終了コードは設定画面の保存と CI に使われるので、編集と関わりのない提案 1 本で止めない（承認は error のまま）。
 func approvalProblems(conf *config.Settings, root string, proposals, copies, closed, review []*ticket.Ticket) []rules.Problem {
 	pending, revisions := agree.Waiting(proposals, copies, closed, review)
@@ -353,7 +353,7 @@ func approvalSaid(id string, p rules.Problem) rules.Problem {
 // spot はチケットの在りか（リポジトリ・ツリー・状態）。
 type spot struct{ repo, at, state string }
 
-// proposalProblems は提案の側。承認待ち、先行が閉じていない着手済み、同じ識別子の重複。同じ識別子が別のツリーに在る
+// proposalProblems は提案の側。承認待ち、先行がクローズしていない着手済み、同じ識別子の重複。同じ識別子が別のツリーに在る
 // のは普通（承認済みチケットは git で共有し、ワークツリーはそれぞれ別のコミットを指す）なので、error にするのは
 // 1 つのツリーの中で 2 つの状態に在る形（ticket.Collisions）と、リポジトリをまたいだ形（違うチケットどうしの衝突）だけ。
 func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map[string]*ticket.Ticket, closed []*ticket.Ticket,
@@ -378,7 +378,7 @@ func proposalProblems(root string, proposals, copies []*ticket.Ticket, index map
 		seen[t.ID] = append(seen[t.ID], placeOf(t, state))
 		held[t.ID] = append(held[t.ID], t)
 	}
-	// state が空のチケットは、承認済みなら doing、閉じたなら done として数える。
+	// state が空のチケットは、承認済みなら doing、クローズしたなら done として数える。
 	for _, t := range copies {
 		hold(t, stateOr(t.State, place.Doing))
 	}
@@ -493,7 +493,7 @@ func relToRoot(root, path string) string {
 }
 
 // staleProblems は正とするツリーの外に残った、承認済みの識別子の todo/ の提案。言うのは計画の違う親の版（書く場所を
-// 案内する。文は --agree と同じ）と、閉じたかレビュー待ちの識別子の todo/ だけ。計画の同じ古い提案は、承認の前に
+// 案内する。文は --agree と同じ）と、クローズしたかレビュー待ちの識別子の todo/ だけ。計画の同じ古い提案は、承認の前に
 // 切ったワークツリーに残る普通の形なので言わない。
 func staleProblems(conf *config.Settings, root string, stale []approval.Stale, index map[string]*ticket.Ticket, done map[string]bool) []rules.Problem {
 	var out []rules.Problem
@@ -514,7 +514,7 @@ func staleProblems(conf *config.Settings, root string, stale []approval.Stale, i
 }
 
 func closedTodoText(id, rel string) string {
-	return id + " は閉じたかレビュー待ちなのに todo/ にも在る（" + rel + "）。todo/ の側は承認の対象にならない。" +
+	return id + " はクローズしたかレビュー待ちなのに todo/ にも在る（" + rel + "）。todo/ の側は承認の対象にならない。" +
 		"再開するには、ユーザが承認済みチケットを戻す"
 }
 

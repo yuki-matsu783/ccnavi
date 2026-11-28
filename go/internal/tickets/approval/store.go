@@ -102,7 +102,7 @@ func stateOf(directory string, t *ticket.Ticket) place.State {
 	return name
 }
 
-// UnreadableCopies はそのツリーの読めない承認済みチケット（作業中・閉じた・レビュー待ち）。
+// UnreadableCopies はそのツリーの読めない承認済みチケット（作業中・クローズした・レビュー待ち）。
 func UnreadableCopies(conf *config.Settings, treeRoot string) []Unread {
 	approved := conf.ApprovedDir(treeRoot)
 	var out []Unread
@@ -120,7 +120,7 @@ func UnreadableCopies(conf *config.Settings, treeRoot string) []Unread {
 	return out
 }
 
-// ScanAll は全ツリーの承認済みチケット（closed なら閉じたもの）を、重複をまとめずに集める。子のワークツリーにも
+// ScanAll は全ツリーの承認済みチケット（closed ならクローズしたもの）を、重複をまとめずに集める。子のワークツリーにも
 // 同じものが checkout されているので、まとめないほうはボードが「どこにコピーがあるか」を見せるのに使う。
 func ScanAll(conf *config.Settings, root string, closed bool) ([]*ticket.Ticket, []string) {
 	state := place.Doing
@@ -156,7 +156,7 @@ func reviewAll(conf *config.Settings, root string) ([]*ticket.Ticket, []string) 
 	return found, notes
 }
 
-// Raw は、全ツリーの承認済みチケット（作業中・閉じた・レビュー待ち）を、まとめる前のまま読んだもの。
+// Raw は、全ツリーの承認済みチケット（作業中・クローズした・レビュー待ち）を、まとめる前のまま読んだもの。
 // 1 回の判定の中で Scan を続けて呼ぶ呼び手が、同じ置き場を何度も読まないために持ち回る。
 // 覚えておいたものではなく、その呼び出しの中で今しがた読んだもの。判定の途中でファイルが動く経路では、読み直す。
 type Raw struct {
@@ -168,7 +168,7 @@ type Raw struct {
 	reviewNotes []string
 }
 
-// Everything は作業中・閉じた・レビュー待ちの全部（正とするツリーを決めるのに使う）。
+// Everything は作業中・クローズした・レビュー待ちの全部（正とするツリーを決めるのに使う）。
 func (r *Raw) Everything() []*ticket.Ticket {
 	out := make([]*ticket.Ticket, 0, len(r.open)+len(r.closed)+len(r.review))
 	out = append(out, r.open...)
@@ -185,9 +185,9 @@ func ReadRaw(conf *config.Settings, root string) *Raw {
 	return r
 }
 
-// Scan は、判定と承認が読む承認済みチケットを返す（closed なら閉じたもの）。raw が nil なら読む。
+// Scan は、判定と承認が読む承認済みチケットを返す（closed ならクローズしたもの）。raw が nil なら読む。
 // 正とするツリー（親のツリー）の側だけを残し、そこに無ければ外す。
-// 子のワークツリーに checkout されているのは切った時点の版なので、残すと閉じたチケットが開いたものとして復活してしまう。
+// 子のワークツリーに checkout されているのは切った時点の版なので、残すとクローズしたチケットが開いたものとして復活してしまう。
 // 作業中の側には、blockingProblems と親子のチケットの立ち位置から、信頼できない理由（Blocked）を付ける。
 // 置き場を手で動かす承認は --agree を通らないため。
 func Scan(conf *config.Settings, root string, closed bool, raw *Raw) ([]*ticket.Ticket, []string) {
@@ -216,13 +216,13 @@ func ScanReview(conf *config.Settings, root string, raw *Raw) ([]*ticket.Ticket,
 	return kept, append([]string(nil), raw.reviewNotes...)
 }
 
-// Approved は作業中・閉じた・レビュー待ちの承認済みチケット（Scan と ScanReview の答え）。親子を引くだけの呼び手が、
+// Approved は作業中・クローズした・レビュー待ちの承認済みチケット（Scan と ScanReview の答え）。親子を引くだけの呼び手が、
 // 3 つの置き場を読む手順を繰り返さずに、1 回読んだ結果を持ち回る。
 type Approved struct {
 	Open, Closed, Review []*ticket.Ticket
 }
 
-// ScanApproved は Scan（作業中・閉じた）と ScanReview を、同じ raw から続けて求める。raw が nil なら読む。
+// ScanApproved は Scan（作業中・クローズした）と ScanReview を、同じ raw から続けて求める。raw が nil なら読む。
 func ScanApproved(conf *config.Settings, root string, raw *Raw) *Approved {
 	if raw == nil {
 		raw = ReadRaw(conf, root)
@@ -233,7 +233,7 @@ func ScanApproved(conf *config.Settings, root string, raw *Raw) *Approved {
 	return &Approved{open, closed, review}
 }
 
-// All は作業中・閉じた・レビュー待ちの順に並べたもの。
+// All は作業中・クローズした・レビュー待ちの順に並べたもの。
 func (a *Approved) All() []*ticket.Ticket { return slices.Concat(a.Open, a.Closed, a.Review) }
 
 // authoritative は、正とするツリーの側だけを残す。決め方は ticket.Authority の 1 つで、承認済みの識別子の提案も同じ関数で決める。

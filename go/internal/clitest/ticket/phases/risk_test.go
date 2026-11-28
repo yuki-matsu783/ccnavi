@@ -16,7 +16,7 @@ import (
 //
 //  1. 差分から点を数える（行数・ファイル数・消したファイル）
 //  2. スクリプトの項目（点を受け取る。測れなければ重いほうとして扱う）
-//  3. 定性の項目（判定が揃うまで閉じられない。judge で記録。HEAD が動けば取り直し）
+//  3. 定性の項目（判定が揃うまでクローズできない。judge で記録。HEAD が動けば取り直し）
 //  4. HIGH 以上なら宣言に関わらずレビューが要る（レビューで止まり、依頼文にリスクの行が載る）
 //  5. --lint が不正な定義を言い、不正なら組み込みに戻る
 
@@ -155,7 +155,7 @@ func TestAJudgeFactorBlocksDoneUntilRecorded(t *testing.T) {
 	tree := r.oneChild(samples.On)
 	refused := r.ccnavi("ticket", "finish", "i0001-01-01")
 	if refused.Code == 0 {
-		t.Fatal("判定が無いのに閉じられた")
+		t.Fatal("判定が無いのにクローズできた")
 	}
 	contains(t, "stderr", refused.Stderr, "untested", "judge")
 	contains(t, "判定の依頼", ticketkit.Read(t, filepath.Join(r.state, "risk-judge-i0001-01-01.md")), "テストの無い振る舞いの変更を含むか", "wip/research/summary.md")
@@ -170,7 +170,7 @@ func TestAJudgeFactorBlocksDoneUntilRecorded(t *testing.T) {
 	r.git(tree, "commit", "--quiet", "-m", "later")
 	stale := r.ccnavi("ticket", "finish", "i0001-01-01")
 	if stale.Code == 0 || !strings.Contains(stale.Stderr, "untested") {
-		t.Errorf("古い判定で閉じられた: code %d\n%s", stale.Code, stale.Stderr)
+		t.Errorf("古い判定でクローズできた: code %d\n%s", stale.Code, stale.Stderr)
 	}
 	r.mustOK(r.ccnavi("ticket", "record-risk", "i0001-01-01", "untested", "no", "--reason", "テストを足した"), "record-risk no")
 	r.mustOK(r.ccnavi("ticket", "finish", "i0001-01-01"), "finish")
@@ -186,7 +186,7 @@ func TestAJudgeFactorBlocksDoneUntilRecorded(t *testing.T) {
 func TestARiskFlagOnTicketFinishDoesNotChangeTheScore(t *testing.T) {
 	t.Parallel()
 	// `ticket finish <子> --risk <別の配点>` は採点を差し替えない（issue #65）。`ccnavi-ticket.sh` が引数をそのまま
-	// 渡すので、この形はエージェントが Bash で打てる。通していた頃は、重い変更を軽い配点で閉じられた。
+	// 渡すので、この形はエージェントが Bash で打てる。通していた頃は、重い変更を軽い配点でクローズできた。
 	// `--risk ""` も同じ。空は「配点を持たない」の意味で通っていた。
 	cheap := "version: 1\nlevels: {medium: 20, high: 40, critical: 70}\nfactors: []\n"
 	for _, c := range []struct {
@@ -224,7 +224,7 @@ func TestASecondRootOnTicketFinishIsRefused(t *testing.T) {
 	if refused.Code == 0 || !strings.Contains(refused.Stderr, "--root は 1 度しか渡せない") {
 		t.Errorf("code %d\n%s", refused.Code, refused.Stderr)
 	}
-	// 止まったことを、結末の側でも見る。閉じても記録を残してもいない。
+	// 止まったことを、結末の側でも見る。クローズしても記録を残してもいない。
 	if !r.isApproved("i0001-01-01") {
 		t.Error("doing/ から動いた")
 	}

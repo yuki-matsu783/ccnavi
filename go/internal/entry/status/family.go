@@ -69,7 +69,7 @@ func treeLabel(t *ticket.Ticket) string { return cmp.Or(t.Tree, workspaceLabel) 
 //
 // 処理フロー:
 //  1. 複数の場所にあるものは、正しい 1 件を特定できないので、状態を変えられないと言って終える
-//  2. 置き場から決まる行（承認待ち・閉じた）を先に出して終える
+//  2. 置き場から決まる行（承認待ち・クローズした）を先に出して終える
 //  3. 着手の状態を出す。レビュー待ちは依頼の前後で次の操作が違う。作業中は doing が止まる理由と次の一手を決める
 func (f *familyView) describe(e *entry, revision bool) []string {
 	t := e.t()
@@ -120,14 +120,14 @@ func (f *familyView) describe(e *entry, revision bool) []string {
 			if t.CancelReason != "" {
 				why = "。理由: " + t.CancelReason
 			}
-			lines = append(lines, "    閉じ方: 取り消し（"+t.CancelledAt+why+"）")
+			lines = append(lines, "    クローズの仕方: 取り消し（"+t.CancelledAt+why+"）")
 		} else {
 			// 合流（finish が親のブランチへ取り込んだ子の先頭）。子だけが持つ。
 			merged := ""
 			if t.MergedSHA != "" {
 				merged = "、合流 " + pyfmt.Head(t.MergedSHA, git.ShortSHA)
 			}
-			lines = append(lines, "    閉じ方: 完了（"+cmp.Or(t.CompletedAt, "時刻なし")+merged+"）")
+			lines = append(lines, "    クローズの仕方: 完了（"+cmp.Or(t.CompletedAt, "時刻なし")+merged+"）")
 		}
 		return append(lines, "    置き場のファイル: "+file.label())
 	}
@@ -224,7 +224,7 @@ func (f *familyView) doing(t *ticket.Ticket, file fileState) []string {
 	case t.IsChild():
 		nexts = append(nexts, "作業を進め、終えたら '"+f.ticketSh+" finish "+t.ID+"' を実行する"+parentOnly)
 	default:
-		nexts = append(nexts, "子を進める。全部のフェーズを閉じたら '"+f.ticketSh+" finish "+t.ID+"' を実行する"+parentOnly)
+		nexts = append(nexts, "子を進める。全部のフェーズをクローズしたら '"+f.ticketSh+" finish "+t.ID+"' を実行する"+parentOnly)
 	}
 	for _, n := range nexts {
 		lines = append(lines, "    次の操作: "+n)

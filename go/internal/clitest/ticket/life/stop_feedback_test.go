@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// フィードバック計画待ちのまま終えようとしたときの促し（NUDGE_TICKET_FEEDBACK）。全体計画のレビューが済んだ親は、閉じる前に
+// フィードバック計画待ちのまま終えようとしたときの促し（NUDGE_TICKET_FEEDBACK）。全体計画のレビューが済んだ親は、クローズする前に
 // フィードバック計画が要る。局面が「フィードバック計画待ち」の親のツリーで終えようとしたとき、1 回だけ止めて次の一手を返す。
 
 func askedFeedback(t *testing.T, r run.Result) string {

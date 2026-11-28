@@ -7,7 +7,7 @@ package flow
 //  2. 着手中の子のフローへの書き込みを止める。解いたパスと解く前のパスの両方で。着手の前と、終わった後は止めない
 //  3. SubagentStart がフローのファイルを名指しし、手順と、askUserQuestion / subAgent のノードでの動き方を渡す。
 //     フローが不正でも残りの文は渡す
-//  4. --explain --json の子に flow の欄が出る（ボードが読む）。閉じた子でフローが無ければ出さない
+//  4. --explain --json の子に flow の欄が出る（ボードが読む）。クローズした子でフローが無ければ出さない
 //  5. 入れ子のサブエージェントが差し戻しを無視して終わったら、systemMessage にも載せる
 //  6. エージェントの下書き（wip/proposals/flows/<子>.yml）は書ける。効力は無く、SubagentStart も着手のハッシュも
 //     読まない。置き場と有無は flow.draft に出る
@@ -194,13 +194,13 @@ func TestTheLockIsReleasedWhenTheChildFinishes(t *testing.T) {
 	}
 	ticketkit.OK(t, tr.CloseChild(flowChild))
 	tr.assertNotLocked(tr.writeTo(tr.flowPath(), writeOpts{}))
-	// finish でレビュー待ちに入った子は、ボードでは閲覧だけ（閉じるまで編集させない）。
+	// finish でレビュー待ちに入った子は、ボードでは閲覧だけ（クローズするまで編集させない）。
 	if !jb(tr.boardFlow(flowChild), "locked") {
 		t.Error("レビュー待ちの子の flow が locked でない")
 	}
 }
 
-// 取り消して閉じた子でも、フローが在れば欄を出す（見返せる）。無ければ出さない。
+// 取り消してクローズした子でも、フローが在れば欄を出す（見返せる）。無ければ出さない。
 func TestAClosedChildShowsTheFlowOnlyWhenItExists(t *testing.T) {
 	t.Parallel()
 	tr := flowTree(t)

@@ -217,7 +217,7 @@ func TestStopWithoutRulesMatchesGolden(t *testing.T) {
 	compare(t, "stop-empty", root, []diagCase{{Kind: "test", Tool: "Stop", Subject: "(stop)"}})
 }
 
-// boardWorkspace は親 1 本（research → design）と子 3 枚（着手中・閉じた・承認待ち）と、承認済みの無い提案の親の場面。
+// boardWorkspace は親 1 本（research → design）と子 3 枚（着手中・クローズした・承認待ち）と、承認済みの無い提案の親の場面。
 func boardWorkspace(t *testing.T) string {
 	t.Helper()
 	root := testkit.ProposalWorkspace(t, "i0001", "i0001-01-01")

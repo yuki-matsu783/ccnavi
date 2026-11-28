@@ -58,7 +58,7 @@ func FamilyStanding(conf *config.Settings, root string, t *ticket.Ticket, fams *
 // markImported は、親子のチケットのうち、信頼できないものに理由を足す。
 // 正とするのは、親のブランチ（親のワークツリー）の上のチケットだけ。
 // 親子のチケットが決まらないものと、親のワークツリーの外にしか無いものは、読むが信頼しない。
-// リストからは外さない。外すと、「在る」ことで止まっていたもの（承認待ちの重複、開いた子のある親を閉じない）が通ってしまう。
+// リストからは外さない。外すと、「在る」ことで止まっていたもの（承認待ちの重複、開いた子のある親をクローズしない）が通ってしまう。
 func markImported(conf *config.Settings, root string, kept []*ticket.Ticket) {
 	fams := standing.NewFamilies(conf, root)
 	for _, t := range kept {
@@ -86,7 +86,7 @@ func outsideReason(st standing.Standing, t *ticket.Ticket) string {
 		"元のチケットを削除します。"
 }
 
-// FamilyProblems は親子のチケットの提案を承認しない理由。親子のチケットが決まらない・閉じているとき、提案が
+// FamilyProblems は親子のチケットの提案を承認しない理由。親子のチケットが決まらない・クローズしているとき、提案が
 // 親のワークツリーの外にあるとき（提案は親のブランチの上で書き、approval-request で送ってから承認を頼む決まり）。
 func FamilyProblems(conf *config.Settings, root string, t *ticket.Ticket, fams *standing.Families) []rules.Problem {
 	st := FamilyStanding(conf, root, t, fams)
@@ -322,7 +322,7 @@ func blockingProblems(conf *config.Settings, t *ticket.Ticket, pool map[string]*
 			problems = append(problems, problem(t, mark))
 		}
 	} else {
-		missing := "親 " + t.Parent + " の承認済みチケットが作業中にありません（未承認か、閉じている）"
+		missing := "親 " + t.Parent + " の承認済みチケットが作業中にありません（未承認か、クローズしている）"
 		problems = append(problems, ChildProblems(t, pool[t.Parent], missing)...)
 	}
 	var out []rules.Problem
@@ -350,7 +350,7 @@ func contentProblems(t *ticket.Ticket) []rules.Problem {
 	return append(out, phases.Errors(t)...)
 }
 
-// ResumedFields は作業中（doing/）なのに値が残っている、閉じるときに書く欄の名前。道具を通る限り残らない
+// ResumedFields は作業中（doing/）なのに値が残っている、クローズするときに書く欄の名前。道具を通る限り残らない
 // （done/ から doing/ へ手で戻した再開の形）。判定では止めず、--lint が warn で言う。
 func ResumedFields(t *ticket.Ticket) []string {
 	var out []string
@@ -372,7 +372,7 @@ func ResumedFields(t *ticket.Ticket) []string {
 // markBlocked は、判定が読む承認済みチケットに、信頼できない理由（blockingProblems の最初）を付ける。
 // 実行前・実行後・サブエージェント終了時の 3 か所が、この理由を同じ答えで読む。別々に検査すると、実行前は通って実行後に
 // 範囲外と報告される食い違いが起きる。
-// 親を引く対応表は kept そのものを使う。判定が parent を引く索引と同じにするため。閉じた親まで引ける対応表にすると、
+// 親を引く対応表は kept そのものを使う。判定が parent を引く索引と同じにするため。クローズした親まで引ける対応表にすると、
 // 判定の側では親が見つからず、子の宣言だけで範囲が決まってしまう。
 func markBlocked(conf *config.Settings, kept []*ticket.Ticket) {
 	pool := ByID(kept)

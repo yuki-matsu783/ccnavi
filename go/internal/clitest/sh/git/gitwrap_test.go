@@ -249,7 +249,7 @@ func TestGitWrapPushFromAChildTicketWorktreeIsRejected(t *testing.T) {
 	git(t, w.dir, "remote", "add", "origin", bare)
 	shkit.Write(t, w.join(".ccnavi", "approved", "doing", "i0001.md"), "---\nversion: 1\nticket: i0001\n---\n")
 	shkit.Write(t, w.join(".ccnavi", "approved", "doing", "i0001-01-01.md"), "---\nversion: 1\nticket: i0001-01-01\nparent: i0001\nphase: 1\n---\n")
-	// 閉じた子。承認済みチケットは done/ に動いているが、ツリーはまだ子のもの。
+	// クローズした子。承認済みチケットは done/ に動いているが、ツリーはまだ子のもの。
 	shkit.Write(t, w.join(".ccnavi", "approved", "done", "i0001-01-02.md"), "---\nversion: 1\nticket: i0001-01-02\nparent: i0001\nphase: 1\n---\n")
 	trees := map[string]string{}
 	for _, name := range []string{"i0001", "i0001-01-01", "i0001-01-02", "free"} {

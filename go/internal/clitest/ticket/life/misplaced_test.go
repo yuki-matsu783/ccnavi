@@ -99,7 +99,7 @@ func TestStartAndFinishStopWhenTheApprovedTicketIsInAnotherWorktree(t *testing.T
 		moveApprovedTo(tr, stray)
 		r := ticketkit.Fails(t, tr.Ccnavi("ticket", "finish", "i0001"))
 		ticketkit.Has(t, ticketkit.Out(r), "ワークツリーの外")
-		// 止めたので、閉じたチケットは別名のツリーの doing/ に残る（done/ へ動かない）。
+		// 止めたので、クローズしたチケットは別名のツリーの doing/ に残る（done/ へ動かない）。
 		if !ticketkit.Exists(filepath.Join(stray, ".ccnavi", "approved", "doing", "i0001.md")) {
 			t.Error("別名のツリーの doing/ から消えた")
 		}

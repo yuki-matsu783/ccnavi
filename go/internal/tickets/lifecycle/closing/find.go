@@ -203,7 +203,7 @@ func FamilyStopped(stderr io.Writer, conf *config.Settings, root string, t *tick
 }
 
 // ParentNotStarted は子に着手してはいけないとき（親が承認されていない・作業中でない・未着手）に言って真。
-// 親の start を飛ばすと親を閉じるときまで気付けないので、最初の子の着手で止める。
+// 親の start を飛ばすと親をクローズするときまで気付けないので、最初の子の着手で止める。
 func ParentNotStarted(stderr io.Writer, conf *config.Settings, root string, t *ticket.Ticket) bool {
 	if !t.IsChild() {
 		return false
@@ -228,7 +228,7 @@ func ParentNotStarted(stderr io.Writer, conf *config.Settings, root string, t *t
 		fmt.Fprintf(stderr, "%sがまだ承認されていない（todo/）。先にユーザに 'ccnavi-user-agree.sh' を通してもらい、"+
 			"'%s start %s' で開始してください\n", head, ticketSh, t.Parent)
 	case parent.State != place.Doing:
-		// review/ に親があるのは不整合なデータのときだけで、「閉じた」と言うと事実と違う。置き場だけを言う。
+		// review/ に親があるのは不整合なデータのときだけで、「クローズした」と言うと事実と違う。置き場だけを言う。
 		fmt.Fprintf(stderr, "%sは作業中ではない（いまは %s/）。子を足せる親ではない\n", head, parent.State)
 	case parent.StartedAt == "":
 		fmt.Fprintf(stderr, "%sが未着手（%s/）。子より先に親を開始してください。\n  '%s start %s'\n",
@@ -259,7 +259,7 @@ func PredecessorsUnmet(stderr io.Writer, conf *config.Settings, root string, t *
 		}
 	}
 	if waiting {
-		fmt.Fprintf(stderr, "  先行を先に閉じてください（作業中なら '%s finish <先行>'。"+
+		fmt.Fprintf(stderr, "  先行を先にクローズしてください（作業中なら '%s finish <先行>'。"+
 			"レビューが必要ならユーザのレビューが済んで done/ に入るまで待つ）\n", ticketSh)
 	}
 	if stuck {

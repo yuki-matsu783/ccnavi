@@ -152,7 +152,7 @@ func textOf(value any) string {
 	return pyfmt.Str(value)
 }
 
-// unreadableClosed は親のワークツリーの閉じた承認済みチケットのうち読めないもの（理由の文）。読めない閉じた子は
+// unreadableClosed は親のワークツリーのクローズした承認済みチケットのうち読めないもの（理由の文）。読めないクローズした子は
 // 子の一覧に入らず、そのまま退避へ進むと片付けの対象から知らないうちに外れる。
 func unreadableClosed(conf *config.Settings, root, treeRoot string) []string {
 	if treeRoot == "" {
@@ -171,12 +171,12 @@ func unreadableClosed(conf *config.Settings, root, treeRoot string) []string {
 
 // Note は ready が子のチケットを退避へ移す前に片付けの記録を書く。答えは書けなかった理由（書けたら空）。
 //
-// 記録は `retire/<親>.json`（親・リポジトリ・ブランチ・MR の番号・閉じた子の一覧）。前の回（途中で止まった）の
+// 記録は `retire/<親>.json`（親・リポジトリ・ブランチ・MR の番号・クローズした子の一覧）。前の回（途中で止まった）の
 // 一覧には足し、同じ子は今回の値で置き換える。mr が無ければ前の回の値を保つ。書かずに理由を返すのは、記録の
-// 置き場が無いとき、前の回の記録が壊れているとき、読めない閉じたチケットがあるとき。呼び手（ready）は理由が
+// 置き場が無いとき、前の回の記録が壊れているとき、読めないクローズしたチケットがあるとき。呼び手（ready）は理由が
 // あれば退避へ進まずに止める。mr は書かれたままの値（型は問わない。nil は無し）。
 func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any) string {
-	// 1. 書ける状態か。壊れた記録は上書きしない（直すかユーザが消す）。読めない閉じたチケットがあれば、子の一覧が欠けるので書かない。
+	// 1. 書ける状態か。壊れた記録は上書きしない（直すかユーザが消す）。読めないクローズしたチケットがあれば、子の一覧が欠けるので書かない。
 	path := recordPath(conf, parent)
 	if path == "" {
 		return "state の置き場が空なので、片付けの記録を書けない"
@@ -186,10 +186,10 @@ func Note(conf *config.Settings, root, parent, project, treeRoot string, mr any)
 		return "既存の片付けの記録 " + path + " を読めない（" + broken + "）。上書きしないので、直すか消してから打ち直す"
 	}
 	if unread := unreadableClosed(conf, root, treeRoot); len(unread) > 0 {
-		return "読めない閉じたチケットがあり、片付ける子の一覧に入らない（" + strings.Join(unread[:min(len(unread), 3)], "; ") +
+		return "読めないクローズしたチケットがあり、片付ける子の一覧に入らない（" + strings.Join(unread[:min(len(unread), 3)], "; ") +
 			"）。直してから打ち直す"
 	}
-	// 2. 子の一覧を作る。前の回の記録の子に、今回閉じた子を足す。同じ子は今回の値で置き換える。
+	// 2. 子の一覧を作る。前の回の記録の子に、今回クローズした子を足す。同じ子は今回の値で置き換える。
 	children := map[string]any{}
 	if list, ok := held.Value(keyChildren).([]any); ok {
 		for _, c := range list {

@@ -29,7 +29,7 @@ const (
 	childDirty    ChildState = "未コミットあり"
 )
 
-// Row はこのPCに親のワークツリーがある、まだ閉じていない親 1 本。mr は親チケットの `mr:`（無ければ空）。
+// Row はこのPCに親のワークツリーがある、まだクローズしていない親 1 本。mr は親チケットの `mr:`（無ければ空）。
 // unsent は origin に送っていないものの言い方（無ければ空）。
 type Row struct {
 	Ident     string
@@ -41,7 +41,7 @@ type Row struct {
 	project   string
 }
 
-// Collect はこのPCに親のワークツリーがある、まだ閉じていない親の一覧。識別子の順。先行の引き方は承認と lint と
+// Collect はこのPCに親のワークツリーがある、まだクローズしていない親の一覧。識別子の順。先行の引き方は承認と lint と
 // 同じ（PoolOf に AlignImported を当てる）。
 func Collect(conf *config.Settings, root string, doing, review, closed, proposals []*ticket.Ticket) []Row {
 	// 1. 親を集める。作業中・レビュー中の親と、承認待ち（todo/）の提案の親。同じ識別子は最初のものを採る。

@@ -20,7 +20,7 @@ const (
 	OpsDir = "ops"
 	// DirectPrefix は直接作業の候補の記録の名前の頭（directcand。`direct-<セッション>.json`）。
 	DirectPrefix = "direct-"
-	// ArchiveName は閉じた親子のチケットの退避の置き場の名前（place.archiveName。logs/ の下）。自己防衛が守る。
+	// ArchiveName はクローズした親子のチケットの退避の置き場の名前（place.archiveName。logs/ の下）。自己防衛が守る。
 	ArchiveName = "archive"
 	// WipRoot と HandoffName は下書きの置き場 wip/handoff の 2 階層（place.WipRoot・place.Handoff）。
 	WipRoot     = "wip"

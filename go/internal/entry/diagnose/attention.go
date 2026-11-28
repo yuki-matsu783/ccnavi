@@ -63,7 +63,7 @@ func attention(r *ticketRow, parents map[string]*parentRow, pending map[string]b
 			}
 		}
 	}
-	// 提案が無く閉じた承認済みチケットは完了・取り消しの列。それ以外は承認待ちか進行中の列。
+	// 提案が無くクローズした承認済みチケットは完了・取り消しの列。それ以外は承認待ちか進行中の列。
 	openColumn := r.hasProposal || r.status != statusClosed
 	if pending[r.id] || (own != nil && (own.gateClosed || own.reviewWaiting)) || (openColumn && !r.worktree) ||
 		highRisk(r) || r.scattered || hasIssues {

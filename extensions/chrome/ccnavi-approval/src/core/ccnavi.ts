@@ -18,7 +18,7 @@ export interface Placement {
   /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの */
   readonly workspace_paths: readonly string[];
   readonly workspace_files: readonly string[];
-  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの設定） */
+  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（クローズしたもの・プロジェクトの設定） */
   readonly project_paths: readonly string[];
 }
 

@@ -69,7 +69,7 @@ const (
 	// WipRoot は途中の作業の置き場。マージの前に全体を消す。
 	WipRoot = config.WipRoot
 
-	// archiveName は閉じた親子のチケットの退避の置き場の名前（logs/ の下）。
+	// archiveName はクローズした親子のチケットの退避の置き場の名前（logs/ の下）。
 	archiveName = config.ArchiveName
 	// PhasesDir・FlowsDir は承認済みの領域の下の、マーカーと子のフローの置き場。
 	PhasesDir = "phases"
@@ -109,7 +109,7 @@ func LeavesOpenState(rel, ticketsRel, approvedRel string) bool {
 	return under(rel, approvedRel+"/"+string(Doing)) || under(rel, ticketsRel+"/"+string(Review))
 }
 
-// LandsInFinishedState は finish と cancel がチケットを動かす先（レビュー待ちと閉じた置き場）か。
+// LandsInFinishedState は finish と cancel がチケットを動かす先（レビュー待ちとクローズした置き場）か。
 // doing/ から todo/ へ置き直す形を移動と読まないよう、行き先をこの 2 つに絞る。
 func LandsInFinishedState(rel, ticketsRel, approvedRel string) bool {
 	return under(rel, ticketsRel+"/"+string(Review)) || under(rel, approvedRel+"/"+string(Done))

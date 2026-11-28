@@ -377,7 +377,7 @@ func (k *kit) rawShim(name, text string) string {
 	return dir + string(os.PathListSeparator) + os.Getenv(env.Path)
 }
 
-// finishPhaseOne はフェーズ 1 の子を着手して閉じる。
+// finishPhaseOne はフェーズ 1 の子を着手してクローズする。
 func (k *kit) finishPhaseOne() {
 	t := k.t
 	okRun(t, k.ticket("start", parentID))

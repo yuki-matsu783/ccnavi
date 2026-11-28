@@ -103,7 +103,7 @@ func TestScenesMatchGolden(t *testing.T) {
 		return plain(t, AnswerJSON(m, why).With("template", tmpl), root)
 	}
 
-	// ready で閉じて退避済みの親は読まない。
+	// ready でクローズして退避済みの親は読まない。
 	root, conf := sceneRoot(t)
 	testkit.Put(t, filepath.Join(root, "logs", "archive", "self", "done", "i0010.md"), parent("i0010", ""))
 	add("退避済みの親", root, make1(t, conf, root, Request{Parent: "i0010"}))

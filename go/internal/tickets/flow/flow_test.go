@@ -185,7 +185,7 @@ func TestInfo(t *testing.T) {
 		c.TreeRoot, c.State = root, state
 		return c
 	}
-	// 閉じた子でフローが無ければ欄を出さない（「フローを作る」を出させない）。
+	// クローズした子でフローが無ければ欄を出さない（「フローを作る」を出させない）。
 	for _, s := range []place.State{place.Done, place.Cancelled} {
 		if FlowInfo(conf, root, with(s, true)) != nil {
 			t.Errorf("%s: 欄がある", s)

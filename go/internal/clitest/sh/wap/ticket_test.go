@@ -446,7 +446,7 @@ func TestATakeInThatTidiedTheParentAwayWritesNothing(t *testing.T) {
 	if r.Code == 0 {
 		t.Error("片付けられた親に書いたのに 0")
 	}
-	has(t, r.Stderr, "閉じた（マージ済み）か、ワークツリーが無い")
+	has(t, r.Stderr, "クローズした（マージ済み）か、ワークツリーが無い")
 	has(t, r.Stderr, "何も反映していません")
 	if shkit.Exists(k.tree) {
 		t.Error("親のワークツリーが残っている")
