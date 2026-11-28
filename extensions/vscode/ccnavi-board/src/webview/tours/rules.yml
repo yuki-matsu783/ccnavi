@@ -1,7 +1,7 @@
 # ルール管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際の設定ではない）。
 # ルールはrules.ymlと同じ書き方。判定・期待する判定・候補は実行ファイルのJSONと同じ形（足りない項目は既定値で埋まる）。
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
-#   tab      rules / judge / hooks
+#   tab      rules / hooks（「判定を試す」はタブではなく右の常設の欄なので、どちらのタブでも指せる）
 #   open開く行のid（, で区切って複数）
 #   when組み合わせ条件の図で選ぶ点（rは最上位、r.0は1番目の子、r.0.1はその中の2番目）
 #   more     「コンテキストの追加」を開く
@@ -12,11 +12,11 @@
 #   sum      「統合結果」の枠を開き、選ぶ統合結果の名前（sample.sumsのname）
 #   error保存前の検証エラーの見本（sample.save_error）を下の欄に出す
 # `target:`の印（画面のdata-tour）:
-#   tabs / rules / find / order-hint / hooks / save / tour / target / status
+#   tabs / rules / find / order-hint / hooks / judge / save / tour / target / status
 #   section-<タイプ> / fold-<タイプ> / count-<タイプ> / add-<タイプ>   タイプの塊 / ▾ / 件数 / 「＋ ルールを追加」（タイプはdeny・ask・allow）
 #   rule-<id>   ルールの行。開いた行の中はrule-<id>-<欄>（match / type / pattern / except / message / context / every / text / once / file / once-file / to-when / buttons）
 #   when-graph / when-inspector組み合わせ条件の図と操作の欄（開いた行）
-#   judge-form / judge-result / expectations / expectations-counts / expectations-result / expectation-ng / open-expectations / suggest / suggest-result / suggest-candidate   「判定を試す」タブ
+#   judge-form / judge-result / expectations / expectations-counts / expectations-result / expectation-ng / open-expectations / suggest / suggest-result / suggest-candidate   「判定を試す」の欄（judgeは欄の全体）
 #   sum / sum-pick / sum-count / sum-<タイプ>   統合結果の枠 / 選ぶ欄 / 件数 / タイプごとの表
 screen: rules
 
@@ -399,8 +399,8 @@ courses:
     summary: 画面の見どころを順に回る
     steps:
       - target: tabs
-        title: 3つのタブ
-        body: 「ルール」タブではdeny・ask・allowのルールを確認して直せます。「判定を試す」タブでは、編集中のルールで判定を試せます。「hook」タブでは登録内容を確認できます。
+        title: 2つのタブと判定を試す欄
+        body: 「ルール」タブではdeny・ask・allowのルールを確認して直せます。「hook」タブでは登録内容を確認できます。右の「判定を試す」の欄は、どちらのタブでも出ていて、編集中のルールで判定を試せます。幅が狭いときは欄がタブの上に移り、畳めます。
         scene: { tab: rules }
       - target: rules
         title: ルール
@@ -413,7 +413,7 @@ courses:
       - target: judge-form
         title: 判定を試す
         body: ツールと対象（コマンドやパス）を入れて「判定」を押すと、編集中の内容でどのルールにヒットするかをccnaviが判定して表示します。保存は不要です。「期待する判定を一括で確認する」は、期待する判定のファイルに並べた例をまとめて確認します。
-        scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
+        scene: { tab: rules, tool: Bash, subject: git push origin main, judge: git-push }
       - target: hooks
         title: hook
         body: .claude/settings.jsonに登録されたhookの一覧です。直すときはsettings.jsonを開いて編集してください。
@@ -498,7 +498,7 @@ courses:
       - target: judge-form
         title: 保存しないで試す
         body: 「判定を試す」は、編集中の内容で判定します。保存は不要です。実際のコマンドは動かず、記録も残りません。動作モードがdry-runでも、ここでは常にenable（実際に止めるモード）のときの判定を返します。
-        scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
+        scene: { tab: rules, tool: Bash, subject: git push origin main, judge: git-push }
         diagram: rule-try
         focus: input, ask, answer, note
       - target: rule-db-migrate
@@ -535,11 +535,11 @@ courses:
       - target: judge-form
         title: 判定で確認する
         body: 組み合わせ条件は、入力しただけでは意図どおりか分かりません。「判定を試す」で、止めたい例（.env）と止めたくない例（.env.example）を入力して確認してください。保存は不要です。
-        scene: { tab: judge, tool: Read, subject: /ws/.env, judge: env-read }
+        scene: { tab: rules, tool: Read, subject: /ws/.env, judge: env-read }
       - target: judge-form
         title: 止めない例を確認する
         body: .env.exampleはどのルールにもヒットせず、判定の対象外になります（ccnaviは止めず、実行できるかどうかは権限モードで決まります）。
-        scene: { tab: judge, tool: Read, subject: /ws/.env.example, judge: env-example }
+        scene: { tab: rules, tool: Read, subject: /ws/.env.example, judge: env-example }
       - target: save
         title: 保存
         body: 保存すると、ccnaviが検証し、通ればファイルに反映します。空の演算子や、中が空のnotのような誤りは、図の下に並びます。誤りが残っていると、保存前の検証で保存が止まります。
@@ -572,7 +572,7 @@ courses:
       - target: judge-form
         title: 判定で確認する
         body: 入力したら「判定を試す」で、止めたい例（git push origin main）を入力してください。保存しなくても、編集中の内容で、どのルールにヒットし、どのメッセージが返るかをccnaviが調べて表示します。
-        scene: { tab: judge, tool: Bash, subject: git push origin main, judge: git-push }
+        scene: { tab: rules, tool: Bash, subject: git push origin main, judge: git-push }
       - target: save
         title: 保存
         body: 保存すると、ccnaviが検証し、通ればファイルに反映します。誤りがあれば何も保存せず、ツールバーの最後の行に理由が出ます。
@@ -609,7 +609,7 @@ courses:
       - target: judge-result
         title: 届くプロンプトを判定で確認する
         body: 「判定を試す」の結果の「返すメッセージ」に、入力したプロンプトが何と一緒に届くかが出ます。everyで間引くかどうかは、実際にヒットした回数で決まるので、ここで確認できるのは文の中身と、ヒットするルールです。
-        scene: { tab: judge, tool: Bash, subject: python manage.py migrate, judge: db-migrate }
+        scene: { tab: rules, tool: Bash, subject: python manage.py migrate, judge: db-migrate }
 
   - id: check-expectations
     title: 期待する判定をまとめて確認したいとき
@@ -618,27 +618,27 @@ courses:
       - target: expectations
         title: 一括で確認する
         body: 「期待する判定を一括で確認する」は、期待する判定のファイルに並べた例を、編集中のルールでまとめて判定します。例は、denyなら止まるはず、askならユーザに確認が出るはず、allowなら通るはず、という期待です。ルールを直したあとの確認に、1件ずつ入力する代わりに使います。
-        scene: { tab: judge }
+        scene: { tab: rules }
       - target: open-expectations
         title: 期待する例を追加する
         body: 例は「エディタで開く」で期待する判定のファイルを開いて追加してください。ルールを1件追加したら、その例も1行追加しておくと、あとから読む人に何のためのルールかが伝わります。ツールと対象（コマンドやパス）と、理由を入力してください。
-        scene: { tab: judge }
+        scene: { tab: rules }
       - target: expectations-counts
         title: 件数で全体を見る
         body: 結果の上に、タイプごとの一致数（deny 2/2など）と不一致の件数が並びます。保存前でも、編集中のルールで判定した結果が出ます。
-        scene: { tab: judge, checked: true }
+        scene: { tab: rules, checked: true }
       - target: expectation-ng
         title: 食い違いを確認する
         body: 食い違った行は赤く出ます。この例では、allowを期待した.env.exampleが、どのallowのルールにもヒットせず、判定の対象外になっています。期待が正しければallowのルールを追加し、期待が古ければ例を直してください。
-        scene: { tab: judge, checked: true }
+        scene: { tab: rules, checked: true }
       - target: expectations-result
         title: ヒットしたルールも見る
         body: 「ヒットしたルール」の列で、どのルールが効いたかが読めます。期待と合っていても、意図したルールではなく別のルールにヒットしていないかを確認してください。
-        scene: { tab: judge, checked: true }
+        scene: { tab: rules, checked: true }
       - target: save
         title: 合ったら保存する
         body: 例がすべて合ったら保存してください。一括の確認は保存前でも使えるので、直して確認する作業を、保存の前に繰り返せます。
-        scene: { tab: judge, checked: true }
+        scene: { tab: rules, checked: true }
 
   - id: suggest-rule
     title: 記録から候補を出して、下書きをルールにしたいとき
@@ -647,15 +647,15 @@ courses:
       - target: suggest
         title: 記録から候補を出す
         body: 「記録から候補を出す」は、判定の記録（logs/decisions.jsonl）を集計して、deny / askのルールの下書きを作ります。どのルールにもヒットせず権限モードへ渡った呼び出しが同じ形で5回以上あると、その形を対象にしたルールを追加する候補になります。保存済みのルールで確認するので、編集中の内容は使いません。
-        scene: { tab: judge }
+        scene: { tab: rules }
       - target: suggest-result
         title: 結果の読み方
         body: 読んだ記録の本数と行数、候補の数が出ます。「検証を通らなかったN件は除いています」の件数は、lintか期待する判定の確認を通らなかったために、候補から外した数です。候補はすべて下書きです。内容を確認して、必要なものを設定に反映してください。
-        scene: { tab: judge, suggested: true }
+        scene: { tab: rules, suggested: true }
       - target: suggest-candidate
         title: 候補1件の中身
         body: '候補には、種類（ルールを追加する・messageを見直す）・タイプ・id・根拠の一言・下書きのYAMLが出ます。下書きは、rules.ymlに追加するrules: と、期待する判定のファイルに追加するexpectations: の組です。ルールを追加する候補は、askのルールとして出ます（記録を根拠に、allowのルールは提案しません）。messageを見直す候補は、同じ呼び出しをdenyが繰り返し止めたときに出ます。'
-        scene: { tab: judge, suggested: true }
+        scene: { tab: rules, suggested: true }
       - target: add-ask
         title: 下書きをルールに転記する
         body: 下書きは自動では保存されません。「＋ ルールを追加」で行を追加し、下書きのid・ツール・パターンを転記してください。追加先は、候補に示された設定（共通設定・ワークスペース・プロジェクトのどれか）のファイルです。いま編集している設定と同じかを確認してください。合わないと思えば、追加しなくてかまいません。
@@ -663,11 +663,11 @@ courses:
       - target: judge-form
         title: 転記したら判定で確認する
         body: 下書きの例（npm install left-pad）を「判定を試す」に入力し、期待したタイプ（ask）でヒットするかを確認してください。
-        scene: { tab: judge, tool: Bash, subject: npm install left-pad, judge: npm-install }
+        scene: { tab: rules, tool: Bash, subject: npm install left-pad, judge: npm-install }
       - target: open-expectations
         title: 期待する例も追加する
         body: '下書きのexpectations: は、期待する判定のファイルをエディタで開いて追加してください。あとで「期待する判定を一括で確認する」で使えます。'
-        scene: { tab: judge, suggested: true }
+        scene: { tab: rules, suggested: true }
       - target: save
         title: 保存
         body: 確認したら保存してください。
@@ -696,11 +696,11 @@ courses:
       - target: judge-result
         title: 止める例を確認する
         body: 意味が変わっていないことを、判定で確認してください。まず、止めたい例（secretsの下のkey.pem）が、変換後もdenyにヒットすることを確かめます。
-        scene: { tab: judge, tool: Read, subject: /ws/secrets/key.pem, judge: secrets-key }
+        scene: { tab: rules, tool: Read, subject: /ws/secrets/key.pem, judge: secrets-key }
       - target: judge-form
         title: 除く例を確認する
         body: 次に除外の例（secrets/README.md）を入力してください。除外にヒットするので、どのルールにもヒットせず、判定の対象外になります。
-        scene: { tab: judge, tool: Read, subject: /ws/secrets/README.md, judge: secrets-readme }
+        scene: { tab: rules, tool: Read, subject: /ws/secrets/README.md, judge: secrets-readme }
       - target: save
         title: 保存
         body: '保存すると、except: はwhen: に置き換わります。組み合わせ条件から1つのglob / regexへは戻せないので、保存の前に判定で確認してください。'

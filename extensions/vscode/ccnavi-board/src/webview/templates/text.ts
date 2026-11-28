@@ -2,13 +2,8 @@
  * テンプレート管理画面に出す言葉。判定は実行ファイルの答えが決めていて、ここは答えの値を読みやすい言葉に直すだけ。
  */
 import { shownLayerOf } from "../../core/templatesmodel.js";
-import type { PlanItem, ProblemSeverity, FlowSummary, TemplateLayer, TemplateProblem } from "../../core/templates-view.js";
+import type { PlanItem, FlowSummary, TemplateLayer, TemplateProblem } from "../../core/templates-view.js";
 import { layerLabel as coreLayerLabel } from "../../core/sums.js";
-
-/** 深刻度の言葉。表示は`[error]`の形にする（`Problems.tsx`） */
-export function severityLabel(severity: ProblemSeverity): string {
-  return severity;
-}
 
 /** 破棄した理由の言葉。知らない値はそのまま返す */
 export function droppedLabel(reason: string): string {

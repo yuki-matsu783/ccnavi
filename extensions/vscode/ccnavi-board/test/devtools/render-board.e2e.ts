@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildBoard } from "../../src/core/board.js";
+import { buildBoard, FOLDED_FIRST } from "../../src/core/board.js";
 import { parseBoardJson } from "../../src/core/model.js";
 // ツールがout/ から読むもの。`test-groups.js`はimportを辿って回すグループを決めるので、ここに並べて
 // 「これを直したらdevtoolsも回す」を表す（実行時には何もしない）
@@ -44,7 +44,8 @@ function main(): number {
       console.error("render-board e2e: board.pngがPNGではありません");
       return 1;
     }
-    // 画面の中身が描かれている: フィクスチャのチケットが全部、見えているテキストに出る
+    // 画面の中身が描かれている: フィクスチャのチケットが、見えているテキストに出る。
+    // 最初から畳む列（完了・取り消し）の子は件数だけになるので数えない（親は行の見出しにあり、畳んでも見える）
     const parsed = parseBoardJson(fs.readFileSync(FIXTURE, "utf8"));
     if (!parsed.ok) {
       console.error(`render-board e2e: フィクスチャを解釈できません: ${parsed.error}`);
@@ -52,7 +53,11 @@ function main(): number {
     }
     const text = fs.readFileSync(path.join(out, "board.txt"), "utf8");
     const board = buildBoard(parsed.board);
-    const missing = board.columns.flatMap((column) => column.cards.map((card) => card.id)).filter((id) => !text.includes(id));
+    const missing = board.columns
+      .flatMap((column) => column.cards)
+      .filter((card) => card.isParent || !FOLDED_FIRST.includes(card.column))
+      .map((card) => card.id)
+      .filter((id) => !text.includes(id));
     if (missing.length > 0) {
       console.error(`render-board e2e: board.txtに出ていないチケット: ${missing.join(" ")}`);
       return 1;

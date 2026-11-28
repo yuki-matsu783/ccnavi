@@ -44,6 +44,7 @@ import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { useHostMessages } from "../useHostMessages.js";
 import { useSaveKey, type SaveKeyTarget } from "../useSaveKey.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
+import { EditorBar, EditorState } from "../shared/EditorBar.js";
 import { PlanGraph } from "../shared/PlanGraph.js";
 import workflowTour from "../tours/workflow.yml";
 import { post } from "./post.js";
@@ -417,49 +418,66 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
         </section>
       )}
       <ScreenHeader courses={courses} onPick={tour.start} status={shownStatus ?? null}>
-        <div className="summary" data-tour="summary">
-          <span className="workflow-ticket">
-            <strong>{shownTicket}</strong>の計画（全体計画・フィードバック計画）の順序
-          </span>
-          <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
-            未保存
-          </span>
-        </div>
-        <div className="controls" data-tour="controls">
-          <button type="button" className="action" data-action="relayout" data-tour="relayout" title="いまの線に合わせて、ステップの配置を整えます（番号は変わりません）" onClick={relayout}>
-            並べ直す
-          </button>
-          <button
-            type="button"
-            className="action"
-            data-action="revert"
-            data-tour="revert"
-            disabled={!shownDirty || shownBusy || shownGone !== undefined}
-            title="提案に記載されている先行と番号に戻します"
-            onClick={revert}
-          >
-            提案の順序に戻す
-          </button>
-          <button type="button" className="action" data-action="reload" data-tour="reload" disabled={shownBusy} onClick={reload}>
-            更新
-          </button>
-          <button
-            type="button"
-            className="action primary"
-            id="save"
-            data-action="save"
-            data-tour="save"
-            disabled={blocker !== ""}
-            title={blocker === "" ? "提案の計画を書き換えます。番号が変わるステップを指している子の提案も、合わせて書き換えます（承認はしません。Ctrl+S）。" : blocker}
-            onClick={() => {
-              if (!touring) {
-                setReview(true);
-              }
-            }}
-          >
-            この順序で保存
-          </button>
-        </div>
+        <EditorBar
+          controlsTour="controls"
+          name={
+            <span className="workflow-ticket" data-tour="summary">
+              <strong>{shownTicket}</strong>の計画（全体計画・フィードバック計画）の順序
+            </span>
+          }
+          states={
+            <>
+              <EditorState shown={shownDirty} tone="dirty" id="dirty" tour="dirty">
+                未保存
+              </EditorState>
+              <EditorState shown={shownGone !== undefined} tone="warn" role="read-only" title="保存できません。理由は上の帯にあります">
+                閲覧のみ
+              </EditorState>
+              <EditorState shown={shownChanged !== undefined && shownGone === undefined} tone="warn" role="changed" title="提案が外で変わりました。上の帯で取り込むか編集を続けるかを選びます">
+                外で変わった
+              </EditorState>
+            </>
+          }
+          aux={
+            <>
+              <button type="button" className="action" data-action="relayout" data-tour="relayout" title="いまの線に合わせて、ステップの配置を整えます（番号は変わりません）" onClick={relayout}>
+                並べ直す
+              </button>
+              <button
+                type="button"
+                className="action"
+                data-action="revert"
+                data-tour="revert"
+                disabled={!shownDirty || shownBusy || shownGone !== undefined}
+                title="提案に記載されている先行と番号に戻します"
+                onClick={revert}
+              >
+                提案の順序に戻す
+              </button>
+              <button type="button" className="action" data-action="reload" data-tour="reload" disabled={shownBusy} onClick={reload}>
+                更新
+              </button>
+            </>
+          }
+          primary={
+            <button
+              type="button"
+              className="action primary"
+              id="save"
+              data-action="save"
+              data-tour="save"
+              disabled={blocker !== ""}
+              title={blocker === "" ? "提案の計画を書き換えます。番号が変わるステップを指している子の提案も、合わせて書き換えます（承認はしません。Ctrl+S）。" : blocker}
+              onClick={() => {
+                if (!touring) {
+                  setReview(true);
+                }
+              }}
+            >
+              この順序で保存
+            </button>
+          }
+        />
       </ScreenHeader>
       {touring ? <div className="banner tour-sample">{SAMPLE_NOTE}</div> : null}
       <p className="dim small">

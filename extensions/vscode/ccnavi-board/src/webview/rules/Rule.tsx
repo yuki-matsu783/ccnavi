@@ -112,7 +112,7 @@ export function Rule(props: RuleProps): JSX.Element {
         <button type="button" className="twist" title="このルールを開く／畳む" aria-expanded={props.open}>
           {props.open ? "▾" : "▸"}
         </button>
-        <span className="sum">
+        <span className="row-sum">
           {/* idは長いと列の幅で切れるので、全体はtitleで見せる */}
           <span className={rule.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(rule)}>
             {summaryId(rule)}
@@ -142,11 +142,11 @@ export function Rule(props: RuleProps): JSX.Element {
           {rule.every === "" ? (
             <span className="sum-every" />
           ) : (
-            <span className="tag sum-every" title={`every: ${rule.every}`}>
+            <span className="tag sum-every" title={`当てはまった${rule.every}回に1回だけ、コンテキストの追加を渡します（every: ${rule.every}）`}>
               {rule.every}回ごと
             </span>
           )}
-          <span className={hasContext(rule) ? "sum-flag on" : "sum-flag"} title={hasContext(rule) ? "コンテキストの追加あり" : ""} />
+          <span className={hasContext(rule) ? "sum-flag on" : "sum-flag"} title={hasContext(rule) ? "コンテキストの追加あり（当てはまったときにモデルへ渡すプロンプトかファイルがあります）" : ""} />
         </span>
       </div>
       <div className="row-body">

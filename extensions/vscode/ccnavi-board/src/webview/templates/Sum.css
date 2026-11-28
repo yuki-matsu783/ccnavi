@@ -1,7 +1,8 @@
 /*
  * 「統合結果」（`Sum.tsx`）。読み取り専用の枠と表。
  */
-.sum { margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 6px 10px; }
+/* 畳んだ枠の直後に次の見出し（下書き）が詰まらないよう、下を空ける */
+.sum { margin: 12px 0 18px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 6px 10px; }
 .sum > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
 .sum-pick { display: flex; gap: var(--gap-3); align-items: center; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
 table.sum-table { border-collapse: collapse; width: 100%; font-size: var(--font-lg); }

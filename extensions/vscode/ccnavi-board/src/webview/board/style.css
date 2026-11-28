@@ -7,7 +7,7 @@
  * `<style nonce>`に流し込む（`src/core/render.ts`）。WebviewのCSPがnonceを持つ`<style>`しか
  * 通さないので、挿すのは入れ物を組む側のまま。画面へnonceは渡さない。
  *
- * **先頭の1行だけが外のパス**（`@xyflow/react`。承認のオーバーレイの計画の図が要るCSS）。色は`--xy-*`の
+ * **先頭の1行だけが外のパス**（`@xyflow/react`。承認のオーバーレイと計画の流れの図が要るCSS）。色は`--xy-*`の
  * 変数で出来ていて、共有の図の部品のCSS（`../shared/PlanGraph.css`）が`--vscode-*`に置き換える。先に読ませるのは
  * そのため（あとから来る`PlanGraph.css`が勝つ）。
  */
@@ -18,8 +18,12 @@
 @import "@ccnavi/shared/styles/page.css";
 @import "../shared/Dialog.css";
 @import "./App.css";
+@import "./Lanes.css";
 @import "./Card.css";
+@import "./Panel.css";
 @import "./MergeBand.css";
 @import "./Approval.css";
+@import "./PlanFlow.css";
+@import "./Toc.css";
 @import "../shared/PlanGraph.css";
 @import "../Tour.css";

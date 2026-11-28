@@ -363,7 +363,7 @@ func (p *probe) resolveAndDecide() bool {
 	return true
 }
 
-// readyAndOutdated は 4: 親を閉じて ready（Draft を外す）と、行を書き換えた後の古いスレッドの読み方。
+// readyAndOutdated は 4: 親をクローズして ready（Draft を外す）と、行を書き換えた後の古いスレッドの読み方。
 func (p *probe) readyAndOutdated() bool {
 	parent, num := p.parent, p.num
 	closed := p.sh(p.script("ccnavi-ticket.sh"), parent, nil, "finish", "i0001")
@@ -416,10 +416,10 @@ func (p *probe) readyAndOutdated() bool {
 	return true
 }
 
-// closeEarly は 5: 別の親をユーザが早めに閉じる（close-early）。
+// closeEarly は 5: 別の親をユーザが早めにクローズする（close-early）。
 func (p *probe) closeEarly() bool {
 	parent2 := p.worktree("i0002", "main")
-	p.propose(parent2, ticket{Name: "i0002", Allow: []string{"src/*", "wip/*"}, Review: true, Title: "途中で早めに閉じる親"})
+	p.propose(parent2, ticket{Name: "i0002", Allow: []string{"src/*", "wip/*"}, Review: true, Title: "途中で早めにクローズする親"})
 	p.propose(parent2, ticket{Name: "i0002-01-01", Parent: "i0002", Phase: 1, Allow: []string{"src/c/*"}, Review: true, Title: "c を書く"})
 	mustWrite(filepath.Join(parent2, "src", "c.py"), "print('c')\n")
 	p.commitAll(parent2, "tickets")
@@ -431,7 +431,7 @@ func (p *probe) closeEarly() bool {
 	}
 	p.check("i0002 の push", pushed2.Code == 0, "")
 	status, pr2 := p.api("POST", "/repos/"+p.repo+"/pulls", "", map[string]any{
-		"head": "i0002", "base": p.base, "title": "Draft: 途中で早めに閉じる親", "draft": true,
+		"head": "i0002", "base": p.base, "title": "Draft: 途中で早めにクローズする親", "draft": true,
 	}, "pr-create-i0002")
 	p.check("ユーザが i0002 の PR を作る", status == 201, "")
 	if status != 201 {

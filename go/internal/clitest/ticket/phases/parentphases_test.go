@@ -229,7 +229,7 @@ func TestPhasesTitlesAndReviewsComeFromTheCopyAfterApproval(t *testing.T) {
 	said := w.reason(w.hookWith(hookOpts{AgentID: "sub-1"}, "SubagentStart", "", tree, nil))
 	contains(t, "SubagentStart", said, "1: 調査", "explorer")
 	lacks(t, "SubagentStart", said, "調べ", "planner")
-	// コピーの research はレビュー不要。閉じても止めない（phases.yml の mr なら止まる）。
+	// コピーの research はレビュー不要。クローズしても止めない（phases.yml の mr なら止まる）。
 	ticketkit.Write(t, filepath.Join(tree, "wip", "research", "summary.md"), "まとめ\n")
 	w.git(tree, "add", "-A")
 	w.git(tree, "commit", "--quiet", "-m", "summary")
@@ -340,7 +340,7 @@ func TestDeliverablesComeFromTheCopy(t *testing.T) {
 	w.propose("i0001-01-01", childReview("i0001-01-01", 1, samples.Off, "wip/research/*"))
 	w.commitParent()
 	w.mustApprove()
-	// 承認のあとに phases.yml の成果物を変えても、閉じるときに見るのはコピーの成果物。
+	// 承認のあとに phases.yml の成果物を変えても、クローズするときに見るのはコピーの成果物。
 	ticketkit.Write(t, w.phases, strings.Replace(samples.Phases, `["wip/research/summary.md"]`, `["wip/research/other.md"]`, 1))
 	w.runChild("i0001-01-01", file{"wip/research/summary.md", "まとめ\n"})
 	w.mustClose("i0001-01-01")

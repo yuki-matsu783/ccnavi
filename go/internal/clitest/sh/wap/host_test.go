@@ -125,7 +125,7 @@ func TestReadyParentRefusesWhatIsNotAParentWorktree(t *testing.T) {
 	}
 }
 
-// ready の退避（閉じたチケットの削除）と、消した wip/ の追跡済みのファイルは、write-and-push がコミットして push してから Draft を外す。
+// ready の退避（クローズしたチケットの削除）と、消した wip/ の追跡済みのファイルは、write-and-push がコミットして push してから Draft を外す。
 // 消した wip/ のファイルと、戻せる版（消す前の HEAD）を出す。
 func TestReadyCommitsTheArchiveAndWipRemovalsAndNamesThem(t *testing.T) {
 	h := newHostKit(t, hostHalf)
@@ -286,7 +286,7 @@ func TestTerminalDecideChoosesOutsideWriteAndPushAndWritesInside(t *testing.T) {
 	h.carried(approved + "/phases/" + parentID + "/1.reviewed")
 }
 
-// 親は --parent で受ける。ワークスペースルート（統合先のブランチ）から打っても、その親を閉じる。
+// 親は --parent で受ける。ワークスペースルート（統合先のブランチ）から打っても、その親をクローズする。
 func TestCloseEarlyHandsOverToTheCarrier(t *testing.T) {
 	h := newHostKit(t, hostHalf)
 	okRun(t, h.review(opts{script: "ccnavi-user-close-early.sh", dir: h.ws}, "--parent", parentID, "--reason", "r", "--no-issue"))

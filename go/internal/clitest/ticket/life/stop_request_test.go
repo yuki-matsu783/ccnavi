@@ -13,7 +13,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// レビュー依頼までの道の途中で終えようとしたときの促し。止めるのは、承認済みの親に作業中の子が残っているか、子が全部閉じたのに
+// レビュー依頼までの道の途中で終えようとしたときの促し。止めるのは、承認済みの親に作業中の子が残っているか、子が全部クローズしたのに
 // （レビューを要する）フェーズの依頼のマーカー（requested）が無いとき。同じ状態では 1 回だけ、進めばまた 1 回。
 
 func askedRequest(t *testing.T, r run.Result) string {
@@ -23,7 +23,7 @@ func askedRequest(t *testing.T, r run.Result) string {
 	return reason
 }
 
-// closeChildren は子 2 本を閉じる。work なら先に子 1 にコミットを置く（親にまだ合流していない子）。
+// closeChildren は子 2 本をクローズする。work なら先に子 1 にコミットを置く（親にまだ合流していない子）。
 func closeChildren(tr *ticketkit.Tree, work bool) {
 	tr.T.Helper()
 	if work {
@@ -261,7 +261,7 @@ func TestTheRequestNudgeIsRecordedApartFromDeny(t *testing.T) {
 
 // ---- 計画を持つ親。フェーズのレビューの要否（延期）と、実際のレビューの状態を作って確かめる。
 
-// closeFirstChild は計画の 1 番目の子を閉じて親に合流する。親のツリーで子は全部閉じた形になる。
+// closeFirstChild は計画の 1 番目の子をクローズして親に合流する。親のツリーで子は全部クローズした形になる。
 func closeFirstChild(t *testing.T, plan []samples.Step, allow []string, rel string) *ticketkit.Tree {
 	t.Helper()
 	key := fmt.Sprintf("close-first-child %#v %v %s", plan, allow, rel)

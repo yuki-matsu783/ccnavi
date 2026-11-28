@@ -22,7 +22,8 @@ import type {
   SeenInJson,
   TicketJson,
 } from "./model.js";
-import { phaseStatusOf, statusOf, type PhaseStatus, type Status } from "./status.js";
+import type { ApprovePlan } from "./approvemodel.js";
+import { holdOf, phaseStatusOf, statusOf, type Hold, type PhaseStatus, type Status } from "./status.js";
 
 export interface ColumnDef {
   readonly state: ProposalState;
@@ -37,6 +38,9 @@ export const COLUMNS: readonly ColumnDef[] = [
   { state: "cancelled", label: "取り消し" },
   { state: "archived", label: "アーカイブ" },
 ];
+
+/** 最初から畳んでおく列。完了と取り消しは見返すことが少ないので、進行中の行に幅を渡す */
+export const FOLDED_FIRST: readonly ProposalState[] = ["done", "cancelled"];
 
 /**
  * ユーザが押せる操作。承認は実行ファイルへ、レビュー完了は「残った指摘の読み取り」（`ccnavi-review.sh decide <N> --preview`）へ
@@ -57,6 +61,8 @@ export interface PhaseChip {
   readonly state: PhaseJson["state"];
   /** フェーズ行の状態の一言（`core/status.ts`の`phaseStatusOf`）。JSONの欄から決めた言葉で、画面はこれを出す */
   readonly status: PhaseStatus;
+  /** 「止まっている」印（`core/status.ts`の`holdOf`）。画面の部品は`status`の言葉を比べず、これで色を決める */
+  readonly hold: Hold;
   readonly gateClosed: boolean;
   /** 依頼を出したのに止まったまま（ユーザのレビュー待ち）。JSONの`review_waiting`をそのまま持つ */
   readonly reviewWaiting: boolean;
@@ -117,11 +123,15 @@ export interface Card {
   readonly phaseStatus: PhaseStatus | "";
   /** 状態のバッジ（`core/status.ts`の`statusOf`）。見出しの右端に1つ出す */
   readonly status: Status;
+  /** バッジの言葉の「止まっている」印（`core/status.ts`の`holdOf`） */
+  readonly hold: Hold;
   /** 親だけ */
   readonly stage: string;
   readonly wrapped: boolean;
   readonly ready: boolean;
   readonly phases: readonly PhaseChip[];
+  /** 親だけ。計画の流れ（図の中身。`parents[].plans`のまま）。空なら「計画の流れを見る」を出さない */
+  readonly plans: readonly ApprovePlan[];
   readonly actions: readonly Action[];
   /** 読み手が気づくべき食い違い。実行ファイルの`issues`をそのまま持つ */
   readonly issues: readonly string[];
@@ -277,7 +287,7 @@ function toCard(
   const reviewWaiting = !isParent && (ownPhase?.review_waiting ?? false);
   const pendingApproval = pending.has(t.ticket);
 
-  const base: Omit<Card, "status" | "actions"> = {
+  const base: Omit<Card, "status" | "hold" | "actions"> = {
     id: t.ticket,
     title: t.title,
     parent: t.parent,
@@ -313,6 +323,7 @@ function toCard(
     wrapped: isParent && wrapped,
     ready: isParent && ownParent?.ready !== null && ownParent?.ready !== undefined,
     phases,
+    plans: isParent && ownParent ? ownParent.plans : [],
     issues: t.issues,
     blocked: t.blocked,
     mrUrl: mr.url,
@@ -335,7 +346,7 @@ function toCard(
  * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。レビュー完了はバッジが「レビュー待ち」の子だけ
  * （承認待ちの子には出さない）。親には付けない（親のフェーズ行にはレビューの操作を置かない）
  */
-function withStatus(base: Omit<Card, "status" | "actions">): Card {
+function withStatus(base: Omit<Card, "status" | "hold" | "actions">): Card {
   const status = statusOf(base);
   const actions: Action[] = [];
   if (base.pendingApproval) {
@@ -343,7 +354,7 @@ function withStatus(base: Omit<Card, "status" | "actions">): Card {
   } else if (!base.isParent && status.label === "レビュー待ち" && base.phase !== null) {
     actions.push({ kind: "review", parent: base.parent, phase: base.phase, mrUrl: mrPage(base.mrUrl) });
   }
-  return { ...base, status, actions };
+  return { ...base, status, hold: holdOf(status.label), actions };
 }
 
 /**
@@ -388,6 +399,7 @@ function toArchivedCard(a: ArchivedTicketJson): Card {
     wrapped: false,
     ready: false,
     phases: [],
+    plans: [],
     issues: [],
     blocked: "",
     mrUrl: "",
@@ -467,6 +479,7 @@ function toChip(parent: ParentJson, p: PhaseJson): PhaseChip {
     label: p.label,
     state: p.state,
     status,
+    hold: holdOf(status),
     gateClosed: p.gate_closed,
     reviewWaiting: p.review_waiting,
     reviewRequired: p.review_required,

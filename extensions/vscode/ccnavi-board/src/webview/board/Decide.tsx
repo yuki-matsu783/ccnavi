@@ -4,20 +4,22 @@
  * - 未解決が0件のとき（正しく読めたときだけ。読めなかったときはここに来ない）: 「フェーズNに未解決の指摘はありません」と、
  *   主ボタン「レビュー済みにする」を出す。
  * - 1件以上のとき: 指摘を1件ずつ並べ、対応方針（対応しない・このフェーズで直す・issueに回す）を選ばせる。
- *   何も選ばなければ、全部を「このフェーズで直す」とする。2件以上なら、全部を一括で同じ対応方針にする小さな行を出す。
+ *   最初はどれも選んでいない。全件を選ぶまで主ボタンは押せない（押せるかは遷移の側と同じ`choicesProblem`で決める）。
+ *   2件以上なら、全部を一括で同じ対応方針にする小さな行を出す。
  *   副ボタン「エージェントに相談するプロンプトをコピー」は、オーバーレイを閉じず、選びかけの対応方針も変えない。
+ *
+ * 指摘が1件以上なら、左に指摘の目次を出す（承認のオーバーレイと同じ形。押すとその指摘まで送るだけ）。
  *
  * 選び直した対応方針だけをここに持つ。見せる指摘、ダイジェスト、置いている最中かどうかは拡張ホストが持つ。
  * ここは渡されたものを見せるだけ。押したら、選んだ対応方針をキーごとに返す（`decideConfirm`）。
  */
 import { useState, type JSX } from "react";
 
-import { DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } from "../../core/decidemodel.js";
+import { choicesProblem, DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } from "../../core/decidemodel.js";
 import { DialogActions } from "../shared/Dialog.js";
 import { post } from "./post.js";
 import { isHttpUrl } from "./text.js";
-
-const DEFAULT_CHOICE: DecideChoice = "fix";
+import { Toc } from "./Toc.js";
 
 export function DecideBody({
   preview,
@@ -36,16 +38,16 @@ export function DecideBody({
     digest: preview.digest,
     choices: {},
   });
-  // 何も選ばなければ、全部「このフェーズで直す」。選び直したものだけを上書きする
-  const overrides = picked.digest === preview.digest ? picked.choices : {};
-  const choices: Record<string, DecideChoice> = Object.fromEntries(
-    preview.threads.map((t) => [t.key, overrides[t.key] ?? DEFAULT_CHOICE]),
-  );
+  // 最初はどれも選んでいない。全件を選ぶまで確定を押せない（押せるかは遷移と同じ`choicesProblem`で決める）
+  const choices: Record<string, DecideChoice> = picked.digest === preview.digest ? picked.choices : {};
+  const unchosen = choicesProblem(preview, choices);
+  const left = preview.threads.filter((t) => !(t.key in choices)).length;
   const choose = (key: string, choice: DecideChoice): void =>
     setPicked({ digest: preview.digest, choices: { ...choices, [key]: choice } });
   const chooseAll = (choice: DecideChoice): void =>
     setPicked({ digest: preview.digest, choices: Object.fromEntries(preview.threads.map((t) => [t.key, choice])) });
   const count = preview.threads.length;
+  const where = (t: { readonly path: string; readonly line: number }): string => (t.path ? `${t.path}:${t.line}` : "（場所なし）");
   return (
     <>
       <h2 id="approval-title">
@@ -61,6 +63,17 @@ export function DecideBody({
           ? "このフェーズをレビュー済みにしますか？"
           : "「このフェーズで直す」を1件でも選ぶと、直すための子チケットを作り、フェーズを再開します。"}
       </p>
+      <div className={count === 0 ? undefined : "overlay-with-toc"}>
+      {count === 0 ? null : (
+        <Toc
+          label="指摘の目次"
+          items={[
+            ...preview.threads.map((t, i) => ({ target: `decide-thread-${i + 1}`, label: `${i + 1}.\u00a0${where(t)}` })),
+            { target: "decide-confirm-area", label: "確定" },
+          ]}
+        />
+      )}
+      <div className={count === 0 ? undefined : "overlay-main"}>
       {/* 2件以上のときだけ、全部を同じ対応方針にする小さな行を出す。個別の選択は上書きされる */}
       {count < 2 ? null : (
         <div className="decide-bulk">
@@ -81,10 +94,10 @@ export function DecideBody({
       )}
       {count === 0 ? null : (
         <ol className="decide-threads" data-tour="decide-threads">
-          {preview.threads.map((t) => (
-            <li key={t.key} className="decide-thread" data-key={t.key}>
+          {preview.threads.map((t, i) => (
+            <li key={t.key} className="decide-thread" id={`decide-thread-${i + 1}`} data-key={t.key}>
               <div className="decide-where">
-                <span className="approval-id">{t.path ? `${t.path}:${t.line}` : "（場所なし）"}</span>
+                <span className="approval-id">{where(t)}</span>
                 {/* 指摘のURL。http(s)のときだけリンクにする（そうでなければ文字として出すだけ） */}
                 {t.url ? (
                   isHttpUrl(t.url) ? (
@@ -122,13 +135,20 @@ export function DecideBody({
           {consult.text}
         </p>
       ) : null}
+      <div id="decide-confirm-area">
+      {unchosen === undefined || deciding ? null : (
+        <p className="approval-note decide-left" data-left={left}>
+          対応方針を選んでいない指摘が{left}件あります。全件を選ぶと確定できます。
+        </p>
+      )}
       <DialogActions className="approval-actions">
         <button
           type="button"
           className="action primary"
           data-action="decide-confirm"
           data-tour="decide-confirm"
-          disabled={deciding}
+          disabled={deciding || unchosen !== undefined}
+          title={unchosen}
           onClick={() => post({ type: "decideConfirm", choices })}
         >
           {deciding ? "反映中…" : count === 0 ? "レビュー済みにする" : "この対応方針を確定"}
@@ -156,6 +176,9 @@ export function DecideBody({
           キャンセル
         </button>
       </DialogActions>
+      </div>
+      </div>
+      </div>
     </>
   );
 }

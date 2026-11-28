@@ -170,14 +170,14 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       data-action="filter-severity"
       data-severity={value}
       aria-pressed={shownSeverity === value}
-      title={`この設定のテンプレートのうち、${label}のものだけを一覧に出します`}
+      title={`この設定のテンプレートのうち、${label}の指摘があるものだけを一覧に出します（件数はテンプレートの数）`}
       onClick={() => {
         if (!tour.touring) {
           setSeverity(severity === value ? undefined : value);
         }
       }}
     >
-      {`${label}${shownTemplates.filter((entry) => hasSeverity(entry, value)).length}件`}
+      {`${label}あり ${shownTemplates.filter((entry) => hasSeverity(entry, value)).length}件`}
     </button>
   );
   /** 案内が指すテンプレート（いま見えている一覧の最初の1件）。`data-tour`はこの1件にだけ付く */
@@ -298,7 +298,9 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       ) : (
         <>
         <p className="count" id="counts" data-tour="summary">
-          <span>error{page.data.errors}件</span>・<span>warn{page.data.warns}件</span>・<span>info{page.data.infos}件</span>
+          {/* 指摘を1件ずつ数えた数。下の絞り込みの札はテンプレートの数なので、何を数えたかを書き分ける */}
+          指摘 {page.data.errors + page.data.warns + page.data.infos}件（<span>error{page.data.errors}件</span>・<span>warn{page.data.warns}件</span>・<span>info{page.data.infos}件</span>）
+          <span className="hint"> 指摘を1件ずつ数えた数</span>
         </p>
         <section className="templates" data-tour="list">
           <h2>
@@ -318,9 +320,10 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
                   }
                 }}
               />{" "}
-              {severityButton("error", "errorあり")}{" "}
-              {severityButton("warn", "warnあり")}{" "}
-              {severityButton("info", "infoあり")}
+              <span className="hint">指摘のあるテンプレートの数:</span>{" "}
+              {severityButton("error", "error")}{" "}
+              {severityButton("warn", "warn")}{" "}
+              {severityButton("info", "info")}
             </div>
           )}
           {layer === undefined ? (

@@ -1,8 +1,10 @@
 /**
  * 承認のオーバーレイ。一覧の識別子の表、承認画面の本文（`<pre>`）、対象外の提案と読めない提案、
  * 「このN件を承認する」「やめる」。本文は実行ファイルが組んだものをそのまま出し、項目には分けない。
+ * 左の目次（`Toc.tsx`）は、1本のページの中の位置へ送るだけ。承認のボタンはページの最後に置く
+ * （下に貼り付けると、本文を最後まで読まずに承認できてしまう）。
  *
- * 計画を持つ親が一覧にあれば、本文の上にその計画の図を読むだけで出す（`PlanGraph`。中身はpreviewの
+ * 計画を持つ親が一覧にあれば、本文の上にその計画の流れを図で読むだけで出す（`PlanGraph`。中身はpreviewの
  * `plans`で、承認する提案そのものの順序）。図は実行ファイルの答えを描くだけ。図は親ごとにまとめ、
  * その前に順序を直す計画編集タブへの入口（「計画を編集」）を置く。押すと拡張ホストがオーバーレイを
  * 閉じてからタブを開く（タブで保存すると、この一覧はもう承認できないため）。
@@ -14,7 +16,7 @@
  */
 import { Fragment, useEffect, useRef, type JSX } from "react";
 
-import { HANDOVER_NOTE, summarize, unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
+import { HANDOVER_NOTE, PROMPT_RUN_LABEL, summarize, unsavedParents, unsavedText, type ApprovePlan, type ApprovePreview } from "../../core/approvemodel.js";
 import type { ApprovalOverlay } from "../../core/board-view.js";
 import { Dialog, DialogActions } from "../shared/Dialog.js";
 import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
@@ -22,13 +24,14 @@ import { PlanGraph } from "../shared/PlanGraph.js";
 import { DecideBody } from "./Decide.js";
 import { post } from "./post.js";
 import { approvalBody, foldRejected } from "./text.js";
+import { Toc, type TocItem } from "./Toc.js";
 import { truncateLines } from "../../core/lintmodel.js";
 
 export function Approval({ overlay, unsaved = [] }: { readonly overlay: ApprovalOverlay; readonly unsaved?: readonly string[] }): JSX.Element {
   const box = useRef<HTMLElement>(null);
-  // 開いたら「やめる」に焦点を置く（承認したあとは「コピー」）。押せないボタンには置かない
+  // 開いたら「やめる」に焦点を置く（承認したあとは主ボタンの「新しいセッションで開く」）。押せないボタンには置かない
   useEffect(() => {
-    const first = box.current?.querySelector<HTMLButtonElement>('button[data-action="prompt-copy"]')
+    const first = box.current?.querySelector<HTMLButtonElement>('button[data-action="prompt-open"]')
       ?? box.current?.querySelector<HTMLButtonElement>('button[data-action="approve-cancel"]');
     if (first && !first.disabled) {
       first.focus({ preventScroll: true });
@@ -128,12 +131,25 @@ function Body({
   const summary = summarize(preview);
   const blocked = unsavedParents(preview, unsaved);
   const blockedText = blocked.length === 0 ? "" : unsavedText(blocked);
-  return (
+  const planFamilies = families(preview.plans);
+  // 目次。承認するものが無ければ出さない（本文も短い）
+  const toc: TocItem[] =
+    count === 0
+      ? []
+      : [
+          ...(summary.tickets === "" ? [] : [{ target: "approval-summary", label: "要約" }]),
+          { target: "approval-tickets", label: "承認するチケット", count },
+          ...planFamilies.map(([ticket]) => ({ target: `approval-plan-${ticket}`, label: `計画の流れ: ${ticket}` })),
+          { target: "approval-legend", label: "凡例" },
+          { target: "approval-body", label: "本文" },
+          { target: "approval-rejected", label: "対象外", count: preview.rejected.length },
+          { target: "approval-problems", label: "読めない提案", count: preview.problems.length },
+          { target: "approval-confirm", label: "承認" },
+        ];
+  const main = (
     <>
-      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット${count}件`}</h2>
-      {notice ? <p className="approval-note warn">{notice}</p> : null}
       {summary.tickets === "" ? null : (
-        <div className="approval-summary" data-approval-summary>
+        <div className="approval-summary" id="approval-summary" data-approval-summary>
           <p>{summary.tickets}</p>
           {summary.plans.map((line) => (
             <p key={line} data-approval-summary-plan>
@@ -143,7 +159,7 @@ function Body({
         </div>
       )}
       {count === 0 ? null : (
-        <table className="approval-batch" data-tour="approval-batch">
+        <table className="approval-batch" id="approval-tickets" data-tour="approval-batch">
           <thead>
             <tr>
               <th>ID</th>
@@ -164,8 +180,8 @@ function Body({
       )}
       {preview.plans.length > 0 ? (
         <div className="plan-graphs" data-tour="approval-plan">
-          {families(preview.plans).map(([ticket, plans]) => (
-            <div key={ticket} className="plan-family" data-ticket={ticket}>
+          {planFamilies.map(([ticket, plans]) => (
+            <div key={ticket} className="plan-family" id={`approval-plan-${ticket}`} data-ticket={ticket}>
               {unsaved.includes(ticket) ? (
                 <p className="approval-note warn plan-unsaved">計画編集タブに保存していない変更があります。変更を保存または破棄するまで、表示中のチケットは承認できません。</p>
               ) : null}
@@ -200,7 +216,7 @@ function Body({
       <BodyText text={preview.text} />
       {preview.rejected.length > 0 ? (
         <>
-          <h3>承認対象外の提案</h3>
+          <h3 id="approval-rejected">承認対象外の提案</h3>
           <ul className="approval-rejected">
             {rejectedGroups.groups.map((g) => (
               <li key={g.tickets.join(",")}>
@@ -221,7 +237,7 @@ function Body({
       ) : null}
       {preview.problems.length > 0 ? (
         <>
-          <h3>読み込めなかった提案・承認済みチケット</h3>
+          <h3 id="approval-problems">読み込めなかった提案・承認済みチケット</h3>
           <ul className="approval-problems">
             {truncateLines(preview.problems, "").map((p, i) => (
               <li key={i}>{p}</li>
@@ -234,6 +250,7 @@ function Body({
           {blockedText}
         </p>
       )}
+      <div id="approval-confirm">
       <DialogActions className="approval-actions">
         {count === 0 ? null : (
           <button
@@ -251,6 +268,21 @@ function Body({
         )}
         <Cancel label="キャンセル" disabled={approving} />
       </DialogActions>
+      </div>
+    </>
+  );
+  return (
+    <>
+      <h2 id="approval-title">{count === 0 ? "承認待ちのチケットなし" : `承認待ちのチケット${count}件`}</h2>
+      {notice ? <p className="approval-note warn">{notice}</p> : null}
+      {toc.length === 0 ? (
+        main
+      ) : (
+        <div className="overlay-with-toc">
+          <Toc items={toc} label="承認の内容の目次" />
+          <div className="overlay-main">{main}</div>
+        </div>
+      )}
     </>
   );
 }
@@ -271,7 +303,7 @@ const LEGEND: readonly (readonly [string, string])[] = [
 
 function Legend(): JSX.Element {
   return (
-    <dl className="approval-legend" data-approval-legend>
+    <dl className="approval-legend" id="approval-legend" data-approval-legend>
       {LEGEND.map(([term, meaning]) => (
         <Fragment key={term}>
           <dt>{term}</dt>
@@ -282,7 +314,7 @@ function Legend(): JSX.Element {
   );
 }
 
-/** 計画の図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の2つの図）。並びは届いた順 */
+/** 計画の流れの図を親ごとにまとめる（全体計画とフィードバック計画は同じ親の2つの図）。並びは届いた順 */
 function families(plans: readonly ApprovePlan[]): [string, ApprovePlan[]][] {
   const out = new Map<string, ApprovePlan[]>();
   for (const plan of plans) {
@@ -301,7 +333,7 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
   // 末尾に改行を足さない。実行ファイルが組んだ文字列と同じものが選択とコピーで取れるようにする。
   const br = (i: number): string => (i === lines.length - 1 ? "" : "\n");
   return (
-    <pre className="approval-text" data-tour="approval-text">
+    <pre className="approval-text" id="approval-body" data-tour="approval-text">
       {lines.map((body, i) =>
         body.note === "" ? (
           <Fragment key={i}>{body.line + br(i)}</Fragment>
@@ -320,26 +352,27 @@ function BodyText({ text }: { readonly text: string }): JSX.Element {
 }
 
 /**
- * 承認のプロンプトと決めた結果のプロンプトは、同じ2ボタンで渡す。プロンプトは拡張ホストが持っている分を使う。
+ * 承認のプロンプトと決めた結果のプロンプトは、同じ3ボタンで渡す。プロンプトは拡張ホストが持っている分を使う。
+ * 主ボタンは「新しいセッションで開く」1つ。「ターミナルで実行」は確認なしで動くので、そのことを名前に入れる。
  * `retry`があるときは、指摘を読み直して決め直すボタンも出す（表示した後に指摘が追加されたとき）
  */
 function HandOver({ retry }: { readonly retry?: { readonly parent: string; readonly phase: number } }): JSX.Element {
   return (
     <DialogActions className="approval-actions" tour="approval-handover">
-      <button type="button" className="action primary" data-action="prompt-copy" onClick={() => post({ type: "promptCopy" })}>
-        コピー
-      </button>
-      <button type="button" className="action" data-action="prompt-open" onClick={() => post({ type: "promptOpen" })}>
+      <button type="button" className="action primary" data-action="prompt-open" onClick={() => post({ type: "promptOpen" })}>
         新しいセッションで開く
+      </button>
+      <button type="button" className="action" data-action="prompt-copy" onClick={() => post({ type: "promptCopy" })}>
+        コピー
       </button>
       <button
         type="button"
-        className="action"
+        className="action risky"
         data-action="prompt-run"
         title="新しいターミナル（ccnavi claude）でclaude -pを実行します（autoモード）。押すと確認なしですぐ実行されます。止めるときは、ターミナルでCtrl+Cを押してください。"
         onClick={() => post({ type: "promptRun" })}
       >
-        ターミナルで実行
+        {PROMPT_RUN_LABEL}
       </button>
       {retry !== undefined ? (
         <button type="button" className="action" data-action="decide-retry" onClick={() => post({ type: "decide", parent: retry.parent, phase: retry.phase })}>

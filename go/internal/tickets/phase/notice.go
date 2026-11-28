@@ -160,10 +160,10 @@ func later(a, b string) bool {
 
 // ResumedReview は、作業中（doing/）の子のフェーズに、レビュー済みのマーカーが残っている形の警告文を返す。無ければ空を返す。文には子の識別子を入れない（呼び手が前に付ける）。
 //
-// 閉じたチケットを手で doing/ へ戻すと、reviewed が残る。もう一度 finish しても止まらない。
+// クローズしたチケットを手で doing/ へ戻すと、reviewed が残る。もう一度 finish しても止まらない。
 // マーカーを消すかどうかは、レビューをやり直すかでユーザが決める。
 // 延期したフェーズの子は、一度終わった印（skipped）で言い、引き受け手は辿らない。
-// review_required は doing/ の子の要求を数えない。そのため、閉じ直したときに要る分（この子の要求）をここでだけ足す。
+// review_required は doing/ の子の要求を数えない。そのため、クローズし直したときに要る分（この子の要求）をここでだけ足す。
 // ゲートと告知の判定は動かさない。
 func ResumedReview(conf *config.Settings, root string, child *ticket.Ticket, raw *approval.Raw) string {
 	n, isChild := child.ChildPhase()

@@ -29,7 +29,7 @@ func realOf(path string) string {
 	return path
 }
 
-// approvedFiles は全ツリーの承認済みチケットの置き場（作業中・閉じた）のファイル（実パス）。
+// approvedFiles は全ツリーの承認済みチケットの置き場（作業中・クローズした）のファイル（実パス）。
 func approvedFiles(tr *ticketkit.Tree) []string {
 	var found []string
 	tops, _ := filepath.Glob(filepath.Join(tr.Root, ".claude", "worktrees", "*"))

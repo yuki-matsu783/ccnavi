@@ -86,7 +86,7 @@ func childText(id, phase string, globs []string, extra ...string) string {
 	return text + "---\n\n本文\n"
 }
 
-// workspace は親 1 本と、状態の違う子（着手済み 2 本・未着手・ワークツリーの無い着手済み・閉じた・取り消した・
+// workspace は親 1 本と、状態の違う子（着手済み 2 本・未着手・ワークツリーの無い着手済み・クローズした・取り消した・
 // レビュー待ち・blocked（着手していないのに基準点がある）・ワークツリーだけある未着手）、直接作業のワークツリー 2 つ、読み取りの定義を置いたワークスペース。
 func workspace(t *testing.T) string {
 	root := testkit.Workspace(t, parent, "direct-a", "direct-b")
@@ -275,7 +275,7 @@ func TestApply(t *testing.T) {
 	}
 }
 
-// 担当にできない子の理由（閉じた・取り消した・レビュー待ち・blocked）。
+// 担当にできない子の理由（クローズした・取り消した・レビュー待ち・blocked）。
 func TestUnavailable(t *testing.T) {
 	wt := &tree.Tree{Name: "x"}
 	cases := []struct {
@@ -283,7 +283,7 @@ func TestUnavailable(t *testing.T) {
 		st   place.State
 		want string
 	}{
-		{&ticket.Ticket{StartedAt: "s"}, place.Done, "閉じた子です"},
+		{&ticket.Ticket{StartedAt: "s"}, place.Done, "クローズした子です"},
 		{&ticket.Ticket{StartedAt: "s", CancelledAt: "c"}, place.Done, "取り消された子です"},
 		{&ticket.Ticket{StartedAt: "s"}, place.Review, "完了してレビュー待ちの子です"},
 		{&ticket.Ticket{StartedAt: "s", CompletedAt: "c"}, place.Doing, "完了してレビュー待ちの子です"},

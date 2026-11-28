@@ -17,7 +17,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// 早めに閉じてから Draft を外すまでを、ワークスペースを作って同じ順で打たせ、終了
+// 早めにクローズしてから Draft を外すまでを、ワークスペースを作って同じ順で打たせ、終了
 // コード・標準出力・標準エラー・置いたファイル（承認済みの領域・wip/・state・退避）が、記録した答え
 // （testdata/flow.json）と 1 字も違わないことを見る。
 // 順は ready --check と ready（子が開いている）→ close-early（理由なし・変更要求・n・計画・計画の照合 2 つ・

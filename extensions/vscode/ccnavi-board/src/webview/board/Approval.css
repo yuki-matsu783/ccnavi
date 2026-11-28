@@ -33,7 +33,7 @@
 .approval-note { margin: 4px 0 8px; }
 .approval-note.warn { color: var(--board-warn-text); }
 .approval-note.error { color: var(--board-error-text); white-space: pre-wrap; overflow-wrap: anywhere; }
-/* 計画の図を親ごとにまとめた塊。注意と「計画を編集」を、その親の図の前に置く */
+/* 計画の流れの図を親ごとにまとめた塊。注意と「計画を編集」を、その親の図の前に置く */
 .plan-family + .plan-family { margin-top: 12px; }
 .plan-family-actions { display: flex; justify-content: flex-end; margin: 4px 0; }
 
@@ -67,3 +67,6 @@ a.decide-url:hover, a.decide-url:focus-visible { text-decoration: underline; col
 .decide-choice:has(input:checked) { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: var(--vscode-button-background); font-weight: 600; }
 .decide-choice:has(input:focus-visible) { outline: 2px solid var(--vscode-focusBorder); outline-offset: -2px; }
 .decide-choice:has(input:disabled) { opacity: .5; cursor: not-allowed; }
+/* 確認なしで動くボタン（ターミナルで実行）。警告の色の枠と文字にし、ほかのボタンから少し離す。色はテーマの警告色 */
+.overlay-actions button.action.risky { margin-left: 16px; color: var(--warn-text); border-color: var(--vscode-editorWarning-foreground); }
+.overlay-actions button.action.risky:hover { border-color: var(--vscode-editorWarning-foreground); background: var(--vscode-inputValidation-warningBackground, var(--vscode-button-secondaryHoverBackground)); }

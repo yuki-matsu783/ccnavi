@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 import { pickAppearance } from "./appearance.js";
 import { disposeReport, finishReport, startReport, takeScreenshot } from "./bug-report.js";
+import { watchBoardFeed } from "./board-feed.js";
 import { openBoard, refreshBoard } from "./board-panel.js";
 import { registerScreens, screens } from "./core/screens.js";
 import { openFlow } from "./flow-panel.js";
@@ -13,12 +14,15 @@ import { openRules } from "./rules-panel.js";
 import { openTemplates } from "./templates-panel.js";
 import { registerSidebar } from "./sidebar.js";
 import { watchTicketControl } from "./ticket-control.js";
+import { initTargetMemory } from "./target-memory.js";
 import { initTours, openSidebarTour, openSidebarTourOnNewVersion, runBasicTours, runScreenTour } from "./tour.js";
 import { openWorkflow } from "./workflow-panel.js";
 
 export function activate(context: vscode.ExtensionContext): void {
   // 画面ごとの初回の案内を見たかどうかの置き場（`globalState`）
   initTours(context);
+  // 設定の4画面で最後に選んだ設定の置き場（`workspaceState`）
+  initTargetMemory(context);
   // 画面の入口はここに集める。画面どうしは互いをimportせず、ここで登録した一覧を通して互いを開く。
   registerScreens({
     board: openBoard,
@@ -31,18 +35,20 @@ export function activate(context: vscode.ExtensionContext): void {
     flow: openFlow,
     workflow: openWorkflow,
   });
-  // サイドパネルより先に読む。入口の順序がこの値で決まる。
+  // 答えを聞く側（チケット制御 → サイドパネル）を登録してから、拡張全体の答えの監視と最初の読み込みを始める。
+  // チケット制御はサイドパネルより先に聞く。サイドパネルの行がこの値で決まる。
   watchTicketControl(context);
   registerSidebar(context);
+  watchBoardFeed(context);
   context.subscriptions.push(
     vscode.commands.registerCommand("ccnaviBoard.open", () => void screens().board()),
     vscode.commands.registerCommand("ccnaviBoard.refresh", refreshBoard),
     // 承認はボードのボタンだけ。パレットからは打てない（承認内容を見ずに押せる入口を作らない）。
-    vscode.commands.registerCommand("ccnaviBoard.openRules", () => void screens().rules({ kind: "workspace" })),
+    vscode.commands.registerCommand("ccnaviBoard.openRules", () => void screens().rules()),
     vscode.commands.registerCommand("ccnaviBoard.openProjects", () => void screens().projects()),
-    vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void screens().risk({ kind: "workspace" })),
-    vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void screens().phases({ kind: "self" })),
-    vscode.commands.registerCommand("ccnaviBoard.openTemplates", () => void screens().templates({ kind: "self" })),
+    vscode.commands.registerCommand("ccnaviBoard.openRisk", () => void screens().risk()),
+    vscode.commands.registerCommand("ccnaviBoard.openPhases", () => void screens().phases()),
+    vscode.commands.registerCommand("ccnaviBoard.openTemplates", () => void screens().templates()),
     vscode.commands.registerCommand("ccnaviBoard.openHandoff", () => void screens().handoff()),
     vscode.commands.registerCommand("ccnaviBoard.appearance", () => void pickAppearance()),
     // 左パネルの案内（ウォークスルー）と、そこから動かす画面の基本の案内

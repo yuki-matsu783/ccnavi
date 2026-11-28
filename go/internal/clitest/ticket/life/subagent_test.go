@@ -251,7 +251,7 @@ func TestTheStageOfAPhaseWaitingForItsReview(t *testing.T) {
 			openFamily(tr, parallelPlan, launchChild{childName, 1, researchScope}, launchChild{launchChild2, 2, designScope})
 			tr.RunChild(childName)
 			tr.RunChild(launchChild2, ticketkit.File{Path: "wip/design/a.md", Text: "設計\n"})
-			// 設計（mr）の子を閉じ、レビューが要る枝を止める。研究の子は開いたまま。
+			// 設計（mr）の子をクローズし、レビューが要る枝を止める。研究の子は開いたまま。
 			ticketkit.OK(t, tr.Ccnavi("ticket", "finish", launchChild2))
 			tr.CommitParent("close 02")
 			tr.Merge(launchChild2)

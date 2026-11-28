@@ -37,7 +37,7 @@ func branchNameProblems(conf *config.Settings, root string, proposals, copies, c
 	integrationOf func(string) string, adopted map[string]bool) []rules.Problem {
 	var out []rules.Problem
 	warn := func(detail string) { out = append(out, ticketProblem(rules.Warn, detail)) }
-	// everyone は全部の状態のチケット。settled は承認以降（承認済み・閉じた・審査中）の識別子で、ブランチ名はもう決まっている。
+	// everyone は全部の状態のチケット。settled は承認以降（承認済み・クローズした・審査中）の識別子で、ブランチ名はもう決まっている。
 	everyone := slices.Concat(copies, closed, review, proposals)
 	settled := map[string]bool{}
 	for _, t := range slices.Concat(copies, closed, review) {
@@ -163,7 +163,7 @@ func prefixSettingProblems(conf *config.Settings) []rules.Problem {
 }
 
 // worktreeProblems はワークツリーの側。チケットの無いツリー、元リポジトリの食い違い（書き込みが止まるので error）、
-// ツリーの無い承認済みチケット。known は未承認・閉じた・審査中を含む識別子で、直接作業の名前だけをこれと照らす。
+// ツリーの無い承認済みチケット。known は未承認・クローズした・審査中を含む識別子で、直接作業の名前だけをこれと照らす。
 func worktreeProblems(conf *config.Settings, root string, worktrees []tree.Tree, index map[string]*ticket.Ticket,
 	copies []*ticket.Ticket, known map[string]bool) []rules.Problem {
 	var out []rules.Problem

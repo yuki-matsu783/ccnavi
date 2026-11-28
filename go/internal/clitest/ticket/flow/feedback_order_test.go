@@ -17,7 +17,7 @@ var fbParallel = []samples.Step{
 	{Type: "implement-feedback", After: []int{2, 3}},
 }
 
-// planReviewed は全体計画（design 1 ステップ）を閉じてレビューを済ませ、親を着手した木。
+// planReviewed は全体計画（design 1 ステップ）をクローズしてレビューを済ませ、親を着手した木。
 func planReviewed(t *testing.T) *Tree {
 	t.Helper()
 	return cachedTree(t, "plan-reviewed", func(tr *Tree) {
@@ -66,13 +66,13 @@ func TestParallelFeedbackChildrenStartTogetherAndTheJoinWaits(t *testing.T) {
 	if isApproved(tr, "i0001-04-04") {
 		t.Error("合流のステップの子が先行より先に承認された")
 	}
-	ticketkit.Has(t, r.Stderr, "閉じるまで承認しない")
+	ticketkit.Has(t, r.Stderr, "クローズするまで承認しない")
 	explained := tr.Ccnavi("--explain").Stdout
 	ticketkit.Has(t, explained, "フェーズ 3（実装フィードバック対応）")
 	ticketkit.Has(t, explained, "先行 1")
 }
 
-// フィードバック計画を立てる改版と子を一緒に出しても、合流のステップの子は先行が閉じるまで承認されない。
+// フィードバック計画を立てる改版と子を一緒に出しても、合流のステップの子は先行がクローズするまで承認されない。
 func TestTheJoinChildWaitsEvenWhenApprovedWithTheFeedbackPlan(t *testing.T) {
 	t.Parallel()
 	tr := planReviewed(t)
@@ -83,7 +83,7 @@ func TestTheJoinChildWaitsEvenWhenApprovedWithTheFeedbackPlan(t *testing.T) {
 	if !isApproved(tr, "i0001-02-02") || !isApproved(tr, "i0001-03-03") || isApproved(tr, "i0001-04-04") {
 		t.Errorf("承認の結果が違う: 02=%v 03=%v 04=%v\n%s%s", isApproved(tr, "i0001-02-02"), isApproved(tr, "i0001-03-03"), isApproved(tr, "i0001-04-04"), r.Stdout, r.Stderr)
 	}
-	ticketkit.Has(t, r.Stderr, "閉じるまで承認しない")
+	ticketkit.Has(t, r.Stderr, "クローズするまで承認しない")
 }
 
 func TestAnApprovedFeedbackPlanCannotChangeItsAfter(t *testing.T) {

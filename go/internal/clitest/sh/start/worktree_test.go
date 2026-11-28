@@ -309,7 +309,7 @@ func TestWorktreeAnApprovedParentTreeMayNotSwitch(t *testing.T) {
 	w.assertRefused(w.shIn(path, nil, "topic", "--dry-run"))
 	r := w.shIn(path, nil, "topic")
 	w.assertRefused(r)
-	has(t, r.Stderr, "案内: 親を早めに閉じたいなら", "ccnavi-user-close-early.sh",
+	has(t, r.Stderr, "案内: 親を早めにクローズしたいなら", "ccnavi-user-close-early.sh",
 		// 断る文は、報告して待つことを言う。
 		"親のワークツリー（p0001）から", "次: 状況をユーザに報告し")
 }

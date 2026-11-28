@@ -63,6 +63,7 @@ import { useHostMessages } from "../useHostMessages.js";
 import { useSaveKey, type SaveKeyTarget } from "../useSaveKey.js";
 import { editSaveBlocker, saveTitle } from "../../core/save-gate.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
+import { EditorBar, EditorState } from "../shared/EditorBar.js";
 import { graphMaximized } from "../shared/Maximize.js";
 import { mergeState, readState } from "../vscode.js";
 import { Canvas, type Selection } from "./Canvas.js";
@@ -695,7 +696,6 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         <div id="offer" data-tour="offer" className="banner missing" role="status">
           <span>
             提案あり: エージェントの下書き（{shownOffer.draftPath}）が、いまのフローと違います。
-            {shownOffer.problem !== undefined && <span className="dim">（読み込めません: {shownOffer.problem}）</span>}
           </span>
           <button type="button" className="action" data-action="open-proposal" disabled={shownBusy} onClick={openProposal}>
             提案を見る
@@ -703,71 +703,96 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         </div>
       )}
       <ScreenHeader courses={courses} onPick={tour.start} status={touring ? null : (status ?? null)}>
-        <div className="summary">
-          <span className="flow-ticket">
-            <strong>{shownPage.ticket}</strong> {shownPage.title}
-          </span>
-          <span className="path" title={`${shownPage.flowRel}（承認済みの領域です。変更・コミットできるのはユーザだけです）`}>
-            {shownPage.flowPath}
-          </span>
-          {!shownPage.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}
-          <span id="dirty" data-tour="dirty" className={shownDirty ? "dirty" : "dirty hidden"}>
-            未保存
-          </span>
-        </div>
-        <div className="controls">
-          <button type="button" className="action" data-action="undo" data-tour="undo" disabled={shownReadOnly || !canUndoNow} title="元に戻す（Ctrl+Z）" onClick={undoEdit}>
-            元に戻す
-          </button>
-          <button type="button" className="action" data-action="redo" data-tour="redo" disabled={shownReadOnly || !canRedoNow} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）" onClick={redoEdit}>
-            やり直す
-          </button>
-          <button type="button" className="action" data-action="copy-nodes" data-tour="copy" disabled={!copyableNow} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始ノードはコピーできません。" onClick={copy}>
-            コピー
-          </button>
-          <button type="button" className="action" data-action="paste-nodes" data-tour="paste" disabled={shownReadOnly || !hasClipNow} title="コピーしたノードを貼り付けます（Ctrl+V）" onClick={paste}>
-            貼り付け
-          </button>
-          <button type="button" className="action" data-action="duplicate-nodes" data-tour="duplicate" disabled={shownReadOnly || !copyableNow} title="選んだノードをその場で複製します（Ctrl+D）。開始ノードは複製できません。" onClick={duplicate}>
-            複製
-          </button>
-          <button
-            type="button"
-            className="action"
-            data-action="group-nodes"
-            data-tour="group"
-            disabled={shownReadOnly || groupableCount < 2}
-            title="Shiftを押しながらノードを2つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません。"
-            onClick={group}
-          >
-            グループ化
-          </button>
-          <button type="button" className="action" data-action="toggle-minimap" data-tour="minimap" aria-pressed={shownMinimap} title="図の右下のミニマップを出す・隠す" onClick={toggleMinimap}>
-            {shownMinimap ? "ミニマップを隠す" : "ミニマップを出す"}
-          </button>
-          {shownRequest !== undefined && !shownLock.locked && (
-            <button
-              type="button"
-              className="action"
-              data-action="request-flow"
-              data-tour="request"
-              disabled={shownBusy}
-              title="エージェントへの依頼の文を作ります。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。"
-              onClick={() => post({ type: "request" })}
-            >
-              {shownRequest}
+        <EditorBar
+          name={
+            <>
+              <span className="flow-ticket">
+                <strong>{shownPage.ticket}</strong> {shownPage.title}
+              </span>
+              <span className="path" title={`${shownPage.flowPath}（承認済みの領域です。変更・コミットできるのはユーザだけです）`}>
+                {shownPage.flowPath}
+              </span>
+              {!shownPage.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}
+            </>
+          }
+          states={
+            <>
+              <EditorState shown={shownDirty} tone="dirty" id="dirty" tour="dirty">
+                未保存
+              </EditorState>
+              <EditorState shown={shownLock.locked} tone="warn" role="read-only" title="保存できません。理由は上の帯にあります">
+                閲覧のみ
+              </EditorState>
+              <EditorState shown={shownOffer !== undefined} tone="info" role="offer" title="エージェントの下書きが、いまのフローと違います。上の帯の「提案を見る」で開きます">
+                提案あり
+              </EditorState>
+              <EditorState shown={shownChanged} tone="warn" role="changed" title="ファイルが外で変わりました。上の帯の「更新」で読み直します">
+                外で変わった
+              </EditorState>
+            </>
+          }
+          history={
+            <>
+              <button type="button" className="action" data-action="undo" data-tour="undo" disabled={shownReadOnly || !canUndoNow} title="元に戻す（Ctrl+Z）" onClick={undoEdit}>
+                元に戻す
+              </button>
+              <button type="button" className="action" data-action="redo" data-tour="redo" disabled={shownReadOnly || !canRedoNow} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）" onClick={redoEdit}>
+                やり直す
+              </button>
+            </>
+          }
+          aux={
+            <>
+              <button type="button" className="action" data-action="copy-nodes" data-tour="copy" disabled={!copyableNow} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始ノードはコピーできません。" onClick={copy}>
+                コピー
+              </button>
+              <button type="button" className="action" data-action="paste-nodes" data-tour="paste" disabled={shownReadOnly || !hasClipNow} title="コピーしたノードを貼り付けます（Ctrl+V）" onClick={paste}>
+                貼り付け
+              </button>
+              <button type="button" className="action" data-action="duplicate-nodes" data-tour="duplicate" disabled={shownReadOnly || !copyableNow} title="選んだノードをその場で複製します（Ctrl+D）。開始ノードは複製できません。" onClick={duplicate}>
+                複製
+              </button>
+              <button
+                type="button"
+                className="action"
+                data-action="group-nodes"
+                data-tour="group"
+                disabled={shownReadOnly || groupableCount < 2}
+                title="Shiftを押しながらノードを2つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません。"
+                onClick={group}
+              >
+                グループ化
+              </button>
+              <button type="button" className="action" data-action="toggle-minimap" data-tour="minimap" aria-pressed={shownMinimap} title="図の右下のミニマップを出す・隠す" onClick={toggleMinimap}>
+                {shownMinimap ? "ミニマップを隠す" : "ミニマップを出す"}
+              </button>
+              {shownRequest !== undefined && !shownLock.locked && (
+                <button
+                  type="button"
+                  className="action"
+                  data-action="request-flow"
+                  data-tour="request"
+                  disabled={shownBusy}
+                  title="エージェントへの依頼の文を作ります。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。"
+                  onClick={() => post({ type: "request" })}
+                >
+                  {shownRequest}
+                </button>
+              )}
+              <button type="button" className="action" data-action="open-flow" disabled={!shownPage.exists} title={!shownPage.exists ? "ファイルがまだないため、開けません" : undefined} onClick={() => post({ type: "openFile" })}>
+                エディタで開く
+              </button>
+              <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
+                更新
+              </button>
+            </>
+          }
+          primary={
+            <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={saveBlocker !== ""} title={saveTitle(saveBlocker)} onClick={save}>
+              保存
             </button>
-          )}
-          <button type="button" className="action" data-action="open-flow" disabled={!shownPage.exists} title={!shownPage.exists ? "ファイルがまだないため、開けません" : undefined} onClick={() => post({ type: "openFile" })}>
-            エディタで開く
-          </button>
-          <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
-            更新
-          </button>
-          <button type="button" className="action primary" id="save" data-action="save" data-tour="save" disabled={saveBlocker !== ""} title={saveTitle(saveBlocker)} onClick={save}>
-            保存
-          </button>
-        </div>
+          }
+        />
       </ScreenHeader>
       {shownNotices.length + (shownChecks?.warns.length ?? 0) > 0 && (
         <ul className="problems" id="flow-notices" data-tour="notices">

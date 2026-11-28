@@ -45,13 +45,14 @@ import { renderRiskPage } from "./core/risk-render.js";
 import type { RiskData, RiskMessage, ToRisk } from "./core/risk-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { HANDOFF_ENTRY } from "./handoff-entry.js";
-import type { RiskTarget } from "./core/screens.js";
+import type { SettingsTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
-import { targetOptions } from "./core/targets.js";
+import { targetKey, targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { showLoading } from "./loading.js";
 import { assertRetained, openInEditor, patternFor, resolveIn, watchPattern, workspaceFolder } from "./panel-common.js";
-import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { binSetting, readSettingFile, settingsPanel, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { targetToOpen } from "./target-memory.js";
 import { requireTickets } from "./ticket-control.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -81,7 +82,7 @@ type PanelState = SettingsState<RiskData, Loaded>;
 let state: PanelState | undefined;
 
 /** 読み込み中の一言で「何を」読んでいるか */
-function whatOf(target: RiskTarget): string {
+function whatOf(target: SettingsTarget): string {
   switch (target.kind) {
     case "workspace":
       return "共通設定のリスク";
@@ -92,8 +93,8 @@ function whatOf(target: RiskTarget): string {
   }
 }
 
-/** `ccnaviBoard.openRisk`の本体。引数なしは共通設定の配点 */
-export async function openRisk(target: RiskTarget = { kind: "workspace" }): Promise<void> {
+/** `ccnaviBoard.openRisk`の本体。開いていれば前面に出すだけ。開くときは最後に選んだ対象で、無ければ共通設定で開く */
+export async function openRisk(): Promise<void> {
   if (!requireTickets("リスク管理画面")) {
     return;
   }
@@ -103,9 +104,6 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
   }
   if (state !== undefined) {
     state.panel.reveal(state.panel.viewColumn);
-    if (!sameTarget(state.target, target)) {
-      await switchTarget(state, target);
-    }
     return;
   }
 
@@ -128,6 +126,7 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
     // 編集の途中を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
+  const target = targetToOpen({ kind: "workspace" });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
@@ -150,11 +149,11 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
   await reload(current);
 }
 
-async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
+async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   const notices: string[] = [];
   // 切り替えの一覧と統合結果のために、共通設定でも実行ファイルに聞く。読めなくても共通設定は開けるので、一覧と統合結果が縮むだけ
   const board = await loadBoard(root, binSetting());
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
+  const targets = targetOptions(board.ok ? board.board : undefined, targetKey(target));
   const sums = riskSums(board.ok ? board.board : undefined);
   let riskRel: string;
   let riskPath: string;
@@ -232,7 +231,7 @@ function alive(current: PanelState): boolean {
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, switchTarget, fail, save } = settingsPanel<RiskData, Loaded, ToRisk, RiskMessage>({
+const { registerPanelHandlers, scheduleChanged, reload, fail, save } = settingsPanel<RiskData, Loaded, ToRisk, RiskMessage>({
   accepts: true,
   screen: SCREEN,
   title: TITLE,
@@ -288,7 +287,7 @@ function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, target) });
 }
 
 /**
@@ -367,7 +366,7 @@ async function create(current: PanelState, loaded: Loaded): Promise<void> {
 }
 
 /** 保存の前の検証に渡す差し替え。共通設定は`--risk`、ほかは名前を付けて`--project-risk-file` */
-function overrideFor(target: RiskTarget, tmp: string): LintOverride {
+function overrideFor(target: SettingsTarget, tmp: string): LintOverride {
   switch (target.kind) {
     case "workspace":
       return { kind: "risk", path: tmp };

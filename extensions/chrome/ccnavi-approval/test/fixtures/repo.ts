@@ -3,7 +3,7 @@
  *
  * - `main`（統合先）: 共通設定、互換のマーカー、文面ファイル、クローズ済みの親子のチケット i0005 の `done/`
  * - `i0001`（直近）: 親と子の提案。子の先行は i0003-01-01（開いた親子のチケット。直近の外なので閉包で読む）と
- *   i0005-01-01（統合先で閉じている。そこで止まる）
+ *   i0005-01-01（統合先でクローズしている。そこで止まる）
  * - `i0002`（直近）: 悪意のある Markdown を本文に持つ親の提案と、範囲が親の外に出る子（承認の対象にしない）。
  *   子の先行 i0007-01-01 の親のブランチは無い
  * - `i0003`（古い）: 親と子の提案。表示用のブランチには入らない
@@ -115,7 +115,7 @@ function done(id: string, parentId: string | null, phase: number | null): string
     "version: 1",
     `ticket: ${id}`,
     ...(parentId ? [`parent: ${parentId}`, `phase: ${phase}`] : ["plan:", "  - research"]),
-    `title: 閉じた ${id}`,
+    `title: クローズした ${id}`,
     "human_review:",
     "  required: false",
     "  reason: 見本",
@@ -128,7 +128,7 @@ function done(id: string, parentId: string | null, phase: number | null): string
     "base_sha: 0000000000000000000000000000000000000000",
     "---",
     "",
-    "閉じた",
+    "クローズした",
     "",
   ].join("\n");
 }

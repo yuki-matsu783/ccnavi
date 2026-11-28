@@ -161,7 +161,7 @@ func TestABaseShaWithoutStartedAtIsBlocked(t *testing.T) {
 	ticketkit.Has(t, lint.Stdout, "`started_at` が無いのに `base_sha` がある")
 }
 
-// done/ から doing/ へ手で戻す再開では、閉じるときの欄が残る。判定は止めず、--lint が warn で言う。
+// done/ から doing/ へ手で戻す再開では、クローズするときの欄が残る。判定は止めず、--lint が warn で言う。
 func TestFieldsLeftByAResumeAreWarnedButNotBlocked(t *testing.T) {
 	t.Parallel()
 	tr := ticketkit.New(t)
@@ -250,7 +250,7 @@ func TestReviewReadsOnlyWhatFinishMoved(t *testing.T) {
 	}
 }
 
-// 親が閉じた子は、親の範囲で切り詰められないので止める（判定が親を引く索引は作業中のものだけ。親を引けない子は止める側を採る）。
+// 親がクローズした子は、親の範囲で切り詰められないので止める（判定が親を引く索引は作業中のものだけ。親を引けない子は止める側を採る）。
 // ボードの JSON にも、書き込みが全部止まっていることが出る（理由が付いていないのに親を引けない子が居ないことも同じ出力から確かめる）。
 func TestAChildWhoseParentIsClosedIsBlockedNotUnclipped(t *testing.T) {
 	t.Parallel()

@@ -1,0 +1,21 @@
+/*
+ * 選んだカードの右のパネル（`Panel.tsx`）。見出し・位置・MR・ユーザ待ち・フェーズ一覧・操作・詳細の見た目は`Card.css`と同じものを使い、
+ * ここは置き場と枠だけを持つ。
+ * 広い幅では列の右に並べ、ページを下へ送っても見えるよう上に貼り付ける（中身が長ければパネルの中で送る）。
+ * 940px以下（列を縦に積む幅）では、選んだカードのすぐ下に開く（`.below`。置くのは`App.tsx`）。
+ */
+.board-area.with-panel { display: flex; gap: var(--gap-5); align-items: flex-start; }
+.board-area.with-panel > .board { flex: 1 1 auto; min-width: 0; }
+.card-panel {
+  box-sizing: border-box; flex: 0 0 min(var(--w-field-wide), 40%); min-width: 0;
+  position: sticky; top: 8px; max-height: calc(100vh - 16px); overflow: auto;
+  border: 1px solid var(--vscode-focusBorder); border-radius: var(--radius-lg); padding: 10px;
+  background: var(--vscode-editorWidget-background);
+}
+.card-panel.below { position: static; max-height: none; overflow: visible; margin-left: 12px; }
+.card-panel-slot { list-style: none; }
+.panel-head { display: flex; gap: var(--gap-3); align-items: flex-start; }
+.panel-head .card-head { flex: 1 1 auto; min-width: 0; }
+.panel-close { flex: 0 0 auto; }
+.card-panel .card-actions { margin-top: 10px; }
+.card-panel .detail-rows { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); font-size: var(--font-sm); }

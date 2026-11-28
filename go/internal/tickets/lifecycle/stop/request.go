@@ -50,7 +50,7 @@ type Pending struct {
 // Key は親とフェーズ。
 func (p *Pending) Key() string { return requestKey + p.Parent.ID + ":" + strconv.Itoa(p.Number) }
 
-// Digest は一手の種類・相手・HEAD。進めば（子を閉じる、合流する、コミットを足す）変わる。
+// Digest は一手の種類・相手・HEAD。進めば（子をクローズする、合流する、コミットを足す）変わる。
 func (p *Pending) Digest() string {
 	return string(p.Step) + ":" + strings.Join(p.Children, ",") + "@" + p.head
 }
@@ -62,9 +62,9 @@ func (p *Pending) finishNudged(data *pyjson.Object) bool {
 }
 
 // PendingAtStop は cwd のツリーが結び付く親が、依頼までの道の途中にいるなら返す。子のツリーなら自分の子が
-// 作業中のとき、親のツリーなら作業中の子が残るか、子が全部閉じてレビューの要るフェーズに依頼がまだ無いとき。
+// 作業中のとき、親のツリーなら作業中の子が残るか、子が全部クローズしてレビューの要るフェーズに依頼がまだ無いとき。
 // 依頼済み（requested が在る）のフェーズは、手で done/ に動かした子を確定できるときだけ confirm を促す。
-// 親のワークツリーが決まらない・早めに閉じた親は対象にしない。raw は UnfinishedAtStop と同じ。
+// 親のワークツリーが決まらない・早めにクローズした親は対象にしない。raw は UnfinishedAtStop と同じ。
 func PendingAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *Pending {
 	at, ok := here(conf, root, cwd)
 	if !ok {

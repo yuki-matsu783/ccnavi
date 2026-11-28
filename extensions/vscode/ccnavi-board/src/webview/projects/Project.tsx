@@ -8,6 +8,7 @@ import type { JSX } from "react";
 
 import type { LintProblem } from "../../core/lintmodel.js";
 import type { MirrorData, ProjectRow, ProjectsMessage } from "../../core/projects-view.js";
+import { PathText } from "../shared/PathText.js";
 import { MirrorField } from "./Mirror.js";
 
 export interface ProjectProps {
@@ -45,13 +46,15 @@ export function Project({ row, ticketsEnabled, tour = false, mirror, act }: Proj
       </div>
       <dl className="fields">
         <div className="field">
-          <dt>origin</dt>
+          <dt>
+            取得元 <span className="dim small">（origin）</span>
+          </dt>
           <dd>
             {row.origin === "" ? (
               <span className="dim">不明</span>
             ) : (
               <span className="mono small" title={row.origin}>
-                {row.origin}
+                <PathText text={row.origin} />
               </span>
             )}
           </dd>
@@ -107,13 +110,13 @@ function Rules({ row }: { readonly row: ProjectRow }): JSX.Element {
   if (row.rulesExists) {
     return (
       <>
-        <span className="ok">あり</span> <span className="mono small">{row.rulesRel}</span>
+        <span className="ok">あり</span> <span className="mono small"><PathText text={row.rulesRel} /></span>
       </>
     );
   }
   return (
     <>
-      <span className="warn-text">なし</span> <span className="mono small dim">{row.rulesRel}</span>
+      <span className="warn-text">なし</span> <span className="mono small dim"><PathText text={row.rulesRel} /></span>
     </>
   );
 }

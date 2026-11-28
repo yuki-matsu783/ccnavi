@@ -370,7 +370,7 @@ func inStore(conf *config.Settings, word, full string) bool {
 // inReview はレビュー待ちの置き場（とその下）か、置き場の親を指すか。
 //
 // 置き場はツリーごとにあり、どのツリーのものかは問わない。親（`wip/`・`wip/proposals/`）を丸ごと消すと置き場ごと消えるが、
-// 空なら消えるものが無いので通す。親を閉じた後の `ccnavi-git.sh rm -r wip` の案内がこの形で、そのときレビュー待ちの子は残っていない。
+// 空なら消えるものが無いので通す。親をクローズした後の `ccnavi-git.sh rm -r wip` の案内がこの形で、そのときレビュー待ちの子は残っていない。
 // 空の親を通すのは `rm` だけ。`restore --source`・`checkout <ref> --` で親を戻すと、いまは空でも過去のコミットにあった
 // レビュー待ちの提案が戻りうるので、中身に依らず当てる。
 func inReview(conf *config.Settings, word, full, sub string) bool {

@@ -30,7 +30,7 @@ func CopyPath(approvedDir, id string) string {
 	return ospath.Join(approvedDir, string(place.Doing), id+config.MdExt)
 }
 
-// ClosedPath は閉じた承認済みチケット（done/）のパス。
+// ClosedPath はクローズした承認済みチケット（done/）のパス。
 func ClosedPath(approvedDir, id string) string {
 	return ospath.Join(approvedDir, string(place.Done), id+config.MdExt)
 }

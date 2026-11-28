@@ -19,7 +19,7 @@ const readFilesListed = 100
 
 // noteReadFiles は、チケットのワークツリーで作業したセッションと finish を打ったセッションのコンテキストに乗った
 // ファイルを、チケットの本文の最後にセッションごとに書く。記録が無い・書けないときは何も言わずに飛ばす（記録は補助で、
-// 閉じる操作を止めない）。
+// クローズする操作を止めない）。
 func noteReadFiles(conf *config.Settings, root string, found *ticket.Ticket) {
 	sessions := reads.Sessions(conf.State, tree.WorktreePath(root, found.ID))
 	if current := os.Getenv(env.ClaudeSessionID); current != "" && !slices.Contains(sessions, current) {

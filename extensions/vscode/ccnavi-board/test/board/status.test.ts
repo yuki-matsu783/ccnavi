@@ -256,7 +256,7 @@ test("CB-T608 親のバッジ: 要確認 → 承認待ち（改版は「承認�
   assert.match(cards.get("odd")!.status.title, /置き場: none/);
 });
 
-test("CB-T609 親のバッジ: アーカイブの親は完了（取り消しなら取り消し）。レビュー待ちのフェーズがあっても閉じていれば完了", () => {
+test("CB-T609 親のバッジ: アーカイブの親は完了（取り消しなら取り消し）。レビュー待ちのフェーズがあってもクローズしていれば完了", () => {
   const archived = (ticket: string, over: Partial<ArchivedTicketJson> = {}): ArchivedTicketJson => ({
     ticket, parent: "", phase: null, title: ticket, project: "", path: `/ws/logs/archive/x/done/${ticket}.md`,
     started_at: "", completed_at: "t", cancelled_at: "", cancel_reason: "", ...over,

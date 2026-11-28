@@ -1,5 +1,6 @@
 /*
- * カード1枚（`Card.tsx`）。見出し（タイトル・ID・状態のバッジ）・位置・MR・ユーザ待ち・注意・親のフェーズ一覧・補助の操作・詳細。
+ * カード1枚（`Card.tsx`）。見出し（タイトル・ID・状態のバッジ）・局面（親）・注意・主な操作。
+ * 右のパネル（`Panel.tsx`）も、見出し・位置・MR・ユーザ待ち・フェーズ一覧・操作・詳細の見た目をここから使う（寸法をそろえる）。
  */
 .card {
   position: relative;
@@ -16,7 +17,7 @@
 .card.has-issue { border-left: 3px solid var(--vscode-editorWarning-foreground); }
 .card.pending { border-left: 3px solid var(--vscode-charts-blue); }
 .card.review-hold { border-left: 3px solid var(--vscode-editorError-foreground); }
-/* 前の読み直しから列が変わった（承認された、レビュー不要で閉じた、レビューが済んだ、取り消された）
+/* 前の読み直しから列が変わった（承認された、レビュー不要でクローズした、レビューが済んだ、取り消された）
    カードと、新しく現れたカード。着手（`ticket start`）は列を動かさないので動いた表示は出ない。
    **時間では消さない。** 承認の直後は渡す文のオーバーレイがボードを覆っていて、動く瞬間そのものを
    ユーザが見られないので、次に何かが動くまで動いた表示を残す（`core/board-moved.ts`）。
@@ -32,6 +33,10 @@
 @media (prefers-reduced-motion: reduce) { .card.moved { animation: none; } }
 .moved-mark { margin-top: 4px; font-size: var(--font-xs); font-weight: 600; color: var(--vscode-charts-green); }
 .card.hidden { display: none; }
+/* 選んだカード（右のパネルに出しているもの）。焦点の輪とは別に、枠を太くして示す。色だけに頼らず、パネルの見出しにも同じIDが出る */
+.card.selected { outline: 2px solid var(--vscode-focusBorder); outline-offset: -1px; background: var(--vscode-list-inactiveSelectionBackground, var(--vscode-list-hoverBackground)); }
+/* 主な操作（あれば1つ）。カードの下に置く */
+.card-primary { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 6px; min-width: 0; }
 /* 見出し。タイトルを主にし、IDは補助にする。DOMの並びはID・タイトル・バッジのまま、orderでタイトルを先頭に出す。
    バッジは右端に1つ（狭くて収まらなければ次の行の右端へ回る） */
 .card-head { display: flex; gap: var(--gap-1) var(--gap-3); align-items: baseline; flex-wrap: wrap; }
@@ -138,14 +143,11 @@ a.card-button, a.card-button:hover, a.card-button:focus, a.card-button:active { 
 .card-button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
 .card-button.primary, a.card-button.primary, a.card-button.primary:hover { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
 .card-button.primary:hover { background: var(--vscode-button-hoverBackground); }
-.card-button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
+.card-button:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
 /* 補助の操作（フロー・計画編集・テンプレートの下書き）。通常の色 */
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 8px; min-width: 0; }
 
-/* 詳細。畳んでおき、開きたいときだけ見る。ここのリンクは普通のリンク */
-.card-details { margin-top: 8px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
-.card-details > summary { cursor: pointer; width: fit-content; }
-.card-details > summary:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+/* 詳細（右のパネル）。ここのリンクは普通のリンク */
 .detail-rows { margin: 6px 0 0; display: flex; flex-direction: column; gap: var(--gap-2); }
 .detail-row { display: grid; grid-template-columns: minmax(4.5em, 30%) minmax(0, 1fr); gap: var(--gap-3); }
 .detail-row dt { color: var(--vscode-descriptionForeground); }

@@ -22,6 +22,17 @@ export type PhaseStatus =
   | "これから"
   | "要確認";
 
+/** 「止まっている」印。`review`はレビューで止まっている（レビュー待ち・レビュー準備中）、`check`は要確認、空は止まっていない */
+export type Hold = "review" | "check" | "";
+
+/** フェーズ行の一言とバッジの言葉から「止まっている」印を決める。部品は言葉を比べず、これを読む */
+export function holdOf(label: string): Hold {
+  if (label === "レビュー待ち" || label === "レビュー準備中") {
+    return "review";
+  }
+  return label === "要確認" ? "check" : "";
+}
+
 /** バッジの色の系統。色だけに頼らず、言葉は必ず出す */
 export type Tone = "check" | "turn" | "wait" | "work" | "done" | "cancel";
 
@@ -104,7 +115,7 @@ export interface StatusCard {
   readonly startedAt: string;
   /** 親だけ。承認済みの親に改版が出ているか */
   readonly revision: boolean;
-  /** 親だけ。早めに閉じたか */
+  /** 親だけ。早めにクローズしたか */
   readonly wrapped: boolean;
   /** 子だけ。自分のフェーズが止まっているか（JSONの`gate_closed`） */
   readonly gateClosed: boolean;
@@ -169,7 +180,7 @@ function fieldsOf(card: StatusCard): string {
  * 1. `blocked`か`scattered` → 要確認
  * 2. `pendingApproval` → 承認待ち（承認済みの親に改版が出ていれば「承認待ち（改版）」）
  * 3. 取り消し → 取り消し
- * 4. 完了・アーカイブ → 完了（早めに閉じていれば「完了（早めに終了）」）
+ * 4. 完了・アーカイブ → 完了（早めにクローズしていれば「完了（早めに終了）」）
  * 5. フェーズのどれかがレビュー待ち → レビュー待ち
  * 6. フェーズのどれかがレビュー準備中 → レビュー準備中
  * 7. `copyStatus === "open"` → 着手待ち／作業中

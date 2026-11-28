@@ -299,10 +299,10 @@ func human(parts []string, approvedRel, reviewRel string, added, removed func(st
 	case len(parts) == 2 && parts[0] == flowsDir:
 		return strings.HasSuffix(parts[1], ".yml") || strings.HasSuffix(parts[1], ".yaml")
 	case len(parts) == 2 && parts[0] == doing:
-		// ユーザの承認で置かれたか、早めに閉じたときの取り消しで done/ へ動いた。
+		// ユーザの承認で置かれたか、早めにクローズしたときの取り消しで done/ へ動いた。
 		return added(rel) || removed(rel) && added(approvedRel+"/"+done+"/"+parts[1])
 	case len(parts) == 2 && parts[0] == done && added(rel):
-		// ユーザのレビュー（review/ から）か、早めに閉じたときの取り消し（doing/ から）で動いた先。
+		// ユーザのレビュー（review/ から）か、早めにクローズしたときの取り消し（doing/ から）で動いた先。
 		return removed(reviewRel+"/"+parts[1]) || removed(approvedRel+"/"+doing+"/"+parts[1])
 	case len(parts) == 3 && parts[0] == place.PhasesDir:
 		name := parts[2]

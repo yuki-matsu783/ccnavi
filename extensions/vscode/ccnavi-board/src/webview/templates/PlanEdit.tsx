@@ -72,7 +72,7 @@ export interface PlanEditProps {
 /** この計画で選べる型。全体計画は`work`、フィードバック計画は`feedback`。いま使っている型が定義に無ければそれも挙げる */
 function optionsFor(part: PlanPart, types: readonly PhaseTypeInfo[], current: string): readonly { readonly id: string; readonly label: string }[] {
   const kind = part === "plan" ? "work" : "feedback";
-  const options = types.filter((t) => t.kind === kind).map((t) => ({ id: t.id, label: t.title === "" || t.title === t.id ? t.id : `${t.id}（${t.title}）` }));
+  const options = types.filter((t) => t.kind === kind).map((t) => ({ id: t.id, label: t.title === "" || t.title === t.id ? t.id : `${t.title}（${t.id}）` }));
   if (current !== "" && !options.some((o) => o.id === current)) {
     options.push({ id: current, label: `${current}（定義なし）` });
   }
@@ -179,6 +179,7 @@ export function PlanEdit({ part, template, plan, fresh, shownIds, types, picked,
             editable
             detail
             proposalNumbers={false}
+            heading={false}
             picked={pickedNode}
             onPick={pickNode}
             detailFooter={footer}

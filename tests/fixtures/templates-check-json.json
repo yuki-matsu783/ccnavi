@@ -45,7 +45,7 @@
        "type": "prompt",
        "name": "実装",
        "position": {
-        "x": 1,
+        "x": 260,
         "y": 0
        },
        "data": {
@@ -57,7 +57,7 @@
        "type": "end",
        "name": "終了",
        "position": {
-        "x": 2,
+        "x": 520,
         "y": 0
        },
        "data": {}

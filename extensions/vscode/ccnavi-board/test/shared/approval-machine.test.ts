@@ -130,6 +130,7 @@ function chipOf(overrides: Partial<PhaseChip> = {}): PhaseChip {
     label: "1設計",
     state: "active",
     status: "レビュー待ち",
+    hold: "review",
     gateClosed: false,
     reviewWaiting: true,
     reviewRequired: true,

@@ -22,15 +22,15 @@
   background: none; border: none; color: var(--vscode-descriptionForeground);
   font: inherit; padding: 0 2px; cursor: pointer; line-height: 1;
 }
-.sum { display: contents; }
-.sum .sum-id { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sum .dim { color: var(--vscode-descriptionForeground); }
-.sum .mono { font-family: var(--vscode-editor-font-family); font-size: var(--font-md); }
-.sum .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sum .sum-note { color: var(--vscode-descriptionForeground); margin-left: 10px; }
-.sum .sum-flag { width: 8px; height: 8px; border-radius: var(--radius-round); justify-self: center; }
-.sum .sum-flag.on { background: var(--vscode-charts-blue); }
-.sum .tag { font-size: var(--font-sm); padding: 0 7px; border-radius: var(--radius-pill); border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); justify-self: start; }
+.row-sum { display: contents; }
+.row-sum .sum-id { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sum .dim { color: var(--vscode-descriptionForeground); }
+.row-sum .mono { font-family: var(--vscode-editor-font-family); font-size: var(--font-md); }
+.row-sum .clip { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-sum .sum-note { color: var(--vscode-descriptionForeground); margin-left: 10px; }
+.row-sum .sum-flag { width: 8px; height: 8px; border-radius: var(--radius-round); justify-self: center; }
+.row-sum .sum-flag.on { background: var(--vscode-charts-blue); }
+.row-sum .tag { font-size: var(--font-sm); padding: 0 7px; border-radius: var(--radius-pill); border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); justify-self: start; }
 .row-body {
   display: none; padding: 4px 10px 10px 36px; gap: var(--gap-3) var(--gap-5); align-items: center;
   grid-template-columns: 150px minmax(0, 1fr); background: var(--vscode-editorWidget-background);

@@ -1,5 +1,5 @@
 /*
- * ルール管理画面の骨組み（`App.tsx`）。タブとその中身、タイプごとの節、判定を試す欄、そして2つのタブが
+ * ルール管理画面の骨組み（`App.tsx`）。タブとその中身、タイプごとの節、右の「判定を試す」の欄、そして欄とhookのタブが
  * 共有する表（期待する判定の一括確認とhookの一覧）。1件の行は`Rule.css`、判定の結果は`Judge.css`。
  */
 .tabs { display: flex; gap: var(--gap-1); border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 10px; }
@@ -8,6 +8,28 @@
   padding: 6px 12px; cursor: pointer; font: inherit;
 }
 .tab.active { color: var(--vscode-editor-foreground); border-bottom-color: var(--vscode-focusBorder); }
+/*
+ * タブの中身（左）と「判定を試す」の欄（右）。欄はルールのタブでだけ出す（hookのタブは中身を全幅にする）。
+ * 940px以下では1列にし、欄をタブの中身の上に積んで畳めるようにする（畳む切り替えは狭い幅でだけ見せる）。
+ */
+.rules-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: var(--gap-7); align-items: start; }
+.rules-body.no-judge { grid-template-columns: minmax(0, 1fr); }
+.rules-main { min-width: 0; }
+.judge-pane { min-width: 0; border-left: 1px solid var(--vscode-panel-border); padding-left: 12px; }
+.judge-head { display: flex; gap: var(--gap-4); align-items: center; margin-bottom: 6px; }
+.judge-head h2 { margin: 0; font-size: 1em; }
+.judge-pane .judge-fold { display: none; }
+@media (max-width: 940px) {
+  .rules-body { grid-template-columns: minmax(0, 1fr); }
+  .judge-pane { order: -1; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px 10px; }
+  .judge-pane .judge-fold { display: inline-flex; margin-left: auto; }
+  .judge-pane[data-folded="1"] .judge-body { display: none; }
+  .judge-pane[data-folded="1"] .judge-head { margin-bottom: 0; }
+}
+/* 行の右端の印（●とN回ごと）の凡例。印は行の見出しと同じ見た目にする */
+.rule-legend { display: inline-flex; align-items: center; gap: var(--gap-2); }
+.rule-legend .sum-flag { display: inline-block; width: 8px; height: 8px; border-radius: var(--radius-round); background: var(--vscode-charts-blue); }
+.rule-legend .tag { font-size: var(--font-sm); padding: 0 7px; border-radius: var(--radius-pill); border: 1px solid currentColor; font-family: var(--vscode-editor-font-family); }
 .pane { display: none; }
 .pane.active { display: block; }
 button.action.small { margin-left: auto; }

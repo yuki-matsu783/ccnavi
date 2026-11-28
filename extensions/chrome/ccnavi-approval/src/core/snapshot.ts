@@ -233,7 +233,7 @@ export async function readIntegration(repo: RepoConfig, reader: Reader, deps: De
 
 /**
  * プロジェクトのリポジトリ: 置き場のパスは既定に固定。共通設定・ccnavi の設定ファイル・互換のマーカーはワークスペースの統合先から、
- * 閉じたもの（`done/`）とプロジェクトの設定はプロジェクトの統合先から読む。プロジェクトの設定の計算は ccnavi
+ * クローズしたもの（`done/`）とプロジェクトの設定はプロジェクトの統合先から読む。プロジェクトの設定の計算は ccnavi
  */
 async function readProjectIntegration(repo: RepoConfig, reader: Reader, deps: Deps): Promise<IntegrationRead> {
   const ws = deps.workspace;

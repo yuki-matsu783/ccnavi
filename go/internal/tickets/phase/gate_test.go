@@ -157,7 +157,7 @@ func TestGateClosedPromises(t *testing.T) {
 		k    gateCase
 		want bool
 	}{
-		{"レビュー要の定義で子が閉じたら止める", gateCase{Type: &yes, Children: [][2]any{{"done", nil}}}, true},
+		{"レビュー要の定義で子がクローズしたら止める", gateCase{Type: &yes, Children: [][2]any{{"done", nil}}}, true},
 		{"レビュー済みなら止めない", gateCase{Type: &yes, Children: [][2]any{{"done", nil}}, Marks: []string{"reviewed"}}, false},
 		{"依頼しただけでは止めたまま", gateCase{Type: &yes, Children: [][2]any{{"review", nil}}, Marks: []string{"requested"}}, true},
 		{"作業中の子が残れば終わらない", gateCase{Type: &yes, Children: [][2]any{{"doing", nil}, {"done", nil}}}, false},

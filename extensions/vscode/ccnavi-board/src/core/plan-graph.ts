@@ -1,5 +1,5 @@
 /**
- * 計画の図の中身。実行ファイルが返す計画1つぶん（`plans`の1件。`approvemodel.ts`の`ApprovePlan`）から、
+ * 計画の流れの図の中身。実行ファイルが返す計画1つぶん（`plans`の1件。`approvemodel.ts`の`ApprovePlan`）から、
  * 点・線・置き場所を組む純関数。描くのは共有の図の部品（`webview/shared/PlanGraph.tsx`）で、承認のオーバーレイは
  * 読むだけで、計画編集タブは線を引き直して使う。
  *

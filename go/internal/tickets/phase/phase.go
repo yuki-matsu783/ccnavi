@@ -32,7 +32,7 @@ type Phase struct {
 	Item  *ticket.PlanItem
 	Type  *phases.PhaseType
 	owner *ticket.Ticket
-	// risks は子の識別子 → 閉じるときに数えた実績のリスクの記録。
+	// risks は子の識別子 → クローズするときに数えた実績のリスクの記録。
 	risks map[string]*pyjson.Object
 	// coveredReviews は延期を引き受けた前のフェーズが、定義として宣言している「レビューが要るか」。
 	coveredReviews []bool
@@ -168,7 +168,7 @@ func (p *Phase) Covers() []int {
 	return p.owner.CoveredBy(p.Number)
 }
 
-// Ended は終わったか。作業中・未着手の子が無く、レビュー待ちか閉じた子が 1 枚以上。取り消しだけでは終わらない。
+// Ended は終わったか。作業中・未着手の子が無く、レビュー待ちかクローズした子が 1 枚以上。取り消しだけでは終わらない。
 func (p *Phase) Ended() bool {
 	if len(p.States) == 0 {
 		return false

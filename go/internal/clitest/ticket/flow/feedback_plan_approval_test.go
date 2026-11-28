@@ -93,7 +93,7 @@ func TestReviewedPassesAndNothingButThePlanChanges(t *testing.T) {
 	before := snapshot(t, tr.Approved)
 	approved := ticketkit.OK(t, tr.Agree("y"))
 	ticketkit.Lacks(t, approved.Stdout, "済ませた扱い")
-	ticketkit.Lacks(t, approved.Stdout, "レビュー待ちの子を閉じた")
+	ticketkit.Lacks(t, approved.Stdout, "レビュー待ちの子をクローズした")
 	after := snapshot(t, tr.Approved)
 	var changed []string
 	for k := range before {

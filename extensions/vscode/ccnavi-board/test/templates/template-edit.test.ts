@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parse } from "yaml";
 
-import type { FlowDoc } from "../../src/core/flow-doc.js";
+import { NODE_SIZE, nodePosition, type FlowDoc, type FlowNode } from "../../src/core/flow-doc.js";
 import {
   addItem,
   blankTemplate,
@@ -62,6 +62,23 @@ function fixtureData(): unknown {
   assert.ok(parsed.ok, parsed.ok ? "" : parsed.error);
   return parsed.value.data;
 }
+
+// 見本の子のフローの点が重なっていると、編集欄の図は点を重ねて描き、全体を収める倍率も上限まで上がる（画面の評価の42番。
+// 原因は図ではなく見本の位置だった）。見本は画面の確かめにも使うので、描く大きさで点が重ならない位置にあることを見る
+test("CB-T1304 見本の子のフローの点は、描く大きさ（NODE_SIZE）で重ならない位置にある", () => {
+  const data = fixtureData() as { flows?: Record<string, { nodes?: FlowNode[] }> };
+  const flows = Object.values(data.flows ?? {});
+  assert.ok(flows.length > 0, "見本に子のフローが無い");
+  for (const flow of flows) {
+    const at = (flow.nodes ?? []).map((node, index) => nodePosition(node, index));
+    for (let i = 0; i < at.length; i++) {
+      for (let j = i + 1; j < at.length; j++) {
+        const apart = Math.abs(at[i].x - at[j].x) >= NODE_SIZE.width || Math.abs(at[i].y - at[j].y) >= NODE_SIZE.height;
+        assert.ok(apart, `点${i}と点${j}が重なる: ${JSON.stringify(at[i])} ${JSON.stringify(at[j])}`);
+      }
+    }
+  }
+});
 
 test("CB-T1139 実行ファイルが読み返した中身を編集のコピーにして、書き出すと同じ中身に戻る（往復）。知らない欄も残る", () => {
   const data = fixtureData();

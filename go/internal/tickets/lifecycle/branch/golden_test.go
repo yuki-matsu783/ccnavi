@@ -26,7 +26,7 @@ func ticketText(id, extra string) string {
 //
 //	i0001            親のワークツリー。issue: 152、mr: 5、branch: feature/152-login を書いた承認済みチケット
 //	feature-9-new    issue: 152 がある承認待ちの提案（ワークスペースの todo/）
-//	feature-7-a      done/ の閉じた親（ブランチ名が識別子と一致）
+//	feature-7-a      done/ のクローズした親（ブランチ名が識別子と一致）
 //	projects/proj    origin が grp/Proj のプロジェクト
 func fixture(t *testing.T) string {
 	root := testkit.ShapedWorkspace(t)

@@ -683,7 +683,7 @@ func TestCorePathHookOnlyForms(t *testing.T) {
 }
 
 // レビュー待ちの置き場（wip/proposals/review/）は、承認済みチケットの置き場と同じくエージェントのラッパーの呼び出しを止める。
-// 親を閉じた後の案内（rm -r wip）は、レビュー待ちが空なら通す。通すのは rm だけで、過去のコミットに戻すと提案が戻りうる。
+// 親をクローズした後の案内（rm -r wip）は、レビュー待ちが空なら通す。通すのは rm だけで、過去のコミットに戻すと提案が戻りうる。
 func TestCorePathReviewPlace(t *testing.T) {
 	t.Parallel()
 	c := newCoreRepo(t)

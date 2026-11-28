@@ -259,13 +259,13 @@ func CheckConfirm(stdout, stderr io.Writer, conf *config.Settings, root, cwd str
 	return 0
 }
 
-// nextAfterConfirm は、レビュー済みを書いたあとの出力を組む。親を閉じられる状態（closing.CloseProblems が空）になったら、親を閉じる流れを言う。まだなら status を促す。
+// nextAfterConfirm は、レビュー済みを書いたあとの出力を組む。親をクローズできる状態（closing.CloseProblems が空）になったら、親をクローズする流れを言う。まだなら status を促す。
 // 最後のフェーズのあとの手順が、親の finish の出力で初めて出てくるのを避けるため。
 func nextAfterConfirm(conf *config.Settings, root, parentID string) string {
 	if len(closing.CloseProblems(conf, root, parentID, nil)) > 0 {
 		return texts.Say(root, "NEXT_REVIEW_CONFIRMED", texts.Values{"parent": parentID}, nil)
 	}
-	return "全部のフェーズのレビューが済み、親 " + parentID + " を閉じられる。\n" + texts.Say(root, "NEXT_REVIEW_LAST", texts.Values{
+	return "全部のフェーズのレビューが済み、親 " + parentID + " をクローズできる。\n" + texts.Say(root, "NEXT_REVIEW_LAST", texts.Values{
 		"parent":        parentID,
 		"ready_command": ops.ReadyCommand(root, parentID),
 		"wip":           place.WipRoot,

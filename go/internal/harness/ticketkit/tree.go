@@ -105,13 +105,13 @@ func FamilyTree(t testing.TB, o FamilyOpts) *Tree {
 	return Cached(t, fmt.Sprintf("family %#v", o), Options{}, func(tr *Tree) { tr.Family(o) })
 }
 
-// ClosedPhaseTree は Family のフェーズ 1 を閉じるまで組んだ木（Cached）。
+// ClosedPhaseTree は Family のフェーズ 1 をクローズするまで組んだ木（Cached）。
 func ClosedPhaseTree(t testing.TB, o FamilyOpts) *Tree {
 	t.Helper()
 	return Cached(t, fmt.Sprintf("closed-phase %#v", o), Options{}, func(tr *Tree) { tr.Family(o); tr.ClosePhase() })
 }
 
-// ClosedTree は Family のフェーズ 1 を閉じ、origin と合流・push した親のブランチ（と結果ファイル）まで組んだ木（Cached）。
+// ClosedTree は Family のフェーズ 1 をクローズし、origin と合流・push した親のブランチ（と結果ファイル）まで組んだ木（Cached）。
 func ClosedTree(t testing.TB) (*Tree, Fixture) {
 	t.Helper()
 	tr := Cached(t, "closed", Options{}, func(tr *Tree) { tr.Family(FamilyOpts{}); tr.ClosePhase(); tr.Remote(nil) })
@@ -383,7 +383,7 @@ func (tr *Tree) Family(o FamilyOpts) {
 	tr.CommitParent("start")
 }
 
-// ClosePhase は Family の子 2 本を閉じて、親がコミットする（フェーズ 1 が終わる）。
+// ClosePhase は Family の子 2 本をクローズして、親がコミットする（フェーズ 1 が終わる）。
 func (tr *Tree) ClosePhase() {
 	tr.T.Helper()
 	for _, child := range []string{"i0001-01-01", "i0001-01-02"} {
@@ -393,7 +393,7 @@ func (tr *Tree) ClosePhase() {
 }
 
 // CloseParentByHand は、親のワークツリーの承認済みチケットを doing/ から done/ へ手で動かす
-// （道具は開いた子がある親を閉じさせないので、置き場を手で動かしたときにしか作れない形）。
+// （道具は開いた子がある親をクローズさせないので、置き場を手で動かしたときにしか作れない形）。
 func (tr *Tree) CloseParentByHand(name string) {
 	tr.T.Helper()
 	if err := os.MkdirAll(filepath.Join(tr.Approved, "done"), 0o755); err != nil {

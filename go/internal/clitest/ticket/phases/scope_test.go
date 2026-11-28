@@ -127,12 +127,12 @@ func TestAPhasesFlagOnTicketFinishDoesNotDropTheReview(t *testing.T) {
 	w.runChild("i0001-01-01", file{"wip/design/plan.md", "d\n"})
 	closed := w.mustOK(w.ccnavi("ticket", "finish", "i0001-01-01", "--phases", loose), "finish")
 	contains(t, "stderr", closed.Stderr, "--phases は診断") // 無視したことを言う
-	// `review: true` のまま。閉じた先はレビュー待ちで、done/ ではない。
+	// `review: true` のまま。クローズした先はレビュー待ちで、done/ ではない。
 	if !ticketkit.Exists(filepath.Join(w.parentTree, "wip", "proposals", "review", "i0001-01-01.md")) {
 		t.Error("レビュー待ちへ動いていない（渡した定義で判定された）")
 	}
 	if ticketkit.Exists(filepath.Join(w.approved, "done", "i0001-01-01.md")) {
-		t.Error("レビューを飛ばして閉じた")
+		t.Error("レビューを飛ばしてクローズした")
 	}
 }
 

@@ -51,8 +51,8 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する | ユーザ |
 | `ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。承認・チケット管理画面の保存・ユーザの判断のあとに呼ばれる | ユーザ |
 | `ccnavi-user-decide.sh` | 残った指摘（未解決のスレッド）の対応方針を決めて置く | ユーザ |
-| `ccnavi-user-close-early.sh` | 残りがあるまま親を早めに閉じる判断を置く。残りを issue に書き出す | ユーザ |
-| `ccnavi-user-clean-branch.sh` | 親を閉じたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
+| `ccnavi-user-close-early.sh` | 残りがあるまま親を早めにクローズする判断を置く。残りを issue に書き出す | ユーザ |
+| `ccnavi-user-clean-branch.sh` | 親をクローズしたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
 | `ccnavi-user-handoff.sh` | 保護対象の下書き（`wip/handoff/`）を、本来の場所へ取り込む。引数なしは取り込み待ちを見せるだけ | ユーザ |
 | `ccnavi-user-mirror.sh` | 共通設定のミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
 | `ccnavi-user-prune.sh` | 判定ログと state を整理する。`--preview` は動かすものを並べるだけ | ユーザ |

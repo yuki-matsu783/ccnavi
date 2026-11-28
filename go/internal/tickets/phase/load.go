@@ -12,7 +12,7 @@ import (
 	"ccnavi/internal/tickets/model/ticket"
 )
 
-// Phases は、この親のフェーズを番号順に返す。開いている承認済みチケットと、閉じた承認済みチケットの両方から組む。
+// Phases は、この親のフェーズを番号順に返す。開いている承認済みチケットと、クローズした承認済みチケットの両方から組む。
 // 親に計画があれば、まだ子の無い番号も並ぶ。
 // raw は、呼び手が approval.ReadRaw で読んだ置き場。読んでから置き場のファイルを動かしていないときだけ渡す。nil ならここで読む。
 func Phases(conf *config.Settings, root, parentID string, raw *approval.Raw) []*Phase {
@@ -52,7 +52,7 @@ func phasesOf(conf *config.Settings, root, parentID string, proposed *ticket.Tic
 			}
 		}
 	}
-	// 状態は置き場そのもの。閉じた・レビュー待ち・作業中の順に読み、同じ識別子は閉じた側を採る。エージェントが
+	// 状態は置き場そのもの。クローズした・レビュー待ち・作業中の順に読み、同じ識別子はクローズした側を採る。エージェントが
 	// 書ける todo/ に同じ識別子を書いても、フェーズは開き直らない。
 	review, _ := approval.ScanReview(conf, root, raw)
 	seen := map[string]bool{}

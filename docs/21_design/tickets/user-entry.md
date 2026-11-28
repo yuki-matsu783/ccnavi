@@ -10,7 +10,7 @@ keywords: [ユーザ専用, user, 入口, 表, useronly, ccnavi-user, hook, 読�
 
 ### 9.18 ユーザ専用の入口
 
-ユーザだけが実行する操作（承認・レビュー済みの記録・早めに閉じる・記録の削除・保護対象の取り込み（handoff）・共通設定のミラーの同期（mirror）・承認済みチケットの push・
+ユーザだけが実行する操作（承認・レビュー済みの記録・早めにクローズする・記録の削除・保護対象の取り込み（handoff）・共通設定のミラーの同期（mirror）・承認済みチケットの push・
 残った指摘の対応方針・子のブランチの削除）が、どの入口にあるかと、hook と実行ファイルがそれをどう止めるかを書く。
 止める判定の細部は [9.5](judging-by-path.md)、承認の手順は [9.4](approval.md)、ターミナル要求は 9.4、`handoff` の中身は [9.19](handoff.md)、`mirror` の中身は [11.12](../multi-repo/distribute-common.md)。
 
@@ -61,7 +61,7 @@ keywords: [ユーザ専用, user, 入口, 表, useronly, ccnavi-user, hook, 読�
 |---|---|---|
 | 承認 | `ccnavi-user-agree.sh` | `user agree`。承認のあと、`ccnavi-user-push-approved.sh` でコミットと push まで行う |
 | 残った指摘の対応方針 | `ccnavi-user-decide.sh` | `user reviewed N --accept-unresolved` |
-| 早めに閉じる | `ccnavi-user-close-early.sh` | `user close-early` |
+| 早めにクローズする | `ccnavi-user-close-early.sh` | `user close-early` |
 | 記録の整理 | `ccnavi-user-prune.sh` | `user prune` |
 | 保護対象の取り込み | `ccnavi-user-handoff.sh` | `user handoff` |
 | 共通設定のミラーの同期 | `ccnavi-user-mirror.sh` | `user mirror` |

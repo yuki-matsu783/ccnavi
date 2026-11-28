@@ -159,7 +159,7 @@ func TestACopyInTheWorkspaceRootDoesNotDecideTheHomeTree(t *testing.T) {
 	}
 }
 
-// 閉じた識別子を別のツリーで提案したとき、--lint は前と同じ再開の案内を出す。
+// クローズした識別子を別のツリーで提案したとき、--lint は前と同じ再開の案内を出す。
 func TestAClosedIdentifierProposedInAnotherTreeKeepsTheReopenGuidance(t *testing.T) {
 	t.Parallel()
 	tr := phaseFamily(t)
@@ -167,7 +167,7 @@ func TestAClosedIdentifierProposedInAnotherTreeKeepsTheReopenGuidance(t *testing
 	tr.Propose("i0005", samples.ParentText("i0005", samples.Plan("research", "design"), samples.ParentOpts{Copy: tr.Phases}), "")
 	tr.CommitParent("tickets")
 	lines := lintLinesWith(tr, "i0005")
-	if !anyLine(lines, "i0005 は閉じたかレビュー待ちなのに todo/ にも在る", "再開するには、ユーザが承認済みチケットを戻す") {
+	if !anyLine(lines, "i0005 はクローズしたかレビュー待ちなのに todo/ にも在る", "再開するには、ユーザが承認済みチケットを戻す") {
 		t.Errorf("lint = %v", lines)
 	}
 	if got := pendingApproval(tr); len(got) != 0 {

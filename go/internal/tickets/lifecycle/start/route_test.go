@@ -97,7 +97,7 @@ func TestRoute(t *testing.T) {
 			map[string]string{"route": "adopt", "problem": "fork"}},
 		{"マージ先が統合先でない MR は採用しない", candidates(true, cand("feature-4-w", true, withMR(func(m map[string]any) { m["base"] = "develop" }))), issue("4"),
 			map[string]string{"route": "adopt", "problem": "target develop", "mr-base": "develop"}},
-		{"閉じていてフォークなら状態を先に言う", candidates(true, cand("feature-4-w", true, withMR(func(m map[string]any) { m["state"] = "merged"; m["fork"] = true }))), issue("4"),
+		{"クローズしていてフォークなら状態を先に言う", candidates(true, cand("feature-4-w", true, withMR(func(m map[string]any) { m["state"] = "merged"; m["fork"] = true }))), issue("4"),
 			map[string]string{"problem": "not-open merged"}},
 		{"採用する MR のブランチが統合先そのもの", candidates(true, cand("feature-4-w", true, withMR(func(m map[string]any) { m["base"] = "feature-4-w" }))),
 			func() RouteArgs { a := issue("4"); a.Integration = "feature-4-w"; return a }(), map[string]string{"route": "adopt", "problem": "protected"}},

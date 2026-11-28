@@ -8,13 +8,13 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh mr-state <番号>       （MR の今の状態を読むだけ。チケット管理画面の「MR の状況を確認」が使う）
-#   sh .ccnavi/scripts/ccnavi-review.sh ready --parent <親>                    （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
+#   sh .ccnavi/scripts/ccnavi-review.sh ready --parent <親>                    （クローズしたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #
 # ユーザだけが打つ操作は、ユーザ専用の sh（ccnavi-user-*.sh）に分けた。エージェントからは hook が名前で止める。
 #
 #   ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイジェスト>]   残った指摘の対応方針を決めて置く
-#   ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue] まだ残っているが早めに閉じる
+#   ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue] まだ残っているが早めにクローズする
 #
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
 # ネットワークに出ない。実行ファイルが見るのはワークツリーの中（フェーズ・ブランチ・マーカー）
@@ -81,16 +81,16 @@ sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready
   confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
   decide       <N> --preview                      未解決（Unresolved）の指摘と、選べる対応方針の一覧を JSON で見るだけ。何も置かない
-  ready        --parent <親>                      閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します。親のワークツリーの外から打ちます。--parent を付けないと、何もせず外から打つ 1 本を出して止まる
+  ready        --parent <親>                      クローズして push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します。親のワークツリーの外から打ちます。--parent を付けないと、何もせず外から打つ 1 本を出して止まる
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
-  merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
+  merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh がクローズしたかを確かめる）
   mr-state <番号>                                 マージリクエストの今の状態を読むだけ。1 行目 "mr-state 1"、2 行目は "open <番号> <yes|no> <URL>"（yes は Draft）・"merged <番号> <URL>"・"closed <番号> <URL>"・"unknown <種類> <理由>"（終了コード 1。種類は no-tool / auth / network / api / not-found）。チケット管理画面の「MR の状況を確認」が使う
 
 ユーザがターミナルで実行する操作は別の sh:
   ccnavi-user-decide.sh <N>          指摘の対応方針を選んで置く（対応しない・このフェーズで直す・issue に回す）
   ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
-                                     まだ残っているが早めに閉じる。残りを issue に書き出す。Draft は親が ready で外す
+                                     まだ残っているが早めにクローズする。残りを issue に書き出す。Draft は親が ready で外す
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
 USAGE
@@ -458,7 +458,7 @@ fetch)
 	printf '\n'
 	;;
 merged)
-	# MR がマージ済みか。ccnavi-sync.sh が、親のブランチがリモートから消えたときに、閉じたか（第一の根拠）を
+	# MR がマージ済みか。ccnavi-sync.sh が、親のブランチがリモートから消えたときに、クローズしたか（第一の根拠）を
 	# 確かめ、マージ済みなら手元の片付けの条件に使う先頭の sha を取るために聞く。読むだけで、何も書かない。
 	# 引数は MR の番号（省けば、いまのブランチを元にした MR を探す）。番号があればその MR だけを聞く。
 	# 答えは 3 つで、呼ぶ側は none のときだけ「マージされていない」と読む。
@@ -682,11 +682,11 @@ decide)
 	exit $?
 	;;
 ready)
-	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
-	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
+	# 親をクローズできる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
+	# クローズした親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
 	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
-	# ロック・取り込みより前に、ワークツリーの中で分かる前提（親を閉じられるか・未コミット・push 済みか）を、
+	# ロック・取り込みより前に、ワークツリーの中で分かる前提（親をクローズできるか・未コミット・push 済みか）を、
 	# 何も変えずに断る。検査は本体と同じ関数（読むだけ）。`--check` は位置引数の前に置く。
 	ccnavi --check review ready >/dev/null || exit $?
 	wap_start "$family"
@@ -712,11 +712,11 @@ ready)
 		rm -f "$noted"
 	fi
 	printf 'OK: Draft を解除した（%s）。マージはユーザが行う\n' "$url"
-	# 親を閉じる片付け: この親の送り終わった操作記録を消す（未完了のものは残す）
+	# 親をクローズする片付け: この親の送り終わった操作記録を消す（未完了のものは残す）
 	ccnavi ops retire "${branch:-}" >/dev/null 2>&1 || :
 	# 最後に子と親の片付けをする（`worktree retire`）。Draft を外す前には消さない（ready を打ち直せなくなる）。
 	# 実行ファイルは、まず親のワークツリーを消せるか（cwd・未コミット）を確かめ、
-	# 消せなければ子にも触らずに断る。消せるなら、閉じた子のワークツリー（レビュー待ちだったものも）、
+	# 消せなければ子にも触らずに断る。消せるなら、クローズした子のワークツリー（レビュー待ちだったものも）、
 	# 子の手元のブランチ（合流した子は条件を確かめて削除。取り消した子は一覧を出すだけで、ユーザの確認が
 	# 取れてから消す）、親のワークツリーの順に片付ける。条件の確認も削除も実行ファイルが行う
 	# （エージェントに git branch -D は開けない）。打った場所（親のワークツリーの外）を cwd として渡す。

@@ -25,7 +25,7 @@ diagrams:
           名前: web-app
       - id: check
         from: プロジェクト管理画面
-        text: 「clone」を押すと、まず画面の中で入力を検査する
+        text: 「取得」を押すと、まず入力を画面で検査する
         value: |-
           URLの形（https / ssh / git@host:path） ✓
           資格情報（user:token@）なし ✓
@@ -68,7 +68,7 @@ diagrams:
       - id: cred
         from: ユーザ
         to: プロジェクト管理画面
-        text: トークンを埋め込んだURLで「clone」を押す
+        text: トークンを埋め込んだURLで「取得」を押す
         value: https://alice:TOKEN@example.com/team/web-app.git
       - id: cred-stop
         from: プロジェクト管理画面
@@ -268,8 +268,8 @@ courses:
         title: プロジェクトの置き場
         body: ワークスペースのprojects/の直下にあるgitリポジトリが、プロジェクトとして並びます。ここに件数と置き場のフォルダが出ます。
       - target: clone
-        title: リポジトリをcloneする
-        body: URLを入力して「clone」を押すと、projects/の直下に取り込みます。名前はURLから自動で入り、手で直せます。git cloneは「ccnavi」ターミナルで動くので、認証が必要なときはそこで入力してください。
+        title: リポジトリを取得する
+        body: URLを入力して「取得」を押すと、projects/の直下に取り込みます。名前はURLから自動で入り、手で直せます。git cloneは「ccnavi」ターミナルで動くので、認証が必要なときはそこで入力してください。
       - target: list
         title: プロジェクトの一覧
         body: プロジェクトごとに、origin・ルール・ワークツリー・チケット・検証の結果をカードで見られます。
@@ -288,7 +288,7 @@ courses:
 
   - id: how-clone
     title: cloneしてから一覧に出るまでの流れを、値の例で知りたいとき
-    summary: URLと名前を入れてcloneを押すと、何がどこへ送られ、いつカードが出るか。止まる例も見る。
+    summary: URLと名前を入れて「取得」を押すと、何がどこへ送られ、いつカードが出るか。止まる例も見る。
     steps:
       - target: clone-url
         title: URLを入力する
@@ -397,7 +397,7 @@ courses:
         body: projects/の下に作るフォルダの名前です。URLの末尾から自動で入ります。変えたいときだけ直してください。
       - target: clone-run
         title: cloneを実行する
-        body: 「clone」を押すと「ccnavi」ターミナルでgit cloneが実行されます。終わると一覧に新しいカードが出ます。
+        body: 「取得」を押すと「ccnavi」ターミナルでgit cloneが実行されます。終わると一覧に新しいカードが出ます。
       - target: refresh
         title: 手で移したときは更新する
         body: 既存のリポジトリをprojects/の直下へ自分で移したときは、「更新」を押すと一覧に出ます。ワークスペース直下などにあって認識されないリポジトリは、一覧の下の「プロジェクトとして認識されないgitリポジトリ」に出ます。

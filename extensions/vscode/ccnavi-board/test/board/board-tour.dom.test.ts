@@ -108,7 +108,7 @@ test("CB-D202 案内の間は、実際のチケットではなく見本のカー
 });
 
 test("CB-D203 案内の間の見本の絞り込み・畳みは見本の上だけに効き、実際の絞り込み・畳んだ列・stateには触れない", async () => {
-  const saved = { project: "*", parent: "*", attention: false, archived: false, folded: ["cancelled"], widths: {}, details: [] };
+  const saved = { project: "*", parent: "*", attention: false, archived: false, folded: ["cancelled"], widths: {}, selected: "" };
   const dom = await openBoard(fixture(), { state: saved });
   try {
     const before = JSON.stringify(dom.state());
@@ -166,13 +166,12 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
     await click('[data-action="approve"]');
     await click('[data-action="approve-one"]');
     await click('[data-action="refresh"]');
+    // 見本のカードを押しても選ばない（パネルは手順のscene.selectだけが開く）
     await click('.card[data-id="sample-a"] .title');
-    await click('[data-action="workflow"]');
-    await click('[data-action="flow"]');
-    // カードのレビュー操作と、マージ状況の確認・帯の操作・詳細の開閉も、見本の上では何も送らない
+    assert.equal(dom.all('aside.card-panel').length, 0, '見本のカードを押したらパネルが開いた');
+    // カードのレビュー操作と、マージ状況の確認も、見本の上では何も送らない
     await click('[data-action="review-done"]');
     await click('[data-action="merge-check"]');
-    await click('.card-details summary');
     // 見本の承認の一覧（4手順進める）
     for (let i = 0; i < 4; i += 1) {
       await click('[data-action="tour-next"]');
@@ -184,7 +183,7 @@ test("CB-D204 案内の間は見本のボタンを押しても拡張ホストへ
     dom.key("Escape");
     await dom.settle();
     assert.deepEqual(dom.posted.slice(posted), [{ type: "tourDone" }], "案内の間に拡張ホストへ余計な送信があった");
-    // 見本の上で詳細を開閉しても、実際の状態（覚えている詳細の開閉）を書き換えない
+    // 見本の上でカードを押しても、実際の状態（覚えている選んだカード）を書き換えない
     assert.equal(JSON.stringify(dom.state()), stateBefore, "案内の間の操作が覚えているstateを書き換えた");
     assert.equal(dom.all(".tour").length, 0);
     // 閉じたら実際の操作は届く

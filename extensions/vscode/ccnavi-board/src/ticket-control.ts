@@ -1,19 +1,16 @@
 /**
- * チケット制御の値を実行ファイルに聞き、VS Codeのcontext keyに反映する。
- * サイドパネルの「チケット管理」「リスク管理」「フェーズ管理」「テンプレート管理」の有無と、コマンドパレットの
- * `when`がこのキーを見る。画面を開く側は`requireTickets`でもう一度見る。
- * VS CodeのAPIと子プロセスに触れるので単体テストの対象外。読み方はcore/ticket-control.ts。
+ * チケット制御の値を実行ファイルの答え（拡張全体で1つの`board-feed.ts`）から読み、VS Codeのcontext keyに反映する。
+ * サイドパネルのチケットに関わる行（ユーザ待ちのチケット・進行中の親・「チケット管理」「リスク管理」「フェーズ管理」
+ * 「テンプレート管理」）の有無と、コマンドパレットの`when`がこのキーを見る。画面を開く側は`requireTickets`でもう一度見る。
+ * VS CodeのAPIに触れるので単体テストの対象外。読み方はcore/ticket-control.ts。
  */
 import * as vscode from "vscode";
 
-import { loadBoard } from "./ccnavi.js";
+import { boardFeed } from "./board-feed.js";
 import { TICKET_CONTROL_ENV, ticketControlOf, type TicketControl } from "./core/ticket-control.js";
-import { firstWorkspaceFolder, watchGlobs } from "./panel-common.js";
 
 /** package.jsonの`when`と揃える */
 export const CONTEXT_KEY = "ccnaviBoard.ticketControl";
-
-const SETTINGS_FILES = [".claude/settings.json", ".claude/settings.local.json"] as const;
 
 let current: TicketControl = "enable";
 const listeners: Array<(value: TicketControl) => void> = [];
@@ -43,15 +40,8 @@ export function requireTickets(what: string): boolean {
   return false;
 }
 
-function binSetting(): string {
-  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
-}
-
-/**
- * 実行ファイルの答え（ボードのJSON）を受け取って反映する。ボードを読み直した画面もここへ渡す。
- * 値が変わったときだけcontext keyと聞き手に知らせる
- */
-export function noteTicketControl(value: TicketControl): void {
+/** 値が変わったときだけcontext keyと聞き手に知らせる */
+function noteTicketControl(value: TicketControl): void {
   if (value === current) {
     return;
   }
@@ -62,21 +52,13 @@ export function noteTicketControl(value: TicketControl): void {
   }
 }
 
-/** 実行ファイルに聞き直す。読めなければenable（入口を消さない） */
-async function refresh(root: string): Promise<void> {
-  const result = await loadBoard(root, binSetting());
-  noteTicketControl(ticketControlOf(result.ok ? result.board : undefined));
-}
-
-/** 起動時に1度聞き、設定ファイルの変化で聞き直す */
+/**
+ * 拡張全体の答えが届くたびに反映する。読めなければenable（入口を消さない）。設定ファイルの変化は`board-feed.ts`の監視が拾う。
+ * 答えを聞く側より先に呼ぶ（サイドパネルの行がこの値で決まる）
+ */
 export function watchTicketControl(context: vscode.ExtensionContext): void {
-  const folder = firstWorkspaceFolder();
   // 最初は既定のenableをVS Code側に知らせておき、答えが来たら差し替える。起動を待たせない
   void vscode.commands.executeCommand("setContext", CONTEXT_KEY, current);
-  if (folder === undefined) {
-    return;
-  }
-  const again = () => void refresh(folder.uri.fsPath);
-  again();
-  context.subscriptions.push(...watchGlobs(folder, SETTINGS_FILES, again));
+  const stop = boardFeed.subscribe((result) => noteTicketControl(ticketControlOf(result.ok ? result.board : undefined)));
+  context.subscriptions.push({ dispose: stop });
 }

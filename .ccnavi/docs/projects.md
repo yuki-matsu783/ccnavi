@@ -21,12 +21,12 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 | 何 | 場所 |
 |---|---|
 | 提案（承認待ち`todo/`、レビュー待ち`review/`） | そのツリーの`wip/proposals/<状態>/`。プロジェクト向けは`projects/<名前>/wip/proposals/<状態>/` |
-| 承認済みチケット（作業中`doing/`、閉じた`done/`）、フェーズのマーカー、子の記録（`.risk.json`など） | 親チケットのツリーの`.ccnavi/approved/`。プロジェクト向けは`projects/<名前>/.ccnavi/approved/` |
+| 承認済みチケット（作業中`doing/`、クローズした`done/`）、フェーズのマーカー、子の記録（`.risk.json`など） | 親チケットのツリーの`.ccnavi/approved/`。プロジェクト向けは`projects/<名前>/.ccnavi/approved/` |
 | gitのラッパースクリプトの記録 | ワークスペースの`logs/<プロジェクト>/`。ワークスペースの記録は`logs/` |
 | 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/` |
 | ワークツリー | ワークスペースの`.claude/worktrees/<名前>` |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
-| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペースは`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
+| クローズしたチケットの退避（`ready`がDraftを外す前に、クローズした親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペースは`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（[templates.md](templates.md)） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | 反映する先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi-user-handoff.sh`） |
@@ -38,9 +38,9 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 プロジェクトのgitリポジトリに入るのは、提案、承認済みチケットとマーカー、プロジェクトの設定の3つ。
 承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる。
 別の機械で続きをするのに必要な、依頼時のHEAD、リスクの点は、すべて`.ccnavi/approved/phases/<親>/`にある。
-Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケットと一緒にワークスペースの`logs/archive/`へ退避するので、
+Draftを外したマーカー（`ready.json`）は、`ready`がクローズしたチケットと一緒にワークスペースの`logs/archive/`へ退避するので、
 ブランチでは他の機械へ届かない。記録とstateの置き場（`logs/`）とワークツリーはワークスペース側に置き、gitには入れない。
-閉じた親子のチケットは`ready`が`logs/archive/`へ移して親のブランチから消すので、既定のブランチには残らない。
+クローズした親子のチケットは`ready`が`logs/archive/`へ移して親のブランチから消すので、既定のブランチには残らない。
 
 効力のあるフロー（`.ccnavi/approved/flows/`）は、エージェントが書かず、シェルからも書かない。下書きは`wip/proposals/flows/<子>.yml`に、
 頼まれたときだけ書き、`sh .ccnavi/scripts/ccnavi-launcher.sh --lint --flow <下書き>`で確かめてから渡す。下書きには効力が無く、ユーザがチケット管理画面のフロー編集画面で

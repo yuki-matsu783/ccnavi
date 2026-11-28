@@ -22,7 +22,7 @@ import (
 	"testing"
 )
 
-// boardSceneBuild は親 1 本（research → design）。フェーズ 1 は閉じ、フェーズ 2 は着手済みで、同じフェーズに未承認の子が 1 枚ある。
+// boardSceneBuild は親 1 本（research → design）。フェーズ 1 はクローズし、フェーズ 2 は着手済みで、同じフェーズに未承認の子が 1 枚ある。
 // その子は着手済みの子のワークツリーにも入っている。
 func boardSceneBuild(t *testing.T) *Tree {
 	t.Helper()
@@ -113,7 +113,7 @@ func TestBoardTicketsCarryProposalCopyMarksAndWorktree(t *testing.T) {
 		t.Errorf("waiting = %v", waiting)
 	}
 	parent := by["i0001"]
-	// 親も着手していて閉じていなければ作業中。
+	// 親も着手していてクローズしていなければ作業中。
 	if js(parent, "parent") != "" || js(parent, "copy", "status") != "open" || !jb(parent, "in_progress") {
 		t.Errorf("parent = %v", parent)
 	}
@@ -222,7 +222,7 @@ func TestATicketWaitingForReviewIsNotScattered(t *testing.T) {
 	tr := boardSceneBuild(t)
 	for _, tk := range jl(tr.board(), "tickets") {
 		if js(tk, "copy", "status") == "review" {
-			t.Errorf("閉じる前にレビュー待ちがある: %v", js(tk, "ticket"))
+			t.Errorf("クローズする前にレビュー待ちがある: %v", js(tk, "ticket"))
 		}
 	}
 	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
@@ -263,14 +263,14 @@ func TestAStaleTodoCopyLeftInAWorktreeIsNotWaitingAfterApproval(t *testing.T) {
 	ticketkit.Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-02-02/wip/proposals/todo/i0001-02-03.md")
 }
 
-// 場面 B。review/ の古いチケットが残ったワークツリーがあっても、閉じたものは閉じたまま。
+// 場面 B。review/ の古いチケットが残ったワークツリーがあっても、クローズしたものはクローズしたまま。
 func TestAStaleReviewCopyLeftInAWorktreeIsNotInProgressAfterClosing(t *testing.T) {
 	t.Parallel()
 	tr := boardSceneBuild(t)
 	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	tr.CommitParent("close")
 	tr.Worktree("i0001-01-09", "i0001") // review/i0001-02-02 を持ったまま切る
-	// 親のツリーで閉じる（レビューを終えて done/ へ）。
+	// 親のツリーでクローズする（レビューを終えて done/ へ）。
 	review := tr.childPath("i0001-02-02", "review")
 	text := ticketkit.Read(t, review)
 	removeFile(t, review)
@@ -330,6 +330,31 @@ func TestParentsCarryPhasesAndGates(t *testing.T) {
 	}
 	if js(two, "state") != "active" || !slices.Equal(strs(jl(two, "tickets")), []string{"i0001-02-02"}) || js(two, "states", "i0001-02-02") != "doing" || !jb(two, "review_required") {
 		t.Errorf("phase 2 = %v", two)
+	}
+	// 計画の流れ（承認の preview の plans と同じ形）。子が承認された番号は固定した番号。提案ではないので source_sha は空。
+	plans := jl(p, "plans")
+	if len(plans) != 1 || js(plans[0], "ticket") != "i0001" || js(plans[0], "part") != "plan" || js(plans[0], "source_sha") != "" {
+		t.Fatalf("plans = %v", plans)
+	}
+	items := jl(plans[0], "items")
+	if len(items) != 2 || jf(items[0], "number") != 1 || js(items[1], "type") != "design" || !jb(items[0], "locked") || !jb(items[1], "locked") {
+		t.Errorf("plans[0].items = %v", items)
+	}
+	if got := jl(plans[0], "after", "2"); len(got) != 1 || got[0] != 1.0 {
+		t.Errorf("plans[0].after = %v", jv(plans[0], "after"))
+	}
+}
+
+// 計画の流れの形は、承認の preview の plans と同じ（同じ関数で組む）。
+func TestParentPlansHaveTheShapeOfTheApprovalPreview(t *testing.T) {
+	t.Parallel()
+	board := boardSceneBuild(t).board()
+	preview := readFixture(t, "approve-preview.json")
+	if !slices.Equal(sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0)))) {
+		t.Errorf("plans のキーが違う: preview %v, チケット管理画面 %v", sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0))))
+	}
+	if !slices.Equal(sortedKeys(jm(jv(preview, "plans", 0, "items", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0, "items", 0)))) {
+		t.Errorf("plans[].items のキーが違う")
 	}
 }
 
@@ -439,7 +464,76 @@ func TestAttentionAndIssuesFollowTheScene(t *testing.T) {
 	ticketkit.OK(t, tr.CloseChild("i0001-02-02"))
 	by = tr.boardByID()
 	if !jb(by["i0001-02-02"], "attention") || !jb(by["i0001"], "attention") || jb(by["i0001-01-01"], "attention") {
-		t.Errorf("閉じた後の attention: %v %v %v", by["i0001-02-02"]["attention"], by["i0001"]["attention"], by["i0001-01-01"]["attention"])
+		t.Errorf("クローズした後の attention: %v %v %v", by["i0001-02-02"]["attention"], by["i0001"]["attention"], by["i0001-01-01"]["attention"])
+	}
+}
+
+// inbox は 1 チケット 1 種類で分ける。承認待ちの子は approval だけに入り、notice に重ねない。フローの下書きが在る
+// 子は flow_draft に、ツリーの取り込める下書きは handoff に数える。
+func TestInboxSortsWaitingTicketsAndDrafts(t *testing.T) {
+	t.Parallel()
+	tr := boardSceneBuild(t)
+	board := tr.board()
+	inboxList := func(b map[string]any, key string) []string {
+		var out []string
+		for _, v := range jl(b, "inbox", key) {
+			s, _ := v.(string)
+			out = append(out, s)
+		}
+		return out
+	}
+	if got := inboxList(board, "approval"); !slices.Equal(got, []string{"i0001-02-03"}) {
+		t.Errorf("approval = %v", got)
+	}
+	for _, key := range []string{"review", "notice", "handoff", "flow_draft"} {
+		if len(jl(board, "inbox", key)) != 0 {
+			t.Errorf("%s = %v", key, jv(board, "inbox", key))
+		}
+	}
+	var draft string
+	for _, tk := range jl(board, "tickets") {
+		if js(tk, "ticket") == "i0001-02-02" {
+			draft = js(tk, "flow", "draft", "path")
+		}
+	}
+	ticketkit.Write(t, draft, "id: f\nnodes:\n  - {id: start, type: start}\n")
+	ticketkit.Write(t, filepath.Join(tr.Root, ".ccnavi", "docs", "note.md"), "前\n")
+	ticketkit.Write(t, filepath.Join(tr.Root, "wip", "handoff", ".ccnavi", "docs", "note.md"), "後\n")
+	board = tr.board()
+	if got := inboxList(board, "flow_draft"); !slices.Equal(got, []string{"i0001-02-02"}) {
+		t.Errorf("flow_draft = %v", got)
+	}
+	handoffs := jl(board, "inbox", "handoff")
+	if len(handoffs) != 1 || js(handoffs[0], "tree") != tr.Root || jv(handoffs[0], "count") != float64(1) {
+		t.Errorf("handoff = %v", handoffs)
+	}
+}
+
+// クローズした子（ここでは終わった i0001-01-01）の下書きは、フローが在っても「提案あり」にせず、flow_draft にも入れない
+// （フロー編集の画面は読むだけ）。置き場は i0001-02-02 の欄と同じディレクトリに組む（クローズしてフローが無い子は flow が null）。
+func TestAClosedChildsDraftIsNotOffered(t *testing.T) {
+	t.Parallel()
+	tr := boardSceneBuild(t)
+	var flowFile, draft string
+	for _, tk := range jl(tr.board(), "tickets") {
+		if js(tk, "ticket") == "i0001-02-02" {
+			flowFile = filepath.Join(filepath.Dir(js(tk, "flow", "path")), "i0001-01-01.yml")
+			draft = filepath.Join(filepath.Dir(js(tk, "flow", "draft", "path")), "i0001-01-01.yml")
+		}
+	}
+	ticketkit.Write(t, flowFile, "id: f\nnodes:\n  - {id: start, type: start}\n")
+	ticketkit.Write(t, draft, "id: f\nnodes:\n  - {id: end, type: end}\n")
+	board := tr.board()
+	if got := jl(board, "inbox", "flow_draft"); len(got) != 0 {
+		t.Errorf("flow_draft = %v", got)
+	}
+	for _, tk := range jl(board, "tickets") {
+		if js(tk, "ticket") != "i0001-01-01" {
+			continue
+		}
+		if !jb(tk, "flow", "exists") || !jb(tk, "flow", "draft", "exists") || jb(tk, "flow", "draft", "differs") {
+			t.Errorf("flow = %v", jv(tk, "flow"))
+		}
 	}
 }
 
@@ -461,7 +555,7 @@ func TestTheMergedHeadOfAChildIsShown(t *testing.T) {
 	if js(by["i0001-02-02"], "merged_sha") != strings.Repeat("a", 40) {
 		t.Errorf("merged_sha = %v", by["i0001-02-02"]["merged_sha"])
 	}
-	// finish で閉じた子は、合流した先頭を持つ。
+	// finish でクローズした子は、合流した先頭を持つ。
 	if !regexp.MustCompile(`^[0-9a-f]{40}$`).MatchString(js(by["i0001-01-01"], "merged_sha")) {
 		t.Errorf("merged_sha = %v", by["i0001-01-01"]["merged_sha"])
 	}
@@ -497,5 +591,16 @@ func TestBoardShapeMatchesTheExtensionFixture(t *testing.T) {
 	sameKeys("proposal", proposalOf(fixture), proposalOf(board))
 	sameKeys("parents[0]", jv(fixture, "parents", 0), jv(board, "parents", 0))
 	sameKeys("parents[0].phases[0]", jv(fixture, "parents", 0, "phases", 0), jv(board, "parents", 0, "phases", 0))
+	sameKeys("parents[0].plans[0]", jv(fixture, "parents", 0, "plans", 0), jv(board, "parents", 0, "plans", 0))
 	sameKeys("sums[0].phases", jv(fixture, "sums", 0, "phases"), jv(board, "sums", 0, "phases"))
+	sameKeys("inbox", jv(fixture, "inbox"), jv(board, "inbox"))
+	flowOf := func(root map[string]any) any {
+		for _, tk := range jl(root, "tickets") {
+			if f := jv(tk, "flow", "draft"); f != nil {
+				return f
+			}
+		}
+		return nil
+	}
+	sameKeys("tickets[].flow.draft", flowOf(fixture), flowOf(board))
 }

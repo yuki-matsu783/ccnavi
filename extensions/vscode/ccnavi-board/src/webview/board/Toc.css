@@ -1,0 +1,27 @@
+/*
+ * 承認のオーバーレイと対応方針の画面の目次（`Toc.tsx`）と、目次と本文を左右に並べる枠（`.overlay-with-toc`）。
+ * 目次はオーバーレイの中で上に貼り付け、本文を送っても見える。狭い幅（640px以下）では本文の上に横に並べる。
+ */
+.overlay-with-toc { display: grid; grid-template-columns: 11em minmax(0, 1fr); gap: var(--gap-5); align-items: start; }
+.overlay-with-toc > .overlay-main { min-width: 0; }
+.overlay-toc { position: sticky; top: 0; font-size: var(--font-md); }
+.overlay-toc-head { font-size: var(--font-xs); font-weight: 600; color: var(--vscode-descriptionForeground); margin-bottom: 4px; }
+.overlay-toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gap-1); }
+.overlay-toc-item {
+  display: flex; width: 100%; justify-content: space-between; gap: var(--gap-3); text-align: left;
+  background: none; border: none; border-radius: var(--radius-sm); padding: 2px 6px; margin: 0;
+  font: inherit; color: var(--vscode-textLink-foreground); cursor: pointer; overflow-wrap: anywhere;
+}
+.overlay-toc-item:hover, .overlay-toc-item:focus-visible { background: var(--vscode-list-hoverBackground); color: var(--vscode-textLink-activeForeground); }
+.overlay-toc-item:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
+.overlay-toc-item:disabled { color: var(--vscode-descriptionForeground); cursor: default; background: none; }
+.overlay-toc-label { min-width: 0; }
+.overlay-toc-count { flex: 0 0 auto; color: var(--vscode-descriptionForeground); font-variant-numeric: tabular-nums; }
+/* 目次で送った先の見出しが、貼り付いた目次や枠の上端に隠れないよう少し余白を取る */
+.overlay-main [id] { scroll-margin-top: 8px; }
+@media (max-width: 640px) {
+  .overlay-with-toc { grid-template-columns: minmax(0, 1fr); }
+  .overlay-toc { position: static; }
+  .overlay-toc ul { flex-direction: row; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); }
+  .overlay-toc-item { width: auto; }
+}

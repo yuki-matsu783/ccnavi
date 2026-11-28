@@ -319,6 +319,15 @@
  "pending_approval": [
   "i0001-02-03"
  ],
+ "inbox": {
+  "approval": [
+   "i0001-02-03"
+  ],
+  "review": [],
+  "notice": [],
+  "handoff": [],
+  "flow_draft": []
+ },
  "tickets": [
   {
    "ticket": "i0001",
@@ -419,7 +428,8 @@
      "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-01-01.yml",
      "rel": "wip/proposals/flows/i0001-01-01.yml",
      "exists": false,
-     "linked": false
+     "linked": false,
+     "differs": false
     }
    },
    "risk": {
@@ -487,7 +497,8 @@
      "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-02.yml",
      "rel": "wip/proposals/flows/i0001-02-02.yml",
      "exists": false,
-     "linked": false
+     "linked": false,
+     "differs": false
     }
    },
    "risk": null,
@@ -558,7 +569,8 @@
      "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-03.yml",
      "rel": "wip/proposals/flows/i0001-02-03.yml",
      "exists": false,
-     "linked": false
+     "linked": false,
+     "differs": false
     }
    },
    "risk": null,
@@ -633,7 +645,8 @@
      "path": "<root>/.claude/worktrees/i0001/wip/proposals/flows/i0001-02-04.yml",
      "rel": "wip/proposals/flows/i0001-02-04.yml",
      "exists": false,
-     "linked": false
+     "linked": false,
+     "differs": false
     }
    },
    "risk": {
@@ -710,6 +723,51 @@
     }
    ],
    "feedback": null,
+   "plans": [
+    {
+     "ticket": "i0001",
+     "part": "plan",
+     "source_sha": "",
+     "items": [
+      {
+       "number": 1,
+       "from": 1,
+       "type": "research",
+       "title": "調査",
+       "review": false,
+       "deferred": false,
+       "review_at": null,
+       "locked": true
+      },
+      {
+       "number": 2,
+       "from": 2,
+       "type": "design",
+       "title": "設計",
+       "review": true,
+       "deferred": false,
+       "review_at": null,
+       "locked": true
+      }
+     ],
+     "after": {
+      "2": [
+       1
+      ]
+     },
+     "proposed": {
+      "2": [
+       1
+      ]
+     },
+     "current": null,
+     "loose": [],
+     "ready": [
+      1
+     ],
+     "problems": []
+    }
+   ],
    "close_early": null,
    "ready": null,
    "closed_record": null,

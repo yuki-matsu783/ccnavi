@@ -105,9 +105,9 @@ func TestScriptWritesTable(t *testing.T) {
 		{"着手の欄だけの書き足し", doing(swBase), doing(swTicket("i0001", `started_at: "`+swStartedT+`"`)), []string{swDoing}},
 		{"マーカーの設置（どちらの版も範囲を宣言しない）", doing(swBase), map[string]string{swMarker: `{"mr": 1}` + "\n"}, []string{swMarker}},
 		{"finish の移動（作業中からレビュー待ち）", doing(swBase), map[string]string{swDoing: "-", swReview: swFinished}, []string{swDoing, swReview}},
-		{"着手済みのチケットを閉じて動かす", doing(swStarted), map[string]string{swDoing: "-", swReview: swStartedFinished}, []string{swDoing, swReview}},
-		{"空の欄を持つチケットを閉じて動かす", doing(swPlaced), map[string]string{swDoing: "-", swReview: swPlacedRun}, []string{swDoing, swReview}},
-		{"レビュー待ちを閉じた置き場へ動かす", doing(swPlaced), map[string]string{swDoing: "-", swDone: swPlacedRun}, []string{swDoing, swDone}},
+		{"着手済みのチケットをクローズして動かす", doing(swStarted), map[string]string{swDoing: "-", swReview: swStartedFinished}, []string{swDoing, swReview}},
+		{"空の欄を持つチケットをクローズして動かす", doing(swPlaced), map[string]string{swDoing: "-", swReview: swPlacedRun}, []string{swDoing, swReview}},
+		{"レビュー待ちをクローズした置き場へ動かす", doing(swPlaced), map[string]string{swDoing: "-", swDone: swPlacedRun}, []string{swDoing, swDone}},
 		// 外れないもの。範囲・基準点・場所の偽造。
 		{"範囲を広げる編集", doing(swBase), doing(strings.Replace(swBase, `glob: "src/*"`, `glob: "*"`, 1)), nil},
 		{"承認済みチケットを消すだけ", doing(swBase), map[string]string{swDoing: "-"}, nil},

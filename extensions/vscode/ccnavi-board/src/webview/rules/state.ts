@@ -6,7 +6,7 @@
  * idはユーザが打つもので、空にも重複にもなるのでキーには使えない。キーは画面の中だけのもので、
  * 拡張ホストへ渡すのは、ファイルを選ぶとき（`pickFile` → `picked`）に行を名指しするときだけ。
  *
- * 残す先はWebviewのstate（`{ open: [id, …], tab }`）。
+ * 残す先はWebviewのstate（`{ open: [id, …], tab, judgeFolded }`）。
  * 残すのはidで、キーは画面を作り直すと変わるため。idが空の行は残せない。
  */
 import { SECTIONS, type RuleForm, type Section, type Sections } from "../../core/rules-view.js";
@@ -87,11 +87,21 @@ export function loadOpen(): ReadonlySet<string> {
 /** stateに残してあるタブ。知らない値は既定（ルール） */
 export function loadTab(): TabName {
   const saved = (getState() ?? {}) as { tab?: unknown };
-  return saved.tab === "judge" || saved.tab === "hooks" ? saved.tab : "rules";
+  return saved.tab === "hooks" ? "hooks" : "rules";
 }
 
-export const TABS = ["rules", "judge", "hooks"] as const;
+/** タブはルールとhookの2つ。「判定を試す」はタブではなく右の常設の欄 */
+export const TABS = ["rules", "hooks"] as const;
 export type TabName = (typeof TABS)[number];
+
+/** 狭い幅で「判定を試す」の欄を畳んでいるか。広い幅では欄を畳まない（CSSが決める） */
+export function loadJudgeFolded(): boolean {
+  return ((getState() ?? {}) as { judgeFolded?: unknown }).judgeFolded === true;
+}
+
+export function saveJudgeFolded(folded: boolean): void {
+  setState({ ...((getState() ?? {}) as object), judgeFolded: folded });
+}
 
 /** 開いている行をstateに残す。idが空の行は残さない（次に開き直す手がかりが無い） */
 export function saveOpen(draft: Draft, open: ReadonlySet<string>): void {

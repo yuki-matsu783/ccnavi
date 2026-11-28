@@ -6,6 +6,50 @@
  */
 import { projectLayer } from "./layers.js";
 import type { BoardJson } from "./model.js";
+import type { SettingsTarget } from "./screens.js";
+
+/** 2つの対象が同じか */
+export function sameTarget(a: SettingsTarget, b: SettingsTarget): boolean {
+  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
+}
+
+/** 開いている対象の欄の値（`TargetOption`の`kind`と`name`。`project`以外は`name`が空） */
+export function targetKey(target: SettingsTarget): { kind: string; name: string } {
+  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
+}
+
+/** 確認の文や知らせで使う対象の名前。「設定」欄の表示（`targetLabel`）をそのまま使う */
+export function targetName(target: SettingsTarget): string {
+  const key = targetKey(target);
+  return targetLabel(key.kind, key.name);
+}
+
+/** 選ぶ欄の値（`kind`と`name`）を対象に戻す。知らない`kind`はundefined */
+export function targetFrom(value: { readonly kind: unknown; readonly name: unknown }): SettingsTarget | undefined {
+  if (value.kind === "workspace" || value.kind === "self") {
+    return { kind: value.kind };
+  }
+  if (value.kind === "project" && typeof value.name === "string" && value.name !== "") {
+    return { kind: "project", name: value.name };
+  }
+  return undefined;
+}
+
+/**
+ * 設定の画面を開くときの対象。覚えた最後の選択（`remembered`）が、いまの答えの選択肢にあればそれを使う。
+ * 無ければ画面の既定（`fallback`）で開き、そのことを1行で返す（`notice`。使えたときは空）。
+ * 答えがまだ無い（`board`がundefined）ときは、選択肢を確かめられないので覚えたものをそのまま使う。
+ */
+export function openingTarget(remembered: SettingsTarget | undefined, board: BoardJson | undefined, fallback: SettingsTarget): { target: SettingsTarget; notice: string } {
+  if (remembered === undefined || board === undefined) {
+    return { target: remembered ?? fallback, notice: "" };
+  }
+  const key = targetKey(remembered);
+  if (targetOptions(board, targetKey(fallback)).some((o) => o.kind === key.kind && o.name === key.name)) {
+    return { target: remembered, notice: "" };
+  }
+  return { target: fallback, notice: `${targetName(remembered)}にはこの設定が無いため、${targetName(fallback)}を開きました` };
+}
 
 /** 対象1つ。`kind`は共通設定の呼び名（`workspace`）、`self`、`project`のどれか */
 export interface TargetOption {
@@ -22,12 +66,11 @@ export function targetValue(target: { readonly kind: string; readonly name: stri
 
 /**
  * 切り替えられる対象の一覧。共通、ワークスペース、設定の対象になっているプロジェクトの順。
- * `commonKind`がundefinedなら、共通設定を並べない（今はどの画面も`workspace`を渡す）。
  * 開いている対象が一覧に無ければ（ボードを読めなかったときなど）、それだけを足す。
  */
-export function targetOptions(board: BoardJson | undefined, commonKind: string | undefined, current: { readonly kind: string; readonly name: string }): TargetOption[] {
+export function targetOptions(board: BoardJson | undefined, current: { readonly kind: string; readonly name: string }): TargetOption[] {
   const options: TargetOption[] = [
-    ...(commonKind === undefined ? [] : [{ kind: commonKind, name: "", label: "共通設定" }]),
+    { kind: "workspace", name: "", label: "共通設定" },
     { kind: "self", name: "", label: "ワークスペース" },
   ];
   if (board !== undefined) {

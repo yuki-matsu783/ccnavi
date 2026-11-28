@@ -168,7 +168,7 @@ func (e *Env) pushesToOrigin(remote, branch string) bool {
 //
 // 子の承認済みチケットを置くのは、ふつう親のワークツリー。ワークスペースルートだけを見ると、親のツリーに置かれた子を
 // 見落とすので、ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・.claude/worktrees/ の下）
-// を全部見る。レビュー待ち（review/）と閉じた承認済みチケット（done/）も見る（子を閉じたあと、親が取り込んで片付けるまでの
+// を全部見る。レビュー待ち（review/）とクローズした承認済みチケット（done/）も見る（子をクローズしたあと、親が取り込んで片付けるまでの
 // 間もそのツリーは子のもの）。
 func (e *Env) childParent(name string) (string, bool) {
 	trees := []string{e.Root}

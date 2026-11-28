@@ -314,7 +314,7 @@ func (j *judgement) builtinStops(notices []string, subject string, inner []layer
 			return code, done, err
 		}
 	}
-	// サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない（閉じるのは親だけ）。
+	// サブエージェントには、状態を動かすスクリプトもレビューのスクリプトも打たせない（クローズするのは親だけ）。
 	// 中で実行されるコマンドにも当てる（`env sh …` は元の形だけでは先頭の sh に固定した形から外れる）。
 	if conf.TicketsEnabled() && in.AgentID != "" && shellTool && useronly.Forbidden(subject, joinLayers(inner, shell.Sep)) {
 		runner, text := "", ""
@@ -550,7 +550,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 		}
 	}
 
-	// ルールの判定とチケットの判定を合わせ、強い側を採る（同じならルール）。チケットが言うのは閉じる向きだけで、
+	// ルールの判定とチケットの判定を合わせ、強い側を採る（同じならルール）。チケットが言うのはクローズする向きだけで、
 	// ルールの deny・ask を緩めることはない。
 	ticketReason, ticketCode := "", ""
 	if verdict != rules.Deny {

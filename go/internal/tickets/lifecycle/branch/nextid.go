@@ -35,7 +35,7 @@ type Known struct {
 }
 
 // SerialNames は通し番号に数える名前と、数えきれなかった理由。数えるのは今の親チケット・提案（承認待ち・作業中・
-// レビュー待ち・閉じたもの）、ワークスペースと各プロジェクトの手元のブランチ名（識別子の形に直す）、
+// レビュー待ち・クローズしたもの）、ワークスペースと各プロジェクトの手元のブランチ名（識別子の形に直す）、
 // `.claude/worktrees/` の直下のディレクトリ名。origin の追跡ブランチは数えない（直接作業のブランチは push しない）。
 // どこかのリポジトリのブランチを数えられなければ理由を返す（番号を決めてはいけない）。known が nil なら読む。
 func SerialNames(conf *config.Settings, root string, known *Known) ([]string, []string) {

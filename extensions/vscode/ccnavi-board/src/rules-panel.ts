@@ -41,11 +41,12 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import { HANDOFF_ENTRY } from "./handoff-entry.js";
-import type { RulesTarget } from "./core/screens.js";
-import { targetOptions } from "./core/targets.js";
+import type { SettingsTarget } from "./core/screens.js";
+import { targetKey, targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { assertRetained, openInEditor, resolveIn, toGlob, watchGlobs, workspaceFolder } from "./panel-common.js";
-import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { binSetting, readSettingFile, settingsPanel, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { targetToOpen } from "./target-memory.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
@@ -73,7 +74,7 @@ type PanelState = SettingsState<RulesData, Loaded>;
 let state: PanelState | undefined;
 
 /** 読み込み中の一言で「何を」読んでいるか */
-function whatOf(target: RulesTarget): string {
+function whatOf(target: SettingsTarget): string {
   switch (target.kind) {
     case "workspace":
       return "共通設定のルール";
@@ -88,17 +89,14 @@ function expectationsSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("expectationsPath", DEFAULT_EXPECTATIONS);
 }
 
-/** `ccnaviBoard.openRules`の本体。引数なしは共通設定のルール */
-export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
+/** `ccnaviBoard.openRules`の本体。開いていれば前面に出すだけ。開くときは最後に選んだ対象で、無ければ共通設定で開く */
+export async function openRules(): Promise<void> {
   const folder = workspaceFolder("ルール管理画面");
   if (folder === undefined) {
     return;
   }
   if (state !== undefined) {
     state.panel.reveal(state.panel.viewColumn);
-    if (!sameTarget(state.target, target)) {
-      await switchTarget(state, target);
-    }
     return;
   }
 
@@ -121,6 +119,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
     // 編集の途中を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
+  const target = targetToOpen({ kind: "workspace" });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
@@ -143,7 +142,7 @@ export async function openRules(target: RulesTarget = { kind: "workspace" }): Pr
   await reload(current);
 }
 
-async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
+async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   const settingsText = readText(path.join(root, ".claude", "settings.json"));
   const localText = readText(path.join(root, ".claude", "settings.local.json"));
   let rulesPath: string;
@@ -154,7 +153,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   if (!board.ok) {
     notices.push(`ccnaviから動作モードを取得できないため、denyやaskの判定でツールの実行が実際に止まるかどうかを表示していません: ${board.error}`);
   }
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
+  const targets = targetOptions(board.ok ? board.board : undefined, targetKey(target));
   if (target.kind === "workspace") {
     // 共通設定の場所は`.ccnavi/config/common/`固定。env（`CCNAVI_RULES`など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
@@ -238,7 +237,7 @@ function alive(current: PanelState): boolean {
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, switchTarget, stale, fail, save } = settingsPanel<RulesData, Loaded, ToRules, RulesMessage>({
+const { registerPanelHandlers, scheduleChanged, reload, stale, fail, save } = settingsPanel<RulesData, Loaded, ToRules, RulesMessage>({
   accepts: true,
   screen: SCREEN,
   title: TITLE,
@@ -297,7 +296,7 @@ function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, target) });
 }
 
 /**
@@ -334,7 +333,7 @@ function stage(current: PanelState, loaded: Loaded, sections: Sections): RulesOv
   return overrideFor(loaded.target, tmp);
 }
 
-function overrideFor(target: RulesTarget, tmp: string): RulesOverride {
+function overrideFor(target: SettingsTarget, tmp: string): RulesOverride {
   switch (target.kind) {
     case "workspace":
       return { kind: "workspace", path: tmp };

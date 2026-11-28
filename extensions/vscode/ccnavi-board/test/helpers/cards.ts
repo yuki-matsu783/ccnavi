@@ -44,7 +44,7 @@ export function ticketJson(ticket: string, over: Partial<TicketJson> = {}): Tick
   };
 }
 
-/** 閉じた（完了）チケット */
+/** クローズした（完了）チケット */
 export function closedJson(ticket: string, over: Partial<TicketJson> = {}): TicketJson {
   return ticketJson(ticket, {
     copy: { status: "closed", approved_at: "2026-10-01T00:00:00+0900", approved_from: "commit", path: `/ws/.ccnavi/approved/done/${ticket}.md` },
@@ -113,7 +113,7 @@ export function waitingPhase(number: number, mr = 12, url = `https://example.com
 }
 
 export function parentJson(ticket: string, phases: readonly PhaseJson[], over: Partial<ParentJson> = {}): ParentJson {
-  return { ticket, closed: false, stage: "作業中", plan: [], feedback: null, close_early: null, ready: null, phases, ...over };
+  return { ticket, closed: false, stage: "作業中", plan: [], feedback: null, plans: [], close_early: null, ready: null, phases, ...over };
 }
 
 /** 見本の殻（設定・統合結果）に、指定したチケットと親だけを入れたボード */

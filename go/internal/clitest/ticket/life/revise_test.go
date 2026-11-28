@@ -16,7 +16,7 @@ import (
 //  2. 全体計画のレビューが済む前は、--feedback は何も書かずに止まる
 //  3. --feedback を付けないと、写しだけを作る（feedback: は足さない）
 //  4. todo/ に同じ識別子の提案が既にあれば、上書きしない。承認済みの親が無い・cwd が親のワークツリーの外・子の識別子は、何も書かずに止まる
-//  5. 親を閉じられない理由（finish）が、この雛形の作り方を言う
+//  5. 親をクローズできない理由（finish）が、この雛形の作り方を言う
 
 // スクリプトだけが書く欄。写しでは空にする。
 var scriptFields = []string{"started_at", "completed_at", "base_sha", "merged_sha", "cancelled_at", "cancel_reason", "finished_to", "settled_by"}

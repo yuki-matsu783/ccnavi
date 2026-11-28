@@ -64,7 +64,7 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
           onChange={(event) => onSelect(event.target.checked)}
         />
         <span className="entry-path mono">{entry.path}</span>
-        <span className="tag" data-role="kind">
+        <span className="tag" data-role="kind" title={`種類: ${entry.kind}`}>
           {kindLabel(entry.kind)}
         </span>
         <span className={tone === "" ? "tag" : `tag ${tone}`} data-role="state">

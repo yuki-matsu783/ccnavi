@@ -1,5 +1,7 @@
 /**
- * Webviewパネルの生成・更新・破棄と、ファイル監視、Webviewからの操作の受け付け。
+ * Webviewパネルの生成・更新・破棄と、Webviewからの操作の受け付け。答えの読み直しとファイル監視は拡張全体の
+ * `board-feed.ts`が持ち、ここは届いた答えを描く（サイドパネルと同じ答え）。サイドパネルの行から開くときは、
+ * 開いたあとに進む場所（`BoardTarget`）を受けて、チケット管理画面が読めたら進む。
  * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
@@ -8,10 +10,11 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runMrState, runSyncRetired, runTemplateDraft } from "./ccnavi.js";
+import { boardFeed } from "./board-feed.js";
+import { runApprovePreview, runApproveYes, runChildWorktreeAdd, runDecidePreview, runDecideYes, runMrState, runSyncRetired, runTemplateDraft } from "./ccnavi.js";
 import { buildBoard, flowCardOf, isKnownPath, parentTreeOf, phaseChipOf, templateDraftCardOf, todoParentsOf, workflowCardOf, type Board } from "./core/board.js";
 import { flowTicketOf } from "./core/flow-view.js";
-import { screens } from "./core/screens.js";
+import { screens, type BoardTarget } from "./core/screens.js";
 import { movedStep, NOTHING_MOVED, type MovedState } from "./core/board-moved.js";
 import {
   abandonCommand,
@@ -37,16 +40,16 @@ import { renderBoardPage } from "./core/render.js";
 import { showLoading } from "./loading.js";
 import { copyCommand, copyPrompt, openPromptInSession, runPromptInTerminal } from "./prompt-handover.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
-import { ticketControlOf } from "./core/ticket-control.js";
 import { isTicketId } from "./core/ticket-id.js";
 import { forgetSaved, onWorkflowTabs, staleSaved, workflowTabs } from "./core/workflow-tabs.js";
 import { childWorktreeFailureText, unsavedText, type ApproveWorktree, type ChildWorktreeFailure } from "./core/approvemodel.js";
 import { runInTerminal, scriptShell } from "./terminal.js";
 import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
-import { noteTicketControl, requireTickets } from "./ticket-control.js";
+import { requireTickets } from "./ticket-control.js";
 import * as diaglog from "./log.js";
-import { assertNever, assertRetained, debounce, watchTickets, workspaceFolder } from "./panel-common.js";
+import { assertNever, assertRetained, workspaceFolder } from "./panel-common.js";
+import type { LoadResult } from "./ccnavi.js";
 
 /** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "board";
@@ -55,20 +58,23 @@ const TITLE = "ccnaviチケット管理";
 interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
-  watchers: vscode.FileSystemWatcher[];
   /** 画面に中身を渡す段取り（`core/screen-host.ts`）。いつ送れるかはここが持つ */
   readonly host: ScreenHost<BoardData>;
-  timer?: NodeJS.Timeout;
   board?: Board;
   /** 読み直せなかったときの文面。描き直しでオーバーレイだけを載せ替えるために覚えておく */
   error?: string;
   launcher?: Launcher;
-  /** 読み直しの最中か。最中にもう1回頼まれたら、終わってからもう1回だけ走らせる */
-  loading: boolean;
-  again: boolean;
   wasVisible: boolean;
   /** 次に描いたときに選ぶ絞り込み。1度使ったら消す（以後はWebviewのstateが覚える） */
   filter?: string;
+  /**
+   * 開いたあとに進む場所（サイドパネルの行から）。チケット管理画面が読めたら1度だけ行う。`project`は`filter`に、`select`は`select`に移す
+   */
+  target?: BoardTarget;
+  /** 画面に送って選ばせるカード（右のパネルに出す）。届いたら消す（絞り込みと同じく、作り直し中は持ち越す） */
+  select?: string;
+  /** 拡張全体の答え（`board-feed.ts`）を聞くのをやめる */
+  stopFeed?: () => void;
   /**
    * 承認のオーバーレイ。あれば描くたびにボードの上に被せる（監視の更新で消えない）。
    * 遷移の規則は`core/approval-machine.ts`が持ち、ここは持ち直すだけ
@@ -116,10 +122,10 @@ async function createChildWorktrees(root: string, worktrees: readonly ApproveWor
 }
 
 /**
- * `ccnaviBoard.open`の本体。`project`を渡すと、開いたボードの絞り込みをそのプロジェクトにする
- * （`""`はワークスペース（プロジェクト外）、`"*"`は全部）。いまは呼び出し元が無い（プロジェクト管理画面の入口を外した）。
+ * `ccnaviBoard.open`の本体。`target`を渡すと、開いたあとにそこへ進む（`core/screens.ts`の`BoardTarget`。サイドパネルの行から）。
+ * 答えは拡張全体で1つ（`board-feed.ts`）で、読めていればすぐに描き、開くたびに読み直しも頼む。
  */
-export async function openBoard(project?: string): Promise<void> {
+export async function openBoard(target?: BoardTarget): Promise<void> {
   const folder = workspaceFolder("チケット管理画面");
   if (folder === undefined) {
     return;
@@ -130,7 +136,10 @@ export async function openBoard(project?: string): Promise<void> {
   if (state !== undefined) {
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
-    state.filter = project;
+    aim(state, target);
+    // 読めているチケット管理画面で、絞り込みとカードの焦点をすぐに渡し、覚えた場所へ進む（読み直しを待たない）
+    redraw(state);
+    runTarget(state);
     void update();
     // 開いたままのタブで、左パネルの案内から案内を頼まれたとき。組み上がりの`ready`は来ない
     if (tourDue(SCREEN)) {
@@ -162,20 +171,66 @@ export async function openBoard(project?: string): Promise<void> {
   const current: PanelState = {
     panel,
     folder,
-    watchers: [],
     host: boardHost(panel),
-    loading: false,
-    again: false,
     wasVisible: panel.visible,
-    filter: project,
     approval: CLOSED,
     moved: NOTHING_MOVED,
     merge: MERGE_IDLE,
   };
   state = current;
+  aim(current, target);
   followAppearance(panel, current.host);
   registerPanelHandlers(current);
+  const latest = boardFeed.latest();
+  if (latest !== undefined) {
+    apply(current, latest);
+  }
   void update();
+}
+
+/** 進む場所を覚える。絞り込みと選ぶカードは画面に送るもの、ほかはチケット管理画面が読めたら行うもの */
+function aim(current: PanelState, target: BoardTarget | undefined): void {
+  if (target === undefined) {
+    return;
+  }
+  if (target.kind === "project") {
+    current.filter = target.project;
+  } else if (target.kind === "select") {
+    current.select = target.ticket;
+  } else {
+    current.target = target;
+  }
+}
+
+/**
+ * 覚えた場所へ進む。チケット管理画面が読めていなければ待つ（次に読めたときに`apply`から呼ばれる）。
+ * 行けるかは、カードのボタンを押したときと同じく遷移の側が、いまのチケット管理画面で確かめる
+ */
+function runTarget(current: PanelState): void {
+  const target = current.target;
+  if (target === undefined || current.board === undefined) {
+    return;
+  }
+  current.target = undefined;
+  switch (target.kind) {
+    case "approve":
+      // カードの「承認」と同じ。その1件だけを絞りとして送る
+      approveTickets(current, [target.ticket], true);
+      return;
+    case "decide":
+      startDecide(current, target.parent, target.phase);
+      return;
+    case "mergeCheck":
+      dispatchMerge(current, { kind: "check" });
+      return;
+    case "project":
+    case "select":
+      // `aim`が画面に送るほうへ移している
+      return;
+    default:
+      assertNever(target);
+      return;
+  }
 }
 
 /** `ccnaviBoard.refresh`の本体 */
@@ -188,7 +243,7 @@ export function refreshBoard(): void {
 }
 
 function registerPanelHandlers(current: PanelState): void {
-  const { panel, folder } = current;
+  const { panel } = current;
 
   panel.webview.onDidReceiveMessage((message: unknown) => {
     handleMessage(asMessage(message));
@@ -217,76 +272,43 @@ function registerPanelHandlers(current: PanelState): void {
   panel.onDidDispose(() => {
     tourPanelClosed(SCREEN);
     current.stopTabs?.();
-    if (current.timer !== undefined) {
-      clearTimeout(current.timer);
-      current.timer = undefined;
-    }
-    for (const watcher of current.watchers) {
-      watcher.dispose();
-    }
-    current.watchers = [];
+    current.stopFeed?.();
     if (state === current) {
       state = undefined;
     }
   });
 
-  current.watchers.push(...watchTickets(folder, scheduleUpdate));
+  // 読み直しは拡張全体の答え（`board-feed.ts`）が持つ。監視もそちらで、チケット管理画面を閉じていても続く
+  current.stopFeed = boardFeed.subscribe((result) => apply(current, result));
 }
 
-function scheduleUpdate(): void {
-  const current = state;
-  if (current === undefined) {
-    return;
-  }
-  debounce(current, "timer", () => {
-    if (state === current) {
-      void update();
-    }
-  });
+/** 読み直しを頼む。答えが届いたら`apply`が描く。重なった頼みは1回にまとめられる（`core/feed.ts`） */
+function update(): Promise<void> {
+  return boardFeed.refresh();
 }
 
-/** 実行ファイルを走らせ直してWebviewの内容を差し替える */
-async function update(): Promise<void> {
-  const current = state;
-  if (current === undefined) {
+/** 届いた答えで描き直し、覚えた場所へ進む */
+function apply(current: PanelState, result: LoadResult): void {
+  if (state !== current) {
     return;
   }
-  if (current.loading) {
-    current.again = true;
+  current.launcher = result.launcher;
+  if (!result.ok) {
+    // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
+    // 承認のオーバーレイは引き継いで残す。承認した文は取り返しがつかないので、
+    // チケット管理画面が描けないことを理由に消さない。進む場所も捨てる（読めないチケット管理画面では確かめられない）
+    current.board = undefined;
+    current.target = undefined;
+    showError(current, result.error);
     return;
   }
-  current.loading = true;
-  try {
-    const result = await loadBoard(current.folder.uri.fsPath, binSetting());
-    if (state !== current) {
-      return;
-    }
-    current.launcher = result.launcher;
-    if (result.ok) {
-      // 読み直した答えでサイドパネルの入口もそろえる。答えるのは実行ファイルだけ
-      noteTicketControl(ticketControlOf(result.board));
-    }
-    if (!result.ok) {
-      // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
-      // 承認のオーバーレイは引き継いで残す。承認した文は取り返しがつかないので、
-      // ボードが描けないことを理由に消さない。
-      current.board = undefined;
-      showError(current, result.error);
-      return;
-    }
-    const board = buildBoard(result.board);
-    current.board = board;
-    // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。ターミナルやChrome拡張で承認した・
-    // 取り下げた親を、あとで出す改版の提案と比べない（ボードから承認したときは承認の結果でも忘れる）
-    forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
-    show(current, board);
-  } finally {
-    current.loading = false;
-    if (current.again) {
-      current.again = false;
-      void update();
-    }
-  }
+  const board = buildBoard(result.board);
+  current.board = board;
+  // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。ターミナルやChrome拡張で承認した・
+  // 取り下げた親を、あとで出す改版の提案と比べない（チケット管理画面から承認したときは承認の結果でも忘れる）
+  forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
+  show(current, board);
+  runTarget(current);
 }
 
 /**
@@ -335,6 +357,11 @@ function send(current: PanelState, data: BoardData): void {
   // 届いたときだけ消す。届かないまま消すと「このプロジェクトで絞って開く」が二度と渡らない
   if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
     current.filter = undefined;
+  }
+  // 選ぶカードも同じ。中身のあとに送る（画面は届いた中身のカードを探す）。読めたチケット管理画面のときだけ
+  const select = current.select;
+  if (select !== undefined && data.kind === "board" && current.host.post({ type: "select", ticket: select } satisfies ToBoard)) {
+    current.select = undefined;
   }
 }
 
@@ -403,13 +430,7 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "approve":
       // 絞り込んでいなければ承認待ち全部。絞り込んでいれば見えている分だけを承認の対象にする。
       // カードの「この1件を承認」は、そのカードの識別子だけを絞りとして送ってくる。
-      // 突き合わせる相手（いまのボードの承認待ち）をつけて渡し、決めるのは遷移の側
-      dispatch(current, {
-        kind: "approve",
-        tickets: message.tickets,
-        filtered: message.filtered,
-        pending: current.board?.pendingApproval ?? [],
-      });
+      approveTickets(current, message.tickets, message.filtered);
       return;
     case "approveConfirm":
       // 押した時点の計画編集タブの様子を添える。未保存のタブがある親を含む一覧は遷移が打たない
@@ -431,14 +452,7 @@ function handleMessage(message: BoardMessage | undefined): void {
     case "decide":
       // ［レビュー完了］。残った指摘を読むオーバーレイを開く。shが指摘を取ってきて、0件ならレビュー済みにする画面、
       // 1件以上ならユーザが指摘ごとに選ぶ画面になる。
-      // ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める
-      dispatch(current, {
-        kind: "decide",
-        parent: message.parent,
-        phase: message.phase,
-        tree: current.board ? parentTreeOf(current.board, message.parent) : undefined,
-        chip: current.board ? phaseChipOf(current.board, message.parent, message.phase) : undefined,
-      });
+      startDecide(current, message.parent, message.phase);
       return;
     case "decideConfirm":
       dispatch(current, { kind: "decideConfirm", choices: message.choices });
@@ -486,6 +500,22 @@ function handleMessage(message: BoardMessage | undefined): void {
       assertNever(message);
       return;
   }
+}
+
+/** 承認のオーバーレイを開く。突き合わせる相手（いまのチケット管理画面の承認待ち）をつけて渡し、決めるのは遷移の側 */
+function approveTickets(current: PanelState, tickets: readonly string[], filtered: boolean): void {
+  dispatch(current, { kind: "approve", tickets, filtered, pending: current.board?.pendingApproval ?? [] });
+}
+
+/** レビュー完了を始める。チケット管理画面から引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める */
+function startDecide(current: PanelState, parent: string, phase: number): void {
+  dispatch(current, {
+    kind: "decide",
+    parent,
+    phase,
+    tree: current.board ? parentTreeOf(current.board, parent) : undefined,
+    chip: current.board ? phaseChipOf(current.board, parent, phase) : undefined,
+  });
 }
 
 /**

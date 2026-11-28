@@ -141,14 +141,14 @@ func TestParallelBranchesStartTogetherAndTheJoinWaits(t *testing.T) {
 	if !w.isApproved("i0001-02-02") || !w.isApproved("i0001-03-03") {
 		t.Error("並行の枝が一緒に承認されない")
 	}
-	// 合流点は、両方の枝が閉じるまで承認しない。
+	// 合流点は、両方の枝がクローズするまで承認しない。
 	w.propose("i0001-04-04", childText("i0001-04-04", 4, "wip/d/*"))
 	w.commitParent("approval-request 04")
 	refused := w.approve()
 	if w.isApproved("i0001-04-04") {
-		t.Error("枝が閉じる前に合流点が承認された")
+		t.Error("枝がクローズする前に合流点が承認された")
 	}
-	contains(t, "stderr", refused.Stderr, "閉じるまで承認しない")
+	contains(t, "stderr", refused.Stderr, "クローズするまで承認しない")
 }
 
 func TestAChainStillWaitsForEveryEarlierPhase(t *testing.T) {
@@ -161,7 +161,7 @@ func TestAChainStillWaitsForEveryEarlierPhase(t *testing.T) {
 	if !w.isApproved("i0001-02-02") || w.isApproved("i0001-03-03") {
 		t.Errorf("一直線の計画で 2 だけが通るはず: 2=%v 3=%v", w.isApproved("i0001-02-02"), w.isApproved("i0001-03-03"))
 	}
-	contains(t, "stderr", r.Stderr, "閉じるまで承認しない")
+	contains(t, "stderr", r.Stderr, "クローズするまで承認しない")
 }
 
 func TestAPlanWithoutAfterIsNotApproved(t *testing.T) {

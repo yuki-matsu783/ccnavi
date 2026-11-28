@@ -41,7 +41,7 @@ test("CB-D21 編集可能な範囲をinheritに変えるとglobの欄が消え�
     await dom.settle();
     assert.ok(dom.one(rowSelector("p2")).classList.contains("open"));
     assert.equal(dom.all(`${rowSelector("p2")} input.f-scope-globs`).length, 0);
-    assert.equal(dom.one(`${rowSelector("p2")} .sum .mono`).textContent, "親の範囲を引き継ぐ");
+    assert.equal(dom.one(`${rowSelector("p2")} .row-sum .mono`).textContent, "親の範囲を引き継ぐ");
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
     dom.type(dom.one(`${rowSelector("p2")} input.f-id`), "research");
     await dom.settle();
@@ -78,7 +78,7 @@ test("CB-D22 絞り込みはtitleとscopeにもヒットし、開いている行
     const added = rows[rows.length - 1];
     assert.ok(added.classList.contains("open"));
     assert.equal(dom.document.activeElement, added.querySelector("input.f-id"));
-    assert.equal(added.querySelector(".sum .mono")?.textContent, "親の範囲を引き継ぐ");
+    assert.equal(added.querySelector(".row-sum .mono")?.textContent, "親の範囲を引き継ぐ");
   } finally {
     await dom.close();
   }

@@ -3,6 +3,7 @@
  * 形の定義はccnaviのdocs/11_requirements/json-shapes.md「ボードのJSON」。同じ例がtest/fixtures/board.jsonにあり、
  * Goのテスト（go/internal/clitest/ticket/flow/board_test.go）が同じ例で形を確かめる。
  */
+import { readPlans, type ApprovePlan } from "./approvemodel.js";
 
 /** 拡張が読める版。実行ファイルが違う版を出したら、解釈せずに版の違いを伝える */
 export const BOARD_VERSION = 1;
@@ -11,7 +12,7 @@ export const BOARD_VERSION = 1;
  * ボードの列。置き場は4つ（`wip/proposals/{todo,review}/`、`.ccnavi/approved/{doing,done}/`）だが、
  * 列は 承認待ち（`todo/`）/ 進行中（`approved/doing/`と`review/`）/ 完了（`approved/done/`）/ 取り消し
  * （`approved/done/`で`cancelled_at`を持つ）の4つ。レビュー待ちは列ではなくカードの属性で分かる。
- * 5つめのアーカイブは置き場ではなく、手元の退避（`logs/archive/`。`ccnavi-review.sh ready`が閉じた
+ * 5つめのアーカイブは置き場ではなく、手元の退避（`logs/archive/`。`ccnavi-review.sh ready`がクローズした
  * 親子のチケットを移した先）にあるもの。表示するだけで、既定では隠す
  */
 export type ProposalState = "todo" | "doing" | "done" | "cancelled" | "archived";
@@ -101,6 +102,40 @@ export interface FlowDraftJson {
   readonly exists: boolean;
   /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
   readonly linked: boolean;
+  /**
+   * 「提案あり」を出すか。下書きが在り、読めないか、いまのフローと位置とグループ化を除いて違う（いまのフローが無ければ在るだけで真）。
+   * 実行ファイルの答え
+   */
+  readonly differs: boolean;
+}
+
+/** レビュー待ちのフェーズ1つ */
+export interface InboxReviewJson {
+  readonly parent: string;
+  readonly phase: number;
+}
+
+/** 取り込み待ちのあるツリー1つ。`tree`は`trees[].root` */
+export interface InboxHandoffJson {
+  readonly tree: string;
+  readonly count: number;
+}
+
+/**
+ * ユーザ待ちの分類（実行ファイルの答え）。1つのチケットは上から最初に当てはまる1種類だけに入る。
+ * 拡張は数を並べるだけで、分け直さない
+ */
+export interface InboxJson {
+  /** 承認待ち（`pending_approval`と同じ） */
+  readonly approval: readonly string[];
+  /** レビュー待ちのフェーズ */
+  readonly review: readonly InboxReviewJson[];
+  /** `attention`のうち上の2つに入らないチケット */
+  readonly notice: readonly string[];
+  /** ツリーごとの取り込み待ちの数（0のツリーは無い） */
+  readonly handoff: readonly InboxHandoffJson[];
+  /** `attention`ではなく、フローの下書きが「提案あり」の子 */
+  readonly flow_draft: readonly string[];
 }
 
 /**
@@ -109,7 +144,7 @@ export interface FlowDraftJson {
  */
 export interface PredecessorUnmetJson {
   readonly ticket: string;
-  /** `todo` / `doing` / `review`（閉じれば満たす）、`cancelled` / `missing` / `scattered`（待っても満たさない） */
+  /** `todo` / `doing` / `review`（クローズすれば満たす）、`cancelled` / `missing` / `scattered`（待っても満たさない） */
   readonly state: string;
   /** ユーザ向けの言葉（「作業中（doing/）」など）。実行ファイルが付ける */
   readonly label: string;
@@ -237,6 +272,11 @@ export interface ParentJson {
   readonly stage: string;
   readonly plan: readonly unknown[];
   readonly feedback: readonly unknown[] | null;
+  /**
+   * 計画の流れ（図の中身。計画ごとに1件）。承認のpreviewの`plans`と同じ形で、実行ファイルの同じ関数が組む。
+   * 計画を持たない親は空で、チケット管理画面は「計画の流れを見る」を出さない
+   */
+  readonly plans: readonly ApprovePlan[];
   readonly close_early: Record<string, unknown> | null;
   readonly ready: Record<string, unknown> | null;
   readonly phases: readonly PhaseJson[];
@@ -367,6 +407,8 @@ export interface BoardJson {
   readonly projects: readonly string[];
   readonly problems: readonly string[];
   readonly pending_approval: readonly string[];
+  /** ユーザ待ちの分類 */
+  readonly inbox: InboxJson;
   readonly tickets: readonly TicketJson[];
   readonly parents: readonly ParentJson[];
   /** 手元の退避にあるクローズしたチケット（表示用） */
@@ -423,11 +465,26 @@ export function parseBoardJson(text: string): ParseResult {
       projects: list(raw.projects).map(str),
       problems: list(raw.problems).map(str),
       pending_approval: list(raw.pending_approval).map(str),
+      inbox: inboxOf(isRecord(raw.inbox) ? raw.inbox : {}),
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
       archived: list(raw.archived).filter(isRecord).map(archived),
       turns: list(raw.turns).filter(isRecord).map(turnOf),
     },
+  };
+}
+
+function inboxOf(raw: Record<string, unknown>): InboxJson {
+  return {
+    approval: list(raw.approval).map(str),
+    review: list(raw.review)
+      .filter(isRecord)
+      .map((r) => ({ parent: str(r.parent), phase: typeof r.phase === "number" ? r.phase : 0 })),
+    notice: list(raw.notice).map(str),
+    handoff: list(raw.handoff)
+      .filter(isRecord)
+      .map((h) => ({ tree: str(h.tree), count: typeof h.count === "number" ? h.count : 0 })),
+    flow_draft: list(raw.flow_draft).map(str),
   };
 }
 
@@ -594,7 +651,7 @@ function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
   if (path === "") {
     return null;
   }
-  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked === true };
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked === true, differs: raw.differs === true };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {
@@ -618,6 +675,7 @@ function parent(raw: Record<string, unknown>): ParentJson {
     stage: str(raw.stage),
     plan: list(raw.plan),
     feedback: Array.isArray(raw.feedback) ? raw.feedback : null,
+    plans: readPlans(raw.plans),
     close_early: isRecord(raw.close_early) ? raw.close_early : null,
     ready: isRecord(raw.ready) ? raw.ready : null,
     phases: list(raw.phases).filter(isRecord).map(phase),

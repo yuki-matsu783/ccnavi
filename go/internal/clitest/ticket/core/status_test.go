@@ -264,7 +264,7 @@ func TestAClosedChildShowsHowItWasClosed(t *testing.T) {
 		ticketkit.Has(t, child, "取り消し")
 		ticketkit.Has(t, child, "要らなくなった")
 	})
-	t.Run("finish で閉じた子は合流した先頭を出す", func(t *testing.T) {
+	t.Run("finish でクローズした子は合流した先頭を出す", func(t *testing.T) {
 		t.Parallel()
 		tr := newPhaseTree(t)
 		tr.PhaseFamily(samples.Plan("research"))
@@ -281,12 +281,12 @@ func TestAClosedChildShowsHowItWasClosed(t *testing.T) {
 			return nil
 		})
 		if done == "" {
-			t.Fatal("done/ に閉じたチケットが無い")
+			t.Fatal("done/ にクローズしたチケットが無い")
 		}
 		ticketkit.Write(t, done, samples.SetFields(ticketkit.Read(t, done), samples.Field{Key: "merged_sha", Value: strings.Repeat("0123456789ab", 3)}))
 		child := block(t, said(t, tr, "i0001"), "i0001-01-01")
-		if !regexp.MustCompile(`閉じ方: 完了（[^）]*、合流 0123456789ab）`).MatchString(child) {
-			t.Errorf("閉じ方に合流先が出ない:\n%s", child)
+		if !regexp.MustCompile(`クローズの仕方: 完了（[^）]*、合流 0123456789ab）`).MatchString(child) {
+			t.Errorf("クローズの仕方に合流先が出ない:\n%s", child)
 		}
 	})
 }

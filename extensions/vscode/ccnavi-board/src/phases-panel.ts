@@ -19,7 +19,7 @@
  * 表示名の重なり、定義の形）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う（流れは`settings-panel.ts`の`save`）。
  * 作業中のチケットは、共通設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分だけを見る
- * （定義は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
+ * （定義は承認・着手・クローズするときに読まれるので、走っている最中に変えない）。
  * ファイルが無いのは「設定が無い」正常な状態で、帯は出さない。欄は触れ、検証を通った最初の保存でファイルを作る（雛形は置かない）。
  * 定義の無いファイル（`phases: {}`）は実行ファイルがerrorにするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
@@ -47,11 +47,12 @@ import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { commonPhases } from "./core/sums.js";
 import { showLoading } from "./loading.js";
 import { HANDOFF_ENTRY } from "./handoff-entry.js";
-import type { PhasesTarget } from "./core/screens.js";
-import { targetOptions } from "./core/targets.js";
+import type { SettingsTarget } from "./core/screens.js";
+import { targetKey, targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { assertRetained, openInEditor, patternFor, resolveIn, watchPattern, workspaceFolder } from "./panel-common.js";
-import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { binSetting, readSettingFile, settingsPanel, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { targetToOpen } from "./target-memory.js";
 import { requireTickets } from "./ticket-control.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -93,7 +94,7 @@ type PanelState = SettingsState<PhasesData, Loaded>;
 let state: PanelState | undefined;
 
 /** 読み込み中の一言で「何を」読んでいるか */
-function whatOf(target: PhasesTarget): string {
+function whatOf(target: SettingsTarget): string {
   switch (target.kind) {
     case "workspace":
       return "共通設定のフェーズ";
@@ -104,8 +105,8 @@ function whatOf(target: PhasesTarget): string {
   }
 }
 
-/** `ccnaviBoard.openPhases`の本体。引数なしはワークスペースの設定のフェーズ定義 */
-export async function openPhases(target: PhasesTarget = { kind: "self" }): Promise<void> {
+/** `ccnaviBoard.openPhases`の本体。開いていれば前面に出すだけ。開くときは最後に選んだ対象で、無ければワークスペースの設定で開く */
+export async function openPhases(): Promise<void> {
   if (!requireTickets("フェーズ管理画面")) {
     return;
   }
@@ -115,9 +116,6 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
   }
   if (state !== undefined) {
     state.panel.reveal(state.panel.viewColumn);
-    if (!sameTarget(state.target, target)) {
-      await switchTarget(state, target);
-    }
     return;
   }
 
@@ -140,6 +138,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
     // 編集の途中を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
+  const target = targetToOpen({ kind: "self" });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
@@ -162,7 +161,7 @@ export async function openPhases(target: PhasesTarget = { kind: "self" }): Promi
   await reload(current);
 }
 
-async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
+async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   const notices: string[] = [];
   const errors: string[] = [];
   // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi`から自分で組むと、組み方が食い違ったときに
@@ -171,7 +170,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   if (!board.ok) {
     throw new Error(`設定ファイルの場所をccnaviから取得できません: ${board.error}`);
   }
-  const targets = targetOptions(board.board, "workspace", targetKey(target));
+  const targets = targetOptions(board.board, targetKey(target));
   let phasesPath: string;
   let phasesRel: string;
   if (target.kind === "workspace") {
@@ -240,7 +239,7 @@ function alive(current: PanelState): boolean {
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, switchTarget, save } = settingsPanel<PhasesData, Loaded, ToPhases, PhasesMessage>({
+const { registerPanelHandlers, scheduleChanged, reload, save } = settingsPanel<PhasesData, Loaded, ToPhases, PhasesMessage>({
   accepts: true,
   screen: SCREEN,
   title: TITLE,
@@ -296,7 +295,7 @@ function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, target) });
 }
 
 /**
@@ -340,12 +339,12 @@ async function handle(current: PanelState, loaded: Loaded, message: PhasesMessag
   }
 }
 
-function headerOf(target: PhasesTarget): string {
+function headerOf(target: SettingsTarget): string {
   return target.kind === "workspace" ? COMMON_HEADER : LAYER_HEADER;
 }
 
 /** 保存の前の検証に渡す差し替え。共通設定は`--phases`、ほかは名前を付けて`--project-phases-file` */
-function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
+function overrideFor(target: SettingsTarget, tmp: string): LintOverride {
   switch (target.kind) {
     case "workspace":
       return { kind: "phases", path: tmp };

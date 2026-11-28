@@ -1,5 +1,5 @@
 /*
- * 計画の図（`PlanGraph.tsx`）。フロー編集の図（`flow/Canvas.css`）と同じく、React Flowの色の変数
+ * 計画の流れの図（`PlanGraph.tsx`）。フロー編集の図（`flow/Canvas.css`）と同じく、React Flowの色の変数
  * （`--xy-*`）をVS Codeのテーマ変数に置き換える。`!important`は要らない。
  *
  * 意味の色（注意の色）は、枠と線にだけ使う。文字の色には使わない（読みにくいテーマがあるため）。

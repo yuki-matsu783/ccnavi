@@ -29,17 +29,14 @@ import { LoadFailure, type ErrorFile } from "./core/load-failure.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { dirtyTitle } from "./core/save-gate.js";
 import type { ScreenHost } from "./core/screen-host.js";
-import type { RulesTarget } from "./core/screens.js";
-import { targetLabel } from "./core/targets.js";
-import { targetOptions, type TargetOption } from "./core/targets.js";
+import type { SettingsTarget } from "./core/screens.js";
+import { sameTarget, targetFrom, targetKey, targetName, targetOptions, type TargetOption } from "./core/targets.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { openHandoffFrom } from "./handoff-entry.js";
 import { debounce, openInEditor, watchTickets } from "./panel-common.js";
+import { rememberTarget } from "./target-memory.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
-
-/** 3画面の対象。共通設定（`workspace`）、ワークスペースの設定（`self`）、プロジェクト1つの設定（同じ3種） */
-export type SettingsTarget = RulesTarget;
 
 /** 共通の段取りが読む、読んだ結果の部分。画面ごとの`L`はこれに画面の分を足す */
 export interface SettingsLoaded {
@@ -204,15 +201,6 @@ export function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-export function sameTarget(a: SettingsTarget, b: SettingsTarget): boolean {
-  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
-}
-
-/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
-export function targetKey(target: SettingsTarget): { kind: string; name: string } {
-  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
-}
-
 /**
  * 設定ファイルを読む。無い（ENOENT）のは「設定が無い」正常な状態で、空（`exists`が偽）として返す。
  * ほかの読めない理由は投げる。`what`は失敗の文で使うファイルの呼び名、`rel`はその場所
@@ -227,11 +215,6 @@ export function readSettingFile(filePath: string, rel: string, what: string): { 
     }
     return { text: "", mtimeMs: 0, exists: false };
   }
-}
-
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）をそのまま使う */
-function targetLabelOf(target: SettingsTarget): string {
-  return targetLabel(target.kind, target.kind === "project" ? target.name : "");
 }
 
 /** 保存を止めるチケットを絞るプロジェクト。共通設定とワークスペースの設定は絞らない（どのツリーのdoingでも止める） */
@@ -362,16 +345,19 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
       case "switchTarget": {
         // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない。
         // 読めていないとき（エラー画面）は、開いている対象と共通・ワークスペースだけが一覧に出ている
-        const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", targetKey(current.target))).find(
+        const option = (current.loaded?.targets ?? targetOptions(undefined, targetKey(current.target))).find(
           (t) => t.kind === message.kind && t.name === message.name,
         );
         if (option === undefined) {
           return;
         }
-        const target: SettingsTarget =
-          option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "self" ? { kind: "self" } : { kind: "workspace" };
-        if (!sameTarget(current.target, target)) {
+        const target = targetFrom(option);
+        if (target !== undefined && !sameTarget(current.target, target)) {
           await switchTarget(current, target);
+          // 切り替わったときだけ覚える（未保存の確認でやめたら覚えない）
+          if (sameTarget(current.target, target)) {
+            rememberTarget(target);
+          }
         }
         return;
       }
@@ -454,7 +440,7 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
       }
       current.asking = true;
       const choice = await vscode.window.showWarningMessage(
-        `未保存の変更があります。破棄して「${targetLabelOf(target)}」に切り替えますか？`,
+        `未保存の変更があります。破棄して「${targetName(target)}」に切り替えますか？`,
         { modal: true },
         "切り替える",
       );

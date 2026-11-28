@@ -42,7 +42,7 @@ export async function openBoard(
     readonly filter?: string;
     readonly state?: unknown;
     readonly prepare?: LoadOptions["prepare"];
-    /** 図（承認のオーバーレイの計画の図）を描かせるときは真。大きさを測れるようにする（`dom.ts`の`measure`） */
+    /** 図（承認のオーバーレイと計画の流れの図）を描かせるときは真。大きさを測れるようにする（`dom.ts`の`measure`） */
     readonly measure?: boolean;
     /** 計画編集タブに未保存の変更がある親（拡張ホストが渡す） */
     readonly unsaved?: readonly string[];

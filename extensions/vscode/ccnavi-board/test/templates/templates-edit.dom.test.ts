@@ -104,7 +104,7 @@ test("CB-D382 編集を押すとeditOpenを送り、答えが届くまで読み�
     assert.equal(dom.all('section.tpl-edit-plan[data-part="plan"] .react-flow__node').length, 4, "startとendと2ステップ");
     assert.equal(dom.all('section[data-role="flows"] li.row').length, 2);
     assert.match(text(dom.one('section[data-role="flows"] li[data-index="2"]')), /フロー: 実装の手順/);
-    assert.equal(dom.all('[data-role="dirty"]').length, 0);
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 0);
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="save-edit"]').disabled, true, "直す前は保存を押せない");
     // 編集の間は対象の切り替えと更新を押せない
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="reload"]').disabled, true);
@@ -119,7 +119,7 @@ test("CB-D383 説明を直すと「未保存」が出て、少し待つと直し
     const { session } = await startEdit(dom);
     dom.type(dom.one(".f-description"), "新しい説明");
     await dom.settle();
-    assert.equal(dom.all('[data-role="dirty"]').length, 1);
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 1);
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="save-edit"]').disabled, false);
     const asked = await checkAsked(dom);
     assert.equal(asked.session, session);
@@ -209,14 +209,14 @@ test("CB-D385 保存はeditSaveに開いたときのハッシュと書き出す�
     await dom.send({ type: "editSaved", session, sha: "", error: "保存しません: 外で変わっています" });
     await dom.settle();
     assert.match(text(dom.one('[data-role="edit-status"]')), /外で変わっています/);
-    assert.equal(dom.all('[data-role="dirty"]').length, 1, "断られたら未保存のまま");
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 1, "断られたら未保存のまま");
     // もう一度押して、書けた
     dom.click(dom.one('button[data-action="save-edit"]'));
     await dom.settle();
     await dom.send({ type: "editSaved", session, sha: "sha-new", error: "" });
     await dom.settle();
     assert.match(text(dom.one('[data-role="edit-status"]')), /保存しました/);
-    assert.equal(dom.all('[data-role="dirty"]').length, 0);
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 0);
     // 次の保存の期待は、書いたファイルのハッシュ
     dom.type(dom.one(".f-when"), "別の場面");
     await dom.settle();
@@ -316,7 +316,7 @@ test("CB-D388 新しいテンプレートは名前を入れて作る。使えな
     await dom.send({ type: "editOpened", session: asked?.session, opened: { name: "my-flow", layer: "self", created: true, sha: "", data: skeleton, check: { ...check, name: "my-flow" }, lock: { locked: false, reason: "", doing: [], turns: [] } }, error: "" });
     await dom.settle();
     assert.match(text(dom.one('[data-role="edit"] h2')), /my-flow/);
-    assert.match(text(dom.one('[data-role="edit"] h2')), /新規/);
+    assert.match(text(dom.one('[data-role="edit"] [data-role="created"]:not(.hidden)')), /新規/);
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="save-edit"]').disabled, false, "新規は直さなくても保存できる");
     dom.click(dom.one('button[data-action="save-edit"]'));
     await dom.settle();
@@ -364,12 +364,12 @@ test("CB-D389 ステップのフローは最初から図を開いていて、部
     await dom.settle();
     assert.equal(dom.all(`${item(2)} .tpl-flow-edit`).length, 1);
     assert.equal(dom.all(`${item(2)} .react-flow__node`).length >= 2, true, "見本のフローのノードが図に出る");
-    assert.equal(dom.all('[data-role="dirty"]').length, 0);
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 0);
     const nodes = dom.all(`${item(2)} .react-flow__node`).length;
     dom.click(dom.one(`${item(2)} button[data-action="add-node"][data-type="prompt"]`));
     await dom.settle();
     assert.equal(dom.all(`${item(2)} .react-flow__node`).length, nodes + 1);
-    assert.equal(dom.all('[data-role="dirty"]').length, 1);
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 1);
     const asked = await checkAsked(dom);
     const flows = (asked.data as { flows: Record<string, { nodes: unknown[] }> }).flows;
     assert.equal(flows["2"].nodes.length, nodes + 1);
@@ -397,7 +397,7 @@ test("CB-D390 作業中のチケットがある間は編集はできるが保存
     assert.match(text(dom.one('[data-role="edit-lock"]')), /作業中のチケットがあります/);
     dom.type(dom.one(".f-description"), "錠の間も直せる");
     await dom.settle();
-    assert.equal(dom.all('[data-role="dirty"]').length, 1);
+    assert.equal(dom.all('[data-role="dirty"]:not(.hidden)').length, 1);
     assert.equal(dom.one<HTMLButtonElement>('button[data-action="save-edit"]').disabled, true, "錠が掛かっている間は保存を押せない");
     await dom.send({ type: "editLock", session, lock: { locked: false, reason: "", doing: [], turns: [] } });
     await dom.settle();
@@ -647,6 +647,35 @@ test("CB-D1277 未保存の間は中身のコピーを拡張ホストへ送り�
     await dom.send({ type: "editSaved", session, sha: "sha-new", error: "" });
     await dom.settle();
     assert.equal(dirties().at(-1)?.data, null, "保存できたら未保存ではない");
+  } finally {
+    await dom.close();
+  }
+});
+
+/** 上部の並びの順。名前と状態の塊 → 元に戻す・やり直す → 補助 → 主ボタン（最後） */
+function barOrder(dom: DomPage, scope: string): string[] {
+  const order: string[] = [];
+  for (const el of dom.all(`${scope} .editor-name, ${scope} .editor-controls > *`)) {
+    if (el.classList.contains("editor-name")) {
+      order.push("name");
+    } else if (el.classList.contains("editor-history")) {
+      order.push("history");
+    } else if (el.classList.contains("primary")) {
+      order.push("primary");
+    } else {
+      order.push("aux");
+    }
+  }
+  return order.filter((item, index) => index === 0 || order[index - 1] !== item);
+}
+
+test("CB-D1301 テンプレートの編集欄の上部は、名前と状態 → 元に戻す・やり直す → 閉じる → 保存の順に並ぶ", async () => {
+  const dom = await openList();
+  try {
+    await startEdit(dom);
+    assert.deepEqual(barOrder(dom, ".tpl-edit-head"), ["name", "history", "aux", "primary"]);
+    assert.equal(dom.one(".tpl-edit-head .editor-controls > :last-child").getAttribute("data-action"), "save-edit");
+    assert.equal(dom.one('.tpl-edit-head .editor-controls > [data-action="close-edit"]').textContent, "閉じる");
   } finally {
     await dom.close();
   }

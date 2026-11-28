@@ -45,7 +45,7 @@ test("CB-D366 一覧は対象ごとに1行。パス・種類・状態のバッ�
     assert.match(text(dom.one(row(".ccnavi/docs/broken.md"))), /error 1/);
     assert.match(text(dom.one(row(DOCS))), /warn 1/);
     // 要約: 対象6件、取り込める3件（template・layer-configのchanged・docs）、選択0件、対象外2件
-    assert.equal(text(dom.one("#counts")), "対象6件・取り込み可能3件・選択0件・対象外2件");
+    assert.equal(text(dom.one("#counts")), "対象のファイル6件（取り込み可能3件・取り込めない3件）・選択0件・対象外のパス2件");
     const ignored = text(dom.one("#ignored-paths"));
     assert.match(ignored, /repro\.sh: 取り込める種類のファイルではない/);
     assert.match(ignored, /linked: シンボリックリンクのディレクトリ/);
@@ -100,7 +100,7 @@ test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、
     assert.equal(open.disabled, true, "何も選んでいない間は押せない");
     await check(dom, TEMPLATE);
     await check(dom, DOCS);
-    assert.equal(text(dom.one("#counts")), "対象6件・取り込み可能3件・選択2件・対象外2件");
+    assert.equal(text(dom.one("#counts")), "対象のファイル6件（取り込み可能3件・取り込めない3件）・選択2件・対象外のパス2件");
     dom.click(open);
     await dom.settle();
     assert.deepEqual(
@@ -173,7 +173,7 @@ test("CB-D372 錠が掛かった状態で開いても、templateとlayer-config�
     assert.equal(pick(locked, RULES).disabled, true);
     assert.equal(pick(locked, DOCS).disabled, false);
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
-    assert.equal(text(locked.one("#counts")), "対象6件・取り込み可能1件・選択0件・対象外2件");
+    assert.equal(text(locked.one("#counts")), "対象のファイル6件（取り込み可能1件・取り込めない5件）・選択0件・対象外のパス2件");
   } finally {
     await locked.close();
   }
@@ -252,7 +252,7 @@ test("CB-D375 取り込みの結果を出す。取り込めた対象・消した
     assert.equal(dom.all('[data-role="confirm"]').length, 0);
     assert.equal(dom.one<HTMLButtonElement>('[data-action="reload"]').disabled, false);
     assert.match(text(dom.one('[data-role="result"] h3')), /取り込みました（1件）。下書きを1件削除しました。下書きを1件残しました/);
-    assert.deepEqual(dom.all('[data-role="applied"] li').map((li) => text(li)), [`${DOCS}（docs）`]);
+    assert.deepEqual(dom.all('[data-role="applied"] li').map((li) => text(li)), [`${DOCS}（文書）`]);
     assert.deepEqual(dom.all('[data-role="removed-drafts"] li').map((li) => text(li)), ["wip/handoff/.ccnavi/docs/guide.md"]);
     assert.match(text(dom.one('[data-role="kept-drafts"] li')), /other\.md\s+取り込み後に下書きが編集されていた/);
   } finally {

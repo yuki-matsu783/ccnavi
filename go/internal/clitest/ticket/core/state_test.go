@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// レビュー要の子を閉じると、承認済みチケットは doing/ から wip/proposals/review/ へ動く。動かすのはエージェント
+// レビュー要の子をクローズすると、承認済みチケットは doing/ から wip/proposals/review/ へ動く。動かすのはエージェント
 // （承認は要らない。範囲が消える向きなので危険は増えない）。レビュー待ちの子のツリーへの書き込みは、チケット無しの扱いになる。
 func TestFinishMovesAReviewedTicketToReviewWithoutApproval(t *testing.T) {
 	t.Parallel()
@@ -61,7 +61,7 @@ func TestMovingStateKeepsTheProposalText(t *testing.T) {
 	ticketkit.Has(t, after, "base_sha:")
 }
 
-// 子の着手は親が着手済みであることを前提にする（飛ばしても途中では何も問題が起きず、親を閉じるときだけが通らない。
+// 子の着手は親が着手済みであることを前提にする（飛ばしても途中では何も問題が起きず、親をクローズするときだけが通らない。
 // 止める場所を最初の子の着手に置けば、親の作業が実際に始まる時点で言える）。案内は親の start で、ワークスペースルートからの
 // 絶対パス（子のワークツリーから打てるパス）。止まった回は子の着手の欄を書かない。親を着手すれば案内のとおりに通る。
 func TestAChildDoesNotStartBeforeItsParent(t *testing.T) {
@@ -88,7 +88,7 @@ func TestAChildDoesNotStartBeforeItsParent(t *testing.T) {
 	ticketkit.OK(t, tr.Ccnavi("ticket", "start", "i0001-01-02"))
 }
 
-// 親が開いていない（閉じた・承認前・見つからない）ときの子の着手は、親の置き場を名指しして止まる。
+// 親が開いていない（クローズした・承認前・見つからない）ときの子の着手は、親の置き場を名指しして止まる。
 func TestAChildDoesNotStartUnderAParentThatIsNotOpen(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
@@ -99,7 +99,7 @@ func TestAChildDoesNotStartUnderAParentThatIsNotOpen(t *testing.T) {
 		{
 			// doing/ から出た親は判定にも使われない。そこに子を足すのは未着手とは別の異常なので、親の start は案内せず、
 			// いまの置き場を出す。
-			name: "閉じた親",
+			name: "クローズした親",
 			set: func(t *testing.T, tr *ticketkit.Tree) {
 				tr.ProposeTicket("i0001", ticketkit.TicketOpts{Allow: []string{"src/*", "wip/*"}})
 				tr.ProposeTicket("i0001-01-01", ticketkit.TicketOpts{Parent: "i0001", Phase: 1, Allow: []string{"src/a/*"}})
@@ -146,7 +146,7 @@ func TestAChildDoesNotStartUnderAParentThatIsNotOpen(t *testing.T) {
 	}
 }
 
-// 開いた子がある親は閉じられない。子を閉じてもレビューで止まっている間は閉じない。
+// 開いた子がある親はクローズできない。子をクローズしてもレビューで止まっている間はクローズしない。
 func TestAParentCannotCloseWhileChildrenAreOpen(t *testing.T) {
 	t.Parallel()
 	tr := ticketkit.FamilyTree(t, ticketkit.FamilyOpts{})
@@ -166,7 +166,7 @@ func TestATodoWithTheSameIDAsAnApprovedTicketIsNotTheOperand(t *testing.T) {
 }
 
 // 同じ識別子が doing/ と done/ に在れば、どちらが正か決まらないので止める（動かした形跡が両方に残った形）。何も言わずに
-// どちらかを選ぶと、閉じた記録を上書きするか、閉じたはずのものが作業中として復活する。止めて、--lint が同じ 1 行で名指しする。
+// どちらかを選ぶと、クローズした記録を上書きするか、クローズしたはずのものが作業中として復活する。止めて、--lint が同じ 1 行で名指しする。
 func TestATicketInTwoHomesIsNotOperatedOn(t *testing.T) {
 	t.Parallel()
 	tr := ticketkit.FamilyTree(t, ticketkit.FamilyOpts{})
@@ -199,7 +199,7 @@ func TestFoldingTheParentWorktreeStopsTheOperations(t *testing.T) {
 	}
 }
 
-// 子のワークツリーに残った古いコピーは、親のワークツリーの答えを変えない（親のツリーで閉じ、子のツリーは取り込まないまま
+// 子のワークツリーに残った古いコピーは、親のワークツリーの答えを変えない（親のツリーでクローズし、子のツリーは取り込まないまま
 // doing/ で止まっている形でも、親のツリーのチケットだけで決まる）。
 func TestAStaleCopyInTheChildWorktreeDoesNotDecide(t *testing.T) {
 	t.Parallel()
@@ -217,8 +217,8 @@ func TestAStaleCopyInTheChildWorktreeDoesNotDecide(t *testing.T) {
 	ticketkit.Lacks(t, tr.Ccnavi("--lint", "--mode", "enable").Stdout, "i0001-01-02 が"+phrase)
 }
 
-// 閉じた承認済みチケットは git に入れて共有するので、コミットしたあとにワークツリーを切れば、その数だけ同じチケットができる。
-// これを「複数の場所にある」で止めると、ワークツリーを 2 本持つだけで閉じたチケットが全部 error になり、--lint が常に非ゼロで終わる。
+// クローズした承認済みチケットは git に入れて共有するので、コミットしたあとにワークツリーを切れば、その数だけ同じチケットができる。
+// これを「複数の場所にある」で止めると、ワークツリーを 2 本持つだけでクローズしたチケットが全部 error になり、--lint が常に非ゼロで終わる。
 // ワークツリーはそれぞれ別のコミットを指すので、古いツリーで doing、新しいツリーで done になるのも普通の形。
 func TestACopyCarriedIntoWorktreesIsNotTwoHomes(t *testing.T) {
 	t.Parallel()
@@ -227,13 +227,13 @@ func TestACopyCarriedIntoWorktreesIsNotTwoHomes(t *testing.T) {
 		name string
 		set  func(t *testing.T, tr *ticketkit.Tree)
 	}{
-		{"閉じたチケットを切ったツリーが抱える", func(t *testing.T, tr *ticketkit.Tree) {
+		{"クローズしたチケットを切ったツリーが抱える", func(t *testing.T, tr *ticketkit.Tree) {
 			ticketkit.Write(t, filepath.Join(tr.Root, ".ccnavi", "approved", "done", "i0002.md"), closed)
 			commitRoot(tr, "close i0002")
 			tr.Worktree("carry-a", "main")
 			tr.Worktree("carry-b", "main")
 		}},
-		{"閉じる前に切ったツリーは doing のまま", func(t *testing.T, tr *ticketkit.Tree) {
+		{"クローズする前に切ったツリーは doing のまま", func(t *testing.T, tr *ticketkit.Tree) {
 			approved := filepath.Join(tr.Root, ".ccnavi", "approved")
 			ticketkit.Write(t, filepath.Join(approved, "doing", "i0002.md"), closed)
 			commitRoot(tr, "start i0002")

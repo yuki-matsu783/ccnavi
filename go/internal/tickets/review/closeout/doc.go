@@ -1,4 +1,4 @@
-// Package closeout は、親を閉じる操作を置く。含むものは次の 2 つである。`ccnavi review ready`（と `--check`）は、
+// Package closeout は、親をクローズする操作を置く。含むものは次の 2 つである。`ccnavi review ready`（と `--check`）は、
 // Draft を外す前に行う。`ccnavi --close-early` は、ユーザがターミナルで打つ早めのクローズである（sh は
 // ccnavi-user-close-early.sh）。ネットワークには出ない。Draft を外す・返信して解決する・issue を作るのは sh が行う。
 // ここは、その前提を確かめ、マーカーと下書きを置く。

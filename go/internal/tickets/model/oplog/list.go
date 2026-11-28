@@ -54,7 +54,7 @@ func removeWhere(state string, drop func(id string, r *Record) bool) []string {
 }
 
 // RetireParent は親の記録のうち、すべての段階が送り終わったものを消し、消した操作ID を返す
-// （親を閉じる片付け。ready が呼ぶ）。
+// （親をクローズする片付け。ready が呼ぶ）。
 func RetireParent(state, parent string) []string {
 	if parent == "" {
 		// 親が空だと、親の無い記録を全部消してしまう

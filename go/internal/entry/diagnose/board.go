@@ -32,6 +32,7 @@ import (
 	"ccnavi/internal/tickets/notice"
 	"ccnavi/internal/tickets/phase"
 	"ccnavi/internal/tickets/proposal/agree"
+	"ccnavi/internal/tickets/proposal/planedit"
 )
 
 // boardVersion は `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
@@ -98,6 +99,8 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 			projects = append(projects, t.Name)
 		}
 	}
+	// 取り込み待ちはチケットに関わらないので、チケット制御が切れていても数える。
+	handoffs := handoffWaiting(trees)
 	turns := []any{}
 	for _, t := range turn.Active(conf.State, time.Now()) {
 		turns = append(turns, pyjson.NewObject("session", t.Session, "since", t.Since.Unix(), "seen", t.Seen.Unix()))
@@ -114,9 +117,11 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 		"sums", sumRecords(conf, root, stderr),
 		"problems", nil,
 		"pending_approval", []string{},
+		// ユーザ待ちの分類。チケットの分は全チケットと親が揃ってから決める（inboxRecord）。
+		"inbox", inboxRecord(nil, nil, nil, handoffs),
 		"tickets", []any{},
 		"parents", []any{},
-		// 手元の退避にある閉じたチケット。表示のためだけに載せ、判定には混ぜない。
+		// 手元の退避にあるクローズしたチケット。表示のためだけに載せ、判定には混ぜない。
 		"archived", []any{},
 		// いまターンの途中にいるセッション。ターン中に設定ファイルを直すと次の呼び出しで戻されうるので、拡張は保存の前に知らせる。
 		"turns", turns,
@@ -166,7 +171,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	pendingIDs := nonNil(slices.Sorted(maps.Keys(waiting)))
 	payload.Set("pending_approval", pendingIDs)
 
-	// 4. 識別子ごとの行を組む。状態（提案・承認済み・閉じた）ごとに、同じ識別子のチケットを引く表を用意する。
+	// 4. 識別子ごとの行を組む。状態（提案・承認済み・クローズした）ごとに、同じ識別子のチケットを引く表を用意する。
 	worktrees := map[string]tree.Tree{}
 	for _, t := range trees {
 		if t.Kind == tree.KindWorktree {
@@ -204,10 +209,11 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	var families []*parentRow
 	for _, p := range parents {
 		if !p.IsChild() {
-			families = append(families, parentRecord(conf, root, p, idx.closed, raw))
+			families = append(families, parentRecord(conf, root, p, idx.closed, raw, settled))
 		}
 	}
 	markAttention(rows, families, waiting)
+	payload.Set("inbox", inboxRecord(rows, families, pendingIDs, handoffs))
 	tickets := make([]any, len(rows))
 	skip := map[[2]string]bool{}
 	for i, r := range rows {
@@ -255,7 +261,7 @@ func objOrNil(o *pyjson.Object, ok bool) any {
 	return o
 }
 
-// archivedRecords は手元の退避にある閉じたチケット（表示用）。skip の（プロジェクト, 識別子）は tickets の側に出すので出さない。
+// archivedRecords は手元の退避にあるクローズしたチケット（表示用）。skip の（プロジェクト, 識別子）は tickets の側に出すので出さない。
 func archivedRecords(root string, skip map[[2]string]bool) []any {
 	out := []any{}
 	for _, t := range archive.ClosedTickets(root) {
@@ -422,6 +428,8 @@ type ticketRow struct {
 	worktree            bool
 	risk                *pyjson.Object
 	scattered           bool
+	// flowDraft はフローの下書きが「提案あり」か（flow.draft.differs）。attention は markAttention が決める。
+	flowDraft, attention bool
 }
 
 // ticketRecord はチケット 1 件。状態は承認済みチケットの置き場で決め、項目は提案があれば提案を、無ければ承認済みの
@@ -490,6 +498,8 @@ func ticketRecord(conf *config.Settings, root, id string, idx indexes, worktrees
 	if flowSource == nil {
 		flowSource = source
 	}
+	flowInfo := flow.FlowInfo(conf, root, flowSource)
+	flowDraft := flow.DraftDiffers(flowInfo)
 	var riskRecord, judgeRecord any
 	var riskObj *pyjson.Object
 	if source.Parent != "" {
@@ -513,7 +523,7 @@ func ticketRecord(conf *config.Settings, root, id string, idx indexes, worktrees
 		"branch", branch,
 		"remote", remote,
 		"predecessors", nonNil(source.Predecessors),
-		// 満たしていない先行。承認と着手はこれが空でなければ止まる。閉じたチケットは空。
+		// 満たしていない先行。承認と着手はこれが空でなければ止まる。クローズしたチケットは空。
 		"predecessors_unmet", unmet,
 		"human_review", pyjson.NewObject("required", needValue(source.ReviewRequired), "reason", source.ReviewReason),
 		"proposal", proposalObj,
@@ -533,13 +543,13 @@ func ticketRecord(conf *config.Settings, root, id string, idx indexes, worktrees
 		"in_progress", isOpen && openCopy.State == place.Doing && openCopy.InProgress(),
 		"seen_in", nonNilAny(seenIn),
 		"scattered", nonNilAny(scattered),
-		"flow", flowObject(flow.FlowInfo(conf, root, flowSource)),
+		"flow", flowObject(flowInfo, flowDraft),
 		"risk", riskRecord,
 		"judge", judgeRecord,
 	)
 	return &ticketRow{obj: obj, id: id, parent: source.Parent, project: source.Project, phase: source.Phase,
 		hasProposal: proposal != nil, status: status, blocked: blocked, worktree: hasTree, risk: riskObj,
-		scattered: len(scattered) > 0}
+		scattered: len(scattered) > 0, flowDraft: flowDraft}
 }
 
 func nonNilAny(s []any) []any {
@@ -568,9 +578,9 @@ func needValue(n ticket.Need) any {
 	return nil
 }
 
-// flowObject はボードのフローの欄。draft はエージェントの下書き（効力は無い）。locked は判定がそのフローへの書き込みを
-// 止めているか、lock_kind はその種類（止めていなければ null）。
-func flowObject(info *flow.Info) any {
+// flowObject はチケット管理画面のフローの欄。draft はエージェントの下書き（効力は無い）で、differs はそれを「提案あり」として
+// 見せるか（flow.DraftDiffers）。locked は判定がそのフローへの書き込みを止めているか、lock_kind はその種類（止めていなければ null）。
+func flowObject(info *flow.Info, differs bool) any {
 	if info == nil {
 		return nil
 	}
@@ -581,7 +591,7 @@ func flowObject(info *flow.Info) any {
 	return pyjson.NewObject("path", info.Path, "rel", info.Rel, "tree", info.Tree, "exists", info.Exists,
 		"linked", info.Linked, "locked", info.Locked(), "lock_kind", kind,
 		"draft", pyjson.NewObject("path", info.Draft.Path, "rel", info.Draft.Rel, "exists", info.Draft.Exists,
-			"linked", info.Draft.Linked))
+			"linked", info.Draft.Linked, "differs", differs))
 }
 
 // parentRow は親 1 件の JSON と、要対応を決めるのに読むフェーズの欄。
@@ -655,10 +665,10 @@ func phaseRecord(ph *phase.Phase, manual string) (*pyjson.Object, phaseRow) {
 		escalates: ph.RiskEscalates()}
 }
 
-// parentRecord は親 1 件。局面、計画、親のマーカー、フェーズの並び。閉じた親は局面を持たない（「クローズ可」と言っても
-// 意味が無い）。
+// parentRecord は親 1 件。局面、計画、計画の流れ（図の中身）、親のマーカー、フェーズの並び。クローズした親は局面を持たない
+// （「クローズ可」と言っても意味が無い）。
 func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, closedIndex map[string]*ticket.Ticket,
-	raw *approval.Raw) *parentRow {
+	raw *approval.Raw, settled []*ticket.Ticket) *parentRow {
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
 	_, closed := closedIndex[parent.ID]
 	stage := ""
@@ -695,6 +705,8 @@ func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, clo
 		"stage", stage,
 		"plan", plan,
 		"feedback", feedback,
+		// 計画の流れ（図の中身）。承認待ちの提案の図（承認の preview・--plan-order）と同じ関数で組む。
+		"plans", planedit.ApprovedPlans(parent, settled),
 		"close_early", objOrNil(marks.ReadParent(home, parent.ID, marks.CloseEarly)),
 		"ready", objOrNil(marks.ReadParent(home, parent.ID, marks.Ready)),
 		"closed_record", objOrNil(marks.ReadParent(home, parent.ID, marks.Closed)),

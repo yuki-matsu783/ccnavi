@@ -35,8 +35,9 @@
  * 変わっていなければコピーを未保存のまま戻し、変わっていれば戻さずにコピーを名前の無いYAMLのエディタで開く
  * （上書きしない）。同じ子の画面が既に開いていれば、その編集は差し替えず、戻せなかったと言ってYAMLで開く。
  *
- * エージェントの下書き。 置き場は実行ファイルに聞く（`tickets[].flow.draft`）。下書きが在り、中身が
- * いまのフローと違えば（`sameFlowIgnoringLayout`が偽）「提案あり」を出す。開くと下書きを読んだバイトのまま`--lint --json --flow`に
+ * エージェントの下書き。 置き場と「提案あり」を出すかは実行ファイルに聞く（`tickets[].flow.draft`の`path`と`differs`）。
+ * 画面は下書きといまのフローを見比べない。下書きが動くと拡張全体の答え（`board-feed.ts`）が読み直され、届いた`differs`で
+ * 「提案あり」を出し直す。開くと下書きを読んだバイトのまま`--lint --json --flow`に
  * 掛け、errorなら取り込めないと言う。通れば画面が文の前後まで見せる差分を出し、「取り込む」で編集中の内容に入れる
  * （書かない。保存はいつもの経路）。保存が成功したら、下書きの中身が取り込んだときのハッシュと同じときだけ消し
  * （`core/flow-write.ts`の`removeDraftFile`）、保存のあとの知らせに名前を出す。依頼のボタン（着手の前だけ）は
@@ -49,9 +50,9 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runWriteAndPushTarget, runFlowLint } from "./ccnavi.js";
+import { boardFeed } from "./board-feed.js";
+import { loadBoard, runWriteAndPushTarget, runFlowLint, type LoadResult } from "./ccnavi.js";
 import { PUSH_APPROVED_SCRIPT, pushApprovedCommand, scriptCommand, shellQuote, toPosixPath } from "./core/commands.js";
-import { sameFlowIgnoringLayout } from "./core/flow-diff.js";
 import { flowMismatch, openMismatchText, saveMismatchText } from "./core/flow-match.js";
 import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } from "./core/flow-doc.js";
 import { lintFlowText } from "./core/flow-lint.js";
@@ -60,6 +61,7 @@ import { renderFlowPage } from "./core/flow-render.js";
 import { decodeFlowBytes, FLOW_FILE_LIMIT, readFlowFile, removeDraftFile, writeTreeFile } from "./core/flow-write.js";
 import {
   asFlowMessage,
+  flowOfferOf,
   flowRequestPrompt,
   flowTargetOf,
   lockFromFailure,
@@ -99,7 +101,7 @@ interface Loaded {
   readonly shown: string;
   /** 開くときに実行ファイルが言ったこと（warn・渡る手順・候補）。ファイルが無ければ無い */
   readonly checks?: FlowChecks;
-  /** 「提案あり」。下書きが無いか、いまのフローと同じなら無い */
+  /** 「提案あり」。実行ファイルの`differs`が偽なら無い。届いた答えで差し替える */
   offer?: FlowOffer;
 }
 
@@ -147,7 +149,8 @@ interface PanelState {
   offered: Set<string>;
   /** 画面に見せている依頼の文（コピー / 新しいセッションで開く はこれを渡す） */
   requestPrompt?: string;
-  offerTimer?: NodeJS.Timeout;
+  /** 拡張全体の答え（`board-feed.ts`）を聞くのをやめる */
+  stopFeed?: () => void;
   /** 錠を聞き直したときの「着手の前か」。読み直すと消す（読み込んだ答えに戻る） */
   beforeStart?: boolean;
 }
@@ -288,7 +291,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (read === undefined) {
     // 無いのは不備ではない（フローは任意）。雛形を見せ、保存でファイルを作る
     const doc = templateFlow(ticket, target.title);
-    return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: readOffer(root, target, doc) };
+    return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: offerOf(root, target) };
   }
   const { bytes, mtimeMs } = read;
   const refuse = (why: string): Error => new Error(`フローのファイルを開けません（${shown}）: ${why}。エディタで直してから更新してください。`);
@@ -316,35 +319,12 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   if (doc === undefined) {
     throw refuse("ノードの一覧が読み取れないため、図を描けません（各ノードにidを文字列で書いてください）");
   }
-  return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks, offer: readOffer(root, target, doc) };
+  return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks, offer: offerOf(root, target) };
 }
 
-/**
- * 「提案あり」を出すか。下書きが在り、中身がいまのフロー（`current`）と違えば出す。読めない（リンク・ハードリンク・
- * 大きすぎる・YAMLとして読めない）ときも出し、開いたときに理由を言う。ここでは実行ファイルに掛けない（開いたときに掛ける）
- */
-function readOffer(root: string, target: FlowTarget, current: FlowDoc): FlowOffer | undefined {
-  const draft = target.flow.draft;
-  if (draft === null) {
-    return undefined;
-  }
-  const draftPath = shownPath(root, draft.path);
-  let read: { readonly bytes: Uint8Array } | undefined;
-  try {
-    read = readFlowFile(target.flow.tree, draft.path);
-  } catch (error) {
-    return { draftPath, problem: (error as Error).message };
-  }
-  if (read === undefined) {
-    return undefined;
-  }
-  const decoded = decodeFlowBytes(read.bytes);
-  const value = decoded.ok ? parseFlowValue(decoded.text) : undefined;
-  const doc = value?.ok === true ? asFlowDoc(value.value) : undefined;
-  if (doc !== undefined && sameFlowIgnoringLayout(doc, current)) {
-    return undefined;
-  }
-  return { draftPath };
+/** 「提案あり」。判定は実行ファイルの`differs`（`flowOfferOf`）。読めない下書きの理由は、開いたときに言う */
+function offerOf(root: string, target: FlowTarget): FlowOffer | undefined {
+  return flowOfferOf(target, (filePath) => shownPath(root, filePath));
 }
 
 /** 下書きが在るか（リンクでも在るとする）。依頼のボタンの言葉に使う */
@@ -396,7 +376,8 @@ function registerPanelHandlers(current: PanelState): void {
   });
   panel.onDidDispose(() => {
     askRestore(current);
-    for (const timer of [current.timer, current.lockTimer, current.offerTimer]) {
+    current.stopFeed?.();
+    for (const timer of [current.timer, current.lockTimer]) {
       if (timer !== undefined) {
         clearTimeout(timer);
       }
@@ -417,6 +398,8 @@ function registerPanelHandlers(current: PanelState): void {
   });
   // チケットが動いたら（着手・終わり・取り消し）、錠を取り直す
   current.watchers.push(...watchTickets(folder, () => scheduleLock(current)));
+  // 下書きが動いたら、拡張全体の答えが読み直される。届いた答えで「提案あり」を出し直す
+  current.stopFeed = boardFeed.subscribe((result) => onBoard(current, result));
 }
 
 /**
@@ -463,17 +446,7 @@ function watchFile(current: PanelState): void {
   current.fileWatchers.push(
     watchPattern(new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath)), () => scheduleChanged(current)),
   );
-  // 下書きはエージェントが書く。動いたら「提案あり」を出し直す。置き場のディレクトリ（`flows/`）は
-  // 開いた時点で無いことが多いので、在るツリーのルートからの相対パスで見張る（後から作られても届く）
-  const draft = loaded.target.flow.draft;
-  if (draft !== null) {
-    const relative = path.relative(loaded.target.flow.tree, draft.path);
-    const inside = loaded.target.flow.tree !== "" && relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
-    const pattern = inside
-      ? new vscode.RelativePattern(vscode.Uri.file(loaded.target.flow.tree), relative.split(path.sep).join("/"))
-      : new vscode.RelativePattern(vscode.Uri.file(path.dirname(draft.path)), path.basename(draft.path));
-    current.fileWatchers.push(watchPattern(pattern, () => scheduleOffer(current)));
-  }
+  // 下書きの監視は拡張全体の答え（`board-feed.ts`）が持つ。「提案あり」は届いた答えで出し直す（`onBoard`）
 }
 
 function scheduleChanged(current: PanelState): void {
@@ -556,20 +529,21 @@ function requestAndOffer(current: PanelState, loaded: Loaded): { request?: strin
   return { ...(request === undefined ? {} : { request }), ...(loaded.offer === undefined ? {} : { offer: loaded.offer }) };
 }
 
-/** 下書きか錠が動いた。読み込んだフローと比べ直して、依頼のボタンと「提案あり」を出し直す（編集は破棄しない） */
-function postOffer(current: PanelState): void {
+/**
+ * 拡張全体の答えが届いた（下書きやフローが動いた）。この子の`differs`で「提案あり」を出し直す（編集は破棄しない）。
+ * 読めなかった答えや、子が答えに無いときは触らない（錠の聞き直しと読み直しが理由を出す）
+ */
+function onBoard(current: PanelState, result: LoadResult): void {
   const loaded = current.loaded;
-  if (loaded === undefined || !alive(current)) {
+  if (loaded === undefined || !alive(current) || !result.ok) {
     return;
   }
-  loaded.offer = readOffer(current.folder.uri.fsPath, loaded.target, loaded.doc);
+  const found = flowTargetOf(result.board, current.ticket);
+  if (!found.ok) {
+    return;
+  }
+  loaded.offer = offerOf(current.folder.uri.fsPath, found.target);
   current.host.post({ type: "offer", ...requestAndOffer(current, loaded) } satisfies ToFlow);
-}
-
-function scheduleOffer(current: PanelState): void {
-  debounce(current, "offerTimer", () => {
-    postOffer(current);
-  });
 }
 
 function showError(current: PanelState, error: string): void {
@@ -784,7 +758,8 @@ async function openProposal(current: PanelState): Promise<void> {
   }
   if (read === undefined) {
     refuse("下書きはもうありません");
-    postOffer(current);
+    // 「提案あり」は届いた答えで消える（`onBoard`）
+    void boardFeed.refresh();
     return;
   }
   const bytes = read.bytes;

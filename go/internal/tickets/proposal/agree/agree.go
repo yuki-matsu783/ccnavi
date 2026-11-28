@@ -165,7 +165,7 @@ func Gather(stderr io.Writer, conf *config.Settings, root string, only []string)
 }
 
 // Waiting はいま --agree で承認の対象に入るもの（新規の承認待ちと、親の改版）。承認待ちは todo/ に在ってどの置き場
-// （作業中・レビュー待ち・閉じた）にも同じ識別子が無いもの。閉じたものの再開はユーザが承認済みチケットを戻す。
+// （作業中・レビュー待ち・クローズした）にも同じ識別子が無いもの。クローズしたものの再開はユーザが承認済みチケットを戻す。
 // 改版は作業中の親の承認済みチケットがあり、todo/ の提案の計画・コピー・範囲がそれと違うもの。--agree と
 // --explain --json が同じ答えを出すため、ここで 1 度だけ決める。
 func Waiting(proposals, approved, closed, review []*ticket.Ticket) (pending, revisions []*ticket.Ticket) {

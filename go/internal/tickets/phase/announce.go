@@ -168,7 +168,7 @@ func nextHint(root string, parent *ticket.Ticket, list []*Phase, number int) str
 		texts.Values{"names": strings.Join(names, "、"), "hints": hints}, nil)
 }
 
-// waitsDone は N 番目の先行のフェーズが、全部閉じてレビューが済んでいるか。
+// waitsDone は N 番目の先行のフェーズが、全部クローズしてレビューが済んでいるか。
 func waitsDone(parent *ticket.Ticket, list []*Phase, number int) bool {
 	for _, m := range phases.WaitsOf(parent, number) {
 		p := find(list, m)

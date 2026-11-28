@@ -372,7 +372,7 @@ func newChromeWS(t *testing.T) *ws {
 	return w
 }
 
-// reviewedPhaseOne はフェーズ 1（MR で見る設計）の子を閉じて合流し、レビューを依頼したところまで進める。
+// reviewedPhaseOne はフェーズ 1（MR で見る設計）の子をクローズして合流し、レビューを依頼したところまで進める。
 func (w *ws) reviewedPhaseOne() string {
 	return w.reviewedFamily()
 }
@@ -513,7 +513,7 @@ func doneChild(name, parent string, predecessors []string) string {
 
 func TestChromePredecessorsAcrossFamilies(t *testing.T) {
 	t.Parallel()
-	// 多階層の先行（閉包）。通る子と、先行が閉じていないので外れる子（文面まで同じ）。
+	// 多階層の先行（閉包）。通る子と、先行がクローズしていないので外れる子（文面まで同じ）。
 	w := newChromeWS(t)
 	type copyRow struct{ state, text string }
 	child := func(name, parent string) string {

@@ -161,7 +161,7 @@ func FindAny(root, ident string) []*ticket.Ticket {
 	return out
 }
 
-// ClosedTickets は退避にある閉じたチケットの全部（ボードの表示用）。
+// ClosedTickets は退避にあるクローズしたチケットの全部（ボードの表示用）。
 func ClosedTickets(root string) []*ticket.Ticket {
 	var out []*ticket.Ticket
 	for _, repo := range repoNames(root) {
@@ -299,7 +299,7 @@ func sortedKeys[V any](m map[string]V, keep func(string) bool) []string {
 	return out
 }
 
-// PlanMove は閉じた親のリストから、移すファイルを決める。親として拾うのは done/ に parent: が無いチケットとして
+// PlanMove はクローズした親のリストから、移すファイルを決める。親として拾うのは done/ に parent: が無いチケットとして
 // 在るものと、root を渡したときは手元の退避に親として在るもの（前の回が途中で止まった残り。作業中に同じ識別子が
 // 在れば別の開いた親子なので拾わない）。子は名前の形ではなく parent: 欄で親に結ぶ（rel-01 という親を rel の子と
 // 取り違えない）。承認済みにも退避にも無い識別子（フローしか残っていない子）だけを子の形で結ぶ。
@@ -560,7 +560,7 @@ func noteReady(root, project, parent, treeRoot string, rels []string, head strin
 
 // Move は todo のファイルを退避へ移し、移した相対パスと止まった理由（無ければ空）を返す。1 本ずつ、退避の側へ
 // 一時ファイルから書いて読み戻して確かめ、それから元を消す（元の消去は fsio を通すので write-and-push の一覧に
-// 載る）。行き先に同じ中身のコピーが在れば（前の回の残り）元だけ消す。違えば、チケット（done/）は閉じた記録を
+// 載る）。行き先に同じ中身のコピーが在れば（前の回の残り）元だけ消す。違えば、チケット（done/）はクローズした記録を
 // 書き換えないので止め、マーカー・フローは今の中身で置き換える。readyParent を渡せば、消す前に ready の
 // マーカーへ移すファイルを足す。途中で止まっても、移した分は戻さない（元は git に残り、write-and-push が戻す）。
 func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot string) ([]string, string) {
@@ -592,7 +592,7 @@ func Move(root, project, approvedDir string, todo Plan, readyParent, treeRoot st
 		if !heldOK && ospath.DiskLexists(target) {
 			return moved, "退避先 " + target + " を読めない（ふつうのファイルでないかリンク）"
 		}
-		// 退避先に違う中身がある。閉じた記録の done/ は書き換えず止め、マーカー・フローは今の中身で置き換える。
+		// 退避先に違う中身がある。クローズした記録の done/ は書き換えず止め、マーカー・フローは今の中身で置き換える。
 		if !Holds(held, heldOK, data) {
 			if heldOK && strings.HasPrefix(rel, string(place.Done)+"/") {
 				return moved, "退避先 " + target + " に違う中身が既に在る。" +

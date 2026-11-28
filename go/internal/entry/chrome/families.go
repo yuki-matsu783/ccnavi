@@ -43,8 +43,8 @@ func sortedSet(items ...string) []string {
 }
 
 // opPlacement は置き場のパス。既定に固定し、統合先の `.claude/settings.json` の env も手元の env も読まない。
-// 統合先の承認済みは閉じたもの（done/）だけを読む。作業中のものは P を正とし、前の統合先から切った P でも
-// 閉じた識別子の使い直しを見つけるため、done/ は常に読む。
+// 統合先の承認済みはクローズしたもの（done/）だけを読む。作業中のものは P を正とし、前の統合先から切った P でも
+// クローズした識別子の使い直しを見つけるため、done/ は常に読む。
 func opPlacement(*pyjson.Object, string) (*pyjson.Object, error) {
 	return pyjson.NewObject("placement", pyjson.NewObject(
 		"tickets", config.DefaultTickets,
@@ -60,7 +60,7 @@ func opPlacement(*pyjson.Object, string) (*pyjson.Object, error) {
 }
 
 // opFamilies は候補のブランチのうち、親のブランチ（その置き場に、ブランチ名を変換した識別子の親の提案か承認済みの
-// チケットがある）であるもの。閉じた親（done/）しか無いブランチは数えない。同じ識別子の親チケットを持つブランチが
+// チケットがある）であるもの。クローズした親（done/）しか無いブランチは数えない。同じ識別子の親チケットを持つブランチが
 // 2 本以上あるときは conflict に止める理由を入れる。
 func opFamilies(req *pyjson.Object, _ string) (*pyjson.Object, error) {
 	s, err := readSnapshot(req)
@@ -165,7 +165,7 @@ func (s *snapshot) closure(family string, hints map[string]string) (*closure, er
 			}
 		}
 	}
-	// 幅優先で先行を辿る。閉じた親子のチケットで止まり、辿った先は families に足す。
+	// 幅優先で先行を辿る。クローズした親子のチケットで止まり、辿った先は families に足す。
 	queue := []string{family}
 	for len(queue) > 0 {
 		name := queue[0]

@@ -19,7 +19,8 @@ func markAttention(rows []*ticketRow, parents []*parentRow, pending map[string]b
 	for _, r := range rows {
 		found := issues(r, ids)
 		r.obj.Set("issues", found)
-		r.obj.Set("attention", attention(r, byID, pending, len(found) > 0))
+		r.attention = attention(r, byID, pending, len(found) > 0)
+		r.obj.Set("attention", r.attention)
 	}
 }
 
@@ -62,7 +63,7 @@ func attention(r *ticketRow, parents map[string]*parentRow, pending map[string]b
 			}
 		}
 	}
-	// 提案が無く閉じた承認済みチケットは完了・取り消しの列。それ以外は承認待ちか進行中の列。
+	// 提案が無くクローズした承認済みチケットは完了・取り消しの列。それ以外は承認待ちか進行中の列。
 	openColumn := r.hasProposal || r.status != statusClosed
 	if pending[r.id] || (own != nil && (own.gateClosed || own.reviewWaiting)) || (openColumn && !r.worktree) ||
 		highRisk(r) || r.scattered || hasIssues {

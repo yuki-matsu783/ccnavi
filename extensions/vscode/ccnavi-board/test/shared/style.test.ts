@@ -331,14 +331,14 @@ test("CB-T290 意味の色を文字に使うときは前景色へ混ぜ、Light 
 test("CB-T291 狭い幅（520px以下）では一覧の欄を1列にして行の見出しを複数行に分け、ルール管理の表は入れ物の中で横に送る", () => {
   const rules = flatStyle(rulesOnly());
   assert.match(rules, /@media \(max-width: 520px\) \{ \.row-body \{ padding-left: 14px; grid-template-columns: minmax\(0, 1fr\);/);
-  assert.match(rules, /\.rule \.sum > \.clip:not\(\.mono\) \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
+  assert.match(rules, /\.rule \.row-sum > \.clip:not\(\.mono\) \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
   assert.match(rules, /\.table-scroll \{ overflow-x: auto; \}/);
   assert.match(rules, /td\.cmd \{ min-width: 12em; \}/);
   const risk = flatStyle(riskHtml({ kind: "page", page: riskPage() }));
-  assert.match(risk, /\.factor \.sum > \.clip \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
+  assert.match(risk, /\.factor \.row-sum > \.clip \{ grid-row: 2; grid-column: 2 \/ -1; \}/);
   assert.match(risk, /\.block h2 \{ display: flex; flex-wrap: wrap;/);
   const phases = flatStyle(phasesHtml({ kind: "page", page: phasesPage() }));
-  assert.match(phases, /\.phase \.sum > \.clip\.mono \{ grid-row: 3; grid-column: 2 \/ -1; \}/);
+  assert.match(phases, /\.phase \.row-sum > \.clip\.mono \{ grid-row: 3; grid-column: 2 \/ -1; \}/);
   // 全体計画の先行関係の選択は外したので、その欄の規則も無い
   assert.doesNotMatch(phases, /\.order select/);
 });

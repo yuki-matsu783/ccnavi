@@ -42,8 +42,9 @@ import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { dirtyTitle } from "./core/save-gate.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import type { TemplatesTarget } from "./core/screens.js";
-import { targetOptions, type TargetOption } from "./core/targets.js";
+import type { SettingsTarget } from "./core/screens.js";
+import { rememberTarget, targetToOpen } from "./target-memory.js";
+import { sameTarget, targetFrom, targetKey, targetOptions, type TargetOption } from "./core/targets.js";
 import { NEW_TEMPLATE_NAME_RULE, shownLayerOf, templateNameTaken, templatesLayerOf, validNewTemplateName, validTemplateName } from "./core/templatesmodel.js";
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
@@ -58,12 +59,9 @@ import { confirmDuringTurn } from "./turn-confirm.js";
 const SCREEN = "templates";
 const TITLE = "ccnaviテンプレート管理";
 
-/** 1枚の画面の「どの対象か」を画面の欄の値にコピーするための、対象の一覧の既定（共通設定の欄のkind） */
-const COMMON_KIND = "workspace";
-
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを見る */
-  readonly target: TemplatesTarget;
+  readonly target: SettingsTarget;
   /** `ccnavi --templates --json`の答え */
   readonly data: TemplatesJson;
   /** 切り替えられる対象（共通設定・ワークスペース・設定のあるプロジェクト） */
@@ -76,7 +74,7 @@ interface Loaded {
 
 interface PanelState {
   /** いま見せている対象。別の対象を開くと入れ替わる（タブは1枚） */
-  target: TemplatesTarget;
+  target: SettingsTarget;
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<TemplatesData>;
@@ -113,12 +111,9 @@ interface Unsaved {
 /** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
 
-function sameTarget(a: TemplatesTarget, b: TemplatesTarget): boolean {
-  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
-}
 
 /** 読み込み中の一言で使う対象の名前 */
-function whatOf(target: TemplatesTarget): string {
+function whatOf(target: SettingsTarget): string {
   switch (target.kind) {
     case "workspace":
       return "共通設定";
@@ -133,8 +128,8 @@ function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openTemplates`の本体。引数なしはワークスペースの設定のテンプレート */
-export async function openTemplates(target: TemplatesTarget = { kind: "self" }): Promise<void> {
+/** `ccnaviBoard.openTemplates`の本体。開いていれば前面に出すだけ。開くときは最後に選んだ対象で、無ければワークスペースの設定で開く */
+export async function openTemplates(): Promise<void> {
   if (!requireTickets("テンプレート管理画面")) {
     return;
   }
@@ -144,14 +139,6 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
   }
   if (state !== undefined) {
     state.panel.reveal(state.panel.viewColumn);
-    if (!sameTarget(state.target, target)) {
-      // 編集欄を開いている間は、外から対象を替えない（古い対象の編集欄が残るため）。画面は前面に出すだけ
-      if (state.editing !== undefined) {
-        vscode.window.showInformationMessage("編集中のため切り替えられません。保存するか破棄してから切り替えてください。");
-        return;
-      }
-      await switchTarget(state, target);
-    }
     return;
   }
 
@@ -174,6 +161,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     // 開いたテンプレートの行や本文を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
+  const target = targetToOpen({ kind: "self" });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
@@ -195,7 +183,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
  * 開いているタブの対象を入れ替える。読み終えるまでは前の対象の中身を消して「読み込み中」を見せ、操作も受けない
  * （`loaded`を空にする）。
  */
-async function switchTarget(current: PanelState, target: TemplatesTarget): Promise<void> {
+async function switchTarget(current: PanelState, target: SettingsTarget): Promise<void> {
   current.target = target;
   current.loaded = undefined;
   current.error = undefined;
@@ -213,14 +201,14 @@ async function switchTarget(current: PanelState, target: TemplatesTarget): Promi
   await reload(current);
 }
 
-async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> {
+async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   // 一覧の中身（設定・統合結果・下書き）は実行ファイルの答えをそのまま使う。設定の場所も拡張は組まない。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
     throw new Error(`チケットとワークツリーの状態をccnaviから取得できません: ${board.error}`);
   }
-  const key = currentKey(target);
-  const targets = targetOptions(board.board, COMMON_KIND, key);
+  const key = targetKey(target);
+  const targets = targetOptions(board.board, key);
   const result = await runTemplates(root, binSetting(), templatesLayerOf(key));
   if (!result.ok) {
     throw new Error(result.error);
@@ -324,7 +312,7 @@ function show(current: PanelState): void {
     page: {
       root: current.folder.uri.fsPath,
       generatedAt: new Date().toISOString(),
-      target: currentKey(loaded.target),
+      target: targetKey(loaded.target),
       targets: loaded.targets,
       data: loaded.data,
       handoff: loaded.handoff,
@@ -337,14 +325,10 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
-  const target = currentKey(current.target);
-  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, COMMON_KIND, target) });
+  const target = targetKey(current.target);
+  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, target) });
 }
 
-/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
-function currentKey(target: TemplatesTarget): { kind: string; name: string } {
-  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
-}
 
 /**
  * いまの状態で渡し直す。1枚目を読み込んでいる間に見送られたものは、画面が
@@ -446,22 +430,25 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, COMMON_KIND, currentKey(current.target))).find(
+      const option = (current.loaded?.targets ?? targetOptions(undefined, targetKey(current.target))).find(
         (t) => t.kind === message.kind && t.name === message.name,
       );
       if (option === undefined) {
         return;
       }
-      const target: TemplatesTarget =
-        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "workspace" ? { kind: "workspace" } : { kind: "self" };
-      if (!sameTarget(current.target, target)) {
+      const target = targetFrom(option);
+      if (target !== undefined && !sameTarget(current.target, target)) {
         await switchTarget(current, target);
+        // 切り替わったときだけ覚える（未保存の確認でやめたら覚えない）
+        if (sameTarget(current.target, target)) {
+          rememberTarget(target);
+        }
       }
       return;
     }
     case "showTemplate": {
       // 1件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前と設定で突き合わせる
-      const result = await runTemplateShow(current.folder.uri.fsPath, binSetting(), message.name, templatesLayerOf(currentKey(current.target)));
+      const result = await runTemplateShow(current.folder.uri.fsPath, binSetting(), message.name, templatesLayerOf(targetKey(current.target)));
       if (!alive(current)) {
         return;
       }
@@ -607,7 +594,7 @@ function askUnsaved(unsaved: Unsaved | undefined): void {
 }
 
 /** 開いている対象に掛ける作業中の錠。確かめられなければ掛かった錠にする */
-async function lockOf(current: PanelState, target: TemplatesTarget = current.target): Promise<Lock> {
+async function lockOf(current: PanelState, target: SettingsTarget = current.target): Promise<Lock> {
   const result = await loadBoard(current.folder.uri.fsPath, binSetting());
   if (!result.ok) {
     return lockFromError(result.error);
@@ -649,7 +636,7 @@ function editableLayer(current: PanelState, layerName: string): { readonly ok: t
   if (data === undefined) {
     return { ok: false, error: "一覧を読めていないため、編集できません" };
   }
-  const shown = shownLayerOf(currentKey(current.target));
+  const shown = shownLayerOf(targetKey(current.target));
   if (layerName !== shown) {
     return { ok: false, error: "いま選んでいる設定のテンプレートだけ編集できます。「設定」を切り替えてください。" };
   }
@@ -680,7 +667,7 @@ function templateFile(root: string, layer: TemplateLayer, name: string): string 
 /** 一時の置き場に`<名前>.yml`として書き、実行ファイルに読ませる。ファイル名が名前の期待値になる */
 async function checkBytes(
   current: PanelState,
-  target: TemplatesTarget,
+  target: SettingsTarget,
   name: string,
   bytes: string | Uint8Array,
 ): Promise<{ readonly ok: true; readonly check: TemplateCheck } | { readonly ok: false; readonly error: string }> {
@@ -697,7 +684,7 @@ async function checkBytes(
     return { ok: false, error: `検査用の一時ファイルを作成できません: ${(error as Error).message}` };
   }
   try {
-    const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), path.join(dir, `${name}.yml`), templatesLayerOf(currentKey(target)));
+    const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), path.join(dir, `${name}.yml`), templatesLayerOf(targetKey(target)));
     return result.ok ? { ok: true, check: result.value } : { ok: false, error: result.error };
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -712,7 +699,7 @@ function sha256(bytes: string | Uint8Array): string {
  * 読ませている間に、対象が別に切り替わった（またはパネルが閉じた）か。切り替わっていたら`reply`で理由を返して真を返す。
  * 設定・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別の設定の錠で通さない）
  */
-function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: string) => void): boolean {
+function abandoned(current: PanelState, target: SettingsTarget, reply: (error: string) => void): boolean {
   if (!alive(current)) {
     return true;
   }
@@ -809,7 +796,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   if (abandoned(current, target, (e) => postOpened(current, session, null, e))) {
     return;
   }
-  const layerName = shownLayerOf(currentKey(current.target));
+  const layerName = shownLayerOf(targetKey(current.target));
   const where = editableLayer(current, layerName);
   if (!where.ok) {
     postOpened(current, session, null, where.error);

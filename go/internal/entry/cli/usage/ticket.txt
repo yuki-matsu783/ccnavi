@@ -50,7 +50,7 @@
         （承認済みの親（doing/）の改版の雛形を、ID と同名のワークツリーの
          wip/proposals/todo/ID.md に書きます。承認済みチケットのコピーから、
          スクリプトだけが書く欄（started_at・base_sha など）を外します。
-         --feedback は、全体計画のフェーズが全部閉じてレビューが済んだあとに、フィードバック計画なし
+         --feedback は、全体計画のフェーズが全部クローズしてレビューが済んだあとに、フィードバック計画なし
          （feedback: []）の改版を作ります。範囲や計画を直す改版は、雛形を編集します。
          どちらも、書いたあとに ccnavi-ticket.sh approval-request <ID> --check が通れば、
          ccnavi-ticket.sh approval-request で送ります。

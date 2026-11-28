@@ -17,7 +17,9 @@ button.action:focus-visible { outline: 1px solid var(--vscode-focusBorder); outl
 button.action.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
 button.action.primary:hover { background: var(--vscode-button-hoverBackground); }
 button.action.small { min-height: 20px; padding: 0 8px; font-size: var(--font-md); }
-button.action:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
+/* 押せないボタンは押せるものと見分けがつくよう、はっきり淡くする。primary も主ボタンの色をやめ、副ボタンの地にする（busy の間は色を残す） */
+button.action:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
+button.action.primary:disabled:not(.busy) { background: var(--vscode-button-secondaryBackground); color: var(--vscode-disabledForeground, var(--vscode-button-secondaryForeground)); }
 /* 待っている間の回り記号。busy が付いたボタンにだけ出す。動きを減らす設定では回さず、出したままにする */
 button.action .spin { display: none; width: .85em; height: .85em; border: 2px solid currentColor; border-right-color: transparent; border-radius: var(--radius-round); }
 /* 非活性の .5 のままだと、見せたい回り記号が一番薄くなる。opacity は子で戻せない（親でまとめて掛かる）ので、busy の間だけボタンごと濃くする。押せない見た目は残る */

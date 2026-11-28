@@ -22,5 +22,6 @@
 @import "./Problems.css";
 @import "./Draft.css";
 @import "./Sum.css";
+@import "../shared/EditorBar.css";
 @import "./Edit.css";
 @import "../Tour.css";

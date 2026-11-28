@@ -152,7 +152,7 @@ func TestTheNextPhaseWaitsForThePreviousOne(t *testing.T) {
 	if !w.isApproved("i0001-01-01") || w.isApproved("i0001-02-02") {
 		t.Errorf("1 番目は通り 2 番目は外れるはず: 1=%v 2=%v", w.isApproved("i0001-01-01"), w.isApproved("i0001-02-02"))
 	}
-	contains(t, "stderr", r.Stderr, "閉じるまで承認しない")
+	contains(t, "stderr", r.Stderr, "クローズするまで承認しない")
 
 	w.runChild("i0001-01-01", file{"wip/research/summary.md", "まとめ\n"})
 	w.mustClose("i0001-01-01")
@@ -160,7 +160,7 @@ func TestTheNextPhaseWaitsForThePreviousOne(t *testing.T) {
 	// レビュー不要の定義なので、マーカーは skipped。2 番目が承認される。
 	w.hook("PostToolUse", "Bash", w.parentTree, input{"command": "ls"})
 	if r := w.approve(); r.Code != 0 || !w.isApproved("i0001-02-02") {
-		t.Errorf("1 を閉じても 2 が承認されない: code %d\n%s", r.Code, r.Stderr)
+		t.Errorf("1 をクローズしても 2 が承認されない: code %d\n%s", r.Code, r.Stderr)
 	}
 }
 
@@ -190,7 +190,7 @@ func TestABatchDoesNotPassALaterChildOverOneThatReopensAnEarlierPhase(t *testing
 	w.mustClose("i0001-01-01")
 	w.commitParent("close 01")
 	w.hook("PostToolUse", "Bash", w.parentTree, input{"command": "ls"})
-	// フェーズ 1 は閉じてレビュー不要。次のフェーズの子と、フェーズ 1 に足す子を一緒に出す。
+	// フェーズ 1 はクローズしてレビュー不要。次のフェーズの子と、フェーズ 1 に足す子を一緒に出す。
 	w.propose("i0001-02-02", childText("i0001-02-02", 2, "wip/design/*"))
 	w.propose("i0001-01-03", childReview("i0001-01-03", 1, samples.Off, "wip/research/*"))
 	w.commitParent("approval-request 02 03")
@@ -219,7 +219,7 @@ func TestANewParentAndALaterPhaseChildTogetherKeepTheOrder(t *testing.T) {
 	if w.isApproved("i0001-02-01") {
 		t.Error("2 番目のフェーズの子が承認された")
 	}
-	contains(t, "stderr", r.Stderr, "1（調査） が閉じるまで承認しない（子がまだ無い）")
+	contains(t, "stderr", r.Stderr, "1（調査） がクローズするまで承認しない（子がまだ無い）")
 }
 
 func TestANewParentWithChildrenInTwoPhasesPassesOnlyTheFirst(t *testing.T) {
@@ -237,7 +237,7 @@ func TestANewParentWithChildrenInTwoPhasesPassesOnlyTheFirst(t *testing.T) {
 	if !w.isApproved(parentName) || !w.isApproved("i0001-01-01") || w.isApproved("i0001-02-02") {
 		t.Errorf("親と 1 番目だけが承認されるはず: 親=%v 1=%v 2=%v", w.isApproved(parentName), w.isApproved("i0001-01-01"), w.isApproved("i0001-02-02"))
 	}
-	contains(t, "stderr", r.Stderr, "同じ承認で i0001-01-01 を追加するが、まだ閉じていない")
+	contains(t, "stderr", r.Stderr, "同じ承認で i0001-01-01 を追加するが、まだクローズしていない")
 }
 
 func TestTheLastChildCannotCloseWithoutDeliverables(t *testing.T) {
@@ -250,7 +250,7 @@ func TestTheLastChildCannotCloseWithoutDeliverables(t *testing.T) {
 	w.runChild("i0001-01-01")
 	refused := w.closeChild("i0001-01-01")
 	if refused.Code == 0 {
-		t.Fatal("成果物が無いのに閉じられた")
+		t.Fatal("成果物が無いのにクローズできた")
 	}
 	contains(t, "stderr", refused.Stderr, "成果物が無い", "wip/research/summary.md")
 	tree := filepath.Join(w.root, ".claude", "worktrees", "i0001-01-01")
@@ -281,7 +281,7 @@ func TestADeliverableTrackedButDeletedFromTheWorktreeIsMissing(t *testing.T) {
 	}
 }
 
-// finishTo は子を着手して閉じ、置き場（done か review）を返す。
+// finishTo は子を着手してクローズし、置き場（done か review）を返す。
 func (w *ws) finishTo(name string, files ...file) string {
 	w.t.Helper()
 	w.runChild(name, files...)
@@ -320,7 +320,7 @@ func TestTheNeedForReviewOfAChild(t *testing.T) {
 			w.commitParent()
 			w.mustApprove()
 			if got := w.finishTo("i0001-01-01", c.file); got != c.want {
-				t.Errorf("閉じた先 = %q, want %q", got, c.want)
+				t.Errorf("クローズした先 = %q, want %q", got, c.want)
 			}
 		})
 	}
@@ -390,7 +390,7 @@ func TestADeferredPhaseDoesNotCloseTheGateAndIsCoveredLater(t *testing.T) {
 		t.Fatal("延期したフェーズに依頼できた")
 	}
 	contains(t, "stderr", refused.Stderr, "一緒に見る")
-	// 2 番目を閉じて依頼すると、1 番目も含まれる。
+	// 2 番目をクローズして依頼すると、1 番目も含まれる。
 	w.propose("i0001-02-02", childText("i0001-02-02", 2, "src/a/*"))
 	w.commitParent("approval-request 02")
 	w.mustApprove()

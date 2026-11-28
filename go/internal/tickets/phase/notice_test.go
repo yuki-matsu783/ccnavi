@@ -86,7 +86,7 @@ func TestNextHintAfterTheLastPhaseAsksForTheFeedbackPlan(t *testing.T) {
 	}
 }
 
-// 3 が先に閉じても、まだ子の無い 2 を次に始められるものとして挙げる。
+// 3 が先にクローズしても、まだ子の無い 2 を次に始められるものとして挙げる。
 func TestNextHintOffersAnEarlierBranchWithoutChildren(t *testing.T) {
 	owner := &ticket.Ticket{ID: "i0001", Plan: []ticket.PlanItem{item("design"), item("acceptance", 1),
 		item("implement", 1), item("docs", 2, 3)}}
@@ -155,7 +155,7 @@ func TestManualLine(t *testing.T) {
 	}
 }
 
-// 手で動かした子の判定は、閉じた子の経路の記録と、置き場の重なりで分ける（git を使わない形だけ。git の形は
+// 手で動かした子の判定は、クローズした子の経路の記録と、置き場の重なりで分ける（git を使わない形だけ。git の形は
 // TestMatchesGolden が見る）。
 func TestAssessManualWithoutGit(t *testing.T) {
 	yes := true
@@ -185,7 +185,7 @@ func TestAssessManualWithoutGit(t *testing.T) {
 			ManualOptions{External: true}, SettleReady, []string{"a"}},
 		{"ccnavi が動かした子は手動ではない", []*ticket.Ticket{child("a", place.Done, "review", "confirm")},
 			ManualOptions{External: true}, SettleNone, nil},
-		{"done へ直に閉じた子は手動ではない", []*ticket.Ticket{child("a", place.Done, "done", "")},
+		{"done へ直にクローズした子は手動ではない", []*ticket.Ticket{child("a", place.Done, "done", "")},
 			ManualOptions{External: true}, SettleNone, nil},
 		{"経路の記録が無い子だけ", []*ticket.Ticket{child("a", place.Done, "", "")},
 			ManualOptions{External: true}, settleRouteUnknown, []string{"a"}},

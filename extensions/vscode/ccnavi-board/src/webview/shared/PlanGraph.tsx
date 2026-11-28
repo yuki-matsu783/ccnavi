@@ -1,5 +1,5 @@
 /**
- * 計画の図の部品。承認のオーバーレイ（読むだけ）と計画編集タブ（線を引き直す）が共有する。
+ * 計画の流れの図の部品。承認のオーバーレイとチケット管理画面の計画の流れ（読むだけ）と計画編集タブ（線を引き直す）が共有する。
  * 中身は実行ファイルが返す計画1つぶん（`plans`の1件）で、点・線・置き場所は`core/plan-graph.ts`が組む。
  * 見た目とReact Flowの扱いはフロー編集画面の図（`flow/Canvas.tsx`）に揃えてある。
  *
@@ -83,11 +83,11 @@ type PlanNode = ItemNode | EndNode;
 /**
  * レビューの要否の言葉。同じオーバーレイの本文（承認画面。`go/internal/tickets/proposal/agree`の`Screen`）の「レビュー不要」
  * 「レビュー必須: MR」を、点の幅に収まる短さにしたもの。
- * 定義が読めない（null）なら「?」
+ * 定義が読めない（null）なら「レビュー: 定義なし」（phases.ymlにその種類の定義が無い）
  */
 function reviewText(review: boolean | null): string {
   if (review === null) {
-    return "レビュー: ?";
+    return "レビュー: 定義なし";
   }
   return review ? "レビュー必須（MR）" : "レビュー不要";
 }
@@ -402,9 +402,11 @@ export interface PlanGraphProps {
   readonly detailFooter?: ReactNode;
   /** 詳細の欄に「提案での番号」を出すか。提案の番号を持たない計画（テンプレート）は偽 */
   readonly proposalNumbers?: boolean;
+  /** 図の見出し（「<親>の全体計画」）を出すか。呼び手が同じ見出しを持つとき（テンプレートの編集欄）は偽 */
+  readonly heading?: boolean;
 }
 
-export function PlanGraph({ plan, detail = false, editable = false, onConnect, onDisconnect, layout, fitKey, picked: pickedProp, onPick, detailFooter, proposalNumbers = true }: PlanGraphProps): JSX.Element {
+export function PlanGraph({ plan, detail = false, editable = false, onConnect, onDisconnect, layout, fitKey, picked: pickedProp, onPick, detailFooter, proposalNumbers = true, heading = true }: PlanGraphProps): JSX.Element {
   const graph = useMemo(() => (layout === undefined ? planGraphOf(plan) : withLayout(planGraphOf(plan), layout)), [plan, layout]);
   const removable = editable && onDisconnect !== undefined;
   const [pickedOwn, setPickedOwn] = useState<string | undefined>(undefined);
@@ -472,7 +474,7 @@ export function PlanGraph({ plan, detail = false, editable = false, onConnect, o
   return (
     <RemoveEdge.Provider value={removeEdge}>
     <section className="plan-graph" data-part={plan.part} data-ticket={plan.ticket} data-editable={editable ? "1" : "0"} data-dragging={dragFrom === undefined ? "0" : "1"}>
-      <h3>{headingOf(plan)}</h3>
+      {heading ? <h3>{headingOf(plan)}</h3> : null}
       <div className="plan-graph-body" data-folded={detail && folded ? "1" : "0"}>
       <div ref={maxBox} className={`graph plan-graph-canvas ${maximizeClass(maximized)}`} data-nodes={graph.nodes.length} data-edges={graph.edges.length}>
         <ReactFlow<PlanNode, Edge>

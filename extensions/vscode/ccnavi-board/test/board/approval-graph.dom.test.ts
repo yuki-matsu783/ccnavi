@@ -1,5 +1,5 @@
 /**
- * 承認のオーバーレイの計画の図。`--agree --preview --json`の`plans`（承認する提案そのものの順序）を、
+ * 承認のオーバーレイの計画の流れの図。`--agree --preview --json`の`plans`（承認する提案そのものの順序）を、
  * 共有の図の部品（`webview/shared/PlanGraph.tsx`）で読むだけで描く。
  *
  * **大きさの偽物が要る**（`openBoard`の`measure`）。React Flowは点の大きさを測れないと線を1本も描かず、
@@ -53,7 +53,7 @@ async function openOverlay(plans: readonly ApprovePlan[]): Promise<DomPage> {
   return dom;
 }
 
-/** その計画の図の中の、線のid（React Flowの`data-id`） */
+/** その計画の流れの図の中の、線のid（React Flowの`data-id`） */
 function edgeIds(dom: DomPage, part: string): string[] {
   return dom
     .all(`.plan-graph[data-part="${part}"] .react-flow__edge`)

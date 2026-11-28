@@ -8,7 +8,7 @@ import (
 	"ccnavi/internal/tickets/testkit"
 )
 
-// 子の連番は、手元の退避（ready が片付けた閉じた親子のチケット）の番号も使ったものとして数える。同じフェーズの
+// 子の連番は、手元の退避（ready が片付けたクローズした親子のチケット）の番号も使ったものとして数える。同じフェーズの
 // 番号だけを数え、親の識別子は大文字小文字を区別しない。
 func TestNextChildIDSkipsTheArchivedNumbers(t *testing.T) {
 	root := testkit.Workspace(t)

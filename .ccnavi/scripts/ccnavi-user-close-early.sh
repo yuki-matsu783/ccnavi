@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-user-close-early まだ残っているが、早めに閉じる判断を置く。ユーザがターミナルで打つ。
+# ccnavi-user-close-early まだ残っているが、早めにクローズする判断を置く。ユーザがターミナルで打つ。
 #
 #   sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
 #
@@ -9,7 +9,7 @@
 # ここが残りを issue に書き出し、コメントを投稿する。Draft を外すのは、親が片付けて push したあとの
 # ccnavi-review.sh ready（外す経路は 1 本）。未解決の指摘は受け入れる。スレッドに返信を残して解決するのはここで、
 # 置く前に済ませる。
-# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push
+# 取り込み済みの親子のチケットなら、早めにクローズしたマーカー（ユーザの判断）を承認の push
 # （ccnavi-user-push-approved.sh <親>）で送る。ユーザの判断を溜めずにその場で送るためで、送れなければ次の write-and-push が止まり、
 # 承認の push の打ち直しを案内する。
 #
@@ -23,7 +23,7 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
 
-  まだ残っているが早めに閉じる判断（ユーザがターミナルで実行します）。残りを issue に書き出す（--no-issue なら書き出さない）。
+  まだ残っているが早めにクローズする判断（ユーザがターミナルで実行します）。残りを issue に書き出す（--no-issue なら書き出さない）。
   Draft は親が ccnavi-review.sh ready で外す。--parent は親の識別子（親のワークツリーの名前）。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
@@ -143,6 +143,6 @@ if [ -f "$noted" ]; then
 	staged_send close-early "$family" comment note "$number" "$url" "$noted" >/dev/null &&
 		rm -f "$noted"
 fi
-# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
+# 取り込み済みの親子のチケットなら、早めにクローズしたマーカー（ユーザの判断）を承認の push で送る。
 carry_human "$family" || exit 1
-printf 'OK: 早めに閉じた（%s）\n' "$url"
+printf 'OK: 早めにクローズした（%s）\n' "$url"

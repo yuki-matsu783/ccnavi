@@ -8,12 +8,12 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 再開（done/ から doing/ へ手で戻す）で残った reviewed のマーカーの警告。運用の基本は、閉じたチケットを戻さず新しいチケットを作り直すこと。
+// 再開（done/ から doing/ へ手で戻す）で残った reviewed のマーカーの警告。運用の基本は、クローズしたチケットを戻さず新しいチケットを作り直すこと。
 // 再開されると、そのフェーズの reviewed が残る。機構はマーカーを消さず、--lint と ticket status が warn で言う。
 //  1. 作業中の子があり、レビューが要るフェーズに reviewed が残っていれば、lint と status が言う
-//  2. 言わないもの: reviewed が無い、子が閉じている（done/）、レビューが要らないフェーズ
+//  2. 言わないもの: reviewed が無い、子がクローズしている（done/）、レビューが要らないフェーズ
 //  3. 警告は判定と start を止めない
-//  4. 定義が review: false でも、再開された子が human_review を求めれば言う（閉じ直すと要る）
+//  4. 定義が review: false でも、再開された子が human_review を求めれば言う（クローズし直すと要る）
 //  5. 延期したフェーズの子が作業中で、そのフェーズが一度終わった印（skipped）が残っていれば言う。引き受け手は辿らず、マーカーの置き場と
 //     消し方（番号は <番号>）を言う
 
@@ -181,7 +181,7 @@ func TestTheDeferredWarningDoesNotStopTheVerdictOrLint(t *testing.T) {
 	ticketkit.Has(t, warned.Stdout, "error 0 件")
 }
 
-// 調査は review: false。doing の子は review_required に数えられないが、閉じ直すと要る。
+// 調査は review: false。doing の子は review_required に数えられないが、クローズし直すと要る。
 func TestAResumedChildAskingForReviewIsWarnedEvenIfTheKindNeedsNone(t *testing.T) {
 	t.Parallel()
 	tr := childWithMarker(t, "research", samples.On, true, true)

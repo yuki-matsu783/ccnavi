@@ -77,7 +77,7 @@ func (w *idWorkspace) commitEmpty() {
 	ticketkit.Git(w.t, w.ws, "commit", "--allow-empty", "-qm", "x")
 }
 
-// 番号は、承認待ち・作業中・閉じた親の識別子の番号の最大 + 1。子の識別子は数えない。引数なしなら番号だけ、`<先頭の語> <slug>` なら
+// 番号は、承認待ち・作業中・クローズした親の識別子の番号の最大 + 1。子の識別子は数えない。引数なしなら番号だけ、`<先頭の語> <slug>` なら
 // 識別子を出す。チケット制御を切っていても動く。
 func TestNextIDCountsParentsInEveryPlace(t *testing.T) {
 	t.Parallel()
@@ -89,7 +89,7 @@ func TestNextIDCountsParentsInEveryPlace(t *testing.T) {
 		want  string
 	}{
 		{"最初は 1", func(w *idWorkspace) {}, nil, nil, "1\n"},
-		{"承認待ち・作業中・閉じたを数える", func(w *idWorkspace) {
+		{"承認待ち・作業中・クローズしたを数える", func(w *idWorkspace) {
 			w.propose("feature-3-a")
 			w.place("doing", "fix-7-b", "")
 			w.place("done", "chore-12-c", "")

@@ -100,7 +100,7 @@ func collidedStates(states []place.State) []place.State {
 
 // Collisions はどれを正とするか決まらないチケットの全部。決まっていれば空。まとめて 2 つ以上残り、同じツリーの
 // 中で collidedStates に当たるときだけ入る（状態の操作が止まるのと lint が言うのとで同じ条件）。acrossTrees は
-// 親のツリーに無く、ほかのツリーのコピーだけが残る形も数える（閉じたものだけなら数えない）。
+// 親のツリーに無く、ほかのツリーのコピーだけが残る形も数える（クローズしたものだけなら数えない）。
 func Collisions(hits []*Ticket, acrossTrees bool) []*Ticket {
 	folded := fold(hits, nil)
 	if len(folded) < 2 {

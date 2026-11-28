@@ -12,11 +12,11 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 親を閉じたときのワークツリーとブランチの片付け（`worktree retire`・`sync`）。判断の中身（退避の後の片付け・取り消した子・
+// 親をクローズしたときのワークツリーとブランチの片付け（`worktree retire`・`sync`）。判断の中身（退避の後の片付け・取り消した子・
 // 確かめられない状態・大文字小文字・壊れた記録・記録の列挙・放棄・MR のマージの後の片付け）は本体の lifecycle/retire のテストが見る。
 // ここで見るのは、ready・worktree retire・sync を起こす通し。
 
-// closedAndPushed は、親を閉じて ready を済ませ、退避の削除をコミットして push した木（Cached）。
+// closedAndPushed は、親をクローズして ready を済ませ、退避の削除をコミットして push した木（Cached）。
 func closedAndPushed(t *testing.T) (*ticketkit.Tree, ticketkit.Fixture) {
 	t.Helper()
 	tr := ticketkit.Cached(t, "closed-and-pushed", ticketkit.Options{Phases: samples.Phases}, func(tr *ticketkit.Tree) {
@@ -159,13 +159,13 @@ func TestAnUnreadableClosedTicketStopsReady(t *testing.T) {
 	t.Parallel()
 	tr, f := closable(t)
 	ticketkit.Write(t, filepath.Join(tr.Approved, "done", "i0001-01-77.md"), "---\nticket: [x\n---\n")
-	tr.CommitParent("読めない閉じたチケット")
+	tr.CommitParent("読めないクローズしたチケット")
 	tr.Parent("push", "--quiet", "origin", "i0001")
 	done := ready(tr, f)
 	if done.Code != 1 {
 		t.Fatalf("code %d\n%s%s", done.Code, done.Stdout, done.Stderr)
 	}
-	ticketkit.Has(t, done.Stderr, "読めない閉じたチケットがあり")
+	ticketkit.Has(t, done.Stderr, "読めないクローズしたチケットがあり")
 	if ticketkit.Exists(retireRecord(tr)) {
 		t.Error("記録を書いた")
 	}

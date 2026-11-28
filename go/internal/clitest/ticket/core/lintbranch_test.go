@@ -14,7 +14,7 @@ import (
 //
 //  1. 新規の提案の識別子の形: ブランチ名として安全でない（`..`・`.lock`・`.` で終わる）、統合先や保護されたブランチの名前、
 //     `<先頭の語>-<番号>-<slug>` の形でない、番号の重なり、既にあるブランチと同じ名前
-//  2. 承認済み・閉じた識別子には 1 を言わない（もう変えられないので、言っても常態になるだけ）
+//  2. 承認済み・クローズした識別子には 1 を言わない（もう変えられないので、言っても常態になるだけ）
 //  3. 大文字小文字だけが違う識別子
 //  4. 末尾が `-<2 桁>` の親の識別子（`-<2 桁>-<2 桁>` なら子の形そのもの、`-<2 桁>` だけなら子の識別子の途中と紛れる）
 //
@@ -61,7 +61,7 @@ func TestNewProposalsAreNamedByTheBranchNameRule(t *testing.T) {
 	ticketkit.Lacks(t, joined, "通し番号は")
 }
 
-// 言わない形: 日本語の識別子・承認済みと閉じた識別子（もう変えられない）・承認済みの親の改版・1 桁で終わる親・本物の子。
+// 言わない形: 日本語の識別子・承認済みとクローズした識別子（もう変えられない）・承認済みの親の改版・1 桁で終わる親・本物の子。
 func TestTheBranchNameRuleStaysSilentWhereItShould(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
@@ -71,7 +71,7 @@ func TestTheBranchNameRuleStaysSilentWhereItShould(t *testing.T) {
 	}{
 		{"日本語の識別子", func(w *idWorkspace) { w.propose("feature-64-統合先の解決") }, ""},
 		// 既存の i0055 などは issue: を持たない。承認済みの識別子は変えられないので言わない。
-		{"承認済みと閉じた識別子", func(w *idWorkspace) { w.place("doing", "i0055", ""); w.place("done", "i0060", "") }, ""},
+		{"承認済みとクローズした識別子", func(w *idWorkspace) { w.place("doing", "i0055", ""); w.place("done", "i0060", "") }, ""},
 		{"承認済みの親の改版は新規でない", func(w *idWorkspace) { w.place("doing", "i0055", ""); w.propose("i0055") }, "i0055:"},
 		{"1 桁で終わる親", func(w *idWorkspace) { w.place("done", "abc-1", ""); w.place("done", "web-i0012", "") }, ""},
 		{"本物の子", func(w *idWorkspace) { w.place("doing", "abc", ""); w.place("doing", "abc-01-01", "abc") }, ""},

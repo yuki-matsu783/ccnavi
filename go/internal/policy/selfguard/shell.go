@@ -80,7 +80,7 @@ const (
 	unknown = `(?:[^- \x00][^ \x00]*)?[*?\[{$` + "`" + `][^ \x00]*|` + head + `\.\.?[\\/]*`
 	dirTail = `(?:[\\/]\.?)*`
 
-	// logsNames は `logs/` の中で守る名前（記録・ローテートした記録・state・閉じたチケットの退避）。
+	// logsNames は `logs/` の中で守る名前（記録・ローテートした記録・state・クローズしたチケットの退避）。
 	logsNames = `decisions(?:\.[^\s\\/\x00]*)?\.jsonl|state|` + config.ArchiveName
 )
 
@@ -488,7 +488,7 @@ func commonLayerRegex(root string, commonFiles []string) string {
 	return folded("^(?:" + strings.Join(alternatives, "|") + ")$")
 }
 
-// recordsPlaces は記録と state の既定の置き場（config.DefaultLog・DefaultState）と、閉じたチケットの退避
+// recordsPlaces は記録と state の既定の置き場（config.DefaultLog・DefaultState）と、クローズしたチケットの退避
 // （config.ArchiveName）を、名指しのツール（解決済みの絶対パス）に当てる表記。
 var recordsPlaces = func() string {
 	stem, ext := ospath.Splitext(ospath.Basename(config.DefaultLog))

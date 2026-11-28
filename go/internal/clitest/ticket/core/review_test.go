@@ -12,7 +12,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// closedFamily は Family のフェーズ 1 を閉じ、origin と、合流して push した親ブランチ（と結果ファイル）まで組んだ木。
+// closedFamily は Family のフェーズ 1 をクローズし、origin と、合流して push した親ブランチ（と結果ファイル）まで組んだ木。
 func closedFamily(t *testing.T) (*ticketkit.Tree, ticketkit.Fixture) {
 	t.Helper()
 	return ticketkit.ClosedTree(t)
@@ -29,7 +29,7 @@ func requested(t *testing.T) (*ticketkit.Tree, ticketkit.Fixture) {
 func TestRequestNeedsMergedChildrenAndCheckOpensTheGate(t *testing.T) {
 	t.Parallel()
 	tr := ticketkit.FamilyTree(t, ticketkit.FamilyOpts{})
-	// 子のツリーに成果を積んでから閉じる。合流していない子を見分けるため。
+	// 子のツリーに成果を積んでからクローズする。合流していない子を見分けるため。
 	for _, child := range []string{"i0001-01-01", "i0001-01-02"} {
 		tree := tr.ChildTree(child)
 		ticketkit.Write(t, filepath.Join(tree, "src", child[len(child)-1:], "work.py"), "x\n")
@@ -506,7 +506,7 @@ func commitCode(t *testing.T, tr *ticketkit.Tree, name, message string, push boo
 	}
 }
 
-// close-early は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを先に見ていた版では、ユーザが早めに閉じた
+// close-early は依頼していないフェーズにもレビュー済みを置く。依頼の記録が無いことを先に見ていた版では、ユーザが早めにクローズした
 // フェーズに request が通り、MR に依頼が投稿された。依頼せずにレビュー済みになったフェーズへは投稿しない。
 func TestRequestRefusesAPhaseSettledWithoutRequest(t *testing.T) {
 	t.Parallel()

@@ -12,12 +12,12 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// 閉じた親子のチケットの退避（`review ready` が `logs/archive/` へ移す）。
+// クローズした親子のチケットの退避（`review ready` が `logs/archive/` へ移す）。
 //   - ready が条件を確かめてから退避し、打ち直しても通ること
 //   - write-and-push の見分け（`ccnavi write-and-push sort`）と実行後チェックが、退避の削除だけを ccnavi の書き込みとして外すこと
 //   - ボードの JSON に退避のチケットが載ること（判定には混ぜない）
 //
-// 退避の構成と移し方、閉じた識別子の使い回し・子の連番が退避を見ることは本体の archive・approval・closeout のテストが見る。
+// 退避の構成と移し方、クローズした識別子の使い回し・子の連番が退避を見ることは本体の archive・approval・closeout のテストが見る。
 
 // write-and-push の見分けの種類（ccnavi が書いたと内容で分かる・見分けられない）。
 const (
@@ -41,7 +41,7 @@ func closedText(name, parent string) string {
 	return strings.Join(lines, "\n")
 }
 
-// buildClosable は、親を閉じて片付け、push 済みにする（Draft のマージリクエストの結果ファイルは Root/fixture.json）。
+// buildClosable は、親をクローズして片付け、push 済みにする（Draft のマージリクエストの結果ファイルは Root/fixture.json）。
 func buildClosable(tr *ticketkit.Tree) {
 	t := tr.T
 	t.Helper()
@@ -62,7 +62,7 @@ func buildClosable(tr *ticketkit.Tree) {
 	ticketkit.OK(t, tr.Approve())
 	closed := ticketkit.OK(t, tr.Ccnavi("ticket", "finish", "i0001"))
 	ticketkit.Has(t, closed.Stdout, "logs/archive/")
-	// 統合先にたまっていた過去の親（閉じた親子のチケット）。
+	// 統合先にたまっていた過去の親（クローズした親子のチケット）。
 	ticketkit.Write(t, filepath.Join(tr.Approved, "done", "old.md"), closedText("old", ""))
 	ticketkit.Write(t, filepath.Join(tr.Approved, "done", "old-01-01.md"), closedText("old-01-01", "old"))
 	ticketkit.Write(t, filepath.Join(tr.Approved, "phases", "old", "closed.json"), "{}\n")
@@ -267,7 +267,7 @@ func TestWriteAndPushCountsOnlyTheArchiveRemovals(t *testing.T) {
 func TestThePostCheckDoesNotReportTheArchiveRemovals(t *testing.T) {
 	t.Parallel()
 	tr, f := closable(t)
-	// 閉じていない親（done/ に無い）の子。退避の対象にならない。
+	// クローズしていない親（done/ に無い）の子。退避の対象にならない。
 	ticketkit.Write(t, filepath.Join(tr.Approved, "done", "zzz-01-01.md"), closedText("zzz-01-01", "zzz"))
 	tr.CommitParent("stray")
 	tr.Parent("push", "--quiet", "origin", "i0001")
@@ -287,7 +287,7 @@ func TestThePostCheckDoesNotReportTheArchiveRemovals(t *testing.T) {
 
 // ---- レビューの指摘の再現（直す前は失敗する）
 
-// ready の後、閉じた子のワークツリーを片付ければ、古い作業中のコピーは残らない。
+// ready の後、クローズした子のワークツリーを片付ければ、古い作業中のコピーは残らない。
 func TestAStaleDoingCopyInAChildTreeGoesWithTheChildWorktree(t *testing.T) {
 	t.Parallel()
 	tr, f := closable(t)
@@ -410,12 +410,12 @@ func TestReadyAgainNeedsTheMergeRequestToBeADraft(t *testing.T) {
 	ticketkit.Fails(t, ready(tr, f))
 }
 
-// 早めに閉じた理由は、ツリーの側からも読む。
+// 早めにクローズした理由は、ツリーの側からも読む。
 func TestTheReasonOfAnEarlyCloseIsReadFromTheTreeToo(t *testing.T) {
 	t.Parallel()
 	tr, f := closable(t)
 	ticketkit.Write(t, filepath.Join(tr.Approved, "phases", "i0001", "close-early.json"), `{"reason": "ここまでで十分"}`)
-	tr.CommitParent("早めに閉じた")
+	tr.CommitParent("早めにクローズした")
 	tr.Parent("push", "--quiet", "origin", "i0001")
 	// 退避の行き先をディレクトリにして、close-early.json の手前で止める。
 	blocker := filepath.Join(archiveSelf(tr), "phases", "i0001", "close-early.json")

@@ -30,7 +30,7 @@ const (
 
 var kinds = []Kind{Work, Feedback}
 
-// Learning は学びの蓄積（learning-wiki）をこの定義の子に効かせるか。Off の子は案内と閉じる検査を受けない。
+// Learning は学びの蓄積（learning-wiki）をこの定義の子に効かせるか。Off の子は案内とクローズする検査を受けない。
 type Learning string
 
 const (

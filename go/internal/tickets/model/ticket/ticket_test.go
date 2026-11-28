@@ -118,7 +118,7 @@ func TestCollisions(t *testing.T) {
 		{"todo と承認済みは並んでよい", []*Ticket{at("p", "", "p", "", place.Todo), at("p", "", "p", "", place.Doing)}, false, 0},
 		{"同じ置き場に 2 つ", []*Ticket{at("p", "", "p", "", place.Todo), at("p", "", "p", "", place.Todo)}, false, 2},
 		{"ほかのツリーのコピーだけ", []*Ticket{at("p", "", "a", "", place.Doing), at("p", "", "b", "", place.Doing)}, true, 2},
-		{"閉じたものだけなら数えない", []*Ticket{at("p", "", "a", "", place.Done), at("p", "", "b", "", place.Cancelled)}, true, 0},
+		{"クローズしたものだけなら数えない", []*Ticket{at("p", "", "a", "", place.Done), at("p", "", "b", "", place.Cancelled)}, true, 0},
 		{"ツリーをまたぐのは普通", []*Ticket{at("p", "", "a", "", place.Doing), at("p", "", "b", "", place.Doing)}, false, 0},
 	}
 	for _, c := range cases {

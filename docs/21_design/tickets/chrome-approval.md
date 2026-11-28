@@ -29,7 +29,7 @@ keywords: [Chrome拡張, PAT, WASM, MV3, CSP, createCommitOnBranch, expectedHead
 - 読むのは置き場のサブツリーだけ。GitHub はパスで置き場の tree の sha を引き `?recursive=1` で取る。`truncated: true` なら error で止める。GitLab は `repository/tree`（`path`・`recursive`）をページングで取り切り、取り切れなければ error
 - blob は sha で引き、IndexedDB に保存する（sha が同じなら中身は同じなので失効が要らない）。ボードを開くたびに読むのは tree だけになる
 - まとめて取る: GitHub は GraphQL の別名（`f1: object(expression: "P:path") { ... on Blob { text } }`）で、IndexedDB に無い blob を 1 回に最大 50 件ほど取る。GitLab は REST の `repository/blobs/:sha` を 1 件ずつ引く
-- 統合先の `done/` は丸ごと読む（閉包の先行と、前の統合先から切った `P` でも閉じた識別子の使い直しを見つけるため。`entry/chrome` の `families.go`、拡張の `snapshot.ts`）
+- 統合先の `done/` は丸ごと読む（閉包の先行と、前の統合先から切った `P` でもクローズした識別子の使い直しを見つけるため。`entry/chrome` の `families.go`、拡張の `snapshot.ts`）
 
 初回の blob の数は、判定に入る親子のチケットの置き場のファイル数の和に統合先の `done/` の件数を足した数。GraphQL の呼び出しは ⌈blob の数 / 50⌉ + 1。2 回目以降は変わった blob の分だけ。GitHub の上限（REST・GraphQL とも 5,000 回（点）/時）に対して十分小さい。
 
@@ -127,7 +127,7 @@ ccnavi のコミットはチケットの置き場だけを変えるので、コ�
 | 親の計画の承認 | Chrome の承認 | 無い |
 | 着手・子の承認・子の終了 | write-and-push、Chrome の承認 | 付けない |
 | フェーズのレビュー | 依頼のマーカー → Chrome の「レビュー済み」か `confirm` | 付けない |
-| 親を閉じる | `finish` → `wip/` を消して push → `ready` のマーカー | なし |
+| 親をクローズする | `finish` → `wip/` を消して push → `ready` のマーカー | なし |
 | マージ | 無い | ここで最後の Approve を付ける |
 
 Chrome の画面では、マージリクエストに Approve が付いているときに「このコミットでマージリクエストの Approve が外れることがあります」と出す。止めはしない。

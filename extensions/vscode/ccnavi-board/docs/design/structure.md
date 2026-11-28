@@ -11,15 +11,16 @@ keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テ
 ```
 src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値を見出しの横に出す（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネル。見出し「ユーザ待ち」「進行中の親」「画面」のツリー（中身は core/sidebar-tree.ts）と、ユーザ待ちの合計のバッジ。行を押すと該当の画面と場所を開く（画面の帳面 screens() を通す）。チケット制御が disable ならチケットに関わる行を出さない。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値をビューの名前の横に出す（vscode に依存する）
+  board-feed.ts       拡張全体で 1 つの --explain --json の答えと、その読み直しの監視（core/watch.ts の FEED_PATTERNS。チケット管理画面を閉じていても続ける）。サイドパネル・チケット管理画面・フロー編集の「提案あり」・チケット制御が同じ答えを聞く（まとめ方は core/feed.ts。vscode に依存する）
   bug-report.ts       バグ報告（サイドパネルのタイトルバーの虫のアイコンから始める）。ステータスバーの撮る・終えるのボタン、ffmpeg の録画の起動と停止（標準入力に q）、スクリーンショットのコマンドの起動、終えたときの gif への変換と zip の書き出し（vscode に依存する。組むものは core/bug-report.ts）
-  ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
-  board-panel.ts      チケット管理画面の Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（チケット管理画面が開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
+  ticket-control.ts   CCNAVI_TICKET_CONTROL を拡張全体の答え（board-feed.ts）から読み、context key に反映する（vscode に依存する）
+  board-panel.ts      チケット管理画面の Webview パネルの生成・更新・破棄、操作の受け付け。答えと監視は board-feed.ts を聞く。サイドパネルの行から開くときは、開いたあとに進む場所（承認・レビュー完了・カードの焦点・MRの状況を確認）を受ける。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（チケット管理画面が開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
-  phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通設定のフェーズ定義（読み取り専用。共通設定を開いているときは並べない）と、共通設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
+  phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通設定の定義（読み取り専用。共通設定を開いているときは並べない）と、共通設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
   templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出し・図の中身の取り出し（preview。読むだけ）の受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し、編集（実行ファイルに読ませる `--templates --check-file`、作業中の錠の取り直し、保存。書くのは保存のときだけで、判定は実行ファイルの答えのまま）。vscode に依存する
-  settings-panel.ts   ルール管理・リスク管理・フェーズ管理の 3 画面のパネルが共通で持つ段取り（受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替え、錠の取り直し、3画面で同じ操作の受け付け、保存の流れ）。画面ごとの仕事（読む・見せる・見張る・検証に渡す差し替え・画面だけの操作）は `settingsPanel` に渡すコールバックで注入し、残す仕事は画面ごとに持つ（vscode に依存する）
+  settings-panel.ts   ルール管理・リスク管理・フェーズ管理の 3 画面のパネルが共通で持つ段取り（受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替えと切り替えた対象を覚えること、錠の取り直し、3画面で同じ操作の受け付け、保存の流れ）。画面ごとの仕事（読む・見せる・見張る・検証に渡す差し替え・画面だけの操作）は `settingsPanel` に渡すコールバックで注入し、残す仕事は画面ごとに持つ（vscode に依存する）
   panel-common.ts     画面（*-panel.ts）が共通で使う小さな部品。`retainContextWhenHidden` の前提の確かめ（assertRetained）、監視の張り方（watchPattern・watchGlobs・watchTickets）、監視の反応を束ねる debounce、`switch` の網羅検査 assertNever、エディタで開く（openInEditor）、画面の対象フォルダ（workspaceFolder・firstWorkspaceFolder）（vscode に依存する）
   handoff-entry.ts    各画面（ルール・リスク・フェーズ・テンプレート管理）の「取り込み待ちを開く」の拡張ホスト側の共通部分（開けるかの確認と、見ている対象に合わせたツリーで開く）。実行ファイルを呼ぶので単体テストの対象外
   handoff-panel.ts    取り込み待ち画面の Webview パネル（1 枚。見るツリー（ワークスペース・プロジェクト・ワークツリー）を切り替える）。user handoff --json の一覧の受け渡しと、取り込みの受け付け（手順は core/handoff-import.ts に分けてあり、ここは実行ファイルの呼び出しを渡すだけ）、ターミナルの案内、下書きと取り込み先のファイルの監視、作業中の錠の取り直し。チケット管理画面のカードの下書きの通知からも開く（vscode に依存する）
@@ -28,6 +29,7 @@ src/
   prompt-handover.ts  Claude Code に文を渡す経路（コピー / 新しいセッションで開く / 専用ターミナルで claude -p を実行）。チケット管理画面とフロー編集画面が使う（vscode に依存する）
   projects-panel.ts   プロジェクト管理画面の Webview パネル。clone の送信、.gitignore への追記（vscode に依存する）
   terminal.ts         「ccnavi」ターミナルの用意とコマンドの送信。作った直後はシェル統合が立ち上がるのを待って送る（vscode に依存する）
+  target-memory.ts    設定の 4 画面で最後に選んだ設定を workspaceState に覚え、開くときの設定を拡張全体の答えから決める（決め方は core/targets.ts の openingTarget）（vscode に依存する）
   tour.ts             画面ごとの初回の案内を見たかどうか（拡張の globalState に画面の名前ごとに持つ）（vscode に依存する）。左パネルの案内（package.json の walkthroughs。本文は media/tour/）を、拡張の版が変わった最初の起動と、パネルのタイトルバーの ? で開き、プロジェクト管理 → チケット管理の基本の案内を続けて動かす（vscode に依存する）
   ccnavi.ts           実行ファイルの探索と --explain --json / --test --json / --test-expectations --json / --lint（--rules / --project-rules-file / --risk / --project-risk-file / --project-phases-file の差し替え）/ --lint --json（--flow でフロー 1 本を確かめる）/ --agree --preview --json / user agree --yes … --json / --templates --json / --templates --show <名前> --json / user handoff [<パス>…] --json（取り込み先行の一覧。見るだけ）と user handoff <パス…> --yes --expect --via board --json（取り込み）/ --templates --draft <親> --json（チケット管理画面の親のカードの「テンプレートの下書きを作る」）/ --suggest --json / --plan-order <親> --json（--order）と --plan-order --write の実行（Node の子プロセス）
   git.ts              ローカルの git を読み取り専用で起動する（origin を読む。Node の子プロセス）
@@ -35,7 +37,7 @@ src/
   core/
     model.ts          チケット管理画面の JSON の形（実行ファイルとの契約）と読み取り
     approvemodel.ts   承認の JSON の形（--agree --preview --json / user agree --yes … --json）と読み取り。計画を持つ親の図の中身（plans）も読む。一覧のうち未保存のタブがある親と、保存したあとに提案が変わった親を引く関数と、その文
-    plan-graph.ts     計画の図の点・線・置き場所を、実行ファイルの plans の 1 件から組む（start / end の仮の点と線、loose の印、引けない線・消せる線、振り直す前の番号で覚えた置き場所）。判定はしない。VS Code に触れないので単体で試せる
+    plan-graph.ts     計画の流れの図の点・線・置き場所を、実行ファイルの plans の 1 件から組む（start / end の仮の点と線、loose の印、引けない線・消せる線、振り直す前の番号で覚えた置き場所）。判定はしない。VS Code に触れないので単体で試せる
     planordermodel.ts --plan-order <親> --json の答えの形（実行ファイルとの契約）と読み取り。plans は承認の preview と同じ読み方。保存の答えをパネルが読む形（書いた・変わらない・外で変わった・書かなかった）
     testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
@@ -84,7 +86,7 @@ src/
     tour-place.ts     吹き出しの案内の置き場所（画面の外に出さない）。DOM に触れないので単体で試せる
     tour-def.ts       案内の定義（YAML）の形 TourDef と検査 parseTour（画面ごとの screen / sample / courses。手順は target・タイトル・本文・scene・image と alt）。見本の目印の文 SAMPLE_NOTE もここ。DOM に触れないので単体で試せる
     tour-rules.ts     ルール管理の案内の見本（tours/rules.yml の sample:）を RuleForm と実行ファイルの JSON の形にする。rules.yml と同じ書き方のルールを読む小さな読み取り（実際の readRules と同じ結果になることをテストが見る）
-    tour-board.ts     チケット管理画面画面の案内の見本（tours/board.yml の sample:）を parseBoardJson / buildBoard と承認・残った指摘の読み取りに通して、画面が描く形にする。実行ファイルの JSON と同じ形で書く
+    tour-board.ts     チケット管理画面の案内の見本（tours/board.yml の sample:）を parseBoardJson / buildBoard と承認・残った指摘の読み取りに通して、画面が描く形にする。実行ファイルの JSON と同じ形で書く
     tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・統合結果）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
     tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、手順ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストで検査する
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
@@ -95,8 +97,8 @@ src/
     load-failure.ts   設定を読めなかった失敗（LoadFailure）。読めなかったファイルのパスを持ち、エラー画面の「エディタで開く」に使う
     mode-banner.ts    動作モード（dry-run・disable）の帯の文。ルール管理とチケット管理の画面が共通で使う（enable と空は出さない）
     workspace-folder.ts 画面の対象にするフォルダの案内の文（フォルダが無いとき・複数のとき。対象は最初のフォルダ）
-    targets.ts        ルール管理・リスク管理・フェーズ管理・テンプレート管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。4 画面とも同じ 3 種）の一覧と、欄の値
-    sums.ts           ルール管理とリスク管理の統合結果（読み取り専用）の表示用の形。チケット管理画面の JSON の sums[] を並べ直すだけで、足し直さない
+    targets.ts        ルール管理・リスク管理・フェーズ管理・テンプレート管理が切り替える設定の対象（共通・ワークスペース・プロジェクト。4 画面とも同じ 3 種）の一覧と、欄の値。2 つの対象が同じか（sameTarget）と欄の値への出し入れ（targetKey・targetFrom）、開くときの設定（覚えた最後の選択が選択肢にあればそれ、無ければ画面の既定と 1 行の知らせ）を決める openingTarget
+    sums.ts           ルール管理とリスク管理の統合結果（読み取り専用）の表示用の形。ボードの JSON の sums[] を並べ直すだけで、足し直さない
     projects.ts       プロジェクト管理の判断。URL と名前の検査、origin のキー、clone の行、プロジェクトになっていない .git の探索、.gitignore の行の有無と追記、画面の中身の組み立て
     projects-view.ts  プロジェクト管理の拡張ホストと画面の契約（見せる形 ProjectsPage / ProjectsData、押した操作 ProjectsMessage）
     projects-render.ts プロジェクト管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
@@ -106,7 +108,9 @@ src/
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
     screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
-    watch.ts          8 つの画面（チケット管理画面・ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
+    watch.ts          拡張全体の答え（board-feed.ts）と 7 つの画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob。取り込み待ちの場所（HANDOFF_PATTERNS）と、拡張全体の答えを読み直す場所（FEED_PATTERNS）も置く
+    feed.ts           1 つの答えを読み直して聞き手みんなに配る仕組み（読んでいる最中の頼みは 1 回にまとめる）。board-feed.ts が使う
+    sidebar-tree.ts   サイドパネルのツリーの中身（ユーザ待ち・進行中の親・画面の行、押したときに開くもの、バッジの数）。件数と分類は inbox のまま
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルが返す値（チケット管理画面の JSON の `settings.ticket_control`）との突き合わせ
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る
@@ -116,28 +120,34 @@ src/
     useHostMessages.ts 拡張ホストからのメッセージの受信（見た目はここで受ける）と、組み上がったときの ready。9 画面で 1 本
     useSaveKey.ts     Ctrl+S（Cmd+S）で保存する入口。理由（save-gate.ts）が空のときだけ保存し、空でなければ理由を表示する
     useEscape.ts      Esc で閉じる面の入口。重なっているときは最も手前の面（ESCAPE_LAYER。CSS の z-index と同じ順）だけが受ける
-    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・タイトル・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。チケット管理画面・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
+    tours/<画面>.yml   案内の定義（sample: 案内の間だけ描く見本、courses: 基本の案内と使い方ごとの案内。手順は target=data-tour の値・タイトル・本文・scene・画像の image と alt・時系列の図の diagram と focus。図は diagrams: に登場者と矢印で書く）。ビルドのとき esbuild のプラグインが JSON にしてバンドルへ入れる（画面に YAML の解析器は入らない）。チケット管理画面・ルール管理・リスク管理・フェーズ管理・テンプレート管理・フロー編集・計画編集・プロジェクト管理の 8 画面（プロジェクト管理は sample: を持たない）。list.css の `.field` / `.row-sum` は `display: contents` で箱を持たないので、指す先がそれでも `Tour.tsx` の `boxOf` が子の枠を合わせて強調する
     tours/images.ts   手順の image（名前）から画像の data: URL を引く表。画像は tours/images/<名前>.png に置き、esbuild の dataurl の読み込みでバンドルへ入れる（Webview はファイルを読まず、チケット管理画面の CSP だけ img-src data: を許す）。表と置き場と YAML の突き合わせはテストが見る
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ。画像のある手順は、本文の下に img を出し、吹き出しを広げる（指す先は空にして中ほどに出す）
     TargetSelect.tsx  ルール管理・リスク管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
-    workflow/tour-marks.ts 案内の間だけ、計画の図の中のステップ・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
+    workflow/tour-marks.ts 案内の間だけ、計画の流れの図の中のステップ・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
     styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する。欄の幅の名前（--w-field・--w-field-wide・--w-grow）は page.css の :root にあり、画面の CSS は 320px・360px を直書きせずそれを参照する（CB-T439 が検査する）
     （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T585 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
-    board/style.css   チケット管理画面画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
-    board/App.css     App.tsx の CSS（列・取っ手・畳んだ列）
+    board/style.css   チケット管理画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の流れの図のために React Flow の CSS と shared/PlanGraph.css も読む）
+    board/App.css     App.tsx の CSS（ツールバー・絞り込み）
+    board/Lanes.tsx   列の見出しと親ごとの行（親は行の見出し、子は列ごとのセル。フェーズを表示で開く行・列の畳みと幅）
+    board/Lanes.css   Lanes.tsx の CSS（列の幅を揃える grid・取っ手・畳んだ列・940px 以下で行を縦に積む）
+    board/PlanFlow.tsx 開いた親の行の「計画の流れを見る」で重ねる、承認済みの親の計画の流れ（parents[].plans を共有の図の部品で読むだけで描く）
+    board/PlanFlow.css PlanFlow.tsx の CSS（幅と見出し。図は shared/PlanGraph.css）
     board/Card.css    Card.tsx の CSS（カード 1 枚。操作ボタン card-button の寸法もここ）
     board/MergeBand.tsx マージ状況の帯（親ごとの 1 行、「MRを開く」「片付ける」、コマンドのコピー）
     board/MergeBand.css MergeBand.tsx の CSS
     board/Approval.css Approval.tsx の CSS（承認のオーバーレイ）
     board/post.ts     チケット管理画面の送り口。契約に無いものは型で止まる
-    board/main.tsx    チケット管理画面画面の入口。埋め込みの JSON を読んでマウントする
-    board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
-    board/Card.tsx    カード 1 枚（見出し・位置・MR・ユーザ待ち・注意・フェーズ行・補助の操作・詳細）
-    board/Approval.tsx 承認のオーバーレイ（要約・一覧・計画の図（読むだけ）・凡例・本文・対象外・渡す文）
+    board/main.tsx    チケット管理画面の入口。埋め込みの JSON を読んでマウントする
+    board/App.tsx     ツールバー・絞り込み・選んだカードの置き場・脚注と、拡張ホストからのメッセージの受け
+    board/Card.tsx    カード 1 枚（見出し・局面・動いた表示・注意・主な操作）
+    board/Panel.tsx   選んだカードの右のパネル（位置・MR・ユーザ待ち・フェーズ行・チケットを開く・補助の操作・詳細）
+    board/Toc.tsx     承認のオーバーレイと対応方針の画面の目次（位置へ送るだけ）
+    board/Approval.tsx 承認のオーバーレイ（要約・一覧・計画の流れ（読むだけ）・凡例・本文・対象外・渡す文）
     board/Decide.tsx   レビュー完了のオーバーレイの中身（0 件は「レビュー済みにする」、1 件以上は指摘ごとの選択と相談のプロンプトのコピー）
-    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅・詳細を開いているカード）の読み書き
+    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列（既定は完了と取り消し）・列の幅・選んだカード・開いた親の行）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
     projects/style.css   プロジェクト管理画面の CSS の入口
     projects/App.css     App.tsx の CSS（節・clone の欄・一覧の入れ物）
@@ -207,7 +217,7 @@ src/
     flow/main.tsx     フロー編集画面の入口。埋め込みの JSON を読んでマウントする
     flow/App.tsx      錠の帯・ツールバー・注意・部品箱と、拡張ホストからのメッセージの受け
     flow/Canvas.tsx   図（ノード・出口・線）。動かす・繋ぐ・選ぶは呼び手に返す
-    shared/PlanGraph.tsx 計画の図の部品（React Flow）。承認のオーバーレイが読むだけで、計画編集タブが編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
+    shared/PlanGraph.tsx 計画の流れの図の部品（React Flow）。承認のオーバーレイとチケット管理画面の計画の流れ（board/PlanFlow.tsx）は読むだけで使い、計画編集タブは編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
     workflow/style.css 計画編集タブの CSS の入口（先頭で React Flow の CSS を @import し、shared/PlanGraph.css と Tour.css も読む）
     workflow/App.css   App.tsx の CSS（図の枠の高さ・外で変わった差分の表）
     workflow/Review.css Review.tsx の CSS（保存の前の確かめ）
@@ -218,6 +228,7 @@ src/
     shared/Dialog.tsx  画面を覆うオーバーレイの部品（背景と本体と操作の列）。承認・保存前の確かめ・エージェントの提案の確認が使う。幅は旧クラス側の `--overlay-w` で決める
     shared/Dialog.css  Dialog.tsx の CSS（背景・本体・見出し・操作の列）
     shared/HandoffLink.tsx 「取り込み待ちを開く」のボタン（ルール・リスク・フェーズ・テンプレート管理が置く。開けない理由も出す）
+    shared/EditorBar.tsx 図の編集（フロー編集・計画編集・テンプレート管理の編集欄）の上部の並び。「対象の名前 → 状態 → 元に戻す・やり直す → 補助の操作 → 主ボタン」の順をここ 1 か所で決める（CSS は EditorBar.css。名前の欄は 16em を基準に縮み、長い名前は「…」で切って広い幅で 1 行に収める）
     shared/StatusLine.tsx 直前の操作の一言の行（ScreenHeader の status に渡すと、貼り付くツールバーの最後の行に出る。error は赤）
     shared/RemovedBand.tsx 削除した行を元の位置へ戻す帯（ルール・リスク管理が置く。直前の 1 行だけ覚える。元に戻す履歴を持つフェーズ管理・フロー編集・テンプレートの編集は置かない）
     shared/Maximize.tsx 図を全画面で出す部品（useMaximize・MaximizeButton・RefitOnChange）
@@ -228,22 +239,22 @@ src/
     shared/PlanGraph.css PlanGraph.tsx の CSS（図・点・仮の線・注意の色。React Flow の色を --vscode-* に置き換える）
     flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
     flow/SaveReview.tsx 保存前の差分の一覧（保存する・やめる・次から確かめない）
-    flow/Proposal.tsx   エージェントの下書きの差分（値の前後まで）と取り込み、エージェントへの依頼の文（コピー・新しいセッションで開く）
+    flow/Proposal.tsx   エージェントの下書きの差分（値の前後まで）と取り込み、エージェントへの依頼の文（新しいセッションで開く・コピー）
     flow/Preview.tsx  担当に渡る手順のプレビュー（実行ファイルが並べた行をそのまま出す）
     flow/text.ts      ノードの目印（メインに戻る・入れ子）と 1 行の要約
     rules/style.css   ルール管理画面の CSS の入口
-    rules/App.css     App.tsx の CSS（タブ・節・判定の欄・判定を試す・hook の 2 つのタブが共有する表）
+    rules/App.css     App.tsx の CSS（タブと右の判定を試す欄の並び・節・判定の欄・判定を試す欄と hook のタブが共有する表。940px 以下は欄をタブの上に積んで畳める）
     rules/Rule.css    Rule.tsx の CSS（ルール 1 件の行・ツールの選択肢）
     rules/When.css    When.tsx の CSS（組み合わせ条件の図。React Flow の色を --vscode-* に置き換える）
     rules/Judge.css   Judge.tsx の CSS（判定の結果）
     rules/post.ts     ルール管理の送り口。契約に無いものは型で止まる
     rules/main.tsx    ルール管理画面の入口。埋め込みの JSON を読んでマウントする
-    rules/App.tsx     帯・ツールバー・3 つのタブ（ルール・判定を試す・hook）と、拡張ホストからのメッセージの受け
+    rules/App.tsx     帯・ツールバー・2 つのタブ（ルール・hook）と右の常設の「判定を試す」欄、拡張ホストからのメッセージの受け
     rules/Rule.tsx    ルール 1 件の行（要約と、開いたときの欄。ツールの選択肢と、ファイルを選ぶ欄。「組み合わせ条件に変換」）
     rules/When.tsx    組み合わせ条件（when）の図（React Flow）と、選んだノードの操作の欄・誤りの一覧
     rules/Judge.tsx   判定の結果とサンプルの一括判定の表。実行ファイルが返した判定を読むだけ
     rules/Hooks.tsx   hook の一覧（表示するだけ）
-    rules/state.ts    編集中のルール（行ごとのキー）・開いている行（id で保持する）・開いているタブ
+    rules/state.ts    編集中のルール（行ごとのキー）・開いている行（id で保持する）・開いているタブ・判定を試す欄を畳んだか
     rules/text.ts     要約の文・絞り込みが適用する文字列・件数の出し方
 media/
   icon.svg            アクティビティバーのアイコン
@@ -256,7 +267,7 @@ test/
   fixtures/plan-order.json          --plan-order <親> --json の答えの実例（開いたとき・逆向きの線・循環・終端の検査・書いたとき・改版）。go/internal/clitest/ticket/phases/planorder_test.go が書き出す
   helpers/fixture.ts  board.json を読む
   helpers/dom.ts      画面の HTML を happy-dom に読み込み、スクリプトを走らせて postMessage と state を記録する
-  helpers/board.ts    チケット管理画面画面（React）をバンドルしたものごと happy-dom で開く
+  helpers/board.ts    チケット管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/cards.ts    カードの組み立てを欄ごとに指定して作る部品（状態のバッジ・レビュー・マージの画面のテストが使う）
   helpers/projects.ts プロジェクト管理画面（React）をバンドルしたものごと happy-dom で開く
   helpers/risk.ts     リスク管理画面（React）をバンドルしたものごと happy-dom で開く
@@ -270,7 +281,7 @@ test/
   helpers/plan-order.ts --plan-order の答えの実例（fixtures/plan-order.json）を読む
   helpers/plan-reorder.ts 振り直しの見本の表（リポジトリの tests/fixtures/plan-reorder.json。実行ファイルのテストと共有し、書き換えない）を読み、表の計画を plans の形に並べる
   helpers/jsdom.ts    happy-dom で固まる図の点のドラッグだけを jsdom で動かす（いま使うテストは無い）
-  board/              チケット管理画面（board, model, approvemodel, status と、画面を動かす render.dom / board.dom / card.dom（カードの構造・操作・詳細）/ review.dom（レビュー完了の画面）/ merge.dom（マージ状況の帯）、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「計画編集」を動かす workflow-card.dom）
+  board/              チケット管理画面（board, model, approvemodel, status と、画面を動かす render.dom / board.dom / card.dom（カードと右のパネルの構造・操作・詳細）/ review.dom（レビュー完了の画面）/ merge.dom（マージ状況の帯）、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「計画編集」を動かす workflow-card.dom）
   rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）

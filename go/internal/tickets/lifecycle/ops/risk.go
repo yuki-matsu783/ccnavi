@@ -34,7 +34,7 @@ const (
 )
 
 // RecordRisk は定性のリスク項目の判定を記録する（判断したのはサブエージェント、記録するのは親）。判定は子の HEAD に
-// 結ぶ。HEAD が動けば判定は使えず、閉じるときに取り直しになる。
+// 結ぶ。HEAD が動けば判定は使えず、クローズするときに取り直しになる。
 func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, factorID, answer, reason string) int {
 	// 1. 入力の検査。判定は yes か no、根拠は必須、対象は子（判定は子の差分に付く）、項目は定性（judge）のもの。
 	answer = pyfmt.Lower(ospath.Strip(answer))
@@ -125,7 +125,7 @@ func projectOf(conf *config.Settings, root string, found *ticket.Ticket) string 
 	return found.Project
 }
 
-// scoreChild は子の実績のリスクを数えて記録する。返すのは、閉じたあとに出す行（点と内訳）。閉じられなければ偽を返し、
+// scoreChild は子の実績のリスクを数えて記録する。返すのは、クローズしたあとに出す行（点と内訳）。クローズできなければ偽を返し、
 // 理由は stderr に出す。親・単独・統合の子は測らない。
 //
 // 数えるのは、子の仕事の始まり（取り込み直後の親の先頭と子の共通の祖先）から、子の先頭まで。着手の基準点から数えると、
@@ -163,7 +163,7 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 		return nil, false
 	}
 	// 2. 定性の判定の記録を読み、配点を評価する。HEAD が今の差分と違う判定は古いので使わず、判定待ちに回る。
-	// 判定待ちがあれば、問いを書き出して閉じない。
+	// 判定待ちがあれば、問いを書き出してクローズしない。
 	judgements, ok := marks.ReadRecord(where, found.Parent, found.ID, marks.Judge)
 	if !ok {
 		judgements = pyjson.NewObject()
@@ -181,7 +181,7 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 		askJudges(stderr, conf, root, found, diff, score.Pending, worktree)
 		return nil, false
 	}
-	// 3. 結果を記録する。高リスクのときの人間レビューの必須化は、閉じたあとの案内で言う。
+	// 3. 結果を記録する。高リスクのときの人間レビューの必須化は、クローズしたあとの案内で言う。
 	record := score.Object()
 	record.Set("head", diff.Head)
 	record.Set("base", diff.Base)
@@ -219,9 +219,9 @@ func askJudges(stderr io.Writer, conf *config.Settings, root string, found *tick
 	for i, f := range pending {
 		names[i] = f.ID
 	}
-	fmt.Fprintf(stderr, "ccnavi: %s を閉じる前に、定性のリスク項目の判定が必要です: %s\n"+
+	fmt.Fprintf(stderr, "ccnavi: %s をクローズする前に、定性のリスク項目の判定が必要です: %s\n"+
 		"  問いと差分の要約を渡してサブエージェントに判断させ、報告を '%s record-risk %s <項目> yes|no --reason <根拠>' "+
-		"で記録してから閉じ直してください\n", found.ID, strings.Join(names, ", "), config.ScriptCommand(root, config.TicketWrapper), found.ID)
+		"で記録してからクローズし直してください\n", found.ID, strings.Join(names, ", "), config.ScriptCommand(root, config.TicketWrapper), found.ID)
 	if where != "" {
 		fmt.Fprintf(stderr, "  問い: %s\n", where)
 	}

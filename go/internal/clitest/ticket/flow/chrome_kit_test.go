@@ -207,7 +207,7 @@ func isNull(m map[string]any, key string) bool {
 	return ok && v == nil
 }
 
-// reviewedPhaseOne はフェーズ 1（MR で見る設計）の子を閉じて合流し、レビューを依頼したところまで進める。
+// reviewedPhaseOne はフェーズ 1（MR で見る設計）の子をクローズして合流し、レビューを依頼したところまで進める。
 func (tr *Tree) reviewedPhaseOne() ticketkit.Fixture { return tr.Phase1Requested() }
 
 // applyChanges は Chrome の Changes を 1 コミットとしてツリーに書く（拡張の書き込みの代わり）。

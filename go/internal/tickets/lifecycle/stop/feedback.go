@@ -54,14 +54,14 @@ func parentOf(index map[string]*ticket.Ticket, bound *ticket.Ticket) *ticket.Tic
 	return parent
 }
 
-// closedEarly はユーザが早めに閉じた親か。
+// closedEarly はユーザが早めにクローズした親か。
 func closedEarly(home, parentID string) bool {
 	_, ok := marks.ReadFilledParent(home, parentID, marks.CloseEarly)
 	return ok
 }
 
 // WaitingAtStop は cwd のツリーが結び付く親が、フィードバック計画待ちの局面で止まっているなら返す。
-// 親のワークツリーが決まらない・早めに閉じた親は対象にしない。
+// 親のワークツリーが決まらない・早めにクローズした親は対象にしない。
 func WaitingAtStop(conf *config.Settings, root, cwd string, raw *approval.Raw) *Waiting {
 	at, ok := here(conf, root, cwd)
 	if !ok {

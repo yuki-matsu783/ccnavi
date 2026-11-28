@@ -102,7 +102,7 @@ func build(conf *config.Settings, root string, parent *ticket.Ticket, items []le
 	review.Put("reason", "学びの統合は wiki への書き込みだけで、人の承認は提案の段階で行う")
 	front.Put("human_review", review)
 	front.Put("title", "学びの統合")
-	front.Put("rationale", "親を閉じる前に、親の HEAD にある気づきを 1 件残らず判定し、手順の材料にするものを "+
+	front.Put("rationale", "親をクローズする前に、親の HEAD にある気づきを 1 件残らず判定し、手順の材料にするものを "+
 		"learning-wiki のパターンへ溜める。ccnavi が `ticket consolidate` で作った保守用の子。\n")
 	var allow []any
 	for _, glob := range ticket.ConsolidateScope() {
@@ -167,7 +167,7 @@ func found(stderr io.Writer, conf *config.Settings, root, parentID string) *pass
 	if closing.MisplacedHome(stderr, conf, root, parent) {
 		return nil
 	}
-	// 親の finish が学びより前に見る検査を先に通す。統合の子を作ったのに、別の理由で親を閉じられない状態にしないため。
+	// 親の finish が学びより前に見る検査を先に通す。統合の子を作ったのに、別の理由で親をクローズできない状態にしないため。
 	if problems := closing.CloseProblems(conf, root, parentID, nil); len(problems) > 0 {
 		for _, p := range problems {
 			fmt.Fprintf(stderr, "ccnavi: %s\n", p)

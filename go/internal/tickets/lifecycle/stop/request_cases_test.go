@@ -15,8 +15,8 @@ import (
 //
 //	j0001 子は合流済みで依頼が無い（促す。以降の場面の比べ元）
 //	j0002 子は合流済みで依頼済み（requested）。マーカーを外すと j0001 と同じになる
-//	j0003 j0001 と同じで、早めに閉じた親（close-early）
-//	j0004 レビューが要らないフェーズだけの計画。子は閉じている
+//	j0003 j0001 と同じで、早めにクローズした親（close-early）
+//	j0004 レビューが要らないフェーズだけの計画。子はクローズしている
 //	j0005 子が着手していない
 func requestCasesWorkspace(t *testing.T) string {
 	root := clock.Workspace(t, "j0001", "j0002", "j0003", "j0004", "j0005")
@@ -26,7 +26,7 @@ func requestCasesWorkspace(t *testing.T) string {
 	write := func(parent, state, id, text string) {
 		testkit.Put(t, filepath.Join(approvedDir(w(parent)), state, id+".md"), text)
 	}
-	// 子 1 本が設計のフェーズを閉じて親へ合流済みの形にする。
+	// 子 1 本が設計のフェーズをクローズして親へ合流済みの形にする。
 	mergedFamily := func(id string) {
 		write(id, "doing", id, testkit.ClosingParent(id, []string{testkit.ClosingStarted, baseLine}, "  - design"))
 		child := id + "-01-01"
@@ -64,7 +64,7 @@ func TestPendingAtStopLeavesOutWhatIsNotOnTheWayToARequest(t *testing.T) {
 	}
 	for parent, why := range map[string]string{
 		"j0002": "依頼済み",
-		"j0003": "早めに閉じた親",
+		"j0003": "早めにクローズした親",
 		"j0004": "レビューが要らないフェーズ",
 		"j0005": "着手していない子",
 	} {
@@ -85,7 +85,7 @@ func TestPendingAtStopLeavesOutWhatIsNotOnTheWayToARequest(t *testing.T) {
 	}
 }
 
-// 同じ状態では 1 回だけ。子を閉じる・コミットを足すなどで状態の要約が変わると、また 1 回だけ促す。別のセッション・別のフェーズは
+// 同じ状態では 1 回だけ。子をクローズする・コミットを足すなどで状態の要約が変わると、また 1 回だけ促す。別のセッション・別のフェーズは
 // 別の記録。
 func TestANudgeIsOncePerStateAndSessionAndPhase(t *testing.T) {
 	state := t.TempDir()
@@ -106,7 +106,7 @@ func TestANudgeIsOncePerStateAndSessionAndPhase(t *testing.T) {
 		before  bool
 	}{
 		{"同じ状態", "s1", at([]string{"i0001-01-01", "i0001-01-02"}, "h1"), true},
-		{"子を 1 本閉じた", "s1", at([]string{"i0001-01-02"}, "h1"), false},
+		{"子を 1 本クローズした", "s1", at([]string{"i0001-01-02"}, "h1"), false},
 		{"コミットを足した", "s1", at([]string{"i0001-01-01", "i0001-01-02"}, "h2"), false},
 		{"一手の種類が変わった", "s1", &Pending{Parent: &ticket.Ticket{ID: "i0001"}, Number: 1, Step: stepRequest, head: "h1"}, false},
 		{"別のセッション", "s2", at([]string{"i0001-01-01", "i0001-01-02"}, "h1"), false},

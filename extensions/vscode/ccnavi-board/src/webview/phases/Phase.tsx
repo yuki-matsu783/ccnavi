@@ -88,7 +88,7 @@ export function Phase(props: PhaseProps): JSX.Element {
         <button type="button" className="twist" title="この定義を開く／畳む" aria-expanded={props.open}>
           {props.open ? "▾" : "▸"}
         </button>
-        <span className="sum">
+        <span className="row-sum">
           <span className={phase.id === "" ? "sum-id dim" : "sum-id"} title={phase.id === "" ? "（id未設定）" : phase.id}>
             {phase.id === "" ? "（id未設定）" : phase.id}
           </span>

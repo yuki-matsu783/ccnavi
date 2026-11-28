@@ -36,7 +36,7 @@
     "name": "feature",
     "layer": "common",
     "path": ".ccnavi/config/common/templates/feature.yml",
-    "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+    "sha": "6286d507bbc7d7c62c4bad70e9aba153930f5f50c955104d0854e75b16981d5d",
     "valid": true,
     "description": "機能を設計から実装まで進める",
     "when": "新しい機能を足すとき",
@@ -171,7 +171,7 @@
     "name": "feature",
     "layer": "self",
     "path": ".ccnavi/config/project/templates/feature.yml",
-    "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+    "sha": "6286d507bbc7d7c62c4bad70e9aba153930f5f50c955104d0854e75b16981d5d",
     "valid": true,
     "description": "機能を設計から実装まで進める",
     "when": "新しい機能を足すとき",
@@ -350,7 +350,7 @@
       "name": "feature",
       "layer": "common",
       "path": ".ccnavi/config/common/templates/feature.yml",
-      "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+      "sha": "6286d507bbc7d7c62c4bad70e9aba153930f5f50c955104d0854e75b16981d5d",
       "valid": true,
       "description": "機能を設計から実装まで進める",
       "when": "新しい機能を足すとき",
@@ -500,7 +500,7 @@
       "name": "feature",
       "layer": "self",
       "path": ".ccnavi/config/project/templates/feature.yml",
-      "sha": "00ac71dc72d380685378c96b3d7990b51ebd1242d15073164ed5c32996564c5f",
+      "sha": "6286d507bbc7d7c62c4bad70e9aba153930f5f50c955104d0854e75b16981d5d",
       "valid": true,
       "description": "機能を設計から実装まで進める",
       "when": "新しい機能を足すとき",
@@ -812,7 +812,7 @@
    {
     "name": "login",
     "path": "wip/handoff/.ccnavi/config/project/templates/login.yml",
-    "sha": "46afac83752340bb6322a015aebb90a19878d2f058fefbe27474a13d4fce0fce",
+    "sha": "928566677ff2a9fd1d434e6b169d2b810af66d9158304598b0f27abc6758b473",
     "valid": true,
     "description": "TODO ログインを設計から実装まで進める",
     "when": "新しい機能を足すとき",
@@ -875,7 +875,7 @@
     "also_in": [
      "lib"
     ],
-    "text": "name: login\ndescription: TODO ログインを設計から実装まで進める\nwhen: 新しい機能を足すとき\nplan:\n  - design\n  - {type: implement, after: [1]}\nfeedback:\n  - implement-feedback\nflows:\n  2:\n    id: wf-impl\n    name: 実装の手順\n    version: 1.0.0\n    nodes:\n      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}\n      - {id: p, type: prompt, name: 実装, position: {x: 1, y: 0}, data: {prompt: 先にテスト}}\n      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}\n    connections:\n      - {id: c1, from: s, to: p, fromPort: output, toPort: input}\n      - {id: c2, from: p, to: e, fromPort: output, toPort: input}\n"
+    "text": "name: login\ndescription: TODO ログインを設計から実装まで進める\nwhen: 新しい機能を足すとき\nplan:\n  - design\n  - {type: implement, after: [1]}\nfeedback:\n  - implement-feedback\nflows:\n  2:\n    id: wf-impl\n    name: 実装の手順\n    version: 1.0.0\n    nodes:\n      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}\n      - {id: p, type: prompt, name: 実装, position: {x: 260, y: 0}, data: {prompt: 先にテスト}}\n      - {id: e, type: end, name: 終了, position: {x: 520, y: 0}, data: {}}\n    connections:\n      - {id: c1, from: s, to: p, fromPort: output, toPort: input}\n      - {id: c2, from: p, to: e, fromPort: output, toPort: input}\n"
    },
    {
     "name": "research",

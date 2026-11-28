@@ -27,6 +27,7 @@ import { Code } from "../shared/Code.js";
 import { layerLabel } from "./text.js";
 import { moveByKey, useDocumentKeys } from "../shared/keys.js";
 import { graphMaximized } from "../shared/Maximize.js";
+import { EditorBar, EditorState } from "../shared/EditorBar.js";
 
 /** 直して読ませるまでの待ち（ミリ秒）。打つたびに実行ファイルを呼ばない */
 const CHECK_DELAY_MS = 300;
@@ -286,25 +287,46 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
   return (
     <section className="tpl-edit" data-role="edit" data-name={tpl.name} data-layer={opened.layer}>
       <div className="tpl-edit-head">
-        <h2>
-          テンプレートを編集 <span className="mono">{tpl.name}</span> <span className="tag">{layerLabel(opened.layer)}</span>{" "}
-          {created && <span className="tag">新規（まだ保存していません）</span>}
-          {dirty && !created && <span className="tag warn" data-role="dirty">未保存</span>}
-        </h2>
-        <div className="controls">
-          <button type="button" className="action" data-action="undo-edit" disabled={busy || !canUndo(history)} title="元に戻す" onClick={() => travel(undo(history, tpl))}>
-            元に戻す
-          </button>
-          <button type="button" className="action" data-action="redo-edit" disabled={busy || !canRedo(history)} title="やり直す" onClick={() => travel(redo(history, tpl))}>
-            やり直す
-          </button>
-          <button type="button" className="action primary" data-action="save-edit" disabled={saveBlocker !== ""} title={saveTitle(saveBlocker)} onClick={save}>
-            保存
-          </button>
-          <button type="button" className="action" data-action="close-edit" disabled={busy} onClick={close}>
-            閉じる
-          </button>
-        </div>
+        <EditorBar
+          name={
+            <h2>
+              テンプレートを編集 <span className="mono">{tpl.name}</span> <span className="tag">{layerLabel(opened.layer)}</span>
+            </h2>
+          }
+          states={
+            <>
+              <EditorState shown={created} tone="info" role="created">
+                新規（まだ保存していません）
+              </EditorState>
+              <EditorState shown={dirty && !created} tone="dirty" role="dirty">
+                未保存
+              </EditorState>
+              <EditorState shown={lock.locked} tone="warn" role="save-locked" title={lock.reason}>
+                保存できません
+              </EditorState>
+            </>
+          }
+          history={
+            <>
+              <button type="button" className="action" data-action="undo-edit" disabled={busy || !canUndo(history)} title="元に戻す" onClick={() => travel(undo(history, tpl))}>
+                元に戻す
+              </button>
+              <button type="button" className="action" data-action="redo-edit" disabled={busy || !canRedo(history)} title="やり直す" onClick={() => travel(redo(history, tpl))}>
+                やり直す
+              </button>
+            </>
+          }
+          aux={
+            <button type="button" className="action" data-action="close-edit" disabled={busy} onClick={close}>
+              閉じる
+            </button>
+          }
+          primary={
+            <button type="button" className="action primary" data-action="save-edit" disabled={saveBlocker !== ""} title={saveTitle(saveBlocker)} onClick={save}>
+              保存
+            </button>
+          }
+        />
       </div>
       {lock.locked && (
         <div className="banner warn" role="status" data-role="edit-lock">

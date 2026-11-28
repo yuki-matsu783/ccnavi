@@ -16,7 +16,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 )
 
-// フィードバック計画・Draft を外す（ready）・早めに閉じる（close-early）。
+// フィードバック計画・Draft を外す（ready）・早めにクローズする（close-early）。
 
 // reviewedFamily は設計 1 つの親を、フェーズ 1 のレビューが済み、フィードバック計画だけが残る所まで進める。
 // レビューの取得結果の見本を返す。
@@ -42,7 +42,7 @@ func TestTheFeedbackPlanComesAfterTheLastReviewAndOnlyOnce(t *testing.T) {
 	// 早すぎる改版は拒む。
 	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: noFeedback}))
 	early := w.approve()
-	if early.Code == 0 || !strings.Contains(early.Stderr, "全部閉じてレビューが済んでから") {
+	if early.Code == 0 || !strings.Contains(early.Stderr, "全部クローズしてレビューが済んでから") {
 		t.Errorf("早すぎる改版が止まらない: code %d\n%s", early.Code, early.Stderr)
 	}
 	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{}))
@@ -61,11 +61,11 @@ func TestTheFeedbackPlanComesAfterTheLastReviewAndOnlyOnce(t *testing.T) {
 	w.wantBoard(1, true, true, "requested")
 	w.mustOK(w.confirm(fixture, 1), "confirm")
 	w.wantBoard(1, false, false, "requested", "reviewed")
-	// 親はまだ閉じられない。
+	// 親はまだクローズできない。
 	w.startParent()
 	refused := w.closeChild(parentName)
 	if refused.Code == 0 || !strings.Contains(refused.Stderr, "フィードバック計画がまだ") {
-		t.Errorf("フィードバック計画が無いのに親を閉じられる: code %d\n%s", refused.Code, refused.Stderr)
+		t.Errorf("フィードバック計画が無いのに親をクローズできる: code %d\n%s", refused.Code, refused.Stderr)
 	}
 	// 空のフィードバック計画を改版で出す（承認済みチケットは doing/ に在ってエージェントは書けないので、提案を todo/ に書く）。
 	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: noFeedback}))
@@ -87,7 +87,7 @@ func TestTheFeedbackPlanComesAfterTheLastReviewAndOnlyOnce(t *testing.T) {
 		t.Errorf("2 度目のフィードバック計画が止まらない: code %d\n%s", again.Code, again.Stderr)
 	}
 	remove(t, w.todo(parentName))
-	// 閉じられる。
+	// クローズできる。
 	w.mustClose(parentName)
 }
 
@@ -198,13 +198,13 @@ func TestCheckStopsReviewConfirmAndReadyWithoutWriting(t *testing.T) {
 	}
 }
 
-// closedFamily は親を閉じて push し、ready を打てる形にする。取得結果の見本を返す。
+// closedFamily は親をクローズして push し、ready を打てる形にする。取得結果の見本を返す。
 func (w *ws) closedFamily() string {
 	fixture, _ := w.closedFamilyWith(nil)
 	return fixture
 }
 
-// closedFamilyWith は beforeClose があれば、親を閉じる直前に呼ぶ。親の finish の結果も返す。
+// closedFamilyWith は beforeClose があれば、親をクローズする直前に呼ぶ。親の finish の結果も返す。
 func (w *ws) closedFamilyWith(beforeClose func()) (string, run.Result) {
 	w.t.Helper()
 	w.family(planOf("design"))
@@ -254,7 +254,7 @@ func splitLines(s string) []string {
 
 func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	t.Parallel()
-	// Draft を外せるのは、親を閉じられる状態と同じ。閉じたあとでも打てる。
+	// Draft を外せるのは、親をクローズできる状態と同じ。クローズしたあとでも打てる。
 	w := newWS(t)
 	w.family(planOf("design"))
 	w.propose("i0001-01-01", childText("i0001-01-01", 1, "wip/design/*"))
@@ -280,21 +280,21 @@ func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	w.startParent()
 	w.propose(parentName, w.parent(planOf("design"), samples.ParentOpts{Feedback: noFeedback}))
 	w.mustApprove()
-	// 閉じられる状態になった。wip/ が追跡されていても、それは ready が消すので止めない。
+	// クローズできる状態になった。wip/ が追跡されていても、それは ready が消すので止めない。
 	refused = w.ready(fixture)
 	if refused.Code == 0 {
-		t.Error("閉じる前に Draft を外せた")
+		t.Error("クローズする前に Draft を外せた")
 	}
 	lacks(t, "stderr", refused.Stderr, "`wip/` に追跡されているファイル")
 	tracked := strings.Fields(w.git(w.parentTree, "ls-files", "--", "wip"))
 	if len(tracked) == 0 {
 		t.Fatal("wip/ に追跡されたファイルが無い")
 	}
-	// 親を閉じる。案内は「push して ready」。wip/ を消す手順（rm -r wip）は案内しない。
+	// 親をクローズする。案内は「push して ready」。wip/ を消す手順（rm -r wip）は案内しない。
 	closed := w.mustOK(w.ccnavi("ticket", "finish", parentName), "finish parent")
 	lacks(t, "finish", closed.Stdout, "rm -r wip")
 	contains(t, "finish", closed.Stdout, "ready", "`wip/` の追跡済みのファイルを削除して", "ready --parent i0001", "合意した範囲に入る", "確認を取り直さずに進める", "squash")
-	// 閉じた記録（どのフェーズをどこで見たか）を置く。
+	// クローズした記録（どのフェーズをどこで見たか）を置く。
 	record := ticketkit.ReadJSON(t, filepath.Join(w.approved, "phases", parentName, "closed.json"))
 	if reviews, _ := record["reviews"].(map[string]any); len(reviews) != 1 || reviews["1"] != true {
 		t.Errorf("closed.json の reviews = %v", record["reviews"])
@@ -352,7 +352,7 @@ func TestReadyNeedsTheParentToBeClosable(t *testing.T) {
 	if ticketkit.Exists(filepath.Join(w.parentTree, "wip")) {
 		t.Error("wip/ が残っている")
 	}
-	// マーカーは閉じたチケットと一緒に手元の退避（logs/archive/）へ移る
+	// マーカーはクローズしたチケットと一緒に手元の退避（logs/archive/）へ移る
 	mark := ticketkit.ReadJSON(t, filepath.Join(w.root, "logs", "archive", "self", "phases", parentName, "ready.json"))
 	if mark["mr"] != float64(7) {
 		t.Errorf("ready.json の mr = %v", mark["mr"])
@@ -405,18 +405,18 @@ func (w *ws) closeEarly(fixture, reason, answer string) (code int, stdout, stder
 
 func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 	t.Parallel()
-	// ユーザが「キリの良いところ」と早めに閉じる。残りは取り消し・省略・受け入れになり、issue に書き出される。
+	// ユーザが「キリの良いところ」と早めにクローズする。残りは取り消し・省略・受け入れになり、issue に書き出される。
 	w := newWS(t)
 	w.family(planOf("research", "design", "acceptance", "implement"))
 	w.propose("i0001-01-01", childReview("i0001-01-01", 1, samples.Off, "wip/research/*"))
 	w.commitParent()
 	w.mustApprove()
 	w.runChild("i0001-01-01", file{"wip/research/summary.md", "s\n"})
-	// 作業中の子がいる間は早めに閉じられない。
+	// 作業中の子がいる間は早めにクローズできない。
 	fixture := w.remote()
 	code, _, stderr := w.closeEarly(fixture, "ここまでで十分", "y")
 	if code == 0 || !strings.Contains(stderr, "作業中の子") {
-		t.Errorf("作業中の子がいるのに早めに閉じられる: code %d\n%s", code, stderr)
+		t.Errorf("作業中の子がいるのに早めにクローズできる: code %d\n%s", code, stderr)
 	}
 	w.mustClose("i0001-01-01")
 	w.commitParent("close 01")
@@ -431,18 +431,18 @@ func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 	// n なら何も変わらない。
 	code, stdout, _ := w.closeEarly(fixture, "ここまでで十分", "n")
 	if code == 0 {
-		t.Error("n と答えたのに早めに閉じた")
+		t.Error("n と答えたのに早めにクローズした")
 	}
 	contains(t, "承認画面", stdout, "i0001-02-02", "実装とテスト", "フィードバック計画", "u/7#t0")
 	if !w.isApproved("i0001-02-02") {
 		t.Error("n なのに子が動いた")
 	}
-	// y で早めに閉じる。
+	// y で早めにクローズする。
 	code, stdout, stderr = w.closeEarly(fixture, "今期はここまで", "y")
 	if code != 0 {
 		t.Fatalf("code %d\n%s%s", code, stdout, stderr)
 	}
-	contains(t, "stdout", stdout, "早めに閉じた")
+	contains(t, "stdout", stdout, "早めにクローズした")
 	cancelled := filepath.Join(w.approved, "done", "i0001-02-02.md")
 	if !ticketkit.Exists(cancelled) {
 		t.Fatal("取り消した子が done/ に無い")
@@ -476,7 +476,7 @@ func TestCloseEarlyClosesEarlyAndFilesTheRest(t *testing.T) {
 		t.Fatalf("打ち直し: code %d\n%s%s", code, stdout, stderr)
 	}
 	w.noSkipMarks(2, 3, 4)
-	// 早めに閉じたので、フィードバック計画が無くても親を閉じられる。
+	// 早めにクローズしたので、フィードバック計画が無くても親をクローズできる。
 	contains(t, "--explain", w.ccnavi("--explain").Stdout, "ユーザが早めにクローズした")
 	w.mustOK(w.ccnavi("ticket", "finish", parentName), "finish parent")
 	// Draft はまだ外れていない。片付けて push してから ready で外す。
@@ -543,7 +543,7 @@ func TestCloseEarlyAcceptsThreadsInThreeStages(t *testing.T) {
 		t.Fatalf("計画の threads = %v", body["threads"])
 	}
 	reply := threads[0].(map[string]any)["reply"].(string)
-	contains(t, "返信", reply, "早めに閉じた", "issue の下書き")
+	contains(t, "返信", reply, "早めにクローズした", "issue の下書き")
 	if ticketkit.Exists(marker) {
 		t.Error("計画だけの段でマーカーを置いた")
 	}

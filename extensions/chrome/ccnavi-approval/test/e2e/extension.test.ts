@@ -326,10 +326,10 @@ test("CX-T159 セルフホストの GitLab（足した通信先）: 登録して
   await page.close();
 });
 
-test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（feature-<番号>-<slug>）の親のブランチを統合先の先頭に作る。閉じた識別子の issue は作らない", async () => {
+test("CX-T160 「始める」: ボードで issue を読み、押すと issue から決めた名前（feature-<番号>-<slug>）の親のブランチを統合先の先頭に作る。クローズした識別子の issue は作らない", async () => {
   lab.issues.push({ number: 12, title: "新しい機能" }, { number: 5, title: "Closed" });
   const closedText = lab.files("main")[".ccnavi/approved/done/i0005.md"].replaceAll("i0005", "feature-5-closed");
-  lab.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "閉じた親子のチケット");
+  lab.push("main", { ".ccnavi/approved/done/feature-5-closed.md": closedText }, "クローズした親子のチケット");
   const page = await openBoard();
   await page.click(`${GL_REPO} [data-testid=start] button[data-action=issues]`);
   await page.waitForSelector(`${GL_REPO} [data-testid=start] li[data-issue="12"]`);

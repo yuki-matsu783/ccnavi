@@ -136,7 +136,7 @@ func ToReview(approvedDir, treeRoot, ticketsRel, id string) string {
 }
 
 // moveFile はチケットを置き場から置き場へ動かす。動かせなければ理由。行き先に同じ名前が既に在れば動かさない
-// （黙って上書きすると、閉じた側の記録が消える）。またぐときのコピーと戻しは fsio.Move が受け持つ。
+// （黙って上書きすると、クローズした側の記録が消える）。またぐときのコピーと戻しは fsio.Move が受け持つ。
 func moveFile(source, target string) string {
 	if fsio.Exists(target) {
 		return "チケットを動かせない (" + source + " → " + target + ": 移動先に既にある)"
@@ -190,7 +190,7 @@ func writeSettledBy(path, by string) string {
 }
 
 // NextChildID は、この親のこのフェーズの次の子の識別子を返す。
-// どの置き場にある同じフェーズの子よりも後ろの連番にする。手元の退避にある子も数える（閉じた子の連番を使い回さない）。
+// どの置き場にある同じフェーズの子よりも後ろの連番にする。手元の退避にある子も数える（クローズした子の連番を使い回さない）。
 // 退避の親は、大文字小文字を区別せずに比べる。
 // フェーズ番号か連番が 2 桁に収まらなければ error を返し、呼び手は何も書かずに止まる。
 func NextChildID(conf *config.Settings, root, parentID string, phase int) (string, error) {

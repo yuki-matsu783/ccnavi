@@ -74,7 +74,7 @@ func CommonPhases(conf *config.Settings) []rules.Problem {
 }
 
 // CommonRisk は共通設定の配点が読めるか（無いのは不備ではない。組み込みの配点）。script: が指す先が在る
-// ことも見る（走らせるときは重いほうになるが、そこで気づくのは子を閉じる時点になる）。
+// ことも見る（走らせるときは重いほうになるが、そこで気づくのは子をクローズする時点になる）。
 func CommonRisk(conf *config.Settings, root string) []rules.Problem {
 	if conf.Risk == "" {
 		return nil

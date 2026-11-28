@@ -10,7 +10,7 @@ import (
 )
 
 const msgCloseNotice = "テンプレートにするなら、`ready` の前に `" + config.Launcher + " --templates --draft %s` で下書きを作る" +
-	"（ready で閉じると下書きの材料は退避されて拾えない）。" +
+	"（ready でクローズすると下書きの材料は退避されて拾えない）。" +
 	"下書きはユーザが `ccnavi-user-handoff.sh --root %s` で取り込むか、削除してから ready\n"
 
 // sameShape は計画の形（全体計画とフィードバック計画のステップ）が同じか。取り込み済みかを見るときの比べ方で、
@@ -19,9 +19,9 @@ func sameShape(a, b *templates.Template) bool {
 	return slices.EqualFunc(a.Plan, b.Plan, templates.Item.Equal) && slices.EqualFunc(a.Feedback, b.Feedback, templates.Item.Equal)
 }
 
-// CloseNotice は親が閉じたときに出す、テンプレート化の案内 1 行（末尾の改行つき）。出さないときは空。
+// CloseNotice は親がクローズしたときに出す、テンプレート化の案内 1 行（末尾の改行つき）。出さないときは空。
 // 出すのは、完了した親（done/）が計画を持ち、その識別子の下書きがまだ無く、同じ計画の形のテンプレートが
-// 取り込まれていないときだけ。ready で閉じると材料（done/ と flows/）は退避されて拾えなくなるので、ready の前に出す。
+// 取り込まれていないときだけ。ready でクローズすると材料（done/ と flows/）は退避されて拾えなくなるので、ready の前に出す。
 // 読めなければ出さない。
 func CloseNotice(conf *config.Settings, root, parent string) string {
 	found, children, _ := findParent(conf, root, parent)

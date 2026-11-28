@@ -31,7 +31,7 @@ func TestACleanChildWithCommitsIsAskedToFinishOnce(t *testing.T) {
 	ticketkit.Has(t, reason, "コミットが 1 件")
 	// 連鎖の 2 回目（Stop の hook が続けさせた後）は促さない。
 	quiet(t, stop(tr, tree, stopOpts{Active: true}), codeFinish)
-	// 閉じれば促さない。
+	// クローズすれば促さない。
 	ticketkit.OK(t, tr.Ccnavi("ticket", "finish", childName))
 	quiet(t, stop(tr, tree), codeFinish)
 }
@@ -131,7 +131,7 @@ func TestAFinishNudgeIsNotGivenWhenTheWorkIsNotDone(t *testing.T) {
 			commitWork(tr, loose, "src/a/work.py")
 			return tr, loose
 		}},
-		// 信頼できない承認済みチケット（親が閉じている）には終わりを勧めない。
+		// 信頼できない承認済みチケット（親がクローズしている）には終わりを勧めない。
 		{"a_blocked_ticket", true, func(t *testing.T) (*ticketkit.Tree, string) {
 			tr, tree := familyWithCommit(t)
 			if err := mkdirRename(tr.ApprovedPath("doing", "i0001"), tr.ApprovedPath("done", "i0001")); err != nil {
