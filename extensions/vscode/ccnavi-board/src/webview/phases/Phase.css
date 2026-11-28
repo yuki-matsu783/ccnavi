@@ -7,10 +7,10 @@
 /* 狭いときは3行。1行目 = 開閉、id、kind、review。2行目 = title。3行目 = scope */
 @media (max-width: 520px) {
   .phase .row-head { grid-template-columns: 18px minmax(0, 1fr) max-content max-content; }
-  .phase .sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
-  .phase .sum > .clip.mono { grid-row: 3; grid-column: 2 / -1; }
+  .phase .row-sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
+  .phase .row-sum > .clip.mono { grid-row: 3; grid-column: 2 / -1; }
 }
-.sum .tag.work { color: var(--vscode-descriptionForeground); }
-.sum .tag.feedback { color: var(--info-text); }
+.row-sum .tag.work { color: var(--vscode-descriptionForeground); }
+.row-sum .tag.feedback { color: var(--info-text); }
 /* 選択肢の文が長いので、狭い幅では枠に収める */
 select.f-scope { max-width: 100%; min-width: 0; }

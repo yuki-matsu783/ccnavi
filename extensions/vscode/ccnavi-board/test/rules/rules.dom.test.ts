@@ -97,7 +97,7 @@ test("CB-D08 idを打っている途中はstateを書き直さず、確定（cha
     dom.change(dom.one(`${rowSelector("git-push-2")} input.f-id`));
     await dom.settle();
     assert.deepEqual((dom.state() as { open: string[] }).open, ["git-push-2"]);
-    assert.equal(dom.one(`${rowSelector("git-push-2")} .sum .sum-id`).textContent, "git-push-2");
+    assert.equal(dom.one(`${rowSelector("git-push-2")} .row-sum .sum-id`).textContent, "git-push-2");
   } finally {
     await dom.close();
   }
@@ -269,7 +269,7 @@ test("CB-D05 ツールの選択肢で選ぶと、欄と行の要約が同じ操�
     dom.click(dom.one(`${rowSelector("no-rm")} .picker input[value="Write"]`));
     await dom.settle();
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("no-rm")} input.f-match`).value, "Bash|Write");
-    assert.equal(dom.one(`${rowSelector("no-rm")} .sum .mono`).textContent, "Bash|Write");
+    assert.equal(dom.one(`${rowSelector("no-rm")} .row-sum .mono`).textContent, "Bash|Write");
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled, "編集したので保存できる");
   } finally {
     await dom.close();
@@ -331,8 +331,8 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
   const dom = await openRules();
   try {
     // 読んだ刻みは折りたたんだままでも見える。刻みが無い行はバッジを出さない（枠だけ置く）
-    assert.equal(dom.one(`${rowSelector("no-rm")} .sum .sum-every`).textContent, "4回ごと");
-    assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "");
+    assert.equal(dom.one(`${rowSelector("no-rm")} .row-sum .sum-every`).textContent, "4回ごと");
+    assert.equal(dom.one(`${rowSelector("git-push")} .row-sum .sum-every`).textContent, "");
     // 刻みだけを直す。欄は「コンテキストの追加」の中にあり、刻みがあれば最初から開いている
     assert.ok(!dom.one(`${rowSelector("git-push")} details.more`).hasAttribute("open"));
     dom.click(dom.one(`${rowSelector("git-push")} .row-head`));
@@ -340,7 +340,7 @@ test("CB-D0c 刻みは畳んだ行のバッジに出る。欄に打てばバッ�
     assert.equal(dom.one<HTMLInputElement>(`${rowSelector("git-push")} input.f-every`).value, "");
     dom.type(dom.one(`${rowSelector("git-push")} input.f-every`), "3");
     await dom.settle();
-    assert.equal(dom.one(`${rowSelector("git-push")} .sum .sum-every`).textContent, "3回ごと");
+    assert.equal(dom.one(`${rowSelector("git-push")} .row-sum .sum-every`).textContent, "3回ごと");
     // 読めない値も打てる。画面は直さず、そのまま送る（止めるのは保存前の --lint）
     dom.type(dom.one(`${rowSelector("no-rm")} input.f-every`), "x");
     await dom.settle();

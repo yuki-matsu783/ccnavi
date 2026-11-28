@@ -112,7 +112,7 @@ export function Rule(props: RuleProps): JSX.Element {
         <button type="button" className="twist" title="このルールを開く／畳む" aria-expanded={props.open}>
           {props.open ? "▾" : "▸"}
         </button>
-        <span className="sum">
+        <span className="row-sum">
           {/* idは長いと列の幅で切れるので、全体はtitleで見せる */}
           <span className={rule.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(rule)}>
             {summaryId(rule)}

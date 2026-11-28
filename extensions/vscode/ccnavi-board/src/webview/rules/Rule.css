@@ -7,10 +7,10 @@
 /* 狭いときは2行。1行目 = 開閉、id、match、every、コンテキスト。2行目 = パターンとメッセージ */
 @media (max-width: 520px) {
   .rule .row-head { grid-template-columns: 18px minmax(0, 1fr) minmax(0, 1fr) max-content 14px; }
-  .rule .sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
+  .rule .row-sum > .clip:not(.mono) { grid-row: 2; grid-column: 2 / -1; }
 }
 /* 刻みのバッジ。刻みが無い行でも空の枠を置く（置かないと右端の●が1列ずれる） */
-.sum .sum-every { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+.row-sum .sum-every { color: var(--vscode-descriptionForeground); white-space: nowrap; }
 .field > input.f-every { max-width: 110px; }
 .rule.hit .row-head { box-shadow: inset 3px 0 0 var(--vscode-focusBorder); }
 select.f-section { max-width: 120px; }
@@ -37,5 +37,5 @@ select.f-section { max-width: 120px; }
 .rule .stale code { margin: 0 6px; }
 .rule .pattern { font-family: var(--vscode-editor-font-family); }
 /* 組み合わせ条件を1行に縮めたもの。誤りがあれば件数を添える（色だけに頼らず文で言う） */
-.sum .sum-when { font-family: var(--vscode-editor-font-family); }
-.sum .sum-when-error { color: var(--error-text); }
+.row-sum .sum-when { font-family: var(--vscode-editor-font-family); }
+.row-sum .sum-when-error { color: var(--error-text); }

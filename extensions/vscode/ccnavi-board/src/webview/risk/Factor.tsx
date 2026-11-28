@@ -83,7 +83,7 @@ export function Factor(props: FactorProps): JSX.Element {
         <button type="button" className="twist" title="この項目を開く／畳む" aria-expanded={props.open}>
           {props.open ? "▾" : "▸"}
         </button>
-        <span className="sum">
+        <span className="row-sum">
           <span className={factor.id === "" ? "sum-id dim" : "sum-id"} title={summaryId(factor)}>
             {summaryId(factor)}
           </span>
