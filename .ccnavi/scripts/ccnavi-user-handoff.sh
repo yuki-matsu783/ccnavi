@@ -49,5 +49,4 @@ root=$(ccnavi_workspace_anywhere) || ccnavi_no_workspace ccnavi-user-handoff
 if bin=$(ccnavi_bin "$root"); then
 	exec "$bin" ${exe_root:+--root "$exe_root"} --entry sh user handoff "$@"
 fi
-printf 'ccnavi-user-handoff: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-exit 2
+ccnavi_no_bin ccnavi-user-handoff

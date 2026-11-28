@@ -95,8 +95,7 @@ trap 'rm -f "$report" "$written"; exit 130' INT TERM HUP
 if ccnavi_wap_use_exe "$root"; then
 	set -- ccnavi_wap_exe --record-writes "$written" --entry sh user agree --placed-out "$report" "$@"
 else
-	printf 'ccnavi-user-agree: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-	exit 2
+	ccnavi_no_bin ccnavi-user-agree
 fi
 
 # 承認。終了コード 0 は全部通った、4 は一部だけ置いて失敗した、それ以外の非 0 は何も置かずに失敗した
