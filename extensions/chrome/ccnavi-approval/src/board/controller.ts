@@ -585,7 +585,7 @@ export function createBoardController(env: BoardEnv): BoardController {
               const before = preview.threads.find((o) => o.key === t.key && o.version === t.version);
               if (before && choices[t.key]) inherited[t.key] = choices[t.key];
             }
-            patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。変わっていない指摘の選択は引き継ぎました。新しい指摘は「${DECIDE_LABELS.fix}」になっているので、確認して選び直してください。` });
+            patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。変わっていない指摘の選択は引き継ぎました。新しい指摘は未選択なので、選び直してください。` });
           }
         } catch (err) {
           patchOf(token, { deciding: false, notice: `指摘が変わりました。読み直せませんでした：${(err as Error).message ?? String(err)}` });

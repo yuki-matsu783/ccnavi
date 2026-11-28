@@ -549,6 +549,6 @@ test("CX-T278 決める: キーが空・重複の指摘は画面を出さず読�
   h.c.actions.decideConfirm?.(b, family(), 1, { a: "keep", b: "issue" }, "v2.aaa");
   await until(() => h.c.snapshot().decide?.preview?.digest === "v2.next" && settled(h), "見せ直し");
   assert.deepEqual(h.c.snapshot().decide?.inherited, { a: "keep" });
-  assert.match(h.c.snapshot().decide?.notice ?? "", /新しい指摘は「このフェーズで直す」になっているので/);
+  assert.match(h.c.snapshot().decide?.notice ?? "", /新しい指摘は未選択なので/);
   out = { kind: "written", oid: "0123456789abcdef", reviewed: true, followup: "", issues: [] };
 });

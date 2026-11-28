@@ -390,7 +390,7 @@ function decideActions(): Actions {
 const radio = (key: string, choice: DecideChoice) => $<HTMLInputElement>(`li[data-key=${key}] input[data-choice=${choice}]`);
 const checkedOf = (key: string) => [...doc.querySelectorAll<HTMLInputElement>(`li[data-key=${key}] input`)].find((i) => i.checked)?.dataset.choice;
 
-test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定はキー→対応方針とダイジェストを渡す", async () => {
+test("CX-T270 決める画面: 既定は無く、未選択が残る間は確定が押せない。一括で全件が切り替わり、個別の選び直しが一括を上書きする。確定はキー→対応方針とダイジェストを渡す", async () => {
   decided.length = 0;
   const fakeActions = decideActions();
   const f = fake({ sections: sections(withThreads(2)), state: "done" });
@@ -401,9 +401,13 @@ test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一�
   await act(async () => $<HTMLButtonElement>("button[data-action=decide-open]").click());
   assert.deepEqual(decided, ["open i0001 1"]);
   await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2), deciding: false, notice: "" } });
-  assert.equal(checkedOf("k0"), "fix");
-  assert.equal(checkedOf("k1"), "fix");
-  assert.equal($<HTMLButtonElement>("button[data-action=decide-confirm]").disabled, false);
+  assert.equal(checkedOf("k0"), undefined);
+  assert.equal(checkedOf("k1"), undefined);
+  assert.equal($<HTMLButtonElement>("button[data-action=decide-confirm]").disabled, true);
+  assert.match($("[data-unselected]").textContent ?? "", /未選択の指摘が 2 件/);
+  await act(async () => radio("k0", "fix").click());
+  assert.match($("[data-unselected]").textContent ?? "", /未選択の指摘が 1 件/);
+  assert.equal($<HTMLButtonElement>("button[data-action=decide-confirm]").disabled, true);
   // 本文は消毒して描く（script は残らない）。1 行目＋全文の details。http(s) 以外の URL はリンクにしない
   assert.equal(doc.querySelectorAll(".decide script").length, 0);
   assert.ok(doc.querySelector("li[data-key=k0] details summary"));
@@ -412,6 +416,8 @@ test("CX-T270 決める画面: 既定は全件 fix で確定が押せる。一�
   // 一括
   await act(async () => $<HTMLButtonElement>("button[data-bulk=issue]").click());
   assert.deepEqual([checkedOf("k0"), checkedOf("k1")], ["issue", "issue"]);
+  assert.equal(doc.querySelector("[data-unselected]"), null);
+  assert.equal($<HTMLButtonElement>("button[data-action=decide-confirm]").disabled, false);
   // 個別の選び直しが一括を上書きする
   await act(async () => radio("k1", "keep").click());
   assert.deepEqual([checkedOf("k0"), checkedOf("k1")], ["issue", "keep"]);
@@ -433,7 +439,7 @@ test("CX-T271 決める画面: 見せ直す（ダイジェストが変わる）�
   assert.equal(checkedOf("k0"), "keep");
   // 見せ直した
   await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { digest: "v2.bbb" }), deciding: false, notice: "指摘が変わりました" } });
-  assert.equal(checkedOf("k0"), "fix");
+  assert.equal(checkedOf("k0"), undefined);
   assert.match($(".decide .notice").textContent ?? "", /指摘が変わりました/);
   // 確定中
   await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { digest: "v2.bbb" }), deciding: true, notice: "" } });
@@ -441,6 +447,17 @@ test("CX-T271 決める画面: 見せ直す（ダイジェストが変わる）�
   // 1 件
   await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(1), deciding: false, notice: "" } });
   assert.equal(doc.querySelector(".decide-bulk"), null);
+});
+
+test("CX-T271b 決める画面: 見せ直したときは引き継いだ選択だけが入り、残りは未選択で確定が押せない", async () => {
+  decided.length = 0;
+  const f = fake({ sections: sections(withThreads(2)), state: "done", decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2), deciding: false, notice: "" } });
+  (f.controller as { actions: Actions }).actions = decideActions();
+  await mountOn(f.controller);
+  await f.set({ decide: { repo: KEY, token: 1, family: "i0001", phase: 1, preview: preview(2, { digest: "v2.ccc" }), inherited: { k0: "keep" }, deciding: false, notice: "指摘が変わりました" } });
+  assert.equal(checkedOf("k0"), "keep");
+  assert.equal(checkedOf("k1"), undefined);
+  assert.equal($<HTMLButtonElement>("button[data-action=decide-confirm]").disabled, true);
 });
 
 test("CX-T272 決める画面: 扱えない指摘は選択肢を出さず理由を言い、確定を出さない。0 件は「レビュー済みにする」", async () => {

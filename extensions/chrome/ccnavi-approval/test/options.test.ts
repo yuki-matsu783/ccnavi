@@ -102,6 +102,10 @@ before(async () => {
   for (const name of ["window", "document", "navigator", "FormData", "Event", "EventTarget", "MutationObserver"]) {
     install(name, win[name]);
   }
+  (dom.window as unknown as { confirm: (m: string) => boolean }).confirm = (message) => {
+    confirms.push(message);
+    return answer.ok;
+  };
   install("chrome", chromeStub);
   install("__CCNAVI_HOSTS__", HOSTS);
   // React の act を試験で使う
@@ -117,7 +121,12 @@ after(() => {
   dom.window.close();
 });
 
+const confirms: string[] = [];
+const answer = { ok: true };
+
 beforeEach(() => {
+  confirms.length = 0;
+  answer.ok = true;
   for (const k of Object.keys(storage)) delete storage[k];
   tokens.clear();
   metas.clear();
@@ -383,6 +392,13 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   );
   assert.ok(sent.filter((m) => m.kind !== "token.set").every((m) => !JSON.stringify(m).includes(TOKEN)));
 
+  // 消す: 確認で断ると何もしない
+  answer.ok = false;
+  await click("#token-clear");
+  assert.deepEqual(confirms, ["gitlab.com の保存済み PAT をこのブラウザから削除します。削除しますか？"]);
+  assert.equal(sent.some((m) => m.kind === "token.clear"), false);
+  assert.deepEqual([...tokens.keys()].sort(), ["github.com", "gitlab.com"]);
+  answer.ok = true;
   // 消す: 選んだホストだけ
   await click("#token-clear");
   assert.equal(text("#token-msg"), "gitlab.com の PAT を削除しました。ホスト側でも失効させてください。");
@@ -486,6 +502,12 @@ test("CX-T240 設定画面の通信先: localhost:8080 の GitLab を許可を�
   $<HTMLInputElement>("#token-value").value = TOKEN;
   await submitToken();
   assert.equal(tokens.get("localhost_8080_http"), TOKEN);
+  answer.ok = false;
+  await click("#host-list button");
+  assert.deepEqual(confirms, ["localhost_8080_http と、このブラウザに保存されている PAT を削除します。削除しますか？"]);
+  assert.equal(tokens.get("localhost_8080_http"), TOKEN);
+  assert.equal(permissionCalls.some((c) => c.op === "remove"), false);
+  answer.ok = true;
   await click("#host-list button");
   assert.equal(tokens.has("localhost_8080_http"), false);
   assert.deepEqual(storage.customHosts, []);

@@ -71,6 +71,7 @@ export function Tokens({ revision }: { readonly revision: number }): JSX.Element
 
   const clear = async (): Promise<void> => {
     const host = hostRef.current?.value ?? "";
+    if (!window.confirm(`${host} の保存済み PAT をこのブラウザから削除します。削除しますか？`)) return;
     const res = await ask({ kind: "token.clear", host });
     setSaid({ text: res.ok ? `${host} の PAT を削除しました。ホスト側でも失効させてください。` : res.error, ok: res.ok });
     await reload();

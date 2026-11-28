@@ -71,6 +71,7 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       setSaid({ text: `${h.id} にリポジトリが登録されています。先にリポジトリの登録を削除してから、ホストを削除してください。`, ok: false });
       return;
     }
+    if (!window.confirm(`${h.id} と、このブラウザに保存されている PAT を削除します。削除しますか？`)) return;
     try {
       // PAT を先に消す。ホストを外したあとは、そのホストの PAT を使う頼みが届かなくなるため
       const cleared = await ask({ kind: "token.clear", host: h.id });

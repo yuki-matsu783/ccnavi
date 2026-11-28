@@ -1,7 +1,7 @@
 /**
  * 残った指摘の対応方針を決める画面（`div.decide`）。レビューの欄（`Review.tsx`）の中に表示する。
  *
- * - 指摘を 1 件ずつ並べ、対応方針（対応しない・このフェーズで直す・issue に回す）を選ばせる。何も選ばなければ、全件を「このフェーズで直す」とする。
+ * - 指摘を 1 件ずつ並べ、対応方針（対応しない・このフェーズで直す・issue に回す）を選ばせる。既定の選択は無い。1 件でも選んでいない指摘があるあいだは、確定のボタンを押せず、選んでいない件数を出す。
  * - 2 件以上あるときは、全件を同じ対応方針にする小さな行を出す。個別の選び直しは、そのあとでもできる。
  * - 解決できない指摘、Chrome で扱えない指摘（`unsupported`）は、選択肢を出さずに理由を出す。1 件でもあれば、確定のボタンは出さない。
  * - 指摘が 0 件のときは、押すとレビュー済みになるだけ。
@@ -16,8 +16,6 @@ import { DECIDE_CHOICES, DECIDE_LABELS, type DecideChoice, type DecidePreview } 
 import { ALLOWED_URI } from "../core/sanitize.js";
 import { Markdown } from "./Markdown.js";
 import { BusyContext } from "./parts.js";
-
-const DEFAULT_CHOICE: DecideChoice = "fix";
 
 export interface DecideProps {
   readonly preview: DecidePreview;
@@ -35,7 +33,8 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
   const [picked, setPicked] = useState<{ readonly digest: string; readonly choices: Readonly<Record<string, DecideChoice>> }>({ digest: preview.digest, choices: {} });
   const overrides = picked.digest === preview.digest ? picked.choices : (inherited ?? {});
   const supported = preview.threads.filter((t) => !t.unsupported);
-  const choices: Record<string, DecideChoice> = Object.fromEntries(supported.map((t) => [t.key, overrides[t.key] ?? DEFAULT_CHOICE]));
+  const choices: Record<string, DecideChoice> = Object.fromEntries(supported.flatMap((t) => (overrides[t.key] ? [[t.key, overrides[t.key]]] : [])));
+  const unselected = supported.filter((t) => !choices[t.key]).length;
   const choose = (key: string, choice: DecideChoice): void => setPicked({ digest: preview.digest, choices: { ...choices, [key]: choice } });
   const chooseAll = (choice: DecideChoice): void => setPicked({ digest: preview.digest, choices: Object.fromEntries(supported.map((t) => [t.key, choice])) });
   const count = preview.threads.length;
@@ -45,6 +44,7 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
       <h5>{count === 0 ? `フェーズ ${preview.phase} に未解決の指摘はありません` : `フェーズ ${preview.phase} で未解決の指摘 ${count} 件の対応方針`}</h5>
       {notice ? <p className="notice warn" role="status">{notice}</p> : null}
       {count > 0 ? <p className="decide-note">「このフェーズで直す」を 1 件でも選ぶと、続きの子チケットを作り、このフェーズを再開します。</p> : null}
+      {unselected > 0 ? <p className="decide-note" data-unselected={unselected}>{`対応方針が未選択の指摘が ${unselected} 件あります。すべて選ぶと確定できます。`}</p> : null}
       {supported.length >= 2 && count >= 2 ? (
         <div className="decide-bulk">
           <span>すべて：</span>
@@ -90,7 +90,7 @@ export function Decide({ preview, deciding, notice, inherited, onConfirm, onCanc
       )}
       <div className="actions">
         {blocked ? null : (
-          <button type="button" className="action" data-action="decide-confirm" disabled={busy} onClick={() => onConfirm(choices, preview.digest)}>
+          <button type="button" className="action" data-action="decide-confirm" disabled={busy || unselected > 0} onClick={() => onConfirm(choices, preview.digest)}>
             {deciding ? "反映中…" : count === 0 ? `フェーズ ${preview.phase} をレビュー済みにする` : "この対応方針を確定"}
           </button>
         )}
