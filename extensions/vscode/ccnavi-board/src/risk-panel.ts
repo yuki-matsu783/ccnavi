@@ -50,8 +50,8 @@ import { riskSums, type RiskSum } from "./core/sums.js";
 import { targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
-import { binSetting, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { assertRetained, openInEditor, patternFor, resolveIn, watchPattern, workspaceFolder } from "./panel-common.js";
+import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -189,22 +189,10 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
       throw unreadableFailure({ path: riskPath, rel: riskRel }, layer.risk.unreadable);
     }
   }
-  let text: string;
-  let mtimeMs: number;
-  let exists: boolean;
-  try {
-    text = fs.readFileSync(riskPath, "utf8");
-    mtimeMs = fs.statSync(riskPath).mtimeMs;
-    exists = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`配点のファイルを読み込めません（${riskRel}）: ${(error as Error).message}`);
-    }
-    // 無いのは不備ではない（「設定が無い」正常な状態）。
-    text = "";
-    mtimeMs = 0;
-    exists = false;
-  }
+  // 無いのは不備ではない（「設定が無い」正常な状態）。
+  const read = readSettingFile(riskPath, riskRel, `${NOUN}のファイル`);
+  let text = read.text;
+  const { mtimeMs, exists } = read;
   // 共通の設定にもワークスペースの設定にも無ければ、適用されているのは組み込みの配点。共通かワークスペースの設定を開いたときだけ、
   // それを読み取り専用で見せ、「作る」で同じ値のファイルを書き出させる。もう一方が分からないとき（ボードを読めない）も組み込みを見せる。
   const builtin = !exists && (target.kind === "workspace" || target.kind === "self") && (other === undefined || !fs.existsSync(other));
@@ -218,10 +206,6 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   }
   const doc = exists || builtin ? parsed : { ...parsed, model: { ...parsed.model, problems: [] } };
   return { target, text, exists, builtin, mtimeMs, doc, file: { path: riskPath, rel: riskRel }, notices, targets, sums, handoff: HANDOFF_ENTRY };
-}
-
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
 /**
@@ -241,17 +225,6 @@ function watchFiles(current: PanelState): void {
     new vscode.RelativePattern(current.folder, ".claude/settings.local.json"),
   ];
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
-}
-
-function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
-  if (path.isAbsolute(filePath)) {
-    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
-  }
-  return new vscode.RelativePattern(folder, toGlob(filePath));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {

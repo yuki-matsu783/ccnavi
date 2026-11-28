@@ -212,6 +212,22 @@ export function targetKey(target: SettingsTarget): { kind: string; name: string 
   return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
+/**
+ * 設定ファイルを読む。無い（ENOENT）のは「設定が無い」正常な状態で、空（`exists`が偽）として返す。
+ * ほかの読めない理由は投げる。`what`は失敗の文で使うファイルの呼び名、`rel`はその場所
+ */
+export function readSettingFile(filePath: string, rel: string, what: string): { text: string; mtimeMs: number; exists: boolean } {
+  try {
+    const text = fs.readFileSync(filePath, "utf8");
+    return { text, mtimeMs: fs.statSync(filePath).mtimeMs, exists: true };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`${what}を読み込めません（${rel}）: ${(error as Error).message}`);
+    }
+    return { text: "", mtimeMs: 0, exists: false };
+  }
+}
+
 /** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
 function targetLabel(target: SettingsTarget): string {
   switch (target.kind) {
@@ -539,7 +555,8 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
       fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
       return;
     }
-    if (!screen.alive(current)) {
+    // 確かめを待つ間に、対象の切り替えや「更新」で読み込みが入れ替わっていたら、古い編集を書かない
+    if (!screen.alive(current) || stale(current, loaded, "この保存")) {
       return;
     }
 

@@ -50,8 +50,8 @@ import { HANDOFF_ENTRY } from "./handoff-entry.js";
 import type { PhasesTarget } from "./core/screens.js";
 import { targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
-import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
-import { binSetting, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { assertRetained, openInEditor, patternFor, resolveIn, watchPattern, workspaceFolder } from "./panel-common.js";
+import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
@@ -204,22 +204,8 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     target.kind === "workspace"
       ? []
       : commonPhases(board.board.sums.find((s) => s.name === (target.kind === "self" ? LAYER_SELF : target.name)));
-  let text: string;
-  let mtimeMs: number;
-  let exists: boolean;
-  try {
-    text = fs.readFileSync(phasesPath, "utf8");
-    mtimeMs = fs.statSync(phasesPath).mtimeMs;
-    exists = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズ定義のファイルを読み込めません（${phasesRel}）: ${(error as Error).message}`);
-    }
-    // 無いのは不備ではない（無い設定は空）。画面は空を見せ、定義を足して保存すればファイルが作られる。
-    text = "";
-    mtimeMs = 0;
-    exists = false;
-  }
+  // 無いのは不備ではない（無い設定は空）。画面は空を見せ、定義を足して保存すればファイルが作られる。
+  const { text, mtimeMs, exists } = readSettingFile(phasesPath, phasesRel, "フェーズ定義のファイル");
   // 無いときの苦情（versionが無い、phasesが無い）は画面に出さない。
   const parsed = readPhases(text);
   if (parsed.blocking.length > 0 && exists) {
@@ -227,10 +213,6 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   }
   const doc = exists ? parsed : { ...parsed, model: { ...parsed.model, problems: [] } };
   return { target, text, exists, mtimeMs, doc, file: { path: phasesPath, rel: phasesRel }, notices, errors, common, targets, handoff: HANDOFF_ENTRY };
-}
-
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
 /**
@@ -251,17 +233,6 @@ function watchFiles(current: PanelState): void {
     new vscode.RelativePattern(current.folder, ".claude/settings.local.json"),
   ];
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
-}
-
-function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
-  if (path.isAbsolute(filePath)) {
-    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
-  }
-  return new vscode.RelativePattern(folder, toGlob(filePath));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {

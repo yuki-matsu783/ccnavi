@@ -48,7 +48,7 @@ import { NEW_TEMPLATE_NAME_RULE, shownLayerOf, templateNameTaken, templatesLayer
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, debounce, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
+import { assertRetained, debounce, toGlob, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -297,10 +297,6 @@ function watchFiles(current: PanelState): void {
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.json"));
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.local.json"));
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {
