@@ -345,7 +345,7 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
       case "switchTarget": {
         // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない。
         // 読めていないとき（エラー画面）は、開いている対象と共通・ワークスペースだけが一覧に出ている
-        const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", targetKey(current.target))).find(
+        const option = (current.loaded?.targets ?? targetOptions(undefined, targetKey(current.target))).find(
           (t) => t.kind === message.kind && t.name === message.name,
         );
         if (option === undefined) {

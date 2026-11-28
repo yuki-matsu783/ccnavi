@@ -153,7 +153,7 @@ async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   if (!board.ok) {
     notices.push(`ccnaviから動作モードを取得できないため、denyやaskの判定でツールの実行が実際に止まるかどうかを表示していません: ${board.error}`);
   }
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
+  const targets = targetOptions(board.ok ? board.board : undefined, targetKey(target));
   if (target.kind === "workspace") {
     // 共通設定の場所は`.ccnavi/config/common/`固定。env（`CCNAVI_RULES`など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
@@ -296,7 +296,7 @@ function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, target) });
 }
 
 /**

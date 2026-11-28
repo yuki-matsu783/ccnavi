@@ -153,7 +153,7 @@ async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   const notices: string[] = [];
   // 切り替えの一覧と統合結果のために、共通設定でも実行ファイルに聞く。読めなくても共通設定は開けるので、一覧と統合結果が縮むだけ
   const board = await loadBoard(root, binSetting());
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
+  const targets = targetOptions(board.ok ? board.board : undefined, targetKey(target));
   const sums = riskSums(board.ok ? board.board : undefined);
   let riskRel: string;
   let riskPath: string;
@@ -287,7 +287,7 @@ function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, target) });
 }
 
 /**

@@ -59,9 +59,6 @@ import { confirmDuringTurn } from "./turn-confirm.js";
 const SCREEN = "templates";
 const TITLE = "ccnaviテンプレート管理";
 
-/** 1枚の画面の「どの対象か」を画面の欄の値にコピーするための、対象の一覧の既定（共通設定の欄のkind） */
-const COMMON_KIND = "workspace";
-
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを見る */
   readonly target: SettingsTarget;
@@ -211,7 +208,7 @@ async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
     throw new Error(`チケットとワークツリーの状態をccnaviから取得できません: ${board.error}`);
   }
   const key = targetKey(target);
-  const targets = targetOptions(board.board, COMMON_KIND, key);
+  const targets = targetOptions(board.board, key);
   const result = await runTemplates(root, binSetting(), templatesLayerOf(key));
   if (!result.ok) {
     throw new Error(result.error);
@@ -329,7 +326,7 @@ function showError(current: PanelState, error: string): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, COMMON_KIND, target) });
+  current.host.send({ kind: "error", error, target, targets: targetOptions(undefined, target) });
 }
 
 
@@ -433,7 +430,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
     }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, COMMON_KIND, targetKey(current.target))).find(
+      const option = (current.loaded?.targets ?? targetOptions(undefined, targetKey(current.target))).find(
         (t) => t.kind === message.kind && t.name === message.name,
       );
       if (option === undefined) {

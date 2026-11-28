@@ -170,7 +170,7 @@ async function readPage(root: string, target: SettingsTarget): Promise<Loaded> {
   if (!board.ok) {
     throw new Error(`設定ファイルの場所をccnaviから取得できません: ${board.error}`);
   }
-  const targets = targetOptions(board.board, "workspace", targetKey(target));
+  const targets = targetOptions(board.board, targetKey(target));
   let phasesPath: string;
   let phasesRel: string;
   if (target.kind === "workspace") {
@@ -295,7 +295,7 @@ function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
   const target = targetKey(current.target);
-  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
+  current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, target) });
 }
 
 /**

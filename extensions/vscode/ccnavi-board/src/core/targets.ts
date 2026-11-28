@@ -45,7 +45,7 @@ export function openingTarget(remembered: SettingsTarget | undefined, board: Boa
     return { target: remembered ?? fallback, notice: "" };
   }
   const key = targetKey(remembered);
-  if (targetOptions(board, "workspace", targetKey(fallback)).some((o) => o.kind === key.kind && o.name === key.name)) {
+  if (targetOptions(board, targetKey(fallback)).some((o) => o.kind === key.kind && o.name === key.name)) {
     return { target: remembered, notice: "" };
   }
   return { target: fallback, notice: `${targetName(remembered)}にはこの設定が無いため、${targetName(fallback)}を開きました` };
@@ -66,12 +66,11 @@ export function targetValue(target: { readonly kind: string; readonly name: stri
 
 /**
  * 切り替えられる対象の一覧。共通、ワークスペース、設定の対象になっているプロジェクトの順。
- * `commonKind`がundefinedなら、共通設定を並べない（今はどの画面も`workspace`を渡す）。
  * 開いている対象が一覧に無ければ（ボードを読めなかったときなど）、それだけを足す。
  */
-export function targetOptions(board: BoardJson | undefined, commonKind: string | undefined, current: { readonly kind: string; readonly name: string }): TargetOption[] {
+export function targetOptions(board: BoardJson | undefined, current: { readonly kind: string; readonly name: string }): TargetOption[] {
   const options: TargetOption[] = [
-    ...(commonKind === undefined ? [] : [{ kind: commonKind, name: "", label: "共通設定" }]),
+    { kind: "workspace", name: "", label: "共通設定" },
     { kind: "self", name: "", label: "ワークスペース" },
   ];
   if (board !== undefined) {
