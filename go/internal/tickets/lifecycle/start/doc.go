@@ -11,7 +11,8 @@
 //   - list-open: open の issue・MR の一覧
 //   - pick: MR・issue の一覧や作った答えから、番号と URL を 1 つ選ぶ
 //   - route・guidance: 候補から進む道と、ホストに届かないときの案内
-//   - args: 引数の検査と、依頼のリポジトリ（--repo）と origin の照合
+//   - args: 引数の検査と、依頼のリポジトリ（--repo）と origin の照合、今いる場所のプロジェクト
+//   - api-failed: ホストの API が失敗した理由の文と、届いたうえで断られたかの分け方
 //   - branch-ok・merged・resolve・issue-state: 識別子と同じ識別子の別ブランチ、マージ済み MR、閉じる issue、closed の issue
 //   - prepare: ワークツリーの作成・早送り・空の初期コミット（積めなければ作った分を片付ける）
 //   - report・dry: 結果と --dry-run の出力

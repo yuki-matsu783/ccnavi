@@ -17,7 +17,7 @@
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --project-phases-file <名前>=<パス>`
  * （ワークスペースの設定は名前が`self`）、共通の設定は`--phases <パス>`で渡す。実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、
  * 表示名の重なり、定義の形）。
- * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う。
+ * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う（流れは`settings-panel.ts`の`save`）。
  * 作業中のチケットは、共通の設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分だけを見る
  * （定義は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
  * ファイルが無いのは「設定が無い」正常な状態で、帯は出さない。欄は触れ、検証を通った最初の保存でファイルを作る（雛形は置かない）。
@@ -35,30 +35,25 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
+import { followAppearance, readAppearance } from "./appearance.js";
+import { loadBoard, type LintOverride } from "./ccnavi.js";
 import { commonLayer, LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
-import { errorLinesOf, warnLinesOf } from "./core/lintmodel.js";
-import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
-import { asPhasesForm, readPhases, type PhasesDocument } from "./core/phases-doc.js";
+import { lockFromError } from "./core/lock.js";
+import { readPhases, asPhasesForm, type PhasesDocument } from "./core/phases-doc.js";
 import { renderPhasesPage } from "./core/phases-render.js";
-import type { CommonPhase, PhasesData, PhasesForm, PhasesMessage, ToPhases } from "./core/phases-view.js";
+import type { CommonPhase, PhasesData, PhasesMessage, ToPhases } from "./core/phases-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { commonPhases } from "./core/sums.js";
 import { showLoading } from "./loading.js";
-import type { HandoffEntry } from "./core/handoff-entry.js";
-import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
+import { HANDOFF_ENTRY } from "./handoff-entry.js";
 import type { PhasesTarget } from "./core/screens.js";
-import { targetOptions, type TargetOption } from "./core/targets.js";
+import { targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
-import { lintSummary } from "./core/lint-summary.js";
-import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
-import { settingsPanel, type SettingsState } from "./settings-panel.js";
+import { assertRetained, openInEditor, patternFor, resolveIn, watchPattern, workspaceFolder } from "./panel-common.js";
+import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
-import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
-import { confirmDuringTurn } from "./turn-confirm.js";
 
 const DEFAULT_PHASES = ".ccnavi/config/project/phases.yml";
 /** 共通の設定の定義の場所。ルール管理・リスク管理と同じく固定で、envでは動かせない */
@@ -80,55 +75,22 @@ const COMMON_HEADER = [
   "",
 ].join("\n");
 
-interface Loaded {
-  /** 読んだ対象。往復の間に切り替わったかを`stale`が見る */
-  readonly target: PhasesTarget;
+interface Loaded extends SettingsLoaded {
   /** ファイルの本文。無ければ空 */
   readonly text: string;
-  readonly exists: boolean;
-  /** 無いときは0 */
-  readonly mtimeMs: number;
   readonly doc: PhasesDocument;
-  readonly phasesPath: string;
-  /** ワークスペースルートからの相対で見せるパス */
-  readonly phasesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
-  /** 取り込み待ち画面を開けるか */
-  readonly handoff: HandoffEntry;
   /** 上部にerrorの帯で出す文。共通の設定のphases.ymlを読めない、など */
   readonly errors: readonly string[];
   /** 共通の設定の定義（読み取り専用）。実行ファイルの統合結果のうち出どころが共通のもの */
   readonly common: readonly CommonPhase[];
-  /** 切り替えられる対象（共通の設定・ワークスペース・設定のあるプロジェクト） */
-  readonly targets: readonly TargetOption[];
 }
 
-type PanelState = SettingsState<PhasesData, PhasesTarget, Loaded>;
+type PanelState = SettingsState<PhasesData, Loaded>;
 
 /** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
-
-function sameTarget(a: PhasesTarget, b: PhasesTarget): boolean {
-  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
-}
-
-/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーのdoingでも止める） */
-function projectOf(target: PhasesTarget): string | undefined {
-  return target.kind === "project" ? target.name : undefined;
-}
-
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
-function targetLabelOf(target: PhasesTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "共通の設定";
-    case "self":
-      return "ワークスペース";
-    case "project":
-      return `プロジェクト${target.name}`;
-  }
-}
 
 /** 読み込み中の一言で「何を」読んでいるか */
 function whatOf(target: PhasesTarget): string {
@@ -140,10 +102,6 @@ function whatOf(target: PhasesTarget): string {
     case "project":
       return `${target.name}のフェーズ`;
   }
-}
-
-function binSetting(): string {
-  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
 /** `ccnaviBoard.openPhases`の本体。引数なしはワークスペースの設定の定義 */
@@ -213,7 +171,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   if (!board.ok) {
     throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
   }
-  const targets = targetOptions(board.board, "workspace", currentKey(target));
+  const targets = targetOptions(board.board, "workspace", targetKey(target));
   let phasesPath: string;
   let phasesRel: string;
   if (target.kind === "workspace") {
@@ -246,33 +204,15 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
     target.kind === "workspace"
       ? []
       : commonPhases(board.board.sums.find((s) => s.name === (target.kind === "self" ? LAYER_SELF : target.name)));
-  let text: string;
-  let mtimeMs: number;
-  let exists: boolean;
-  try {
-    text = fs.readFileSync(phasesPath, "utf8");
-    mtimeMs = fs.statSync(phasesPath).mtimeMs;
-    exists = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`フェーズ定義のファイルを読み込めません（${phasesRel}）: ${(error as Error).message}`);
-    }
-    // 無いのは不備ではない（無い設定は空）。画面は空を見せ、定義を足して保存すればファイルが作られる。
-    text = "";
-    mtimeMs = 0;
-    exists = false;
-  }
+  // 無いのは不備ではない（無い設定は空）。画面は空を見せ、定義を足して保存すればファイルが作られる。
+  const { text, mtimeMs, exists } = readSettingFile(phasesPath, phasesRel, "フェーズ定義のファイル");
   // 無いときの苦情（versionが無い、phasesが無い）は画面に出さない。
   const parsed = readPhases(text);
   if (parsed.blocking.length > 0 && exists) {
     throw blockedFailure({ path: phasesPath, rel: phasesRel }, parsed.blocking);
   }
   const doc = exists ? parsed : { ...parsed, model: { ...parsed.model, problems: [] } };
-  return { target, text, exists, mtimeMs, doc, phasesPath, phasesRel, notices, errors, common, targets, handoff: HANDOFF_ENTRY };
-}
-
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+  return { target, text, exists, mtimeMs, doc, file: { path: phasesPath, rel: phasesRel }, notices, errors, common, targets, handoff: HANDOFF_ENTRY };
 }
 
 /**
@@ -286,7 +226,7 @@ function watchFiles(current: PanelState): void {
   }
   current.fileWatchers = [];
   // 読めていないときの仮の場所。共通の設定を開いているなら共通の場所を見る（読めなかった後も、その設定の変化を拾うため）
-  const phasesRel = current.loaded?.phasesRel ?? (current.target.kind === "workspace" ? DEFAULT_COMMON_PHASES : DEFAULT_PHASES);
+  const phasesRel = current.loaded?.file.rel ?? (current.target.kind === "workspace" ? DEFAULT_COMMON_PHASES : DEFAULT_PHASES);
   const patterns: vscode.RelativePattern[] = [
     patternFor(current.folder, phasesRel),
     new vscode.RelativePattern(current.folder, ".claude/settings.json"),
@@ -295,56 +235,31 @@ function watchFiles(current: PanelState): void {
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
 }
 
-function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
-  if (path.isAbsolute(filePath)) {
-    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
-  }
-  return new vscode.RelativePattern(folder, toGlob(filePath));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
-}
-
 function alive(current: PanelState): boolean {
   return state === current;
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, setDirty } = settingsPanel<PhasesData, PhasesTarget, Loaded, ToPhases>({
+const { registerPanelHandlers, scheduleChanged, reload, switchTarget, save } = settingsPanel<PhasesData, Loaded, ToPhases, PhasesMessage>({
   accepts: true,
+  screen: SCREEN,
+  title: TITLE,
+  words: { file: "フェーズ定義", content: "定義" },
   alive,
   release: (current) => {
     if (state === current) {
       state = undefined;
     }
   },
-  handleMessage: (current, message) => void handleMessage(current, asMessage(message)),
+  parse: asMessage,
+  handle,
   read: readPage,
   show,
   showError,
   watchFiles,
-  refreshLock,
   loading: (current) => ({ kind: "loading", text: loadingText(whatOf(current.target)) }),
-  sameTarget,
-  targetLabel: targetLabelOf,
-  title: TITLE,
+  override: overrideFor,
 });
-
-/**
- * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通の設定とワークスペースの設定の定義はどのツリーのdoingでも止める（プロジェクト外のチケットだけに影響するが、絞らずに止める側にする）。
- * プロジェクトの設定は、そのプロジェクトのチケットにしか足されないので、そのプロジェクトのdoingだけを見る。
- */
-async function refreshLock(current: PanelState): Promise<Lock> {
-  const result = await loadBoard(current.folder.uri.fsPath, binSetting());
-  const lock = result.ok ? lockFromBoard(result.board, projectOf(current.target)) : lockFromError(result.error);
-  if (alive(current)) {
-    current.lock = lock;
-    current.host.post({ type: "lock", lock } satisfies ToPhases);
-  }
-  return lock;
-}
 
 /**
  * いま見せるものを渡す。画面の編集はここで破棄されるので、呼ぶのはユーザが「更新」を押した
@@ -362,7 +277,7 @@ function show(current: PanelState): void {
     kind: "page",
     page: {
       root: current.folder.uri.fsPath,
-      phasesPath: loaded.phasesRel,
+      phasesPath: loaded.file.rel,
       exists: loaded.exists,
       model: loaded.doc.model,
       lock: current.lock,
@@ -370,7 +285,7 @@ function show(current: PanelState): void {
       handoff: loaded.handoff,
       errors: loaded.errors,
       common: loaded.common,
-      target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
+      target: targetKey(loaded.target),
       targets: loaded.targets,
     },
   });
@@ -380,13 +295,8 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
-  const target = currentKey(current.target);
+  const target = targetKey(current.target);
   current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
-}
-
-/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
-function currentKey(target: PhasesTarget): { kind: string; name: string } {
-  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
@@ -416,117 +326,25 @@ function phasesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<Phases
   );
 }
 
-/**
- * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
- *
- * 保存は実行ファイルへ2度出る（`--lint`と錠の取り直し）。その間にユーザが「更新」を押せば、
- * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
- * ファイルに入る。 読み直されていたら、この保存はもう無かったことにする。
- */
-function stale(current: PanelState, loaded: Loaded): boolean {
-  if (current.loaded === loaded) {
-    return false;
-  }
-  // 往復の間に別の対象へ切り替わった。破棄するのは同じだが、切り替え先の画面に前の対象の話を出さない
-  if (!sameTarget(loaded.target, current.target)) {
-    return true;
-  }
-  fail(current, "画面を更新したので、この保存は取りやめました。更新後の定義で編集し直してください");
-  return true;
-}
-
-/** 操作の結果の一言。1枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
-function fail(current: PanelState, message: string): void {
-  current.host.post({ type: "failed", message } satisfies ToPhases);
-}
-
-async function handleMessage(current: PanelState, message: PhasesMessage | undefined): Promise<void> {
-  if (message === undefined || !alive(current)) {
-    return;
-  }
-  if (message.type === "dirty") {
-    setDirty(current, message.dirty);
-    return;
-  }
-  if (message.type === "ready") {
-    // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
-    setDirty(current, false);
-    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
-    // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
-    current.host.ready();
-    redraw(current);
-    postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は定義の中身が出てから始め、閉じたら`tourDone`を返す。
-    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう1度出る
-    if (!tourSeen(SCREEN)) {
-      current.host.post({ type: "tour" } satisfies ToPhases);
-    }
-    return;
-  }
-  if (message.type === "tourDone") {
-    markTourSeen(SCREEN);
-    return;
-  }
-  // 読み直せていない画面では、定義にヒットする操作はどれも行き先が無い（「更新」は
-  // 押せるが、その経路は`reload`が読み直しからやり直す）
-  if (current.loaded === undefined && message.type !== "reload") {
-    return;
-  }
+/** この画面にだけある操作（3画面で同じものは`settings-panel.ts`が受ける） */
+async function handle(current: PanelState, loaded: Loaded, message: PhasesMessage): Promise<void> {
   switch (message.type) {
-    case "reload": {
-      if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage(
-          "未保存の変更があります。破棄して更新しますか？",
-          { modal: true },
-          "更新",
-        );
-        if (choice !== "更新") {
-          // 画面は「更新」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
-          current.host.post({ type: "cancelled" } satisfies ToPhases);
-          return;
-        }
-      }
-      await reload(current);
+    case "openFile":
+      openInEditor(loaded.file.path);
       return;
-    }
-    case "openFile": {
-      const target = current.loaded?.phasesPath ?? current.errorFile?.path;
-      if (target !== undefined) {
-        openInEditor(target);
-      }
+    case "save":
+      // ファイルを初めて作るときは、先頭に説明を置く。検証にも同じ本文を掛ける。
+      // 実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、表示名の重なり）。承認済みの計画がこの定義で読めるかもここで分かる。
+      await save(current, loaded, () => (loaded.exists ? "" : headerOf(loaded.target)) + loaded.doc.apply(message.form));
       return;
-    }
-    case "openHandoff": {
-      // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
-      await openHandoffFrom(current.loaded?.handoff, current.loaded?.target ?? current.target);
-      return;
-    }
-    case "switchTarget": {
-      // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
-      if (option === undefined) {
-        return;
-      }
-      const target: PhasesTarget =
-        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "workspace" ? { kind: "workspace" } : { kind: "self" };
-      if (!sameTarget(current.target, target)) {
-        await switchTarget(current, target);
-      }
-      return;
-    }
-    case "save": {
-      await save(current, message.form);
-      return;
-    }
   }
 }
 
-/** 保存の前の検証に渡す差し替え。共通の設定は`--phases`、ほかは名前を付けて`--project-phases-file` */
 function headerOf(target: PhasesTarget): string {
   return target.kind === "workspace" ? COMMON_HEADER : LAYER_HEADER;
 }
 
+/** 保存の前の検証に渡す差し替え。共通の設定は`--phases`、ほかは名前を付けて`--project-phases-file` */
 function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
   switch (target.kind) {
     case "workspace":
@@ -536,103 +354,6 @@ function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
     case "project":
       return { kind: "layerPhases", name: target.name, path: tmp };
   }
-}
-
-async function save(current: PanelState, form: PhasesForm): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  const root = current.folder.uri.fsPath;
-  let tmp: string;
-  let text: string;
-  try {
-    // ファイルを初めて作るときは、先頭に説明を置く。検証にも同じ本文を掛ける。
-    text = (loaded.exists ? "" : headerOf(loaded.target)) + loaded.doc.apply(form);
-    tmp = path.join(current.tmpDir, "phases.yml");
-    fs.writeFileSync(tmp, text, "utf8");
-  } catch (error) {
-    fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
-    return;
-  }
-
-  // 1. 検証。errorが1件でもあれば保存しない。承認済みの計画がこの定義で読めるかもここで分かる。
-  //    実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、表示名の重なり）。
-  const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
-  if (!alive(current)) {
-    return;
-  }
-  if (stale(current, loaded)) {
-    return;
-  }
-  if (!lint.ok) {
-    fail(current, lint.error);
-    return;
-  }
-  if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.phasesRel).join("\n")}`);
-    return;
-  }
-
-  // 2. 作業中のチケットが無いこと。押した時点で取り直す。
-  const lock = await refreshLock(current);
-  if (!alive(current)) {
-    return;
-  }
-  if (stale(current, loaded)) {
-    return;
-  }
-  if (lock.locked) {
-    fail(current, lock.reason);
-    return;
-  }
-  if (!(await confirmDuringTurn(lock))) {
-    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
-    return;
-  }
-  if (!alive(current)) {
-    return;
-  }
-
-  // 3. 読み込んでから外で変わっていないこと。無かったファイルは、まだ無いこと。
-  if (loaded.exists) {
-    let mtimeMs: number;
-    try {
-      mtimeMs = fs.statSync(loaded.phasesPath).mtimeMs;
-    } catch (error) {
-      fail(current, `フェーズ定義のファイルを確認できません: ${(error as Error).message}`);
-      return;
-    }
-    if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）");
-      return;
-    }
-  } else if (fs.existsSync(loaded.phasesPath)) {
-    fail(current, "フェーズ定義のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）");
-    return;
-  }
-
-  try {
-    current.wroteAt = Date.now();
-    if (loaded.exists) {
-      fs.writeFileSync(loaded.phasesPath, text, "utf8");
-    } else {
-      fs.mkdirSync(path.dirname(loaded.phasesPath), { recursive: true });
-      fs.writeFileSync(loaded.phasesPath, text, { encoding: "utf8", flag: "wx" });
-    }
-  } catch (error) {
-    current.wroteAt = 0;
-    fail(current, `フェーズ定義のファイルに保存できません: ${(error as Error).message}`);
-    return;
-  }
-  await reload(current);
-  // warnの本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
-  const warns = warnLinesOf(lint.value.report, tmp, loaded.phasesRel);
-  if (warns.length > 0 && alive(current)) {
-    current.host.post({ type: "saved", warns } satisfies ToPhases);
-  }
-  vscode.window.showInformationMessage(`${loaded.phasesRel}に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): PhasesMessage | undefined {

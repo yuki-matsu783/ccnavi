@@ -151,6 +151,11 @@ func inSide(f *finding, roots map[string]bool) bool {
 	return f.treeRoot != "" && roots[pathcase.Fold(f.treeRoot)]
 }
 
+// onSide は、横で作業するチェックアウトの、戻せたはずの変更か（戻さずに横の変更として言う分）。
+func onSide(f *finding, roots map[string]bool) bool {
+	return inSide(f, roots) && restorable(f)
+}
+
 func addDetail(record *audit.Record, note string) {
 	if note == "" {
 		return
@@ -233,8 +238,10 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 	}
 	// ユーザの発言で受け入れた変更のうえに、そのあと中身が変わったもの。キーは種類とパスだけなので、指紋で見分けて
 	// 新しい変更として言う。戻さない（戻す先のコミット済みの内容はユーザの編集より前で、その編集まで消える）。
+	// 受け入れた変更と、横で作業するチェックアウトの指紋（sidePrefix の付いたキー）は同じ記録に在るので、1 回読んで 1 回書く。
+	accepted := c.loadAccepted(in.SessionID)
 	shadowed := map[string]bool{}
-	if accepted := c.loadAccepted(in.SessionID); len(accepted) > 0 {
+	if len(accepted) > 0 {
 		var still []*finding
 		for _, f := range known {
 			if v, ok := accepted[f.key()]; ok && fingerprint(f) != v {
@@ -245,25 +252,22 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 			}
 		}
 		known = still
-		if len(shadowed) > 0 {
-			// 同じ変更を呼び出しのたびに言わない。言ったぶんは今の指紋を受け入れ済みに直す。
-			for _, f := range fresh {
-				if shadowed[f.key()] {
-					accepted[f.key()] = fingerprint(f)
-				}
+		// 同じ変更を呼び出しのたびに言わない。言ったぶんは今の指紋を受け入れ済みに直す。
+		for _, f := range fresh {
+			if shadowed[f.key()] {
+				accepted[f.key()] = fingerprint(f)
 			}
-			c.saveAccepted(in.SessionID, accepted)
 		}
 	}
 	// 横で作業するチェックアウト（SideBySide）は、別の作業者の変更を含みうるので戻さない。報告時の指紋を覚え、指紋が変わったら新しい変更として言い直す。
 	side := sideRoots(read)
-	// 横で作業するチェックアウトの変更は戻さないので、報告したときの指紋と違えば新しい変更として言い直す。
-	sideSeen := c.loadAccepted(in.SessionID)
+	// 指紋で追うのは、横のチェックアウトの変更のうち受け入れ済みの上に重なっていないもの（重なったものは上で言い直している）。
+	tracked := func(f *finding) bool { return onSide(f, side) && !shadowed[f.key()] }
 	var still []*finding
 	for _, f := range known {
-		if inSide(f, side) && restorable(f) && !shadowed[f.key()] {
+		if tracked(f) {
 			now := fingerprint(f)
-			before := sideSeen[sidePrefix+f.key()]
+			before := accepted[sidePrefix+f.key()]
 			if before == "" {
 				before = now
 			}
@@ -275,21 +279,19 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 		still = append(still, f)
 	}
 	known = still
-	marks := map[string]string{}
+	changed := len(shadowed) > 0
 	for _, f := range fresh {
-		if inSide(f, side) && restorable(f) && !shadowed[f.key()] {
-			marks[sidePrefix+f.key()] = fingerprint(f)
+		if !tracked(f) {
+			continue
 		}
-	}
-	changed := false
-	for k, v := range marks {
-		if old, ok := sideSeen[k]; !ok || old != v {
+		k, v := sidePrefix+f.key(), fingerprint(f)
+		if old, ok := accepted[k]; !ok || old != v {
 			changed = true
 		}
-		sideSeen[k] = v
+		accepted[k] = v
 	}
 	if changed {
-		c.saveAccepted(in.SessionID, sideSeen)
+		c.saveAccepted(in.SessionID, accepted)
 	}
 	// 基準が無いセッションでは、今そこに在るものは直前の実行の結果ではない。基準が在れば、起動時に在ったものが
 	// まだ伝えていない分に当たる。どちらも原因を付けずに 1 度だけ伝える。
@@ -367,7 +369,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 	}
 	sideFresh := 0
 	for _, f := range fresh {
-		if inSide(f, side) && restorable(f) {
+		if onSide(f, side) {
 			sideFresh++
 		}
 	}
@@ -403,7 +405,7 @@ func (c *Checker) Check(enforcing bool, restore config.Mode, in hookio.Input, re
 			would:       would[f.key()],
 			notRestored: gated && (!restorable(f) || shadowed[f.key()]),
 			shadowed:    shadowed[f.key()],
-			sideBySide:  inSide(f, side) && restorable(f),
+			sideBySide:  onSide(f, side),
 		}
 		blocks = append(blocks, violation(f, in, o, gitCommand, c.Root))
 	}
@@ -571,7 +573,7 @@ func (c *Checker) AtStop(in hookio.Input, record *audit.Record) string {
 			how = f.change.Path + " を元に戻す操作はユーザに頼んでください"
 		}
 		origin := ""
-		if inSide(f, side) && restorable(f) {
+		if onSide(f, side) {
 			origin = " " + sideBySideLabel + "。"
 		}
 		lines = append(lines, "  "+where+f.change.Path+"（"+kindLabel(f.change.Kind)+"） 対象のルール: "+

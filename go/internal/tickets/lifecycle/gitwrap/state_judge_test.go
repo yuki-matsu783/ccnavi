@@ -381,6 +381,11 @@ func TestPushToTheIntegrationBranch(t *testing.T) {
 			pointOriginHead(t, p, "trunk")
 			return p, "trunk"
 		}, true},
+		{"a branch spelled differently from the integration is refused", func(t *testing.T, root string) (string, string) {
+			p := project(t, root, "Trunk")
+			pointOriginHead(t, p, "trunk")
+			return p, "Trunk"
+		}, true},
 		{"each repository has its own integration (workspace)", func(t *testing.T, root string) (string, string) {
 			gitIn(t, root, "remote", "add", "origin", filepath.Join(t.TempDir(), "o.git"))
 			pointOriginHead(t, root, "main")

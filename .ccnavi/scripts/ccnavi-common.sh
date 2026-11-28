@@ -7,7 +7,7 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みと、cwd からワークスペースルートを
 # 探せないときの起点（下の ccnavi_workspace_anywhere と ccnavi_no_workspace_text）に `$0` を使う。
 #
-# ここにあるのは 21 個。`ccnavi_load` と `ccnavi_no_workspace` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# 呼ぶ側が使うのは次の 23 個（ほかは中で使う補助）。`ccnavi_load`・`ccnavi_no_workspace`・`ccnavi_no_bin` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
@@ -22,7 +22,8 @@
 #   ccnavi_bin <ワークスペースルート>  起動する実行ファイルのパス
 #   ccnavi_bin_path <振り分けの sh>  PATH の ccnavi（これ自身へのリンクは飛ばす）
 #   ccnavi_bin_try <パス>      そのパス（または .exe）が実行できれば返す
-#   ccnavi_project <ディレクトリ>  そこが属するプロジェクトの名前（ワークスペース自身なら空）
+#   ccnavi_no_bin_text         実行ファイルが見つからないときの文面
+#   ccnavi_no_bin <名前> [<終了コード>]  その文面を標準エラーに出して終わる（既定は 2）
 #   ccnavi_path_under <パス> <基準>  パスが基準の下なら基準からの相対を出す（大文字小文字を区別しない）
 #   ccnavi_path_pick <一覧>    標準入力のパスのうち一覧にあるものを出す（大文字小文字を区別しない）
 #   ccnavi_same_name <名前> <名前>  2 つの名前が、大文字小文字を区別しなければ同じなら 0
@@ -340,84 +341,17 @@ ccnavi_bin_try() {
 	fi
 }
 
-# そのディレクトリが属するプロジェクトの名前。ワークスペース自身なら空を返す。
-#
-# 第 2 引数にワークスペースルートを渡す。省くと自分で探す。
-#
-#   <ws>/projects/<名前>/...          -> <名前>
-#   <ws>/.claude/worktrees/<id>/...   -> 元リポジトリがプロジェクトならその名前
-#   それ以外                           -> 空
-#
-# ワークツリーの元リポジトリは `.git` ファイルの `gitdir:` から取る。書式は実際に確かめて確定して
-# いる（git 2.39.2、Git Bash と PowerShell の両方）。絶対パス、区切りは `/` のみ、
-# ドライブレターは大文字、`gitdir:` の後ろは半角空白 1 個。
-#
-# 取れなければ空を返す。止めない。 `.git` が読めない、`gitdir:` が無い、
-# 元リポジトリが消えている（孤児）のどれでも空。記録の置き場のために作業を止めるのは
-# 釣り合わない。
-ccnavi_project() {
-	ccnavi_pj_dir=$(ccnavi_abs "${1:-.}") || return 0
-	if [ -n "${2:-}" ]; then
-		ccnavi_pj_ws="$2"
-	else
-		ccnavi_pj_ws=$(ccnavi_workspace) || return 0
-	fi
-	ccnavi_pj_places=projects # 固定
-	# リンクを解いたパスで揃える（git が返すパスはリンクを解いている）。
-	ccnavi_pj_dir=$(ccnavi_phys "$ccnavi_pj_dir")
-	ccnavi_pj_ws=$(ccnavi_phys "$ccnavi_pj_ws")
+# 実行ファイルが見つからないときの文面（1 行。頭の「<名前>: 」は呼ぶ側が付ける）。ccnavi_bin が探す場所を並べる。
+# 実行ファイルが無い場面の文なので、文面ファイル（実行ファイルの `text`）には置かず、ここに 1 つだけ置く。
+ccnavi_no_bin_text() {
+	printf '%s\n' 'ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。'
+}
 
-	# ワークスペースの下に無ければ、宣言するプロジェクトは無い。
-	case "$ccnavi_pj_dir" in
-	"$ccnavi_pj_ws" | "$ccnavi_pj_ws"/*) ;;
-	*) return 0 ;;
-	esac
-	ccnavi_pj_rel="${ccnavi_pj_dir#"$ccnavi_pj_ws"}"
-	ccnavi_pj_rel="${ccnavi_pj_rel#/}"
-
-	case "$ccnavi_pj_rel" in
-	"$ccnavi_pj_places"/*)
-		ccnavi_pj_name="${ccnavi_pj_rel#"$ccnavi_pj_places"/}"
-		ccnavi_pj_name="${ccnavi_pj_name%%/*}"
-		# 直下に .git を持つものだけがプロジェクト。
-		if [ -e "$ccnavi_pj_ws/$ccnavi_pj_places/$ccnavi_pj_name/.git" ]; then
-			printf '%s\n' "$ccnavi_pj_name"
-		fi
-		return 0
-		;;
-	.claude/worktrees/*)
-		ccnavi_pj_id="${ccnavi_pj_rel#.claude/worktrees/}"
-		ccnavi_pj_id="${ccnavi_pj_id%%/*}"
-		ccnavi_pj_git="$ccnavi_pj_ws/.claude/worktrees/$ccnavi_pj_id/.git"
-		[ -f "$ccnavi_pj_git" ] || return 0
-		# gitdir: <元リポジトリ>/.git/worktrees/<id>
-		ccnavi_pj_gitdir=$(sed -n 's/^gitdir:[[:space:]]*//p' "$ccnavi_pj_git" | head -n 1)
-		[ -n "$ccnavi_pj_gitdir" ] || return 0
-		case "$ccnavi_pj_gitdir" in
-		*/.git/worktrees/*) ;;
-		*) return 0 ;;
-		esac
-		ccnavi_pj_owner="${ccnavi_pj_gitdir%/.git/worktrees/*}"
-		# 元リポジトリがワークスペースそのものなら、プロジェクトではない。
-		ccnavi_pj_owner_abs=$(ccnavi_phys "$ccnavi_pj_owner")
-		case "$ccnavi_pj_owner_abs" in
-		"$ccnavi_pj_ws") return 0 ;;
-		esac
-		ccnavi_pj_orel="${ccnavi_pj_owner_abs#"$ccnavi_pj_ws"}"
-		ccnavi_pj_orel="${ccnavi_pj_orel#/}"
-		case "$ccnavi_pj_orel" in
-		"$ccnavi_pj_places"/*)
-			ccnavi_pj_name="${ccnavi_pj_orel#"$ccnavi_pj_places"/}"
-			case "$ccnavi_pj_name" in
-			*/*) return 0 ;; # 2 階層以上は数えない
-			esac
-			printf '%s\n' "$ccnavi_pj_name"
-			;;
-		esac
-		return 0
-		;;
-	esac
-	return 0
+# ccnavi_no_bin <名前> [<終了コード>]  上の文面を「<名前>: 」付きで標準エラーに出し、終了コード（既定は 2）で終わる。
+# 識別子つきで止める仕組み（fail・reject）を持たない sh が使う。
+ccnavi_no_bin() {
+	printf '%s: %s\n' "$1" "$(ccnavi_no_bin_text)" >&2
+	exit "${2:-2}"
 }
 
 # 置き場（ワークスペースルートかツリーのルートからの相対、/ 区切り）。実行ファイルを起こさずに動く sh
@@ -451,7 +385,7 @@ ccnavi_path_under() {
 }
 
 # 標準入力のパスのうち、<一覧のファイル>（1 行 1 つ）のどれかと同じものを 1 行ずつ。大文字小文字を区別せず比べる
-# （pathcase.Fold で畳んで比べるのと同じ。畳むのは ASCII の英字だけ）。一致は tests/fixtures/approved-carry.json の same。
+# （畳むのは ASCII の英字だけ。ASCII の範囲では pathcase.Fold と同じで、ASCII の外の字は Go と違って畳まない）。一致は tests/fixtures/approved-carry.json の same。
 ccnavi_path_pick() {
 	LC_ALL=C awk 'NR == FNR { want[tolower($0)] = 1; next } tolower($0) in want' "$1" -
 }

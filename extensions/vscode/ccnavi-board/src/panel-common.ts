@@ -4,6 +4,7 @@
  * 画面ごとに違う仕事（何を監視するか、何を渡すか）は呼ぶ側が渡す。ここにあるのは、どの画面でも
  * 同じ形になる書き方だけ。
  */
+import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { multiFolderText, noFolderText } from "./core/workspace-folder.js";
@@ -41,6 +42,24 @@ export function watchGlobs(folder: vscode.WorkspaceFolder, patterns: readonly st
 /** チケットの置き場（`core/watch.ts`の`WATCH_PATTERNS`）に`watchPattern`を張る */
 export function watchTickets(folder: vscode.WorkspaceFolder, onChange: () => void): vscode.FileSystemWatcher[] {
   return watchGlobs(folder, WATCH_PATTERNS, onChange);
+}
+
+/** 実行ファイルが答えたパス（絶対かワークスペース相対）を、`root`からの絶対パスにする */
+export function resolveIn(root: string, filePath: string): string {
+  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+}
+
+/** ワークスペース相対のパスを、globの区切り（`/`）にする */
+export function toGlob(rel: string): string {
+  return rel.replace(/\\/g, "/");
+}
+
+/** 1つのファイルを見る監視の型。絶対パスはワークスペース相対のglobにならないので、そのディレクトリを起点にする */
+export function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
+  if (path.isAbsolute(filePath)) {
+    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
+  }
+  return new vscode.RelativePattern(folder, toGlob(filePath));
 }
 
 /**

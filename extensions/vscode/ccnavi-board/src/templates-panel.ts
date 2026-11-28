@@ -36,7 +36,7 @@ import { loadBoard, runTemplateCheck, runTemplates, runTemplateShow } from "./cc
 import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
 import { yamlText } from "./core/flow-doc.js";
-import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, readFlowFile, writeTreeFile } from "./core/flow-write.js";
 import { sameData } from "./core/template-edit.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
@@ -48,7 +48,7 @@ import { NEW_TEMPLATE_NAME_RULE, shownLayerOf, templateNameTaken, templatesLayer
 import { renderTemplatesPage } from "./core/templates-render.js";
 import type { TemplateCheck, TemplateLayer, TemplatesData, TemplatesJson, TemplatesMessage, ToTemplates } from "./core/templates-view.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, debounce, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
+import { assertRetained, debounce, toGlob, watchPattern, watchTickets, workspaceFolder } from "./panel-common.js";
 import { requireTickets } from "./ticket-control.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
@@ -297,10 +297,6 @@ function watchFiles(current: PanelState): void {
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.json"));
   patterns.push(new vscode.RelativePattern(current.folder, ".claude/settings.local.json"));
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {
@@ -957,7 +953,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   // 4. リンクを辿らず、一時ファイルの入れ替えで書く
-  const written = writeFlowFile(root, file, text, { exists: read !== undefined, mtimeMs: read?.mtimeMs ?? 0 }, "テンプレート");
+  const written = writeTreeFile(root, file, text, { exists: read !== undefined, mtimeMs: read?.mtimeMs ?? 0 }, "テンプレート", FLOW_FILE_LIMIT);
   if (!written.ok) {
     reply("", written.error);
     return;

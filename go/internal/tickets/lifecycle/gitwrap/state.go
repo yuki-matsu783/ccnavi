@@ -8,6 +8,7 @@ import (
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/pathcase"
 	"ccnavi/internal/tickets/lifecycle/integrate"
+	"ccnavi/internal/tickets/model/ids"
 )
 
 // Env は、git の状態とワークスペースを読む判定の材料。git はラッパーの cwd（Cwd）で起動する。
@@ -129,7 +130,7 @@ func (e *Env) targetHere() string {
 	if _, ok := e.userCheckout(top); !ok {
 		return ""
 	}
-	if integ := integration(top); integ != "" && e.branchNow() == integ {
+	if integ := integration(top); integ != "" && ids.SameID(e.branchNow(), integ) {
 		return integ
 	}
 	return ""

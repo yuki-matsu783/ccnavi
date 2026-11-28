@@ -215,7 +215,10 @@
          0 は済んだ、1 は止めた、2 は拒否。ロックは呼ぶ側が取ります）
     ccnavi start args -- <ccnavi-start.sh の引数>...
         （ccnavi-start.sh 用。引数を確かめ、依頼のリポジトリ（--repo）と origin を比べ、値を 1 行 1 項目で
-         出力します。誤りは "fail <識別子> <終了コード>" と "msg <文>"。読み取り専用）
+         出力します。今いる場所のプロジェクトは "project <名前>"。誤りは "fail <識別子> <終了コード>" と "msg <文>"。読み取り専用）
+    ccnavi start api-failed what=<何の問い合わせか> status=<HTTP の番号> body=<応答の本文> why=<届かなかった理由>
+        （ccnavi-start.sh 用。ホストの API が失敗した理由を "reason <文>" で出力します。ホストに届いて断られた
+         （401・403・404・410）ときだけ "refused <文>" も出力します）
     ccnavi start branch-ok <branch> strict|lenient [heads=<file>] [err=…] [hint=…] [exit=<n>]
         （ccnavi-start.sh 用。識別子が親に使えるかと、同じ識別子になる別のブランチが無いかを確かめます）
     ccnavi start merged github|gitlab <branch> <file>

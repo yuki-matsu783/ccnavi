@@ -35,7 +35,7 @@ Claude Codeの振る舞いについて測った前提は設計書の付録C（[a
 - **Windowsのコンソール経由で日本語を引数に渡すとCP932になり、`jq --arg`がUTF-8でないJSONを作る。** 本文はファイルで渡す。
   `jq`の実体は`C:\Program Files\jq\jq`で、`"$JQ"`と引用しないと空白で分かれる
 - **Windowsの`gitdir:`の表記**（git 2.39.2、Git BashとPowerShell）。絶対パス、区切りは`/`、ドライブレターは大文字、
-  `gitdir:`の後ろは半角空白1個。`ccnavi_project`（sh）と`go/internal/infra/tree`がこれを前提にしている
+  `gitdir:`の後ろは半角空白1個。`go/internal/infra/tree`がこれを前提にしている
 - **Docker Desktopを起動すると`restart=unless-stopped`のGitLabが勝手に上がり、2GBのVMではengineごと異常終了する。**
   GitLab CEには4GB要る
 - **macOSの`/etc`・`/tmp`・`/var`は`/private`へのリンク。** `ospath.Realpath`で実体化すると先頭に`private`が付く。

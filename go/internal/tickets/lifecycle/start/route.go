@@ -162,7 +162,7 @@ func Route(cwd string, candidates []byte, a RouteArgs) (string, int) {
 
 // protected は、ブランチ名が親のブランチに使えない書き方か、保護されたブランチ（統合先を含む）か。
 func protected(branch, integration string) bool {
-	return ids.BranchProblem(branch) != "" || branch == integration
+	return ids.BranchProblem(branch) != "" || ids.IsIntegration(branch, integration)
 }
 
 // adoptProblem は、開いた MR を採用できない理由の最初の 1 つを書く（状態・フォーク・マージ先・保護の順）。
