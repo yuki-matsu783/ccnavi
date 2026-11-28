@@ -134,7 +134,7 @@ func hostMRs(hostKind string, kind Kind, n int, repo, pid string, value any, pre
 			return nil, false
 		}
 		state := pr.Value("state")
-		if pyfmt.Truthy(pr.Value("merged_at")) {
+		if hostreply.GitHubMerged(pr.Value("merged_at")) {
 			state = "merged"
 		}
 		return []any{pullOf(pr, state, repo)}, true

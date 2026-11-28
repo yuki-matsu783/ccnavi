@@ -3,6 +3,8 @@ package hostreply
 import (
 	"fmt"
 	"strings"
+
+	"ccnavi/internal/infra/pathcase"
 )
 
 // OpenMR は、開いた MR の一覧（ホストの応答のまま）から 1 件を選ぶ。GitHub は先頭、GitLab はこのプロジェクト
@@ -23,26 +25,86 @@ func OpenMR(kind, pid string, all []any) (any, error) {
 	return nil, nil
 }
 
-// MergedMR は、MR の一覧から、マージ済みの 1 件を選ぶ。GitHub は閉じた PR の一覧のうち merged_at のあるものの先頭、
-// GitLab はマージ済みの一覧の先頭。pid を渡せば、GitLab はこのプロジェクトから出たものに限る。無ければ nil。
+// MergedMR は、MR の一覧から、マージ済みの 1 件を選ぶ。GitHub は閉じた PR の一覧のうち IsMerged のものの先頭、
+// GitLab はマージ済みの一覧のうち IsFork でないものの先頭（一覧はマージ済みで絞ってあるので state は見ない）。
+// pid を渡せば、GitLab はこのプロジェクトから出たものに限る。無ければ nil。
 func MergedMR(kind, pid string, all []any) (any, error) {
 	for _, x := range all {
-		key, want := "merged_at", ""
-		if kind != "github" {
-			if pid == "" {
-				return x, nil
-			}
-			key, want = "source_project_id", pid
+		var ok bool
+		var err error
+		if kind == "github" {
+			ok, err = IsMerged(kind, pid, x)
+		} else {
+			ok, err = IsFork(kind, pid, x)
+			ok = !ok
 		}
-		v, err := Field(x, key)
 		if err != nil {
 			return nil, err
 		}
-		if (want == "" && v != nil) || (want != "" && SameNumber(v, want)) {
+		if ok {
 			return x, nil
 		}
 	}
 	return nil, nil
+}
+
+// IsFork は、MR（ホストの応答 1 本）がフォークから出たもの（このプロジェクト・リポジトリの MR でないもの）か。
+// GitLab は source_project_id が pid と違うこと。pid が空なら、応答の target_project_id と比べる（どちらかが無ければ
+// 偽）。GitHub は head のリポジトリ（head.repo.full_name）が base のリポジトリ（base.repo.full_name）と違うこと
+// （大文字小文字は区別しない。どちらかが読めなければ偽）。
+func IsFork(kind, pid string, mr any) (bool, error) {
+	if kind == "github" {
+		head, err := Path(mr, "head", "repo", "full_name")
+		if err != nil {
+			return false, err
+		}
+		base, err := Path(mr, "base", "repo", "full_name")
+		if err != nil {
+			return false, err
+		}
+		h, hok := head.(string)
+		b, bok := base.(string)
+		return hok && bok && pathcase.Fold(h) != pathcase.Fold(b), nil
+	}
+	src, err := Field(mr, "source_project_id")
+	if err != nil {
+		return false, err
+	}
+	if pid != "" {
+		return !SameNumber(src, pid), nil
+	}
+	target, err := Field(mr, "target_project_id")
+	if err != nil {
+		return false, err
+	}
+	return src != nil && target != nil && Text(src) != Text(target), nil
+}
+
+// GitHubMerged は、GitHub の PR の merged_at から、マージ済みかを決める（ホストの `merged` の欄は見ない）。
+func GitHubMerged(mergedAt any) bool { return Truthy(mergedAt) }
+
+// IsMerged は、MR 1 本（ホストの応答）がマージ済みかを決める 1 か所。マージ済みで、かつフォークから出たものでないとき真。
+// GitLab は state が merged、GitHub は GitHubMerged。pid は IsFork に渡す。
+func IsMerged(kind, pid string, mr any) (bool, error) {
+	var merged bool
+	if kind == "github" {
+		at, err := Field(mr, "merged_at")
+		if err != nil {
+			return false, err
+		}
+		merged = GitHubMerged(at)
+	} else {
+		state, err := Field(mr, "state")
+		if err != nil {
+			return false, err
+		}
+		merged = state == "merged"
+	}
+	if !merged {
+		return false, nil
+	}
+	fork, err := IsFork(kind, pid, mr)
+	return !fork, err
 }
 
 // FindMR は、開いた MR の一覧から親のブランチの MR を選び、`number`・`url`・`source`・`target`・`draft` の 1 行 1 項目で
@@ -130,25 +192,11 @@ func Merged(kind, number, pid string, data []byte) (string, error) {
 
 // mergedOne は MR 1 本の応答 v がマージ済みなら v、そうでなければ nil。
 func mergedOne(kind, pid string, v any) (any, error) {
-	if kind == "github" {
-		at, err := Field(v, "merged_at")
-		if err != nil || at == nil {
-			return nil, err
-		}
-		return v, nil
-	}
-	state, err := Field(v, "state")
-	if err != nil {
+	ok, err := IsMerged(kind, pid, v)
+	if err != nil || !ok {
 		return nil, err
 	}
-	src, err := Field(v, "source_project_id")
-	if err != nil {
-		return nil, err
-	}
-	if state == "merged" && SameNumber(src, pid) {
-		return v, nil
-	}
-	return nil, nil
+	return v, nil
 }
 
 // oneLine は、ホストから来る値の改行を空白にする（答えの行に紛れさせない）。

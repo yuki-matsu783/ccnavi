@@ -29,6 +29,9 @@ func MRState(kind, scheme, host, path, n string, failed bool, data []byte) (stri
 	if got.number != n {
 		return unknown("api", fmt.Sprintf("ホストが別の MR（%s）を返した", got.number))
 	}
+	if got.fork {
+		return unknown("api", fmt.Sprintf("MR #%s はフォークから出た MR（このプロジェクトの MR ではない）", n))
+	}
 	url := mrURL(kind, scheme, host, path, n, got.url)
 	if got.merged {
 		return "merged", fmt.Sprintf("merged %s %s", n, url)
@@ -58,8 +61,8 @@ func unknown(kind, why string) (string, string) {
 }
 
 type mrSeen struct {
-	number, state, url string
-	merged, draft      bool
+	number, state, url  string
+	merged, draft, fork bool
 }
 
 // mrFields は MR 1 本の応答の番号・state・マージ済みか・Draft か・URL。表でなければ ErrShape。
@@ -73,12 +76,23 @@ func mrFields(kind string, data []byte) (mrSeen, error) {
 		return mrSeen{}, ErrShape
 	}
 	state := Text(Alt(m["state"], "-"))
+	// マージ済みかとフォークかは、`merged` の問い合わせと同じ関数（IsMerged・IsFork）で決める。
+	// フォークから出た MR は、マージ済みとは数えない（MRState が unknown で答える）。
+	fork, err := IsFork(kind, "", m)
+	if err != nil {
+		return mrSeen{}, err
+	}
+	merged, err := IsMerged(kind, "", m)
+	if err != nil {
+		return mrSeen{}, err
+	}
 	if kind == "github" {
 		return mrSeen{
 			number: Text(Alt(m["number"], "-")),
 			state:  state,
 			url:    Text(Alt(m["html_url"], "")),
-			merged: m["merged"] == true || Truthy(m["merged_at"]),
+			merged: merged,
+			fork:   fork,
 			draft:  m["draft"] == true,
 		}, nil
 	}
@@ -86,7 +100,8 @@ func mrFields(kind string, data []byte) (mrSeen, error) {
 		number: Text(Alt(m["iid"], "-")),
 		state:  state,
 		url:    Text(Alt(m["web_url"], "")),
-		merged: m["state"] == "merged",
+		merged: merged,
+		fork:   fork,
 		draft:  Alt(m["draft"], m["work_in_progress"]) == true,
 	}, nil
 }

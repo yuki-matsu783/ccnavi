@@ -72,7 +72,13 @@ func TestMRState(t *testing.T) {
 		{"github", true, "curl: (28) Operation timed out", "unknown", "unknown network ホストに届きません（ネットワークか、ホスト名を確かめてください）"},
 		{"github", true, "API rate limit exceeded\ncurl: (22) The requested URL returned error: 403", "unknown", "unknown api ホストの API の利用上限に達しました（HTTP 403）"},
 		{"github", false, `{"number": 9, "state": "closed", "html_url": "https://u/9"}`, "closed", "closed 9 https://u/9"},
-		{"github", false, `{"number": 9, "state": "closed", "merged": true, "merged_at": null, "html_url": "https://u/9"}`, "merged", "merged 9 https://u/9"},
+		// マージ済みの見方は merged_at だけ（`merged` の欄は見ない）。`merged` の問い合わせと同じ
+		{"github", false, `{"number": 9, "state": "closed", "merged": true, "merged_at": null, "html_url": "https://u/9"}`, "closed", "closed 9 https://u/9"},
+		// フォークから出た MR は、マージ済みとも open とも答えない（`merged` が none になるのと揃える）
+		{"gitlab", false, `{"iid": 9, "state": "merged", "source_project_id": 99, "target_project_id": 42, "web_url": "https://u/9"}`, "unknown", "unknown api MR #9 はフォークから出た MR（このプロジェクトの MR ではない）"},
+		{"gitlab", false, `{"iid": 9, "state": "merged", "source_project_id": 42, "target_project_id": 42, "web_url": "https://u/9"}`, "merged", "merged 9 https://u/9"},
+		{"github", false, `{"number": 9, "state": "closed", "merged_at": "x", "head": {"repo": {"full_name": "fork/R"}}, "base": {"repo": {"full_name": "o/r"}}, "html_url": "https://u/9"}`, "unknown", "unknown api MR #9 はフォークから出た MR（このプロジェクトの MR ではない）"},
+		{"github", false, `{"number": 9, "state": "closed", "merged_at": "x", "head": {"repo": {"full_name": "O/R"}}, "base": {"repo": {"full_name": "o/r"}}, "html_url": "https://u/9"}`, "merged", "merged 9 https://u/9"},
 		{"github", false, `{"number": 9, "state": "open", "draft": false, "html_url": "https://u/a\tb"}`, "open", "open 9 no https://h/g/p/pull/9"},
 		{"github", false, `{"number": 9, "state": "open", "draft": false}`, "open", "open 9 no https://h/g/p/pull/9"},
 		{"gitlab", false, `{"iid": 9, "state": "merged", "web_url": "https://u/9"}`, "merged", "merged 9 https://u/9"},

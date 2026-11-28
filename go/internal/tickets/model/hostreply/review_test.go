@@ -89,6 +89,8 @@ func TestMergedTable(t *testing.T) {
 		{"gitlab", "9", "42", `{"iid": 9, "state": "merged", "source_project_id": 42, "sha": "abc123", "source_branch": "feature/12-x"}`, "merged 9 abc123 feature/12-x\n"},
 		{"gitlab", "9", "42", `{"iid": 9, "state": "opened", "source_project_id": 42, "sha": "abc123"}`, "none\n"},
 		{"gitlab", "9", "42", `{"iid": 9, "state": "merged", "source_project_id": 99, "sha": "abc123"}`, "none\n"},
+		{"github", "9", "", `{"number": 9, "merged_at": "x", "head": {"sha": "abc123", "repo": {"full_name": "fork/r"}}, "base": {"repo": {"full_name": "o/r"}}}`, "none\n"},
+		{"github", "", "", `[{"number": 9, "merged_at": "x", "head": {"sha": "abc123", "repo": {"full_name": "fork/r"}}, "base": {"repo": {"full_name": "o/r"}}}]`, "none\n"},
 	}
 	for _, c := range cases {
 		got, err := Merged(c.kind, c.number, c.pid, []byte(c.data))
@@ -98,5 +100,20 @@ func TestMergedTable(t *testing.T) {
 	}
 	if _, err := Merged("github", "", "", []byte(`not json`)); err == nil {
 		t.Error("読めない応答は error")
+	}
+}
+
+// フォークから出た MR は、`merged` の問い合わせと `mr-state` の答えの両方で、マージ済みと数えない。
+func TestForkMRIsNeverMerged(t *testing.T) {
+	gitlab := `{"iid": 9, "state": "merged", "source_project_id": 99, "target_project_id": 42, "sha": "abc123", "web_url": "https://u/9"}`
+	github := `{"number": 9, "state": "closed", "merged_at": "x", "head": {"sha": "abc123", "repo": {"full_name": "fork/r"}}, "base": {"repo": {"full_name": "o/r"}}, "html_url": "https://u/9"}`
+	for _, c := range []struct{ kind, pid, data string }{{"gitlab", "42", gitlab}, {"github", "", github}} {
+		merged, err := Merged(c.kind, "9", c.pid, []byte(c.data))
+		if err != nil || merged != "none\n" {
+			t.Errorf("Merged(%s) = %q, %v, want none", c.kind, merged, err)
+		}
+		if state, answer := MRState(c.kind, "https", "h", "g/p", "9", false, []byte(c.data)); state == "merged" {
+			t.Errorf("MRState(%s) = %q %q, want not merged", c.kind, state, answer)
+		}
 	}
 }
