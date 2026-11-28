@@ -182,7 +182,7 @@ function waitingNode(board: BoardJson, tickets: boolean): { readonly node: Sideb
       review.map((r) =>
         node(`review:${r.parent}:${r.phase}`, `${r.parent} ${phaseName(r.parent, r.phase)}`, {
           description: titles.get(r.parent) ?? "",
-          tooltip: "押すと、このフェーズのレビュー完了の画面を開きます（MRの残った指摘を取りに行きます）",
+          tooltip: "押すと、このフェーズのレビュー完了の画面を開きます（MRに残っている指摘を取りに行きます）",
           action: { kind: "board", target: { kind: "decide", parent: r.parent, phase: r.phase } },
         }),
       ),

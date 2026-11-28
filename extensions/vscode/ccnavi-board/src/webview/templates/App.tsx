@@ -170,7 +170,7 @@ export function App({ initial }: { readonly initial: TemplatesData }): JSX.Eleme
       data-action="filter-severity"
       data-severity={value}
       aria-pressed={shownSeverity === value}
-      title={`この設定のテンプレートのうち、${label}の指摘があるものだけを一覧に出します（数はテンプレートの数）`}
+      title={`この設定のテンプレートのうち、${label}の指摘があるものだけを一覧に出します（件数はテンプレートの数）`}
       onClick={() => {
         if (!tour.touring) {
           setSeverity(severity === value ? undefined : value);

@@ -302,7 +302,7 @@ export function Edit({ session, opened, onClose }: EditProps): JSX.Element {
                 未保存
               </EditorState>
               <EditorState shown={lock.locked} tone="warn" role="save-locked" title={lock.reason}>
-                保存は作業の後
+                保存できません
               </EditorState>
             </>
           }
