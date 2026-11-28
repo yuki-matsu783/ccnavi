@@ -6,6 +6,7 @@
  *   返るPromiseは、頼んだ後に始まった読み込みが終わったところで解ける
  * - 読めた答えは`latest`に残し、`subscribe`した聞き手に順に渡す。聞き手が増えても読み直しは増えない
  * - `load`は投げないこと（失敗は答えの形で返す）
+ * - 聞き手が投げても、残りの聞き手に渡し、次の読み直しも止めない。投げた例外は`onListenerError`に渡す（記録は呼ぶ側）
  */
 export interface Feed<R> {
   /** 最後に読めた答え。まだ1度も読んでいなければundefined */
@@ -15,7 +16,7 @@ export interface Feed<R> {
   subscribe(listener: (result: R) => void): () => void;
 }
 
-export function makeFeed<R>(load: () => Promise<R>): Feed<R> {
+export function makeFeed<R>(load: () => Promise<R>, onListenerError: (error: unknown) => void): Feed<R> {
   let latest: R | undefined;
   let running: Promise<void> | undefined;
   let queued: Promise<void> | undefined;
@@ -25,7 +26,11 @@ export function makeFeed<R>(load: () => Promise<R>): Feed<R> {
     const result = await load();
     latest = result;
     for (const listener of [...listeners]) {
-      listener(result);
+      try {
+        listener(result);
+      } catch (error) {
+        onListenerError(error);
+      }
     }
   };
 
@@ -38,10 +43,11 @@ export function makeFeed<R>(load: () => Promise<R>): Feed<R> {
     }
     // 読んでいる最中。頼まれた時点より後の変化を拾うため、終わってからもう1回だけ読む
     if (queued === undefined) {
-      queued = running.then(() => {
-        queued = undefined;
-        return refresh();
-      });
+      queued = running
+        .finally(() => {
+          queued = undefined;
+        })
+        .then(refresh);
     }
     return queued;
   };

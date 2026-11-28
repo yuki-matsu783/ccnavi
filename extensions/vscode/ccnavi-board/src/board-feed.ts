@@ -12,6 +12,7 @@ import { loadBoard, type LoadResult } from "./ccnavi.js";
 import { makeFeed, type Feed } from "./core/feed.js";
 import { FEED_PATTERNS } from "./core/watch.js";
 import { noFolderText } from "./core/workspace-folder.js";
+import * as diaglog from "./log.js";
 import { debounce, firstWorkspaceFolder, watchGlobs } from "./panel-common.js";
 
 function binSetting(): string {
@@ -27,8 +28,16 @@ async function load(): Promise<LoadResult> {
   return loadBoard(folder.uri.fsPath, binSetting());
 }
 
+/** 聞き手が投げた例外を診断ログに残す（ほかの聞き手と次の読み直しは止めない）。フォルダが無ければ書かない */
+function listenerFailed(error: unknown): void {
+  const folder = firstWorkspaceFolder();
+  if (folder !== undefined) {
+    diaglog.get("ccnavi-board", folder.uri.fsPath).error("答えの聞き手が例外を投げた", { error: String(error) });
+  }
+}
+
 /** 拡張全体の答え。読み直しは`refresh`、届いた答えは`subscribe`で受ける */
-export const boardFeed: Feed<LoadResult> = makeFeed(load);
+export const boardFeed: Feed<LoadResult> = makeFeed(load, listenerFailed);
 
 const timers: { timer?: NodeJS.Timeout } = {};
 

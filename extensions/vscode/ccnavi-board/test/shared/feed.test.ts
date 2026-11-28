@@ -23,8 +23,13 @@ function slowLoader(): { readonly load: () => Promise<number>; readonly release:
   };
 }
 
+/** 聞き手が投げないはずの試験で渡す。呼ばれたら試験を落とす */
+function unexpected(error: unknown): void {
+  assert.fail(`聞き手が投げた: ${String(error)}`);
+}
+
 test("CB-T1305 読めた答えを残し、聞き手みんなに同じ答えを渡す。聞くのをやめた聞き手には渡さない", async () => {
-  const feed = makeFeed(async () => "答え");
+  const feed = makeFeed(async () => "答え", unexpected);
   assert.equal(feed.latest(), undefined);
   const a: string[] = [];
   const b: string[] = [];
@@ -42,7 +47,7 @@ test("CB-T1305 読めた答えを残し、聞き手みんなに同じ答えを�
 
 test("CB-T1306 読んでいる最中の頼みは、終わってからの1回にまとめる。返るのは頼んだ後の読み込みが終わったとき", async () => {
   const loader = slowLoader();
-  const feed = makeFeed(loader.load);
+  const feed = makeFeed(loader.load, unexpected);
   const seen: number[] = [];
   feed.subscribe((r) => seen.push(r));
   const first = feed.refresh();
@@ -66,4 +71,29 @@ test("CB-T1306 読んでいる最中の頼みは、終わってからの1回に�
   loader.release();
   await again;
   assert.deepEqual(seen, [1, 2, 3]);
+});
+
+test("CB-T1309 聞き手が投げても次の聞き手に渡し、読んでいる最中の頼みも以後まとめて走る。投げた例外は記録の関数に渡す", async () => {
+  const loader = slowLoader();
+  const errors: string[] = [];
+  const feed = makeFeed(loader.load, (error) => errors.push(String(error)));
+  const seen: number[] = [];
+  feed.subscribe(() => {
+    throw new Error("壊れた聞き手");
+  });
+  feed.subscribe((r) => seen.push(r));
+  // 2回続けて、読んでいる最中に頼む。どちらも追いかけの1回が走る
+  for (const expected of [2, 4]) {
+    const first = feed.refresh();
+    const second = feed.refresh();
+    loader.release();
+    await first;
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(loader.calls(), expected);
+    loader.release();
+    await second;
+  }
+  assert.deepEqual(seen, [1, 2, 3, 4]);
+  assert.equal(errors.length, 4);
+  assert.match(errors[0] ?? "", /壊れた聞き手/);
 });
