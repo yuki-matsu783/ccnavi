@@ -130,10 +130,10 @@ export type ToBoard =
   /** 開くときにプロジェクトを指定されたとき（いまは呼び出し元が無い） */
   | { readonly type: "filter"; readonly project: string }
   /**
-   * サイドパネルの行から開いたとき。そのカードまで送って焦点を当てる。絞り込み・畳んだ列・アーカイブの表示で
-   * 隠れていれば、見えるようにそれを外す。いまの中身に無いカードなら何もしない
+   * サイドパネルの行から開いたとき。そのカードを選んで右のパネルに出し、焦点を当てる（カードを押したときと同じ選択）。
+   * 絞り込み・畳んだ列・アーカイブの表示で隠れていれば、見えるようにそれを外す。いまの中身に無いカードなら何もしない
    */
-  | { readonly type: "reveal"; readonly ticket: string }
+  | { readonly type: "select"; readonly ticket: string }
   /** 初回の吹き出しの案内を出す。画面は指す先が出てから始める（`src/tour.ts`） */
   | { readonly type: "tour" }
   | AppearanceMessage;

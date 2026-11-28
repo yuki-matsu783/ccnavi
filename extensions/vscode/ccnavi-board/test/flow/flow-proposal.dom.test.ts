@@ -97,7 +97,7 @@ test("CB-D140 未保存の変更があれば破棄することを言ってから
   }
 });
 
-test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が掛かれば隠す。押すと文を頼み、コピー / 新しいセッションで開く で渡す", async () => {
+test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が掛かれば隠す。押すと文を頼み、新しいセッションで開く（主ボタン）/ コピー で渡す", async () => {
   const none = await openFlow();
   try {
     assert.equal(none.all('[data-action="request-flow"]').length, 0);
@@ -113,6 +113,9 @@ test("CB-D141 依頼のボタンは言葉が届いたときだけ出し、錠が
     assert.equal(dom.posted.filter((m) => m.type === "request").length, 1);
     await dom.send({ type: "requestText", prompt: "[ccnavi]ユーザが子チケットi0001-01-01のフローの作成を頼んだ" });
     assert.match(dom.one("#request-text pre").textContent ?? "", /フローの作成を頼んだ/);
+    // 主ボタンは「新しいセッションで開く」1つ。焦点もそこに置く
+    assert.deepEqual(dom.all("#request-text button.primary").map((b) => b.getAttribute("data-action")), ["request-open"]);
+    assert.equal(dom.document.activeElement, dom.one('[data-action="request-open"]'));
     dom.click(dom.one('[data-action="request-copy"]'));
     dom.click(dom.one('[data-action="request-open"]'));
     await dom.settle();

@@ -68,11 +68,11 @@ interface PanelState {
   /** 次に描いたときに選ぶ絞り込み。1度使ったら消す（以後はWebviewのstateが覚える） */
   filter?: string;
   /**
-   * 開いたあとに進む場所（サイドパネルの行から）。ボードが読めたら1度だけ行う。`project`は`filter`に、`reveal`は`reveal`に移す
+   * 開いたあとに進む場所（サイドパネルの行から）。ボードが読めたら1度だけ行う。`project`は`filter`に、`select`は`select`に移す
    */
   target?: BoardTarget;
-  /** 画面に送って焦点を当てるカード。届いたら消す（絞り込みと同じく、作り直し中は持ち越す） */
-  reveal?: string;
+  /** 画面に送って選ばせるカード（右のパネルに出す）。届いたら消す（絞り込みと同じく、作り直し中は持ち越す） */
+  select?: string;
   /** 拡張全体の答え（`board-feed.ts`）を聞くのをやめる */
   stopFeed?: () => void;
   /**
@@ -188,15 +188,15 @@ export async function openBoard(target?: BoardTarget): Promise<void> {
   void update();
 }
 
-/** 進む場所を覚える。絞り込みとカードの焦点は画面に送るもの、ほかはボードが読めたら行うもの */
+/** 進む場所を覚える。絞り込みと選ぶカードは画面に送るもの、ほかはボードが読めたら行うもの */
 function aim(current: PanelState, target: BoardTarget | undefined): void {
   if (target === undefined) {
     return;
   }
   if (target.kind === "project") {
     current.filter = target.project;
-  } else if (target.kind === "reveal") {
-    current.reveal = target.ticket;
+  } else if (target.kind === "select") {
+    current.select = target.ticket;
   } else {
     current.target = target;
   }
@@ -224,7 +224,7 @@ function runTarget(current: PanelState): void {
       dispatchMerge(current, { kind: "check" });
       return;
     case "project":
-    case "reveal":
+    case "select":
       // `aim`が画面に送るほうへ移している
       return;
     default:
@@ -358,10 +358,10 @@ function send(current: PanelState, data: BoardData): void {
   if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
     current.filter = undefined;
   }
-  // カードの焦点も同じ。中身のあとに送る（画面は届いた中身のカードを探す）。読めたボードのときだけ
-  const reveal = current.reveal;
-  if (reveal !== undefined && data.kind === "board" && current.host.post({ type: "reveal", ticket: reveal } satisfies ToBoard)) {
-    current.reveal = undefined;
+  // 選ぶカードも同じ。中身のあとに送る（画面は届いた中身のカードを探す）。読めたボードのときだけ
+  const select = current.select;
+  if (select !== undefined && data.kind === "board" && current.host.post({ type: "select", ticket: select } satisfies ToBoard)) {
+    current.select = undefined;
   }
 }
 

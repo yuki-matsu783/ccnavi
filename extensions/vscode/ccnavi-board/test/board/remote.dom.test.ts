@@ -57,7 +57,7 @@ test("CB-T579 リモートとの差の言い方。未送信・遅れ。読めな
   assert.deepEqual(remoteItems(board(null)), []);
 });
 
-test("CB-D363 親のカードは、未送信を注意の行に短く出し、出どころ（issue・MR・ブランチ）とリモートとの差の全部は詳細に畳む", async () => {
+test("CB-D363 親のカードは、未送信を注意の行に短く出し、出どころ（issue・MR・ブランチ）とリモートとの差の全部は選んだパネルの詳細に出す", async () => {
   const remote: RemoteJson = { branch: "feature/12-login", ahead: 2, behind: 1 };
   const json = withRemote(remote, { issue: 12, mr: 7, branch: "feature/12-login" });
   const page = await openBoard(json);
@@ -66,17 +66,16 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
     // 未送信（aheadが1以上）は注意の行に。遅れはここには出さない
     assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未送信2件"]);
     assert.equal(parent.querySelectorAll(".origin").length, 0, "出どころの行は常時は出さない");
-    // 詳細は畳んである（開くまで中身を出さない）
-    assert.equal(parent.querySelectorAll("details.card-details").length, 1);
-    assert.equal(parent.querySelectorAll(".detail-rows").length, 0);
+    // 詳細はカードに無い（選ぶとパネルに出る）
+    assert.equal(parent.querySelectorAll(".detail-rows, details").length, 0);
   } finally {
     await page.close();
   }
-  // 詳細を開いた状態（カードごとに覚えている）で開く
-  const opened = await openBoard(json, { state: { details: [JSON.stringify(["", "i0001"])] } });
+  // 選んだ状態（webviewの状態に覚えている）で開く
+  const opened = await openBoard(json, { state: { selected: JSON.stringify(["", "i0001"]) } });
   try {
-    const parent = opened.one('li.card[data-id="i0001"]');
-    const row = (key: string): string => parent.querySelector(`.detail-row[data-row="${key}"] dd`)?.textContent ?? "";
+    const panel = opened.one("aside.card-panel");
+    const row = (key: string): string => panel.querySelector(`.detail-row[data-row="${key}"] dd`)?.textContent ?? "";
     assert.equal(row("issue"), "#12");
     assert.equal(row("parent-mr"), "!7");
     assert.equal(row("branch"), "feature/12-login");

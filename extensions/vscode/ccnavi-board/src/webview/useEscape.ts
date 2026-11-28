@@ -5,6 +5,8 @@ import { useEffect, useRef } from "react";
  * Escは、いま出ているもののうち最も手前の1つだけが受ける。
  */
 export const ESCAPE_LAYER = {
+  /** ボードの選んだカードの右のパネル（`board/Panel.css`）。画面を覆わないので一番奥 */
+  panel: 1,
   /** 選択肢の一覧（`rules/Rule.css`） */
   popup: 5,
   /** 承認・保存前の確認・答えの確認など、画面全体を覆う面（`board/Approval.css`ほか） */

@@ -14,25 +14,29 @@ import { approvePreview, openBoard, openPage } from "../helpers/board.js";
 import type { Element, Event, HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 import type { DomPage } from "../helpers/dom.js";
 
-test("CB-D1288 拡張ホストのrevealで、そのカードを隠している絞り込みと畳んだ列を外し、焦点を当てる。ほかの絞り込みは残す。知らないカードでは何もしない", async () => {
+test("CB-D1288 拡張ホストのselectで、そのカードを隠している絞り込みと畳んだ列を外し、カードを押したときと同じく選んで右のパネルに出し、焦点を当てる。ほかの絞り込みは残す。知らないカードでは何もしない", async () => {
   // i0001-02-02は進行中の列の、ユーザ待ちでない子。親の絞り込み（同じ親）は残り、ユーザ待ちのみと畳みは外れる
   const page = await openBoard(fixture(), { state: { parent: "i0001", attention: true, folded: ["doing", "done"] } });
   try {
     assert.ok(page.one('.card[data-id="i0001-02-02"]').classList.contains("hidden"));
-    await page.send({ type: "reveal", ticket: "i0001-02-02" });
+    await page.send({ type: "select", ticket: "i0001-02-02" });
     await page.settle();
     const card = page.one('.card[data-id="i0001-02-02"]');
     assert.ok(!card.classList.contains("hidden"));
+    assert.ok(card.classList.contains("selected"));
+    assert.equal(page.one("aside.card-panel").getAttribute("data-panel"), "i0001-02-02");
     assert.equal(page.document.activeElement, card);
-    const state = page.state() as { parent: string; attention: boolean; folded: string[] };
+    const state = page.state() as { parent: string; attention: boolean; folded: string[]; selected: string };
     assert.equal(state.parent, "i0001");
     assert.equal(state.attention, false);
     assert.deepEqual(state.folded, ["done"]);
+    assert.equal(state.selected, JSON.stringify(["", "i0001-02-02"]));
     assert.deepEqual(page.posted.filter((m) => m.type !== "ready"), []);
-    // いまのボードに無いカードなら、絞り込みも畳みも変えない
-    await page.send({ type: "reveal", ticket: "i9999" });
+    // いまのボードに無いカードなら、絞り込みも畳みも選択も変えない
+    await page.send({ type: "select", ticket: "i9999" });
     await page.settle();
     assert.deepEqual((page.state() as { folded: string[] }).folded, ["done"]);
+    assert.equal(page.one("aside.card-panel").getAttribute("data-panel"), "i0001-02-02");
   } finally {
     await page.close();
   }
@@ -78,10 +82,12 @@ test("CB-D41 親で絞り込むと他の親子のチケットのカードが隠�
     page.click(page.one('button[data-action="approve-one"][data-ticket="i0001-02-03"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "approve", tickets: ["i0001-02-03"], filtered: true });
-    // カードを押すと提案を開く。ボタンの上では開かない
+    // カードを押すと選んで右のパネルに出す（拡張ホストへは送らない）
+    const sent = page.posted.length;
     page.click(page.one('.card[data-id="i0001-01-01"]'));
     await page.settle();
-    assert.equal(page.posted.at(-1)?.type, "open");
+    assert.equal(page.posted.length, sent);
+    assert.equal(page.one("aside.card-panel").getAttribute("data-panel"), "i0001-01-01");
   } finally {
     await page.close();
   }
@@ -283,21 +289,23 @@ test("CB-D49 承認のオーバーレイはEscで閉じる。承認している�
   }
 });
 
-test("CB-D50 カードはEnterでも開く。ボタンやリンクの上では開かない", async () => {
+test("CB-D50 カードはEnterでも選ぶ。ボタンやリンクの上では選ばない", async () => {
   const page = await openBoard();
   try {
+    const selected = (): string | null => (page.all("aside.card-panel")[0]?.getAttribute("data-panel") ?? null);
     page.key("Enter", page.one('.card[data-id="i0001-01-01"]'));
     await page.settle();
-    assert.equal(page.posted.at(-1)?.type, "open");
-    const sent = page.posted.length;
-    // カードの中のボタンの上で押しても、提案は開かない
-    page.key("Enter", page.one('button[data-action="approve-one"]'));
+    assert.equal(selected(), "i0001-01-01");
+    const sent = page.posted.filter((m) => m.type === "open").length;
+    assert.equal(sent, 0, "Enterでファイルを開いた");
+    // カードの中のボタンの上で押しても、そのカードは選ばない（ボタンの操作だけ）
+    page.key("Enter", page.one('.card button[data-action="approve-one"]'));
     await page.settle();
-    assert.equal(page.posted.length, sent);
-    // 他のキーでは開かない
-    page.key("a", page.one('.card[data-id="i0001-01-01"]'));
+    assert.equal(selected(), "i0001-01-01");
+    // 他のキーでは選ばない
+    page.key("a", page.one('.card[data-id="i0001-02-02"]'));
     await page.settle();
-    assert.equal(page.posted.length, sent);
+    assert.equal(selected(), "i0001-01-01");
   } finally {
     await page.close();
   }
@@ -443,7 +451,7 @@ test("CB-D95 拡張ホストが頼んだらボードの案内を出し、最後�
     await dom.settle();
     // チケットがあるボードでも、案内の間は見本を描く
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "詳細", "承認", "更新", "MRの状況を確認", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "右のパネル", "承認", "更新", "MRの状況を確認", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.equal(dom.all(".tour-sample").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
@@ -612,8 +620,10 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
     assert.equal(page.one('.column[data-state="archived"] > h2 > .count').textContent, "1");
     assert.equal(page.one('button.fold[data-fold="archived"]').textContent, "アーカイブ");
-    // 押すと退避したファイルを開く
+    // 押すと右のパネルが開き、「チケットを開く」で退避したファイルを開く
     page.click(page.one('.card[data-id="old"]'));
+    await page.settle();
+    page.click(page.one('aside.card-panel button[data-action="open-ticket"]'));
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "open", filePath: "/ws/logs/archive/self/done/old.md" });
     // 「ユーザ待ちのみ」と重ねると隠れる（アーカイブは要対応に入らない）

@@ -1,11 +1,11 @@
 /**
- * ボード画面の本体。列とカード、絞り込み、承認のオーバーレイ。
+ * ボード画面の本体。列とカード、選んだカードの右のパネル、絞り込み、承認のオーバーレイ。
  *
  * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いた表示も、
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
- * 決めるもの（絞り込み・折りたたんだ列・列の幅・「更新」を押したか）だけ。判定はしない。
+ * 決めるもの（絞り込み・折りたたんだ列・列の幅・選んだカード・「更新」を押したか）だけ。判定はしない。
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
 import { LoadError } from "../shared/LoadError.js";
 
 import type { Board, BoardColumn, Card } from "../../core/board.js";
@@ -14,20 +14,41 @@ import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
 import { OVERLAY_NAMES, parseBoardSample, type OverlayName } from "../../core/tour-board.js";
 import { useHostMessages } from "../useHostMessages.js";
+import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 import { courseOf, coursesOf, ScreenHeader, Tour, useTour } from "../Tour.js";
 import { TOUR_IMAGES } from "../tours/images.js";
 import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
 import { CardItem } from "./Card.js";
+import { CardPanel } from "./Panel.js";
 import { lastUpdatedText } from "../shared/format.js";
 import { ModeBand } from "../shared/ModeBand.js";
 import { MergeBand } from "./MergeBand.js";
-import { detailsKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
+import { cardKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
 
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSSのmin-widthと同じ値 */
 const MIN_WIDTH = 220;
+
+/** 列を縦に積む幅（`App.css`の`@media (max-width: 940px)`と同じ値）。ここより狭いと、右のパネルは選んだカードの下に開く */
+const NARROW = "(max-width: 940px)";
+
+/** 幅が狭いか。CSSの縦積みと同じ条件で、幅が変わったら描き直す。`matchMedia`の無い環境では広いものとして扱う */
+function useNarrow(): boolean {
+  const query = typeof window.matchMedia === "function" ? window.matchMedia(NARROW) : undefined;
+  const [narrow, setNarrow] = useState(query?.matches === true);
+  useEffect(() => {
+    if (query === undefined) {
+      return;
+    }
+    const onChange = (): void => setNarrow(query.matches);
+    query.addEventListener?.("change", onChange);
+    onChange();
+    return () => query.removeEventListener?.("change", onChange);
+  }, []);
+  return narrow;
+}
 
 /**
  * 案内（`tours/board.yml`）。案内の間は今のチケットではなく、案内用の見本（`core/tour-board.ts`）を描く。
@@ -114,9 +135,10 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
     setView((now) => ({ ...now, project: value }));
   };
-  // サイドパネルの行から選ばれたカード。隠している絞り込み・畳んだ列・アーカイブの表示を外してから、描いたあとで送って焦点を当てる
+  // サイドパネルの行から選ばれたカード。カードを押したときと同じ選択にする（右のパネルに出す）。
+  // 隠している絞り込み・畳んだ列・アーカイブの表示を外してから、描いたあとで送って焦点を当てる
   const [revealing, setRevealing] = useState<string | undefined>(undefined);
-  const revealCard = (ticket: string): void => {
+  const selectFromHost = (ticket: string): void => {
     const card = boardRef.current?.columns.flatMap((column) => column.cards).find((c) => c.id === ticket);
     if (card === undefined) {
       return;
@@ -128,15 +150,16 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       attention: now.attention && card.attention,
       archived: now.archived || card.column === "archived",
       folded: now.folded.filter((state) => state !== card.column),
+      selected: cardKey(card),
     }));
-    setRevealing(ticket);
+    setRevealing(cardKey(card));
   };
   useEffect(() => {
     if (revealing === undefined) {
       return;
     }
     setRevealing(undefined);
-    const element = [...document.querySelectorAll<HTMLElement>(".card[data-id]")].find((el) => el.dataset.id === revealing);
+    const element = [...document.querySelectorAll<HTMLElement>(".card[data-id]")].find((el) => cardKey({ project: el.dataset.project ?? "", id: el.dataset.id ?? "" }) === revealing);
     if (element !== undefined) {
       element.scrollIntoView?.({ block: "nearest", inline: "nearest" });
       element.focus();
@@ -150,10 +173,10 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       setMergePending(false);
     } else if (message.type === "filter" && typeof message.project === "string") {
       pickProject(message.project);
-    } else if (message.type === "reveal" && typeof message.ticket === "string") {
+    } else if (message.type === "select" && typeof message.ticket === "string") {
       // 案内の間は見本を描いているので、実際のカードを探さない
       if (!touring) {
-        revealCard(message.ticket);
+        selectFromHost(message.ticket);
       }
     } else if (message.type === "tour") {
       requestTour();
@@ -191,10 +214,9 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     document.body.classList.toggle("filtering", filtering);
   }, [filtering]);
 
-  // 詳細を開いているカード。覚えるのは実際のボードのカードだけ（消えたカードの分は破棄する）。
+  // 選んだカード。覚えるのは実際のボードのカードだけ（消えたカードなら外す）。
   // 読み直せなかった画面（boardが無い）では、覚えていた分を触らない
-  const cardKeys = board === undefined ? undefined : new Set(board.columns.flatMap((column) => column.cards.map(detailsKey)));
-  const details = cardKeys === undefined ? view.details : view.details.filter((key) => cardKeys.has(key));
+  const selected = board === undefined || board.columns.some((column) => column.cards.some((card) => cardKey(card) === view.selected)) ? view.selected : EMPTY.selected;
 
   /**
    * 覚える。外した後の値（候補に無い絞り込みは「すべて」）で書くので、消えた親の絞り込みは
@@ -207,8 +229,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     if (board === undefined) {
       return;
     }
-    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths, details });
-  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths, details.join("\u0000")]);
+    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths, selected });
+  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths, selected]);
 
   // 案内の間は見本の上の様子を描く。絞り込み・畳んだ列・幅は`scene`が決め、実際の`view`は使わない（動かさない）
   const shownProject = touring ? (typeof scene.project === "string" ? scene.project : EMPTY.project) : project;
@@ -217,16 +239,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const shownArchived = touring ? scene.archived === true : archived;
   const shownFolded = touring ? sceneList(scene.fold) : view.folded;
   const shownWidths: Readonly<Record<string, number>> = touring ? {} : view.widths;
-  // 案内の間に詳細を開いて見せるカードは、手順の`scene.details`（識別子を , で区切る）が決める。実際の開閉（`view.details`）には書かない
-  const shownDetails: readonly string[] = touring ? sceneList(scene.details) : details;
-  const detailsOpenOf = (card: Card): boolean => (touring ? shownDetails.includes(card.id) : shownDetails.includes(detailsKey(card)));
-  const toggleDetails = (card: Card, open: boolean): void => {
-    if (touring) {
-      return;
-    }
-    const key = detailsKey(card);
-    setView((now) => ({ ...now, details: open ? [...now.details.filter((k) => k !== key), key] : now.details.filter((k) => k !== key) }));
-  };
+  // 案内の間に選んで見せるカードは、手順の`scene.select`（見本の識別子）が決める。実際の選択（`view.selected`）には書かない
+  const selectedOf = (card: Card): boolean => (touring ? typeof scene.select === "string" && scene.select === card.id : selected === cardKey(card));
+  const selectCard = (card: Card): void => change((now) => ({ ...now, selected: cardKey(card) }));
+  const closePanel = (): void => change((now) => ({ ...now, selected: EMPTY.selected }));
+  const narrow = useNarrow();
   const shownParents = shown === undefined ? [] : shownArchived ? [...shown.parents, ...shown.archivedParents] : shown.parents;
   // マージ状況の帯。実際の結果は拡張ホストが持ち（ボードが開いている間だけ）、ここは出すだけ。案内の間は見本の結果を、
   // 手順の`scene.merge`が指すときだけ出す（実際の結果は見せない・書き換えない）
@@ -252,6 +269,16 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   // 「絞り込み無し」は空のリストではなくfilteredで言う。空を「全部」に読ませると、0件のつもりが全部承認になってしまう。
   const visiblePending =
     shown?.columns.flatMap((column) => column.cards.filter((card) => card.pendingApproval && !hiddenOf(card)).map((card) => card.id)) ?? [];
+
+  // 右のパネルに出すカード。選んだカードが絞り込み・畳んだ列で隠れている間は出さない（選択は覚えたまま）
+  const panelCard = shown?.columns
+    .filter((column) => !shownFolded.includes(column.state))
+    .flatMap((column) => column.cards)
+    .find((card) => selectedOf(card) && !hiddenOf(card));
+  // Escでパネルを閉じる。オーバーレイ・案内が出ていれば、そちらが先に受ける
+  useEscape(panelCard !== undefined && !touring, ESCAPE_LAYER.panel, closePanel);
+  const panelOf = (card: Card): JSX.Element | null =>
+    panelCard !== undefined && card === panelCard ? <CardPanel card={card} below={narrow} onClose={closePanel} /> : null;
 
   return (
     <>
@@ -388,6 +415,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
               {mergeShown === undefined && !touring ? <p className="merge-note" data-merge="hint">マージ待ちのチケットを見たい場合は、［MRの状況を確認］をクリックしてください</p> : null}
             </>
           ) : null}
+          <div className={panelCard !== undefined && !narrow ? "board-area with-panel" : "board-area"}>
           <div className="board" data-tour="board">
             {/* アーカイブの列は「アーカイブ済みチケットを表示」がONのときだけ出す（OFFならカードは全部隠れる） */}
             {shown.columns.filter((column) => shownArchived || column.state !== "archived").map((column) => (
@@ -396,8 +424,9 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 column={column}
                 hiddenOf={hiddenOf}
                 movedOf={movedOf}
-                detailsOpenOf={detailsOpenOf}
-                onDetails={toggleDetails}
+                selectedOf={selectedOf}
+                onSelect={selectCard}
+                panelOf={narrow ? panelOf : () => null}
                 folded={shownFolded.includes(column.state)}
                 width={shownWidths[column.state]}
                 onFold={(folded) =>
@@ -419,6 +448,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
                 }
               />
             ))}
+          </div>
+          {panelCard !== undefined && !narrow ? panelOf(panelCard) : null}
           </div>
           <Footer board={shown} />
         </>
@@ -446,8 +477,9 @@ function Column({
   column,
   hiddenOf,
   movedOf,
-  detailsOpenOf,
-  onDetails,
+  selectedOf,
+  onSelect,
+  panelOf,
   folded,
   width,
   onFold,
@@ -456,8 +488,10 @@ function Column({
   readonly column: BoardColumn;
   readonly hiddenOf: (card: Card) => boolean;
   readonly movedOf: (card: Card) => Moved | undefined;
-  readonly detailsOpenOf: (card: Card) => boolean;
-  readonly onDetails: (card: Card, open: boolean) => void;
+  readonly selectedOf: (card: Card) => boolean;
+  readonly onSelect: (card: Card) => void;
+  /** 幅が狭いときだけ、選んだカードのすぐ下に置くパネル（それ以外はnull） */
+  readonly panelOf: (card: Card) => JSX.Element | null;
   readonly folded: boolean;
   readonly width: number | undefined;
   readonly onFold: (folded: boolean) => void;
@@ -540,14 +574,10 @@ function Column({
       ) : (
         <ul className="cards">
           {column.cards.map((card) => (
-            <CardItem
-              key={`${card.project}/${card.id}`}
-              card={card}
-              hidden={hiddenOf(card)}
-              moved={movedOf(card)}
-              detailsOpen={detailsOpenOf(card)}
-              onDetails={(open) => onDetails(card, open)}
-            />
+            <Fragment key={`${card.project}/${card.id}`}>
+              <CardItem card={card} hidden={hiddenOf(card)} moved={movedOf(card)} selected={selectedOf(card)} onSelect={() => onSelect(card)} />
+              {panelOf(card) === null ? null : <li className="card-panel-slot">{panelOf(card)}</li>}
+            </Fragment>
           ))}
         </ul>
       )}

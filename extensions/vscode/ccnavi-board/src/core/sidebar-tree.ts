@@ -197,7 +197,7 @@ function waitingNode(board: BoardJson, tickets: boolean): { readonly node: Sideb
         node(`notice:${id}`, named(id), {
           description: issuesOf.get(id)?.[0] ?? "",
           tooltip: [...(issuesOf.get(id) ?? []), "押すと、チケット管理でこのカードを選びます"].join("\n"),
-          action: { kind: "board", target: { kind: "reveal", ticket: id } },
+          action: { kind: "board", target: { kind: "select", ticket: id } },
         }),
       ),
       "承認待ち・レビュー待ちのほかに、ユーザの確認が要るチケット",
@@ -264,7 +264,7 @@ function progressNode(board: BoardJson): SidebarNode {
             node(`progress:${card.project}:${card.id}`, card.title === "" ? card.id : `${card.id} ${card.title}`, {
               description: card.stage === "" ? card.status.label : card.stage,
               tooltip: "押すと、チケット管理でこのカードを選びます",
-              action: { kind: "board", target: { kind: "reveal", ticket: card.id } },
+              action: { kind: "board", target: { kind: "select", ticket: card.id } },
             }),
           ),
   });

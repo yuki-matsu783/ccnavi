@@ -1,6 +1,6 @@
 /**
  * 画面が覚えておくもの。絞り込み（プロジェクト・親・ユーザ待ちのみ・アーカイブ済みを表示するか）、折りたたんだ列、
- * ドラッグで決めた列の幅、詳細を開いているカード。
+ * ドラッグで決めた列の幅、選んだカード（右のパネルに出すもの）。
  *
  * 置き場はWebviewのstateで、拡張がHTMLを作り直しても（非表示になって作り直されても）残る。
  */
@@ -15,16 +15,16 @@ export interface ViewState {
   readonly folded: readonly string[];
   readonly widths: Readonly<Record<string, number>>;
   /**
-   * 詳細を開いているカード（`detailsKey`）。更新や列の移動では閉じない。カードごとに覚えるので、
-   * 同じ識別子の別プロジェクトのカードとは別
+   * 選んだカード（`cardKey`）。右のパネルに出す。空なら選んでいない。更新や列の移動では外さない。
+   * プロジェクトと識別子の組で覚えるので、同じ識別子の別プロジェクトのカードとは別
    */
-  readonly details: readonly string[];
+  readonly selected: string;
 }
 
-export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: [], widths: {}, details: [] };
+export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: [], widths: {}, selected: "" };
 
-/** 詳細の開閉を覚えるキー。プロジェクトと識別子の組（どちらも文字列なのでJSONにすれば取り違えない） */
-export function detailsKey(card: { readonly project: string; readonly id: string }): string {
+/** 選んだカードを覚えるキー。プロジェクトと識別子の組（どちらも文字列なのでJSONにすれば取り違えない） */
+export function cardKey(card: { readonly project: string; readonly id: string }): string {
   return JSON.stringify([card.project, card.id]);
 }
 
@@ -39,7 +39,7 @@ export function loadState(): ViewState {
     archived: saved.archived === true,
     folded: Array.isArray(saved.folded) ? saved.folded.filter((f): f is string => typeof f === "string") : [],
     widths: Object.fromEntries(Object.entries(widths).filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)),
-    details: Array.isArray(saved.details) ? saved.details.filter((d): d is string => typeof d === "string") : [],
+    selected: typeof saved.selected === "string" ? saved.selected : EMPTY.selected,
   };
 }
 
@@ -55,6 +55,6 @@ export function saveState(state: ViewState): void {
     archived: state.archived,
     folded: state.folded,
     widths: state.widths,
-    details: state.details,
+    selected: state.selected,
   });
 }

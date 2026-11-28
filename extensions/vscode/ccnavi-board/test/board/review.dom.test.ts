@@ -122,3 +122,36 @@ test("CB-D733 指摘が増えたとき: 「レビュー済みにしていませ�
     await kept.close();
   }
 });
+
+test("CB-D1293 対応方針の画面の左に指摘の目次（番号と場所、最後に「確定」）。押すとその指摘の位置へ送るだけ。0件の画面には出さない", async () => {
+  const scrolled: string[] = [];
+  const base = preview(2);
+  const shown: DecidePreview = { ...base, threads: [base.threads[0], { ...base.threads[1], path: "", line: 0 }] };
+  const page = await openBoard(fixture(), {
+    approval: { kind: "decidePreview", preview: shown, tree: "/t" },
+    prepare: (window) => {
+      (window.HTMLElement.prototype as unknown as { scrollIntoView: (this: { id: string }) => void }).scrollIntoView = function () {
+        scrolled.push(this.id);
+      };
+    },
+  });
+  try {
+    const items = page.all(".approval nav.overlay-toc button.overlay-toc-item");
+    assert.deepEqual(items.map((b) => b.textContent), ["1. src/a0.py:1", "2. （場所なし）", "確定"]);
+    for (const b of items) {
+      page.click(b);
+      await page.settle();
+    }
+    assert.deepEqual(scrolled, ["decide-thread-1", "decide-thread-2", "decide-confirm-area"]);
+    assert.equal(page.one("#decide-thread-1").getAttribute("data-key"), "u1");
+    assert.ok(page.one("#decide-confirm-area").contains(page.one('button[data-action="decide-confirm"]')));
+  } finally {
+    await page.close();
+  }
+  const zero = await openBoard(fixture(), { approval: { kind: "decidePreview", preview: preview(0), tree: "/t" } });
+  try {
+    assert.equal(zero.all("nav.overlay-toc").length, 0);
+  } finally {
+    await zero.close();
+  }
+});

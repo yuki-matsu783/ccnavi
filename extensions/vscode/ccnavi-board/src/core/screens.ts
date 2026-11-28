@@ -30,14 +30,14 @@ export type TemplatesTarget = RulesTarget;
  * - `project` 開いたときの絞り込み（`""`はワークスペース（プロジェクト外）、`"*"`は全部）
  * - `approve` そのチケット1件の承認のオーバーレイ（カードの［承認］と同じ）
  * - `decide` そのフェーズのレビュー完了（カードの［レビュー完了］と同じ。リモートの指摘を取りに行く）
- * - `reveal` そのカードまで送って焦点を当てる（絞り込みや畳んだ列で隠れていれば外す）
+ * - `select` そのカードを選んで右のパネルに出し、焦点を当てる（絞り込みや畳んだ列で隠れていれば外す）
  * - `mergeCheck` 「MRの状況を確認」（リモートのMRを見に行く）
  */
 export type BoardTarget =
   | { readonly kind: "project"; readonly project: string }
   | { readonly kind: "approve"; readonly ticket: string }
   | { readonly kind: "decide"; readonly parent: string; readonly phase: number }
-  | { readonly kind: "reveal"; readonly ticket: string }
+  | { readonly kind: "select"; readonly ticket: string }
   | { readonly kind: "mergeCheck" };
 
 /** 画面の入口（サイドパネルに並ぶ7つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */

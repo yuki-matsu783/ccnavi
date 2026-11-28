@@ -134,26 +134,29 @@ export function ProposalReview({ view, base, lock, dirty, onImport, onCancel }: 
   );
 }
 
-/** エージェントへの依頼の文。承認の文と同じ2ボタンで渡す。文は拡張ホストが持っている分を使う */
+/**
+ * エージェントへの依頼の文。承認の文と同じく、主ボタンは「新しいセッションで開く」1つで、「コピー」は通常の色。
+ * 文は拡張ホストが持っている分を使う
+ */
 export function RequestText({ prompt, onClose }: { readonly prompt: string; readonly onClose: () => void }): JSX.Element {
-  const copy = useRef<HTMLButtonElement>(null);
+  const open = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    copy.current?.focus({ preventScroll: true });
+    open.current?.focus({ preventScroll: true });
   }, []);
   return (
     <Dialog titleId="request-text-title" backdropClass="review-backdrop" cardClass="review" id="request-text" tour="request-text">
       <h2 id="request-text-title">エージェントへの依頼文</h2>
       <p className="dim small">
-        コピーして進行中のセッションに貼るか、新しいセッションで開いてください。送るときは自分でEnterを押してください。エージェントは下書きのみを作成します。
+        「新しいセッションで開く」で渡すか、コピーして進行中のセッションに貼ってください。送るときは自分でEnterを押してください。エージェントは下書きのみを作成します。
         取り込むかどうかは、この画面で差分を確認して判断してください。
       </p>
       <pre className="request-prompt">{prompt}</pre>
       <DialogActions className="review-actions">
-        <button type="button" className="action primary" data-action="request-copy" ref={copy} onClick={() => post({ type: "requestCopy" })}>
-          コピー
-        </button>
-        <button type="button" className="action" data-action="request-open" onClick={() => post({ type: "requestOpen" })}>
+        <button type="button" className="action primary" data-action="request-open" ref={open} onClick={() => post({ type: "requestOpen" })}>
           新しいセッションで開く
+        </button>
+        <button type="button" className="action" data-action="request-copy" onClick={() => post({ type: "requestCopy" })}>
+          コピー
         </button>
         <button type="button" className="action" data-action="request-close" onClick={onClose}>
           閉じる

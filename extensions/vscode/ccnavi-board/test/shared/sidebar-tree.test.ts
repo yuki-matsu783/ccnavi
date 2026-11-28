@@ -76,7 +76,7 @@ test("CB-T1283 行を押すと、該当の画面と場所を開く（承認・�
   const review = find(tree.nodes, "review:i0001:2");
   assert.equal(review?.label, "i0001 フェーズ2（設計）");
   assert.deepEqual(review?.action, { kind: "board", target: { kind: "decide", parent: "i0001", phase: 2 } });
-  assert.deepEqual(find(tree.nodes, "notice:i0001-02-02")?.action, { kind: "board", target: { kind: "reveal", ticket: "i0001-02-02" } });
+  assert.deepEqual(find(tree.nodes, "notice:i0001-02-02")?.action, { kind: "board", target: { kind: "select", ticket: "i0001-02-02" } });
   // ツリーはルートのパスで引く（大文字小文字は区別しない）。キーは取り込み待ち画面のもの
   const handoff = find(tree.nodes, "handoff:<ROOT>/.claude/worktrees/i0001");
   assert.equal(handoff?.label, "ワークツリーi0001");
@@ -93,7 +93,7 @@ test("CB-T1284 進行中の親は、進行中の列の親を局面の文つき�
     progress?.children.map((n) => [n.label, n.description]),
     [["i0001 親", "作業中・フェーズ2 設計"]],
   );
-  assert.deepEqual(progress?.children[0].action, { kind: "board", target: { kind: "reveal", ticket: "i0001" } });
+  assert.deepEqual(progress?.children[0].action, { kind: "board", target: { kind: "select", ticket: "i0001" } });
   const screens = find(tree.nodes, "screens");
   assert.deepEqual(
     screens?.children.map((n) => n.label),

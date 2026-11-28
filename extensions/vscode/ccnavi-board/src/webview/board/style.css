@@ -19,7 +19,9 @@
 @import "../shared/Dialog.css";
 @import "./App.css";
 @import "./Card.css";
+@import "./Panel.css";
 @import "./MergeBand.css";
 @import "./Approval.css";
+@import "./Toc.css";
 @import "../shared/PlanGraph.css";
 @import "../Tour.css";

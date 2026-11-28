@@ -161,7 +161,7 @@ test("CB-T424 見本の読み取りは、列でない名前・オブジェクト
 });
 
 /** 案内の`scene`が読むキー（`board.yml`の先頭のコメントと`board/App.tsx`が読むもの） */
-const SCENE_KEYS = ["overlay", "project", "parent", "attention", "archived", "fold", "details", "merge"];
+const SCENE_KEYS = ["overlay", "project", "parent", "attention", "archived", "fold", "select", "merge"];
 
 test("CB-T425 ボードの案内のsceneは、見本にある絞り込み・列・オーバーレイの名前だけを指し、絞り込んでも見本のカードが残る（綴り違いが既定へ黙って戻らない）", () => {
   const parents = new Set([...sample.board.parents, ...sample.board.archivedParents].map((p) => p.id));
@@ -179,9 +179,7 @@ test("CB-T425 ボードの案内のsceneは、見本にある絞り込み・列�
       assert.ok(scene.attention === undefined || typeof scene.attention === "boolean", `${at}: attentionは真偽`);
       assert.ok(scene.archived === undefined || typeof scene.archived === "boolean", `${at}: archivedは真偽`);
       assert.ok(scene.merge === undefined || (typeof scene.merge === "boolean" && sample.merge !== undefined), `${at}: mergeは真偽で、見本にmergeがある`);
-      for (const id of String(scene.details ?? "").split(",").filter((item) => item.trim() !== "")) {
-        assert.ok(cards.some((c) => c.id === id.trim()), `${at}: detailsの${id}のカードが見本にありません`);
-      }
+      assert.ok(scene.select === undefined || cards.some((c) => c.id === scene.select), `${at}: selectの${String(scene.select)}のカードが見本にありません`);
       for (const state of String(scene.fold ?? "").split(",").filter((item) => item.trim() !== "")) {
         assert.ok(states.has(state.trim() as never), `${at}: foldの${state}は列の名前でない`);
       }
@@ -202,7 +200,7 @@ test("CB-T425 ボードの案内のsceneは、見本にある絞り込み・列�
 const FIXED_TARGETS = new Set([
   "summary", "filter-project", "filter-parent", "filter-attention", "filter-archived", "refresh", "merge-check", "approve", "tour", "board",
   "merge-band", "merge-retire", "merge-abandon",
-  "status", "turn", "details", "notes", "badge-blocked", "badge-preds", "badge-worktree", "badge-risk", "badge-seen", "badge-issue", "badge-unsent",
+  "status", "turn", "details", "panel", "open-ticket", "notes", "badge-blocked", "badge-preds", "badge-worktree", "badge-risk", "badge-seen", "badge-issue", "badge-unsent",
   "approve-one", "review-done", "mr", "phases", "moved", "flow-create", "flow-edit", "flow-locked", "workflow-button",
   "approval-batch", "approval-plan", "approve-confirm", "approval-prompt", "approval-handover", "edit-workflow", "decide-threads", "decide-consult", "decide-confirm",
 ]);
@@ -228,7 +226,7 @@ test("CB-T426 ボードの案内の指す先は、画面が付ける印か、見
   }
   const intro = def.courses[0];
   assert.equal(intro.id, INTRO_ID);
-  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "詳細", "承認", "更新", "MRの状況を確認", "案内"]);
+  assert.deepEqual(intro.steps.map((s) => s.title), ["集計", "絞り込み", "列", "状態のバッジ", "ユーザ待ち", "右のパネル", "承認", "更新", "MRの状況を確認", "案内"]);
   assert.equal(intro.steps.at(-1)?.target, "tour");
 });
 
