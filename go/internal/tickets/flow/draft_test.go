@@ -88,7 +88,8 @@ func replaceOnce(s, old, repl string) string {
 	return strings.Replace(s, old, repl, 1)
 }
 
-// 下書きが無ければ見せない。在れば、読めない・いまのフローが無い・中身が違うときに見せる。いまのフローが読めなければ見せない。
+// 下書きが無ければ見せない。在れば、読めない・いまのフローが無い・中身が違うときに見せる。閉じた子と、いまのフローが
+// 読めないときは見せない。
 func TestDraftDiffers(t *testing.T) {
 	root := t.TempDir()
 	info := func() *Info {
@@ -111,6 +112,11 @@ func TestDraftDiffers(t *testing.T) {
 	testkit.Put(t, filepath.Join(root, "drafts", "a.yml"), replaceOnce(layoutFlow, "name: 設計", "name: 別"))
 	if !DraftDiffers(info()) {
 		t.Error("名前が違う")
+	}
+	closed := info()
+	closed.Closed = true
+	if DraftDiffers(closed) {
+		t.Error("閉じた子の下書き")
 	}
 	testkit.Put(t, filepath.Join(root, "drafts", "a.yml"), "nodes: [\n")
 	if !DraftDiffers(info()) {

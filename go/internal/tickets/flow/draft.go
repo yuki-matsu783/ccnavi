@@ -8,11 +8,12 @@ var layoutKeys = map[string]bool{"position": true, "style": true, "parentId": tr
 // groupType はグループの枠のノードの種類。枠は見た目だけなので見比べない。
 const groupType = "group"
 
-// DraftDiffers は子のフローの下書きを「提案あり」として見せるか（チケット管理画面の flow.draft.differs）。下書きが在り、
-// 読めないか、いまのフローと位置とグループ化を除いて違えば真。いまのフローが無ければ、下書きが在るだけで真。
-// いまのフローが読めなければ偽（フロー編集の画面が開けないので、見比べる相手が無い）。
+// DraftDiffers は子のフローの下書きを「提案あり」として見せるか（チケット管理画面の flow.draft.differs）。開いている子で
+// 下書きが在り、読めないか、いまのフローと位置とグループ化を除いて違えば真。いまのフローが無ければ、下書きが在るだけで真。
+// 閉じた子は偽（フロー編集の画面は読むだけで、下書きを取り込めない）。いまのフローが読めなければ偽（フロー編集の画面が
+// 開けないので、見比べる相手が無い）。
 func DraftDiffers(info *Info) bool {
-	if info == nil || !info.Draft.Exists {
+	if info == nil || info.Closed || !info.Draft.Exists {
 		return false
 	}
 	var current any

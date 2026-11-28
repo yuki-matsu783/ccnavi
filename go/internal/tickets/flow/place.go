@@ -118,7 +118,9 @@ type Info struct {
 	Exists, Linked  bool
 	// LockKind は錠の種類。レビュー中（Review）は着手の有無によらず止め、着手中は Doing。空なら錠は無い。
 	LockKind place.State
-	Draft    DraftInfo
+	// Closed は子が閉じている（終わった・取り消した）か。閉じた子の下書きは「提案あり」にしない（DraftDiffers）。
+	Closed bool
+	Draft  DraftInfo
 }
 
 // DraftInfo はエージェントが書く下書きの欄。置くツリーはフローと同じ。
@@ -137,7 +139,8 @@ func FlowInfo(conf *config.Settings, root string, child *ticket.Ticket) *Info {
 		return nil
 	}
 	file, base, exists := Resolve(conf, root, child)
-	if !exists && (child.State == place.Done || child.State == place.Cancelled) {
+	closed := child.State == place.Done || child.State == place.Cancelled
+	if !exists && closed {
 		return nil
 	}
 	draft := DraftFile(conf, base, child.ID)
@@ -152,7 +155,7 @@ func FlowInfo(conf *config.Settings, root string, child *ticket.Ticket) *Info {
 	return &Info{
 		Path: file, Rel: FlowRel(conf, child.ID), Tree: base,
 		Exists: exists, Linked: exists && pathmatch.HasLink(base, file),
-		LockKind: lock,
+		LockKind: lock, Closed: closed,
 		Draft: DraftInfo{
 			Path: draft, Rel: DraftRel(conf, child.ID),
 			Exists: draftExists, Linked: draftExists && pathmatch.HasLink(base, draft),

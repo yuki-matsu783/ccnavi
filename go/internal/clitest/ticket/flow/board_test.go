@@ -509,6 +509,34 @@ func TestInboxSortsWaitingTicketsAndDrafts(t *testing.T) {
 	}
 }
 
+// 閉じた子（ここでは終わった i0001-01-01）の下書きは、フローが在っても「提案あり」にせず、flow_draft にも入れない
+// （フロー編集の画面は読むだけ）。置き場は i0001-02-02 の欄と同じディレクトリに組む（閉じてフローが無い子は flow が null）。
+func TestAClosedChildsDraftIsNotOffered(t *testing.T) {
+	t.Parallel()
+	tr := boardSceneBuild(t)
+	var flowFile, draft string
+	for _, tk := range jl(tr.board(), "tickets") {
+		if js(tk, "ticket") == "i0001-02-02" {
+			flowFile = filepath.Join(filepath.Dir(js(tk, "flow", "path")), "i0001-01-01.yml")
+			draft = filepath.Join(filepath.Dir(js(tk, "flow", "draft", "path")), "i0001-01-01.yml")
+		}
+	}
+	ticketkit.Write(t, flowFile, "id: f\nnodes:\n  - {id: start, type: start}\n")
+	ticketkit.Write(t, draft, "id: f\nnodes:\n  - {id: end, type: end}\n")
+	board := tr.board()
+	if got := jl(board, "inbox", "flow_draft"); len(got) != 0 {
+		t.Errorf("flow_draft = %v", got)
+	}
+	for _, tk := range jl(board, "tickets") {
+		if js(tk, "ticket") != "i0001-01-01" {
+			continue
+		}
+		if !jb(tk, "flow", "exists") || !jb(tk, "flow", "draft", "exists") || jb(tk, "flow", "draft", "differs") {
+			t.Errorf("flow = %v", jv(tk, "flow"))
+		}
+	}
+}
+
 // finish が書いた merged_sha（合流した子の先頭）をボードの JSON に載せる（表示だけ）。
 func TestTheMergedHeadOfAChildIsShown(t *testing.T) {
 	t.Parallel()
