@@ -133,7 +133,7 @@ func Unreadable(conf *config.Settings, root string) []string {
 	return broken
 }
 
-// LayerFor は、このツリーに足す設定を返す（書き込み系は行き先の 1 つだけ）。ワークスペースのツリーなら自身の
+// LayerFor は、このツリーに足す設定を返す（書き込み系は行き先の 1 つだけ）。ワークスペースのツリーならワークスペースの
 // 設定、プロジェクトのツリーならその設定、ワークスペースルートの外（nil）なら無し。
 // 行き先が予約名のプロジェクトなら無し。名前引きに任せると、`projects/self/` への書き込みがワークスペースの設定の
 // ルール（広い allow があればそれ）で判定されてしまう。無しなら共通設定だけで判定するので、緩む側にならない。
@@ -156,7 +156,7 @@ func LayerFor(conf *config.Settings, root string, target *tree.Tree) []Layer {
 
 // RulesFor は、この呼び出しに適用するルール集合、その出所、行き先のツリーを返す。パスを持たないツールと
 // ワークスペースルートの外は、行き先を nil にする。パスのあるツールは、共通設定に行き先の設定を足す。
-// パスの無いツールは全部の設定の和を使う。どのプロジェクトのものかは特定しない。和なら deny と ask は増える側になる。
+// パスの無いツールは全部の設定を足した統合結果を使う。どのプロジェクトのものかは特定しない。和なら deny と ask は増える側になる。
 // record.Subject は解決済みの行き先のパス。
 func RulesFor(stderr io.Writer, conf *config.Settings, root string, in hookio.Input, record *audit.Record) (*rules.RuleSet, rules.Origin, *tree.Tree) {
 	byPath := isPathTool(in.ToolName)
@@ -280,7 +280,7 @@ type LayerView struct {
 	Problems   []rules.Problem
 }
 
-// commonView は診断のために共通設定を読み、合わせる先（共通設定のルールを写した集合）を作る。
+// commonView は診断のために共通設定を読み、足す先（共通設定のルールを写した集合）を作る。
 // 既定に戻っていれば unreadable が読めなかったもの。
 func commonView(stderr io.Writer, conf *config.Settings, root string) (common, merged *rules.RuleSet, unreadable string) {
 	record := &audit.Record{}
@@ -325,7 +325,7 @@ func overlay(view *LayerView, merged *rules.RuleSet, l Layer, root string) *rule
 }
 
 // Survey は共通設定と各設定を、判定と同じ順・同じ読み方で読む（--explain・--lint）。並べたものは Bash の
-// 和と一致する（合わせ方は判定と同じ merge の 1 本）。共通設定が壊れているときは、設定を足さない。
+// 和と一致する（足し方は判定と同じ merge の 1 本）。共通設定が壊れているときは、設定を足さない。
 func Survey(stderr io.Writer, conf *config.Settings, root string) []LayerView {
 	common, merged, unreadable := commonView(stderr, conf, root)
 	views := []LayerView{{Name: config.LayerCommon, Path: conf.Rules, RuleSet: common, Unreadable: unreadable}}
@@ -347,9 +347,9 @@ func Survey(stderr io.Writer, conf *config.Settings, root string) []LayerView {
 	return views
 }
 
-// SumView は、共通設定に 1 つの設定を足した和を、判定と同じ読み方で読む（診断用）。Survey は全設定を
-// 順に合わせるので、後ろの設定の欄は先の設定の定義に引かれて欠ける。SumView は、パスのあるツールの判定と
-// 同じ和を返す（RuleSet は共通設定を含む。土台の deny は含まない）。
+// SumView は、共通設定に 1 つの設定を足した統合結果を、判定と同じ読み方で読む（診断用）。Survey は全設定を
+// 順に足すので、後ろの設定の欄は先の設定のフェーズ定義に引かれて欠ける。SumView は、パスのあるツールの判定と
+// 同じ統合結果を返す（RuleSet は共通設定を含む。土台の deny は含まない）。
 func SumView(stderr io.Writer, conf *config.Settings, root string, l Layer) LayerView {
 	_, merged, unreadable := commonView(stderr, conf, root)
 	view := LayerView{Name: l.Name, Path: l.Path, RuleSet: merged, Unreadable: unreadable}
@@ -361,7 +361,7 @@ func SumView(stderr io.Writer, conf *config.Settings, root string, l Layer) Laye
 }
 
 // LayerFiles は、守る対象（selfguard）に渡す設定ごとの設定ファイルを返す。共通設定は phases・risk・sections
-// だけ（rules は守る側が別に受け取る）。自身とプロジェクトの設定は本来の置き場の 4 本を渡す（差し替えは診断のため）。
+// だけ（rules は守る側が別に受け取る）。ワークスペースとプロジェクトの設定は本来の置き場の 4 本を渡す（差し替えは診断のため）。
 // プロジェクトはさらに、共通設定のミラーの 4 本も渡す。Origin で分けるのは、`projects/common/` の名前で比べると
 // 共通設定と同じ key になって外れるため。予約名のプロジェクトも並べる。判定に使わないものを守るだけで、
 // 緩む側にはならない。在るかどうかは見ない（無いものは守る側が外す）。
@@ -427,7 +427,7 @@ func prefixIDs(rs *rules.RuleSet, layer string) {
 	}
 }
 
-// workspaceRules は、共通設定とワークスペースの設定の和を返す。判定の経路ではない場面（ターンの終わり、
+// workspaceRules は、共通設定にワークスペースの設定を足した統合結果を返す。判定の経路ではない場面（ターンの終わり、
 // セッションの開始）で、ワークスペースが何を宣言しているかを見るためのものである。苦情は捨て、記録にも残さない。
 // 共通設定が壊れて既定に戻ったときは、設定を足さない（判定と同じ）。
 func workspaceRules(conf *config.Settings, root string) *rules.RuleSet {

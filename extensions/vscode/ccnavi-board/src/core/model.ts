@@ -304,9 +304,9 @@ export interface SumPhaseJson {
 }
 
 /**
- * 統合結果（`sums[]`）の1件。「共通の設定 + その設定」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
+ * 統合結果（`sums[]`）の1件。「共通設定 + その設定」の読み取り用の結果で、実行ファイルが判定と同じ関数で組む。
  * 拡張はこれを足し直さず、そのまま見せる。順は ワークスペース（`self`）→ プロジェクト（名前順）。
- * パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した和ではない。
+ * パスを持たないツール（Bashなど）が適用する、全プロジェクトの設定を足した統合結果ではない。
  */
 export interface SumJson {
   /** `self` / プロジェクトの名前 */
@@ -333,7 +333,7 @@ export interface SumJson {
     readonly problems: readonly string[];
   };
   /**
-   * 共通の設定 + その設定の定義（判定に使う和）。`path`と`unreadable`はその設定のファイル。
+   * 共通設定 + その設定のフェーズ定義（判定に使う和）。`path`と`unreadable`はその設定ファイル。
    * 各定義の`source`が出どころ（`common`かその設定の名前）
    */
   readonly phases: {
@@ -360,7 +360,7 @@ export interface BoardJson {
     readonly projects: string;
   };
   readonly trees: readonly TreeJson[];
-  /** 順序は 共通の設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
+  /** 順序は 共通設定 → ワークスペースの設定 → プロジェクトの設定（名前順） */
   readonly layers: readonly LayerJson[];
   /** 順序は、ワークスペースの統合結果 → プロジェクトの統合結果（名前順） */
   readonly sums: readonly SumJson[];

@@ -48,7 +48,7 @@ func commitOrUnknown() string {
 	return commit
 }
 
-// formats は読む設定とチケットの書式の版（設定のファイルの `version:` と比べるもの）。キーの名前の順。
+// formats は読む設定とチケットの書式の版（設定ファイルの `version:` と比べるもの）。キーの名前の順。
 func formats() *pyjson.Object {
 	return pyjson.NewObject(
 		"phases", phases.Version,

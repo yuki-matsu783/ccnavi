@@ -229,9 +229,9 @@ func TestReservedSelfIsNamedByLintAndNotCounted(t *testing.T) {
 
 	// `projects/Self/` も error で名指しする。
 	w.MustHaveDetail(w.Problems("error", configws.ProjectWhere("Self")), "self")
-	// 数えないので、その設定の deny は Bash の和に入らない。
+	// 数えないので、その設定の deny は Bash の統合結果に入らない。
 	w.AssertNotDenied(w.Hook("Bash", w.Root, configws.Obj{"command": "kubectl get pods"}))
-	// 普通の名前の設定は和に入る。「そもそも和が使われていない」ではないことを見る。
+	// 普通の名前の設定は統合結果に入る。「そもそも統合結果が使われていない」ではないことを見る。
 	w.AssertDenied(w.Hook("Bash", w.Root, configws.Obj{"command": "psql -c 'select 1'"}), "lib:raw-psql")
 }
 
@@ -371,7 +371,7 @@ func TestATicketCannotNameAReservedLayerName(t *testing.T) {
 
 func TestTheLayersOfReservedNamesAreRestoredWithTheCommonLayer(t *testing.T) {
 	t.Parallel()
-	// `projects/common/` の 3 本・`projects/self/` の 2 本・共通設定の phases / risk・ワークスペース自身の risk が、
+	// `projects/common/` の 3 本・`projects/self/` の 2 本・共通設定の phases / risk・ワークスペースの risk が、
 	// 同じ 1 回のバックアップと復元で全部戻る（key が衝突しない）。`projects/self/` は、ワークスペースの設定とは別に守る。
 	w := newWS(t, configws.KindGuard)
 	reserved := w.Project(layerCommon, reservedProjectRules, reservedProjectPhases, reservedProjectRisk)

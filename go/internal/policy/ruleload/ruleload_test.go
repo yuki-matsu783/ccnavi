@@ -208,7 +208,7 @@ func goResult(t *testing.T, root string) result {
 	return res
 }
 
-// 設定の合わせ方・出所・記録・診断の見え方・守る対象を、答えの見本（testdata）と突き合わせる。
+// 設定の足し方・出所・記録・診断の見え方・守る対象を、答えの見本（testdata）と突き合わせる。
 func TestMatchesGolden(t *testing.T) {
 	cases := slices.Clone(scenarios)
 	for i := range cases {
@@ -281,7 +281,7 @@ func severities(problems []rules.Problem) []rules.Severity {
 	return out
 }
 
-// 重ねても except と when は落ちず、それだけが違う定義は別の定義（warn）、全欄が同じなら後ろを捨てる（info）。
+// 足しても except と when は落ちず、それだけが違う定義は別の定義（warn）、全欄が同じなら後ろを捨てる（info）。
 func TestMergeKeepsExceptAndWhen(t *testing.T) {
 	const plain = `{id: a, match: Write, glob: "*", message: m}`
 	const withExcept = `{id: a, match: Write, glob: "*", message: m, except: [{glob: "*.md"}]}`
@@ -294,7 +294,7 @@ func TestMergeKeepsExceptAndWhen(t *testing.T) {
 	prefixIDs(extra, "lib")
 	merge(base, extra, "lib")
 	if got := base.Deny[1]; got.ID != "lib:b" || len(got.Excepts) != 1 || got.When == nil || got.Matches("Write", "/r/wip/a.crt") || !got.Matches("Write", "/r/a.crt") {
-		t.Errorf("重ねたルール: %+v", got)
+		t.Errorf("足したルール: %+v", got)
 	}
 
 	for _, c := range []struct {

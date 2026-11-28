@@ -66,7 +66,7 @@ test("CB-T441 組み込みの配点の見本は、実際の組み込みの配点
   assert.equal(sample.missing.sums, undefined);
 });
 
-test("CB-T442 統合結果の見本は、共通の設定の項目に追加した設定の項目が続き、閾値は小さいほう、同じidの別の項目は設定の名前が付く", () => {
+test("CB-T442 統合結果の見本は、共通設定の項目に追加した設定の項目が続き、閾値は小さいほう、同じidの別の項目は設定の名前が付く", () => {
   const sums = sample.page.sums ?? [];
   assert.deepEqual(sums.map((sum) => sum.name), ["self", "lib"]);
   const common = sample.page.model.form.factors.map((factor) => factor.id);

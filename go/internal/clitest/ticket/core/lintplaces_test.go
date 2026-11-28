@@ -105,7 +105,7 @@ func TestOneProjectAloneIsNotAnError(t *testing.T) {
 	ticketkit.Lacks(t, r.Stdout, "複数の場所にある")
 }
 
-// `projects/` の置き場がワークスペース自身のソースとぶつかったときの `--lint --json` の通し。ワークスペースの git が `projects/` の
+// `projects/` の置き場がワークスペースのソースとぶつかったときの `--lint --json` の通し。ワークスペースの git が `projects/` の
 // 下のファイルを追跡していると、名前を逃がす手段が無い（置き場は固定）。`(projects)` の warn を 1 件だけ出す。プロジェクトが 0 件でも、
 // `.gitignore` に入っていても出す（追跡が先に決まる）。VS Code 拡張（projects-render.ts）がこの句で始まる苦情を見分けてバナーに出す。
 // 置き場の苦情の場面の表（追跡・載せ忘れ・無視の有無・置き場の形・変な `--projects`）は Go の見本

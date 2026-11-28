@@ -146,7 +146,7 @@ ccnavi --lint --json --project-risk-file lib=/tmp/risks.yml
 
 - `--project-rules-file <名前>=<パス>` は、その名前のプロジェクトのルールファイルの代わりに `<パス>` を読む
 - `--project-phases-file <名前>=<パス>` は、その名前の設定（`self` はワークスペースの設定）のフェーズ定義の代わりに `<パス>` を読み、共通設定の `phases.yml` と足した形で確かめる（同 `id` で中身が違う、`title` の重なり）。配点（risk）の設定には次の `--project-risk-file` がある
-- `--project-risk-file <名前>=<パス>` は、その名前の設定（`self` はワークスペースの設定）の配点の代わりに `<パス>` を読む。phases と同じく統合結果なので、共通設定の配点と合わせて確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がその設定の git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通設定の配点は `--risk`。ファイルの無い設定に渡しても、その設定の配点として合成する
+- `--project-risk-file <名前>=<パス>` は、その名前の設定（`self` はワークスペースの設定）の配点の代わりに `<パス>` を読む。phases と同じく統合結果なので、共通設定の配点に足して確かめる（境目の `levels` が合成後に逆転していないか、同 `id` で中身が違う衝突の warn、`script:` が指す先がその設定の git プロジェクトルートの `.ccnavi/scripts/` に在るか）。共通設定の配点は `--risk`。ファイルの無い設定に渡しても、その設定の配点として合成する
 - 設定の置き場を動かすフラグ 8 本（`--rules` / `--phases` / `--risk` / `--projects` / `--project-home` と上の 3 本）は、`--test` / `--test-expectations` /
   `--lint` / `--explain` でだけ有効になる。診断の外（hook からの判定、`ticket` / `review` のサブコマンド）に渡すと無視し、標準エラーにその旨を出す。
   守る対象（コアファイル）も差し替えを見ない
@@ -167,8 +167,8 @@ ccnavi --explain --json
 | `root` / `generated_at` | ワークスペースルートと、出した時刻 |
 | `settings` | `mode`（動作モード。`enable` / `dry-run` / `disable`）/ `ticket_control`（チケット制御を使うか）/ `tickets`（提案の置き場、相対）/ `approved`（承認済みチケットの置き場）/ `projects`（プロジェクトの置き場）。`mode` と `ticket_control` は hook がいま受け取るはずの値で、プロセスの環境にワークスペースルートの `.claude/settings.json`・`.claude/settings.local.json` の env をこの順で重ね、判定と同じ解決（読めない値は `enable`）を通したもの。ホームの設定は読まない。チケット管理画面の中身も同じ `ticket_control` で組み立てる |
 | `trees[]` | ワークスペースルート・プロジェクト・ワークツリー。`{name, root, project, kind}`。`kind` は `main` / `project` / `worktree` |
-| `layers[]` | 設定ごとの宣言。順序は 共通設定 → ワークスペースの設定 → プロジェクト（名前順）。`{name, rules, phases, risk, phases_file}`。`name` は `common` / `self` / プロジェクトの名前。`rules` は `{path, unreadable, deny, ask, allow}` で、各タイプはその設定から実際に判定へ入ったルール `{id, section, source, match, kind, written, pattern, message}`（`when` のルールだけ、書いた組み合わせ条件を `when` に持つ。重複で破棄したものは入らない）。`phases` はその設定のファイルに書いてあるフェーズ定義 `{id, source, kind, title, review, scope}`、`risk` は `{path, unreadable, factors}`（`factors[]` は `{id, source, kind, value, points, message}`）、`phases_file` は `{path, unreadable}`。phases と risk は合成前の、その設定のぶんだけ |
-| `sums[]` | ワークスペースとプロジェクトごとの「共通設定 + 1 つの設定」の和（判定と同じ合成。拡張は足し直さずこれを見せる）。順序は ワークスペースの設定 → プロジェクト（名前順）。`{name, layers, rules, risk, phases}`。`name` は `self` / プロジェクトの名前、`layers` は `["common", <name>]`。`rules` は `{path, unreadable, missing, deny, ask, allow}` で、各タイプは共通設定に足した和（`layers[]` と違い、他の足す側の定義で欠けない）。`risk` は `{levels, factors, fallback, problems}`（`levels` は実際に使う閾値）、`phases` は共通 + その設定の和 `{path, unreadable, types}`（`path` と `unreadable` はその設定のファイル、`types` の `source` は定義の出どころの設定。足すときの衝突は `--lint` が言う。定義は順序を持たないので先行関係の欄は無い） |
+| `layers[]` | 設定ごとの宣言。順序は 共通設定 → ワークスペースの設定 → プロジェクト（名前順）。`{name, rules, phases, risk, phases_file}`。`name` は `common` / `self` / プロジェクトの名前。`rules` は `{path, unreadable, deny, ask, allow}` で、各タイプはその設定から実際に判定へ入ったルール `{id, section, source, match, kind, written, pattern, message}`（`when` のルールだけ、書いた組み合わせ条件を `when` に持つ。重複で破棄したものは入らない）。`phases` はその設定ファイルに書いてあるフェーズ定義 `{id, source, kind, title, review, scope}`、`risk` は `{path, unreadable, factors}`（`factors[]` は `{id, source, kind, value, points, message}`）、`phases_file` は `{path, unreadable}`。phases と risk は合成前の、その設定のぶんだけ |
+| `sums[]` | ワークスペースとプロジェクトごとの共通設定に1 つの設定を足した統合結果（判定と同じ合成。拡張は足し直さずこれを見せる）。順序は ワークスペースの設定 → プロジェクト（名前順）。`{name, layers, rules, risk, phases}`。`name` は `self` / プロジェクトの名前、`layers` は `["common", <name>]`。`rules` は `{path, unreadable, missing, deny, ask, allow}` で、各タイプは共通設定に足した統合結果（`layers[]` と違い、他の足した設定のフェーズ定義で欠けない）。`risk` は `{levels, factors, fallback, problems}`（`levels` は実際に使う閾値）、`phases` は共通設定にその設定を足した統合結果 `{path, unreadable, types}`（`path` と `unreadable` はその設定ファイル、`types` の `source` は定義の出どころの設定。足すときの衝突は `--lint` が言う。定義は順序を持たないので先行関係の欄は無い） |
 | `projects[]` | プロジェクトの名前 |
 | `problems[]` | 読めなかった提案や承認済みチケットの説明。あっても他は出す |
 | `pending_approval[]` | `user agree` で承認の対象に入る識別子（承認済みチケットの無い提案と、親の改版） |
@@ -376,14 +376,14 @@ ccnavi --version --json
 | `commit` | 組み立ての元のコミット。組み立てのときに埋め、未コミットの変更があれば `-dirty` が付く。ソースで動かしているときは `unknown` |
 | `built` | `scripts/ccnavi-build.sh` で組んだ実行ファイル（コミットを埋めたもの）なら真、そうでなければ偽 |
 | `compat` | 互換の版。実行ファイルと、それを呼ぶ側（sh と拡張）の契約の版（下） |
-| `formats` | 読む書式の版。設定のファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
+| `formats` | 読む書式の版。設定ファイル（`rules.yml` / `phases.yml` / `risks.yml`）とチケットの頭の `version:` と比べるもの |
 
 **互換の版**は 3 か所に同じ値で持つ。実行ファイル（`--version --json` の `compat`）、sh（`ccnavi-common.sh` の
 `CCNAVI_COMPAT`）、VS Code 拡張。Chrome 拡張は組み立てのときに実行ファイルの値を埋め込む。
 sh や拡張が頼るフラグや出力の形を、呼ぶ側を直さないと動かない形に変えたときに上げる。データの形（承認済みの置き場に置くものの並び、
 先行関係の置き場など）が変わるときも上げる。古い実行ファイル（古いコアを積んだ Chrome 拡張を含む）が
 新しい形のデータを読み違えるため。フラグや欄を足すだけで、データの形も変わらないなら上げない。
-設定のファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、設定に別の版は足さない。
+設定ファイルは頭の `version:` が書式の版を示し、読めない版は `--lint` が既に error を出すので、設定に別の版は足さない。
 
 sh と VS Code 拡張は、実行ファイルとの食い違いを実行時に断らない・知らせない（sh と実行ファイルは必ず同時に配る前提）。使うフラグや機能の有無も事前に確かめず、版のずれは実行ファイルの断りの文面をそのまま見せる。見つける場所は `ccnavi --lint` だけで、sh の `CCNAVI_COMPAT` と比べ、`(version)` の warn を出す。
 

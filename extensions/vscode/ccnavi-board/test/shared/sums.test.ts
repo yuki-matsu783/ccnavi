@@ -22,7 +22,7 @@ test("CB-T307 統合結果は実行ファイルのsums[]をそのまま渡す。
   assert.deepEqual(riskSums(undefined), []);
 });
 
-test("CB-T308 統合結果の欄の表記と、最初に見せる統合結果。共通の設定を開いているときはワークスペースの統合結果", () => {
+test("CB-T308 統合結果の欄の表記と、最初に見せる統合結果。共通設定を開いているときはワークスペースの統合結果", () => {
   assert.equal(sumLabel("self"), "共通設定 + ワークスペース");
   assert.equal(sumLabel("lib"), "共通設定 + プロジェクト（lib）");
   const sums = [{ name: "self" }, { name: "lib" }];
@@ -35,7 +35,7 @@ test("CB-T308 統合結果の欄の表記と、最初に見せる統合結果。
   assert.equal(defaultSum([], { kind: "self", name: "" }), "");
 });
 
-test("CB-T309 設定の対象の一覧。共通の設定の呼び名を渡さない画面（フェーズ管理）は、共通の設定を並べない", () => {
+test("CB-T309 設定の対象の一覧。共通設定の呼び名を渡さない画面（フェーズ管理）は、共通設定を並べない", () => {
   const labels = (kind: string | undefined) => targetOptions(undefined, kind, { kind: "self", name: "" }).map((o) => o.label);
   assert.deepEqual(labels("workspace"), ["共通設定", "ワークスペース"]);
   assert.deepEqual(labels(undefined), ["ワークスペース"]);

@@ -73,7 +73,7 @@ test("CB-D325 統合結果の枠は閉じた枠で出て、選んだ統合結果
 });
 
 test("CB-D326 見出しを押すと開き、計画の表が番号と種類を出す。本文は依頼を送り、返った本文の見えない文字を \\uで見せる", async () => {
-  // 共通設定の行を開くので、対象は共通の設定（workspace）にする（一覧は開いている対象の設定だけ）
+  // 共通設定の行を開くので、対象は共通設定（workspace）にする（一覧は開いている対象の設定だけ）
   const dom = await openPage({ kind: "page", page: page({ target: { kind: "workspace", name: "" } }) });
   try {
     await openRow(dom, 'li.template[data-name="feature"][data-layer="common"]');
@@ -180,7 +180,7 @@ test("CB-D330 読み込みのエラーは文面を出し、読み込み中は読
   }
 });
 
-test("CB-D331 対象を切り替えるとswitchTargetを送る。共通の設定を開いたときは共通設定のテンプレートだけを出す", async () => {
+test("CB-D331 対象を切り替えるとswitchTargetを送る。共通設定を開いたときは共通設定のテンプレートだけを出す", async () => {
   const dom = await openTemplates();
   try {
     dom.change(dom.one<HTMLSelectElement>("select#target"), "workspace:");

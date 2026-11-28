@@ -12,7 +12,7 @@ import (
 )
 
 // ミラーのずれ（共通設定のコピー・skills/）の案内は、プロジェクトの親の finish だけに出す（#707）。
-// ワークスペース自身の親はふつうの変更として言い、混在のときはずれ以外の件数も出す。
+// ワークスペースの親はふつうの変更として言い、混在のときはずれ以外の件数も出す。
 
 const (
 	mirrorFile = ".ccnavi/config/common/rules.yml"
@@ -47,7 +47,7 @@ func TestTreeProblemMirrorGuidance(t *testing.T) {
 		{"プロジェクトの親はミラーの案内", []string{mirrorFile, skillFile}, true, 1,
 			[]string{mirrorFile, "コミットも取り消しもしない", "ccnavi-user-mirror.sh"},
 			[]string{"サブエージェントの作業がコミットされていません", "ずれ以外", "restore"}},
-		{"ワークスペース自身の親はふつうの変更", []string{mirrorFile}, false, -1,
+		{"ワークスペースの親はふつうの変更", []string{mirrorFile}, false, -1,
 			[]string{"サブエージェントの作業がコミットされていません", "restore"}, []string{"ccnavi-user-mirror.sh"}},
 		{"プロジェクトの親のふつうの変更", []string{"src/keep.py"}, true, -1,
 			[]string{"サブエージェントの作業がコミットされていません"}, []string{"ccnavi-user-mirror.sh"}},

@@ -191,7 +191,7 @@ func TestLayerDrift(t *testing.T) {
 			}
 		}
 	})
-	t.Run("ワークスペース自身は共通設定も比べる", func(t *testing.T) {
+	t.Run("ワークスペースは共通設定も比べる", func(t *testing.T) {
 		root := driftRoot(t)
 		write(t, root, commonLayer, "version: 1\nrules: [x]\n")
 		if got := layerDrift(layerConf(t, root), root, ""); len(got) != 1 || !strings.Contains(got[0].Detail, commonLayer) {

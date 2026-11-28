@@ -208,7 +208,7 @@ func (c *Condition) Walk() []*Condition {
 
 // Rule は探すものと、見つけたときに言うことの組。
 type Rule struct {
-	// ID は報告で名指しする名前。設定の和では `lib:schema` のように前に設定の名前が付く。
+	// ID は報告で名指しする名前。統合結果では `lib:schema` のように前に設定の名前が付く。
 	ID string
 	// BareID は書かれたままの id。設定をまたいで同じルールかを見るキー（ID から前置きを外して
 	// 求めると、`:` を含む id を書いたユーザの定義が外される側になる）。

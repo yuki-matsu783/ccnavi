@@ -21,7 +21,7 @@ export class LoadFailure extends Error {
   }
 }
 
-/** 実行ファイルがこの設定のファイルを読めなかった（`layer.*.unreadable`が空でない） */
+/** 実行ファイルがこの設定ファイルを読めなかった（`layer.*.unreadable`が空でない） */
 export function unreadableFailure(file: ErrorFile, reason: string): LoadFailure {
   return new LoadFailure(`ccnaviがこのファイルを読み込めません。ファイルを直すか、削除してから更新してください: ${reason}`, file);
 }

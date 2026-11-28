@@ -34,7 +34,7 @@ const (
 
 // commonSources は共通設定のうち写すもの（ミラーの置き場からの相対 → 中身）。写せなければ理由。
 func commonSources(conf *config.Settings, root string) (map[string][]byte, string) {
-	// 1. 共通設定のファイル（rules・phases・risks など）と rule-expectations.yml を読む。ファイルが無いのは構わず、在るのに読めないときは止める。
+	// 1. 共通設定ファイル（rules・phases・risks など）と rule-expectations.yml を読む。ファイルが無いのは構わず、在るのに読めないときは止める。
 	base := conf.CommonLayerDir(root)
 	out := map[string][]byte{}
 	riskName := config.LayerFileNames()[config.KindRisk]

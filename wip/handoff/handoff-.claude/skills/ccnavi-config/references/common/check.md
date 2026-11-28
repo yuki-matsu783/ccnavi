@@ -27,8 +27,8 @@ sh .ccnavi/scripts/ccnavi-launcher.sh --lint --log "" --state ""
 | `(risk)` | 読めない、版が違う、levels の順、id の重複・形、points が負、加点条件が 0 か 2 つ、script の置き場が外、glob が組めない | 知らないリスクレベル名 |
 | `(ticket)` `(project)` `(mode)` | 承認済みチケットの置き場が守られていない、計画を持つ親に定義のコピー（phases:）が無いか壊れている | dry-run、登録の欠け、ワークツリーとチケットの食い違い |
 
-下書きを見るときは `--rules` `--phases` `--risk` で差し替える。1 本だけ差し替えると、本物の残り 2 本と
-組み合わせたときの答えになる。
+下書きを見るときは `--rules` `--phases` `--risk` で差し替える。1 本だけ差し替えると、本物の残り 2 本に
+足したときの答えになる。
 
 ## 2. rules: 期待する判定を回す
 
@@ -69,7 +69,7 @@ sh .ccnavi/scripts/ccnavi-launcher.sh --explain --log "" --state ""
 
 承認済みの親とその計画が出る。見るのは 4 つ。
 
-- 開いている親の `plan:` / `feedback:` が指すフェーズ定義が、全部 phases.yml（共通設定と親の `project:` が指すプロジェクトの設定の和）に在るか。無ければ
+- 開いている親の `plan:` / `feedback:` が指すフェーズ定義が、全部 phases.yml（共通設定に親の `project:` が指すプロジェクトの設定を足した統合結果）に在るか。無ければ
   その親は次のフェーズを承認できない
 - `review: false` のフェーズ定義が、本当にユーザが見なくてよい成果か。`when` に「飛ばしてよい条件」まで
   書いてあるか

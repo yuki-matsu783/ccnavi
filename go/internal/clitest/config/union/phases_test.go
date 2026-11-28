@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 設定の受入テスト。phases は共通 + 1 つの設定の和。
+// 設定の受入テスト。phases は共通設定に1 つの設定を足した統合結果。
 //
 // 土台の共通設定は phases を持たない（統合結果を見るテストが自分で置く）。ワークスペースの設定に `docs`、lib の設定に
 // `design` / `build` / `release` がある。使うフェーズ定義は、親の承認済みチケットの `project:` で決まる。
@@ -28,7 +28,7 @@ const ownPhasesDesign = `version: 1
 phases:
   design:
     kind: work
-    title: 設計（自身）
+    title: 設計（ワークスペース）
     review: false
     scope: ["wip/*"]
 `
@@ -127,7 +127,7 @@ func TestAPlanCanNameATypeFromTheProjectLayer(t *testing.T) {
 
 func TestTheLayerFollowsTheProjectOfTheParent(t *testing.T) {
 	t.Parallel()
-	// 空の `project:` はワークスペースの設定。プロジェクトの設定の定義は他から指せない。
+	// 空の `project:` はワークスペースの設定。プロジェクトの設定のフェーズ定義は他から指せない。
 	w := newWS(t, configws.KindBase)
 	w.Propose("i0002", configws.TicketText("i0002", configws.TicketOpts{Plan: []string{"docs"}, Allow: []string{"docs/*"}}), "")
 	w.mustApprove()
@@ -151,7 +151,7 @@ func TestTheLayerFollowsTheProjectOfTheParent(t *testing.T) {
 func TestTheSameIdInTwoLayersIsNotAConflict(t *testing.T) {
 	t.Parallel()
 	// ワークスペースの設定とプロジェクトの設定どうしは足さないので、その間の衝突は無い。足すのは共通設定と親の `project:` が
-	// 指す設定だけ（その和の苦情は Go の phases の TestLayerTypes が見る）。同じ design を別の中身で持っても、title が
+	// 指す設定だけ（その統合結果の苦情は Go の phases の TestLayerTypes が見る）。同じ design を別の中身で持っても、title が
 	// 重なっても、全欄が同じでも、error にも info にもならず、lib 向けの親は lib の design を使う。
 	w := newWS(t, configws.KindBase)
 	configws.WritePhases(t, w.Root, ownPhasesDesign)
@@ -175,14 +175,14 @@ func TestTheSameIdInTwoLayersIsNotAConflict(t *testing.T) {
 	if len(sums["lib"]) == 0 || sums["lib"][0].Title != "設計" {
 		t.Errorf("lib は lib の design を使う: %+v", sums["lib"])
 	}
-	if len(sums["self"]) == 0 || sums["self"][0].Title != "設計（自身）" {
-		t.Errorf("self は自身の design を使う: %+v", sums["self"])
+	if len(sums["self"]) == 0 || sums["self"][0].Title != "設計（ワークスペース）" {
+		t.Errorf("self はワークスペースの design を使う: %+v", sums["self"])
 	}
 }
 
 func TestACommonPhasesFileIsNotAnErrorAndIsUsed(t *testing.T) {
 	t.Parallel()
-	// 共通設定の phases.yml は置ける。--lint は error を出さず、`plan:` が共通設定の定義を指せる。
+	// 共通設定の phases.yml は置ける。--lint は error を出さず、`plan:` が共通設定のフェーズ定義を指せる。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 
@@ -205,7 +205,7 @@ func TestACommonPhasesFileIsNotAnErrorAndIsUsed(t *testing.T) {
 
 func TestOnlyTheCommonLayerHasPhases(t *testing.T) {
 	t.Parallel()
-	// 設定に phases.yml が無くても、共通設定の定義だけで `plan:` が読める。
+	// 設定に phases.yml が無くても、共通設定のフェーズ定義だけで `plan:` が読める。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	if err := configws.RemoveFile(configws.LayerPath(w.Root, "phases")); err != nil {
@@ -217,14 +217,14 @@ func TestOnlyTheCommonLayerHasPhases(t *testing.T) {
 	}
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"design"}, Allow: []string{"wip/design/*"}}), "")
 	w.mustApprove()
-	// app は `.ccnavi/` を持たないが、共通設定の定義は使える。
+	// app は `.ccnavi/` を持たないが、共通設定のフェーズ定義は使える。
 	w.Propose("i0002", configws.TicketText("i0002", configws.TicketOpts{Project: "app", Plan: []string{"design"}, Allow: []string{"wip/design/*"}}), "app")
 	w.mustApprove()
 }
 
 func TestCommonAndLayerTypesAddUp(t *testing.T) {
 	t.Parallel()
-	// 共通設定の定義と設定の定義を足す。1 つの計画で両方を使える。
+	// 共通設定のフェーズ定義と設定のフェーズ定義を足す。1 つの計画で両方を使える。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"design", "docs"}, Allow: []string{"wip/design/*", "docs/*"}}), "")
@@ -235,7 +235,7 @@ func TestCommonAndLayerTypesAddUp(t *testing.T) {
 	if len(got) != 2 || got["design"] != "common" || got["docs"] != "self" {
 		t.Errorf("self の定義と出どころ: %v", got)
 	}
-	// ワークスペースの設定の定義はプロジェクトには足さない。
+	// ワークスペースの設定のフェーズ定義はプロジェクトには足さない。
 	if ids := idsOf(sums["app"]); len(ids) != 1 || ids[0] != "design" {
 		t.Errorf("app の定義: %v", ids)
 	}
@@ -243,7 +243,7 @@ func TestCommonAndLayerTypesAddUp(t *testing.T) {
 
 func TestFillPhasesTakesTypesFromBothLayers(t *testing.T) {
 	t.Parallel()
-	// `--plan-order <親> --fill-phases` は共通設定とプロジェクトの設定の和からコピーする。
+	// `--plan-order <親> --fill-phases` は共通設定にプロジェクトの設定を足した統合結果からコピーする。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	text := configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"design", "docs"}, Allow: []string{"wip/design/*", "docs/*"}})
@@ -286,7 +286,7 @@ func TestTheSameIdWithADifferentBodyAcrossCommonIsAnError(t *testing.T) {
 	if !configws.Exists(w.ApprovedCopy("i0001")) {
 		t.Error("承認済みチケットが置かれていない")
 	}
-	// design は共通設定の定義が使われる。
+	// design は共通設定のフェーズ定義が使われる。
 	byID := map[string]sumType{}
 	for _, ty := range w.sums()["self"] {
 		byID[ty.ID] = ty
@@ -302,7 +302,7 @@ func TestTheSameIdWithADifferentBodyAcrossCommonIsAnError(t *testing.T) {
 
 func TestABrokenCommonLayerLeavesTheLayerTypesInUse(t *testing.T) {
 	t.Parallel()
-	// 共通設定の phases.yml が読めなくても、設定の定義だけで `plan:` が読める。
+	// 共通設定の phases.yml が読めなくても、設定のフェーズ定義だけで `plan:` が読める。
 	// 共通の定義は空として扱うので、共通にしか無い定義を使う計画は承認で止まる。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, "version: 1\nphases: [\n")
@@ -362,6 +362,6 @@ func TestABrokenProjectPhasesIsAnErrorAndTheLayerIsEmpty(t *testing.T) {
 	}
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Project: "lib", Plan: []string{"design"}, Allow: []string{"wip/*"}}), "lib")
 	if w.Approve().Code == 0 {
-		t.Error("読めない設定の定義を指す計画が通った")
+		t.Error("読めない設定のフェーズ定義を指す計画が通った")
 	}
 }

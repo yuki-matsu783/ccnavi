@@ -29,7 +29,7 @@ func Home(conf *config.Settings, root, project string) string {
 	return tree.ProjectRoot(conf.Projects, project)
 }
 
-// File はそのプロジェクトの設定のファイル（kind の種類）。予約名（common / self）のプロジェクトは
+// File はそのプロジェクトの設定ファイル（kind の種類）。予約名（common / self）のプロジェクトは
 // 設定として数えないので空（名前で引くとワークスペースの設定として合成され、設定を書ける側が
 // 設定を選べてしまう）。
 func File(conf *config.Settings, root, project string, kind config.LayerKind) string {

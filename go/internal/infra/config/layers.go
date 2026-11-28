@@ -36,7 +36,7 @@ var layerKinds = []LayerKind{KindRules, KindPhases, KindRisk, KindSections}
 // LayerKinds は layerKinds の写しを返す（呼び手が書き換えても元は変わらない）。
 func LayerKinds() []LayerKind { return slices.Clone(layerKinds) }
 
-// layerFileNames は設定のファイル名。
+// layerFileNames は設定ファイル名。
 var layerFileNames = map[LayerKind]string{KindRules: "rules.yml", KindPhases: "phases.yml", KindRisk: "risks.yml",
 	KindSections: "ticket-sections.yml"}
 
@@ -75,7 +75,7 @@ const (
 	OriginMirror Origin = "mirror-layer"
 )
 
-// LayerFile は 1 つの設定のファイル（守る対象へ渡す形）。
+// LayerFile は 1 つの設定ファイル（守る対象へ渡す形）。
 type LayerFile struct {
 	Origin Origin
 	Layer  string
@@ -111,14 +111,14 @@ func (s *Settings) ApprovedDir(treeRoot string) string {
 	return ospath.Join(treeRoot, filepath.FromSlash(approved))
 }
 
-// LayerScriptHome は自身とプロジェクトの設定の `script:` に書ける唯一の場所（"/" 区切り、
+// LayerScriptHome はワークスペースとプロジェクトの設定の `script:` に書ける唯一の場所（"/" 区切り、
 // その設定の git プロジェクトルートから）。
 func (s *Settings) LayerScriptHome() string {
 	home := strings.Trim(ospath.Slashed(s.projectHome()), "/")
 	return home + "/scripts/"
 }
 
-// LayerPath は設定のファイルの絶対パス（判定と診断が読む先）。診断の差し替えがあればそれを返す。
+// LayerPath は設定ファイルの絶対パス（判定と診断が読む先）。診断の差し替えがあればそれを返す。
 // layer が空ならパスの最後の名前で差し替えを引く。守る対象は差し替えを見ない LayerRealPath を使う。
 func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) string {
 	swaps := map[LayerKind]map[string]string{
@@ -145,12 +145,12 @@ func (s *Settings) LayerPath(homeRoot string, kind LayerKind, layer string) stri
 	return s.LayerRealPath(homeRoot, kind)
 }
 
-// CommonPath は共通設定のファイルのパス（設定が持つ既定、診断のフラグで動かせる）。
+// CommonPath は共通設定ファイルのパス（設定が持つ既定、診断のフラグで動かせる）。
 func (s *Settings) CommonPath(kind LayerKind) string {
 	return map[LayerKind]string{KindRules: s.Rules, KindPhases: s.Phases, KindRisk: s.Risk, KindSections: s.Sections}[kind]
 }
 
-// LayerRealPath は設定のファイルが本来ある場所。
+// LayerRealPath は設定ファイルが本来ある場所。
 func (s *Settings) LayerRealPath(homeRoot string, kind LayerKind) string {
 	return ospath.Join(homeRoot, filepath.FromSlash(s.projectHome()), LayerConfigDir, layerFileNames[kind])
 }

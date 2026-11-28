@@ -30,7 +30,7 @@ import (
 	"ccnavi/internal/tickets/phase"
 )
 
-// layerLabels は設定の見出し。共通と自身だけ日本語で出す。プロジェクトは名前そのもの（id の前置きと同じ表記）。
+// layerLabels は設定の見出し。共通とワークスペースだけ日本語で出す。プロジェクトは名前そのもの（id の前置きと同じ表記）。
 var layerLabels = map[string]string{
 	config.LayerCommon: "共通設定",
 	config.LayerSelf:   "ワークスペースの設定",
@@ -98,7 +98,7 @@ func Explain(stdout, stderr io.Writer, conf *config.Settings, root string) (int,
 		source = string(builtin.Source)
 	}
 	p("ccnavi: いま有効な宣言（出所 %s）\n", source)
-	p("  パスを持つツールは共通設定 + 対象の設定、持たないツールは全部の設定を組み合わせて判定する\n")
+	p("  パスを持つツールは共通設定 + 対象の設定、持たないツールは全部の設定を足して判定する\n")
 	// 2. ルール・フェーズ・リスク・宣言の無い領域・モードの順に、節ごとに書く。
 	for _, view := range views {
 		explainRules(stdout, root, view)
@@ -149,7 +149,7 @@ func explainRules(w io.Writer, root string, view ruleload.LayerView) {
 		return
 	}
 	if view.Missing {
-		p("  この設定のファイルはありません。設定なしとして扱います。\n")
+		p("  この設定ファイルはありません。設定なしとして扱います。\n")
 		return
 	}
 	for _, name := range rules.Sections() {
@@ -201,7 +201,7 @@ func explainPhases(w io.Writer, conf *config.Settings, root string, views []rule
 		tables[i] = table{v.Name, items, why}
 		counts[i] = fmt.Sprintf("%s %d 種", layerLabel(v.Name), len(items))
 	}
-	fmt.Fprintf(w, "\n■ phases（%s。共通設定と、親チケットの project: で指定された設定を組み合わせて適用します）\n",
+	fmt.Fprintf(w, "\n■ phases（%s。共通設定に、親チケットの project: で指定された設定を足して適用します）\n",
 		strings.Join(counts, "、"))
 	fmt.Fprintf(w, "  %s%s%s%s%sscope\n", ljust("id", 16), pad("設定", layerCol), ljust("kind", 8), ljust("title", 16),
 		ljust("review", 8))
@@ -227,7 +227,7 @@ func explainRisk(w io.Writer, conf *config.Settings, root string, views []rulelo
 		items, why := layerRisk(conf, v.Name, layerConfig(conf, root, v.Name, config.KindRisk))
 		tables[i] = table{v.Name, items, why}
 	}
-	// 共通設定の側の既定の閾値。設定の levels はキーごとに小さいほうを採るので、実際の値はチケットの設定で決まる。
+	// 共通その設定の既定の閾値。設定の levels はキーごとに小さいほうを採るので、実際の値はチケットの設定で決まる。
 	common, _ := risk.Load(conf.Risk)
 	t := risk.EffectiveLevels(common.Levels)
 	fmt.Fprintf(w, "\n■ risk（levels: medium %d / high %d / critical %d）\n", t.Medium, t.High, t.Critical)

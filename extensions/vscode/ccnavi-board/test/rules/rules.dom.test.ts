@@ -868,7 +868,7 @@ test("CB-D150 設定の切り替えの欄は、選んだ対象を種類と名前
   }
 });
 
-test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通の設定へ戻れる", async () => {
+test("CB-D152 読み込みに失敗した画面にも設定の切り替えの欄を出し、共通設定へ戻れる", async () => {
   const dom = await openPage({
     kind: "error",
     error: "ファイルを読み込めません",
@@ -899,7 +899,7 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する1�
     const select = dom.one<HTMLSelectElement>("select#sum-select");
     assert.equal(select.value, "lib");
     assert.deepEqual([...select.options].map((o) => o.textContent), ["共通設定 + ワークスペース", "共通設定 + プロジェクト（lib）"]);
-    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bashなど）には、全プロジェクトの設定を合わせたルールが適用されます/);
+    assert.match(dom.one("#sum .hint").textContent, /パスを持たないツール（Bashなど）には、全プロジェクトの設定を足したルールが適用されます/);
     const rows = (section: string) => dom.all(`#sum .sum-section[data-section="${section}"] tbody tr`).map((tr) => [...tr.querySelectorAll("td")].map((td) => td.textContent));
     assert.deepEqual(rows("deny").map((r) => [r[0], r[1], r[3]]), [["guard-approved", "Write|Edit", "共通設定"], ["lib:no-tmp", "Write", "プロジェクト（lib）"]]);
     assert.deepEqual(rows("ask").map((r) => r[0]), ["lib:deps"]);
@@ -918,7 +918,7 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する1�
   }
 });
 
-test("CB-T311 共通の設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
+test("CB-T311 共通設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
   const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAMLとして読み込めない", deny: [], ask: [] } : s));
   const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
   try {

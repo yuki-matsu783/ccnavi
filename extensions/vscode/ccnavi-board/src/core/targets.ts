@@ -1,13 +1,13 @@
 /**
  * ルール管理・リスク管理・フェーズ管理・テンプレート管理の画面が、開いたまま切り替えられる設定の対象。
- * 共通の設定、ワークスペースの設定、プロジェクト1つの設定の3種で、一覧は実行ファイルの答え（`trees`と`layers`）から作る。
+ * 共通設定、ワークスペースの設定、プロジェクト1つの設定の3種で、一覧は実行ファイルの答え（`trees`と`layers`）から作る。
  *
  * ここはvscodeにもDOMにも触れない。拡張ホストと画面の両方から読まれる。
  */
 import { projectLayer } from "./layers.js";
 import type { BoardJson } from "./model.js";
 
-/** 対象1つ。`kind`は共通の設定の呼び名（`workspace`）、`self`、`project`のどれか */
+/** 対象1つ。`kind`は共通設定の呼び名（`workspace`）、`self`、`project`のどれか */
 export interface TargetOption {
   readonly kind: string;
   /** `project`のときだけプロジェクト名。ほかは空 */
@@ -22,7 +22,7 @@ export function targetValue(target: { readonly kind: string; readonly name: stri
 
 /**
  * 切り替えられる対象の一覧。共通、ワークスペース、設定の対象になっているプロジェクトの順。
- * `commonKind`がundefinedなら、共通の設定を並べない（今はどの画面も`workspace`を渡す）。
+ * `commonKind`がundefinedなら、共通設定を並べない（今はどの画面も`workspace`を渡す）。
  * 開いている対象が一覧に無ければ（ボードを読めなかったときなど）、それだけを足す。
  */
 export function targetOptions(board: BoardJson | undefined, commonKind: string | undefined, current: { readonly kind: string; readonly name: string }): TargetOption[] {

@@ -165,7 +165,7 @@ func unpushed(treeRoot string, conf *config.Settings, branch string, ignorePlace
 
 // Options は Check の補い。Branch は親のブランチ名（空ならワークツリーの今のブランチ）、Root はワークスペースの
 // ルート（承認の依頼の文に載せるコマンドのパス）。PlainDirty なら未コミットをミラーのずれに分けず、ふつうの
-// 変更として言う（ワークスペース自身の親の finish）。
+// 変更として言う（ワークスペースの親の finish）。
 type Options struct {
 	branch     string
 	Root       string

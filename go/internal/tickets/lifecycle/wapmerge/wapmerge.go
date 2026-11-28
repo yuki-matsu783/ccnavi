@@ -203,7 +203,7 @@ func limitNote(v scope.Verdict) string {
 
 // treeProblem は親と子のワークツリーが合流できる形か。できなければ（止める理由, 案内, 真）。project はプロジェクトの
 // 子のとき。親のワークツリーがプロジェクトのツリーなので、共通のコピーのずれは作業の変更ではなく、ユーザに揃えて
-// もらう（ready と同じ案内）。ワークスペース自身の親では、共通のコピーの置き場は共通設定本体なので、ふつうの
+// もらう（ready と同じ案内）。ワークスペースの親では、共通のコピーの置き場は共通設定本体なので、ふつうの
 // 変更として言う。
 func treeProblem(conf *config.Settings, parentTree, childTree, ident string, project bool) (string, []string, bool) {
 	// 1. 親のワークツリーが finish できる状態か（未コミット・未 push）。treegate の条件をそのまま使う。

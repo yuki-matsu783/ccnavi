@@ -68,7 +68,7 @@ func TestLayer(t *testing.T) {
 	// 設定にある種類だけ置き換える。
 	testkit.Put(t, layerPath, "version: 1\nparent:\n  - name: Goal\n")
 	if got := For(conf, root, ""); !reflect.DeepEqual(got, form.Sections{Parent: []form.Heading{{Name: "Goal"}}, Child: common.Child}) {
-		t.Errorf("重ねた %v", got)
+		t.Errorf("足した %v", got)
 	}
 	// 判定の基準は共通設定だけを見る。
 	if got := Common(conf); !reflect.DeepEqual(got, common) {

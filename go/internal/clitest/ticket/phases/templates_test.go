@@ -20,7 +20,7 @@ import (
 
 // 作業・レビュー計画のテンプレート（読む側）の受入テスト。
 //
-// 読み込み・2 層の統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
+// 読み込み・統合結果・検査・`--templates` の一覧・検索・`--check-file` の答えの中身は、
 // go/internal/tickets/proposal/templates の見本（TestMatchesGolden）が 1 字単位で見る。リンク・ハードリンクを読まない保護は
 // links_test.go（TestLinksAreNotRead）が見る。ここで見るのは見本が持たない次の 3 つ。
 //  1. `ccnavi --templates` のテキストの出方、`--json` の答えの形（tests/fixtures/templates-json.json と

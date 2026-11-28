@@ -105,7 +105,7 @@ func New(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, req 
 	}
 	types := phases.LoadTypes(conf, root, where.Project)
 	if types == nil {
-		return refuse("フェーズ定義（" + layerLabel(where.Project) + " の設定の phases.yml）が無いか読めない。" +
+		return refuse("フェーズ定義（" + layerLabel(where.Project) + "の phases.yml）が無いか読めない。" +
 			"plan の型の定義を読めず、承認の検査を通る plan とコピー（phases:）を作れない" +
 			"（設計 9.7）。phases.yml を用意してから実行します。")
 	}
@@ -254,9 +254,9 @@ func New(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, req 
 
 func layerLabel(project string) string {
 	if project == "" {
-		return "自身"
+		return "ワークスペースの設定"
 	}
-	return project
+	return "プロジェクト " + project + " の設定"
 }
 
 // unique は初めて出た順の重複なし。
@@ -303,7 +303,7 @@ func fromTemplate(conf *config.Settings, root string, where tree.Tree, types *ph
 	}
 	if len(missing) > 0 {
 		return nil, "テンプレート " + pyfmt.Repr(name) + " のステップの定義 " + strings.Join(missing, ", ") + " が " +
-			"phases.yml にありません（" + layerLabel(where.Project) + " の設定）。テンプレートを直すか、" +
+			"phases.yml にありません（" + layerLabel(where.Project) + "）。テンプレートを直すか、" +
 			"ユーザに phases.yml へ追加してもらう"
 	}
 	// 2. 型の kind が、置く計画に合うか（plan は作業、feedback はフィードバックの定義だけ）。

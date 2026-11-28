@@ -334,7 +334,7 @@ func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, 
 	if entry.Layer == config.LayerCommon {
 		entry = templates.Recheck(entry, templates.TypesFor(conf, root, layer), &scanned.Catalog)
 	}
-	// 共通設定のテンプレートは、見ている設定の定義で検査し直したものを見せる（使えない部分は「使わない」と添える）。
+	// 共通設定のテンプレートは、見ている設定のフェーズ定義で検査し直したものを見せる（使えない部分は「使わない」と添える）。
 	row := templates.EntryJSON(entry)
 	text, _ := fsio.DecodeBytes(yaml.TrimBOM(entry.Raw), fsio.Replace)
 	if asJSON {

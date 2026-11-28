@@ -79,7 +79,7 @@ func Tidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd, fam
 			pyfmt.Repr(branchName), family, pyfmt.Repr(made))
 		return config.ExitError
 	}
-	// sh はワークスペース自身を self と呼ぶが、内部ではプロジェクト名を空で表す。
+	// sh はワークスペースを self と呼ぶが、内部ではプロジェクト名を空で表す。
 	project := repo
 	if repo == selfKey {
 		project = ""
@@ -87,7 +87,7 @@ func Tidy(stdout, stderr io.Writer, root string, conf *config.Settings, cwd, fam
 	return retire.RunMerged(stdout, conf, root, family, project, branchName, headSHA, cwd)
 }
 
-// selfKey はワークスペース自身のリポジトリの名前。
+// selfKey はワークスペースのリポジトリの名前。
 const selfKey = "self"
 
 // Check は `sync check <親> [<リポジトリ>]`。取り込みの後の検査で、頭に `check 1`、続けて 1 行 1 件（`error <detail>`

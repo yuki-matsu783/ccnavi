@@ -48,7 +48,7 @@ export interface Snapshot {
   readonly integration: Integration;
   readonly branches: Record<string, Branch>;
   readonly absent: readonly string[];
-  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い */
+  /** プロジェクト名（`projects/<名前>`）。ワークスペースなら無い */
   readonly project?: string;
   readonly workspace?: Workspace;
   /**

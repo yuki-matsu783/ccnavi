@@ -178,7 +178,7 @@ test("CB-T237 256KBを超えるフローは読まないし書かない。書け�
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
 });
 
-test("CB-T1280 上限を渡さない書き込み（設定のファイル）は、256KBを超えても書く", () => {
+test("CB-T1280 上限を渡さない書き込み（設定ファイル）は、256KBを超えても書く", () => {
   const tree = scratch();
   const file = path.join(tree, ".ccnavi", "config", "common", "rules.yml");
   const big = `version: 1\n# ${"x".repeat(FLOW_FILE_LIMIT)}\n`;

@@ -83,16 +83,16 @@ func TempDir(t testing.TB) string {
 	return dir
 }
 
-// CommonRelpath は共通設定のファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。
+// CommonRelpath は共通設定ファイル（rules / phases / risk）の、ワークスペースルートからの相対パス。
 func CommonRelpath(kind string) string {
 	return filepath.Join(projectHome, "config", "common", layerFileNames[kind])
 }
 
-// CommonPath はそのワークスペースルートの共通設定のファイルのパス。
+// CommonPath はそのワークスペースルートの共通設定ファイルのパス。
 func CommonPath(root, kind string) string { return filepath.Join(root, CommonRelpath(kind)) }
 
 // ConfigPath はワークスペースルートの config（ワークスペースの設定）のファイルのパス。
-// フェーズ定義は共通設定と config の両方に置け、判定は 2 本の和を読む。
+// フェーズ定義は共通設定と config の両方に置け、判定は共通設定に config を足した統合結果を読む。
 func ConfigPath(root, kind string) string {
 	return filepath.Join(root, projectHome, "config", "project", layerFileNames[kind])
 }

@@ -8,23 +8,23 @@
  * 中身を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存や作成が通った）。
  * ファイルが外で変わっただけのときは`changed`を送り、破棄するかどうかはユーザが決める。
  *
- * 対象は3種。共通の設定の配点（`.ccnavi/config/common/risks.yml`。場所は固定）、
+ * 対象は3種。共通設定の配点（`.ccnavi/config/common/risks.yml`。場所は固定）、
  * ワークスペースの設定の配点（既定`.ccnavi/config/project/risks.yml`）、プロジェクト1つの設定の配点
  * （既定`projects/<名前>/.ccnavi/config/project/risks.yml`）。タブは1枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json`の`layers[].risk`）を使い、拡張は組まない。
- * 判定は共通の設定と、親の`project:`が指す設定の和で行う。編集する1本とは別に、読み取り専用の統合結果
- * （共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。統合結果は実行ファイルが出した結果で、拡張は合成しない。
+ * 判定は共通設定に、親の`project:`が指す設定を足した統合結果で行う。編集する1本とは別に、読み取り専用の統合結果
+ * （共通設定 + ワークスペース、共通設定 + 各プロジェクト。`sums[]`）を出す。統合結果は実行ファイルが出した結果で、拡張は合成しない。
  *
  * チケット制御がdisableのワークスペースでは開かない。配点は子チケットをクローズするときにしか
  * 読まれないので、disableの間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
  *
- * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint`に渡す。共通の設定は`--risk <パス>`、ワークスペースの設定は`--project-risk-file self=<パス>`、
- * プロジェクトは`--project-risk-file <名前>=<パス>`（設定の配点は共通の設定と合わせて検証される）。
- * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（共通の設定とワークスペースの設定はどのツリーでも、
+ * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint`に渡す。共通設定は`--risk <パス>`、ワークスペースの設定は`--project-risk-file self=<パス>`、
+ * プロジェクトは`--project-risk-file <名前>=<パス>`（設定の配点は共通設定に足して検証される）。
+ * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（共通設定とワークスペースの設定はどのツリーでも、
  * プロジェクトの設定はそのプロジェクトの分だけ。配点は子をクローズするときに読まれるので、走っている最中に変えない）、
  * ファイルが外で変わっていないときだけ行う（流れは`settings-panel.ts`の`save`）。
- * ファイルが無いのは「設定が無い」正常な状態。共通の設定にもワークスペースの設定にも無いときは、組み込みの配点を読み取り専用で見せ、
+ * ファイルが無いのは「設定が無い」正常な状態。共通設定にもワークスペースの設定にも無いときは、組み込みの配点を読み取り専用で見せ、
  * 「作る」で同じ値のファイルを書き出してから直す。それ以外（プロジェクトの設定など）は空として出し、欄は触れて、
  * 検証を通った最初の保存でファイルを作る。
  */
@@ -92,7 +92,7 @@ function whatOf(target: RiskTarget): string {
   }
 }
 
-/** `ccnaviBoard.openRisk`の本体。引数なしは共通の設定の配点 */
+/** `ccnaviBoard.openRisk`の本体。引数なしは共通設定の配点 */
 export async function openRisk(target: RiskTarget = { kind: "workspace" }): Promise<void> {
   if (!requireTickets("リスク管理画面")) {
     return;
@@ -152,16 +152,16 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
 
 async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   const notices: string[] = [];
-  // 切り替えの一覧と統合結果のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧と統合結果が縮むだけ
+  // 切り替えの一覧と統合結果のために、共通設定でも実行ファイルに聞く。読めなくても共通設定は開けるので、一覧と統合結果が縮むだけ
   const board = await loadBoard(root, binSetting());
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
   const sums = riskSums(board.ok ? board.board : undefined);
   let riskRel: string;
   let riskPath: string;
-  /** 共通の設定とワークスペースの設定の、もう一方の配点のファイル。組み込みの配点を見せるかどうかの判断に使う */
+  /** 共通設定とワークスペースの設定の、もう一方の配点のファイル。組み込みの配点を見せるかどうかの判断に使う */
   let other: string | undefined;
   if (target.kind === "workspace") {
-    // 共通の設定の場所は`.ccnavi/config/common/`固定で、env（`CCNAVI_RISK`など）では動かせない。
+    // 共通設定の場所は`.ccnavi/config/common/`固定で、env（`CCNAVI_RISK`など）では動かせない。
     riskRel = DEFAULT_RISK;
     riskPath = resolveIn(root, riskRel);
     const self = board.ok ? selfLayer(board.board) : undefined;
@@ -193,7 +193,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   const read = readSettingFile(riskPath, riskRel, `${NOUN}のファイル`);
   let text = read.text;
   const { mtimeMs, exists } = read;
-  // 共通の設定にもワークスペースの設定にも無ければ、適用されているのは組み込みの配点。共通かワークスペースの設定を開いたときだけ、
+  // 共通設定にもワークスペースの設定にも無ければ、適用されているのは組み込みの配点。共通かワークスペースの設定を開いたときだけ、
   // それを読み取り専用で見せ、「作る」で同じ値のファイルを書き出させる。もう一方が分からないとき（ボードを読めない）も組み込みを見せる。
   const builtin = !exists && (target.kind === "workspace" || target.kind === "self") && (other === undefined || !fs.existsSync(other));
   if (builtin) {
@@ -366,7 +366,7 @@ async function create(current: PanelState, loaded: Loaded): Promise<void> {
   vscode.window.showInformationMessage(`${loaded.file.rel}を組み込みの配点で作りました。コミットは自分でしてください`);
 }
 
-/** 保存の前の検証に渡す差し替え。共通の設定は`--risk`、ほかは名前を付けて`--project-risk-file` */
+/** 保存の前の検証に渡す差し替え。共通設定は`--risk`、ほかは名前を付けて`--project-risk-file` */
 function overrideFor(target: RiskTarget, tmp: string): LintOverride {
   switch (target.kind) {
     case "workspace":

@@ -7,7 +7,7 @@
     ccnavi --templates --show NAME [--layer self|PROJECT] [--json]
     ccnavi --templates --check-file PATH [--layer self|PROJECT|common] [--json]
 
-一覧は、共通設定と1つの設定（--layer を指定しない場合は self）を合わせたものです。
+一覧は、共通設定に1つの設定（--layer を指定しない場合は self）を足したものです。
 --keyword は名前、説明、または使う場面の一部に一致します（2回指定した場合はどちらかに一致）。
 --show は、1件のテンプレートを計画・フロー・検査結果とともに表示します。
 --check-file は、任意のパスのテンプレートを、その設定のフェーズ定義で検査します
@@ -66,7 +66,7 @@ phases: を補完します。feedback: は --with-feedback
 ticket new --template 以外で指定すると拒否されます。n番目の計画のステップのフローは
 wip/proposals/flows/ID-NN-01.yml に出力されます。これは下書きで、
 ユーザがフローエディターで取り込むまで効力を持ちません。NAME は、
-共通設定と1つの設定（--layer を指定しない場合は、
+共通設定に1つの設定（--layer を指定しない場合は、
 ワークツリーワークスペースの設定）から検索されます。次の場合は、何も書き込まずに停止します。
 テンプレートが存在しない、または使用できない（エラーがある、または重複により除外された）場合、
 phases.yml にないタイプがある場合、--plan も指定された場合、

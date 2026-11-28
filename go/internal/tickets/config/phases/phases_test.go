@@ -119,7 +119,7 @@ func TestLayerTypes(t *testing.T) {
 	if got := idsOf(types); !reflect.DeepEqual(got, []string{"a@common", "b@common"}) || len(notes) != 1 {
 		t.Errorf("壊れた設定 %v %v", got, notes)
 	}
-	// 共通設定が壊れていれば、設定の定義だけを使う（共通設定の苦情は返さない）。
+	// 共通設定が壊れていれば、設定のフェーズ定義だけを使う（共通設定の苦情は返さない）。
 	testkit.Put(t, conf.Phases, "\xff")
 	testkit.Put(t, layer, defs("  d: {}"))
 	types, notes = LayerTypes(conf, root, "")

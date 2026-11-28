@@ -55,7 +55,7 @@ export interface Dropped {
 /** 設定の中の1テンプレート */
 export interface TemplateEntry {
   readonly name: string;
-  /** どの設定のファイルか（commonか、開いている設定の名前）。`--layer`の名前と同じ */
+  /** どの設定ファイルか（commonか、開いている設定の名前）。`--layer`の名前と同じ */
   readonly layer: string;
   readonly path: string;
   /** 本文のハッシュ。取り込みの`--expect`などに使う */
@@ -181,7 +181,7 @@ export interface TemplateCheck {
 export interface TemplatesPage {
   readonly root: string;
   readonly generatedAt: string;
-  /** 開いている対象。kindは "workspace"（共通の設定）/ "self" / "project"。`--layer`にはkindがprojectならname、それ以外は "self" を渡す */
+  /** 開いている対象。kindは "workspace"（共通設定）/ "self" / "project"。`--layer`にはkindがprojectならname、それ以外は "self" を渡す */
   readonly target: { readonly kind: string; readonly name: string };
   readonly targets: readonly TargetOption[];
   readonly data: TemplatesJson;

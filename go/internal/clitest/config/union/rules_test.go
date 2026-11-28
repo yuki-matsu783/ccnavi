@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-// 設定 3 本の和の受入テスト。rules の合成。
+// 設定 3 本の統合結果の受入テスト。rules の合成。
 //
 // 設定は 3 種。共通設定（`.ccnavi/config/common/`）、ワークスペースの設定、プロジェクトの設定。
 // lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い設定 = 空）。
 
 func p(parts ...string) string { return filepath.Join(parts...) }
 
-// Write / Edit は共通設定 + 行き先の設定の和。
+// Write / Edit は共通設定に行き先の設定を足した統合結果。
 
 func TestEachLayerDenyAppliesToItsOwnFiles(t *testing.T) {
 	t.Parallel()
@@ -130,7 +130,7 @@ func TestProjectAllowStaysInsideTheProject(t *testing.T) {
 
 func TestNotebookEditGoesThroughTheSameUnion(t *testing.T) {
 	t.Parallel()
-	// NotebookEdit も書き込み系。共通設定 + 行き先の設定の和で、欄は notebook_path。
+	// NotebookEdit も書き込み系。共通設定に行き先の設定を足した統合結果で、欄は notebook_path。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", configws.Plus(configws.DenyOf(configws.LibRules), configws.NotebookRule)))
 
@@ -169,7 +169,7 @@ func TestAProjectAllowDoesNotLoosenTheCommonAsk(t *testing.T) {
 	}
 }
 
-// パスを持つツールは行き先の設定、持たないツールは全部の設定の和。
+// パスを持つツールは行き先の設定、持たないツールは全部の設定を足した統合結果。
 
 var secretsRule = configws.Rule("secrets", "Read|Grep|Glob", "glob", "*/secrets*", "secrets は探さない。")
 
@@ -192,7 +192,7 @@ func TestGrepAndGlobUseTheLayerOfThePlaceTheySearch(t *testing.T) {
 
 func TestToolsWithoutAPathUseTheUnionOfEveryLayer(t *testing.T) {
 	t.Parallel()
-	// WebFetch・Skill・Agent・PowerShell は、Bash と同じく全部の設定の和。cwd によらない。
+	// WebFetch・Skill・Agent・PowerShell は、Bash と同じく全部の設定を足した統合結果。cwd によらない。
 	w := newWS(t, configws.KindBase)
 	fetch := configws.Rule("fetch-internal", "WebFetch", "glob", "*internal.example.com*", "社内のページは取りに行かない。")
 	configws.WriteRules(t, w.Root, configws.With(configws.OwnRules, "deny", configws.Plus(configws.DenyOf(configws.OwnRules), fetch)))
@@ -216,7 +216,7 @@ func TestToolsWithoutAPathUseTheUnionOfEveryLayer(t *testing.T) {
 
 func TestALayerAllowReachesGrepAndToolsWithoutAPath(t *testing.T) {
 	t.Parallel()
-	// 設定をツールの種類で選ぶ形の代償。パスを持つツールは行き先の設定、持たないツールは全部の設定の和を足す。
+	// 設定をツールの種類で選ぶ形の代償。パスを持つツールは行き先の設定、持たないツールは全部の設定を足した統合結果を足す。
 	w := newWS(t, configws.KindBase)
 	allow := configws.Plus(configws.AllowOf(configws.LibRules),
 		configws.Rule("grep-src", "Grep", "glob", "*/src*", ""),
@@ -298,7 +298,7 @@ func TestBashRecordNamesTheLayerOfTheDecidingRule(t *testing.T) {
 
 func TestTwoNonEmptyProjectLayersTakePartInNameOrder(t *testing.T) {
 	t.Parallel()
-	// 非空のプロジェクトの設定が 2 つでも両方が和に入り、順序は名前順。
+	// 非空のプロジェクトの設定が 2 つでも両方が統合結果に入り、順序は名前順。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.App, configws.AppRules)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", configws.Plus(configws.DenyOf(configws.LibRules), configws.LibDeploy)))
@@ -369,7 +369,7 @@ func TestBashUnionDropsIdenticalDuplicatesToo(t *testing.T) {
 
 func TestMissingLayerIsEmptyWithoutFallback(t *testing.T) {
 	t.Parallel()
-	// 設定のファイルが無い = 空。fallback は付かず、--lint も言わない。
+	// 設定ファイルが無い = 空。fallback は付かず、--lint も言わない。
 	w := newWS(t, configws.KindBase)
 	passed := w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.App, "schema", "x.sql")})
 	w.AssertNotDenied(passed)
@@ -436,7 +436,7 @@ func TestABrokenCommonLayerFallsBackToBuiltin(t *testing.T) {
 	}
 }
 
-// ルールの苦情は、1 回の起動で 1 度だけ出す。hook はツリーの設定ごとに共通設定を読み直し、`--lint` は設定のファイルを
+// ルールの苦情は、1 回の起動で 1 度だけ出す。hook はツリーの設定ごとに共通設定を読み直し、`--lint` は設定ファイルを
 // 2 つの経路で読む。読むたびに言うと、同じ苦情が設定やツリーの数だけ並ぶ。
 
 var silentRule = configws.Rule("silent", "Bash", "glob", "*nothing matches*", "")
@@ -477,7 +477,7 @@ func TestLintCountsALayerProblemOnce(t *testing.T) {
 	}
 }
 
-// 実行後チェックも「共通設定 + そのツリーの設定」の和。行き先の設定 1 本のままの実装では、共通設定の deny の場所が
+// 実行後チェックも共通設定にそのツリーの設定を足した統合結果。行き先の設定 1 本のままの実装では、共通設定の deny の場所が
 // 保護領域に数えられない。プロジェクトのツリー（共通設定）と、ワークスペースのワークツリー（ワークスペースの設定）の両方で見る。
 
 func TestPostMonitoringIsTheUnionOfTheCommonAndTheTreeLayers(t *testing.T) {
@@ -684,7 +684,7 @@ func TestExplainJSONCarriesEveryLayer(t *testing.T) {
 	if len(layers["app"].deny) != 0 {
 		t.Errorf("app の deny は空のはず: %v", layers["app"].deny)
 	}
-	// この土台の共通設定は phases.yml を持たないので、共通設定の定義は空。
+	// この土台の共通設定は phases.yml を持たないので、共通設定のフェーズ定義は空。
 	if len(layers["common"].phases) != 0 {
 		t.Errorf("common の phases は空のはず: %v", layers["common"].phases)
 	}

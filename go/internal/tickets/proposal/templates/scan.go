@@ -201,8 +201,8 @@ func (l *LayerRead) readEntries(root string, names []string) {
 	}
 }
 
-// merge は共通に設定を足す。同名で全欄が同じなら設定の側を破棄して info、中身が違えば error で
-// 設定の側を使わない。共通の側が読めていないものは無いものとして扱う。苦情は返し、設定の側の Notes にも足す。
+// merge は共通に設定を足す。同名で全欄が同じなら足した設定を破棄して info、中身が違えば error で
+// 足した設定を使わない。共通の側が読めていないものは無いものとして扱う。苦情は返し、その設定の Notes にも足す。
 func merge(common, extra *LayerRead) []rules.Problem {
 	base := map[string]*Entry{}
 	for _, e := range common.Entries {
@@ -287,7 +287,7 @@ func Recheck(e *Entry, types *phases.Types, cat *flow.Catalog) *Entry {
 }
 
 // Load は共通と全設定のテンプレートを読んで検査する。各 Entry の検査はその設定のフェーズ定義で行い、
-// 統合結果の印は設定の側に付く。読むのは設定の置き場だけで、承認済みチケットの置き場は読まない。
+// 統合結果の印は足した設定に付く。読むのは設定の置き場だけで、承認済みチケットの置き場は読まない。
 func Load(conf *config.Settings, root string) *Scan {
 	cat := flow.LoadCatalog(root)
 	common := ReadLayer(config.LayerCommon, root, conf.CommonTemplatesDir(root), CommonWritable(conf, root))

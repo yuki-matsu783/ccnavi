@@ -63,7 +63,7 @@ func CommonRules(conf *config.Settings, root string) []rules.Problem {
 }
 
 // CommonPhases は共通設定の phases.yml が読めるか。無いのは正常で、何も言わない。読めなければ判定は共通
-// 設定を空として扱い、各設定の定義だけを使う（各設定は LayerConfigs が見る）。
+// 設定を空として扱い、各設定のフェーズ定義だけを使う（各設定は LayerConfigs が見る）。
 func CommonPhases(conf *config.Settings) []rules.Problem {
 	_, notes := phases.CommonTypes(conf)
 	var out []rules.Problem
@@ -134,7 +134,7 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 			out = append(out, prefixed(where, p))
 			told[problem(p.Severity, p.Rule, p.Detail)] = true
 		}
-		// Survey の結果にも設定のファイルの苦情が含まれる。FileProblems が同じファイルを読んで言ったものは数えない
+		// Survey の結果にも設定ファイルの苦情が含まれる。FileProblems が同じファイルを読んで言ったものは数えない
 		// （同じ苦情が 2 度並び、件数も水増しされる）。
 		for _, p := range view.Problems {
 			if !told[problem(p.Severity, p.Rule, p.Detail)] {
@@ -147,7 +147,7 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 
 // LayerConfigs は各設定の phases・risk・sections が共通設定と合成できるか。only を渡せばその設定だけ、
 // kind（KindPhases・KindRisk・KindSections）を渡せばその種類だけ。見るのは合成したあとの内容で、共通設定自身の
-// 苦情は CommonPhases・CommonRisk・CommonSections が言うので、設定の側だけを数える。
+// 苦情は CommonPhases・CommonRisk・CommonSections が言うので、足した設定だけを数える。
 func LayerConfigs(conf *config.Settings, root, only string, kind config.LayerKind) []rules.Problem {
 	var out []rules.Problem
 	for _, name := range layer.Names(conf) {
@@ -202,8 +202,8 @@ func FileProblems(conf *config.Settings, root string, kind config.LayerKind, nam
 const spareScope = "wip/"
 
 // UnmatchedScopes はフェーズ定義の scope の glob で、git が挙げるどのファイルにも当たらないものを warn で言う。
-// 共通設定の定義は src/*・tests/* のような配置を前提にするので、違う配置では範囲に合う型が見つからずに
-// 止まる。見るのは自身と各プロジェクトの設定それぞれで共通と合成した結果。inherit と wip/ の下は見ず、
+// 共通設定のフェーズ定義は src/*・tests/* のような配置を前提にするので、違う配置では範囲に合う型が見つからずに
+// 止まる。見るのはワークスペースと各プロジェクトの設定それぞれで共通と合成した結果。inherit と wip/ の下は見ず、
 // git が使えない設定は何も言わない（一覧が取れないだけで、設定の不備ではない）。
 func UnmatchedScopes(conf *config.Settings, root string) []rules.Problem {
 	var out []rules.Problem

@@ -10,7 +10,7 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 
 ワークスペースの下に別のリポジトリをcloneして、そのリポジトリを直すことがある。置き場は
 `projects/<名前>/`の直下1階層だけで、それより深い場所や置き場の外にあるものはプロジェクトとして扱わない。
-`projects/`が無いか空なら、以下の説明はすべてワークスペース自身の作業に適用して読む。
+`projects/`が無いか空なら、以下の説明はすべてワークスペースの作業に適用して読む。
 
 - プロジェクトで作業するときは、`cd projects/<名前>`してから`ccnavi-git.sh`を実行する。gitの操作はそのリポジトリに対して行われる
 - チケットは`project:`キーを持つ。値は`projects/`の下の名前で、ユーザが承認するときに決まる。エージェントが申告した値は判定に使われない
@@ -22,18 +22,18 @@ keywords: [プロジェクト, projects, リポジトリ, clone, チケット, �
 |---|---|
 | 提案（承認待ち`todo/`、レビュー待ち`review/`） | そのツリーの`wip/proposals/<状態>/`。プロジェクト向けは`projects/<名前>/wip/proposals/<状態>/` |
 | 承認済みチケット（作業中`doing/`、閉じた`done/`）、フェーズのマーカー、子の記録（`.risk.json`など） | 親チケットのツリーの`.ccnavi/approved/`。プロジェクト向けは`projects/<名前>/.ccnavi/approved/` |
-| gitのラッパースクリプトの記録 | ワークスペースの`logs/<プロジェクト>/`。ワークスペース自身の記録は`logs/` |
+| gitのラッパースクリプトの記録 | ワークスペースの`logs/<プロジェクト>/`。ワークスペースの記録は`logs/` |
 | 判定の記録とstateの置き場 | ワークスペースの`logs/decisions.jsonl`と`logs/state/` |
 | ワークツリー | ワークスペースの`.claude/worktrees/<名前>` |
 | 子のフロー（担当のサブエージェントが読む手順書） | 親チケットのツリーの`.ccnavi/approved/flows/<子>.yml`。置き場は固定。中身はYAML。チケットの欄で場所を指定しない |
-| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペース自身は`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
+| 閉じたチケットの退避（`ready`がDraftを外す前に、閉じた親子のチケットの`done/`・`phases/<親>/`・`flows/`を移す）。手元の機械にだけ残る | ワークスペースの`logs/archive/<リポジトリ>/`。ワークスペースは`self`、プロジェクトはその名前。その下は承認済みの領域と同じ構成 |
 | 子のフローの下書き（エージェントが書く。効力は無い） | フローを保存するツリーと同じツリーの`wip/proposals/flows/<子>.yml`。プロジェクト向けは`projects/<名前>/wip/proposals/flows/<子>.yml` |
 | 作業・レビュー計画のテンプレート（効力のあるもの。計画と子のフローの一式） | 共通は`.ccnavi/config/common/templates/<名前>.yml`、プロジェクトは`.ccnavi/config/project/templates/<名前>.yml`。取り込むのはユーザ（[templates.md](templates.md)） |
 | テンプレートの下書き（エージェントが書く。効力は無い） | 反映する先と同じ相対パスで`wip/handoff/`の下（`wip/handoff/.ccnavi/config/project/templates/<名前>.yml`など）。プロジェクト向けは`projects/<名前>/wip/handoff/…`。取り込むのはユーザ（`ccnavi-user-handoff.sh`） |
 | ユーザに渡す物（保護対象を直したコピーなど） | ワークスペースのワークツリーの`wip/handoff/`（追跡する。直接作業では`integrate`が取り込み結果から外す） |
 | 一時のファイル・コミットしたくないもの | ワークスペースルート直下の`scratchpad/`（`.gitignore`で追跡から外す。[scratchpad.md](scratchpad.md)）。セッションのスクラッチパッドには置かない。プロジェクトの`projects/<名前>/`には`wip/`の規約が無いので、プロジェクトの作業中の置き物もワークスペース側に置く |
 | ワークスペースのルール | 共通設定の`.ccnavi/config/common/rules.yml`。リスクの配点とフェーズ定義（`phases.yml`）も同じ場所。レイアウトに依存するフェーズ定義はワークスペースの設定の`.ccnavi/config/project/phases.yml` |
-| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通設定は親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ。`skills/`の工程スキルも同じ入口で揃う）。フェーズ定義は共通設定と`config/project/`の和 |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/`（`rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml`）。ここはプロジェクト専用で、着手では上書きされない。親チケットに着手したあと、ユーザの発言のたびに、共通設定は親のワークツリーのプロジェクトの`.ccnavi/config/common/`にミラーされる（ずれは`ccnavi-user-mirror.sh`で見て、揃えるのはユーザ。`skills/`の工程スキルも同じ入口で揃う）。フェーズ定義は共通設定に`config/project/`を足した統合結果 |
 
 プロジェクトのgitリポジトリに入るのは、提案、承認済みチケットとマーカー、プロジェクトの設定の3つ。
 承認とフェーズの進み具合は親チケットのブランチに含まれて他の機械へ届くので、cloneすれば続きから作業できる。

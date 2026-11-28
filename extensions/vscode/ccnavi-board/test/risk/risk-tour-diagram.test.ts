@@ -39,7 +39,7 @@ function globMatch(glob: string, path: string): boolean {
   return g.endsWith("/**") ? p.startsWith(g.slice(0, -2)) : g === p;
 }
 
-/** 見本の配点（共通の設定）の項目 */
+/** 見本の配点（共通設定）の項目 */
 function commonRules(): Map<string, Rule> {
   return new Map(
     form.factors.map((factor) => [
@@ -169,7 +169,7 @@ test("CB-T1180 リスクの図の中の値（差分・加点・合計・レベ�
   assert.equal(valueOf("risk-save", "edit"), levelsText(raised));
 });
 
-test("CB-T1181 共通の設定に lib の設定を足した図は、統合結果の見本（閾値は小さいほう、項目は連結）の数え方と一致する", () => {
+test("CB-T1181 共通設定に lib の設定を足した図は、統合結果の見本（閾値は小さいほう、項目は連結）の数え方と一致する", () => {
   const lib = (sample.page.sums ?? []).find((entry) => entry.name === "lib")!;
   const levels = { medium: lib.levels.medium!, high: lib.levels.high!, critical: lib.levels.critical! };
   const common = commonRules();

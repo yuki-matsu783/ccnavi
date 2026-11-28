@@ -16,7 +16,7 @@ export const LAYER_COMMON = "common";
 
 const RESERVED = [LAYER_COMMON, LAYER_SELF];
 
-/** 共通の設定。実行ファイルは常に出す。JSONに無ければundefined */
+/** 共通設定。実行ファイルは常に出す。JSONに無ければundefined */
 export function commonLayer(board: BoardJson): LayerJson | undefined {
   return board.layers.find((l) => l.name === LAYER_COMMON);
 }

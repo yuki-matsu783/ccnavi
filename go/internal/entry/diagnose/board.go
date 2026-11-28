@@ -301,8 +301,8 @@ func factorRecord(layerName string, f *risk.Factor) *pyjson.Object {
 		"points", f.Points, "message", f.Message)
 }
 
-// layerRecords は設定ごとの宣言（共通 → 自身 → プロジェクトの名前順）。rules は重複を捨てたあとの、その設定
-// から実際に判定へ入ったぶん。phases と risk はその設定のファイルに書いてあるぶんで、合成の結果は sums と親の
+// layerRecords は設定ごとの宣言（共通 → ワークスペース → プロジェクトの名前順）。rules は重複を捨てたあとの、その設定
+// から実際に判定へ入ったぶん。phases と risk はその設定ファイルに書いてあるぶんで、合成の結果は sums と親の
 // フェーズの側に出る。
 func layerRecords(conf *config.Settings, root string, stderr io.Writer) []any {
 	out := []any{}
@@ -334,7 +334,7 @@ func layerRecords(conf *config.Settings, root string, stderr io.Writer) []any {
 	return out
 }
 
-// sumRecords はワークスペースとプロジェクトごとの「共通 + 1 つの設定」の和。拡張は layers を足し直さず、ここをそのまま
+// sumRecords はワークスペースとプロジェクトごとの共通設定に1 つの設定を足した統合結果。拡張は layers を足し直さず、ここをそのまま
 // 見せる。判定の合成と同じ関数（ruleload.SumView・risk.LayerDefinition・phases.LayerTypes）で組む。
 func sumRecords(conf *config.Settings, root string, stderr io.Writer) []any {
 	out := []any{}

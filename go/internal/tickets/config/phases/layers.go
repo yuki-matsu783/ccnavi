@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/tickets/config/layer"
 )
 
-// 使う定義は、共通設定の phases.yml と、親の project: が指す設定（空ならワークスペース自身）の和。
+// 使う定義は、共通設定の phases.yml と、親の project: が指す設定（空ならワークスペース）を足した統合結果。
 // どちらが無くても正常（無い = 空）で、両方無いときだけ定義が無い。足すだけで、設定が共通設定の
 // 定義を上書きすることはない。
 
@@ -18,7 +18,7 @@ func typesPath(conf *config.Settings, root, project string) string {
 	return layer.File(conf, root, project, config.KindPhases)
 }
 
-// CommonTypes は共通設定の定義と、その苦情。ファイルが無いか壊れていれば nil。単体 clone では共通
+// CommonTypes は共通設定のフェーズ定義と、その苦情。ファイルが無いか壊れていれば nil。単体 clone では共通
 // 設定は同期で配られたミラーになる。苦情を言う場所は --lint の共通設定の項。
 func CommonTypes(conf *config.Settings) (*Types, []rules.Problem) {
 	if conf.Phases == "" || !ospath.DiskExists(conf.Phases) {
@@ -29,14 +29,14 @@ func CommonTypes(conf *config.Settings) (*Types, []rules.Problem) {
 	return types, notes
 }
 
-// merge は共通設定の定義に、行き先の設定の定義を id ごとに足す。同じ id で全欄が一致すれば重複として
-// 設定の側を捨て（info）、中身が違えば error。表示名の重なりも設定をまたいで error。捨てるのはいつも
-// 設定の側（共通設定の定義は全プロジェクトで同じに読まれるべきなので、1 つの設定の書き方で中身が
+// merge は共通設定のフェーズ定義に、行き先の設定のフェーズ定義を id ごとに足す。同じ id で全欄が一致すれば重複として
+// 足した設定を捨て（info）、中身が違えば error。表示名の重なりも設定をまたいで error。捨てるのはいつも
+// 足した設定（共通設定のフェーズ定義は全プロジェクトで同じに読まれるべきなので、1 つの設定の書き方で中身が
 // 変わらないようにする）。
 func merge(common, extra *Types, layer string) (*Types, []rules.Problem) {
 	merged := common.clone()
 	var problems []rules.Problem
-	// 共通設定の定義が正。設定の定義は、同じ id（中身が同じなら捨て、違えばエラー）、表示名の重なり（エラー）を除いたものだけ足す。
+	// 共通設定のフェーズ定義が正。設定のフェーズ定義は、同じ id（中身が同じなら捨て、違えばエラー）、表示名の重なり（エラー）を除いたものだけ足す。
 	titles := map[string]string{}
 	for p := range common.All() {
 		titles[p.Title] = p.ID
@@ -50,7 +50,7 @@ func merge(common, extra *Types, layer string) (*Types, []rules.Problem) {
 			} else {
 				problems = append(problems, problem(rules.Error, p.ID, "`"+p.ID+"` は共通設定と同じ id で中身が違う"+
 					"（違う欄: "+strings.Join(Differing(prior, p), ", ")+"）。"+
-					layer+" の `"+p.ID+"` は使わず、共通設定の定義を使う。"+
+					layer+" の `"+p.ID+"` は使わず、共通設定のフェーズ定義を使う。"+
 					"中身を変えたいなら "+layer+" の側に別の id を付ける"))
 			}
 			continue

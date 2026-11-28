@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 設定の受入テスト。risk は共通 + 1 つの設定の和。
+// 設定の受入テスト。risk は共通設定に1 つの設定を足した統合結果。
 // risk は共通設定に `big-diff`、lib の設定に `schema` と `levels: {critical: 50}` がある。
 // 親と子は lib の `work`（範囲の上限が無くレビュー不要）を使う。
 
@@ -208,7 +208,7 @@ func TestSameFactorIdAcrossLayersCountsBothUnderTheLayerName(t *testing.T) {
 
 func TestACollidingJudgeItemIsRecordedUnderTheLayerName(t *testing.T) {
 	t.Parallel()
-	// 同 id の定性項目は、後ろの設定の側を `<設定>:<id>` で record-risk する。
+	// 同 id の定性項目は、後ろの設定を `<設定>:<id>` で record-risk する。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, w.Risk, configws.CommonRiskText+commonJudgeFactor)
 	configws.WriteRisk(t, w.Lib, configws.LibRiskText+"  - {id: outward, points: 15, judge: 公開の API を変えるか, message: 外向き（lib）}\n")
@@ -387,8 +387,8 @@ func TestTheMarkThatRestsOnATypeNamesItsLayer(t *testing.T) {
 
 func TestTheMarkNamesCommonWhenTheTypeComesFromCommon(t *testing.T) {
 	t.Parallel()
-	// 共通設定の定義をコピーした親のマーカーは、source が common。`--explain --json` の和と同じ。lib の `work` は共通設定の
-	// `work` と全欄が同じなので、和では共通の側が残る。コピーは出どころを持たないが、共通設定の定義と中身が同じなら
+	// 共通設定のフェーズ定義をコピーした親のマーカーは、source が common。`--explain --json` の統合結果と同じ。lib の `work` は共通設定の
+	// `work` と全欄が同じなので、統合結果では共通の側が残る。コピーは出どころを持たないが、共通設定のフェーズ定義と中身が同じなら
 	// 共通の定義として記す。
 	w := newWS(t, configws.KindRisk)
 	configws.Write(t, w.Phases, configws.LibPhasesWork)

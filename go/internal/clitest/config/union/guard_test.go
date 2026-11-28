@@ -39,7 +39,7 @@ func TestLayerFilesAreRestored(t *testing.T) {
 
 func TestCopiesInWorktreesAreRestored(t *testing.T) {
 	t.Parallel()
-	// ワークツリー側の設定も対象。lib から切った分・ワークスペースから切った自身の分・共通設定の 3 本
+	// ワークツリー側の設定も対象。lib から切った分・ワークスペースから切った分・共通設定の 3 本
 	// （既存の穴。直す前は allow `worktrees` にヒットして書けた）。
 	w := newWS(t, configws.KindGuard)
 	t1 := w.Worktree(w.Lib, "w1")

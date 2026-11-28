@@ -2,7 +2,7 @@
 name: ccnavi-config
 distribute: true
 description: >-
-  ccnavi の設定 4 本（rules.yml・phases.yml・risks.yml・ticket-sections.yml。.ccnavi/config/common/ と config/project/ の和）を書く・足す・直す・
+  ccnavi の設定 4 本（rules.yml・phases.yml・risks.yml・ticket-sections.yml。.ccnavi/config/common/ に config/project/ を足した統合結果）を書く・足す・直す・
   確かめる。ルールを足したい、フェーズ定義やリスクの配点や提案の見出しを変えたい、書いた設定が
   意図どおりに効いているか疑わしい、`/ccnavi-config` と打たれた、のどれでも使う。
   足すときは下書きを検証してからユーザに渡し、確かめるときは lint と期待する判定を回して
@@ -16,7 +16,7 @@ ccnavi の判定と進め方は 4 本のファイルで決まる。どれもユ�
 | ファイル | 決めるもの | どの設定にも無いとき |
 |---|---|---|
 | `rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定だけで判定する（無いのは正常で、`--lint` も言わない） |
-| `phases.yml` | フェーズ定義（共通設定と config の和）。親の `plan:` に並べる名前と、その範囲・レビュー・成果物。順序は持たない（親の計画のステップの `after` で書く） | 計画の無い親だけが利用できる（番号だけのフェーズ）。計画を持つ親は承認できない |
+| `phases.yml` | フェーズ定義（共通設定に config を足した統合結果）。親の `plan:` に並べる名前と、その範囲・レビュー・成果物。順序は持たない（親の計画のステップの `after` で書く） | 計画の無い親だけが利用できる（番号だけのフェーズ）。計画を持つ親は承認できない |
 | `risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（big-diff・many-files・ci・deletes） |
 | `ticket-sections.yml` | 親（`parent`）と子（`child`）の提案の本文に求める `## ` の見出しと、親の雛形が見出しの下に置く空欄の目印（`todo`）。Stop の判定（R2）も共通設定の見出しを求める | その種類の見出しを見ない（雛形にも見出しを置かない） |
 
@@ -25,7 +25,7 @@ ccnavi の判定と進め方は 4 本のファイルで決まる。どれもユ�
 | 設定 | 置き場 | 何を置くか |
 |---|---|---|
 | 共通設定 | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml` | どのツリーにも適用するもの |
-| ワークスペースの設定 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
+| ワークスペースの設定 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペースのツリーにだけ適用するもの |
 | プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
 同じ `id` のルールは足すだけで、上書きも取り消しもしない。厳しいほうが採られる。共通設定は、着手済みの親のワークツリーのプロジェクトへミラーされる（`.ccnavi/docs/projects.md`）。

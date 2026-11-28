@@ -62,7 +62,7 @@ func problemsText(notes []rules.Problem) string {
 	return unreadableFallback
 }
 
-// layerPhaseSet はその設定のファイルに書かれたフェーズ定義と、読めなかった理由。無い設定は nil。
+// layerPhaseSet はその設定ファイルに書かれたフェーズ定義と、読めなかった理由。無い設定は nil。
 // 判定が使う和（共通 + 親の project: の設定）は phases.LayerTypes が組む。
 func layerPhaseSet(path string) (*phases.Types, string) {
 	if path == "" || !ospath.IsFile(path) {

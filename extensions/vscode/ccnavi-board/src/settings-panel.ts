@@ -2,7 +2,7 @@
  * 設定を編集する3画面（ルール管理・リスク管理・フェーズ管理）のパネルが共通で持つ段取り。
  * VS CodeのAPIに触れるので単体テストの対象外（`vscode`を差し替えて試せる所だけ試す）。
  *
- * 3画面は同じ形をしている。対象（共通の設定・ワークスペース・プロジェクト）を1枚のタブで切り替える。
+ * 3画面は同じ形をしている。対象（共通設定・ワークスペース・プロジェクト）を1枚のタブで切り替える。
  * 編集の途中を持つので`retainContextWhenHidden`は真。ここにまとめたのは、パネルの
  * 受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替え、保存できるかの取り直し、
  * 画面からの操作のうち3画面で同じもの（`SettingsMessage`）の受け付け、保存の流れ（`save`）。
@@ -38,7 +38,7 @@ import { debounce, openInEditor, watchTickets } from "./panel-common.js";
 import { markTourSeen, tourSeen } from "./tour.js";
 import { confirmDuringTurn } from "./turn-confirm.js";
 
-/** 3画面の対象。共通の設定（`workspace`）、ワークスペースの設定（`self`）、プロジェクト1つの設定（同じ3種） */
+/** 3画面の対象。共通設定（`workspace`）、ワークスペースの設定（`self`）、プロジェクト1つの設定（同じ3種） */
 export type SettingsTarget = RulesTarget;
 
 /** 共通の段取りが読む、読んだ結果の部分。画面ごとの`L`はこれに画面の分を足す */
@@ -53,7 +53,7 @@ export interface SettingsLoaded {
   readonly file: { readonly path: string; readonly rel: string };
   /** 取り込み待ち画面を開けるか */
   readonly handoff: HandoffEntry;
-  /** 切り替えられる対象（共通の設定・ワークスペース・設定のあるプロジェクト） */
+  /** 切り替えられる対象（共通設定・ワークスペース・設定のあるプロジェクト） */
   readonly targets: readonly TargetOption[];
 }
 
@@ -234,7 +234,7 @@ function targetLabelOf(target: SettingsTarget): string {
   return targetLabel(target.kind, target.kind === "project" ? target.name : "");
 }
 
-/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーのdoingでも止める） */
+/** 保存を止めるチケットを絞るプロジェクト。共通設定とワークスペースの設定は絞らない（どのツリーのdoingでも止める） */
 function projectOf(target: SettingsTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
@@ -521,7 +521,7 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
       return;
     }
 
-    // 1. 検証。errorが1件でもあれば保存しない。実行ファイルは共通の設定と足した形で確かめる。
+    // 1. 検証。errorが1件でもあれば保存しない。実行ファイルは共通設定と足した形で確かめる。
     const lint = await runLint(root, binSetting(), screen.override(loaded.target, tmp));
     if (!screen.alive(current) || stale(current, loaded, "この保存")) {
       return;
@@ -555,7 +555,7 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
     }
 
     // 3. 書く。読み込んでから外で変わっていないこと（無かったファイルはまだ無いこと）、ツリーの外とリンクを断ること、
-    //    一時ファイルの入れ替えは`writeTreeFile`が受け持つ。実行ファイルは設定のファイルに大きさの上限を持たないので渡さない
+    //    一時ファイルの入れ替えは`writeTreeFile`が受け持つ。実行ファイルは設定ファイルに大きさの上限を持たないので渡さない
     current.wroteAt = Date.now();
     const written = writeTreeFile(root, file.path, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs }, screen.words.file, undefined);
     if (!written.ok) {

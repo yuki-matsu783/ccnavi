@@ -18,7 +18,7 @@ import (
 //
 // ファイルが無いのは「設定が無い」正常で、ルール・リスクの配点・フェーズ定義のすべてで空として扱う。記録の `fallback` にも `--lint` にも出さない。
 // 不正なときだけ `fallback` を残す。組み込みの deny は、共通設定と config の有無・状態によらず常にヒットする。
-// 土台は configws の雛形。配点の設定の和の細部、組み込みの文面、照合の速さは Go のテスト
+// 土台は configws の雛形。配点の統合結果の細部、組み込みの文面、照合の速さは Go のテスト
 // （go/internal/tickets/config/risk・go/internal/policy/builtin・go/internal/policy/rules）が確かめる。
 
 const (
@@ -238,7 +238,7 @@ func TestExplainShowsAMissingLayerAsNotPlaced(t *testing.T) {
 
 	out := w.Ccnavi("--explain").Stdout
 
-	if !strings.Contains(out, "この設定のファイルはありません") {
+	if !strings.Contains(out, "この設定ファイルはありません") {
 		t.Errorf("置いていないと言わない:\n%s", out)
 	}
 	before, _, _ := strings.Cut(out, "■ rules ワークスペースの設定")
@@ -683,7 +683,7 @@ func (w absentWS) explain() (sums map[string]sumView, raw map[string]any) {
 }
 
 // ワークスペースの中では、プロジェクトのミラー（`.ccnavi/config/common/`）を共通設定として読まない。
-// ミラーのルール・配点・フェーズ定義は、判定にも和にも入らない（不正なミラーの phases.yml があっても何も言わない）。
+// ミラーのルール・配点・フェーズ定義は、判定にも統合結果にも入らない（不正なミラーの phases.yml があっても何も言わない）。
 func TestTheMirrorIsNotReadInTheWorkspace(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -717,7 +717,7 @@ func TestTheMirrorIsNotReadInTheWorkspace(t *testing.T) {
 }
 
 // 単体の clone。そのプロジェクトがルートになる。`.ccnavi/config/common/`（ミラー）が共通設定、`.ccnavi/config/project/` が
-// ワークスペースの設定として読まれ、ワークスペースの中と同じ「共通 + 1 つの設定」の和で判定される。
+// ワークスペースの設定として読まれ、ワークスペースの中と同じ共通設定に1 つの設定を足した統合結果で判定される。
 func newStandalone(t *testing.T) (absentWS, string) {
 	w := newAbsentWS(t)
 	// lib を単体の clone に見立てる。ミラーは共通設定のコピー。
@@ -750,7 +750,7 @@ func TestStandaloneCloneSumsTheCommonLayerAndTheOwnLayer(t *testing.T) {
 	t.Parallel()
 	w, _ := newStandalone(t)
 	sums, _ := w.explain()
-	// 配点も共通 + ワークスペースの設定の和。閾値は小さいほう。
+	// 配点も共通設定にワークスペースの設定を足した統合結果。閾値は小さいほう。
 	risk := sums["self"].Risk
 	if got := sums["self"].factorIDs(); !slices.Equal(got, []string{"big-diff", "schema"}) || risk.Levels["critical"] != 50 || risk.Fallback != "" {
 		t.Errorf("risk = %+v", risk)
@@ -819,8 +819,8 @@ func TestEveryExplainSumIsTheCommonLayerPlusOneLayer(t *testing.T) {
 	}
 }
 
-// `layers[]` は合わせる途中経過なので、先の設定と全欄が同じ定義は後ろから外れる。
-// `sums[]` は「共通 + その設定」だけで合わせるので、外れない。
+// `layers[]` は足す途中経過なので、先の設定と全欄が同じ定義は後ろから外れる。
+// `sums[]` は「共通 + その設定」だけで足すので、外れない。
 func TestASumKeepsWhatTheLayersOverviewDrops(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -830,7 +830,7 @@ func TestASumKeepsWhatTheLayersOverviewDrops(t *testing.T) {
 
 	sums, _ := w.explain()
 
-	// どちらの和も共通設定の定義だけ（全欄一致の重複は後ろを破棄する）。
+	// どちらの統合結果も共通設定のフェーズ定義だけ（全欄一致の重複は後ろを破棄する）。
 	var want []string
 	for _, r := range configws.DenyOf(configws.CommonRules) {
 		want = append(want, r["id"].(string))
@@ -838,7 +838,7 @@ func TestASumKeepsWhatTheLayersOverviewDrops(t *testing.T) {
 	if got := sums["lib"].denyIDs(); !slices.Equal(got, want) {
 		t.Errorf("lib の deny = %v, want %v", got, want)
 	}
-	// lib の設定自身の宣言は、他の設定の定義に引かれない。
+	// lib の設定の宣言は、他の設定のフェーズ定義に引かれない。
 	if sums["lib"].denyIDs()[0] != sums["self"].denyIDs()[0] {
 		t.Errorf("lib = %v, self = %v", sums["lib"].denyIDs(), sums["self"].denyIDs())
 	}

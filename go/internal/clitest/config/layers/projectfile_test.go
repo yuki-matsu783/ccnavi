@@ -12,8 +12,8 @@ import (
 // `--project-phases-file <名前>=<パス>` と `--project-risk-file <名前>=<パス>` の受入テスト
 // 。
 //
-// VS Code 拡張のフェーズ管理画面とリスク管理画面が、編集中の設定（自身かプロジェクト）の定義を保存せずに、
-// 共通設定と合わせて検証するための差し替え。config 単体の形式だけでなく、合成したあとの
+// VS Code 拡張のフェーズ管理画面とリスク管理画面が、編集中の設定（ワークスペースかプロジェクト）の定義を保存せずに、
+// 共通設定に足して検証するための差し替え。config 単体の形式だけでなく、合成したあとの
 // 表示名の重なり・同じ id で中身が違う定義・閾値の逆転・同 id の衝突・`script:` の存在確認（解決先はその設定の git プロジェクトルート）を見る。
 // 土台は configws の雛形（ワークスペースの設定に `docs`「文書」、lib の設定に `design`「設計」/ `build` / `release`。
 // 共通設定に `big-diff` と `levels: {medium: 20, high: 40, critical: 70}`、lib の設定に `schema` と `levels: {critical: 50}`。
@@ -28,7 +28,7 @@ const (
 	// 定義の無い設定。実行ファイルは読めないとして error にする（拡張はこの形を書き出さない）。
 	emptyLayer = "version: 1\nphases: {}\n"
 
-	// config 単体では読めるが、共通の medium 20 と合わせると high 10 < medium 20 で逆転する。
+	// config 単体では読めるが、共通の medium 20 に足すと high 10 < medium 20 で逆転する。
 	invertingRisk = "version: 1\nlevels: {high: 10}\n"
 	// 共通の `big-diff` と同じ id で中身が違う。
 	clashingRisk = "version: 1\nfactors:\n  - {id: big-diff, points: 99, lines_over: 1, message: 別の行数}\n"
@@ -91,14 +91,14 @@ func TestProjectPhasesFileSelfNamesTheWorkspacesOwnLayer(t *testing.T) {
 	if errs := w.layerProblems("phases", "error", "(self)", args(added)...); len(errs) != 0 {
 		t.Errorf("重ならない定義で error: %v", errs)
 	}
-	// 定義の無い設定は error。拡張が設定のファイルを最初の保存まで作らないのはこのため。
+	// 定義の無い設定は error。拡張が設定ファイルを最初の保存まで作らないのはこのため。
 	empty := w.edited("empty.yml", emptyLayer)
 	if len(w.layerProblems("phases", "error", "(self)", args(empty)...)) == 0 {
 		t.Error("定義の無い設定が error にならない")
 	}
 }
 
-// 差し替えた 1 本は共通設定の定義と足して確かめる。共通の design と中身が違う design は error。
+// 差し替えた 1 本は共通設定のフェーズ定義と足して確かめる。共通の design と中身が違う design は error。
 func TestProjectPhasesFileIsCheckedTogetherWithTheCommonLayer(t *testing.T) {
 	t.Parallel()
 	w := newFileWS(t)
@@ -134,7 +134,7 @@ func TestProjectRiskFileALayerThatInvertsLevelsOnlyAfterTheMergeIsAnError(t *tes
 		t.Error("本来のファイルが変わった")
 	}
 	// 共通の差し替え（--risk）に同じ中身を渡す形では、合成後の逆転は見えない。共通設定単体の `levels` が逆転していないため。
-	// 設定の側として渡すと見える。
+	// その設定として渡すと見える。
 	if old := w.layerProblems("risk", "error", "(projects/lib)", "--risk", tmp); len(old) != 0 {
 		t.Errorf("--risk で逆転が見えた: %v", old)
 	}

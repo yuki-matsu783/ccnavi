@@ -151,7 +151,7 @@ export function templatesLayerOf(target: { readonly kind: string; readonly name:
   return target.kind === "project" ? target.name : "self";
 }
 
-/** 対象が見せる設定の名前。共通の設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこの設定のテンプレートだけ） */
+/** 対象が見せる設定の名前。共通設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこの設定のテンプレートだけ） */
 export function shownLayerOf(target: { readonly kind: string; readonly name: string }): string {
   if (target.kind === "workspace") {
     return "common";

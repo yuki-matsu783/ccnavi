@@ -25,7 +25,7 @@ import (
 // 見るのは 5 つ。
 //  1. 発言が、共通設定の中身を着手済みの親のワークツリーのミラーへコピーし、config には触れない。共通設定から無くなったファイルは
 //     ミラーからも消す。`script:` の値は書き換えない
-//  2. 子とワークスペース自身の作業、未着手の親にはコピーしない。`ticket start` 自身はコピーしない
+//  2. 子とワークスペースの作業、未着手の親にはコピーしない。`ticket start` 自身はコピーしない
 //  3. コピーできない形（読めない・書き込みの失敗）では何もコピーせず、発言と着手は止めずに理由を言う。上書きの記録・知らせ・閉じるのを止める処理は無い
 //  4. コピーした分は発言の受け入れに入るので、実行後チェックとバックアップと復元が戻さず、報告もしない。ツール呼び出しの中でミラーが書き換わったら、今までどおり戻す
 //  5. 差分が無いときは何も読み書きしない（指紋が前と同じ）。元か先が動けば、検証つきで比べ直す
@@ -268,7 +268,7 @@ func TestAProjectWithoutALayerGetsTheMirror(t *testing.T) {
 	assertGone(t, configOf(tree, "rules"))
 }
 
-// 2: ワークスペース自身の作業は、共通設定と同じリポジトリにあるのでコピーしない。
+// 2: ワークスペースの作業は、共通設定と同じリポジトリにあるのでコピーしない。
 func TestWorkspaceTicketsAreNotMirrored(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
@@ -581,7 +581,7 @@ func TestAMirroredScriptFactorIsNotCountedTwice(t *testing.T) {
 		}
 		return
 	}
-	t.Error("lib の和が無い")
+	t.Error("lib の統合結果が無い")
 }
 
 // ---- 発言ごとの同期（差分が無ければ読み書きしない）

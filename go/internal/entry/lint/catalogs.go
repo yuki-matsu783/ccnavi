@@ -57,7 +57,7 @@ func messageProblems(root string) []rules.Problem {
 }
 
 // wikiProblems は学びの蓄積の wiki（`docs/wiki/`）の frontmatter が壊れたファイル（--learnings はそれを数えない）。
-// ワークスペース自身と各プロジェクトのユーザのチェックアウトを見る。
+// ワークスペースと各プロジェクトのユーザのチェックアウトを見る。
 func wikiProblems(conf *config.Settings, root string) []rules.Problem {
 	var out []rules.Problem
 	for _, main := range mainTrees(conf, root) {
@@ -74,7 +74,7 @@ func wikiProblems(conf *config.Settings, root string) []rules.Problem {
 	return out
 }
 
-// mainTrees はワークスペース自身と各プロジェクトのユーザのチェックアウト。
+// mainTrees はワークスペースと各プロジェクトのユーザのチェックアウト。
 func mainTrees(conf *config.Settings, root string) []tree.Tree {
 	return append([]tree.Tree{tree.MainTree(root)}, tree.Projects(conf.Projects)...)
 }

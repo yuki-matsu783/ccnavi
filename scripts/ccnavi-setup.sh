@@ -121,7 +121,7 @@ DEPLOY_RULES=".ccnavi/config/common/rules.yml"
 # 実行ファイルは条件と差し込みを解くだけ。無いと、決まりが渡らないことを 1 行で言うだけになる。
 DEPLOY_CCNAVI_MD=".ccnavi/CCNAVI.md"
 # 設定 4 本のひな形。rules・phases・risk・ticket-sections はどれも共通設定（.ccnavi/config/common/）へ配る。
-# phases の判定は、共通設定とワークスペースの設定（.ccnavi/config/project/）の和を読む。ワークスペースの設定の
+# phases の判定は、共通設定とワークスペースの設定（.ccnavi/config/project/）を足した統合結果を読む。ワークスペースの設定の
 # phases.yml は配らない。そこに置くのはワークスペースのレイアウト（scope のパス）に依存する定義で、
 # 配布元のものは配布元のレイアウトに合わせてあるため。配布先に既にあれば触らない。
 DEPLOY_RISK=".ccnavi/config/common/risks.yml"
@@ -247,7 +247,7 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
 CCNAVI_ENTRY_PATH は .ccnavi/scripts/ccnavi-launcher.sh（振り分けの sh）に固定で、実行ファイルは
 .ccnavi/bin/<os>-<arch>/ に置く。実行ファイル・作業の決まり（.ccnavi/CCNAVI.md）・設定 4 本（.ccnavi/config/common/rules.yml、
 .ccnavi/config/common/risks.yml、.ccnavi/config/common/phases.yml、.ccnavi/config/common/ticket-sections.yml。ワークスペースの設定の .ccnavi/config/project/phases.yml は
-配らず、既にあれば触らない。フェーズ定義は 2 本の和で判定する）・代わりに通る sh と振り分けの sh
+配らず、既にあれば触らない。フェーズ定義は共通設定に config を足した統合結果で判定する）・代わりに通る sh と振り分けの sh
 （.ccnavi/scripts/）・使い方の文書（.ccnavi/docs/*.md）・共通の作業・レビュー計画のテンプレート
 （.ccnavi/config/common/templates/*.yml。配布元に無ければ配らない）・文面ファイル
 （.ccnavi/messages/*.yml。拒否・促し・次の一手の文。無いと短い既定の文に落ちる）・共通の工程スキルと配るだけのスキル
@@ -2026,7 +2026,7 @@ fi
 if [ ! -f "$root/$DEPLOY_SECTIONS" ]; then
 	note_missing "${DEPLOY_SECTIONS}（提案の本文に求める見出し。無いと見出しを確かめず、親の雛形にも見出しを置かない）"
 fi
-# フェーズ定義は共通設定とワークスペースの設定の和。どちらか片方があれば足りるので、両方無いときだけ言う。
+# フェーズ定義は共通設定にワークスペースの設定を足した統合結果。どちらか片方があれば足りるので、両方無いときだけ言う。
 if [ ! -f "$root/$DEPLOY_PHASES" ] && [ ! -f "$root/$DEPLOY_COMMON_PHASES" ]; then
 	note_missing "${DEPLOY_COMMON_PHASES}（フェーズ定義。ワークスペースの設定の ${DEPLOY_PHASES} にも無いと plan を持つ親を承認できず、plan の無い親は start が止まる）"
 fi

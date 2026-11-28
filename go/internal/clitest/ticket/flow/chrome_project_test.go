@@ -149,7 +149,7 @@ func TestApprovingAProjectFamilyWritesOnlyItsBranch(t *testing.T) {
 	ticketkit.Lacks(t, js(paths[".ccnavi/approved/doing/web-i0012.md"], "content"), "ccnavi_approved")
 }
 
-// フェーズ定義は共通設定（ワークスペースの統合先）と、親の project: が指す config の和。ミラーは足さない。
+// フェーズ定義は共通設定（ワークスペースの統合先）と、親の project: が指す config を足した統合結果。ミラーは足さない。
 func TestTheProjectFamilyIsJudgedByTheProjectPhasesAndIgnoresTheMirror(t *testing.T) {
 	t.Parallel()
 	tmp := base.TempDir(t)

@@ -187,7 +187,7 @@ func shellWriteRegex(binPath string, extra []triple, moved []holder) string {
 
 // ShellRegex は、この設定で組んだ、シェルから守る場所へ書き込む形を返す。実行前の保護（AddRules）と
 // 組み込みの既定（builtin）が同じものを取る。片方だけ空の設定で組むと、動かした ccnavi ディレクトリや実行ファイルが、
-// ルールファイルの壊れた間だけ守られなくなる。commonFiles は共通設定のファイル（CommonLayerFiles）。
+// ルールファイルの壊れた間だけ守られなくなる。commonFiles は共通設定ファイル（CommonLayerFiles）。
 func ShellRegex(root, binPath, projectHome string, commonFiles []string) string {
 	home := projectHomeClause(projectHome, writeForm)
 	extra := []triple{{home, projectHomeClause(projectHome, copyForm), home}}
@@ -198,7 +198,7 @@ func ShellRegex(root, binPath, projectHome string, commonFiles []string) string 
 	return shellWriteRegex(binPath, extra, movedHolders(root, projectHome, commonFiles))
 }
 
-// CommonLayerFiles は共通設定のファイル（config.LayerKinds の順）。
+// CommonLayerFiles は共通設定ファイル（config.LayerKinds の順）。
 func CommonLayerFiles(conf *config.Settings) []string {
 	var files []string
 	for _, kind := range config.LayerKinds() {
@@ -420,7 +420,7 @@ func movedHolders(root, projectHome string, commonFiles []string) []holder {
 		}
 	}
 	found = append(found, holder{"(?:" + strings.Join(where, "|") + ")", strings.Join(unique(top), "|")})
-	// 共通設定のファイルは同じディレクトリに並ぶことが多い。同じ組は 1 つにする。
+	// 共通設定ファイルは同じディレクトリに並ぶことが多い。同じ組は 1 つにする。
 	return unique(found)
 }
 
@@ -455,7 +455,7 @@ func commonShellClause(root, path string, f form) string {
 	return `(?:^|[^\w.-])` + named + term
 }
 
-// commonLayerRegex は共通設定のファイルを、名指しのツール（解決済みの絶対パス）に当てる式。ルートの下なら、ワークスペースと
+// commonLayerRegex は共通設定ファイルを、名指しのツール（解決済みの絶対パス）に当てる式。ルートの下なら、ワークスペースと
 // そこから切ったワークツリーの同じ相対に当てる。統合で統合先の設定になる経路があるため。
 func commonLayerRegex(root string, commonFiles []string) string {
 	var bases []string

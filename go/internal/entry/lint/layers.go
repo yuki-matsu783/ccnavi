@@ -147,7 +147,7 @@ func holdsParent(conf *config.Settings, work tree.Tree, root string) bool {
 	return ok && held.Ticket == work.Name && held.Parent == ""
 }
 
-// layerRepos は設定を比べるリポジトリ（ワークスペース自身の空と、プロジェクト）。
+// layerRepos は設定を比べるリポジトリ（ワークスペースの空と、プロジェクト）。
 func layerRepos(conf *config.Settings) []string {
 	out := []string{""}
 	for _, p := range tree.Projects(conf.Projects) {
@@ -157,7 +157,7 @@ func layerRepos(conf *config.Settings) []string {
 }
 
 // layerDrift は手元の設定が origin/<統合先> の設定（同じパス）と違う、という warn。origin/<統合先> が手元に
-// 無ければ黙る。project が空ならワークスペース自身。
+// 無ければ黙る。project が空ならワークスペース。
 func layerDrift(conf *config.Settings, root, project string) []rules.Problem {
 	found, _ := drift(conf, root, project)
 	return found
@@ -184,7 +184,7 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 		// origin が無いリポジトリ（git でない、リモートを持たない）は、取得で解けないので言わない。
 		return nil, !git.Run(home, []string{"remote", "get-url", "origin"}, git.Options{}).OK()
 	}
-	// 比べるファイル。ワークスペース自身は共通設定の 4 本も含み、どのリポジトリもワークスペースの設定の 4 本を比べる。
+	// 比べるファイル。ワークスペースは共通設定の 4 本も含み、どのリポジトリもワークスペースの設定の 4 本を比べる。
 	homeRel := strings.Trim(ospath.Slashed(projectHome(conf)), "/")
 	var rels []string
 	if project == "" {

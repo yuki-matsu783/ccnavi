@@ -19,7 +19,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | 共通設定のミラー | `projects/<名前>/.ccnavi/config/common/`（着手済みの親があるとき、ユーザの発言でワークスペースルートの `.ccnavi/config/common/` から配る。11.12） | プロジェクト |
 | ワークスペースの設定の 4 本 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース |
 | プロジェクトの設定の 4 本 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | プロジェクト |
-| 自身・プロジェクトの設定のテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |
+| ワークスペースの設定・プロジェクトの設定のテンプレート | `<ツリー>/.ccnavi/config/project/templates/<名前>.yml`（9.15。共通のテンプレートと同じく一般の保護で守る） | そのツリーのリポジトリ |
 | 固有スクリプト（配点の `script:` が指す先） | 共通設定とそのミラーは `.ccnavi/config/common/scripts/`。ワークスペースの設定とプロジェクトの設定は、それぞれの `.ccnavi/scripts/` | 設定と同じ |
 | プロジェクト | `projects/<名前>/`（`projects/` は固定。ワークスペースルートからの相対）。直下で `.git` を持つディレクトリだけ。1 階層に固定 | ワークスペースでは無視。プロジェクト自身の git |
 | ワークツリー | `.claude/worktrees/<識別子>/`。ワークスペースかプロジェクトから切る | 管理外 |
@@ -27,18 +27,18 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 | テンプレートの下書き | そのツリーの `wip/handoff/` の下の、取り込み先と同じ相対パス（ユーザが `ccnavi user handoff` で取り込む。9.15、9.19） | そのツリーのリポジトリ |
 | 承認済みチケット（閉じたものを含む）、フェーズのマーカー | 親チケットのツリーの `.ccnavi/approved/`（9.2）。承認済みチケットに `project:` が入る | そのツリーのリポジトリ |
 | 記録、state、セッションの状態 | ワークスペースの `logs/`（`logs/decisions.jsonl`、`logs/state/`、`logs/session/`） | 管理外 |
-| git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペース自身は `logs/` | 管理外 |
+| git のラッパースクリプトの記録 | ワークスペースの `logs/<プロジェクト>/`。ワークスペースは `logs/` | 管理外 |
 
 `.ccnavi/` は ccnavi ディレクトリの固定の名前。この表の置き場はどれも固定で、環境変数では動かない。
 
 設定は 3 種で、形は同じ。共通設定はどのツリーにも適用され、ワークスペースルートの `.ccnavi/config/common/` に置く。
 ユーザが持つ設定は ccnavi ディレクトリの下、記録と state は `logs/`、`.claude/` には Claude Code 自身のものだけを置く。
-共通設定のファイルと期待する判定も、名指しのツールからは組み込みの deny（`*/.ccnavi/*`）が止める。
+共通設定ファイルと期待する判定も、名指しのツールからは組み込みの deny（`*/.ccnavi/*`）が止める。
 共通設定の置き場は固定で、置き場を動かすフラグと環境変数の扱いは設計の startup-config（4 章）にある。
 ワークスペースの設定とプロジェクトの設定はそのツリーにだけ適用され、どちらも git プロジェクトルートの下の `.ccnavi/config/project/` に置く。
-ワークスペース自身に設定を分けるのは、ワークスペースのフェーズ定義の一部（`scope` に `scripts/*` や `extensions/*` を持つものなど）がそのレイアウトにしか合わないから。
+ワークスペースに設定を分けるのは、ワークスペースのフェーズ定義の一部（`scope` に `scripts/*` や `extensions/*` を持つものなど）がそのレイアウトにしか合わないから。
 
-**何をどこに置けるか。** ルールとリスクの配点は、共通（`.ccnavi/config/common/`）と config（ワークスペース自身かプロジェクトの `.ccnavi/config/project/`）の
+**何をどこに置けるか。** ルールとリスクの配点は、共通（`.ccnavi/config/common/`）と config（ワークスペースかプロジェクトの `.ccnavi/config/project/`）の
 両方に置け、効くのは和（合成は 11.4）。フェーズ定義（`phases.yml`）も同じで、どのプロジェクトでも同じ構成を前提にできる定義は共通に、
 レイアウトに依存する定義はワークスペースの設定 `<ワークスペースルート>/.ccnavi/config/project/phases.yml` か、
 そのプロジェクトの `.ccnavi/config/project/phases.yml` に置く。共通設定に足す設定は親の `project:` が決める（11.4.1）。
@@ -48,7 +48,7 @@ keywords: [置き場, ワークスペース, プロジェクト, .ccnavi/config/
 **共通設定のミラー。** プロジェクトの `.ccnavi/config/common/` は、ワークスペースルートの共通設定のコピー（11.12）。
 ワークスペースの中で共通設定として読むのは、ワークスペースルートの `.ccnavi/config/common/` だけ。
 プロジェクトだけを clone したときは、そのプロジェクトがルートになるので、`.ccnavi/config/common/`（ミラー）が共通設定、`.ccnavi/config/project/` がワークスペースの設定として読まれる。
-どちらの場合も「共通設定 + 1 つの設定」の和になる（11.4）。
+どちらの場合も共通設定に1 つの設定を足した統合結果になる（11.4）。
 
 ccnavi ディレクトリは git プロジェクトルートの直下の `.ccnavi` で、ワークスペースの設定とプロジェクトの設定に同じ名前が使われる。
 `config/` と `scripts/` と 4 本のファイル名は固定。プロジェクトの `config/project/` と混ぜないのは、組み込みの deny を `*/.ccnavi/*` の 1 行で済ませるため。

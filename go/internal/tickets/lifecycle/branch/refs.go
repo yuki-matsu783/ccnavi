@@ -266,7 +266,7 @@ func boundLine(r Ref, b *boundTo) string {
 		"説明・調査だけなら、作業場所を変えずに答えてよい。"
 }
 
-// projectOfRepo は `owner/repo` を origin に持つ場所。自身なら空と真、プロジェクトならその名前と真、無ければ偽。
+// projectOfRepo は `owner/repo` を origin に持つ場所。ワークスペースなら空と真、プロジェクトならその名前と真、無ければ偽。
 // origin のパスの最後の 2 要素を、大文字小文字を区別せずに比べる。
 func projectOfRepo(conf *config.Settings, root, repo string) (string, bool) {
 	want := pathcase.Fold(repo)
@@ -303,7 +303,7 @@ func startLines(conf *config.Settings, root string, refs []Ref) []string {
 			continue
 		}
 		args += " --repo " + r.repo
-		// 実行する場所を絶対パスで名指しする（cwd がどこでも届く）。ワークスペース自身も同じ形。
+		// 実行する場所を絶対パスで名指しする（cwd がどこでも届く）。ワークスペースも同じ形。
 		place := root
 		if where != "" {
 			place = ospath.Join(conf.Projects, where)

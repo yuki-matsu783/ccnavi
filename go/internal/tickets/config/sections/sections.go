@@ -134,7 +134,7 @@ func headings(kind string, raw any) ([]form.Heading, []rules.Problem) {
 	return out, problems
 }
 
-// over は base に f の並びを重ねる。f にキーがある種類だけ置き換える。
+// over は base に f の並びを足す。f にキーがある種類だけ置き換える。
 func (f *File) over(base form.Sections) form.Sections {
 	if f == nil {
 		return base
@@ -162,8 +162,8 @@ func Common(conf *config.Settings) form.Sections {
 	return f.over(form.Sections{})
 }
 
-// Layer は使う見出し（共通設定に、親の project: が指す設定を合わせたもの）と、その設定の苦情。
-// 設定のファイルが壊れていれば共通設定だけを使う。共通設定の苦情は返さない（言う場所は --lint の
+// Layer は使う見出し（共通設定に、親の project: が指す設定を足したもの）と、その設定の苦情。
+// 設定ファイルが壊れていれば共通設定だけを使う。共通設定の苦情は返さない（言う場所は --lint の
 // 共通設定の項で、二重に言わない）。
 func Layer(conf *config.Settings, root, project string) (form.Sections, []rules.Problem) {
 	out := Common(conf)

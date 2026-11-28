@@ -13,8 +13,8 @@
     ccnavi --lint --project-phases-file self=/tmp/phases.yml
 
 1つの設定のリスクの配点も同じ方法で渡します（--project-risk-file。共通設定には --risk
-を使います）。共通設定と組み合わせて、統合後のレベルの境界、重複するid、各 script:
-がその設定自身のgitプロジェクトルート配下に存在するかを検証します。
+を使います）。共通設定に足して、統合後のレベルの境界、重複するid、各 script:
+がその設定のgitプロジェクトルート配下に存在するかを検証します。
 
     ccnavi --lint --project-risk-file lib=/tmp/risks.yml
 

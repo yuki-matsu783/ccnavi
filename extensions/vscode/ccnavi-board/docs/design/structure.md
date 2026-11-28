@@ -15,10 +15,10 @@ src/
   bug-report.ts       バグ報告（サイドパネルのタイトルバーの虫のアイコンから始める）。ステータスバーの撮る・終えるのボタン、ffmpeg の録画の起動と停止（標準入力に q）、スクリーンショットのコマンドの起動、終えたときの gif への変換と zip の書き出し（vscode に依存する。組むものは core/bug-report.ts）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
   board-panel.ts      チケット管理画面の Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（チケット管理画面が開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
-  rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
-  risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
-  phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
-  templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出し・図の中身の取り出し（preview。読むだけ）の受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し、編集（実行ファイルに読ませる `--templates --check-file`、作業中の錠の取り直し、保存。書くのは保存のときだけで、判定は実行ファイルの答えのまま）。vscode に依存する
+  rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
+  risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
+  phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通設定のフェーズ定義（読み取り専用。共通設定を開いているときは並べない）と、共通設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
+  templates-panel.ts  テンプレート管理画面の Webview パネル（1 枚。対象（共通設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。読み直し・本文の取り出し・図の中身の取り出し（preview。読むだけ）の受け付けと、ファイルの監視、「取り込み待ちを開く」の受け渡し、編集（実行ファイルに読ませる `--templates --check-file`、作業中の錠の取り直し、保存。書くのは保存のときだけで、判定は実行ファイルの答えのまま）。vscode に依存する
   settings-panel.ts   ルール管理・リスク管理・フェーズ管理の 3 画面のパネルが共通で持つ段取り（受け付け・再表示・破棄、監視の反応の遅らせ方、読み直しと描き直し、対象の切り替え、錠の取り直し、3画面で同じ操作の受け付け、保存の流れ）。画面ごとの仕事（読む・見せる・見張る・検証に渡す差し替え・画面だけの操作）は `settingsPanel` に渡すコールバックで注入し、残す仕事は画面ごとに持つ（vscode に依存する）
   panel-common.ts     画面（*-panel.ts）が共通で使う小さな部品。`retainContextWhenHidden` の前提の確かめ（assertRetained）、監視の張り方（watchPattern・watchGlobs・watchTickets）、監視の反応を束ねる debounce、`switch` の網羅検査 assertNever、エディタで開く（openInEditor）、画面の対象フォルダ（workspaceFolder・firstWorkspaceFolder）（vscode に依存する）
   handoff-entry.ts    各画面（ルール・リスク・フェーズ・テンプレート管理）の「取り込み待ちを開く」の拡張ホスト側の共通部分（開けるかの確認と、見ている対象に合わせたツリーで開く）。実行ファイルを呼ぶので単体テストの対象外
@@ -62,7 +62,7 @@ src/
     phases-doc.ts     phases.yml の読み書き（同じくコメントを残す。読まない順序の欄は名指しするだけで、書き戻しで手を付けない）
     templates-view.ts テンプレート管理の拡張ホストと画面の契約（見せる形 TemplatesPage / TemplatesData、答えの形 TemplatesJson、押した操作 TemplatesMessage、編集の答え・図の中身の答え TemplateCheck / EditOpened）
     templates-render.ts テンプレート管理の入れ物の HTML（外部資源なし）。中身は画面（React）が作る
-    templatesmodel.ts `--templates` の答え（一覧・層ごとの中身・統合結果・下書き・本文・編集中の 1 本の検査）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
+    templatesmodel.ts `--templates` の答え（一覧・設定ごとの中身・統合結果・下書き・本文・編集中の 1 本の検査）の読み取り。判定はしない。答えの版が違えば解釈せず伝える
     template-edit.ts  テンプレートの編集の手元のコピー（EditTemplate）と編集の関数（ステップの追加・削除・並べ替え・線・フロー。先行が小さい添字になるよう振り直す）、書き出しと見比べ。vscode も DOM も node も入れない
     handoff-entry.ts  各画面の「取り込み待ちを開く」の契約（開けるか HandoffEntry・メッセージ openHandoff・開くツリーのキー）。VS Code にも node にも触れない
     handoff-view.ts   取り込み待ちの拡張ホストと画面の契約（答えの形 HandoffList / HandoffEntry / HandoffResult、見せる形 HandoffPage / HandoffData、押した操作 HandoffMessage）
@@ -88,7 +88,7 @@ src/
     tour-risk.ts      リスク管理の案内の見本（tours/risk.yml の sample:）を、risks.yml と同じ書き方から RiskPage（配点あり・ファイル無し・統合結果）にする小さな読み取り。yaml を持たず、readRisk と同じ結果になることをテストが見る
     tour-flow.ts      フロー編集の案内の見本（tours/flow.yml の sample）を FlowDoc と FlowChecks にし、手順ごとの scene を読む。yaml を持たず、実際の読み取り・実行ファイルとの一致はテストで検査する
     tour-workflow.ts  計画編集の案内の見本（名前付きの --plan-order の答え）を parsePlanOrder に通して、画面が描く形にする
-    tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（自身の層のテンプレート・下書き・統合結果）と本文の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
+    tour-templates.ts テンプレート管理の案内の見本（tours/templates.yml の sample:）を、小さい書き方から TemplatesPage（ワークスペースの設定のテンプレート・下書き・統合結果）と本文の見本にする小さな読み取り。判定はせず、見本に書いた値をそのまま使う
     tour-phases.ts    フェーズ管理の案内の見本（tours/phases.yml の sample:）を、phases.yml と同じ書き方から PhasesPage にする小さな読み取り。yaml を持たず、readPhases と同じ結果になることをテストが見る
     yaml11.ts         実行ファイル（YAML 1.1）が文字列以外に読む語の見分け。risk-doc と phases-doc が引用符を足す判断に使う
     yaml-read.ts      rules・phases・risks の文書が共通で使う、読み込みを止める問題の検出（YAMLの構文エラー・最上位がマップでない）。見つけたものはエラー画面に出す
@@ -176,7 +176,7 @@ src/
     templates/Problems.css Problems.tsx の CSS（苦情の一覧）
     templates/post.ts   テンプレート管理の送り口。契約に無いものは型で止まる
     templates/main.tsx  テンプレート管理画面の入口。埋め込みの JSON を読んでマウントする
-    templates/App.tsx   帯・ツールバー・開いている対象の層の一覧（語と深刻度の絞り込み）と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
+    templates/App.tsx   帯・ツールバー・開いている対象の設定の一覧（語と深刻度の絞り込み）と下書き・統合結果の枠、「取り込み待ちを開く」（共通部品 shared/HandoffLink.tsx）、拡張ホストからのメッセージの受け。案内の間は見本を描く
     templates/Sum.tsx   統合結果の枠（読み取り専用。実行ファイルの索引を、統合結果を選ぶ欄と表で出す。ルール管理・リスク管理の Sum.tsx と同じ作り）
     templates/Template.tsx テンプレート 1 件（バッジ・図・本文・「編集」。行は畳んで出す）
     templates/Diagrams.tsx 一覧の 1 行の図（計画の図と子のフローの図。読むだけ。実行ファイルの答え TemplateCheck を描く）

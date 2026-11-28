@@ -136,7 +136,7 @@ func v4Line(root, top, name string, fields map[string]string, deadline time.Time
 		"`" + cd + " integrate-done " + name + " -m '<メッセージ>'` を打ちます。" + abort
 }
 
-// RepoKey は一時ワークツリーの置き場の名前（config.DirectTmpDir/<repo>/）。ワークスペース自身は tree.Self。
+// RepoKey は一時ワークツリーの置き場の名前（config.DirectTmpDir/<repo>/）。ワークスペースは tree.Self。
 func RepoKey(root, top string) string {
 	if pathcase.SameReal(top, root) {
 		return tree.Self

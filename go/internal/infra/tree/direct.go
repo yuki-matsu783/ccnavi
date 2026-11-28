@@ -102,7 +102,7 @@ func DirectRecords(root string, main Tree) []DirectRecord {
 	return out
 }
 
-// SideBySideRoots は有効な記録があるユーザのチェックアウト（ワークスペース自身かプロジェクト）。
+// SideBySideRoots は有効な記録があるユーザのチェックアウト（ワークスペースかプロジェクト）。
 func SideBySideRoots(root, projectsDir string) []Tree {
 	var out []Tree
 	for _, m := range append([]Tree{MainTree(root)}, Projects(projectsDir)...) {

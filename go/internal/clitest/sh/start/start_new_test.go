@@ -405,7 +405,7 @@ func TestARepoThatDiffersFromCwdStopsBeforeAskingTheHost(t *testing.T) {
 	same := e.sh("--issue", "152", "--repo", "ACME/Widgets", "--dry-run")
 	lacks(t, same.Stderr, "が違います")
 	shkit.Remove(t, e.stub.Log)
-	// projects/ の中から、ワークスペース自身のリポジトリを頼むと、ルートへの移動を案内する
+	// projects/ の中から、ワークスペースのリポジトリを頼むと、ルートへの移動を案内する
 	up := code(t, e.run(opt{dir: proj}, "--issue", "152", "--repo", "acme/widgets"), 1)
 	has(t, up.Stderr, "ワークスペースルートに移動")
 	// projects/ に無いリポジトリは、移動先を案内せず止める

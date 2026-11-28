@@ -77,7 +77,7 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// targetLayer は下書きの取り込み先の設定。共通・自身（プロジェクトのツリーならそのプロジェクト）・プロジェクト。
+// targetLayer は下書きの取り込み先の設定。共通・ワークスペース（プロジェクトのツリーならそのプロジェクト）・プロジェクト。
 func targetLayer(conf *config.Settings, root string, where tree.Tree, key string) string {
 	names := known(conf, root)
 	parts := splitKey(key)
@@ -174,7 +174,7 @@ var draftKeys = []string{"name", "path", "sha", "valid", "description", "when", 
 	"has_flows", "flows", "problems"}
 
 // DraftJSON はボードのテンプレートの画面が下書きを並べる 1 本分の答え。path は下書き（ツリーからの相対）、target は
-// 取り込み先、layer は取り込み先の設定、checked_with は検査に使ったフェーズ定義の層、text は下書きの本文そのまま
+// 取り込み先、layer は取り込み先の設定、checked_with は検査に使ったフェーズ定義がある設定、text は下書きの本文そのまま
 // （reveal はしない）、exists_in は同じ名前のテンプレートが在る設定。problems の深刻度は下書きの検査のまま。
 func DraftJSON(d *Draft, scanned *templates.Scan) *pyjson.Object {
 	row := templates.EntryJSON(d.Entry)

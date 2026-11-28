@@ -18,13 +18,13 @@ import (
 	"ccnavi/internal/harness/samples"
 )
 
-// 設定の和を見るテストの土台。
+// 統合結果を見るテストの土台。
 
 const Home = ".ccnavi"
 
 var fileNames = map[string]string{"rules": "rules.yml", "phases": "phases.yml", "risk": "risks.yml", "sections": "ticket-sections.yml"}
 
-// layerPath はその git プロジェクトルートの設定のファイル（rules / phases / risk / sections）のパス。
+// layerPath はその git プロジェクトルートの設定ファイル（rules / phases / risk / sections）のパス。
 func LayerPath(root, kind string) string {
 	return filepath.Join(root, Home, "config", "project", fileNames[kind])
 }
@@ -342,7 +342,7 @@ func (w *WS) Propose(name, text, project string) string {
 		treeName = m[1]
 	}
 	tree := w.Worktree(owner, treeName)
-	// 計画を持つ親には、共通設定とその設定の phases.yml の和から、計画が使う定義のコピー（`phases:`）を足す
+	// 計画を持つ親には、共通設定にその設定の phases.yml を足した統合結果から、計画が使う定義のコピー（`phases:`）を足す
 	// （`ccnavi --plan-order <親> --fill-phases` と同じ）。どちらにも無ければ空のコピー。
 	var texts []string
 	for _, path := range []string{w.Phases, LayerPath(owner, "phases")} {

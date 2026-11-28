@@ -223,7 +223,7 @@ func reservedProject(t *ticket.Ticket) []rules.Problem {
 	}
 	return []rules.Problem{problem(t, "`project: "+t.Project+"` は設定の名前として予約してある表記（"+strings.Join(names, " と ")+"）。"+
 		"その名前のプロジェクトは設定として数えないので、このチケットの設定が決まらない。"+
-		"ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"+
+		"ワークスペースの提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"+
 		"そのプロジェクトの名前を変えてから置いてください")}
 }
 

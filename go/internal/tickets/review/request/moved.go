@@ -53,7 +53,7 @@ func IsSHA(value string) bool {
 // MovedDetail は、依頼の後にユーザが見るものが動いたかを返す。手元の confirm と Chrome のレビュー済みが、この関数で同じように決める。head は親のブランチの今の先頭である。
 // changed は、依頼時の先頭から head までに変わったパス（置き場で絞る前）である。
 // 読めなかった場合（差分を取れない、ホストの一覧が打ち切られた、依頼時のコミットが祖先でない）は listed が偽になり、動いたと数える。project はプロジェクトの親のときに真になる。
-// その場合だけ、ミラー側が動いたもの（kindMirror）を見る。ワークスペース自身の親では、共通設定が本体なので、ずれとは言わない。
+// その場合だけ、ミラー側が動いたもの（kindMirror）を見る。ワークスペースの親では、共通設定が本体なので、ずれとは言わない。
 //
 // ccnavi 自身の置き場（承認済みチケットと提案）だけを変えたコミットは、動いたと数えない。依頼のマーカーはそこに置かれ、親のブランチにコミットされる。数えると、依頼の直後に必ず動いたことになってしまうため。
 func MovedDetail(conf *config.Settings, requested *pyjson.Object, head string, changed []string, listed, project bool) Moved {

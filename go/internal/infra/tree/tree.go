@@ -21,7 +21,7 @@ func WorktreesPath(root string) string { return ospath.Join(root, WorktreesDir) 
 // Main はワークスペースルートの名前（空）。
 const Main = ""
 
-// Self はワークスペース自身の手元の状態（退避・退役の記録・ロック）を分ける名前。
+// Self はワークスペースの手元の状態（退避・退役の記録・ロック）を分ける名前。
 const Self = "self"
 
 // Kind はツリーの種類。
@@ -45,7 +45,7 @@ type Tree struct {
 // IsMain はチケットを持たないツリー（ワークスペースルートとプロジェクト）か。
 func (t Tree) IsMain() bool { return t.Kind != KindWorktree }
 
-// RepoKey は手元の状態を分ける名前。ワークスペース自身は Self。
+// RepoKey は手元の状態を分ける名前。ワークスペースは Self。
 func RepoKey(project string) string {
 	if project == "" {
 		return Self

@@ -92,7 +92,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
 - 承認済みの親の改版の雛形は `ccnavi ticket revise <識別子> [--feedback]` で作る（`tickets/proposal/scaffold`。REQ-TKT-62）。承認済みの置き場の `doing/<識別子>.md` を写し、スクリプトだけが書く欄と `followup_of`、本文の最後の「参照したファイル」の節（REQ-TKT-63）を外して `<提案の置き場>/todo/<識別子>.md` に書く。`--feedback` は `feedback: []` を足し、局面が「フィードバック計画待ち」（`phase.StageFeedbackWaiting`）のときだけ。親のワークツリーの中かどうかの検査は `ticket new` と共通（`scaffold.parentWorktree`）
   - 書いたあと、`allow` の項が計画のどのフェーズ定義の `scope` とも重ならないときは、「承認しても書けない」と名指しする（警告で、書いた提案は残る。承認の確認 `--agree --preview --verify` も同じ文を出す）。計画に `scope: inherit` の型が 1 つでもあれば、上限が無いので何も言わない
   - `scope: inherit` の型は範囲を持たないので、`--scope <glob>`（繰り返せる。ワークツリーのルートからの相対）で触るファイルを渡す。渡さずに止まったときの案内は、範囲を持つ型を足すのではなく `--scope` を示す
-  - 止める場合は何も書かない。共通設定と足す側の設定の `phases.yml` がどちらも無いか読めない（承認の検査を通る plan とコピーを作れない。9.7）、plan の型が無い・
+  - 止める場合は何も書かない。共通設定と足した設定の `phases.yml` がどちらも無いか読めない（承認の検査を通る plan とコピーを作れない。9.7）、plan の型が無い・
     `feedback` の定義、`scope: inherit` の型だけで `allow` が空（`allow` か `ask` が 1 件は要る）、子の識別子（`<親>-<NN>-<NN>`。
     雛形は親だけ）、識別子の形の誤り、cwd が識別子と同名のワークツリーの中でない（切り方を案内する）、同じ識別子の提案か承認済みチケットが既に在る
   - `--plan` の代わりに `--template <名前> [--layer <名前>]` を渡すと、溜めたテンプレート（9.15）から `plan:` / `feedback:`
@@ -114,7 +114,7 @@ frontmatter は rules.yml と同じタイプ（`allow` / `ask` / `deny`）で書
     設定の `.ccnavi/config/project/ticket-sections.yml` の 2 段（`tickets/config/sections`）。形は `version: 1` と、
     `parent`・`child` の並び（各項は `name` と省ける `todo`）。設定に `parent`（`child`）があればその種類の並びを置き換え、
     無ければ共通の並びを使う。組み込みの見出しは持たず、どちらにも無い種類は見出しを見ない。`name` は並びの中で大文字小文字を
-    区別せずに一意。版の違い・知らないキー・形の誤りは `--lint` が error で言い、そのファイルは使わない（足す側の設定が壊れていれば
+    区別せずに一意。版の違い・知らないキー・形の誤りは `--lint` が error で言い、そのファイルは使わない（足した設定が壊れていれば
     共通の並びを使う）。目印は rationale の目印と、渡した並びの `todo` 全部。
     Stop の判定の R2 は共通の並びの名前から組む（`.ccnavi/config/stop-review.md` があればそれをそのまま使い、差し込まない）
   - `ccnavi-ticket.sh` は `new` を通さない。`--fill-phases` と同じく実行ファイルを直接打つ。
