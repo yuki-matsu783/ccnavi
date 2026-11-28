@@ -87,7 +87,7 @@ sh に処理を書くときは、上の「sh で実装するもの」のどれ�
 - 親のブランチの共通のpushゲートは、判定を実行ファイルの`ccnavi tree gate`（`go/internal/entry/shask`の`pushGate`）が持ち、
   次の一手（`gate pass`・`gate stop`・`gate ls-remote`）で答える。shの口（`ccnavi-common-state.sh`の`ccnavi_push_gate`）は、
   `ls-remote`（外との出入り）を打って結果を返すだけ。ゲートを通る経路は、`ccnavi-git.sh`の`push`（送り先がoriginのとき）、
-  write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、`ccnavi-user-push-approved.sh`の3つで、後ろの2つは素の`git push`を打つ。
+  write-and-push（`ccnavi-common-write-and-push.sh`の`ccnavi_wap_prepare`）、`ccnavi-user-push-approved.sh`の3つで、後ろの2つは同じ送り方（`ccnavi_wap_push`。認証を尋ねず、`CCNAVI_WRITE_AND_PUSH_TIMEOUT`秒で切り、失敗したら`ls-remote`で届いたかを確かめる）で打つ。
   同じゲートを共有しないと消えた親のブランチを作り直せてしまうため、3経路とも同じ口を通す。形跡（手元の origin の参照・着手済み・`.requested`・退避）の
   判定は`pushTrace`が持つ。write-and-pushの「一度も送っていない親」と`ccnavi-sync.sh`の「消えた親」も、`tree parent <ツリー> <名前> <ブランチ>`の`trace`の行で`pushTrace`を使う。
   実行ファイルが答えないとき（実行ファイルを起こさない`ccnavi-user-push-approved.sh`だけが来る）は、手元に origin の参照があるブランチだけ`ls-remote`で確かめる

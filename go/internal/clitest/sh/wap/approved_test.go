@@ -2,6 +2,7 @@ package wap
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -410,6 +411,27 @@ func TestFailedPushExits1AndKeepsTheCommit(t *testing.T) {
 	eq(t, "件名", p.subject(tree), carryMessage)
 	eq(t, "置き場の未コミット", p.dirty(tree, approvedDoing), "")
 	has(t, r.Stderr, parentID)
+	// 失敗の理由（git の標準エラーの 1 行目）を添え、手で送る道も言う。
+	has(t, r.Stderr, "missing.git")
+	has(t, r.Stderr, "git push -u origin "+parentID)
+}
+
+// 送る側が失敗の終了コードを返しても、リモートに先頭が届いていれば成功として扱う（ls-remote で確かめる）。
+func TestAPushThatFailedAfterArrivingCountsAsSent(t *testing.T) {
+	p := newPushKit(t, false)
+	tree := p.worktree(parentID, false)
+	p.place(tree, parentID)
+	realGit, err := exec.LookPath("git")
+	if err != nil {
+		t.Skip("git が見つからない")
+	}
+	bin := filepath.Join(p.tmp, "gitwrap")
+	shkit.WriteExec(t, filepath.Join(bin, "git"),
+		"#!/bin/sh\n'"+shkit.Slash(realGit)+"' \"$@\"\nrc=$?\ncase \" $* \" in *\" push \"*) exit 1 ;; esac\nexit $rc\n")
+	e := p.env(map[string]string{"PATH": shkit.Slash(bin) + string(os.PathListSeparator) + os.Getenv("PATH")})
+	r := p.runSh(pushApproved, opts{env: e})
+	code(t, r, 0)
+	eq(t, "リモート", p.remoteHead(parentID), p.head(tree))
 }
 
 // ---- 親のブランチの push のゲート（ccnavi_push_gate）

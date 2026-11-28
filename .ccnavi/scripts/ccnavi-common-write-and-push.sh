@@ -372,7 +372,7 @@ ccnavi_wap_merge_plan() {
 	return 0
 }
 
-# 親のブランチを push する（--force なし）。失敗したように見えても、ls-remote で <送る先頭> が届いていれば成功。
+# ブランチを push する（--force なし。親の経路と承認済みチケットの単独の経路が使う。ccnavi_wap_tree・ccnavi_wap_branch を前提にする）。失敗したように見えても、ls-remote で <送る先頭> が届いていれば成功。
 # <送る先頭>。0 なら届いた。ccnavi_wap_via に push（push が通った）か ls（応答は失ったが届いていた）を入れる。
 # 失敗の 1 行目は ccnavi_wap_tmp/push-err にある。
 ccnavi_wap_via=""
@@ -380,7 +380,7 @@ ccnavi_wap_push() {
 	ccnavi_pu_timeout=$(ccnavi_number_or "${CCNAVI_WRITE_AND_PUSH_TIMEOUT:-}" 60)
 	ccnavi_wap_via=push
 	if ccnavi_git_timed "$ccnavi_pu_timeout" "$ccnavi_wap_tmp/push-err" "$ccnavi_wap_tree" \
-		push --quiet origin "refs/heads/$ccnavi_wap_branch:refs/heads/$ccnavi_wap_branch" >/dev/null; then
+		push --quiet -u origin "refs/heads/$ccnavi_wap_branch:refs/heads/$ccnavi_wap_branch" >/dev/null; then
 		return 0
 	fi
 	ccnavi_wap_via=ls

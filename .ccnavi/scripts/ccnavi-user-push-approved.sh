@@ -55,6 +55,7 @@
 # - 統合先（ccnavi_integration）は決まらないので、固定の保護されたブランチ（ccnavi_is_protected）だけで送らないと決める
 # - push のゲートは親かを確かめられないので、手元に origin の参照があるブランチだけ ls-remote で確かめる
 # - git が断った理由（ccnavi_git_refusal）は読み分けず、git の 1 行目だけを添える
+# - push は親子の経路と同じ ccnavi_wap_push（認証を尋ねず、CCNAVI_WRITE_AND_PUSH_TIMEOUT 秒で切り、失敗したら ls-remote で届いたかを確かめる）。失敗の文には git の標準エラーの 1 行目を添える
 # - push に失敗したツリーの未送信のパスの一覧（unsent_paths。実行ファイルの write-and-push unsent）は出さない
 #
 # 実行ファイルに任せるのは、実行ファイルが無いときに省いても push が止まらないものだけ。取り込み済みの親子のチケットの
@@ -431,12 +432,14 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	fi
 
 	# push は失敗しても巻き戻さない。コミットは残るので、ユーザがもう一度送れる。
-	ccnavi_git_auth "$tree"
-	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
+	# 親子の経路と同じ送り方（ccnavi_wap_push。認証を尋ねず、時間で切り、失敗したら ls-remote で届いたかを確かめる）。
+	ccnavi_wap_tree="$tree"
+	ccnavi_wap_branch="$branch"
+	if ccnavi_wap_push "$(git -C "$tree" rev-parse HEAD)"; then
 		printf '承認済みチケットをブランチ %s にpushしました（%s）。\n' "$branch" "$name"
 	else
-		printf 'ccnavi-user-push-approved: %s の push に失敗しました。手で送ってください（git push -u origin %s）。\n' \
-			"$name" "$branch" >&2
+		printf 'ccnavi-user-push-approved: %s の push に失敗しました（%s）。手で送ってください（git push -u origin %s）。\n' \
+			"$name" "$(head -n 1 "$ccnavi_wap_tmp/push-err" 2>/dev/null)" "$branch" >&2
 		unsent_paths "$tree" "$branch"
 		printf 'fail\n' >>"$state"
 	fi

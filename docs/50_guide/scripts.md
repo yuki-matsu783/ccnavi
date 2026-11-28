@@ -49,7 +49,7 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | sh | 役割 | 打つ人 |
 |---|---|---|
 | `ccnavi-user-agree.sh` | 承認し、`ccnavi-user-push-approved.sh` でコミットして push する | ユーザ |
-| `ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する。承認・チケット管理画面の保存・ユーザの判断のあとに呼ばれる | ユーザ |
+| `ccnavi-user-push-approved.sh` | 承認済みチケットの置き場だけをコミットし、保護されたブランチでなければ親のブランチへ push する（認証は尋ねず、時間で切る。失敗したら理由の 1 行を言う）。承認・チケット管理画面の保存・ユーザの判断のあとに呼ばれる | ユーザ |
 | `ccnavi-user-decide.sh` | 残った指摘（未解決のスレッド）の対応方針を決めて置く | ユーザ |
 | `ccnavi-user-close-early.sh` | 残りがあるまま親を早めにクローズする判断を置く。残りを issue に書き出す | ユーザ |
 | `ccnavi-user-clean-branch.sh` | 親をクローズしたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
