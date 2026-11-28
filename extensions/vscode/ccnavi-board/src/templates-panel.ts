@@ -36,7 +36,7 @@ import { loadBoard, runTemplateCheck, runTemplates, runTemplateShow } from "./cc
 import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
 import { yamlText } from "./core/flow-doc.js";
-import { decodeFlowBytes, readFlowFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, readFlowFile, writeTreeFile } from "./core/flow-write.js";
 import { sameData } from "./core/template-edit.js";
 import { loadingText } from "./core/loading-render.js";
 import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
@@ -957,7 +957,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   // 4. リンクを辿らず、一時ファイルの入れ替えで書く
-  const written = writeFlowFile(root, file, text, { exists: read !== undefined, mtimeMs: read?.mtimeMs ?? 0 }, "テンプレート");
+  const written = writeTreeFile(root, file, text, { exists: read !== undefined, mtimeMs: read?.mtimeMs ?? 0 }, "テンプレート", FLOW_FILE_LIMIT);
   if (!written.ok) {
     reply("", written.error);
     return;

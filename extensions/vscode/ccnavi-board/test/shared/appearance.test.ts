@@ -213,8 +213,10 @@ test("CB-T183b 9画面とも段取りに繋ぎ、組み上がったところで�
   for (const name of [...REBUILT_PANELS, ...RETAINED_PANELS]) {
     const text = source(name);
     assert.match(text, /followAppearance\(panel, current\.host\)/, `${name}が段取りに繋いでいない`);
-    // `ready`を受けたところ。入れてあるHTMLのbodyのクラスは古いことがある
-    assert.match(text, /current\.host\.ready\(\);[\s\S]{0,600}?postAppearance\(current\.host\)/, `${name}のreadyで送り直していない`);
+    // `ready`を受けたところ。入れてあるHTMLのbodyのクラスは古いことがある。
+    // ルール・リスク・フェーズの`ready`は、3画面が共通で使う段取り（settings-panel.ts）が受ける
+    const ready = /settingsPanel</.test(text) ? source("settings-panel.ts") : text;
+    assert.match(ready, /current\.host\.ready\(\);[\s\S]{0,600}?postAppearance\(current\.host\)/, `${name}のreadyで送り直していない`);
   }
 });
 
