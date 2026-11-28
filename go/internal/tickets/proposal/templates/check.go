@@ -96,7 +96,7 @@ func planConfig(t *Template, known *phases.Types) (*yaml.Map, *phases.Types, []r
 			copies.Put(item.Type, pt.AsCopy())
 			placeholders = append(placeholders, pt)
 			if known != nil {
-				said.add(rules.Warn, fmt.Sprintf("`%s[%d]` の型 `%s` が phases.yml にありません（定義が変わったか、このレイヤーにありません。使う前に直す）",
+				said.add(rules.Warn, fmt.Sprintf("`%s[%d]` の型 `%s` が phases.yml に無い（定義が変わったか、この設定に無い。使う前に直す）",
 					p.key, i+1, item.Type))
 			}
 		}

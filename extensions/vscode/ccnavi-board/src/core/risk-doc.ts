@@ -59,7 +59,7 @@ factors:
     points: 35
     glob: ".github/**"
     max: 35
-    message: CI やエージェント定義に触った
+    message: CIやエージェント定義に触った
   - id: deletes
     points: 20
     deleted_over: 3

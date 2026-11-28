@@ -63,10 +63,10 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 		where := "(projects/" + p.Name + ")"
 		if config.IsReservedLayerName(p.Name) {
 			out = append(out, rules.Problem{Severity: rules.Error, Rule: where, Detail: fmt.Sprintf(
-				"%s はレイヤーの名前として予約してある（`%s` は共通レイヤー、`%s` はワークスペース自身のレイヤー）。"+
-					"このプロジェクトはレイヤーとして数えていない（id の `%s:` がどちらのレイヤーを指すか決まらないため。"+
+				"%s は設定の名前として予約してある（`%s` は共通設定、`%s` はワークスペースの設定）。"+
+					"このプロジェクトは設定として数えていない（id の `%s:` がどちらの設定を指すか決まらないため。"+
 					"大文字小文字の違いは問わない）。ここに置いた宣言は 1 件も使われておらず、このプロジェクトを行き先にするパスを持つ"+
-					"ツール（Read / Grep / Glob / Write / Edit / MultiEdit / NotebookEdit）は共通レイヤーだけで判定している。"+
+					"ツール（Read / Grep / Glob / Write / Edit / MultiEdit / NotebookEdit）は共通設定だけで判定している。"+
 					"プロジェクトを別の名前に変えてください",
 				strings.Join(quoted, " と "), config.LayerCommon, config.LayerSelf, p.Name)})
 		}

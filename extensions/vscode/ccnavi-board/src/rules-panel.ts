@@ -20,7 +20,7 @@
  * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら`--rules`、
  * ワークスペースかプロジェクトの設定なら`--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が`self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
- * ときだけ行う。
+ * ときだけ行う（流れは`settings-panel.ts`の`save`）。
  */
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -28,30 +28,25 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runExpectations, runLint, runSuggest, runTest, type RulesOverride } from "./ccnavi.js";
+import { followAppearance, readAppearance } from "./appearance.js";
+import { loadBoard, runExpectations, runSuggest, runTest, type RulesOverride } from "./ccnavi.js";
 import { hooksFor, parseHooks, type HookEntry } from "./core/hooks.js";
 import { projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
-import { errorLinesOf, warnLinesOf } from "./core/lintmodel.js";
-import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
+import { lockFromError } from "./core/lock.js";
 import { asSections, readRules, type RulesDocument } from "./core/rules-doc.js";
 import { renderRulesPage } from "./core/rules-render.js";
 import { isToolName, TMP_RULES_PREFIX, type RulesData, type RulesMessage, type Sections, type ToRules } from "./core/rules-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import { rulesSums, type RulesSum } from "./core/sums.js";
 import { showLoading } from "./loading.js";
-import type { HandoffEntry } from "./core/handoff-entry.js";
-import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
+import { HANDOFF_ENTRY } from "./handoff-entry.js";
 import type { RulesTarget } from "./core/screens.js";
-import { targetOptions, type TargetOption } from "./core/targets.js";
+import { targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
-import { lintSummary } from "./core/lint-summary.js";
-import { assertRetained, openInEditor, watchGlobs, workspaceFolder } from "./panel-common.js";
-import { settingsPanel, targetLabelOf, type SettingsState } from "./settings-panel.js";
-import { markTourSeen, tourSeen } from "./tour.js";
+import { assertRetained, openInEditor, resolveIn, toGlob, watchGlobs, workspaceFolder } from "./panel-common.js";
+import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
-import { confirmDuringTurn } from "./turn-confirm.js";
 
 const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
 const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
@@ -59,23 +54,10 @@ const DEFAULT_EXPECTATIONS =".ccnavi/config/common/rule-expectations.yml";
 const SCREEN = "rules";
 const TITLE = "ccnaviルール管理";
 
-interface Loaded {
-  /** 読んだ対象。往復の間に切り替わったかを`stale`が見る */
-  readonly target: RulesTarget;
-  /** ファイルが在るか。無ければ空として出し、保存で作る */
-  readonly exists: boolean;
-  /** 無いときは0 */
-  readonly mtimeMs: number;
+interface Loaded extends SettingsLoaded {
   readonly doc: RulesDocument;
-  readonly rulesPath: string;
-  /** ワークスペースルートからの相対で見せるパス。プロジェクトなら`projects/<名前>/.ccnavi/config/project/rules.yml` */
-  readonly rulesRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
-  /** 取り込み待ち画面を開けるか */
-  readonly handoff: HandoffEntry;
-  /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
-  readonly targets: readonly TargetOption[];
   /** 読み取り専用の統合結果（実行ファイルの`sums[]`） */
   readonly sums: readonly RulesSum[];
   readonly hooks: readonly HookEntry[];
@@ -85,19 +67,10 @@ interface Loaded {
   readonly expectationsRel: string;
 }
 
-type PanelState = SettingsState<RulesData, RulesTarget, Loaded>;
+type PanelState = SettingsState<RulesData, Loaded>;
 
 /** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
-
-function sameTarget(a: RulesTarget, b: RulesTarget): boolean {
-  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
-}
-
-/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どちらも全ツリーのBashに影響する） */
-function projectOf(target: RulesTarget): string | undefined {
-  return target.kind === "project" ? target.name : undefined;
-}
 
 /** 読み込み中の一言で「何を」読んでいるか */
 function whatOf(target: RulesTarget): string {
@@ -109,10 +82,6 @@ function whatOf(target: RulesTarget): string {
     case "project":
       return `プロジェクト「${target.name}」のルール`;
   }
-}
-
-function binSetting(): string {
-  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
 function expectationsSetting(): string {
@@ -185,7 +154,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   if (!board.ok) {
     notices.push(`ccnaviから動作モードを取得できないため、denyやaskの判定でツールの実行が実際に止まるかどうかを表示していません: ${board.error}`);
   }
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", { kind: target.kind, name: target.kind === "project" ? target.name : "" });
+  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
   if (target.kind === "workspace") {
     // 共通の設定の場所は`.ccnavi/config/common/`固定。env（`CCNAVI_RULES`など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
@@ -211,22 +180,8 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
       throw unreadableFailure({ path: rulesPath, rel: rulesRel }, layer.rules.unreadable);
     }
   }
-  let text: string;
-  let mtimeMs: number;
-  let exists: boolean;
-  try {
-    text = fs.readFileSync(rulesPath, "utf8");
-    mtimeMs = fs.statSync(rulesPath).mtimeMs;
-    exists = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`ルールファイルを読み込めません（${rulesRel}）: ${(error as Error).message}`);
-    }
-    // 無いのは不備ではない（「設定が無い」正常な状態）。空として出し、ルールを足して保存すればファイルが作られる。
-    text = "";
-    mtimeMs = 0;
-    exists = false;
-  }
+  // 無いのは不備ではない（「設定が無い」正常な状態）。空として出し、ルールを足して保存すればファイルが作られる。
+  const { text, mtimeMs, exists } = readSettingFile(rulesPath, rulesRel, "ルールファイル");
   const doc = readRules(exists ? text : "version: 1\n");
   if (doc.blocking.length > 0) {
     throw blockedFailure({ path: rulesPath, rel: rulesRel }, doc.blocking);
@@ -243,8 +198,7 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
     mtimeMs,
     // 無いファイルは、書式の版だけを持つ空のルールとして読む（版が無いファイルは実行ファイルが読めないので、保存で作るときに先頭へ置く）
     doc,
-    rulesPath,
-    rulesRel,
+    file: { path: rulesPath, rel: rulesRel },
     notices,
     targets,
     sums: rulesSums(board.ok ? board.board : undefined),
@@ -266,10 +220,6 @@ function readText(filePath: string): string | undefined {
   }
 }
 
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
-}
-
 /**
  * ルールファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは設定ファイルの場所で変わるので、更新のたびに張り直す。
@@ -279,12 +229,8 @@ function watchFiles(current: PanelState): void {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  const rulesRel = current.loaded?.rulesRel ?? DEFAULT_RULES;
+  const rulesRel = current.loaded?.file.rel ?? DEFAULT_RULES;
   current.fileWatchers.push(...watchGlobs(current.folder, [toGlob(rulesRel), ".claude/settings.json", ".claude/settings.local.json"], () => scheduleChanged(current)));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {
@@ -292,39 +238,26 @@ function alive(current: PanelState): boolean {
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, setDirty } = settingsPanel<RulesData, RulesTarget, Loaded, ToRules>({
+const { registerPanelHandlers, scheduleChanged, reload, switchTarget, stale, fail, save } = settingsPanel<RulesData, Loaded, ToRules, RulesMessage>({
   accepts: true,
+  screen: SCREEN,
+  title: TITLE,
+  words: { file: "ルール", content: "ルール" },
   alive,
   release: (current) => {
     if (state === current) {
       state = undefined;
     }
   },
-  handleMessage: (current, message) => void handleMessage(current, asMessage(message)),
+  parse: asMessage,
+  handle,
   read: readPage,
   show,
   showError,
   watchFiles,
-  refreshLock,
   loading: (current) => ({ kind: "loading", text: loadingText(whatOf(current.target)) }),
-  sameTarget,
-  targetLabel: targetLabelOf,
-  title: TITLE,
+  override: overrideFor,
 });
-
-/**
- * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通の設定とワークスペースの設定のルールはどのツリーのdoingでも止め、プロジェクトのルールはそのプロジェクトのdoingだけ見る。
- */
-async function refreshLock(current: PanelState): Promise<Lock> {
-  const result = await loadBoard(current.folder.uri.fsPath, binSetting());
-  const lock = result.ok ? lockFromBoard(result.board, projectOf(current.target)) : lockFromError(result.error);
-  if (alive(current)) {
-    current.lock = lock;
-    current.host.post({ type: "lock", lock } satisfies ToRules);
-  }
-  return lock;
-}
 
 /**
  * いま見せるものを渡す。画面の編集はここで破棄されるので、呼ぶのはユーザが「更新」を押した
@@ -342,7 +275,7 @@ function show(current: PanelState): void {
     kind: "page",
     page: {
       root: current.folder.uri.fsPath,
-      rulesPath: loaded.rulesRel,
+      rulesPath: loaded.file.rel,
       exists: loaded.exists,
       mode: loaded.mode,
       model: loaded.doc.model,
@@ -352,7 +285,7 @@ function show(current: PanelState): void {
       lock: current.lock,
       notices: loaded.notices,
       handoff: loaded.handoff,
-      target: { kind: loaded.target.kind, name: loaded.target.kind === "project" ? loaded.target.name : "" },
+      target: targetKey(loaded.target),
       targets: loaded.targets,
       sums: loaded.sums,
     },
@@ -363,13 +296,8 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
-  const target = currentKey(current.target);
+  const target = targetKey(current.target);
   current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
-}
-
-/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
-function currentKey(target: RulesTarget): { kind: string; name: string } {
-  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
 }
 
 /**
@@ -399,40 +327,11 @@ function rulesHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RulesDa
   );
 }
 
-/**
- * 頼まれたときに読んでいたものが、往復の間に入れ替わっていないか。`what`は破棄するもの。
- *
- * 保存は実行ファイルへ2度出る（`--lint`と錠の取り直し）。その間にユーザが「更新」を押せば、
- * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
- * ファイルに入る。 判定と期待する判定の確認はファイルに触らないが、破棄した編集で出した答えを
- * 「いまのルールの判定」として見せることになるので、同じく無かったことにする。
- */
-function stale(current: PanelState, loaded: Loaded, what: string): boolean {
-  if (current.loaded === loaded) {
-    return false;
-  }
-  // 往復の間に別の対象へ切り替わった。破棄するのは同じだが、切り替え先の画面に前の対象の話を出さない
-  if (!sameTarget(loaded.target, current.target)) {
-    return true;
-  }
-  fail(current, `画面を更新したので、${what}は取りやめました。更新後のルールでやり直してください。`);
-  return true;
-}
-
-/** 操作の結果の一言。1枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
-function fail(current: PanelState, message: string): void {
-  current.host.post({ type: "failed", message } satisfies ToRules);
-}
-
 /** 編集中の内容を一時ファイルに書き、実行ファイルへ渡す差し替えを返す */
-function stage(current: PanelState, sections: Sections): RulesOverride {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    throw new Error("ルールが読み込まれていません");
-  }
+function stage(current: PanelState, loaded: Loaded, sections: Sections): RulesOverride {
   const tmp = path.join(current.tmpDir, "rules.yml");
   fs.writeFileSync(tmp, loaded.doc.apply(sections), "utf8");
-  return overrideFor(current.target, tmp);
+  return overrideFor(loaded.target, tmp);
 }
 
 function overrideFor(target: RulesTarget, tmp: string): RulesOverride {
@@ -446,86 +345,13 @@ function overrideFor(target: RulesTarget, tmp: string): RulesOverride {
   }
 }
 
-async function handleMessage(current: PanelState, message: RulesMessage | undefined): Promise<void> {
-  if (message === undefined || !alive(current)) {
-    return;
-  }
-  if (message.type === "dirty") {
-    setDirty(current, message.dirty);
-    return;
-  }
-  if (message.type === "ready") {
-    // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
-    setDirty(current, false);
-    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
-    // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
-    current.host.ready();
-    redraw(current);
-    postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら`tourDone`を返す。
-    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう1度出る
-    if (!tourSeen(SCREEN)) {
-      current.host.post({ type: "tour" } satisfies ToRules);
-    }
-    return;
-  }
-  if (message.type === "tourDone") {
-    markTourSeen(SCREEN);
-    return;
-  }
-  // 読み直せていない画面では、ルールにヒットする操作はどれも行き先が無い（「更新」は
-  // 押せるが、その経路は`reload`が読み直しからやり直す）
-  if (current.loaded === undefined && message.type !== "reload") {
-    return;
-  }
+/** この画面にだけある操作（3画面で同じものは`settings-panel.ts`が受ける） */
+async function handle(current: PanelState, loaded: Loaded, message: RulesMessage): Promise<void> {
   const root = current.folder.uri.fsPath;
   switch (message.type) {
-    case "reload": {
-      if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage(
-          "未保存の変更があります。破棄して更新しますか？",
-          { modal: true },
-          "更新",
-        );
-        if (choice !== "更新") {
-          // 画面は「更新」を押した時点でボタンを止めている。やめたことを伝えないと止まったままになる。
-          // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
-          if (alive(current)) {
-            current.host.post({ type: "cancelled" } satisfies ToRules);
-          }
-          return;
-        }
-      }
-      await reload(current);
+    case "openFile":
+      openInEditor(message.which === "rules" ? loaded.file.path : loaded.expectationsPath);
       return;
-    }
-    case "openHandoff": {
-      // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
-      await openHandoffFrom(current.loaded?.handoff, current.loaded?.target ?? current.target);
-      return;
-    }
-    case "switchTarget": {
-      // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
-      if (option === undefined) {
-        return;
-      }
-      const target: RulesTarget =
-        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "self" ? { kind: "self" } : { kind: "workspace" };
-      if (!sameTarget(current.target, target)) {
-        await switchTarget(current, target);
-      }
-      return;
-    }
-    case "openFile": {
-      const loaded = current.loaded;
-      const target = loaded === undefined ? current.errorFile?.path : message.which === "rules" ? loaded.rulesPath : loaded.expectationsPath;
-      if (target !== undefined) {
-        openInEditor(target);
-      }
-      return;
-    }
     case "pickFile": {
       // 選んだファイルはワークスペースルートからの相対で欄に入れる。外を選んだら入れない。
       // 実行ファイルが読むのはルートの中だけで、lintも外を指すパスをerrorにする。
@@ -555,13 +381,9 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       return;
     }
     case "judge": {
-      const loaded = current.loaded;
-      if (loaded === undefined) {
-        return;
-      }
       let rules: RulesOverride;
       try {
-        rules = stage(current, message.sections);
+        rules = stage(current, loaded, message.sections);
       } catch (error) {
         fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
         return;
@@ -578,10 +400,6 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       return;
     }
     case "expectations": {
-      const loaded = current.loaded;
-      if (loaded === undefined) {
-        return;
-      }
       if (!fs.existsSync(loaded.expectationsPath)) {
         current.host.post({
           type: "notice",
@@ -591,7 +409,7 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       }
       let rules: RulesOverride;
       try {
-        rules = stage(current, message.sections);
+        rules = stage(current, loaded, message.sections);
       } catch (error) {
         fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
         return;
@@ -608,10 +426,6 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       return;
     }
     case "suggest": {
-      const loaded = current.loaded;
-      if (loaded === undefined) {
-        return;
-      }
       const result = await runSuggest(root, binSetting());
       if (!alive(current) || stale(current, loaded, "候補の取得")) {
         return;
@@ -623,101 +437,10 @@ async function handleMessage(current: PanelState, message: RulesMessage | undefi
       current.host.post({ type: "suggested", result: result.value } satisfies ToRules);
       return;
     }
-    case "save": {
-      await save(current, message.sections);
+    case "save":
+      await save(current, loaded, () => loaded.doc.apply(message.sections));
       return;
-    }
   }
-}
-
-async function save(current: PanelState, sections: Sections): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  const root = current.folder.uri.fsPath;
-  let tmp: string;
-  let text: string;
-  try {
-    text = loaded.doc.apply(sections);
-    tmp = path.join(current.tmpDir, "rules.yml");
-    fs.writeFileSync(tmp, text, "utf8");
-  } catch (error) {
-    fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
-    return;
-  }
-
-  // 1. 検証。errorが1件でもあれば保存しない。
-  const lint = await runLint(root, binSetting(), overrideFor(current.target, tmp));
-  if (!alive(current) || stale(current, loaded, "この保存")) {
-    return;
-  }
-  if (!lint.ok) {
-    fail(current, lint.error);
-    return;
-  }
-  if (!lint.value.ok) {
-    // 指摘は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でerrorが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.rulesRel).join("\n")}`);
-    return;
-  }
-
-  // 2. 作業中のチケットが無いこと。押した時点で取り直す。
-  const lock = await refreshLock(current);
-  if (!alive(current) || stale(current, loaded, "この保存")) {
-    return;
-  }
-  if (lock.locked) {
-    fail(current, lock.reason);
-    return;
-  }
-  if (!(await confirmDuringTurn(lock))) {
-    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
-    return;
-  }
-  if (!alive(current)) {
-    return;
-  }
-
-  // 3. 読み込んでから外で変わっていないこと。無かったファイルは、まだ無いこと。
-  if (loaded.exists) {
-    let mtimeMs: number;
-    try {
-      mtimeMs = fs.statSync(loaded.rulesPath).mtimeMs;
-    } catch (error) {
-      fail(current, `ルールファイルを確認できません: ${(error as Error).message}`);
-      return;
-    }
-    if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "ルールファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）。");
-      return;
-    }
-  } else if (fs.existsSync(loaded.rulesPath)) {
-    fail(current, "ルールファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）。");
-    return;
-  }
-
-  try {
-    current.wroteAt = Date.now();
-    if (loaded.exists) {
-      fs.writeFileSync(loaded.rulesPath, text, "utf8");
-    } else {
-      fs.mkdirSync(path.dirname(loaded.rulesPath), { recursive: true });
-      fs.writeFileSync(loaded.rulesPath, text, { encoding: "utf8", flag: "wx" });
-    }
-  } catch (error) {
-    // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
-    current.wroteAt = 0;
-    fail(current, `ルールファイルに保存できません: ${(error as Error).message}`);
-    return;
-  }
-  await reload(current);
-  // warnの本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
-  const warns = warnLinesOf(lint.value.report, tmp, loaded.rulesRel);
-  if (warns.length > 0 && alive(current)) {
-    current.host.post({ type: "saved", warns } satisfies ToRules);
-  }
-  vscode.window.showInformationMessage(`${loaded.rulesRel}に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): RulesMessage | undefined {

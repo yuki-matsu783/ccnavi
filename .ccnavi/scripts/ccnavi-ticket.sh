@@ -158,10 +158,7 @@ esac
 root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-ticket
 
 # 実行ファイル。識別子の読み・結果ファイル・子のワークツリーも実行ファイルに聞くので、最初に探す。
-if ! ccnavi_wap_use_exe "$root"; then
-	printf 'ccnavi-ticket: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-	exit 2
-fi
+ccnavi_wap_use_exe "$root" || ccnavi_no_bin ccnavi-ticket
 
 # 識別子は実行ファイル（`ticket-sh id`）が、本体の ticket の引数の読み（argparse）と同じに読む。`--` と `--reason <値>` を
 # 読み飛ばした最初の語。使える識別子なら ticket_id に入れ、使えなければ空にして断りの文を ticket_bad に入れる。

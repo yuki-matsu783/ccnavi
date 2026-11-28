@@ -13,7 +13,7 @@
  * 答えを見せる文の材料（`renumbered`・`planDiff`・`saveBlocker`）だけで、計画の良し悪しを決めない。
  *
  * **未保存は答えから決める。** 答えの線を元の番号に戻したもの（`orderOf`）が、提案に書いてある先行（`proposed`）と
- * 違えば未保存（`isDirty`）。画面が別に「変えたか」を持たないので、案に戻すと必ず消える。
+ * 違えば未保存（`isDirty`）。画面が別に「変えたか」を持たないので、提案の順序に戻すと必ず消える。
  *
  * この画面は`retainContextWhenHidden: true`（編集の途中を持つ）。渡し方は`retainedHost`で、入れ物は1度しか入らない。
  * 中身（`data`）が届くのは、画面の編集を破棄してよいとき（更新・取り込む・保存が通った）だけ。
@@ -34,7 +34,7 @@ export interface WorkflowPage {
   readonly root: string;
   /** 親の識別子 */
   readonly ticket: string;
-  /** 開いたとき（`--order`なし）の答え。提案のままの順序で、「案に戻す」はここへ戻る */
+  /** 開いたとき（`--order`なし）の答え。提案のままの順序で、「提案の順序に戻す」はここへ戻る */
   readonly answer: PlanOrderAnswer;
   /**
    * 未保存のまま閉じた画面から戻す線（元の番号での先行）。あれば画面は開いてすぐこの線で答えを頼み、未保存にする
@@ -75,7 +75,7 @@ export type WorkflowMessage =
   | { readonly type: "dirty"; readonly dirty: boolean; readonly checking: boolean }
   /** 線を変えた。この先行で実行ファイルに振り直させる。答えは`answer` */
   | { readonly type: "order"; readonly seq: number; readonly order: PlanOrder }
-  /** 「この順序に決める」。`expect`は開いたときの`source_sha` */
+  /** 「この順序で保存」。`expect`は開いたときの`source_sha` */
   | { readonly type: "save"; readonly order: PlanOrder; readonly expect: string }
   /** 未保存の線のコピー。未保存のまま閉じられたときに戻すため、拡張ホストが覚えておく。未保存でなくなったらnull */
   | { readonly type: "draft"; readonly order: PlanOrder | null }

@@ -9,8 +9,13 @@ import * as path from "node:path";
 import { connectionLabel, connectionsOf, type FlowDoc } from "../../src/core/flow-doc.js";
 import { bareFlow } from "../helpers/flow.js";
 import { spawnSync } from "node:child_process";
-import { decodeFlowBytes, FLOW_FILE_LIMIT, linkedSegment, readFlowFile, removeDraftFile, writeFlowFile } from "../../src/core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, linkedSegment, readFlowFile, removeDraftFile, writeTreeFile, type TreeFileExpect } from "../../src/core/flow-write.js";
 import * as crypto from "node:crypto";
+
+/** フロー編集の保存と同じ渡し方（呼び名と256KBの上限） */
+function writeFlow(tree: string, file: string, text: string, expect: TreeFileExpect): ReturnType<typeof writeTreeFile> {
+  return writeTreeFile(tree, file, text, expect, "フロー", FLOW_FILE_LIMIT);
+}
 
 function scratch(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ccnavi-flow-write-"));
@@ -40,7 +45,7 @@ const NEW = { exists: false, mtimeMs: 0 } as const;
 test("CB-T231 ない置き場は1階層ずつ作って入れ替えで書く。一時ファイルは残らない。読むとその中身", () => {
   const tree = scratch();
   const file = place(tree);
-  const written = writeFlowFile(tree, file, '{"nodes":[]}\n', NEW);
+  const written = writeFlow(tree, file, '{"nodes":[]}\n', NEW);
   assert.deepEqual(written, { ok: true });
   assert.equal(fs.readFileSync(file, "utf8"), '{"nodes":[]}\n');
   assert.deepEqual(fs.readdirSync(path.dirname(file)), ["i0001-01-01.yml"]);
@@ -48,7 +53,7 @@ test("CB-T231 ない置き場は1階層ずつ作って入れ替えで書く。�
   assert.ok(read !== undefined);
   assert.equal(Buffer.from(read.bytes).toString("utf8"), '{"nodes":[]}\n');
   // 読んだときのままなら上書きする
-  const again = writeFlowFile(tree, file, '{"nodes":[1]}\n', { exists: true, mtimeMs: read.mtimeMs });
+  const again = writeFlow(tree, file, '{"nodes":[1]}\n', { exists: true, mtimeMs: read.mtimeMs });
   assert.deepEqual(again, { ok: true });
   assert.equal(fs.readFileSync(file, "utf8"), '{"nodes":[1]}\n');
   // 無いファイルはundefined（フローは任意）
@@ -69,7 +74,7 @@ test("CB-T232 ファイルか途中のディレクトリがリンクなら、読
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.symlinkSync(target, file);
   assert.equal(linkedSegment(tree, file), file);
-  const first = writeFlowFile(tree, file, "x", { exists: true, mtimeMs: fs.statSync(target).mtimeMs });
+  const first = writeFlow(tree, file, "x", { exists: true, mtimeMs: fs.statSync(target).mtimeMs });
   assert.equal(first.ok, false);
   assert.match(first.ok ? "" : first.error, /シンボリックリンク/);
   assert.equal(fs.readFileSync(target, "utf8"), "keep");
@@ -79,12 +84,12 @@ test("CB-T232 ファイルか途中のディレクトリがリンクなら、読
   const flows = path.join(other, ".ccnavi", "approved", "flows");
   fs.mkdirSync(path.dirname(flows), { recursive: true });
   fs.symlinkSync(outside, flows);
-  const second = writeFlowFile(other, place(other), "x", NEW);
+  const second = writeFlow(other, place(other), "x", NEW);
   assert.equal(second.ok, false);
   assert.equal(linkedSegment(other, place(other)), flows);
   assert.deepEqual(fs.readdirSync(outside), ["real.yml"]);
   // ツリーの外は書かない
-  const third = writeFlowFile(tree, path.join(outside, "x.yml"), "x", NEW);
+  const third = writeFlow(tree, path.join(outside, "x.yml"), "x", NEW);
   assert.equal(third.ok, false);
   assert.match(third.ok ? "" : third.error, /ツリーの外/);
 });
@@ -94,10 +99,10 @@ test("CB-T233 読み込んでから外で作られた・変わったファイル
   const file = place(tree);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, "theirs");
-  const created = writeFlowFile(tree, file, "mine", NEW);
+  const created = writeFlow(tree, file, "mine", NEW);
   assert.equal(created.ok, false);
   assert.match(created.ok ? "" : created.error, /外で作られています/);
-  const changed = writeFlowFile(tree, file, "mine", { exists: true, mtimeMs: 1 });
+  const changed = writeFlow(tree, file, "mine", { exists: true, mtimeMs: 1 });
   assert.equal(changed.ok, false);
   assert.match(changed.ok ? "" : changed.error, /外で変更されています/);
   assert.equal(fs.readFileSync(file, "utf8"), "theirs");
@@ -136,7 +141,7 @@ test("CB-T235 ハードリンクのフローは読まないし書かない。別
   const alias = path.join(tree, "alias.yml");
   fs.linkSync(file, alias);
   assert.throws(() => readFlowFile(tree, file), /ハードリンク/);
-  const written = writeFlowFile(tree, file, '{"nodes":[1]}', { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
+  const written = writeFlow(tree, file, '{"nodes":[1]}', { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
   assert.equal(written.ok, false);
   assert.match(written.ok ? "" : written.error, /ハードリンク/);
   assert.equal(fs.readFileSync(alias, "utf8"), '{"nodes":[]}');
@@ -152,7 +157,7 @@ test("CB-T236 名前付きパイプは読まずに戻る（開いて待たない
     return; // mkfifoがない機械
   }
   assert.throws(() => readFlowFile(tree, file), /通常のファイルではない/);
-  const written = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
+  const written = writeFlow(tree, file, "{}", { exists: true, mtimeMs: fs.lstatSync(file).mtimeMs });
   assert.equal(written.ok, false);
 });
 
@@ -160,7 +165,7 @@ test("CB-T237 256KBを超えるフローは読まないし書かない。書け�
   const tree = scratch();
   const file = place(tree);
   const big = `{"nodes":[],"pad":"${"x".repeat(FLOW_FILE_LIMIT)}"}`;
-  const refused = writeFlowFile(tree, file, big, NEW);
+  const refused = writeFlow(tree, file, big, NEW);
   assert.equal(refused.ok, false);
   assert.match(refused.ok ? "" : refused.error, /大きすぎる/);
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
@@ -168,9 +173,17 @@ test("CB-T237 256KBを超えるフローは読まないし書かない。書け�
   assert.throws(() => readFlowFile(tree, file), /大きすぎる/);
   // 入れ替えの直前に外で作られた（2度目の確かめで止まる）ときも、一時ファイルは消す
   fs.rmSync(file);
-  const raced = writeFlowFile(tree, file, "{}", { exists: true, mtimeMs: 1 });
+  const raced = writeFlow(tree, file, "{}", { exists: true, mtimeMs: 1 });
   assert.equal(raced.ok, false);
   assert.deepEqual(fs.readdirSync(path.dirname(file)), []);
+});
+
+test("CB-T1280 上限を渡さない書き込み（設定のファイル）は、256KBを超えても書く", () => {
+  const tree = scratch();
+  const file = path.join(tree, ".ccnavi", "config", "common", "rules.yml");
+  const big = `version: 1\n# ${"x".repeat(FLOW_FILE_LIMIT)}\n`;
+  assert.deepEqual(writeTreeFile(tree, file, big, NEW, "ルール", undefined), { ok: true });
+  assert.equal(fs.readFileSync(file, "utf8"), big);
 });
 
 test("CB-T238 線の言葉は真偽値を空として読み、整数の値は表記で比べる（実行ファイルのflow_text._textと同じ）", () => {

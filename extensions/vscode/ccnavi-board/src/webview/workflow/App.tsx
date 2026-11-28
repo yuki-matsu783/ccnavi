@@ -10,7 +10,7 @@
  * 確かめられなかったときは、線を引く前の答えのまま理由を出す。引けない線（循環・子が承認された番号へ入る線）は、
  * 図の部品が引いている最中に断る（`core/plan-graph.ts`の`canConnect`）。
  *
- * **未保存は答えから決める**（`isDirty`）。案に戻すは、往復せずに開いたときの答えへ戻す。未保存の間は、
+ * **未保存は答えから決める**（`isDirty`）。提案の順序に戻すは、往復せずに開いたときの答えへ戻す。未保存の間は、
  * 線のコピーを拡張ホストに覚えさせる（未保存のまま閉じられたときに戻すため）。
  *
  * **置き場所は動かさない。** 番号が振り直っても点に表示する番号だけが変わる。置き場所は振り直す前の番号で覚え
@@ -237,7 +237,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
   }, [answer, dirty]);
 
   useEscape(review, ESCAPE_LAYER.overlay, () => setReview(false));
-  /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す。押すと［この順序に決める］と同じく確認を出す */
+  /** Ctrl+Sの答え。保存の状態は早く返す分岐の後ろで決まるので、描くたびにここへ入れ直す。押すと［この順序で保存］と同じく確認を出す */
   const saveKey = useRef<SaveKeyTarget | undefined>(undefined);
   useSaveKey(!tour.touring && data.kind === "page" && !review, () => saveKey.current ?? { blocker: "読み込みが終わっていないため、保存できません", busy: false, save: () => undefined, blocked: () => undefined });
 
@@ -438,7 +438,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
             title="提案に記載されている先行と番号に戻します"
             onClick={revert}
           >
-            案に戻す
+            提案の順序に戻す
           </button>
           <button type="button" className="action" data-action="reload" data-tour="reload" disabled={shownBusy} onClick={reload}>
             更新
@@ -457,7 +457,7 @@ export function App({ initial }: { readonly initial: WorkflowData }): JSX.Elemen
               }
             }}
           >
-            この順序に決める
+            この順序で保存
           </button>
         </div>
       </ScreenHeader>

@@ -4,10 +4,10 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh review-request --phase <N> --body-file <依頼文>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
-#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N> --preview （残った指摘の一覧を JSON で見るだけ。ボードも読む）
+#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N> --preview （残った指摘の一覧を JSON で見るだけ。チケット管理画面も読む）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
-#   sh .ccnavi/scripts/ccnavi-review.sh mr-state <番号>       （MR の今の状態を読むだけ。ボードの「MR の状況を確認」が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh mr-state <番号>       （MR の今の状態を読むだけ。チケット管理画面の「MR の状況を確認」が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh ready --parent <親>                    （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #
@@ -85,7 +85,7 @@ sh .ccnavi/scripts/ccnavi-review.sh <review-request|confirm|comment|decide|ready
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
   merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
-  mr-state <番号>                                 マージリクエストの今の状態を読むだけ。1 行目 "mr-state 1"、2 行目は "open <番号> <yes|no> <URL>"（yes は Draft）・"merged <番号> <URL>"・"closed <番号> <URL>"・"unknown <種類> <理由>"（終了コード 1。種類は no-tool / auth / network / api / not-found）。ボードの「MR の状況を確認」が使う
+  mr-state <番号>                                 マージリクエストの今の状態を読むだけ。1 行目 "mr-state 1"、2 行目は "open <番号> <yes|no> <URL>"（yes は Draft）・"merged <番号> <URL>"・"closed <番号> <URL>"・"unknown <種類> <理由>"（終了コード 1。種類は no-tool / auth / network / api / not-found）。チケット管理画面の「MR の状況を確認」が使う
 
 ユーザがターミナルで実行する操作は別の sh:
   ccnavi-user-decide.sh <N>          指摘の対応方針を選んで置く（対応しない・このフェーズで直す・issue に回す）
@@ -675,7 +675,7 @@ comment)
 	printf 'OK: 記録した（%s）\n' "$(ccnavi_val1 url "$posted")"
 	;;
 decide)
-	# 残った指摘の一覧を JSON で返す。何も置かない（ボードとエージェントが読む）。
+	# 残った指摘の一覧を JSON で返す。何も置かない（チケット管理画面とエージェントが読む）。
 	# 引数は上で確かめた（--preview だけ。選んだものを置く形は ccnavi-user-decide.sh）。
 	fetch_all >"$result"
 	ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"

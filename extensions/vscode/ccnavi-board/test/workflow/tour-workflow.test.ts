@@ -323,7 +323,7 @@ test("CB-T506 案内のsceneは、画面が読むキーと、見本にある答�
 test("CB-T507 案内の構成。基本の案内は今のタイトルと順序のまま。ユースケースは5〜8本で1本4〜10手順、キーとタイトルが重ならない", () => {
   assert.deepEqual(
     tour.courses[0].steps.map((step) => step.title),
-    ["図", "直す手段", "この順序に決める", "承認との関係", "案内"],
+    ["図", "直す手段", "この順序で保存", "承認との関係", "案内"],
   );
   assert.equal(tour.courses[0].id, "intro");
   const cases = tour.courses.slice(1);

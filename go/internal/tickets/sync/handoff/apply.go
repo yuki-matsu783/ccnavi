@@ -16,7 +16,7 @@ const (
 	msgNothing      = "取り込む対象がありません"
 	msgBoardKind    = "%s の種類で"
 	msgBoardDefense = "%sので"
-	msgBoardRefused = "%s は %s、ボードからは取り込めない。" +
+	msgBoardRefused = "%s は %s、チケット管理画面からは取り込めない。" +
 		"ターミナルで `ccnavi-user-handoff.sh <パス> --yes --expect <ハッシュ>` を打つ"
 	msgNotOK        = "選んだ対象に error がある: %s。何も書いていません"
 	msgNoExpect     = "--yes には --expect <ハッシュ>（見るだけの形が示す値）を付けてください"

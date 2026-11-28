@@ -179,7 +179,7 @@ sample:
       - { parent: sample-h, mr: 21, state: open, draft: true, url: "https://example.com/sample/pulls/21" }
       - { parent: sample-i, mr: 20, state: merged, url: "https://example.com/sample/pulls/20" }
       - { parent: sample-j, mr: 19, state: closed, url: "https://example.com/sample/pulls/19", abandon: "sh /ws/.ccnavi/scripts/ccnavi-launcher.sh worktree retire --abandon sample-j" }
-      - { parent: sample-k, mr: 18, state: unknown, reason: auth, detail: 認証に失敗した（トークンか gh / glab の認証を確かめる） }
+      - { parent: sample-k, mr: 18, state: unknown, reason: auth, detail: 認証に失敗しました（トークンか gh / glab の認証を確かめてください） }
       - { parent: sample-l, state: incomplete, detail: 記録を読めない }
   overlays:
     # 承認の一覧（`--agree --preview --json`と同じ形）

@@ -104,7 +104,7 @@ func (e *Env) push(args []string, a *Answer) *Deny {
 		}
 	}
 	// 固定のリストに無い名前の統合先（develop-v1.0.0 など）も止める。統合先の名前は、このツリーが属するリポジトリごとに決める。
-	if ids.Protected(branch) || branch == integration(cmpOr(top, e.Cwd)) {
+	if ids.IsIntegration(branch, integration(cmpOr(top, e.Cwd))) {
 		return &Deny{"push-integration-branch", branch + " は統合先です。統合はユーザがマージリクエストで行うので、ここへ直接は送りません。作業用のブランチから送ってください。"}
 	}
 	remote := ""

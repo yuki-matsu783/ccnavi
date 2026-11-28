@@ -136,10 +136,7 @@ trap 'cleanup; exit 130' INT TERM HUP
 
 log_info 受け付けた -- "args=$#"
 
-if ! bin=$(ccnavi_bin "$root"); then
-	printf 'ccnavi-sync: 実行ファイルが見つからない。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。\n' >&2
-	exit 2
-fi
+bin=$(ccnavi_bin "$root") || ccnavi_no_bin ccnavi-sync
 
 # ---- 実行ファイルに聞く（段取り）
 #

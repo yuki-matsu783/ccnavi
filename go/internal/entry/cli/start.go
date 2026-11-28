@@ -57,7 +57,15 @@ func runStart(stdout, stderr io.Writer, root string, conf *config.Settings, args
 		files, answer = nil, func([][]byte) (string, int) { return start.Guidance(root, ga) }
 	case op == "args":
 		wd, _ := os.Getwd()
-		files, answer = nil, func([][]byte) (string, int) { return start.Args(wd, root, rest) }
+		files, answer = nil, func([][]byte) (string, int) { return start.Args(wd, root, integrate.ProjectsDir(conf, root), rest) }
+	case op == "api-failed":
+		kv, valid := pairs(rest, "what", "status", "body", "why")
+		if !valid {
+			return usage()
+		}
+		files, answer = nil, func([][]byte) (string, int) {
+			return start.APIFailed(kv["what"], kv["status"], kv["body"], kv["why"]), 0
+		}
 	case op == "branch-ok" && len(rest) >= 2 && (rest[1] == "strict" || rest[1] == "lenient"):
 		kv, valid := pairs(rest[2:], "heads", "err", "hint", "exit")
 		if !valid {

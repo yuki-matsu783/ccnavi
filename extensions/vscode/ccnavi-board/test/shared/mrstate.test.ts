@@ -34,8 +34,8 @@ test("CB-T620 mr-state: 4つの状態を読む（openはDraftかも、merged / c
 
 test("CB-T621 mr-state: unknownは種類ごとに読み、理由（空白を含む）を残す。終了コード1のときだけ", () => {
   for (const kind of ["no-tool", "auth", "network", "api", "not-found"]) {
-    const result = state(`unknown ${kind} ホストに届かない（ネットワーク）`, { code: 1 });
-    assert.deepEqual(result, { kind: "unknown", reason: kind, detail: "ホストに届かない（ネットワーク）" });
+    const result = state(`unknown ${kind} ホストに届きません（ネットワークか、ホスト名を確かめてください）`, { code: 1 });
+    assert.deepEqual(result, { kind: "unknown", reason: kind, detail: "ホストに届きません（ネットワークか、ホスト名を確かめてください）" });
   }
   // 種類を知らない・終了コードが合わない・理由が無い: 形が想定外
   assert.match(formatError(state("unknown frobnicate 理由", { code: 1 })), /unknownの種類が想定外です（frobnicate）/);

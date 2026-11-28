@@ -2,7 +2,7 @@
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-agree.sh
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01
-        （指定したチケットのみ。例: 絞り込んだボードから実行する場合。
+        （指定したチケットのみ。例: 絞り込んだチケット管理画面から実行する場合。
          idはすべてのフラグの後ろに指定します）
 
 承認はユーザ専用で、ユーザがターミナルから ccnavi-user-agree.sh を打ちます（実行ファイルは内部で
@@ -17,7 +17,7 @@
 は一括処理の対象を絞り込むだけです。承認待ちでない id や、
 承認待ちの親（またはその親の承認待ちの改訂）がない状態で指定された子は、何も承認されません。
 
-ユーザとボードは、承認を押す前に、提案が承認可能な状態であることを検証します
+ユーザとチケット管理画面は、承認を押す前に、提案が承認可能な状態であることを検証します
 （エージェントは `ccnavi-ticket.sh approval-request <親> --check` で、同じ検査を送らずに通します）。
 
     ccnavi --agree --preview --verify [--json] [<id>...]
@@ -90,7 +90,7 @@ Codeのワークフロータブがこれを実行します。エージェント�
 承認待ちが何もないという状態だけは、両者で扱いが異なります。--agree は、
 処理するものがない成功として扱い、検証は「不可」として扱います。
 
-VS Codeのボード拡張機能は、オーバーレイから承認します。
+VS Codeのチケット管理画面は、オーバーレイから承認します。
 
     ccnavi --agree --preview --json [<id>...]  （一括処理の内容を表示します。何も配置しません）
     ccnavi --entry board user agree --yes <id,id,...> --digest <hex> --json [<id>...]

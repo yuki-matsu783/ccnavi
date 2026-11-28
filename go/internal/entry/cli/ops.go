@@ -124,7 +124,7 @@ func decideBoard(stdout, stderr io.Writer, conf *config.Settings, root string, a
 		return config.ExitError
 	}
 	if !a.Truthy("json") || a.Str("result") == "" {
-		fmt.Fprintln(stderr, "ccnavi: ボードから実行する場合は、--json と --result <json> を指定してください。")
+		fmt.Fprintln(stderr, "ccnavi: チケット管理画面から実行する場合は、--json と --result <json> を指定してください。")
 		return config.ExitError
 	}
 	if refused := outsideState(conf, a, "--accept-plan", "--accept-done"); refused != "" {

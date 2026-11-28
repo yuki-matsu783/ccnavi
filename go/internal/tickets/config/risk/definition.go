@@ -289,7 +289,7 @@ func builtin() *Definition {
 	factors, _ := readFactors([]any{
 		spec("id", "big-diff", "points", 25, "lines_over", 300, "message", "行数が多い"),
 		spec("id", "many-files", "points", 15, "files_over", 10, "message", "ファイルが多い"),
-		spec("id", "ci", "points", 35, "glob", ".github/**", "max", 35, "message", "CI やエージェント定義に触った"),
+		spec("id", "ci", "points", 35, "glob", ".github/**", "max", 35, "message", "CIやエージェント定義に触った"),
 		spec("id", "deletes", "points", 20, "deleted_over", 3, "message", "削除したファイルが多い"),
 	}, Builtin, scriptHomes)
 	return &Definition{Levels: map[string]int{}, Factors: factors, Source: Builtin}

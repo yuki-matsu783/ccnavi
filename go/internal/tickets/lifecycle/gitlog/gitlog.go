@@ -29,7 +29,7 @@ type Input struct {
 	Output []byte
 	// MaxLines は成功したときに返す先頭の行数、FailLines は失敗したときに返す末尾の行数、Keep は残す記録の本数。
 	MaxLines, FailLines, Keep int
-	// Warn は成功したときに後ろに出す警告、Target は統合先のユーザのチェックアウトの統合先（空でなければ）。
+	// Warn は成功したときに後ろに出す警告、Target は統合先のユーザのチェックアウト（空でなければ）。
 	Warn, Target string
 	// SelfQ は案内に載せるラッパーの呼び方（引用済み）。
 	SelfQ string

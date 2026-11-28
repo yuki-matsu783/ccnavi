@@ -10,6 +10,7 @@ import (
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/shell"
+	"ccnavi/internal/infra/tree"
 	"ccnavi/internal/tickets/model/hostreply"
 )
 
@@ -39,8 +40,9 @@ const newTitleLimit = 200
 // 答えは outcome の形。誤りは `fail`（終了コード 2。--repo の食い違いと git の外は 1）で、使い方を出すときは先に `usage yes`。
 // --help は `help`。読めたら、値を `what`・`number`・`issue`・`issue-n`・`issue-r`・`mr`・`branch`・`slug`・`prefix`・
 // `title`・`repo`・`new-title`・`body`・`orig`・`real`・`top` の行で、指定の有無を `dry`・`mcp`・`similar`・`reopened`・
-// `check`・`list-open` の行（`yes`）で返す。
-func Args(cwd, root string, argv []string) (string, int) {
+// `check`・`list-open` の行（`yes`）で返す。`top` がプロジェクト（projectsDir の下のリポジトリか、それから切ったワークツリー）
+// なら、その名前を `project` の行で返す（新しい親のブランチ名の頭に付ける。`tree.TreeOf` で決める）。
+func Args(cwd, root, projectsDir string, argv []string) (string, int) {
 	var o outcome
 	opt, ok := parseArgs(&o, argv)
 	if !ok {
@@ -59,6 +61,9 @@ func Args(cwd, root string, argv []string) (string, int) {
 		{"title", opt.Title}, {"repo", opt.Repo}, {"new-title", opt.NewTitle}, {"body", opt.NewBody}, {"orig", opt.Orig},
 		{"real", opt.Real}, {"top", top}} {
 		o.Val(kv[0], kv[1])
+	}
+	if here, ok := tree.TreeOf(root, ospath.Abspath(top), projectsDir); ok {
+		o.Val("project", here.Project)
 	}
 	for _, kv := range []struct {
 		key string

@@ -3,7 +3,7 @@
  *
  * 直すのは`core/flow-doc.ts`の関数で作ったコピーで、触った欄以外は元のまま（知らない欄を消さない）。
  * 画面が欄を持たない種類は、名前だけ直せて、`data`は読むだけ（ファイルと同じYAMLの形で見せる）。
- * グループは名前だけ直せて、解く（中のノードは残して枠だけ消す）か消す（同じく中のノードは残す）。
+ * グループは名前だけ直せて、解除できる（中のノードは残してグループだけ消す）。
  * サブエージェントの種類とスキルの名前は、実行ファイルが挙げた候補（`candidates`）から選べる。打って決めても
  * よく（ユーザ・プラグインのものは候補に無い）、候補のどれか（組み込み・プロジェクト）か、候補に無いかをつける。
  * 欄に打った字は、どの欄かをつけて返す（呼び手が同じ欄への打ち込みを元に戻す1件にまとめる）。フォーカスが外れたら`onSeal`。
@@ -274,13 +274,13 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
               data-action="ungroup"
               data-tour="inspector-ungroup"
               disabled={readOnly}
-              title="枠だけ削除して、中のノードはその場に残します"
+              title="グループだけ削除して、中のノードはその場に残します"
               onClick={() => {
                 onChange(ungroup(doc, node.id));
                 onSelect(undefined);
               }}
             >
-              グループを解く
+              グループを解除
             </button>
           </div>
         </>
@@ -291,20 +291,22 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}
-      <div className="buttons">
-        <button
-          type="button"
-          className="action"
-          data-action="remove-node"
-          disabled={readOnly}
-          onClick={() => {
-            onChange(removeNode(doc, node.id));
-            onSelect(undefined);
-          }}
-        >
-          {group ? "グループを削除（中のノードは残す）" : "ノードを削除"}
-        </button>
-      </div>
+      {!group && (
+        <div className="buttons">
+          <button
+            type="button"
+            className="action"
+            data-action="remove-node"
+            disabled={readOnly}
+            onClick={() => {
+              onChange(removeNode(doc, node.id));
+              onSelect(undefined);
+            }}
+          >
+            ノードを削除
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

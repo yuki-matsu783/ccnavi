@@ -1,5 +1,5 @@
 /**
- * 保存（「この順序に決める」）の前の確かめ。番号の変わるステップと、一緒に付け替える`todo/`の子の提案
+ * 保存（「この順序で保存」）の前の確かめ。番号の変わるステップと、一緒に付け替える`todo/`の子の提案
  * （旧識別子 → 新識別子、`phase:`の旧 → 新、`predecessors`の直し）を見せる。並べるのは実行ファイルの答え
  * （`children`・`mismatched`）と、答えの番号と元の番号の違い（`renumbered`）だけで、画面は決めない。
  */
@@ -41,7 +41,7 @@ export function Review({ ticket, answer, onConfirm, onCancel, focus = true }: Re
   const moved = renumbered(answer);
   return (
     <Dialog titleId="save-review-title" backdropClass="workflow-review-backdrop" cardClass="workflow-review" id="save-review">
-      <h2 id="save-review-title">この順序に決める</h2>
+      <h2 id="save-review-title">この順序で保存する</h2>
       <p className="dim small">ccnaviが{ticket}の提案の計画（plan: / feedback:）を書き換えます。番号が変わるステップを指している子の提案も、合わせて書き換えます。承認はしません。</p>
       <div data-tour="review-numbers">
         <h3>番号が変わるステップ（{moved.length}）</h3>

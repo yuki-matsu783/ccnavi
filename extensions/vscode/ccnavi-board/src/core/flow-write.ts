@@ -1,8 +1,10 @@
 /**
- * フローのファイルを書く。フロー編集画面の保存の、ファイルに触る部分だけ。
+ * ユーザが画面で保存するファイルを書く（`writeTreeFile`）。フロー編集・テンプレート管理・設定の3画面（ルール管理・
+ * リスク管理・フェーズ管理）の保存のうち、ファイルに触る部分だけ。フローとテンプレートの読み込み（`readFlowFile`）もここ。
  *
- * 置き場は承認済みの領域（既定`.ccnavi/approved/flows/<子>.yml`）で、ユーザが持つ（エージェントのWrite / Editは判定が止める）。書くのはユーザが
- * ボードで保存したときだけ。ここはその1回を、リンクを辿らずに、途中で異常終了しても半端なファイルを残さずに書く。
+ * フローの置き場は承認済みの領域（既定`.ccnavi/approved/flows/<子>.yml`）で、ユーザが持つ（エージェントのWrite / Editは判定が止める）。
+ * 設定のファイルも同じくユーザが持つ。書くのはユーザが画面で保存したときだけ。ここはその1回を、リンクを辿らずに、
+ * 途中で異常終了しても半端なファイルを残さずに書く。
  *
  * - リンクは辿らない。 ツリーのルートからファイルまでの途中（ファイルそのものを含む）に1つでも
  *   シンボリックリンクがあれば書かない。辿ると、承認済みの領域の外（エージェントが書ける場所）に書いたり、
@@ -13,7 +15,8 @@
  * - 読み込んでから外で変わっていない。 在ったファイルは更新時刻が同じ、無かったファイルはまだ無い
  * - ふつうのファイルで、名前が1つのものだけ。 名前付きパイプは開くと待ち続け、ハードリンクは承認済みの
  *   領域の外の名前から書き換えられる。読むときは`O_NOFOLLOW | O_NONBLOCK`で開き、開いたものを確かめ直す
- * - 大きさは256KBまで（実行ファイルと同じ上限）。読むのも書くのも
+ * - フローとテンプレートの大きさは256KBまで（実行ファイルと同じ上限）。読むときも書くときも同じ上限にする。設定のファイルは
+ *   実行ファイルが上限を持たないので、書くときも上限を渡さない
  * - 一時ファイルを残さない。 失敗しても消す。消せずに残った`.*.tmp`を`ccnavi-user-push-approved.sh`はコミットしない
  *
  * 残る隙間（TOCTOU）: 確かめてから`rename`までの間に、誰かが途中のディレクトリをリンクに差し替えれば
@@ -29,9 +32,9 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-export type FlowWriteResult = { readonly ok: true } | { readonly ok: false; readonly error: string };
+export type TreeWriteResult = { readonly ok: true } | { readonly ok: false; readonly error: string };
 
-/** 読み書きするファイルの大きさの上限（バイト）。実行ファイル（`flow.FILE_LIMIT`）と同じ256KB */
+/** フローとテンプレートを読み書きするときの大きさの上限（バイト）。実行ファイル（`flow.fileLimit`）と同じ256KB */
 export const FLOW_FILE_LIMIT = 256 * 1024;
 
 // Windowsには無い。無ければ0（確かめ直しだけが有効）
@@ -39,7 +42,7 @@ const O_NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
 const O_NONBLOCK = fs.constants.O_NONBLOCK ?? 0;
 
 /** 読み込んだときのファイルの様子。無かったなら`exists: false` */
-export interface FlowExpect {
+export interface TreeFileExpect {
   readonly exists: boolean;
   readonly mtimeMs: number;
 }
@@ -117,10 +120,11 @@ function linkedError(where: string): string {
 }
 
 /**
- * フローのファイルを書く。リンクを辿らず、読み込んだときから外で変わっていなければ、一時ファイルの入れ替えで書く。
- * `noun`は断る文に出す呼び名（テンプレートの保存は同じ書き方を`テンプレート`の名で使う）。
+ * treeの下のファイルを書く。リンクを辿らず、読み込んだときから外で変わっていなければ、一時ファイルの入れ替えで書く。
+ * `noun`は断る文に出す呼び名（`フロー`・`テンプレート`・`ルール`など）。`limit`は大きさの上限（バイト）で、
+ * 実行ファイルがそれより大きいものを読まないときだけ渡す（無ければ見ない）。
  */
-export function writeFlowFile(tree: string, file: string, text: string, expect: FlowExpect, noun = "フロー"): FlowWriteResult {
+export function writeTreeFile(tree: string, file: string, text: string, expect: TreeFileExpect, noun: string, limit: number | undefined): TreeWriteResult {
   if (segments(tree, file) === undefined) {
     return { ok: false, error: `ワークツリーの外には保存できません（${file}）` };
   }
@@ -138,8 +142,8 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
     return { ok: false, error: changed };
   }
   const size = Buffer.byteLength(text, "utf8");
-  if (size > FLOW_FILE_LIMIT) {
-    return { ok: false, error: `${noun}が大きすぎるため、保存できません（${size}バイト、上限${FLOW_FILE_LIMIT}バイト）。ccnaviはこれより大きい${noun}を読み込めません。` };
+  if (limit !== undefined && size > limit) {
+    return { ok: false, error: `${noun}が大きすぎるため、保存できません（${size}バイト、上限${limit}バイト）。ccnaviはこれより大きい${noun}を読み込めません。` };
   }
   const temp = path.join(dir, `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`);
   let renamed = false;
@@ -175,7 +179,7 @@ export function writeFlowFile(tree: string, file: string, text: string, expect: 
 }
 
 /** 読み込んでから外で変わったなら理由。変わっていなければundefined */
-function changedSince(file: string, expect: FlowExpect, noun: string): string | undefined {
+function changedSince(file: string, expect: TreeFileExpect, noun: string): string | undefined {
   let stat: fs.Stats | undefined;
   try {
     stat = fs.lstatSync(file);

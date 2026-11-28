@@ -140,7 +140,7 @@ sample:
           - {id: c-start-end, from: start, to: end, fromPort: output, toPort: input}
       checks:
         warns:
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: start から届かないノードがある: prompt-1（プロンプト）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: 開始（start）から届かないノードがある: prompt-1（プロンプト）"
         rendered:
           - "1. [start] 開始: 開始 → 2"
           - "2. [end] 終了: 終了"
@@ -396,8 +396,8 @@ sample:
           - {id: c-investigate-end, from: investigate, to: end, fromPort: output, toPort: input}
       checks:
         warns:
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: start がありません（どこから始めるかが決まらない）"
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: ノード investigate（原因を調べる） のサブエージェントの種類 Explorer が候補にありません（組み込みと .claude/ の下にありません。書き誤りかもしれない。ユーザ・プラグインのものなら気にしなくてよい）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: 開始（start）が無い（どこから始めるかが決まらない）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: ノード investigate（原因を調べる） のサブエージェントの種類 Explorer が候補に無い（組み込みと .claude/ の下に無い。書き誤りかもしれない。ユーザ・プラグインのものなら気にしなくてよい）"
         rendered:
           - "1. [prompt] ログを読む: 認証まわりのエラーログを読む → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせる / プロンプト: 原因の候補を挙げる / 種類: Explorer → 3"
@@ -508,7 +508,7 @@ sample:
         connections: *main-connections
       checks:
         warns:
-          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: start から届かないノードがある: subAgent-1（原因を調べる）"
+          - ".claude/worktrees/i0042/.ccnavi/approved/flows/i0042-01-01.yml: 開始（start）から届かないノードがある: subAgent-1（原因を調べる）"
         rendered:
           - "1. [start] 開始: 開始 → 2"
           - "2. [subAgent] 原因を調べる: ログと該当コードを突き合わせ、原因の候補を挙げる / プロンプト: 認証まわりのエラーログを読み、失敗が起きる条件を整理する。 該当するコードを探し、原因の候補を3件以内で挙げる。 / 種類: Explore → 3"
@@ -735,8 +735,8 @@ courses:
         body: 枠の中へドラッグしたノードは枠に入り、外へドラッグすると出ます。枠を選ぶと、縁をドラッグして大きさを変えられます。
         scene: {doc: grouped, select: group-1}
       - target: inspector-ungroup
-        title: 枠を解く
-        body: 枠を選ぶと、右の欄で名前を直せます。「グループを解く」は枠だけを消し、中のノードはその場に残します。
+        title: グループを解除する
+        body: 枠を選ぶと、右の欄で名前を直せます。「グループを解除」は枠だけを消し、中のノードはその場に残します。
         scene: {doc: grouped, select: group-1}
       - target: copy
         title: コピーする

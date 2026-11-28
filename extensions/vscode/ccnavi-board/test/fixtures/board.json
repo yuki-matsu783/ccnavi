@@ -222,7 +222,7 @@
       "kind": "glob",
       "value": ".github/**",
       "points": 35,
-      "message": "CI やエージェント定義に触った"
+      "message": "CIやエージェント定義に触った"
      },
      {
       "id": "deletes",
