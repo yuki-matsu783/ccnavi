@@ -3,7 +3,7 @@ title: ccnaviボードの画面の作り
 type: design
 description: 承認のオーバーレイの遷移と目次、列と親ごとの行、カードと右のパネルの組み立て（状態のバッジ・ユーザ待ち・詳細・選んだカード）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、拡張全体の答えとサイドパネル、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
 tags: [design-doc, extension, board]
-keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, 右のパネル, Panel.tsx, 選んだカード, 目次, Toc, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage, board-feed, サイドパネル, BoardTarget, select, EditorBar, 上部の並び, layer-memory, レイヤー]
+keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, 計画の流れを見る, PlanFlow.tsx, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, 右のパネル, Panel.tsx, 選んだカード, 目次, Toc, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage, board-feed, サイドパネル, BoardTarget, select, EditorBar, 上部の並び, layer-memory, レイヤー]
 ---
 
 # 画面の作り
@@ -23,6 +23,8 @@ keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, ap
 ボードの本体は`webview/board/Lanes.tsx`（CSSは`Lanes.css`）。1行目に列の見出し（`.column`。畳む切り替え・件数・幅の取っ手）、その下に親ごとの行（`.lane`）を並べる。列の幅を全部の行で揃えるため、ボードは1つのgridで、`.lane`は箱を作らない（`display: contents`）。列の幅の指定は`tracksOf`がインラインのstyle（`grid-template-columns`）に書く。畳んだ列は`max-content`、固定した列はpx、ほかは`minmax(220px, 1fr)`。ドラッグの最中は、その列だけを差し替えた指定をDOMに直に書き、離したときに`state.ts`の`widths`に覚える。
 
 行に分けるのは`lanesOf`で、キーはカードの`family`とプロジェクトの組（`laneKey`）。親のカードは行の見出し（`CardItem`の`head`。`div.card.parent.lane-head`）、子は列ごとのセル（`.cell[data-cell=<列>]`）に入る。親のカードが無い子の行は`.lane-orphan`の見出しを持ち、選べない。隠れたカード（絞り込み）と畳んだ列のカードもDOMには置き、CSSで隠す（`.card.hidden`、`.folded-cell .cards`）。親も子も見えない行は`.lane.hidden`。見出しの補助の操作（［計画編集］・「フェーズを表示」）は`CardItem`の子として渡し、主な操作（［承認］）と同じ段に並べる。「フェーズを表示」で開いた行は`state.ts`の`opened`（`laneKey`の一覧）に覚え、見出しの下に`LanePhases`がフェーズごとの状態の一言（`PhaseChip.status`）と子の識別子とバッジの言葉を並べる。
+
+開いた行の「計画の流れを見る」は、親のカードの`plans`（`parents[].plans`のまま。`core/board.ts`が親のカードに移す）が空でないときだけ`LanePhases`が出す。押すと`App.tsx`が親の`cardKey`を`useState`に持ち、`webview/board/PlanFlow.tsx`（CSSは`PlanFlow.css`）を`Dialog`で重ねる。図は承認のオーバーレイと同じ`shared/PlanGraph.tsx`を`editable`なしで使う。拡張ホストへは何も送らず、`state.ts`にも覚えない（更新で親が消えるか`plans`が空になったら出さない）。承認のオーバーレイが出ている間は出さない。Escは`ESCAPE_LAYER.overlay`で受ける。図の中身を拡張で組み直さないため、承認済みの親の図も実行ファイルが承認の`plans`と同じ関数（`planedit.ApprovedPlans`）で組む。
 
 完了と取り消しの列は最初から畳む（`core/board.ts`の`FOLDED_FIRST`。`folded`を覚えていなければこれを使う）。案内の見本も、手順が`fold`を書かなければ同じ既定で描く。940px以下（`useNarrow`と同じ条件）では`Lanes.css`のメディアクエリがgridをやめ、行を縦に積み、セルの`.cell-label`（列の名前と件数）を出す。子の無いセルと畳んだ列のセルは出さない。
 

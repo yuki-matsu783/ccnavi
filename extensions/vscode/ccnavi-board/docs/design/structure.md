@@ -37,7 +37,7 @@ src/
   core/
     model.ts          ボードの JSON の形（実行ファイルとの契約）と読み取り
     approvemodel.ts   承認の JSON の形（--agree --preview --json / user agree --yes … --json）と読み取り。計画を持つ親の図の中身（plans）も読む。一覧のうち未保存のタブがある親と、保存したあとに提案が変わった親を引く関数と、その文
-    plan-graph.ts     計画の図の点・線・置き場所を、実行ファイルの plans の 1 件から組む（start / end の仮の点と線、loose の印、引けない線・消せる線、振り直す前の番号で覚えた置き場所）。判定はしない。VS Code に触れないので単体で試せる
+    plan-graph.ts     計画の流れの図の点・線・置き場所を、実行ファイルの plans の 1 件から組む（start / end の仮の点と線、loose の印、引けない線・消せる線、振り直す前の番号で覚えた置き場所）。判定はしない。VS Code に触れないので単体で試せる
     planordermodel.ts --plan-order <親> --json の答えの形（実行ファイルとの契約）と読み取り。plans は承認の preview と同じ読み方。保存の答えをパネルが読む形（書いた・変わらない・外で変わった・書かなかった）
     testmodel.ts      試験の JSON の形（--test --json / --test-expectations --json）と読み取り
     suggestmodel.ts   候補の JSON の形（--suggest --json）と読み取り。allow の候補は並べない
@@ -124,15 +124,17 @@ src/
     tours/images.ts   手順の image（名前）から画像の data: URL を引く表。画像は tours/images/<名前>.png に置き、esbuild の dataurl の読み込みでバンドルへ入れる（Webview はファイルを読まず、ボードの CSP だけ img-src data: を許す）。表と置き場と YAML の突き合わせはテストが見る
     Tour.tsx          吹き出しの案内と、その出し入れ（useTour）。案内のある 8 画面で 1 本。画面ごとの初回（拡張ホストの tour）と、ヘッダ右上の ?（TourButton。ツールバーは ScreenHeader が組み、? を最後の子に置くのでどの画面も同じ位置）で案内の一覧を開き、選んだ 1 本が出る（coursesOf が YAML の定義から案内の一覧を作る）。画面全体を覆う `role="dialog"` は Dialog.tsx を使わず、指す先の枠の影で暗くする作りを別に持つ。画像のある手順は、本文の下に img を出し、吹き出しを広げる（指す先は空にして中ほどに出す）
     TargetSelect.tsx  ルール管理・リスク管理・フェーズ管理・テンプレート管理の、設定の対象を切り替える欄
-    workflow/tour-marks.ts 案内の間だけ、計画の図の中のステップ・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
+    workflow/tour-marks.ts 案内の間だけ、計画の流れの図の中のステップ・線に data-tour の印を付ける（共通の図の部品 shared/PlanGraph.tsx には口が無いため）
     flow/post.ts の muteForTour は、案内の間に tourDone 以外を拡張ホストへ送らない。board/post.ts の mutePosts も同じ
     Tour.css          Tour.tsx の CSS（吹き出しの案内と見本の帯）。各画面の style.css が @import する
     styles/appearance.css Claude の配色（body のクラスの下でテーマ変数を上書きする）。共通の骨組み（page.css）・ボタン（button.css）・設定 3 画面の一覧（list.css）は Chrome 拡張と共有する extensions/shared/styles/ にあり、画面の style.css が button.css（@ccnavi/shared/styles/）・appearance.css（この置き場）・page.css（@ccnavi/shared/styles/）の順に @import する。欄の幅の名前（--w-field・--w-field-wide・--w-grow）は page.css の :root にあり、画面の CSS は 320px・360px を直書きせずそれを参照する（CB-T439 が検査する）
     （CSS の値）重なり順（--z-*）・角丸（--radius-*）・文字サイズ（--font-*）・すき間（--gap-*）・影（--shadow-popup）は page.css の :root で定め、画面の CSS には数値を直書きしない。直書きは test/shared/style.test.ts の CB-T585 が見つける（Chrome 拡張の CSS も対象。見つけるのは z-index・px の角丸・em の文字サイズ・gap の数値・影の rgba で、`font:` の省略形、rem、TSX のインライン style は見ない）
-    board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の図のために React Flow の CSS と shared/PlanGraph.css も読む）
+    board/style.css   ボード画面の CSS の入口。部品の CSS を @import で並べるだけ（計画の流れの図のために React Flow の CSS と shared/PlanGraph.css も読む）
     board/App.css     App.tsx の CSS（ツールバー・絞り込み）
     board/Lanes.tsx   列の見出しと親ごとの行（親は行の見出し、子は列ごとのセル。フェーズを表示で開く行・列の畳みと幅）
     board/Lanes.css   Lanes.tsx の CSS（列の幅を揃える grid・取っ手・畳んだ列・940px 以下で行を縦に積む）
+    board/PlanFlow.tsx 開いた親の行の「計画の流れを見る」で重ねる、承認済みの親の計画の流れ（parents[].plans を共有の図の部品で読むだけで描く）
+    board/PlanFlow.css PlanFlow.tsx の CSS（幅と見出し。図は shared/PlanGraph.css）
     board/Card.css    Card.tsx の CSS（カード 1 枚。操作ボタン card-button の寸法もここ）
     board/MergeBand.tsx マージ状況の帯（親ごとの 1 行、［MR を開く］［片付ける］、コマンドのコピー）
     board/MergeBand.css MergeBand.tsx の CSS
@@ -143,7 +145,7 @@ src/
     board/Card.tsx    カード 1 枚（見出し・局面・動いた表示・注意・主な操作）
     board/Panel.tsx   選んだカードの右のパネル（位置・MR・ユーザ待ち・フェーズ行・チケットを開く・補助の操作・詳細）
     board/Toc.tsx     承認のオーバーレイと対応方針の画面の目次（位置へ送るだけ）
-    board/Approval.tsx 承認のオーバーレイ（要約・一覧・計画の図（読むだけ）・凡例・本文・対象外・渡す文）
+    board/Approval.tsx 承認のオーバーレイ（要約・一覧・計画の流れ（読むだけ）・凡例・本文・対象外・渡す文）
     board/Decide.tsx   レビュー完了のオーバーレイの中身（0 件は「レビュー済みにする」、1 件以上は指摘ごとの選択と相談のプロンプトのコピー）
     board/state.ts    画面が覚えるもの（絞り込み・畳んだ列（既定は完了と取り消し）・列の幅・選んだカード・開いた親の行）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
@@ -215,7 +217,7 @@ src/
     flow/main.tsx     フロー編集画面の入口。埋め込みの JSON を読んでマウントする
     flow/App.tsx      錠の帯・ツールバー・注意・部品箱と、拡張ホストからのメッセージの受け
     flow/Canvas.tsx   図（ノード・出口・線）。動かす・繋ぐ・選ぶは呼び手に返す
-    shared/PlanGraph.tsx 計画の図の部品（React Flow）。承認のオーバーレイが読むだけで、計画編集タブが編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
+    shared/PlanGraph.tsx 計画の流れの図の部品（React Flow）。承認のオーバーレイとボードの計画の流れ（board/PlanFlow.tsx）が読むだけで、計画編集タブが編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
     workflow/style.css 計画編集タブの CSS の入口（先頭で React Flow の CSS を @import し、shared/PlanGraph.css と Tour.css も読む）
     workflow/App.css   App.tsx の CSS（図の枠の高さ・外で変わった差分の表）
     workflow/Review.css Review.tsx の CSS（保存の前の確かめ）
