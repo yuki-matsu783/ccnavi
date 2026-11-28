@@ -10,6 +10,8 @@
 .tpl-edit .field textarea { resize: vertical; }
 .tpl-edit-plan, .tpl-edit-flows { margin: 14px 0; }
 .tpl-edit-items select { max-width: 100%; }
+/* 編集の表は欄（select・チェック）と番号の札を同じ高さに揃える（共通の表は上寄せ） */
+.tpl-plan.tpl-edit-items td { vertical-align: middle; }
 .tpl-edit-ops { white-space: nowrap; }
 .tpl-edit-ops button.action.small { margin-left: 0; margin-right: var(--gap-2); }
 .tpl-edit-add { margin: 6px 0 0; }

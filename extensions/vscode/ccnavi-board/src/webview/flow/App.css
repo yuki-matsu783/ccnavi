@@ -3,13 +3,13 @@
  */
 .flow-body {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 300px;
+  grid-template-columns: 180px minmax(0, 1fr) 300px;
   gap: var(--gap-4);
   align-items: start;
 }
 /* 左右の欄は畳める（畳むと押すバッジだけの細い列になる）。列の幅は畳んだかで決める */
 .flow-body[data-palette-folded="1"] { grid-template-columns: auto minmax(0, 1fr) 300px; }
-.flow-body[data-side-folded="1"] { grid-template-columns: 150px minmax(0, 1fr) auto; }
+.flow-body[data-side-folded="1"] { grid-template-columns: 180px minmax(0, 1fr) auto; }
 .flow-body[data-palette-folded="1"][data-side-folded="1"] { grid-template-columns: auto minmax(0, 1fr) auto; }
 /* 畳んだらバッジのボタンだけ残す（中身は消さずに隠す。欄の入力途中の状態を残す）。部品のボタンの`display: flex`（下）より詳細度が低いので`!important`で勝つ */
 .flow-palette[data-folded="1"] > :not(.flow-fold), .flow-side[data-folded="1"] > :not(.flow-fold) { display: none !important; }
@@ -19,6 +19,8 @@
   .flow-body, .flow-body[data-palette-folded], .flow-body[data-side-folded], .flow-body[data-palette-folded][data-side-folded] { grid-template-columns: minmax(0, 1fr); }
 }
 .flow-ticket { overflow-wrap: anywhere; }
+/* フロー編集の画面では、図を窓の下端近くまで伸ばす（上部の並びのぶんを引く）。テンプレートの編集欄の図は70vhのまま */
+.flow-body:not(.tpl-flow-edit) .flow-graph { height: calc(100vh - 96px); }
 .flow-palette {
   display: flex; flex-direction: column; gap: var(--gap-3);
   border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 8px;
@@ -26,8 +28,8 @@
 .flow-palette button.action.small.palette-item {
   margin-left: 0; text-align: left;
   display: flex; gap: var(--gap-1) var(--gap-3); align-items: center; justify-content: space-between;
-  /* 列は150px。名前と目印が並ばないときは目印を次の行へ回す（回さないと目印がボタンの外へ出る） */
-  flex-wrap: wrap; white-space: normal;
+  /* 列は180px。名前と目印をどの行も1行に並べる（行によって折り返したりしなかったりしないように） */
+  flex-wrap: nowrap; white-space: nowrap;
 }
 /* 目印（種類の性質）。askUserQuestionはメインへ戻る、subAgentは入れ子。色だけに頼らず文字で言う */
 .flow-badge {
