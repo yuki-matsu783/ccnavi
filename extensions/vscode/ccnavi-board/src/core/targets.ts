@@ -6,6 +6,56 @@
  */
 import { projectLayer } from "./layers.js";
 import type { BoardJson } from "./model.js";
+import type { LayerTarget } from "./screens.js";
+
+/** 2つのレイヤーが同じか */
+export function sameLayer(a: LayerTarget, b: LayerTarget): boolean {
+  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
+}
+
+/** 選ぶ欄と突き合わせる形（`project`以外は`name`が空） */
+export function layerKey(target: LayerTarget): { kind: string; name: string } {
+  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
+}
+
+/** レイヤーの名前。「設定」欄の表示（`targetOptions`の`label`）と揃える */
+export function layerName(target: LayerTarget): string {
+  switch (target.kind) {
+    case "workspace":
+      return "共通の設定";
+    case "self":
+      return "ワークスペース";
+    case "project":
+      return `プロジェクト${target.name}`;
+  }
+}
+
+/** 選ぶ欄の値（`kind`と`name`）をレイヤーに戻す。知らない`kind`はundefined */
+export function layerFrom(value: { readonly kind: unknown; readonly name: unknown }): LayerTarget | undefined {
+  if (value.kind === "workspace" || value.kind === "self") {
+    return { kind: value.kind };
+  }
+  if (value.kind === "project" && typeof value.name === "string" && value.name !== "") {
+    return { kind: "project", name: value.name };
+  }
+  return undefined;
+}
+
+/**
+ * 設定の画面を開くときのレイヤー。覚えた最後の選択（`remembered`）が、いまの答えの選択肢にあればそれを使う。
+ * 無ければ画面の既定（`fallback`）で開き、そのことを1行で返す（`notice`。使えたときは空）。
+ * 答えがまだ無い（`board`がundefined）ときは、選択肢を確かめられないので覚えたものをそのまま使う。
+ */
+export function openingLayer(remembered: LayerTarget | undefined, board: BoardJson | undefined, fallback: LayerTarget): { target: LayerTarget; notice: string } {
+  if (remembered === undefined || board === undefined) {
+    return { target: remembered ?? fallback, notice: "" };
+  }
+  const key = layerKey(remembered);
+  if (targetOptions(board, "workspace", layerKey(fallback)).some((o) => o.kind === key.kind && o.name === key.name)) {
+    return { target: remembered, notice: "" };
+  }
+  return { target: fallback, notice: `${layerName(remembered)}にはこの設定が無いため、${layerName(fallback)}を開きました` };
+}
 
 /** 対象1つ。`kind`は共通の設定の呼び名（`workspace`）、`self`、`project`のどれか */
 export interface TargetOption {

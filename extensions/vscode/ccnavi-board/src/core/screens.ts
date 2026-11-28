@@ -9,20 +9,14 @@
  * 組み立ての誤りなので例外で止める（ユーザの操作では起こらない）。
  */
 
-/** ルール管理画面が直すルールファイル。共通の設定、ワークスペースの設定、プロジェクト1つの設定 */
-export type RulesTarget =
+/**
+ * 設定の4画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理）が開くレイヤー。共通の設定、ワークスペースの設定、プロジェクト1つの設定。
+ * 開くときのレイヤーは拡張が覚えた最後の選択で決める（`layer-memory.ts`）。
+ */
+export type LayerTarget =
   | { readonly kind: "workspace" }
   | { readonly kind: "self" }
   | { readonly kind: "project"; readonly name: string };
-
-/** リスク管理画面が直す配点のファイル。共通の設定、ワークスペースの設定、プロジェクト1つの設定 */
-export type RiskTarget = RulesTarget;
-
-/** フェーズ管理画面が直す定義のファイル。共通の設定、ワークスペースの設定、プロジェクト1つの設定（ルール管理・リスク管理と同じ3種） */
-export type PhasesTarget = RulesTarget;
-
-/** テンプレート管理画面が開く対象。共通の設定、ワークスペースの設定、プロジェクト1つの設定（ルール管理・リスク管理・フェーズ管理と同じ3種） */
-export type TemplatesTarget = RulesTarget;
 
 /**
  * ボードを開いたあとに進む場所（サイドパネルのユーザ待ち・進行中の親の行から）。行けるかはボードが、いまの答えで確かめてから進む。
@@ -44,10 +38,14 @@ export type BoardTarget =
 export interface Screens {
   /** ボード。`target`は開いたあとに進む場所。未指定なら開くだけ（絞り込みは前回のまま） */
   readonly board: (target?: BoardTarget) => Promise<void>;
-  readonly rules: (target: RulesTarget) => Promise<void>;
-  readonly risk: (target: RiskTarget) => Promise<void>;
-  readonly phases: (target: PhasesTarget) => Promise<void>;
-  readonly templates: (target: TemplatesTarget) => Promise<void>;
+  /**
+   * 設定の4画面。開いていれば前面に出すだけで、レイヤーは切り替えない。開くときは拡張が覚えた最後のレイヤーで開き、
+   * その画面の選択肢に無ければ画面の既定（ルールとリスクは共通の設定、フェーズとテンプレートはワークスペース）で開く
+   */
+  readonly rules: () => Promise<void>;
+  readonly risk: () => Promise<void>;
+  readonly phases: () => Promise<void>;
+  readonly templates: () => Promise<void>;
   /**
    * 取り込み待ち画面（`wip/handoff/`の下書きを取り込む）。`tree`は見るツリーのキー（`main:`はワークスペース、
    * `project:<名前>`、`worktree:<名前>`）。未指定はワークスペース。タブは1枚で、別のツリーを開けば中身を入れ替える
@@ -78,7 +76,7 @@ export function forgetScreens(): void {
   registered = undefined;
 }
 
-/** 画面を開く。`screens().rules({ kind: "self" })`のように使う */
+/** 画面を開く。`screens().rules()`のように使う */
 export function screens(): Screens {
   if (registered === undefined) {
     throw new Error("画面の入口が登録されていません（extension.tsのregisterScreensを通っていません）");

@@ -46,9 +46,10 @@ import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.j
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
 import type { HandoffEntry } from "./core/handoff-entry.js";
 import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
-import type { RiskTarget } from "./core/screens.js";
+import type { LayerTarget } from "./core/screens.js";
+import { rememberLayer, layerToOpen } from "./layer-memory.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
-import { targetOptions, type TargetOption } from "./core/targets.js";
+import { layerFrom, layerKey, layerName, sameLayer, targetOptions, type TargetOption } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
 import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
@@ -66,7 +67,7 @@ const TITLE = "ccnaviリスク管理";
 
 interface Loaded {
   /** 読んだ対象。往復の間に切り替わったかを`stale`が見る */
-  readonly target: RiskTarget;
+  readonly target: LayerTarget;
   /** ファイルの本文。無ければ、組み込みの配点を見せるときはその本文、そうでなければ空 */
   readonly text: string;
   readonly exists: boolean;
@@ -88,34 +89,20 @@ interface Loaded {
   readonly sums: readonly RiskSum[];
 }
 
-type PanelState = SettingsState<RiskData, RiskTarget, Loaded>;
+type PanelState = SettingsState<RiskData, LayerTarget, Loaded>;
 
 /** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
 
-function sameTarget(a: RiskTarget, b: RiskTarget): boolean {
-  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
-}
 
 /** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーの子をクローズするときにも読まれる） */
-function projectOf(target: RiskTarget): string | undefined {
+function projectOf(target: LayerTarget): string | undefined {
   return target.kind === "project" ? target.name : undefined;
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
-function targetLabelOf(target: RiskTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "共通の設定";
-    case "self":
-      return "ワークスペース";
-    case "project":
-      return `プロジェクト${target.name}`;
-  }
-}
 
 /** 読み込み中の一言で「何を」読んでいるか */
-function whatOf(target: RiskTarget): string {
+function whatOf(target: LayerTarget): string {
   switch (target.kind) {
     case "workspace":
       return "リスク";
@@ -126,17 +113,13 @@ function whatOf(target: RiskTarget): string {
   }
 }
 
-/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
-function currentKey(target: RiskTarget): { kind: string; name: string } {
-  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
-}
 
 function binSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
-/** `ccnaviBoard.openRisk`の本体。引数なしは共通の設定の配点 */
-export async function openRisk(target: RiskTarget = { kind: "workspace" }): Promise<void> {
+/** `ccnaviBoard.openRisk`の本体。開いていれば前面に出すだけ。開くときは最後に選んだレイヤーで、無ければ共通の設定で開く */
+export async function openRisk(): Promise<void> {
   if (!requireTickets("リスク管理画面")) {
     return;
   }
@@ -146,9 +129,6 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
   }
   if (state !== undefined) {
     state.panel.reveal(state.panel.viewColumn);
-    if (!sameTarget(state.target, target)) {
-      await switchTarget(state, target);
-    }
     return;
   }
 
@@ -171,6 +151,7 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
     // 編集の途中を持つので、タブを非表示にしても破棄しない。
     retainContextWhenHidden: true,
   });
+  const target = layerToOpen({ kind: "workspace" });
   showLoading(panel, TITLE, SCREEN, whatOf(target));
   const current: PanelState = {
     target,
@@ -193,11 +174,11 @@ export async function openRisk(target: RiskTarget = { kind: "workspace" }): Prom
   await reload(current);
 }
 
-async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
+async function readPage(root: string, target: LayerTarget): Promise<Loaded> {
   const notices: string[] = [];
   // 切り替えの一覧と統合結果のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧と統合結果が縮むだけ
   const board = await loadBoard(root, binSetting());
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", currentKey(target));
+  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", layerKey(target));
   const sums = riskSums(board.ok ? board.board : undefined);
   let riskRel: string;
   let riskPath: string;
@@ -302,7 +283,7 @@ function alive(current: PanelState): boolean {
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, setDirty } = settingsPanel<RiskData, RiskTarget, Loaded, ToRisk>({
+const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, setDirty } = settingsPanel<RiskData, LayerTarget, Loaded, ToRisk>({
   accepts: true,
   alive,
   release: (current) => {
@@ -317,8 +298,8 @@ const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, se
   watchFiles,
   refreshLock,
   loading: (current) => ({ kind: "loading", text: loadingText(whatOf(current.target)) }),
-  sameTarget,
-  targetLabel: targetLabelOf,
+  sameTarget: sameLayer,
+  targetLabel: layerName,
   title: TITLE,
 });
 
@@ -360,7 +341,7 @@ function show(current: PanelState): void {
       lock: current.lock,
       notices: loaded.notices,
       handoff: loaded.handoff,
-      target: currentKey(loaded.target),
+      target: layerKey(loaded.target),
       targets: loaded.targets,
       sums: loaded.sums,
     },
@@ -371,7 +352,7 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
-  const target = currentKey(current.target);
+  const target = layerKey(current.target);
   current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
 }
 
@@ -414,7 +395,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
     return false;
   }
   // 往復の間に別の対象へ切り替わった。破棄するのは同じだが、切り替え先の画面に前の対象の話を出さない
-  if (!sameTarget(loaded.target, current.target)) {
+  if (!sameLayer(loaded.target, current.target)) {
     return true;
   }
   fail(current, "画面を更新したので、この保存は取りやめました。更新後の配点で編集し直してください");
@@ -486,14 +467,17 @@ async function handleMessage(current: PanelState, message: RiskMessage | undefin
     }
     case "switchTarget": {
       // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
+      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", layerKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
       if (option === undefined) {
         return;
       }
-      const target: RiskTarget =
-        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "self" ? { kind: "self" } : { kind: "workspace" };
-      if (!sameTarget(current.target, target)) {
+      const target = layerFrom(option);
+      if (target !== undefined && !sameLayer(current.target, target)) {
         await switchTarget(current, target);
+        // 切り替わったときだけ覚える（未保存の確認でやめたら覚えない）
+        if (sameLayer(current.target, target)) {
+          rememberLayer(target);
+        }
       }
       return;
     }
@@ -547,7 +531,7 @@ async function create(current: PanelState): Promise<void> {
 }
 
 /** 保存の前の検証に渡す差し替え。共通の設定は`--risk`、ほかは名前を付けて`--project-risk-file` */
-function overrideFor(target: RiskTarget, tmp: string): LintOverride {
+function overrideFor(target: LayerTarget, tmp: string): LintOverride {
   switch (target.kind) {
     case "workspace":
       return { kind: "risk", path: tmp };

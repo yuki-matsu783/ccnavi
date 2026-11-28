@@ -8,10 +8,10 @@ function spy(): { readonly screens: Screens; readonly calls: string[] } {
     calls,
     screens: {
       board: async (target) => void calls.push(`board:${target === undefined ? "-" : target.kind === "project" ? target.project : target.kind}`),
-      rules: async (target) => void calls.push(`rules:${target.kind}`),
-      risk: async (target) => void calls.push(`risk:${target.kind}`),
-      phases: async (target) => void calls.push(`phases:${target.kind}`),
-      templates: async (target) => void calls.push(`templates:${target.kind}`),
+      rules: async () => void calls.push("rules"),
+      risk: async () => void calls.push("risk"),
+      phases: async () => void calls.push("phases"),
+      templates: async () => void calls.push("templates"),
       handoff: async (tree) => void calls.push(`handoff:${tree ?? "-"}`),
       projects: async () => void calls.push("projects"),
       flow: async (ticket) => void calls.push(`flow:${ticket}`),
@@ -25,16 +25,16 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   registerScreens(registered);
   await screens().board({ kind: "project", project: "lib" });
   await screens().board({ kind: "mergeCheck" });
-  await screens().rules({ kind: "project", name: "lib" });
-  await screens().phases({ kind: "self" });
-  await screens().templates({ kind: "self" });
+  await screens().rules();
+  await screens().phases();
+  await screens().templates();
   await screens().handoff("project:lib");
   await screens().handoff();
-  await screens().risk({ kind: "workspace" });
+  await screens().risk();
   await screens().projects();
   await screens().flow("i0001-01-01");
   await screens().workflow("i0001");
-  assert.deepEqual(calls, ["board:lib", "board:mergeCheck", "rules:project", "phases:self", "templates:self", "handoff:project:lib", "handoff:-", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
+  assert.deepEqual(calls, ["board:lib", "board:mergeCheck", "rules", "phases", "templates", "handoff:project:lib", "handoff:-", "risk", "projects", "flow:i0001-01-01", "workflow:i0001"]);
   forgetScreens();
 });
 
