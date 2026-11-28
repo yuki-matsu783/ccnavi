@@ -18,8 +18,5 @@ set -eu
 
 root="${CLAUDE_PROJECT_DIR:-.}"
 [ -d "$root/projects" ] || exit 0
-bin=$(ccnavi_bin "$root") || {
-	printf 'ccnavi-dirs: ccnavi の実行ファイルが見つかりません。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてください。\n' >&2
-	exit 1
-}
+bin=$(ccnavi_bin "$root") || ccnavi_no_bin ccnavi-dirs 1
 exec "$bin" --root "$root" dirs

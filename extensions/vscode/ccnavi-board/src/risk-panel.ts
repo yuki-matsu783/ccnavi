@@ -23,7 +23,7 @@
  * プロジェクトは`--project-risk-file <名前>=<パス>`（レイヤーの配点は共通の設定と合わせて検証される）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く（共通の設定とワークスペースの設定はどのツリーでも、
  * プロジェクトの設定はそのプロジェクトの分だけ。配点は子をクローズするときに読まれるので、走っている最中に変えない）、
- * ファイルが外で変わっていないときだけ行う。
+ * ファイルが外で変わっていないときだけ行う（流れは`settings-panel.ts`の`save`）。
  * ファイルが無いのは「設定が無い」正常な状態。共通の設定にもワークスペースの設定にも無いときは、組み込みの配点を読み取り専用で見せ、
  * 「作る」で同じ値のファイルを書き出してから直す。それ以外（プロジェクトの設定など）は空として出し、欄は触れて、
  * 検証を通った最初の保存でファイルを作る。
@@ -34,73 +34,51 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { followAppearance, postAppearance, readAppearance } from "./appearance.js";
-import { loadBoard, runLint, type LintOverride } from "./ccnavi.js";
+import { followAppearance, readAppearance } from "./appearance.js";
+import { loadBoard, type LintOverride } from "./ccnavi.js";
+import { writeTreeFile } from "./core/flow-write.js";
 import { LAYER_SELF, projectLayer, selfLayer } from "./core/layers.js";
 import { loadingText } from "./core/loading-render.js";
-import { errorLinesOf, warnLinesOf } from "./core/lintmodel.js";
-import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
+import { lockFromError } from "./core/lock.js";
 import { asRiskForm, BUILTIN_RISK_TEXT, readRisk, type RiskDocument } from "./core/risk-doc.js";
 import { renderRiskPage } from "./core/risk-render.js";
-import type { RiskData, RiskForm, RiskMessage, ToRisk } from "./core/risk-view.js";
+import type { RiskData, RiskMessage, ToRisk } from "./core/risk-view.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import type { HandoffEntry } from "./core/handoff-entry.js";
-import { HANDOFF_ENTRY, openHandoffFrom } from "./handoff-entry.js";
+import { HANDOFF_ENTRY } from "./handoff-entry.js";
 import type { RiskTarget } from "./core/screens.js";
 import { riskSums, type RiskSum } from "./core/sums.js";
-import { targetOptions, type TargetOption } from "./core/targets.js";
+import { targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
-import { lintSummary } from "./core/lint-summary.js";
 import { showLoading } from "./loading.js";
-import { assertRetained, openInEditor, watchPattern, workspaceFolder } from "./panel-common.js";
-import { settingsPanel, targetLabelOf, type SettingsState } from "./settings-panel.js";
+import { assertRetained, openInEditor, patternFor, resolveIn, watchPattern, workspaceFolder } from "./panel-common.js";
+import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
 import { requireTickets } from "./ticket-control.js";
-import { markTourSeen, tourSeen } from "./tour.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
-import { confirmDuringTurn, confirmIfTurn } from "./turn-confirm.js";
+import { confirmIfTurn } from "./turn-confirm.js";
 
 const DEFAULT_RISK = ".ccnavi/config/common/risks.yml";
 /** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "risk";
 const TITLE = "ccnaviリスク管理";
+/** 文で使う呼び名（「配点のファイル」） */
+const NOUN = "配点";
 
-interface Loaded {
-  /** 読んだ対象。往復の間に切り替わったかを`stale`が見る */
-  readonly target: RiskTarget;
+interface Loaded extends SettingsLoaded {
   /** ファイルの本文。無ければ、組み込みの配点を見せるときはその本文、そうでなければ空 */
   readonly text: string;
-  readonly exists: boolean;
   /** 組み込みの配点を読み取り専用で見せている（「作る」だけができる） */
   readonly builtin: boolean;
-  /** 無いときは0 */
-  readonly mtimeMs: number;
   readonly doc: RiskDocument;
-  readonly riskPath: string;
-  /** ワークスペースルートからの相対で見せるパス */
-  readonly riskRel: string;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
-  /** 取り込み待ち画面を開けるか */
-  readonly handoff: HandoffEntry;
-  /** 切り替えられる対象（共通・ワークスペース・設定のあるプロジェクト） */
-  readonly targets: readonly TargetOption[];
   /** 読み取り専用の統合結果（実行ファイルの`sums[]`） */
   readonly sums: readonly RiskSum[];
 }
 
-type PanelState = SettingsState<RiskData, RiskTarget, Loaded>;
+type PanelState = SettingsState<RiskData, Loaded>;
 
 /** 開いているパネル。種類ごとに1枚 */
 let state: PanelState | undefined;
-
-function sameTarget(a: RiskTarget, b: RiskTarget): boolean {
-  return a.kind === b.kind && (a.kind !== "project" || (b.kind === "project" && a.name === b.name));
-}
-
-/** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーの子をクローズするときにも読まれる） */
-function projectOf(target: RiskTarget): string | undefined {
-  return target.kind === "project" ? target.name : undefined;
-}
 
 /** 読み込み中の一言で「何を」読んでいるか */
 function whatOf(target: RiskTarget): string {
@@ -112,15 +90,6 @@ function whatOf(target: RiskTarget): string {
     case "project":
       return `プロジェクト「${target.name}」のリスク`;
   }
-}
-
-/** 開いている対象の欄の値（`targets.ts`の`kind`と`name`） */
-function currentKey(target: RiskTarget): { kind: string; name: string } {
-  return { kind: target.kind, name: target.kind === "project" ? target.name : "" };
-}
-
-function binSetting(): string {
-  return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("binPath", "");
 }
 
 /** `ccnaviBoard.openRisk`の本体。引数なしは共通の設定の配点 */
@@ -185,7 +154,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
   const notices: string[] = [];
   // 切り替えの一覧と統合結果のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧と統合結果が縮むだけ
   const board = await loadBoard(root, binSetting());
-  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", currentKey(target));
+  const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
   const sums = riskSums(board.ok ? board.board : undefined);
   let riskRel: string;
   let riskPath: string;
@@ -220,22 +189,10 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
       throw unreadableFailure({ path: riskPath, rel: riskRel }, layer.risk.unreadable);
     }
   }
-  let text: string;
-  let mtimeMs: number;
-  let exists: boolean;
-  try {
-    text = fs.readFileSync(riskPath, "utf8");
-    mtimeMs = fs.statSync(riskPath).mtimeMs;
-    exists = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`配点のファイルを読み込めません（${riskRel}）: ${(error as Error).message}`);
-    }
-    // 無いのは不備ではない（「設定が無い」正常な状態）。
-    text = "";
-    mtimeMs = 0;
-    exists = false;
-  }
+  // 無いのは不備ではない（「設定が無い」正常な状態）。
+  const read = readSettingFile(riskPath, riskRel, `${NOUN}のファイル`);
+  let text = read.text;
+  const { mtimeMs, exists } = read;
   // 共通の設定にもワークスペースの設定にも無ければ、適用されているのは組み込みの配点。共通かワークスペースの設定を開いたときだけ、
   // それを読み取り専用で見せ、「作る」で同じ値のファイルを書き出させる。もう一方が分からないとき（ボードを読めない）も組み込みを見せる。
   const builtin = !exists && (target.kind === "workspace" || target.kind === "self") && (other === undefined || !fs.existsSync(other));
@@ -248,11 +205,7 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     throw blockedFailure({ path: riskPath, rel: riskRel }, parsed.blocking);
   }
   const doc = exists || builtin ? parsed : { ...parsed, model: { ...parsed.model, problems: [] } };
-  return { target, text, exists, builtin, mtimeMs, doc, riskPath, riskRel, notices, targets, sums, handoff: HANDOFF_ENTRY };
-}
-
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+  return { target, text, exists, builtin, mtimeMs, doc, file: { path: riskPath, rel: riskRel }, notices, targets, sums, handoff: HANDOFF_ENTRY };
 }
 
 /**
@@ -265,7 +218,7 @@ function watchFiles(current: PanelState): void {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  const riskRel = current.loaded?.riskRel ?? DEFAULT_RISK;
+  const riskRel = current.loaded?.file.rel ?? DEFAULT_RISK;
   const patterns: vscode.RelativePattern[] = [
     patternFor(current.folder, riskRel),
     new vscode.RelativePattern(current.folder, ".claude/settings.json"),
@@ -274,56 +227,31 @@ function watchFiles(current: PanelState): void {
   current.fileWatchers.push(...patterns.map((pattern) => watchPattern(pattern, () => scheduleChanged(current))));
 }
 
-function patternFor(folder: vscode.WorkspaceFolder, filePath: string): vscode.RelativePattern {
-  if (path.isAbsolute(filePath)) {
-    return new vscode.RelativePattern(vscode.Uri.file(path.dirname(filePath)), path.basename(filePath));
-  }
-  return new vscode.RelativePattern(folder, toGlob(filePath));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
-}
-
 function alive(current: PanelState): boolean {
   return state === current;
 }
 
 /** この画面の仕事を、3画面で共通の段取り（`settings-panel.ts`）に渡す */
-const { registerPanelHandlers, scheduleChanged, reload, redraw, switchTarget, setDirty } = settingsPanel<RiskData, RiskTarget, Loaded, ToRisk>({
+const { registerPanelHandlers, scheduleChanged, reload, switchTarget, fail, save } = settingsPanel<RiskData, Loaded, ToRisk, RiskMessage>({
   accepts: true,
+  screen: SCREEN,
+  title: TITLE,
+  words: { file: NOUN, content: NOUN },
   alive,
   release: (current) => {
     if (state === current) {
       state = undefined;
     }
   },
-  handleMessage: (current, message) => void handleMessage(current, asMessage(message)),
+  parse: asMessage,
+  handle,
   read: readPage,
   show,
   showError,
   watchFiles,
-  refreshLock,
   loading: (current) => ({ kind: "loading", text: loadingText(whatOf(current.target)) }),
-  sameTarget,
-  targetLabel: targetLabelOf,
-  title: TITLE,
+  override: overrideFor,
 });
-
-/**
- * 保存できるかを実行ファイルに聞く。確かめられなければ閉じる側。
- * 共通の設定とワークスペースの設定の配点は、どのツリーの子をクローズするときにも読まれるので、どのツリーのdoingでも止める。
- * プロジェクトの設定の配点は、そのプロジェクトのdoingだけを見る。
- */
-async function refreshLock(current: PanelState): Promise<Lock> {
-  const result = await loadBoard(current.folder.uri.fsPath, binSetting());
-  const lock = result.ok ? lockFromBoard(result.board, projectOf(current.target)) : lockFromError(result.error);
-  if (alive(current)) {
-    current.lock = lock;
-    current.host.post({ type: "lock", lock } satisfies ToRisk);
-  }
-  return lock;
-}
 
 /**
  * いま見せるものを渡す。画面の編集はここで破棄されるので、呼ぶのはユーザが「更新」を押した
@@ -341,14 +269,14 @@ function show(current: PanelState): void {
     kind: "page",
     page: {
       root: current.folder.uri.fsPath,
-      riskPath: loaded.riskRel,
+      riskPath: loaded.file.rel,
       exists: loaded.exists,
       builtin: loaded.builtin,
       model: loaded.doc.model,
       lock: current.lock,
       notices: loaded.notices,
       handoff: loaded.handoff,
-      target: currentKey(loaded.target),
+      target: targetKey(loaded.target),
       targets: loaded.targets,
       sums: loaded.sums,
     },
@@ -359,7 +287,7 @@ function show(current: PanelState): void {
 function showError(current: PanelState, error: string, file?: ErrorFile): void {
   current.loaded = undefined;
   current.error = error;
-  const target = currentKey(current.target);
+  const target = targetKey(current.target);
   current.host.send({ kind: "error", error, ...(file === undefined ? {} : { file: file.rel }), target, targets: targetOptions(undefined, "workspace", target) });
 }
 
@@ -390,127 +318,32 @@ function riskHost(panel: vscode.WebviewPanel, root: string): ScreenHost<RiskData
   );
 }
 
-/**
- * 保存を始めたときに読んでいたものが、往復の間に入れ替わっていないか。
- *
- * 保存は実行ファイルへ2度出る（`--lint`と錠の取り直し）。その間にユーザが「更新」を押せば、
- * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
- * ファイルに入る。 読み直されていたら、この保存はもう無かったことにする。
- */
-function stale(current: PanelState, loaded: Loaded): boolean {
-  if (current.loaded === loaded) {
-    return false;
-  }
-  // 往復の間に別の対象へ切り替わった。破棄するのは同じだが、切り替え先の画面に前の対象の話を出さない
-  if (!sameTarget(loaded.target, current.target)) {
-    return true;
-  }
-  fail(current, "画面を更新したので、この保存は取りやめました。更新後の配点で編集し直してください。");
-  return true;
-}
-
-/** 操作の結果の一言。1枚目を読み込んでいる間だけ届かずに破棄される（非表示になっていても届く） */
-function fail(current: PanelState, message: string): void {
-  current.host.post({ type: "failed", message } satisfies ToRisk);
-}
-
-async function handleMessage(current: PanelState, message: RiskMessage | undefined): Promise<void> {
-  if (message === undefined || !alive(current)) {
-    return;
-  }
-  if (message.type === "dirty") {
-    setDirty(current, message.dirty);
-    return;
-  }
-  if (message.type === "ready") {
-    // 組み上がったばかりの画面は必ず「変更なし」で始まる（作り直された画面は前の編集を持たない）
-    setDirty(current, false);
-    // 画面が組み上がった。1枚目を読み込んでいる間に見送った中身は、ここで渡る。
-    // 見送るものが無くても渡し直す（同じ中身がもう1度届く）。VS Codeが画面を作り直す経路
-    // （`Developer: Reload Webviews`）では、入れてあるHTMLの中身が古いことがあるため
-    current.host.ready();
-    redraw(current);
-    postAppearance(current.host);
-    // 初回だけ吹き出しの案内を頼む。画面は指す先が出てから始め、閉じたら`tourDone`を返す。
-    // 閉じずにタブを閉じたら見た記録は残らないので、次に開いたときにもう1度出る
-    if (!tourSeen(SCREEN)) {
-      current.host.post({ type: "tour" } satisfies ToRisk);
-    }
-    return;
-  }
-  if (message.type === "tourDone") {
-    markTourSeen(SCREEN);
-    return;
-  }
-  // 読み直せていない画面では、配点にヒットする操作はどれも行き先が無い（「更新」は
-  // 押せるが、その経路は`reload`が読み直しからやり直す）
-  if (current.loaded === undefined && message.type !== "reload") {
-    return;
-  }
+/** この画面にだけある操作（3画面で同じものは`settings-panel.ts`が受ける） */
+async function handle(current: PanelState, loaded: Loaded, message: RiskMessage): Promise<void> {
   switch (message.type) {
-    case "reload": {
-      if (message.dirty) {
-        const choice = await vscode.window.showWarningMessage(
-          "未保存の変更があります。破棄して更新しますか？",
-          { modal: true },
-          "更新",
-        );
-        if (choice !== "更新") {
-          // 画面は「更新」を押した時点で欄を止めている。やめたことを伝えないと止まったままになる
-          // 問いを出している間にパネルを閉じられるので、送る前に生きているかを見る
-          if (alive(current)) {
-            current.host.post({ type: "cancelled" } satisfies ToRisk);
-          }
-          return;
-        }
-      }
-      await reload(current);
+    case "openFile":
+      openInEditor(loaded.file.path);
       return;
-    }
-    case "openHandoff": {
-      // 設定のプロジェクトに合わせて、そのプロジェクトのツリーの下書きを開く
-      await openHandoffFrom(current.loaded?.handoff, current.loaded?.target ?? current.target);
+    case "create":
+      await create(current, loaded);
       return;
-    }
-    case "switchTarget": {
-      // 一覧にある対象だけを受ける。画面が古いまま、消えたプロジェクトを指していても開かない
-      const option = (current.loaded?.targets ?? targetOptions(undefined, "workspace", currentKey(current.target))).find((t) => t.kind === message.kind && t.name === message.name);
-      if (option === undefined) {
+    case "save":
+      if (loaded.builtin) {
+        fail(current, `${loaded.file.rel}がありません。先に「組み込みの配点でファイルを作る」を押してください`);
         return;
       }
-      const target: RiskTarget =
-        option.kind === "project" ? { kind: "project", name: option.name } : option.kind === "self" ? { kind: "self" } : { kind: "workspace" };
-      if (!sameTarget(current.target, target)) {
-        await switchTarget(current, target);
-      }
+      await save(current, loaded, () => loaded.doc.apply(message.form));
       return;
-    }
-    case "openFile": {
-      const target = current.loaded?.riskPath ?? current.errorFile?.path;
-      if (target !== undefined) {
-        openInEditor(target);
-      }
-      return;
-    }
-    case "create": {
-      await create(current);
-      return;
-    }
-    case "save": {
-      await save(current, message.form);
-      return;
-    }
   }
 }
 
 /** 組み込みと同じ値のファイルを書き出す。既にあれば上書きしない（値は同じなので数え方は変わらない） */
-async function create(current: PanelState): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined || !loaded.builtin) {
+async function create(current: PanelState, loaded: Loaded): Promise<void> {
+  if (!loaded.builtin) {
     return;
   }
-  if (fs.existsSync(loaded.riskPath)) {
-    fail(current, `${loaded.riskRel}は既にあるため、上書きしません。更新してください。`);
+  if (fs.existsSync(loaded.file.path)) {
+    fail(current, `${loaded.file.rel}は既に存在するため、上書きしません。更新してください`);
     return;
   }
   if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "作成", "それでも作成する"))) {
@@ -520,18 +353,17 @@ async function create(current: PanelState): Promise<void> {
   if (!alive(current)) {
     return;
   }
-  try {
-    fs.mkdirSync(path.dirname(loaded.riskPath), { recursive: true });
-    current.wroteAt = Date.now();
-    fs.writeFileSync(loaded.riskPath, BUILTIN_RISK_TEXT, { encoding: "utf8", flag: "wx" });
-  } catch (error) {
+  // 保存と同じ守りで書く（ツリーの外とリンクを断り、一時ファイルの入れ替えで書く。まだ無いことも確かめ直す）
+  current.wroteAt = Date.now();
+  const written = writeTreeFile(current.folder.uri.fsPath, loaded.file.path, BUILTIN_RISK_TEXT, { exists: false, mtimeMs: 0 }, NOUN, undefined);
+  if (!written.ok) {
     // 書けなかったのに猶予を残したままだと、その間の実際の外部変更が知らされない。
     current.wroteAt = 0;
-    fail(current, `${loaded.riskRel}に保存できません: ${(error as Error).message}`);
+    fail(current, written.error);
     return;
   }
   await reload(current);
-  vscode.window.showInformationMessage(`${loaded.riskRel}を組み込みの配点で作成しました。コミットは自分でしてください。`);
+  vscode.window.showInformationMessage(`${loaded.file.rel}を組み込みの配点で作りました。コミットは自分でしてください`);
 }
 
 /** 保存の前の検証に渡す差し替え。共通の設定は`--risk`、ほかは名前を付けて`--project-risk-file` */
@@ -544,105 +376,6 @@ function overrideFor(target: RiskTarget, tmp: string): LintOverride {
     case "project":
       return { kind: "layerRisk", name: target.name, path: tmp };
   }
-}
-
-async function save(current: PanelState, form: RiskForm): Promise<void> {
-  const loaded = current.loaded;
-  if (loaded === undefined) {
-    return;
-  }
-  if (loaded.builtin) {
-    fail(current, `${loaded.riskRel}がありません。先に「組み込みの配点でファイルを作る」を押してください。`);
-    return;
-  }
-  const root = current.folder.uri.fsPath;
-  let tmp: string;
-  let text: string;
-  try {
-    text = loaded.doc.apply(form);
-    tmp = path.join(current.tmpDir, "risks.yml");
-    fs.writeFileSync(tmp, text, "utf8");
-  } catch (error) {
-    fail(current, `編集中の内容を保存できません: ${(error as Error).message}`);
-    return;
-  }
-
-  // 1. 検証。errorが1件でもあれば保存しない。
-  const lint = await runLint(root, binSetting(), overrideFor(loaded.target, tmp));
-  if (!alive(current)) {
-    return;
-  }
-  if (stale(current, loaded)) {
-    return;
-  }
-  if (!lint.ok) {
-    fail(current, lint.error);
-    return;
-  }
-  if (!lint.value.ok) {
-    // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でerrorが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.riskRel).join("\n")}`);
-    return;
-  }
-
-  // 2. 作業中のチケットが無いこと。押した時点で取り直す。
-  const lock = await refreshLock(current);
-  if (!alive(current)) {
-    return;
-  }
-  if (stale(current, loaded)) {
-    return;
-  }
-  if (lock.locked) {
-    fail(current, lock.reason);
-    return;
-  }
-  if (!(await confirmDuringTurn(lock))) {
-    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
-    return;
-  }
-  if (!alive(current)) {
-    return;
-  }
-
-  // 3. 読み込んでから外で変わっていないこと。無かったファイルは、まだ無いこと。
-  if (loaded.exists) {
-    let mtimeMs: number;
-    try {
-      mtimeMs = fs.statSync(loaded.riskPath).mtimeMs;
-    } catch (error) {
-      fail(current, `配点のファイルを確認できません: ${(error as Error).message}`);
-      return;
-    }
-    if (mtimeMs !== loaded.mtimeMs) {
-      fail(current, "配点のファイルは、読み込んだあとに画面の外で変更されています。更新してから編集し直してください（この変更は上書きしません）。");
-      return;
-    }
-  } else if (fs.existsSync(loaded.riskPath)) {
-    fail(current, "配点のファイルは、読み込んだあとに画面の外で作られています。更新してから編集し直してください（上書きしません）。");
-    return;
-  }
-
-  try {
-    current.wroteAt = Date.now();
-    if (loaded.exists) {
-      fs.writeFileSync(loaded.riskPath, text, "utf8");
-    } else {
-      fs.mkdirSync(path.dirname(loaded.riskPath), { recursive: true });
-      fs.writeFileSync(loaded.riskPath, text, { encoding: "utf8", flag: "wx" });
-    }
-  } catch (error) {
-    current.wroteAt = 0;
-    fail(current, `配点のファイルに保存できません: ${(error as Error).message}`);
-    return;
-  }
-  await reload(current);
-  // warnの本文は画面上部の帯に出す（通知は件数だけ）。中身（data）を渡したあとに送る
-  const warns = warnLinesOf(lint.value.report, tmp, loaded.riskRel);
-  if (warns.length > 0 && alive(current)) {
-    current.host.post({ type: "saved", warns } satisfies ToRisk);
-  }
-  vscode.window.showInformationMessage(`${loaded.riskRel}に保存しました（${lintSummary(lint.value.report)}）`);
 }
 
 function asMessage(message: unknown): RiskMessage | undefined {

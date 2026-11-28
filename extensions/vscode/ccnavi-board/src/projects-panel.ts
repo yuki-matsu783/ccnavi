@@ -50,7 +50,7 @@ import { showLoading } from "./loading.js";
 import type { MirrorData, ProjectsData, ProjectsMessage, ToProjects } from "./core/projects-view.js";
 import { screenHost, type ScreenHost } from "./core/screen-host.js";
 import { readOrigin } from "./git.js";
-import { assertRetained, debounce, watchGlobs, workspaceFolder } from "./panel-common.js";
+import { assertRetained, debounce, resolveIn, watchGlobs, workspaceFolder } from "./panel-common.js";
 import { runInTerminal } from "./terminal.js";
 import { markTourSeen, tourDue, tourPanelClosed } from "./tour.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -247,10 +247,6 @@ function isFile(filePath: string): boolean {
 
 function toPosix(p: string): string {
   return p.split(path.sep).join("/");
-}
-
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
 // ---- パネル

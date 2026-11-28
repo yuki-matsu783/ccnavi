@@ -183,11 +183,12 @@ case "$1" in
 *) sub="$1" ;;
 esac
 gc_bin=$(ccnavi_bin "$WS") ||
-	reject no-exe "ccnavi の実行ファイルが見つからないため、git の引数の形を確かめられません。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、無ければユーザに伝えてください。"
+	reject no-exe "git の引数の形を確かめられないので止めました。$(ccnavi_no_bin_text)"
 gc_out=$(printf '%s\0' "$@" | "$gc_bin" --root "$WS" git check "$SELF" "$SYNC" "$START" "$SELF_Q" "$WT_SH_Q" 2>/dev/null) || gc_out=""
 gc_out=$(printf '%s\n' "$gc_out" | tr -d '\r')
 # 答えの行を読む。allow に続けて、git の引数の前に足す語（prepend）・出力の後ろに出す警告（warn）・push の前に確かめる
-# 親のブランチ（gate-top・gate-branch）・統合先のユーザのチェックアウトの統合先（target）が付くことがある。
+# 親のブランチ（gate-top・gate-branch）・統合先のユーザのチェックアウトの統合先（target）・integrate のロックを分ける
+# 名前（repo）が付くことがある。
 case "$(printf '%s\n' "$gc_out" | head -n 1)" in
 allow | pass) ;;
 deny\ *)
@@ -220,10 +221,10 @@ wt_fresh_dir() {
 # logs/state/locks/<repo>/.integrate。持ち主はこの sh）を取ってから呼ぶ。標準入力はそのまま渡す（自己防衛の対象を含む取り込みは
 # ターミナルから打たせるので、端末かを実行ファイルが見る）。
 ig_run() {
-	ig_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	ig_repo=""
-	[ -z "$ig_top" ] || ig_repo=$(ccnavi_project "$ig_top" "$WS")
-	[ -n "$ig_repo" ] || ig_repo=self
+	# ロックを分ける名前（cwd のツリーのプロジェクト。ワークスペース自身は self）は、上の `ccnavi git check` が答える。
+	ig_repo=$(ccnavi_val1 repo "$gc_out")
+	[ -n "$ig_repo" ] ||
+		reject integrate-no-repo "ccnavi の実行ファイルがロックを分ける名前（repo）を答えませんでした。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、scripts/ccnavi-build.sh で組み直してください。"
 	ccnavi_lock_take "$WS" "$ig_repo" .integrate 0 ||
 		reject integrate-locked "別の integrate か integrate-done が動いています（ロック: logs/state/locks/${ig_repo}/.integrate）。終わってから再実行してください。"
 	trap 'ccnavi_lock_drop' EXIT

@@ -101,7 +101,7 @@ trap 'rm -f "$result" "$host_err" "$host_err.text"' EXIT
 if bin=$(ccnavi_bin "$root"); then
 	ccnavi() { "$bin" --root "$root" --cwd "$here" "$@"; }
 else
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "$(ccnavi_no_bin_text)" 2
 fi
 
 # ---- ホスト。sh は応答を取ってきてファイルに書くだけ（外との出入り）。読めなければ理由を渡して、手元の候補だけにする。

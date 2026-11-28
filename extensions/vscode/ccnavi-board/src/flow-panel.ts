@@ -57,7 +57,7 @@ import { asFlowDoc, parseFlowValue, serializeFlow, templateFlow, type FlowDoc } 
 import { lintFlowText } from "./core/flow-lint.js";
 import { dirtyTitle } from "./core/save-gate.js";
 import { renderFlowPage } from "./core/flow-render.js";
-import { decodeFlowBytes, readFlowFile, removeDraftFile, writeFlowFile } from "./core/flow-write.js";
+import { decodeFlowBytes, FLOW_FILE_LIMIT, readFlowFile, removeDraftFile, writeTreeFile } from "./core/flow-write.js";
 import {
   asFlowMessage,
   flowRequestPrompt,
@@ -910,7 +910,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
   // 6. 一時ファイルに書いて入れ替える（途中で異常終了しても半端なファイルを残さない）。4〜6はflow-write.ts
   current.wroteAt = Date.now();
-  const written = writeFlowFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs });
+  const written = writeTreeFile(target.flow.tree, filePath, text, { exists: loaded.exists, mtimeMs: loaded.mtimeMs }, "フロー", FLOW_FILE_LIMIT);
   if (!written.ok) {
     current.wroteAt = 0;
     fail(current, written.error);

@@ -104,7 +104,7 @@ scripts="$root/.ccnavi/scripts"
 # 実行し、値は ccnavi_val で読む。答えが無ければ止める。
 wt_do() {
 	wd_bin=$(ccnavi_bin "$root") ||
-		fail exe-missing "ccnavi の実行ファイルが見つかりません。何も切らずに止めました。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。"
+		fail exe-missing "何も切らずに止めました。$(ccnavi_no_bin_text)"
 	wd_out=$("$wd_bin" --root "$root" worktree direct "$@" 2>/dev/null </dev/null | tr -d '\r') || wd_out=""
 	[ -n "$wd_out" ] ||
 		fail exe-unanswered "ccnavi の実行ファイルが答えませんでした（worktree direct $1）。何も切らずに止めました。実行ファイルを組む（sh scripts/ccnavi-build.sh）か置いてから打ち直してください。"
