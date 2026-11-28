@@ -1,7 +1,17 @@
 /*
  * 図の編集の上部の並び（`EditorBar.tsx`）。名前と状態を左に、元に戻す・やり直す、補助の操作、主ボタンを右に並べる。
  * 元に戻す・やり直すは1つの組として間を詰め、補助の操作との間を空ける。
+ *
+ * 広い幅では1行に収める。名前の欄は16emを基準に残りの幅を取り、長い名前（フロー編集のファイルのパスなど）は折り返さずに末尾を
+ * 「…」で切る（全文は呼ぶ側が付ける`title`で見る）。名前の欄の基準の幅と操作の並びが1行に入らない幅でだけ、操作の並びが次の行へ回る。
+ * 状態の印は切らない。
  */
+.editor-name { flex: 1 1 16em; min-width: 0; flex-wrap: nowrap; }
+.editor-name > * { min-width: 0; }
+.editor-name > :not(.editor-states) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editor-name > .editor-states { flex-shrink: 0; flex-wrap: nowrap; }
+/* 先頭（対象の名前の主。フロー編集なら識別子とタイトル）は残し、後ろの補足（パスなど）から先に縮める */
+.editor-name > :first-child:not(.editor-states) { flex-shrink: 0.1; }
 .editor-states { display: inline-flex; flex-wrap: wrap; gap: var(--gap-3); align-items: baseline; }
 .editor-state { font-size: var(--font-sm); padding: 0 8px; border: 1px solid currentColor; border-radius: var(--radius-pill); }
 .editor-state.hidden { display: none; }

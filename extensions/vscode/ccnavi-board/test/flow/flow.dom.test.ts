@@ -10,7 +10,8 @@ import type { HTMLButtonElement, HTMLInputElement, HTMLTextAreaElement } from "h
 import { addNode, parseFlow, patchData, templateFlow, type FlowDoc } from "../../src/core/flow-doc.js";
 import { lockedReason } from "../../src/core/flow-view.js";
 import type { DomPage } from "../helpers/dom.js";
-import { openFlow, SAMPLE, sampleData, savedDoc, bareFlow } from "../helpers/flow.js";
+import { flowHtml, openFlow, page, SAMPLE, sampleData, savedDoc, bareFlow } from "../helpers/flow.js";
+import { flatStyle } from "../helpers/bundle.js";
 
 function sample(): FlowDoc {
   const read = parseFlow(SAMPLE);
@@ -558,6 +559,20 @@ test("CB-D1299 フロー編集の上部は、対象の名前と状態 → 元に
     assert.deepEqual(dom.all(".editor-state:not(.hidden)").map((s) => s.textContent), []);
     await dom.send({ type: "changed" });
     assert.deepEqual(dom.all(".editor-state:not(.hidden)").map((s) => s.textContent), ["外で変わった"]);
+  } finally {
+    await dom.close();
+  }
+});
+
+test("CB-T1303 図の編集の上部は広い幅で1行に収める。名前の欄は16emを基準に縮み、長い名前は折り返さず「…」で切る（状態の印は切らない）。切ったパスの全文はtitleで見る", async () => {
+  const css = flatStyle(flowHtml({ kind: "page", page: page() }));
+  assert.match(css, /\.editor-name \{ flex: 1 1 16em; min-width: 0; flex-wrap: nowrap; \}/);
+  assert.match(css, /\.editor-name > :not\(\.editor-states\) \{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; \}/);
+  assert.match(css, /\.editor-name > \.editor-states \{ flex-shrink: 0;/);
+  const dom = await openFlow();
+  try {
+    const path = dom.one(".editor-name .path");
+    assert.match(path.getAttribute("title") ?? "", new RegExp(`^${path.textContent.replace(/[.]/g, "\\.")}（`));
   } finally {
     await dom.close();
   }

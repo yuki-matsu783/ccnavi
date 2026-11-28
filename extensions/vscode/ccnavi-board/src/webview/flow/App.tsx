@@ -709,7 +709,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
               <span className="flow-ticket">
                 <strong>{shownPage.ticket}</strong> {shownPage.title}
               </span>
-              <span className="path" title={`${shownPage.flowRel}（承認済みの領域です。変更・コミットできるのはユーザだけです）`}>
+              <span className="path" title={`${shownPage.flowPath}（承認済みの領域です。変更・コミットできるのはユーザだけです）`}>
                 {shownPage.flowPath}
               </span>
               {!shownPage.exists && <span className="dim">（ファイルはまだありません。保存すると作られます）</span>}
