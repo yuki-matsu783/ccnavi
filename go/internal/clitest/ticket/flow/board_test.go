@@ -351,7 +351,7 @@ func TestParentPlansHaveTheShapeOfTheApprovalPreview(t *testing.T) {
 	board := boardSceneBuild(t).board()
 	preview := readFixture(t, "approve-preview.json")
 	if !slices.Equal(sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0)))) {
-		t.Errorf("plans のキーが違う: preview %v, ボード %v", sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0))))
+		t.Errorf("plans のキーが違う: preview %v, チケット管理画面 %v", sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0))))
 	}
 	if !slices.Equal(sortedKeys(jm(jv(preview, "plans", 0, "items", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0, "items", 0)))) {
 		t.Errorf("plans[].items のキーが違う")
