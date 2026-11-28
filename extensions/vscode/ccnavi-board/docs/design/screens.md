@@ -16,11 +16,11 @@ keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, �
 
 承認の一覧と対応方針の画面の目次は`webview/board/Toc.tsx`（CSSは`Toc.css`）。目次は行き先の`id`へ`scrollIntoView`するだけで、本文を項目に分けない。行き先の`id`は`Approval.tsx`（`approval-summary`・`approval-tickets`・`approval-plan-<親>`・`approval-legend`・`approval-body`・`approval-rejected`・`approval-problems`・`approval-confirm`）と`Decide.tsx`（`decide-thread-<番号>`・`decide-confirm-area`）が付ける。承認のボタンはページの最後のままで、目次の「承認」はそこへ送る。
 
-文を渡す3ボタン（`Approval.tsx`の`HandOver`）は「新しいセッションで開く」を主ボタンにし、開いたときの焦点もそこに置く。「ターミナルで実行」の名前は`core/approvemodel.ts`の`PROMPT_RUN_LABEL`（「ターミナルで実行（確認なしで動きます）」）。フロー編集の依頼の文（`webview/flow/Proposal.tsx`の`RequestText`）も、主ボタンを「新しいセッションで開く」にそろえる。
+文を渡す3ボタン（`Approval.tsx`の`HandOver`）は「新しいセッションで開く」を主ボタンにし、開いたときの焦点もそこに置く。「ターミナルで実行」の名前は`core/approvemodel.ts`の`PROMPT_RUN_LABEL`（「ターミナルで実行（確認なしで動きます）」）。確認なしで動くので、ボタンは`risky`のクラスで警告の見た目（テーマの警告色`--vscode-editorWarning-foreground`の枠と、読める濃さの警告の文字`--warn-text`）にし、［コピー］から16px離す（`Approval.css`）。押す前の確認は足さない。フロー編集の依頼の文（`webview/flow/Proposal.tsx`の`RequestText`）も、主ボタンを「新しいセッションで開く」にそろえる。
 
 ## 列と親ごとの行
 
-ボードの本体は`webview/board/Lanes.tsx`（CSSは`Lanes.css`）。1行目に列の見出し（`.column`。畳む切り替え・件数・幅の取っ手）、その下に親ごとの行（`.lane`）を並べる。列の幅を全部の行で揃えるため、ボードは1つのgridで、`.lane`は箱を作らない（`display: contents`）。列の幅の指定は`tracksOf`がインラインのstyle（`grid-template-columns`）に書く。畳んだ列は`max-content`、固定した列はpx、ほかは`minmax(220px, 1fr)`。ドラッグの最中は、その列だけを差し替えた指定をDOMに直に書き、離したときに`state.ts`の`widths`に覚える。
+ボードの本体は`webview/board/Lanes.tsx`（CSSは`Lanes.css`）。1行目に列の見出し（`.column`。畳む切り替え・件数・幅の取っ手。件数は子だけを数えるので「子2」と書き、ツールチップで親を数えないことを言う。畳んだ列の各行の`.folded-count`も「子3」と書き、ツールチップで何の列の子の数かを言う）、その下に親ごとの行（`.lane`）を並べる。列の幅を全部の行で揃えるため、ボードは1つのgridで、`.lane`は箱を作らない（`display: contents`）。列の幅の指定は`tracksOf`がインラインのstyle（`grid-template-columns`）に書く。畳んだ列は`max-content`、固定した列はpx、ほかは`minmax(220px, 1fr)`。ドラッグの最中は、その列だけを差し替えた指定をDOMに直に書き、離したときに`state.ts`の`widths`に覚える。
 
 行に分けるのは`lanesOf`で、キーはカードの`family`とプロジェクトの組（`laneKey`）。親のカードは行の見出し（`CardItem`の`head`。`div.card.parent.lane-head`）、子は列ごとのセル（`.cell[data-cell=<列>]`）に入る。親のカードが無い子の行は`.lane-orphan`の見出しを持ち、選べない。隠れたカード（絞り込み）と畳んだ列のカードもDOMには置き、CSSで隠す（`.card.hidden`、`.folded-cell .cards`）。親も子も見えない行は`.lane.hidden`。見出しの補助の操作（［計画編集］・「フェーズを表示」）は`CardItem`の子として渡し、主な操作（［承認］）と同じ段に並べる。「フェーズを表示」で開いた行は`state.ts`の`opened`（`laneKey`の一覧）に覚え、見出しの下に`LanePhases`がフェーズごとの状態の一言（`PhaseChip.status`）と子の識別子とバッジの言葉を並べる。
 
@@ -78,7 +78,8 @@ keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, �
 
 ## ボタンの見た目
 
-- 共通の`button.action`（`extensions/shared/styles/button.css`）とChrome拡張は変えない。カードと右のパネルの中の操作ボタンと、操作として置いた［MRを開く］リンクにだけ、新しいクラス`card-button`（主ボタンは`card-button primary`）を付ける。マージ状況の帯のボタンとリンクも同じ。
+- 押せない`button.action`（`extensions/shared/styles/button.css`。Chrome拡張と共有）は、押せるものと見分けがつくよう`opacity: .4`にし、主ボタン（`primary`）も主ボタンの色をやめて副ボタンの地にする（回り記号の`busy`の間は色を残す）。カードの`card-button`も同じ濃さ。
+- それ以外の共通の`button.action`の見た目とChrome拡張は変えない。カードと右のパネルの中の操作ボタンと、操作として置いた［MRを開く］リンクにだけ、新しいクラス`card-button`（主ボタンは`card-button primary`）を付ける。マージ状況の帯のボタンとリンクも同じ。
 - `Card.css`で文字サイズ（`var(--vscode-font-size)`）・高さ（`min-height: 26px`）・余白を絶対値で明示し、親（カード・フェーズ一覧・列）の文字サイズを引き継がない（`font: inherit`を使わない）。幅に収まらない言葉はボタンの中で折り返す。
 - 主ボタンは「ユーザ待ちの操作」だけ。操作のまとまり（カードの主な操作・パネルの「ユーザ待ち」）ごとに1つまで。補助の操作（チケットを開く・フロー・計画編集・テンプレートの下書き）は通常の色。
 - カードの中で縦に広がるメニューは使わない。
