@@ -454,3 +454,10 @@ messages:
     values: [self_q, name, short]
     note: |-
       原因を直してから、同じコマンド（{self_q} integrate-done {name:sh}）を再実行すると、K（{short}）から再開する。
+
+  # ---- entry/cli mirror（一部のプロジェクトだけが揃ったとき）
+  NEXT_MIRROR_RETRY:
+    kind: next
+    values: []
+    next: |-
+      `{script:ccnavi-user-mirror.sh}` を打ち直す（揃わなかった分だけが反映される）

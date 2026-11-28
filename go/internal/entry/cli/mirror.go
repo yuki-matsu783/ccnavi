@@ -9,6 +9,7 @@ import (
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/shell"
+	"ccnavi/internal/policy/texts"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
 	"ccnavi/internal/tickets/sync/mirror"
@@ -121,8 +122,8 @@ func mirrorLeft(w io.Writer, done *mirror.Applied, root string) {
 	for i, s := range done.Synced {
 		names[i] = s.Name
 	}
-	fmt.Fprintf(w, "通ったもの: %s\n残り: %s\n次: %s\n", strings.Join(names, ", "), done.Error,
-		config.ScriptCommand(root, useronly.UserScriptPrefix+"mirror.sh"))
+	fmt.Fprintf(w, "通ったもの: %s\n残り: %s\n", strings.Join(names, ", "), done.Error)
+	fmt.Fprintln(w, texts.Say(root, "NEXT_MIRROR_RETRY", nil, nil))
 }
 
 // mirrorPlan はミラーの状態を人が読む形で書く。何も反映しない。preview のときは、揃えるときに実行するコマンドを添える
