@@ -184,7 +184,7 @@ curl -s http://127.0.0.1:8080/healthz      # {"status":...} が返る
 
 操作して撮る道具は、リポジトリの [`scripts/real-screen/`](../../scripts/real-screen/README.md)（ページオブジェクトの形）にある。以下の`shoot.js`は最小の例で、新しい操作は`scripts/real-screen/`に足す。
 
-次を`$W/shoot.js`に保存する。左の「画面の一覧」から画面を開き、案内ツアーを閉じて、撮る。
+次を`$W/shoot.js`に保存する。サイドパネルの「一覧」から画面を開き、案内ツアーを閉じて、撮る。
 
 ```js
 // shoot.js: node shoot.js <フォルダ> <出力名の接頭辞> <幅> <高さ> <画面の名前>...
