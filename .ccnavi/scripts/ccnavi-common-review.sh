@@ -462,6 +462,28 @@ find_marked() {
 # 確定できないときは止めて 1（自動では送り直さない）。
 # 記録を作れないときは、二重投稿を防ぐため、送らずに止める。
 
+# 前に試した形跡のある段階を、ホストの一覧の目印で照合する（staged_send_locked と post_staged が共有）。
+#
+# reconcile_stage <種類 issue|note|issue-note> <操作ID> <段階ID> <対象の番号> <アカウント> <対象の URL>
+# 答えは変数 rs_word（sent・send・unknown・stop）と rs_urls（目印が一致した URL）、rs_why（理由）に置く。
+# stop（一覧を読めない・目印が複数・段階が記録に無い）のときは、ここで状態と直し方を標準エラーに言う。
+# 呼び出し側は、stop では操作記録を書かずに 1 で止める。unknown は呼び出し側が記録に unknown を書いて止める。
+reconcile_stage() {
+	rs_found=$(find_marked "$1" "$2" "$3" "$4" "$5" "$6")
+	rs_urls="${rs_found#* }"
+	rs_out=$(ccnavi ops reconcile "$2" "$3" "$rs_urls" "${rs_found%% *}" "$5" 2>/dev/null) || rs_out="stop 照合できなかった"
+	rs_word="${rs_out%% *}"
+	rs_why="${rs_out#* }"
+	case "$rs_word" in
+	sent | send | unknown) : ;;
+	*)
+		rs_word=stop
+		printf '%s: %s の送信を照合できない（%s）。止めた。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
+			"${review_label:-ccnavi-review}" "$3" "$rs_why" "$2" "$3" >&2
+		;;
+	esac
+}
+
 cs_set() {
 	ccnavi ops stage-set "$cs_id" "$cs_stage" "$@" 2>/dev/null || {
 		printf '%s: 操作記録に段階 %s を書けなかった。\n' "${review_label:-ccnavi-review}" "$cs_stage" >&2
@@ -528,22 +550,21 @@ staged_send_locked() {
 	cs_tries=$(cs_field tries)
 	if [ "${cs_tries:-0}" -gt 0 ] || [ "$cs_state" = unknown ]; then
 		cs_who=$(account || :)
-		cs_found=$(find_marked "$cs_skind" "$cs_id" "$cs_stage" "$cs_mr" "$cs_who" "$cs_url")
-		cs_urls="${cs_found#* }"
-		cs_verdict=$(ccnavi ops reconcile "$cs_id" "$cs_stage" "$cs_urls" "${cs_found%% *}" "$cs_who" 2>/dev/null) || cs_verdict="stop 照合できなかった"
-		case "$cs_verdict" in
-		sent*)
-			cs_set sent "$cs_urls" "$cs_who" || :
-			cs_sent "$cs_urls"
+		reconcile_stage "$cs_skind" "$cs_id" "$cs_stage" "$cs_mr" "$cs_who" "$cs_url"
+		case "$rs_word" in
+		sent)
+			cs_set sent "$rs_urls" "$cs_who" || :
+			cs_sent "$rs_urls"
 			return 0
 			;;
-		send*) : ;;
-		*)
+		send) : ;;
+		unknown)
 			cs_set unknown || :
 			printf '%s: 投稿を送ったか確定できない（%s）。自動では送り直さない。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
-				"${review_label:-ccnavi-review}" "${cs_verdict#* }" "$cs_id" "$cs_stage" >&2
+				"${review_label:-ccnavi-review}" "$rs_why" "$cs_id" "$cs_stage" >&2
 			return 1
 			;;
+		*) return 1 ;;
 		esac
 	fi
 	cs_body="$state/review-staged-$$.md"

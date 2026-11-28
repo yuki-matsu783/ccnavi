@@ -126,7 +126,8 @@ func TestCommentStagedDoesNotPostWhenItCannotBeSure(t *testing.T) {
 		{name: "記録を作れなければ送らずに止まる", env: map[string]string{"NO_RECORD": "1"}, code: 1, err: "操作記録を作れなかった"},
 		{name: "送り済みなら送り直さない", env: map[string]string{"ST": "sent"}, out: "u0"},
 		{name: "前に試した形跡は先に照合し、ホストに在れば送らない", env: map[string]string{"TRIES": "1", "VERDICT": "sent", "FOUND": "https://h/c/9"}, out: "https://h/c/9"},
-		{name: "送ったか確定できなければ送らずに止まる", env: map[string]string{"ST": "unknown", "VERDICT": "unknown 作成直後"}, code: 1},
+		{name: "送ったか確定できなければ送らずに止まる", env: map[string]string{"ST": "unknown", "VERDICT": "unknown 作成直後"}, code: 1, opsLogWord: "comment unknown"},
+		{name: "照合できなければ記録を書かず、送らずに止まる", env: map[string]string{"TRIES": "1", "VERDICT": "stop 一覧を読めない"}, code: 1, err: "照合できない"},
 		{name: "投稿が失敗したら unknown と記録して止まる", env: map[string]string{"POST_FAIL": "1"}, code: 1, posted: true, opsLogWord: "comment unknown"},
 	}
 	for _, c := range cases {
@@ -138,6 +139,12 @@ func TestCommentStagedDoesNotPostWhenItCannotBeSure(t *testing.T) {
 			}
 			if posted := shkit.Exists(filepath.Join(dir, "posted.md")); posted != c.posted {
 				t.Errorf("投稿した = %v, want %v", posted, c.posted)
+			}
+			if strings.Contains(c.name, "記録を書かず") {
+				if log := readIf(filepath.Join(dir, "ops.log")); strings.Contains(log, "stage-set") {
+					t.Errorf("記録を書かないはずが、ops.log = %q", log)
+				}
+				return
 			}
 			if !strings.Contains(readIf(filepath.Join(dir, "ops.log")), c.opsLogWord) {
 				t.Errorf("ops.log = %q に %q が無い", readIf(filepath.Join(dir, "ops.log")), c.opsLogWord)

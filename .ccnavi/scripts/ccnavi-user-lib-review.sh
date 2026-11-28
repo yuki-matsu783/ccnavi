@@ -287,28 +287,21 @@ post_staged() {
 	ps_tries=$(op_field "$ps_stage" tries)
 	if [ "${ps_tries:-0}" -gt 0 ] || [ "$ps_state" = unknown ]; then
 		op_account
-		ps_found=$(find_marked "$ps_kind" "$op_id" "$ps_stage" "$ps_target" "$op_who" "$ps_url")
-		ps_complete="${ps_found%% *}"
-		ps_urls="${ps_found#* }"
-		ps_verdict=$(ccnavi ops reconcile "$op_id" "$ps_stage" "$ps_urls" "$ps_complete" "$op_who" 2>/dev/null) || ps_verdict="stop 照合できなかった"
-		case "$ps_verdict" in
-		sent*)
-			op_set "$ps_stage" sent "$ps_urls" "$op_who"
-			printf '%s' "$ps_urls"
+		reconcile_stage "$ps_kind" "$op_id" "$ps_stage" "$ps_target" "$op_who" "$ps_url"
+		case "$rs_word" in
+		sent)
+			op_set "$ps_stage" sent "$rs_urls" "$op_who"
+			printf '%s' "$rs_urls"
 			return 0
 			;;
-		send*) : ;;
-		unknown*)
+		send) : ;;
+		unknown)
 			op_set "$ps_stage" unknown
 			printf '%s: %s を送ったか確定できない（%s）。自動では送り直さない。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
-				"$review_label" "$ps_stage" "${ps_verdict#unknown }" "$op_id" "$ps_stage" >&2
+				"$review_label" "$ps_stage" "$rs_why" "$op_id" "$ps_stage" >&2
 			return 1
 			;;
-		*)
-			printf '%s: %s の送信を照合できない（%s）。止めた。ホストで目印 ccnavi:op=%s stage=%s を探して確かめてください。\n' \
-				"$review_label" "$ps_stage" "${ps_verdict#stop }" "$op_id" "$ps_stage" >&2
-			return 1
-			;;
+		*) return 1 ;;
 		esac
 	fi
 	ps_text="$state/review-post-$$-$ps_stage.md"
