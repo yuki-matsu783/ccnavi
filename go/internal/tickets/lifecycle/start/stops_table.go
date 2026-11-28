@@ -36,7 +36,7 @@ var stops = map[string]stopText{
 	"issue-missing-create":     {"issue-missing", 2, "issue #{number} が見つからない、または読む権限がありません（{issue_why}）。番号を作らず、ユーザに確かめてください。issue が無ければ、--new-issue <タイトル> を先に打ち、作れなければユーザに作ってもらい、その番号で打ち直します（チケット作業は issue と MR のセットです）。"},
 	"issue-is-pr":              {"issue-is-pr", 2, "#{number} は issue ではなく PR です。MR の番号なら --mr {number} を使ってください。"},
 	"no-slug":                  {"no-slug", 2, "issue #{number} からブランチ名を作れませんでした（{issue_branch_why}）。--slug <語> を付けて再実行してください。"},
-	"id-unchecked":             {"id-unchecked", 1, "issue #{number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。"},
+	"id-unchecked":             {"id-unchecked", 1, "issue #{number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行してください。"},
 	"bad-branch":               {"bad-branch", 2, "ブランチ名 {new_branch} は使えない書き方です（--prefix・--slug を見直してください）。"},
 	"fetch-failed-integration": {"fetch-failed", 1, "統合先 {integration} を origin から取れなかった（上の出力を見てください）。"},
 	"no-origin-integration":    {"no-origin-integration", 1, "origin/{integration} がありません。統合先の名前を確かめてください。"},

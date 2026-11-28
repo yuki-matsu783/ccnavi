@@ -382,29 +382,39 @@ issue_state_gate() {
 	start_do issue-state "state=$issue_state_read" "number=$number" "real=$real_args" "reopened=$opt_reopened"
 }
 
-# issue の番号とタイトルから、新しい親のブランチ名（= 識別子）を実行ファイルに作らせる（`worktree issue-id`）。
-# Chrome 拡張の「始める」と同じ関数（`ids.IssueIdentifier`）なので、タイトルが短ければ同じ名前になる。
+# issue の番号と、タイトル（--slug を付けたときは、その語）から、新しい親のブランチ名（= 識別子）を実行ファイルに
+# 作らせる（`worktree issue-id`）。Chrome 拡張の「始める」と同じ関数（`ids.IssueIdentifier`）なので、タイトルが短ければ
+# 同じ名前になる。プロジェクトの issue なら slug の頭に付くプロジェクト名も含め、名前は実行ファイルだけが組む。
 # タイトルが長くて slug が途中で切れるときは、実行ファイルが `long yes` を返す（issue_branch_long）。拡張は切った名前で
 # 進めるが、ここでは短い --slug を付けさせて止める（エージェントがタイトルから短い語を考える）。
 # プロジェクト（projects/<名前>）のリポジトリなら、その名前を渡す（slug の頭に付く）。
-# 名前を issue_branch に入れる。実行ファイルが無い・答えないなら 1、作れないと言われたら 2（理由は issue_branch_why）
+# 名前を issue_branch に、その slug 部分を issue_slug に入れる。実行ファイルが無い・答えないなら 1、作れないと言われたら 2（理由は issue_branch_why）
 issue_branch=""
 issue_branch_why=""
 issue_branch_long=""
+issue_slug=""
 issue_branch_make() {
 	issue_branch=""
+	issue_slug=""
 	issue_branch_why=""
 	issue_branch_long=""
 	ib_project=$(ccnavi_project "$top" "$root")
+	ib_flag=--title
+	ib_word=$1
+	if [ -n "$opt_slug" ]; then
+		ib_flag=--slug
+		ib_word=$opt_slug
+	fi
 	if ib_bin=$(ccnavi_bin "$root"); then
 		ib_rc=0
-		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
+		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project "$ib_flag" "$ib_word" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
 	else
 		return 1
 	fi
 	issue_branch_why=$(tr -d '\r' <"$state/start-issue-id-$$" 2>/dev/null | head -n 1 | sed 's/^ccnavi: //')
 	rm -f "$state/start-issue-id-$$"
 	issue_branch=$(ccnavi_val1 id "$ib_out")
+	issue_slug=$(ccnavi_val1 slug "$ib_out")
 	issue_branch_long=$(ccnavi_val1 long "$ib_out")
 	[ -n "$issue_branch" ] && return 0
 	[ "$ib_rc" -ne 0 ] && return 2
@@ -1022,33 +1032,28 @@ if [ "$total" -eq 0 ]; then
 		3) stop issue-is-pr "number=${number}" ;;
 		esac
 	fi
-	if [ -n "$opt_slug" ]; then
-		slug="$opt_slug"
-		new_branch="${opt_prefix}-${number}-${slug}"
-	else
-		# タイトルが読めなければ slug を決められない（ホストに届かないなら代行を案内する）
-		if [ -z "$opt_title" ] && [ -z "$issue_title_read" ]; then
-			if [ "$host_rc" -eq 2 ]; then
-				stop_host title "$host_why"
-			fi
-			if [ "$issue_rc" -eq 1 ]; then
-				stop_host title "$(api_failed_reason)"
-			fi
+	# タイトルが読めなければ slug を決められない（ホストに届かないなら代行を案内する）。--slug を付けたなら要らない
+	if [ -z "$opt_slug" ] && [ -z "$opt_title" ] && [ -z "$issue_title_read" ]; then
+		if [ "$host_rc" -eq 2 ]; then
+			stop_host title "$host_why"
 		fi
-		ib_rc=0
-		issue_branch_make "${opt_title:-$issue_title_read}" || ib_rc=$?
-		case "$ib_rc" in
-		0) ;;
-		2) stop no-slug "number=${number}" "issue_branch_why=${issue_branch_why}" ;;
-		*) stop id-unchecked "number=${number}" ;;
-		esac
-		if [ "$issue_branch_long" = yes ]; then
-			# タイトルが長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
-			stop long-slug "number=$number" "branch=$issue_branch" "project=$ib_project" "real=$real_args"
+		if [ "$issue_rc" -eq 1 ]; then
+			stop_host title "$(api_failed_reason)"
 		fi
-		new_branch="$issue_branch"
-		slug="${new_branch#"${opt_prefix}-${number}-"}"
 	fi
+	ib_rc=0
+	issue_branch_make "${opt_title:-$issue_title_read}" || ib_rc=$?
+	case "$ib_rc" in
+	0) ;;
+	2) stop no-slug "number=${number}" "issue_branch_why=${issue_branch_why}" ;;
+	*) stop id-unchecked "number=${number}" ;;
+	esac
+	if [ "$issue_branch_long" = yes ]; then
+		# タイトルが長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
+		stop long-slug "number=$number" "branch=$issue_branch" "real=$real_args"
+	fi
+	new_branch="$issue_branch"
+	slug="$issue_slug"
 	ccnavi_is_branch "$new_branch" || stop bad-branch "new_branch=${new_branch}"
 	# 作る前に、既存の MR を採用するときと同じ識別子の確認をする。作ってから後のステップで詰まると、打ち直しても
 	# 採用の確認で止まり、手で消すまで戻れない

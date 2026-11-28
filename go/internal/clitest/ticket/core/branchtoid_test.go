@@ -28,13 +28,28 @@ func TestWorktreeIssueIDMakesTheBranchOfAnIssueAsChromeDoes(t *testing.T) {
 		{[]string{"7", "fix", "web"}, "ログイン画面", "fix-7-web-ログイン画面"},
 	} {
 		r := ticketkit.OK(t, ask(append(append([]string{"worktree", "issue-id"}, row.args...), "--title", row.title)...))
-		if got := strings.TrimSpace(r.Stdout); got != "id "+row.want {
+		slug := strings.SplitN(row.want, "-", 3)[2]
+		if got := strings.TrimSpace(r.Stdout); got != "id "+row.want+"\nslug "+slug {
 			t.Errorf("%s: %q", row.title, got)
+		}
+	}
+	// --slug を渡すと、タイトルの代わりにその語で名前を組む。プロジェクトの issue はプロジェクト名が付く
+	for _, row := range []struct {
+		args []string
+		slug string
+		want string
+	}{
+		{[]string{"7", "feature"}, "login-fix", "id feature-7-login-fix\nslug login-fix"},
+		{[]string{"7", "chore", "web"}, "login-fix", "id chore-7-web-login-fix\nslug web-login-fix"},
+	} {
+		r := ticketkit.OK(t, ask(append(append([]string{"worktree", "issue-id"}, row.args...), "--slug", row.slug)...))
+		if got := strings.TrimSpace(r.Stdout); got != row.want {
+			t.Errorf("--slug %s: %q", row.slug, got)
 		}
 	}
 	// タイトルが長くて slug を短くしたときは、`long yes` を添える（start.sh が短い --slug を求める）
 	long := ticketkit.OK(t, ask("worktree", "issue-id", "41", "feature", "--title", "テキスト整形CLI（main.sh）を README の仕様どおりに実装する"))
-	if got := strings.TrimSpace(long.Stdout); got != "id feature-41-テキスト整形cli-main-sh-を-readme\nlong yes" {
+	if got := strings.TrimSpace(long.Stdout); got != "id feature-41-テキスト整形cli-main-sh-を-readme\nslug テキスト整形cli-main-sh-を-readme\nlong yes" {
 		t.Errorf("長いタイトル: %q", got)
 	}
 	bad := ticketkit.Fails(t, ask("worktree", "issue-id", "7", "Bad-Prefix", "--title", "x"))

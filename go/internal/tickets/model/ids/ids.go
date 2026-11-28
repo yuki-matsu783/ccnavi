@@ -211,8 +211,10 @@ type IssueError struct{ fault.Detail }
 // IssueIdentifier は issue から親の識別子 `<prefix>-<番号>-<slug>` を決め、タイトルが長くて slug を短くしたかを
 // 添える。プロジェクトの issue なら slug の頭に `<プロジェクト名>-` を付ける（issue の番号はリポジトリごと）。
 // 全体は SuggestedIDLength 文字に収め、末尾が `-<2 桁>` になるときはその部分を除く。
+// slug を渡したときは、タイトルの代わりにその語を使い、`<プロジェクト名>-` を同じく頭に付ける（切らず、長さと末尾の
+// 検査は呼び手が識別子として確かめる）。
 // 「issue → 識別子」はこの 1 つだけ。作れなければ *IssueError。
-func IssueIdentifier(number int, title, project, prefix string) (string, bool, error) {
+func IssueIdentifier(number int, title, slug, project, prefix string) (string, bool, error) {
 	fail := func(detail string) (string, bool, error) {
 		return "", false, &IssueError{fault.New("ERROR_ISSUE_IDENTIFIER", fault.Values{"detail": detail}, detail)}
 	}
@@ -229,7 +231,10 @@ func IssueIdentifier(number int, title, project, prefix string) (string, bool, e
 	if project != "" {
 		head += project + "-"
 	}
-	slug := issueSlug(title, SuggestedIDLength-runes(head))
+	if slug != "" {
+		return head + slug, false, nil
+	}
+	slug = issueSlug(title, SuggestedIDLength-runes(head))
 	// NFKC で字数が増えるタイトルでも切られないよう、十分大きい上限で全体の slug を作る。
 	shortened := runes(slug) < runes(issueSlug(title, 1_000_000))
 	ident := head + slug

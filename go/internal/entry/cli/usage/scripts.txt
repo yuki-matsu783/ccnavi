@@ -139,10 +139,12 @@
         （ccnavi-worktree.sh 用。sh が取った fetch の出力と ls-remote --heads の応答（heads が空なら取れなかった）から、
          origin とのずれ・書きかけ・確認コードを決め、確認が要れば報告して終了コード 3 を返す答えを出し、要らなければ
          記録（ccnavi-direct/<名前>）を書いてワークツリーを切ります）
-    ccnavi worktree issue-id <number> <prefix> [<project>] --title <title>
-        （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" を
-         出力します。Chrome 拡張の「始める」と同じ作り方です。タイトルが長くて slug を
-         語の区切りで切ったときは、続けて "long yes" を出力します）
+    ccnavi worktree issue-id <number> <prefix> [<project>] (--title <title> | --slug <word>)
+        （ccnavi-start.sh 用。issue から新しい親のブランチ名（= 識別子）を作り、"id <名前>" と
+         "slug <名前の slug 部分>" を出力します。Chrome 拡張の「始める」と同じ作り方です。
+         --slug を渡すと、タイトルの代わりにその語を使い（プロジェクトの issue は
+         <project>- を頭に付けます）、切りません。タイトルが長くて slug を語の区切りで切ったときは、
+         続けて "long yes" を出力します）
     ccnavi write-and-push family <id>
         （write-and-push 用。"write-and-push 1" の行に続いて、
         親子のチケット・リポジトリ・write-and-push の対象か

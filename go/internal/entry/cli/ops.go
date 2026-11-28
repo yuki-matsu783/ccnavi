@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strings"
 
 	"ccnavi/internal/entry/status"
 	"ccnavi/internal/infra/config"
@@ -280,7 +281,7 @@ func ticketOrReview(stdout, stderr io.Writer, conf *config.Settings, root string
 const worktreeUsage = "ccnavi: worktree drop <名前> か worktree clean <名前> [--preview] か worktree tidy <親> [--phase <N>]" +
 	" か worktree remaining <親> か worktree retire <親> か worktree retire --abandon <親>" +
 	" か worktree branch <名前> [confirmed] か worktree direct plan|cut …" +
-	" か worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>\n"
+	" か worktree issue-id <番号> <先頭の語> [<プロジェクト>] (--title <タイトル> | --slug <語>)\n"
 
 // worktree は `worktree drop|clean|tidy|remaining|retire|branch|direct|issue-id …`。sh が状態を書く操作の後に呼ぶ。
 // 名前は、clean 以外は識別子の形だけを受ける（パスを渡して任意の場所を消させない。clean は RunClean が置き場の直下の
@@ -346,8 +347,8 @@ func worktree(stdout, stderr io.Writer, conf *config.Settings, root string, a op
 	return okIf(worktrees.RunTidy(stdout, conf, root, target, phaseNo, cwd) == 0)
 }
 
-// issueID は `worktree issue-id <番号> <先頭の語> [<プロジェクト>] --title <タイトル>`。issue から新しい親のブランチ名
-// （= 識別子）を作る（Chrome の「始める」と同じ関数）。
+// issueID は `worktree issue-id <番号> <先頭の語> [<プロジェクト>] (--title <タイトル> | --slug <語>)`。issue から新しい
+// 親のブランチ名（= 識別子）を作る（Chrome の「始める」と同じ関数）。--slug はタイトルの代わりに語を渡す。
 func issueID(stdout, stderr io.Writer, root string, a opts, words []string) int {
 	number := 0
 	if pyfmt.IsDigit(words[2]) {
@@ -362,11 +363,12 @@ func issueID(stdout, stderr io.Writer, root string, a opts, words []string) int 
 	if len(words) == 5 {
 		project = words[4]
 	}
-	ident, shortened, err := ids.IssueIdentifier(number, a.Str("title"), project, words[3])
+	ident, shortened, err := ids.IssueIdentifier(number, a.Str("title"), a.Str("slug"), project, words[3])
 	if err != nil {
 		return finish(stderr, root, config.ExitError, err)
 	}
 	fmt.Fprintf(stdout, "id %s\n", ident)
+	fmt.Fprintf(stdout, "slug %s\n", strings.TrimPrefix(ident, fmt.Sprintf("%s-%d-", words[3], number)))
 	if shortened {
 		// タイトルが長くて slug を短くした。ccnavi-start.sh は短い --slug を付けさせる。
 		fmt.Fprintln(stdout, "long yes")

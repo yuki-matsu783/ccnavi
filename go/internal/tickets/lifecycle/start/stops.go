@@ -62,9 +62,6 @@ var asks = map[string]func(root string, kv map[string]string, o *outcome){
 	"long-slug": func(root string, kv map[string]string, o *outcome) {
 		o.Err("ccnavi-start: issue #" + kv["number"] + " のタイトルが長く、タイトルから作る名前 " + kv["branch"] + " は途中で切れます。ブランチは作らずに止めました（--new-issue から来たときの issue は作成済み）。")
 		o.Err(texts.Say(root, "NOTE_START_SLUG_SHORT", nil, nil))
-		if kv["project"] != "" {
-			o.Err(texts.Say(root, "NOTE_START_SLUG_PROJECT", texts.Values{"project": kv["project"]}, nil))
-		}
 		o.Err(texts.Say(root, "NEXT_START_LONG_SLUG", texts.Values{"real_args_q": kv["real"]}, nil))
 		o.Exit(exitUsage)
 	},
