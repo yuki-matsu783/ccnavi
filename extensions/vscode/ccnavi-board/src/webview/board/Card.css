@@ -143,7 +143,7 @@ a.card-button, a.card-button:hover, a.card-button:focus, a.card-button:active { 
 .card-button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
 .card-button.primary, a.card-button.primary, a.card-button.primary:hover { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
 .card-button.primary:hover { background: var(--vscode-button-hoverBackground); }
-.card-button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
+.card-button:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; border-color: transparent; }
 /* 補助の操作（フロー・計画編集・テンプレートの下書き）。通常の色 */
 .card-actions { display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-3); margin-top: 8px; min-width: 0; }
 
