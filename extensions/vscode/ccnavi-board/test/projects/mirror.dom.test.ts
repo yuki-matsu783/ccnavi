@@ -115,7 +115,7 @@ test("CB-D736 同期中はどのボタンも押せない。終われば（busy�
 test("CB-D737 確認できない・コピーするものが無いときは帯に理由を出し、ボタンは押せない", async () => {
   const cases: [MirrorStatus, RegExp][] = [
     [{ kind: "failed", error: "60秒で中断しました" }, /確認できませんでした。60秒で中断しました/],
-    [{ kind: "ok", list: list({ ok: false, error: "共通レイヤーを読み込めません" }) }, /確認できませんでした。共通レイヤーを読み込めません/],
+    [{ kind: "ok", list: list({ ok: false, error: "共通設定を読み込めません" }) }, /確認できませんでした。共通設定を読み込めません/],
     [{ kind: "ok", list: list({ common_empty: true }) }, /コピーするものがありません/],
   ];
   for (const [status, banner] of cases) {

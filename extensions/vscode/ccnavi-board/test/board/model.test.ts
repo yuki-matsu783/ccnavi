@@ -69,7 +69,7 @@ test("CB-T110 layers[]からルールファイルの置き場を読み、欠け�
   ]);
 });
 
-test("CB-T318 sums[]を読む。ワークスペースの統合結果（共通 + 自身）が先で、欠けた欄は空で補い、sumsがなければ空", () => {
+test("CB-T318 sums[]を読む。ワークスペースの統合結果（共通設定 + ワークスペースの設定）が先で、欠けた欄は空で補い、sumsがなければ空", () => {
   const board = fixture();
   assert.deepEqual(board.sums.map((s) => s.name), ["self"]);
   const self = board.sums[0];
@@ -79,7 +79,7 @@ test("CB-T318 sums[]を読む。ワークスペースの統合結果（共通 + 
   assert.deepEqual(self.rules.deny.map((r) => [r.id, r.source, r.match, r.kind]), [["guard-approved", "common", "Write|Edit|NotebookEdit", "glob"]]);
   assert.deepEqual(self.risk.levels, { medium: 20, high: 40, critical: 70 });
   assert.equal(self.risk.fallback, "");
-  // フェーズ定義は共通 + 自身の設定の和。この見本の共通の設定には定義が無いので、自身の設定の定義だけが載る
+  // フェーズ定義は共通設定にワークスペースの設定を足した統合結果。この見本の共通設定には定義が無いので、ワークスペースの設定のフェーズ定義だけが載る
   // 定義は順序を持たない（順序は親の計画のステップのafter）。先行関係（order）の欄は実行ファイルも渡さず、拡張も読まない
   assert.ok(!("order" in self.phases), JSON.stringify(self.phases));
   assert.deepEqual(self.phases.types.map((t) => t.id).slice(0, 2), ["research", "design"]);

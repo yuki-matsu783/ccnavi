@@ -71,8 +71,8 @@ func Start(stdout, stderr io.Writer, conf *config.Settings, root, id string) int
 		}
 	}
 	if found.Project != "" && !found.IsChild() {
-		// 共通レイヤーと工程スキルのコピーは、ここでは書かない（発言ごとの写しが置く）。
-		io.WriteString(stdout, "共通レイヤーと工程スキルのプロジェクトへのコピーは、次のユーザの発言で置かれる\n")
+		// 共通設定と工程スキルのコピーは、ここでは書かない（発言ごとの写しが置く）。
+		io.WriteString(stdout, "共通設定と工程スキルのプロジェクトへのコピーは、次のユーザの発言で置かれる\n")
 	}
 	// 4. 次の一手の案内。子の無いフェーズが残る親には、その案内だけを出す。
 	childless := plan.ChildlessNotice(conf, root, found)

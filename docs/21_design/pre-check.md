@@ -326,7 +326,7 @@ ccnavi は判定を返さず、Claude Code の権限モードに従う（REQ-PRE
 jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort | uniq -c | sort -rn
 ```
 
-`CCNAVI_GUARD_UNWATCHED=disable` と書いたレイヤーがあると、`--lint` が切れていることを warn で知らせる。
+`CCNAVI_GUARD_UNWATCHED=disable` と書いた設定があると、`--lint` が切れていることを warn で知らせる。
 
 確認と拒否の回の文面は、結末と読み切れたかの組で次の一手を変える（`reasons.Undeclared`）。
 
@@ -404,8 +404,8 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 
 | 何を | どうするか |
 |---|---|
-| 読むレイヤー | 共通レイヤーとワークスペース自身のレイヤーだけ（`ruleload.StopRules`）。プロジェクトのレイヤーは外のリポジトリにあり、そこに書いた 1 行が cwd に依らずメインのターンを止めることになり、ミラー（11.12）をワークスペースの中で読むと同じルールを二重に数える |
-| 同じ id | レイヤーの前置きを除いた id が同じなら、最初の 1 本だけ |
+| 読む設定 | 共通設定とワークスペースの設定だけ（`ruleload.StopRules`）。プロジェクトの設定は外のリポジトリにあり、そこに書いた 1 行が cwd に依らずメインのターンを止めることになり、ミラー（11.12）をワークスペースの中で読むと同じルールを二重に数える |
+| 同じ id | 設定の前置きを除いた id が同じなら、最初の 1 本だけ |
 | `every` | 2 より小さいものは実行時にも使わない（ターンの終わりのたびに止まる） |
 | 本文のファイル | ワークスペースルートの版だけを読む。ワークツリーやプロジェクトにある版はエージェントが書き換えられる |
 | 前置き | 「タスクの続きではない。振り返りだけをする。ユーザへの問い・確認で終わったターンなら、その問いを最後にもう一度書く。何も無ければ『振り返り: 無し』とだけ答える」。実行ファイルが持ち、ルールの文やファイルが何であっても付く |
@@ -421,7 +421,7 @@ jq -r 'select(.decision == "handover") | .subject' logs/decisions.jsonl | sort |
 | `dry-run` | `enable` と同じく止める（`finish` の促しと同じ） |
 
 - 保護領域の報告（7.4）と繰り返しの拒否の知らせは、止めたときも同じ応答の `systemMessage` に載る
-- `--lint` は warn で言う: `deny` / `ask` に書いたもの（`Bash|Stop` なら `Stop` の部分だけ）、プロジェクトのレイヤーに書いたもの、`(stop)` にヒットしない表記、`every` の無いもの
+- `--lint` は warn で言う: `deny` / `ask` に書いたもの（`Bash|Stop` なら `Stop` の部分だけ）、プロジェクトの設定に書いたもの、`(stop)` にヒットしない表記、`every` の無いもの
 - `--test Stop "(stop)"` と期待（`tool: Stop`）は、使われるルールを並べる。あれば `allow`、無ければ判定に入らない（10 章）
 - 書いたルールが無ければ、止めない
 

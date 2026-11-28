@@ -8,7 +8,7 @@ import (
 
 // proposal のテスト（承認・計画の編集・候補・送る入口）が使うワークスペースと提案の見本。
 
-// ProposalWorkspace は Workspace に、共通レイヤーの phases.yml（proposalPhases と proposalExtraType）と
+// ProposalWorkspace は Workspace に、共通設定の phases.yml（proposalPhases と proposalExtraType）と
 // ticket-sections.yml（Sections）を置く。
 func ProposalWorkspace(t *testing.T, worktrees ...string) string {
 	t.Helper()
@@ -18,7 +18,7 @@ func ProposalWorkspace(t *testing.T, worktrees ...string) string {
 	return root
 }
 
-// Sections は提案の本文に求める見出しの見本（リポジトリの共通レイヤーの ticket-sections.yml と同じ見出し）。
+// Sections は提案の本文に求める見出しの見本（リポジトリの共通設定の ticket-sections.yml と同じ見出し）。
 const Sections = `version: 1
 parent:
   - {name: 目的, todo: （ここにこの作業の目的を書く）}
@@ -32,13 +32,13 @@ child:
   - {name: 確認の手順}
 `
 
-// PutSections は共通レイヤーに ticket-sections.yml（Sections）を置く。
+// PutSections は共通設定に ticket-sections.yml（Sections）を置く。
 func PutSections(t *testing.T, root string) {
 	t.Helper()
 	Put(t, filepath.Join(root, ".ccnavi", "config", "common", "ticket-sections.yml"), Sections)
 }
 
-// proposalPhases は提案の見本の定義のコピー（phases: の欄）。共通レイヤーの phases.yml にも同じ定義を置く。
+// proposalPhases は提案の見本の定義のコピー（phases: の欄）。共通設定の phases.yml にも同じ定義を置く。
 const proposalPhases = `phases:
   research:
     kind: work

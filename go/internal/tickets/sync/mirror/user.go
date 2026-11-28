@@ -62,11 +62,11 @@ func (p *Project) expect() string {
 // Plan は Prepare の結果。
 type Plan struct {
 	Projects []*Project
-	// Error は全体を止める誤り（共通レイヤーが読めない、名前がプロジェクトに無いなど）。
+	// Error は全体を止める誤り（共通設定が読めない、名前がプロジェクトに無いなど）。
 	Error string
 	// CommonEmpty は写すものが無い（正常。揃えても何も起きない）。
 	CommonEmpty bool
-	// CommonPath はワークスペースの共通レイヤーの置き場（絶対）。
+	// CommonPath はワークスペースの共通設定の置き場（絶対）。
 	CommonPath string
 }
 
@@ -91,7 +91,7 @@ func (p *Plan) Expect() string {
 }
 
 // expectOf は名前順に、名前と変更（パス・種類・中身の要約）を長さ付きで連結した SHA-256。中身まで入れるのは、
-// 同じ名前のファイルで共通レイヤーの中身だけが変わったときに、見せていない内容を書かないため。
+// 同じ名前のファイルで共通設定の中身だけが変わったときに、見せていない内容を書かないため。
 func expectOf(projects []*Project) string {
 	sum := digest.New(digest.SHA256)
 	framed := func(value string) {
@@ -119,7 +119,7 @@ func expectOf(projects []*Project) string {
 }
 
 // Prepare はミラーの状態を調べる。何も書かない。wanted が空なら全プロジェクト。名前は大文字小文字を区別しない。
-// 共通レイヤーか工程スキルが読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
+// 共通設定か工程スキルが読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
 func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 	// 1. 対象のプロジェクトを決める。名前は大文字小文字を区別せず、見つからない名前が 1 つでもあれば全体を止める。
 	plan := &Plan{CommonPath: conf.CommonLayerDir(root)}
@@ -143,7 +143,7 @@ func Prepare(conf *config.Settings, root string, wanted []string) *Plan {
 			return plan
 		}
 	}
-	// 2. 写し元（共通レイヤーと工程スキル）を読む。読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
+	// 2. 写し元（共通設定と工程スキル）を読む。読めなければ、どのプロジェクトでも同じ理由なので全体の誤りにする。
 	commonFiles, why := commonSources(conf, root)
 	var skillFiles map[string][]byte
 	if why == "" {

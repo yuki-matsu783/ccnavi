@@ -45,16 +45,16 @@ const (
 	msgLinkOnWay   = "取り込み先の途中にリンクがあるか、ツリーの外を指すので書かない"
 	msgTargetBad   = "取り込み先には書かない（%s）"
 	msgCannotMake  = "取り込み先 %s が無い。この種類（%s）は新しく作れない"
-	msgNotLayer    = "projects/%s はレイヤーとして読まれるプロジェクトではない（取り込んでも使われない）"
-	msgLayerAway   = "projects/%s のレイヤーの置き場がこのツリーの外にある"
-	msgMirror      = "このツリーの `.ccnavi/config/common/` は共通レイヤーのコピー（ミラー）なので書かない。" +
+	msgNotLayer    = "projects/%s は設定として読まれるプロジェクトではない（取り込んでも使われない）"
+	msgLayerAway   = "projects/%s の設定の置き場がこのツリーの外にある"
+	msgMirror      = "このツリーの `.ccnavi/config/common/` は共通設定のコピー（ミラー）なので書かない。" +
 		"ワークスペースのツリーで取り込む"
 )
 
 // gitPrefix で始まる要素（.git・.gitmodules など）には取り込まない。
 const gitPrefix = ".git"
 
-// projectsPart は取り込み先のパスの先頭で、プロジェクトのレイヤーを指す要素。
+// projectsPart は取り込み先のパスの先頭で、プロジェクトの設定を指す要素。
 const projectsPart = "projects"
 
 // Entry は下書き 1 本。Rel は取り込み先のツリーからの相対パス（読み替えを戻した形）。Errors があれば取り込まない。
@@ -65,7 +65,7 @@ type Entry struct {
 	// target は取り込み先の絶対パス、raw と current は下書きと取り込み先のバイト列（無ければ nil）。
 	key, draft, drel, target string
 	raw, current             []byte
-	// layer はテンプレートとレイヤーの設定のレイヤー（common・self・プロジェクト）、configKind はレイヤーの設定の種類。
+	// layer はテンプレートと設定の持ち主（common・self・プロジェクト）、configKind は設定の種類。
 	layer      string
 	configKind config.LayerKind
 	Errors     []string
@@ -316,8 +316,8 @@ func inside(root, path string) bool {
 	return strings.HasPrefix(full, base+ospath.Sep)
 }
 
-// locateLayer はテンプレートとレイヤーの設定のレイヤーを決める。読まれない置き場なら断る。
-// 文面ファイルはレイヤーを持たない（projects/<名前>/.ccnavi/messages/ は表が許さない）。
+// locateLayer はテンプレートと設定の置き場を決める。読まれない置き場なら断る。
+// 文面ファイルは設定を持たない（projects/<名前>/.ccnavi/messages/ は表が許さない）。
 func locateLayer(conf *config.Settings, root string, e *Entry) {
 	if e.Kind.ID != Template && e.Kind.ID != layerConfig {
 		return

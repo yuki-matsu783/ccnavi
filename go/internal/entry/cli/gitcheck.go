@@ -62,7 +62,7 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 		}
 	}
 	// 直接作業の取り込みは、ラッパーがロックを取ってから `git integrate` を呼ぶ。ロックを分ける名前（cwd のツリーの
-	// プロジェクト。ワークスペース自身は self）をここで答える。
+	// プロジェクト。ワークスペースは self）をここで答える。
 	if len(args) > 0 && (args[0] == "integrate" || args[0] == "integrate-done") {
 		here, _ := tree.TreeOf(root, cwd, integrate.ProjectsDir(conf, root))
 		lines = append(lines, "repo "+tree.RepoKey(here.Project))

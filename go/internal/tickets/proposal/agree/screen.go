@@ -126,7 +126,7 @@ func originLine(t *ticket.Ticket) string {
 }
 
 // screen は承認を求める画面。最初に「何が新たに書けるようになるか」を置き、子が編集できる範囲（親をどこまで
-// 絞ったか）・人間レビューの要否・計画を並べる。定義は候補が持つもの（チケットごとにレイヤーが違いうる）を使う。
+// 絞ったか）・人間レビューの要否・計画を並べる。定義は候補が持つもの（チケットごとに設定が違いうる）を使う。
 func screen(batch []*candidates.Candidate, pool map[string]*ticket.Ticket) string {
 	lines := []string{fmt.Sprintf("チケットの承認リクエスト: %d 件", len(batch))}
 	for _, cand := range batch {

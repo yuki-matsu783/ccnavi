@@ -107,7 +107,7 @@ func layerJSON(l *LayerRead) *pyjson.Object {
 }
 
 // AsJSON は ccnavi --templates --json の答え。templates は共通 + layer の統合結果（共通の側は統合結果のフェーズ
-// 定義で検査し直す。keywords で絞る）、layers は各レイヤーの生の中身、sums はレイヤーごとの統合結果の索引。
+// 定義で検査し直す。keywords で絞る）、layers は各設定の生の中身、sums は設定ごとの統合結果の索引。
 func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords []string) *pyjson.Object {
 	chosen := []any{}
 	for _, e := range s.checked(conf, root, layer) {
@@ -142,7 +142,7 @@ func AsJSON(conf *config.Settings, root string, s *Scan, layer string, keywords 
 		"errors", counts[rules.Error], "warns", counts[rules.Warn], "infos", counts[rules.Info])
 }
 
-// checked は、レイヤー layer で採るテンプレート（共通の側は、統合結果のフェーズ定義で検査し直したもの）。
+// checked は、設定 layer で採るテンプレート（共通の側は、統合結果のフェーズ定義で検査し直したもの）。
 func (s *Scan) checked(conf *config.Settings, root, layer string) []*Entry {
 	var types *phases.Types
 	if s.layer(layer) != nil {
@@ -158,7 +158,7 @@ func (s *Scan) checked(conf *config.Settings, root, layer string) []*Entry {
 	return out
 }
 
-// UsableCount は、レイヤー layer で使えるテンプレートの数（ccnavi --templates --json の usable が真のもの）。
+// UsableCount は、設定 layer で使えるテンプレートの数（ccnavi --templates --json の usable が真のもの）。
 func UsableCount(conf *config.Settings, root string, s *Scan, layer string) int {
 	n := 0
 	for _, e := range s.checked(conf, root, layer) {
@@ -171,7 +171,7 @@ func UsableCount(conf *config.Settings, root string, s *Scan, layer string) int 
 
 // CheckFile は任意のパスのテンプレートを検査した答え（--templates --check-file）。書かない。名前の期待値は
 // ファイル名から拡張子を除いたもの。data は読んだ中身の写し（読めなければ null）で、呼び手が「書こうとした
-// 中身を実行ファイルがそのまま読んだか」を見るのに使う。types はこのレイヤーで使えるフェーズ定義。
+// 中身を実行ファイルがそのまま読んだか」を見るのに使う。types はこの設定で使えるフェーズ定義。
 func CheckFile(conf *config.Settings, root, path, layer string) *pyjson.Object {
 	base, stem := stemOf(path)
 	types := TypesFor(conf, root, layer)

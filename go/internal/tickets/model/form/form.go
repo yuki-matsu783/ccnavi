@@ -101,7 +101,7 @@ func headings(body string) map[string]bool {
 
 // Problems は提案の形式の苦情。目印（rationale の目印と sections の各見出しの目印）の残りは新規の提案なら error、
 // 改版（revision）なら warn（承認済みチケットのコピーなので、残りで止めない）。見出しの欠けは新規の提案（親と子）
-// だけを warn で言う。求める見出しは sections（その提案のレイヤーの ticket-sections.yml）。
+// だけを warn で言う。求める見出しは sections（その提案の設定の ticket-sections.yml）。
 func Problems(t *ticket.Ticket, revision bool, sections Sections) []rules.Problem {
 	var out []rules.Problem
 	severity := rules.Error

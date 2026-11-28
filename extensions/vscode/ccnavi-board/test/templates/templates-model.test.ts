@@ -143,7 +143,7 @@ test("CB-T544 BMPの外の書式文字は \\Uで見せ、通常の日本語と�
   assert.equal(revealControls("日本語の本文 😀"), "日本語の本文 😀");
 });
 
-test("CB-T545 本文を読むレイヤーは、projectなら名前、それ以外はself", () => {
+test("CB-T545 本文を読む設定は、projectなら名前、それ以外はself", () => {
   assert.equal(templatesLayerOf({ kind: "project", name: "lib" }), "lib");
   assert.equal(templatesLayerOf({ kind: "workspace", name: "" }), "self");
   assert.equal(templatesLayerOf({ kind: "self", name: "self" }), "self");

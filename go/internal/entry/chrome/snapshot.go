@@ -120,7 +120,7 @@ func readSnapshot(req *pyjson.Object) (*snapshot, error) {
 			return nil, refusedf("プロジェクト名が不正です：%s", pyfmt.Repr(project))
 		}
 		if config.IsReservedLayerName(text) {
-			return nil, refusedf("プロジェクト名 %s はレイヤー名として予約されています（common・self）", text)
+			return nil, refusedf("プロジェクト名 %s は設定の名前として予約されています（common・self）", text)
 		}
 		ws, _ := raw.Value("workspace").(*pyjson.Object)
 		var wsInteg *pyjson.Object
@@ -178,7 +178,7 @@ func (s *snapshot) has(name string) bool {
 // isAbsent はsnapshot の absent に載った（ホストが読めなかった）ブランチか。
 func (s *snapshot) isAbsent(name string) bool { return slices.Contains(s.absent, name) }
 
-// workspaceFiles はワークスペースの統合先の中身（共通レイヤー・設定・互換のマーカー）。ワークスペース自身なら統合先。
+// workspaceFiles はワークスペースの統合先の中身（共通設定・設定・互換のマーカー）。ワークスペースなら統合先。
 func (s *snapshot) workspaceFiles() *branch {
 	if s.project != "" {
 		return s.workspace

@@ -88,7 +88,7 @@ func (f *Families) Standing(family, project string) Standing {
 
 // StandingAny はリポジトリの分からない親子のチケットの立ち位置。同じ名前の親のワークツリーのあるリポジトリを
 // 全部探し、2 つ以上にあればどれとも決めずに止める（ワークスペースの web-i0012 と、プロジェクト web の issue 12
-// の親子のチケットなど）。どこにも無ければワークスペース自身として引く（親のワークツリーが無いので止まる）。
+// の親子のチケットなど）。どこにも無ければワークスペースとして引く（親のワークツリーが無いので止まる）。
 func (f *Families) StandingAny(family string) Standing {
 	var repos []string
 	for _, w := range f.Worktrees() {

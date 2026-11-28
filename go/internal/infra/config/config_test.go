@@ -308,7 +308,7 @@ func TestIntAndFinite(t *testing.T) {
 	}
 }
 
-// 診断の差し替え（--project-rules-file など）は、レイヤーの名前を大文字小文字を区別せずに引く。
+// 診断の差し替え（--project-rules-file など）は、設定の名前を大文字小文字を区別せずに引く。
 func TestLayerPathSwapsIgnoreCase(t *testing.T) {
 	s := &Settings{ProjectRulesFiles: map[string]string{"Alpha": "/swap/rules.yml"}}
 	home := filepath.Join(string(filepath.Separator)+"ws", "projects", "alpha")

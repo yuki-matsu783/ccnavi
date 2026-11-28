@@ -27,14 +27,14 @@ func TestLoadFallsBackToTheBuiltin(t *testing.T) {
 	if len(problems) != 0 || d.Source != Builtin || len(d.Factors) != 4 || d.Fallback != "" {
 		t.Errorf("無いファイル: %#v %v", d, problems)
 	}
-	// UTF-8 として読めない定義は、共通レイヤーなら組み込みへ、レイヤーなら空にして苦情を返す。
+	// UTF-8 として読めない定義は、共通設定なら組み込みへ、設定なら空にして苦情を返す。
 	path := testkit.Put(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 1\nfactors: [{id: a, message: \xff\xfe\x80}]\n")
 	d, problems = Load(path)
 	if d.Source != Builtin || !strings.Contains(d.Fallback, "を読めない ('utf-8' codec can't decode byte 0xff") || len(problems) != 1 {
 		t.Errorf("読めない: %#v %v", d, problems)
 	}
 	if layer, problems := LoadLayer(path, scriptHomes); layer != nil || len(problems) != 1 {
-		t.Errorf("読めないレイヤー: %v %v", layer, problems)
+		t.Errorf("読めない設定: %v %v", layer, problems)
 	}
 	broken := testkit.Put(t, filepath.Join(t.TempDir(), "risks.yml"), "version: 2\n")
 	if d, _ := Load(broken); d.Source != Builtin || d.Fallback != broken+" が不正。組み込みの配点で数える" {
@@ -61,37 +61,37 @@ func TestLayerDefinition(t *testing.T) {
 	if d, notes := LayerDefinition(conf, root, ""); d.Source != Builtin || len(d.Factors) != 4 || notes != nil {
 		t.Errorf("組み込み: %v %v", factorIDs(d), notes)
 	}
-	// 共通レイヤーだけが無ければ、共通レイヤーは空として、レイヤーの項目だけを数える。
+	// 共通設定だけが無ければ、共通設定は空として、設定の項目だけを数える。
 	testkit.Put(t, layer, factors("  - {id: own, points: 5, files_over: 1}"))
 	d, _ := LayerDefinition(conf, root, "")
 	if got := factorIDs(d); !reflect.DeepEqual(got, []string{"own@self"}) || d.Factors[0].home != root {
-		t.Errorf("レイヤーだけ: %v", got)
+		t.Errorf("設定だけ: %v", got)
 	}
 	testkit.Put(t, conf.Risk, sampleRisk)
 	d, notes := LayerDefinition(conf, root, "")
 	if got := factorIDs(d); len(got) != 7 || got[6] != "own@self" || len(notes) != 0 {
 		t.Errorf("和: %v %v", got, notes)
 	}
-	// レイヤーが壊れていれば空として数え、そのことを fallback に言う。
+	// 設定が壊れていれば空として数え、そのことを fallback に言う。
 	testkit.Put(t, layer, "version: 1\nfactors: x\n")
 	d, notes = LayerDefinition(conf, root, "")
-	if len(d.Factors) != 6 || d.Fallback != "self の配点が不正。このレイヤーは空として数える" ||
+	if len(d.Factors) != 6 || d.Fallback != "self の配点が不正。この設定は空として数える" ||
 		!reflect.DeepEqual(d.Dropped, []string{"self"}) || len(notes) != 1 {
-		t.Errorf("壊れたレイヤー: %v %q %v", factorIDs(d), d.Fallback, notes)
+		t.Errorf("壊れた設定: %v %q %v", factorIDs(d), d.Fallback, notes)
 	}
-	// 合成で閾値が逆転すれば、レイヤーを空として数える。
+	// 合成で閾値が逆転すれば、設定を空として数える。
 	testkit.Put(t, layer, "version: 1\nlevels: {high: 39, critical: 39}\n")
 	testkit.Put(t, conf.Risk, "version: 1\nlevels: {medium: 40, high: 60}\n")
 	d, notes = LayerDefinition(conf, root, "")
-	if d.Fallback != "self の配点の閾値が合成で逆転している。このレイヤーは空として数える" || len(notes) != 1 || notes[0].Rule != levelsWhere {
+	if d.Fallback != "self の配点の閾値が合成で逆転している。この設定は空として数える" || len(notes) != 1 || notes[0].Rule != levelsWhere {
 		t.Errorf("逆転: %q %v", d.Fallback, notes)
 	}
-	// 共通レイヤーが壊れていれば組み込みに戻り、レイヤーを足さない。
+	// 共通設定が壊れていれば組み込みに戻り、設定を足さない。
 	testkit.Put(t, conf.Risk, "version: 9\n")
 	if d, notes := LayerDefinition(conf, root, ""); d.Source != Builtin || d.Fallback == "" || notes != nil {
 		t.Errorf("壊れた共通: %#v %v", d, notes)
 	}
-	// 予約名のプロジェクトはレイヤーとして数えない（配点を書ける側がレイヤーを選べないように）。
+	// 予約名のプロジェクトは設定として数えない（配点を書ける側が設定を選べないように）。
 	testkit.Put(t, conf.Risk, sampleRisk)
 	if d := LoadDefinition(conf, root, config.LayerSelf); len(d.Factors) != 6 {
 		t.Errorf("予約名: %v", factorIDs(d))

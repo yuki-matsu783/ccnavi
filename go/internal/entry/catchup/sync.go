@@ -231,7 +231,7 @@ func yesNo(b bool) string {
 
 // ---- リポジトリごと
 
-// label はリポジトリの文の頭（ワークスペース自身は空、プロジェクトは `<名前>: `）。
+// label はリポジトリの文の頭（ワークスペースは空、プロジェクトは `<名前>: `）。
 func label(key string) string {
 	if key == tree.Self {
 		return ""

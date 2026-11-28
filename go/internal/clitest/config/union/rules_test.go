@@ -10,21 +10,21 @@ import (
 	"testing"
 )
 
-// 設定 3 本の和の受入テスト。rules の合成。
+// 設定 3 本の統合結果の受入テスト。rules の合成。
 //
-// レイヤーは 3 種。共通レイヤー（`.ccnavi/config/common/`）、ワークスペース自身のレイヤー、プロジェクトのレイヤー。
-// lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無いレイヤー = 空）。
+// 設定は 3 種。共通設定（`.ccnavi/config/common/`）、ワークスペースの設定、プロジェクトの設定。
+// lib は 3 本とも持ち、app は `.ccnavi/` を持たない（無い設定 = 空）。
 
 func p(parts ...string) string { return filepath.Join(parts...) }
 
-// Write / Edit は共通レイヤー + 行き先のレイヤーの和。
+// Write / Edit は共通設定に行き先の設定を足した統合結果。
 
 func TestEachLayerDenyAppliesToItsOwnFiles(t *testing.T) {
 	t.Parallel()
 	w := newWS(t, configws.KindBase)
-	// id は共通レイヤーなら裸、プロジェクトのレイヤーなら `lib:`、自身のレイヤーなら `self:` が付く。
-	// 記録の source はそのレイヤー、project は行き先のプロジェクトで、ワークスペースのファイルなら持たない。
-	// cwd は行き先と別の側に置く。レイヤーを選ぶのは行き先で、cwd ではない。
+	// id は共通設定なら裸、プロジェクトの設定なら `lib:`、ワークスペースの設定なら `self:` が付く。
+	// 記録の source はその設定、project は行き先のプロジェクトで、ワークスペースのファイルなら持たない。
+	// cwd は行き先と別の側に置く。設定を選ぶのは行き先で、cwd ではない。
 	for _, c := range []struct {
 		source, target, cwd, id, message string
 		lib                              bool
@@ -60,7 +60,7 @@ func TestEachLayerDenyAppliesToItsOwnFiles(t *testing.T) {
 
 func TestALayerDenyDoesNotReachOtherTrees(t *testing.T) {
 	t.Parallel()
-	// プロジェクトのレイヤーは他のプロジェクトにもワークスペースにも、自身のレイヤーはプロジェクトにも足さない。
+	// プロジェクトの設定は他のプロジェクトにもワークスペースにも、ワークスペースの設定はプロジェクトにも足さない。
 	w := newWS(t, configws.KindBase)
 	for _, target := range [][]string{
 		{w.App, "schema", "x.sql"},
@@ -78,7 +78,7 @@ func TestALayerDenyDoesNotReachOtherTrees(t *testing.T) {
 
 func TestAWorktreeGetsTheLayersOfTheTreeItWasCutFrom(t *testing.T) {
 	t.Parallel()
-	// ワークスペースから切ったもの（w1）には自身のレイヤー、lib から切ったもの（i0007）には lib のレイヤー。
+	// ワークスペースから切ったもの（w1）にはワークスペースの設定、lib から切ったもの（i0007）には lib の設定。
 	// 記録の tree はワークツリーの名前。
 	w := newWS(t, configws.KindBase)
 	trees := map[string]string{"w1": w.Worktree(w.Root, "w1"), "i0007": w.Worktree(w.Lib, "i0007")}
@@ -110,7 +110,7 @@ func TestProjectAllowStaysInsideTheProject(t *testing.T) {
 	if rec.Str("decision") != "allow" {
 		t.Fatalf("decision = %q: %v", rec.Str("decision"), rec)
 	}
-	// 順は 共通レイヤー → 自身のレイヤー → プロジェクトのレイヤー。先にヒットするのは共通レイヤーの ws-src。
+	// 順は 共通設定 → ワークスペースの設定 → プロジェクトの設定。先にヒットするのは共通設定の ws-src。
 	// ここを「どちらでも良い」にすると、逆順に並べた実装でも通ってしまう。
 	if ids := rec.Ids(); len(ids) == 0 || ids[0] != "ws-src" {
 		t.Errorf("先にヒットするのは ws-src: %v", ids)
@@ -119,7 +119,7 @@ func TestProjectAllowStaysInsideTheProject(t *testing.T) {
 	w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.Root, "docs", "a.md")})
 	rec = w.LastRecord()
 	if rec.Str("decision") != "allow" || !slices.Equal(rec.Ids(), []string{"self:docs"}) {
-		t.Errorf("自身のレイヤーの docs が allow: %v", rec)
+		t.Errorf("ワークスペースの設定の docs が allow: %v", rec)
 	}
 	// lib の docs/ に self:docs はヒットしない。どのルールも言及しない。
 	w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.Lib, "docs", "a.md")})
@@ -130,7 +130,7 @@ func TestProjectAllowStaysInsideTheProject(t *testing.T) {
 
 func TestNotebookEditGoesThroughTheSameUnion(t *testing.T) {
 	t.Parallel()
-	// NotebookEdit も書き込み系。共通レイヤー + 行き先のレイヤーの和で、欄は notebook_path。
+	// NotebookEdit も書き込み系。共通設定に行き先の設定を足した統合結果で、欄は notebook_path。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", configws.Plus(configws.DenyOf(configws.LibRules), configws.NotebookRule)))
 
@@ -141,14 +141,14 @@ func TestNotebookEditGoesThroughTheSameUnion(t *testing.T) {
 		t.Errorf("record = %v", rec)
 	}
 
-	// 共通レイヤーの guard-approved も NotebookEdit を持つ。プロジェクトのツリーでもヒットする。
+	// 共通設定の guard-approved も NotebookEdit を持つ。プロジェクトのツリーでもヒットする。
 	common := w.Hook("NotebookEdit", w.Root, configws.Obj{"notebook_path": p(w.Lib, ".ccnavi", "approved", "a.ipynb")})
 	w.AssertDenied(common, "guard-approved")
 }
 
 func TestAProjectAllowDoesNotLoosenTheCommonAsk(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの ask を、プロジェクトのレイヤーの allow では緩められない。
+	// 共通設定の ask を、プロジェクトの設定の allow では緩められない。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Rules, configws.Body(configws.With(configws.CommonRules, "ask", []configws.Obj{configws.AskVendor})))
 	allow := configws.Plus(configws.AllowOf(configws.LibRules), configws.Rule("open-vendor", "Write|Edit", "glob", "*/vendor/*", ""))
@@ -169,13 +169,13 @@ func TestAProjectAllowDoesNotLoosenTheCommonAsk(t *testing.T) {
 	}
 }
 
-// パスを持つツールは行き先のレイヤー、持たないツールは全部のレイヤーの和。
+// パスを持つツールは行き先の設定、持たないツールは全部の設定を足した統合結果。
 
 var secretsRule = configws.Rule("secrets", "Read|Grep|Glob", "glob", "*/secrets*", "secrets は探さない。")
 
 func TestGrepAndGlobUseTheLayerOfThePlaceTheySearch(t *testing.T) {
 	t.Parallel()
-	// Grep と Glob は Read と同じく行き先のレイヤー。探す場所を省けば cwd。
+	// Grep と Glob は Read と同じく行き先の設定。探す場所を省けば cwd。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", configws.Plus(configws.DenyOf(configws.LibRules), secretsRule)))
 	secrets := p(w.Lib, "secrets")
@@ -186,13 +186,13 @@ func TestGrepAndGlobUseTheLayerOfThePlaceTheySearch(t *testing.T) {
 	// 探す場所を省くと cwd。
 	w.AssertDenied(w.Hook("Grep", secrets, configws.Obj{"pattern": "token"}), "lib:secrets")
 	w.AssertDenied(w.Hook("Glob", secrets, configws.Obj{"pattern": "*"}), "lib:secrets")
-	// 行き先のレイヤーだけなので、app の secrets には lib のルールはヒットしない。
+	// 行き先の設定だけなので、app の secrets には lib のルールはヒットしない。
 	w.AssertNotDenied(w.Hook("Grep", w.Root, configws.Obj{"pattern": "token", "path": p(w.App, "secrets")}))
 }
 
 func TestToolsWithoutAPathUseTheUnionOfEveryLayer(t *testing.T) {
 	t.Parallel()
-	// WebFetch・Skill・Agent・PowerShell は、Bash と同じく全部のレイヤーの和。cwd によらない。
+	// WebFetch・Skill・Agent・PowerShell は、Bash と同じく全部の設定を足した統合結果。cwd によらない。
 	w := newWS(t, configws.KindBase)
 	fetch := configws.Rule("fetch-internal", "WebFetch", "glob", "*internal.example.com*", "社内のページは取りに行かない。")
 	configws.WriteRules(t, w.Root, configws.With(configws.OwnRules, "deny", configws.Plus(configws.DenyOf(configws.OwnRules), fetch)))
@@ -216,7 +216,7 @@ func TestToolsWithoutAPathUseTheUnionOfEveryLayer(t *testing.T) {
 
 func TestALayerAllowReachesGrepAndToolsWithoutAPath(t *testing.T) {
 	t.Parallel()
-	// レイヤーをツールの種類で選ぶ形の代償。パスを持つツールは行き先のレイヤー、持たないツールは全部のレイヤーの和を足す。
+	// 設定をツールの種類で選ぶ形の代償。パスを持つツールは行き先の設定、持たないツールは全部の設定を足した統合結果を足す。
 	w := newWS(t, configws.KindBase)
 	allow := configws.Plus(configws.AllowOf(configws.LibRules),
 		configws.Rule("grep-src", "Grep", "glob", "*/src*", ""),
@@ -229,7 +229,7 @@ func TestALayerAllowReachesGrepAndToolsWithoutAPath(t *testing.T) {
 	if rec.Str("decision") != "allow" || !slices.Equal(rec.Ids(), []string{"lib:grep-src"}) {
 		t.Errorf("Grep: %v", rec)
 	}
-	// lib のレイヤーの allow は、app に居る WebFetch にもヒットする（パスを持たないツールは全部の和）。
+	// lib の設定の allow は、app に居る WebFetch にもヒットする（パスを持たないツールは全部の和）。
 	w.Hook("WebFetch", w.App, configws.Obj{"url": "https://docs.example.com/a", "prompt": "read"})
 	rec = w.LastRecord()
 	if rec.Str("decision") != "allow" || !slices.Equal(rec.Ids(), []string{"lib:fetch-docs"}) {
@@ -237,7 +237,7 @@ func TestALayerAllowReachesGrepAndToolsWithoutAPath(t *testing.T) {
 	}
 }
 
-// `{root}` の置換先はどのレイヤーでもワークスペースルート。
+// `{root}` の置換先はどの設定でもワークスペースルート。
 
 func TestRootInAProjectLayerIsTheWorkspaceRoot(t *testing.T) {
 	t.Parallel()
@@ -266,7 +266,7 @@ func TestACopiedRootRuleIsDroppedAsADuplicate(t *testing.T) {
 	w.MustHaveDetail(w.Problems("info", configws.ProjectWhere("lib")), "root-secret")
 }
 
-// Bash は共通レイヤー + 自身のレイヤー + 全プロジェクトのレイヤー。
+// Bash は共通設定 + ワークスペースの設定 + 全プロジェクトの設定。
 
 func TestBashIsTheUnionOfEveryLayerRegardlessOfCwd(t *testing.T) {
 	t.Parallel()
@@ -283,7 +283,7 @@ func TestBashIsTheUnionOfEveryLayerRegardlessOfCwd(t *testing.T) {
 
 func TestBashRecordNamesTheLayerOfTheDecidingRule(t *testing.T) {
 	t.Parallel()
-	// 記録の source は判定を下したルール（rules の先頭）のレイヤー。
+	// 記録の source は判定を下したルール（rules の先頭）の設定。
 	w := newWS(t, configws.KindBase)
 	w.Hook("Bash", w.App, configws.Obj{"command": "dropdb prod"})
 	rec := w.LastRecord()
@@ -298,7 +298,7 @@ func TestBashRecordNamesTheLayerOfTheDecidingRule(t *testing.T) {
 
 func TestTwoNonEmptyProjectLayersTakePartInNameOrder(t *testing.T) {
 	t.Parallel()
-	// 非空のプロジェクトのレイヤーが 2 つでも両方が和に入り、順序は名前順。
+	// 非空のプロジェクトの設定が 2 つでも両方が統合結果に入り、順序は名前順。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.App, configws.AppRules)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", configws.Plus(configws.DenyOf(configws.LibRules), configws.LibDeploy)))
@@ -322,7 +322,7 @@ func TestTwoNonEmptyProjectLayersTakePartInNameOrder(t *testing.T) {
 
 func TestIdenticalDefinitionInALaterLayerIsDropped(t *testing.T) {
 	t.Parallel()
-	// 裸の id と全欄が一致する定義は後ろのレイヤーを破棄する。記録に 1 本、--lint は info。
+	// 裸の id と全欄が一致する定義は後ろの設定を破棄する。記録に 1 本、--lint は info。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", append([]configws.Obj{configws.DenyOf(configws.CommonRules)[0]}, configws.DenyOf(configws.LibRules)...)))
 
@@ -355,7 +355,7 @@ func TestSameIdWithDifferentContentKeepsBoth(t *testing.T) {
 
 func TestBashUnionDropsIdenticalDuplicatesToo(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの `terraform` をコピーした lib の定義は 1 本にまとまる。
+	// 共通設定の `terraform` をコピーした lib の定義は 1 本にまとまる。
 	w := newWS(t, configws.KindBase)
 	configws.WriteRules(t, w.Lib, configws.With(configws.LibRules, "deny", configws.Plus(configws.DenyOf(configws.LibRules), configws.DenyOf(configws.CommonRules)[1])))
 
@@ -365,11 +365,11 @@ func TestBashUnionDropsIdenticalDuplicatesToo(t *testing.T) {
 	}
 }
 
-// レイヤーが無い・不正・共通レイヤー自身が不正、の 3 つ。
+// 設定が無い・不正・共通設定自身が不正、の 3 つ。
 
 func TestMissingLayerIsEmptyWithoutFallback(t *testing.T) {
 	t.Parallel()
-	// レイヤーのファイルが無い = 空。fallback は付かず、--lint も言わない。
+	// 設定ファイルが無い = 空。fallback は付かず、--lint も言わない。
 	w := newWS(t, configws.KindBase)
 	passed := w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.App, "schema", "x.sql")})
 	w.AssertNotDenied(passed)
@@ -381,14 +381,14 @@ func TestMissingLayerIsEmptyWithoutFallback(t *testing.T) {
 	}
 	for _, pr := range w.LintProblems() {
 		if strings.HasPrefix(pr.Where, "(projects/app)") {
-			t.Errorf("無いレイヤーを --lint が言う: %+v", pr)
+			t.Errorf("無い設定を --lint が言う: %+v", pr)
 		}
 	}
 }
 
 func TestABrokenLayerIsEmptyAndNamedInTheRecord(t *testing.T) {
 	t.Parallel()
-	// 不正なレイヤーは空 + 記録の fallback にレイヤーの名前。組み込みには戻らず、共通レイヤーの deny はヒットしたまま。
+	// 不正な設定は空 + 記録の fallback に設定の名前。組み込みには戻らず、共通設定の deny はヒットしたまま。
 	// Bash の和からも外れ、記録がそれを言う。--lint は error。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, configws.LayerPath(w.Lib, "rules"), configws.Broken)
@@ -405,23 +405,23 @@ func TestABrokenLayerIsEmptyAndNamedInTheRecord(t *testing.T) {
 
 	w.AssertDenied(w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.Lib, ".env")}), "credentials")
 	if got := w.LastRecord().Str("fallback"); got != "lib" {
-		t.Errorf("共通レイヤーの deny でも fallback は lib: %q", got)
+		t.Errorf("共通設定の deny でも fallback は lib: %q", got)
 	}
 
 	w.AssertNotDenied(w.Hook("Bash", w.Lib, configws.Obj{"command": "psql"}))
 	w.AssertDenied(w.Hook("Bash", w.Lib, configws.Obj{"command": "dropdb prod"}), "self:dropdb")
 	if detail, _ := w.LastRecord()["detail"].(string); !strings.Contains(detail, "lib") {
-		t.Errorf("記録の detail がレイヤーを言わない: %q", detail)
+		t.Errorf("記録の detail が設定を言わない: %q", detail)
 	}
 
 	if !configws.AnyWhere(w.Problems("error", ""), "(projects/lib)") {
-		t.Error("不正なレイヤーを --lint が error で言わない")
+		t.Error("不正な設定を --lint が error で言わない")
 	}
 }
 
 func TestABrokenCommonLayerFallsBackToBuiltin(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤー自身が読めないときは組み込みの既定。レイヤーは足さない。
+	// 共通設定自身が読めないときは組み込みの既定。設定は足さない。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Rules, configws.Broken)
 
@@ -436,8 +436,8 @@ func TestABrokenCommonLayerFallsBackToBuiltin(t *testing.T) {
 	}
 }
 
-// ルールの苦情は、1 回の起動で 1 度だけ出す。hook はツリーのレイヤーごとに共通レイヤーを読み直し、`--lint` はレイヤーのファイルを
-// 2 つの経路で読む。読むたびに言うと、同じ苦情がレイヤーやツリーの数だけ並ぶ。
+// ルールの苦情は、1 回の起動で 1 度だけ出す。hook はツリーの設定ごとに共通設定を読み直し、`--lint` は設定ファイルを
+// 2 つの経路で読む。読むたびに言うと、同じ苦情が設定やツリーの数だけ並ぶ。
 
 var silentRule = configws.Rule("silent", "Bash", "glob", "*nothing matches*", "")
 
@@ -470,15 +470,15 @@ func TestLintCountsALayerProblemOnce(t *testing.T) {
 		}
 	}
 	if total == 0 {
-		t.Fatal("レイヤーの苦情が出ていない")
+		t.Fatal("設定の苦情が出ていない")
 	}
 	if total != len(seen) {
 		t.Errorf("同じ苦情が重なっている: %v", seen)
 	}
 }
 
-// 実行後チェックも「共通レイヤー + そのツリーのレイヤー」の和。行き先のレイヤー 1 本のままの実装では、共通レイヤーの deny の場所が
-// 保護領域に数えられない。プロジェクトのツリー（共通レイヤー）と、ワークスペースのワークツリー（自身のレイヤー）の両方で見る。
+// 実行後チェックも共通設定にそのツリーの設定を足した統合結果。行き先の設定 1 本のままの実装では、共通設定の deny の場所が
+// 保護領域に数えられない。プロジェクトのツリー（共通設定）と、ワークスペースのワークツリー（ワークスペースの設定）の両方で見る。
 
 func TestPostMonitoringIsTheUnionOfTheCommonAndTheTreeLayers(t *testing.T) {
 	t.Parallel()
@@ -543,9 +543,9 @@ func TestAProjectNamedSelfIsNotCounted(t *testing.T) {
 
 func TestAWorkspaceWithoutProjectsOrOwnLayerIsUnchanged(t *testing.T) {
 	t.Parallel()
-	// `projects/` が無く自身のレイヤーも無ければ、共通レイヤーだけで判定し記録する。
+	// `projects/` が無くワークスペースの設定も無ければ、共通設定だけで判定し記録する。
 	w := newWS(t, configws.KindBase)
-	// 自身のレイヤーだけを消す。共通レイヤーも同じ ccnavi ディレクトリの下（`.ccnavi/config/common/`）にある。
+	// ワークスペースの設定だけを消す。共通設定も同じ ccnavi ディレクトリの下（`.ccnavi/config/common/`）にある。
 	if err := os.RemoveAll(p(w.Root, configws.Home, "config", "project")); err != nil {
 		t.Fatal(err)
 	}
@@ -573,16 +573,16 @@ func TestAWorkspaceWithoutProjectsOrOwnLayerIsUnchanged(t *testing.T) {
 	w.AssertNotDenied(w.Hook("Bash", w.Root, configws.Obj{"command": "psql"}))
 }
 
-// `--explain` はレイヤーごとに全件。
+// `--explain` は設定ごとに全件。
 
 func TestExplainListsRulesPerLayerAndThePhaseAndRiskTables(t *testing.T) {
 	t.Parallel()
-	// rules を共通レイヤー・自身のレイヤー・各プロジェクトの順に、phases と risk の表を足す。
+	// rules を共通設定・ワークスペースの設定・各プロジェクトの順に、phases と risk の表を足す。
 	w := newWS(t, configws.KindBase)
 	r := w.Ccnavi("--explain")
 	w.MustOK(r, "--explain")
 	out := r.Stdout
-	order := []string{"■ rules 共通レイヤー", "■ rules ワークスペースのレイヤー", "■ rules lib", "■ phases", "■ risk"}
+	order := []string{"■ rules 共通設定", "■ rules ワークスペースの設定", "■ rules lib", "■ phases", "■ risk"}
 	last := -1
 	for _, heading := range order[:3] {
 		at := strings.Index(out, heading)
@@ -598,7 +598,7 @@ func TestExplainListsRulesPerLayerAndThePhaseAndRiskTables(t *testing.T) {
 			t.Errorf("見出し %q が無い", heading)
 		}
 	}
-	// phases と risk は id と出どころのレイヤー。
+	// phases と risk は id と出どころの設定。
 	for _, want := range []string{"self:generated", "lib:schema", "build", "big-diff", "schema"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("--explain に %q が無い", want)
@@ -612,13 +612,13 @@ func TestExplainShowsABrokenLayerAsUnreadableAndEmpty(t *testing.T) {
 	configws.Write(t, configws.LayerPath(w.Lib, "rules"), configws.Broken)
 	out := w.Ccnavi("--explain").Stdout
 	if !strings.Contains(out, "■ rules lib") || !strings.Contains(out, "読めない") {
-		t.Errorf("読めないレイヤーを言わない: %s", out)
+		t.Errorf("読めない設定を言わない: %s", out)
 	}
 }
 
 func TestExplainJSONCarriesEveryLayer(t *testing.T) {
 	t.Parallel()
-	// `--explain --json` にレイヤーごとの rules 全件と phases / risk の定義と出どころが出る。
+	// `--explain --json` に設定ごとの rules 全件と phases / risk の定義と出どころが出る。
 	// 形は docs/11_requirements/json-shapes.md「ボードの JSON」にある。ここでは `layers` のリストに
 	// name（common / self / プロジェクト名）と rules / phases / risk が在ることまでを固定する。
 	w := newWS(t, configws.KindBase)
@@ -684,7 +684,7 @@ func TestExplainJSONCarriesEveryLayer(t *testing.T) {
 	if len(layers["app"].deny) != 0 {
 		t.Errorf("app の deny は空のはず: %v", layers["app"].deny)
 	}
-	// この土台の共通レイヤーは phases.yml を持たないので、共通レイヤーの定義は空。
+	// この土台の共通設定は phases.yml を持たないので、共通設定のフェーズ定義は空。
 	if len(layers["common"].phases) != 0 {
 		t.Errorf("common の phases は空のはず: %v", layers["common"].phases)
 	}

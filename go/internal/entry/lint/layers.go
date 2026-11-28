@@ -21,7 +21,7 @@ import (
 	"ccnavi/internal/tickets/model/standing"
 )
 
-// 設定のレイヤーをまたぐ検査。1 つのレイヤーの 1 本ずつの検査は tickets/config/check にある。
+// 設定をまたぐ検査。1 つの設定の 1 本ずつの検査は tickets/config/check にある。
 
 // worktreesWhere はワークツリーの苦情の出どころ（`(.claude/worktrees/<名前>)`）。
 func worktreesWhere(name string) string {
@@ -51,7 +51,7 @@ func worktreeLayers(conf *config.Settings, root string) []rules.Problem {
 			if ospath.DiskExists(ospath.Join(origin, home, filepath.FromSlash(rel))) {
 				continue
 			}
-			// プロジェクトのワークツリーの共通レイヤーは、発言のときの同期がミラーしたもの。ワークスペースの中では読まれない。
+			// プロジェクトのワークツリーの共通設定は、発言のときの同期がミラーしたもの。ワークスペースの中では読まれない。
 			if work.Project != "" && strings.HasPrefix(rel, config.CommonDir+"/") {
 				continue
 			}
@@ -92,7 +92,7 @@ func filesUnder(base string) []string {
 	return found
 }
 
-// syncProblems は親のワークツリーの置き場の検査と、レイヤーのずれ。origin/<統合先> が手元に無く比べられなかった
+// syncProblems は親のワークツリーの置き場の検査と、設定のずれ。origin/<統合先> が手元に無く比べられなかった
 // リポジトリは info 1 行にまとめる。
 func syncProblems(conf *config.Settings, root string) []rules.Problem {
 	out := parentTreesOffBranch(conf, root)
@@ -147,7 +147,7 @@ func holdsParent(conf *config.Settings, work tree.Tree, root string) bool {
 	return ok && held.Ticket == work.Name && held.Parent == ""
 }
 
-// layerRepos はレイヤーを比べるリポジトリ（ワークスペース自身の空と、プロジェクト）。
+// layerRepos は設定を比べるリポジトリ（ワークスペースの空と、プロジェクト）。
 func layerRepos(conf *config.Settings) []string {
 	out := []string{""}
 	for _, p := range tree.Projects(conf.Projects) {
@@ -156,15 +156,15 @@ func layerRepos(conf *config.Settings) []string {
 	return out
 }
 
-// layerDrift は手元のレイヤーが origin/<統合先> のレイヤー（同じパス）と違う、という warn。origin/<統合先> が手元に
-// 無ければ黙る。project が空ならワークスペース自身。
+// layerDrift は手元の設定が origin/<統合先> の設定（同じパス）と違う、という warn。origin/<統合先> が手元に
+// 無ければ黙る。project が空ならワークスペース。
 func layerDrift(conf *config.Settings, root, project string) []rules.Problem {
 	found, _ := drift(conf, root, project)
 	return found
 }
 
 // drift は layerDrift の本体。2 つめは済んだか（origin を持つのに origin/<統合先> が手元に無いときだけ偽。origin を
-// 持たないリポジトリは比べる相手が無いので済んだ扱い）。手元の判定は元リポジトリのチェックアウトのレイヤーを読み、
+// 持たないリポジトリは比べる相手が無いので済んだ扱い）。手元の判定は元リポジトリのチェックアウトの設定を読み、
 // 統合先へは切り替えない。読むのは取得済みの refs/remotes/origin/<統合先> だけで、ネットワークには出ない。
 func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) {
 	home := root
@@ -184,7 +184,7 @@ func drift(conf *config.Settings, root, project string) ([]rules.Problem, bool) 
 		// origin が無いリポジトリ（git でない、リモートを持たない）は、取得で解けないので言わない。
 		return nil, !git.Run(home, []string{"remote", "get-url", "origin"}, git.Options{}).OK()
 	}
-	// 比べるファイル。ワークスペース自身は共通レイヤーの 4 本も含み、どのリポジトリも自身のレイヤーの 4 本を比べる。
+	// 比べるファイル。ワークスペースは共通設定の 4 本も含み、どのリポジトリもワークスペースの設定の 4 本を比べる。
 	homeRel := strings.Trim(ospath.Slashed(projectHome(conf)), "/")
 	var rels []string
 	if project == "" {

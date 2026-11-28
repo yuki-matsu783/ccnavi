@@ -207,7 +207,7 @@ func TryOne(stderr io.Writer, conf *config.Settings, root, tool, subject string,
 	return out, nil
 }
 
-// tryStop はターンの終わりの試し。使われるのは共通レイヤーと自身のレイヤーの allow で、every が 2 以上のものだけ
+// tryStop はターンの終わりの試し。使われるのは共通設定とワークスペースの設定の allow で、every が 2 以上のものだけ
 // （ruleload.StopRules）。あれば allow、無ければ判定に入らない（skip）。数えは進めない。
 func tryStop(conf *config.Settings, root string, out Result) Result {
 	picked := ruleload.StopRules(conf, root)
@@ -307,7 +307,7 @@ func writeTest(w io.Writer, root string, out Result, call Call) {
 	tool := out.tool
 	if tool == rules.StopMatch {
 		p("verdict: %s\ntool: %s\n", out.Verdict, tool)
-		p("note: ターンの終わり。使われるのは共通レイヤーと自身のレイヤーの allow で、every が 2 以上のものだけ。渡す回にだけ止める\n")
+		p("note: ターンの終わり。使われるのは共通設定とワークスペースの設定の allow で、every が 2 以上のものだけ。渡す回にだけ止める\n")
 		if len(out.Rules) == 0 {
 			p("rules: (使われるルールがありません。ターンの終わりには止めない)\n")
 			return

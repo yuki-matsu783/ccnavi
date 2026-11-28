@@ -11,8 +11,8 @@ import (
 
 // 設定ファイルの保護の受入テスト。
 //
-// selfguard のコアに、各レイヤーの `.ccnavi/config/project/` の 3 本と共通レイヤーの phases / risks が入る。
-// Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、共通レイヤーの rules.yml に掛けているものを
+// selfguard のコアに、各設定の `.ccnavi/config/project/` の 3 本と共通設定の phases / risks が入る。
+// Write / Edit の拒否、シェルからの書き込みの拒否、バックアップと復元の 3 つとも、共通設定の rules.yml に掛けているものを
 // そのまま掛ける。元リポジトリから切ったワークツリー側の設定も対象。
 // ルールファイルは何でも通す 1 本にしてある。止まるなら、それはルールの外の組み込み。
 
@@ -20,7 +20,7 @@ import (
 
 func TestLayerFilesAreRestored(t *testing.T) {
 	t.Parallel()
-	// 守る対象は、プロジェクト・自身のレイヤーの 3 本ずつと、共通レイヤーの phases・risks。
+	// 守る対象は、プロジェクト・ワークスペースの設定の 3 本ずつと、共通設定の phases・risks。
 	// どの対象が守られるかの組み立ては Go の selfguard の見本（backup_golden_test.go）が見る。ここは本物の hook で戻ることの通し。
 	w := newWS(t, configws.KindGuard)
 	configws.Write(t, configws.LayerPath(w.Root, "risk"), configws.CommonRiskText)
@@ -39,7 +39,7 @@ func TestLayerFilesAreRestored(t *testing.T) {
 
 func TestCopiesInWorktreesAreRestored(t *testing.T) {
 	t.Parallel()
-	// ワークツリー側の設定も対象。lib から切った分・ワークスペースから切った自身の分・共通レイヤーの 3 本
+	// ワークツリー側の設定も対象。lib から切った分・ワークスペースから切った分・共通設定の 3 本
 	// （既存の穴。直す前は allow `worktrees` にヒットして書けた）。
 	w := newWS(t, configws.KindGuard)
 	t1 := w.Worktree(w.Lib, "w1")
@@ -62,7 +62,7 @@ func TestCopiesInWorktreesAreRestored(t *testing.T) {
 
 func TestADeletedLayerFileComesBackFromTheProjectGit(t *testing.T) {
 	t.Parallel()
-	// バックアップが無ければ、そのレイヤーの git（プロジェクト自身）から戻る。
+	// バックアップが無ければ、その設定の git（プロジェクト自身）から戻る。
 	w := newWS(t, configws.KindGuard)
 	path := configws.LayerPath(w.Lib, "rules")
 	expected := configws.Read(t, path)
@@ -78,17 +78,17 @@ func TestADeletedLayerFileComesBackFromTheProjectGit(t *testing.T) {
 
 func TestMissingLayerFilesAreNotReported(t *testing.T) {
 	t.Parallel()
-	// 無いものは対象から外れる。app のレイヤーが無いことは言わない。
+	// 無いものは対象から外れる。app の設定が無いことは言わない。
 	w := newWS(t, configws.KindGuard)
 	result := w.RunHook("PreToolUse")
 	if strings.Contains(result.Stdout, "app") || result.Stderr != "" {
-		t.Errorf("無いレイヤーを言っている\n%s", configws.Said(result, ""))
+		t.Errorf("無い設定を言っている\n%s", configws.Said(result, ""))
 	}
 }
 
 func TestTheRecordNamesTheLayerThatWasRestored(t *testing.T) {
 	t.Parallel()
-	// 記録の `guarded` に、レイヤーの名前付きのキーで何をしたかが残る。
+	// 記録の `guarded` に、設定の名前付きのキーで何をしたかが残る。
 	w := newWS(t, configws.KindGuard)
 	path := configws.LayerPath(w.Lib, "phases")
 	w.RunHook("PreToolUse")
@@ -106,11 +106,11 @@ func TestTheRecordNamesTheLayerThatWasRestored(t *testing.T) {
 	}
 }
 
-// 共通レイヤーのルールファイルが読めない間の書き込み。
+// 共通設定のルールファイルが読めない間の書き込み。
 
 func TestARepairOfAnUnreadableCommonRulesFileIsRestoredWithTheWay(t *testing.T) {
 	t.Parallel()
-	// 読めない共通レイヤーのルールを名指しのツールで直した結果も、実行後に戻す。
+	// 読めない共通設定のルールを名指しのツールで直した結果も、実行後に戻す。
 	// 黙って戻されたように見せず、下書きとユーザの取り込みという直し方を添える。
 	w := newWS(t, configws.KindGuard)
 	fixed := configws.Body(configws.OpenRules)
@@ -164,7 +164,7 @@ func TestAShellWriteToAnUnreadableCommonRulesFileIsRestored(t *testing.T) {
 func TestARuleNamedLikeABuiltinDoesNotReplaceIt(t *testing.T) {
 	t.Parallel()
 	// 組み込みの名前（`builtin:guard-`）のルールは読み込まず、組み込みは常に足す。
-	// 以前は何にもヒットしない 1 本をこの名前で書くだけで、共通レイヤーの保護が気づかないうちに消えた。
+	// 以前は何にもヒットしない 1 本をこの名前で書くだけで、共通設定の保護が気づかないうちに消えた。
 	w := newWS(t, configws.KindGuard)
 	decoy := configws.With(configws.OpenRules, "deny", []configws.Obj{
 		configws.Rule("builtin:guard-common-layer", "Write|Edit|NotebookEdit", "regex", "never-matches-anything", "decoy"),
@@ -179,7 +179,7 @@ func TestARuleNamedLikeABuiltinDoesNotReplaceIt(t *testing.T) {
 
 func TestLintNamesARuleNamedLikeABuiltinInAnyLayer(t *testing.T) {
 	t.Parallel()
-	// プロジェクトのレイヤーに書いても `--lint` が error で名指しする。
+	// プロジェクトの設定に書いても `--lint` が error で名指しする。
 	w := newWS(t, configws.KindGuard)
 	configws.WriteRules(t, w.Lib, configws.Ruleset([]configws.Obj{configws.Rule("builtin:guard-setting-files", "Bash", "regex", "never-matches-anything", "decoy")}, nil))
 	w.MustHaveDetail(w.Problems("error", configws.ProjectWhere("lib")), "builtin:")
@@ -232,8 +232,8 @@ func TestDisableDoesNotAddTheDeny(t *testing.T) {
 
 func TestNamedToolWritesIntoTheCommonLayerAreDenied(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
-	// 土台の共通レイヤーは既定の置き場（`.ccnavi/config/common/`）にある。ルールの 1 行に任せると、
+	// 共通設定の 3 本への Write / Edit は、ルールに宣言が無くても組み込みで止まる。
+	// 土台の共通設定は既定の置き場（`.ccnavi/config/common/`）にある。ルールの 1 行に任せると、
 	// 書き換えたルールファイルのもとでは通ってしまう（issue #14）。
 	w := newWS(t, configws.KindGuard)
 	for _, target := range []string{w.Rules, w.Phases, w.Risk} {
@@ -248,7 +248,7 @@ func TestNamedToolWritesIntoTheCommonLayerAreDenied(t *testing.T) {
 
 func TestCommonLayerCopiesInAWorktreeAreDenied(t *testing.T) {
 	t.Parallel()
-	// ワークスペースから切ったワークツリー側の共通レイヤーも止まる。統合すればそのまま main の設定になる。
+	// ワークスペースから切ったワークツリー側の共通設定も止まる。統合すればそのまま main の設定になる。
 	w := newWS(t, configws.KindGuard)
 	tree := w.Worktree(w.Root, "w5")
 	w.AssertDenied(w.GuardedHook("Write", w.Root, configws.Obj{"file_path": p(tree, ".ccnavi", "config", "common", "phases.yml")}), "builtin:guard-common-layer")
@@ -269,7 +269,7 @@ func TestTheCommonLayerDenyNamesOnlyThoseFiles(t *testing.T) {
 
 func TestShellWritesIntoTheCommonLayerAreDenied(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの 3 本へのシェルからの書き込みは組み込みで止まる。置き場は `.ccnavi/config/common/` に固定なので、
+	// 共通設定の 3 本へのシェルからの書き込みは組み込みで止まる。置き場は `.ccnavi/config/common/` に固定なので、
 	// ccnavi ディレクトリを丸ごと拾う 1 本が適用する。動かした置き場は TestShellWritesIntoAMovedCommonLayerAreDenied が見る。
 	w := newWS(t, configws.KindGuard)
 	w.AssertAllGuarded([]string{
@@ -286,7 +286,7 @@ func TestShellWritesIntoTheCommonLayerAreDenied(t *testing.T) {
 
 func TestCopyingOutOfTheCommonLayerIsAllowed(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの 3 本が cp / ln / install の元の側にだけ出る形は、読むだけなので通る。
+	// 共通設定の 3 本が cp / ln / install の元の側にだけ出る形は、読むだけなので通る。
 	// コピーする側は行き先（最後の引数か `-t` の値）だけを見る。元の側でヒットすると、バックアップを取るだけの `cp` まで止まる
 	// （rule-expectations.yml の期待する判定）。
 	w := newWS(t, configws.KindGuard)
@@ -306,7 +306,7 @@ func TestCopyingOutOfTheCommonLayerIsAllowed(t *testing.T) {
 	w.AssertNoneGuarded(commands)
 }
 
-// movedLayer は共通レイヤーの 3 本を policy/ に動かした形（`--rules` などは診断でだけ有効。それでも動かせる以上、保護は動かした先を追う）。
+// movedLayer は共通設定の 3 本を policy/ に動かした形（`--rules` などは診断でだけ有効。それでも動かせる以上、保護は動かした先を追う）。
 func (w *ws) movedLayer() (flags []string, rel, abs map[string]string) {
 	w.T.Helper()
 	rel, abs = map[string]string{}, map[string]string{}
@@ -325,7 +325,7 @@ func (w *ws) movedLayer() (flags []string, rel, abs map[string]string) {
 
 func TestShellWritesIntoAMovedCommonLayerAreDenied(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーが既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。名指しのツールは `common_layer_regex` が
+	// 共通設定が既定の置き場の外にあっても、シェルからの書き込みは組み込みで止まる。名指しのツールは `common_layer_regex` が
 	// 同じ先を追うので、こちらを外すと、同じファイルが `Write` では止まってシェルでは通る形になる。
 	// 末尾の 2 本が境界を見る。前と後ろの両方が要る。`otherpolicy/rules.yml` は前の境界だけを、`policy/rules.yml.bak` は
 	// 後ろの境界だけを外す。片方しか置かないと、置かなかったほうの境界を消す変異があってもテストが通る。
@@ -347,7 +347,7 @@ func TestShellWritesIntoAMovedCommonLayerAreDenied(t *testing.T) {
 
 func TestCopiesOfAMovedCommonLayerLookOnlyAtTheDestination(t *testing.T) {
 	t.Parallel()
-	// 動かした共通レイヤーの 3 本も、cp / ln / install は行き先の側だけで適用する。動かした先の表記は書き込み用とコピー用に分けて足す。
+	// 動かした共通設定の 3 本も、cp / ln / install は行き先の側だけで適用する。動かした先の表記は書き込み用とコピー用に分けて足す。
 	// 書き込み用（空白で閉じる）をそのままコピーする側に足すと、元の側に出ただけでヒットする。
 	w := newWS(t, configws.KindGuard)
 	flags, rels, abss := w.movedLayer()
@@ -393,7 +393,7 @@ func TestCopiesOfAMovedCommonLayerLookOnlyAtTheDestination(t *testing.T) {
 
 func TestADirectoryHoldingAMovedCommonLayerIsGuardedByName(t *testing.T) {
 	t.Parallel()
-	// 動かした共通レイヤーの入っているディレクトリを行き先にした形（`_moved_holders`）。行き先の表記に共通レイヤーの名前が出ないので、
+	// 動かした共通設定の入っているディレクトリを行き先にした形（`_moved_holders`）。行き先の表記に共通設定の名前が出ないので、
 	// 元の名前で見る。同じ名前を置く形と、名前の決まらない形は止め、別の名前を置くだけの形は止めない。
 	w := newWS(t, configws.KindGuard)
 	policy := configws.Write(t, p(w.Root, "policy", "rules.yml"), configws.Read(t, w.Rules))

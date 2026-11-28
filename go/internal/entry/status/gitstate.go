@@ -102,7 +102,7 @@ func fileStates(found []*ticket.Ticket) map[string]fileState {
 	return out
 }
 
-// gitOptions は git に渡す共通の設定。パスは引用せずに読み、時間の上限を付ける。
+// gitOptions は git に渡す共通設定。パスは引用せずに読み、時間の上限を付ける。
 func gitOptions() git.Options { return git.Options{Timeout: git.ReadTimeout, RawPaths: true} }
 
 // dirtyPaths は (まだコミットに無いパス, 未コミットの変更があるパス)。前者は未追跡と索引に足しただけのもの（`??`・`A`）と、

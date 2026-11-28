@@ -143,7 +143,7 @@ func TestSetupAFetchRegisteredFirstDoesNotHideTheMainHook(t *testing.T) {
 	}
 }
 
-// 共通レイヤーの 3 本は `.ccnavi/config/common/` 固定なので、env には書かない（`--all` の一覧にも）。読まれない語が設定に残ると、
+// 共通設定の 3 本は `.ccnavi/config/common/` 固定なので、env には書かない（`--all` の一覧にも）。読まれない語が設定に残ると、
 // そこを直せば置き場が動くと読める。
 func TestSetupDoesNotWriteTheCommonLayerPaths(t *testing.T) {
 	t.Parallel()

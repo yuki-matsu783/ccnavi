@@ -71,7 +71,7 @@ func TestTheNoticeIsSilencedOrKept(t *testing.T) {
 		{"別の名前の下書きでは出す", func(w *ws) { ticketkit.Write(w.t, w.noticeDraft("other", "project"), "name: other\n") }, true},
 		{"同じ計画の形のテンプレートが取り込み済みなら出さない", func(w *ws) { w.commonTemplate("same", templateSame) }, false},
 		{"別の計画のテンプレートでは出す", func(w *ws) { w.commonTemplate("other", templateOther) }, true},
-		{"プロジェクトのレイヤーのテンプレートも数える", func(w *ws) {
+		{"プロジェクトの設定のテンプレートも数える", func(w *ws) {
 			ticketkit.Write(w.t, filepath.Join(w.root, ".ccnavi", "config", "project", "templates", "same.yml"), templateSame)
 		}, false},
 	}

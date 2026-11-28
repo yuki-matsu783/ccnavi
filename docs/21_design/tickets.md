@@ -25,7 +25,7 @@ REQ-APV、REQ-RSK。用語は CONTEXT.md。
 生の git は組み込みの deny（`builtin:guard-raw-git`）でいつも止め、git の入口をこのラッパー 1 本に寄せる（REQ-TKT-55）。ラッパーの中には、承認済みチケットの
 置き場を別のコミットの中身に戻す `restore` / `checkout` を通さない、直接作業だけを取り込む `integrate`、子のワークツリーから送らない
 `push`、親のブランチへ移るときに承認済みチケットを運ぶ `checkout` といった、チケット制御の可否がある。生の git は組み込みで
-いつも止める。チケット制御の有無と共通レイヤーの有無には依らない。
+いつも止める。チケット制御の有無と共通設定の有無には依らない。
 
 - 式は `git` がコマンドの位置に立つ形。文面はラッパーがあればその打ち方を名指しし、無ければユーザに頼む形にする
 - ルールファイルが読めずに組み込みの既定へ戻った間も足す（5.6）
@@ -64,7 +64,7 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.12 | [tickets/subagents.md](tickets/subagents.md) | SubagentStart と SubagentStop でのサブエージェントの扱い |
 | 9.13 | [tickets/branch-lookup.md](tickets/branch-lookup.md) | issue や MR に紐づくブランチを確かめる指示 |
 | 9.14 | [tickets/phase-management.md](tickets/phase-management.md) | フェーズ管理の全体像。定義・計画・先行関係・レビュー・局面をつなぐ入口 |
-| 9.15 | [tickets/templates.md](tickets/templates.md) | 作業・レビュー計画のテンプレート。置き場・2 層の統合結果・検査・`--templates` |
+| 9.15 | [tickets/templates.md](tickets/templates.md) | 作業・レビュー計画のテンプレート。置き場・統合結果・検査・`--templates` |
 | 9.16 | [tickets/learning-wiki.md](tickets/learning-wiki.md) | 学びの蓄積。子の気づきを learning-wiki に溜め、反映先への提案として育てる流れ |
 | 9.17 | [tickets/sharing.md](tickets/sharing.md) | 複数人・別 PC・別セッションでの作業。共有するもの・同期の手順・承認者の操作の入口・保証しないこと |
 | 9.18 | [tickets/user-entry.md](tickets/user-entry.md) | ユーザ専用の入口。`ccnavi user`・`ccnavi-user-*.sh`・hook の止め・実行ファイルの読み替えと断り・ターミナル要求を、表 1 つ（`tickets/model/useronly`）から作る仕組み |

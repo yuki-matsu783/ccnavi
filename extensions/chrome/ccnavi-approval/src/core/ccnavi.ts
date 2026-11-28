@@ -18,7 +18,7 @@ export interface Placement {
   /** プロジェクトのリポジトリで、ワークスペースの統合先から読むもの */
   readonly workspace_paths: readonly string[];
   readonly workspace_files: readonly string[];
-  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトのレイヤー） */
+  /** プロジェクトのリポジトリで、プロジェクトの統合先から読むもの（閉じたもの・プロジェクトの設定） */
   readonly project_paths: readonly string[];
 }
 
@@ -36,7 +36,7 @@ export interface Integration {
   readonly head: string;
 }
 
-/** プロジェクトのリポジトリのワークスペースの統合先の中身（共通レイヤー・自身のレイヤー・設定・互換のマーカー） */
+/** プロジェクトのリポジトリのワークスペースの統合先の中身（共通設定・ワークスペースの設定・ccnavi の設定ファイル・互換のマーカー） */
 export interface Workspace {
   readonly integration: Integration;
   readonly files: Record<string, string>;
@@ -48,7 +48,7 @@ export interface Snapshot {
   readonly integration: Integration;
   readonly branches: Record<string, Branch>;
   readonly absent: readonly string[];
-  /** プロジェクト名（`projects/<名前>`）。ワークスペース自身なら無い */
+  /** プロジェクト名（`projects/<名前>`）。ワークスペースなら無い */
   readonly project?: string;
   readonly workspace?: Workspace;
   /**

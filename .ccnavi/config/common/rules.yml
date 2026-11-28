@@ -18,7 +18,7 @@
 # 除くだけなら except のほうが読みやすいので、workspace-root は except のままにしてある。
 version: 1
 
-# ccnavi 自身の保護（hook・settings・scripts・共通の設定・承認済みの置き場・認証情報・再帰的な強制削除）は
+# ccnavi 自身の保護（hook・settings・scripts・共通設定・承認済みの置き場・認証情報・再帰的な強制削除）は
 # 組み込みにあり、ここには書かない（builtin:guard-*、builtin:ticket-approved、builtin:credentials、
 # builtin:recursive-delete。`sh .ccnavi/scripts/ccnavi-launcher.sh --test` で判定を試せる）。ここに書くのはこのワークスペースの決まり。
 deny:

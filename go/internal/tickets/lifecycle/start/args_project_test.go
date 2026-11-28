@@ -10,7 +10,7 @@ import (
 )
 
 // `start args` は、打った場所がプロジェクト（projects/<名前>）か、そこから切ったワークツリーなら、その名前を `project` で答える。
-// ワークスペース自身と、ワークスペースから切ったワークツリーでは答えない。
+// ワークスペースと、ワークスペースから切ったワークツリーでは答えない。
 func TestArgsNamesTheProject(t *testing.T) {
 	root := testkit.Workspace(t, "self-wt")
 	projects := filepath.Join(root, "projects")

@@ -56,10 +56,10 @@ const (
 	msgFeedbackOff = "フィードバック計画の子のフローはコピーしない（全体計画の子のフローだけ）"
 	msgWhen        = "「%s」と同じ形の作業をするとき"
 	msgLayerToOnly = "--layer は --to project のときだけ使う"
-	msgProjectTree = "%s はプロジェクト（%s）のツリーの親。そのツリーの共通の置き場は共通レイヤーのコピーなので、共通の下書きは作らない"
+	msgProjectTree = "%s はプロジェクト（%s）のツリーの親。そのツリーの共通の置き場は共通設定のコピーなので、共通の下書きは作らない"
 	msgBadTo       = "--to は %s"
-	msgNoLayer     = "レイヤー %s はありません（%s）"
-	msgLayerAway   = "レイヤー %s の置き場が親のツリー（%s）の外にある。このツリーの下書きからは取り込めない"
+	msgNoLayer     = "設定 %s はありません（%s）"
+	msgLayerAway   = "設定 %s の置き場が親のツリー（%s）の外にある。このツリーの下書きからは取り込めない"
 	msgBadName     = "下書きの名前 %s は指定できない（%s）。--name で付ける"
 	msgTargetThere = "取り込み先に同名のテンプレート %s が既に在る。上書きになる下書きは作らない" +
 		"（別の --name を付けるか、直すなら ccnavi-stage.sh で既存をコピーして編集する）"
@@ -223,11 +223,11 @@ func build(conf *config.Settings, found *ticket.Ticket, children []*ticket.Ticke
 	return t, notes
 }
 
-// targetOf は下書きの取り込み先（ツリーからの相対）と、そのレイヤー。決まらなければ理由。
+// targetOf は下書きの取り込み先（ツリーからの相対）と、その設定。決まらなければ理由。
 func targetOf(conf *config.Settings, root string, found *ticket.Ticket, name string, to Target, layer string) (string, string, string) {
 	// 取り込み先（ツリーからの相対）を決める。
-	// 共通 → 共通レイヤーのテンプレート置き場、プロジェクト → 親のプロジェクトか指定のレイヤーの置き場。
-	// 指定のレイヤーが親のツリーの外にあるときは、相対で届かないので断る。
+	// 共通 → 共通設定のテンプレート置き場、プロジェクト → 親のプロジェクトか指定の設定の置き場。
+	// 指定の設定が親のツリーの外にあるときは、相対で届かないので断る。
 	home := conf.ProjectHome
 	if home == "" {
 		home = config.DefaultProjectHome
@@ -279,7 +279,7 @@ func targetOf(conf *config.Settings, root string, found *ticket.Ticket, name str
 	return rel + "/" + home + "/" + config.LayerConfigDir + "/" + file, layer, ""
 }
 
-// Request は下書きを作る頼み。Name は空なら親の識別子、To は空なら ToProject、Layer は --to project の行き先のレイヤー。
+// Request は下書きを作る頼み。Name は空なら親の識別子、To は空なら ToProject、Layer は --to project の行き先の設定。
 type Request struct {
 	Parent string
 	Name   string
@@ -287,7 +287,7 @@ type Request struct {
 	Layer  string
 }
 
-// Made は作った下書き。Rel は下書き（ツリーからの相対）、Target と Layer は取り込み先とそのレイヤー、
+// Made は作った下書き。Rel は下書き（ツリーからの相対）、Target と Layer は取り込み先とその設定、
 // Tree は下書きを置いたツリーの名前、TreeRoot はそのルート（user handoff を打つツリー）。Notes は知らせ
 // （コピーできなかったフロー、落とした先行など）、Problems は書いたものを読み直した検査。
 type Made struct {

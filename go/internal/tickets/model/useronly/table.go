@@ -56,7 +56,7 @@ var flags = []option{
 	{name: "--close-early", cli: true, gated: true},
 	// 記録を消す形は PruneForm が別の deny で止める（cliForms には入れない）。
 	{name: optPrune, previewExempt: true, gated: true, unlessPreview: true, groups: []group{groupPrune}},
-	// 保護対象の下書きの取り込みと共通レイヤーのミラーの同期。見るだけの形（`--yes` なし）もユーザ専用
+	// 保護対象の下書きの取り込みと共通設定のミラーの同期。見るだけの形（`--yes` なし）もユーザ専用
 	// （エージェントは `ccnavi-stage.sh --commands` で下書きの状態を見られる）。
 	{name: "--handoff", cli: true, gated: true, groups: []group{groupHandoff}},
 	{name: "--mirror", cli: true, gated: true, groups: []group{groupHandoff}},

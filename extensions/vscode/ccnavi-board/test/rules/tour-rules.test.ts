@@ -105,7 +105,7 @@ test("CB-T520 ルールの案内は、使い方ごとの案内が4〜9手順で�
   }
 });
 
-test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取りと同じRulesSumになり、共通の設定と別のレイヤーの由来を持つ", () => {
+test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取りと同じRulesSumになり、共通設定と別の設定の由来を持つ", () => {
   const raw = (loadTour("rules").sample as { sums: unknown }).sums;
   const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
   assert.ok(parsed.ok);
@@ -116,7 +116,7 @@ test("CB-T521 統合結果の見本は、実際のボードのJSONの読み取�
     assert.ok(rules.some((rule) => rule.source === "common"), sum.name);
     const own = rules.filter((rule) => rule.source !== "common");
     assert.ok(own.length >= 1, sum.name);
-    // 共通以外のidにはレイヤー名が付く
+    // 共通以外のidには設定の名前が付く
     for (const rule of own) {
       assert.ok(rule.id.startsWith(`${rule.source}:`), `${sum.name}: ${rule.id}`);
     }

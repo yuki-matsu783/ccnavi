@@ -25,7 +25,7 @@ var scaffoldPlaceholders = []string{
 	"（ここに計画の理由を書く）",
 }
 
-// 雛形の見出しを決める ticket-sections.yml（このリポジトリの共通レイヤーと同じ見出し）。
+// 雛形の見出しを決める ticket-sections.yml（このリポジトリの共通設定と同じ見出し）。
 const scaffoldSections = `version: 1
 parent:
   - name: 目的

@@ -1,6 +1,6 @@
 /**
  * プロジェクト管理画面（React）をhappy-domで動かす。cloneと .gitignoreのボタンの送り先、
- * カードに出るレイヤーの置き場と苦情、チケット制御がdisableのときの件数の欄。
+ * カードに出る設定の置き場と苦情、チケット制御がdisableのときの件数の欄。
  *
  * 移す前は拡張ホストが組んだHTMLの文字列を正規表現で見ていた（CB-T113 / CB-T123 / CB-T133）。
  * 確かめている中身はそのままで、見る先をDOMに移してある。
@@ -85,7 +85,7 @@ test("CB-D34 失敗の一言は次の一覧が届いたら消える。案内は�
   }
 });
 
-test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤーは本体の枠に出す。ミラーを調べる前は操作のボタンはありません", async () => {
+test("CB-T113 カードは設定の置き場を出す。ワークスペースの設定は本体の枠に出す。ミラーを調べる前は操作のボタンはありません", async () => {
   const dom = await openProjects([
     row({ name: "app", rel: "projects/app", rulesRel: "projects/app/.ccnavi/config/project/rules.yml" }),
     row({ rulesExists: false }),
@@ -95,7 +95,7 @@ test("CB-T113 カードはレイヤーの置き場を出す。自身のレイヤ
     const rules = (name: string): string => text(dom.one(`${cardSelector(name)} .field:nth-child(2) dd`));
     assert.equal(rules("app"), "あり projects/app/.ccnavi/config/project/rules.yml");
     assert.equal(rules("lib"), "なし projects/lib/.ccnavi/config/project/rules.yml");
-    // 予約名のプロジェクトはレイヤーが無いので、置く先も出さない
+    // 予約名のプロジェクトは設定が無いので、置く先も出さない
     assert.match(rules("Self"), /設定の対象になっていません/);
     assert.equal(dom.all("section.list button").length, 0, "カードに操作のボタンがある");
 

@@ -82,16 +82,16 @@ export function openedFromIds(draft: Draft, ids: ReadonlySet<string>): ReadonlyS
   return new Set(draft.rows.filter((row) => row.phase.id !== "" && ids.has(row.phase.id)).map((row) => row.key));
 }
 
-/** 編集中の定義と共通の設定の定義の重なり */
+/** 編集中の定義と共通設定のフェーズ定義の重なり */
 export interface CommonClash {
-  /** 共通の設定にも同じidがある定義のid。全欄が同じなら共通の側が使われ、違えば実行ファイルがerrorにする */
+  /** 共通設定にも同じidがある定義のid。全欄が同じなら共通の側が使われ、違えば実行ファイルがerrorにする */
   readonly ids: ReadonlySet<string>;
-  /** 共通の設定の別のidと表示名（title）が重なる定義のid。実行ファイルがerrorにするので、画面で止める */
+  /** 共通設定の別のidと表示名（title）が重なる定義のid。実行ファイルがerrorにするので、画面で止める */
   readonly titles: ReadonlySet<string>;
 }
 
 /**
- * 共通の設定の定義との重なり。表示名は空ならidを使う（実行ファイルと同じ）。前後の空白は除いて見る。
+ * 共通設定のフェーズ定義との重なり。表示名は空ならidを使う（実行ファイルと同じ）。前後の空白は除いて見る。
  * idが空の行は数えない（打っている途中の行を重なりとして赤くしない）。
  * 同じidの中身が同じかは、実行ファイルの`--lint`に任せる（共通の定義は全欄を持たない）。
  */

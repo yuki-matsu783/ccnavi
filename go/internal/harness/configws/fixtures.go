@@ -14,7 +14,7 @@ func Rule(id, match, key, pattern, message string) Obj {
 	return o
 }
 
-// ruleset はルールファイルの本文。ask は共通レイヤーだけが使う。
+// ruleset はルールファイルの本文。ask は共通設定だけが使う。
 func Ruleset(deny, allow []Obj) Obj {
 	o := Obj{"version": 1}
 	if deny != nil {
@@ -46,7 +46,7 @@ func Plus(rules []Obj, more ...Obj) []Obj {
 func DenyOf(o Obj) []Obj  { return o["deny"].([]Obj) }
 func AllowOf(o Obj) []Obj { return o["allow"].([]Obj) }
 
-// 共通レイヤー。どのツリーにも適用したい deny と、ワークスペースの allow。
+// 共通設定。どのツリーにも適用したい deny と、ワークスペースの allow。
 var CommonRules = Ruleset(
 	[]Obj{
 		Rule("credentials", "Write|Edit", "glob", "*/.env*", "credentials are not edited by the agent."),
@@ -59,7 +59,7 @@ var CommonRules = Ruleset(
 	},
 )
 
-// ワークスペース自身のレイヤー。ワークスペースのツリーにだけヒットする。
+// ワークスペースの設定。ワークスペースのツリーにだけヒットする。
 var OwnRules = Ruleset(
 	[]Obj{
 		Rule("generated", "Write|Edit", "glob", "*/generated/*", "generated files are rebuilt, not edited."),
@@ -68,7 +68,7 @@ var OwnRules = Ruleset(
 	[]Obj{Rule("docs", "Write|Edit", "glob", "*/docs/*", "")},
 )
 
-// lib のレイヤー。lib のツリーにだけヒットする。
+// lib の設定。lib のツリーにだけヒットする。
 var LibRules = Ruleset(
 	[]Obj{
 		Rule("schema", "Write|Edit", "glob", "*/schema/*", "schema is not edited by hand. write a migration."),
@@ -77,7 +77,7 @@ var LibRules = Ruleset(
 	[]Obj{Rule("source", "Write|Edit", "glob", "*/src/*", "")},
 )
 
-// app のレイヤー。雛形では置かない（無いレイヤー = 空）。2 つ目の非空のレイヤーを要るテストだけが置く。
+// app の設定。雛形では置かない（無い設定 = 空）。2 つ目の非空の設定を要るテストだけが置く。
 var AppRules = Ruleset(
 	[]Obj{
 		Rule("kube", "Bash", "glob", "*kubectl*", "kubectl is not run by the agent."),
@@ -89,13 +89,13 @@ var AppRules = Ruleset(
 // lib 側の、app の `deploy` と同じ呼び出しにヒットする deny。名前順に並ぶかを見る。
 var LibDeploy = Rule("deploy-any", "Bash", "glob", "*deploy*", "deploy is run by a human.")
 
-// 共通レイヤーの `ask`。プロジェクトのレイヤーの `allow` で緩められないことを見る。
+// 共通設定の `ask`。プロジェクトの設定の `allow` で緩められないことを見る。
 var AskVendor = Rule("ask-vendor", "Write|Edit", "glob", "*/vendor/*", "vendor はユーザに確かめてから触る。")
 
 // NotebookEdit を実際の tool_name として通すためのルール。欄は notebook_path。
 var NotebookRule = Rule("notebook", "NotebookEdit", "glob", "*/notebooks/*", "ノートはユーザが回す。")
 
-// `{root}` を含む定義。共通レイヤーとレイヤーの両方に同じものを置いて、置換後の全欄一致を見る。
+// `{root}` を含む定義。共通設定とプロジェクトの設定の両方に同じものを置いて、置換後の全欄一致を見る。
 var RootRule = Rule("root-secret", "Write|Edit", "glob", "{root}/*/secret.txt", "secret.txt は置かない。")
 
 // YAML として不正。閉じていないリスト。
@@ -154,6 +154,6 @@ factors:
 var keepFiles = []string{"src/keep.py", "generated/keep.py", "schema/keep.sql", "docs/keep.md"}
 
 // ワークスペースの git が無視するもの。実物の .gitignore と同じ 3 つだけ。
-// `/.ccnavi/` を丸ごと無視すると共通レイヤーの 3 本が追跡されず、ワークツリー側の設定ができない。
-// それができないと、共通レイヤーのワークツリー側の設定が書けて戻らないという穴を一度も再現できない。
+// `/.ccnavi/` を丸ごと無視すると共通設定の 3 本が追跡されず、ワークツリー側の設定ができない。
+// それができないと、共通設定のワークツリー側の設定が書けて戻らないという穴を一度も再現できない。
 const gitignoreText = "/projects/\n/.claude/worktrees/\n/logs/\n"

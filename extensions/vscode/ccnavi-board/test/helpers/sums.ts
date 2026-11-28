@@ -1,6 +1,6 @@
 /**
  * 統合結果（`--explain --json`の`sums[]`）の見本。実行ファイルの出力の形で、
- * ワークスペースの統合結果（共通 + 自身）とプロジェクトlibの統合結果（共通 + lib）を持つ。
+ * ワークスペースの統合結果（共通設定 + ワークスペースの設定）とプロジェクトlibの統合結果（共通 + lib）を持つ。
  */
 import { parseBoardJson, type BoardJson } from "../../src/core/model.js";
 import { fixture } from "./fixture.js";

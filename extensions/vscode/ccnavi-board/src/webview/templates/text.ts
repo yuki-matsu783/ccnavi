@@ -29,10 +29,10 @@ export function treeLabel(tree: string): string {
   return tree === "" ? "ワークスペース" : tree;
 }
 
-/** レイヤーの言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は`core/sums.ts`と同じ */
+/** 設定の言葉。共通・ワークスペース（self）・プロジェクト（名前）。言い方は`core/sums.ts`と同じ */
 export const layerLabel = coreLayerLabel;
 
-/** 対象が見せるレイヤー。実行ファイルが返していなければundefined */
+/** 対象が見せる設定。実行ファイルが返していなければundefined */
 export function layerFor(target: { readonly kind: string; readonly name: string }, layers: readonly TemplateLayer[]): TemplateLayer | undefined {
   const name = shownLayerOf(target);
   return layers.find((layer) => layer.name === name);

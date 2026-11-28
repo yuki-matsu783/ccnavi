@@ -78,7 +78,7 @@ Claude Codeのセッションが示すスクラッチパッド（Environment欄�
 | 種類 | 反映する先 | 新規 | チケット管理画面から |
 |---|---|---|---|
 | `template` | `.ccnavi/config/{common,project}/templates/<名前>.yml` ほか | できる | 可 |
-| `messages` | `.ccnavi/messages/<名前>.yml`（レイヤーごとの`messages/`は読まれないので対象外） | できる | 不可（ターミナルのユーザだけ） |
+| `messages` | `.ccnavi/messages/<名前>.yml`（設定ごとの`messages/`は読まれないので対象外） | できる | 不可（ターミナルのユーザだけ） |
 | `layer-config` | `rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml` | できない | 可（`rules.yml`の`guard-*`のルールか今あるdenyを動かす取り込みは不可） |
 | `docs` | `.ccnavi/docs/**/*.md`・`.ccnavi/CCNAVI.md` | できない | 可 |
 | `defense` | `.ccnavi/scripts/**`・`.claude/hooks/**`・`.claude/settings*.json`・`.claude/skills/**/*.md` | できない | 不可（ターミナルのユーザだけ） |

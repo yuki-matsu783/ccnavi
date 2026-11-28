@@ -126,7 +126,7 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `rules` | ヒットしたルールの名前（ルールファイル由来は `<相対パス>:<id>`、組み込みは id）。ルールファイルの外の決めごとで止めた回は先頭に括弧付きの名前（`builtin:ticket-scope`、`builtin:phase-review` など。判定ごとに分かれる。一覧は付録 A） |
 | `reason` | `skip` の理由（上の一覧）。`stop-review-judge` は `allow`・`deny` の行にも、`stop-review-worker` は `deny` の行に付く。`worktree-unreadable` は `detail` に理由 |
 | `hinted` | この呼び出しで `additionalContextOnce` の案内を渡した回だけ `true`。渡した後の呼び出しと、毎回渡す案内だけの呼び出しには出ない（案内がどの呼び出しに付いたかは hook の応答から分からないので残す） |
-| `guarded` | ccnavi 自身の設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`missing`・`failed`。変わっていない回は残さない |
+| `guarded` | `.claude/settings*.json` と、共通設定・ワークスペースの設定・プロジェクトの設定ファイルについて、その回に起きたことの配列。要素は `<対象>:<動き>`。動きは `saved`（バックアップを取った）・`restored`（バックアップから戻した）・`restored-from-git`（git から戻した）・`would-restore`（予行で言うだけ）・`rebased`（大きい対象が変わったので基準を取り直した）・`accepted`（ユーザの発言で消えたことを受け入れた）・`missing`・`failed`。変わっていない回は残さない |
 | `tree` / `project` | 呼び出しの行き先が属するツリーとプロジェクト |
 | `permission_mode` | Claude Code から来たモード。`handover` の行と合わせて読む |
 | `paths` | 実行後チェックが検知した「種類とパス」 |
@@ -134,11 +134,11 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `degraded` | コマンドを読み切れずに生の文字列で判定した回。`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote`、`expanded-redirect-target`（`ambiguous-substitution` と `backquote` は `DENY_AMBIGUOUS_FORM` / `DENY_BACKQUOTE` で止めた回） |
 | `quoted` | 引用の中から切り出したコマンドにだけヒットしたルールの id |
 | `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（6.3.2）でヒットしたときの、そのコマンド。複数なら `\x00` でつなぐ |
-| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。自身のレイヤーやプロジェクトのレイヤーが読めなかった回は、そのレイヤーの名前（`self`、`lib` など）が入り、そのレイヤーを空として判定している |
-| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の名前にはレイヤーの前置きが付かない（相対パスで出どころが分かる） |
+| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。ワークスペースの設定やプロジェクトの設定が読めなかった回は、その設定の名前（`self`、`lib` など）が入り、その設定を空として判定している |
+| `source` | 判定を下したルールの設定。`common` / `self` / プロジェクトの名前。`rules` の名前には設定の前置きが付かない（相対パスで出どころが分かる） |
 
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
-フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義のレイヤーが入る。
+フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義の設定が入る。
 
 #### 秘密の伏せ方
 

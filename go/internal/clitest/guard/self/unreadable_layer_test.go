@@ -9,15 +9,15 @@ import (
 	"ccnavi/internal/infra/env"
 )
 
-// SessionStart で、読めないレイヤーのルールを知らせること。
+// SessionStart で、読めない設定のルールを知らせること。
 //
-// 読めないレイヤーは空として扱われ、そのレイヤーの deny が黙って効かなくなる。どのレイヤーを読めないと数えるかは
+// 読めない設定は空として扱われ、その設定の deny が黙って効かなくなる。どの設定を読めないと数えるかは
 // policy/ruleload のテストが見る。
 func TestSessionStartSaysAnUnreadableLayerToTheModelAndTheUser(t *testing.T) {
 	t.Parallel()
 	root := base.TempDir(t)
 	mkdirs(t, root+"/.claude")
-	write(t, base.ConfigPath(root, "rules"), "version: 1\ndeny: [: broken\n") // ワークスペースのプロジェクトのレイヤー（self）
+	write(t, base.ConfigPath(root, "rules"), "version: 1\ndeny: [: broken\n") // ワークスペースのプロジェクトの設定（self）
 	body := payload{"hook_event_name": "SessionStart", "source": "startup", "cwd": root}
 	r := hook(t, root, []string{"--mode", "enable", "--guard-core-files", "disable"}, body, map[string]string{env.Learning: "enable"})
 	if r.Code != 0 {

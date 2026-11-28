@@ -110,7 +110,7 @@ func (w *ws) useRules(body any) {
 	w.useRulesText(string(raw))
 }
 
-// useRulesText は共通レイヤーの rules.yml を書き換える（--rules は診断でだけ有効で、hook には渡せない）。
+// useRulesText は共通設定の rules.yml を書き換える（--rules は診断でだけ有効で、hook には渡せない）。
 func (w *ws) useRulesText(text string) {
 	w.T.Helper()
 	ticketkit.Write(w.T, filepath.Join(w.Root, ".ccnavi", "config", "common", "rules.yml"), text)

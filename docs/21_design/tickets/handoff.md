@@ -59,7 +59,7 @@ Claude Code 本体は `.claude` という名前の階層（深さを問わない
 
 | 種類 | パス（ツリーからの相対） | 新規作成 | チケット管理画面 | 検査 |
 |---|---|---|---|---|
-| `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通と層で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`ids.IsValidName` と、`proposal/templates` の `nameLimit`） |
+| `template` | `.ccnavi/config/common/templates/<名前>.yml`（共通。ワークスペースルートのツリーでだけ書ける）、`.ccnavi/config/project/templates/<名前>.yml`、`projects/<名前>/.ccnavi/config/project/templates/<名前>.yml` | できる | 可 | テンプレートの検査（`templates`）。`description` と `when` の `TODO` の印は warn、制御文字は error、共通設定と設定で同名なのに中身が違えば error、ファイル名と中身の `name:` の照合、名前の形（`ids.IsValidName` と、`proposal/templates` の `nameLimit`） |
 | `messages` | `.ccnavi/messages/<名前>.yml`（ワークスペースルート直下だけ。`projects/<名前>/` の下の `messages/` は読まれないので対象外） | できる | 不可 | 文面ファイルの検査（`policy/texts`。欄・差し込みの名前・`次:` の数・長さ・ADR 番号・相対の script 呼び出し。[文面ファイル](../messages.md)）。error のある下書きは取り込めない |
 | `layer-config` | `.ccnavi/config/{common,project}/{rules,phases,risks,ticket-sections}.yml`、`projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | できない | 可（`rules.yml` で防御の記述を動かすものは不可。下記） | `ccnavi --lint` が同じファイルに掛ける検査と同じ水準（下の「検査の共有」） |
 | `docs` | `.ccnavi/docs/**/*.md`、`.ccnavi/CCNAVI.md` | できない | 可 | UTF-8 であること |

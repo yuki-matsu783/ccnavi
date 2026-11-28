@@ -1,7 +1,7 @@
 /**
- * フェーズ管理画面の、拡張ホストとWebviewの間の契約。編集する対象は共通の設定・ワークスペースの設定・プロジェクトの設定の3種。リスク管理（`risk-view.ts`）と同じ作り。
- * 判定に使われる定義は、共通の設定（`.ccnavi/config/common/phases.yml`）と、開いている設定の和。ワークスペースかプロジェクトを開いたときは、
- * 共通の設定の定義を読み取り専用で並べ（`PhasesPage.common`）、出どころが共通か開いている設定かを見分けられるようにする。共通の設定を開いたときは並べない。
+ * フェーズ管理画面の、拡張ホストとWebviewの間の契約。編集する対象は共通設定・ワークスペースの設定・プロジェクトの設定の3種。リスク管理（`risk-view.ts`）と同じ作り。
+ * 判定に使われる定義は、共通設定（`.ccnavi/config/common/phases.yml`）と、開いている統合結果。ワークスペースかプロジェクトを開いたときは、
+ * 共通設定のフェーズ定義を読み取り専用で並べ（`PhasesPage.common`）、出どころが共通か開いている設定かを見分けられるようにする。共通設定を開いたときは並べない。
  *
  * 画面はReactで組み、拡張ホストはHTMLを組み立てない。更新のたびに画面を作り直さず、画面の中身にも型検査を効かせるため。渡すのは「いま何を見せるか」
  * （`PhasesData`）だけで、画面が返すのはユーザが押した操作（`PhasesMessage`）だけ。定義の意味
@@ -53,8 +53,8 @@ export interface PhasesForm {
 }
 
 /**
- * 共通の設定の定義1件（読み取り専用）。実行ファイルの統合結果（`--explain --json`の`sums[].phases.types`）のうち、
- * 出どころ（`source`）が共通の設定のもの。拡張は足し直さず、そのまま見せる
+ * 共通設定のフェーズ定義1件（読み取り専用）。実行ファイルの統合結果（`--explain --json`の`sums[].phases.types`）のうち、
+ * 出どころ（`source`）が共通設定のもの。拡張は足し直さず、そのまま見せる
  */
 export interface CommonPhase {
   readonly id: string;
@@ -90,7 +90,7 @@ export const REVIEW_OPTIONS: readonly { readonly value: "true" | "false"; readon
   { value: "true", label: "あり（true）", short: "レビューあり", note: "MRのレビューを受けます。" },
 ];
 
-/** 区分の短い名前。知らない値（共通の設定の定義はkindを文字のまま持つ）はそのまま返す */
+/** 区分の短い名前。知らない値（共通設定のフェーズ定義はkindを文字のまま持つ）はそのまま返す */
 export function kindShort(kind: string): string {
   return Object.hasOwn(KIND_LABELS, kind) ? KIND_LABELS[kind as PhaseKind].short : kind;
 }
@@ -117,12 +117,12 @@ export interface PhasesPage {
   readonly notices?: readonly string[];
   /** 取り込み待ち画面へ進む入口（開けるか）。読み込めなかったときは無い */
   readonly handoff?: HandoffEntry;
-  /** 上部にerrorの帯で出す文（共通の設定のphases.ymlを読めない、など）。画面は開いたまま。`--lint`がerrorを言う間は保存できない */
+  /** 上部にerrorの帯で出す文（共通設定のphases.ymlを読めない、など）。画面は開いたまま。`--lint`がerrorを言う間は保存できない */
   readonly errors?: readonly string[];
   /**
-   * 共通の設定の定義（読み取り専用）。開いている設定の定義に足されて判定に使われる。同じidで中身が違う定義や、
+   * 共通設定のフェーズ定義（読み取り専用）。開いている設定のフェーズ定義に足されて判定に使われる。同じidで中身が違う定義や、
    * 表示名（title）の重なりは、実行ファイルがerrorにする（そのとき開いている設定のその定義だけが使われず、同じidなら共通の定義が使われる）。
-   * 共通の設定を開いているときは空（編集する定義がそのまま共通の定義）。無ければ欄を出さない
+   * 共通設定を開いているときは空（編集する定義がそのまま共通の定義）。無ければ欄を出さない
    */
   readonly common?: readonly CommonPhase[];
   /** 開いている対象と、切り替えられる対象。無ければ切り替えの欄を出さない */

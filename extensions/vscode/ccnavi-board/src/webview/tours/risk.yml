@@ -2,7 +2,7 @@
 #   path見本のファイルの場所（画面には「（見本）」を付けて出す）
 #   risks見本の配点。risks.ymlと同じ書き方（levelsとfactors）
 #   builtin配点のファイルが無いときに画面が見せる組み込みの配点（src/core/risk-doc.tsのBUILTIN_RISK_TEXTと同じ値）
-#   sums     「統合結果」の見本。ccnaviが出す結果の形（共通設定 + 1つの設定の和）
+#   sums     「統合結果」の見本。ccnaviが出す結果の形（共通設定に1つの設定を足した統合結果）
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。
 #   open開く項目のid（, で区切って複数。指す先factor-* は、開いた最初の項目に付く）
 #   find絞り込みの欄に入れる文字
@@ -168,7 +168,7 @@ courses:
 
   - id: how-save-effect
     title: 保存してから効くまでを知りたいとき
-    summary: 保存で検証されること・書く場所・効き始める時期、共通設定との重ね合わせ、HIGH以上のときに変わること
+    summary: 保存で検証されること・書く場所・効き始める時期、共通設定に足した統合結果、HIGH以上のときに変わること
     steps:
       - target: levels
         title: 値を直す
@@ -200,13 +200,13 @@ courses:
         body: HIGHの閾値が40点のとき、40点の子はHIGHです。閾値を50に直したあとにクローズする40点の子はMEDIUMになり、リスクを理由にユーザのレビューが要る扱いにはなりません。ただし、計画でreviewをtrueと宣言したフェーズは、レビューが必要なままです。
         diagram: risk-level-edit
       - target: sum
-        title: 実際に使うのは、共通設定との重ね合わせ
-        body: 子をクローズするときの配点は、共通設定に、親チケットのプロジェクト（project:）の設定を重ねたものです。ここではlibの設定を共通設定に重ねます。閾値は小さいほうを使い、項目は両方を並べます。
+        title: 実際に使うのは、共通設定に足した統合結果
+        body: 子をクローズするときの配点は、共通設定に、親チケットのプロジェクト（project:）の設定を足したものです。ここではlibの設定を共通設定に足します。閾値は小さいほうを使い、項目は両方を並べます。
         scene: { sum: lib }
         diagram: risk-sum-lib
         focus: common, layer, merge
       - target: sum-table
-        title: 同じ差分を、重ねた配点で数える
+        title: 同じ差分を、足した配点で数える
         body: src/api/v1.pyを120行変えた子で見ます。共通設定のbig-diffは300行以下で0点です。libのlib:big-diffは100行を超えるので15点、public-apiは1ファイルで20点になり、合計35点です。libのHIGHは30なのでHIGHになります。
         scene: { sum: lib }
         diagram: risk-sum-lib
@@ -335,11 +335,11 @@ courses:
 
   - id: sum
     title: 共通設定との統合結果を確認したいとき
-    summary: 子をクローズするときに実際に使われる配点（共通設定に、選んだ設定を重ねた結果）の見方
+    summary: 子をクローズするときに実際に使われる配点（共通設定に、選んだ設定を足した結果）の見方
     steps:
       - target: sum
         title: 統合結果の枠
-        body: 子チケットをクローズするときの配点は、共通設定に、親チケットのプロジェクト（project:）の設定を重ねたものです。この枠は、ccnaviが計算した結果を、読み取り専用でそのまま表示します。
+        body: 子チケットをクローズするときの配点は、共通設定に、親チケットのプロジェクト（project:）の設定を足したものです。この枠は、ccnaviが計算した結果を、読み取り専用でそのまま表示します。
         scene:
           sum: self
       - target: sum-pick
@@ -354,7 +354,7 @@ courses:
           sum: lib
       - target: sum-table
         title: 項目の並びと由来
-        body: 項目は両方を並べ、由来の列に、共通設定か追加した設定かを出します。同じidで中身が違うときは両方を数え、後から重ねた設定の項目は、lib:big-diffのように設定名を前に付けた名前になります。
+        body: 項目は両方を並べ、由来の列に、共通設定か追加した設定かを出します。同じidで中身が違うときは両方を数え、後から足した設定の項目は、lib:big-diffのように設定名を前に付けた名前になります。
         scene:
           sum: lib
       - target: factors
@@ -399,7 +399,7 @@ diagrams:
       - id: load
         from: ccnavi
         to: risks.yml
-        text: 配点を読む（共通設定に、親チケットのプロジェクトの設定を重ねたもの）
+        text: 配点を読む（共通設定に、親チケットのプロジェクトの設定を足したもの）
         value: 'levels: {medium: 20, high: 40, critical: 70}'
       - id: diff
         from: ccnavi
@@ -568,7 +568,7 @@ diagrams:
         text: 次に子をクローズする（ticket finish）とき、配点を読み直す
         value: Claude Codeの再起動は要らない
 
-  # 共通設定にlibの設定を重ねた配点で、同じ差分を数える
+  # 共通設定にlibの設定を足した配点で、同じ差分を数える
   risk-sum-lib:
     actors: [ccnavi, 共通設定, libの設定]
     steps:

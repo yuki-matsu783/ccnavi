@@ -48,7 +48,7 @@ func newPushFixture(t *testing.T) *pushFixture {
 	tmp := base.TempDir(t)
 	ws := filepath.Join(tmp, "ws")
 	buildWorkspace(t, s, ws)
-	// 承認は共通レイヤーのルールを読む。無いと承認は通るが「ルールを読めない」と言うので、実際のワークスペースと同じく置く。
+	// 承認は共通設定のルールを読む。無いと承認は通るが「ルールを読めない」と言うので、実際のワークスペースと同じく置く。
 	writeFile(t, base.CommonPath(ws, "rules"), "version: 1\n")
 	// 計画（plan）のあるチケットは、計画が使うフェーズの定義も要る。
 	writeFile(t, base.ConfigPath(ws, "phases"), samples.Phases)

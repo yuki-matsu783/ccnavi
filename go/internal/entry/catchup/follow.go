@@ -145,7 +145,7 @@ func familyAt(root string, conf *config.Settings, name string) (path, branch str
 	return path, branch, unknown
 }
 
-// familyKey は親のワークツリーの元のリポジトリの名前（ロックの置き場の名前。ワークスペース自身は self）。
+// familyKey は親のワークツリーの元のリポジトリの名前（ロックの置き場の名前。ワークスペースは self）。
 func familyKey(root string, conf *config.Settings, path, name string) string {
 	return tree.RepoKey(integrate.TreeAt(conf, root, path, name).Project)
 }

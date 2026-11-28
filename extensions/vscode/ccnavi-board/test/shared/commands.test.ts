@@ -224,7 +224,7 @@ test("CB-T317 リスクの配点の差し替え: 共通は --risk、ワークス
   ]);
 });
 
-test("CB-T531 フェーズ定義の共通の差し替え: 共通の設定は --phases、ワークスペースとプロジェクトは --project-phases-fileの名前=", () => {
+test("CB-T531 フェーズ定義の共通の差し替え: 共通設定は --phases、ワークスペースとプロジェクトは --project-phases-fileの名前=", () => {
   assert.deepEqual(overrideArgs({ kind: "phases", path: "/tmp/p.yml" }), ["--phases", "/tmp/p.yml"]);
   assert.deepEqual(overrideArgs({ kind: "layerPhases", name: "self", path: "/tmp/p.yml" }), [
     "--project-phases-file",

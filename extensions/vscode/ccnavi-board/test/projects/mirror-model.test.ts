@@ -1,5 +1,5 @@
 /**
- * プロジェクト管理画面が読む、共通レイヤーのミラーの結果（`user mirror --json`）の読み取りと、画面の判断
+ * プロジェクト管理画面が読む、共通設定のミラーの結果（`user mirror --json`）の読み取りと、画面の判断
  * （`src/core/mirrormodel.ts`）、子プロセスに渡す引数（`src/core/commands.ts`の`mirror*Args`）、
  * 実行ファイルの出力の読み方（`src/ccnavi.ts`の`mirrorListOf` / `mirrorResultOf`）を確かめる。
  * 実行ファイルの実物は無くても試せる。結果は実行ファイルとの取り決めの例をそのまま使う。
@@ -90,9 +90,9 @@ test("CB-T1156 見るだけの答えを取り決めのとおりに読む。状�
 });
 
 test("CB-T1157 okが偽の答えは読み取りの失敗にせず、理由を持った一覧として返す。版の違い・欄の欠け・JSONでないものは失敗", () => {
-  const failed = listOf(JSON.stringify({ version: 1, ok: false, error: "共通レイヤーを読み込めません", projects: [] }));
+  const failed = listOf(JSON.stringify({ version: 1, ok: false, error: "共通設定を読み込めません", projects: [] }));
   assert.equal(failed.ok, false);
-  assert.equal(failed.error, "共通レイヤーを読み込めません");
+  assert.equal(failed.error, "共通設定を読み込めません");
   assert.deepEqual(failed.projects, []);
 
   const version = parseMirrorList(JSON.stringify({ version: 2, ok: true, projects: [] }));

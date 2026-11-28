@@ -44,7 +44,7 @@ func checkerOf(stderr io.Writer, conf *config.Settings, root string, watched []p
 	}
 }
 
-// watchedFor は実行後に見るツリーと、それぞれに当てるルール（共通レイヤーにそのツリーのレイヤーを足した和）。
+// watchedFor は実行後に見るツリーと、それぞれに当てるルール（共通設定にそのツリーの設定を足した和）。
 // in があればワークスペースルートと、この呼び出しが触ったツリー（パスを持つツールは行き先、ほかは cwd）。横で作業する
 // 指定が有効なユーザのチェックアウトは毎回見る（書き換えはそのチェックアウトに起きる）。
 //
@@ -89,8 +89,8 @@ func watchedFor(stderr io.Writer, conf *config.Settings, root string, record *au
 	for _, t := range trees {
 		got, ok := loaded[t.Project]
 		if !ok {
-			// 共通レイヤーはツリーのレイヤーごとに読み直す（レイヤーを足すと集合が書き換わる）。共通レイヤーの苦情は
-			// 同じなので最初の 1 回だけ書き、レイヤーの苦情はツリーごとに違うのでそのまま書く。
+			// 共通設定はツリーの設定ごとに読み直す（設定を足すと集合が書き換わる）。共通設定の苦情は
+			// 同じなので最初の 1 回だけ書き、設定の苦情はツリーごとに違うのでそのまま書く。
 			said := stderr
 			if len(loaded) > 0 {
 				said = io.Discard

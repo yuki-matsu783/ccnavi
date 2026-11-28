@@ -1,7 +1,7 @@
 /**
- * プロジェクト管理画面が読む、共通レイヤーのミラーの結果（`user mirror --json`）の読み取りと、画面の判断の部分。
+ * プロジェクト管理画面が読む、共通設定のミラーの結果（`user mirror --json`）の読み取りと、画面の判断の部分。
  *
- * ミラーは、ワークスペースの`.ccnavi/config/common/`（共通レイヤー）を各プロジェクトの`.ccnavi/config/common/`にコピーしたもの。
+ * ミラーは、ワークスペースの`.ccnavi/config/common/`（共通設定）を各プロジェクトの`.ccnavi/config/common/`にコピーしたもの。
  * ずれの有無・中身・ハッシュ（`expect`）は実行ファイルが決めて返し、同期で書くのも実行ファイル。ここで決めるのは次の3つだけ。
  *
  * - 行と帯に出す文言（同期済み / ずれN件 / 確認できない、変更の種類の言い方、同期の結果の通知）
@@ -41,10 +41,10 @@ export interface MirrorProject {
 /** 見るだけの結果（`user mirror [<名前>…] --json`）の全体 */
 export interface MirrorList {
   readonly version: number;
-  /** 偽なら`error`に理由（共通レイヤーが読めないなど）。そのとき`projects`は空 */
+  /** 偽なら`error`に理由（共通設定が読めないなど）。そのとき`projects`は空 */
   readonly ok: boolean;
   readonly error: string;
-  /** 共通レイヤーにも工程スキルにもコピーするものが無い。同期しても何も起きない（ミラーは消さない） */
+  /** 共通設定にも工程スキルにもコピーするものが無い。同期しても何も起きない（ミラーは消さない） */
   readonly commonEmpty: boolean;
   readonly projects: readonly MirrorProject[];
   /** 差分のある全プロジェクトをまとめて同期するときに渡す`--expect`の値。差分が無ければ空 */

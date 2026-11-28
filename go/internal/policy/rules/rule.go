@@ -34,7 +34,7 @@ const (
 	StopMatch = string(hookio.Stop)
 	// StopSubject は StopMatch のルールを当てる固定の文字列。
 	StopSubject = "(stop)"
-	// IDSeparator はレイヤーの名前と id の間の字（`self:docs`）。書いた id には使えない。
+	// IDSeparator は設定の名前と id の間の字（`self:docs`）。書いた id には使えない。
 	IDSeparator = ":"
 	// ReservedIDPrefix は組み込みのルールの名前の頭。ルールファイルには書けない。
 	ReservedIDPrefix = "builtin:"
@@ -208,12 +208,12 @@ func (c *Condition) Walk() []*Condition {
 
 // Rule は探すものと、見つけたときに言うことの組。
 type Rule struct {
-	// ID は報告で名指しする名前。レイヤーの和では `lib:schema` のように前にレイヤーの名前が付く。
+	// ID は報告で名指しする名前。統合結果では `lib:schema` のように前に設定の名前が付く。
 	ID string
-	// BareID は書かれたままの id。レイヤーをまたいで同じルールかを見るキー（ID から前置きを外して
+	// BareID は書かれたままの id。設定をまたいで同じルールかを見るキー（ID から前置きを外して
 	// 求めると、`:` を含む id を書いたユーザの定義が外される側になる）。
 	BareID string
-	// Source はルールが来たレイヤー（common・self・プロジェクトの名前）。
+	// Source はルールが来た設定（common・self・プロジェクトの名前）。
 	Source string
 	// Match は対象のツール名を "|" で並べたもの。
 	Match string
@@ -231,7 +231,7 @@ type Rule struct {
 	// ルールは組み上げ、Every は 1 にする（指摘は lint の仕事で、id で名指しできるように）。
 	Every        int
 	EveryWritten any
-	// Base は設定に依らず常に当たる組み込みの deny（土台）。同じ呼び出しがレイヤーの deny にも当たれば、
+	// Base は設定に依らず常に当たる組み込みの deny（土台）。同じ呼び出しが設定の deny にも当たれば、
 	// 文面と記録はそちらに載せる。
 	Base     bool
 	Decision Decision
@@ -284,7 +284,7 @@ func (r *Rule) Speech() (ref *TextRef, text string) {
 	return nil, FillText(r.Message, r.Root)
 }
 
-// Key はレイヤーをまたいで「同じ定義」と言えるかのキー。式は {root} を置き換えたあとで比べる。
+// Key は設定をまたいで「同じ定義」と言えるかのキー。式は {root} を置き換えたあとで比べる。
 func (r *Rule) Key() string {
 	pattern := func(re *pyre.Regexp) string {
 		if re == nil {

@@ -69,7 +69,7 @@ type Options struct {
 	Bin         string
 	ProjectHome string
 	Root        string
-	// CommonFiles は共通レイヤーの設定ファイル（CommonLayerFiles）。
+	// CommonFiles は共通設定ファイル（CommonLayerFiles）。
 	CommonFiles []string
 	// Log と State は記録と state の置き場（診断のフラグで動かせる）。
 	Log, State string
@@ -81,8 +81,8 @@ type Options struct {
 }
 
 // AddRules はガード自身を守るルールを、ルールファイルの外から判定の先頭に足す（ルールに書かせると消せるため）。
-// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通レイヤーの設定ファイル。
-// 先頭に挿すので、後に足したものほど先に当たる（共通レイヤーの 1 本が ccnavi ディレクトリの 1 本より先）。
+// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通設定ファイル。
+// 先頭に挿すので、後に足したものほど先に当たる（共通設定の 1 本が ccnavi ディレクトリの 1 本より先）。
 func AddRules(rs *rules.RuleSet, o Options) {
 	next := nextHint(o.Root)
 	if o.Tool == "" || rules.ToolMatches(shellMatch, o.Tool) {
@@ -132,9 +132,9 @@ func AddRules(rs *rules.RuleSet, o Options) {
 	}
 }
 
-// AddNamedRules は、hook・settings・scripts・共通の設定ファイルを名前で書くツールから守る 4 本を、先頭に足す。
+// AddNamedRules は、hook・settings・scripts・共通設定ファイルを名前で書くツールから守る 4 本を、先頭に足す。
 // ルールファイルが読めない間も、実行後の保護範囲に同じ 4 本を使う。実行前は AddRules の後に呼ぶ（専用の文が先に並ぶため）。
-// 置き場の中のつながっていないコピーは外す。ccnavi ディレクトリの名前が空なら、scripts と共通の設定は足さない。
+// 置き場の中のつながっていないコピーは外す。ccnavi ディレクトリの名前が空なら、scripts と共通設定は足さない。
 func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 	exempt := handoffWriteExempt(root)
 	variants := texts.SpecOptions{Variants: texts.Variants{nextVariant: string(nextHint(root))}}
@@ -158,7 +158,7 @@ func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 	}
 }
 
-// commonFileNames は共通レイヤーの設定ファイルの名前を並べた式（config.LayerKinds の順）。
+// commonFileNames は共通設定ファイルの名前を並べた式（config.LayerKinds の順）。
 func commonFileNames() string {
 	names := config.LayerFileNames()
 	var quoted []string

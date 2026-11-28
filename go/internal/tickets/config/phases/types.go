@@ -67,7 +67,7 @@ type PhaseType struct {
 	Skill    string
 	When     string
 	Learning Learning
-	// Source はこの定義が書いてあるレイヤーの名前（common / self / プロジェクト名）。記録の source になる。
+	// Source はこの定義が書いてある設定の名前（common / self / プロジェクト名）。記録の source になる。
 	Source string
 }
 
@@ -84,7 +84,7 @@ func (p *PhaseType) Decide(rel string) rules.Decision {
 	return ticket.Outside
 }
 
-// fields はレイヤーをまたいで「同じ定義か」を比べる欄（id を除く）。Source は含めない（比べたいのは中身で、
+// fields は設定をまたいで「同じ定義か」を比べる欄（id を除く）。Source は含めない（比べたいのは中身で、
 // 置いてある場所ではない）。名前の並びはコピーの欄と同じ。
 func (p *PhaseType) fields() []field {
 	scope := inherit
@@ -225,7 +225,7 @@ func (t *Types) clone() *Types {
 	return out
 }
 
-// markSource はこの集合の定義に、どのレイヤーから来たかを持たせる。
+// markSource はこの集合の定義に、どの設定から来たかを持たせる。
 func (t *Types) markSource(layer string) {
 	for p := range t.All() {
 		p.Source = layer
@@ -292,9 +292,9 @@ func readDefs(raw *yaml.Map) (*Types, []rules.Problem) {
 	for key, body := range raw.All() {
 		id := ospath.Strip(pyfmt.Str(key))
 		if strings.Contains(id, rules.IDSeparator) {
-			// レイヤーの名前をつけた形（lib:build）と見分けが付かず、記録を読んだユーザが直すファイルを決められない。
+			// 設定の名前をつけた形（lib:build）と見分けが付かず、記録を読んだユーザが直すファイルを決められない。
 			problems = append(problems, problem(rules.Error, id, "識別子に `"+rules.IDSeparator+"` は書けない。"+
-				"レイヤーの名前を添えた形（`self"+rules.IDSeparator+"id` / "+
+				"設定の名前を添えた形（`self"+rules.IDSeparator+"id` / "+
 				"`<プロジェクト名>"+rules.IDSeparator+"id`）と見分けが付かない"))
 			continue
 		}

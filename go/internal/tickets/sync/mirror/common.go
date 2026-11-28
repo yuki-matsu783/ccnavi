@@ -19,10 +19,10 @@ import (
 	"ccnavi/internal/tickets/proposal/templates"
 )
 
-// 共通レイヤーからミラーへ写すもの: 設定 4 本と期待する判定、配点の script: が指す共通のスクリプト、
-// error の無いテンプレート。ミラーとして（単体 clone では共通レイヤーとして）読めない設定があれば何も写さない。
+// 共通設定からミラーへ写すもの: 設定 4 本と期待する判定、配点の script: が指す共通のスクリプト、
+// error の無いテンプレート。ミラーとして（単体 clone では共通設定として）読めない設定があれば何も写さない。
 
-// expectationsName は共通レイヤーの期待する判定のファイル名。
+// expectationsName は共通設定の期待する判定のファイル名。
 const expectationsName = "rule-expectations.yml"
 
 // 設定の読み込みで、苦情の出どころとして添える where。
@@ -32,9 +32,9 @@ const (
 	sectionsWhere = "(sections)"
 )
 
-// commonSources は共通レイヤーのうち写すもの（ミラーの置き場からの相対 → 中身）。写せなければ理由。
+// commonSources は共通設定のうち写すもの（ミラーの置き場からの相対 → 中身）。写せなければ理由。
 func commonSources(conf *config.Settings, root string) (map[string][]byte, string) {
-	// 1. 共通レイヤーの設定ファイル（rules・phases・risks など）と rule-expectations.yml を読む。ファイルが無いのは構わず、在るのに読めないときは止める。
+	// 1. 共通設定ファイル（rules・phases・risks など）と rule-expectations.yml を読む。ファイルが無いのは構わず、在るのに読めないときは止める。
 	base := conf.CommonLayerDir(root)
 	out := map[string][]byte{}
 	riskName := config.LayerFileNames()[config.KindRisk]
@@ -45,18 +45,18 @@ func commonSources(conf *config.Settings, root string) (map[string][]byte, strin
 	for _, name := range append(names, expectationsName) {
 		raw, existed, why := readStrict(ospath.Join(base, name))
 		if why != "" {
-			return nil, "共通レイヤーの " + name + " を読めない (" + why + ")"
+			return nil, "共通設定の " + name + " を読めない (" + why + ")"
 		}
 		if existed {
 			out[name] = raw
 		}
 	}
-	// 2. 共通レイヤーの設定として不正な中身は、ミラーに写さずに止める。
+	// 2. 共通設定として不正な中身は、ミラーに写さずに止める。
 	for _, kind := range config.LayerKinds() {
 		name := config.LayerFileNames()[kind]
 		if raw, ok := out[name]; ok {
 			if why := unreadableAsCommon(kind, raw, root); why != "" {
-				return nil, "共通レイヤーの " + name + " を、ミラーとして読めない: " + why
+				return nil, "共通設定の " + name + " を、ミラーとして読めない: " + why
 			}
 		}
 	}
@@ -68,7 +68,7 @@ func commonSources(conf *config.Settings, root string) (map[string][]byte, strin
 			if why == "" {
 				why = missing
 			}
-			return nil, "共通レイヤーの配点が指すスクリプト " + rel + " を読めない (" + why + ")"
+			return nil, "共通設定の配点が指すスクリプト " + rel + " を読めない (" + why + ")"
 		}
 		out[strings.TrimPrefix(rel, prefix)] = raw
 	}
@@ -108,7 +108,7 @@ func scriptPrefix() string {
 	return head + config.CommonDir + "/"
 }
 
-// scriptValues は共通レイヤーの配点が指す共通のスクリプト（ワークスペースルートからの相対。書かれた順、重なりなし）。
+// scriptValues は共通設定の配点が指す共通のスクリプト（ワークスペースルートからの相対。書かれた順、重なりなし）。
 func scriptValues(raw []byte) []string {
 	if len(raw) == 0 {
 		return nil
@@ -127,7 +127,7 @@ func scriptValues(raw []byte) []string {
 	return found
 }
 
-// unreadableAsCommon はミラーとして（単体 clone では共通レイヤーとして）読めない理由。読めれば空。
+// unreadableAsCommon はミラーとして（単体 clone では共通設定として）読めない理由。読めれば空。
 func unreadableAsCommon(kind config.LayerKind, content []byte, root string) string {
 	if !utf8.Valid(content) {
 		return "UTF-8 として読めない"

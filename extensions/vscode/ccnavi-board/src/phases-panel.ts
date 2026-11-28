@@ -7,24 +7,24 @@
  * `retainContextWhenHidden`が真で、入れ物（HTML）は1度しか入らない。入れ直すと画面が作り直され、打ちかけの編集が消えるため。
  * 中身を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存が通った）。
  *
- * 対象は3種。共通の設定の定義（`.ccnavi/config/common/phases.yml`。場所は固定）、ワークスペースの設定の定義
- * （既定`.ccnavi/config/project/phases.yml`）、プロジェクト1つの設定の定義（既定`projects/<名前>/.ccnavi/config/project/phases.yml`）。
- * 判定に使われるのは、共通の設定と、親チケットの`project:`が指す設定の和。共通の設定を開いたときは、編集する定義がそのまま
+ * 対象は3種。共通設定のフェーズ定義（`.ccnavi/config/common/phases.yml`。場所は固定）、ワークスペースの設定のフェーズ定義
+ * （既定`.ccnavi/config/project/phases.yml`）、プロジェクト1つの設定のフェーズ定義（既定`projects/<名前>/.ccnavi/config/project/phases.yml`）。
+ * 判定に使われるのは、共通設定に、親チケットの`project:`が指す設定を足した統合結果。共通設定を開いたときは、編集する定義がそのまま
  * 共通の定義になるので、読み取り専用の欄（実行ファイルの統合結果のうち出どころが共通のもの）は出さない。
  * タブは1枚だけで、別の対象を開くとそのタブの中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json`の`layers[].phases_file`）を使い、拡張は組まない。
  *
  * 検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、`--lint --project-phases-file <名前>=<パス>`
- * （ワークスペースの設定は名前が`self`）、共通の設定は`--phases <パス>`で渡す。実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、
+ * （ワークスペースの設定は名前が`self`）、共通設定は`--phases <パス>`で渡す。実行ファイルは共通設定と足した形で確かめる（同じidで中身が違う、
  * 表示名の重なり、定義の形）。
  * 保存は、検証（`--lint`）を通り、作業中のチケットが無く、ファイルが外で変わっていないときだけ行う（流れは`settings-panel.ts`の`save`）。
- * 作業中のチケットは、共通の設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分だけを見る
+ * 作業中のチケットは、共通設定とワークスペースの設定ならどのツリーでも、プロジェクトの設定ならそのプロジェクトの分だけを見る
  * （定義は承認・着手・閉じるときに読まれるので、走っている最中に変えない）。
  * ファイルが無いのは「設定が無い」正常な状態で、帯は出さない。欄は触れ、検証を通った最初の保存でファイルを作る（雛形は置かない）。
  * 定義の無いファイル（`phases: {}`）は実行ファイルがerrorにするので、先に書き出さない。
  * 組み込みの既定は無い（実行ファイルも持たない。既定を組み込むと、意図せずレビューの要否が決まる）。
- * 共通の設定の`phases.yml`を実行ファイルが読めないときは、共通の定義が空として扱われ、`--lint`がerrorで言う。画面は開き、その
- * errorを上部の帯で出す。共通の設定を開いているときは、その定義を直して検証の通る形で保存できる（直さなければ、ほかの対象の`--lint`もerrorのまま）。
+ * 共通設定の`phases.yml`を実行ファイルが読めないときは、共通の定義が空として扱われ、`--lint`がerrorで言う。画面は開き、その
+ * errorを上部の帯で出す。共通設定を開いているときは、その定義を直して検証の通る形で保存できる（直さなければ、ほかの対象の`--lint`もerrorのまま）。
  *
  * チケット制御がdisableのワークスペースでは、対象がどれでも開かない。定義は親チケットの計画と
  * 子の範囲にしか読まれないので、disableの間は何も動かさない。入口（サイドパネル・コマンドパレット）も同じキーで隠れる。
@@ -56,21 +56,21 @@ import { requireTickets } from "./ticket-control.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEFAULT_PHASES = ".ccnavi/config/project/phases.yml";
-/** 共通の設定の定義の場所。ルール管理・リスク管理と同じく固定で、envでは動かせない */
+/** 共通設定のフェーズ定義の場所。ルール管理・リスク管理と同じく固定で、envでは動かせない */
 const DEFAULT_COMMON_PHASES = ".ccnavi/config/common/phases.yml";
 /** 画面の名前。バンドルのパスは`src/webview/<名前>/main.tsx` → `out/webview/<名前>.js`、`style.css` → `<名前>.css` */
 const SCREEN = "phases";
 const TITLE = "ccnaviフェーズ管理";
 
-/** ワークスペースかプロジェクトの設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
+/** ワークスペースかプロジェクトの設定ファイルを最初の保存で作るときに、先頭へ置く説明 */
 const LAYER_HEADER = [
-  "# この設定のフェーズ定義。親チケットのproject: がこの設定を指すときに、共通設定の定義に追加して使われる。",
+  "# この設定のフェーズ定義。親チケットのproject: がこの設定を指すときに、共通設定のフェーズ定義に追加して使われる。",
   "# 共通設定と同じidで中身が違う定義と、titleが重なる定義は、--lintがerrorにする。その定義は使われない（このファイルのほかの定義は使われる）。",
   "",
 ].join("\n");
-/** 共通の設定のファイルを最初の保存で作るときに、先頭へ置く説明 */
+/** 共通設定ファイルを最初の保存で作るときに、先頭へ置く説明 */
 const COMMON_HEADER = [
-  "# フェーズ定義（共通設定）。判定には、このファイルと、親チケットのproject: が指す設定のphases.ymlを合わせた結果を使う。",
+  "# フェーズ定義（共通設定）。判定には、このファイルと、親チケットのproject: が指す設定のphases.ymlを足した結果を使う。",
   "# 同じidで中身が違う定義と、titleが重なる定義は、--lintがerrorにする。",
   "",
 ].join("\n");
@@ -81,9 +81,9 @@ interface Loaded extends SettingsLoaded {
   readonly doc: PhasesDocument;
   /** 上部に出す注意。実行ファイルがこの設定を読めていない、など */
   readonly notices: readonly string[];
-  /** 上部にerrorの帯で出す文。共通の設定のphases.ymlを読めない、など */
+  /** 上部にerrorの帯で出す文。共通設定のphases.ymlを読めない、など */
   readonly errors: readonly string[];
-  /** 共通の設定の定義（読み取り専用）。実行ファイルの統合結果のうち出どころが共通のもの */
+  /** 共通設定のフェーズ定義（読み取り専用）。実行ファイルの統合結果のうち出どころが共通のもの */
   readonly common: readonly CommonPhase[];
 }
 
@@ -104,7 +104,7 @@ function whatOf(target: PhasesTarget): string {
   }
 }
 
-/** `ccnaviBoard.openPhases`の本体。引数なしはワークスペースの設定の定義 */
+/** `ccnaviBoard.openPhases`の本体。引数なしはワークスペースの設定のフェーズ定義 */
 export async function openPhases(target: PhasesTarget = { kind: "self" }): Promise<void> {
   if (!requireTickets("フェーズ管理画面")) {
     return;
@@ -175,7 +175,7 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
   let phasesPath: string;
   let phasesRel: string;
   if (target.kind === "workspace") {
-    // 共通の設定の場所は`.ccnavi/config/common/`固定。env（`--phases`を渡す設定など）では動かせない（リスク管理と同じ）。
+    // 共通設定の場所は`.ccnavi/config/common/`固定。env（`--phases`を渡す設定など）では動かせない（リスク管理と同じ）。
     phasesRel = DEFAULT_COMMON_PHASES;
     phasesPath = resolveIn(root, phasesRel);
   } else {
@@ -193,13 +193,13 @@ async function readPage(root: string, target: PhasesTarget): Promise<Loaded> {
       throw unreadableFailure({ path: phasesPath, rel: phasesRel }, layer.phasesFile.unreadable);
     }
   }
-  // 共通の設定のphases.ymlを実行ファイルが読めなければ、共通の定義は空として扱われ、--lintがerrorで言う。画面は開いたまま帯で知らせる。
+  // 共通設定のphases.ymlを実行ファイルが読めなければ、共通の定義は空として扱われ、--lintがerrorで言う。画面は開いたまま帯で知らせる。
   const commonFile = commonLayer(board.board);
   if (commonFile !== undefined && commonFile.phasesFile.unreadable !== "") {
-    errors.push(`共通設定のphases.ymlを読み込めません（${commonFile.phasesFile.path}）: ${commonFile.phasesFile.unreadable}。共通設定の定義は空として扱われています。`);
+    errors.push(`共通設定のphases.ymlを読み込めません（${commonFile.phasesFile.path}）: ${commonFile.phasesFile.unreadable}。共通設定のフェーズ定義は空として扱われています。`);
   }
   // 判定に使われる和は実行ファイルが組む（`sums[]`）。出どころが共通の定義だけを読み取り専用で見せ、拡張は足し直さない。
-  // 共通の設定を開いているときは、編集する定義がそのまま共通の定義なので、読み取り専用の欄は出さない。
+  // 共通設定を開いているときは、編集する定義がそのまま共通の定義なので、読み取り専用の欄は出さない。
   const common =
     target.kind === "workspace"
       ? []
@@ -225,7 +225,7 @@ function watchFiles(current: PanelState): void {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  // 読めていないときの仮の場所。共通の設定を開いているなら共通の場所を見る（読めなかった後も、その設定の変化を拾うため）
+  // 読めていないときの仮の場所。共通設定を開いているなら共通の場所を見る（読めなかった後も、その設定の変化を拾うため）
   const phasesRel = current.loaded?.file.rel ?? (current.target.kind === "workspace" ? DEFAULT_COMMON_PHASES : DEFAULT_PHASES);
   const patterns: vscode.RelativePattern[] = [
     patternFor(current.folder, phasesRel),
@@ -334,7 +334,7 @@ async function handle(current: PanelState, loaded: Loaded, message: PhasesMessag
       return;
     case "save":
       // ファイルを初めて作るときは、先頭に説明を置く。検証にも同じ本文を掛ける。
-      // 実行ファイルは共通の設定と足した形で確かめる（同じidで中身が違う、表示名の重なり）。承認済みの計画がこの定義で読めるかもここで分かる。
+      // 実行ファイルは共通設定と足した形で確かめる（同じidで中身が違う、表示名の重なり）。承認済みの計画がこの定義で読めるかもここで分かる。
       await save(current, loaded, () => (loaded.exists ? "" : headerOf(loaded.target)) + loaded.doc.apply(message.form));
       return;
   }
@@ -344,7 +344,7 @@ function headerOf(target: PhasesTarget): string {
   return target.kind === "workspace" ? COMMON_HEADER : LAYER_HEADER;
 }
 
-/** 保存の前の検証に渡す差し替え。共通の設定は`--phases`、ほかは名前を付けて`--project-phases-file` */
+/** 保存の前の検証に渡す差し替え。共通設定は`--phases`、ほかは名前を付けて`--project-phases-file` */
 function overrideFor(target: PhasesTarget, tmp: string): LintOverride {
   switch (target.kind) {
     case "workspace":

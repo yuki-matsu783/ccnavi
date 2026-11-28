@@ -42,7 +42,7 @@ func mirrorUsage(parser *argparse.Parser, a opts) string {
 	return ""
 }
 
-// runMirror は `ccnavi user mirror`。プロジェクトのミラーを、ワークスペースの共通レイヤーに揃える。見るだけの形を
+// runMirror は `ccnavi user mirror`。プロジェクトのミラーを、ワークスペースの共通設定に揃える。見るだけの形を
 // 含めてユーザ専用。書くのはワークツリーだけで、コミットはしない。
 func runMirror(in *input, stdout, stderr io.Writer, parser *argparse.Parser, conf *config.Settings, root string, a opts) int {
 	// 1. 引数の組み合わせを確かめる。
@@ -83,13 +83,13 @@ func runMirror(in *input, stdout, stderr io.Writer, parser *argparse.Parser, con
 
 // mirrorPlan はミラーの状態を人が読む形で書く。何も反映せず、揃えるときに実行するコマンドを添える。
 func mirrorPlan(w io.Writer, plan *mirror.Plan, named bool, root string) {
-	fmt.Fprintln(w, "ccnavi: 共通レイヤーのミラー（各プロジェクトの .ccnavi/config/common/）と工程スキル（skills/）")
+	fmt.Fprintln(w, "ccnavi: 共通設定のミラー（各プロジェクトの .ccnavi/config/common/）と工程スキル（skills/）")
 	if len(plan.Projects) == 0 {
 		fmt.Fprintln(w, "  プロジェクトはありません。")
 		return
 	}
 	if plan.CommonEmpty {
-		fmt.Fprintln(w, "  共通レイヤーにも工程スキルにもコピーするものがありません。ミラーは消さず、何も揃えません。")
+		fmt.Fprintln(w, "  共通設定にも工程スキルにもコピーするものがありません。ミラーは消さず、何も揃えません。")
 	}
 	for _, p := range plan.Projects {
 		if !p.Selected {
@@ -144,7 +144,7 @@ func mirrorPlan(w io.Writer, plan *mirror.Plan, named bool, root string) {
 	for _, p := range chosen {
 		for _, c := range p.Changes {
 			if c.Action() != mirror.ActionCreate {
-				fmt.Fprintln(w, "更新と削除は、ミラーの今の中身を共通レイヤーの中身で上書き・削除します。"+
+				fmt.Fprintln(w, "更新と削除は、ミラーの今の中身を共通設定の中身で上書き・削除します。"+
 					"ミラーや skills/ に手を入れていたなら、上の案内で確かめてから実行します。")
 				return
 			}

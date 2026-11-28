@@ -78,7 +78,7 @@ func TestStopRulesCountAndGates(t *testing.T) {
 			[]map[string]any{stopRule("stop-deny", "message", "止める")},
 			[]map[string]any{stopRule("stop-ask", "additionalContext", stopNudgeText)}, nil,
 			[]stopTurn{turn, turn, turn, turn}, []bool{false, false, false, false}},
-		{"プロジェクトのレイヤーの Stop は見ない", nil, nil, nil,
+		{"プロジェクトの設定の Stop は見ない", nil, nil, nil,
 			map[string]string{"projects/lib/.git/HEAD": "x", "projects/lib/.ccnavi/config/project/rules.yml": stopRuleSet(
 				[]map[string]any{stopRule("lib-review", "additionalContext", "外の文", "every", 2)}, nil, nil)},
 			[]stopTurn{turn, turn, turn, turn}, []bool{false, false, false, false}},
@@ -87,9 +87,9 @@ func TestStopRulesCountAndGates(t *testing.T) {
 				[]map[string]any{stopRule("skill-review", "additionalContext", stopNudgeText, "every", 3)}, nil, nil)},
 			[]stopTurn{turn, turn, turn, turn},
 			[]bool{false, true, false, true}},
-		{"ワークスペース自身のレイヤーのルールも当たり、同じ id は 1 本だけ数える", every2, nil, nil,
+		{"ワークスペースの設定のルールも当たり、同じ id は 1 本だけ数える", every2, nil, nil,
 			map[string]string{".ccnavi/config/project/rules.yml": stopRuleSet(
-				[]map[string]any{stopRule("skill-review", "additionalContext", "自身のレイヤー", "every", 3)}, nil, nil)},
+				[]map[string]any{stopRule("skill-review", "additionalContext", "ワークスペースの設定", "every", 3)}, nil, nil)},
 			[]stopTurn{turn, turn, turn, turn}, []bool{false, true, false, true}},
 		{"数えの記録が読めなければ止めない", every2, nil, nil,
 			map[string]string{"logs/state/stop-s1.json": "{壊れた"},

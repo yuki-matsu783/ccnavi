@@ -165,7 +165,7 @@ func unpushed(treeRoot string, conf *config.Settings, branch string, ignorePlace
 
 // Options は Check の補い。Branch は親のブランチ名（空ならワークツリーの今のブランチ）、Root はワークスペースの
 // ルート（承認の依頼の文に載せるコマンドのパス）。PlainDirty なら未コミットをミラーのずれに分けず、ふつうの
-// 変更として言う（ワークスペース自身の親の finish）。
+// 変更として言う（ワークスペースの親の finish）。
 type Options struct {
 	branch     string
 	Root       string
@@ -203,7 +203,7 @@ func dirtyRefusals(op Op, w watch, treeRoot string, conf *config.Settings, o Opt
 }
 
 // DirtyRefusal は未コミットの変更があるために止めるときの文。paths は Dirty の答え。変更がミラーのコピー先に
-// あれば作業の変更ではなく共通レイヤーとのずれなので、コミットを促さずに揃える手順（ユーザの操作）を言う。
+// あれば作業の変更ではなく共通設定とのずれなので、コミットを促さずに揃える手順（ユーザの操作）を言う。
 func DirtyRefusal(op Op, treeRoot string, conf *config.Settings, paths []string, root string, mirrorGuidance bool) Refusal {
 	if op == ApprovalRequest {
 		return approvalDirty(treeRoot, paths, root)

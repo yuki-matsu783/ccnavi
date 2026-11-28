@@ -209,7 +209,7 @@ func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts
 		return config.ExitError
 	}
 
-	// 1 つのレイヤーだけを差し替える形。使われる経路は共通レイヤーの 3 本と同じ。
+	// 1 つの設定だけを差し替える形。使われる経路は共通設定の 3 本と同じ。
 	for _, s := range []struct {
 		flag, dest string
 		swaps      map[string]string

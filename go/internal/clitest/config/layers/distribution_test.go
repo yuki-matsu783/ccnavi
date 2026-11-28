@@ -52,7 +52,7 @@ func TestDistributedLintHasNoProblem(t *testing.T) {
 	t.Parallel()
 	root := base.TempDir(t)
 	dest := filepath.Join(root, ".ccnavi")
-	// 保護対象（共通の設定・スクリプト・CCNAVI.md）は、下書きがあれば下書きの、できあがりの姿を配る。
+	// 保護対象（共通設定・スクリプト・CCNAVI.md）は、下書きがあれば下書きの、できあがりの姿を配る。
 	commons, err := os.ReadDir(filepath.Join(base.Root(), ".ccnavi", "config", "common"))
 	if err != nil {
 		t.Fatal(err)

@@ -10,7 +10,7 @@ import (
 	"ccnavi/internal/harness/base"
 )
 
-// Rules は見本のルール（JSON。共通レイヤーの rules.yml に書く）。
+// Rules は見本のルール（JSON。共通設定の rules.yml に書く）。
 // 守る場所のコピーを置く wip/handoff/ の中は、本物のルールと同じく除く。
 const Rules = `{"version": 1, "deny": [{"id": "guard-approved", "match": "Write|Edit|NotebookEdit", "glob": "*/.ccnavi/*", ` +
 	`"except": [{"regex": "[\\\\/]wip[\\\\/]handoff[\\\\/]"}], ` +

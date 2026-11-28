@@ -377,7 +377,7 @@ func TestAProjectIsJudgedByItsOwnIntegration(t *testing.T) {
 	project := filepath.Join(p.ws, "projects", "app")
 	remote := p.repository(project, "develop-v1.0.0")
 	p.place(project, parentID)
-	// ワークスペース自身の origin/HEAD が同じ名前でも、プロジェクトの統合先は別（origin も空）。
+	// ワークスペースの origin/HEAD が同じ名前でも、プロジェクトの統合先は別（origin も空）。
 	ref := "refs/remotes/origin/develop-v1.0.0"
 	p.git(p.ws, "update-ref", ref, "HEAD")
 	p.git(p.ws, "symbolic-ref", "refs/remotes/origin/HEAD", ref)

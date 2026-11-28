@@ -65,26 +65,26 @@ func TestLayer(t *testing.T) {
 	if got := For(conf, root, ""); !reflect.DeepEqual(got, common) {
 		t.Errorf("共通だけ %v", got)
 	}
-	// レイヤーにある種類だけ置き換える。
+	// 設定にある種類だけ置き換える。
 	testkit.Put(t, layerPath, "version: 1\nparent:\n  - name: Goal\n")
 	if got := For(conf, root, ""); !reflect.DeepEqual(got, form.Sections{Parent: []form.Heading{{Name: "Goal"}}, Child: common.Child}) {
-		t.Errorf("重ねた %v", got)
+		t.Errorf("足した %v", got)
 	}
-	// 判定の基準は共通レイヤーだけを見る。
+	// 判定の基準は共通設定だけを見る。
 	if got := Common(conf); !reflect.DeepEqual(got, common) {
 		t.Errorf("共通 %v", got)
 	}
-	// 壊れたレイヤーは使わず、そのレイヤーの苦情を返す。
+	// 壊れた設定は使わず、その設定の苦情を返す。
 	testkit.Put(t, layerPath, "version: 1\nparent: x\n")
 	got, notes := Layer(conf, root, "")
 	if !reflect.DeepEqual(got, common) || len(notes) != 1 {
-		t.Errorf("壊れたレイヤー %v %v", got, notes)
+		t.Errorf("壊れた設定 %v %v", got, notes)
 	}
-	// 予約名のプロジェクトはレイヤーとして数えない。
+	// 予約名のプロジェクトは設定として数えない。
 	if got, notes := Layer(conf, root, config.LayerCommon); !reflect.DeepEqual(got, common) || notes != nil {
 		t.Errorf("予約名 %v %v", got, notes)
 	}
-	// 共通レイヤーが壊れていれば、共通レイヤーの見出しは使わない（苦情は CommonFile が返す）。
+	// 共通設定が壊れていれば、共通設定の見出しは使わない（苦情は CommonFile が返す）。
 	testkit.Put(t, conf.Sections, "\xff")
 	testkit.Put(t, layerPath, "version: 1\nchild:\n  - name: 担当範囲\n")
 	if got, notes := Layer(conf, root, ""); !reflect.DeepEqual(got, form.Sections{Child: common.Child}) || len(notes) != 0 {

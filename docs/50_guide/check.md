@@ -63,28 +63,28 @@ ccnavi --test Bash "git push" --cwd .claude/worktrees/feat-x --permission-mode d
 フラグは`--test <ツール> <対象>`の前か後ろに置く。2 語の間に置く（`--test Bash --permission-mode auto '<cmd>'`）とオプションの名前が対象になるので、
 ツールか対象にオプションが入った形と、2 語の後ろに余った語がある形は終了コード 1 で断る。
 
-いま適用されている宣言を見渡すには`--explain`。レイヤーごとのルール、フェーズ定義とリスクの配点の表、承認されたチケットの作業範囲が出る。
+いま適用されている宣言を見渡すには`--explain`。設定ごとのルール、フェーズ定義とリスクの配点の表、承認されたチケットの作業範囲が出る。
 
 ```
-■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
+■ rules 共通設定（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  git-push                     Bash                               *git push*
-■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
+■ rules ワークスペースの設定（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees               Write|Edit                         */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 1 / ask 0 / allow 0）
   deny  lib:schema                   Write|Edit                         */schema/*
-■ phases（自身のレイヤー 7 種、lib 0 種）
-  id              レイヤー        kind    title           review  scope
-  design          自身のレイヤー  work    設計            mr      wip/design/*
+■ phases（ワークスペースの設定 7 種、lib 0 種）
+  id              設定        kind    title           review  scope
+  design          ワークスペースの設定  work    設計            mr      wip/design/*
 ■ risk（levels: medium 20 / high 40 / critical 70）
-  id              レイヤー        加点条件            points  message
-  big-diff        共通レイヤー    lines_over 300      25      行数が多い
+  id              設定        加点条件            points  message
+  big-diff        共通設定    lines_over 300      25      行数が多い
 ```
 
-（件数と中身は例。）ルールは共通レイヤー、自身のレイヤー、プロジェクト（名前順）の順に並ぶ。
+（件数と中身は例。）ルールは共通設定、ワークスペースの設定、プロジェクト（名前順）の順に並ぶ。
 「どのルールにも一致しないツール呼び出し」の節は、権限モードごとに、読めた呼び出しと読み切れない呼び出しの結末を 1 行ずつ出す。
 ルールの表のあとには、「dry-runのときに止めるもの」と、「判定に達せなかったとき」（内部の例外・期限切れ・payloadが読めない。ツールごとの扱い）の節も出る。
-読めないレイヤーは「読めない: <理由>。このレイヤーは空として扱う」、設定ファイルが無いレイヤーは「このレイヤーの設定ファイルはありません。設定なしとして扱います。」と出る。
-`levels`の行は共通レイヤーの値。レイヤーで`levels`を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその`project:`のレイヤーで変わる。
+読めない設定は「読めない: <理由>。この設定は空として扱う」、設定ファイルが無い設定は「この設定ファイルはありません。設定なしとして扱います。」と出る。
+`levels`の行は共通設定の値。設定で`levels`を書くとキーごとに小さいほうが採られるので、チケットに適用される値はその`project:`の設定で変わる。
 
 ## 期待する判定で確かめる
 
@@ -160,7 +160,7 @@ error 3 件、warn 0 件、info 0 件
 既定に入っているのは取り返しの付かない操作だけ。`rm -rf`、`git push`、`git reset --hard`、認証情報の置き場、シェルからガード自身の設定への書き込み。
 止めるのは書き込みの形だけで、場所の名前が出ただけの文は通す。既定を使ったことは、止めた回だけでなく通した回にも伝える。
 名指しのツール（`Write` / `Edit`）でルールファイルを直す形は、読めない間も通さない。ここを通すと、ルールを書き換えて保護の甘い既定に戻す手順が成り立つため。
-読めないレイヤーがあるときは、セッションの開始のたびに、そのレイヤーの名前と`ccnavi --lint`を打つ案内を出す（そのレイヤーの deny は効かない）。
+読めない設定があるときは、セッションの開始のたびに、その設定の名前と`ccnavi --lint`を打つ案内を出す（その設定の deny は効かない）。
 直し方は 1 つで、下書きをワークスペースルートの`wip/handoff/.ccnavi/config/common/rules.yml`に置き、ユーザがターミナルで`sh .ccnavi/scripts/ccnavi-user-handoff.sh`を打つか、手で直す。
 今の中身が読めないファイルの取り込みは、確かめられないのでターミナルに限る。
 `add` / `restore --ours`でマージの衝突を解く操作は通る。戻すのは既にコミットされている内容で、新しい文面は書かないため（生のgitはいつも止まるので、ラッパーで打つ）。

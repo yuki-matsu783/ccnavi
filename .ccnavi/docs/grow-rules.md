@@ -3,7 +3,7 @@ type: guide
 title: ルールが育つ流れ
 description: rules.yml のルールが、きっかけから下書き・検証・ユーザの配置・効き始め・配布までどう育つかの全体像
 tags: [rules, config]
-keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, test-expectations, rule-expectations, dry-run, 共通レイヤー, ミラー]
+keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, test-expectations, rule-expectations, dry-run, 共通設定, ミラー]
 ---
 
 # ルールが育つ流れ
@@ -30,4 +30,4 @@ keywords: [ルール, rules.yml, 育つ, 全体像, suggest, 下書き, lint, te
 |---|---|
 | 書式・記法の細部 | `.claude/skills/ccnavi-config/references/common/add.md` |
 | 確かめ方 | `.claude/skills/ccnavi-config/references/common/check.md` |
-| 共通レイヤーの配り方 | [grow.md](grow.md)（「配る」の行） |
+| 共通設定の配り方 | [grow.md](grow.md)（「配る」の行） |

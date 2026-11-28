@@ -9,7 +9,7 @@ import (
 	"ccnavi/internal/infra/config"
 )
 
-// 見本（handoff.json）が持たない場面。レイヤーの設定（rules.yml・phases.yml）とテンプレートの取り込みで、ボードの経路に
+// 見本（handoff.json）が持たない場面。設定（rules.yml・phases.yml）とテンプレートの取り込みで、ボードの経路に
 // 載せてよいかと、同じ回に取り込む対象を取り込んだあとの状態で検査し直すこと。
 
 func sceneRoot(t *testing.T, files map[string]string) (string, *config.Settings) {
@@ -92,7 +92,7 @@ func TestRemovingADenyIsTerminalOnly(t *testing.T) {
 	}
 }
 
-// 読めないレイヤーの設定は、取り込む前に error で断る。
+// 読めない設定は、取り込む前に error で断る。
 func TestBrokenLayerFilesAreRejected(t *testing.T) {
 	projPhases := ".ccnavi/config/project/phases.yml"
 	root, conf := sceneRoot(t, map[string]string{

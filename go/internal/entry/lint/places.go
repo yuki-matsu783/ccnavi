@@ -54,7 +54,7 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 				Kind: kindProjectsUnignored})
 		}
 	}
-	// 2. プロジェクトごとの検査。予約名のプロジェクトはレイヤーとして数えないので error にする。
+	// 2. プロジェクトごとの検査。予約名のプロジェクトは設定として数えないので error にする。
 	quoted := make([]string, len(config.ReservedLayerNames()))
 	for i, name := range config.ReservedLayerNames() {
 		quoted[i] = "`" + name + "`"
@@ -158,7 +158,7 @@ func shWord(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
-// inIndex は置き場が索引に載っているなら、その苦情の文。通常のファイルがあればぶつかり（ワークスペース自身のソースに
+// inIndex は置き場が索引に載っているなら、その苦情の文。通常のファイルがあればぶつかり（ワークスペースのソースに
 // projects/ がある。.gitignore に足すとソースが追跡から外れるので改名を案内する）、gitlink だけなら載せ忘れ（索引から
 // 外して無視に入れる 2 手を案内する）。導入スクリプトが同じ条件と同じ文を持つので、変えるならそちらも直す。
 func inIndex(root, rel string) (string, bool) {

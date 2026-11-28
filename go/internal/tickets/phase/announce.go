@@ -36,7 +36,7 @@ const (
 	announceSeparate = "\n\n"
 )
 
-// typeSource は review: が絡むマーカー（省略と保留）に足す、定義のレイヤー。定義の無いフェーズでは欄を置かない。
+// typeSource は review: が絡むマーカー（省略と保留）に足す、定義の設定。定義の無いフェーズでは欄を置かない。
 func typeSource(o *pyjson.Object, p *Phase, common *phases.Types) *pyjson.Object {
 	if p.Type != nil {
 		o.Set("source", phases.Origin(p.Type, common))

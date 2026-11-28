@@ -94,7 +94,7 @@ var subTiers = map[string]map[string]int{
 		"selfguard": 3,
 		// 4: 組み込みのルール（selfguard の守る形を読む）
 		"builtin": 4,
-		// 5: 適用するルール集合を決める（組み込みとレイヤーを重ねる）
+		// 5: 適用するルール集合を決める（組み込みに設定を足す）
 		"ruleload": 5,
 	},
 	"tickets": {
@@ -160,7 +160,7 @@ var subTiers = map[string]map[string]int{
 		"gitlabdocker": 2, "gitlabprobe": 2,
 		// 3: claude の台本スタブ（契約の形を読む。読み手は teststub と clitest だけ）・組み立ての写し・契約の録り・受入シナリオの実行器の部品・sh を通すテストのファイルと作業場所の道具・ホストの fixture（PATH のスタブの置き方は hoststub を使う）
 		"fakeclaude": 3, "treecache": 3, "contractrecord": 3, "shkit": 3, "scenario": 3, "hostfixture": 3,
-		// 3 のうち設定の和を見るテストの土台（ワークスペースの雛形と見本の設定。clitest/config が使う）
+		// 3 のうち統合結果を見るテストの土台（ワークスペースの雛形と見本の設定。clitest/config が使う）
 		"configws": 3,
 		// 4: 入口（main）・チケット・フェーズ・レビューを CLI で通すテストが共有する木と本文（treecache の上に立つ。clitest/ticket/…）
 		"cmd": 4, "ticketkit": 4,

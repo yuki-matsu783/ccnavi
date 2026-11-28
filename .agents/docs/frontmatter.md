@@ -20,7 +20,7 @@ frontmatterのキーと書き方、索引、対象外の置き場は[.ccnavi/doc
 | `design-doc` | `docs/`の要件書・設計書・ADR（`docs/10_requirements.md`・`docs/11_requirements/**`・`docs/20_design.md`・`docs/21_design/**`・`docs/30_adr.md`・`docs/30_adr/**`）と、ADRの書き方や置き場についての文書 | tag `design`は使わない（`design-doc`に統合した。`type: design`とは別） |
 | `settings` | Claude Codeの`settings.json`（hookの登録・`env`・`permissions`）と、そこで渡す環境変数 | ccnavi自身の設定ファイル |
 | `user-guide` | `docs/50_guide/*.md`（人間の利用者が読む手引き）。`type`は`guide`のまま、読み手の区別だけに使う | `docs/40_development.md`と`.ccnavi/docs/*.md` |
-| `config` | ccnaviの設定ファイル（`.ccnavi/config/common/`の`rules.yml`・`risks.yml`・`ticket-sections.yml`と、`.ccnavi/config/project/`の`phases.yml`など）の形・読み方・レイヤー | `settings.json`と環境変数 |
+| `config` | ccnaviの設定ファイル（`.ccnavi/config/common/`の`rules.yml`・`risks.yml`・`ticket-sections.yml`と、`.ccnavi/config/project/`の`phases.yml`など）の形・読み方・設定 | `settings.json`と環境変数 |
 
 `settings.json`の`env`でccnaviの設定ファイルの置き場を渡す話のように両方にまたがるときだけ、両方を付ける。
 

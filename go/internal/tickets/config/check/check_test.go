@@ -42,7 +42,7 @@ func TestUnmatchedScopes(t *testing.T) {
 	if found := UnmatchedScopes(conf, root); len(found) != 0 {
 		t.Errorf("当たるのに %v", found)
 	}
-	// git が使えないレイヤーは何も言わない。
+	// git が使えない設定は何も言わない。
 	if err := os.RemoveAll(filepath.Join(root, ".git")); err != nil {
 		t.Fatal(err)
 	}
@@ -61,25 +61,25 @@ func TestFileProblems(t *testing.T) {
 	if len(found) != 1 || found[0].Rule != "(phases)" || !strings.HasPrefix(found[0].Detail, "a:b: 識別子に `:` は書けない") {
 		t.Errorf("共通の phases: %v", found)
 	}
-	// 共通レイヤーの配点は script: の指す先も見る。
+	// 共通設定の配点は script: の指す先も見る。
 	testkit.Put(t, conf.Risk, "version: 1\nfactors:\n  - {id: s, points: 1, script: .ccnavi/config/common/scripts/none.sh}\n")
 	found = FileProblems(conf, root, config.KindRisk, config.LayerCommon)
 	if len(found) != 1 || found[0].Rule != "(risk)" || !strings.HasPrefix(found[0].Detail, "s: `script` の `.ccnavi/config/common/scripts/none.sh` が "+root+" にありません。") {
 		t.Errorf("共通の risk: %v", found)
 	}
-	// レイヤーの phases は共通レイヤーと合成した結果を見る。
+	// 設定の phases は共通設定と合成した結果を見る。
 	testkit.Put(t, conf.Phases, phasesYML)
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "project", "phases.yml"), "version: 1\nphases:\n  implement: {title: 別}\n")
 	found = FileProblems(conf, root, config.KindPhases, config.LayerSelf)
 	if len(found) != 1 || found[0].Severity != rules.Error || found[0].Rule != "(self) (phases) implement" {
-		t.Errorf("レイヤーの phases: %v", found)
+		t.Errorf("設定の phases: %v", found)
 	}
 	testkit.Put(t, filepath.Join(root, ".ccnavi", "config", "project", "risks.yml"), "version: 1\nfactors: x\n")
 	found = LayerConfigs(conf, root, "", config.KindRisk)
 	if len(found) != 1 || found[0].Rule != "(self) (risk) "+conf.LayerPath(root, config.KindRisk, config.LayerSelf) {
-		t.Errorf("レイヤーの risk: %v", found)
+		t.Errorf("設定の risk: %v", found)
 	}
-	// 無いレイヤーのルールは言わない。
+	// 無い設定のルールは言わない。
 	if found := LayerRules(io.Discard, conf, root, ""); len(found) != 0 {
 		t.Errorf("ルール: %v", found)
 	}

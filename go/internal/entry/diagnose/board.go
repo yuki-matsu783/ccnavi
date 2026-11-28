@@ -87,7 +87,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	c := *conf
 	c.TicketControl = string(control)
 	conf = &c
-	// 1. 設定・ツリー・レイヤーなど、チケットを読まなくても決まる欄を組む。チケットの欄は空で置いて、後で埋める。
+	// 1. 設定・ツリー・設定など、チケットを読まなくても決まる欄を組む。チケットの欄は空で置いて、後で埋める。
 	var problems []string
 	trees := tree.AllTrees(root, conf.Projects)
 	treeRows := make([]any, len(trees))
@@ -301,8 +301,8 @@ func factorRecord(layerName string, f *risk.Factor) *pyjson.Object {
 		"points", f.Points, "message", f.Message)
 }
 
-// layerRecords はレイヤーごとの宣言（共通 → 自身 → プロジェクトの名前順）。rules は重複を捨てたあとの、そのレイヤー
-// から実際に判定へ入ったぶん。phases と risk はそのレイヤーのファイルに書いてあるぶんで、合成の結果は sums と親の
+// layerRecords は設定ごとの宣言（共通 → ワークスペース → プロジェクトの名前順）。rules は重複を捨てたあとの、その設定
+// から実際に判定へ入ったぶん。phases と risk はその設定ファイルに書いてあるぶんで、合成の結果は sums と親の
 // フェーズの側に出る。
 func layerRecords(conf *config.Settings, root string, stderr io.Writer) []any {
 	out := []any{}
@@ -334,7 +334,7 @@ func layerRecords(conf *config.Settings, root string, stderr io.Writer) []any {
 	return out
 }
 
-// sumRecords はワークスペースとプロジェクトごとの「共通 + 1 レイヤー」の和。拡張は layers を足し直さず、ここをそのまま
+// sumRecords はワークスペースとプロジェクトごとの共通設定に1 つの設定を足した統合結果。拡張は layers を足し直さず、ここをそのまま
 // 見せる。判定の合成と同じ関数（ruleload.SumView・risk.LayerDefinition・phases.LayerTypes）で組む。
 func sumRecords(conf *config.Settings, root string, stderr io.Writer) []any {
 	out := []any{}

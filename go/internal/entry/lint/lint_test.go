@@ -133,7 +133,7 @@ func TestDirectRecordsQuietAndSideBySide(t *testing.T) {
 	}
 }
 
-// レイヤーのずれ。手元のレイヤーを、取得済みの origin/<統合先> と比べる。
+// 設定のずれ。手元の設定を、取得済みの origin/<統合先> と比べる。
 const (
 	commonLayer = ".ccnavi/config/common/rules.yml"
 	selfLayer   = ".ccnavi/config/project/rules.yml"
@@ -191,7 +191,7 @@ func TestLayerDrift(t *testing.T) {
 			}
 		}
 	})
-	t.Run("ワークスペース自身は共通レイヤーも比べる", func(t *testing.T) {
+	t.Run("ワークスペースは共通設定も比べる", func(t *testing.T) {
 		root := driftRoot(t)
 		write(t, root, commonLayer, "version: 1\nrules: [x]\n")
 		if got := layerDrift(layerConf(t, root), root, ""); len(got) != 1 || !strings.Contains(got[0].Detail, commonLayer) {
@@ -246,7 +246,7 @@ func TestLayerDrift(t *testing.T) {
 			t.Fatal(details(got))
 		}
 	})
-	t.Run("プロジェクトは自分の origin と比べ、共通レイヤーは比べない", func(t *testing.T) {
+	t.Run("プロジェクトは自分の origin と比べ、共通設定は比べない", func(t *testing.T) {
 		root := driftRoot(t)
 		app := filepath.Join(root, "projects", "app")
 		driftRepo(t, app)

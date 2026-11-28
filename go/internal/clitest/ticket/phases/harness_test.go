@@ -31,7 +31,7 @@ type ws struct {
 	parentTree string
 	approved   string
 	state      string
-	// rules・phases は共通レイヤーのルールと、自身のレイヤーのフェーズ定義のパス。
+	// rules・phases は共通設定のルールと、ワークスペースの設定のフェーズ定義のパス。
 	rules, phases string
 	// phasesText は親の `phases:` にコピーする元の phases.yml の本文。phases.yml を差し替えるテストは setPhases で揃える。
 	phasesText string
@@ -43,7 +43,7 @@ type ws struct {
 	lastBody string
 }
 
-// newWS はリポジトリと親のワークツリーを組む。共通レイヤーのルールは既定の置き場に置く
+// newWS はリポジトリと親のワークツリーを組む。共通設定のルールは既定の置き場に置く
 // （`--rules`・`--phases` は診断でだけ有効で、hook の判定と `--reviewed` には渡せない）。
 func newWS(t *testing.T) *ws {
 	t.Helper()
@@ -70,7 +70,7 @@ func (w *ws) as(t testing.TB) *ws {
 	return &c
 }
 
-// setPhases は自身のレイヤーの phases.yml を書き、親にコピーする元の本文も揃える。
+// setPhases はワークスペースの設定の phases.yml を書き、親にコピーする元の本文も揃える。
 func (w *ws) setPhases(text string) {
 	w.t.Helper()
 	ticketkit.Write(w.t, w.phases, text)

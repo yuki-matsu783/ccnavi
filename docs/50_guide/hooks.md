@@ -118,7 +118,7 @@ undo: rm -- .ccnavi/config/common/probe.json
 `ccnavi-git.sh`を通しても同じ場所は消せない。名指しのツール（`Write` / `Edit` / `MultiEdit` / `NotebookEdit`）からも守られる。期待する判定のファイル`.ccnavi/config/common/rule-expectations.yml`も同じである。
 
 止めるのは書き込みの形と場所の組で、場所の名前が出ただけでは止めない（`cat .ccnavi/config/common/rules.yml`や`git add <パス>`は通る）。
-`builtin:guard-`で始まるidはどのレイヤーのルールファイルにも書けない（書けばerror。`--lint`も指摘する）。外したいならenvでこの機能ごと切る。
+`builtin:guard-`で始まるidはどの設定のルールファイルにも書けない（書けばerror。`--lint`も指摘する）。外したいならenvでこの機能ごと切る。
 
 止まったときは、エージェントに回避させない。ユーザがターミナルで自分で打つ。承認済みチケットの置き場（`.ccnavi/approved/`）やレビュー待ちの置き場（`wip/proposals/review/`）を
 エージェントがラッパーで消す形も止まるので、レビュー済みのマーカーを消す`rm`や、レビュー待ちの提案を外す操作は、ユーザがターミナルで打つ。

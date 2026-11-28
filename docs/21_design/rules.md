@@ -60,7 +60,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 （正規表現の照合（`infra/pyre`）に時間制限は無く、判定の途中で止まったままの hook は期限に達し、呼び出しは止められずに通る）。
 
 `{!root}` は、読み込み時に「ワークスペースルートで始まらない」へ展開される。`(?!...)` を使わずに否定を書くための
-記法である。ルートを 1 文字ずつ分解した入れ子の式になり、繰り返しを含まない。展開先はどのレイヤーのルールでもワークスペースルート。
+記法である。ルートを 1 文字ずつ分解した入れ子の式になり、繰り返しを含まない。展開先はどの設定のルールでもワークスペースルート。
 
 | 決まり | |
 |---|---|
@@ -97,7 +97,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 書式の誤り | 空のリスト、`null`、マッピングでない要素、`glob` と `regex` の両方・どちらも無い要素、知らないキー。ルールごと読み込まずに error |
 | 何にでもヒットする要素 | `--lint` が warn。ルールがどの呼び出しにもヒットしなくなる |
 | `{!root}` を組み立てられない要素 | error。`deny` / `ask` はその要素を外して使う（ヒットする範囲が広がり、止める側に外れる）。`allow` はルールごと外す。本体を組み立てられなかった `deny` / `ask` は `except` を付けずに全部止める |
-| レイヤーの重複 | `except` も比べる。除くものだけが違う 2 本は別の定義として両方使う |
+| 設定の重複 | `except` も比べる。除くものだけが違う 2 本は別の定義として両方使う |
 
 `when` は本体を組み合わせ条件で書く欄（REQ-RUL-12）。ルールは `glob` / `regex` / `when` のちょうど 1 つを持つ。
 
@@ -123,7 +123,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | 書式の誤り | 知らないキー、キーが 0 個・2 個以上のノード、空のリスト、型の違う値（個別条件が空・文字列でない、`all` / `any` がリストでない、`not` がマッピングでない）、上限を超えた組み合わせ条件、`glob` / `regex` と並べた `when`。ルールごと読み込まずに error で、位置を `when.any[1].not` の形で名指しする |
 | `{!root}` を組み立てられない個別条件 | error。`deny` / `ask` はルール全体を `match` の全部に適用して止め（`except` も付けない）、`allow` はルールごと外す。個別条件だけは外さず、ルール全体で扱う |
 | `--lint` | 同じ個別条件を肯定と否定で並べた `all` / `any`（`all: [A, not: A]` は何にもヒットせず、`any: [A, not: A]` は何にでもヒットする）を warn。同じ演算子の入れ子は開いて見る。何にでもヒットする・何にもヒットしないノード（`not` の下が何にでもヒットする個別条件だけ、`any` の中に何にでもヒットする個別条件など）を warn。`Bash` / `PowerShell` の `deny` / `ask` で `not` を含む組み合わせ条件を warn（除く語をコマンドのどこかに足すだけで外れる） |
-| レイヤーの重複 | 個別条件の式と組み方の両方を比べる。`glob` で書いた 1 本と、同じ個別条件 1 つだけの `when` の 1 本は別の定義として扱う |
+| 設定の重複 | 個別条件の式と組み方の両方を比べる。`glob` で書いた 1 本と、同じ個別条件 1 つだけの `when` の 1 本は別の定義として扱う |
 | 一覧と記録 | `--explain` は 1 行（`when: any(glob '*.pem', …)`）で出し、個別条件が 3 つ以上なら続けて字下げで出す。`--test --json` などのルールの欄は `kind: when` と、書いた形の `when` を持つ |
 
 `except` と `when` の使い分け。「本体にヒットしても、ここは除く」だけなら `except` で書く。「A か B」「A かつ B」、除外の中にさらに例外がある形のように、組み合わせが要るときに `when` を使う。
@@ -146,13 +146,13 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 
 | 呼び出し | ルール集合 |
 |---|---|
-| パスを取るツール（`Read` `Grep` `Glob` `Write` `Edit` `MultiEdit` `NotebookEdit`） | 共通レイヤーに、行き先のツリーが属する 1 レイヤーを足したもの。プロジェクトに属すればそのレイヤー、属さなければワークスペース自身のレイヤー。`Grep` と `Glob` の行き先は探し始める場所で、省略されていれば `cwd`（11.4） |
-| パスを取らないツール（`Bash` `PowerShell` `Skill` `Agent` `WebFetch`） | 共通レイヤー・自身のレイヤー・全プロジェクトのレイヤーのルールをタイプごとに連結したもの |
+| パスを取るツール（`Read` `Grep` `Glob` `Write` `Edit` `MultiEdit` `NotebookEdit`） | 共通設定に、行き先のツリーが属する 1 つの設定を足したもの。プロジェクトに属すればその設定、属さなければワークスペースの設定。`Grep` と `Glob` の行き先は探し始める場所で、省略されていれば `cwd`（11.4） |
+| パスを取らないツール（`Bash` `PowerShell` `Skill` `Agent` `WebFetch`） | 共通設定・ワークスペースの設定・全プロジェクトの設定のルールをタイプごとに連結したもの |
 
-共通レイヤーはワークスペースルートの `.ccnavi/config/common/` の 1 本。プロジェクトの `.ccnavi/config/common/`（ミラー。11.12）は、そのプロジェクトだけを clone したときにだけ共通レイヤーとして読まれる。
+共通設定はワークスペースルートの `.ccnavi/config/common/` の 1 本。プロジェクトの `.ccnavi/config/common/`（ミラー。11.12）は、そのプロジェクトだけを clone したときにだけ共通設定として読まれる。
 共通と config のどちらのファイルも無くてよく、無いのは「設定が無い」正常で空として扱う。両方に無ければ組み込みの既定を使う（11.2、11.4）。
 
-自身のレイヤーのルールにヒットしたときは識別子に `self:`、プロジェクトのレイヤーなら `<プロジェクト名>:` を前置して出す。
+ワークスペースの設定のルールにヒットしたときは識別子に `self:`、プロジェクトの設定なら `<プロジェクト名>:` を前置して出す。
 
 ### 5.6 ルールが読めないとき
 
@@ -167,7 +167,7 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 | シェルから `.claude/hooks/` `.claude/settings*.json`、ccnavi ディレクトリ `.ccnavi`、`logs/decisions.jsonl` `logs/state` `logs/archive`、`ccnavi-git.sh` へ書き込む形 | 止める（書き込みの形と場所の組で見る。8.2） |
 | `.git` の中（`.git/` の下と、ワークツリーの `.git` ファイル）への `Write` `Edit` `MultiEdit` `NotebookEdit` と、シェルから書き込む形 | 止める（`builtin:guard-git-dir`・`builtin:guard-git-dir-via-bash`。下） |
 | `Read`（認証情報の置き場を除く。強いタイプが先にヒットする） | 通す |
-| `hook`・`settings`・`scripts`・共通の設定ファイルへの `Write` `Edit` `MultiEdit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
+| `hook`・`settings`・`scripts`・共通設定ファイルへの `Write` `Edit` `MultiEdit` `NotebookEdit` | 止める（`builtin:guard-hooks` など。`CCNAVI_GUARD_CORE_FILES` が `disable` でなければ。8.2）。ルールファイルが読めない間の修復も、直接は通さない。下書きを `wip/handoff/` に置き、ユーザが `ccnavi user handoff` で取り込む |
 | ワークスペースルート直下への `Write` `Edit` と、`Bash` の書き込み先（`workspace-root`） | 既定には入らない（ルールファイルの決まり）。ルールファイルを読めないときは、どちらも権限モードに委ねる |
 | それ以外 | 権限モードに委ねる |
 
@@ -228,5 +228,5 @@ keywords: [ルール, rules.yml, deny, ask, allow, glob, regex, when, except, �
 衝突の解決に要る `add`・`restore --ours` / `--theirs`・`merge-file -p` を通すので、直す道は残る（REQ-PRE-06）。
 
 既定にはプロジェクトの `allow` が無いので、読み取り以外はほぼ確認になる。
-自身のレイヤーかプロジェクトのレイヤーが読めないときは、そのレイヤーを空として扱い、Bash の和からも
+ワークスペースの設定かプロジェクトの設定が読めないときは、その設定を空として扱い、Bash の統合結果からも
 外し、外したことを記録と診断で示す（11.4）。

@@ -8,16 +8,16 @@
  * 中身を渡すのは、画面の編集を破棄してよいときだけ（ユーザが「更新」を押した、保存が通った）。
  * ファイルが外で変わっただけのときは`changed`を送り、破棄するかどうかはユーザが決める。
  *
- * 対象は3種。共通の設定のルール（`.ccnavi/config/common/rules.yml`）、
+ * 対象は3種。共通設定のルール（`.ccnavi/config/common/rules.yml`）、
  * ワークスペースの設定のルール（既定`.ccnavi/config/project/rules.yml`）、プロジェクト1つの設定のルール
  * （既定`projects/<名前>/.ccnavi/config/project/rules.yml`）。タブは1枚だけで、別の対象を開くとそのタブの
  * 中身を入れ替える（未保存の変更があれば、破棄して切り替えるかを聞く）。
  * 設定ファイルの場所は実行ファイルが解いたもの（`--explain --json`の`layers[]`）を使い、拡張は組まない。
  * ファイルが無いのは「設定が無い」正常な状態で、空として出す（保存でファイルを作る）。
- * 編集する1本とは別に、読み取り専用の統合結果（共通の設定 + ワークスペース、共通の設定 + 各プロジェクト。`sums[]`）を出す。
+ * 編集する1本とは別に、読み取り専用の統合結果（共通設定 + ワークスペース、共通設定 + 各プロジェクト。`sums[]`）を出す。
  * 統合結果は実行ファイルが出した結果をそのまま見せる。
  *
- * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通の設定なら`--rules`、
+ * 判定・検証は実行ファイルに任せる。編集中の内容は一時ファイルに書き、共通設定なら`--rules`、
  * ワークスペースかプロジェクトの設定なら`--project-rules-file <名前>=<パス>`（ワークスペースの設定は名前が`self`）で渡す。保存は、検証（`--lint`）を通り、
  * 作業中のチケットが無く（プロジェクトならそのプロジェクトの）、ファイルが外で変わっていない
  * ときだけ行う（流れは`settings-panel.ts`の`save`）。
@@ -88,7 +88,7 @@ function expectationsSetting(): string {
   return vscode.workspace.getConfiguration("ccnaviBoard").get<string>("expectationsPath", DEFAULT_EXPECTATIONS);
 }
 
-/** `ccnaviBoard.openRules`の本体。引数なしは共通の設定のルール */
+/** `ccnaviBoard.openRules`の本体。引数なしは共通設定のルール */
 export async function openRules(target: RulesTarget = { kind: "workspace" }): Promise<void> {
   const folder = workspaceFolder("ルール管理画面");
   if (folder === undefined) {
@@ -149,14 +149,14 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
   let rulesPath: string;
   let rulesRel: string;
   const notices: string[] = [];
-  // 切り替えの一覧のために、共通の設定でも実行ファイルに聞く。読めなくても共通の設定は開けるので、一覧が縮むだけ
+  // 切り替えの一覧のために、共通設定でも実行ファイルに聞く。読めなくても共通設定は開けるので、一覧が縮むだけ
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
     notices.push(`ccnaviから動作モードを取得できないため、denyやaskの判定でツールの実行が実際に止まるかどうかを表示していません: ${board.error}`);
   }
   const targets = targetOptions(board.ok ? board.board : undefined, "workspace", targetKey(target));
   if (target.kind === "workspace") {
-    // 共通の設定の場所は`.ccnavi/config/common/`固定。env（`CCNAVI_RULES`など）では動かせないので、設定ファイルは読まない。
+    // 共通設定の場所は`.ccnavi/config/common/`固定。env（`CCNAVI_RULES`など）では動かせないので、設定ファイルは読まない。
     rulesRel = DEFAULT_RULES;
     rulesPath = resolveIn(root, rulesRel);
   } else {
