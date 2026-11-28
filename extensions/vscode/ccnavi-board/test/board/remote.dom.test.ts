@@ -62,7 +62,7 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
   const json = withRemote(remote, { issue: 12, mr: 7, branch: "feature/12-login" });
   const page = await openBoard(json);
   try {
-    const parent = page.one('li.card[data-id="i0001"]');
+    const parent = page.one('.card[data-id="i0001"]');
     // 未送信（aheadが1以上）は注意の行に。遅れはここには出さない
     assert.deepEqual(Array.from(parent.querySelectorAll(".notes .badge.unsent")).map((e) => e.textContent), ["未送信2件"]);
     assert.equal(parent.querySelectorAll(".origin").length, 0, "出どころの行は常時は出さない");
@@ -81,7 +81,7 @@ test("CB-D363 親のカードは、未送信を注意の行に短く出し、出
     assert.equal(row("branch"), "feature/12-login");
     assert.equal(row("remote"), "未送信2件遅れ1件");
     // 子のカードには出さない
-    const child = opened.one('li.card[data-id="i0001-01-01"]');
+    const child = opened.one('.card[data-id="i0001-01-01"]');
     assert.equal(child.querySelectorAll(".notes .badge.unsent").length, 0);
   } finally {
     await opened.close();

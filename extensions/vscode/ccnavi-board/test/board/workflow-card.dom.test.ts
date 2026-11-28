@@ -69,12 +69,20 @@ test("CB-D185 カードのworkflowは、計画を持つ承認待ちの親の提�
   assert.equal(cardOf(stripped, "i0002").workflow, false);
 });
 
-test("CB-D184 計画を持つ承認待ちの親の提案を選んだパネルに「計画編集」を出し、押すと親の識別子だけを返す（ファイルは開かない）。カードには出さない", async () => {
+test("CB-D184 計画を持つ承認待ちの親の提案を選んだパネルと、その親の行の見出しに「計画編集」を出し、押すと親の識別子だけを返す（ファイルは開かない）。子のカードには出さない", async () => {
   const dom = await openBoard(withParents());
   try {
-    assert.equal(dom.all('li.card [data-action="workflow"]').length, 0, "カードには出さない");
+    assert.equal(dom.all('.card.child [data-action="workflow"]').length, 0, "子のカードには出さない");
+    assert.deepEqual(
+      dom.all('.card.lane-head [data-action="workflow"]').map((b) => b.getAttribute("data-ticket")).sort(),
+      ["i0001", "i0002"],
+    );
+    dom.click(dom.one('.card.lane-head[data-id="i0001"] [data-action="workflow"]'));
+    await dom.settle();
+    assert.deepEqual(dom.posted.filter((m) => m.type === "workflow"), [{ type: "workflow", ticket: "i0001" }]);
+    dom.posted.length = 0;
     const shown: string[][] = [];
-    for (const card of dom.all("li.card")) {
+    for (const card of dom.all(".card")) {
       dom.click(card.querySelector(".title")!);
       await dom.settle();
       shown.push(...dom.all('aside.card-panel [data-action="workflow"]').map((b) => [b.getAttribute("data-ticket") ?? "", b.textContent, card.classList.contains("child") ? "child" : "parent"]));
@@ -83,7 +91,7 @@ test("CB-D184 計画を持つ承認待ちの親の提案を選んだパネルに
       ["i0001", "計画編集", "parent"],
       ["i0002", "計画編集", "parent"],
     ]);
-    dom.click(dom.one('li.card[data-id="i0002"] .title'));
+    dom.click(dom.one('.card[data-id="i0002"] .title'));
     await dom.settle();
     dom.click(dom.one('aside.card-panel [data-action="workflow"][data-ticket="i0002"]'));
     await dom.settle();

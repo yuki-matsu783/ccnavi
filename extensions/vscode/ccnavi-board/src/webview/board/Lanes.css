@@ -1,0 +1,89 @@
+/*
+ * ボードの本体（`Lanes.tsx`）。列の見出しを1行目に、親ごとの行をその下に並べる。列の幅は全部の行で揃える（grid。
+ * 列の幅の指定は`Lanes.tsx`の`tracksOf`がインラインのstyleで書く）。親ごとの行（`.lane`）は箱を作らず（display: contents）、
+ * 見出し・開いたフェーズ・列ごとのセルが、そのままgridに並ぶ。
+ * 4列が220pxずつ収まらない幅（940px以下）では、gridをやめて親ごとの行を縦に積み、行の中で子を列の名前つきで並べる。
+ * 列の見出しの右端の取っ手をドラッグした列は幅がpxで固定され（.sized）、ダブルクリックで元の伸び縮みに戻る。
+ * 畳んだ列は見出し1行ぶんの幅に縮む。縦書きにはしない。
+ */
+.board { display: grid; column-gap: var(--gap-5); align-items: start; overflow-x: auto; padding-bottom: 4px; }
+.column { grid-row: 1; position: relative; min-width: 0; padding: 0 0 6px; border-bottom: 2px solid var(--vscode-panel-border); }
+.resizer { position: absolute; top: 0; bottom: 0; right: -7px; width: 12px; cursor: col-resize; z-index: var(--z-inline); }
+.column:nth-last-child(1 of .column) .resizer { right: 0; }
+.resizer::after {
+  content: ""; position: absolute; top: 2px; bottom: 2px; left: 5px; width: 2px;
+  border-radius: var(--radius-sm); background: var(--vscode-focusBorder); opacity: 0;
+}
+.resizer:hover::after, .column.resizing .resizer::after { opacity: 1; }
+body.resizing, body.resizing * { cursor: col-resize; user-select: none; }
+.column h2 { margin: 0; font-size: 1em; display: flex; justify-content: space-between; align-items: center; gap: var(--gap-3); white-space: nowrap; }
+.column .count, .cell-label .count { color: var(--vscode-descriptionForeground); font-weight: normal; }
+button.fold {
+  display: flex; align-items: center; gap: var(--gap-2); min-width: 0;
+  background: none; border: none; padding: 0; margin: 0; cursor: pointer;
+  font: inherit; font-weight: inherit; color: inherit; text-align: left;
+}
+button.fold:hover .label { text-decoration: underline; }
+button.fold:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+.fold-mark {
+  display: inline-block; width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+}
+.column.folded .fold-mark {
+  border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 6px solid currentColor; border-right: 0;
+}
+
+/* 親ごとの行。見出しは全部の列にまたがる。親は列の中に置かない */
+.lane { display: contents; }
+/* 親も子も絞り込みで隠れた行は出さない（カードはDOMに置いたまま） */
+.lane.hidden { display: none; }
+.lane-head, .lane-phases, .lane-empty { grid-column: 1 / -1; }
+.lane > .card-panel.below { grid-column: 1 / -1; margin-left: 0; }
+.card.lane-head {
+  margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4);
+  background: var(--vscode-sideBarSectionHeader-background, var(--vscode-editorWidget-background));
+}
+.lane-head .card-head { flex: 0 1 auto; min-width: 0; }
+.lane-head .card-head .title { flex: 0 1 auto; }
+.lane-head .status { margin-left: 0; }
+.lane-head .stage, .lane-head .moved-mark, .lane-head .badges { margin-top: 0; }
+.lane-head .card-primary { margin: 0 0 0 auto; }
+/* 親のチケットがボードに無い子の行の見出し。選べない（パネルに出す親が無い） */
+.lane-orphan {
+  margin-top: 14px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-4); align-items: baseline;
+  border: 1px dashed var(--vscode-panel-border); border-radius: var(--radius-lg);
+}
+.lane-orphan-id { font-weight: 600; }
+.lane-orphan-note { font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
+.lane-empty { margin: 4px 0 0 12px; font-size: var(--font-sm); color: var(--vscode-descriptionForeground); }
+/* 開いた親の行。フェーズごとに 状態 と 子の一覧。矢印は描かない */
+.lane-phases { margin: 4px 0 0 12px; }
+.lane-phases .phases { margin-top: 0; border-top: none; padding-top: 0; }
+/* 名前と状態の列は行ごとに幅が変わらないよう固定する（子の一覧の始まりを揃える） */
+.lane-phases .phase { grid-template-columns: 12px minmax(0, 16em) minmax(0, 1fr); }
+.lane-phases .phase-state { margin-left: var(--gap-3); color: var(--vscode-descriptionForeground); }
+.lane-phases .phase-active .phase-state { color: var(--board-info-text); }
+.phase-children { min-width: 0; overflow-wrap: anywhere; }
+
+/* 列ごとのセル。子のカードを縦に並べる。畳んだ列のセルは件数だけ */
+.cell { min-width: 0; padding-top: 6px; }
+.cell .card.child { margin-left: 0; }
+.cell-label { display: none; }
+.folded-cell { text-align: center; font-size: var(--font-xs); color: var(--vscode-descriptionForeground); }
+.folded-cell .cards, .folded-cell .cell-label { display: none; }
+.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gap-3); }
+
+/* 940px以下。gridをやめ、列の見出しは畳む切り替えとして1行に並べ、親ごとの行を縦に積む。
+   行の中では子を列の名前つきで並べ、子の無い列と畳んだ列のセルは出さない */
+@media (max-width: 940px) {
+  .board { display: block; overflow-x: visible; }
+  .column { display: inline-block; margin: 0 var(--gap-5) 0 0; border-bottom: none; padding: 0; }
+  .resizer { display: none; }
+  .lane:not(.hidden) { display: block; }
+  .cell { padding: 4px 0 0 12px; }
+  .cell.empty-cell, .cell.folded-cell { display: none; }
+  .cell-label { display: flex; gap: var(--gap-3); margin: 2px 0 4px; font-size: var(--font-sm); font-weight: 600; color: var(--vscode-descriptionForeground); }
+  .lane-head .card-primary { margin-left: 0; }
+  .lane-phases .phase { grid-template-columns: 12px minmax(0, 1fr); }
+  .lane-phases .phase-children { grid-column: 2; }
+}

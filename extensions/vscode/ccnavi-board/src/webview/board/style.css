@@ -18,6 +18,7 @@
 @import "@ccnavi/shared/styles/page.css";
 @import "../shared/Dialog.css";
 @import "./App.css";
+@import "./Lanes.css";
 @import "./Card.css";
 @import "./Panel.css";
 @import "./MergeBand.css";

@@ -41,15 +41,15 @@ function withDone(): BoardJson {
 test("CB-D357 完了した計画付きの親を選んだパネルにだけ「テンプレートの下書きを作る」を出し、押すと親の識別子だけを返す", async () => {
   const dom = await openBoard(withDone());
   try {
-    assert.equal(dom.all('li.card [data-action="template-draft"]').length, 0, "カードには出さない");
+    assert.equal(dom.all('.card [data-action="template-draft"]').length, 0, "カードには出さない");
     const shown: string[] = [];
-    for (const card of dom.all("li.card")) {
+    for (const card of dom.all(".card")) {
       dom.click(card.querySelector(".title")!);
       await dom.settle();
       shown.push(...dom.all('aside.card-panel [data-action="template-draft"]').map((b) => b.getAttribute("data-ticket") ?? ""));
     }
     assert.deepEqual(shown, ["i0004"], "子にも、完了していない親にも出ない");
-    dom.click(dom.one('li.card[data-id="i0004"] .title'));
+    dom.click(dom.one('.card[data-id="i0004"] .title'));
     await dom.settle();
     dom.click(dom.one('aside.card-panel [data-action="template-draft"][data-ticket="i0004"]'));
     await dom.settle();

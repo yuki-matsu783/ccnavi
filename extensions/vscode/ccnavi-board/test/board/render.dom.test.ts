@@ -358,37 +358,39 @@ test("CB-T12 4列と件数と承認ボタンを出す", async () => {
   assert.ok(html().includes(`<script nonce="${NONCE}">`));
 });
 
-test("CB-T12b 列ごとに畳むボタンを出す", async () => {
+test("CB-T12b 列ごとに畳むボタンを出す。完了と取り消しは最初から畳む", async () => {
   const page = await openBoard();
   try {
     assert.equal(page.all("button.fold").length, 4);
-    for (const state of ["todo", "doing", "done", "cancelled"]) {
-      assert.equal(page.one(`button.fold[data-fold="${state}"]`).getAttribute("aria-expanded"), "true", state);
+    for (const [state, expanded] of [["todo", "true"], ["doing", "true"], ["done", "false"], ["cancelled", "false"]]) {
+      assert.equal(page.one(`button.fold[data-fold="${state}"]`).getAttribute("aria-expanded"), expanded, state);
     }
   } finally {
     await page.close();
   }
 });
 
-test("CB-T12c 列の件数は見えているカードの数。畳んだ列は固定幅に縛られない", async () => {
+test("CB-T12c 列の件数は見えている子のカードの数（親は行の見出しにあり、数えない）", async () => {
   const page = await openBoard();
   try {
     const counts = (): string[] => page.all(".column").map((column) => column.querySelector(":scope > h2 > .count")?.textContent ?? "");
     const visible = (): string[] =>
-      page.all(".column").map((column) => String(column.querySelectorAll(".card:not(.hidden)").length));
+      page.all(".column").map((column) => String(page.all(`.cell[data-cell="${column.getAttribute("data-state") ?? ""}"] .card.child:not(.hidden)`).length));
     assert.deepEqual(counts(), visible());
+    assert.deepEqual(counts(), ["1", "2", "1", "1"]);
+    // 親はどの列のセルにも入らない
+    assert.equal(page.all(".cell .card.parent").length, 0);
+    assert.equal(page.all(".lane > .card.lane-head.parent").length, 1);
     // 絞り込んだ後も、見えているカードの数。全件のままにすると合わなくなる
     page.click(page.one("#attention-filter"));
     await page.settle();
     assert.deepEqual(counts(), visible());
-    assert.notDeepEqual(counts(), ["1", "3", "1", "1"], "絞る前の数のままではない");
+    assert.notDeepEqual(counts(), ["1", "2", "1", "1"], "絞る前の数のままではない");
   } finally {
     await page.close();
   }
-  // ドラッグで付けたインラインのwidthより折りたたんだ状態を優先する
-  assert.match(css(), /\.column\.folded \{[^}]*width: auto !important/);
   // 最後の列の取っ手は内側に置き、ボードを常に横へ流さない
-  assert.match(css(), /\.column:last-child \.resizer \{ right: 0; \}/);
+  assert.match(css(), /\.column:nth-last-child\(1 of \.column\) \.resizer \{ right: 0; \}/);
   // 絞り込みのselectは最長の選択肢の幅に広がらず、ページを横に流さない
   assert.match(css(), /\.filter select \{ flex: 0 1 auto; min-width: 0; max-width: var\(--w-field\);/);
   // 操作ボタン（card-button）は、親（カード・フェーズ一覧）の文字サイズを引き継がず、文字サイズ・高さ・余白を明示する。
@@ -438,7 +440,7 @@ test("CB-T14 0件のときは空の表示と無効な承認ボタン", async () 
   const page = await openBoard({ ...fixture(), tickets: [], parents: [], pending_approval: [] });
   try {
     assert.equal(text(page, ".board-empty"), "チケットなし");
-    assert.equal(page.all(".column .empty").length, 4);
+    assert.equal(page.all(".lane").length, 0);
     assert.equal(page.one<HTMLButtonElement>('.controls button[data-action="approve"]').disabled, true);
   } finally {
     await page.close();

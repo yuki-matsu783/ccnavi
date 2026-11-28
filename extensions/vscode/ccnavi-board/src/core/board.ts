@@ -38,6 +38,9 @@ export const COLUMNS: readonly ColumnDef[] = [
   { state: "archived", label: "アーカイブ" },
 ];
 
+/** 最初から畳んでおく列。完了と取り消しは見返すことが少ないので、進行中の行に幅を渡す */
+export const FOLDED_FIRST: readonly ProposalState[] = ["done", "cancelled"];
+
 /**
  * ユーザが押せる操作。承認は実行ファイルへ、レビュー完了は「残った指摘の読み取り」（`ccnavi-review.sh decide <N> --preview`）へ
  * 進む（判定は動かさない。置くのは実行ファイル）。画面は［承認］と、［MRを開く］［レビュー完了］の組を出す。

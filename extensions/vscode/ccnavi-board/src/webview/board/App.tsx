@@ -5,10 +5,10 @@
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
  * 決めるもの（絞り込み・折りたたんだ列・列の幅・選んだカード・「更新」を押したか）だけ。判定はしない。
  */
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from "react";
 import { LoadError } from "../shared/LoadError.js";
 
-import type { Board, BoardColumn, Card } from "../../core/board.js";
+import { FOLDED_FIRST, type Board, type Card } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import type { BoardData, ToBoard } from "../../core/board-view.js";
 import { SAMPLE_NOTE, tourOf, type Scene } from "../../core/tour-def.js";
@@ -20,18 +20,15 @@ import { TOUR_IMAGES } from "../tours/images.js";
 import boardTour from "../tours/board.yml";
 import { mutePosts, post } from "./post.js";
 import { Approval } from "./Approval.js";
-import { CardItem } from "./Card.js";
 import { CardPanel } from "./Panel.js";
+import { LaneBoard, laneKey } from "./Lanes.js";
 import { lastUpdatedText } from "../shared/format.js";
 import { ModeBand } from "../shared/ModeBand.js";
 import { MergeBand } from "./MergeBand.js";
 import { cardKey, EMPTY, loadState, saveState, type ViewState } from "./state.js";
 import { FILTER_LABELS } from "./text.js";
 
-/** 列の最小の幅（px）。ドラッグでもこれより狭くしない。CSSのmin-widthと同じ値 */
-const MIN_WIDTH = 220;
-
-/** 列を縦に積む幅（`App.css`の`@media (max-width: 940px)`と同じ値）。ここより狭いと、右のパネルは選んだカードの下に開く */
+/** 親ごとの行を縦に積む幅（`Lanes.css`の`@media (max-width: 940px)`と同じ値）。ここより狭いと、右のパネルは選んだカードの下に開く */
 const NARROW = "(max-width: 940px)";
 
 /** 幅が狭いか。CSSの縦積みと同じ条件で、幅が変わったら描き直す。`matchMedia`の無い環境では広いものとして扱う */
@@ -149,7 +146,8 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       parent: now.parent === EMPTY.parent || now.parent === card.family ? now.parent : EMPTY.parent,
       attention: now.attention && card.attention,
       archived: now.archived || card.column === "archived",
-      folded: now.folded.filter((state) => state !== card.column),
+      // 親は行の見出しにあり、列を畳んでも隠れない
+      folded: card.isParent ? now.folded : now.folded.filter((state) => state !== card.column),
       selected: cardKey(card),
     }));
     setRevealing(cardKey(card));
@@ -229,15 +227,20 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     if (board === undefined) {
       return;
     }
-    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths, selected });
-  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths, selected]);
+    saveState({ project, parent, attention, archived, folded: view.folded, widths: view.widths, selected, opened: view.opened });
+  }, [board === undefined, project, parent, attention, archived, view.folded, view.widths, selected, view.opened]);
 
   // 案内の間は見本の上の様子を描く。絞り込み・畳んだ列・幅は`scene`が決め、実際の`view`は使わない（動かさない）
   const shownProject = touring ? (typeof scene.project === "string" ? scene.project : EMPTY.project) : project;
   const shownParent = touring ? (typeof scene.parent === "string" ? scene.parent : EMPTY.parent) : parent;
   const shownAttention = touring ? scene.attention === true : attention;
   const shownArchived = touring ? scene.archived === true : archived;
-  const shownFolded = touring ? sceneList(scene.fold) : view.folded;
+  // 案内でも、手順が`fold`を書かなければ実際の既定（完了と取り消しを畳む）と同じに描く
+  const shownFolded = touring ? (typeof scene.fold === "string" ? sceneList(scene.fold) : FOLDED_FIRST) : view.folded;
+  // 案内の`open`は見本の親の識別子で書く。開いた行の覚え方（プロジェクトと親の組）に直す
+  const shownOpened = touring
+    ? (shown?.columns.flatMap((column) => column.cards).filter((card) => card.isParent && sceneList(scene.open).includes(card.id)).map((card) => laneKey(card)) ?? [])
+    : view.opened;
   const shownWidths: Readonly<Record<string, number>> = touring ? {} : view.widths;
   // 案内の間に選んで見せるカードは、手順の`scene.select`（見本の識別子）が決める。実際の選択（`view.selected`）には書かない
   const selectedOf = (card: Card): boolean => (touring ? typeof scene.select === "string" && scene.select === card.id : selected === cardKey(card));
@@ -270,11 +273,16 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
   const visiblePending =
     shown?.columns.flatMap((column) => column.cards.filter((card) => card.pendingApproval && !hiddenOf(card)).map((card) => card.id)) ?? [];
 
-  // 右のパネルに出すカード。選んだカードが絞り込み・畳んだ列で隠れている間は出さない（選択は覚えたまま）
-  const panelCard = shown?.columns
-    .filter((column) => !shownFolded.includes(column.state))
+  // 出している列（アーカイブの列は「アーカイブ済みチケットを表示」がONのときだけ）
+  const shownColumns = shown?.columns.filter((column) => shownArchived || column.state !== "archived") ?? [];
+  // 親の行の見出しは、その親か子のどれかが見えている間は出る（子だけが絞り込みに残っても、親が分かるように）
+  const headShown = (parentCard: Card): boolean =>
+    !hiddenOf(parentCard) || shownColumns.some((column) => column.cards.some((card) => !card.isParent && card.family === parentCard.id && card.project === parentCard.project && !hiddenOf(card)));
+  // 右のパネルに出すカード。選んだカードが絞り込み・畳んだ列で隠れている間は出さない（選択は覚えたまま）。
+  // 親は行の見出しにあるので、列を畳んでも隠れない
+  const panelCard = shownColumns
     .flatMap((column) => column.cards)
-    .find((card) => selectedOf(card) && !hiddenOf(card));
+    .find((card) => selectedOf(card) && (card.isParent ? headShown(card) : !hiddenOf(card) && !shownFolded.includes(card.column)));
   // Escでパネルを閉じる。オーバーレイ・案内が出ていれば、そちらが先に受ける
   useEscape(panelCard !== undefined && !touring, ESCAPE_LAYER.panel, closePanel);
   const panelOf = (card: Card): JSX.Element | null =>
@@ -416,39 +424,40 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
             </>
           ) : null}
           <div className={panelCard !== undefined && !narrow ? "board-area with-panel" : "board-area"}>
-          <div className="board" data-tour="board">
-            {/* アーカイブの列は「アーカイブ済みチケットを表示」がONのときだけ出す（OFFならカードは全部隠れる） */}
-            {shown.columns.filter((column) => shownArchived || column.state !== "archived").map((column) => (
-              <Column
-                key={column.state}
-                column={column}
-                hiddenOf={hiddenOf}
-                movedOf={movedOf}
-                selectedOf={selectedOf}
-                onSelect={selectCard}
-                panelOf={narrow ? panelOf : () => null}
-                folded={shownFolded.includes(column.state)}
-                width={shownWidths[column.state]}
-                onFold={(folded) =>
-                  change((now) => ({
-                    ...now,
-                    folded: folded ? [...now.folded, column.state] : now.folded.filter((f) => f !== column.state),
-                  }))
+          <LaneBoard
+            columns={shownColumns}
+            folded={shownFolded}
+            widths={shownWidths}
+            opened={shownOpened}
+            hiddenOf={hiddenOf}
+            movedOf={movedOf}
+            selectedOf={selectedOf}
+            onSelect={selectCard}
+            panelOf={narrow ? panelOf : () => null}
+            onFold={(state, folded) =>
+              change((now) => ({
+                ...now,
+                folded: folded ? [...now.folded, state] : now.folded.filter((f) => f !== state),
+              }))
+            }
+            onWidth={(state, width) =>
+              change((now) => {
+                const widths = { ...now.widths };
+                if (width === undefined) {
+                  delete widths[state];
+                } else {
+                  widths[state] = width;
                 }
-                onWidth={(width) =>
-                  change((now) => {
-                    const widths = { ...now.widths };
-                    if (width === undefined) {
-                      delete widths[column.state];
-                    } else {
-                      widths[column.state] = width;
-                    }
-                    return { ...now, widths };
-                  })
-                }
-              />
-            ))}
-          </div>
+                return { ...now, widths };
+              })
+            }
+            onOpen={(lane, opened) =>
+              change((now) => ({
+                ...now,
+                opened: opened ? [...now.opened, lane] : now.opened.filter((o) => o !== lane),
+              }))
+            }
+          />
           {panelCard !== undefined && !narrow ? panelOf(panelCard) : null}
           </div>
           <Footer board={shown} />
@@ -465,123 +474,5 @@ function Footer({ board }: { readonly board: Board }): JSX.Element {
     <footer className="foot">
       {lastUpdatedText(board.generatedAt)} / {board.root}
     </footer>
-  );
-}
-
-/**
- * 1つの列。見出しを押すと折りたたみ、右端の取っ手をドラッグすると幅がpxで固定される
- * （ダブルクリックで元の伸び縮みに戻る）。件数は絞り込みで見えているカードの数。
- * 上部の集計（残り・全・不備・承認待ち）は絞り込みに関係なくボード全体の数のまま。
- */
-function Column({
-  column,
-  hiddenOf,
-  movedOf,
-  selectedOf,
-  onSelect,
-  panelOf,
-  folded,
-  width,
-  onFold,
-  onWidth,
-}: {
-  readonly column: BoardColumn;
-  readonly hiddenOf: (card: Card) => boolean;
-  readonly movedOf: (card: Card) => Moved | undefined;
-  readonly selectedOf: (card: Card) => boolean;
-  readonly onSelect: (card: Card) => void;
-  /** 幅が狭いときだけ、選んだカードのすぐ下に置くパネル（それ以外はnull） */
-  readonly panelOf: (card: Card) => JSX.Element | null;
-  readonly folded: boolean;
-  readonly width: number | undefined;
-  readonly onFold: (folded: boolean) => void;
-  readonly onWidth: (width: number | undefined) => void;
-}): JSX.Element {
-  const section = useRef<HTMLElement>(null);
-  const visible = column.cards.filter((card) => !hiddenOf(card)).length;
-  // ドラッグの最中に列が消えたら（読み直せずエラーの画面に替わる）`pointerup`を受ける相手が居なくなり、
-  // 後片付けが走らない。bodyに付けたクラスを残すと、カーソルが変わったまま文字も選べなくなる
-  useEffect(() => () => document.body.classList.remove("resizing"), []);
-  const classes = ["column"];
-  if (width !== undefined) {
-    classes.push("sized");
-  }
-  if (folded) {
-    classes.push("folded");
-  }
-
-  /**
-   * ドラッグしている間の幅はDOMに直に書く。動かすたびにReactへ流すと、指を動かすあいだ中
-   * ボード全体を描き直すことになる。離したときに覚える（そこでReactの持ち物に戻る）。
-   */
-  const onPointerDown = (event: React.PointerEvent<HTMLDivElement>): void => {
-    if (event.button !== 0 || section.current === null) {
-      return;
-    }
-    event.preventDefault();
-    const handle = event.currentTarget;
-    const element = section.current;
-    const startX = event.clientX;
-    // 画面を拡大している（bodyのzoom）と、矩形とポインタの座標は見た目のpx、`style.width`はCSSのpxになる。その比で換算する
-    const scale = Number.parseFloat(document.body.style.zoom) || 1;
-    const startWidth = element.getBoundingClientRect().width / scale;
-    let last = Math.max(MIN_WIDTH, Math.round(startWidth));
-    // 動かさずに押して離しただけなら、幅は決めない。押しただけでpxに固定されると、
-    // その列は窓の幅に追従しなくなる
-    let dragged = false;
-    element.classList.add("resizing");
-    document.body.classList.add("resizing");
-    handle.setPointerCapture(event.pointerId);
-    const move = (moved: PointerEvent): void => {
-      last = Math.max(MIN_WIDTH, Math.round(startWidth + (moved.clientX - startX) / scale));
-      dragged = true;
-      element.classList.add("sized");
-      element.style.width = `${last}px`;
-    };
-    const finish = (): void => {
-      handle.removeEventListener("pointermove", move);
-      handle.removeEventListener("pointerup", finish);
-      handle.removeEventListener("pointercancel", finish);
-      element.classList.remove("resizing");
-      document.body.classList.remove("resizing");
-      if (dragged) {
-        onWidth(last);
-      }
-    };
-    handle.addEventListener("pointermove", move);
-    handle.addEventListener("pointerup", finish);
-    handle.addEventListener("pointercancel", finish);
-  };
-
-  return (
-    <section className={classes.join(" ")} data-state={column.state} data-tour={`column-${column.state}`} style={width === undefined ? undefined : { width: `${width}px` }} ref={section}>
-      <h2>
-        <button
-          type="button"
-          className="fold"
-          data-fold={column.state}
-          aria-expanded={folded ? "false" : "true"}
-          title="列を折りたたむ／広げる"
-          onClick={() => onFold(!folded)}
-        >
-          <span className="fold-mark" aria-hidden="true" />
-          <span className="label">{column.label}</span>
-        </button>
-        <span className="count">{visible}</span>
-      </h2>
-      {column.cards.length === 0 ? (
-        <p className="empty">チケットなし</p>
-      ) : (
-        <ul className="cards">
-          {column.cards.map((card) => (
-            <Fragment key={`${card.project}/${card.id}`}>
-              <CardItem card={card} hidden={hiddenOf(card)} moved={movedOf(card)} selected={selectedOf(card)} onSelect={() => onSelect(card)} />
-              {panelOf(card) === null ? null : <li className="card-panel-slot">{panelOf(card)}</li>}
-            </Fragment>
-          ))}
-        </ul>
-      )}
-      <div className="resizer" data-resize={column.state} title="ドラッグで幅を変える／ダブルクリックで戻す" onPointerDown={onPointerDown} onDoubleClick={() => onWidth(undefined)} />
-    </section>
   );
 }

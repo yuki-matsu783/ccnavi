@@ -1,9 +1,10 @@
 /**
  * 画面が覚えておくもの。絞り込み（プロジェクト・親・ユーザ待ちのみ・アーカイブ済みを表示するか）、折りたたんだ列、
- * ドラッグで決めた列の幅、選んだカード（右のパネルに出すもの）。
+ * ドラッグで決めた列の幅、選んだカード（右のパネルに出すもの）、開いた親の行。
  *
  * 置き場はWebviewのstateで、拡張がHTMLを作り直しても（非表示になって作り直されても）残る。
  */
+import { FOLDED_FIRST } from "../../core/board.js";
 import { getState, setState } from "../vscode.js";
 
 export interface ViewState {
@@ -19,9 +20,11 @@ export interface ViewState {
    * プロジェクトと識別子の組で覚えるので、同じ識別子の別プロジェクトのカードとは別
    */
   readonly selected: string;
+  /** 「フェーズを表示」で開いた親の行（`Lanes.tsx`の`laneKey`＝プロジェクトと親の識別子の組） */
+  readonly opened: readonly string[];
 }
 
-export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: [], widths: {}, selected: "" };
+export const EMPTY: ViewState = { project: "*", parent: "*", attention: false, archived: false, folded: FOLDED_FIRST, widths: {}, selected: "", opened: [] };
 
 /** 選んだカードを覚えるキー。プロジェクトと識別子の組（どちらも文字列なのでJSONにすれば取り違えない） */
 export function cardKey(card: { readonly project: string; readonly id: string }): string {
@@ -37,9 +40,10 @@ export function loadState(): ViewState {
     parent: typeof saved.parent === "string" ? saved.parent : EMPTY.parent,
     attention: saved.attention === true,
     archived: saved.archived === true,
-    folded: Array.isArray(saved.folded) ? saved.folded.filter((f): f is string => typeof f === "string") : [],
+    folded: Array.isArray(saved.folded) ? saved.folded.filter((f): f is string => typeof f === "string") : EMPTY.folded,
     widths: Object.fromEntries(Object.entries(widths).filter((entry): entry is [string, number] => typeof entry[1] === "number" && entry[1] > 0)),
     selected: typeof saved.selected === "string" ? saved.selected : EMPTY.selected,
+    opened: Array.isArray(saved.opened) ? saved.opened.filter((o): o is string => typeof o === "string") : EMPTY.opened,
   };
 }
 
@@ -56,5 +60,6 @@ export function saveState(state: ViewState): void {
     folded: state.folded,
     widths: state.widths,
     selected: state.selected,
+    opened: state.opened,
   });
 }

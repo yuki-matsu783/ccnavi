@@ -7,7 +7,7 @@
  * バッジは「状況」、主な操作は「ユーザができること」。別の規則で決めるので、同時に出てよい
  * （「要確認」のバッジと［承認］など）。ボタンは`card-button`（共通の`button.action`は使わない。寸法は`Card.css`）。
  */
-import type { JSX } from "react";
+import { Children, type JSX, type ReactNode } from "react";
 
 import type { Action, Card } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
@@ -28,14 +28,23 @@ export function CardItem({
   moved,
   selected,
   onSelect,
+  head = false,
+  children,
 }: {
   readonly card: Card;
   readonly hidden: boolean;
   readonly moved?: Moved;
   readonly selected: boolean;
   readonly onSelect: () => void;
+  /** 親の行の見出しとして描く（`div`。列の中の子は`li`） */
+  readonly head?: boolean;
+  /** 主な操作の後ろに並べる補助の操作（親の行の見出しの［計画編集］［フェーズを表示］） */
+  readonly children?: ReactNode;
 }): JSX.Element {
   const classes = ["card", card.isParent ? "parent" : "child"];
+  if (head) {
+    classes.push("lane-head");
+  }
   if (card.issues.length > 0) {
     classes.push("has-issue");
   }
@@ -61,14 +70,16 @@ export function CardItem({
     }
     onSelect();
   };
+  const Tag = head ? "div" : "li";
   return (
-    <li
+    <Tag
       className={classes.join(" ")}
       data-id={card.id}
       data-tour={`card-${card.id}`}
       data-path={card.openPath}
       data-project={card.project}
       data-family={card.family}
+      data-column={card.column}
       data-attention={card.attention ? "1" : "0"}
       data-status={card.status.label}
       data-moved={moved === undefined ? undefined : `${moved.from ?? "none"}-${moved.to}`}
@@ -99,8 +110,8 @@ export function CardItem({
         </div>
       ) : null}
       <Notes card={card} />
-      <Primary card={card} />
-    </li>
+      <Primary card={card} extra={children} />
+    </Tag>
   );
 }
 
@@ -120,13 +131,18 @@ export function StatusMark({ status }: { readonly status: Status }): JSX.Element
  * カードの主な操作。あれば1つだけ出す（主ボタン）。承認待ちなら［承認］、そうでなくバッジが「レビュー待ち」の子なら［レビュー完了］。
  * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。［MRを開く］と案内の文は右のパネルの「ユーザ待ち」に出す
  */
-function Primary({ card }: { readonly card: Card }): JSX.Element | null {
+function Primary({ card, extra }: { readonly card: Card; readonly extra?: ReactNode }): JSX.Element | null {
   const approve = card.actions.some((a) => a.kind === "approve");
   const review = card.actions.find((a): a is ReviewAction => a.kind === "review");
-  if (!approve && review === undefined) {
+  if (!approve && review === undefined && Children.toArray(extra).length === 0) {
     return null;
   }
-  return <div className="card-primary">{approve ? <ApproveButton id={card.id} tour /> : review !== undefined ? <ReviewDoneButton action={review} tour /> : null}</div>;
+  return (
+    <div className="card-primary">
+      {approve ? <ApproveButton id={card.id} tour /> : review !== undefined ? <ReviewDoneButton action={review} tour /> : null}
+      {extra}
+    </div>
+  );
 }
 
 /**
