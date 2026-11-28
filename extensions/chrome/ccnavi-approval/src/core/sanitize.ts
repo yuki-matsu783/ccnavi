@@ -10,7 +10,7 @@
  * - リンクは新しいタブで開き、`noopener noreferrer` を付ける
  * - 中身を隠す書き方は通さない（承認者に見えないまま承認させない）。
  *   `hidden`・`class`・`style`・`id`・`color` などの属性と、`font`・`details`・`summary` などの要素は除く。
- *   HTML コメントは消さずに「〈HTML コメント: …〉」の文字で見せる
+ *   HTML コメントは消さずに「〈HTML コメント：…〉」の文字で見せる
  */
 import createDOMPurify, { type Config, type WindowLike } from "dompurify";
 import { Marked } from "marked";
@@ -48,7 +48,7 @@ function escape(text: string): string {
  * コードの中のコメントは marked が既に実体参照にしているのでヒットしない。
  */
 export function visibleComments(html: string): string {
-  return html.replace(/<!--([\s\S]*?)(?:-->|$)/g, (_, body: string) => `<span>〈HTML コメント: ${escape(body.trim())}〉</span>`);
+  return html.replace(/<!--([\s\S]*?)(?:-->|$)/g, (_, body: string) => `<span>〈HTML コメント：${escape(body.trim())}〉</span>`);
 }
 
 export interface Renderer {

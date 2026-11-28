@@ -196,25 +196,25 @@ const DEFAULT_OPS: BoardOps = {
 export function sayDecide(out: DecideOutcome): ResultLine {
   if (out.kind === "written") {
     const extra = out.pendingExtra ?? 0;
-    const head = out.reviewed ? "レビュー済みにしました" : extra > 0 && !out.followup ? `対応方針は反映しましたが、見せた後に増えた指摘 ${extra} 件が判断待ちで、フェーズはレビュー済みにしていません` : "対応方針を反映しました";
+    const head = out.reviewed ? "レビュー済みにしました" : extra > 0 && !out.followup ? `対応方針は反映しました。画面に表示した後に指摘が ${extra} 件増えたため、フェーズはまだレビュー済みにしていません。増えた指摘の対応方針を決めてください` : "対応方針を反映しました";
     const parts = [head];
-    if (out.followup) parts.push(`続きの子：${out.followup}`);
-    if (extra > 0 && out.followup) parts.push(`見せた後に増えた指摘 ${extra} 件は判断待ちで、フェーズはレビュー済みにしていません`);
+    if (out.followup) parts.push(`続きの子チケット：${out.followup}`);
+    if (extra > 0 && out.followup) parts.push(`画面に表示した後に指摘が ${extra} 件増えたため、フェーズはまだレビュー済みにしていません。増えた指摘の対応方針を決めてください`);
     if (out.issues.length > 0) parts.push(`作った issue：${out.issues.join(", ")}`);
     const reused = out.reusedIssues ?? [];
     if (reused.length > 0) parts.push(`既にあった issue ${reused.length} 件：${reused.join(", ")}`);
-    const commit = out.oid ? `（コミット：${out.oid.slice(0, 7)}）` : "（親のブランチへ積むものはありませんでした）";
+    const commit = out.oid ? `（コミット：${out.oid.slice(0, 7)}）` : "（親ブランチへ反映する内容はありませんでした）";
     const warn = out.warning ? ` 注意：${out.warning}。` : "";
     return { kind: "written", className: warn ? "notice error" : "notice ok", text: `${parts.join("。")}${commit}。${warn}` };
   }
   if (out.kind === "halted") {
     const d = out.done;
-    const made = d.issues.length > 0 ? `作った issue：${d.issues.join(", ")}` : "作った issue：なし";
-    const reused = (d.reusedIssues ?? []).length > 0 ? `。既にあった issue ${d.reusedIssues?.length} 件：${d.reusedIssues?.join(", ")}` : "";
+    const made = d.issues.length > 0 ? `issue の作成 ${d.issues.length} 件（${d.issues.join(", ")}）` : "issue の作成 0 件";
+    const reused = (d.reusedIssues ?? []).length > 0 ? `・既存の issue の利用 ${d.reusedIssues?.length} 件（${d.reusedIssues?.join(", ")}）` : "";
     return {
       kind: "halted",
       className: "notice error",
-      text: `ホストへの書き込みが途中で止まりました。済んだ分（${made}${reused}。返信 ${d.replied} 件・解決 ${d.resolved} 件）。止まった理由：${out.message}。ボードを読み直して、未解決の指摘だけ決め直してください。済んだ分は MR の返信と issue に残りますが、決めた内容のまとめのコメントには載りません。`,
+      text: `ホストへの書き込みが途中で止まりました（${out.message}）。ここまでに済んだ書き込みは、${made}${reused}・返信 ${d.replied} 件・スレッドの解決 ${d.resolved} 件です。ボードを更新して、未解決の指摘だけ対応方針を決め直してください。済んだ分は MR の返信と issue に残りますが、まとめのコメントには載りません。`,
     };
   }
   if (out.kind === "mismatch") return { kind: "changed", className: "notice error", text: `指摘が変わっていたので反映していません：${out.message}` };
@@ -233,23 +233,23 @@ export function sayOutcome(outcome: Outcome, what: string): ResultLine {
       : outcome.kind === "changed"
         ? `${what}は反映されていません：${outcome.message}`
         : outcome.kind === "conflict"
-          ? `${what}を反映できませんでした。自動再試行は行いません：${outcome.message}`
+          ? `${what}を反映できませんでした（自動ではやり直しません）：${outcome.message}`
           : outcome.kind === "attention"
-            ? `${what}は確認が必要な状態です。反映されたかどうかと残っている内容を、ホストの履歴で確認してください：${outcome.message}`
+            ? `${what}の結果を確認してください。${outcome.message}`
             : `${what}は反映されていません：${outcome.message}`;
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
 }
 
 /** 「レビュー済みにする」の確認文（指摘が 0 件の決めるも同じ文面） */
 function reviewMessage(family: string, phase: number, warn: string): string {
-  return `${family} のフェーズ ${phase} をレビュー済みにする。レビュー待ちの子チケットを done/ に移動し、レビュー済みマーカーとともに1つのコミットとして反映します。反映する前に、押した時点のスレッドとレビューを再取得して確認します。${warn}`;
+  return `${family} のフェーズ ${phase} をレビュー済みにします。レビュー待ちの子チケットを done/ に移動し、レビュー済みの記録と合わせて 1 つのコミットとして反映します。反映する前に、スレッドとレビューを再取得して確認します。${warn}`;
 }
 
 function decideMessage(family: string, phase: number, choices: Readonly<Record<string, DecideChoice>>, warn: string): string {
   const n = (c: DecideChoice): number => Object.values(choices).filter((v) => v === c).length;
   const parts = `${DECIDE_LABELS.fix} ${n("fix")} 件・${DECIDE_LABELS.issue} ${n("issue")} 件・${DECIDE_LABELS.keep} ${n("keep")} 件`;
   const fix = n("fix") > 0 ? `「${DECIDE_LABELS.fix}」が 1 件以上あるので、続きの子チケットを作り、このフェーズを再開します。` : "";
-  return `${family} のフェーズ ${phase} の残った指摘の対応方針を反映します（${parts}）。${fix}issue の作成、スレッドへの返信、スレッドの解決の順にホストへ書いてから、親のブランチへ1つのコミットとして反映します。${warn}`;
+  return `${family} のフェーズ ${phase} の残った指摘の対応方針を反映します（${parts}）。${fix}issue の作成、スレッドへの返信、スレッドの解決の順にホストへ書いてから、親ブランチへ 1 つのコミットとして反映します。${warn}`;
 }
 
 /** 読み取った指摘のキーが空か重複していれば理由を返す（対応方針を結ぶキーとして使えない） */
@@ -265,11 +265,11 @@ function previewProblem(preview: DecidePreview): string {
 
 /** 選んだ対応方針が、見せた指摘の全部に 1 つずつ付いているか。付いていなければ理由を返す */
 function choicesProblem(preview: DecidePreview, choices: Readonly<Record<string, DecideChoice>>, digest: string): string {
-  if (digest !== preview.digest) return "見せた指摘と確定の内容が食い違っています。閉じて開き直してください";
-  if (preview.threads.some((t) => t.unsupported)) return "Chrome では扱えない指摘があります。VS Code で決めてください";
+  if (digest !== preview.digest) return "表示中の指摘と確定する内容が一致しません。この画面を閉じて、開き直してください";
+  if (preview.threads.some((t) => t.unsupported)) return "Chrome 拡張では扱えない指摘があります。VS Code 拡張で対応方針を確定してください";
   const keys = preview.threads.map((t) => t.key);
   const given = Object.keys(choices);
-  if (given.length !== keys.length || !keys.every((k) => k in choices)) return "対応方針を選んでいない指摘か、見せていない指摘があります";
+  if (given.length !== keys.length || !keys.every((k) => k in choices)) return "対応方針を選んでいない指摘か、画面に表示されていない指摘があります";
   if (!given.every((k) => DECIDE_CHOICES.includes(choices[k]))) return "不明な対応方針があります";
   return "";
 }
@@ -439,7 +439,7 @@ export function createBoardController(env: BoardEnv): BoardController {
         const deps = await writeDeps(repoBoard.repo);
         const ids = r.batch.map((e) => e.ticket);
         const warn = await approvalWarning(deps, repoBoard.repo, family.family.name);
-        if (!env.confirm(`${family.family.name} に、チケット ${ids.join(", ")} の承認を1つのコミットとして反映します。承認しますか？${warn}`)) return false;
+        if (!env.confirm(`${family.family.name} に、チケット ${ids.join(", ")} の承認を 1 つのコミットとして反映します。承認しますか？${warn}`)) return false;
         const outcome = await ops.approveFamily(repoBoard.repo, family.family.name, { ids, digest: r.digest, only: r.only ?? null }, deps);
         await noteAttention(repoBoard.repo, family.family.name, outcome);
         say(outcome, "承認");
@@ -509,7 +509,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     },
     dismiss(repoBoard, family) {
       void (async () => {
-        if (!env.confirm(`${family} の確認が必要な状態を解除します。ホストの履歴を確認し、親ブランチの置き場が正しいと確認できた場合のみ解除してください。`)) return;
+        if (!env.confirm(`${family} の警告を解除します。ホストのコミット履歴を見て、親ブランチのチケットと承認の記録（wip/proposals・.ccnavi/approved）が正しい状態だと確かめた場合のみ、解除してください。`)) return;
         const all = await readAttention();
         const key = repoKey(repoBoard.repo);
         if (all[key]) delete all[key][family];
@@ -585,7 +585,7 @@ export function createBoardController(env: BoardEnv): BoardController {
               const before = preview.threads.find((o) => o.key === t.key && o.version === t.version);
               if (before && choices[t.key]) inherited[t.key] = choices[t.key];
             }
-            patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。同じ指摘の選択は引き継ぎましたが、新しい指摘は「${DECIDE_LABELS.fix}」に戻っています。選び直してください。` });
+            patchOf(token, { preview: next, deciding: false, inherited, notice: `指摘が変わりました（${out.message}）。変わっていない指摘の選択は引き継ぎました。新しい指摘は「${DECIDE_LABELS.fix}」になっているので、確認して選び直してください。` });
           }
         } catch (err) {
           patchOf(token, { deciding: false, notice: `指摘が変わりました。読み直せませんでした：${(err as Error).message ?? String(err)}` });
@@ -656,7 +656,7 @@ export function createBoardController(env: BoardEnv): BoardController {
     if (!fromTimer) set({ status: { ...snap.status, text: "ccnavi（WASM）を起動しています…" } });
     const w = ccnaviWorker();
     const t = await w.init();
-    set({ status: { text: `ccnavi ${t.version}（WASM）：起動 ${t.boot_ms} ms`, bootMs: t.boot_ms, violations: t.violations.length } });
+    set({ status: { text: `読み込みが終わりました（ccnavi ${t.version}・起動 ${t.boot_ms} ms）`, bootMs: t.boot_ms, violations: t.violations.length } });
     const cache = await env.blobCache();
     const attention = await readAttention();
     set({ attention });

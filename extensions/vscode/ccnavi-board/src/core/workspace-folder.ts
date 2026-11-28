@@ -10,5 +10,5 @@ export function noFolderText(what: string): string {
 
 /** フォルダが複数開かれているとき。`first`は最初のフォルダの名前 */
 export function multiFolderText(first: string): string {
-  return `フォルダが複数開かれています。最初のフォルダ ${first} だけを対象にします`;
+  return `フォルダが複数開かれています。最初のフォルダ ${first} だけを対象にします。`;
 }

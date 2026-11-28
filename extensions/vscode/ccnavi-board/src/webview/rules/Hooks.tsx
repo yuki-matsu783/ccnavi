@@ -67,7 +67,7 @@ function Table({ hooks, files }: HooksProps): JSX.Element {
         </table>
       </div>
       <p className="hint">
-        「判定を試す」でツールを選ぶと、そのツールで実行されるhookだけをここから絞り込んで出します。matcherの意味はClaude Codeのものです（空か<code>*</code>で全部、それ以外はツール名への正規表現）。
+        「判定を試す」でツールを選ぶと、この一覧のうち、そのツールで実行されるhookだけを判定の結果に表示します。matcherの書き方はClaude Codeの仕様に従います（空か<code>*</code>ならすべてのツール、それ以外はツール名に対する正規表現）。
       </p>
     </>
   );

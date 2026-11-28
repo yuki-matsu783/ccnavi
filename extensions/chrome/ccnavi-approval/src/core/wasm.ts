@@ -60,6 +60,6 @@ export async function startCcnavi(wasm: BufferSource, loadExec: () => Promise<un
   const { instance } = await WebAssembly.instantiate(wasm, go.importObject);
   void go.run(instance);
   const handle = g.ccnaviHandle;
-  if (handle === undefined) throw new Error("ccnavi.wasm が入口（ccnaviHandle）を置きませんでした");
+  if (handle === undefined) throw new Error("ccnavi.wasm を起動できませんでした（入口 ccnaviHandle がありません）");
   return { handle, bootMs: performance.now() - t0 };
 }

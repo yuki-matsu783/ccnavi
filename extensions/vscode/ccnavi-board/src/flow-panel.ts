@@ -202,7 +202,7 @@ async function openFlowPanel(ticket: string, restore: Restore | undefined): Prom
     open.panel.reveal(open.panel.viewColumn);
     if (restore !== undefined) {
       // 既に開いている画面の編集を何も言わずに差し替えない。戻せなかったと言い、コピーはYAMLで見せる
-      void vscode.window.showWarningMessage(`${ticket}のフローは既に開いているため、閉じる前の編集を戻せませんでした。閉じる前の編集は、無題のYAMLファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${ticket}のフローは既に開いているため、閉じる前の編集を画面に戻せませんでした。代わりに、無題のYAMLファイルとして開きます。`);
       void openDraftAsYaml(restore.draft);
     }
     return;
@@ -260,7 +260,7 @@ function shownPath(root: string, filePath: string): string {
 async function lookUp(root: string, ticket: string): Promise<FlowTarget> {
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
-    throw new Error(`フローの置き場を実行ファイルから取得できません: ${board.error}`);
+    throw new Error(`フローの置き場をccnaviから取得できません: ${board.error}`);
   }
   const found = flowTargetOf(board.board, ticket);
   if (!found.ok) {
@@ -291,7 +291,7 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
     return { target, exists: false, mtimeMs: 0, hash: "", doc, shown, offer: readOffer(root, target, doc) };
   }
   const { bytes, mtimeMs } = read;
-  const refuse = (why: string): Error => new Error(`フローのファイルを開けません（${shown}）: ${why}。エディタで直してから更新してください`);
+  const refuse = (why: string): Error => new Error(`フローのファイルを開けません（${shown}）: ${why}。エディタで直してから更新してください。`);
   // 正しいかは実行ファイルに聞く（SubagentStartと同じ読み）。読んだバイトのまま渡す（UTF-8として不正かどうかも
   // 実行ファイルが言う）。読めないフローを画面で直すと、読めなかった部分を省いて書くことになる。エディタで直させる
   const verdict = await lintText(root, tmpDir, bytes, shown);
@@ -310,11 +310,11 @@ async function readPage(root: string, ticket: string, tmpDir: string): Promise<L
   // 値の意味が変わる（`0755` `yes` `1:30`マージキー など）。意味の答えは実行ファイルが持つ（core/flow-match.ts）
   const mismatch = flowMismatch(value.value, verdict.data);
   if (mismatch !== undefined) {
-    throw new Error(`フローのファイルを開けません（${shown}）: ${openMismatchText(mismatch)}。直したら更新してください`);
+    throw new Error(`フローのファイルを開けません（${shown}）: ${openMismatchText(mismatch)}。直したら更新してください。`);
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    throw refuse("ノードのリスト（idが文字列のノード）を取り出せないため、図を描けません");
+    throw refuse("ノードの一覧が読み取れないため、図を描けません（各ノードにidを文字列で書いてください）");
   }
   return { target, exists: true, mtimeMs, hash: hashOf(bytes), doc, shown, checks: verdict.checks, offer: readOffer(root, target, doc) };
 }
@@ -640,7 +640,7 @@ async function reload(current: PanelState): Promise<void> {
       current.shownDraft = restore.draft;
     } else {
       // 閉じた後にファイルが変わった。コピーを戻すと、変わった中身を気づかないうちに上書きしうる。コピーはYAMLで見せる
-      void vscode.window.showWarningMessage(`${current.ticket}のフローは閉じた後に変わったので、編集を戻しませんでした。閉じる前の編集は、無題のYAMLファイルとして開きます。`);
+      void vscode.window.showWarningMessage(`${current.ticket}のフローは閉じた後に変わったので、閉じる前の編集は画面に戻しませんでした。代わりに、無題のYAMLファイルとして開きます。`);
       void openDraftAsYaml(restore.draft);
     }
   }
@@ -657,7 +657,7 @@ function stale(current: PanelState, loaded: Loaded): boolean {
   if (current.loaded === loaded) {
     return false;
   }
-  fail(current, "フローを更新したため、この保存は取りやめました。更新したフローで編集し直してください");
+  fail(current, "フローを更新したため、この保存は取りやめました。更新したフローで編集し直してください。");
   return true;
 }
 
@@ -810,7 +810,7 @@ async function openProposal(current: PanelState): Promise<void> {
   }
   const doc = asFlowDoc(value.value);
   if (doc === undefined) {
-    refuse("ノードのリスト（idが文字列のノード）を取り出せないため、図を描けません");
+    refuse("ノードの一覧が読み取れないため、図を描けません（各ノードにidを文字列で書いてください）");
     return;
   }
   const hash = hashOf(bytes);
@@ -858,9 +858,9 @@ function removeImported(current: PanelState, target: FlowTarget, imported: strin
   const shown = shownPath(current.folder.uri.fsPath, draft.path);
   const removed = removeDraftFile(target.flow.tree, draft.path, imported);
   if (!removed.ok) {
-    return `取り込んだ下書き${shown}は削除していません（${removed.error}）。`;
+    return `取り込んだ下書き（${shown}）は削除できませんでした: ${removed.error}。`;
   }
-  return removed.removed ? `取り込んだ下書き${shown}を削除しました（削除もコミットに入ります）。` : "";
+  return removed.removed ? `取り込んだ下書き（${shown}）を削除しました（削除もコミットに入ります）。` : "";
 }
 
 async function save(current: PanelState, doc: FlowDoc, imported?: string): Promise<void> {
@@ -875,13 +875,13 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
     return;
   }
   if (!verdict.ok) {
-    fail(current, `保存しません: ${verdict.error}`);
+    fail(current, `保存できません: ${verdict.error}`);
     return;
   }
   // 書き出す本文を実行ファイルが、画面が書こうとした中身と同じに読むときだけ書く（core/flow-match.ts）
   const mismatch = flowMismatch(doc, verdict.data);
   if (mismatch !== undefined) {
-    fail(current, `保存しません: ${saveMismatchText(mismatch)}`);
+    fail(current, `保存できません: ${saveMismatchText(mismatch)}`);
     return;
   }
   // 2. 押した時点で錠を聞き直す。着手中なら書かない（実行ファイルの答えのまま）
@@ -894,8 +894,8 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
-    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください");
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "保存", "それでも保存する"))) {
+    fail(current, "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (!alive(current) || stale(current, loaded)) {
@@ -904,7 +904,7 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
   // 3. 置き場が同じ。往復の間にチケットが動くと、読む先（正とする側のツリー）が替わることがある
   const filePath = loaded.target.flow.path;
   if (target.flow.path !== filePath) {
-    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。更新してから編集し直してください`);
+    fail(current, `フローの置き場が変わりました（${loaded.shown} → ${shownPath(current.folder.uri.fsPath, target.flow.path)}）。更新してから編集し直してください。`);
     return;
   }
   // 4. 読み込んでから外で変わっていない（無かったファイルは、まだ無い）。5. リンクを辿らない。
@@ -929,13 +929,13 @@ async function save(current: PanelState, doc: FlowDoc, imported?: string): Promi
     (await runWriteAndPushTarget(root, binSetting(), target.parent)) === "yes";
   if (!carrier) {
     vscode.window.showInformationMessage(
-      `${loaded.shown}に保存しました。${drafted}コミットは、承認済みチケットと同じくユーザが行います（sh ${PUSH_APPROVED_SCRIPT}）`,
+      `${loaded.shown}に保存しました。${drafted}コミットは、承認済みチケットと同じく自分でしてください（sh ${PUSH_APPROVED_SCRIPT}）。`,
     );
     return;
   }
   const send = "ターミナルで送る";
   const picked = await vscode.window.showInformationMessage(
-    `${loaded.shown}に保存しました。${drafted}親${target.parent}とその子は取り込み済みのため、コミットとpushは、「${send}」を押すと${PUSH_APPROVED_SCRIPT} ${target.parent}で送れます`,
+    `${loaded.shown}に保存しました。${drafted}親「${target.parent}」とその子は取り込み済みです。「${send}」を押すと、コミットとpushのコマンド（sh ${PUSH_APPROVED_SCRIPT} ${target.parent}）をターミナルに送ります。`,
     send,
   );
   if (picked === send) {

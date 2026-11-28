@@ -216,7 +216,7 @@ test("CX-T233 設定画面: 実機の試験とボードが読む欄の ID が描
   }
   assert.equal($("#repo-list").children.length, 0);
   // PAT の欄: 開いた直後に、ホストごとの登録の有無を service worker に聞く
-  assert.deepEqual(text("#token-list"), "github.com（GitHub）: 未登録gitlab.com（GitLab）: 未登録");
+  assert.deepEqual(text("#token-list"), "github.com（GitHub）：未登録gitlab.com（GitLab）：未登録");
   assert.deepEqual(
     sent.map((m) => [m.kind, m.host]),
     HOSTS.map((h) => ["token.status", h.id]),
@@ -229,7 +229,7 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
   await submitRepo();
   assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録しました。");
   assert.equal($("#repo-msg").className, "status ok");
-  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）登録を削除");
+  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・検索期間 7 日）登録を削除");
   assert.deepEqual(storedRepos(), [
     { host: "github.com", owner: "acme", repo: "widgets", integration: "", recentDays: 7, extraBranches: [], project: "", workspace: "" },
   ]);
@@ -252,8 +252,8 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
   assert.equal(text("#repo-msg"), "github.com/acme/app を登録しました。");
   assert.equal(
     text("#repo-list"),
-    "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）登録を削除" +
-      "github.com/acme/app（統合先 develop・直近 0 日・指定 a, b・プロジェクト app（ワークスペース github.com/acme/widgets））登録を削除",
+    "github.com/acme/widgets（統合先 デフォルトブランチ・検索期間 7 日）登録を削除" +
+      "github.com/acme/app（統合先 develop・検索期間 0 日・追加で表示するブランチ a, b・プロジェクト app（ワークスペース github.com/acme/widgets））登録を削除",
   );
   assert.deepEqual(storedRepos()[1], {
     host: "github.com",
@@ -294,7 +294,7 @@ test("CX-T234 設定画面のリポジトリ: 登録すると一覧に出し、�
     storedRepos().map((r) => r.repo),
     ["widgets"],
   );
-  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 7 日）登録を削除");
+  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・検索期間 7 日）登録を削除");
   await click("#repo-list li button");
   assert.deepEqual(storedRepos(), []);
   assert.equal($("#repo-list").children.length, 0);
@@ -332,7 +332,7 @@ test("CX-T216 設定画面のリポジトリ: 直近の日数は 0〜90。外れ
   await submitRepo();
   assert.equal(text("#repo-msg"), "github.com/acme/widgets を登録しました。");
   assert.equal(storedRepos()[0]?.recentDays, 90);
-  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・直近 90 日）登録を削除");
+  assert.equal(text("#repo-list"), "github.com/acme/widgets（統合先 デフォルトブランチ・検索期間 90 日）登録を削除");
 });
 
 test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し、欄を空にして画面に読み返さない。消すと未登録に戻す。形の違う PAT は断る", async () => {
@@ -347,7 +347,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   assert.equal($("#token-msg").className, "status error");
   assert.equal(value.value, "");
   assert.equal(tokens.size, 0);
-  assert.match(text("#token-list"), /github\.com（GitHub）: 未登録/);
+  assert.match(text("#token-list"), /github\.com（GitHub）：未登録/);
 
   // 期限を入れずに登録: 期限が分からないと出す
   value.value = TOKEN;
@@ -356,7 +356,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   assert.equal($("#token-msg").className, "status ok");
   assert.equal(tokens.get("github.com"), TOKEN);
   assert.equal(value.value, "");
-  assert.match(text("#token-list"), /github\.com（GitHub）: 登録済み（github\.com の PAT の期限が不明です（/);
+  assert.match(text("#token-list"), /github\.com（GitHub）：登録済み・期限不明/);
   assert.ok(!container.innerHTML.includes(TOKEN));
   assert.ok(!document.body.innerHTML.includes(TOKEN));
 
@@ -368,7 +368,7 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   assert.equal(text("#token-msg"), "gitlab.com の PAT を登録しました。差し替えた場合は、古いトークンをホスト側で失効させてください。");
   assert.deepEqual(metas.get("gitlab.com"), { manual: "2026-10-03" });
   assert.equal([value.value, $<HTMLInputElement>("#token-expires").value].join(""), "");
-  assert.match(text("#token-list"), /gitlab\.com（GitLab）: 登録済み（gitlab\.com の PAT はあと 3 日で切れます（2026-10-03）。/);
+  assert.match(text("#token-list"), /gitlab\.com（GitLab）：登録済み・あと 3 日で期限切れ（2026-10-03）/);
   assert.ok(!container.innerHTML.includes(TOKEN));
 
   // 送った頼み: PAT は token.set にだけ載る
@@ -388,8 +388,8 @@ test("CX-T217 設定画面の PAT: 登録すると登録済みと期限を出し
   assert.equal(text("#token-msg"), "gitlab.com の PAT を削除しました。ホスト側でも失効させてください。");
   assert.equal($("#token-msg").className, "status ok");
   assert.deepEqual([...tokens.keys()], ["github.com"]);
-  assert.match(text("#token-list"), /gitlab\.com（GitLab）: 未登録/);
-  assert.match(text("#token-list"), /github\.com（GitHub）: 登録済み/);
+  assert.match(text("#token-list"), /gitlab\.com（GitLab）：未登録/);
+  assert.match(text("#token-list"), /github\.com（GitHub）：登録済み/);
 });
 
 /** 状態欄の中身が作り直されたか（子の足し引き）を数える */

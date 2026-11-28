@@ -161,7 +161,7 @@ function StepView({ id, data }: NodeProps<StepNode>): JSX.Element {
   const actions = useContext(Actions);
   const many = data.outputs.length > 1 || data.outputs.some((port) => port.label !== "");
   return (
-    <div className="flow-node" data-type={cssType(data.type, data.known)} data-tour={data.mark} title={data.known ? undefined : `この画面に入力欄がない種類です（${data.type || "種類なし"}）。中身は保存してもそのまま残ります`}>
+    <div className="flow-node" data-type={cssType(data.type, data.known)} data-tour={data.mark} title={data.known ? undefined : `この画面に入力欄がない種類です（${data.type || "種類なし"}）。中身は保存してもそのまま残ります。`}>
       {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このノードを削除" onRemove={() => actions.removeNode(id)} />}
       {data.inputs.map((port, index) => (
         <Handle
@@ -215,7 +215,7 @@ function GroupView({ id, data, selected }: NodeProps<GroupNode>): JSX.Element {
       <div className="flow-group" data-type="group" data-tour={data.mark}>
         <span className="flow-group-label">{data.name}</span>
       </div>
-      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを削除（中のノードは残す）" onRemove={() => actions.removeNode(id)} />}
+      {!data.readOnly && <RemoveButton action="canvas-remove-node" label="このグループを解除（中のノードは残す）" onRemove={() => actions.removeNode(id)} />}
     </>
   );
 }

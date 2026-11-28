@@ -32,14 +32,14 @@ export interface BoardSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Record<string, unknown>;
 }
 
 function str(value: unknown, at: string): string {
   if (typeof value !== "string") {
-    throw new Error(`${at}が文字列ではない`);
+    throw new Error(`${at}が文字列ではありません`);
   }
   return value;
 }
@@ -47,7 +47,7 @@ function str(value: unknown, at: string): string {
 function column(value: unknown, at: string): ProposalState {
   const state = COLUMNS.find((c) => c.state === value)?.state;
   if (state === undefined) {
-    throw new Error(`${at}は列の名前（${COLUMNS.map((c) => c.state).join(" / ")}）にする`);
+    throw new Error(`${at}は列の名前（${COLUMNS.map((c) => c.state).join(" / ")}）にしてください`);
   }
   return state;
 }
@@ -100,7 +100,7 @@ function mergeSample(raw: unknown): MergeView {
     const row = object(item, where);
     const state = MERGE_STATES.find((s) => s === row.state);
     if (state === undefined) {
-      throw new Error(`${where}.stateは${MERGE_STATES.join(" / ")}のどれかにする`);
+      throw new Error(`${where}.stateは${MERGE_STATES.join(" / ")}のどれかにしてください`);
     }
     const text = (name: string): string => (row[name] === undefined ? "" : str(row[name], `${where}.${name}`));
     return {

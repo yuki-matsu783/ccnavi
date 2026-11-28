@@ -478,7 +478,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       return;
     }
     if (!isToolName(tool.trim())) {
-      setStatus({ text: "ツール名は英字で始まり、英数字・_・-だけを使ってください", error: true });
+      setStatus({ text: "ツール名は英字で始め、英数字・_・-だけを使ってください", error: true });
       return;
     }
     if (subject.trim() === "") {
@@ -537,8 +537,8 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
         </div>
       ))}
       <div id="changed" className={changed ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。更新してください。
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
+        ファイルの変更を検知しました。「更新」を押してください。
+        <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={busy} onClick={reload}>
           更新
         </button>
       </div>
@@ -563,7 +563,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           <button type="button" className="action" data-action="open-rules" disabled={page?.exists === false} title={page?.exists === false ? "ファイルがまだないため、開けません" : undefined} onClick={() => post({ type: "openFile", which: "rules" })}>
             エディタで開く
           </button>
-          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={reload}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={busy} onClick={reload}>
             更新
           </button>
           <button
@@ -607,9 +607,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
         <div className="find">
           <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
-          <span className="hint" data-tour="order-hint">判定は強い順に 拒否 &gt; 確認 &gt; 許可（deny &gt; ask &gt; allow）</span>
+          <span className="hint" data-tour="order-hint">判定の強さ: 拒否 &gt; 確認 &gt; 許可（deny &gt; ask &gt; allow）</span>
         </div>
-        {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください</p>}
+        {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください。</p>}
         {SECTIONS.map((section) => {
           const rows = shownDraft[section].map((row) => {
             const text = findText(row.rule);
@@ -696,7 +696,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
               id="tool"
               type="text"
               list="tool-names"
-              title="候補は判定が対象を取り出せるツールです。一覧にない名前も入れられます（判定には届きません）"
+              title="候補は、ルールで判定できるツールです。一覧にない名前も入力できますが、ルールでは判定されません。"
               spellCheck={false}
               value={shownTool}
               onChange={(event) => setTool(event.target.value)}
@@ -767,7 +767,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           >
             記録から候補を出す
           </button>
-          <span className="hint">保存済みのルールで確認した候補です。編集中の内容は使いません</span>
+          <span className="hint">保存済みのルールで確認した候補です。編集中の内容は使いません。</span>
         </div>
         {shownSuggested !== undefined && <SuggestResult result={shownSuggested} />}
       </section>

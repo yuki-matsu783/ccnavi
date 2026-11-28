@@ -221,8 +221,8 @@ func reservedProject(t *ticket.Ticket) []rules.Problem {
 	for _, n := range config.ReservedLayerNames() {
 		names = append(names, "`"+n+"`")
 	}
-	return []rules.Problem{problem(t, "`project: "+t.Project+"` はレイヤーの名前として予約してある表記（"+strings.Join(names, " と ")+"）。"+
-		"その名前のプロジェクトはレイヤーとして数えないので、このチケットのレイヤーが決まらない。"+
+	return []rules.Problem{problem(t, "`project: "+t.Project+"` は設定の名前として予約してある表記（"+strings.Join(names, " と ")+"）。"+
+		"その名前のプロジェクトは設定として数えないので、このチケットの設定が決まらない。"+
 		"ワークスペース自身の提案は `wip/proposals/` に置いてください。プロジェクトの提案なら、"+
 		"そのプロジェクトの名前を変えてから置いてください")}
 }

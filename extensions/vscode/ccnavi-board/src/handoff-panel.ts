@@ -151,14 +151,14 @@ function mainTree(root: string): TreeJson {
 async function readPage(workspace: string, key: string): Promise<Loaded> {
   const board = await loadBoard(workspace, binSetting());
   if (!board.ok) {
-    throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);
+    throw new Error(`チケットとワークツリーの状態をccnaviから取得できません: ${board.error}`);
   }
   const trees = treeOptions(board.board);
   const found = findTree(board.board, key);
   // ワークスペースは、ボードの`main`のroot（実パス）ではなく、開いているフォルダを渡す。他は実行ファイルが答えたroot
   const tree: TreeJson | undefined = key === MAIN_TREE_KEY ? { ...(found ?? mainTree(workspace)), root: workspace } : found;
   if (tree === undefined) {
-    throw new Error(`ツリーが見つかりません: ${keyLabel(key)}`);
+    throw new Error(`ワークツリーが見つかりません: ${keyLabel(key)}。更新して選び直してください。`);
   }
   const result = await runHandoff(workspace, binSetting(), tree.root, []);
   if (!result.ok) {
@@ -391,7 +391,7 @@ async function handleMessage(current: PanelState, message: HandoffMessage | unde
     // 画面が出したターミナルのコマンドだけをコピーする
     if (isTerminalCommand(message.text)) {
       await vscode.env.clipboard.writeText(message.text);
-      void vscode.window.showInformationMessage("ターミナルで打つコマンドをコピーしました");
+      void vscode.window.showInformationMessage("ターミナルで実行するコマンドをコピーしました");
     }
     return;
   }
@@ -434,12 +434,12 @@ async function importPaths(current: PanelState, loaded: Loaded | undefined, path
     current.host.post({ type: "imported", paths, result } satisfies ToHandoff);
   };
   if (loaded?.kind !== "page") {
-    answer({ ok: false, error: "画面を更新してください" });
+    answer({ ok: false, error: "一覧を読み込めていないため、取り込めません。画面を更新してください。" });
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
-    answer({ ok: false, error: "エージェントの応答中のため取り込みを取りやめました。応答が終わってから取り込んでください" });
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "取り込み", "それでも取り込む"))) {
+    answer({ ok: false, error: "エージェントの応答中のため取り込みを取りやめました。応答が終わってから取り込んでください。" });
     return;
   }
   if (!alive(current)) {

@@ -38,7 +38,7 @@ test("CX-T244 足すホスト: GitHub Enterprise Server は /api/v3 と /api/gra
 test("CX-T245 足すホストの誤り: 種類・URL の形・http（loopback 以外）・資格情報・クエリ・パス・IPv6 は投げる", () => {
   const cases: [unknown, unknown, RegExp][] = [
     ["bitbucket", "https://x.example.com", /GitHub か GitLab/],
-    ["gitlab", "", /URL を入れてください/],
+    ["gitlab", "", /URL を入力してください/],
     ["gitlab", "not a url", /Invalid URL/],
     ["gitlab", "http://gitlab.example.com", /https のみ指定できます/],
     ["gitlab", "https://u:p@gitlab.example.com", /資格情報/],

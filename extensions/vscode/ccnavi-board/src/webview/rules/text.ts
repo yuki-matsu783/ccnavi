@@ -56,7 +56,7 @@ export function contextSummary(rule: RuleForm): string {
 /** askとallowにmessageが残っているときに出す断り。lintがerrorにする */
 export function staleMessage(section: Section): string {
   const where = section === "ask" ? "ユーザの確認ダイアログにしか出ない" : "どこにも届かない";
-  return `${section}のmessageは${where}ため、設定の検証（lint）でエラーになります。モデルに渡すプロンプトはadditionalContextに移してください。残っている文面は次のとおりです。`;
+  return `${section}のmessageは${where}ため、設定の検証（lint）でerrorになります。モデルに渡すプロンプトはadditionalContextに移してください。残っている文面は次のとおりです。`;
 }
 
 /**
@@ -85,6 +85,6 @@ export const JUDGE_LABELS = {
   subject: "対象（subject）",
   resolved: "実際に見た対象（resolved）",
   reason: "理由（reason）",
-  degraded: "縮退（生の文字列で判定。degraded）",
+  degraded: "簡易判定（degraded）",
   fallback: "組み込みの既定（fallback）",
 } as const;

@@ -220,18 +220,18 @@ export type MirrorStatus =
 /** 一覧に共通する押せない理由。押せるなら空 */
 function commonBlock(status: MirrorStatus, busy: boolean): string {
   if (busy) {
-    return "同期しています。終わるまで待ってください";
+    return "同期しています。終わるまで待ってください。";
   }
   switch (status.kind) {
     case "waiting":
       return "ミラーを確認しています";
     case "failed":
-      return "ミラーを確認できませんでした。「更新」で確認し直してください";
+      return "ミラーを確認できませんでした。「更新」を押して確認し直してください。";
     case "ok":
       if (!status.list.ok) {
-        return "ミラーを確認できませんでした。「更新」で確認し直してください";
+        return "ミラーを確認できませんでした。「更新」を押して確認し直してください。";
       }
-      return status.list.commonEmpty ? "共通レイヤーにも工程スキルにもコピーするものがありません" : "";
+      return status.list.commonEmpty ? "共通設定にも工程スキルにも、コピーするものがありません" : "";
   }
 }
 
@@ -243,7 +243,7 @@ export function projectSyncButton(status: MirrorStatus, busy: boolean, name: str
   }
   const project = status.kind === "ok" ? mirrorOf(status.list, name) : undefined;
   if (project === undefined) {
-    return { enabled: false, reason: "ミラーの結果にこのプロジェクトがありません" };
+    return { enabled: false, reason: "ミラーの確認結果に、このプロジェクトがありません" };
   }
   if (project.state === "synced") {
     return { enabled: false, reason: "ずれはありません" };
@@ -252,7 +252,7 @@ export function projectSyncButton(status: MirrorStatus, busy: boolean, name: str
     return { enabled: false, reason: project.error || stateText(project) };
   }
   if (project.expect === "") {
-    return { enabled: false, reason: "同期に要る値が返りませんでした。「更新」で確認し直してください" };
+    return { enabled: false, reason: "ミラーの確認結果が不完全なため、同期できません。「更新」を押して確認し直してください。" };
   }
   return { enabled: true, reason: "" };
 }
@@ -268,7 +268,7 @@ export function syncAllButton(status: MirrorStatus, busy: boolean): SyncButton &
     return { enabled: false, reason: "ずれのあるプロジェクトはありません", count };
   }
   if (status.kind === "ok" && status.list.expect === "") {
-    return { enabled: false, reason: "同期に要る値が返りませんでした。「更新」で確認し直してください", count };
+    return { enabled: false, reason: "ミラーの確認結果が不完全なため、同期できません。「更新」を押して確認し直してください。", count };
   }
   return { enabled: true, reason: "", count };
 }
@@ -282,14 +282,14 @@ export function isStale(error: string): boolean {
 export function syncNotice(result: MirrorResult): { readonly kind: "info" | "warn" | "error"; readonly message: string } {
   if (!result.ok) {
     if (isStale(result.error)) {
-      return { kind: "warn", message: "表示した後でミラーの内容が変わったので、同期しませんでした。最新の状態を読み直したので、確かめてからもう一度押してください" };
+      return { kind: "warn", message: "表示した後でミラーの内容が変わったので、同期できませんでした。最新の状態を読み直したので、確かめてからもう一度押してください。" };
     }
     const done = result.synced ?? [];
     if (done.length > 0) {
       const names = done.map((s) => s.name).join("、");
       return {
         kind: "error",
-        message: `ミラーを同期できなかったものがあります: ${result.error}。同期できたのは${names}です（ワークツリーに書いただけで、コミットはしていません）`,
+        message: `ミラーを同期できなかったものがあります: ${result.error}。同期できたのは${names}です（ワークツリーに書いただけで、コミットはしていません）。`,
       };
     }
     return { kind: "error", message: `ミラーを同期できませんでした: ${result.error}` };
@@ -301,7 +301,7 @@ export function syncNotice(result: MirrorResult): { readonly kind: "info" | "war
   const names = result.synced.map((s) => s.name).join("、");
   return {
     kind: "info",
-    message: `${names}のミラーを同期しました（${files}ファイル）。書いたのは各プロジェクトのワークツリーで、コミットはしていません。必要なら各プロジェクトでコミットしてください`,
+    message: `${names}のミラーを同期しました（${files}ファイル）。書いたのは各プロジェクトのワークツリーで、コミットはしていません。必要なら各プロジェクトでコミットしてください。`,
   };
 }
 
@@ -328,7 +328,7 @@ function parseRecord(text: string): { readonly ok: true; readonly value: Record<
 }
 
 function versionMismatch(version: unknown): string {
-  return `ミラーのJSONの版が違います（拡張は${MIRROR_VERSION}、実行ファイルは${String(version)}）`;
+  return `ミラーのJSONの版が違います（拡張は${MIRROR_VERSION}、ccnaviは${String(version)}）。拡張かccnaviを更新して、版を揃えてください。`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

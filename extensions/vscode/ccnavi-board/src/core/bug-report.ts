@@ -344,10 +344,10 @@ export function reportText(info: ReportInfo): string {
     `終了: ${info.finished.toISOString()}`,
     `VS Code: ${info.vscodeVersion}`,
     `拡張: ${info.extensionVersion}`,
-    `OS: ${info.platform}（画面の取り方: ${info.capture}）`,
+    `OS: ${info.platform}（画面の取得方法: ${info.capture}）`,
     `録画: ${info.recording}`,
     `スクリーンショット: ${info.screenshots}枚`,
-    `ログ: ${info.logs.length === 0 ? "この間に書かれた行は無い" : info.logs.join(", ")}`,
+    `ログ: ${info.logs.length === 0 ? "この間に書かれた行はありません" : info.logs.join(", ")}`,
   ];
   if (info.errors.length > 0) {
     lines.push("", "エラー:", ...info.errors.map((error) => `- ${error}`));

@@ -38,7 +38,7 @@ export const Repo = memo(function Repo({ board, actions, attention = NONE, issue
         ) : null}
         {board.integration ? (
           <p className="integration" data-testid="integration">
-            {`統合先: ${board.integration.name}（${board.integration.source === "setting" ? "設定" : "ホストのデフォルトブランチ"}） ${board.integration.head.slice(0, 7)}`}
+            {`統合先：${board.integration.name}（${board.integration.source === "setting" ? "設定画面で指定" : "ホストのデフォルトブランチ"}） ${board.integration.head.slice(0, 7)}`}
           </p>
         ) : null}
         {actions?.setRecentDays ? <RecentDays board={board} set={actions.setRecentDays} /> : null}
@@ -55,7 +55,7 @@ function RepoBody({ board, actions, attention, issues, decide }: RepoProps & { a
     <>
       {board.compat && !board.compat.same ? <Notice kind="warn" text={`${board.compat.message}（表示のみとし、承認のボタンは表示しません）`} /> : null}
       {board.missingExtras.length > 0 ? <Notice kind="warn" text={`指定したブランチがリモートに見つかりません：${board.missingExtras.join(", ")}`} /> : null}
-      <p className="scope">{`確認したブランチ（表示用）：${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`}</p>
+      <p className="scope">{`表示対象として検索したブランチ：${board.candidates.length === 0 ? "なし" : board.candidates.join(", ")}`}</p>
       {board.families.length === 0 ? <p className="empty">確認したブランチの中に、親チケットに対応するブランチはありません。</p> : null}
       {board.families.map((f) => {
         const why = attention[f.family.name];
@@ -95,7 +95,7 @@ function RepoBody({ board, actions, attention, issues, decide }: RepoProps & { a
           </article>
         ))}
       {actions?.loadIssues && actions.start ? <Start board={board} actions={actions} issues={issues} /> : null}
-      <p className="stats">{`取得回数：REST ${s.rest} 回・GraphQL ${s.graphql} 回・blob ${s.blobsFetched} 件（キャッシュから ${s.blobsCached} 件）`}</p>
+      <p className="stats">{`API の呼び出し：REST ${s.rest} 回・GraphQL ${s.graphql} 回、ファイルの取得 ${s.blobsFetched} 件（キャッシュ ${s.blobsCached} 件）`}</p>
     </>
   );
 }

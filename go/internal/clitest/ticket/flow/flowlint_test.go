@@ -159,10 +159,10 @@ func TestShapeErrorsAreTheSameReasonsAsSubagentStart(t *testing.T) {
 	for _, c := range []struct{ text, reason string }{
 		{"", "最上位がマッピングではない"},
 		{"- 1\n", "最上位がマッピングではない"},
-		{"name: x\n", "`nodes` のリストがありません。"},
+		{"name: x\n", "`nodes` のリストが無い"},
 		{"nodes: [1]\n", "nodes[0] がマッピングではない"},
-		{"nodes:\n  - {type: start}\n", "nodes[0] に文字列の id がありません。"},
-		{"nodes:\n  - {id: 1, type: start}\n", "nodes[0] に文字列の id がありません。"},
+		{"nodes:\n  - {type: start}\n", "nodes[0] に文字列の id が無い"},
+		{"nodes:\n  - {id: 1, type: start}\n", "nodes[0] に文字列の id が無い"},
 		{"nodes:\n  - {id: a}\n  - {id: a}\n", "ノードの id が重なっている（a）"},
 		{"nodes: []\nconnections: {}\n", "`connections` がリストではない"},
 		{"nodes: []\nconnections: [1]\n", "connections[0] がマッピングではない"},

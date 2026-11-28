@@ -134,8 +134,8 @@ export function Hosts({ onChange }: { readonly onChange: () => void }): JSX.Elem
       <p className="hint">
         追加すると、そのホストへの通信の許可を Chrome に求めます。許可したホスト名にのみ通信し、PAT も許可したホストにのみ送信します。追加できるのは https のホストと、http の localhost・127.0.0.1 です。GitLab
         は API が「ホスト/api/v4」、GitHub Enterprise Server は「ホスト/api/v3」と「ホスト/api/graphql」にあるものとして扱います。
-        GitHub として登録した *.ghe.com（GHE.com）は、API が「https://api.ホスト」、GraphQL が「https://api.ホスト/graphql」にあるものとして扱い、画面と API の両方の通信を許可してもらいます（ポートは付けられません）。
-        種類はここで選んだものが優先されます。
+        GitHub として登録した *.ghe.com（GHE.com）は、API が「https://api.ホスト」、GraphQL が「https://api.ホスト/graphql」にあるものとして扱い、画面と API の両方について通信の許可を求めます（ポート番号は指定できません）。
+        ホストの種類は自動では判定せず、ここで選んだ種類として扱います。
       </p>
     </section>
   );

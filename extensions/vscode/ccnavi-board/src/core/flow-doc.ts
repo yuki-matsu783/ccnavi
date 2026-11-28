@@ -1148,28 +1148,28 @@ export function flowNotices(doc: FlowDoc, options: { readonly exe?: boolean } = 
   const { depth, cyclic } = nesting(doc);
   if (depth > NEST_ALLOWED) {
     out.push(
-      `入れ子のサブエージェントが、子の下に${depth}階層重なっています。既定の上限はメインの下${SPAWN_LIMIT}階層で、子（1階層目）の下は${NEST_ALLOWED}階層までです。` +
-        "上限に達した階層ではAgentツールを利用できず、そのノードで止まってメインへ戻ります",
+      `サブエージェントの入れ子が、子チケットの担当の下に${depth}階層あります。重ねられるのは${NEST_ALLOWED}階層までです（既定の上限は、メインのエージェントから数えて${SPAWN_LIMIT}階層）。` +
+        "上限を超えた階層ではAgentツールを使えず、そのノードで止まってメインへ戻ります。",
     );
   }
   if (cyclic) {
-    out.push("サブフローの呼び出しが循環しています（subAgentFlowIdが輪になっています）。階層の数を数えられません");
+    out.push("サブフローの呼び出しが循環しています（subAgentFlowIdが輪になっています）。階層の数を数えられません。");
   }
   const starts = doc.nodes.filter((node) => nodeType(node) === "start").length;
   if (starts === 0) {
     if (options.exe !== true) {
-      out.push("開始（start）のノードがありません。担当のサブエージェントは先頭のノードから読みます");
+      out.push("開始（start）のノードがありません。担当のサブエージェントは先頭のノードから読みます。");
     }
   } else if (starts > 1) {
-    out.push(`開始（start）のノードが${starts}つあります。案内は、どの開始からもたどって並べます`);
+    out.push(`開始（start）のノードが${starts}つあります。担当のサブエージェントに渡す手順には、すべての開始からたどったノードを並べます。`);
   }
   const unknown = [...new Set(doc.nodes.map(nodeType).filter((type) => !isEditableType(type) && type !== GROUP_TYPE))];
   if (unknown.length > 0) {
-    out.push(`この画面に入力欄がない種類があります（${unknown.map((t) => t || "(種類なし)").join(", ")}）。名前と位置だけを変えられ、中身は保存してもそのまま残ります`);
+    out.push(`この画面で編集できない種類のノードがあります（${unknown.map((t) => t || "種類なし").join(", ")}）。名前と位置だけを変えられ、中身は保存してもそのまま残ります。`);
   }
   const flows = subFlows(doc).size;
   if (flows > 0) {
-    out.push(`サブフロー（subAgentFlows）が${flows}本あります。この画面では中身を描きません。保存してもそのまま残ります`);
+    out.push(`サブフロー（subAgentFlows）が${flows}本あります。この画面では中身を描きません。保存してもそのまま残ります。`);
   }
   return out;
 }

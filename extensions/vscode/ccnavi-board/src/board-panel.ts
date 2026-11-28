@@ -181,7 +181,7 @@ export async function openBoard(project?: string): Promise<void> {
 /** `ccnaviBoard.refresh`の本体 */
 export function refreshBoard(): void {
   if (state === undefined) {
-    vscode.window.showInformationMessage("チケット管理画面が開かれていません");
+    vscode.window.showInformationMessage("チケット管理画面を開いていません。先に「ccnaviボード: チケット管理を開く」を実行してください。");
     return;
   }
   void update();
@@ -796,12 +796,12 @@ async function showTicketPreview(filePath: string): Promise<void> {
 async function makeTemplateDraft(current: PanelState, ticket: string): Promise<void> {
   const result = await runTemplateDraft(current.folder.uri.fsPath, binSetting(), ticket);
   if (!result.ok) {
-    void vscode.window.showErrorMessage(`テンプレートの下書きを作れませんでした: ${result.error}`);
+    void vscode.window.showErrorMessage(`テンプレートの下書きを作成できませんでした: ${result.error}`);
     return;
   }
   const open = "取り込み待ちを開く";
   const picked = await vscode.window.showInformationMessage(
-    `テンプレートの下書きを作りました: ${result.value.path}。まだ効力はなく、取り込み待ち画面で差分を読んで取り込むまで使われません。`,
+    `テンプレートの下書きを作成しました（${result.value.path}）。取り込み待ち画面で差分を読んで取り込むまでは使われません。`,
     open,
   );
   if (picked === open) {

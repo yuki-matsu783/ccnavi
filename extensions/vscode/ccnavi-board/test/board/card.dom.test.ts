@@ -300,7 +300,7 @@ test("CB-D707 注意の行は例外のときだけ短い言葉で出す（不備
     assert.equal(rows("risk"), "リスクCRITICAL（90点）");
     // 普通のこと（LOW・MEDIUMのリスク、未送信0件）は注意に出さない。LOWは詳細にだけある
     assert.equal(page.all(`${card(page, "calm")} .notes`).length, 0);
-    assert.deepEqual(notes("p"), ["未送信3件"]);
+    assert.deepEqual(notes("p"), ["未pushのコミット3件"]);
   } finally {
     await page.close();
   }
@@ -353,7 +353,7 @@ test("CB-D709 詳細は畳んである。MRは詳細に無く位置の下にあ�
     assert.equal(row("issue"), "#12");
     assert.equal(row("parent-mr"), "!7");
     assert.equal(row("branch"), "feature/x");
-    assert.equal(row("remote"), "未送信2件遅れ1件");
+    assert.equal(row("remote"), "未pushのコミット2件未取得のコミット1件");
     assert.equal(row("worktree"), "busy");
     assert.equal(row("phase-1"), "レビュー不要 · リスク: 0 (LOW)");
     assert.equal(row("phase-2"), "レビュー必須 · リスク: 60 (HIGH)");

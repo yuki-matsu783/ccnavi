@@ -38,7 +38,7 @@ export function LoadError({
             エディタで開く
           </button>
         ) : null}
-        <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={onReload}>
+        <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={busy} onClick={onReload}>
           更新
         </button>
       </div>

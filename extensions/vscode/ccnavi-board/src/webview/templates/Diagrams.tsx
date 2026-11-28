@@ -15,7 +15,7 @@ const NOOP = (): void => undefined;
 /** 子のフローの見出し。「1:調査 のフロー」の形にし、フローの名前は書かない。番号に当たる計画の段がなければ「1番のフロー」にする */
 function flowHeading(check: TemplateCheck, index: string): string {
   const item = check.plans.find((plan) => plan.part === "plan")?.items.find((it) => String(it.number) === index);
-  return item === undefined ? `${index}番のフロー` : `${index}:${item.title !== "" ? item.title : item.type} のフロー`;
+  return item === undefined ? `${index}番のフロー` : `${index}番（${item.title !== "" ? item.title : item.type}）のフロー`;
 }
 
 export function Diagrams({ check }: { readonly check: TemplateCheck }): JSX.Element {

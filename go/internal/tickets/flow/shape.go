@@ -63,7 +63,7 @@ func shapeProblem(data any) string {
 	}
 	nodes, ok := top.List("nodes")
 	if !ok {
-		return "`nodes` のリストがありません。"
+		return "`nodes` のリストが無い"
 	}
 	seen := map[string]bool{}
 	for i, n := range nodes {
@@ -73,7 +73,7 @@ func shapeProblem(data any) string {
 		}
 		id, ok := node.String("id")
 		if !ok || id == "" {
-			return fmt.Sprintf("nodes[%d] に文字列の id がありません。", i)
+			return fmt.Sprintf("nodes[%d] に文字列の id が無い", i)
 		}
 		if seen[id] {
 			return "ノードの id が重なっている（" + Line(id) + "）"
@@ -241,10 +241,10 @@ func StructureProblems(raw any) []string {
 		edges[src] = append(edges[src], dst)
 		edgePorts[src] = append(edgePorts[src], edgePort{dst, port})
 		if kinds[dst] == kindStart {
-			out = append(out, "線 "+cid+" が start（"+named(byID[dst])+"）に入っている")
+			out = append(out, "線 "+cid+" が開始（start）の "+named(byID[dst])+" に入っている")
 		}
 		if kinds[src] == kindEnd {
-			out = append(out, "線 "+cid+" が end（"+named(byID[src])+"）から出ている")
+			out = append(out, "線 "+cid+" が終了（end）の "+named(byID[src])+" から出ている")
 		}
 	}
 	// 3. start と end が 1 つ以上あるか。
@@ -263,10 +263,10 @@ func StructureProblems(raw any) []string {
 		}
 	}
 	if len(starts) == 0 {
-		out = append(out, "start がありません（どこから始めるかが決まらない）")
+		out = append(out, "開始（start）が無い（どこから始めるかが決まらない）")
 	}
 	if !hasEnd {
-		out = append(out, "end がありません（どこで終わるかが決まらない）")
+		out = append(out, "終了（end）が無い（どこで終わるかが決まらない）")
 	}
 	// 4. start から線をたどって、届かないノードを挙げる（幅優先）。
 	if len(starts) > 0 {
@@ -288,7 +288,7 @@ func StructureProblems(raw any) []string {
 			}
 		}
 		if len(lost) > 0 {
-			out = append(out, "start から届かないノードがある: "+names(lost))
+			out = append(out, "開始（start）から届かないノードがある: "+names(lost))
 		}
 	}
 	// 5. 問い・分岐・繰り返しの出口のうち、線が出ていないものを挙げる。複数選択の問いは output の 1 本だけが出口。
@@ -512,8 +512,8 @@ func NameProblems(raw any, cat Catalog) []string {
 				break
 			}
 		}
-		out = append(out, "ノード "+named(node)+" の"+what+" "+Line(value)+" が候補にありません"+
-			"（組み込みと .claude/ の下にありません。書き誤りかもしれない。"+
+		out = append(out, "ノード "+named(node)+" の"+what+" "+Line(value)+" が候補に無い"+
+			"（組み込みと .claude/ の下に無い。書き誤りかもしれない。"+
 			"ユーザ・プラグインのものなら気にしなくてよい）"+hint)
 	}
 	return out

@@ -117,7 +117,7 @@ const NEED_TEXT: Record<Need, string> = {
 /** 権限が足りないときの文面。書く操作ごとに、要る権限の名前を言う */
 export function lacking(need?: Need): string {
   if (!need) return "PAT の権限（リポジトリ・Contents など）を見直してください";
-  return `PAT に ${NEED_TEXT[need]} の権限が要ります（fine-grained token は対象のリポジトリも選びます。classic は repo スコープ）`;
+  return `PAT に ${NEED_TEXT[need]} の権限が必要です（fine-grained token では対象のリポジトリも選んでください。classic の PAT では repo スコープです）`;
 }
 
 /** Retry-After を待ち直す上限（秒）。これより長ければ待たずに原因を言う */
@@ -136,10 +136,10 @@ function rateLimit(res: Res): { text: string; wait: number | null } | null {
   const reset = Number(header(res, "x-ratelimit-reset"));
   if (!(res.status === 429 || (res.status === 403 && (after !== "" || remaining === "0")))) return null;
   const seconds = after !== "" && /^\d+$/.test(after) ? Number(after) : null;
-  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `。制限が解けるのは ${new Date(reset * 1000).toISOString()}` : "";
-  const kind = after !== "" ? "二次のレート制限" : "レート制限";
+  const when = remaining === "0" && Number.isFinite(reset) && reset > 0 ? `（制限の解除は ${new Date(reset * 1000).toISOString()} ごろ）` : "";
+  const kind = after !== "" ? "レート制限（セカンダリ）" : "レート制限";
   return {
-    text: `GitHub の${kind}にかかりました（${res.status}${seconds !== null ? `、${seconds} 秒待つよう求められました` : ""}${when}）。少し待ってからボードを更新してください`,
+    text: `GitHub の${kind}にかかりました（${res.status}）。${seconds !== null ? `${seconds} 秒以上` : "少し"}待ってから${when}、ボードを更新してください`,
     wait: seconds !== null && seconds <= RETRY_LIMIT_SECONDS ? seconds : null,
   };
 }
@@ -173,7 +173,7 @@ async function send(client: Client, url: string, init: Parameters<Fetch>[1], wha
     const res = await fetchNoRedirect(client, url, init, what);
     note(client, res);
     if (res.status === 401) {
-      throw new HostError("PAT で認証できません（401）。設定画面で差し替えてください", 401);
+      throw new HostError("PAT で認証できません（401）。設定画面で PAT を登録し直してください", 401);
     }
     const limited = rateLimit(res);
     if (limited) {
@@ -392,7 +392,7 @@ export async function tree(client: Client, owner: string, repo: string, oid: str
   }
   const b = body as { truncated?: boolean; tree?: { path?: unknown; type?: unknown; sha?: unknown; mode?: unknown }[] };
   if (b.truncated) {
-    throw new HostError("置き場の tree が大きすぎて取得しきれません（truncated）。Chrome では読み取れません");
+    throw new HostError("チケットを置くディレクトリのファイルが多すぎて、一覧を取得しきれません（truncated）。このリポジトリは Chrome 拡張では表示できません");
   }
   const out: TreeEntry[] = [];
   for (const e of b.tree ?? []) {
@@ -411,7 +411,7 @@ export interface BlobText {
 /** blob を sha でまとめて取る（1 回に最大 50 件） */
 export async function blobs(client: Client, owner: string, repo: string, oids: readonly string[]): Promise<Record<string, BlobText>> {
   if (oids.length > BLOB_BATCH) {
-    throw new HostError(`blob は 1 回に ${BLOB_BATCH} 件まで`);
+    throw new HostError(`blob は 1 回に ${BLOB_BATCH} 件までです`);
   }
   const vars: Record<string, unknown> = { owner: checkName(owner, "owner"), name: checkName(repo, "repo") };
   const decl: string[] = ["$owner: String!", "$name: String!"];
@@ -432,10 +432,10 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
   oids.forEach((oid, i) => {
     const b = repoData[`b${i}`];
     if (!b) {
-      throw new HostError(`blob ${oid} を取れませんでした`);
+      throw new HostError(`ファイルの内容（blob ${oid}）を取得できませんでした`);
     }
     if (b.isTruncated) {
-      throw new HostError(`blob ${oid} の本文が切られています（isTruncated）。取り切れていません`);
+      throw new HostError(`ファイルの内容（blob ${oid}）が途中で切れていて、全部を取得できません（isTruncated）`);
     }
     if (b.isBinary || typeof b.text !== "string") {
       out[oid] = { text: null, binary: true };
@@ -443,7 +443,7 @@ export async function blobs(client: Client, owner: string, repo: string, oids: r
     }
     // 本文が途中で切られていたら「無い」とも「空」とも読ませない（取っていないファイルと同じ扱い）。
     if (typeof b.byteSize === "number" && encoder.encode(b.text).length !== b.byteSize) {
-      throw new HostError(`blob ${oid} の本文が大きさと合いません（取り切れていません）`);
+      throw new HostError(`ファイルの内容（blob ${oid}）のサイズが、ホストの示すサイズと一致しません（全部を取得できていません）`);
     }
     out[oid] = { text: b.text, binary: false };
   });
@@ -720,9 +720,9 @@ export async function createBranch(client: Client, owner: string, repo: string, 
     { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ ref: `refs/heads/${checkBranch(name)}`, sha: checkOid(sha) }) },
     `POST ${path}`,
   );
-  if (!res.ok) throw new HostError(`GitHub がブランチを作成しませんでした（${res.status}。同じ名前のブランチが既にあるか、権限が不足しています）`, res.status);
+  if (!res.ok) throw new HostError(`ブランチを作成できませんでした（GitHub の応答：${res.status}。同じ名前のブランチが既にあるか、権限が不足しています）`, res.status);
   const made = (await res.json()) as { ref?: unknown; object?: { sha?: unknown } };
-  if (made.ref !== `refs/heads/${name}`) throw new HostError("作ったブランチの名前が、頼んだ名前と違います");
+  if (made.ref !== `refs/heads/${name}`) throw new HostError("作成されたブランチの名前が、指定した名前と違います");
   return checkOid(made.object?.sha);
 }
 
@@ -746,7 +746,7 @@ export interface MrInfo {
 /** 開いた MR（PR）の全部。issue を閉じる MR の探索と、採用の確認に使う。読むだけ */
 export async function listOpenMrs(client: Client, owner: string, repo: string): Promise<MrInfo[]> {
   const { items, more } = await restPages(client, `${repoPath(owner, repo)}/pulls?state=open&per_page=100`, MR_PAGES);
-  if (more) throw new HostError("オープン状態のプルリクエストが多すぎて読み切れません。既存のプルリクエスト を見落とさないよう、「始める」は手元で行ってください");
+  if (more) throw new HostError("オープン状態のプルリクエストが多すぎて読み切れません。既存のプルリクエストを見落とさないよう、「始める」は手元で行ってください");
   const own = `${owner}/${repo}`.toLowerCase();
   const out: MrInfo[] = [];
   for (const p of items as { number?: unknown; title?: unknown; body?: unknown; html_url?: unknown; head?: { ref?: unknown; repo?: { full_name?: unknown } | null }; base?: { ref?: unknown } }[]) {
@@ -812,7 +812,7 @@ export async function createDraftMr(client: Client, owner: string, repo: string,
     { method: "POST", headers: { ...headers(client), "Content-Type": "application/json" }, body: JSON.stringify({ head: checkBranch(head), base: checkBranch(base), title, body, draft: true }) },
     `POST ${path}`,
   );
-  if (!res.ok) throw new HostError(`GitHub が Draft のプルリクエストを作りませんでした（${res.status}）`, res.status);
+  if (!res.ok) throw new HostError(`Draft のプルリクエストを作成できませんでした（GitHub の応答：${res.status}）`, res.status);
   const made = (await res.json()) as { number?: unknown; html_url?: unknown };
   if (typeof made.number !== "number") throw new HostError("作ったプルリクエストの番号を取得できません");
   return { number: made.number, url: String(alt(made.html_url, "")) };
@@ -830,20 +830,20 @@ export const ISSUE_MARKER = /^<!-- ccnavi:issue op=[A-Za-z0-9._:-]{1,100} -->$/;
 
 /** GraphQL の node id（スレッドの id）。経路にも変数にも使える字に限る */
 export function checkThreadId(value: unknown): string {
-  if (typeof value !== "string" || !THREAD_ID.test(value)) throw new HostError(`スレッドの id の形が正しくありません: ${String(value)}`);
+  if (typeof value !== "string" || !THREAD_ID.test(value)) throw new HostError(`スレッドの id の形が正しくありません：${String(value)}`);
   return value;
 }
 
 /** PR・MR の番号 */
 export function checkNumber(value: unknown, what = "番号"): number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 999_999_999) throw new HostError(`${what} の形が正しくありません: ${String(value)}`);
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 999_999_999) throw new HostError(`${what}の形が正しくありません：${String(value)}`);
   return value;
 }
 
 /** 返信・コメント・issue の本文。空でなく、上限以内で、NUL を含まない */
 export function checkWriteText(value: unknown, what: string): string {
   if (typeof value !== "string" || value.trim() === "" || value.length > MAX_WRITE_TEXT || value.includes("\0")) {
-    throw new HostError(`${what} は ${MAX_WRITE_TEXT} 字までの空でない文字列にしてください（NUL は含められません）`);
+    throw new HostError(`${what}は ${MAX_WRITE_TEXT} 字までの空でない文字列にしてください（NUL は含められません）`);
   }
   return value;
 }
@@ -900,11 +900,11 @@ export function checkWebUrl(client: Pick<Client, "host">, value: unknown): strin
   try {
     url = new URL(String(value));
   } catch {
-    throw new HostError(`ホストが返した URL を読めません: ${String(value)}`);
+    throw new HostError(`ホストが返した URL を読めません：${String(value)}`);
   }
   const root = new URL(client.host.web);
   if (url.origin !== root.origin || url.username || url.password || /[\s`<>]/.test(String(value))) {
-    throw new HostError(`ホストが返した URL が通信先の画面の外を指しています: ${String(value)}`);
+    throw new HostError(`ホストが返した URL が、登録した通信先とは別のサイトを指しています：${String(value)}`);
   }
   return url.toString();
 }
@@ -943,7 +943,7 @@ const REPLY_THREAD = `mutation($input: AddPullRequestReviewThreadReplyInput!) {
 export async function replyThread(client: Client, threadId: string, body: string): Promise<{ url: string }> {
   const data = await graphql(client, REPLY_THREAD, { input: { pullRequestReviewThreadId: checkThreadId(threadId), body: checkWriteText(body, "返信の本文") } }, "Pull requests");
   const comment = (data.addPullRequestReviewThreadReply as { comment?: { id?: unknown; url?: unknown } | null } | null)?.comment;
-  if (!comment || typeof comment.id !== "string") throw new HostError("GitHub がスレッドへの返信を受け付けませんでした（返信が作られていません。保留中のレビューのスレッドは返信できないことがあります）");
+  if (!comment || typeof comment.id !== "string") throw new HostError("スレッドに返信できませんでした（返信が作られていません。保留中のレビューのスレッドは返信できないことがあります）");
   return { url: typeof comment.url === "string" ? comment.url : "" };
 }
 
@@ -955,7 +955,7 @@ const RESOLVE_THREAD = `mutation($input: ResolveReviewThreadInput!) {
 export async function resolveThread(client: Client, threadId: string): Promise<void> {
   const data = await graphql(client, RESOLVE_THREAD, { input: { threadId: checkThreadId(threadId) } }, "Pull requests");
   const thread = (data.resolveReviewThread as { thread?: { isResolved?: unknown } | null } | null)?.thread;
-  if (!thread || thread.isResolved !== true) throw new HostError("GitHub がスレッドを解決済みにしませんでした（応答が解決済みを示していません）");
+  if (!thread || thread.isResolved !== true) throw new HostError("スレッドを解決済みにできませんでした（GitHub の応答が解決済みになっていません）");
 }
 
 /**
@@ -965,11 +965,11 @@ export async function resolveThread(client: Client, threadId: string): Promise<v
 export async function createIssue(client: Client, owner: string, repo: string, title: string, body: string): Promise<IssueRef> {
   const path = `${repoPath(owner, repo)}/issues`;
   const res = await writeJson(client, path, "POST", { title: checkTitle(title), body: checkWriteText(body, "issue の本文") }, "Issues");
-  if (res.status === 410) throw new HostError("このリポジトリは Issues が無効です（410）。設定で Issues を有効にしてください", 410);
-  if (res.status === 404) throw new HostError(`issue を作れませんでした（404）。リポジトリ ${owner}/${repo} が見えないか、PAT に ${NEED_TEXT.Issues} の権限がありません`, 404);
+  if (res.status === 410) throw new HostError("このリポジトリは Issues が無効です（410）。GitHub のリポジトリの設定で Issues を有効にしてください", 410);
+  if (res.status === 404) throw new HostError(`issue を作成できませんでした（404）。リポジトリ ${owner}/${repo} が見つからないか、PAT に ${NEED_TEXT.Issues} の権限がありません`, 404);
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitHub が issue を作りませんでした（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`issue を作成できませんでした（GitHub の応答：${res.status}）${typeof why === "string" ? `：${why}` : ""}`, res.status);
   }
   const made = (res.body ?? {}) as { number?: unknown; html_url?: unknown };
   if (typeof made.number !== "number" || !Number.isInteger(made.number) || made.number <= 0) throw new HostError("作った issue の番号を取得できません");
@@ -1014,7 +1014,7 @@ export async function issueComments(client: Client, owner: string, repo: string,
   const out: string[] = [];
   for (let page = 1; page <= 5; page += 1) {
     const { status, body } = await rest(client, `${repoPath(owner, repo)}/issues/${checkNumber(number, "issue の番号")}/comments?per_page=100&page=${page}`);
-    if (status === 404 || !Array.isArray(body)) throw new HostError(`issue #${number} のコメントを読めません`, status === 404 ? 404 : 0);
+    if (status === 404 || !Array.isArray(body)) throw new HostError(`issue #${number} のコメントを取得できません`, status === 404 ? 404 : 0);
     for (const c of body as { body?: unknown }[]) out.push(typeof c.body === "string" ? c.body : "");
     if (body.length < 100) return out;
   }
@@ -1040,10 +1040,10 @@ export async function issueComment(client: Client, owner: string, repo: string, 
   const path = `${repoPath(owner, repo)}/issues/${checkNumber(number, target === "pr" ? "PR の番号" : "issue の番号")}/comments`;
   const need: Need = target === "pr" ? "Pull requests" : "Issues";
   const res = await writeJson(client, path, "POST", { body: checkWriteText(body, "コメントの本文") }, need);
-  if (res.status === 404) throw new HostError(`コメントを付けられませんでした（404）。${target === "pr" ? "PR" : "issue"} #${number} が見えないか、PAT に ${NEED_TEXT[need]} の権限がありません`, 404);
+  if (res.status === 404) throw new HostError(`コメントを投稿できませんでした（404）。${target === "pr" ? "PR" : "issue"} #${number} が見つからないか、PAT に ${NEED_TEXT[need]} の権限がありません`, 404);
   if (res.status < 200 || res.status >= 300) {
     const why = (res.body as { message?: unknown } | null)?.message;
-    throw new HostError(`GitHub がコメントを受け付けませんでした（${res.status}）: ${typeof why === "string" ? why : "?"}`, res.status);
+    throw new HostError(`コメントを投稿できませんでした（GitHub の応答：${res.status}）${typeof why === "string" ? `：${why}` : ""}`, res.status);
   }
   const url = (res.body as { html_url?: unknown } | null)?.html_url;
   return { url: typeof url === "string" ? checkWebUrl(client, url) : "" };

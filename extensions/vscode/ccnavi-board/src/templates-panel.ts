@@ -121,11 +121,11 @@ function sameTarget(a: TemplatesTarget, b: TemplatesTarget): boolean {
 function whatOf(target: TemplatesTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "共通の設定";
+      return "共通設定";
     case "self":
-      return "ワークスペース";
+      return "ワークスペースの設定";
     case "project":
-      return `プロジェクト${target.name}`;
+      return `プロジェクト「${target.name}」の設定`;
   }
 }
 
@@ -147,7 +147,7 @@ export async function openTemplates(target: TemplatesTarget = { kind: "self" }):
     if (!sameTarget(state.target, target)) {
       // 編集欄を開いている間は、外から対象を替えない（古い対象の編集欄が残るため）。画面は前面に出すだけ
       if (state.editing !== undefined) {
-        vscode.window.showInformationMessage("編集中のため切り替えません。保存か破棄してから切り替えてください");
+        vscode.window.showInformationMessage("編集中のため切り替えられません。保存するか破棄してから切り替えてください。");
         return;
       }
       await switchTarget(state, target);
@@ -217,7 +217,7 @@ async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> 
   // 一覧の中身（レイヤー・統合結果・下書き）は実行ファイルの答えをそのまま使う。レイヤーの場所も拡張は組まない。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
-    throw new Error(`ボードを実行ファイルから取得できません: ${board.error}`);
+    throw new Error(`チケットとワークツリーの状態をccnaviから取得できません: ${board.error}`);
   }
   const key = currentKey(target);
   const targets = targetOptions(board.board, COMMON_KIND, key);
@@ -594,7 +594,7 @@ function askUnsaved(unsaved: Unsaved | undefined): void {
   void vscode.window
     .showWarningMessage(
       `${unsaved.name === "" ? "テンプレート" : `テンプレート「${unsaved.name}」`}を未保存のまま閉じました。編集をYAMLで開きますか？`,
-      { modal: true, detail: "名前の無いエディタで開き、ファイルには書きません。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
+      { modal: true, detail: "無題のYAMLファイルとして開きます（保存はしません）。「破棄する」を選ぶと、閉じる前の編集は残りません。" },
       asYaml,
       "破棄する",
     )
@@ -651,17 +651,17 @@ function editableLayer(current: PanelState, layerName: string): { readonly ok: t
   }
   const shown = shownLayerOf(currentKey(current.target));
   if (layerName !== shown) {
-    return { ok: false, error: "開いている対象のレイヤーのテンプレートだけ編集できます。対象を切り替えてください" };
+    return { ok: false, error: "いま選んでいる設定のテンプレートだけ編集できます。「設定」を切り替えてください。" };
   }
   const layer = data.layers.find((l) => l.name === shown);
   if (layer === undefined) {
-    return { ok: false, error: "この設定のテンプレートの置き場を、実行ファイルが返していません" };
+    return { ok: false, error: "この設定のテンプレートの置き場が分かりません（ccnaviが返しませんでした）。更新してやり直してください。" };
   }
   if (layer.unreadable !== "") {
-    return { ok: false, error: `このレイヤーの置き場を読めないため、編集できません: ${layer.unreadable}` };
+    return { ok: false, error: `この設定のテンプレートの置き場を読み込めないため、編集できません: ${layer.unreadable}` };
   }
   if (!layer.writable) {
-    return { ok: false, error: "このレイヤーは読み取り専用です。実行ファイルが書き込めないと判定したため、置き場の権限を確かめてください" };
+    return { ok: false, error: "この設定のテンプレートは読み取り専用です（ccnaviが、置き場に書き込めないと判定しました）。置き場のフォルダの権限を確かめてください。" };
   }
   return { ok: true, layer };
 }
@@ -694,7 +694,7 @@ async function checkBytes(
     dir = fs.mkdtempSync(path.join(current.tmpDir, "check-"));
     fs.writeFileSync(path.join(dir, `${name}.yml`), bytes);
   } catch (error) {
-    return { ok: false, error: `検査のための一時ファイルを書けません: ${(error as Error).message}` };
+    return { ok: false, error: `検査用の一時ファイルを作成できません: ${(error as Error).message}` };
   }
   try {
     const result = await runTemplateCheck(current.folder.uri.fsPath, binSetting(), path.join(dir, `${name}.yml`), templatesLayerOf(currentKey(target)));
@@ -717,7 +717,7 @@ function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: 
     return true;
   }
   if (!sameTarget(current.target, target)) {
-    reply("対象が切り替わったため、中止しました。開き直してください");
+    reply("設定が切り替わったため、中止しました。開き直してください。");
     return true;
   }
   return false;
@@ -735,12 +735,12 @@ async function preview(current: PanelState, name: string, layerName: string): Pr
   const layer = current.loaded?.data.layers.find((l) => l.name === layerName);
   const file = layer === undefined ? undefined : templateFile(current.folder.uri.fsPath, layer, name);
   if (layer === undefined || file === undefined) {
-    reply(null, `テンプレート${name}の置き場が分かりません`);
+    reply(null, `テンプレート「${name}」の置き場が分かりません`);
     return;
   }
   const read = readFlowFile(current.folder.uri.fsPath, file);
   if (read === undefined) {
-    reply(null, `${name}.ymlがありません。更新してください`);
+    reply(null, `${name}.ymlがありません。更新してください。`);
     return;
   }
   const decoded = decodeFlowBytes(read.bytes);
@@ -764,7 +764,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
   const where = editableLayer(current, layerName);
   const file = where.ok ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (!where.ok || file === undefined) {
-    postOpened(current, session, null, where.ok ? `テンプレートの名前${name}は指定できません` : where.error);
+    postOpened(current, session, null, where.ok ? `「${name}」はテンプレートの名前に使えません` : where.error);
     return;
   }
   let read: ReturnType<typeof readFlowFile>;
@@ -775,7 +775,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
     return;
   }
   if (read === undefined) {
-    postOpened(current, session, null, `${name}.ymlがありません。更新してから開き直してください`);
+    postOpened(current, session, null, `${name}.ymlがありません。更新してから開き直してください。`);
     return;
   }
   const decoded = decodeFlowBytes(read.bytes);
@@ -793,7 +793,7 @@ async function editOpen(current: PanelState, session: number, name: string, laye
   }
   if (!checked.check.valid) {
     const why = checked.check.problems.map((p) => p.detail).join(" / ");
-    postOpened(current, session, null, `読み込めないため、画面では編集できません。ファイルを直接直してください: ${why}`);
+    postOpened(current, session, null, `読み込めないため、画面では編集できません。ファイルを直接直してください: ${why}。`);
     return;
   }
   const lock = await lockOf(current, target);
@@ -817,19 +817,19 @@ async function editNew(current: PanelState, session: number, name: string): Prom
   }
   const file = validNewTemplateName(name) ? templateFile(current.folder.uri.fsPath, where.layer, name) : undefined;
   if (file === undefined) {
-    postOpened(current, session, null, `テンプレートの名前${name}は指定できません。${NEW_TEMPLATE_NAME_RULE}`);
+    postOpened(current, session, null, `「${name}」はテンプレートの名前に使えません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
   // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通のレイヤーにある名前も、
   // 同名で中身が違うと統合結果で破棄されるので作らない
   const taken = current.loaded === undefined ? undefined : templateNameTaken(current.loaded.data.layers, layerName, name);
   if (taken !== undefined) {
-    postOpened(current, session, null, `名前${name}は、${taken.layer === "common" ? "共通" : "このレイヤー"}の${taken.name}と同じです（大文字小文字は区別しません）。別の名前にしてください`);
+    postOpened(current, session, null, `「${name}」は、${taken.layer === "common" ? "共通設定" : "この設定"}の「${taken.name}」と同じ名前です（大文字と小文字は区別しません）。別の名前にしてください。`);
     return;
   }
   try {
     if (readFlowFile(current.folder.uri.fsPath, file) !== undefined) {
-      postOpened(current, session, null, `${name}.ymlは既にあります。一覧から開いて編集してください`);
+      postOpened(current, session, null, `${name}.ymlは既にあります。一覧から開いて編集してください。`);
       return;
     }
   } catch (error) {
@@ -861,7 +861,7 @@ async function editCheck(current: PanelState, session: number, seq: number, data
   };
   const named = dataOf(data);
   if (named === undefined || !validTemplateName(named.name)) {
-    reply(null, "テンプレートの名前は指定できません（英数字で始め、英数字と「.」「_」「-」のみ、64字まで）");
+    reply(null, "この名前はテンプレートの名前に使えません。英数字で始め、英数字と「.」「_」「-」だけを使い、64字までにしてください。");
     return;
   }
   const checked = await checkBytes(current, target, named.name, yamlText(data));
@@ -879,7 +879,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   };
   const root = current.folder.uri.fsPath;
   if (session !== current.editing) {
-    reply("", "保存しません: この編集は開いていません。開き直してください");
+    reply("", "保存できません: この編集は既に閉じられています。テンプレートを開き直してください。");
     return;
   }
   const where = editableLayer(current, layerName);
@@ -894,11 +894,11 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   if (lock.locked) {
     current.host.post({ type: "editLock", session, lock } satisfies ToTemplates);
-    reply("", `保存しません: ${lock.reason}`);
+    reply("", `保存できません: ${lock.reason}`);
     return;
   }
   if (!(await confirmDuringTurn(lock))) {
-    reply("", "保存しません。エージェントの応答中です。応答が終わってから保存してください");
+    reply("", "エージェントの応答中のため保存を取りやめました。応答が終わってから保存してください。");
     return;
   }
   if (abandoned(current, target, (e) => reply("", e))) {
@@ -907,7 +907,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   const file = templateFile(root, where.layer, name);
   const named = dataOf(data);
   if (file === undefined || named === undefined || named.name !== name) {
-    reply("", "保存しません: テンプレートの名前が不正か、中身の名前と食い違っています");
+    reply("", "保存できません: テンプレートの名前が不正か、中身の名前と食い違っています。");
     return;
   }
   // 1. 書き出す本文を実行ファイルに読ませる。errorが1件でもあれば書かない
@@ -917,17 +917,17 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   if (!checked.ok) {
-    reply("", `保存しません: ${checked.error}`);
+    reply("", `保存できません: ${checked.error}`);
     return;
   }
   const errors = checked.check.problems.filter((p) => p.severity === "error");
   if (!checked.check.valid || errors.length > 0) {
-    reply("", `保存しません: ${errors.map((p) => p.detail).join(" / ") || "実行ファイルが読み込めませんでした"}`);
+    reply("", `保存できません: ${errors.map((p) => p.detail).join(" / ") || "ccnaviが読み込めませんでした"}`);
     return;
   }
   // 2. 実行ファイルが読み返した中身が、画面が書こうとした中身と同じときだけ書く
   if (!sameData(data, checked.check.data)) {
-    reply("", "保存しません: 実行ファイルが読み返した中身が、画面の中身と食い違いました（YAMLの読み方の違い）。食い違う欄を直してから、保存し直してください");
+    reply("", "保存できません: 保存する内容をccnaviが読み返すと、画面の入力と違う値になりました（YAMLの読み方の違い）。入力した値を見直してから、保存し直してください。");
     return;
   }
   // 錠は、読ませている間に着手されたチケットを見逃さないよう、読んで書く直前（同期の区間の手前）にもう一度取り直す
@@ -937,7 +937,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
   }
   if (final.locked) {
     current.host.post({ type: "editLock", session, lock: final } satisfies ToTemplates);
-    reply("", `保存しません: ${final.reason}`);
+    reply("", `保存できません: ${final.reason}`);
     return;
   }
   // 3. 開いたときからファイルが外で変わっていない（新規はまだ無い）
@@ -949,7 +949,7 @@ async function editSave(current: PanelState, message: Extract<TemplatesMessage, 
     return;
   }
   if (expect === "" ? read !== undefined : read === undefined || sha256(read.bytes) !== expect) {
-    reply("", expect === "" ? `${name}.ymlは、開いたあとに画面の外で作られています。更新してからやり直してください（上書きしません）` : `${name}.ymlは、開いたあとに画面の外で変わっています。この編集は上書きしません。更新して開き直してください`);
+    reply("", expect === "" ? `${name}.ymlは、開いたあとに画面の外で作られています。更新してからやり直してください（上書きはしません）。` : `${name}.ymlは、開いたあとに画面の外で変わっています。この編集では上書きできません。更新して開き直してください。`);
     return;
   }
   // 4. リンクを辿らず、一時ファイルの入れ替えで書く

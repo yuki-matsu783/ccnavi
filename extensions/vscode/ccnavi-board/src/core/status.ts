@@ -146,7 +146,7 @@ function fieldsOf(card: StatusCard): string {
     `置き場: ${card.copyStatus}`,
     `承認待ち: ${card.pendingApproval ? "はい" : "いいえ"}`,
     `着手: ${card.startedAt === "" ? "なし" : card.startedAt}`,
-    card.isParent ? "" : `フェーズ: ${card.phaseStatus === "" ? "取得できない" : card.phaseStatus}`,
+    card.isParent ? "" : `フェーズ: ${card.phaseStatus === "" ? "取得できません" : card.phaseStatus}`,
   ]
     .filter((line) => line !== "")
     .join("\n");
@@ -197,10 +197,10 @@ export function statusOf(card: StatusCard): Status {
 const PREPARING_TITLE = "エージェントがレビュー依頼を出す番です";
 
 /** 「着手待ち」のツールチップ。ユーザが次に頼むこと */
-const NOT_STARTED_TITLE = "承認済みで、まだ着手していません。Claude Codeに着手を頼むと、エージェントがワークツリーを作って作業を始めます";
+const NOT_STARTED_TITLE = "承認済みで、まだ着手していません。Claude Codeに着手を頼むと、エージェントがワークツリーを作って作業を始めます。";
 
 /** 「作業中」のツールチップ。エージェントの番 */
-const WORKING_TITLE = "エージェントが作業中です。ユーザの操作は要りません。終わるとエージェントがレビュー依頼を出します";
+const WORKING_TITLE = "エージェントが作業中です。操作は要りません。終わるとエージェントがレビュー依頼を出します。";
 
 /** 着手前の開いたチケット。ワークツリーは着手で作るので、無くて普通 */
 export function isNotStarted(card: StatusCard): boolean {
@@ -241,12 +241,12 @@ function childStatus(card: StatusCard): Status {
       case "レビュー予定":
         return { label: "レビュー予定", title: "", tone: "wait" };
       default:
-        return check("レビュー待ちの置き場にありますが、フェーズの状態と合いません");
+        return check("チケットはレビュー待ちの場所にありますが、フェーズの状態と合っていません");
     }
   }
   if (card.copyStatus === "open") {
     if (card.reviewWaiting || card.gateClosed) {
-      return check("作業中なのに、フェーズがレビューで止まっています");
+      return check("チケットは作業中ですが、フェーズがレビューで止まっています");
     }
     return openStatus(card);
   }

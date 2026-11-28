@@ -97,7 +97,7 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
           )}
           {detail !== undefined && !detailMatches(detail, entry) && (
             <p className="hint" data-role="detail-mismatch">
-              この行の本文は読み込めません。実行ファイルは、統合結果で使われる同名の別のレイヤーの本文を返します（破棄された行など）。ファイルを直接開いて読んでください。対象は次のファイルです。<span className="mono">{entry.path}</span>
+              このテンプレートの本文は、この画面では表示できません（同じ名前のテンプレートが別の設定にあり、ccnaviはそちらの本文を返すため）。次のファイルを直接開いて確認してください。<span className="mono">{entry.path}</span>
             </p>
           )}
           {detailError !== "" && <p className="status failed">{detailError}</p>}
@@ -123,7 +123,7 @@ function StateTags({ entry }: { readonly entry: TemplateEntry }): JSX.Element {
   return (
     <>
       {entry.dropped?.reason === "duplicate" ? (
-        <span className="tag">共通の側を使用</span>
+        <span className="tag">共通設定の側を使用</span>
       ) : entry.dropped !== null ? (
         <>
           {!entry.usable && <span className="tag bad">無効</span>}

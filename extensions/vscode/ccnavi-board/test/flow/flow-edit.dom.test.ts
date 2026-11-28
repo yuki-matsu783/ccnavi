@@ -163,7 +163,7 @@ test("CB-D126 選んだノードをCtrl+CでコピーしてCtrl+Vで貼ると、
     dom.key("c", undefined, CTRL);
     release(dom, "c");
     await dom.settle();
-    assert.match(dom.one("#status").textContent ?? "", /開始はコピーしません/);
+    assert.match(dom.one("#status").textContent ?? "", /開始ノードはコピーできません/);
     // プロンプトと終了を選んでコピーする
     dom.click(dom.one('.react-flow__node[data-id="prompt-1"]'));
     await dom.settle();
@@ -358,7 +358,7 @@ test("CB-D131 実行ファイルのwarnは画面の注意と並べて出し、�
     assert.equal(dom.all("#flow-preview-checking").length, 0);
     assert.equal(dom.all('#flow-notices li[data-source="exe"]').length, 2);
     assert.equal(dom.all("#flow-preview pre.flow-rendered").length, 0);
-    assert.match(dom.one("#flow-preview").textContent ?? "", /並べられませんでした/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /手順に変換できませんでした/);
     // 確かめられなければ理由を出し、前の答えは残す
     dom.click(dom.one('[data-action="add-node"][data-type="prompt"]'));
     await dom.settle();
@@ -375,7 +375,7 @@ test("CB-D131 実行ファイルのwarnは画面の注意と並べて出し、�
 test("CB-D132 答えのないフロー（まだないファイル）は開いてすぐ確認を頼む", async () => {
   const dom = await openFlow({ exists: false });
   try {
-    assert.match(dom.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確認していません/);
+    assert.match(dom.one("#flow-preview").textContent ?? "", /まだccnaviで確認していません/);
     await waitCheck(dom);
     const asked = checksAsked(dom);
     assert.equal(asked.length, 1);
@@ -476,7 +476,7 @@ test("CB-T1223 右ペインは見出しの下に説明を出し、確認中は�
     none.click(none.one('[data-action="add-node"][data-type="skill"]'));
     await none.settle();
     assert.equal(none.all("#flow-preview-checking").length, 0);
-    assert.match(none.one("#flow-preview").textContent ?? "", /まだ実行ファイルで確認していません/);
+    assert.match(none.one("#flow-preview").textContent ?? "", /まだccnaviで確認していません/);
   } finally {
     await none.close();
   }

@@ -98,7 +98,7 @@ export function parseLintJson(text: string): ParsedLint {
   if (version !== LINT_VERSION) {
     return {
       ok: false,
-      error: `lintのJSONの版が違います（拡張は${LINT_VERSION}、実行ファイルは${String(raw.version)}）`,
+      error: `lintのJSONの版が違います（拡張は${LINT_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   const problems = list(raw.problems).filter(isRecord).map(problem);
@@ -137,7 +137,7 @@ function problem(raw: Record<string, unknown>): LintProblem {
 export const MAX_WARN_LINES = 5;
 
 /** `--lint`の報告を切り詰めたときの「ほかN件」に続ける案内。報告の元が`--lint`のときだけ渡す */
-export const LINT_MORE_HINT = "。`ccnavi --lint`で全部見られます";
+export const LINT_MORE_HINT = "。`ccnavi --lint`で全部見られます。";
 
 /**
  * `hint`は「ほかN件」の後ろに続ける案内（なければ空文字）。全部を見る手段は呼ぶ側の出どころで違う
@@ -171,12 +171,12 @@ export function warnLinesOf(report: string, tmp: string, shown: string): string[
 }
 
 /**
- * `--lint`の報告からerrorの行だけを取り出す（保存の拒否に出す）。行頭は日本語（`エラー: `）にする。
+ * `--lint`の報告からerrorの行だけを取り出す（保存の拒否に出す）。行頭の`error: `はそのまま残す。
  * 対象のファイル（`shown`）に触れる行を先頭に出し、先頭`MAX_WARN_LINES`件までにする。
  * 無関係なチケット由来の指摘が何十件あっても、保存を止めた本当の原因が埋もれない。
  */
 export function errorLinesOf(report: string, tmp: string, shown: string): string[] {
-  const all = linesOf(report, "error: ", tmp, shown).map((line) => `エラー: ${line.slice("error: ".length)}`);
+  const all = linesOf(report, "error: ", tmp, shown);
   const own = all.filter((line) => line.includes(shown));
   return truncateLines([...own, ...all.filter((line) => !line.includes(shown))], LINT_MORE_HINT);
 }

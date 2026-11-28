@@ -147,7 +147,7 @@ function readObject(text: string): Parsed<Record<string, unknown>> {
   if (raw.version !== TEST_VERSION) {
     return {
       ok: false,
-      error: `試験のJSONの版が違います（拡張は${TEST_VERSION}、実行ファイルは${String(raw.version)}）。拡張か実行ファイルを揃えてください`,
+      error: `試験のJSONの版が違います（拡張は${TEST_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   return { ok: true, value: raw };

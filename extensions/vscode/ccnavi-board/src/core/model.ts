@@ -400,7 +400,7 @@ export function parseBoardJson(text: string): ParseResult {
   if (version !== BOARD_VERSION) {
     return {
       ok: false,
-      error: `ccnavi --explain --jsonの版が違います（拡張は${BOARD_VERSION}、実行ファイルは${String(raw.version)}）`,
+      error: `ccnavi --explain --jsonの版が違います（拡張は${BOARD_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。`,
     };
   }
   const settings = isRecord(raw.settings) ? raw.settings : {};

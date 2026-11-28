@@ -32,8 +32,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
     <details className="sum" id="sum" data-tour="sum" open={tour === undefined ? undefined : tour.open}>
       <summary>統合結果（読み取り専用）</summary>
       <p className="hint">
-        共通の設定に選んだ設定を重ねた、実行ファイルの答えをそのまま並べた結果です。保存済みの内容が対象で、編集中の内容は含みません。
-        パスを持たないツール（Bashなど）が適用するのは、この結果ではなく、全プロジェクトの設定を足した和です。
+        共通設定に、選択中の設定を重ねた結果です（ccnaviの出力をそのまま表示しています）。保存済みの内容が対象で、編集中の内容は含みません。パスを持たないツール（Bashなど）には、全プロジェクトの設定を合わせたルールが適用されます（この結果とは異なります）。
       </p>
       <label className="sum-pick" data-tour="sum-pick">
         統合結果{" "}
@@ -46,9 +45,9 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
         </select>
       </label>
       {sum.unreadable !== "" && (
-        <div className="banner warn">{sum.path}を読み込めませんでした。（共通の設定のルールだけが効いています）: {sum.unreadable}</div>
+        <div className="banner warn">{sum.path}を読み込めず、その設定を空として扱っています: {sum.unreadable}（共通設定のルールだけが効いています）</div>
       )}
-      {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path}がないため、共通の設定のルールのみを表示しています</p>}
+      {sum.missing && sum.unreadable === "" && <p className="hint">{sum.path}がないため、共通設定のルールのみを表示しています</p>}
       <p className="count" data-count="sum" data-tour="sum-count">
         {total}件（{layersText(sum.layers)}）
       </p>
@@ -82,7 +81,7 @@ export function Sum({ sums, initial, tour }: SumProps): JSX.Element | null {
                         <code>{rule.match}</code>
                       </td>
                       <td>
-                        <span className="dim">{rule.kind}</span> <code title={rule.pattern === "" ? undefined : `翻訳後の正規表現: ${rule.pattern}`}>{rule.written}</code>
+                        <span className="dim">{rule.kind}</span> <code title={rule.pattern === "" ? undefined : `正規表現に直した形: ${rule.pattern}`}>{rule.written}</code>
                       </td>
                       <td>{layerLabel(rule.source)}</td>
                       <td className="why">{rule.message}</td>

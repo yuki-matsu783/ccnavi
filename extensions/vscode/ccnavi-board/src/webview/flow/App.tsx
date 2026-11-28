@@ -503,12 +503,12 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     const copied = copyNodes(doc, chosen);
     if (copied === undefined) {
-      setStatus({ text: "コピーできるノードが選ばれていません（開始はコピーしません）", error: false });
+      setStatus({ text: "コピーできるノードが選ばれていません（開始ノードはコピーできません）", error: false });
       return;
     }
     clip.current = { clip: copied, pasted: 0 };
     setHasClip(true);
-    setStatus({ text: `ノードを${copied.nodes.length}個、線を${copied.connections.length}本コピーしました。Ctrl+Vで貼り付けられます`, error: false });
+    setStatus({ text: `ノードを${copied.nodes.length}個、線を${copied.connections.length}本コピーしました。Ctrl+Vで貼り付けられます。`, error: false });
   };
 
   const paste = (): void => {
@@ -529,7 +529,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     }
     const made = duplicateNodes(doc, chosen);
     if (made === undefined) {
-      setStatus({ text: "複製できるノードが選ばれていません（開始は複製しません）", error: false });
+      setStatus({ text: "複製できるノードが選ばれていません（開始ノードは複製できません）", error: false });
       return;
     }
     edit(made.doc);
@@ -574,7 +574,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
     imported.current = { hash: taken.hash, doc: taken.doc };
     setProposal(undefined);
     setSelected(undefined);
-    setStatus({ text: "下書きを取り込みました（まだ保存していません）。そのまま保存すると、取り込んだ下書きは消えます（直してから保存したときは残します）", error: false });
+    setStatus({ text: "下書きを取り込みました（まだ保存していません）。このまま保存すると、下書きのファイルは削除されます。内容を直してから保存した場合は、下書きのファイルは残ります。", error: false });
   };
 
   const save = (): void => {
@@ -686,7 +686,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
         </div>
       )}
       <div id="changed" data-tour="changed" className={shownChanged ? "banner warn" : "banner warn hidden"}>
-        ファイルの変更を検知しました。更新してください。
+        ファイルの変更を検知しました。「更新」を押してください。
         <button type="button" className="action" data-action="reload" disabled={shownBusy} onClick={reload}>
           更新
         </button>
@@ -722,13 +722,13 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
           <button type="button" className="action" data-action="redo" data-tour="redo" disabled={shownReadOnly || !canRedoNow} title="やり直す（Ctrl+Shift+Z / Ctrl+Y）" onClick={redoEdit}>
             やり直す
           </button>
-          <button type="button" className="action" data-action="copy-nodes" data-tour="copy" disabled={!copyableNow} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始はコピーしません" onClick={copy}>
+          <button type="button" className="action" data-action="copy-nodes" data-tour="copy" disabled={!copyableNow} title="選んだノードと、それらをつなぐ線をコピーします（Ctrl+C）。開始ノードはコピーできません。" onClick={copy}>
             コピー
           </button>
           <button type="button" className="action" data-action="paste-nodes" data-tour="paste" disabled={shownReadOnly || !hasClipNow} title="コピーしたノードを貼り付けます（Ctrl+V）" onClick={paste}>
             貼り付け
           </button>
-          <button type="button" className="action" data-action="duplicate-nodes" data-tour="duplicate" disabled={shownReadOnly || !copyableNow} title="選んだノードをその場で複製します（Ctrl+D）。開始は複製しません" onClick={duplicate}>
+          <button type="button" className="action" data-action="duplicate-nodes" data-tour="duplicate" disabled={shownReadOnly || !copyableNow} title="選んだノードをその場で複製します（Ctrl+D）。開始ノードは複製できません。" onClick={duplicate}>
             複製
           </button>
           <button
@@ -737,7 +737,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
             data-action="group-nodes"
             data-tour="group"
             disabled={shownReadOnly || groupableCount < 2}
-            title="Shiftを押しながらノードを2つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません"
+            title="Shiftを押しながらノードを2つ以上選ぶと、枠（グループ）にまとめられます。枠は図の上の囲みで、手順は変わりません。"
             onClick={group}
           >
             グループ化
@@ -752,7 +752,7 @@ export function App({ initial }: { readonly initial: FlowData }): JSX.Element {
               data-action="request-flow"
               data-tour="request"
               disabled={shownBusy}
-              title="エージェントへの依頼の文を作ります。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください"
+              title="エージェントへの依頼の文を作ります。エージェントは下書きのみを作成します。取り込むかどうかは、この画面で差分を確認して判断してください。"
               onClick={() => post({ type: "request" })}
             >
               {shownRequest}

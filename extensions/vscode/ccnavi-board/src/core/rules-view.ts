@@ -83,7 +83,7 @@ export function subjectExample(tool: string): string {
     case "WebFetch":
       return "URLを書きます。例: https://example.com/docs";
     default:
-      return "書き方はツールで変わります。ツールを候補から選ぶと例が出ます";
+      return "書き方はツールで変わります。ツールを候補から選ぶと例が出ます。";
   }
 }
 

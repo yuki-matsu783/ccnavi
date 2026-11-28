@@ -182,7 +182,7 @@ func usageRefusal(parser *argparse.Parser, a opts) string {
 	}
 	// ターミナルで 1 件ずつ選ぶ形（--yes 無し）はボードの経路でない。
 	if route == string(via.Board) && a.Str("yes") == "" && !sideways {
-		return "--via board は --yes（ボードで押した選択）と一緒に指定してください。"
+		return "--via board は --yes（チケット管理画面で押した選択）と一緒に指定してください。"
 	}
 	return ""
 }

@@ -29,7 +29,7 @@ export interface RulesSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Record<string, unknown>;
 }
@@ -43,7 +43,7 @@ export function condOfRaw(raw: unknown, at = "when"): CondNode {
   const map = object(raw, at);
   const keys = Object.keys(map);
   if (keys.length !== 1) {
-    throw new Error(`${at}のキーはちょうど1つでなければならない`);
+    throw new Error(`${at}のキーはちょうど1つにしてください`);
   }
   const key = keys[0];
   const value = map[key];
@@ -54,7 +54,7 @@ export function condOfRaw(raw: unknown, at = "when"): CondNode {
     case "all":
     case "any":
       if (!Array.isArray(value)) {
-        throw new Error(`${at}.${key}はリスト`);
+        throw new Error(`${at}.${key}はリストにしてください`);
       }
       return { op: key, children: value.map((item, i) => condOfRaw(item, `${at}.${key}[${i}]`)) };
     case "not":
@@ -104,7 +104,7 @@ function sumsOfRaw(raw: unknown): readonly RulesSum[] {
     return [];
   }
   if (!Array.isArray(raw)) {
-    throw new Error("sample.sumsはリスト");
+    throw new Error("sample.sumsはリストにしてください");
   }
   const parsed = parseBoardJson(JSON.stringify({ version: BOARD_VERSION, sums: raw }));
   if (!parsed.ok) {
@@ -120,7 +120,7 @@ export function parseRulesSample(raw: unknown): RulesSample {
   for (const section of SECTIONS) {
     const list = rules[section] ?? [];
     if (!Array.isArray(list)) {
-      throw new Error(`sample.rules.${section}はリスト`);
+      throw new Error(`sample.rules.${section}はリストにしてください`);
     }
     sections[section] = list.map((item, index) => ruleOfRaw(item, section, index));
   }

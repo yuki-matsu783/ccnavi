@@ -83,7 +83,7 @@ export function parsePlanOrder(text: string): PlanOrderParse {
     return { ok: false, error: "JSONの最上位がオブジェクトではありません" };
   }
   if (raw.version !== PLAN_ORDER_VERSION) {
-    return { ok: false, error: `--plan-orderの答えの版が違います（拡張は${PLAN_ORDER_VERSION}、実行ファイルは${String(raw.version)}）` };
+    return { ok: false, error: `--plan-orderの答えの版が違います（拡張は${PLAN_ORDER_VERSION}、ccnaviは${String(raw.version)}）。拡張かccnaviを更新して、版を揃えてください。` };
   }
   return {
     ok: true,

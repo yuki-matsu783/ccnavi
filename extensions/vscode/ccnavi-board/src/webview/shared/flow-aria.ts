@@ -8,15 +8,15 @@ import type { AriaLabelConfig } from "@xyflow/react";
 const DIRECTIONS: Readonly<Record<string, string>> = { up: "上", down: "下", left: "左", right: "右" };
 
 export const FLOW_ARIA_LABELS: Partial<AriaLabelConfig> = {
-  "node.a11yDescription.default": "EnterかSpaceでノードを選びます。Escでやめます。",
-  "node.a11yDescription.keyboardDisabled": "EnterかSpaceでノードを選び、矢印キーで動かします。Escでやめます。",
-  "node.a11yDescription.ariaLiveMessage": ({ direction, x, y }) => `選んだノードを${DIRECTIONS[direction] ?? direction}へ動かしました。位置はx: ${x}、y: ${y}です`,
-  "edge.a11yDescription.default": "EnterかSpaceで線を選びます。Escでやめます。",
+  "node.a11yDescription.default": "EnterかSpaceでノードを選びます。Escで選択を解除します。",
+  "node.a11yDescription.keyboardDisabled": "EnterかSpaceでノードを選び、矢印キーで動かします。Escで選択を解除します。",
+  "node.a11yDescription.ariaLiveMessage": ({ direction, x, y }) => `選んだノードを${DIRECTIONS[direction] ?? direction}へ動かしました。位置はx: ${x}、y: ${y}です。`,
+  "edge.a11yDescription.default": "EnterかSpaceで線を選びます。Escで選択を解除します。",
   "controls.ariaLabel": "図の操作",
   "controls.zoomIn.ariaLabel": "拡大",
   "controls.zoomOut.ariaLabel": "縮小",
   "controls.fitView.ariaLabel": "全体を表示",
-  "controls.interactive.ariaLabel": "操作の切り替え",
+  "controls.interactive.ariaLabel": "図の編集のロックを切り替え",
   "minimap.ariaLabel": "ミニマップ",
   "handle.ariaLabel": "接続口",
 };

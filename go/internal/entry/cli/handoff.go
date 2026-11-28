@@ -153,7 +153,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 			fmt.Fprintf(w, "    warn  %s\n", line)
 		}
 		if e.Defense != "" {
-			fmt.Fprintf(w, "    ターミナルのみ %s。ボードからは取り込めません\n", e.Defense)
+			fmt.Fprintf(w, "    ターミナルのみ %s。チケット管理画面からは取り込めません\n", e.Defense)
 		}
 		if e.Selected && e.Diff != "" {
 			for _, line := range strings.Split(e.Diff, "\n") {
@@ -187,7 +187,7 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	fmt.Fprintf(w, "  %s--yes --expect %s\n", command, plan.Expect())
 	for _, e := range chosen {
 		if !e.Board() {
-			fmt.Fprintln(w, "  （defense の種類か、防御の記述を動かす rules.yml を含むため、ボードからは取り込めません。"+
+			fmt.Fprintln(w, "  （defense の種類か、防御の記述を動かす rules.yml を含むため、チケット管理画面からは取り込めません。"+
 				"ターミナルで実行してください）")
 			break
 		}

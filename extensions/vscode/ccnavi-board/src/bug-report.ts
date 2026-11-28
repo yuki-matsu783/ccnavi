@@ -128,14 +128,14 @@ async function findFfmpeg(capture: Capture): Promise<string | undefined> {
 
 async function startRecording(current: Session): Promise<void> {
   if (current.capture === "none") {
-    current.noRecording = "このOSでは録画しない（Windows・macOS・WSLだけ）";
+    current.noRecording = "このOSでは録画できません（対応しているのはWindows・macOS・WSL）";
     return;
   }
   const ffmpeg = await findFfmpeg(current.capture);
   if (ffmpeg === undefined) {
     current.noRecording = "ffmpegが見つからない";
     void vscode.window.showWarningMessage(
-      "ffmpegが見つからないので、録画はしません。スクリーンショットとログは保存します。録画するにはffmpegを入れるか、設定ccnaviBoard.ffmpegPathに場所を書きます。",
+      "ffmpegが見つからないため、録画できません。スクリーンショットとログは保存します。録画するには、ffmpegを入れるか、設定ccnaviBoard.ffmpegPathにffmpegのパスを指定してください。",
     );
     return;
   }
@@ -170,7 +170,7 @@ async function startRecording(current: Session): Promise<void> {
     current.noRecording = "録画を始められなかった";
     current.errors.push(`ffmpeg（録画）: ${recording.stderr.trim()}`);
     const hint = current.capture === "mac" ? "macOSの「システム設定」→「プライバシーとセキュリティ」→「画面収録」でVS Codeを許可してから、もう一度バグ報告を始めてください。" : "";
-    void vscode.window.showWarningMessage(`録画を始められなかったので、録画はしません。スクリーンショットとログは保存します。${hint}`);
+    void vscode.window.showWarningMessage(`録画を始められなかったので、録画できません。スクリーンショットとログは保存します。${hint}`);
     return;
   }
   current.recording = recording;
@@ -223,12 +223,12 @@ async function prompt(current: Session): Promise<void> {
   const canShoot = current.capture !== "none";
   const picked = canShoot
     ? await vscode.window.showInformationMessage(
-        "バグ発生時の挙動を再現してください。途中の画面は「スクリーンショット」で撮れます。終わったら「終了」を押します（ステータスバーにも同じボタンがあります）。",
+        "バグが起きたときの操作をもう一度行ってください。途中の画面は「スクリーンショット」で撮れます。終わったら「終了」を押してください（ステータスバーにも同じボタンがあります）。",
         shot,
         finish,
       )
     : await vscode.window.showInformationMessage(
-        "バグ発生時の挙動を再現してください。終わったら「終了」を押します（ステータスバーにも同じボタンがあります）。",
+        "バグが起きたときの操作をもう一度行ってください。終わったら「終了」を押してください（ステータスバーにも同じボタンがあります）。",
         finish,
       );
   if (session !== current) {
@@ -263,7 +263,7 @@ export async function startReport(): Promise<void> {
     errors: [],
     items: [
       statusItem("$(record)再現中: 終了", "ccnaviBoard.bugReportFinish", "バグ報告を終えてzipにまとめる", 1001),
-      statusItem("$(device-camera)スクリーンショット", "ccnaviBoard.bugReportScreenshot", "バグ報告: スクリーンショットを撮る", 1000),
+      statusItem("$(device-camera)スクリーンショット", "ccnaviBoard.bugReportScreenshot", "バグ報告のスクリーンショットを撮る", 1000),
     ],
   };
   current.items[0].backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
@@ -294,22 +294,22 @@ export async function takeScreenshot(): Promise<void> {
   try {
     const command = screenshotCommand(current.capture, await toolPath(current.capture, file));
     if (command === undefined) {
-      void vscode.window.showWarningMessage("このOSではスクリーンショットを撮りません（Windows・macOS・WSLだけ）。");
+      void vscode.window.showWarningMessage("このOSではスクリーンショットを撮れません（対応しているのはWindows・macOS・WSLです）。");
       return;
     }
     // 押したボタンの通知が消えるのを待ってから撮る
     await new Promise((resolve) => setTimeout(resolve, 300));
     await run(command.file, command.args, 20_000);
     if (!fs.existsSync(file)) {
-      throw new Error("画像を作れなかった");
+      throw new Error("画像のファイルが作られませんでした");
     }
     current.shots += 1;
     vscode.window.setStatusBarMessage(`$(check)スクリーンショット${current.shots}枚目を撮りました`, 3000);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     current.errors.push(`スクリーンショット: ${message}`);
-    const hint = current.capture === "mac" ? "（macOSでは、「画面収録」でVS Codeの許可が必要です）" : "";
-    void vscode.window.showWarningMessage(`スクリーンショットを撮れませんでした${hint}: ${message}`);
+    const hint = current.capture === "mac" ? "。macOSでは、「システム設定」の「画面収録」でVS Codeを許可してください" : "";
+    void vscode.window.showWarningMessage(`スクリーンショットを撮れませんでした: ${message}${hint}`);
   }
 }
 
@@ -396,7 +396,7 @@ export async function finishReport(): Promise<void> {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    void vscode.window.showErrorMessage(`バグ報告のzipを書けませんでした: ${message}`);
+    void vscode.window.showErrorMessage(`バグ報告のzipを保存できませんでした: ${message}`);
     return;
   } finally {
     removeWork(current.work);
@@ -404,7 +404,7 @@ export async function finishReport(): Promise<void> {
 
   const reveal = "フォルダで表示";
   const picked = await vscode.window.showInformationMessage(
-    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには、画面に映っていた内容が入ります。その中には秘密の値が含まれることがあります。ログには、その間の操作の記録が入ります。渡す前に中身を確かめてください。`,
+    `バグ報告を${zipFile}に保存しました。録画とスクリーンショットには画面に映っていた内容が、ログにはその間の操作の記録が入ります。パスワードやトークンなどが映っていないか、開発者に渡す前に中身を確かめてください。`,
     reveal,
   );
   if (picked === reveal) {

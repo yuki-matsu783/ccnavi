@@ -241,16 +241,16 @@ export function connectRefusal(graph: PlanGraph, source: string, target: string)
     return "線の先のステップが図にありません";
   }
   if (from.kind !== "item" || to.kind !== "item") {
-    return "開始と終了への線は図が自動で引きます";
+    return "開始と終了への線は自動で引かれます";
   }
   if (to.locked) {
-    return "子が承認された番号です。入る線は変えられません";
+    return "このステップは子チケットが承認済みのため、入る線を変えられません";
   }
   if (graph.edges.some((edge) => edge.kind === "after" && edge.source === source && edge.target === target)) {
-    return "この線はもうあります";
+    return "この線はすでにあります";
   }
   if (reaches(graph, target, source)) {
-    return `${from.number}は${to.number}より後に続くステップです。この線を引くと順序が輪になります`;
+    return `ステップ${from.number}はステップ${to.number}より後のステップです。この線を引くと順序が循環します。`;
   }
   return undefined;
 }

@@ -23,7 +23,7 @@ keywords: [ユーザ専用, user, 入口, 表, useronly, ccnavi-user, hook, 読�
 | `Op` | ターミナルの前のユーザを求める操作の名前（型。`approve`・`reviewed`・`close-early`・`prune`・`handoff`・`mirror`） |
 | `flags` | 実行ファイル（`where` が空）と sh スクリプト（`where` がスクリプトの名前）のオプション。実行ファイルを直に呼ぶ形として止めるか（`cli`）、所属するグループ、`user` の外で断るか（`gated`）、`--preview` と一緒なら断らないか（`unlessPreview`）、`--preview` を単独の語として隣に置いた見るだけの形を通すか（`previewExempt`） |
 | `subs` | 実行ファイルを直に呼ぶ形のサブコマンド（`ticket`・`review`・`sync`・`worktree`・`ops`。`ops` は書き込む副命令だけを止め、読むだけの `pending`・`show`・`reconcile` は通す） |
-| `boardCombos` | ボードで押した操作の、オプションの組み合わせ。どのグループからも 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含む。`--via`（グループ `via`）と `board` の語（グループ `board`）の組は、`user` を伴わなくても止める |
+| `boardCombos` | チケット管理画面で押した操作の、オプションの組み合わせ。どのグループからも 1 つずつがコマンド行に並んだら止める。語のグループ `user-board-verb` に `handoff` を含む。`--via`（グループ `via`）と `board` の語（グループ `board`）の組は、`user` を伴わなくても止める |
 | `verbs` | `ccnavi user <操作>` の読み替え。操作の語、読み替えた先の内部のオプション、`Op`、値を取るか、ユーザが打つ入口の sh（`Verb.Script`）、実行ファイルがターミナルを求めるときに標準エラーへ出す表示名（`terminal`。ユーザが打つ sh の名前） |
 | `wrapperOptions` | sh と拡張が先に付ける値つきのオプション（`--root`・`--cwd`・`--record-writes`・`--record-tree`・`--entry`） |
 
@@ -75,7 +75,7 @@ keywords: [ユーザ専用, user, 入口, 表, useronly, ccnavi-user, hook, 読�
 #### 入口の印
 
 `user <操作>` は、どこから呼ばれたかを示す印 `--entry <値>` を `user` の前に付けて呼ぶ。値は `sh`（`ccnavi-user-*.sh`）と
-`board`（拡張のボードの子プロセス）の 2 つ。印は `wrapperOptions` に入っていて、読み替え（`Rewrite`）と hook の正規表現は
+`board`（拡張のチケット管理画面の子プロセス）の 2 つ。印は `wrapperOptions` に入っていて、読み替え（`Rewrite`）と hook の正規表現は
 読み飛ばす。実行ファイルは `useronly.TakeEntry` で argv から外し、argparse の結果（`args`）には入れない。値が 2 つのどちらでもない、
 2 度ある、`user` の入口でない形は `useronly.EntryError` で断る（終了コード 2）。
 
@@ -126,5 +126,5 @@ hook は擬似ターミナルを作る実行役（`script`・`tmux`・`screen`�
 実行ファイルは、`ccnavi-user-agree.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`・`ccnavi-user-prune.sh` と、書くとき（`--yes`）の `ccnavi-user-handoff.sh` と `ccnavi-user-mirror.sh` で、標準入力がターミナルのときだけ動く。
 ターミナルを求めるときに標準エラーへ出す名前は、ユーザが打つ sh の名前で、`verbs` の `terminal`（`useronly.Terminal`）が持つ。
 
-ターミナルを求めない経路（`--yes` の承認、ボードの指摘の対応方針、ボードからの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、ターミナル要求は 2 つ目ではない。
+ターミナルを求めない経路（`--yes` の承認、チケット管理画面の指摘の対応方針、チケット管理画面からの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、ターミナル要求は 2 つ目ではない。
 擬似ターミナルを使えばターミナル要求は満たせる。

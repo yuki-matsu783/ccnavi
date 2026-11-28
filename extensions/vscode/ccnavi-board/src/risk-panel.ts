@@ -84,11 +84,11 @@ let state: PanelState | undefined;
 function whatOf(target: RiskTarget): string {
   switch (target.kind) {
     case "workspace":
-      return "リスク";
+      return "共通設定のリスク";
     case "self":
       return "ワークスペースの設定のリスク";
     case "project":
-      return `${target.name}のリスク`;
+      return `プロジェクト「${target.name}」のリスク`;
   }
 }
 
@@ -170,14 +170,14 @@ async function readPage(root: string, target: RiskTarget): Promise<Loaded> {
     // 設定ファイルの場所は実行ファイルに聞く。`.ccnavi`から自分で組むと、組み方が実行ファイルと
     // 食い違ったときに、この画面で保存した配点が判定に使われなくなる。答えは元リポジトリの版。
     if (!board.ok) {
-      throw new Error(`設定ファイルの場所を実行ファイルから取得できません: ${board.error}`);
+      throw new Error(`設定ファイルの場所をccnaviから取得できません: ${board.error}`);
     }
     const layer = target.kind === "self" ? selfLayer(board.board) : projectLayer(board.board, target.name);
     if (layer === undefined || layer.risk.path === "") {
       throw new Error(
         target.kind === "self"
           ? "ccnaviの出力にワークスペースの設定がありません"
-          : `プロジェクト${target.name}は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
+          : `プロジェクト「${target.name}」は設定の対象になっていません（プロジェクトのフォルダの直下にないか、名前が予約名のcommonかselfです）`,
       );
     }
     riskPath = resolveIn(root, layer.risk.path);
@@ -346,7 +346,7 @@ async function create(current: PanelState, loaded: Loaded): Promise<void> {
     fail(current, `${loaded.file.rel}は既に存在するため、上書きしません。更新してください`);
     return;
   }
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "作成", "それでも作成する"))) {
     fail(current, "エージェントの応答中のため作成を取りやめました。応答が終わってから作成してください。");
     return;
   }

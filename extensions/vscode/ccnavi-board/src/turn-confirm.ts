@@ -8,16 +8,15 @@ import { turnWarning, type Lock } from "./core/lock.js";
  * として戻すことがある。保存は止めず、押した時点で知らせて選ばせる。
  */
 export async function confirmDuringTurn(lock: Lock): Promise<boolean> {
-  return confirmTurns(lock.turns);
+  return confirmTurns(lock.turns, "保存", "それでも保存する");
 }
 
 /** `confirmDuringTurn`の、セッションの一覧を直に渡す形（保存の錠を持たない画面が使う） */
-export async function confirmTurns(sessions: readonly string[]): Promise<boolean> {
-  const warning = turnWarning({ locked: false, reason: "", doing: [], turns: sessions });
+export async function confirmTurns(sessions: readonly string[], what: string, go: string): Promise<boolean> {
+  const warning = turnWarning({ locked: false, reason: "", doing: [], turns: sessions }, what);
   if (warning === "") {
     return true;
   }
-  const go = "それでも保存する";
   const picked = await vscode.window.showWarningMessage(warning, { modal: true }, go);
   return picked === go;
 }
@@ -26,7 +25,7 @@ export async function confirmTurns(sessions: readonly string[]): Promise<boolean
  * ボードを聞き直して、ターン中なら確認する。錠を持たない書き込み（取り込み・ファイルの新規作成・ミラーの同期）が使う。
  * ボードが読めないときは、ターン中かが分からないので確認を出さない（書き込み自体の検査は実行ファイルの側にある）。
  */
-export async function confirmIfTurn(root: string, setting: string): Promise<boolean> {
+export async function confirmIfTurn(root: string, setting: string, what: string, go: string): Promise<boolean> {
   const board = await loadBoard(root, setting);
-  return confirmTurns(board.ok ? (board.board.turns).map((t) => t.session) : []);
+  return confirmTurns(board.ok ? (board.board.turns).map((t) => t.session) : [], what, go);
 }

@@ -390,7 +390,7 @@ export function textDiff(rawBefore: FlowDoc, rawAfter: FlowDoc): TextDiff {
       problem = "欄の名前が重複していて見分けられないもの（`.`や`[`を含むキーなど）があるため、欄ごとに変更前と変更後を分けられません";
       changes.push({ kind, label, texts: rawTexts(a, b) });
     } else if (made.texts.length === 0 && a !== undefined && b !== undefined && !sameValue(a, b)) {
-      problem = "中身が違うのに、違う欄を見つけられません";
+      problem = "内容に差がありますが、どの欄が変わったかを特定できません";
       changes.push({ kind, label, texts: rawTexts(a, b) });
     } else if (made.texts.length > 0) {
       changes.push({ kind, label, texts: made.texts });

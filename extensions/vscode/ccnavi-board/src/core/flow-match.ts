@@ -233,16 +233,16 @@ export function describeExecutable(value: unknown): string {
 /** 開くときに食い違ったときの文面 */
 export function openMismatchText(found: FlowMismatch): string {
   return (
-    `画面と実行ファイルとで、値の読み方が食い違っています（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
+    `画面とccnaviとで、値の読み方が食い違っています（${found.where}。画面: ${found.screen}、ccnavi: ${found.executable}）。` +
     "このまま画面で直して保存すると、値の意味が変わります。エディタで引用符を付けるなどして、" +
-    "実行ファイルが意図どおりの値として読むように直してください"
+    "ccnaviが意図どおりの値として読むように直してください。"
   );
 }
 
 /** 保存の前に食い違ったときの文面 */
 export function saveMismatchText(found: FlowMismatch): string {
   return (
-    `保存する本文を、実行ファイルが画面とは違う値として読みます（${found.where}。画面: ${found.screen}、実行ファイル: ${found.executable}）。` +
-    "保存すると値の意味が変わるため、保存しません"
+    `保存する本文を、ccnaviが画面とは違う値として読みます（${found.where}。画面: ${found.screen}、ccnavi: ${found.executable}）。` +
+    "保存すると値の意味が変わるため、保存できません。"
   );
 }

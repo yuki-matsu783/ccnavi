@@ -431,7 +431,7 @@ test("CB-D739 一覧の行は畳んで出し、開くと図の中身を求める
     assert.equal(dom.all(`${row} .plan-graph[data-editable="1"]`).length, 0, "一覧の図は読むだけ");
     assert.equal(dom.all(`${row} [data-role="flow-diagram"] .react-flow__node`).length >= 2, true, "子のフローの図が出る");
     const heading = dom.one(`${row} [data-role="flow-diagram"] h3`).textContent ?? "";
-    assert.equal(heading, "2:実装とテスト のフロー", "子のフローの見出しは「番号:フェーズ名 のフロー」の形で、フローの名前（実装の手順）は出さない");
+    assert.equal(heading, "2番（実装とテスト）のフロー", "子のフローの見出しは「番号番（フェーズ名）のフロー」の形で、フローの名前（実装の手順）は出さない");
     assert.equal(dom.all(`${row} table.tpl-plan`).length, 0, "図が出たら表は出さない");
     // 畳むと消え、押し直すと戻る。求め直さない
     dom.click(dom.one(`${row} .row-head`));
@@ -606,8 +606,8 @@ test("CB-D1255 子のフローの行の見出しは「番号:型のタイトル 
   try {
     await startEdit(dom);
     const flowRow = (index: number) => `section[data-role="flows"] li[data-index="${index}"]`;
-    assert.equal(text(dom.one(`${flowRow(1)} .tpl-flow-heading`)), "1:設計 のフロー");
-    assert.equal(text(dom.one(`${flowRow(2)} .tpl-flow-heading`)), "2:実装とテスト のフロー");
+    assert.equal(text(dom.one(`${flowRow(1)} .tpl-flow-heading`)), "1番（設計）のフロー");
+    assert.equal(text(dom.one(`${flowRow(2)} .tpl-flow-heading`)), "2番（実装とテスト）のフロー");
     dom.click(dom.one(`${flowRow(2)} button[data-action="toggle-flow"]`));
     await dom.settle();
     assert.equal(dom.all(`${flowRow(2)}.open`).length, 0);

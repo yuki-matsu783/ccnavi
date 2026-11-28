@@ -13,7 +13,7 @@
 --check-file は、任意のパスのテンプレートを、そのレイヤーのフェーズ定義で検査します
 （何も書き込みません。保存前の確かめ用で、--show・--draft・--keyword とは併用できません）。
 両方のレイヤーに同じ名前で内容の異なるテンプレートがある場合はエラーとなり、
-そのレイヤー側のテンプレートは使用されません。--json は、ボード画面が描画する完全な応答で、
+そのレイヤー側のテンプレートは使用されません。--json は、チケット管理画面が描画する完全な応答で、
 docs/21_design/tickets/templates.mdに記載しています。--keyword は --docs
 と共通で、それ以外では拒否されます。--docs のその他のフィルターはここでは拒否されます。--lint
 でも同じ検査を報告します。
@@ -37,7 +37,7 @@ ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] [--json]
         （見るだけ。PATH はツリーからの相対パスで、省くと下書き全部）
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] --yes --expect HASH
-        （取り込みます。ボードは実行ファイルを --entry board --via board で呼びます）
+        （取り込みます。チケット管理画面は実行ファイルを --entry board --via board で呼びます）
 
 共通レイヤー（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
 .ccnavi/config/common/）と工程スキル（各プロジェクトの skills/）がずれていないかの確認と、ずれの同期は、ユーザが
@@ -48,7 +48,7 @@ ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザ�
         （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] --yes --expect HASH
         （差分のあるプロジェクトを揃えます。--expect が今の差分と違うときは何も書きません。
-        ボードは実行ファイルを --entry board --via board で呼びます）
+        チケット管理画面は実行ファイルを --entry board --via board で呼びます）
 
 収集済みのテンプレートは、親の提案を開始するときに使用されます。
 エージェントも実行できます（フローの下書きも効力を持ちません）。

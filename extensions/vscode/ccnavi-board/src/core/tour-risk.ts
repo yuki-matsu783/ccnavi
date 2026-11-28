@@ -17,7 +17,7 @@ export interface RiskSample {
 
 function object(value: unknown, at: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`${at}がオブジェクトではない`);
+    throw new Error(`${at}がオブジェクトではありません`);
   }
   return value as Record<string, unknown>;
 }
@@ -60,7 +60,7 @@ export function riskFormOf(raw: unknown, at = "risks"): RiskForm {
   }
   const list = root.factors ?? [];
   if (!Array.isArray(list)) {
-    throw new Error(`${at}.factorsはリスト`);
+    throw new Error(`${at}.factorsはリストにしてください`);
   }
   return { levels, factors: list.map((item, index) => factorOf(item, index)) };
 }

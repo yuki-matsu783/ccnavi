@@ -261,7 +261,7 @@
     "problems": [
      {
       "severity": "warn",
-      "detail": "`plan[1]` の型 `docs` が phases.yml にありません（定義が変わったか、このレイヤーにありません。使う前に直す）"
+      "detail": "`plan[1]` の型 `docs` が phases.yml に無い（定義が変わったか、この設定に無い。使う前に直す）"
      }
     ]
    },
@@ -590,7 +590,7 @@
       "problems": [
        {
         "severity": "warn",
-        "detail": "`plan[1]` の型 `docs` が phases.yml にありません（定義が変わったか、このレイヤーにありません。使う前に直す）"
+        "detail": "`plan[1]` の型 `docs` が phases.yml に無い（定義が変わったか、この設定に無い。使う前に直す）"
        }
       ]
      },

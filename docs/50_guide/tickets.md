@@ -47,7 +47,7 @@ keywords: [チケット, 親, 子, 承認, user agree, 直接作業, チケッ�
 | 置き場 | 意味 | 動かすもの |
 |---|---|---|
 | `wip/proposals/todo/` | 承認待ち | 親が書く。作成と編集は自由 |
-| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `sh .ccnavi/scripts/ccnavi-user-agree.sh`（ユーザ）、ボード、置き場のファイルの移動。続きの子をユーザが起こすときも、ここに直接置く |
+| `.ccnavi/approved/doing/` | 承認済み。判定が範囲を読むのはここだけ | `sh .ccnavi/scripts/ccnavi-user-agree.sh`（ユーザ）、VS Code のチケット管理画面、置き場のファイルの移動。続きの子をユーザが起こすときも、ここに直接置く |
 | `wip/proposals/review/` | 作業が終わり、ユーザのレビューを待つ | `sh .ccnavi/scripts/ccnavi-ticket.sh finish <識別子>`（フェーズがレビュー要のとき） |
 | `.ccnavi/approved/done/` | 閉じた。取り消しは `cancelled_at` を持ってここに入る | `ccnavi-review.sh confirm`、`ccnavi-user-decide.sh`、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh`（ユーザ）。レビュー不要の `finish` と `cancel --reason` |
 
@@ -94,8 +94,8 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子
 | 経路 | 形 |
 |---|---|
 | ターミナル | `sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]`。一覧を見せて y/N を取り、y のあとに提案が更新されていれば「内容が更新されました」と最新を表示し直して確認し直す。通れば `ccnavi-user-push-approved.sh` でコミットして push する。一部だけ書けたときは、書けた分を送り、書けなかった提案を言う |
-| ボード | VS Code のボードで承認の一覧から選んで承認する。見せたあとに提案が更新されていれば承認せず、「内容が更新されました」と最新に読み直す。1 件以上書けたら `ccnavi-user-push-approved.sh` を統合ターミナルへ送る |
-| Chrome 拡張のボード | ブラウザと PAT だけで、リモートのブランチの承認待ちを見て承認する。承認は 1 コミットとしてリモートのブランチに書かれる（[拡張の README](../../extensions/chrome/ccnavi-approval/README.md)） |
+| VS Code のチケット管理画面 | 承認の一覧から選んで承認する。見せたあとに提案が更新されていれば承認せず、「内容が更新されました」と最新に読み直す。1 件以上書けたら `ccnavi-user-push-approved.sh` を統合ターミナルへ送る |
+| Chrome 拡張の承認ボード | ブラウザと PAT だけで、リモートのブランチの承認待ちを見て承認する。承認は 1 コミットとしてリモートのブランチに書かれる（[拡張の README](../../extensions/chrome/ccnavi-approval/README.md)） |
 | ファイルを動かす | 提案を `.ccnavi/approved/doing/` へ動かす。GitLab や GitHub の画面しか利用できないユーザ向け。承認の画面を通らないぶん、構造の検査は判定のときに行い、引っかかれば `DENY_TICKET_BLOCKED` で止まる（`--lint` でも分かる） |
 
 エージェントが承認を実行する形は止まる。エージェントは、承認できる状態かを確かめる `approval-request <親> --check`（承認の画面と同じ検査。何も送らない）だけを打てる。
@@ -105,7 +105,7 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子
 ### 承認したら push する
 
 **承認済みチケットは親チケットのブランチに乗って他の機械へ届く。** 承認しても push しなければ、他の機械では承認されなかったことになる。
-承認の push は `sh .ccnavi/scripts/ccnavi-user-push-approved.sh` で行う。ターミナルとボードの承認は、このスクリプトを自動で呼ぶ。
+承認の push は `sh .ccnavi/scripts/ccnavi-user-push-approved.sh` で行う。ターミナルと画面の承認は、このスクリプトを自動で呼ぶ。
 
 - ワークスペース、`projects/*`、`.claude/worktrees/*` のツリーごとに、変更があれば置き場（`.ccnavi/approved/`）だけをコミットし、そのブランチへ push する
 - `main` / `master` / `develop` / `release` / `release/*` と、そのリポジトリの統合先は push せず、コミットまでで止める
@@ -125,10 +125,10 @@ sh .ccnavi/scripts/ccnavi-user-agree.sh i0002 i0002-01-01   # 並べた識別子
 ### 承認したことを伝える
 
 承認したことは、拡張が渡す文と `ccnavi-ticket.sh status` で伝わる。hook は承認を伝えない。
-VS Code のボードは、承認の文をオーバーレイの 3 ボタン（コピー、新しいセッションで開く、ターミナルで実行）から渡せる。ターミナル・GitLab や GitHub の画面・Chrome 拡張で
+VS Code のチケット管理画面は、承認の文をオーバーレイの 3 ボタン（コピー、新しいセッションで開く、ターミナルで実行）から渡せる。ターミナル・GitLab や GitHub の画面・Chrome 拡張で
 承認したときは、ユーザがそのあとセッションに一言送る。
 
-ユーザがレビューを終えたことは、VS Code のボードの［レビュー完了］で済ませる。ボードがエージェントに `confirm` を打たせることはしない。
+ユーザがレビューを終えたことは、VS Code のチケット管理画面の「レビュー完了」で済ませる。チケット管理画面がエージェントに `confirm` を打たせることはしない。
 ターミナルの `confirm` や `decide`、Chrome 拡張のレビュー済みで済ませたときも、ユーザがそのあとセッションに一言送り、エージェントは `status` で確かめる。
 
 ### 状態を聞く

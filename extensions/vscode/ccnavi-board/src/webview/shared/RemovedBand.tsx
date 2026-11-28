@@ -38,7 +38,7 @@ export function RemovedBand<D>(props: {
   return (
     <div className="banner" data-banner="removed" role="status">
       <span>{removed.label}を削除しました（まだ保存していません）。</span>
-      <button type="button" className="action" data-action="undo-remove" disabled={busy} title={busy ? "処理中のため戻せません。終わるまでお待ちください" : undefined} onClick={onUndo}>
+      <button type="button" className="action" data-action="undo-remove" disabled={busy} title={busy ? "処理中のため戻せません。終わるまでお待ちください。" : undefined} onClick={onUndo}>
         元に戻す
       </button>
       <button type="button" className="action" data-action="dismiss-removed" title="この案内を閉じます" onClick={onDismiss}>

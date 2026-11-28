@@ -114,8 +114,8 @@ var networkWords = []string{
 }
 
 const (
-	whyNotFound = "MR #%s が見つからない（番号か、リポジトリへの権限を確かめる）"
-	whyAuth     = "認証に失敗した（トークンか gh / glab の認証を確かめる）"
+	whyNotFound = "MR #%s が見つかりません（番号か、リポジトリへの権限を確かめてください）"
+	whyAuth     = "認証に失敗しました（トークンか gh / glab の認証を確かめてください）"
 )
 
 // classifyFailure は API の失敗の返事から、unknown の種類と理由を決める。返事の本文は理由にコピーしない。
@@ -134,11 +134,11 @@ func classifyFailure(text, n string) (string, string) {
 	}
 	for _, w := range networkWords {
 		if strings.Contains(low, w) {
-			return "network", "ホストに届かない（ネットワークか、ホスト名を引けない）"
+			return "network", "ホストに届きません（ネットワークか、ホスト名を確かめてください）"
 		}
 	}
 	if strings.Contains(low, "rate limit") {
-		return "api", "ホストの API の利用上限に達した" + with
+		return "api", "ホストの API の利用上限に達しました" + with
 	}
 	switch code {
 	case "404":
@@ -153,7 +153,7 @@ func classifyFailure(text, n string) (string, string) {
 		strings.Contains(low, "forbidden"), strings.Contains(low, "authentication"):
 		return "auth", whyAuth
 	}
-	return "api", "ホストの API が失敗した" + with
+	return "api", "ホストの API が失敗しました" + with
 }
 
 // asciiLower は ASCII の英大文字だけを小文字にする（sh の tr 'A-Z' 'a-z' と同じ）。

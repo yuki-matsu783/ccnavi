@@ -32,18 +32,18 @@ export const OPEN_LOCK: FlowLock = { locked: false, reason: "" };
 export function lockedReason(ticket: string): string {
   return (
     `子チケット${ticket}は着手中かレビュー中のため、フローを変更できません。` +
-    `${ticket}が終わる（finish）か取り消される（cancel）と変更できます。手順を直すなら、それまで待つか、次の子チケットのフローで直してください`
+    `${ticket}が終わる（finish）か取り消される（cancel）と変更できます。手順を直すなら、それまで待つか、次の子チケットのフローで直してください。`
   );
 }
 
 /** 置き場の途中かファイルがシンボリックリンク。読まないし書かない */
 export function linkedReason(rel: string): string {
-  return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み込みも保存もしません。リンク先は承認済みの領域の外かもしれません。リンクを解除してから開き直してください`;
+  return `フローの置き場（${rel}）か、そこへ至る途中のフォルダがシンボリックリンクのため、読み込みも保存もできません。リンク先は承認済みの領域の外かもしれません。リンクを解除してから開き直してください。`;
 }
 
 /** 確かめられなかったとき。書けない扱いにする */
 export function lockFromFailure(error: string): FlowLock {
-  return { locked: true, reason: `着手中かどうかを確認できないため、保存しません: ${error}` };
+  return { locked: true, reason: `着手中かどうかを確認できないため、保存できません: ${error}` };
 }
 
 /** ボードのJSONから引いた、この子のフロー */
@@ -69,13 +69,13 @@ export type FlowTargetResult = { readonly ok: true; readonly target: FlowTarget 
 export function flowTargetOf(board: BoardJson, ticket: string): FlowTargetResult {
   const found = board.tickets.find((t) => t.ticket === ticket);
   if (found === undefined) {
-    return { ok: false, error: `チケット${ticket}が実行ファイルの出力にありません` };
+    return { ok: false, error: `チケット${ticket}がccnaviの出力にありません` };
   }
   if (found.parent === "") {
-    return { ok: false, error: `${ticket}は親チケットです。フローがあるのは子チケットだけです` };
+    return { ok: false, error: `${ticket}は親チケットです。フローがあるのは子チケットだけです。` };
   }
   if (found.flow === null) {
-    return { ok: false, error: `${ticket}のフローの置き場が実行ファイルの出力にありません（完了・取り消しの子チケットには、フローのファイルがありません）` };
+    return { ok: false, error: `${ticket}のフローの置き場がccnaviの出力にありません（完了・取り消しの子チケットには、フローのファイルがありません）` };
   }
   return {
     ok: true,
@@ -129,7 +129,7 @@ export function requestLabel(state: {
   if (state.draftExists) {
     return "エージェントにフローを頼み直す";
   }
-  return state.flowExists ? "エージェントにフローの直しを頼む" : "エージェントにフローの作成を頼む";
+  return state.flowExists ? "エージェントにフローの修正を頼む" : "エージェントにフローの作成を頼む";
 }
 
 /** 依頼の文の材料。パスは絶対（エージェントはどのcwdからでも開ける） */

@@ -444,11 +444,11 @@ async function readMirror(root: string): Promise<MirrorStatus> {
 async function syncMirror(current: PanelState, names: readonly string[], expect: string): Promise<void> {
   if (current.syncing || current.seenSeq < current.syncSeq) {
     // 画面はボタンを押せなくしているので、来るのは押した直後の二度押しくらい。黙って破棄すると何も起きないように見えるので言う
-    void vscode.window.showInformationMessage("ミラーを同期しています。終わるまで待ってください");
+    void vscode.window.showInformationMessage("ミラーを同期しています。終わるまで待ってください。");
     return;
   }
   // ターン中に書くと、次のツール呼び出しの実行後チェックが戻しうる。押した時点で知らせる。
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "同期", "それでも同期する"))) {
     return;
   }
   if (state !== current) {
@@ -582,7 +582,7 @@ async function handleMessage(current: PanelState, message: ProjectsMessage | und
     const unknown = unknownSyncNames(current.mirror, message.names);
     if (unknown.length > 0) {
       // 画面が見せていない名前は、実行ファイルに渡さない。一覧を読み直して、もう一度押してもらう
-      void vscode.window.showWarningMessage(`同期の対象を確かめられませんでした: ${unknown.join("、")}。最新の状態に更新します`);
+      void vscode.window.showWarningMessage(`同期の対象（${unknown.join("、")}）が一覧に見つからないため、同期していません。一覧を最新の状態に更新します。`);
       void refreshMirror();
       return;
     }
@@ -604,7 +604,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   }
   const twin = duplicateOf(page.rows, remote.remote.key);
   if (twin !== undefined) {
-    fail(current, `同じリポジトリを${twin.name}として既にcloneしています（origin ${twin.origin}）`);
+    fail(current, `同じリポジトリを「${twin.name}」として既にcloneしています（origin ${twin.origin}）`);
     return;
   }
   const target = path.join(page.projectsDir, name.name);
@@ -615,7 +615,7 @@ function clone(current: PanelState, page: ProjectsPage, rawUrl: string, rawName:
   runInTerminal(root, cloneCommand(root, page.projectsDir, remote.remote.url, name.name));
   info(
     current,
-    `git cloneを「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます`,
+    `git cloneを「ccnavi」ターミナルに送りました（${page.projectsRel}/${name.name}）。認証が必要ならターミナルで入力してください。終わると一覧が更新されます。`,
     "cloned",
   );
 }
@@ -629,7 +629,7 @@ function fixIgnore(current: PanelState, page: ProjectsPage): void {
     fail(current, `.gitignoreに保存できません: ${(error as Error).message}`);
     return;
   }
-  info(current, `.gitignoreに「/${page.projectsRel}/」を追加しました。コミットは自分でしてください`);
+  info(current, `.gitignoreに「/${page.projectsRel}/」を追加しました。コミットは自分でしてください。`);
   void update();
 }
 

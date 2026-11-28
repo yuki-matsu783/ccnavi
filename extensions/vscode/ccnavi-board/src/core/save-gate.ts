@@ -21,7 +21,7 @@ export interface EditSaveState {
 /** 押せない理由。空なら押せる */
 export function editSaveBlocker(state: EditSaveState): string {
   if (state.busy) {
-    return "処理中のため保存できません。終わるまでお待ちください";
+    return "処理中のため保存できません。終わるまでお待ちください。";
   }
   if (state.readOnly !== undefined && state.readOnly !== "") {
     return state.readOnly;

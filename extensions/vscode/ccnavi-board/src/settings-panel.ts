@@ -30,6 +30,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { dirtyTitle } from "./core/save-gate.js";
 import type { ScreenHost } from "./core/screen-host.js";
 import type { RulesTarget } from "./core/screens.js";
+import { targetLabel } from "./core/targets.js";
 import { targetOptions, type TargetOption } from "./core/targets.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { openHandoffFrom } from "./handoff-entry.js";
@@ -228,16 +229,9 @@ export function readSettingFile(filePath: string, rel: string, what: string): { 
   }
 }
 
-/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）と揃える */
-function targetLabel(target: SettingsTarget): string {
-  switch (target.kind) {
-    case "workspace":
-      return "共通の設定";
-    case "self":
-      return "ワークスペース";
-    case "project":
-      return `プロジェクト${target.name}`;
-  }
+/** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）をそのまま使う */
+function targetLabelOf(target: SettingsTarget): string {
+  return targetLabel(target.kind, target.kind === "project" ? target.name : "");
 }
 
 /** 保存を止めるチケットを絞るプロジェクト。共通の設定とワークスペースの設定は絞らない（どのツリーのdoingでも止める） */
@@ -460,7 +454,7 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
       }
       current.asking = true;
       const choice = await vscode.window.showWarningMessage(
-        `未保存の変更があります。破棄して「${targetLabel(target)}」に切り替えますか？`,
+        `未保存の変更があります。破棄して「${targetLabelOf(target)}」に切り替えますか？`,
         { modal: true },
         "切り替える",
       );

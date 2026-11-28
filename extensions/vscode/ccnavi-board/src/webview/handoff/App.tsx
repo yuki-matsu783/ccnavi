@@ -19,8 +19,8 @@ import { Result } from "./Result.js";
 
 /** 対象外の理由。知らない値はそのまま出す */
 const IGNORED_WHY: Readonly<Record<string, string>> = {
-  "not-allowed": "取り込める種類の表に無い",
-  "linked-dir": "リンクのディレクトリ（中は読まない）",
+  "not-allowed": "取り込める種類のファイルではない",
+  "linked-dir": "シンボリックリンクのディレクトリ（中は読まない）",
 };
 
 /** 中身が無いときの錠。止めていない扱いにする */
@@ -178,7 +178,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           </span>
         </div>
         <div className="controls">
-          <button type="button" className="action" data-action="reload" title="ファイルを更新します" disabled={busy} onClick={refresh}>
+          <button type="button" className="action" data-action="reload" title="ファイルを読み込み直します" disabled={busy} onClick={refresh}>
             更新
           </button>
         </div>
@@ -187,7 +187,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
         {lockedPresent ? `テンプレートと設定の取り込みは止めています: ${lock.reason}` : ""}
       </p>
       <p className="count" id="counts">
-        <span>対象{entries.length}件</span>・<span>取り込める{selectable.length}件</span>・<span>選択{chosen.length}件</span>・<span>対象外{page.list.ignored}件</span>
+        <span>対象{entries.length}件</span>・<span>取り込み可能{selectable.length}件</span>・<span>選択{chosen.length}件</span>・<span>対象外{page.list.ignored}件</span>
       </p>
       {page.list.ignored_paths.length > 0 && (
         <details id="ignored-paths">
@@ -211,7 +211,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
         </p>
         {entries.length === 0 ? (
           <p className="empty" data-role="empty">
-            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/にコピーして編集します。
+            取り込み待ちの下書きはありません。保護対象を直すときは、ccnavi-stage.shでwip/handoff/にコピーして編集してください。
           </p>
         ) : (
           <>
@@ -282,7 +282,7 @@ function TreeSelect({
 }): JSX.Element {
   return (
     <label className="tree-select">
-      ツリー{" "}
+      ワークツリー{" "}
       <select id="tree" data-action="switch-tree" value={tree} disabled={disabled} onChange={(event) => onSwitch(event.target.value)}>
         {trees.map((t) => (
           <option key={t.key} value={t.key}>

@@ -89,7 +89,7 @@ export async function startIssue(
     if (open.length > 1) {
       return {
         kind: "refused",
-        message: `Issue #${issue.number} をクローズする、オープン状態のマージリクエストが ${open.length} 本あります（${open.map((m) => `!${m.number} ${m.branch}`).join("、")}）。どれで続けるかを決めてから、手元で ccnavi-start.sh --mr <番号> を実行してください。`,
+        message: `Issue #${issue.number} をクローズする、オープン状態のマージリクエストが ${open.length} 件あります（${open.map((m) => `!${m.number} ${m.branch}`).join("、")}）。どれを使うかを決めてから、手元で ccnavi-start.sh --mr <番号> を実行してください。`,
       };
     }
     if (open.length === 1) {
@@ -127,9 +127,9 @@ export async function startIssue(
  * マージ済みの MR の有無はここ（ホストの答え）で見る。
  */
 async function adopt(repo: RepoConfig, mr: Mr, integration: string, snapshot: Snapshot, names: readonly string[], deps: Deps): Promise<StartOutcome> {
-  const why = (text: string): StartOutcome => ({ kind: "refused", message: `MR !${mr.number}（${mr.branch}）は採用できません。${text}` });
-  if (mr.state !== "open") return why(`状態が ${mr.state || "不明"} です。open の MR だけ採用できます。`);
-  if (mr.fork) return why("フォークから出た MR で、元ブランチがこのリポジトリにありません。");
+  const why = (text: string): StartOutcome => ({ kind: "refused", message: `MR !${mr.number}（${mr.branch}）は使用できません。${text}` });
+  if (mr.state !== "open") return why(`状態が ${mr.state || "不明"} です。open の MR だけ使用できます。`);
+  if (mr.fork) return why("フォークから作成された MR で、ソースブランチがこのリポジトリにありません。");
   if (mr.base !== integration) return why(`マージ先が ${mr.base || "不明"} で、統合先 ${integration} ではありません。`);
   const res = await ccnavi.adopt(deps.ccnavi, { snapshot, branch: mr.branch, names });
   if (res.problems.length > 0) return why(res.problems.join("\n"));

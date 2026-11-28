@@ -25,7 +25,7 @@ export function MirrorField({ mirror, name, act }: { readonly mirror: MirrorData
           className="action small"
           data-action="mirror-sync"
           disabled={!button.enabled}
-          title={button.enabled ? "共通レイヤーの内容を、このプロジェクトのワークツリーにコピーします。コミットはしません" : button.reason}
+          title={button.enabled ? "共通設定の内容を、このプロジェクトのワークツリーにコピーします。コミットはしません。" : button.reason}
           onClick={() => {
             if (project !== undefined) {
               act({ type: "mirrorSync", names: [project.name], expect: project.expect });
@@ -87,7 +87,7 @@ export function SyncAllButton({ mirror, act }: { readonly mirror: MirrorData; re
       className={`action${mirror.busy ? " busy" : ""}`}
       data-action="mirror-sync-all"
       disabled={!button.enabled}
-      title={button.enabled ? "ずれのある全プロジェクトに、共通レイヤーの内容をコピーします。書き込み先は各プロジェクトのワークツリーで、コミットはしません" : button.reason}
+      title={button.enabled ? "ずれのある全プロジェクトに、共通設定の内容をコピーします。書き込み先は各プロジェクトのワークツリーで、コミットはしません。" : button.reason}
       onClick={() => act({ type: "mirrorSync", names: [], expect })}
     >
       <span className="spin" aria-hidden="true" />
@@ -101,7 +101,7 @@ export function CheckedAt({ mirror }: { readonly mirror: MirrorData }): JSX.Elem
   if (mirror.checkedAt === "") {
     return null;
   }
-  return <span className="mirror-checked dim">ミラーの最終確認{mirror.checkedAt}</span>;
+  return <span className="mirror-checked dim">ミラーの最終確認: {mirror.checkedAt}</span>;
 }
 
 /** ミラーを確認できないとき・コピーするものが無いときの帯 */
@@ -116,7 +116,7 @@ export function MirrorBanners({ mirror }: { readonly mirror: MirrorData }): JSX.
   if (status.kind === "ok" && status.list.commonEmpty) {
     return (
       <div className="banner mirror-banner">
-        共通レイヤー（<code>.ccnavi/config/common/</code>）にも工程スキル（<code>skills/</code>）にもコピーするものがありません。同期しても何も変わらないので、同期のボタンは押せません。
+        共通設定（<code>.ccnavi/config/common/</code>）にも工程スキル（<code>skills/</code>）にもコピーするものがありません。同期しても何も変わらないので、同期のボタンは押せません。
       </div>
     );
   }
