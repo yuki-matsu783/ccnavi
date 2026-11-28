@@ -223,7 +223,8 @@ wt_fresh_dir() {
 ig_run() {
 	# ロックを分ける名前（cwd のツリーのプロジェクト。ワークスペース自身は self）は、上の `ccnavi git check` が答える。
 	ig_repo=$(ccnavi_val1 repo "$gc_out")
-	[ -n "$ig_repo" ] || ig_repo=self
+	[ -n "$ig_repo" ] ||
+		reject integrate-no-repo "ccnavi の実行ファイルがロックを分ける名前（repo）を答えませんでした。sh .ccnavi/scripts/ccnavi-launcher.sh --version で実行ファイルを確かめ、scripts/ccnavi-build.sh で組み直してください。"
 	ccnavi_lock_take "$WS" "$ig_repo" .integrate 0 ||
 		reject integrate-locked "別の integrate か integrate-done が動いています（ロック: logs/state/locks/${ig_repo}/.integrate）。終わってから再実行してください。"
 	trap 'ccnavi_lock_drop' EXIT

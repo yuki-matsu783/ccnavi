@@ -509,10 +509,9 @@ mr_linked_issues_body() {
 }
 
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
-# 戻り値: 0 読めた / 1 API の失敗（応答の errors・null を含む） / 2 読み切れない（件数の上限を超えた）。理由は ml_why
+# 戻り値: 0 読めた / 1 API の失敗（応答の errors・null を含む） / 2 読み切れない（件数の上限を超えた）。理由は api_failed_reason で読む
 mr_linked_issues() {
 	ml_mr="$1"
-	ml_why=""
 	rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" || :
 	if [ "$ccnavi_h_kind" = github ]; then
 		ml_owner="${ccnavi_h_path%%/*}"

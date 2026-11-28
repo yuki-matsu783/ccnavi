@@ -7,7 +7,7 @@
 # 同じディレクトリを指す。この読み込みと、下の部品の読み込みと、cwd からワークスペースルートを
 # 探せないときの起点（下の ccnavi_workspace_anywhere と ccnavi_no_workspace_text）に `$0` を使う。
 #
-# ここにあるのは 23 個。`ccnavi_load`・`ccnavi_no_workspace`・`ccnavi_no_bin` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
+# 呼ぶ側が使うのは次の 23 個（ほかは中で使う補助）。`ccnavi_load`・`ccnavi_no_workspace`・`ccnavi_no_bin` 以外は、標準出力と終了コードだけを返し、標準エラーには何も書かない。
 # 失敗したときの文面は呼ぶ側が決める（reject と fail で書き方が違うため）。
 #
 #   ccnavi_abs <パス>          相対を絶対に直す
@@ -385,7 +385,7 @@ ccnavi_path_under() {
 }
 
 # 標準入力のパスのうち、<一覧のファイル>（1 行 1 つ）のどれかと同じものを 1 行ずつ。大文字小文字を区別せず比べる
-# （pathcase.Fold で畳んで比べるのと同じ。畳むのは ASCII の英字だけ）。一致は tests/fixtures/approved-carry.json の same。
+# （畳むのは ASCII の英字だけ。ASCII の範囲では pathcase.Fold と同じで、ASCII の外の字は Go と違って畳まない）。一致は tests/fixtures/approved-carry.json の same。
 ccnavi_path_pick() {
 	LC_ALL=C awk 'NR == FNR { want[tolower($0)] = 1; next } tolower($0) in want' "$1" -
 }
