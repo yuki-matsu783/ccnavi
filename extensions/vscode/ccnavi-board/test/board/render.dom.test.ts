@@ -100,7 +100,7 @@ function decidePreview(): DecidePreview {
   };
 }
 
-test("CB-T205 残った指摘は既定で全部「このフェーズで直す」。1件ずつ・一括で選び直せる。選んだ対応方針をキーごとに送る", async () => {
+test("CB-T205 残った指摘は最初は未選択で、全件を選ぶまで確定を押せない。1件ずつ・一括で選べる。選んだ対応方針をキーごとに送る", async () => {
   const page = await openBoard(fixture(), {
     approval: { kind: "decidePreview", preview: decidePreview(), tree: "/w/.claude/worktrees/i0001" },
   });
@@ -128,13 +128,15 @@ test("CB-T205 残った指摘は既定で全部「このフェーズで直す」
     assert.equal(page.all('input[data-choice="issue"]').length, 2);
     assert.ok(!texts(page, ".approval-note").join(" ").includes("フィードバック計画"));
     assert.equal(page.all('input[data-choice="keep"]').length, 2);
-    // 何も選ばなければ全部「このフェーズで直す」で、そのまま確定できる
+    // 最初はどれも選んでいない。全件を選ぶまで確定を押せず、残りの件数を言う
     const checked = (sel: string): boolean => (page.one(sel) as unknown as { checked: boolean }).checked;
-    assert.equal(checked('li[data-key="u1"] input[data-choice="fix"]'), true);
-    assert.equal(checked('li[data-key="u2"] input[data-choice="fix"]'), true);
-    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, false);
+    assert.ok(page.all('input[type="radio"]').every((r) => !(r as unknown as { checked: boolean }).checked));
+    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true);
+    assert.equal(page.one(".decide-left").getAttribute("data-left"), "2");
     page.click(page.one('li[data-key="u1"] input[data-choice="keep"]'));
     await page.settle();
+    assert.equal(page.one<HTMLButtonElement>('button[data-action="decide-confirm"]').disabled, true, "1件だけでは押せない");
+    assert.equal(page.one(".decide-left").getAttribute("data-left"), "1");
     page.click(consult);
     await page.settle();
     assert.deepEqual(page.posted.at(-1), { type: "decideConsult" });
@@ -373,11 +375,13 @@ test("CB-T12b 列ごとに畳むボタンを出す。完了と取り消しは最
 test("CB-T12c 列の件数は見えている子のカードの数（親は行の見出しにあり、数えない）", async () => {
   const page = await openBoard();
   try {
-    const counts = (): string[] => page.all(".column").map((column) => column.querySelector(":scope > h2 > .count")?.textContent ?? "");
+    const counts = (): string[] => page.all(".column").map((column) => column.querySelector(":scope > h2 > .count")?.textContent?.replace(/^子/, "") ?? "");
     const visible = (): string[] =>
       page.all(".column").map((column) => String(page.all(`.cell[data-cell="${column.getAttribute("data-state") ?? ""}"] .card.child:not(.hidden)`).length));
     assert.deepEqual(counts(), visible());
     assert.deepEqual(counts(), ["1", "2", "1", "1"]);
+    // 件数には「子」を添え、親を数えないことが分かるようにする
+    assert.equal(page.one(".column > h2 > .count").textContent, "子1");
     // 親はどの列のセルにも入らない
     assert.equal(page.all(".cell .card.parent").length, 0);
     assert.equal(page.all(".lane > .card.lane-head.parent").length, 1);

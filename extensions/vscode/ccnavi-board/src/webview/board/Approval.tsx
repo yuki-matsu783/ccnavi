@@ -367,7 +367,7 @@ function HandOver({ retry }: { readonly retry?: { readonly parent: string; reado
       </button>
       <button
         type="button"
-        className="action"
+        className="action risky"
         data-action="prompt-run"
         title="ボードのターミナルでclaude -pを実行します（autoモード）。押すと確認なしですぐ実行されます。止めるときはターミナルでCtrl+C"
         onClick={() => post({ type: "promptRun" })}

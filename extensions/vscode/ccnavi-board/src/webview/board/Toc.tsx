@@ -5,6 +5,8 @@
  */
 import type { JSX } from "react";
 
+import { PathText } from "../shared/PathText.js";
+
 export interface TocItem {
   /** 行き先の要素の`id` */
   readonly target: string;
@@ -27,7 +29,10 @@ export function Toc({ items, label }: { readonly items: readonly TocItem[]; read
               disabled={item.count === 0}
               onClick={() => document.getElementById(item.target)?.scrollIntoView?.({ block: "start", behavior: "smooth" })}
             >
-              <span className="overlay-toc-label">{item.label}</span>
+              {/* 場所（パス）の項目が名前の途中で折れないよう、`/`の直後で折り返す */}
+              <span className="overlay-toc-label">
+                <PathText text={item.label} />
+              </span>
               {item.count === undefined ? null : <span className="overlay-toc-count">{item.count}</span>}
             </button>
           </li>

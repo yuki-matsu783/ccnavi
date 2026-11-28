@@ -49,7 +49,7 @@ test("CB-D40 完了と取り消しの列は最初から畳む。列の見出し�
     assert.ok(page.one('.column[data-state="done"]').classList.contains("folded"));
     assert.ok(page.one('.column[data-state="cancelled"]').classList.contains("folded"));
     assert.ok(!page.one('.column[data-state="doing"]').classList.contains("folded"));
-    assert.equal(page.one('.lane[data-lane="i0001"] .cell[data-cell="done"] .folded-count').textContent, "1");
+    assert.equal(page.one('.lane[data-lane="i0001"] .cell[data-cell="done"] .folded-count').textContent, "子1");
     page.click(page.one('button.fold[data-fold="doing"]'));
     await page.settle();
     assert.ok(page.one('.column[data-state="doing"]').classList.contains("folded"));
@@ -137,10 +137,10 @@ test("CB-D42 「ユーザ待ちのみ」でユーザが動く必要のないカ�
     assert.ok(!page.one('.card[data-id="i0001-02-03"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001-02-04"]').classList.contains("hidden"));
     assert.ok(page.one('.card[data-id="i0001-02-05"]').classList.contains("hidden"));
-    assert.equal(page.one('.column[data-state="todo"] > h2 > .count').textContent, "1");
-    assert.equal(page.one('.column[data-state="doing"] > h2 > .count').textContent, "0");
-    assert.equal(page.one('.column[data-state="done"] > h2 > .count').textContent, "0");
-    assert.equal(page.one('.column[data-state="cancelled"] > h2 > .count').textContent, "0");
+    assert.equal(page.one('.column[data-state="todo"] > h2 > .count').textContent, "子1");
+    assert.equal(page.one('.column[data-state="doing"] > h2 > .count').textContent, "子0");
+    assert.equal(page.one('.column[data-state="done"] > h2 > .count').textContent, "子0");
+    assert.equal(page.one('.column[data-state="cancelled"] > h2 > .count').textContent, "子0");
     assert.equal((page.state() as { attention: boolean }).attention, true);
     page.click(page.one('.controls button[data-action="approve"]'));
     await page.settle();
@@ -635,7 +635,7 @@ test("CB-D144 「アーカイブ済みチケットを表示」は既定で外れ
     // 絞り込みではない（承認の送り先は変わらない）
     assert.ok(!page.document.body.classList.contains("filtering"));
     assert.ok(!page.one('.card[data-id="old"]').classList.contains("hidden"));
-    assert.equal(page.one('.column[data-state="archived"] > h2 > .count').textContent, "1");
+    assert.equal(page.one('.column[data-state="archived"] > h2 > .count').textContent, "子1");
     assert.equal(page.one('button.fold[data-fold="archived"]').textContent, "アーカイブ");
     // 押すと右のパネルが開き、「チケットを開く」で退避したファイルを開く
     page.click(page.one('.card[data-id="old"]'));

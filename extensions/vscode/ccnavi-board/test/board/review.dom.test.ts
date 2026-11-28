@@ -137,7 +137,7 @@ test("CB-D1293 対応方針の画面の左に指摘の目次（番号と場所�
   });
   try {
     const items = page.all(".approval nav.overlay-toc button.overlay-toc-item");
-    assert.deepEqual(items.map((b) => b.textContent), ["1. src/a0.py:1", "2. （場所なし）", "確定"]);
+    assert.deepEqual(items.map((b) => b.textContent), ["1.\u00a0src/a0.py:1", "2.\u00a0（場所なし）", "確定"]);
     for (const b of items) {
       page.click(b);
       await page.settle();

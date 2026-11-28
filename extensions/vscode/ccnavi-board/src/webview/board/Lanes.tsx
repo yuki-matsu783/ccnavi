@@ -153,15 +153,15 @@ function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf,
         return (
           <div key={column.state} className={visible === 0 ? "cell empty-cell" : isFolded ? "cell folded-cell" : "cell"} data-cell={column.state}>
             {visible > 0 && isFolded ? (
-              <span className="folded-count" title={`${column.label}の子 ${visible}件（列を畳んでいます）`}>
-                {visible}
+              <span className="folded-count" title={`この親の${column.label}の子チケット ${visible}件（列を畳んでいます）`}>
+                子{visible}
               </span>
             ) : null}
             {own.length > 0 ? (
               <>
                 <div className="cell-label">
                   {column.label}
-                  <span className="count">{visible}</span>
+                  <span className="count" title={`この親の${column.label}の子チケット ${visible}件`}>子{visible}</span>
                 </div>
                 <ul className="cards">
                   {own.map((card) => (
@@ -308,7 +308,9 @@ function ColumnHead({
           <span className="fold-mark" aria-hidden="true" />
           <span className="label">{column.label}</span>
         </button>
-        <span className="count">{count}</span>
+        <span className="count" title={`この列の子チケット ${count}件（親は数えません）`}>
+          子{count}
+        </span>
       </h2>
       {folded ? null : <div className="resizer" data-resize={column.state} title="ドラッグで幅を変える／ダブルクリックで戻す" onPointerDown={onPointerDown} onDoubleClick={() => onWidth(undefined)} />}
     </div>

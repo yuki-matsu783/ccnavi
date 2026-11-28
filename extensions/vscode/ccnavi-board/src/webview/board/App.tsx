@@ -479,7 +479,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
 function Footer({ board }: { readonly board: Board }): JSX.Element {
   return (
     <footer className="foot">
-      {lastUpdatedText(board.generatedAt)} / {board.root}
+      {lastUpdatedText(board.generatedAt)} / ワークスペース: {board.root}
     </footer>
   );
 }

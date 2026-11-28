@@ -58,7 +58,7 @@ test("CB-D1294 行は親ごと。親は行の見出しにだけ置き（バッ�
       page.all(`.lane[data-lane="${lane}"] .cell`).map((cell) => [cell.getAttribute("data-cell") ?? "", ...Array.from(cell.querySelectorAll(".card")).map((c) => c.getAttribute("data-id") ?? "")]);
     assert.deepEqual(cells("p1"), [["todo", "p1-03-01"], ["doing", "p1-02-01", "p1-02-02"], ["done", "p1-01-01"], ["cancelled", "p1-02-03"]]);
     // 列の件数は子だけ（承認待ちの親p2は数えない）
-    assert.deepEqual(page.all(".column").map((c) => c.querySelector(".count")?.textContent), ["1", "3", "1", "1"]);
+    assert.deepEqual(page.all(".column").map((c) => c.querySelector(".count")?.textContent), ["子1", "子3", "子1", "子1"]);
     // 承認待ちの親の見出しには［承認］（主ボタン）と［計画編集］。子が無いことを言う
     const p2 = page.one('.lane[data-lane="p2"] > .card.lane-head');
     assert.deepEqual(Array.from(p2.querySelectorAll("button")).map((b) => b.getAttribute("data-action")), ["approve-one", "workflow"]);
@@ -78,7 +78,7 @@ test("CB-D1295 絞り込みで子が残る親の見出しは残り、親も子�
   const page = await openBoard(scene());
   try {
     // 最初は完了と取り消しを畳む。畳んだ列のセルは件数だけ
-    assert.equal(page.one('.lane[data-lane="p1"] .cell[data-cell="done"] .folded-count').textContent, "1");
+    assert.equal(page.one('.lane[data-lane="p1"] .cell[data-cell="done"] .folded-count').textContent, "子1");
     assert.ok(page.one('.lane[data-lane="p1"] .cell[data-cell="done"]').classList.contains("folded-cell"));
     // ユーザ待ちのみ: p1の子は承認待ち（p1-03-01）とレビュー待ち（p1-02-02）が残るので、見出しのp1も残る
     page.click(page.one("#attention-filter"));
