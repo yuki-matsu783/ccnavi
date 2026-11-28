@@ -180,6 +180,7 @@ new_issue_body=$(ccnavi_val body)
 orig_args=$(ccnavi_val orig)
 real_args=$(ccnavi_val real)
 top=$(ccnavi_val top)
+project=$(ccnavi_val project)
 dry=$(ccnavi_val dry)
 mcp_checked=$(ccnavi_val mcp)
 similar_checked=$(ccnavi_val similar)
@@ -312,23 +313,16 @@ host_api_failed() {
 		: >"$host_err.blocked"
 	fi
 }
-# mr_linked_issues は $( ) の中で呼ばれるので、理由はファイル（$host_err.why）で受け渡す
-ml_why=""
+# 覚えておいた失敗（どの呼び出しか・HTTP の番号・本文・mr_linked_issues の理由）を実行ファイルの `ccnavi start api-failed` に
+# 渡し、答え（`reason <理由の文>`・断られたときの `refused <文>`）を出す。mr_linked_issues は $( ) の中で呼ばれるので、
+# 理由はファイル（$host_err.why）で受け渡す
+api_failed_answer() {
+	start_read api-failed "what=$(cat "$host_err" 2>/dev/null || :)" "status=$(cat "$host_err.status" 2>/dev/null || :)" \
+		"body=$(cat "$host_err.body" 2>/dev/null || :)" "why=$(cat "$host_err.why" 2>/dev/null || :)" || :
+}
 api_failed_reason() {
-	what_failed=$(cat "$host_err" 2>/dev/null || :)
-	ml_why=$(cat "$host_err.why" 2>/dev/null || :)
-	if [ -z "$what_failed" ] && [ -n "$ml_why" ]; then
-		printf '%s' "$ml_why"
-		return 0
-	fi
-	af_status=$(cat "$host_err.status" 2>/dev/null || :)
-	af_body=$(cat "$host_err.body" 2>/dev/null || :)
-	if [ -n "$af_status" ]; then
-		# 届いたうえでホストが断った。接続や認証の問題とは限らない
-		printf 'ホストの API が失敗した（%s）。HTTP %s: %s' "${what_failed:-?}" "$af_status" "${af_body:-（本文なし）}"
-	else
-		printf 'ホストの API が失敗した（%s）%s' "${what_failed:-?}" "${af_body:+。ホストの返事: $af_body}"
-	fi
+	af_reason=$(ccnavi_val1 reason "$(api_failed_answer)")
+	printf '%s' "${af_reason:-ホストの API が失敗した}"
 }
 
 # 親のシェルで呼ぶ。結果は issue_title_read（タイトル。1 行、制御文字は空白）と issue_why（失敗の理由）に入れる。
@@ -349,17 +343,9 @@ issue_title_get() {
 		it_path="projects/$(ccnavi_host_encoded_path)/issues/$it_num"
 	fi
 	it_got=$(ccnavi_host_api GET "$it_path") || {
-		it_status=$(cat "$host_err.status" 2>/dev/null || :)
-		case "$it_status" in
-		401 | 403)
-			issue_why="権限がありません（HTTP ${it_status}）"
-			return 2
-			;;
-		404 | 410)
-			issue_why="見つからない（HTTP ${it_status}）"
-			return 2
-			;;
-		esac
+		# 届いたうえで断られた（権限が無い・見つからない）かは実行ファイルが分ける
+		issue_why=$(ccnavi_val1 refused "$(api_failed_answer)")
+		[ -z "$issue_why" ] || return 2
 		return 1
 	}
 	start_save "$host_err.resp" "$it_got"
@@ -386,7 +372,7 @@ issue_state_gate() {
 # Chrome 拡張の「始める」と同じ関数（`ids.IssueIdentifier`）なので、タイトルが短ければ同じ名前になる。
 # タイトルが長くて slug が途中で切れるときは、実行ファイルが `long yes` を返す（issue_branch_long）。拡張は切った名前で
 # 進めるが、ここでは短い --slug を付けさせて止める（エージェントがタイトルから短い語を考える）。
-# プロジェクト（projects/<名前>）のリポジトリなら、その名前を渡す（slug の頭に付く）。
+# プロジェクト（projects/<名前>）のリポジトリなら、その名前（`start args` の `project` の行）を渡す（slug の頭に付く）。
 # 名前を issue_branch に入れる。実行ファイルが無い・答えないなら 1、作れないと言われたら 2（理由は issue_branch_why）
 issue_branch=""
 issue_branch_why=""
@@ -395,10 +381,9 @@ issue_branch_make() {
 	issue_branch=""
 	issue_branch_why=""
 	issue_branch_long=""
-	ib_project=$(ccnavi_project "$top" "$root")
 	if ib_bin=$(ccnavi_bin "$root"); then
 		ib_rc=0
-		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" $ib_project --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
+		ib_out=$("$ib_bin" --root "$root" worktree issue-id "$number" "$opt_prefix" ${project:+"$project"} --title "$1" 2>"$state/start-issue-id-$$" </dev/null) || ib_rc=$?
 	else
 		return 1
 	fi
@@ -1044,7 +1029,7 @@ if [ "$total" -eq 0 ]; then
 		esac
 		if [ "$issue_branch_long" = yes ]; then
 			# タイトルが長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
-			stop long-slug "number=$number" "branch=$issue_branch" "project=$ib_project" "real=$real_args"
+			stop long-slug "number=$number" "branch=$issue_branch" "project=$project" "real=$real_args"
 		fi
 		new_branch="$issue_branch"
 		slug="${new_branch#"${opt_prefix}-${number}-"}"

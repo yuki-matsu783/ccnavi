@@ -123,7 +123,7 @@ review_exe() {
 }
 
 review_no_bin() {
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。scripts/ccnavi-build.sh で組み立てるか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "$(ccnavi_no_bin_text)" 2
 }
 
 # 居るブランチ・親の識別子・親のワークツリーの中か（branch・family・review_in_tree）を決める。

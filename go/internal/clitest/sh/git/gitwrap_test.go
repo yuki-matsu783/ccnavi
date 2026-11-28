@@ -786,7 +786,7 @@ func TestGitWrapNoExecutableStopsTheWrapper(t *testing.T) {
 	g := newGate(t)
 	g.approve(true)
 	r := g.refused(g.runIn(g.tree, map[string]string{"CCNAVI_ENTRY_PATH": g.join("no-such-ccnavi")}, "push", "-u", "origin", "i0001"), "push")
-	if !strings.Contains(r.Stderr, "実行ファイルが見つからない") {
+	if !strings.Contains(r.Stderr, "実行ファイルが見つかりません") {
 		t.Errorf("stderr = %q", r.Stderr)
 	}
 }
