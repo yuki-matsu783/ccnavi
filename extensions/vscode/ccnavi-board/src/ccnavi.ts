@@ -345,7 +345,7 @@ export async function runApproveYes(
       error:
         `${cutOff(APPROVE_YES, APPROVE_TIMEOUT_MS)}。` +
         "一部だけ承認済みになっている可能性があります。承認済みチケットのコミットとpushは実行していません。" +
-        "チケット管理画面を更新して、何が承認されたかを確認してください。",
+        "チケット管理画面を更新して、何が承認されたかを確認してください。承認済みの分のコミットとpushは、確認したあとに自分で行ってください。",
     };
   }
   const parsed = parseApproveResult(ran.stdout);

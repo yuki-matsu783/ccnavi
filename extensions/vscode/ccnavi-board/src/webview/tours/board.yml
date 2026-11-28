@@ -190,7 +190,7 @@ sample:
         - { ticket: sample-a-01-01, title: "（見本）再設定メールの文面を決める", parent: sample-a, phase: 1, revision: false, tree: sample-a, path: /ws/.claude/worktrees/sample-a/wip/proposals/todo/sample-a-01-01.md, branch: sample-a-01-01 }
         - { ticket: sample-b-03-01, title: "（見本）索引を本番へ反映する手順を書く", parent: sample-b, phase: 3, revision: false, tree: sample-b, path: /ws/.claude/worktrees/sample-b/wip/proposals/todo/sample-b-03-01.md, branch: sample-b-03-01 }
       text: |
-        チケットの承認リクエスト: 3 件
+        チケットの承認リクエスト: 3件
 
         == sample-a: （見本）ログイン画面にパスワードの再設定を追加する  親チケット
         ■ このチケットで編集可能な範囲

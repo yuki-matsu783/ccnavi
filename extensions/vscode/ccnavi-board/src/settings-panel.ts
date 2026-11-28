@@ -19,7 +19,7 @@ import { lockFromError, type Lock } from "./core/lock.js";
 import { dirtyTitle } from "./core/save-gate.js";
 import type { ScreenHost } from "./core/screen-host.js";
 import type { RulesTarget } from "./core/screens.js";
-import { targetOptions } from "./core/targets.js";
+import { targetLabel } from "./core/targets.js";
 import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { debounce, watchTickets } from "./panel-common.js";
 
@@ -91,8 +91,7 @@ export interface SettingsScreen<D, T, L, M> {
 
 /** 確認の文で使う対象の名前。「設定」欄の表示（core/targets.tsのlabel）をそのまま使う */
 export function targetLabelOf(target: RulesTarget): string {
-  const current = { kind: target.kind, name: target.kind === "project" ? target.name : "" };
-  return targetOptions(undefined, "workspace", current).find((o) => o.kind === current.kind && o.name === current.name)?.label ?? current.kind;
+  return targetLabel(target.kind, target.kind === "project" ? target.name : "");
 }
 
 /** `settingsPanel`が返す、画面のパネルから呼ぶ関数 */

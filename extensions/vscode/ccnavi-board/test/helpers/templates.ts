@@ -43,7 +43,7 @@ export function page(overrides: Partial<TemplatesPage> = {}): TemplatesPage {
     generatedAt: "2026-10-12T00:00:00+0900",
     target: { kind: "self", name: "" },
     targets: [
-      { kind: "workspace", name: "", label: "共通の設定" },
+      { kind: "workspace", name: "", label: "共通設定" },
       { kind: "self", name: "", label: "ワークスペース" },
     ],
     data: fixtureJson(),

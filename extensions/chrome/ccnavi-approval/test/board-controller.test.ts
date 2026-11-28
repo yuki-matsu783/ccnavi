@@ -101,7 +101,7 @@ test("CX-T219 書いた結果の一言: 結果の種類ごとの文面と data-k
     [{ ...WRITTEN, rounds: 3 } as Outcome, "written", "承認を反映しました（コミット：0123456。途中で親のブランチの先頭が動いたので、3 回目で反映しました）。反映後の内容も確認しました。"],
     [{ kind: "changed", message: "動いた" }, "changed", "承認は反映されていません：動いた"],
     [{ kind: "conflict", message: "競合" }, "conflict", "承認を反映できませんでした（自動ではやり直しません）：競合"],
-    [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認が反映されたかどうかを確認できませんでした。残った"],
+    [{ kind: "attention", message: "残った" } as Outcome, "attention", "承認の結果を確認してください。残った"],
     [{ kind: "refused", message: "断った" }, "refused", "承認は反映されていません：断った"],
     [{ kind: "failed", message: "落ちた" }, "failed", "承認は反映されていません：落ちた"],
   ];

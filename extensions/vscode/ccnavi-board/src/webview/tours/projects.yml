@@ -156,7 +156,7 @@ diagrams:
         text: errorを返す。selfとcommonは設定の名前として予約してあり、このプロジェクトの設定は1件も使われない。
         value: |-
           error (projects/self)
-          `common` と `self` はレイヤーの名前として予約してある。…プロジェクトを別の名前に変えてください
+          `common` と `self` は設定の名前として予約してある。…プロジェクトを別の名前に変えてください
       - id: err-card
         from: プロジェクト管理画面
         text: カードの見出しにerrorのバッジが付き、「ルール」の欄は「設定の対象になっていません」になる

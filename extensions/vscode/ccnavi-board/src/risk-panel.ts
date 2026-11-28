@@ -513,7 +513,7 @@ async function create(current: PanelState): Promise<void> {
     fail(current, `${loaded.riskRel}は既にあるため、上書きしません。更新してください。`);
     return;
   }
-  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting()))) {
+  if (!(await confirmIfTurn(current.folder.uri.fsPath, binSetting(), "作成", "それでも作成する"))) {
     fail(current, "エージェントの応答中のため作成を取りやめました。応答が終わってから作成してください。");
     return;
   }
@@ -581,7 +581,7 @@ async function save(current: PanelState, form: RiskForm): Promise<void> {
   }
   if (!lint.value.ok) {
     // 苦情は渡した一時ファイルのパスで出るので、画面では対象のファイルのパスに直す。
-    fail(current, `設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.riskRel).join("\n")}`);
+    fail(current, `設定の検証（--lint）でerrorが見つかりました。内容を修正してから保存してください。\n${errorLinesOf(lint.value.report, tmp, loaded.riskRel).join("\n")}`);
     return;
   }
 

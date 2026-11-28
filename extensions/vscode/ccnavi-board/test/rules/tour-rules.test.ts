@@ -172,9 +172,9 @@ test("CB-T525 候補の見本は、下書きのYAMLが候補のid・タイプ・
   }
 });
 
-test("CB-T526 保存前の検証エラーの見本は、lintの報告の形（設定の検証（--lint）でエラーが見つかりました…、続けて「error: id: 内容」）で、見本の行のidを名指しする", () => {
+test("CB-T526 保存前の検証エラーの見本は、lintの報告の形（設定の検証（--lint）でerrorが見つかりました…、続けて「error: id: 内容」）で、見本の行のidを名指しする", () => {
   const lines = sample.saveError.split("\n");
-  assert.match(lines[0], /^設定の検証（--lint）でエラーが見つかりました。内容を修正してから保存してください。$/);
+  assert.match(lines[0], /^設定の検証（--lint）でerrorが見つかりました。内容を修正してから保存してください。$/);
   const ids = new Set([...sample.sections.deny, ...sample.sections.ask, ...sample.sections.allow].map((rule) => rule.id));
   assert.ok(lines.length >= 2);
   for (const line of lines.slice(1)) {

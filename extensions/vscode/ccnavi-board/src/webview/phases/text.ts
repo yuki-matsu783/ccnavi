@@ -69,7 +69,7 @@ export function emptyNote(exists: boolean): string {
   if (exists) {
     return "定義がありません。定義が空のファイルはccnaviで読み込めません。保存する前に、定義を1つ以上追加してください。";
   }
-  return "フェーズ定義ファイルはまだありません（未設定の状態で、エラーではありません）。定義を追加して保存すると、ファイルが作られます。";
+  return "フェーズ定義ファイルはまだありません（未設定の状態で、errorではありません）。定義を追加して保存すると、ファイルが作られます。";
 }
 
 /** 共通の設定の定義と表示名が重なっているときにツールバーの最後の行へ出す文 */
@@ -80,7 +80,7 @@ export function commonTitleNote(ids: ReadonlySet<string>): string {
 
 /** 共通の設定にも同じidがある定義に添える文 */
 export function commonIdNote(ids: ReadonlySet<string>): string {
-  return `共通設定にも同じidがあります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通設定の定義が使われ、中身が違えば保存時の検証（--lint）でエラーになります。変えたいときは別のidにしてください。`;
+  return `共通設定にも同じidがあります（${Array.from(ids).join(", ")}）。中身がすべて同じなら共通設定の定義が使われ、中身が違えば保存時の検証（--lint）でerrorになります。変えたいときは別のidにしてください。`;
 }
 
 /** 共通の設定の定義の欄の見出しにつける説明 */

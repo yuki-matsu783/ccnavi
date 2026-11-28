@@ -12,7 +12,7 @@ ccnaviのチケットが、どのワークツリーでどこまで進んでい�
 |---|---|
 | VS Code | 1.90以上 |
 | ccnaviの実行ファイル | 探す順は、設定`ccnaviBoard.binPath` → `.claude/settings.json`（`settings.local.json`が優先）の`CCNAVI_ENTRY_PATH` → `dist/ccnavi/ccnavi[.exe]` → `.ccnavi/scripts/ccnavi-launcher.sh` → PATHの`ccnavi`（PATHのうち絶対パスのフォルダだけを探す）。起動スクリプト（`ccnavi-launcher.sh`）を指していれば、スクリプトは実行せず、`../bin/<os>-<arch>/`にあるこのOSとCPU向けの実行ファイルを使う。無ければ次の候補へ進む（Windowsではshを直接起動できないため）。それ以外のパスは、そのまま実行ファイルとして使う |
-| 実行ファイルの版 | 拡張と実行ファイルは同じ版を一緒に配る前提。版が合っているかは事前に確かめない。版がずれていてccnaviがエラーを返したときは、そのエラー文をそのまま表示する（[版のJSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
+| ccnaviの版 | 拡張とccnaviは同じ版を一緒に配る前提。版が合っているかは事前に確かめない。版がずれていてccnaviがエラーを返したときは、そのエラー文をそのまま表示する（[版のJSON](../../../docs/11_requirements/json-shapes.md#版の-json)） |
 | bash | clone / fetch / pullのコマンドと、承認済みチケットのコミットとpushのshを送るターミナルのシェル。承認と、未解決の指摘の対応方針は、ターミナルには送らず子プロセスで実行するが、そこで動かすshにも同じシェルを使う。WindowsはGit Bash（`C:\Program Files\Git\bin\bash.exe`、無ければPATHの`bash`） |
 | git | PATHにあること。プロジェクト管理画面がoriginを読み、ターミナルでcloneを実行する |
 | ffmpeg | 任意。バグ報告の録画にだけ使う（無ければ録画せず、スクリーンショットとログだけをzipにする）。WindowsはPATHから呼べること、WSLはWindows側のPATHに`ffmpeg.exe`があること、macOSはPATHかHomebrewの置き場にあること。入れ方は`winget install ffmpeg`・`brew install ffmpeg`など。入れたあとはVS Codeを再起動する（起動中のVS Codeは新しいPATHを読まない） |

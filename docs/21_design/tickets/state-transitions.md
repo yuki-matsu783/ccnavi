@@ -32,7 +32,7 @@ keywords: [状態遷移, 置き場, マーカー, doing, review, done]
 | 遷移 | 動かす者 | 条件 | 書く欄 |
 |---|---|---|---|
 | 無し → `todo` | 親が `Write` / `Edit` で作る | 無し | ― |
-| `todo` → `doing` | `ccnavi-user-agree.sh`（ユーザ）、ボード、Chrome 拡張 | 9.4。同じ識別子がどの置き場にも無い | ―（中身は変えない。先行関係は承認済みチケットの計画から都度計算する） |
+| `todo` → `doing` | `ccnavi-user-agree.sh`（ユーザ）、チケット管理画面、Chrome 拡張 | 9.4。同じ識別子がどの置き場にも無い | ―（中身は変えない。先行関係は承認済みチケットの計画から都度計算する） |
 | `todo` → `doing`（手で） | ユーザが hook の外で動かす | 無し。動かせること自体が条件（その置き場にエージェントは書けない）。承認の検査は判定が適用する | ― |
 | `todo`（改版）→ 消える | `ccnavi-user-agree.sh`（ユーザ） | 同じ識別子が `doing/` にあり、計画・`phases:`・範囲のどれかが違う。`doing/` の側の計画・コピー・範囲を差し替える | `plan` / `feedback`（ステップの `after` ごと）・`phases:`・`allow` / `ask` / `deny` |
 | `doing` のまま | `ccnavi-ticket.sh start` | 着手の欄が空。`.claude/worktrees/<識別子>/` がワークツリーとして在り、元リポジトリが承認済みチケットの `project` と合い。子なら親が `doing/` に在って着手済みで、先行が全部 `done/` に在って取り消しでない | `started_at`、`base_sha`（そのワークツリーの HEAD） |
@@ -124,7 +124,7 @@ warn で言う。マーカーを消すかは、レビューをやり直すかど
 | 無し → `skipped` | 同上 | 終わっていて、マーカーが 1 つも無く、レビュー不要（または延期） |
 | 任意 → `skipped` | `ccnavi-user-close-early.sh`（ユーザ） | 終わっていないフェーズのうち、レビュー待ちか閉じた子が居るもの(未着手の子を取り消すと終わるもの)に置く。手を付けていないフェーズには置かず、issue に書き出す（9.11） |
 | 任意 → `requested` | `ccnavi-review.sh review-request`（親） | 9.10 の前提。`pending` は要らない |
-| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザがターミナルで打つか、VS Code のボードの連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
+| `requested` → `reviewed` | `ccnavi-review.sh confirm`（ユーザがターミナルで打つか、VS Code のチケット管理画面の連絡を受けた親が打つ）、`ccnavi-user-decide.sh`（ユーザ）、Chrome 拡張のレビュー済み、`ccnavi-user-close-early.sh` | 変更要求のレビューが無い。`confirm` は未解決が 0、`decide` は未解決をユーザが受け入れる（続きの子を起こす選択ではマーカーは置かず、そのフェーズのマーカーを消す）。置いたときに `review/` の子は `done/` へ動く |
 | 任意 → 無し | `ccnavi-user-agree.sh` で同じ番号の子が承認された | 4 種を全部消す |
 
 マーカーはユーザが子を再開しても残る。再開は想定しない運用で、された場合は `--lint` と

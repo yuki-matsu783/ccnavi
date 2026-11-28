@@ -43,7 +43,7 @@ Draftを外したマーカー（`ready.json`）は、`ready`が閉じたチケ�
 閉じた親子のチケットは`ready`が`logs/archive/`へ移して親のブランチから消すので、既定のブランチには残らない。
 
 効力のあるフロー（`.ccnavi/approved/flows/`）は、エージェントが書かず、シェルからも書かない。下書きは`wip/proposals/flows/<子>.yml`に、
-頼まれたときだけ書き、`sh .ccnavi/scripts/ccnavi-launcher.sh --lint --flow <下書き>`で確かめてから渡す。下書きには効力が無く、ユーザがボードのフロー編集画面で
+頼まれたときだけ書き、`sh .ccnavi/scripts/ccnavi-launcher.sh --lint --flow <下書き>`で確かめてから渡す。下書きには効力が無く、ユーザがチケット管理画面のフロー編集画面で
 差分を読んで取り込み、保存したものだけが効く。保存とコミット・pushはユーザが`ccnavi-user-push-approved.sh`で行う。取り込んで消えた下書きも
 一緒にコミットして push する。着手中はユーザも書き換えられない。着手のあとにフローが変わると、`NOTICE_TICKET_FLOW_CHANGED`で
 ユーザに知らされる。親のツリーから起動されたときは、自分が担当する子のフローだけに従う。
@@ -63,7 +63,7 @@ statusが言うとおりユーザに`ccnavi-user-push-approved.sh <親>`を打�
 チケットは1つのファイルで、`wip/proposals/todo/`（承認待ち。エージェントが`ccnavi-ticket.sh approval-request`で親のブランチへ送る）→`.ccnavi/approved/doing/`（ユーザが承認）→
 `wip/proposals/review/`（`ticket finish`。レビューが要るとき）→`.ccnavi/approved/done/`（ユーザがレビュー）の順に
 移る。`.ccnavi/approved/`へ移すのはユーザ、`wip/proposals/`へ移すのはエージェントで、
-エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はボードの［レビュー完了］かターミナルの`ccnavi-user-decide.sh <N>`から使う。
+エージェントは`ccnavi-ticket.sh`を使う。レビューで残った指摘は、ユーザが`decide`で指摘ごとに扱いを決める。`decide`はチケット管理画面の「レビュー完了」かターミナルの`ccnavi-user-decide.sh <N>`から使う。
 選べるのは「対応しない」「このフェーズで直す」「issueに回す」の3つ。「このフェーズで直す」は続きの子チケットを`doing/`に作る。
 
 ラッパースクリプトは、記録のパスをcwdから開ける形で出す。そのまま`sed -n`などで開けばよい。

@@ -25,7 +25,7 @@ import type { RepoConfig } from "./settings.js";
 import { MovedError, readFamily, type Deps as ReadDeps, type FamilyRead } from "./snapshot.js";
 import type { BlobText, FileAddition, PathObject } from "./github.js";
 import { askConfirm, askDecide, readCopy, type DecideChoice, type DecidePreview, type DecideThread } from "./reviewed.js";
-import { callOps, describeHostFailure, ISSUE_LINKS_SLOT, precheckHostPlan, runHostPlan, type HostPlan } from "./decide-host.js";
+import { callOps, describeHostFailure, ISSUE_LINKS_SLOT, precheckHostPlan, runHostPlan, SEARCH_TRUNCATED_NOTE, type HostPlan } from "./decide-host.js";
 import { underPlaces } from "./guard.js";
 import { localStamp } from "./stamp.js";
 
@@ -158,7 +158,7 @@ async function actorOf(deps: WriteDeps, repo: RepoConfig): Promise<Actor> {
 }
 
 function why(res: PlanResult): string {
-  const lines = [res.refused, ...res.rejected.map((r) => `${r.ticket}: ${r.problems.join(" / ")}`)].filter((s) => s);
+  const lines = [res.refused, ...res.rejected.map((r) => `${r.ticket}：${r.problems.join(" / ")}`)].filter((s) => s);
   const text = lines.join("\n") || "承認の対象がありません";
   return res.code ? tagged(res.code, text) : text;
 }
@@ -788,7 +788,7 @@ export async function decidePhase(
   // (5) 決めた内容のコメント。0 件の確定では投稿しない。失敗はコミットを戻さず警告にする
   const decided = last as Awaited<ReturnType<typeof askDecide>> | null;
   const warnings: string[] = [];
-  if (truncated) warnings.push("既に作成済みの issue を上限件数まで検索しましたが、見つかりませんでした。検索しきれていないため、作成済みの issue があった場合は重複しています");
+  if (truncated) warnings.push(SEARCH_TRUNCATED_NOTE);
   let comment = planned ? planned.comment : (decided?.host_plan?.comment ?? null);
   if (comment && decided) {
     // 続きの子の名前と増えた指摘は、コミットを積んだ側（2 周目）の値にそろえる

@@ -235,7 +235,7 @@ export function sayOutcome(outcome: Outcome, what: string): ResultLine {
         : outcome.kind === "conflict"
           ? `${what}を反映できませんでした（自動ではやり直しません）：${outcome.message}`
           : outcome.kind === "attention"
-            ? `${what}が反映されたかどうかを確認できませんでした。${outcome.message}`
+            ? `${what}の結果を確認してください。${outcome.message}`
             : `${what}は反映されていません：${outcome.message}`;
   return { kind: outcome.kind, className: `notice ${outcome.kind === "written" ? "ok" : "error"}`, text };
 }

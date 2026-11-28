@@ -383,14 +383,14 @@ test("CB-D100 拡張ホストが頼んだらリスク管理の基本の案内（
 
 test("CB-T313 設定の切り替えの欄は、選んだ対象を種類と名前で送る。対象が1つだけでも出す。読み込み中と、読み込めなかった画面にも出る", async () => {
   const targets = [
-    { kind: "workspace", name: "", label: "共通の設定" },
+    { kind: "workspace", name: "", label: "共通設定" },
     { kind: "self", name: "", label: "ワークスペース" },
     { kind: "project", name: "lib", label: "プロジェクトlib" },
   ];
   const dom = await openRisk({ target: { kind: "workspace", name: "" }, targets });
   try {
     const select = dom.one<HTMLSelectElement>("select#target");
-    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通の設定", "ワークスペース", "プロジェクトlib"]);
+    assert.deepEqual([...select.options].map((o) => o.textContent), ["共通設定", "ワークスペース", "プロジェクトlib"]);
     assert.equal(select.value, "workspace:");
     dom.change(select, "project:lib");
     await dom.settle();
