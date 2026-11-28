@@ -918,14 +918,14 @@ test("CB-T310 統合結果は読み取り専用の表で出し、編集する1�
   }
 });
 
-test("CB-T311 共通の設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は空として扱っていると言う", async () => {
+test("CB-T311 共通の設定を開いているときはワークスペースの統合結果が最初に出る。統合結果がなければ（ボードを読み込めない）欄ごと出さない。読み込めない設定は、共通の設定のルールだけが効いていると言う", async () => {
   const sums = rulesSums(sumsBoard()).map((s) => (s.name === "lib" ? { ...s, unreadable: "YAMLとして読み込めない", deny: [], ask: [] } : s));
   const dom = await openRules({ target: { kind: "workspace", name: "" }, sums });
   try {
     assert.equal(dom.one<HTMLSelectElement>("select#sum-select").value, "self");
     dom.change(dom.one("select#sum-select"), "lib");
     await dom.settle();
-    assert.match(dom.one("#sum .banner.warn").textContent, /読み込めず、その設定を空として扱っています.*YAMLとして読み込めない/);
+    assert.match(dom.one("#sum .banner.warn").textContent, /rules\.ymlを読み込めませんでした。（共通の設定のルールだけが効いています）: YAMLとして読み込めない/);
   } finally {
     await dom.close();
   }
