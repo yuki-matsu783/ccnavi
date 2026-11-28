@@ -294,8 +294,9 @@ test("CB-D06 判定でヒットした行はその場で開くがstateには入�
     assert.ok(dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("git-push")).classList.contains("hit"));
     assert.deepEqual(((dom.state() as { open?: string[] }) ?? {}).open ?? [], []);
-    assert.equal((dom.state() as { tab: string }).tab, "judge");
-    assert.ok(dom.one("#tab-judge").classList.contains("active"));
+    // 判定の結果は右の常設の欄に出る。タブは動かさない
+    assert.equal(dom.all("#judge-pane #judge-result").length, 1);
+    assert.equal(dom.one(".pane.active").id, "tab-rules");
     await dom.send(judged([hit("deny", "no-rm")]));
     assert.ok(!dom.one(rowSelector("git-push")).classList.contains("open"));
     assert.ok(dom.one(rowSelector("no-rm")).classList.contains("open"));
@@ -374,7 +375,7 @@ test("CB-D124 「記録から候補を出す」はsuggestを送り、届いた�
       type: "suggested",
       result: { version: 1, root: "/ws", rules_path: "", logs: ["/ws/logs/decisions.jsonl"], records: 9, candidates: [candidate], dropped: 2 },
     });
-    assert.ok(dom.one("#tab-judge").classList.contains("active"));
+    assert.equal(dom.all("#judge-pane #suggest-result").length, 1);
     assert.ok(!(dom.one('button[data-action="suggest"]') as unknown as HTMLButtonElement).disabled);
     assert.equal(dom.all("#suggest-result .candidate").length, 1);
     assert.match(dom.one("#suggest-result").textContent ?? "", /除いたもの2件/);
@@ -693,9 +694,9 @@ test("CB-D101 ルール管理の基本の案内は見本の上でタブを切り
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
-    assert.deepEqual(titles, ["3つのタブ", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
-    // 案内は見本の上のタブを動かす。最後の2手順は「ルール」のタブで保存と案内の入口を指す
-    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-judge", "tab-hooks", "tab-rules", "tab-rules"]);
+    assert.deepEqual(titles, ["2つのタブと判定を試す欄", "ルール", "絞り込み", "判定を試す", "hook", "保存", "案内"]);
+    // 案内は見本の上のタブを動かす。判定を試す欄はタブではないので、判定の手順は「ルール」のタブのまま
+    assert.deepEqual(tabs, ["tab-rules", "tab-rules", "tab-rules", "tab-rules", "tab-hooks", "tab-rules", "tab-rules"]);
     assert.ok(dom.one("#tab-hooks").classList.contains("active"), "実際のタブが動いた");
     assert.equal((dom.state() as { tab?: string }).tab, "hooks");
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
@@ -772,12 +773,12 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
     await dom.settle();
     const open: string[] = [];
     const picked: string[] = [];
-    const tabs: string[] = [];
+    const judged: number[] = [];
     while (dom.all(".tour").length > 0) {
       await dom.settle();
       open.push(String(dom.all(".rule.open").length));
       picked.push(dom.all(".cond-inspector").map((el) => el.getAttribute("data-key") ?? "").join(","));
-      tabs.push(dom.one(".pane.active").id);
+      judged.push(dom.all("#judge-pane #judge-result").length);
       dom.click(dom.one('[data-action="tour-next"]'));
       await dom.settle();
     }
@@ -785,7 +786,7 @@ test("CB-D194 組み合わせ条件の案内は、見本の行を開いて図を
     assert.equal(open[0], "0");
     assert.equal(open[1], "1");
     assert.deepEqual(picked.slice(2, 5), ["r.0", "r.1.0", "r.1"]);
-    assert.ok(tabs.includes("tab-judge"), "判定を試すのタブに移らない");
+    assert.ok(judged.some((n) => n > 0), "判定を試す欄に見本の判定が出ない");
   } finally {
     await dom.close();
   }
@@ -826,7 +827,7 @@ test("CB-D106 読み込み中に頼まれた案内はルールが出てから始
     assert.equal(dom.all(".tour").length, 0, "指す先がない読み込み中には出さない");
     await dom.send({ type: "data", data: { kind: "page", page: page() } });
     await dom.settle();
-    assert.equal(dom.one("#tour-title").textContent, "3つのタブ");
+    assert.equal(dom.one("#tour-title").textContent, "2つのタブと判定を試す欄");
     await dom.send({ type: "data", data: { kind: "loading", text: "ルールを読み込み中…" } });
     await dom.settle();
     assert.equal(dom.all(".tour").length, 0);
@@ -1138,8 +1139,6 @@ test("CB-D157 glob / regexと除外のルールは「組み合わせ条件に変
     );
     assert.equal(dom.one(`${row} .sum-when`).textContent, "all(regex ^{root}[\\\\/]src, not(any(1)))");
     assert.ok(!dom.one<HTMLButtonElement>("#save").disabled);
-    dom.click(dom.one("#tab-judge"));
-    await dom.settle();
     dom.type(dom.one("#subject"), "/ws/src/a.ts");
     await dom.settle();
     dom.click(dom.one('button[data-action="judge"]'));
@@ -1386,7 +1385,7 @@ test("CB-D304 一括確認と候補の案内は、その手順から結果を出
     await startCourse(dom, "check-expectations");
     assert.equal(dom.all("#expectations-result").length, 0, "押す前に結果が出ている");
     await toStep(dom, "check-expectations", 2);
-    assert.equal(dom.one(".pane.active").id, "tab-judge");
+    assert.equal(dom.one(".pane.active").id, "tab-rules");
     assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /allow 1\/2/);
     assert.match(dom.one('[data-tour="expectations-counts"]').textContent ?? "", /不一致1件/);
     assert.equal(dom.all('[data-tour="expectation-ng"]').length, 1);
@@ -1426,7 +1425,7 @@ test("CB-D305 ルールの欄の案内は、sceneのopenとmoreで行と「コ�
     assert.deepEqual(dom.all(".rule.open").map((row) => row.getAttribute("data-id")), ["deps-change"]);
     assert.equal(dom.all('[data-tour="rule-deps-change-once"]').length, 1);
     await toStep(dom, "context-every", 6);
-    assert.equal(dom.one(".pane.active").id, "tab-judge");
+    assert.equal(dom.one(".pane.active").id, "tab-rules");
     assert.match(dom.one("#judge-result .response").textContent ?? "", /migrateでないかを確認する/);
     dom.click(dom.one('[data-action="tour-skip"]'));
     await dom.settle();
@@ -1483,6 +1482,7 @@ test("CB-D320 案内の間は、案内の外の操作（開く・選ぶ・更新
       '[data-action="fold-section"]',
       '[data-action="add"]',
       '[data-tab="hooks"]',
+      '[data-action="toggle-judge"]',
     ];
     for (const selector of selectors) {
       for (const el of dom.all(selector)) {
@@ -1565,5 +1565,31 @@ test("CB-D1274 削除した行は帯の［元に戻す］で元の位置へ戻�
     assert.deepEqual(savedSections(dom).deny.map((rule) => rule.id), ["git-push", "no-rm"]);
   } finally {
     await dom.close();
+  }
+});
+
+test("CB-D1298 判定を試す欄はルールとhookのどちらのタブでも出る。タブは2つで、欄の畳みはstateに残り、画面を作り直しても畳んだまま", async () => {
+  const dom = await openRules();
+  try {
+    assert.deepEqual(dom.all("nav.tabs .tab").map((tab) => tab.getAttribute("data-tab")), ["rules", "hooks"]);
+    assert.equal(dom.all("#judge-pane .judge-form").length, 1);
+    dom.click(dom.one('[data-tab="hooks"]'));
+    await dom.settle();
+    assert.equal(dom.one(".pane.active").id, "tab-hooks");
+    assert.equal(dom.all("#judge-pane .judge-form").length, 1, "hookのタブで判定を試す欄が消えた");
+    assert.equal(dom.one("#judge-pane").getAttribute("data-folded"), "0");
+    dom.click(dom.one('[data-action="toggle-judge"]'));
+    await dom.settle();
+    assert.equal(dom.one("#judge-pane").getAttribute("data-folded"), "1");
+    assert.equal(dom.one('[data-action="toggle-judge"]').getAttribute("aria-expanded"), "false");
+    assert.equal((dom.state() as { judgeFolded?: boolean }).judgeFolded, true);
+  } finally {
+    await dom.close();
+  }
+  const again = await openRules({}, { judgeFolded: true });
+  try {
+    assert.equal(again.one("#judge-pane").getAttribute("data-folded"), "1");
+  } finally {
+    await again.close();
   }
 });

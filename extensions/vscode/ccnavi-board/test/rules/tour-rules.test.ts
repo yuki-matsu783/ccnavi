@@ -46,7 +46,7 @@ test("CB-T407 ルールの案内のsceneは、見本にあるタブ・行のid�
     for (const [index, step] of course.steps.entries()) {
       const at = `${course.id}の${index + 1}番目の手順`;
       const scene = step.scene;
-      assert.ok(scene.tab === undefined || ["rules", "judge", "hooks"].includes(String(scene.tab)), `${at}: tab`);
+      assert.ok(scene.tab === undefined || ["rules", "hooks"].includes(String(scene.tab)), `${at}: tab`);
       for (const id of String(scene.open ?? "").split(",").filter((item) => item.trim() !== "")) {
         assert.ok(ids.has(id.trim()), `${at}: openの${id}が見本にありません`);
       }
@@ -73,7 +73,7 @@ const FIELDS = ["match", "type", "pattern", "except", "message", "context", "eve
 
 /** 案内が指せる印（`data-tour`）。画面に付けた印と、この表が同じであること（冒頭のコメントにも同じ表がある） */
 function knownTarget(target: string, ids: ReadonlySet<string>): boolean {
-  if (["", "tabs", "rules", "find", "order-hint", "hooks", "save", "tour", "target", "status", "when-graph", "when-inspector"].includes(target)) {
+  if (["", "tabs", "rules", "find", "order-hint", "hooks", "judge", "save", "tour", "target", "status", "when-graph", "when-inspector"].includes(target)) {
     return true;
   }
   if (["judge-form", "judge-result", "expectations", "expectations-counts", "expectations-result", "expectation-ng", "open-expectations", "suggest", "suggest-result", "suggest-candidate"].includes(target)) {

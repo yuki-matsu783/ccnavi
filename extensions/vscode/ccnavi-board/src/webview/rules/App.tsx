@@ -1,8 +1,9 @@
 /**
- * ルール管理画面の本体。ルールの一覧・判定を試す・hookの3タブ。
+ * ルール管理画面の本体。ルールの一覧とhookの2タブと、その右に常に出す「判定を試す」の欄。
+ * 狭い幅（940px以下）では欄をタブの上に積み、畳める（畳んだかはstateに残す）。
  *
  * 見せる中身は拡張ホストが渡す（`RulesData`）。画面が持つのは、ユーザが触って決めるもの
- * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、直前の操作の一言）だけ。
+ * （編集中のルール、開いている行、折りたたんだタイプ、絞り込み、開いているタブ、判定を試す欄の畳み、直前の操作の一言）だけ。
  * 「判定」も「期待する判定を一括で確かめる」も、編集中の内容を拡張ホストへ渡し、
  * 実行ファイルが返した結果を出すだけ。
  *
@@ -43,9 +44,11 @@ import {
   emptyRule,
   findRow,
   keyer,
+  loadJudgeFolded,
   loadOpen,
   loadTab,
   openedFromIds,
+  saveJudgeFolded,
   saveOpen,
   saveTab,
   sectionsOf,
@@ -125,6 +128,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   const [saveWarns, setSaveWarns] = useState<readonly string[]>([]);
   const [find, setFind] = useState("");
   const [tab, setTab] = useState<TabName>(() => loadTab());
+  const [judgeFolded, setJudgeFolded] = useState(() => loadJudgeFolded());
   const [judged, setJudged] = useState<Judged | undefined>(undefined);
   const [checked, setChecked] = useState<ExpectationsJson | undefined>(undefined);
   const [suggested, setSuggested] = useState<SuggestJson | undefined>(undefined);
@@ -229,17 +233,14 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       setStatus(undefined);
       setJudged({ result, hooks: (message.hooks ?? []) as Judged["hooks"] });
       unfoldHits(result.rules.map((rule) => bareRuleId(rule.id)));
-      showTab("judge");
     } else if (message.type === "expectationsChecked") {
       setBusy(false);
       setStatus(undefined);
       setChecked(message.result as ExpectationsJson);
-      showTab("judge");
     } else if (message.type === "suggested") {
       setBusy(false);
       setStatus(undefined);
       setSuggested(message.result as SuggestJson);
-      showTab("judge");
     } else if (message.type === "failed") {
       setBusy(false);
       setStatus({ text: tmpName(String(message.message ?? "")), error: true });
@@ -312,6 +313,14 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
     }
     setTab(name);
     saveTab(name);
+  };
+
+  const toggleJudge = (): void => {
+    if (tour.touring) {
+      return;
+    }
+    setJudgeFolded(!judgeFolded);
+    saveJudgeFolded(!judgeFolded);
   };
 
   const pick = (key: string, field: FileField, path: string): void => {
@@ -495,7 +504,9 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
   // 案内の間は、今の設定ではなく見本を描く。画面のstate（編集中のルール・開いた行・タブ・判定の結果）は触らない
   const touring = tour.touring;
   const sceneOpen = new Set(sceneList(scene.open));
-  const shownTab: TabName = touring ? (scene.tab === "judge" || scene.tab === "hooks" ? scene.tab : "rules") : tab;
+  const shownTab: TabName = touring ? (scene.tab === "hooks" ? "hooks" : "rules") : tab;
+  // 案内の間は欄を畳まない（指す先が見えなくなる）
+  const shownJudgeFolded = touring ? false : judgeFolded;
   const shownDraft = touring ? SAMPLE_DRAFT : draft;
   // 畳んだタイプの中は指しても見えない（0×0の枠を強調することになる）。案内の間は、手順の`fold`が名指ししたタイプだけを畳む（見出しを指す手順でだけ使う）
   const shownFolded: ReadonlySet<Section> = touring ? new Set(SECTIONS.filter((section) => sceneList(scene.fold).includes(section))) : folded;
@@ -596,7 +607,6 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
       <nav className="tabs" role="tablist" data-tour="tabs">
         {([
           ["rules", "ルール"],
-          ["judge", "判定を試す"],
           ["hooks", "hook"],
         ] as const).map(([name, label]) => (
           <button key={name} type="button" className={shownTab === name ? "tab active" : "tab"} data-tab={name} role="tab" onClick={() => showTab(name)}>
@@ -604,176 +614,188 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
         ))}
       </nav>
-      <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
-        <div className="find">
-          <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
-          <span className="hint" data-tour="order-hint">判定は強い順に 拒否 &gt; 確認 &gt; 許可（deny &gt; ask &gt; allow）</span>
+      <div className="rules-body">
+        <div className="rules-main">
+          <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
+            <div className="find">
+              <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
+              <span className="hint" data-tour="order-hint">判定は強い順に 拒否 &gt; 確認 &gt; 許可（deny &gt; ask &gt; allow）</span>
+            </div>
+            {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください</p>}
+            {SECTIONS.map((section) => {
+              const rows = shownDraft[section].map((row) => {
+                const text = findText(row.rule);
+                return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
+              });
+              const shown = rows.filter((row) => !row.hidden).length;
+              const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
+              // 絞り込み中は折りたたんだタイプの中も見えるので、矢印も開いた向きにする
+              const shownAsOpen = query !== "" || !shownFolded.has(section);
+              return (
+                <section className={shownFolded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} data-tour={`section-${section}`} key={section}>
+                  <h2>
+                    <button
+                      type="button"
+                      className="twist"
+                      data-action="fold-section"
+                      data-section={section}
+                      data-tour={`fold-${section}`}
+                      aria-expanded={shownAsOpen}
+                      title="このタイプを開く／畳む"
+                      onClick={() => fold(section)}
+                    >
+                      {shownAsOpen ? "▾" : "▸"}
+                    </button>{" "}
+                    <span className={`section-name ${section}`}>{section}</span> <span className="section-label">{SECTION_LABELS[section]}</span>{" "}
+                    <span className="count" data-count={section} data-tour={`count-${section}`}>
+                      {countText(query, shown, shownDraft[section].length, kept)}
+                    </span>
+                    <button type="button" className="action small" data-action="add" data-section={section} data-tour={`add-${section}`} onClick={() => add(section)}>
+                      ＋ ルールを追加
+                    </button>
+                  </h2>
+                  <ul className="list" data-list={section}>
+                    {rows.map((row, index) => (
+                      <Rule
+                        key={row.key}
+                        ruleKey={row.key}
+                        section={section}
+                        rule={row.rule}
+                        find={row.find}
+                        hidden={row.hidden}
+                        open={isShownOpen(row)}
+                        hit={row.rule.id !== "" && shownHits.has(row.rule.id)}
+                        pickerOpen={pickerKey === row.key}
+                        moreOpen={touring ? scene.more === true : moreOpen.get(row.key) ?? hasContext(row.rule)}
+                        onToggle={() => toggle(row.key)}
+                        onChange={(rule) => editRule(section, row.key, rule)}
+                        onMoveSection={(to) => moveSection(section, row.key, to)}
+                        finding={query !== ""}
+                        first={index === 0}
+                        last={index === rows.length - 1}
+                        onMove={(delta) => move(section, row.key, delta)}
+                        onRemove={() => remove(section, row.key)}
+                        onOpenPicker={() => (tour.touring ? undefined : setPickerKey(row.key))}
+                        onPickFile={(field) => post({ type: "pickFile", key: row.key, field })}
+                        pickNode={touring ? (typeof scene.when === "string" ? scene.when : "r") : undefined}
+                        onToggleMore={(value) => (tour.touring ? undefined : setMoreOpen(new Map([...moreOpen, [row.key, value]])))}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
+            {touring ? (
+              // 案内の間の見本はキーを替えて別に作る（閉じたあとの実際の枠に、案内で選んだ統合結果を持ち越さない）
+              <Sum
+                sums={SAMPLE.sums}
+                initial={defaultSum(SAMPLE.sums, undefined)}
+                key="tour-sum"
+                tour={{ open: typeof scene.sum === "string" && scene.sum !== "", picked: typeof scene.sum === "string" && scene.sum !== "" ? scene.sum : SAMPLE.sums[0]?.name ?? "" }}
+              />
+            ) : (
+              page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />
+            )}
+          </section>
+          <section id="tab-hooks" data-tour="hooks" className={shownTab === "hooks" ? "pane active" : "pane"}>
+            <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
+          </section>
         </div>
-        {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください</p>}
-        {SECTIONS.map((section) => {
-          const rows = shownDraft[section].map((row) => {
-            const text = findText(row.rule);
-            return { ...row, find: text, hidden: query !== "" && !text.includes(query) };
-          });
-          const shown = rows.filter((row) => !row.hidden).length;
-          const kept = rows.filter((row) => row.hidden && isShownOpen(row)).length;
-          // 絞り込み中は折りたたんだタイプの中も見えるので、矢印も開いた向きにする
-          const shownAsOpen = query !== "" || !shownFolded.has(section);
-          return (
-            <section className={shownFolded.has(section) ? "rule-section folded" : "rule-section"} data-section={section} data-tour={`section-${section}`} key={section}>
-              <h2>
-                <button
-                  type="button"
-                  className="twist"
-                  data-action="fold-section"
-                  data-section={section}
-                  data-tour={`fold-${section}`}
-                  aria-expanded={shownAsOpen}
-                  title="このタイプを開く／畳む"
-                  onClick={() => fold(section)}
-                >
-                  {shownAsOpen ? "▾" : "▸"}
-                </button>{" "}
-                <span className={`section-name ${section}`}>{section}</span> <span className="section-label">{SECTION_LABELS[section]}</span>{" "}
-                <span className="count" data-count={section} data-tour={`count-${section}`}>
-                  {countText(query, shown, shownDraft[section].length, kept)}
-                </span>
-                <button type="button" className="action small" data-action="add" data-section={section} data-tour={`add-${section}`} onClick={() => add(section)}>
-                  ＋ ルールを追加
-                </button>
-              </h2>
-              <ul className="list" data-list={section}>
-                {rows.map((row, index) => (
-                  <Rule
-                    key={row.key}
-                    ruleKey={row.key}
-                    section={section}
-                    rule={row.rule}
-                    find={row.find}
-                    hidden={row.hidden}
-                    open={isShownOpen(row)}
-                    hit={row.rule.id !== "" && shownHits.has(row.rule.id)}
-                    pickerOpen={pickerKey === row.key}
-                    moreOpen={touring ? scene.more === true : moreOpen.get(row.key) ?? hasContext(row.rule)}
-                    onToggle={() => toggle(row.key)}
-                    onChange={(rule) => editRule(section, row.key, rule)}
-                    onMoveSection={(to) => moveSection(section, row.key, to)}
-                    finding={query !== ""}
-                    first={index === 0}
-                    last={index === rows.length - 1}
-                    onMove={(delta) => move(section, row.key, delta)}
-                    onRemove={() => remove(section, row.key)}
-                    onOpenPicker={() => (tour.touring ? undefined : setPickerKey(row.key))}
-                    onPickFile={(field) => post({ type: "pickFile", key: row.key, field })}
-                    pickNode={touring ? (typeof scene.when === "string" ? scene.when : "r") : undefined}
-                    onToggleMore={(value) => (tour.touring ? undefined : setMoreOpen(new Map([...moreOpen, [row.key, value]])))}
-                  />
-                ))}
-              </ul>
-            </section>
-          );
-        })}
-        {touring ? (
-          // 案内の間の見本はキーを替えて別に作る（閉じたあとの実際の枠に、案内で選んだ統合結果を持ち越さない）
-          <Sum
-            sums={SAMPLE.sums}
-            initial={defaultSum(SAMPLE.sums, undefined)}
-            key="tour-sum"
-            tour={{ open: typeof scene.sum === "string" && scene.sum !== "", picked: typeof scene.sum === "string" && scene.sum !== "" ? scene.sum : SAMPLE.sums[0]?.name ?? "" }}
-          />
-        ) : (
-          page?.sums !== undefined && <Sum sums={page.sums} initial={defaultSum(page.sums, page.target)} key={`${page.target?.kind ?? ""}:${page.target?.name ?? ""}`} />
-        )}
-      </section>
-      <section id="tab-judge" className={shownTab === "judge" ? "pane active" : "pane"}>
-        <p className="hint">
-          いまのモードが記録だけ（dry-run）でも、ここでは実際に止めるとき（enable）の判定を返します。
-        </p>
-        <div className="judge-form" data-tour="judge-form">
-          <label>
-            ツール{" "}
-            <input
-              id="tool"
-              type="text"
-              list="tool-names"
-              title="候補は判定が対象を取り出せるツールです。一覧にない名前も入れられます（判定には届きません）"
-              spellCheck={false}
-              value={shownTool}
-              onChange={(event) => setTool(event.target.value)}
-            />
-            <datalist id="tool-names">
-              {KNOWN_TOOLS.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
-          </label>
-          <label className="grow">
-            対象{" "}
-            <input
-              id="subject"
-              type="text"
-              aria-describedby="subject-example"
-              spellCheck={false}
-              value={shownSubject}
-              onChange={(event) => setSubject(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  judge();
-                }
-              }}
-            />
-          </label>
-          <button type="button" className="action primary" data-action="judge" disabled={busy} onClick={judge}>
-            判定
-          </button>
-        </div>
-        <p className="hint subject-example" id="subject-example">
-          {subjectExample(shownTool)}
-        </p>
-        {shownJudged !== undefined && <JudgeResult judged={shownJudged} />}
-        <div className="expectations-head" data-tour="expectations">
-          <button
-            type="button"
-            className="action"
-            data-action="expectations"
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              setStatus({ text: "期待する判定を確認中…", error: false });
-              post({ type: "expectations", sections: sectionsOf(draft) });
-            }}
-          >
-            期待する判定を一括で確認する
-          </button>
-          <span className="path">{touring ? "（見本）rule-expectations.yml" : page?.expectationsPath ?? ""}</span>
-          <button type="button" className="action" data-action="open-expectations" data-tour="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
-            エディタで開く
-          </button>
-        </div>
-        {shownChecked !== undefined && <ExpectationsResult result={shownChecked} />}
-        <div className="expectations-head" data-tour="suggest">
-          <button
-            type="button"
-            className="action"
-            data-action="suggest"
-            disabled={busy}
-            title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを作ります"
-            onClick={() => {
-              setBusy(true);
-              setStatus({ text: "記録から候補を作っています…", error: false });
-              post({ type: "suggest" });
-            }}
-          >
-            記録から候補を出す
-          </button>
-          <span className="hint">保存済みのルールで確認した候補です。編集中の内容は使いません</span>
-        </div>
-        {shownSuggested !== undefined && <SuggestResult result={shownSuggested} />}
-      </section>
-      <section id="tab-hooks" data-tour="hooks" className={shownTab === "hooks" ? "pane active" : "pane"}>
-        <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
-      </section>
+        <aside id="judge-pane" className="judge-pane" data-tour="judge" data-folded={shownJudgeFolded ? "1" : "0"} aria-label="判定を試す">
+          <div className="judge-head">
+            <h2>判定を試す</h2>
+            <button type="button" className="action small judge-fold" data-action="toggle-judge" aria-expanded={!shownJudgeFolded} title={shownJudgeFolded ? "判定を試す欄を開く" : "判定を試す欄を畳む"} onClick={toggleJudge}>
+              {shownJudgeFolded ? "▸ 開く" : "▾ 畳む"}
+            </button>
+          </div>
+          <div className="judge-body">
+            <p className="hint">
+              いまのモードが記録だけ（dry-run）でも、ここでは実際に止めるとき（enable）の判定を返します。
+            </p>
+            <div className="judge-form" data-tour="judge-form">
+              <label>
+                ツール{" "}
+                <input
+                  id="tool"
+                  type="text"
+                  list="tool-names"
+                  title="候補は判定が対象を取り出せるツールです。一覧にない名前も入れられます（判定には届きません）"
+                  spellCheck={false}
+                  value={shownTool}
+                  onChange={(event) => setTool(event.target.value)}
+                />
+                <datalist id="tool-names">
+                  {KNOWN_TOOLS.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </label>
+              <label className="grow">
+                対象{" "}
+                <input
+                  id="subject"
+                  type="text"
+                  aria-describedby="subject-example"
+                  spellCheck={false}
+                  value={shownSubject}
+                  onChange={(event) => setSubject(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      judge();
+                    }
+                  }}
+                />
+              </label>
+              <button type="button" className="action primary" data-action="judge" disabled={busy} onClick={judge}>
+                判定
+              </button>
+            </div>
+            <p className="hint subject-example" id="subject-example">
+              {subjectExample(shownTool)}
+            </p>
+            {shownJudged !== undefined && <JudgeResult judged={shownJudged} />}
+            <div className="expectations-head" data-tour="expectations">
+              <button
+                type="button"
+                className="action"
+                data-action="expectations"
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  setStatus({ text: "期待する判定を確認中…", error: false });
+                  post({ type: "expectations", sections: sectionsOf(draft) });
+                }}
+              >
+                期待する判定を一括で確認する
+              </button>
+              <span className="path">{touring ? "（見本）rule-expectations.yml" : page?.expectationsPath ?? ""}</span>
+              <button type="button" className="action" data-action="open-expectations" data-tour="open-expectations" onClick={() => post({ type: "openFile", which: "expectations" })}>
+                エディタで開く
+              </button>
+            </div>
+            {shownChecked !== undefined && <ExpectationsResult result={shownChecked} />}
+            <div className="expectations-head" data-tour="suggest">
+              <button
+                type="button"
+                className="action"
+                data-action="suggest"
+                disabled={busy}
+                title="ccnavi --suggest --jsonを実行し、保存済みのルールと判定の記録からdeny / askの下書きを作ります"
+                onClick={() => {
+                  setBusy(true);
+                  setStatus({ text: "記録から候補を作っています…", error: false });
+                  post({ type: "suggest" });
+                }}
+              >
+                記録から候補を出す
+              </button>
+              <span className="hint">保存済みのルールで確認した候補です。編集中の内容は使いません</span>
+            </div>
+            {shownSuggested !== undefined && <SuggestResult result={shownSuggested} />}
+          </div>
+        </aside>
+      </div>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
     </>
   );
