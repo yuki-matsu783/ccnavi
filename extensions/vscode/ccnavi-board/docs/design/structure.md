@@ -137,10 +137,12 @@ src/
     board/post.ts     ボードの送り口。契約に無いものは型で止まる
     board/main.tsx    ボード画面の入口。埋め込みの JSON を読んでマウントする
     board/App.tsx     ツールバー・絞り込み・列・フェーズ・脚注と、拡張ホストからのメッセージの受け
-    board/Card.tsx    カード 1 枚（見出し・位置・MR・ユーザ待ち・注意・フェーズ行・補助の操作・詳細）
+    board/Card.tsx    カード 1 枚（見出し・局面・動いた表示・注意・主な操作）
+    board/Panel.tsx   選んだカードの右のパネル（位置・MR・ユーザ待ち・フェーズ行・チケットを開く・補助の操作・詳細）
+    board/Toc.tsx     承認のオーバーレイと対応方針の画面の目次（位置へ送るだけ）
     board/Approval.tsx 承認のオーバーレイ（要約・一覧・計画の図（読むだけ）・凡例・本文・対象外・渡す文）
     board/Decide.tsx   レビュー完了のオーバーレイの中身（0 件は「レビュー済みにする」、1 件以上は指摘ごとの選択と相談のプロンプトのコピー）
-    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅・詳細を開いているカード）の読み書き
+    board/state.ts    画面が覚えるもの（絞り込み・畳んだ列・列の幅・選んだカード）の読み書き
     board/text.ts     カードとフェーズ行に出す言葉
     projects/style.css   プロジェクト管理画面の CSS の入口
     projects/App.css     App.tsx の CSS（節・clone の欄・一覧の入れ物）
@@ -231,7 +233,7 @@ src/
     shared/PlanGraph.css PlanGraph.tsx の CSS（図・点・仮の線・注意の色。React Flow の色を --vscode-* に置き換える）
     flow/Inspector.tsx 右の欄（ノード・線・フローの中身）
     flow/SaveReview.tsx 保存前の差分の一覧（保存する・やめる・次から確かめない）
-    flow/Proposal.tsx   エージェントの下書きの差分（値の前後まで）と取り込み、エージェントへの依頼の文（コピー・新しいセッションで開く）
+    flow/Proposal.tsx   エージェントの下書きの差分（値の前後まで）と取り込み、エージェントへの依頼の文（新しいセッションで開く・コピー）
     flow/Preview.tsx  担当に渡る手順のプレビュー（実行ファイルが並べた行をそのまま出す）
     flow/text.ts      ノードの目印（メインに戻る・入れ子）と 1 行の要約
     rules/style.css   ルール管理画面の CSS の入口
@@ -273,7 +275,7 @@ test/
   helpers/plan-order.ts --plan-order の答えの実例（fixtures/plan-order.json）を読む
   helpers/plan-reorder.ts 振り直しの見本の表（リポジトリの tests/fixtures/plan-reorder.json。実行ファイルのテストと共有し、書き換えない）を読み、表の計画を plans の形に並べる
   helpers/jsdom.ts    happy-dom で固まる図の点のドラッグだけを jsdom で動かす（いま使うテストは無い）
-  board/              ボード（board, model, approvemodel, status と、画面を動かす render.dom / board.dom / card.dom（カードの構造・操作・詳細）/ review.dom（レビュー完了の画面）/ merge.dom（マージ状況の帯）、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「計画編集」を動かす workflow-card.dom）
+  board/              ボード（board, model, approvemodel, status と、画面を動かす render.dom / board.dom / card.dom（カードと右のパネルの構造・操作・詳細）/ review.dom（レビュー完了の画面）/ merge.dom（マージ状況の帯）、承認のオーバーレイの計画の図を動かす approval-graph.dom、カードの「計画編集」を動かす workflow-card.dom）
   rules/              ルール管理（rules-doc, rules-when, hooks, testmodel と、画面を動かす rules.dom。入れ物は rules-render）
   risk/               リスク管理（risk-doc と、画面を動かす risk.dom。入れ物は risk-render）
   phases/             フェーズ管理（phases-doc, phases-layer と、画面を動かす phases.dom。入れ物は phases-render）

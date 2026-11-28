@@ -1,9 +1,9 @@
 ---
 title: ccnaviボードの画面の作り
 type: design
-description: 承認のオーバーレイの遷移、カードの組み立て（状態のバッジ・ユーザ待ち・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、拡張全体の答えとサイドパネル、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
+description: 承認のオーバーレイの遷移と目次、カードと右のパネルの組み立て（状態のバッジ・ユーザ待ち・詳細・選んだカード）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、拡張全体の答えとサイドパネル、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
 tags: [design-doc, extension, board]
-keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage, board-feed, サイドパネル, BoardTarget, reveal]
+keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, 右のパネル, Panel.tsx, 選んだカード, 目次, Toc, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage, board-feed, サイドパネル, BoardTarget, select]
 ---
 
 # 画面の作り
@@ -14,9 +14,19 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 計画編集タブとの結び付き（未保存のタブがある親を含む一覧は承認を打たない、「計画を編集」は閉じてからタブを開く、保存したあとに提案が変わった親を覚える）も、この遷移のガードと入力に置いた。遷移はVS Codeに触れないので、タブの様子（未保存の親・保存したときのハッシュ）は`board-panel.ts`が帳面`core/workflow-tabs.ts`から引いて入力に添える。押された時点の様子で決めるので、`board-panel.ts`は承認を打つ直前（`approve`のやること）にももう1度帳面を見る。その確かめも遷移のファイルの純関数（`blockedBeforeApprove`）にして、変異テストの表に入れてある。
 
+承認の一覧と対応方針の画面の目次は`webview/board/Toc.tsx`（CSSは`Toc.css`）。目次は行き先の`id`へ`scrollIntoView`するだけで、本文を項目に分けない。行き先の`id`は`Approval.tsx`（`approval-summary`・`approval-tickets`・`approval-plan-<親>`・`approval-legend`・`approval-body`・`approval-rejected`・`approval-problems`・`approval-confirm`）と`Decide.tsx`（`decide-thread-<番号>`・`decide-confirm-area`）が付ける。承認のボタンはページの最後のままで、目次の「承認」はそこへ送る。
+
+文を渡す3ボタン（`Approval.tsx`の`HandOver`）は「新しいセッションで開く」を主ボタンにし、開いたときの焦点もそこに置く。「ターミナルで実行」の名前は`core/approvemodel.ts`の`PROMPT_RUN_LABEL`（「ターミナルで実行（確認なしで動きます）」）。フロー編集の依頼の文（`webview/flow/Proposal.tsx`の`RequestText`）も、主ボタンを「新しいセッションで開く」にそろえる。
+
 ## カードの組み立て
 
-カード1枚は、上から順に見出し（タイトルが主、IDは補助、状態のバッジは右端。DOMはID・タイトル・バッジの順のままCSSの`order`で並べる）、位置、MR（リンクがあるとき。`.card-mr`）、ユーザ待ち、注意、フェーズ行（親だけ）、補助の操作、詳細（畳む）の順に並ぶ。`webview/board/Card.tsx`が描き、何を出すかは`core/board.ts`と`core/status.ts`が決めた値のとおりで、画面は判定し直さない。
+カード1枚は、上から順に見出し（タイトルが主、IDは補助、状態のバッジは右端。DOMはID・タイトル・バッジの順のままCSSの`order`で並べる）、局面の行（親だけ。`.stage`）、動いた表示、注意（短い言葉）、主な操作（あれば1つ。`.card-primary`）の順に並ぶ。`webview/board/Card.tsx`が描く。
+
+選んだカードの右のパネルは`webview/board/Panel.tsx`（CSSは`Panel.css`。見出し・ボタン・詳細の行の見た目は`Card.css`を共用する）が描く。上から見出し（タイトル・ID・状態のバッジ・［閉じる］）、位置（子は`.where`、親は`.stage`）、MR（`.card-mr`）、ユーザ待ち（`.turn`）、フェーズ行（親だけ）、操作（`.card-actions`。チケットを開く・フロー・計画編集・テンプレートの下書き）、詳細（`.detail-rows`。畳まない）。何を出すかはカードもパネルも`core/board.ts`と`core/status.ts`が決めた値のとおりで、画面は判定し直さない。
+
+選んだカードは`webview/board/state.ts`の`selected`（`cardKey`＝プロジェクトとIDの組）に1つだけ覚える。画面が作り直されても残り、ボードからそのカードが消えたら外す。パネルを置く場所は`App.tsx`が決める。広い幅では列の右（`.board-area.with-panel`）、`App.css`が列を縦に積むのと同じ`(max-width: 940px)`では`matchMedia`で見て、選んだカードのすぐ下（`.card-panel-slot`の`<li>`）。パネルはEscで閉じる（`ESCAPE_LAYER.panel`。オーバーレイと案内より奥）。
+
+注意の行（短い言葉）はカードに残す。選ばなくても例外（不備・書き込み停止・先行待ち・リスクHIGH以上など）に気づけるようにするため。理由の全文はパネルの詳細。
 
 **状態のバッジは「状況」、操作欄（ユーザ待ち）は「ユーザができること」。** 両者は別の規則で決め、同時に出てよい（バッジ「要確認」と［承認］など）。操作してよいかの最終判断は実行ファイルが持つ。
 
@@ -50,17 +60,17 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 `marks`の中身（`skipped.deferred_to`）は`ccnavi --explain --json`の`marks`にそのまま載っているので、ボードは推測で代わりを作らない。
 
-ユーザ待ちは、ユーザができることがあるときだけ出し、主ボタンは1つ。親は承認待ちなら「内容を確認して承認してください」と［承認］で、レビューの操作は置かない（子のカードだけ）。子は承認待ちなら［承認］、バッジが「レビュー待ち」なら「MRでレビューしてください」と［MRを開く］（リンク）と［レビュー完了］（主ボタン）の順で1つだけ出す。承認は`pendingApproval`だけを条件にし、バッジが「要確認」でも出す。
+ユーザ待ちは、ユーザができることがあるときだけ出し、主ボタンは1つ。カードには主ボタンだけ（承認待ちなら［承認］、そうでなくバッジが「レビュー待ち」の子なら［レビュー完了］）を出し、パネルの「ユーザ待ち」に説明の文と操作の全部を出す。親は承認待ちなら「内容を確認して承認してください」と［承認］で、レビューの操作は置かない（子だけ）。子は承認待ちなら［承認］、バッジが「レビュー待ち」なら「MRでレビューしてください」と［MRを開く］（リンク）と［レビュー完了］（主ボタン）の順で1つだけ出す。承認は`pendingApproval`だけを条件にし、バッジが「要確認」でも出す。案内の指す先（`data-tour`の`approve-one`・`review-done`）はカードのボタンにだけ付ける。
 
-注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止中・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・着手待ちの子）・ワークツリーが見つからない（作業中・レビュー中）・未送信）。理由の全文、issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由、リスクの文言（JSONのまま）、人間レビューの要否と理由は詳細に畳む。base / 合流のsha、マーカー名は画面に出さない。詳細の開閉はカードごと（プロジェクトとIDの組）に`webview/board/state.ts`の状態へ覚え、更新や列の移動でも閉じない。案内の見本では、開閉を実際の状態に書き込まない（案内は`scene.details`で見本のカードを開く）。
+注意の行は例外のときだけ短い言葉で出す（不備・書き込み停止中・先行待ち・リスクHIGH以上・複数の場所にある・ワークツリー未作成（承認待ち・着手待ちの子）・ワークツリーが見つからない（作業中・レビュー中）・未送信）。理由の全文、issue・ブランチ・ワークツリー名・プロジェクト・取り消しの理由、リスクの文言（JSONのまま）、人間レビューの要否と理由はパネルの詳細に出す。base / 合流のsha、マーカー名は画面に出さない。案内の見本では、選んだカードを実際の状態に書き込まない（案内は`scene.select`で見本のカードを選ぶ）。
 
-カードを押す（または焦点を当ててEnter）とチケットのファイルが開く。ボタン・リンク・詳細（開閉と開いた本文）の上では開かない（`NOT_OPENING`）。
+カードを押す（または焦点を当ててEnter）とそのカードを選ぶ。ボタン・リンクの上では選ばない（`NOT_SELECTING`）。チケットのファイルはパネルの「チケットを開く」で開く。
 
 ## ボタンの見た目
 
-- 共通の`button.action`（`extensions/shared/styles/button.css`）とChrome拡張は変えない。カードの中の操作ボタンと、操作として置いた［MRを開く］リンクにだけ、新しいクラス`card-button`（主ボタンは`card-button primary`）を付ける。マージ状況の帯のボタンとリンクも同じ。
+- 共通の`button.action`（`extensions/shared/styles/button.css`）とChrome拡張は変えない。カードと右のパネルの中の操作ボタンと、操作として置いた［MRを開く］リンクにだけ、新しいクラス`card-button`（主ボタンは`card-button primary`）を付ける。マージ状況の帯のボタンとリンクも同じ。
 - `Card.css`で文字サイズ（`var(--vscode-font-size)`）・高さ（`min-height: 26px`）・余白を絶対値で明示し、親（カード・フェーズ一覧・列）の文字サイズを引き継がない（`font: inherit`を使わない）。幅に収まらない言葉はボタンの中で折り返す。
-- 主ボタンは「ユーザ待ちの操作」だけ。操作のまとまり（「ユーザ待ち」）ごとに1つまで。補助の操作（フロー・計画編集・テンプレートの下書き）は通常の色。
+- 主ボタンは「ユーザ待ちの操作」だけ。操作のまとまり（カードの主な操作・パネルの「ユーザ待ち」）ごとに1つまで。補助の操作（チケットを開く・フロー・計画編集・テンプレートの下書き）は通常の色。
 - カードの中で縦に広がるメニューは使わない。
 - 詳細の中のリンクは普通のリンクのまま（`detail-link`）。ボタンの寸法にしない。
 - 検査: DOMで、操作ボタンと操作のMRリンクが全部`card-button`を持つこと、詳細の中のリンクと位置の下のMRのリンク（`.card-mr a`）は持たないこと、操作のまとまりごとに主ボタンが1つ以下であることを見る（`test/board/card.dom.test.ts`）。寸法と見た目は、拡張開発ホストでの手動確認（READMEの6g）に回す。狭い列（220px）・長いタイトル・ズーム150% で、操作ボタンの高さと文字サイズが揃っていること。
@@ -85,7 +95,7 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 `--explain --json`の答えは拡張全体で1つだけ持つ（`board-feed.ts`。読み直しのまとめ方は`core/feed.ts`）。監視（`core/watch.ts`の`FEED_PATTERNS`）もそこにあり、ボードを閉じていても拡張が動いている間は続ける。聞き手はサイドパネル（`sidebar.ts`）・ボード（`board-panel.ts`）・フロー編集の「提案あり」（`flow-panel.ts`）・チケット制御の入口（`ticket-control.ts`）で、どれも同じ答えを`subscribe`で受ける。ボードは自分で監視も読み込みもしない。読み直しを頼むのは`boardFeed.refresh()`で、重なった頼みは1回にまとめられる。聞き手は`extension.ts`で、チケット制御 → サイドパネルの順に登録してから`watchBoardFeed`で最初の読み込みを始める（サイドパネルの行がチケット制御の値で決まる）。
 
-サイドパネルのツリーの中身（行・押したときに開くもの・バッジの数）は`core/sidebar-tree.ts`が決め、`sidebar.ts`はVS CodeのTreeItemに置き換えるだけ。件数と分類は`inbox`のまま並べる。行を押すと`ccnaviBoard.sidebarOpen`（パレットには出さない）が`screens()`の帳面を通して画面を開く。ボードの中の場所（承認・レビュー完了・カードの焦点・MRの状況を確認）は`screens().board(target)`の`BoardTarget`で渡し、ボードは答えが読めたら1度だけ進む。承認とレビュー完了はカードのボタンと同じ入力（`approveTickets`・`startDecide`）を遷移に入れるので、行けるかの確かめも同じ。カードの焦点（`reveal`）は、絞り込み（`filter`）と同じく画面に届いたら消すメッセージで送り、画面（`App.tsx`）がそのカードを隠している絞り込み・畳んだ列・アーカイブの表示を外して焦点を当てる。
+サイドパネルのツリーの中身（行・押したときに開くもの・バッジの数）は`core/sidebar-tree.ts`が決め、`sidebar.ts`はVS CodeのTreeItemに置き換えるだけ。件数と分類は`inbox`のまま並べる。行を押すと`ccnaviBoard.sidebarOpen`（パレットには出さない）が`screens()`の帳面を通して画面を開く。ボードの中の場所（承認・レビュー完了・カードを選ぶ・MRの状況を確認）は`screens().board(target)`の`BoardTarget`で渡し、ボードは答えが読めたら1度だけ進む。承認とレビュー完了はカードのボタンと同じ入力（`approveTickets`・`startDecide`）を遷移に入れるので、行けるかの確かめも同じ。カードを選ぶ（`select`）は、絞り込み（`filter`）と同じく拡張（`board-panel.ts`の`select`）が覚え、画面に届いたら消すメッセージで送る（作り直し中なら`ready`で送り直す）。画面（`App.tsx`）はそのカードを隠している絞り込み・畳んだ列・アーカイブの表示を外し、カードを押したときと同じ選択（`state.ts`の`selected`）にして焦点を当てる。
 
 ## 機能や画面を足すとき
 
@@ -93,7 +103,7 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 
 | 足すもの | 触る場所 |
 |---|---|
-| カードに出す項目 | `core/status.ts`（バッジの言葉と規則）→ `core/model.ts`（実行ファイルとの契約。JSONを増やすならGo側の`go/internal/clitest/ticket/flow/board_test.go`が書き出す見本`test/fixtures/board.json`も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（見せ方）→ `webview/board/Card.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`status.test.ts`・`card.dom.test.ts`・`render.dom.test.ts`） |
+| カードかパネルに出す項目 | `core/status.ts`（バッジの言葉と規則）→ `core/model.ts`（実行ファイルとの契約。JSONを増やすならGo側の`go/internal/clitest/ticket/flow/board_test.go`が書き出す見本`test/fixtures/board.json`も）→ `core/board.ts`（出すか出さないかの判断）→ `webview/board/text.ts`（出す言葉）→ `webview/board/Card.tsx`（カード。状態と主な操作だけ）か`webview/board/Panel.tsx`（右のパネル。それ以外）→ `webview/board/Card.css`・`Panel.css`（CSS）→ テスト（`test/board/model.test.ts`・`board.test.ts`・`status.test.ts`・`card.dom.test.ts`・`render.dom.test.ts`） |
 | ユーザが押せる操作 | `core/board-view.ts`の`BoardMessage` → 画面のボタン → `board-panel.ts`の`KNOWN`（形の確認の一覧）と`asMessage`（形の確認）と`handleMessage`（処理）。`KNOWN`か処理を書き忘れると型が合わなくなる（どちらも型で網羅を強制してある） |
 | 画面が覚えるもの | `webview/board/state.ts`（形と既定）→ `App.tsx`（読み書き）→ `test/board/board.dom.test.ts` |
 
