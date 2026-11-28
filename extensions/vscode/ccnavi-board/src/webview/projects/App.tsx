@@ -18,6 +18,7 @@ import { Project } from "./Project.js";
 import { post } from "./post.js";
 import { EMPTY, guessName, loadClone, saveClone, type CloneState } from "./state.js";
 import { lastUpdatedText } from "../shared/format.js";
+import { severityText } from "../../core/lint-summary.js";
 import { isTrackedProjectsDir, isUnignoredProjectsDir } from "./text.js";
 
 /** 案内（`tours/projects.yml`）。見本は使わず、画面は今の中身のまま指す */
@@ -103,7 +104,9 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
       <Banners page={page} act={act} />
       {mirror !== undefined && <MirrorBanners mirror={mirror} />}
       <section className="clone" data-tour="clone">
-        <h2>リポジトリをcloneする</h2>
+        <h2>
+          リポジトリを取得する <span className="dim small">（git clone）</span>
+        </h2>
         <div className="clone-form">
           <label className="grow" data-tour="clone-url">
             URL{" "}
@@ -142,7 +145,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
             title="git cloneを「ccnavi」ターミナルで実行します。認証が必要ならターミナルで入力してください"
             onClick={() => act({ type: "clone", url: clone.url, name: clone.name })}
           >
-            clone
+            取得
           </button>
         </div>
         <p id="status" className={status === undefined ? "status hidden" : status.kind === "failed" ? "status failed" : "status"}>
@@ -154,7 +157,7 @@ export function App({ initial }: { readonly initial: ProjectsData }): JSX.Elemen
           ワークスペース内のプロジェクト <span className="count">{rows.length}</span>
         </h2>
         {rows.length === 0 ? (
-          <p className="empty">プロジェクトがありません。上のボタンでcloneするか、既存のリポジトリをprojects/の直下に移動してください。</p>
+          <p className="empty">プロジェクトがありません。上の「取得」でリポジトリを取得するか、既存のリポジトリをprojects/の直下に移動してください。</p>
         ) : (
           <ul className="projects">
             {rows.map((row, index) => (
@@ -212,7 +215,7 @@ function Banners({ page, act }: { readonly page: ProjectsPage; readonly act: (me
   for (const [index, p] of dirProblems.entries()) {
     banners.push(
       <div key={`dir:${index}`} className={`banner ${p.severity}`}>
-        {p.severity}: {p.detail}
+        {severityText(p.severity)}: {p.detail}
       </div>,
     );
   }

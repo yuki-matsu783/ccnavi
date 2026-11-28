@@ -187,7 +187,8 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
         {lockedPresent ? `テンプレートと設定の取り込みは止めています: ${lock.reason}` : ""}
       </p>
       <p className="count" id="counts">
-        <span>対象{entries.length}件</span>・<span>取り込める{selectable.length}件</span>・<span>選択{chosen.length}件</span>・<span>対象外{page.list.ignored}件</span>
+        {/* どれもファイルの数。対象は取り込める分と取り込めない分の和で、対象外はその外（下の折りたたみに名前と理由） */}
+        <span>対象のファイル{entries.length}件（取り込める{selectable.length}件・取り込めない{entries.length - selectable.length}件）</span>・<span>選択{chosen.length}件</span>・<span>対象外のパス{page.list.ignored}件</span>
       </p>
       {page.list.ignored_paths.length > 0 && (
         <details id="ignored-paths">
@@ -207,7 +208,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
           取り込み待ち <span className="count">{entries.length}</span>
         </h2>
         <p className="hint">
-          wip/handoff/に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、errorが無い対象です。
+          wip/handoff/に置いた下書きを、同じ相対パスへ取り込みます。取り込めるのは、新規か変更ありで、エラーが無い対象です。
         </p>
         {entries.length === 0 ? (
           <p className="empty" data-role="empty">
@@ -235,7 +236,7 @@ export function App({ initial }: { readonly initial: HandoffData }): JSX.Element
                   ))}
                 </ul>
                 <div className="buttons">
-                  <button type="button" className="action" data-action="import-yes" disabled={busy} onClick={doImport}>
+                  <button type="button" className="action primary" data-action="import-yes" disabled={busy} onClick={doImport}>
                     この内容で取り込む
                   </button>
                   <button type="button" className="action" data-action="import-cancel" disabled={busy} onClick={() => setConfirming(false)}>

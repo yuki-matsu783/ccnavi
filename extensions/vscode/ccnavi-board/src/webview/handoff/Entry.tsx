@@ -8,6 +8,7 @@ import type { JSX } from "react";
 import type { HandoffEntry } from "../../core/handoff-view.js";
 import { blockReason } from "../../core/handoffmodel.js";
 import type { Lock } from "../../core/lock.js";
+import { severityText } from "../../core/lint-summary.js";
 import { DEFENSE_NOTE, kindLabel, stateLabel, stateTone } from "./text.js";
 
 /** ターミナルで打つコマンドの案内の状態。まだ頼んでいなければundefined */
@@ -64,15 +65,15 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
           onChange={(event) => onSelect(event.target.checked)}
         />
         <span className="entry-path mono">{entry.path}</span>
-        <span className="tag" data-role="kind">
+        <span className="tag" data-role="kind" title={`種類: ${entry.kind}`}>
           {kindLabel(entry.kind)}
         </span>
         <span className={tone === "" ? "tag" : `tag ${tone}`} data-role="state">
           {stateLabel(entry.state)}
         </span>
         {!entry.board && <span className="tag warn">ターミナルで取り込む</span>}
-        {entry.errors.length > 0 && <span className="tag bad">error {entry.errors.length}</span>}
-        {entry.warnings.length > 0 && <span className="tag warn">warn {entry.warnings.length}</span>}
+        {entry.errors.length > 0 && <span className="tag bad">{severityText("error")} {entry.errors.length}</span>}
+        {entry.warnings.length > 0 && <span className="tag warn">{severityText("warn")} {entry.warnings.length}</span>}
       </div>
       {!importable && (
         <p className="hint entry-reason" data-role="reason">
@@ -85,12 +86,12 @@ export function Entry({ entry, lock, selected, open, disabled, terminal, onToggl
             <ul className="entry-notes">
               {entry.errors.map((text, index) => (
                 <li key={`e${index}`} className="sev-error">
-                  <span className="sev-label">[error]</span> <span>{text}</span>
+                  <span className="sev-label">[{severityText("error")}]</span> <span>{text}</span>
                 </li>
               ))}
               {entry.warnings.map((text, index) => (
                 <li key={`w${index}`} className="sev-warn">
-                  <span className="sev-label">[warn]</span> <span>{text}</span>
+                  <span className="sev-label">[{severityText("warn")}]</span> <span>{text}</span>
                 </li>
               ))}
             </ul>

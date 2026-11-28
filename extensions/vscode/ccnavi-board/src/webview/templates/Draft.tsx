@@ -39,7 +39,7 @@ export function Draft({ draft, open, onToggle, tour }: DraftProps): JSX.Element 
         <span className="twist">{open ? "▾" : "▸"}</span>
         <span className="tpl-name mono">{draft.name}</span>
         <span className="tag">{treeLabel(draft.tree)}</span>
-        {bad && <span className="tag bad">errorあり</span>}
+        {bad && <span className="tag bad">エラーあり</span>}
         {todo && <span className="tag warn">TODOが残っています</span>}
         {!draft.valid && <span className="tag bad">読み込めません</span>}
       </div>

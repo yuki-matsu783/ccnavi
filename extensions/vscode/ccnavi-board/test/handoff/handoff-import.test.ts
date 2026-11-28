@@ -120,7 +120,7 @@ test("CB-T1127 defenseはターミナルのみ。錠が空いていてもボー�
 
 test("CB-T1128 取り込めない対象（error・unchanged）と、一覧にない対象と、空の選択は、実行ファイルを呼ばずに理由を返す", async () => {
   const cases: [string, readonly string[], RegExp][] = [
-    ["errorあり", [".ccnavi/docs/broken.md"], /error/],
+    ["errorあり", [".ccnavi/docs/broken.md"], /エラー/],
     ["unchanged", [".ccnavi/docs/same.md"], /同じ内容/],
     ["一覧にない", [".ccnavi/docs/none.md"], /一覧にない対象です/],
     ["空", [], /選ばれていません/],

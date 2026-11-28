@@ -42,10 +42,10 @@ test("CB-D366 一覧は対象ごとに1行。パス・種類・状態のバッ�
     assert.equal(text(dom.one(`${row(RULES)} [data-role="kind"]`)), "設定");
     assert.equal(text(dom.one(`${row(RULES)} [data-role="state"]`)), "変更あり");
     assert.equal(text(dom.one(`${row(".ccnavi/docs/same.md")} [data-role="state"]`)), "変更なし");
-    assert.match(text(dom.one(row(".ccnavi/docs/broken.md"))), /error 1/);
-    assert.match(text(dom.one(row(DOCS))), /warn 1/);
+    assert.match(text(dom.one(row(".ccnavi/docs/broken.md"))), /エラー 1/);
+    assert.match(text(dom.one(row(DOCS))), /警告 1/);
     // 要約: 対象6件、取り込める3件（template・layer-configのchanged・docs）、選択0件、対象外2件
-    assert.equal(text(dom.one("#counts")), "対象6件・取り込める3件・選択0件・対象外2件");
+    assert.equal(text(dom.one("#counts")), "対象のファイル6件（取り込める3件・取り込めない3件）・選択0件・対象外のパス2件");
     const ignored = text(dom.one("#ignored-paths"));
     assert.match(ignored, /repro\.sh: 取り込める種類の表に無い/);
     assert.match(ignored, /linked: リンクのディレクトリ/);
@@ -64,8 +64,8 @@ test("CB-D367 見出しを押すと開き、差分とerrors / warningsを出す�
     dom.click(dom.one(`${row(DOCS)} .row-head`));
     await dom.settle();
     assert.equal(text(dom.one(`${row(DOCS)} [data-role="no-diff"]`)), "差分はありません。");
-    assert.match(text(dom.one(`${row(DOCS)} .sev-error`)), /\[error\] UTF-8ではない/);
-    assert.match(text(dom.one(`${row(DOCS)} .sev-warn`)), /\[warn\] 見出しが無い/);
+    assert.match(text(dom.one(`${row(DOCS)} .sev-error`)), /\[エラー\] UTF-8ではない/);
+    assert.match(text(dom.one(`${row(DOCS)} .sev-warn`)), /\[警告\] 見出しが無い/);
   } finally {
     await dom.close();
   }
@@ -79,7 +79,7 @@ test("CB-D368 取り込めない対象は選べず、理由を出す。error・u
       assert.equal(dom.all(`${row(path)} [data-role="reason"]`).length, 0, `${path}に理由は出ない`);
     }
     const reasons: [string, RegExp][] = [
-      [".ccnavi/docs/broken.md", /取り込めません: 検査でerrorがあります/],
+      [".ccnavi/docs/broken.md", /取り込めません: 検査でエラーがあります/],
       [".ccnavi/docs/same.md", /取り込めません: 取り込み先と同じ内容/],
       [HOOK, /取り込めません: ボードからは取り込めません。ターミナルで取り込みます/],
     ];
@@ -100,7 +100,7 @@ test("CB-D369 選んで「取り込む…」を押すと確認の帯が出て、
     assert.equal(open.disabled, true, "何も選んでいない間は押せない");
     await check(dom, TEMPLATE);
     await check(dom, DOCS);
-    assert.equal(text(dom.one("#counts")), "対象6件・取り込める3件・選択2件・対象外2件");
+    assert.equal(text(dom.one("#counts")), "対象のファイル6件（取り込める3件・取り込めない3件）・選択2件・対象外のパス2件");
     dom.click(open);
     await dom.settle();
     assert.deepEqual(
@@ -173,7 +173,7 @@ test("CB-D372 錠が掛かった状態で開いても、templateとlayer-config�
     assert.equal(pick(locked, RULES).disabled, true);
     assert.equal(pick(locked, DOCS).disabled, false);
     assert.ok(!locked.one("#lock").classList.contains("hidden"));
-    assert.equal(text(locked.one("#counts")), "対象6件・取り込める1件・選択0件・対象外2件");
+    assert.equal(text(locked.one("#counts")), "対象のファイル6件（取り込める1件・取り込めない5件）・選択0件・対象外のパス2件");
   } finally {
     await locked.close();
   }
@@ -252,7 +252,7 @@ test("CB-D375 取り込みの結果を出す。取り込めた対象・消した
     assert.equal(dom.all('[data-role="confirm"]').length, 0);
     assert.equal(dom.one<HTMLButtonElement>('[data-action="reload"]').disabled, false);
     assert.match(text(dom.one('[data-role="result"] h3')), /取り込みました（1件）。下書きを1件削除しました。下書きを1件残しました/);
-    assert.deepEqual(dom.all('[data-role="applied"] li').map((li) => text(li)), [`${DOCS}（docs）`]);
+    assert.deepEqual(dom.all('[data-role="applied"] li').map((li) => text(li)), [`${DOCS}（文書）`]);
     assert.deepEqual(dom.all('[data-role="removed-drafts"] li').map((li) => text(li)), ["wip/handoff/.ccnavi/docs/guide.md"]);
     assert.match(text(dom.one('[data-role="kept-drafts"] li')), /other\.md\s+取り込み後に下書きが編集されていた/);
   } finally {

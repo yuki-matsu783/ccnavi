@@ -100,19 +100,22 @@ test("CB-D326 見出しを押すと開き、計画の表が番号と種類を出
   }
 });
 
-test("CB-D327 苦情の件数と深刻度の文字（[error] [warn] [info]）が出る。要約の件数は見本の数と合う", async () => {
+test("CB-D327 苦情の件数と深刻度の文字（[エラー] [警告] [情報]）が出る。要約の件数は見本の数と合い、指摘の数とテンプレートの数を書き分ける", async () => {
   const dom = await openTemplates();
   try {
     const summary = text(dom.one('[data-tour="summary"]'));
     assert.match(summary, /エラー3/);
     assert.match(summary, /警告2/);
     assert.match(summary, /情報1/);
+    assert.match(summary, /^指摘 6件（/);
+    // 絞り込みの札はテンプレートの数。何の数かを札の前に書く
+    assert.match(text(dom.one('[data-role="template-find"]')), /指摘のあるテンプレートの数:/);
     await openRow(dom, 'li.template[data-name="ends"][data-layer="self"]');
-    assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[error\]/);
+    assert.match(text(dom.one('li.template[data-name="ends"][data-layer="self"] .sev-label')), /\[エラー\]/);
     await openRow(dom, 'li.template[data-name="feature"][data-layer="self"]');
-    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"] .sev-label')), /\[info\]/);
+    assert.match(text(dom.one('li.template[data-name="feature"][data-layer="self"] .sev-label')), /\[情報\]/);
     await openRow(dom, 'li.template[data-name="local"][data-layer="self"]');
-    assert.match(text(dom.one('li.template[data-name="local"][data-layer="self"] .sev-label')), /\[warn\]/);
+    assert.match(text(dom.one('li.template[data-name="local"][data-layer="self"] .sev-label')), /\[警告\]/);
   } finally {
     await dom.close();
   }
@@ -122,7 +125,7 @@ test("CB-D328 下書きは3件出て、error・TODOをバッジで出す。取�
   const dom = await openTemplates();
   try {
     assert.equal(dom.all("li.draft").length, 3);
-    assert.match(text(dom.one('li.draft[data-name="broken"]')), /errorあり/);
+    assert.match(text(dom.one('li.draft[data-name="broken"]')), /エラーあり/);
     assert.match(text(dom.one('li.draft[data-name="login"]')), /TODOが残っています/);
     assert.match(text(dom.one('[data-tour="drafts"] .hint')), /取り込むまでテンプレートとしては使われません/);
     // 取り込み・保存・改名・移動・削除の操作はこの画面に無い

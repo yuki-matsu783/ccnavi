@@ -130,7 +130,7 @@ test("CB-D383 説明を直すと「未保存」が出て、少し待つと直し
     const check = fixtureCheck();
     await dom.send({ type: "editChecked", session, seq: asked.seq, check: { ...check, problems: [{ severity: "warn", detail: "検査の指摘です" }] }, error: "" });
     await dom.settle();
-    assert.match(text(dom.one(".tpl-problems")), /\[warn\] 検査の指摘です/);
+    assert.match(text(dom.one(".tpl-problems")), /\[警告\] 検査の指摘です/);
     assert.equal(dom.all('section.plan-graph[data-part="plan"][data-editable="1"]').length, 1);
     assert.equal(dom.all('[data-role="graph-stale"]').length, 0, "答えが届いたら読んでいる旨は消える");
   } finally {

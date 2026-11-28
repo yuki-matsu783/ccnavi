@@ -136,11 +136,11 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を1か所にだ�
     // .gitignoreの帯（直すボタン付き）があるので、lintの「無視されていない」は重ねない。別の指摘は出る
     assert.equal(dom.all('button[data-action="fix-ignore"]').length, 1);
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
-    assert.ok(banners.some((b) => b === "warn: 別の指摘"), banners.join(" / "));
+    assert.ok(banners.some((b) => b === "警告: 別の指摘"), banners.join(" / "));
     // ".claude/settings.jsonを読めない" のようなwarnとerrorは、lintの指摘のまま出る
     const lint = dom.all(`${cardSelector("lib")} ul.lint li`).map((li) => text(li));
-    assert.ok(lint.some((l) => l === "warn: .claude/settings.jsonを読み込めない: 壊れている"), lint.join(" / "));
-    assert.ok(lint.some((l) => l === "error: 文面がありません"), lint.join(" / "));
+    assert.ok(lint.some((l) => l === "警告: .claude/settings.jsonを読み込めない: 壊れている"), lint.join(" / "));
+    assert.ok(lint.some((l) => l === "エラー: 文面がありません"), lint.join(" / "));
   } finally {
     await dom.close();
   }
@@ -148,7 +148,7 @@ test("CB-T123 プロジェクト管理は同じ事象の注意を1か所にだ�
   // .gitignoreが済んでいればlintの指摘はそのまま出る
   const fine = await openProjects([row()], { dirProblems: [problem("warn", UNIGNORED, "(projects)", "projects-unignored")] });
   try {
-    assert.ok(fine.all(".banner").some((b) => text(b) === `warn: ${UNIGNORED}`));
+    assert.ok(fine.all(".banner").some((b) => text(b) === `警告: ${UNIGNORED}`));
   } finally {
     await fine.close();
   }
@@ -181,18 +181,18 @@ async function trackedBanners(detail: string, ignored: boolean): Promise<{ banne
 test("CB-D148 A10置き場がワークスペースのソースとぶつかっていたら、苦情の帯だけを出し、.gitignoreのボタンと「無視されていない」の帯を出さない", async () => {
   const { banners, fixButtons } = await trackedBanners(COLLISION, false);
   assert.equal(fixButtons, 0);
-  assert.ok(banners.includes(`warn: ${COLLISION}`), banners.join(" / "));
+  assert.ok(banners.includes(`警告: ${COLLISION}`), banners.join(" / "));
   assert.ok(!banners.some((b) => /\.gitignore.*がない/.test(b)), banners.join(" / "));
   assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
   // 別の指摘は今どおり出る
-  assert.ok(banners.includes("warn: 別の指摘"), banners.join(" / "));
+  assert.ok(banners.includes("警告: 別の指摘"), banners.join(" / "));
 });
 
 test("CB-D149 A10b載せ忘れ（入れ子のリポジトリが索引に載った）でも同じ。.gitignoreに /projects/ が既にあっても苦情の帯は出たまま", async () => {
   for (const ignored of [false, true]) {
     const { banners, fixButtons } = await trackedBanners(ADDED_BY_MISTAKE, ignored);
     assert.equal(fixButtons, 0, `ignored=${ignored}`);
-    assert.ok(banners.includes(`warn: ${ADDED_BY_MISTAKE}`), `ignored=${ignored}: ${banners.join(" / ")}`);
+    assert.ok(banners.includes(`警告: ${ADDED_BY_MISTAKE}`), `ignored=${ignored}: ${banners.join(" / ")}`);
     assert.ok(!banners.some((b) => /\.gitignore.*がない/.test(b)), banners.join(" / "));
     assert.ok(!banners.some((b) => /無視されていない/.test(b)), banners.join(" / "));
   }

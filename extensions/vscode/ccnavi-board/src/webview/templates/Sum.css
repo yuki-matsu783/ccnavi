@@ -3,6 +3,11 @@
  */
 .sum { margin: 0 0 10px; border: 1px solid var(--vscode-panel-border); border-radius: var(--radius-lg); padding: 6px 10px; }
 .sum > summary { cursor: pointer; color: var(--vscode-descriptionForeground); }
+/*
+ * 畳んだ枠の直後に次の見出し（下書き）が詰まらないよう、下を空ける。共通の`list.css`の`.sum`（行の見出しの要約。
+ * `display: contents`）と名前が重なり、枠の余白と縁が消えていたので、この枠は`display: block`に戻す
+ */
+details#sum { display: block; margin: 12px 0 18px; }
 .sum-pick { display: flex; gap: var(--gap-3); align-items: center; margin: 0 0 8px; color: var(--vscode-descriptionForeground); }
 table.sum-table { border-collapse: collapse; width: 100%; font-size: var(--font-lg); }
 /* 表は入れ物の中で横へ送る。狭い画面でも表の外（ページ全体）は横に流れない */

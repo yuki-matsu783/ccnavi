@@ -3,7 +3,7 @@
  * 知らない値はそのまま出す（実行ファイルが種類や状態を足しても、画面が黙って読み違えない）。
  */
 
-/** 種類の言葉。`kind`の値も併記して、実行ファイルの答えと突き合わせられるようにする */
+/** 種類の言葉。`kind`の値はバッジのツールチップに出し、実行ファイルの答えと突き合わせられるようにする */
 export function kindLabel(kind: string): string {
   switch (kind) {
     case "template":
@@ -11,7 +11,7 @@ export function kindLabel(kind: string): string {
     case "layer-config":
       return "設定";
     case "docs":
-      return "docs";
+      return "文書";
     case "defense":
       return "防御（hookなど・ターミナルのみ）";
     default:

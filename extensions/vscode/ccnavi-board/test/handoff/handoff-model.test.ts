@@ -170,7 +170,7 @@ test("CB-T1110 取り込めない対象には理由を言う。ターミナル�
   assert.match(refusalReason(entry({ board: false, kind: "defense" })), /ボードからは取り込めません。ターミナルで取り込みます/);
   assert.match(refusalReason(entry({ state: "rejected" })), /rejected/);
   assert.match(refusalReason(entry({ state: "unchanged" })), /同じ内容/);
-  assert.match(refusalReason(entry({ errors: ["x"] })), /error/);
+  assert.match(refusalReason(entry({ errors: ["x"] })), /エラー/);
   assert.match(refusalReason(entry({ state: "later" })), /未知の状態です（later）/);
   // ターミナルのみの対象は、状態より先にターミナルで取り込むことを言う
   assert.match(refusalReason(entry({ board: false, state: "rejected" })), /ターミナルで取り込みます/);

@@ -156,7 +156,7 @@ export function refusalReason(entry: HandoffEntry): string {
       return "取り込み先と同じ内容なので、取り込むものがありません";
     case "new":
     case "changed":
-      return entry.errors.length > 0 ? "検査でerrorがあります。直してから取り込みます" : "";
+      return entry.errors.length > 0 ? "検査でエラーがあります。直してから取り込みます" : "";
     default:
       return `未知の状態です（${entry.state}）。実行ファイルを更新してください`;
   }
