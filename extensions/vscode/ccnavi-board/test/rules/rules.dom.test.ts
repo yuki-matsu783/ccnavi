@@ -1568,7 +1568,7 @@ test("CB-D1274 削除した行は帯の［元に戻す］で元の位置へ戻�
   }
 });
 
-test("CB-D1298 判定を試す欄はルールとhookのどちらのタブでも出る。タブは2つで、欄の畳みはstateに残り、画面を作り直しても畳んだまま", async () => {
+test("CB-D1298 判定を試す欄はルールのタブでだけ出る（hookのタブでは隠して中身を全幅にする）。タブは2つで、欄の畳みはstateに残り、画面を作り直しても畳んだまま", async () => {
   const dom = await openRules();
   try {
     assert.deepEqual(dom.all("nav.tabs .tab").map((tab) => tab.getAttribute("data-tab")), ["rules", "hooks"]);
@@ -1576,7 +1576,10 @@ test("CB-D1298 判定を試す欄はルールとhookのどちらのタブでも�
     dom.click(dom.one('[data-tab="hooks"]'));
     await dom.settle();
     assert.equal(dom.one(".pane.active").id, "tab-hooks");
-    assert.equal(dom.all("#judge-pane .judge-form").length, 1, "hookのタブで判定を試す欄が消えた");
+    assert.equal(dom.all("#judge-pane").length, 0, "hookのタブで判定を試す欄が出ている");
+    assert.ok(dom.one(".rules-body").classList.contains("no-judge"));
+    dom.click(dom.one('[data-tab="rules"]'));
+    await dom.settle();
     assert.equal(dom.one("#judge-pane").getAttribute("data-folded"), "0");
     dom.click(dom.one('[data-action="toggle-judge"]'));
     await dom.settle();

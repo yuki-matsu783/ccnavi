@@ -41,13 +41,13 @@ function Hits({ rules }: { readonly rules: readonly RuleHitJson[] }): JSX.Elemen
   }
   return (
     <div className="table-scroll">
-      <table>
+      <table className="hits">
         <thead>
           <tr>
             <th>タイプ</th>
             <th>id</th>
-            <th>指定したパターン</th>
-            <th>正規表現に直した形</th>
+            <th title="ルールに書いたパターン">パターン</th>
+            <th title="判定に使う、正規表現に直した形">正規表現</th>
           </tr>
         </thead>
         <tbody>
@@ -111,7 +111,12 @@ export function JudgeResult({ judged }: { readonly judged: Judged }): JSX.Elemen
         <>
           <p>
             <Verdict verdict={result.verdict} />
-            {result.code !== "" && ` ${result.code}`}
+            {/* 根拠コードは hook の文面の先頭に出る名前。判定（バッジ）を主にし、コードは小さく添える */}
+            {result.code !== "" && (
+              <span className="judge-code" title="判定の根拠コード（止めたときの文面の先頭に出る名前）">
+                {" "}根拠: <code>{result.code}</code>
+              </span>
+            )}
           </p>
           <Pairs
             pairs={[

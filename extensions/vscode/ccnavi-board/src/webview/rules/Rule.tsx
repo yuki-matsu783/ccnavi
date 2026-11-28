@@ -142,11 +142,11 @@ export function Rule(props: RuleProps): JSX.Element {
           {rule.every === "" ? (
             <span className="sum-every" />
           ) : (
-            <span className="tag sum-every" title={`every: ${rule.every}`}>
+            <span className="tag sum-every" title={`当てはまった${rule.every}回に1回だけ、コンテキストの追加を渡します（every: ${rule.every}）`}>
               {rule.every}回ごと
             </span>
           )}
-          <span className={hasContext(rule) ? "sum-flag on" : "sum-flag"} title={hasContext(rule) ? "コンテキストの追加あり" : ""} />
+          <span className={hasContext(rule) ? "sum-flag on" : "sum-flag"} title={hasContext(rule) ? "コンテキストの追加あり（当てはまったときにモデルへ渡すプロンプトかファイルがあります）" : ""} />
         </span>
       </div>
       <div className="row-body">

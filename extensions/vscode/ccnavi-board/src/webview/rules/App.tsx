@@ -614,12 +614,16 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
           </button>
         ))}
       </nav>
-      <div className="rules-body">
+      {/* 判定を試す欄はルールのタブでだけ出す。hookのタブは読むだけの一覧で、ルールを直して試す作業が無いため */}
+      <div className={shownTab === "rules" ? "rules-body" : "rules-body no-judge"}>
         <div className="rules-main">
           <section id="tab-rules" data-tour="rules" className={`pane${shownTab === "rules" ? " active" : ""}${query === "" ? "" : " finding"}`} ref={list}>
             <div className="find">
-              <input id="find" data-tour="find" type="search" placeholder="id・ツール・パターン・メッセージ・プロンプトで絞り込む" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
+              <input id="find" data-tour="find" type="search" placeholder="id・パターンなどで絞り込む" title="id・ツール・パターン・メッセージ・プロンプトのどれかに含む語で絞り込みます" spellCheck={false} value={shownFind} onChange={(event) => (tour.touring ? undefined : setFind(event.target.value))} />
               <span className="hint" data-tour="order-hint">判定は強い順に 拒否 &gt; 確認 &gt; 許可（deny &gt; ask &gt; allow）</span>
+              <span className="hint rule-legend" aria-label="行の印の凡例">
+                <span className="sum-flag on" aria-hidden="true" /> コンテキストの追加あり　<span className="tag">N回ごと</span> 当てはまったN回に1回だけ渡す
+              </span>
             </div>
             {nothingFound && <p className="empty">絞り込みにヒットするルールがありません。語を変えるか、絞り込み欄を空にしてください</p>}
             {SECTIONS.map((section) => {
@@ -701,6 +705,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             <Hooks hooks={touring ? SAMPLE.hooks : page?.hooks ?? []} files={touring ? { settings: true, settingsLocal: false } : page?.hookFiles ?? { settings: false, settingsLocal: false }} />
           </section>
         </div>
+        {shownTab === "rules" && (
         <aside id="judge-pane" className="judge-pane" data-tour="judge" data-folded={shownJudgeFolded ? "1" : "0"} aria-label="判定を試す">
           <div className="judge-head">
             <h2>判定を試す</h2>
@@ -795,6 +800,7 @@ export function App({ initial }: { readonly initial: RulesData }): JSX.Element {
             {shownSuggested !== undefined && <SuggestResult result={shownSuggested} />}
           </div>
         </aside>
+        )}
       </div>
       {tour.touring && <Tour steps={courseOf(courses, tour.course).steps} onClose={tour.end} />}
     </>
