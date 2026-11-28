@@ -35,8 +35,8 @@ const flowText = `    id: wf-impl
     version: 1.0.0
     nodes:
       - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}
-      - {id: p, type: prompt, name: 実装, position: {x: 1, y: 0}, data: {prompt: 先にテスト}}
-      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}
+      - {id: p, type: prompt, name: 実装, position: {x: 260, y: 0}, data: {prompt: 先にテスト}}
+      - {id: e, type: end, name: 終了, position: {x: 520, y: 0}, data: {}}
     connections:
       - {id: c1, from: s, to: p, fromPort: output, toPort: input}
       - {id: c2, from: p, to: e, fromPort: output, toPort: input}
