@@ -12,7 +12,7 @@ keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テ
 src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
   sidebar.ts          左端のアイコンから開くサイドパネル。見出し「ユーザ待ち」「進行中の親」「画面」のツリー（中身は core/sidebar-tree.ts）と、ユーザ待ちの合計のバッジ。行を押すと該当の画面と場所を開く（画面の帳面 screens() を通す）。チケット制御が disable ならチケットに関わる行を出さない。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値をビューの名前の横に出す（vscode に依存する）
-  board-feed.ts       拡張全体で 1 つの --explain --json の答えと、その読み直しの監視（core/watch.ts の FEED_PATTERNS。ボードを閉じていても続ける）。サイドパネル・ボード・フロー編集の「提案あり」・チケット制御が同じ答えを聞く（まとめ方は core/feed.ts。vscode に依存する）
+  board-feed.ts       拡張全体で 1 つの --explain --json の答えと、その読み直しの監視（core/watch.ts の FEED_PATTERNS。チケット管理画面を閉じていても続ける）。サイドパネル・チケット管理画面・フロー編集の「提案あり」・チケット制御が同じ答えを聞く（まとめ方は core/feed.ts。vscode に依存する）
   bug-report.ts       バグ報告（サイドパネルのタイトルバーの虫のアイコンから始める）。ステータスバーの撮る・終えるのボタン、ffmpeg の録画の起動と停止（標準入力に q）、スクリーンショットのコマンドの起動、終えたときの gif への変換と zip の書き出し（vscode に依存する。組むものは core/bug-report.ts）
   ticket-control.ts   CCNAVI_TICKET_CONTROL を拡張全体の答え（board-feed.ts）から読み、context key に反映する（vscode に依存する）
   board-panel.ts      チケット管理画面の Webview パネルの生成・更新・破棄、操作の受け付け。答えと監視は board-feed.ts を聞く。サイドパネルの行から開くときは、開いたあとに進む場所（承認・レビュー完了・カードの焦点・MRの状況を確認）を受ける。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（チケット管理画面が開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
@@ -217,7 +217,7 @@ src/
     flow/main.tsx     フロー編集画面の入口。埋め込みの JSON を読んでマウントする
     flow/App.tsx      錠の帯・ツールバー・注意・部品箱と、拡張ホストからのメッセージの受け
     flow/Canvas.tsx   図（ノード・出口・線）。動かす・繋ぐ・選ぶは呼び手に返す
-    shared/PlanGraph.tsx 計画の流れの図の部品（React Flow）。承認のオーバーレイとボードの計画の流れ（board/PlanFlow.tsx）が読むだけで、計画編集タブが編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
+    shared/PlanGraph.tsx 計画の流れの図の部品（React Flow）。承認のオーバーレイとチケット管理画面の計画の流れ（board/PlanFlow.tsx）が読むだけで、計画編集タブが編集で使う。editable が真ならステップからステップへ線を引け（引けない線は引いている最中に断る）、onDisconnect を渡せば消せる線に × を出す。置き場所（layout）を渡せば、番号が振り直っても点を動かさない
     workflow/style.css 計画編集タブの CSS の入口（先頭で React Flow の CSS を @import し、shared/PlanGraph.css と Tour.css も読む）
     workflow/App.css   App.tsx の CSS（図の枠の高さ・外で変わった差分の表）
     workflow/Review.css Review.tsx の CSS（保存の前の確かめ）

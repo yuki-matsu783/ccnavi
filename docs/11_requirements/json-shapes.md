@@ -199,7 +199,7 @@ ccnavi --explain --json
 | `issues[]` | 読み手が気づくべき不備の文。この順に入る。`blocked` が空でなければ `書き込みが止まっています: <blocked>`、提案が無く `copy.status` が `open` でも `closed` でもなければ `提案が見つかりません（承認済みチケットだけがあります）`、子で親の識別子のチケットが `tickets[]` に無ければ `親 <親> が見つかりません`。無ければ空。チケット管理画面はこれをそのまま出し、自分では組み直さない |
 | `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、チケット管理画面の承認待ち・進行中の列（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき。チケット管理画面の「ユーザ待ちのみ」はこれで絞るだけ |
 
-`inbox` の 1 件。ボードとサイドパネルの「ユーザ待ち」の件数と分類。1 つのチケットは、`approval` → `review` → `notice` → `flow_draft` の順で最初に当てはまる 1 種類だけに入る（`attention` には承認待ちとレビュー待ちも含まれるので、二重に数えない）。先行待ち（`predecessors_unmet[]`）と未送信（`remote.ahead`）は `attention` に入らないので、ここにも入らない。チケット制御が disable なら `handoff` 以外は空。ボードはこれを並べるだけで、分け直さない。
+`inbox` の 1 件。チケット管理画面とサイドパネルの「ユーザ待ち」の件数と分類。1 つのチケットは、`approval` → `review` → `notice` → `flow_draft` の順で最初に当てはまる 1 種類だけに入る（`attention` には承認待ちとレビュー待ちも含まれるので、二重に数えない）。先行待ち（`predecessors_unmet[]`）と未送信（`remote.ahead`）は `attention` に入らないので、ここにも入らない。チケット制御が disable なら `handoff` 以外は空。チケット管理画面はこれを並べるだけで、分け直さない。
 
 | キー | 何 |
 |---|---|
@@ -215,7 +215,7 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（「着手待ち・フェーズ1 調査」「作業中・フェーズ2 設計」「レビュー待ち・フェーズ1 設計」など、ユーザに見せる言葉。閉じた親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
-| `plans[]` | 計画の流れ（図の中身）。計画ごとに 1 件（全体計画、フィードバック計画の順）。形は「承認の JSON」の `plans[]` と同じで、同じ関数で組む。承認済みチケットの計画をそのまま描くので、番号は振り直さない（`from` は `number` と同じ）。`locked` は子が承認された番号（開いていても閉じていても）。提案ではないので `current` は `null`、`source_sha` は空文字。計画を持たない親は空。ボードは開いた親の行の「計画の流れを見る」で、承認のオーバーレイと同じ図の部品で読むだけで描き、計画から図を組み直さない |
+| `plans[]` | 計画の流れ（図の中身）。計画ごとに 1 件（全体計画、フィードバック計画の順）。形は「承認の JSON」の `plans[]` と同じで、同じ関数で組む。承認済みチケットの計画をそのまま描くので、番号は振り直さない（`from` は `number` と同じ）。`locked` は子が承認された番号（開いていても閉じていても）。提案ではないので `current` は `null`、`source_sha` は空文字。計画を持たない親は空。チケット管理画面は開いた親の行の「計画の流れを見る」で、承認のオーバーレイと同じ図の部品で読むだけで描き、計画から図を組み直さない |
 | `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_required` は、そのフェーズの終わりにユーザのレビューが要るかを表す（真偽値）。定義・ステップ・引き受けた延期のどれか 1 つでも要ると言えば真。子の宣言か実績のリスクが要ると言う場合も真。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、チケット管理画面はこれをコピーするだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |
 

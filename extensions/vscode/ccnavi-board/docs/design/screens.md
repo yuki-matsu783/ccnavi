@@ -16,13 +16,13 @@ keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, �
 
 承認の一覧と対応方針の画面の目次は`webview/board/Toc.tsx`（CSSは`Toc.css`）。目次は行き先の`id`へ`scrollIntoView`するだけで、本文を項目に分けない。行き先の`id`は`Approval.tsx`（`approval-summary`・`approval-tickets`・`approval-plan-<親>`・`approval-legend`・`approval-body`・`approval-rejected`・`approval-problems`・`approval-confirm`）と`Decide.tsx`（`decide-thread-<番号>`・`decide-confirm-area`）が付ける。承認のボタンはページの最後のままで、目次の「承認」はそこへ送る。
 
-文を渡す3ボタン（`Approval.tsx`の`HandOver`）は「新しいセッションで開く」を主ボタンにし、開いたときの焦点もそこに置く。「ターミナルで実行」の名前は`core/approvemodel.ts`の`PROMPT_RUN_LABEL`（「ターミナルで実行（確認なしで動きます）」）。確認なしで動くので、ボタンは`risky`のクラスで警告の見た目（テーマの警告色`--vscode-editorWarning-foreground`の枠と、読める濃さの警告の文字`--warn-text`）にし、［コピー］から16px離す（`Approval.css`）。押す前の確認は足さない。フロー編集の依頼の文（`webview/flow/Proposal.tsx`の`RequestText`）も、主ボタンを「新しいセッションで開く」にそろえる。
+文を渡す3ボタン（`Approval.tsx`の`HandOver`）は「新しいセッションで開く」を主ボタンにし、開いたときの焦点もそこに置く。「ターミナルで実行」の名前は`core/approvemodel.ts`の`PROMPT_RUN_LABEL`（「ターミナルで実行（確認なしで動きます）」）。確認なしで動くので、ボタンは`risky`のクラスで警告の見た目（テーマの警告色`--vscode-editorWarning-foreground`の枠と、読める濃さの警告の文字`--warn-text`）にし、「コピー」から16px離す（`Approval.css`）。押す前の確認は足さない。フロー編集の依頼の文（`webview/flow/Proposal.tsx`の`RequestText`）も、主ボタンを「新しいセッションで開く」にそろえる。
 
 ## 列と親ごとの行
 
-ボードの本体は`webview/board/Lanes.tsx`（CSSは`Lanes.css`）。1行目に列の見出し（`.column`。畳む切り替え・件数・幅の取っ手。件数は子だけを数えるので「子2」と書き、ツールチップで親を数えないことを言う。畳んだ列の各行の`.folded-count`も「子3」と書き、ツールチップで何の列の子の数かを言う）、その下に親ごとの行（`.lane`）を並べる。列の幅を全部の行で揃えるため、ボードは1つのgridで、`.lane`は箱を作らない（`display: contents`）。列の幅の指定は`tracksOf`がインラインのstyle（`grid-template-columns`）に書く。畳んだ列は`max-content`、固定した列はpx、ほかは`minmax(220px, 1fr)`。ドラッグの最中は、その列だけを差し替えた指定をDOMに直に書き、離したときに`state.ts`の`widths`に覚える。
+チケット管理画面の本体は`webview/board/Lanes.tsx`（CSSは`Lanes.css`）。1行目に列の見出し（`.column`。畳む切り替え・件数・幅の取っ手。件数は子だけを数えるので「子2」と書き、ツールチップで親を数えないことを言う。畳んだ列の各行の`.folded-count`も「子3」と書き、ツールチップで何の列の子の数かを言う）、その下に親ごとの行（`.lane`）を並べる。列の幅を全部の行で揃えるため、チケット管理画面は1つのgridで、`.lane`は箱を作らない（`display: contents`）。列の幅の指定は`tracksOf`がインラインのstyle（`grid-template-columns`）に書く。畳んだ列は`max-content`、固定した列はpx、ほかは`minmax(220px, 1fr)`。ドラッグの最中は、その列だけを差し替えた指定をDOMに直に書き、離したときに`state.ts`の`widths`に覚える。
 
-行に分けるのは`lanesOf`で、キーはカードの`family`とプロジェクトの組（`laneKey`）。親のカードは行の見出し（`CardItem`の`head`。`div.card.parent.lane-head`）、子は列ごとのセル（`.cell[data-cell=<列>]`）に入る。親のカードが無い子の行は`.lane-orphan`の見出しを持ち、選べない。隠れたカード（絞り込み）と畳んだ列のカードもDOMには置き、CSSで隠す（`.card.hidden`、`.folded-cell .cards`）。親も子も見えない行は`.lane.hidden`。見出しの補助の操作（［計画編集］・「フェーズを表示」）は`CardItem`の子として渡し、主な操作（［承認］）と同じ段に並べる。「フェーズを表示」で開いた行は`state.ts`の`opened`（`laneKey`の一覧）に覚え、見出しの下に`LanePhases`がフェーズごとの状態の一言（`PhaseChip.status`）と子の識別子とバッジの言葉を並べる。
+行に分けるのは`lanesOf`で、キーはカードの`family`とプロジェクトの組（`laneKey`）。親のカードは行の見出し（`CardItem`の`head`。`div.card.parent.lane-head`）、子は列ごとのセル（`.cell[data-cell=<列>]`）に入る。親のカードが無い子の行は`.lane-orphan`の見出しを持ち、選べない。隠れたカード（絞り込み）と畳んだ列のカードもDOMには置き、CSSで隠す（`.card.hidden`、`.folded-cell .cards`）。親も子も見えない行は`.lane.hidden`。見出しの補助の操作（「計画編集」・「フェーズを表示」）は`CardItem`の子として渡し、主な操作（「承認」）と同じ段に並べる。「フェーズを表示」で開いた行は`state.ts`の`opened`（`laneKey`の一覧）に覚え、見出しの下に`LanePhases`がフェーズごとの状態の一言（`PhaseChip.status`）と子の識別子とバッジの言葉を並べる。
 
 開いた行の「計画の流れを見る」は、親のカードの`plans`（`parents[].plans`のまま。`core/board.ts`が親のカードに移す）が空でないときだけ`LanePhases`が出す。押すと`App.tsx`が親の`cardKey`を`useState`に持ち、`webview/board/PlanFlow.tsx`（CSSは`PlanFlow.css`）を`Dialog`で重ねる。図は承認のオーバーレイと同じ`shared/PlanGraph.tsx`を`editable`なしで使う。拡張ホストへは何も送らず、`state.ts`にも覚えない（更新で親が消えるか`plans`が空になったら出さない）。承認のオーバーレイが出ている間は出さない。Escは`ESCAPE_LAYER.overlay`で受ける。図の中身を拡張で組み直さないため、承認済みの親の図も実行ファイルが承認の`plans`と同じ関数（`planedit.ApprovedPlans`）で組む。
 
@@ -32,9 +32,9 @@ keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, �
 
 カード1枚は、上から順に見出し（タイトルが主、IDは補助、状態のバッジは右端。DOMはID・タイトル・バッジの順のままCSSの`order`で並べる）、局面の行（親だけ。`.stage`）、動いた表示、注意（短い言葉）、主な操作（あれば1つ。`.card-primary`）の順に並ぶ。`webview/board/Card.tsx`が描く。
 
-選んだカードの右のパネルは`webview/board/Panel.tsx`（CSSは`Panel.css`。見出し・ボタン・詳細の行の見た目は`Card.css`を共用する）が描く。上から見出し（タイトル・ID・状態のバッジ・［閉じる］）、位置（子は`.where`、親は`.stage`）、MR（`.card-mr`）、ユーザ待ち（`.turn`）、フェーズ行（親だけ）、操作（`.card-actions`。チケットを開く・フロー・計画編集・テンプレートの下書き）、詳細（`.detail-rows`。畳まない）。何を出すかはカードもパネルも`core/board.ts`と`core/status.ts`が決めた値のとおりで、画面は判定し直さない。
+選んだカードの右のパネルは`webview/board/Panel.tsx`（CSSは`Panel.css`。見出し・ボタン・詳細の行の見た目は`Card.css`を共用する）が描く。上から見出し（タイトル・ID・状態のバッジ・「閉じる」）、位置（子は`.where`、親は`.stage`）、MR（`.card-mr`）、ユーザ待ち（`.turn`）、フェーズ行（親だけ）、操作（`.card-actions`。チケットを開く・フロー・計画編集・テンプレートの下書き）、詳細（`.detail-rows`。畳まない）。何を出すかはカードもパネルも`core/board.ts`と`core/status.ts`が決めた値のとおりで、画面は判定し直さない。
 
-選んだカードは`webview/board/state.ts`の`selected`（`cardKey`＝プロジェクトとIDの組）に1つだけ覚える。画面が作り直されても残り、ボードからそのカードが消えたら外す。パネルを置く場所は`App.tsx`が決める。広い幅では列の右（`.board-area.with-panel`）、`Lanes.css`が行を縦に積むのと同じ`(max-width: 940px)`では`matchMedia`で見て、選んだカードのすぐ下（子は`.card-panel-slot`の`<li>`、親は行の見出しの直後）。親は行の見出しにあるので、列を畳んでもパネルは隠れない。パネルはEscで閉じる（`ESCAPE_LAYER.panel`。オーバーレイと案内より奥）。
+選んだカードは`webview/board/state.ts`の`selected`（`cardKey`＝プロジェクトとIDの組）に1つだけ覚える。画面が作り直されても残り、チケット管理画面からそのカードが消えたら外す。パネルを置く場所は`App.tsx`が決める。広い幅では列の右（`.board-area.with-panel`）、`Lanes.css`が行を縦に積むのと同じ`(max-width: 940px)`では`matchMedia`で見て、選んだカードのすぐ下（子は`.card-panel-slot`の`<li>`、親は行の見出しの直後）。親は行の見出しにあるので、列を畳んでもパネルは隠れない。パネルはEscで閉じる（`ESCAPE_LAYER.panel`。オーバーレイと案内より奥）。
 
 注意の行（短い言葉）はカードに残す。選ばなくても例外（不備・書き込み停止・先行待ち・リスクHIGH以上など）に気づけるようにするため。理由の全文はパネルの詳細。
 
@@ -104,9 +104,9 @@ keywords: [設計, 画面, 親ごとの行, Lanes.tsx, フェーズを表示, �
 
 ## 拡張全体の答えとサイドパネル
 
-`--explain --json`の答えは拡張全体で1つだけ持つ（`board-feed.ts`。読み直しのまとめ方は`core/feed.ts`）。監視（`core/watch.ts`の`FEED_PATTERNS`）もそこにあり、ボードを閉じていても拡張が動いている間は続ける。聞き手はサイドパネル（`sidebar.ts`）・ボード（`board-panel.ts`）・フロー編集の「提案あり」（`flow-panel.ts`）・チケット制御の入口（`ticket-control.ts`）で、どれも同じ答えを`subscribe`で受ける。ボードは自分で監視も読み込みもしない。読み直しを頼むのは`boardFeed.refresh()`で、重なった頼みは1回にまとめられる。聞き手は`extension.ts`で、チケット制御 → サイドパネルの順に登録してから`watchBoardFeed`で最初の読み込みを始める（サイドパネルの行がチケット制御の値で決まる）。
+`--explain --json`の答えは拡張全体で1つだけ持つ（`board-feed.ts`。読み直しのまとめ方は`core/feed.ts`）。監視（`core/watch.ts`の`FEED_PATTERNS`）もそこにあり、チケット管理画面を閉じていても拡張が動いている間は続ける。聞き手はサイドパネル（`sidebar.ts`）・チケット管理画面（`board-panel.ts`）・フロー編集の「提案あり」（`flow-panel.ts`）・チケット制御の入口（`ticket-control.ts`）で、どれも同じ答えを`subscribe`で受ける。チケット管理画面は自分で監視も読み込みもしない。読み直しを頼むのは`boardFeed.refresh()`で、重なった頼みは1回にまとめられる。聞き手は`extension.ts`で、チケット制御 → サイドパネルの順に登録してから`watchBoardFeed`で最初の読み込みを始める（サイドパネルの行がチケット制御の値で決まる）。
 
-サイドパネルのツリーの中身（行・押したときに開くもの・バッジの数）は`core/sidebar-tree.ts`が決め、`sidebar.ts`はVS CodeのTreeItemに置き換えるだけ。件数と分類は`inbox`のまま並べる。行を押すと`ccnaviBoard.sidebarOpen`（パレットには出さない）が`screens()`の帳面を通して画面を開く。ボードの中の場所（承認・レビュー完了・カードを選ぶ・MRの状況を確認）は`screens().board(target)`の`BoardTarget`で渡し、ボードは答えが読めたら1度だけ進む。承認とレビュー完了はカードのボタンと同じ入力（`approveTickets`・`startDecide`）を遷移に入れるので、行けるかの確かめも同じ。カードを選ぶ（`select`）は、絞り込み（`filter`）と同じく拡張（`board-panel.ts`の`select`）が覚え、画面に届いたら消すメッセージで送る（作り直し中なら`ready`で送り直す）。画面（`App.tsx`）はそのカードを隠している絞り込み・畳んだ列・アーカイブの表示を外し、カードを押したときと同じ選択（`state.ts`の`selected`）にして焦点を当てる。
+サイドパネルのツリーの中身（行・押したときに開くもの・バッジの数）は`core/sidebar-tree.ts`が決め、`sidebar.ts`はVS CodeのTreeItemに置き換えるだけ。件数と分類は`inbox`のまま並べる。行を押すと`ccnaviBoard.sidebarOpen`（パレットには出さない）が`screens()`の帳面を通して画面を開く。チケット管理画面の中の場所（承認・レビュー完了・カードを選ぶ・MRの状況を確認）は`screens().board(target)`の`BoardTarget`で渡し、チケット管理画面は答えが読めたら1度だけ進む。承認とレビュー完了はカードのボタンと同じ入力（`approveTickets`・`startDecide`）を遷移に入れるので、行けるかの確かめも同じ。カードを選ぶ（`select`）は、絞り込み（`filter`）と同じく拡張（`board-panel.ts`の`select`）が覚え、画面に届いたら消すメッセージで送る（作り直し中なら`ready`で送り直す）。画面（`App.tsx`）はそのカードを隠している絞り込み・畳んだ列・アーカイブの表示を外し、カードを押したときと同じ選択（`state.ts`の`selected`）にして焦点を当てる。
 
 ## 機能や画面を足すとき
 
