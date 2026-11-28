@@ -181,7 +181,7 @@ export interface SettingsPanel<D, L extends SettingsLoaded> {
   /** 保存できるかを実行ファイルに聞き、画面へ知らせる。確かめられなければ閉じる側 */
   refreshLock(current: SettingsState<D, L>): Promise<Lock>;
   /**
-   * 頼まれたときに読んでいたもの（`loaded`）が、往復の間に入れ替わっていないか。`what`は破棄するもの（「この保存」など）。
+   * 操作を受けたときに読んでいたもの（`loaded`）が、往復の間に入れ替わっていないか。`what`は破棄するもの（「この保存」など）。
    *
    * 保存は実行ファイルへ2度出る（`--lint`と錠の取り直し）。その間にユーザが「更新」を押せば、
    * 画面の編集は破棄され、新しい中身が出ている。そこへ古い編集を書くと、破棄したはずのものが
@@ -485,7 +485,7 @@ export function settingsPanel<D, L extends SettingsLoaded, To, From extends { re
     if (current.loaded === loaded) {
       return false;
     }
-    // 往復の間に別の対象へ切り替わった。破棄するのは同じだが、切り替え先の画面に前の対象の話を出さない
+    // 往復の間に別の対象へ切り替わった。どちらも破棄する。切り替え先の画面には前の対象の話を出さない
     if (!sameTarget(loaded.target, current.target)) {
       return true;
     }
