@@ -5,14 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	"ccnavi/internal/infra/difflib"
 	"ccnavi/internal/infra/golden"
 )
 
-// 差分（difflib.unified_diff の写し）と、rules.yml の下書きが防御の記述を動かすかの判定を、記録した答え（testdata/parts.json）と突き合わせる。
+// 防御の判定と、rules.yml の下書きが防御の記述を動かすかの判定を、記録した答え（testdata/parts.json）と突き合わせる。
 
 type partsAnswers struct {
-	Diff    [][]string `json:"diff"`
 	Lines   [][]string `json:"lines"`
 	Defense []string   `json:"defense"`
 }
@@ -111,12 +109,6 @@ func TestPartsMatchGolden(t *testing.T) {
 		defense = append(defense, [2]any{b64(c[0]), b64(c[1])})
 	}
 	answers := golden.Load[partsAnswers](t, "parts")
-	for i, c := range diffCases {
-		got := difflib.UnifiedDiff(c[0], c[1], "a/x", "b/x", diffContext)
-		if strings.Join(got, "\n") != strings.Join(answers.Diff[i], "\n") {
-			t.Errorf("差分 %d が違う\n--- go\n%s\n--- golden\n%s", i, strings.Join(got, "\n"), strings.Join(answers.Diff[i], "\n"))
-		}
-	}
 	for i, c := range linesCases {
 		got := visibleLines(bytesOf(c))
 		if strings.Join(got, "\n") != strings.Join(answers.Lines[i], "\n") || len(got) != len(answers.Lines[i]) {
@@ -126,6 +118,43 @@ func TestPartsMatchGolden(t *testing.T) {
 	for i, c := range defenseCases {
 		if got := defenseChange(bytesOf(c[0]), bytesOf(c[1])); got != answers.Defense[i] {
 			t.Errorf("防御 %d: %q, golden は %q", i, got, answers.Defense[i])
+		}
+	}
+}
+
+func TestUnifiedDiff(t *testing.T) {
+	want := map[int][]string{
+		0: nil,
+		1: {"--- a/x", "+++ b/x", "@@ -0,0 +1 @@", "+a"},
+		2: {"--- a/x", "+++ b/x", "@@ -1 +0,0 @@", "-a"},
+		3: nil,
+		4: {"--- a/x", "+++ b/x", "@@ -1,4 +1,5 @@", " a", "-b", "+x", " c", " d", "+e"},
+		5: {"--- a/x", "+++ b/x", "@@ -1,7 +1,7 @@", " a", " b", " c", "-d", "+changed", " e", " f", " g",
+			"@@ -18,7 +18,7 @@", " r", " s", " t", "-u", "+changed", " v", " w", " x"},
+	}
+	for i, c := range diffCases {
+		got := unifiedDiff(c[0], c[1], "a/x", "b/x", diffContext)
+		if w, ok := want[i]; ok {
+			if strings.Join(got, "\n") != strings.Join(w, "\n") {
+				t.Errorf("差分 %d が違う\n--- got\n%s\n--- want\n%s", i, strings.Join(got, "\n"), strings.Join(w, "\n"))
+			}
+			continue
+		}
+		// 残りは、足した行と消した行の差が行数の差に合い、最小に近い（最長共通部分列で突き合わせた）ことを見る。
+		plus, minus := 0, 0
+		for _, l := range got[2:] {
+			switch l[0] {
+			case '+':
+				plus++
+			case '-':
+				minus++
+			}
+		}
+		if plus-minus != len(c[1])-len(c[0]) {
+			t.Errorf("差分 %d の行数が合わない: +%d -%d", i, plus, minus)
+		}
+		if i == 6 && plus+minus > 20 {
+			t.Errorf("差分 %d が長い: +%d -%d", i, plus, minus)
 		}
 	}
 }

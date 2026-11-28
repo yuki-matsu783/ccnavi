@@ -3,7 +3,6 @@ package handoff
 import (
 	"strings"
 
-	"ccnavi/internal/infra/difflib"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/tickets/proposal/templates"
 )
@@ -61,7 +60,7 @@ func makeDiff(e *Entry) {
 	if e.current != nil {
 		from = "a/" + e.Rel
 	}
-	lines := difflib.UnifiedDiff(visibleLines(e.current), visibleLines(e.raw), from, "b/"+e.Rel, diffContext)
+	lines := unifiedDiff(visibleLines(e.current), visibleLines(e.raw), from, "b/"+e.Rel, diffContext)
 	if len(lines) == 0 {
 		e.Errors = append(e.Errors, msgInvisible)
 		return

@@ -39,14 +39,13 @@ var topTiers = map[string]int{
 var subTiers = map[string]map[string]int{
 	"infra": {
 		// 0: 何も読まない土台（環境変数の名前・値の書式化・パスの扱いと OS の分岐）
-		"env":     0,
-		"pyfmt":   0,
-		"ospath":  0,
-		"digest":  0, // 16 進の要約と乱数（記録・バックアップの名前）
-		"fault":   0, // 読み手に届くエラーの共通の形（識別子・値・What）。文面は境界が引く
-		"difflib": 0, // 見せる差分（difflib の写し）
-		"reply":   0, // sh の段取りへの答え（1 行 1 項目）の組み立て
-		"golden":  0, // テストの見本（testdata の JSON）を読む。テストからだけ読む
+		"env":    0,
+		"pyfmt":  0,
+		"ospath": 0,
+		"digest": 0, // 16 進の要約と乱数（記録・バックアップの名前）
+		"fault":  0, // 読み手に届くエラーの共通の形（識別子・値・What）。文面は境界が引く
+		"reply":  0, // sh の段取りへの答え（1 行 1 項目）の組み立て
+		"golden": 0, // テストの見本（testdata の JSON）を読む。テストからだけ読む
 		// 1: 土台だけを読む
 		"pathcase":    1,
 		"pyjson":      1,
