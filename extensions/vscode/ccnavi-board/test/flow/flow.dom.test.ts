@@ -531,3 +531,34 @@ test("CB-D191 図を全画面にしている間は、背後をinertにしてEsc�
     await dom.close();
   }
 });
+
+/** 上部の並びの順。名前と状態の塊 → 元に戻す・やり直す → 補助 → 主ボタン（最後） */
+function barOrder(dom: DomPage, scope: string): string[] {
+  const order: string[] = [];
+  for (const el of dom.all(`${scope} .editor-name, ${scope} .editor-controls > *`)) {
+    if (el.classList.contains("editor-name")) {
+      order.push("name");
+    } else if (el.classList.contains("editor-history")) {
+      order.push("history");
+    } else if (el.classList.contains("primary")) {
+      order.push("primary");
+    } else {
+      order.push("aux");
+    }
+  }
+  return order.filter((item, index) => index === 0 || order[index - 1] !== item);
+}
+
+test("CB-D1299 フロー編集の上部は、対象の名前と状態 → 元に戻す・やり直す → 補助の操作 → 保存の順に並ぶ。状態は未保存・閲覧のみ・提案あり・外で変わったを出し分ける", async () => {
+  const dom = await openFlow();
+  try {
+    assert.deepEqual(barOrder(dom, "header.toolbar"), ["name", "history", "aux", "primary"]);
+    assert.equal(dom.one(".editor-controls > :last-child").id, "save");
+    assert.deepEqual(dom.all(".editor-history button").map((b) => b.getAttribute("data-action")), ["undo", "redo"]);
+    assert.deepEqual(dom.all(".editor-state:not(.hidden)").map((s) => s.textContent), []);
+    await dom.send({ type: "changed" });
+    assert.deepEqual(dom.all(".editor-state:not(.hidden)").map((s) => s.textContent), ["外で変わった"]);
+  } finally {
+    await dom.close();
+  }
+});

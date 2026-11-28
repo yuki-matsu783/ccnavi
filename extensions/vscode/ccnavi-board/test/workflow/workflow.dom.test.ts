@@ -430,3 +430,32 @@ test("CB-D189 図の拡大ボタンで図だけを全画面にし、閉じる・
     await dom.close();
   }
 });
+
+/** 上部の並びの順。名前と状態の塊 → 元に戻す・やり直す → 補助 → 主ボタン（最後） */
+function barOrder(dom: DomPage, scope: string): string[] {
+  const order: string[] = [];
+  for (const el of dom.all(`${scope} .editor-name, ${scope} .editor-controls > *`)) {
+    if (el.classList.contains("editor-name")) {
+      order.push("name");
+    } else if (el.classList.contains("editor-history")) {
+      order.push("history");
+    } else if (el.classList.contains("primary")) {
+      order.push("primary");
+    } else {
+      order.push("aux");
+    }
+  }
+  return order.filter((item, index) => index === 0 || order[index - 1] !== item);
+}
+
+test("CB-D1300 計画編集の上部は、対象の名前と状態 → 補助の操作 → この順序に決めるの順に並ぶ（元に戻す・やり直すは持たない）", async () => {
+  const dom = await openWorkflow();
+  try {
+    assert.deepEqual(barOrder(dom, "header.toolbar"), ["name", "aux", "primary"]);
+    assert.equal(dom.one(".editor-controls > :last-child").textContent, "この順序に決める");
+    assert.equal(dom.all(".editor-history").length, 0);
+    assert.deepEqual(dom.all(".editor-state:not(.hidden)").map((s) => s.textContent), []);
+  } finally {
+    await dom.close();
+  }
+});

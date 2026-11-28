@@ -1,0 +1,10 @@
+/*
+ * 図の編集の上部の並び（`EditorBar.tsx`）。名前と状態を左に、元に戻す・やり直す、補助の操作、主ボタンを右に並べる。
+ * 元に戻す・やり直すは1つの組として間を詰め、補助の操作との間を空ける。
+ */
+.editor-states { display: inline-flex; flex-wrap: wrap; gap: var(--gap-3); align-items: baseline; }
+.editor-state { font-size: var(--font-sm); padding: 0 8px; border: 1px solid currentColor; border-radius: var(--radius-pill); }
+.editor-state.hidden { display: none; }
+.editor-state.dirty, .editor-state.warn { color: var(--warn-text); font-weight: 600; }
+.editor-state.info { color: var(--vscode-descriptionForeground); }
+.editor-history { display: inline-flex; gap: var(--gap-2); margin-right: var(--gap-4); }
