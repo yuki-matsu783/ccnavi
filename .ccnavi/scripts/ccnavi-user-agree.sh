@@ -1,7 +1,7 @@
 #!/bin/sh
 # ccnavi-user-agree: 提案を承認し、承認済みチケットを親ブランチにコミットして push する。ユーザがターミナルで実行する。
 #
-#   sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]
+#   sh .ccnavi/scripts/ccnavi-user-agree.sh [--preview] [<識別子>...]
 #
 # ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、名前で見分けられる。
 #
@@ -31,7 +31,10 @@
 #
 # エージェントからは hook が止める（ccnavi-user- で始まる sh の名前と、実行ファイルの `user` の入口）。
 #
-# 終了コード: 0 成功（push 失敗含む。未送信は文面で言う） / 1 承認が通らなかった（一部だけ通ったときも。置かれたぶんは送る） / 2 引数または環境の誤り
+# `--preview` は一覧を見るだけで、何も置かない（実行ファイルの `user agree --preview`）。
+#
+# 終了コード: 0 成功 / 1 承認が通らなかった・一部だけ通った・push が済んでいない（置かれたぶんは送る。
+# 通ったもの・残り・打ち直す 1 行を出す） / 2 引数または環境の誤り
 
 set -eu
 
@@ -40,12 +43,15 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-agree.sh [<識別子>...]
+使い方: sh .ccnavi/scripts/ccnavi-user-agree.sh [--preview] [<識別子>...]
 
-  承認待ちのチケットを一覧表示し、y/N で確認を取ってから承認する。
+  承認待ちのチケットを一覧表示し、実行ファイルが y/N で確認を取ってから承認する。
   承認が通れば承認済みチケットをコミットして push する。
-  識別子を並べると、その分だけを承認の対象にする（例: ccnavi-user-agree.sh i0002-01-03）。
-  ターミナルからユーザが実行します。エージェントからは呼べない（hook が止める）。
+  識別子を並べると、その分だけを承認の対象にする。
+  --preview は一覧を見るだけで、何も置かない。
+  ターミナルからユーザが実行します。エージェントからは呼べない（hook が止める）。全体の一覧は `ccnavi user`。
+
+例: sh .ccnavi/scripts/ccnavi-user-agree.sh i0002-01-03
 USAGE
 }
 
@@ -58,6 +64,13 @@ if [ $# -eq 1 ]; then
 		exit 0
 		;;
 	esac
+fi
+
+# `--preview` は先頭に 1 つだけ。見るだけなので、書く経路（置く・コミット・push）には入らない。
+preview=""
+if [ "${1:-}" = "--preview" ]; then
+	preview=1
+	shift
 fi
 
 # 並べた語は識別子として `user agree` の後ろにそのまま渡す。承認待ちに在るかは実行ファイルが見る。
@@ -75,6 +88,16 @@ done
 
 # ワークスペースルート。ワークツリーの中から呼ばれても、ツリーの一覧はワークスペースルートの側から数える。
 root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-user-agree
+
+if [ -n "$preview" ]; then
+	root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-user-agree
+	if ccnavi_wap_use_exe "$root"; then
+		exec_rc=0
+		ccnavi_wap_exe --entry sh user agree --preview "$@" || exec_rc=$?
+		exit "$exec_rc"
+	fi
+	ccnavi_no_bin ccnavi-user-agree
+fi
 
 # 承認が実際に書けたパスの一覧（JSON）の受け皿。実行ファイルは書き込みに入ったときだけ書く。
 report=$(mktemp "${TMPDIR:-/tmp}/ccnavi-user-agree.XXXXXX") || {
@@ -142,14 +165,19 @@ else
 fi
 
 say_report
-if [ "$push_rc" -ne 0 ]; then
-	# push-approved はツリーごとに結果を言う（送れたツリーは「pushしました」、送れなかったツリーは理由）。
-	# 失敗はどれか 1 本でもあれば返るので、全部が未送信とは限らない。
-	printf 'ccnavi-user-agree: コミットか push が済んでいないツリーがある（上の push-approved の文面。「pushしました」と出たツリーは送れている）。直してから、上で名指しされたコマンドを再実行してください。\n' >&2
+if [ "$push_rc" -eq 0 ] && [ "$approve_rc" -eq 0 ]; then
+	exit 0
 fi
-
+# 一部だけ通ったときの出力（決まりは .agents/docs/script-output.md の「ユーザ専用 sh の作法」）。
+# 通ったもの: この承認が置いた承認済みチケット。残り: 承認されなかった提案と、コミットか push が済んでいないツリー。
+if [ -s "$written" ]; then
+	printf '通ったもの: 承認済みチケットを置いた（%s 件のパス）\n' "$(grep -c . "$written")"
+fi
 if [ "$approve_rc" -ne 0 ]; then
-	printf 'ccnavi-user-agree: 承認の一部だけが通りました。置かれた承認済みチケットは、上の結果のとおりコミット・push を試しています。通らなかった分は原因を直して、もう一度承認してください。\n' >&2
-	exit 1
+	printf '残り: 承認されなかった提案（上の承認の結果の failed・unwritten・rejected）。原因を直してから打ち直す\n'
+	printf '次: sh %s\n' "$(ccnavi_sh_quote "$(dirname "$0")/ccnavi-user-agree.sh")"
+else
+	printf '残り: コミットか push が済んでいないツリー（上の push-approved の文面。「pushしました」と出たツリーは送れている）\n'
+	printf '次: sh %s\n' "$(ccnavi_sh_quote "$(dirname "$0")/ccnavi-user-push-approved.sh")"
 fi
-exit 0
+exit 1

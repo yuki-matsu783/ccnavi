@@ -21,12 +21,16 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
+使い方: sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent <親> --reason <理由> [--no-issue]
 
-  まだ残っているが早めにクローズする判断（ユーザがターミナルで実行します）。残りを issue に書き出す（--no-issue なら書き出さない）。
+  まだ残っているが早めにクローズする判断。実行ファイルが残りを見せて y/N を聞く（--preview は無い。見せるのが y/N の前の一覧）。
+  残りを issue に書き出す（--no-issue なら書き出さない）。
   Draft は親が ccnavi-review.sh ready で外す。--parent は親の識別子（親のワークツリーの名前）。
+  ユーザがターミナルで実行します。全体の一覧は `ccnavi user`。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
+
+例: sh .ccnavi/scripts/ccnavi-user-close-early.sh --parent i0002 --reason '残りは次のフェーズで扱う'
 USAGE
 }
 
@@ -59,7 +63,7 @@ while [ "$#" -gt 0 ]; do
 		shift
 		;;
 	--parent) shift 2 ;; # 読むのは上の review_parent_arg
-	*) shift ;;
+	*) fail close-early-bad-option "$1 は受け付けません（使い方は -h）。" 2 ;;
 	esac
 done
 [ -n "$reason" ] || fail close-early-no-reason "--reason <理由> が必要です。" 2
@@ -99,8 +103,9 @@ carry_human() {
 	case "$ccnavi_wap_target" in
 	yes)
 		sh "$ccnavi_wap_sh/ccnavi-user-push-approved.sh" "$ccnavi_wap_family_id" || {
-			printf '%s: ユーザの判断は置いたが送れなかった。接続を戻してから、sh %s/ccnavi-user-push-approved.sh %s をユーザが再実行してください（送るまで、この親子のチケットの状態の操作は止まります）\n' \
-				"$review_label" "$ccnavi_wap_sh" "$ccnavi_wap_family_id" >&2
+			printf '%s: ユーザの判断は置いたが送れなかった（送るまで、この親子のチケットの状態の操作は止まります）\n' "$review_label" >&2
+			printf '通ったもの: 早めにクローズする判断を置いた\n残り: 判断の送信（push）\n次: sh %s %s\n' \
+				"$(ccnavi_sh_quote "$ccnavi_wap_sh/ccnavi-user-push-approved.sh")" "$ccnavi_wap_family_id"
 			return 1
 		}
 		;;

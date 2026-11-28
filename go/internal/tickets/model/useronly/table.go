@@ -133,8 +133,8 @@ var verbs = []Verb{
 	{words: []string{"reviewed"}, internal: []string{"--reviewed"}, op: OpReviewed, value: true, Script: "decide", terminal: "ccnavi-user-decide.sh"},
 	{words: []string{"close-early"}, internal: []string{"--close-early"}, op: OpCloseEarly, Script: "close-early", terminal: "ccnavi-user-close-early.sh"},
 	{words: []string{"prune"}, internal: []string{optPrune}, op: OpPrune, Script: "prune", terminal: "ccnavi-user-prune.sh"},
-	{words: []string{"handoff"}, internal: []string{"--handoff"}, op: OpHandoff, Script: "handoff", terminal: "ccnavi-user-handoff.sh --yes"},
-	{words: []string{"mirror"}, internal: []string{"--mirror"}, op: OpMirror, Script: "mirror", terminal: "ccnavi-user-mirror.sh --yes"},
+	{words: []string{"handoff"}, internal: []string{"--handoff"}, op: OpHandoff, Script: "handoff", terminal: "ccnavi-user-handoff.sh"},
+	{words: []string{"mirror"}, internal: []string{"--mirror"}, op: OpMirror, Script: "mirror", terminal: "ccnavi-user-mirror.sh"},
 }
 
 // errNotTerminal はターミナルを求めない操作を Terminal に渡したこと。

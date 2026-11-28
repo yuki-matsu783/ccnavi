@@ -82,15 +82,24 @@ func TestPruneEntry(t *testing.T) {
 		t.Parallel()
 		e := newPruneEnv(t)
 		old := putAged(t, filepath.Join(e.logs, oldLogName), 30)
-		proc := e.ccnavi(pruneApproval, "", "user", "prune")
+		proc := e.ccnavi(pruneApproval, "y\n", "user", "prune")
 		if proc.Code != 0 || !strings.Contains(proc.Stdout, "削除した  logs/"+oldLogName) || exists(old) {
+			t.Errorf("code = %d, stdout = %q, stderr = %q", proc.Code, proc.Stdout, proc.Stderr)
+		}
+	})
+	t.Run("y 以外の答えでは何も動かさず、1 で終わる", func(t *testing.T) {
+		t.Parallel()
+		e := newPruneEnv(t)
+		old := putAged(t, filepath.Join(e.logs, oldLogName), 30)
+		proc := e.ccnavi(pruneApproval, "n\n", "user", "prune")
+		if proc.Code != 1 || !strings.Contains(proc.Stdout, "削除する  logs/"+oldLogName) || !strings.Contains(proc.Stderr, "整理しなかった") || !exists(old) {
 			t.Errorf("code = %d, stdout = %q, stderr = %q", proc.Code, proc.Stdout, proc.Stderr)
 		}
 	})
 	t.Run("動かすものが無い", func(t *testing.T) {
 		t.Parallel()
 		e := newPruneEnv(t)
-		proc := e.ccnavi(pruneApproval, "", "user", "prune")
+		proc := e.ccnavi(pruneApproval, "y\n", "user", "prune")
 		if proc.Code != 0 || !strings.Contains(proc.Stdout, "動かすものはありません。") {
 			t.Errorf("code = %d, stdout = %q, stderr = %q", proc.Code, proc.Stdout, proc.Stderr)
 		}
@@ -100,7 +109,7 @@ func TestPruneEntry(t *testing.T) {
 		// いま書いたばかりの記録が消える形になるので受けない。
 		e := newPruneEnv(t)
 		fresh := putAged(t, filepath.Join(e.logs, oldLogName), 0.5)
-		proc := e.ccnavi(map[string]string{"CCNAVI_GUARD_TICKET_APPROVAL": "disable", "CCNAVI_LOG_KEEP_DAYS": "0.0001"}, "", "user", "prune")
+		proc := e.ccnavi(map[string]string{"CCNAVI_GUARD_TICKET_APPROVAL": "disable", "CCNAVI_LOG_KEEP_DAYS": "0.0001"}, "y\n", "user", "prune")
 		if proc.Code != 0 || !strings.Contains(proc.Stderr, "下限") || !exists(fresh) {
 			t.Errorf("code = %d, stderr = %q", proc.Code, proc.Stderr)
 		}

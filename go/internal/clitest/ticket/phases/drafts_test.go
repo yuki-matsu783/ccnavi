@@ -185,7 +185,7 @@ func (d *drafts) generalize() string {
 func (d *drafts) handoff(rel, tree string) run.Result {
 	d.t.Helper()
 	env := map[string]string{guardEnv: "disable"}
-	shown := run.Ccnavi(d.t, []string{"--root", tree, "user", "handoff", rel, "--json"}, run.Opts{Env: env, Dir: base.Root()})
+	shown := run.Ccnavi(d.t, []string{"--root", tree, "user", "handoff", rel, "--preview", "--json"}, run.Opts{Env: env, Dir: base.Root()})
 	if shown.Code != 0 {
 		d.t.Fatalf("handoff 表示: code %d\n%s%s", shown.Code, shown.Stdout, shown.Stderr)
 	}

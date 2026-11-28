@@ -78,13 +78,16 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-push-approved.sh [<親>...]
-sh .ccnavi/scripts/ccnavi-user-push-approved.sh --path <パス> [--path <パス>...]
+使い方: sh .ccnavi/scripts/ccnavi-user-push-approved.sh [<親>...] | --path <パス> [--path <パス>...]
 
   承認済みチケットの置き場に変更があるツリーごとに、その置き場だけをコミットし、
   保護されたブランチでなければ push する。取り込み済みの親子のチケットの親のワークツリーは、
   取り込んでから送る（write-and-push と同じ手順）。<親> を並べるとその親子のチケットだけ。
   --path を並べると、置き場の変更のうちそのパス（ワークスペースルートからの相対）だけ。
+  確認（y/N）は聞かない。送れなかったツリーがあれば終了コード 1 で、通ったもの・残り・打ち直す 1 行を出す。
+  ユーザがターミナルで実行します。全体の一覧は `ccnavi user`。
+
+例: sh .ccnavi/scripts/ccnavi-user-push-approved.sh i0002
 USAGE
 }
 
@@ -94,6 +97,11 @@ case "${1:-}" in
 	exit 0
 	;;
 esac
+# 失敗したときに打ち直す 1 行に使う、渡された引数（引用つき）。
+again=""
+for arg in "$@"; do
+	again="$again $(ccnavi_sh_quote "$arg")"
+done
 # --path で渡したパス（1 行 1 つ）。空なら今どおり、置き場の変更を全部。
 given=""
 named=""
@@ -434,6 +442,7 @@ printf '%s\n' "$trees" | while IFS= read -r tree; do
 	ccnavi_git_auth "$tree"
 	if git -C "$tree" push --quiet -u origin "$branch" 2>/dev/null; then
 		printf '承認済みチケットをブランチ %s にpushしました（%s）。\n' "$branch" "$name"
+		printf 'ok:%s\n' "$name" >>"$state"
 	else
 		printf 'ccnavi-user-push-approved: %s の push に失敗しました。手で送ってください（git push -u origin %s）。\n' \
 			"$name" "$branch" >&2
@@ -446,5 +455,12 @@ if [ ! -s "$state" ]; then
 	printf 'コミットして push する承認済みチケットはありません。\n'
 	exit 0
 fi
-grep -q '^fail$' "$state" && exit 1
+if grep -q '^fail$' "$state"; then
+	# 一部だけ通ったときの出力（決まりは .agents/docs/script-output.md の「ユーザ専用 sh の作法」）。
+	pushed=$(sed -n 's/^ok://p' "$state" | tr '\n' ' ')
+	[ -z "$pushed" ] || printf '通ったもの: %s\n' "$pushed"
+	printf '残り: %s 本のツリーが送れていない（上の文面のとおり。コミットはローカルに残っている）\n' "$(grep -c '^fail$' "$state")"
+	printf '次: sh %s%s\n' "$(ccnavi_sh_quote "$(dirname "$0")/ccnavi-user-push-approved.sh")" "$again"
+	exit 1
+fi
 exit 0

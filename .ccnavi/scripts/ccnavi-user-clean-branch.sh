@@ -23,10 +23,14 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed]
+使い方: sh .ccnavi/scripts/ccnavi-user-clean-branch.sh <子の識別子> [--confirmed]
 
   親をクローズしたときに片付ける子として記録した手元のブランチを、条件を確かめて削除します。
-  取り消した子は --confirmed（ユーザが確認した）が要る。ユーザがターミナルで実行します。
+  取り消した子は --confirmed（ユーザが消してよいと確認した）が要る。y/N は聞かない（--confirmed が y/N の代わりで、
+  条件が合わなければ何も消さずに止まる）。
+  ユーザがターミナルで実行します。全体の一覧は `ccnavi user`。
+
+例: sh .ccnavi/scripts/ccnavi-user-clean-branch.sh i0002-01-03
 USAGE
 }
 

@@ -2,11 +2,12 @@
 # ccnavi-user-decide 残った指摘（未解決のスレッド）の対応方針を決めて置く。ユーザがターミナルで打つ（ボードが押した選択を送る形も、ユーザが打つ）。
 #
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N>                                     ターミナルで 1 件ずつ選ぶ
+#   sh .ccnavi/scripts/ccnavi-user-decide.sh <N> --preview                           残った指摘とダイジェストを見るだけ（何も置かない）
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
 #   sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]                    止まった判断の続きを送る
 #
 # ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める。一覧を見るだけの形（`ccnavi-review.sh decide <N> --preview`）は
-# エージェントも使うので、ccnavi-review.sh に残してある。
+# エージェントも使うので、ccnavi-review.sh に残してある（`--preview` はそこへ渡す）。
 #
 # ここが取ってくる → `ccnavi user reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
 # 対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
@@ -26,12 +27,13 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイジェスト>]
-sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]
+使い方: sh .ccnavi/scripts/ccnavi-user-decide.sh <N> [--preview | --choices <JSON> --digest <ダイジェスト>]
+        sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]
 
   未解決（Unresolved）の指摘の対応方針を指摘ごとに選んで置く。対応しない・このフェーズで直す・issue に回す。
-  ユーザがターミナルで実行します。--choices と --digest は、ボードでユーザが押した選択を置く形（組で渡す）。
-  一覧を見るだけなら sh .ccnavi/scripts/ccnavi-review.sh decide <N> --preview。
+  実行ファイルが指摘ごとに選ばせ、最後に y/N を聞く。--preview は残った指摘とダイジェストを見るだけで、何も置かない。
+  --choices と --digest は、ボードでユーザが押した選択を置く形（組で渡す。y/N は聞かない）。
+  ユーザがターミナルで実行します。全体の一覧は `ccnavi user`。
 
   --resume は、途中で止まった判断の続きを送る。保存した判断（操作記録）から、返信・解決・適用・
   issue・コメントの済んでいない段階だけを進める。選び直しはさせず、送り終えた段階は繰り返さない。
@@ -39,6 +41,8 @@ sh .ccnavi/scripts/ccnavi-user-decide.sh --resume [<操作ID>]
   ワークスペースの中ならどこからでも打てる（親のワークツリーへは自分で移る）。
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
+
+例: sh .ccnavi/scripts/ccnavi-user-decide.sh 3
 USAGE
 }
 
@@ -58,6 +62,7 @@ esac
 args_n=$#
 resume_op=""
 resuming=""
+preview=""
 choices=""
 digest=""
 if [ "${1:-}" = --resume ]; then
@@ -82,9 +87,7 @@ else
 fi
 while [ "$#" -gt 0 ]; do
 	case "$1" in
-	--preview)
-		fail decide-preview "一覧を見るだけなら ccnavi-review.sh decide <N> --preview を使ってください（何も置きません）。" 2
-		;;
+	--preview) preview=1; shift ;;
 	--json) shift ;;
 	--choices | --digest)
 		[ "$#" -ge 2 ] || fail decide-no-value "$1 には値が必要です。" 2
@@ -96,6 +99,11 @@ while [ "$#" -gt 0 ]; do
 done
 if [ -n "$choices" ] || [ -n "$digest" ]; then
 	[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "--choices と --digest は組で渡してください。" 2
+fi
+# --preview は見るだけ（何も置かない）。読む側の ccnavi-review.sh decide <N> --preview がそのまま答える。
+if [ -n "$preview" ]; then
+	[ -z "$choices$resuming" ] || fail decide-preview-combo "--preview は <N> だけと一緒に指定できます。" 2
+	exec sh "$(dirname "$0")/ccnavi-review.sh" decide "$n" --preview
 fi
 
 # ---- --resume: 保存した判断（操作記録）から、止まった判断の続きを送る。
@@ -207,11 +215,22 @@ post_decision() {
 	post_decision_staged after || :
 }
 
+# 置いたあとの投稿が済んでいないとき（post_warning がある）の出力（決まりは .agents/docs/script-output.md の
+# 「ユーザ専用 sh の作法」）。通ったもの・残り・打ち直す 1 行を言って、終了コード 1 で終わる。置いたものは戻さない。
+decide_left() {
+	[ -n "$post_warning" ] || return 0
+	printf '%s: %s\n' "$review_label" "$post_warning" >&2
+	printf '通ったもの: フェーズ %s の対応方針を置いた\n' "$n"
+	printf '残り: 投稿（issue・コメント）\n'
+	printf '次: sh %s --resume %s\n' "$(ccnavi_sh_quote "$(dirname "$0")/ccnavi-user-decide.sh")" "${op_id:-}"
+	exit 1
+}
+
 # --resume の終わりに言うこと。
 resume_report() {
 	printf 'OK: 判断（操作 %s）の続きを送った\n' "$resume_op"
 	[ -z "$issue_url" ] || printf 'issue に回した: %s\n' "$issue_url"
-	[ -z "$post_warning" ] || printf '%s: %s\n' "$review_label" "$post_warning" >&2
+	decide_left
 	return 0
 }
 
@@ -297,6 +316,7 @@ if [ -n "$choices" ]; then
 	fi
 	# issue の URL と警告を足すのは実行ファイル（`accept decided`）
 	ccnavi accept decided "$decide_out" "$issue_url" "$post_warning"
+	decide_left
 	exit 0
 fi
 ccnavi_wap_family "$family"
@@ -365,6 +385,6 @@ yes)
 	;;
 esac
 post_decision "$n"
-[ -n "$issue_url" ] && printf 'issue に回した: %s\n' "$issue_url"
-[ -n "$post_warning" ] && printf '%s: %s\n' "$review_label" "$post_warning" >&2
-:
+[ -z "$issue_url" ] || printf 'issue に回した: %s\n' "$issue_url"
+decide_left
+exit 0

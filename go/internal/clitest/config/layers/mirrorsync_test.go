@@ -37,7 +37,7 @@ func (w mirrorWS) userMirror(args ...string) (code int, stdout, stderr string) {
 // view は `user mirror --json` の答え（書かずに調べる）。
 func (w mirrorWS) view(names ...string) map[string]any {
 	w.T.Helper()
-	code, out, errText := w.userMirror(append(names, "--json")...)
+	code, out, errText := w.userMirror(append(names, "--preview", "--json")...)
 	if code != 0 {
 		w.T.Fatalf("code = %d\n%s%s", code, out, errText)
 	}
@@ -107,7 +107,7 @@ func TestTheMirrorViewPrintsJSONWithTheAgreedShape(t *testing.T) {
 func TestTheMirrorViewInTextNamesTheCommandToRun(t *testing.T) {
 	t.Parallel()
 	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
-	code, out, errText := w.userMirror()
+	code, out, errText := w.userMirror("--preview")
 	if code != 0 {
 		t.Fatalf("code = %d\n%s%s", code, out, errText)
 	}
@@ -118,7 +118,7 @@ func TestTheMirrorViewInTextNamesTheCommandToRun(t *testing.T) {
 	}
 	// 名前は引用し、差分の見方を添える。
 	w.Project("odd name", nil, "", "")
-	code, odd, errText := w.userMirror("odd name")
+	code, odd, errText := w.userMirror("odd name", "--preview")
 	if code != 0 {
 		t.Fatalf("code = %d\n%s%s", code, odd, errText)
 	}
@@ -134,10 +134,10 @@ func TestTheTextViewWarnsWhenAnUpdateOverwritesTheMirror(t *testing.T) {
 	w := mirrorWS{configws.NewWS(t, configws.KindBase)}
 	w.syncAll()
 	configws.Write(t, mirrorOf(w.Lib, "risks.yml"), "version: 1\nlevels: {}\nfactors: []\n")
-	if _, out, _ := w.userMirror(); !strings.Contains(out, "上書き・削除します") {
+	if _, out, _ := w.userMirror("--preview"); !strings.Contains(out, "上書き・削除します") {
 		t.Errorf("上書きの警告が無い:\n%s", out)
 	}
-	if _, fresh, _ := w.userMirror("app"); strings.Contains(fresh, "上書き・削除します") {
+	if _, fresh, _ := w.userMirror("app", "--preview"); strings.Contains(fresh, "上書き・削除します") {
 		t.Errorf("上書きしない app に警告が出た:\n%s", fresh)
 	}
 }

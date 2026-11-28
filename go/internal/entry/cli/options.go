@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"ccnavi/internal/infra/fsio"
 	"fmt"
 	"io"
 	"strings"
@@ -215,6 +216,18 @@ func runDocs(stdout, stderr io.Writer, conf *config.Settings, root string, a opt
 func runPrune(in *input, stdout, stderr io.Writer, conf *config.Settings, root string, preview bool) int {
 	if !preview && !fromTerminal(in, conf, stderr, useronly.OpPrune) {
 		return config.ExitError
+	}
+	if !preview {
+		// 動かすものを先に見せて、y/N を聞く（見せたのと同じ設定で、そのまま整理する）。
+		plan := prune.Run(root, conf.Log, conf.State, "", prune.Options{DryRun: true})
+		for _, line := range prune.Lines(plan, true) {
+			fmt.Fprintln(stdout, line)
+		}
+		fmt.Fprint(stdout, "この内容で整理する場合は y、やめる場合はそれ以外: ")
+		if !fsio.ReadYes(in.buf) {
+			fmt.Fprintln(stderr, "ccnavi: 整理しなかった")
+			return config.ExitError
+		}
 	}
 	report := prune.Run(root, conf.Log, conf.State, "", prune.Options{DryRun: preview})
 	for _, line := range prune.Lines(report, preview) {

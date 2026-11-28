@@ -87,7 +87,7 @@ func (d *decideSite) age(id, stage string) {
 
 func (d *decideSite) choose(env map[string]string) {
 	d.t.Helper()
-	if done := d.decide(dOpts{env: env}, "1", "--choices", `{"u1":"issue"}`, "--digest", "d0"); done.Code != 0 {
+	if done := d.decide(dOpts{env: env}, "1", "--choices", `{"u1":"issue"}`, "--digest", "d0"); done.Code != 0 && !(done.Code == 1 && strings.Contains(done.Stdout, "通ったもの:")) {
 		d.t.Fatalf("code = %d\n%s%s", done.Code, done.Stdout, done.Stderr)
 	}
 }
@@ -121,7 +121,7 @@ func TestDecideAFailedNoteIsResumedOnlyWhenItIsSafe(t *testing.T) {
 	done := d.decide(dOpts{}, "1", "--choices", `{"u1":"issue"}`, "--digest", "d0")
 	answer := answerOf(t, done.Stdout)
 	warning := fmt.Sprint(answer["warning"])
-	if done.Code != 0 || !strings.Contains(warning, "引き継ぎ未完了") || !strings.Contains(warning, "--resume") || !strings.HasSuffix(fmt.Sprint(answer["issue_url"]), "/issues/1") {
+	if done.Code != 1 || !strings.Contains(done.Stdout, "次: sh ") || !strings.Contains(warning, "引き継ぎ未完了") || !strings.Contains(warning, "--resume") || !strings.HasSuffix(fmt.Sprint(answer["issue_url"]), "/issues/1") {
 		t.Fatalf("code = %d, 答え = %v\n%s", done.Code, answer, done.Stderr)
 	}
 	rec := d.record()

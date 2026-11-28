@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"ccnavi/internal/infra/config"
+	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/tickets/model/place"
@@ -28,7 +29,7 @@ func writeAnswer(stdout io.Writer, v any) { writeJSON(stdout, v, true, 1) }
 var sidewaysOptions = map[string]bool{
 	"root": true, "cwd": true, "record_writes": true, "record_tree": true, "record_commit": true, "record_merge": true, "mode": true, "restore_if_deny": true,
 	"guard_core_files": true, "guard_ticket_approval": true, "ticket_control": true, "command": true, "yes": true,
-	"expect": true, "via": true, "json": true,
+	"expect": true, "via": true, "json": true, "preview": true,
 }
 
 // sidewaysProblem は、`--handoff`（own）・`--mirror` と同時に渡せないオプションのうち最初のもの。
@@ -92,6 +93,10 @@ func handoffUsage(parser *argReader, a opts) string {
 		return "--via に渡せるのは board だけです"
 	case route != "" && (yes == "" || a.IsNone("expect") || !a.Truthy("json")):
 		return "--via board は --yes --expect <ハッシュ> --json と一緒に指定してください"
+	case a.Truthy("preview") && yes != "":
+		return "--preview と --yes は同時に指定できません"
+	case a.Truthy("json") && yes == "" && !a.Truthy("preview"):
+		return "--json は --preview か --yes と一緒に指定してください"
 	}
 	return ""
 }
@@ -128,12 +133,36 @@ func runHandoff(in *input, stdout, stderr io.Writer, parser *argReader, conf *co
 		writeAnswer(stdout, plan.JSON())
 		return config.ExitOK
 	}
-	handoffPlan(stdout, plan, wanted(a) != nil, root)
+	preview := a.Truthy("preview")
+	if !preview && !fromTerminal(in, conf, stderr, useronly.OpHandoff) {
+		return config.ExitError
+	}
+	handoffPlan(stdout, plan, wanted(a) != nil, root, preview)
+	if preview {
+		return config.ExitOK
+	}
+	// ターミナル。計画を見せて y/N を聞き、y のときだけ、見せた計画のハッシュで取り込む。
+	if len(plan.Selected()) == 0 || !plan.OK() {
+		return config.ExitError
+	}
+	fmt.Fprint(stdout, "この内容で取り込む場合は y、やめる場合はそれ以外: ")
+	if !fsio.ReadYes(in.buf) {
+		fmt.Fprintln(stderr, "ccnavi: 取り込まなかった")
+		return config.ExitError
+	}
+	via.SetRoute(via.Terminal)
+	done := handoff.Apply(handoff.Prepare(conf, root, wanted(a)), plan.Expect(), false)
+	if !done.OK {
+		fmt.Fprintf(stderr, "ccnavi: %s\n", done.Error)
+		return config.ExitError
+	}
+	handoffApplied(stdout, done)
 	return config.ExitOK
 }
 
-// handoffPlan は取り込みの計画を人が読む形で書く。何も反映せず、取り込めるときだけ次に打つコマンドを添える。
-func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
+// handoffPlan は取り込みの計画を人が読む形で書く。何も反映しない。preview のときだけ、取り込めるなら次に打つコマンドを添える
+// （ターミナルの y/N の前は、コマンドを添えない）。
+func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string, preview bool) {
 	fmt.Fprintf(w, "ccnavi: 保護対象の下書き（%s の %s/）\n", plan.Tree, place.Handoff)
 	if len(plan.Entries) == 0 {
 		fmt.Fprintln(w, "  取り込める下書きはありません。")
@@ -171,6 +200,15 @@ func handoffPlan(w io.Writer, plan *handoff.Plan, named bool, root string) {
 	}
 	if !plan.OK() {
 		fmt.Fprintln(w, "選んだ対象に error があるため、取り込めません。直すか、パスを選び直してください。何も反映していません。")
+		return
+	}
+	if !preview {
+		for _, e := range chosen {
+			if !e.Board() {
+				fmt.Fprintln(w, "  （defense の種類か、防御の記述を動かす rules.yml を含むため、チケット管理画面からは取り込めません）")
+				break
+			}
+		}
 		return
 	}
 	// 取り込むコマンドの案内。パスを名指しで選んだときだけ、そのパスを引数に付ける。

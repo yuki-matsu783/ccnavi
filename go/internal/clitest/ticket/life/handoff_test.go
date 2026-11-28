@@ -89,7 +89,7 @@ func (w *hoWS) handoff(guard string, args ...string) run.Result {
 
 func (w *hoWS) view(paths ...string) map[string]any {
 	w.t.Helper()
-	r := ticketkit.OK(w.t, w.handoff("", append(paths, "--json")...))
+	r := ticketkit.OK(w.t, w.handoff("", append(paths, "--preview", "--json")...))
 	return ticketkit.ParseJSON(w.t, r.Stdout)
 }
 
@@ -142,12 +142,12 @@ func TestHandoffExitCodesAndRefusedCombinations(t *testing.T) {
 	w.stage(handoffDocs, []byte("new\n"))
 	ticketkit.Write(t, w.draftPath(handoffScript), "a\x00\n")
 	// 見るだけは、下書きに error があっても 0。
-	r := ticketkit.OK(t, w.handoff("", "--json"))
+	r := ticketkit.OK(t, w.handoff("", "--preview", "--json"))
 	if ticketkit.ParseJSON(t, r.Stdout)["ok"] != false {
 		t.Error("error のある下書きで ok が真")
 	}
 	for _, args := range [][]string{
-		{w.target(handoffDocs), "--json"}, {"../x.md", "--json"}, {"--yes", "--json"}, {"--yes", "--expect", "x", "--via", "terminal", "--json"},
+		{w.target(handoffDocs), "--preview", "--json"}, {"../x.md", "--preview", "--json"}, {"--yes", "--json"}, {"--yes", "--expect", "x", "--via", "terminal", "--json"},
 		{"--lint"}, {"--docs"}, {"--yes", "i1"}, {"--templates"},
 	} {
 		if got := w.handoff("", args...); got.Code != 1 {
@@ -192,7 +192,7 @@ func TestTheHandoffTextAnswerShowsTheDiffAndTheCommand(t *testing.T) {
 	t.Parallel()
 	w := newHoWS(t)
 	w.stage(handoffDocs, []byte("# 手引き\n\n新しい文\n"))
-	r := ticketkit.OK(t, w.handoff(""))
+	r := ticketkit.OK(t, w.handoff("", "--preview"))
 	ticketkit.Has(t, r.Stdout, "-古い文")
 	ticketkit.Has(t, r.Stdout, "+新しい文")
 	ticketkit.Has(t, r.Stdout, "ccnavi-user-handoff.sh --yes --expect "+w.view()["expect"].(string))
@@ -202,7 +202,7 @@ func TestTheHandoffTextAnswerShowsTheDiffAndTheCommand(t *testing.T) {
 	rel := ".ccnavi/docs/my guide.md"
 	ticketkit.Write(t, w.target(rel), "# 手引き\n")
 	w.stage(rel, []byte("# 手引き\n\n足した\n"))
-	r = ticketkit.OK(t, w.handoff("", rel))
+	r = ticketkit.OK(t, w.handoff("", rel, "--preview"))
 	ticketkit.Has(t, r.Stdout, "ccnavi-user-handoff.sh '"+rel+"' --yes --expect "+w.view(rel)["expect"].(string))
 }
 
@@ -264,7 +264,7 @@ func TestTheTerminalIsNeededToWriteAndTheBoardRouteSkipsIt(t *testing.T) {
 		t.Errorf("code %d", r.Code)
 	}
 	ticketkit.Has(t, r.Stderr, "ターミナル")
-	ticketkit.OK(t, w.handoff("enable", "--json"))
+	ticketkit.OK(t, w.handoff("enable", "--preview", "--json"))
 	// defense はボードから断る。
 	r = w.board(both)
 	if r.Code != 1 {
@@ -355,4 +355,27 @@ func TestSpellingVariantsOfTheDraftDirectoryAreOnePlace(t *testing.T) {
 	if !slices.Equal(paths, []string{handoffSettings}) || answer["ok"] != true {
 		t.Errorf("項目 = %v, ok = %v", paths, answer["ok"])
 	}
+}
+
+// 引数なし（ターミナル）は、計画を見せて y/N を聞く。y のときだけ取り込み、それ以外は何も書かず 1 で終わる。
+func TestHandoffWithoutFlagsAsksYesOrNo(t *testing.T) {
+	t.Parallel()
+	w := newHoWS(t)
+	w.stage(handoffDocs, []byte("# 手引き\n\n新しい文\n"))
+	ask := func(input string) run.Result {
+		return run.Ccnavi(t, []string{"--root", w.root, "--entry", "sh", "user", "handoff"}, run.Opts{Dir: base.Root(), Input: input, Env: map[string]string{"CCNAVI_GUARD_TICKET_APPROVAL": "disable"}})
+	}
+	no := ask("n\n")
+	if no.Code != 1 {
+		t.Fatalf("n の終了コード = %d\n%s%s", no.Code, no.Stdout, no.Stderr)
+	}
+	ticketkit.Has(t, no.Stdout, "取り込む場合は y")
+	if _, err := os.Stat(w.draftPath(handoffDocs)); err != nil {
+		t.Error("n と答えたのに下書きが消えた")
+	}
+	yes := ask("y\n")
+	if yes.Code != 0 {
+		t.Fatalf("y の終了コード = %d\n%s%s", yes.Code, yes.Stdout, yes.Stderr)
+	}
+	ticketkit.Has(t, yes.Stdout, "取り込んだ")
 }

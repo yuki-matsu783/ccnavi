@@ -76,7 +76,7 @@ func TestReadOnlyFormsAreNotRefused(t *testing.T) {
 
 func TestUserWithAnUnknownOperationIsRefused(t *testing.T) {
 	t.Parallel()
-	for _, argv := range [][]string{{"user"}, {"user", "bogus"}, {"user", "reviewed"}} {
+	for _, argv := range [][]string{{"user", "bogus"}, {"user", "reviewed"}} {
 		t.Run(strings.Join(argv, " "), func(t *testing.T) {
 			t.Parallel()
 			r := entry(t, argv...)
@@ -85,6 +85,20 @@ func TestUserWithAnUnknownOperationIsRefused(t *testing.T) {
 			}
 			mustHave(t, r.Stderr, "user")
 		})
+	}
+}
+
+// 操作の無い `user` は、入口の一覧（名前・1 行の説明・打つ例）を出して終わる。何も動かさない。
+func TestUserAloneListsTheEntries(t *testing.T) {
+	t.Parallel()
+	r := entry(t, "user")
+	if r.Code != 0 {
+		t.Fatalf("終了コード = %d: %s", r.Code, r.Stderr)
+	}
+	for _, name := range []string{"agree", "decide", "close-early", "push-approved", "handoff", "mirror", "prune", "clean-branch"} {
+		script := "ccnavi-user-" + name + ".sh"
+		mustHave(t, r.Stdout, script)
+		mustHave(t, r.Stdout, "例: sh .ccnavi/scripts/"+script)
 	}
 }
 
@@ -108,8 +122,8 @@ func TestWritingThroughTheEntryNeedsATerminal(t *testing.T) {
 		argv []string
 		want string
 	}{
-		{[]string{"--entry", "sh", "user", "handoff", "--yes", "--expect", "x"}, "ccnavi-user-handoff.sh --yes はユーザがターミナルから実行する必要があります"},
-		{[]string{"--entry", "sh", "user", "mirror", "--yes", "--expect", "x"}, "ccnavi-user-mirror.sh --yes はユーザがターミナルから実行する必要があります"},
+		{[]string{"--entry", "sh", "user", "handoff", "--yes", "--expect", "x"}, "ccnavi-user-handoff.sh はユーザがターミナルから実行する必要があります"},
+		{[]string{"--entry", "sh", "user", "mirror", "--yes", "--expect", "x"}, "ccnavi-user-mirror.sh はユーザがターミナルから実行する必要があります"},
 		{[]string{"--entry", "sh", "user", "prune"}, "ccnavi-user-prune.sh はユーザがターミナルから実行する必要があります"},
 	} {
 		t.Run(c.argv[3], func(t *testing.T) {

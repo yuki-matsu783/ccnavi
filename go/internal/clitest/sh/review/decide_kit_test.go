@@ -510,5 +510,11 @@ func answerOf(t testing.TB, out string) map[string]any {
 	if len(ls) == 0 {
 		t.Fatal("標準出力が空")
 	}
+	// 一部だけ通ったときは、JSON の後ろに 通ったもの・残り・次 が続く。答えは最後の JSON の行。
+	for i := len(ls) - 1; i >= 0; i-- {
+		if strings.HasPrefix(ls[i], "{") {
+			return decode(t, ls[i])
+		}
+	}
 	return decode(t, ls[len(ls)-1])
 }

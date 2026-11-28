@@ -814,7 +814,10 @@ func TestAPartialApprovalStillCarriesWhatWasPlaced(t *testing.T) {
 	eq(t, "件名", a.subject(tree), carryMessage)
 	eqList(t, "コミット", a.committed(tree), []string{approvedDoing + "/i0001.md"})
 	eq(t, "リモート", a.remoteHead(parentID), a.head(tree))
-	has(t, r.Stderr, "承認の一部だけが通りました")
+	// 一部だけ通ったときは、通ったもの・残り・打ち直す 1 行を標準出力に出す。
+	has(t, r.Stdout, "通ったもの:")
+	has(t, r.Stdout, "残り:")
+	has(t, r.Stdout, "次: sh ")
 }
 
 // 親は書けて子だけ書けなかった承認。親は push され、書けた分と子の失敗が報告される。
@@ -895,11 +898,16 @@ func TestAFailedApprovalStillShowsWhy(t *testing.T) {
 	has(t, r.Stderr, "提案の内容が更新されました")
 }
 
-// コミットや push の失敗で承認が失敗に見えないように、承認が通れば 0。コミットは残る。
-func TestAFailedPushDoesNotFailTheApproval(t *testing.T) {
+// 承認が通ってもコミットか push が済んでいなければ、全部は通っていないので 1。承認は戻さず、コミットは残る。
+// 通ったもの・残り・打ち直す 1 行（push-approved）を出す。
+func TestAFailedPushLeavesTheApprovalAndSaysWhatIsLeft(t *testing.T) {
 	a := newApproveKit(t)
 	a.git(a.ws, "remote", "set-url", "origin", filepath.Join(a.tmp, "missing.git"))
 	tree := a.worktree(parentID, false)
-	code(t, a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree)}), 0)
+	r := a.approve(map[string]string{"STUB_TREE": shkit.Slash(tree)})
+	code(t, r, 1)
+	has(t, r.Stdout, "通ったもの:")
+	has(t, r.Stdout, "次: sh ")
+	has(t, r.Stdout, "ccnavi-user-push-approved.sh")
 	eq(t, "件名", a.subject(tree), carryMessage)
 }

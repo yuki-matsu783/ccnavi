@@ -34,20 +34,24 @@ ccnavi-user-handoff.sh で行います（見るだけの形も含めてユーザ
 ない user handoff も断ります）。テンプレートの
 改名・移動・削除は、ユーザがファイルを直接操作します。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] [--json]
-        （見るだけ。PATH はツリーからの相対パスで、省くと下書き全部）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...]
+        （下書きと差分を見せて y/N を聞き、y なら取り込みます。PATH はツリーからの相対パスで、省くと下書き全部）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] --preview [--json]
+        （見るだけ。何も取り込みません）
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-handoff.sh [PATH...] --yes --expect HASH
-        （取り込みます。チケット管理画面は実行ファイルを --entry board --via board で呼びます）
+        （y/N を省いて取り込みます。チケット管理画面は実行ファイルを --entry board --via board で呼びます）
 
 共通設定（ワークスペースの .ccnavi/config/common/）のミラー（各プロジェクトの
 .ccnavi/config/common/）と工程スキル（各プロジェクトの skills/）がずれていないかの確認と、ずれの同期は、ユーザが
 ccnavi-user-mirror.sh で行います（見るだけの形も含めてユーザ専用です。実行ファイルは内部で
 --mirror に読み替えます。sh が付ける入口の印（--entry sh）がない user mirror は断ります）。同期は各プロジェクトのワークツリーに書くだけで、コミットはしません。
 
-    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] [--json]
-        （見るだけ。PROJECT を省くと全プロジェクト。差分と --expect の値を出します）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...]
+        （差分を見せて y/N を聞き、y なら揃えます。PROJECT を省くと全プロジェクト）
+    sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] --preview [--json]
+        （見るだけ。差分と --expect の値を出します）
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-mirror.sh [PROJECT...] --yes --expect HASH
-        （差分のあるプロジェクトを揃えます。--expect が今の差分と違うときは何も書きません。
+        （y/N を省いて、差分のあるプロジェクトを揃えます。--expect が今の差分と違うときは何も書きません。
         チケット管理画面は実行ファイルを --entry board --via board で呼びます）
 
 収集済みのテンプレートは、親の提案を開始するときに使用されます。

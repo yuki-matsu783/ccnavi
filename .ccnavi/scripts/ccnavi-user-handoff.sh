@@ -1,13 +1,14 @@
 #!/bin/sh
 # ccnavi-user-handoff wip/handoff/ の下書きを、保護対象の本来の場所へ取り込む。ユーザが端末で打つ。
 #
-#   sh .ccnavi/scripts/ccnavi-user-handoff.sh [--root <ツリー>] [<相対パス>…] [--yes --expect <ハッシュ>]
+#   sh .ccnavi/scripts/ccnavi-user-handoff.sh [--root <ツリー>] [<相対パス>…] [--preview | --yes --expect <ハッシュ>]
 #
 # ユーザだけが打つ sh は ccnavi-user-*.sh に分けてあり、エージェントからは hook が名前で止める。
 # 中身は実行ファイルの `user handoff` で、引数はそのまま渡す。ユーザが打つ入口を sh にそろえるための
 # 薄い包みで、実行ファイルに入口の印（`--entry sh`）を付けて起こす。印が無い `user` の入口は、
 # 実行ファイルが直に打った形として断る。
-# 引数なしは取り込み待ちの一覧を見せるだけ。取り込むときは `--yes --expect <ハッシュ>` を添える。
+# 引数なしは取り込み待ちの一覧を見せて y/N を聞く（実行ファイルが聞く）。`--preview` は一覧を見るだけ。
+# `--yes --expect <ハッシュ>` は y/N を省く形（ボードが送る形。ターミナルでも、見せたハッシュと同じなら使える）。
 #
 # 終了コード: 実行ファイルの `user handoff` のもの。2 は引数か環境の誤り
 
@@ -18,10 +19,13 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-handoff.sh [--root <ツリー>] [<相対パス>…] [--yes --expect <ハッシュ>]
+使い方: sh .ccnavi/scripts/ccnavi-user-handoff.sh [--root <ツリー>] [<相対パス>…] [--preview | --yes --expect <ハッシュ>]
 
-  wip/handoff/ の下書きを、保護対象の本来の場所へ取り込む。
-  実行ファイルの `user handoff` を、入口の印を付けて起こす。ユーザが端末で実行します。
+  wip/handoff/ の下書きを、保護対象の本来の場所へ取り込む。一覧を見せたあと、実行ファイルが y/N を聞く。
+  --preview は一覧を見るだけで、何も取り込まない。--yes --expect は y/N を省く形（見せたハッシュと合うときだけ取り込む）。
+  実行ファイルの `user handoff` を、入口の印を付けて起こす。ユーザが端末で実行します。全体の一覧は `ccnavi user`。
+
+例: sh .ccnavi/scripts/ccnavi-user-handoff.sh --preview
 USAGE
 }
 

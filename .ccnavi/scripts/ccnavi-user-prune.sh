@@ -7,7 +7,7 @@
 # 中身は実行ファイルの `user prune` で、引数はそのまま渡す。ユーザが打つ入口を sh にそろえるための
 # 薄い包みで、実行ファイルに入口の印（`--entry sh`）を付けて起こす。印が無い `user` の入口は、
 # 実行ファイルが直に打った形として断る。
-# `--preview` は動かすものを並べるだけ。
+# 引数なしは動かすものを見せて y/N を聞く（実行ファイルが聞く）。`--preview` は動かすものを並べるだけ。
 #
 # 終了コード: 実行ファイルの `user prune` のもの。2 は引数か環境の誤り
 
@@ -18,10 +18,13 @@ set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-user-prune.sh [--preview]
+使い方: sh .ccnavi/scripts/ccnavi-user-prune.sh [--preview]
 
-  判定ログを整理して、動かしたものを出す。
-  実行ファイルの `user prune` を、入口の印を付けて起こす。ユーザが端末で実行します。
+  判定ログと state を整理する。動かすものを見せたあと、実行ファイルが y/N を聞く。
+  --preview は動かすものを並べるだけで、何も動かさない。
+  実行ファイルの `user prune` を、入口の印を付けて起こす。ユーザが端末で実行します。全体の一覧は `ccnavi user`。
+
+例: sh .ccnavi/scripts/ccnavi-user-prune.sh --preview
 USAGE
 }
 

@@ -86,6 +86,11 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 	// ユーザ専用の入口（`ccnavi user …`）の印と動詞を取り除き、内部の形の引数に直す。
 	argv, marker, err := useronly.TakeEntry(argv)
 	var entry *useronly.Verb
+	if err == nil && useronly.IsBareEntry(argv) {
+		// 操作の無い `user` は、入口の一覧を出す（何も動かさない）。
+		io.WriteString(stdout, useronly.Listing())
+		return config.ExitOK
+	}
 	if err == nil {
 		argv, entry, err = useronly.Rewrite(argv)
 	}

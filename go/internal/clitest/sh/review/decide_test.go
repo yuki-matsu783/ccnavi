@@ -216,13 +216,13 @@ func TestReviewShDecideTakesOnlyPreview(t *testing.T) {
 	}
 }
 
-// 見るだけの --preview は ccnavi-review.sh に残る。ユーザ専用の sh は断って案内する。
-func TestTheUserScriptPointsThePreviewBack(t *testing.T) {
+// 見るだけの --preview は、読む側の ccnavi-review.sh decide <N> --preview へ渡る。何も書かない。
+func TestTheUserScriptPassesThePreviewOn(t *testing.T) {
 	t.Parallel()
 	d := newDecideSite(t)
-	refused := d.decide(dOpts{}, "1", "--preview")
-	if refused.Code != 2 || !strings.Contains(refused.Stderr, "ccnavi-review.sh decide <N> --preview") || len(d.calls()) != 0 {
-		t.Errorf("code = %d, 呼び出し = %v\n%s", refused.Code, d.calls(), refused.Stderr)
+	r := d.decide(dOpts{}, "1", "--preview")
+	if r.Code != 0 || !strings.Contains(strings.Join(d.calls(), " "), "--preview") || len(d.gl.kinds()) != 0 {
+		t.Errorf("code = %d, 呼び出し = %v, 書き込み = %v\n%s", r.Code, d.calls(), d.gl.kinds(), r.Stderr)
 	}
 }
 
