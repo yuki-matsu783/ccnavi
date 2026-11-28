@@ -7,7 +7,7 @@ function spy(): { readonly screens: Screens; readonly calls: string[] } {
   return {
     calls,
     screens: {
-      board: async (project) => void calls.push(`board:${project ?? "-"}`),
+      board: async (target) => void calls.push(`board:${target === undefined ? "-" : target.kind === "project" ? target.project : target.kind}`),
       rules: async (target) => void calls.push(`rules:${target.kind}`),
       risk: async (target) => void calls.push(`risk:${target.kind}`),
       phases: async (target) => void calls.push(`phases:${target.kind}`),
@@ -23,7 +23,8 @@ function spy(): { readonly screens: Screens; readonly calls: string[] } {
 test("CB-T136 登録した入口を帳面から開く。要求する側は相手のパネルを知らない", async () => {
   const { screens: registered, calls } = spy();
   registerScreens(registered);
-  await screens().board("lib");
+  await screens().board({ kind: "project", project: "lib" });
+  await screens().board({ kind: "mergeCheck" });
   await screens().rules({ kind: "project", name: "lib" });
   await screens().phases({ kind: "self" });
   await screens().templates({ kind: "self" });
@@ -33,7 +34,7 @@ test("CB-T136 登録した入口を帳面から開く。要求する側は相手
   await screens().projects();
   await screens().flow("i0001-01-01");
   await screens().workflow("i0001");
-  assert.deepEqual(calls, ["board:lib", "rules:project", "phases:self", "templates:self", "handoff:project:lib", "handoff:-", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
+  assert.deepEqual(calls, ["board:lib", "board:mergeCheck", "rules:project", "phases:self", "templates:self", "handoff:project:lib", "handoff:-", "risk:workspace", "projects", "flow:i0001-01-01", "workflow:i0001"]);
   forgetScreens();
 });
 

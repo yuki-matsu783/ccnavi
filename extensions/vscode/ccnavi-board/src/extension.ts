@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 import { pickAppearance } from "./appearance.js";
 import { disposeReport, finishReport, startReport, takeScreenshot } from "./bug-report.js";
+import { watchBoardFeed } from "./board-feed.js";
 import { openBoard, refreshBoard } from "./board-panel.js";
 import { registerScreens, screens } from "./core/screens.js";
 import { openFlow } from "./flow-panel.js";
@@ -31,9 +32,11 @@ export function activate(context: vscode.ExtensionContext): void {
     flow: openFlow,
     workflow: openWorkflow,
   });
-  // サイドパネルより先に読む。入口の順序がこの値で決まる。
+  // 答えを聞く側（チケット制御 → サイドパネル）を登録してから、拡張全体の答えの監視と最初の読み込みを始める。
+  // チケット制御はサイドパネルより先に聞く。サイドパネルの行がこの値で決まる。
   watchTicketControl(context);
   registerSidebar(context);
+  watchBoardFeed(context);
   context.subscriptions.push(
     vscode.commands.registerCommand("ccnaviBoard.open", () => void screens().board()),
     vscode.commands.registerCommand("ccnaviBoard.refresh", refreshBoard),

@@ -1,9 +1,9 @@
 ---
 title: ccnaviボードの画面の作り
 type: design
-description: 承認のオーバーレイの遷移、カードの組み立て（状態のバッジ・ユーザ待ち・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
+description: 承認のオーバーレイの遷移、カードの組み立て（状態のバッジ・ユーザ待ち・詳細）、ボタンの見た目、レビュー完了の流れ、マージ状況の確認、見た目の実装、拡張全体の答えとサイドパネル、機能や画面を足すときに触る場所と、画面に中身を渡す段取り
 tags: [design-doc, extension, board]
-keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage]
+keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち, 詳細, card-button, レビュー完了, マージ状況, merge, 見た目, ScreenHost, screenHost, retainedHost, retainContextWhenHidden, screens.ts, 契約, BoardMessage, board-feed, サイドパネル, BoardTarget, reveal]
 ---
 
 # 画面の作り
@@ -80,6 +80,12 @@ keywords: [設計, 画面, approval-machine, 状態のバッジ, ユーザ待ち
 ## 見た目
 
 実装はbodyのクラスの下でテーマ変数を上書きし、拡大率をbodyの`style.zoom`に当てるだけ（配色は`src/webview/styles/appearance.css`、切り替えは`src/core/appearance.ts`と`src/webview/appearance.ts`。画面が受けるのは`src/webview/useHostMessages.ts`）。配色と拡大率（`ccnaviBoard.zoom`）は、ほかの中身と同じ段取り（`ScreenHost`）で1つのメッセージ`{ type: "appearance", value, zoom? }`に載せて送る（等倍のときは`zoom`を付けない。画面は付いていなければ拡大を外す）。拡大率はHTMLには埋めないので、組み上がる（`ready`）までは等倍で描かれる。組み上がっていない画面と破棄された画面には送らない。保持しない画面には作り直されたあと`ready`で、保持する画面には再表示されたところで送り直す。ハイコントラストのテーマではClaudeの配色を適用しない。設定を書く先は、いま値が定義されている場所（フォルダ → ワークスペース → ユーザ）。
+
+## 拡張全体の答えとサイドパネル
+
+`--explain --json`の答えは拡張全体で1つだけ持つ（`board-feed.ts`。読み直しのまとめ方は`core/feed.ts`）。監視（`core/watch.ts`の`FEED_PATTERNS`）もそこにあり、ボードを閉じていても拡張が動いている間は続ける。聞き手はサイドパネル（`sidebar.ts`）・ボード（`board-panel.ts`）・フロー編集の「提案あり」（`flow-panel.ts`）・チケット制御の入口（`ticket-control.ts`）で、どれも同じ答えを`subscribe`で受ける。ボードは自分で監視も読み込みもしない。読み直しを頼むのは`boardFeed.refresh()`で、重なった頼みは1回にまとめられる。聞き手は`extension.ts`で、チケット制御 → サイドパネルの順に登録してから`watchBoardFeed`で最初の読み込みを始める（サイドパネルの行がチケット制御の値で決まる）。
+
+サイドパネルのツリーの中身（行・押したときに開くもの・バッジの数）は`core/sidebar-tree.ts`が決め、`sidebar.ts`はVS CodeのTreeItemに置き換えるだけ。件数と分類は`inbox`のまま並べる。行を押すと`ccnaviBoard.sidebarOpen`（パレットには出さない）が`screens()`の帳面を通して画面を開く。ボードの中の場所（承認・レビュー完了・カードの焦点・MRの状況を確認）は`screens().board(target)`の`BoardTarget`で渡し、ボードは答えが読めたら1度だけ進む。承認とレビュー完了はカードのボタンと同じ入力（`approveTickets`・`startDecide`）を遷移に入れるので、行けるかの確かめも同じ。カードの焦点（`reveal`）は、絞り込み（`filter`）と同じく画面に届いたら消すメッセージで送り、画面（`App.tsx`）がそのカードを隠している絞り込み・畳んだ列・アーカイブの表示を外して焦点を当てる。
 
 ## 機能や画面を足すとき
 

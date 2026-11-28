@@ -26,4 +26,4 @@ VS Code拡張「ccnaviボード」の作りを書く。拡張ホスト（`src/`�
 
 `core/`は`vscode`をimportしない。ここだけを`node --test`で試す。
 
-`webview/`は反対に、DOMだけを触り、`vscode`も`node`もimportしない。拡張ホストと共有するのは、`core/`のうちimportで辿れるぶん（`board.ts`・`board-view.ts`など、判定もI/Oもしないもの）だけ。画面はどれもReactで（サイドパネルの6画面（取り込み待ちを含めて7画面）と、ボードから開くフロー編集）、拡張ホストは中身（`BoardData` / `ProjectsData` / `RiskData` / `PhasesData` / `TemplatesData` / `HandoffData` / `RulesData` / `FlowData`）を渡す。
+`webview/`は反対に、DOMだけを触り、`vscode`も`node`もimportしない。拡張ホストと共有するのは、`core/`のうちimportで辿れるぶん（`board.ts`・`board-view.ts`など、判定もI/Oもしないもの）だけ。画面はどれもReactで（サイドパネルの入口の7画面と、ボードから開くフロー編集）、拡張ホストは中身（`BoardData` / `ProjectsData` / `RiskData` / `PhasesData` / `TemplatesData` / `HandoffData` / `RulesData` / `FlowData`）を渡す。

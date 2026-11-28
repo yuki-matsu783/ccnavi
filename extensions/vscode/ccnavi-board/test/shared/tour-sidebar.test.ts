@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { ENTRIES } from "../../src/core/sidebar-tree.js";
 import { basicTourScreens, SIDEBAR_WALKTHROUGH } from "../../src/core/tour-sidebar.js";
 import { tourScreens } from "../helpers/tour.js";
 
@@ -48,5 +49,15 @@ test("CB-T1169 左パネルのウォークスルーが宣言され、各ステ�
   const basics = walkthrough.steps.map((step) => step.description).join("\n");
   for (const command of ["ccnaviBoard.tourProjects", "ccnaviBoard.tourBoard", "ccnaviBoard.tourBasics"]) {
     assert.ok(basics.includes(`command:${command}`), `${command}へのリンクが無い`);
+  }
+});
+
+test("CB-T1290 左パネルの案内の本文は、サイドパネルの3つの見出しと、画面の入口を全部名指しする", () => {
+  const text = fs.readFileSync(path.join(ROOT, "media", "tour", "panel.md"), "utf8");
+  for (const heading of ["ユーザ待ち", "進行中の親", "画面"]) {
+    assert.ok(text.includes(heading), heading);
+  }
+  for (const entry of ENTRIES) {
+    assert.ok(text.includes(entry.label), entry.label);
   }
 });

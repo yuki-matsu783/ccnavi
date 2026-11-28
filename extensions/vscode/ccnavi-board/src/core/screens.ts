@@ -24,10 +24,26 @@ export type PhasesTarget = RulesTarget;
 /** テンプレート管理画面が開く対象。共通の設定、ワークスペースの設定、プロジェクト1つの設定（ルール管理・リスク管理・フェーズ管理と同じ3種） */
 export type TemplatesTarget = RulesTarget;
 
-/** 画面の入口（サイドパネルに並ぶ6つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
+/**
+ * ボードを開いたあとに進む場所（サイドパネルのユーザ待ち・進行中の親の行から）。行けるかはボードが、いまの答えで確かめてから進む。
+ *
+ * - `project` 開いたときの絞り込み（`""`はワークスペース（プロジェクト外）、`"*"`は全部）
+ * - `approve` そのチケット1件の承認のオーバーレイ（カードの［承認］と同じ）
+ * - `decide` そのフェーズのレビュー完了（カードの［レビュー完了］と同じ。リモートの指摘を取りに行く）
+ * - `reveal` そのカードまで送って焦点を当てる（絞り込みや畳んだ列で隠れていれば外す）
+ * - `mergeCheck` 「MRの状況を確認」（リモートのMRを見に行く）
+ */
+export type BoardTarget =
+  | { readonly kind: "project"; readonly project: string }
+  | { readonly kind: "approve"; readonly ticket: string }
+  | { readonly kind: "decide"; readonly parent: string; readonly phase: number }
+  | { readonly kind: "reveal"; readonly ticket: string }
+  | { readonly kind: "mergeCheck" };
+
+/** 画面の入口（サイドパネルに並ぶ7つと、ボードから開くフロー編集・計画編集）。引数は開く側が解く（空の表記や未登録のプロジェクトの扱いは各パネルの持ち物） */
 export interface Screens {
-  /** ボード。`project`は開いたときの絞り込み（`""`はワークスペース（プロジェクト外）、`"*"`は全部、未指定は前回のまま） */
-  readonly board: (project?: string) => Promise<void>;
+  /** ボード。`target`は開いたあとに進む場所。未指定なら開くだけ（絞り込みは前回のまま） */
+  readonly board: (target?: BoardTarget) => Promise<void>;
   readonly rules: (target: RulesTarget) => Promise<void>;
   readonly risk: (target: RiskTarget) => Promise<void>;
   readonly phases: (target: PhasesTarget) => Promise<void>;

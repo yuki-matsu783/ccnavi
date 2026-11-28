@@ -26,7 +26,7 @@ import { lockFromBoard, lockFromError, type Lock } from "./core/lock.js";
 import { loadingText } from "./core/loading-render.js";
 import type { TreeJson } from "./core/model.js";
 import { retainedHost, type ScreenHost } from "./core/screen-host.js";
-import { OWN_WRITE_GRACE_MS } from "./core/watch.js";
+import { HANDOFF_PATTERNS, OWN_WRITE_GRACE_MS } from "./core/watch.js";
 import { showLoading } from "./loading.js";
 import { assertRetained, debounce, watchGlobs, watchTickets, workspaceFolder } from "./panel-common.js";
 import { confirmIfTurn } from "./turn-confirm.js";
@@ -208,26 +208,12 @@ function registerPanelHandlers(current: PanelState): void {
   current.watchers.push(...watchTickets(folder, () => scheduleLock(current)));
 }
 
-/** 下書きの置き場と、取り込み先になる場所（許可リストの種類）の監視。ワークスペース・プロジェクト・ワークツリーの下を見る */
-const WATCH_GLOBS: readonly string[] = [
-  "wip/handoff/**",
-  "projects/*/wip/handoff/**",
-  ".claude/worktrees/*/wip/handoff/**",
-  ".ccnavi/config/**",
-  "projects/*/.ccnavi/config/**",
-  ".ccnavi/docs/**",
-  ".ccnavi/CCNAVI.md",
-  ".claude/skills/**",
-  ".claude/settings.json",
-  ".claude/settings.local.json",
-];
-
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
     watcher.dispose();
   }
   current.fileWatchers = [];
-  current.fileWatchers.push(...watchGlobs(current.folder, WATCH_GLOBS, () => scheduleChanged(current)));
+  current.fileWatchers.push(...watchGlobs(current.folder, HANDOFF_PATTERNS, () => scheduleChanged(current)));
 }
 
 function alive(current: PanelState): boolean {

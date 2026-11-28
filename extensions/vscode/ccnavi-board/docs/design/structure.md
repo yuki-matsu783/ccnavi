@@ -11,10 +11,11 @@ keywords: [設計, 構成, ファイル, src, core, webview, test, fixtures, テ
 ```
 src/
   extension.ts        画面の入口の登録（core/screens.ts の帳面）、コマンド登録とサイドパネルの登録（vscode に依存する）
-  sidebar.ts          左端のアイコンから開くサイドパネルの 6 つの入口（取り込み待ちは並べない）。チケット制御が disable なら 2 つ（プロジェクト管理・ルール管理）。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値を見出しの横に出す（vscode に依存する）
+  sidebar.ts          左端のアイコンから開くサイドパネル。見出し「ユーザ待ち」「進行中の親」「画面」のツリー（中身は core/sidebar-tree.ts）と、ユーザ待ちの合計のバッジ。行を押すと該当の画面と場所を開く（画面の帳面 screens() を通す）。チケット制御が disable ならチケットに関わる行を出さない。タイトルバーの「?」で左パネルの案内を開く。見た目は配色のアイコンで切り替え、今の値をビューの名前の横に出す（vscode に依存する）
+  board-feed.ts       拡張全体で 1 つの --explain --json の答えと、その読み直しの監視（core/watch.ts の FEED_PATTERNS。ボードを閉じていても続ける）。サイドパネル・ボード・フロー編集の「提案あり」・チケット制御が同じ答えを聞く（まとめ方は core/feed.ts。vscode に依存する）
   bug-report.ts       バグ報告（サイドパネルのタイトルバーの虫のアイコンから始める）。ステータスバーの撮る・終えるのボタン、ffmpeg の録画の起動と停止（標準入力に q）、スクリーンショットのコマンドの起動、終えたときの gif への変換と zip の書き出し（vscode に依存する。組むものは core/bug-report.ts）
-  ticket-control.ts   CCNAVI_TICKET_CONTROL を設定ファイルから読み、context key に反映する。変化を監視する（vscode に依存する）
-  board-panel.ts      ボードの Webview パネルの生成・更新・破棄、監視、操作の受け付け。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（ボードが開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
+  ticket-control.ts   CCNAVI_TICKET_CONTROL を拡張全体の答え（board-feed.ts）から読み、context key に反映する（vscode に依存する）
+  board-panel.ts      ボードの Webview パネルの生成・更新・破棄、操作の受け付け。答えと監視は board-feed.ts を聞く。サイドパネルの行から開くときは、開いたあとに進む場所（承認・レビュー完了・カードの焦点・MRの状況を確認）を受ける。承認のオーバーレイと動いた表示もここが持つ（画面は作り直されるので持たせない）。計画編集タブの帳面（core/workflow-tabs.ts）を見て、未保存の親を画面に渡し、承認を打つ直前にも確かめる。オーバーレイの「計画を編集」でタブを開く（画面の帳面 screens().workflow を通す）。1 枚目は HTML ごと、以後は postMessage で中身だけ渡す（vscode に依存する）。マージ状況の確認の結果（core/merge.ts）もここが持つ（ボードが開いている間だけ）。実行ファイルと sh を子プロセスで呼ぶ読み取りと、片付けの送信（ダイアログのあとだけ）を分けて行う
   rules-panel.ts      ルール管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。判定・検証・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   risk-panel.ts       リスク管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・作成・保存の受け付けと、読み取り専用の統合結果（sums[]）の受け渡し（vscode に依存する）
   phases-panel.ts     フェーズ管理画面の Webview パネル（1 枚。対象（共通の設定・ワークスペースの設定・プロジェクトの設定）を切り替える）。検証・保存の受け付けと、共通の設定の定義（読み取り専用。共通の設定を開いているときは並べない）と、共通の設定の phases.yml を読めないときの error の帯の受け渡し（vscode に依存する）
@@ -106,7 +107,9 @@ src/
     commands.ts       ターミナルに送るコマンド行と、承認・残った指摘の対応方針を子プロセスで打つ引数の配列
     decidemodel.ts    残った指摘の JSON（実行ファイルとの契約）の読み取りと、選んだ対応方針の確かめ
     screens.ts        画面の入口の帳面（Root）。どの画面をどう開くかを 1 か所に集める。画面どうしは互いを import せず、ここへ要求を出す
-    watch.ts          8 つの画面（ボード・ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob
+    watch.ts          拡張全体の答え（board-feed.ts）と 7 つの画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理・取り込み待ち・フロー編集・計画編集）が見張る場所（提案・承認済みチケットとマーカー・ワークツリーの登録）の glob。取り込み待ちの場所（HANDOFF_PATTERNS）と、拡張全体の答えを読み直す場所（FEED_PATTERNS）も
+    feed.ts           1 つの答えを読み直して聞き手みんなに配る仕組み（読んでいる最中の頼みは 1 回にまとめる）。board-feed.ts が使う
+    sidebar-tree.ts   サイドパネルのツリーの中身（ユーザ待ち・進行中の親・画面の行、押したときに開くもの、バッジの数）。件数と分類は inbox のまま
     locate.ts         実行ファイルの探索順
     ticket-control.ts CCNAVI_TICKET_CONTROL の読み取り（settings.json と settings.local.json）と、実行ファイルが返す値（ボードの JSON の `settings.ticket_control`）との突き合わせ
   webview/            画面（React）。DOM を触る側で、vscode も node も import しない。tsconfig.webview.json で型を見る

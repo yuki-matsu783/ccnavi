@@ -114,6 +114,34 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     }
     setView((now) => ({ ...now, project: value }));
   };
+  // サイドパネルの行から選ばれたカード。隠している絞り込み・畳んだ列・アーカイブの表示を外してから、描いたあとで送って焦点を当てる
+  const [revealing, setRevealing] = useState<string | undefined>(undefined);
+  const revealCard = (ticket: string): void => {
+    const card = boardRef.current?.columns.flatMap((column) => column.cards).find((c) => c.id === ticket);
+    if (card === undefined) {
+      return;
+    }
+    setView((now) => ({
+      ...now,
+      project: now.project === EMPTY.project || now.project === card.project ? now.project : EMPTY.project,
+      parent: now.parent === EMPTY.parent || now.parent === card.family ? now.parent : EMPTY.parent,
+      attention: now.attention && card.attention,
+      archived: now.archived || card.column === "archived",
+      folded: now.folded.filter((state) => state !== card.column),
+    }));
+    setRevealing(ticket);
+  };
+  useEffect(() => {
+    if (revealing === undefined) {
+      return;
+    }
+    setRevealing(undefined);
+    const element = [...document.querySelectorAll<HTMLElement>(".card[data-id]")].find((el) => el.dataset.id === revealing);
+    if (element !== undefined) {
+      element.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      element.focus();
+    }
+  }, [revealing]);
   useHostMessages<ToBoard>((message) => {
     if (message.type === "data" && message.data !== undefined) {
       // 中身だけ。開いた直後の絞り込みは1枚目のHTMLに埋まっていて、2枚目以降はfilterのメッセージで届く
@@ -122,6 +150,11 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
       setMergePending(false);
     } else if (message.type === "filter" && typeof message.project === "string") {
       pickProject(message.project);
+    } else if (message.type === "reveal" && typeof message.ticket === "string") {
+      // 案内の間は見本を描いているので、実際のカードを探さない
+      if (!touring) {
+        revealCard(message.ticket);
+      }
     } else if (message.type === "tour") {
       requestTour();
     }

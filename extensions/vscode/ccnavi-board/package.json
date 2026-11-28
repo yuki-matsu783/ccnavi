@@ -29,7 +29,7 @@
       "ccnavi": [
         {
           "id": "ccnaviBoard.entries",
-          "name": "画面",
+          "name": "一覧",
           "icon": "media/icon.svg"
         }
       ]
@@ -226,12 +226,12 @@
       {
         "id": "ccnaviBoard.sidebar",
         "title": "ccnaviの左パネルの案内",
-        "description": "左パネルに並ぶ画面の入口と、最初に見る2つの画面（プロジェクト管理・チケット管理）の基本を順に説明します。",
+        "description": "左パネルに並ぶユーザ待ちと画面の入口と、最初に見る2つの画面（プロジェクト管理・チケット管理）の基本を順に説明します。",
         "steps": [
           {
             "id": "ccnaviBoard.tour.panel",
             "title": "左パネルを開く",
-            "description": "アクティビティバーのccnaviを押すと、画面の入口が一覧で並びます。行にマウスを重ねると説明が出ます。\n[左パネルを開く](command:workbench.view.extension.ccnavi)",
+            "description": "アクティビティバーのccnaviを押すと、ユーザ待ち（件数はバッジにも出ます）・進行中の親・画面の入口が並びます。行を押すと、その画面と場所が開きます。\n[左パネルを開く](command:workbench.view.extension.ccnavi)",
             "media": {
               "markdown": "media/tour/panel.md"
             }

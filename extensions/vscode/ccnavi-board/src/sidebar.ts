@@ -1,109 +1,117 @@
 /**
- * アクティビティバーのccnaviから開くサイドパネル。並ぶのは画面の入口6つで（取り込み待ちは並べない。ルール管理・リスク管理・フェーズ管理・テンプレート管理の各画面から開く）、どれもWebviewパネルを開く。
- * 「チケット管理」「リスク管理」「フェーズ管理」「テンプレート管理」は、チケット制御（CCNAVI_TICKET_CONTROL）が
- * disableのワークスペースでは出さない。配点は子チケットをクローズするときに、フェーズ定義は親の
- * 計画と子の範囲にしか読まれないので、disableの間はどちらも何も動かさない。使われない設定の
- * 入口を残すと、直したのに反映されていない、という読み違いの元になる。
+ * アクティビティバーのccnaviから開くサイドパネル。見出しは「ユーザ待ち」「進行中の親」「画面」の3つ（中身は`core/sidebar-tree.ts`）。
+ *
+ * - ユーザ待ちは、実行ファイルの答えの`inbox`を種類ごとの件数と識別子の行で並べ、合計をビューのバッジ（`TreeView.badge`）に出す。
+ *   行を押すと該当の画面と場所を開く（承認待ち → 承認のオーバーレイ、レビュー待ち → そのフェーズのレビュー完了、
+ *   注意 → ボードでそのカード、取り込み待ち → そのツリーの取り込み待ち画面、フローの下書き → その子のフロー編集、
+ *   片付け → 「MRの状況を確認」）。片付けとレビュー待ちは、押すまでリモートを見ない
+ * - 進行中の親は、押すとボードでそのカードを選ぶ
+ * - 画面は、画面の入口7つ（取り込み待ちを含む）。どれもWebviewパネルを開く
+ *
+ * 答えはボードと同じ1回の`--explain --json`（`board-feed.ts`）で、ボードを閉じていても監視が変化を見つけたら読み直す。
+ * チケット制御（CCNAVI_TICKET_CONTROL）がdisableのワークスペースでは、チケットに関わる行を出さない。配点は子チケットを
+ * クローズするときに、フェーズ定義は親の計画と子の範囲にしか読まれないので、disableの間はどちらも何も動かさない。
+ * 使われない設定の入口を残すと、直したのに反映されていない、という読み違いの元になる。
  *
  * 見た目の切り替えとバグ報告は一覧に混ぜず、パネルのタイトルバーのアイコン（配色・虫）に置く（`package.json`の`view/title`）。
  * 押すと画面が開く行と、押すと設定が変わる行が1列に並ぶと、押す前に何が起きるか読めない。
  * 今どれを選んでいるかは、行の代わりにビューの見出しの横（`view.description`）に出す。
- * VS CodeのAPIに触れるので単体テストの対象外。
+ * VS CodeのAPIに触れるので単体テストの対象外（行の中身は`core/sidebar-tree.ts`で試す）。
  */
 import * as vscode from "vscode";
 
 import { onDidChangeAppearance, readAppearance } from "./appearance.js";
+import { boardFeed } from "./board-feed.js";
 import { APPEARANCE_LABELS } from "./core/appearance.js";
+import { screens } from "./core/screens.js";
+import { sidebarTree, type SidebarAction, type SidebarNode } from "./core/sidebar-tree.js";
+import { assertNever } from "./panel-common.js";
 import { onDidChangeTicketControl, ticketControl } from "./ticket-control.js";
 
-interface Entry {
-  readonly label: string;
-  readonly description: string;
-  readonly command: string;
-  readonly icon: string;
-  /** チケット制御が有効なときだけ出す */
-  readonly needsTickets: boolean;
-}
+/** 行を押したときのコマンド。行から呼ぶだけなので、コマンドパレットには出さない（package.jsonに載せない） */
+const OPEN_COMMAND = "ccnaviBoard.sidebarOpen";
 
-/** 並びは使う頻度の順。毎日開くチケット管理を先頭に、設定の画面をその後に置く */
-const ENTRIES: readonly Entry[] = [
-  {
-    label: "チケット管理",
-    description: "チケットのカンバン表示、承認とレビューの進行",
-    command: "ccnaviBoard.open",
-    icon: "checklist",
-    needsTickets: true,
-  },
-  {
-    label: "プロジェクト管理",
-    description: "projects/の一覧、clone・fetch・pullの実行",
-    command: "ccnaviBoard.openProjects",
-    icon: "repo",
-    needsTickets: false,
-  },
-  {
-    label: "ルール管理",
-    description: "ルールの編集と保存、判定を試す、hookの確認",
-    command: "ccnaviBoard.openRules",
-    icon: "shield",
-    needsTickets: false,
-  },
-  {
-    label: "リスク管理",
-    description: "実績で測るリスクの配点（閾値と項目）の編集と保存",
-    command: "ccnaviBoard.openRisk",
-    icon: "pulse",
-    needsTickets: true,
-  },
-  {
-    label: "フェーズ管理",
-    description: "フェーズ定義（計画に並べる型、編集可能な範囲の上限、レビューの既定）の編集と保存",
-    command: "ccnaviBoard.openPhases",
-    icon: "milestone",
-    needsTickets: true,
-  },
-  {
-    label: "テンプレート管理",
-    description: "作業・レビュー計画のテンプレートと下書きの一覧と、テンプレートの編集",
-    command: "ccnaviBoard.openTemplates",
-    icon: "files",
-    needsTickets: true,
-  },
-];
-
-class EntryProvider implements vscode.TreeDataProvider<Entry> {
-  private readonly changed = new vscode.EventEmitter<Entry | undefined>();
+class TreeProvider implements vscode.TreeDataProvider<SidebarNode> {
+  private readonly changed = new vscode.EventEmitter<SidebarNode | undefined>();
   readonly onDidChangeTreeData = this.changed.event;
+  private roots: readonly SidebarNode[] = [];
 
-  refresh(): void {
+  set(roots: readonly SidebarNode[]): void {
+    this.roots = roots;
     this.changed.fire(undefined);
   }
 
-  getTreeItem(entry: Entry): vscode.TreeItem {
-    const item = new vscode.TreeItem(entry.label, vscode.TreeItemCollapsibleState.None);
-    // 一覧は名前だけにして、説明はマウスを重ねたときに出す（横に並べると狭いパネルで切れて読めない）
-    item.tooltip = entry.description;
-    item.iconPath = new vscode.ThemeIcon(entry.icon);
-    item.command = { command: entry.command, title: entry.label };
+  getTreeItem(entry: SidebarNode): vscode.TreeItem {
+    const state =
+      entry.children.length === 0
+        ? vscode.TreeItemCollapsibleState.None
+        : entry.expanded
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed;
+    const item = new vscode.TreeItem(entry.label, state);
+    item.id = entry.id;
+    item.description = entry.description;
+    // 説明はマウスを重ねたときに出す（横に並べると狭いパネルで切れて読めない）
+    if (entry.tooltip !== "") {
+      item.tooltip = entry.tooltip;
+    }
+    if (entry.icon !== "") {
+      item.iconPath = new vscode.ThemeIcon(entry.icon);
+    }
+    if (entry.action !== undefined) {
+      item.command = { command: OPEN_COMMAND, title: entry.label, arguments: [entry.action] };
+    }
     return item;
   }
 
-  getChildren(): Entry[] {
-    const enabled = ticketControl() === "enable";
-    return ENTRIES.filter((entry) => enabled || !entry.needsTickets);
+  getChildren(entry?: SidebarNode): SidebarNode[] {
+    return [...(entry === undefined ? this.roots : entry.children)];
+  }
+}
+
+function open(action: SidebarAction): void {
+  switch (action.kind) {
+    case "board":
+      void screens().board(action.target);
+      return;
+    case "handoff":
+      void screens().handoff(action.tree);
+      return;
+    case "flow":
+      void screens().flow(action.ticket);
+      return;
+    case "command":
+      void vscode.commands.executeCommand(action.command);
+      return;
+    default:
+      assertNever(action);
+      return;
   }
 }
 
 export function registerSidebar(context: vscode.ExtensionContext): void {
-  const provider = new EntryProvider();
-  // 見出しの横に今の見た目を出すので、providerを登録するだけでなくビューを持つ
+  const provider = new TreeProvider();
+  // バッジと見出しの横の見た目を出すので、providerを登録するだけでなくビューを持つ
   const view = vscode.window.createTreeView("ccnaviBoard.entries", { treeDataProvider: provider });
   view.description = APPEARANCE_LABELS[readAppearance()];
-  context.subscriptions.push(view);
-  onDidChangeTicketControl(() => provider.refresh());
+  const draw = (): void => {
+    const latest = boardFeed.latest();
+    const tree = sidebarTree({
+      ...(latest?.ok === true ? { board: latest.board } : {}),
+      ...(latest?.ok === false ? { error: latest.error } : {}),
+      tickets: ticketControl() === "enable",
+    });
+    provider.set(tree.nodes);
+    view.badge = tree.badge > 0 ? { value: tree.badge, tooltip: `ユーザ待ち${tree.badge}件` } : undefined;
+  };
+  draw();
   context.subscriptions.push(
+    view,
+    vscode.commands.registerCommand(OPEN_COMMAND, (action: SidebarAction) => open(action)),
+    { dispose: boardFeed.subscribe(draw) },
     onDidChangeAppearance((appearance) => {
       view.description = APPEARANCE_LABELS[appearance];
     }),
   );
+  onDidChangeTicketControl(draw);
 }

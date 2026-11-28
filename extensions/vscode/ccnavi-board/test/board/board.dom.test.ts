@@ -14,6 +14,30 @@ import { approvePreview, openBoard, openPage } from "../helpers/board.js";
 import type { Element, Event, HTMLButtonElement, HTMLInputElement } from "happy-dom" with { "resolution-mode": "import" };
 import type { DomPage } from "../helpers/dom.js";
 
+test("CB-D1288 拡張ホストのrevealで、そのカードを隠している絞り込みと畳んだ列を外し、焦点を当てる。ほかの絞り込みは残す。知らないカードでは何もしない", async () => {
+  // i0001-02-02は進行中の列の、ユーザ待ちでない子。親の絞り込み（同じ親）は残り、ユーザ待ちのみと畳みは外れる
+  const page = await openBoard(fixture(), { state: { parent: "i0001", attention: true, folded: ["doing", "done"] } });
+  try {
+    assert.ok(page.one('.card[data-id="i0001-02-02"]').classList.contains("hidden"));
+    await page.send({ type: "reveal", ticket: "i0001-02-02" });
+    await page.settle();
+    const card = page.one('.card[data-id="i0001-02-02"]');
+    assert.ok(!card.classList.contains("hidden"));
+    assert.equal(page.document.activeElement, card);
+    const state = page.state() as { parent: string; attention: boolean; folded: string[] };
+    assert.equal(state.parent, "i0001");
+    assert.equal(state.attention, false);
+    assert.deepEqual(state.folded, ["done"]);
+    assert.deepEqual(page.posted.filter((m) => m.type !== "ready"), []);
+    // いまのボードに無いカードなら、絞り込みも畳みも変えない
+    await page.send({ type: "reveal", ticket: "i9999" });
+    await page.settle();
+    assert.deepEqual((page.state() as { folded: string[] }).folded, ["done"]);
+  } finally {
+    await page.close();
+  }
+});
+
 test("CB-D40 列の見出しを押すと畳み、stateに列名が入る。更新しても畳んだまま", async () => {
   const page = await openBoard();
   try {
