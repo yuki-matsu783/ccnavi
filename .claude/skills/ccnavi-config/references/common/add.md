@@ -13,7 +13,7 @@ keywords: [rules.yml, phases.yml, risks.yml, ticket-sections.yml, 見出し, den
 ## 手順
 
 1. 何を変えたいかを 1 行にする（「`git push --force` を止める」など）。ユーザに渡す文の先頭になる
-2. どのファイルかを決める。止める・聞く・通すなら rules、フェーズと範囲なら phases、閉じるときの重さなら risk。
+2. どのファイルかを決める。止める・聞く・通すなら rules、フェーズと範囲なら phases、クローズするときの重さなら risk。
    2 本にまたがるなら別々の下書きにする
 3. 今の本物を読む。同じことを言うルールやフェーズ定義が既に無いか
 4. 下書きをワークツリーの `wip/handoff/`（.ccnavi/docs/scratchpad.md）に書く。本物の全文をコピーして足す（断片だと lint に掛けられない）
@@ -171,7 +171,7 @@ phases:
     title: 調査                 # id と title はどちらも一意
     review: false                # true | false。既定（true）であって上限ではない（計画のステップで true に強められる）
     scope: ["wip/research/*"]   # 子が宣言できる範囲の上限。inherit なら親の範囲そのまま
-    deliverables: ["wip/research/summary.md"]   # 閉じる前に親のワークツリーに在って追跡されているべきもの
+    deliverables: ["wip/research/summary.md"]   # クローズする前に親のワークツリーに在って追跡されているべきもの
     when: 既存の振る舞いや依存が分からないとき   # 案内。次のフェーズを促す文に出る
   implement:
     kind: work
@@ -198,10 +198,10 @@ phases:
   ただし実績のリスクが HIGH 以上なら宣言に関わらずレビューが済むまで止まる（risks.yml の側）
 - `scope` は子 ⊆ フェーズ定義 ⊆ 親の真ん中。rules.yml の deny が止める場所を入れても deny が勝つ。
   glob はワークツリーのルートからの相対で、`..` `~` `$` と絶対パスは受け付けない
-- `deliverables` は「在って追跡されている」ことだけ見る。閉じるときに無ければ
-  最後の子を閉じられないので、必ず作れる名前にする
+- `deliverables` は「在って追跡されている」ことだけ見る。クローズするときに無ければ
+  最後の子をクローズできないので、必ず作れる名前にする
 - `skill` は、子が最初に `Skill` ツールで呼ぶ工程スキルの名前（例 `process-research`）。案内にだけ使い、判定には使わない。この機械に無いスキルは案内に出ない
-- `learning: off` を書くと、その定義の子は学びの蓄積（気づきの記録を閉じる前に求める検査）を受けない。
+- `learning: off` を書くと、その定義の子は学びの蓄積（気づきの記録をクローズする前に求める検査）を受けない。
   小さい作業のように気づきを求める意味が薄い定義にだけ書く。既定は `on`。YAML は引用符なしの `on` / `off` を真偽値に読むが、どちらも読める
 - フェーズ定義に順序は書かない。並行させたいかは計画ごとに、親の計画のステップの `after` で書く（線を引かないステップは並行する）。一緒に置くべき定義の組は `when` に書く
 - `scope` と `deliverables` はそれぞれ 20 件まで
@@ -217,7 +217,7 @@ phases:
 
 ## risks.yml
 
-子を `ticket finish` で閉じるとき、その子のワークツリーで `base_sha..HEAD` の差分を数え、点を
+子を `ticket finish` でクローズするとき、その子のワークツリーで `base_sha..HEAD` の差分を数え、点を
 付ける。フェーズの点は子の最大値。HIGH 以上なら宣言に関わらずレビューが要る扱いになり、
 レビューが済むまで止まる。実績が小さくても宣言のレビュー要を下げることはしない。
 
@@ -240,7 +240,7 @@ factors:
 | `lines_over` / `files_over` / `deleted_over` | 差分の行数・ファイル数・消したファイル数が基準を超えたら加点 | 基準はこのプロジェクトの普通の子の大きさで決める。`ccnavi-git.sh log --shortstat` で最近の差分を見る。生成物やロックファイルが差分を膨らませるなら `exclude: ["*.lock"]` のように外し、一部のディレクトリだけ測るなら `include: ["src/**"]` を書く（どちらも既定は無指定＝全パス。`exclude` は `include` にヒットしていても外す。バイナリは行数 0）。`*` は `/` をまたぐので `*.lock` は下の階層の `x.lock` にもヒットする。`**/*.lock` はルート直下の `x.lock` にヒットしない。末尾が `/` の glob はディレクトリ（`src/` は `src/**`）。`include` にワイルドカードの無い名前（`src`）を書くとそのファイルにしかヒットせず点が 0 になるので、lint が warn する。rename は元のパスも見る（`include` は旧新どちらか、`exclude` は両方にヒットしたときだけ外す） |
 | `glob` | ヒットしたファイルごとに加点。`max` で上限 | 触ったらユーザが見るべき場所（CI、移行、`.claude/`）。ワークツリーのルートからの相対（`.github/**` のように書く） |
 | `script` | 各設定の `scripts/` の下の sh（共通設定は `.ccnavi/config/common/scripts/`（プロジェクトの `.ccnavi/config/common/` のミラーも同じ表記）、ワークスペースの設定とプロジェクトの設定は `.ccnavi/scripts/`。たがいの側は指せない）。cwd は子のワークツリー、`CCNAVI_BASE_SHA` `CCNAVI_HEAD` `CCNAVI_TICKET` `CCNAVI_PARENT` を受け取り、標準出力に整数か `{"points": N, "message": "…"}` | 失敗・無出力・読めない出力は重いほうとして扱われ、`points` が丸ごと加点される。30 秒で打ち切り。黙って 0 を出す形にしない |
-| `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子は閉じられない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
+| `judge` | 問いの文。親がサブエージェントに差分を読ませ、`ccnavi-ticket.sh record-risk <子> <項目> yes\|no --reason` で記録。揃うまで子はクローズできない | 差分を読んで yes / no で答えられる問いにする。「品質は十分か」は答えられない |
 
 `levels` は `medium <= high <= critical`。リスクレベルの名前は増やせない（知らない名前は warn）。
 `points` と `max` は 0 以上の整数。`id` は英数と `._-`。
@@ -275,7 +275,7 @@ child:
 変えるもの: .ccnavi/config/common/rules.yml（下書き: <下書きのパス>）
 なぜ: <1 行>
 得るもの: <何が止まる / 通る / 変わるか>
-失うもの: <広がる沈黙、増える確認、閉じにくくなるフェーズ、など>
+失うもの: <広がる沈黙、増える確認、クローズしにくくなるフェーズ、など>
 やらない場合: <今どうなっているか>
 検証: --lint error 0 / warn N（内容）、期待 deny a/b ask c/d allow e/f 食い違い 0
 差分:

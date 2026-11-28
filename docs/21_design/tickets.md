@@ -58,9 +58,9 @@ dry-run のときは末尾に 1 行足し、通ったことを許可と読まな
 | 9.6 | [tickets/state-transitions.md](tickets/state-transitions.md) | チケットの置き場とマーカーの状態遷移 |
 | 9.7 | [tickets/phases.md](tickets/phases.md) | phases.yml のフェーズ定義と、親の計画 |
 | 9.8 | [tickets/hitl.md](tickets/hitl.md) | フェーズの終わりにユーザの手が入る HITL ポイント |
-| 9.9 | [tickets/risk.md](tickets/risk.md) | 子を閉じるときに差分から測るリスク |
+| 9.9 | [tickets/risk.md](tickets/risk.md) | 子をクローズするときに差分から測るリスク |
 | 9.10 | [tickets/review.md](tickets/review.md) | レビューの依頼と確認 |
-| 9.11 | [tickets/close.md](tickets/close.md) | 親を閉じる条件、早めに閉じる、Draft を外す |
+| 9.11 | [tickets/close.md](tickets/close.md) | 親をクローズする条件、早めにクローズする、Draft を外す |
 | 9.12 | [tickets/subagents.md](tickets/subagents.md) | SubagentStart と SubagentStop でのサブエージェントの扱い |
 | 9.13 | [tickets/branch-lookup.md](tickets/branch-lookup.md) | issue や MR に紐づくブランチを確かめる指示 |
 | 9.14 | [tickets/phase-management.md](tickets/phase-management.md) | フェーズ管理の全体像。定義・計画・先行関係・レビュー・局面をつなぐ入口 |

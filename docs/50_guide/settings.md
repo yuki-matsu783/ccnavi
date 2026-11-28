@@ -104,7 +104,7 @@ keywords: [設定, settings.json, env, 環境変数, hook, CCNAVI_HANDOFF_SUGGES
 | `PreToolUse` | 判定そのものが働かない |
 | `PostToolUse` | 引数に現れない書き込みを取りこぼす。フェーズの終わりが伝わらない。frontmatter の無い md を新しく作っても、書き方の案内が出ない。`finish` がチケットに「参照したファイル」を書けない |
 | `PostToolUseFailure` | 失敗の連続を数えられず、案内が出ない。Artifact ツールが失敗したときの scratchpad/ の案内も出ない |
-| `Stop` | 変更がユーザの目に触れない。閉じ忘れたチケットが作業中に残る。同じ呼び出しを繰り返し止めたことがユーザに伝わらない。ターンの終わりの促しが届かない |
+| `Stop` | 変更がユーザの目に触れない。クローズし忘れたチケットが作業中に残る。同じ呼び出しを繰り返し止めたことがユーザに伝わらない。ターンの終わりの促しが届かない |
 | `SubagentStart` | サブエージェントが自分の範囲を知らずに始める |
 | `SubagentStop` | 範囲外のコミット済みの変更が親に届く |
 
@@ -186,7 +186,7 @@ ccnavi の動作に依存する決まりと考え方なので、ワークスペ�
 | `CCNAVI_TICKET_CONTROL` | `enable`（既定）、`disable`。チケット制御（提案の承認・承認済みチケットの範囲・フェーズの HITL ポイント・サブエージェントの制限）を使うか。`disable` なら `ccnavi user` の操作と `ticket` / `review` のサブコマンドは動かず、セッション開始の案内も出ず、VS Code 拡張の「チケット管理」も出ない。それ以外の値は `enable` として動き、`--lint` が error にする |
 | `CCNAVI_GUARD_TICKET_APPROVAL` | `enable`（既定）、`disable`。チケットの承認の経路を守るか。enable なら、承認などユーザだけが行う操作を、エージェントがシェルから打つ形を止める。ユーザ専用の sh（`ccnavi-user-*.sh`）の一部は、標準入力がターミナルであることも求める。テストやターミナルの無い実行環境（CI など）で切る。`dry-run` は取らず、書かれていたら `enable` として扱い、`--lint` が error にする |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | レビューの依頼と確認がリモートを読み書きするときの認証。どちらが要るかは origin の URL で決まる |
-| `CCNAVI_LEARNING` | 学びの蓄積を使うか。`enable` / `disable`、既定 `enable`。子チケットを閉じるときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、親を閉じるときに気づきの処理の証跡を確かめる（[記録](records.md)の「学びの蓄積」） |
+| `CCNAVI_LEARNING` | 学びの蓄積を使うか。`enable` / `disable`、既定 `enable`。子チケットをクローズするときに気づきの記録（`wip/handoff/learnings/<子>.md`）を求め、親をクローズするときに気づきの処理の証跡を確かめる（[記録](records.md)の「学びの蓄積」） |
 | `CCNAVI_LEARNING_SOURCES` | パターンの観測元の数が何以上なら提案に足りるか。既定 3 |
 | `CCNAVI_LEARNING_NOTICE_COUNT` | 提案の候補が何件溜まったら SessionStart で知らせるか。既定 5 |
 | `CCNAVI_SCRATCHPAD_WARN_MB` | ワークスペースルート直下の `scratchpad/` の中身がこの大きさ（MB）を超えたとき、セッションの起動（SessionStart の `startup`）で消してよいものをユーザに尋ねる文を渡す（再開・compact・clear では出さない）。既定は `500`。`0` なら知らせない。読めない値と負の値は既定に戻る |

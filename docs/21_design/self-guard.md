@@ -36,11 +36,11 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、設定ファイルと ccnavi ディレクトリ、共通設定ファイル（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
+| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、設定ファイルと ccnavi ディレクトリ、共通設定ファイル（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、クローズしたチケットの退避の `logs/archive`）の組 |
 | `builtin:guard-binary` | `CCNAVI_ENTRY_PATH` が設定されているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` |
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
 | `builtin:guard-common-layer` | 共通設定ファイルの置き場が決まっているとき（11.6） | 同上 |
-| `builtin:guard-records` | 常に | `Write` `Edit` `MultiEdit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも適用する）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
+| `builtin:guard-records` | 常に | `Write` `Edit` `MultiEdit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、クローズしたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも適用する）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
 | `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていないコピーと置き場の外にはヒットしない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
 
@@ -124,7 +124,7 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 | `:` で始まる pathspec、グロブの前に固定のディレクトリが無い指定、`--pathspec-from-file`（省略形も） | ヒットするとみなして止める。git の pathspec のグロブは `/` もまたぐ |
 | 対象を読み切れない形。変数・置換で組み立てたパス、居場所の読めない `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行 | ヒットするとみなして止める |
 | 承認済みチケットの置き場（`.ccnavi/approved/` とその下） | 文面は「ユーザに依頼する」。置き場を動かすのはユーザと ccnavi のスクリプト。レビュー済みのマーカーを消す `rm` はユーザがターミナルで打つ手順なので、sh は通す |
-| レビュー待ちの置き場（`wip/proposals/review/` とその下。提案の置き場の設定に従う）と、置き場に何かがある間のその親（`wip/`・`wip/proposals/`） | 承認済みチケットの置き場と同じ扱い。文面は「レビュー待ちの提案を外すのはユーザに依頼する」。sh は `rm` を通し、過去の中身に戻す形は前からの置き場の検査が止める。空の置き場の親を消す形（親を閉じた後の案内の `rm -r wip`）は通す。親を過去の中身に戻す形（`restore --source <ref> wip`・`checkout <ref> -- wip`）は空でも適用する |
+| レビュー待ちの置き場（`wip/proposals/review/` とその下。提案の置き場の設定に従う）と、置き場に何かがある間のその親（`wip/`・`wip/proposals/`） | 承認済みチケットの置き場と同じ扱い。文面は「レビュー待ちの提案を外すのはユーザに依頼する」。sh は `rm` を通し、過去の中身に戻す形は前からの置き場の検査が止める。空の置き場の親を消す形（親をクローズした後の案内の `rm -r wip`）は通す。親を過去の中身に戻す形（`restore --source <ref> wip`・`checkout <ref> -- wip`）は空でも適用する |
 | ラッパーの名前があるのに、サブコマンドが文字どおりの語でない形（`$S`・`$(echo rm)`・`r?`）、標準入力から読むシェル（`bash --norc`・`--rcfile <値>`・`-o pipefail`・`-O extglob` のようなオプションを前に置いた形と、`env sh`・`command sh` を含む）に流す文字列の中の名前、走査が読み切れず名前の直後に文字どおりのサブコマンドが無い形（`… \| xargs sh …ccnavi-git.sh`） | 止める（`CDPATH`・別の言語の中・`xargs` の値・オプションの変数は限界として 12.1 に書く） |
 | `checkout -- <パス>`（起点の無い、索引の中身に戻す形） | sh はこの形を通さない。文面は sh と同じく `restore <パス>` を名指しで使うよう案内する |
 

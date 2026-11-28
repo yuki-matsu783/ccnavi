@@ -69,11 +69,11 @@ cd go && go run ./internal/harness/cmd/gitlabmanual probe
 - `CCNAVI_PROBE_GITLAB`（既定 `http://127.0.0.1:<CCNAVI_GITLAB_PORT、既定 8929>`）で接続先を変える。
 - `CCNAVI_PROBE_PREFIX`（既定 `ccnavi-probe`）で、作るプロジェクト名の前置きを変える。名前は `<前置き>-<日時>`。並行して別の作業が同じ GitLab を使うとき、作業の識別（例 `p614`）を付けて区別する。
 - 結果と生の JSON は `CCNAVI_PROBE_OUT`（既定は一時ディレクトリ）に残る。
-- probe はユーザの役として、承認（`ccnavi-user-agree.sh` に当たる `user agree`）・承認の push（`ccnavi-user-push-approved.sh`）・受け入れ（`ccnavi-user-decide.sh`）・早めに閉じる（`ccnavi-user-close-early.sh`）を使い捨てのリポジトリで実行する。子は finish の前に `ticket learn` で学びの記録を書く。
-- 親は `plan` だけで作るので、閉じる前に、`ccnavi ticket revise <親> --feedback` で `feedback: []` の改版の雛形を作って出し、承認を受ける（probe は雛形を使わず、承認済みの親の全文に `feedback: []` を足して、承認のあとに ccnavi が書く欄を空にして出す）。
+- probe はユーザの役として、承認（`ccnavi-user-agree.sh` に当たる `user agree`）・承認の push（`ccnavi-user-push-approved.sh`）・受け入れ（`ccnavi-user-decide.sh`）・早めにクローズする（`ccnavi-user-close-early.sh`）を使い捨てのリポジトリで実行する。子は finish の前に `ticket learn` で学びの記録を書く。
+- 親は `plan` だけで作るので、クローズする前に、`ccnavi ticket revise <親> --feedback` で `feedback: []` の改版の雛形を作って出し、承認を受ける（probe は雛形を使わず、承認済みの親の全文に `feedback: []` を足して、承認のあとに ccnavi が書く欄を空にして出す）。
 - 受け入れ（decide）は、別の親 `i0003` で通す。未解決の指摘が残る親は `confirm` が止まる → `ccnavi-review.sh decide <N> --preview` が JSON（`threads`・`digest`）を返す → `--preview` なしの直呼びは rc 2 で断られる → ボードの形（`--choices` と `--digest`）で「対応しない」を置く → スレッドが解決済みになって返信が付き、`reviewed` が置かれる → 同じフェーズへの `confirm` は「レビュー済み」で拒まれる。判定は GitLab の側（スレッドの `resolved` と note の数）とローカルの置き場で見る。
-- ready のあとは、MR の Draft が外れて squash が立つこと、ready の note があること、GitLab の親のブランチに `wip/` が無いこと、閉じた親子がワークスペースの `logs/archive/` へ移ったことを見る（`logs/archive/` は git の外にあり、GitLab には無い）。`wip/` に未追跡ファイルがあると ready が止まり、MR は Draft のままであることも、先に確かめる。
-- 取り消した子は、置き場でなく欄（`cancelled_at`）で表す。早めに閉じた親では、未着手の子が `.ccnavi/approved/done/` に移って `cancelled_at` が入ることを見る（`cancelled/` という置き場は無い）。
+- ready のあとは、MR の Draft が外れて squash が立つこと、ready の note があること、GitLab の親のブランチに `wip/` が無いこと、クローズした親子がワークスペースの `logs/archive/` へ移ったことを見る（`logs/archive/` は git の外にあり、GitLab には無い）。`wip/` に未追跡ファイルがあると ready が止まり、MR は Draft のままであることも、先に確かめる。
+- 取り消した子は、置き場でなく欄（`cancelled_at`）で表す。早めにクローズした親では、未着手の子が `.ccnavi/approved/done/` に移って `cancelled_at` が入ることを見る（`cancelled/` という置き場は無い）。
 - 終わりに、この実行が作ったプロジェクトだけを `DELETE` で消す（他の作業のものは触らない）。GitLab の削除は非同期で、応答は 202、直後の `GET` は 200 で `marked_for_deletion_on` が入る（本当に消えるまで待たない）。調べるために残したいときは `CCNAVI_PROBE_KEEP=1`。
 - まとめは `PASS n / SKIP m / FAIL k`。SKIP は確かめられなかったステップ（CE の変更要求）で、PASS に数えない。FAIL があれば終了コードは 1。
 - `--help` は、トークンも exe も無くても終わる。

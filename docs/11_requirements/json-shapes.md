@@ -176,7 +176,7 @@ ccnavi --explain --json
 | `tickets[]` | 識別子ごとに 1 件。提案と承認済みチケットのどちらか一方しか無くても出す |
 | `parents[]` | 承認済みチケットのある親ごとの局面とフェーズ。承認前の親はフェーズを持たないのでここに無い |
 | `turns[]` | いまターンの途中にいるセッション。`{session, since, seen}`（`since` はターンが始まった時刻、`seen` は最後にツールの呼び出しがあった時刻。どちらも UNIX 秒）。ターン中に設定ファイルを直すと、次のツール呼び出しで戻されることがあるので、拡張は保存の前にこれで確かめる。更新が 30 分以上無い印と、読めない印は数えない。チケット制御の有無によらず出す |
-| `archived[]` | 手元の退避（`logs/archive/`。`ready` が閉じた親子のチケットを移した先）にある閉じたチケット。表示のためだけの欄（必ず出す。空のことがある）で、判定（承認待ち・先行・局面）の入力には含めない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, started_at, completed_at, merged_sha, cancelled_at, cancel_reason}`。`path` は退避したファイルの絶対パス |
+| `archived[]` | 手元の退避（`logs/archive/`。`ready` がクローズした親子のチケットを移した先）にあるクローズしたチケット。表示のためだけの欄（必ず出す。空のことがある）で、判定（承認待ち・先行・局面）の入力には含めない。`tickets[]` に同じ識別子があるものは出さない。`{ticket, parent, phase, title, project, path, started_at, completed_at, merged_sha, cancelled_at, cancel_reason}`。`path` は退避したファイルの絶対パス |
 
 `tickets[]` の 1 件。
 
@@ -184,17 +184,17 @@ ccnavi --explain --json
 |---|---|
 | `ticket` / `parent` / `phase` / `title` / `project` / `issue` / `mr` / `predecessors` / `human_review` | 提案（無ければ承認済みチケット）の frontmatter から。`mr` は親を載せるマージリクエストの番号（親チケットの `mr:`）。`human_review` は `{required, reason}` |
 | `branch` / `remote` | 親で、親のワークツリーがあるときだけ値が入る。`branch` は親のワークツリーがいま居るブランチ（それ以外は空文字）、`remote` は最後に取ってきた origin との差 `{branch, ahead, behind}`（`ahead` は未送信のコミット数、`behind` は取り込んでいない数。読めなければ `null`。子とワークツリーが無い親は `remote` 全体が `null`） |
-| `predecessors_unmet[]` | 満たしていない先行。`{ticket, state, label}`。`state` は `todo` / `doing` / `review`（先行が閉じれば満たす）と `cancelled` / `missing` / `scattered` / `self` / `ancestor` / `cycle`（待っても満たさない）、`label` はユーザ向けの言葉（「作業中（doing/）」など）。空でなければ承認と着手（`start`）が止まる（書き込みと `finish` は止まらない）。先行が無い子・親・閉じたチケットは空。チケット管理画面はこれで「先行待ち」のバッジを出し、自分では数えない |
+| `predecessors_unmet[]` | 満たしていない先行。`{ticket, state, label}`。`state` は `todo` / `doing` / `review`（先行がクローズすれば満たす）と `cancelled` / `missing` / `scattered` / `self` / `ancestor` / `cycle`（待っても満たさない）、`label` はユーザ向けの言葉（「作業中（doing/）」など）。空でなければ承認と着手（`start`）が止まる（書き込みと `finish` は止まらない）。先行が無い子・親・クローズしたチケットは空。チケット管理画面はこれで「先行待ち」のバッジを出し、自分では数えない |
 | `proposal` | `{state, tree, tree_root, path, has_plan}`。正とする側のツリー（親のツリー。無ければ元ツリー）の提案の置き場で見つけたもの。`state` は `todo`（承認待ち）/ `review`（レビュー待ち）。`has_plan` は親の提案が全体計画（`plan:`）を持つか（`feedback:` だけの親と子は `false`。計画の順序を直すタブ（`--plan-order`）は `plan:` の無い親を開けないため）。承認前の親は `parents[]` に出ないので、チケット管理画面はこれで計画の順序を直すタブの入口を出し分ける。足しただけの欄で、読まない拡張はそのまま動く。`doing/` `done/` に在るときは `null`。承認済みの識別子では、正とする側のツリーを、承認済みチケットがどのツリーにあるかで決める。そのツリーの外に残った古い提案（承認の前に切ったワークツリーの `todo/` など）は出さない（`seen_in` には出る） |
 | `template_draft` | 完了した（`done/` の）計画付きの親か（取り消した親・子・計画の無い親は `false`）。チケット管理画面はこれで親のカードに『テンプレートの下書きを作る』ボタンを出す（`ccnavi --templates --draft <親>` を呼ぶ） |
 | `copy` | `{status, approved_at, approved_from, path}`。`status` は `none`（未承認。このときは `{status}` だけ）/ `open`（`doing/`）/ `review`（`wip/proposals/review/`）/ `closed`（`done/`）。`approved_at` は承認の時刻で、承認済みチケットの欄ではなく、`doing/<識別子>.md` を足したコミットから引く。`approved_from` はどこから引いたか（`commit` / `uncommitted`（コミットが無い。手で置いてまだコミットしていない）/ 空（分からない。git を打たない場））。`uncommitted` と空のとき `approved_at` は空。 |
 | `blocked` | 空でなければ「読めるが信じられない」理由。判定はこのチケットのワークツリーへの書き込みを `DENY_TICKET_BLOCKED` で全部止める。`status` は `open` のままなので、止まっていることはこの欄でしか分からない |
 | `worktree` | `{exists, path, project}`（無いときは `{exists: false, path}`）。`.claude/worktrees/<識別子>` が実際のワークツリーか |
-| `started_at` / `completed_at` / `base_sha` / `merged_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄。`merged_sha` は `finish` が親のブランチへ合流した子の先頭（表示だけ。チケット管理画面は閉じた子に「合流」を出す） |
-| `in_progress` | 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいないとき真。`flow.locked` と同じ読み方。承認しただけで着手していないもの・レビュー待ち・閉じたものは偽。チケット管理画面は、ルール・配点・フェーズ定義の保存を止めるかどうかをこれで決め、`started_at` などから組み直さない |
+| `started_at` / `completed_at` / `base_sha` / `merged_sha` / `cancelled_at` / `cancel_reason` | スクリプトが書く欄。`merged_sha` は `finish` が親のブランチへ合流した子の先頭（表示だけ。チケット管理画面はクローズした子に「合流」を出す） |
+| `in_progress` | 作業中か。承認済みチケットが `doing/` にあり、着手していて、終わってもいないし取り消されてもいないとき真。`flow.locked` と同じ読み方。承認しただけで着手していないもの・レビュー待ち・クローズしたものは偽。チケット管理画面は、ルール・配点・フェーズ定義の保存を止めるかどうかをこれで決め、`started_at` などから組み直さない |
 | `seen_in[]` | 同じ識別子のチケットがある場所の全部。`{tree, state, path}`。子のワークツリーは親のブランチから切るので、子のワークツリーにも親の提案があるのが普通 |
 | `scattered[]` | どれが正か決まらない、チケットがある場所の全部。`{tree, state, path}`。決まっていれば空。正とする側のツリー（親のツリー → 元ツリーの順）で絞り込んでも 2 つ以上残り、その残りが 2 つの置き場にまたがるか同じ置き場に重なるときに入る。状態の操作が「複数の場所にある」で止まる条件と、`--lint` が ERROR を出す条件と同じ。`seen_in` の数は食い違いを意味しない |
-| `flow` | 子のフロー。親と、フローが無い閉じた子（終わった・取り消した）は `null`（チケット管理画面はこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked, differs}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、チケット管理画面はパスを組まずにこれを読む。`draft.differs` は「提案あり」を出すか（真偽値）で、開いている子（終わった・取り消したでない子）に下書きが在り、読めない（リンク・大きすぎる・YAML として読めない・ノードの並びを持たない）か、いまのフローと中身が違うとき真。比べるときは位置とグループ化（ノードの `position`・`style`・`parentId` と、`type` が `group` のノード。`subAgentFlows` の中も）を除き、マップのキーの順は見ない。いまのフローが無ければ下書きが在るだけで真、いまのフローが読めなければ偽。閉じた子はフロー編集の画面が読むだけで下書きを取り込めないので、いつも偽。チケット管理画面は「提案あり」をこれで出し、自分では見比べない。読むのは承認済みチケット（無ければ提案）の欄。チケット管理画面は `locked` をそのままコピーし、自分で組み直さない |
+| `flow` | 子のフロー。親と、フローが無いクローズした子（終わった・取り消した）は `null`（チケット管理画面はこのとき「フローを作る」を出さない）。`{path, rel, tree, exists, linked, locked, lock_kind, draft}`。`path` は読む先の絶対パス、`rel` はツリーのルートからの相対、`tree` はそのファイルを持つツリーのルート、`exists` はファイルが在るか、`linked` はファイルかツリーのルートからそこまでの途中がシンボリックリンクか（真なら読まないし書かない）、`locked` は判定がいまその書き込みを `DENY_TICKET_FLOW_LOCKED` で止めているか（着手中・レビュー中）、`lock_kind` はその種類（`doing` は着手中、`review` はレビュー中、止めていなければ null）、`draft` はエージェントが書く下書き（効力は無い）の `{path, rel, exists, linked, differs}`。`path` が指すのは正とする側のツリー＝承認済みチケットが在るツリーの版だけで、子のワークツリー上のフローは読まない。承認の前は提案が在るツリーで、承認でフローもチケットと一緒に動く。`rel` は承認済みの領域の固定の置き場 `.ccnavi/approved/flows/<子>.yml` で、中身は YAML。`draft` の置き場はフローと同じツリーの `wip/proposals/flows/<子>.yml` で、チケット管理画面はパスを組まずにこれを読む。`draft.differs` は「提案あり」を出すか（真偽値）で、開いている子（終わった・取り消したでない子）に下書きが在り、読めない（リンク・大きすぎる・YAML として読めない・ノードの並びを持たない）か、いまのフローと中身が違うとき真。比べるときは位置とグループ化（ノードの `position`・`style`・`parentId` と、`type` が `group` のノード。`subAgentFlows` の中も）を除き、マップのキーの順は見ない。いまのフローが無ければ下書きが在るだけで真、いまのフローが読めなければ偽。クローズした子はフロー編集の画面が読むだけで下書きを取り込めないので、いつも偽。チケット管理画面は「提案あり」をこれで出し、自分では見比べない。読むのは承認済みチケット（無ければ提案）の欄。チケット管理画面は `locked` をそのままコピーし、自分で組み直さない |
 | `risk` / `judge` | 子の記録 `phases/<親>/<子>.risk.json` と `.judge.json` の中身。無ければ `null` |
 | `issues[]` | 読み手が気づくべき不備の文。この順に入る。`blocked` が空でなければ `書き込みが止まっています: <blocked>`、提案が無く `copy.status` が `open` でも `closed` でもなければ `提案が見つかりません（承認済みチケットだけがあります）`、子で親の識別子のチケットが `tickets[]` に無ければ `親 <親> が見つかりません`。無ければ空。チケット管理画面はこれをそのまま出し、自分では組み直さない |
 | `attention` | ユーザが動く必要があるか。真になるのは、`pending_approval` に入っている、子で自分のフェーズが `gate_closed` か `review_waiting`、チケット管理画面の承認待ち・進行中の列（提案が無く `closed` のもの以外）なのにワークツリーが無い、自分の `risk` の水準が HIGH 以上、`scattered[]` が空でない、`issues[]` が空でない、親でフェーズのどれかが `gate_closed` / `review_waiting` / `risk_escalates` のとき。チケット管理画面の「ユーザ待ちのみ」はこれで絞るだけ |
@@ -207,16 +207,16 @@ ccnavi --explain --json
 | `review[]` | レビュー待ちのフェーズ。`{parent, phase}`（`parents[].phases[]` のうち `review_waiting` が真のもの。親の順、番号順）。`attention` が真の子のうちこのフェーズの子と、`attention` が真の親のうちレビュー待ちのフェーズを持つ親は、ほかの種類に入らない（`attention` が偽のものは、下の `flow_draft` に入ることがある） |
 | `notice[]` | `attention` が真のチケットのうち、上の 2 つに入らないものの識別子（`tickets[]` の順） |
 | `handoff[]` | ツリーごとの取り込み待ち。`{tree, count}`。`tree` は `trees[].root`、`count` は `user handoff --json` をそのツリーで打ったときの、状態が `new` か `changed` の下書きの数（error のあるもの（`rejected`）と取り込み先と同じもの（`unchanged`）は数えない。ターミナルでだけ取り込めるものは数える）。数が 0 のツリーと、置き場が読めないツリーは載せない。チケットに関わらないので、チケット制御が disable でも出す |
-| `flow_draft[]` | `attention` が偽で、フローの下書きの `flow.draft.differs` が真の子の識別子（`tickets[]` の順）。`differs` は閉じた子で偽なので、開いている子だけが入る |
+| `flow_draft[]` | `attention` が偽で、フローの下書きの `flow.draft.differs` が真の子の識別子（`tickets[]` の順）。`differs` はクローズした子で偽なので、開いている子だけが入る |
 
 `parents[]` の 1 件。
 
 | キー | 何 |
 |---|---|
-| `ticket` / `closed` / `stage` | 識別子、閉じた承認済みチケットか、いまの局面（「着手待ち・フェーズ1 調査」「作業中・フェーズ2 設計」「レビュー待ち・フェーズ1 設計」など、ユーザに見せる言葉。閉じた親は空文字） |
+| `ticket` / `closed` / `stage` | 識別子、クローズした承認済みチケットか、いまの局面（「着手待ち・フェーズ1 調査」「作業中・フェーズ2 設計」「レビュー待ち・フェーズ1 設計」など、ユーザに見せる言葉。クローズした親は空文字） |
 | `plan` / `feedback` | 全体計画とフィードバック計画（`null` は未計画） |
-| `plans[]` | 計画の流れ（図の中身）。計画ごとに 1 件（全体計画、フィードバック計画の順）。形は「承認の JSON」の `plans[]` と同じで、同じ関数で組む。承認済みチケットの計画をそのまま描くので、番号は振り直さない（`from` は `number` と同じ）。`locked` は子が承認された番号（開いていても閉じていても）。提案ではないので `current` は `null`、`source_sha` は空文字。計画を持たない親は空。チケット管理画面は開いた親の行の「計画の流れを見る」で、承認のオーバーレイと同じ図の部品で読むだけで描き、計画から図を組み直さない |
-| `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親を閉じたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
+| `plans[]` | 計画の流れ（図の中身）。計画ごとに 1 件（全体計画、フィードバック計画の順）。形は「承認の JSON」の `plans[]` と同じで、同じ関数で組む。承認済みチケットの計画をそのまま描くので、番号は振り直さない（`from` は `number` と同じ）。`locked` は子が承認された番号（開いていてもクローズしていても）。提案ではないので `current` は `null`、`source_sha` は空文字。計画を持たない親は空。チケット管理画面は開いた親の行の「計画の流れを見る」で、承認のオーバーレイと同じ図の部品で読むだけで描き、計画から図を組み直さない |
+| `close_early` / `ready` / `closed_record` | 親のマーカー `close-early.json` / `ready.json` / `closed.json` の中身。無ければ `null`。`closed.json` は親をクローズしたときに置かれ、どのフェーズをどこで見たか（`reviews`）を持つ |
 | `phases[]` | 番号順。`{number, type, title, label, state, tickets, states, marks, review_required, gate_closed, review_waiting, deferred, review_at, covers, risk, risk_escalates, risk_line, manual}`。`state` は `planned`（子がまだ無い）/ `active` / `ended`。`marks` はマーカーの種類 → 中身。`review_required` は、そのフェーズの終わりにユーザのレビューが要るかを表す（真偽値）。定義・ステップ・引き受けた延期のどれか 1 つでも要ると言えば真。子の宣言か実績のリスクが要ると言う場合も真。`gate_closed` は判定が使うのと同じ値で、レビューが済むまで止めているかを示す（ユーザに見せる名前は「レビュー準備中」「レビュー待ち」）。`review_waiting` は依頼を出したのに止まったまま（ユーザのレビュー待ち）で、チケット管理画面はこれをコピーするだけで組み直さない。`manual` は、手で `done/` に動かされた子の確認待ち・移動が未共有など、手で動かした子についての 1 行（無ければ空文字）。VS Code のフェーズ行に出す。 |
 
 VS Code のチケット管理画面は、`gate_closed`・`review_waiting`・`marks` を次のように言葉に置き換えるだけで、レビューの要否・ゲートの条件・リスクは判定し直さない（フェーズ行の一言は上から最初にヒットしたもの）。`gate_closed` かつ `review_waiting` は「レビュー待ち」、`gate_closed` は「レビュー準備中」、`marks.reviewed` があれば「レビュー済み」、`marks.skipped.deferred_to` があり、その番号のフェーズに `marks.reviewed` があれば「レビュー済み」、`deferred_to` があれば「レビュー予定」、`marks.skipped` があれば「レビュー省略」、ほかは `state` により「終了」「進行中」「これから」。`marks` の中身（`skipped` の `deferred_to`、`requested` の `mr` と `url`）は JSON にそのまま載っているので、チケット管理画面は推測で代わりを作らない。
@@ -258,7 +258,7 @@ VS Code の拡張が、承認をチケット管理画面のオーバーレイで
 | `verify.reason` | 答えの理由の名前。全部入るなら `ok`、入らないなら `refused`（絞りが通らない）/ `nothing-pending`（承認待ちが 1 件も無い）/ `rejected`（承認の対象にしない提案がある）/ `proposal`（送る提案を名指しする problems がある）/ `dirty_parent`（親のワークツリーに置き場の外の未コミットの変更がある）/ `unpushed_code`（親のブランチに未 push のコードがある。後ろの 2 つは `approval-request` が止まる条件と同じ）。読めない提案（`problems[]`）はここに出ない |
 
 `--verify` は、`user agree` が承認を止めない範囲の超過（`batch[].overflow`）では「いいえ」にしない。本文には出す。送る提案を名指しする `problems[]`（警告を含む）は `proposal` で「いいえ」にする（`approval-request` が止まる条件と同じ。他の提案の `problems[]` は見ない）。
-承認されないものは `ccnavi --lint` も同じ関数で名指しする。ただし「まだ承認できない」子は `--lint` では warn で、先行が閉じれば通る子もここに入る。取り消し済み・どこにも無い・複数の場所にある・自分自身・自分の親・輪になった先行は error。
+承認されないものは `ccnavi --lint` も同じ関数で名指しする。ただし「まだ承認できない」子は `--lint` では warn で、先行がクローズすれば通る子もここに入る。取り消し済み・どこにも無い・複数の場所にある・自分自身・自分の親・輪になった先行は error。
 
 `--yes` の答え。値は `--preview` の `batch[].ticket` をカンマで並べたもの。
 

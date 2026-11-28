@@ -40,14 +40,14 @@ sh .ccnavi/scripts/ccnavi-launcher.sh ticket new <識別子> --title <タイト�
 
 ## 承認済みの親の改版の雛形を作る
 
-承認済みの親の計画・範囲・`phases:` を変える改版と、親を閉じる前のフィードバック計画（`feedback: []`）は、承認済みチケットをコピーした提案を、親と同じ識別子で `todo/` に置いて出す。手で写さず、親のワークツリーの中で雛形を作る。
+承認済みの親の計画・範囲・`phases:` を変える改版と、親をクローズする前のフィードバック計画（`feedback: []`）は、承認済みチケットをコピーした提案を、親と同じ識別子で `todo/` に置いて出す。手で写さず、親のワークツリーの中で雛形を作る。
 
 ```
 sh .ccnavi/scripts/ccnavi-launcher.sh ticket revise <識別子> [--feedback]
 ```
 
 - 承認済みの置き場の `doing/<識別子>.md` をコピーし、スクリプトだけが書く欄（`started_at`・`completed_at`・`base_sha`・`merged_sha`・`cancelled_at`・`cancel_reason`・`finished_to`・`settled_by`）、続きの子の目印、本文の最後の「参照したファイル」の節を外して、`todo/<識別子>.md` に書く
-- `--feedback` は `feedback: []`（対応なし）を足す。全体計画のフェーズが全部閉じてレビューが済んだあと（局面が「フィードバック計画待ち」）だけ。フィードバック計画が既にあれば止まる。対応のフェーズを並べるときは、雛形の `feedback:` を直す
+- `--feedback` は `feedback: []`（対応なし）を足す。全体計画のフェーズが全部クローズしてレビューが済んだあと（局面が「フィードバック計画待ち」）だけ。フィードバック計画が既にあれば止まる。対応のフェーズを並べるときは、雛形の `feedback:` を直す
 - `--feedback` を付けないときは、写しだけを作る。`plan`・`phases`・`allow`・`ask`・`deny` を直す（範囲を変えるときは、作業中の子を先に取り消す。[decisions.md](decisions.md)）
 - `todo/` に同じ識別子の提案が既にあるときは、上書きせず止まる
 - 書けたら `ccnavi-ticket.sh approval-request <識別子> --check` を通し、`ccnavi-ticket.sh approval-request <識別子>` で送る
@@ -115,7 +115,7 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 ## 子の提案
 
 子はフェーズごとに 1 枚以上作る。最初のフェーズの子は、親の提案と一緒に `todo/` に置き、`approval-request` は親の識別子で打つ。
-後ろのフェーズの子は、前のフェーズが閉じて（レビューがあれば済んで）から出す。先に出すと承認で止まる。
+後ろのフェーズの子は、前のフェーズがクローズして（レビューがあれば済んで）から出す。先に出すと承認で止まる。
 
 ```yaml
 ---
@@ -123,7 +123,7 @@ version: 1
 ticket: feature-50-settings-split-02-01
 parent: feature-50-settings-split
 phase: 2                   # 親の plan の番号。計画があれば 1 から
-predecessors: [feature-50-settings-split-01-01]  # 先に閉じているべき子。無ければ省く
+predecessors: [feature-50-settings-split-01-01]  # 先にクローズしているべき子。無ければ省く
 title: 設定画面の分割（実装）
 human_review:
   required: true

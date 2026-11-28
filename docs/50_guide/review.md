@@ -75,7 +75,7 @@ Chrome 拡張の承認ボードにも、同じ内容を決める「残った指�
 - push の認証は、gh / glab でログイン済みならそのまま通る。それ以外は git の設定側（Git Credential Manager か `credential.helper`）に置く。git のラッパースクリプトは環境変数での差し替えも認証画面も使えない
 - origin の読み方が合わないときは `sh .ccnavi/scripts/ccnavi-review.sh origin` で、ホスト・scheme・API の URL・使う道具を確かめる
 
-## 親を閉じるとき
+## 親をクローズするとき
 
-最後のレビューが済んだら、親を `finish` で閉じて push し、`ready` で Draft を外す。マージはユーザが行う。この順、片付け、早めに閉じる方法は
-[チケットによる作業範囲の使い方](tickets.md) の「親を閉じる」にある。
+最後のレビューが済んだら、親を `finish` でクローズして push し、`ready` で Draft を外す。マージはユーザが行う。この順、片付け、早めにクローズする方法は
+[チケットによる作業範囲の使い方](tickets.md) の「親をクローズする」にある。
