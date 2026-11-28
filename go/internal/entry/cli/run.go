@@ -9,12 +9,12 @@ import (
 	"strconv"
 	"strings"
 
+	"ccnavi/internal/hostreply"
 	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/policy/texts"
-	"ccnavi/internal/tickets/model/hostreply"
 	"ccnavi/internal/tickets/model/useronly"
 	"ccnavi/internal/tickets/model/via"
 )

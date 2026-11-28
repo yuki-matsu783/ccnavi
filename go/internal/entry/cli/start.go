@@ -78,7 +78,7 @@ func runStart(stdout, stderr io.Writer, root string, conf *config.Settings, args
 				HeadsErr: kv["err"], Hint: kv["hint"], IDExit: code})
 		}
 	case op == "merged" && len(rest) == 3 && host(rest[0]):
-		files, answer = rest[2:], func(in [][]byte) (string, int) { return start.Merged(rest[0], rest[1], in[0]) }
+		files, answer = rest[2:], func(in [][]byte) (string, int) { return start.RefuseMerged(rest[0], rest[1], in[0]) }
 	case op == "resolve" && len(rest) >= 1:
 		kv, valid := pairs(rest[1:], "issue", "issue-n", "issue-r", "own", "mr", "orig")
 		if !valid {

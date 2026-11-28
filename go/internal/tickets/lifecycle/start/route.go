@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"ccnavi/internal/hostreply"
 	"ccnavi/internal/infra/git"
-	"ccnavi/internal/tickets/model/hostreply"
 	"ccnavi/internal/tickets/model/ids"
 )
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"ccnavi/internal/tickets/model/hostreply"
+	"ccnavi/internal/hostreply"
 )
 
 // 終了コード。unreadable は、応答が JSON でないか、読み方の前提の形でないこと。

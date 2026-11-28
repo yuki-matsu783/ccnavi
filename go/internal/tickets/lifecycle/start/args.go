@@ -7,11 +7,11 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"ccnavi/internal/hostreply"
 	"ccnavi/internal/infra/git"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/infra/tree"
-	"ccnavi/internal/tickets/model/hostreply"
 )
 
 // Options は ccnavi-start.sh の引数を読んだもの。

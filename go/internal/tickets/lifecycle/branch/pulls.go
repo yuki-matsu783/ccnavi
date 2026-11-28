@@ -7,11 +7,11 @@ import (
 	"regexp"
 	"strconv"
 
+	"ccnavi/internal/hostreply"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/hostreply"
 )
 
 // Source は sh が渡すホストの結果（`branches <種類> <番号> [<渡し方> <引数>...] [--result <ファイル>]`）。

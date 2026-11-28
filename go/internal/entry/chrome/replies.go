@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"ccnavi/internal/hostreply"
 	"ccnavi/internal/infra/pyjson"
-	"ccnavi/internal/tickets/model/hostreply"
 )
 
 // opCopy は、拡張の service worker が取ってきた MR のスレッドとレビューの応答（replies）から、取ってきた時点の状態

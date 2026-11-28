@@ -24,14 +24,16 @@ const modulePrefix = "ccnavi/internal/"
 var topTiers = map[string]int{
 	"infra":   0,
 	"records": 1,
-	"policy":  2,
-	"tickets": 3,
-	"catalog": 4,
-	"hook":    5,
-	"entry":   6,
+	// ホストの応答の読み方。infra と records（伏せ字）だけを読む。チケットのドメインを知らず、tickets・entry が共有する
+	"hostreply": 2,
+	"policy":    3,
+	"tickets":   4,
+	"catalog":   5,
+	"hook":      6,
+	"entry":     7,
 	// テストの道具（harness）と、それを使う CLI を通すテスト（clitest。_test.go だけ）。道具は本体より上に置き、本体から読めないようにする。
-	"harness": 7,
-	"clitest": 8,
+	"harness": 8,
+	"clitest": 9,
 }
 
 var subTiers = map[string]map[string]int{
@@ -138,8 +140,7 @@ var subTiers = map[string]map[string]int{
 	},
 	"tickets/model": {
 		"ids": 0, "place": 0, "directcand": 0, "handoffnames": 0, "host": 0, "oplog": 0,
-		// hostreply は sh が取ってきたホストの応答の読み方（start・branch・review と Chrome 拡張の WASM が共有する）
-		"useronly": 0, "via": 0, "hostreply": 0,
+		"useronly": 0, "via": 0,
 		"ticket": 1, "standing": 1, "guard": 1,
 		"archive": 2, "fields": 2, "form": 2,
 	},

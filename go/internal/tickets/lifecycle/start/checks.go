@@ -72,8 +72,8 @@ func BranchOK(cwd string, a BranchArgs) (string, int) {
 	return o.String(), 0
 }
 
-// Merged は、同じブランチ名のマージ済み MR の応答（ホストの一覧）を読み、あれば止める（マージ済みのブランチは再利用しない）。
-func Merged(kind, branch string, data []byte) (string, int) {
+// RefuseMerged は、同じブランチ名のマージ済み MR の応答（ホストの一覧）を読み、あれば止める（マージ済みのブランチは再利用しない）。
+func RefuseMerged(kind, branch string, data []byte) (string, int) {
 	got, code := Pick("merged-mr", kind, "", data)
 	if code != 0 {
 		return "", code

@@ -81,7 +81,7 @@ MR のスレッドとレビューを取得する処理は 2 か所にありま�
    `expected.json` を書き直す。続けて `go/` で `CCNAVI_HOST_FIXTURE=1 go test ./internal/tickets/model/host -run HostFixture` を回し、
    ccnavi が出す結論で `conclusion.json` を書き直す。差分が意図どおりか（sh が新しい形を正しく読めているか）を目で確かめる。
    読めていなければ `ccnavi-review.sh` を直す
-3. `pnpm test` を回す。CX-T129 が失敗したら、問い合わせかページの切り方（`src/core/github.ts`）か、読み（`go/internal/tickets/model/hostreply`）を直して sh と同じ結果にする
+3. `pnpm test` を回す。CX-T129 が失敗したら、問い合わせかページの切り方（`src/core/github.ts`）か、読み（`go/internal/hostreply`）を直して sh と同じ結果にする
 4. 見本・期待値・sh・TS の変更を同じコミットに入れる（片方だけ変えると、もう片方の試験が失敗する）
 
 試験の名前の ID は `CX-T<番号>`。足すときは最後尾の次を採る。

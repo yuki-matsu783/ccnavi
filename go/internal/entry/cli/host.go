@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"ccnavi/internal/hostreply"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/pyfmt"
 	"ccnavi/internal/records/redact"
-	"ccnavi/internal/tickets/model/hostreply"
 )
 
 // runHost は `ccnavi host <問い> …`（ccnavi-common-host.sh・ccnavi-common-review.sh・ccnavi-review.sh 用）。sh がホストから
