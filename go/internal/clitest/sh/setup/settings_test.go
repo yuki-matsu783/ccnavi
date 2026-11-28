@@ -143,11 +143,11 @@ func TestSetupAFetchRegisteredFirstDoesNotHideTheMainHook(t *testing.T) {
 	}
 }
 
-// 共通設定の 3 本は `.ccnavi/config/common/` 固定なので、env には書かない（`--all` の一覧にも）。読まれない語が設定に残ると、
+// 共通設定の 3 本は `.ccnavi/config/common/` 固定なので、env には書かない。読まれない語が設定に残ると、
 // そこを直せば置き場が動くと読める。
 func TestSetupDoesNotWriteTheCommonLayerPaths(t *testing.T) {
 	t.Parallel()
-	for _, args := range [][]string{{"--mode", "enable"}, {"--mode", "enable", "--all"}} {
+	for _, args := range [][]string{{"--mode", "enable"}, {"--mode", "enable", "--force"}} {
 		w := newTarget(t)
 		w.setup(args...)
 		for _, name := range []string{"CCNAVI_RULES", "CCNAVI_PHASES", "CCNAVI_RISK"} {
@@ -278,7 +278,7 @@ func TestSetupKeepsTheCopyItTookBeforeTheFirstChange(t *testing.T) {
 	w := newTarget(t)
 	w.writeSettings(jsonObj{"env": jsonObj{"MY_IMPORTANT": "keep"}})
 	w.setup("--mode", "enable")
-	w.setup("--mode", "enable", "--all")
+	w.setup("--mode", "enable", "--force")
 	saved := parseJSON(t, shkit.Read(t, w.settingsPath()+".bak"))
 	if !reflect.DeepEqual(saved, jsonObj{"env": map[string]any{"MY_IMPORTANT": "keep"}}) {
 		t.Errorf("バックアップ = %v", saved)
@@ -311,13 +311,13 @@ func TestSetupReportsAValueItWillNotReplace(t *testing.T) {
 	in(t, checked.Stdout, "CCNAVI_MODE")
 }
 
-// 置き換えるのは、この実行で名指しした値だけ。--force が既定値まで書き込むと、`--all` を足しに来た打ち直しが、
+// 置き換えるのは、この実行で名指しした値だけ。--force が既定値まで書き込むと、打ち直しが、
 // 指定していない CCNAVI_MODE を既定の dry-run に戻す。
 func TestSetupKeepsAnExistingValueUnlessTheOptionIsNamed(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
 	w.setup("--mode", "enable")
-	w.setup("--all", "--force")
+	w.setup("--force")
 	eq(t, "CCNAVI_MODE", w.envOf()["CCNAVI_MODE"], any("enable"))
 	w.setup("--mode", "dry-run", "--force")
 	eq(t, "CCNAVI_MODE", w.envOf()["CCNAVI_MODE"], any("dry-run"))
@@ -429,6 +429,7 @@ func TestSetupReadsItsArguments(t *testing.T) {
 		t.Parallel()
 		w := newTarget(t)
 		code(t, w.setup("--nope"), 2)
+		code(t, w.setup("--all"), 2) // 置き場の設定を足す口は無い
 		code(t, w.raw("--mode"), 2)
 	})
 	t.Run("知らないモードは 2 で、何も書かない", func(t *testing.T) {

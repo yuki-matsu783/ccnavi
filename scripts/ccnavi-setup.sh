@@ -10,7 +10,6 @@
 #   --deploy <ccnavi の根>   配布元。既定はこのスクリプトが入っている ccnavi の根
 #   --no-deploy              配布物を置かず、settings.json だけを書く
 #   --bin <project|user>     実行ファイルの置き方。既定は project（配布先の .ccnavi/bin/）。user はホームディレクトリの下に置き、ターミナルで確認する
-#   --all                    受け付けるが、今は足すものが無い（置き場の env は廃止した）
 #   --force                  明示した --mode / --ticket-control で、既にある値を置き換える。
 #                            配るときも、配布先に既にあるものを入れ替える
 #   --check                  書かずに、揃っていないところだけを並べる
@@ -143,8 +142,6 @@ DEPLOY_TEMPLATES_DIR=".ccnavi/config/common/templates"
 # *.yml を全部配る。ccnavi の仕組み側のもので、設定ではないので .ccnavi/config/ の外に置く。
 # 無いと sh と hook の文は短い既定の文に落ちる（止める・止めないは変わらない）。
 DEPLOY_MESSAGES_DIR=".ccnavi/messages"
-# 古い置き場。自動では消さない（古い実行ファイルが走っている間に消すと、文が既定の文に落ちる）。
-DEPLOY_OLD_MESSAGES_DIR=".ccnavi/config/common/messages"
 # 配布先へ配るスキル。配布元の .claude/skills/ の中で、SKILL.md の frontmatter に `process: true`（共通の工程スキル）
 # か `distribute: true`（配るだけのスキル。ccnavi-config）を持つものだけを配る（.ccnavi/docs/skill-processes.md）。
 # 配るのは SKILL.md と references/common/ の下の .md。`distribute: true` のスキルは、ユーザの発言のときの同期の対象ではない。
@@ -190,7 +187,7 @@ DEPLOY_SCRIPTS="ccnavi-ticket.sh ccnavi-review.sh ccnavi-git.sh ccnavi-common-st
 LAUNCHER_NAME="ccnavi-launcher.sh"
 mode="$DEFAULT_MODE"
 # 明示されたかどうかを別の変数で持つ。--force で置き換えてよいのは、ユーザがこの実行で
-# 指定した値だけ。既定で埋めただけの値まで置き換えると、`--all` を足すための実行し直しが、
+# 指定した値だけ。既定で埋めただけの値まで置き換えると、実行し直しが、
 # そのとき指定していない CCNAVI_MODE を既定の dry-run に戻す。
 mode_given=no
 # チケット制御。プロジェクトで「全体ルールだけ」を使うか「チケットまで」使うかを、導入の
@@ -198,7 +195,6 @@ mode_given=no
 # 切りたいユーザが、README ではなく設定ファイルの中でこの設定項目を見つけられるようにするため。
 ticket_control="enable"
 ticket_control_given=no
-all=no
 force=no
 check=no
 vscode=yes
@@ -231,7 +227,6 @@ sh scripts/ccnavi-setup.sh [<ワークスペースルート>] [オプション]
                             user は ~/.local/share/ccnavi/<os>-<arch>/ に置き、~/.local/bin/ccnavi からリンクする
                             （PATH から使う形。Windows の Git Bash はリンクを張らず、実体のフォルダを PATH に通す）。
                             ホームディレクトリに書き込むので、ターミナルでの確認が要る。PATH への追加の仕方は環境に合わせて案内する
-  --all                     受け付けるが、今は足すものが無い（置き場の env は廃止した）
   --force                   明示した --mode / --ticket-control で、既にある値を置き換える。
                             配るときも、配布先に既にあるものを置き換える。ただし、この機械の実行ファイルは
                             --force が無くても、配布元と中身が違えば置き換える
@@ -295,10 +290,6 @@ while [ "$#" -gt 0 ]; do
 		[ "$#" -ge 2 ] || die "--bin に値がありません。project か user を指定します。"
 		bin_place="$2"
 		shift 2
-		;;
-	--all)
-		all=yes
-		shift
 		;;
 	--force)
 		force=yes
@@ -1066,8 +1057,7 @@ shape=$(printf '%s' "$current" | jq -r '
 # 置き場（記録・控え・提案・承認済みチケット・プロジェクト・ccnavi ディレクトリ）の env は
 # 書かない。置き場は既定に固定で、env では動かないので、書いても読まれない（共通設定の
 # 3 本も同じ）。読まれない語を設定項目の一覧に混ぜると、そこを直せば置き場が
-# 動くと読める。`--all` は今は足すものが無い。打ち慣れた手順が断られないように、
-# オプションとしては受ける。
+# 動くと読める。
 env_json=$(jq -n --arg mode "$mode" --arg bin "$BIN_PATH" --arg ticket_control "$ticket_control" '{
 	CCNAVI_MODE: $mode,
 	CCNAVI_ENTRY_PATH: $bin,
@@ -2135,9 +2125,6 @@ for skill_rel in $skills_all; do
 done
 set +f
 IFS=$skill_ifs
-if [ -d "$root/$DEPLOY_OLD_MESSAGES_DIR" ] && [ -d "$root/$DEPLOY_MESSAGES_DIR" ]; then
-	printf '案内: 古い置き場 %s は不要です（文面ファイルは %s に移りました）。実行ファイルを新しいものに入れ替えてから、消してかまいません。\n' "$DEPLOY_OLD_MESSAGES_DIR" "$DEPLOY_MESSAGES_DIR"
-fi
 if [ -n "$missing_parts" ]; then
 	printf 'まだ無いもの:\n%s' "$missing_parts"
 	# 配布をやめた理由は report_deploy が既に出している。ここで足すのは、ユーザが自分で

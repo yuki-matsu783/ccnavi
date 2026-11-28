@@ -184,7 +184,7 @@ Claude Code は 0 と 2 以外を止める扱いにしないので、`PreToolUse
 
 | 書くもの | 中身 |
 |---|---|
-| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_ENTRY_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。`--all` は受けるが、今は足すものが無い。置き場の env は書かない（置き場は固定。残っていても読まない） |
+| `.claude/settings.json` の `env` | `CCNAVI_MODE` / `CCNAVI_ENTRY_PATH` / `CCNAVI_RESTORE_IF_DENY` / `CCNAVI_GUARD_CORE_FILES` / `CCNAVI_GUARD_TICKET_APPROVAL` / `CCNAVI_GUARD_UNWATCHED` / `CCNAVI_TICKET_CONTROL`。置き場の env は書かない（置き場は固定。残っていても読まない） |
 | `.claude/settings.json` の `hooks` | 8 つのイベントに実行ファイルを登録する。既に別の表記で登録されていれば足さずに名前を挙げる |
 | `.vscode/settings.json` | `git.detectWorktrees: true` と `git.repositoryScanMaxDepth: 2`。足りないキーだけを足す。`--no-vscode` で触らない |
 | 配るもの | `dist/ccnavi/` の中身を `.ccnavi/bin/<os>-<arch>/` へ、設定 4 本（rules・phases・risks・ticket-sections）のひな形、`.ccnavi/scripts/ccnavi-{ticket,review,git,common,fetch,dirs,idle,session-start,sync,clean,branches,start,stage,worktree,launcher}.sh`、ユーザ専用の `ccnavi-user-{agree,push-approved,close-early,decide,clean-branch,handoff,mirror,prune,lib-review}.sh`、共通部の部品 `ccnavi-common-{state,lock,write-and-push,host,log,review}.sh`。入口（`ccnavi-session-start.sh`。`ccnavi-fetch.sh` と `ccnavi-dirs.sh` を順に呼ぶ）は `SessionStart` に別の 1 行で登録する（`--no-fetch` で外す）。配布先に既にあるものは、`--force` のときだけ入れ替える。振り分けの sh は配った回に実行ビットを付け、配らなかった回でも外れていれば付け直す（`--no-deploy` の回と、配布元と配布先が同じ回には触らない）。使い方の文書は配布元の `.ccnavi/docs/*.md` を全部 `.ccnavi/docs/` へ配る（`--docs` の索引はここだけ `.ccnavi/` の下でも載せる。配布先の既にあるものは `--force` のときだけ入れ替える）。配布元に `.ccnavi/docs/` が無ければ「配布元に無くて配れないもの」に挙げる。文面ファイル（`.ccnavi/messages/*.yml`。[13 章](messages.md)）、共通の作業・レビュー計画のテンプレートは配布元の `.ccnavi/config/common/templates/*.yml` を 1 本ずつ同じ場所へ配る（既にあるものは `--force` のときだけ入れ替える。配布元に置き場や `*.yml` が無ければ何もせず、何も言わない）。共通の工程スキルと配るだけのスキル（`ccnavi-config`）は、配布元の `.claude/skills/<名前>/SKILL.md` の frontmatter に `process: true` か `distribute: true` を持つものについて、`SKILL.md` と `references/common/` の下の `.md` を同じ場所へ 1 ファイルずつ配る（`.DS_Store` や `ccnavi-index.jsonl` のような生成物は配らない。`process: true` の読み方はユーザの発言のときの同期がコピーする判定に寄せ、CRLF の改行と、行末の `# コメント`は許し、閉じの `---` が無いものは配らない。配布先の道にディレクトリでないものがあるときは、そのファイルだけ配らずに挙げる）（既にあるものは `--force` のときだけ入れ替える。ユーザの発言のときの同期がプロジェクトへコピーする元になる。`.ccnavi/docs/skill-processes.md`）。配布元に該当するスキルが無ければ何もせず、何も言わない |
@@ -273,7 +273,7 @@ Windows でも走っている実行ファイルの名前は変えられる（付
 
 **設定の書き方。**
 
-- `--check` を付けると、書かずに揃っていないところだけを見る。`--all` も受けるが、今は足すものが無い。
+- `--check` を付けると、書かずに揃っていないところだけを見る。
 - 同じ 1 回で `.vscode/settings.json` も見る。触ってほしくないときは `--no-vscode`。
   `.vscode/settings.json` にコメントや末尾のカンマがあると（`jq` が読めない）、何を足せばよいかだけを出し、`.claude/settings.json` は書く。
   VS Code の他の設定は残し、`false` と書いてあれば変えずに並べて見せる。
