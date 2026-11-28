@@ -84,7 +84,7 @@ func workspace(t *testing.T, wrapper bool) string {
 	return root
 }
 
-// settingsFor は見本を取ったときの設定（project_home を渡した Settings）と同じ値を作る。moved なら実行ファイルと共通レイヤーの置き場を持つ。
+// settingsFor は見本を取ったときの設定（project_home を渡した Settings）と同じ値を作る。moved なら実行ファイルと共通設定の置き場を持つ。
 func settingsFor(root string, moved bool) *config.Settings {
 	conf := &config.Settings{ProjectHome: config.DefaultProjectHome}
 	if moved {

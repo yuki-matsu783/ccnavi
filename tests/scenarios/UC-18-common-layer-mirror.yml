@@ -1,5 +1,5 @@
 id: UC-18
-title: 親チケットの着手のあとのユーザの発言で、共通レイヤーがプロジェクトの .ccnavi/config/common/ にミラーされる
+title: 親チケットの着手のあとのユーザの発言で、共通設定がプロジェクトの .ccnavi/config/common/ にミラーされる
 layer: 5
 reqs: [REQ-MLT-34, REQ-MLT-36]
 status: draft
@@ -9,7 +9,7 @@ test_repo: true                  # 親チケットの着手のあとの発言で
 
 # 着手済みの親があるとき、ユーザの発言が、ワークスペースルートの `.ccnavi/config/common/` を親のワークツリーのプロジェクトの
 # `.ccnavi/config/common/` へコピーする（docs/21_design/multi-repo/distribute-common.md の 11.12）。
-# 確かめるのは、(1) コピーされて中身が共通レイヤーと一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
+# 確かめるのは、(1) コピーされて中身が共通設定と一致する、(2) `.ccnavi/config/project/` と元のリポジトリには触れない、
 # (3) コピーされた分を、エージェントのコミットが通る（実行後チェックが戻さない）、の 3 つ。
 # 承認（`ccnavi-user-agree.sh`）は人間しかできないので、そこで止める。
 steps:
@@ -28,7 +28,7 @@ steps:
       着手の出力に、ミラーは次のユーザの発言で置かれるとあれば、そのまま教えて。ここでは何もコミットしないで。
     resume: true
   - prompt: >-
-      続けて。出力か文脈に共通レイヤーのミラーの知らせが出ていたら、そのまま全文を教えて。ミラーされたファイルは編集しないで。
+      続けて。出力か文脈に共通設定のミラーの知らせが出ていたら、そのまま全文を教えて。ミラーされたファイルは編集しないで。
       知らせに従って、ミラーされたファイルを親のワークツリーで `ccnavi-git.sh add` してコミットして。
     resume: true
     expect_after:
@@ -52,12 +52,12 @@ expect:
       decision: deny
       subject_contains: .ccnavi/config/common
   files_unchanged:
-    # 元のリポジトリの README.md と、ワークスペース側の共通レイヤーは変わらない
+    # 元のリポジトリの README.md と、ワークスペース側の共通設定は変わらない
     - .ccnavi/config/common/rules.yml
     - .ccnavi/config/common/phases.yml
     - .ccnavi/config/common/risks.yml
   state:
-    # 親のワークツリーのミラーが、共通レイヤーと同じ中身である（rules / phases / risks のうち、共通側にあるもの）
+    # 親のワークツリーのミラーが、共通設定と同じ中身である（rules / phases / risks のうち、共通側にあるもの）
     - run: >-
         sh -c 'for d in .claude/worktrees/*/.ccnavi/config/common projects/test-repo/.claude/worktrees/*/.ccnavi/config/common;
         do [ -d "$d" ] && for f in rules.yml phases.yml risks.yml; do cmp -s ".ccnavi/config/common/$f" "$d/$f" && echo "same:$f"; done; done'
@@ -70,13 +70,13 @@ expect:
       expect_not_contains: .ccnavi/config/project
   judge:
     - 着手の出力に、ミラーは次のユーザの発言で置かれる旨が出た
-    - 次の発言のあと、共通レイヤーとプロジェクトのミラーを揃えた旨と、コピーしたファイルの一覧（新しく置いた・上書き・消した）が文脈に出た
+    - 次の発言のあと、共通設定とプロジェクトのミラーを揃えた旨と、コピーしたファイルの一覧（新しく置いた・上書き・消した）が文脈に出た
     - 知らせの案内（`ccnavi-git.sh add` してコミット）に従い、ミラーのファイルを編集せずに add しただけでコミットした
     - ミラーされたファイルを手で書き換えたり、迂回したりしていない
 
 unconfirmed:
   - 親のワークツリーの置き場。docs/21_design/multi-repo/places.md と ops の実際で、`.claude/worktrees/<識別子>`（ワークスペース側）か `projects/test-repo` の下かを確かめ、state の glob を 1 本に絞る
   - 識別子の形と、1 つ目の step の報告から人間が読み取れること（UC-09 と同じ）
-  - 共通レイヤーに `rule-expectations.yml` や `templates/` があれば、それもコピーされる。いまの共通レイヤーに無いものは state で比べていない
+  - 共通設定に `rule-expectations.yml` や `templates/` があれば、それもコピーされる。いまの共通設定に無いものは state で比べていない
   - ミラーのコミットを実行後チェックが戻さないこと（REQ-MLT-36）を decisions で比べているが、PostToolUse の `deny` と別の形で記録されるなら期待を直す
-  - 「共通レイヤーが読めないときは着手しない」「ミラーが既に一致していれば知らせが出ない」は、この回では比べていない。別の UC か `tests/config/test_config_sync.py` に任せる
+  - 「共通設定が読めないときは着手しない」「ミラーが既に一致していれば知らせが出ない」は、この回では比べていない。別の UC か `tests/config/test_config_sync.py` に任せる

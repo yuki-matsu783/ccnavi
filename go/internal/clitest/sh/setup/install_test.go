@@ -486,7 +486,7 @@ func TestInstallBuildFailureIs4(t *testing.T) {
 
 // ---- --force のバックアップ
 
-// バックアップは作業場の外に 700 で取り、リンクの先の中身を写す。ユーザ自身のスキル・自身のレイヤーは写さない。配布元は変えない。
+// バックアップは作業場の外に 700 で取り、リンクの先の中身を写す。ユーザ自身のスキル・ワークスペースの設定は写さない。配布元は変えない。
 func TestInstallForceBacksUpOutsideTheWorkspaceWithMode700(t *testing.T) {
 	t.Parallel()
 	i := newInstall(t)

@@ -25,7 +25,7 @@ func treeLabel(name string) string {
 	return name
 }
 
-// Draft は下書きの置き場の <名前>.yml 1 本。layer は取り込み先のレイヤー（検査はこのフェーズ定義で行う）、
+// Draft は下書きの置き場の <名前>.yml 1 本。layer は取り込み先の設定（検査はこのフェーズ定義で行う）、
 // target は取り込み先（ツリーからの相対）、also は同じ中身の下書きがあるほかのツリーの名前（ルートは ""）。
 type Draft struct {
 	tree   tree.Tree
@@ -77,7 +77,7 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// targetLayer は下書きの取り込み先のレイヤー。共通・自身（プロジェクトのツリーならそのプロジェクト）・プロジェクト。
+// targetLayer は下書きの取り込み先の設定。共通・自身（プロジェクトのツリーならそのプロジェクト）・プロジェクト。
 func targetLayer(conf *config.Settings, root string, where tree.Tree, key string) string {
 	names := known(conf, root)
 	parts := splitKey(key)
@@ -99,7 +99,7 @@ func targetLayer(conf *config.Settings, root string, where tree.Tree, key string
 }
 
 // Scan は全ツリー（ワークスペース・プロジェクト・ワークツリー）のテンプレートの下書きを読んで、取り込み先の
-// レイヤーのフェーズ定義（共通は共通だけ、ほかは共通 + レイヤー）で検査する。同じ中身の下書きが複数のツリーに
+// 設定のフェーズ定義（共通は共通だけ、ほかは共通 + 設定）で検査する。同じ中身の下書きが複数のツリーに
 // 在れば（親のブランチに乗ったものが子のワークツリーにも checkout される）、最初の 1 本にまとめる。
 // catalog が nil なら読む。
 func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
@@ -155,7 +155,7 @@ func Scan(conf *config.Settings, root string, catalog *flow.Catalog) *Scanned {
 	return out
 }
 
-// layersWith は同じ名前のテンプレートが在るレイヤー（共通を先に）。
+// layersWith は同じ名前のテンプレートが在る設定（共通を先に）。
 func layersWith(scanned *templates.Scan, name string) []any {
 	out := []any{}
 	for _, view := range scanned.All() {
@@ -174,8 +174,8 @@ var draftKeys = []string{"name", "path", "sha", "valid", "description", "when", 
 	"has_flows", "flows", "problems"}
 
 // DraftJSON はボードのテンプレートの画面が下書きを並べる 1 本分の答え。path は下書き（ツリーからの相対）、target は
-// 取り込み先、layer は取り込み先のレイヤー、checked_with は検査に使ったフェーズ定義の層、text は下書きの本文そのまま
-// （reveal はしない）、exists_in は同じ名前のテンプレートが在るレイヤー。problems の深刻度は下書きの検査のまま。
+// 取り込み先、layer は取り込み先の設定、checked_with は検査に使ったフェーズ定義の層、text は下書きの本文そのまま
+// （reveal はしない）、exists_in は同じ名前のテンプレートが在る設定。problems の深刻度は下書きの検査のまま。
 func DraftJSON(d *Draft, scanned *templates.Scan) *pyjson.Object {
 	row := templates.EntryJSON(d.Entry)
 	out := pyjson.NewObject()

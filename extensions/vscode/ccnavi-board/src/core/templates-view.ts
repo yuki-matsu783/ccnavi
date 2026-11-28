@@ -1,5 +1,5 @@
 /**
- * テンプレート管理画面の、拡張ホストとWebviewの間の契約。見せるのは`ccnavi --templates --json`の答え（テンプレートの一覧・レイヤーごとの中身・統合結果の索引・下書き）と、
+ * テンプレート管理画面の、拡張ホストとWebviewの間の契約。見せるのは`ccnavi --templates --json`の答え（テンプレートの一覧・設定ごとの中身・統合結果の索引・下書き）と、
  * 1件の本文（`--templates --show <名前> --json`）。形の見本は`tests/fixtures/templates-json.json`。
  * 一覧・検索・表示と、テンプレートの編集（保存はユーザが押したときだけ）をする画面。下書きの取り込みは取り込み待ち画面（`handoff-view.ts`）が受け持つ。
  *
@@ -52,10 +52,10 @@ export interface Dropped {
   readonly detail: string;
 }
 
-/** レイヤーの中の1テンプレート */
+/** 設定の中の1テンプレート */
 export interface TemplateEntry {
   readonly name: string;
-  /** どのレイヤーのファイルか（commonか、開いているレイヤーの名前）。`--layer`の名前と同じ */
+  /** どの設定のファイルか（commonか、開いている設定の名前）。`--layer`の名前と同じ */
   readonly layer: string;
   readonly path: string;
   /** 本文のハッシュ。取り込みの`--expect`などに使う */
@@ -77,7 +77,7 @@ export interface TemplateEntry {
   readonly problems: readonly TemplateProblem[];
 }
 
-/** レイヤーごとの生の中身（共通と各レイヤー） */
+/** 設定ごとの生の中身（共通と各設定） */
 export interface TemplateLayer {
   readonly name: string;
   readonly path: string;
@@ -97,10 +97,10 @@ export interface SumRow {
   readonly dropped: Dropped | null;
 }
 
-/** レイヤーごとの統合結果の索引 */
+/** 設定ごとの統合結果の索引 */
 export interface Sum {
   readonly name: string;
-  /** 統合結果に入るレイヤーの名前 */
+  /** 統合結果に入る設定の名前 */
   readonly layers: readonly string[];
   readonly templates: readonly SumRow[];
 }
@@ -131,7 +131,7 @@ export interface TemplatesJson {
   readonly version: number;
   /** ワークスペースのルート */
   readonly root: string;
-  /** 一覧の対象のレイヤー */
+  /** 一覧の対象の設定 */
   readonly layer: string;
   readonly keywords: readonly string[];
   readonly templates: readonly TemplateEntry[];
@@ -148,7 +148,7 @@ export interface TemplateDetail extends TemplateEntry {
   readonly text: string;
 }
 
-/** このレイヤーで使えるフェーズ定義1件（計画のステップの型の選択肢） */
+/** この設定で使えるフェーズ定義1件（計画のステップの型の選択肢） */
 export interface PhaseTypeInfo {
   readonly id: string;
   readonly title: string;
@@ -238,7 +238,7 @@ export type TemplatesMessage =
   | { readonly type: "openHandoff" }
   /** 既存のテンプレートの編集を始める。`session`は画面が付ける番号で、答えに返る */
   | { readonly type: "editOpen"; readonly session: number; readonly name: string; readonly layer: string }
-  /** 開いている対象のレイヤーに新しいテンプレートを作る編集を始める（保存するまでファイルは作らない） */
+  /** 開いている対象の設定に新しいテンプレートを作る編集を始める（保存するまでファイルは作らない） */
   | { readonly type: "editNew"; readonly session: number; readonly name: string }
   /** 編集欄を閉じた。拡張ホストは作業中の錠を取り直すのをやめる */
   | { readonly type: "editClose"; readonly session: number }

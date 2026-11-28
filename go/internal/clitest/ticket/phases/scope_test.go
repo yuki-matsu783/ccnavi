@@ -83,7 +83,7 @@ func TestAParentWithoutAPlanIsApprovedButCannotStartEvenWithChildren(t *testing.
 
 func TestNoPhasesFileAnywhereStopsAParentWithoutAPlan(t *testing.T) {
 	t.Parallel()
-	// どのレイヤーにも phases.yml が無いと plan を持てず、計画の無い親は着手が止まる。
+	// どの設定にも phases.yml が無いと plan を持てず、計画の無い親は着手が止まる。
 	w := newWS(t)
 	remove(t, w.phases)
 	w.propose(parentName, noPlanParent(parentName, "src/*", "wip/*"))
@@ -115,7 +115,7 @@ func TestASecondCwdIsRefusedAndOneOfEachGoesThrough(t *testing.T) {
 
 func TestAPhasesFlagOnTicketFinishDoesNotDropTheReview(t *testing.T) {
 	t.Parallel()
-	// `ticket` のサブコマンドに `--phases` を足しても、定義は共通レイヤーのまま（issue #65）。`ccnavi-ticket.sh` が引数を
+	// `ticket` のサブコマンドに `--phases` を足しても、定義は共通設定のまま（issue #65）。`ccnavi-ticket.sh` が引数を
 	// そのまま渡すので、この形はエージェントが Bash で打てる。通していた頃は、`review: true` の定義を `review: false` と
 	// 宣言するファイルに差し替えて、レビュー待ちを飛ばせた。
 	w := newWS(t)

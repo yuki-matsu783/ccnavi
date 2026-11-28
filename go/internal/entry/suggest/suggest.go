@@ -345,10 +345,10 @@ func expectationsPass(conf *config.Settings, root string, expectations []any, wa
 	return true, nil
 }
 
-// ruleCandidates は、足すと良い ask のルールの候補と、検証を通らずに捨てた数。共通レイヤーを読めなければ、足した
+// ruleCandidates は、足すと良い ask のルールの候補と、検証を通らずに捨てた数。共通設定を読めなければ、足した
 // コピーで試せないので候補を出さず、全部を捨てた数にする。
 func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object) ([]candidate, int, error) {
-	// 1. 候補の材料（渡った回数の多い形）を集め、足し先の共通レイヤーを読む。
+	// 1. 候補の材料（渡った回数の多い形）を集め、足し先の共通設定を読む。
 	groups := handoverGroups(records, root)
 	if len(groups) == 0 {
 		return nil, 0, nil
@@ -372,7 +372,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 			}
 		}
 	}
-	// 2. 候補ごとに、共通レイヤーに 1 件足したコピーを一時ディレクトリに書いて試す。実際のファイルは書き換えない。
+	// 2. 候補ごとに、共通設定に 1 件足したコピーを一時ディレクトリに書いて試す。実際のファイルは書き換えない。
 	scratch, removeScratch, err := fsio.ScratchDir(scratchPrefix)
 	if err != nil {
 		return nil, 0, err
@@ -415,7 +415,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 		}
 		trial := *conf
 		trial.Rules = path
-		// 候補は試す共通レイヤー（path）に書いてあるので、記録名はその相対パスと書いた id。
+		// 候補は試す共通設定（path）に書いてあるので、記録名はその相対パスと書いた id。
 		recordName := ruleload.RelPath(path, root) + rules.IDSeparator + id
 		// 3. 検証。--lint の error が付く候補と、期待が通らない候補は捨てて、捨てた数に数える。
 		if lintErrors(path, root, id, false) {
@@ -441,7 +441,7 @@ func ruleCandidates(conf *config.Settings, root string, records []*pyjson.Object
 // messageCandidates は、記録で同じ呼び出しを繰り返し止めた deny のルールについて、message の見直し候補を作る。ルール
 // ファイルに見つからないもの（組み込みや、もう無いルール）は、文面を直す先が無いので捨てる。
 func messageCandidates(conf *config.Settings, root string, records []*pyjson.Object, n int) ([]candidate, int, error) {
-	// 読めたレイヤーのルールだけを、deny の探し先にする。
+	// 読めた設定のルールだけを、deny の探し先にする。
 	list := repeatedDenies(records, n)
 	if len(list) == 0 {
 		return nil, 0, nil

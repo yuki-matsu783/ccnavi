@@ -205,7 +205,7 @@ func TestNoLimitWhenNoProtectionIsLeftOut(t *testing.T) {
 	mustHave(t, s.run("PreToolUse", call{Env: off, Command: bashCmd}).Stdout, "DENY_REDIRECT_LIMIT")
 }
 
-// ask のルールにもヒットした回。判定を決めたのは上限なので、ask のルールのレイヤーを残さない（組み込みの拒否と同じく出所を持たない）。
+// ask のルールにもヒットした回。判定を決めたのは上限なので、ask のルールの設定を残さない（組み込みの拒否と同じく出所を持たない）。
 func TestTheRecordOfALimitDenyHasNoSource(t *testing.T) {
 	t.Parallel()
 	s := newSG(t)
@@ -228,8 +228,8 @@ func TestTheRecordOfALimitDenyHasNoSource(t *testing.T) {
 	}
 }
 
-// 上限で外すのは生の文字列への照合だけで、中で実行されるコマンド（レイヤー）には保護をそのまま適用する。`grep -n "<<"` で縮退させる。
-// この縮退は読みを止めても実行役の中身（レイヤー）を作るので、生の文字列の経路に入りつつ、`sudo` が実行する `tee` がレイヤーに出る。
+// 上限で外すのは生の文字列への照合だけで、中で実行されるコマンド（設定）には保護をそのまま適用する。`grep -n "<<"` で縮退させる。
+// この縮退は読みを止めても実行役の中身（設定）を作るので、生の文字列の経路に入りつつ、`sudo` が実行する `tee` が設定に出る。
 func TestOverTheLimitTheCommandsRunInsideAreStillProtected(t *testing.T) {
 	t.Parallel()
 	s := newSG(t)

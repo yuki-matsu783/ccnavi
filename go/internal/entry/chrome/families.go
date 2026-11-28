@@ -26,7 +26,7 @@ var (
 	ownLayer     = config.DefaultProjectHome + "/" + config.LayerConfigDir
 	settingsFile = filepath.ToSlash(config.SharedClaudeSettings)
 	doneDir      = config.DefaultApproved + "/" + string(place.Done)
-	// 文面ファイル（拒否の文）。手元と同じくワークスペースの統合先のものだけを読む（レイヤーごとの文面は無い）。
+	// 文面ファイル（拒否の文）。手元と同じくワークスペースの統合先のものだけを読む（設定ごとの文面は無い）。
 	// 配布先が文を書き換えていれば、手元の CLI と同じ文になる。
 	messagesDir = config.DefaultProjectHome + "/" + texts.MessagesDir
 )

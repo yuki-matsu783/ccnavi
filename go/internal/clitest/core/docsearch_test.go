@@ -212,7 +212,7 @@ func TestDocsFiltersOutsideDocsStopTheRun(t *testing.T) {
 }
 
 // 他の実行の旗・設定や sh のパスを差し替える旗は、何も言わずに無視せず --docs を止める。
-// 止める文は「診断でだけ効く」のレイヤーの文で先へ進まない。
+// 止める文は「診断でだけ効く」の設定の文で先へ進まない。
 func TestDocsIsStoppedByTheFlagsOfOtherRuns(t *testing.T) {
 	t.Parallel()
 	r := newDocsRepo(t)

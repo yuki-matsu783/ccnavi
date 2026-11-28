@@ -14,7 +14,7 @@
  * `user handoff [<パス>…] --json`（`wip/handoff/`の下書きの一覧を見る。取り込み待ち画面が読む。`--root`で指したツリー1本だけを見る）と
  * `user handoff <パス…> --yes --expect <ハッシュ> --via board --json`（取り込み。書くのは実行ファイル。ユーザが画面で押したときだけ。
  * `expect`は取り込むパスを指して見るだけをもう一度呼んだ結果のもの）、
- * `user mirror [<名前>…] --json`（共通レイヤーのミラーのずれを見る。プロジェクト管理画面が5分ごとに読む）と
+ * `user mirror [<名前>…] --json`（共通設定のミラーのずれを見る。プロジェクト管理画面が5分ごとに読む）と
  * `user mirror [<名前>…] --yes --expect <値> --via board --json`（ミラーの同期。書くのは実行ファイルで、各プロジェクトのワークツリーへ。
  * ユーザが画面で押したときだけ）。
  * 判定と検証はルールファイルを差し替えられる。
@@ -872,9 +872,9 @@ export async function runHandoffYes(workspace: string, setting: string, tree: st
 }
 
 /**
- * 共通レイヤーのミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
- * `--root`はワークスペースのルート（ミラーの元の共通レイヤーと、コピーする先の`projects/`を持つ側）。
- * 見るだけの結果は、プロジェクトにずれやerrorがあっても終了コード0で返る。`ok`が偽の結果（共通レイヤーが読めないなど）も
+ * 共通設定のミラーのずれを見る（`user mirror [<名前>…] --json`）。何も書かない。
+ * `--root`はワークスペースのルート（ミラーの元の共通設定と、コピーする先の`projects/`を持つ側）。
+ * 見るだけの結果は、プロジェクトにずれやerrorがあっても終了コード0で返る。`ok`が偽の結果（共通設定が読めないなど）も
  * 読めた結果として返し、理由は呼び手が出す
  */
 export async function runMirror(root: string, setting: string, names: readonly string[] = []): Promise<RunResult<MirrorList>> {

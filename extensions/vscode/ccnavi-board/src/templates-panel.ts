@@ -8,14 +8,14 @@
  * 中身を渡すのは、ユーザが「更新」を押したときと、ファイルが外で変わったのを読み直したときだけ。
  *
  * 対象は3種。共通の設定のテンプレート（`.ccnavi/config/common/templates/`）、ワークスペースの設定のテンプレート、
- * プロジェクト1つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象のレイヤーのテンプレートの編集（計画のステップと線・子のフロー）。
- * 読んだ中身（一覧・レイヤーごとの中身・統合結果の索引・下書き）は`ccnavi --templates --json`の答えをそのまま渡す。
+ * プロジェクト1つの設定のテンプレート。画面は一覧・検索・表示と、開いている対象の設定のテンプレートの編集（計画のステップと線・子のフロー）。
+ * 読んだ中身（一覧・設定ごとの中身・統合結果の索引・下書き）は`ccnavi --templates --json`の答えをそのまま渡す。
  *
  * **編集。** 編集中の中身は画面が持つ。拡張ホストが受け持つのは、実行ファイルでの検査（`--templates --check-file`）と保存だけ。
  * 読めるか・計画の順序・フローの形・図に描く中身は、実行ファイルの答えのまま。保存は、(1)書き出す本文を実行ファイルで検査してerrorが無い、
  * (2)実行ファイルが読み返した中身が、画面が書こうとした中身と同じ（食い違えば書かない）、(3)開いたときからファイルが外で変わっていない
  * （ハッシュが同じ。新規はまだ無い）、(4)リンクを辿らず一時ファイルの入れ替えで書く（`core/flow-write.ts`）、を満たしたときだけ書く。
- * 編集できるのは、開いている対象のレイヤーで、実行ファイルが書ける（`writable`）と答えたレイヤーのテンプレートだけ。
+ * 編集できるのは、開いている対象の設定で、実行ファイルが書ける（`writable`）と答えた設定のテンプレートだけ。
  * **作業中の錠。** 作業中のチケットがある間は、編集はできるが保存できない（取り込み待ち画面がテンプレートの取り込みを止めるのと同じ決まり。
  * 共通の設定とワークスペースはどのツリーの作業中でも、プロジェクトはそのプロジェクトの作業中だけ。確かめられなければ止める）。
  * 錠は編集を始めたときと、チケットが動いたときと、保存を押した時点で取り直す。実行ファイルには錠を足さない。
@@ -80,7 +80,7 @@ interface PanelState {
   readonly panel: vscode.WebviewPanel;
   readonly folder: vscode.WorkspaceFolder;
   readonly host: ScreenHost<TemplatesData>;
-  /** テンプレートの置き場と設定ファイルの監視。対象のレイヤーが変わるので、更新のたびに張り直す */
+  /** テンプレートの置き場と設定ファイルの監視。対象の設定が変わるので、更新のたびに張り直す */
   fileWatchers: vscode.FileSystemWatcher[];
   timer?: NodeJS.Timeout;
   loaded?: Loaded;
@@ -214,7 +214,7 @@ async function switchTarget(current: PanelState, target: TemplatesTarget): Promi
 }
 
 async function readPage(root: string, target: TemplatesTarget): Promise<Loaded> {
-  // 一覧の中身（レイヤー・統合結果・下書き）は実行ファイルの答えをそのまま使う。レイヤーの場所も拡張は組まない。
+  // 一覧の中身（設定・統合結果・下書き）は実行ファイルの答えをそのまま使う。設定の場所も拡張は組まない。
   const board = await loadBoard(root, binSetting());
   if (!board.ok) {
     throw new Error(`チケットとワークツリーの状態をccnaviから取得できません: ${board.error}`);
@@ -277,7 +277,7 @@ function registerPanelHandlers(current: PanelState): void {
 
 /**
  * テンプレートの置き場と下書きの置き場（`wip/handoff/`）、設定ファイルが変わったら、読み直す。
- * レイヤーの場所は読んだ答えから決まるので、更新のたびに張り直す。
+ * 設定の場所は読んだ答えから決まるので、更新のたびに張り直す。
  */
 function watchFiles(current: PanelState): void {
   for (const watcher of current.fileWatchers) {
@@ -460,7 +460,7 @@ async function handleMessage(current: PanelState, message: TemplatesMessage | un
       return;
     }
     case "showTemplate": {
-      // 1件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前とレイヤーで突き合わせる
+      // 1件の本文は実行ファイルに読ませる。待つ間に別の対象へ切り替わっても、画面が名前と設定で突き合わせる
       const result = await runTemplateShow(current.folder.uri.fsPath, binSetting(), message.name, templatesLayerOf(currentKey(current.target)));
       if (!alive(current)) {
         return;
@@ -643,7 +643,7 @@ function postOpened(current: PanelState, session: number, opened: Extract<ToTemp
   current.host.post({ type: "editOpened", session, opened, error } satisfies ToTemplates);
 }
 
-/** 編集してよいレイヤー。開いている対象のレイヤーで、実行ファイルが書けると答えたものだけ。理由は画面にそのまま出す */
+/** 編集してよい設定。開いている対象の設定で、実行ファイルが書けると答えたものだけ。理由は画面にそのまま出す */
 function editableLayer(current: PanelState, layerName: string): { readonly ok: true; readonly layer: TemplateLayer } | { readonly ok: false; readonly error: string } {
   const data = current.loaded?.data;
   if (data === undefined) {
@@ -666,7 +666,7 @@ function editableLayer(current: PanelState, layerName: string): { readonly ok: t
   return { ok: true, layer };
 }
 
-/** レイヤーの置き場のテンプレートのファイル。名前は形を確かめてから使う（ファイル名になるため） */
+/** 設定の置き場のテンプレートのファイル。名前は形を確かめてから使う（ファイル名になるため） */
 function templateFile(root: string, layer: TemplateLayer, name: string): string | undefined {
   if (!validTemplateName(name)) {
     return undefined;
@@ -710,7 +710,7 @@ function sha256(bytes: string | Uint8Array): string {
 
 /**
  * 読ませている間に、対象が別に切り替わった（またはパネルが閉じた）か。切り替わっていたら`reply`で理由を返して真を返す。
- * レイヤー・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別のレイヤーの錠で通さない）
+ * 設定・錠・検査に使う対象は入口で控えたものに揃っているので、途中で変わった答えは使わない（別の設定の錠で通さない）
  */
 function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: string) => void): boolean {
   if (!alive(current)) {
@@ -725,7 +725,7 @@ function abandoned(current: PanelState, target: TemplatesTarget, reply: (error: 
 
 /**
  * 一覧の1行を図で見せるため、そのファイルを実行ファイルに読ませて答えを返す。読むだけで、錠も編集の番号も取らない。
- * レイヤーは開いている対象のどのレイヤーでもよい（読み取り専用のレイヤーも図は見られる）
+ * 編集する設定は、開いている対象のどの設定でもよい（読み取り専用の設定も図は見られる）
  */
 async function preview(current: PanelState, name: string, layerName: string): Promise<void> {
   const target = current.target;
@@ -820,7 +820,7 @@ async function editNew(current: PanelState, session: number, name: string): Prom
     postOpened(current, session, null, `「${name}」はテンプレートの名前に使えません。${NEW_TEMPLATE_NAME_RULE}`);
     return;
   }
-  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通のレイヤーにある名前も、
+  // 大文字小文字だけが違う名前は同じものとして扱う（別の機械で2本が1本に重なるため）。共通設定にある名前も、
   // 同名で中身が違うと統合結果で破棄されるので作らない
   const taken = current.loaded === undefined ? undefined : templateNameTaken(current.loaded.data.layers, layerName, name);
   if (taken !== undefined) {

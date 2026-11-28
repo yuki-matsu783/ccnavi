@@ -72,7 +72,7 @@ func atStart(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, 
 		if parents := notice.Parents(conf, root); parents != "" {
 			blocks = append(blocks, parents)
 		}
-		// 読めないレイヤーの deny は黙って効かなくなる。判定のたびには言わないので、開始のたびに言う。
+		// 読めない設定の deny は黙って効かなくなる。判定のたびには言わないので、開始のたびに言う。
 		if broken := ruleload.Unreadable(conf, root); len(broken) > 0 {
 			said := texts.Say(root, "NOTICE_LAYER_UNREADABLE", texts.Values{"layers": strings.Join(broken, "、")}, nil)
 			rejects = pyfmt.JoinNonEmpty(pyfmt.ParagraphBreak, rejects, said)

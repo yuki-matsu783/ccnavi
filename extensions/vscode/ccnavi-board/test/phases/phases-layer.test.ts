@@ -19,7 +19,7 @@ test("CB-T114 定義のファイルがないのは正常で、不備の帯も作
   try {
     assert.equal(dom.all(".banner.missing").length, 0, "ファイルがないことを不備として出さない");
     assert.equal(dom.all('button[data-action="create"]').length, 0, "雛形は置かない");
-    assert.equal(dom.all('button[data-action="open-self"]').length, 0, "共通向けの「自身のレイヤーを開く」はありません");
+    assert.equal(dom.all('button[data-action="open-self"]').length, 0, "共通向けの「ワークスペースの設定を開く」はありません");
     // 文面はそのまま出る（Reactが文字として入れるので、実体参照に変わらない）
     assert.equal(dom.all(".banner.warn:not(#changed)").length, 1);
     assert.equal(dom.one(".banner.warn:not(#changed)").textContent, "読み込めない <理由>");

@@ -4,7 +4,7 @@ package flow
 //
 //  1. プロジェクトのリポジトリ（手元で projects/<名前> に clone されるもの）の親子のチケットを、手元と同じ形の仮のツリーで判定し、
 //     承認で書くもの（Changes）はその親子のチケットの親のブランチだけ
-//  2. プロジェクトのレイヤーは、プロジェクトの統合先の .ccnavi/config/project/ をそのまま使う。共通レイヤーはワークスペースの
+//  2. プロジェクトの設定は、プロジェクトの統合先の .ccnavi/config/project/ をそのまま使う。共通設定はワークスペースの
 //     統合先の .ccnavi/config/common/ だけで、プロジェクトの .ccnavi/config/common/（同期が配るミラー）は読まない
 //  3. 「始める」: issue の番号から識別子（feature-12-<slug>、プロジェクトなら feature-12-web-<slug>）を決め、統合先の done/ にある・
 //     同じ名前のブランチがある・開いた親子のチケットに同じ識別子がある・互換の版が違う、のどれでも始められない
@@ -23,7 +23,7 @@ import (
 	"ccnavi/internal/harness/ticketkit"
 )
 
-// mirrorRules はミラー（プロジェクトの .ccnavi/config/common/）。ワークスペースの中では共通レイヤーとして読まれない。
+// mirrorRules はミラー（プロジェクトの .ccnavi/config/common/）。ワークスペースの中では共通設定として読まれない。
 const mirrorRules = `{"version": 1, "deny": [{"id": "mirror-only", "match": "Bash", "glob": "*x*"}]}` + "\n"
 
 var projectActor = map[string]any{"account": "lab-approver", "version": "9.9.9"}
@@ -40,7 +40,7 @@ func workspaceSnapshot(compat string, extra map[string]string) map[string]any {
 	return map[string]any{"integration": map[string]any{"name": "main", "source": "default", "head": zeroHead}, "files": files, "binary": []any{}, "links": []any{}}
 }
 
-// projectIntegration はプロジェクトの統合先。フェーズ定義は、ワークスペースの共通レイヤーと、親の project: が指すプロジェクトの config の和。
+// projectIntegration はプロジェクトの統合先。フェーズ定義は、ワークスペースの共通設定と、親の project: が指すプロジェクトの config の和。
 func projectIntegration(extra map[string]string) map[string]any {
 	files := map[string]any{
 		".ccnavi/config/project/rules.yml":  `{"version": 1, "deny": []}` + "\n",
@@ -56,7 +56,7 @@ func familyFiles(ident string) map[string]any {
 	return map[string]any{
 		"wip/proposals/todo/" + ident + ".md":       samples.ParentText(ident, samples.Plan("research"), samples.ParentOpts{Issue: 12}),
 		"wip/proposals/todo/" + ident + "-01-01.md": samples.ChildTextReview(ident+"-01-01", ident, 1, []string{"wip/research/*"}, samples.Off),
-		// 親のブランチの上のレイヤーは読まない（置き場の外なので拡張はそもそも読まない。
+		// 親のブランチの上の設定は読まない（置き場の外なので拡張はそもそも読まない。
 		// 親のブランチの上で書き換えて承認やレビューを不要にさせない）
 	}
 }
@@ -149,7 +149,7 @@ func TestApprovingAProjectFamilyWritesOnlyItsBranch(t *testing.T) {
 	ticketkit.Lacks(t, js(paths[".ccnavi/approved/doing/web-i0012.md"], "content"), "ccnavi_approved")
 }
 
-// フェーズ定義は共通レイヤー（ワークスペースの統合先）と、親の project: が指す config の和。ミラーは足さない。
+// フェーズ定義は共通設定（ワークスペースの統合先）と、親の project: が指す config の和。ミラーは足さない。
 func TestTheProjectFamilyIsJudgedByTheProjectPhasesAndIgnoresTheMirror(t *testing.T) {
 	t.Parallel()
 	tmp := base.TempDir(t)
@@ -171,7 +171,7 @@ func TestTheProjectFamilyIsJudgedByTheProjectPhasesAndIgnoresTheMirror(t *testin
 	if got := batchIDs(c.project("board", projectAsk{branches: bare}, tmp)); reflect.DeepEqual(got, []string{"web-i0012", "web-i0012-01-01"}) {
 		t.Error("ミラーの定義で通った")
 	}
-	// ワークスペースの共通レイヤーに定義があれば、プロジェクトの config に無くてもその定義が効く。
+	// ワークスペースの共通設定に定義があれば、プロジェクトの config に無くてもその定義が効く。
 	common := workspaceSnapshot(exe.Compat(t), map[string]string{".ccnavi/config/common/phases.yml": samples.Phases})
 	board = c.project("board", projectAsk{branches: bare, ws: common}, tmp)
 	if _, bad := board["error"]; bad || !reflect.DeepEqual(batchIDs(board), []string{"web-i0012", "web-i0012-01-01"}) {

@@ -89,7 +89,7 @@ func TestBypassPermissionsRefuses(t *testing.T) {
 
 func TestTheProjectCanOpenTheUnwatchedGate(t *testing.T) {
 	t.Parallel()
-	// CCNAVI_GUARD_UNWATCHED=disable にしたレイヤーでは、ここも渡す側になる。
+	// CCNAVI_GUARD_UNWATCHED=disable にした設定では、ここも渡す側になる。
 	for _, mode := range []string{"dontAsk", "bypassPermissions"} {
 		t.Run(mode, func(t *testing.T) {
 			t.Parallel()

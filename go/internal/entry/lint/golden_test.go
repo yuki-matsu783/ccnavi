@@ -213,7 +213,7 @@ func TestReportProjects(t *testing.T) {
 	compare(t, "projects-tracked", root, []reportRun{textRun}, nil)
 }
 
-// 直接作業の記録・marker・一時ワークツリーと、ワークツリーにしかないレイヤーのファイル・レイヤーのずれ。
+// 直接作業の記録・marker・一時ワークツリーと、ワークツリーにしかない設定のファイル・設定のずれ。
 func TestReportDirectAndLayers(t *testing.T) {
 	quietEnv(t)
 	root := testkit.Workspace(t, "w1", "w2")

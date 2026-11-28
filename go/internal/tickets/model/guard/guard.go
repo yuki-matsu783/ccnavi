@@ -160,9 +160,9 @@ func GateRules(approvedRel, root string) ([]*rules.Rule, error) {
 	return append(approved, ops...), nil
 }
 
-// RawGitRule は生の git を止めるルール。チケット制御の有無や共通レイヤーの有無によらずいつも足す（ラッパーの中の
+// RawGitRule は生の git を止めるルール。チケット制御の有無や共通設定の有無によらずいつも足す（ラッパーの中の
 // 可否は git がラッパーの外から打てれば外れる）。ラッパーが無いワークスペースでは文をユーザに頼む形にする。
-// 土台（Base）なので、ほかのレイヤーの deny にも当たった回はそちらだけを言う。
+// 土台（Base）なので、ほかの設定の deny にも当たった回はそちらだけを言う。
 func RawGitRule(root string) (*rules.Rule, error) {
 	text := texts.Spec(textRawGit, texts.SpecOptions{Wrapper: config.HasGitWrapper(root), Cased: []string{"why", "next"}})
 	r, err := rule(RawGitRuleID, config.ToolBash, rawGitRegex, root, text)

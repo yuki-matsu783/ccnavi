@@ -11,7 +11,7 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// ruleBlob は共通レイヤーのルールの JSON 文字列。
+// ruleBlob は共通設定のルールの JSON 文字列。
 func ruleBlob(t testing.TB, v any) string {
 	t.Helper()
 	b, err := json.Marshal(v)

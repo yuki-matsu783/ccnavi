@@ -72,13 +72,13 @@ func syncOne(conf *config.Settings, root, ticket, project, worktree string) []st
 	// 2. ミラー、工程スキルの順に揃える。片方が失敗してももう片方は試す。揃えたファイルは committable に集めて、最後にコミットを頼む。
 	var lines, committable []string
 	failedAny := false
-	failMirror := "ccnavi: " + ticket + " の共通レイヤーをミラーできない: "
+	failMirror := "ccnavi: " + ticket + " の共通設定をミラーできない: "
 	changes, why := commonPlan(conf, root, worktree)
 	if why == "" && len(changes) > 0 {
 		why = applyCommon(conf, worktree, changes)
 		if why == "" {
-			lines = append(lines, "共通レイヤーとプロジェクト "+project+" のミラー（.ccnavi/config/common/）が"+
-				"違っていたので、共通レイヤーの中身に揃えた。変えたのは次のファイル。")
+			lines = append(lines, "共通設定とプロジェクト "+project+" のミラー（.ccnavi/config/common/）が"+
+				"違っていたので、共通設定の中身に揃えた。変えたのは次のファイル。")
 			lines = append(lines, describe(changes)...)
 			committable = appendRels(committable, changes)
 		}

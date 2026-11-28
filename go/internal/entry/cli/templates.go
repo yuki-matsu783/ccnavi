@@ -82,7 +82,7 @@ func templatesUsage(a opts) string {
 		return "--with-feedback は ticket new <識別子> --title <タイトル> --template <名前> でだけ使う"
 	}
 	if !templatesOn {
-		// `ticket new --template` の `--layer` は、テンプレートを引くレイヤー。
+		// `ticket new --template` の `--layer` は、テンプレートを引く設定。
 		if flag := firstGiven([]flagGiven{{"--check-file", !a.IsNone("check_file")}, {"--show", !a.IsNone("show")},
 			{"--layer", a.Str("layer") != "" && !ticketNew(a)}, {"--draft", !a.IsNone("draft")},
 			{"--name", a.Str("name") != ""}, {"--to", a.Str("to") != ""}}); flag != "" {
@@ -129,14 +129,14 @@ func templatesUsage(a opts) string {
 }
 
 // runTemplates は `--templates` の一覧・検索・表示と、下書きの作成。`--layer` を省けば、一覧と表示はワークスペース
-// 自身のレイヤー（共通 + self）。
+// ワークスペースの設定（共通 + self）。
 func runTemplates(stdout, stderr io.Writer, conf *config.Settings, root string, a opts) int {
-	// 1. 下書きを作る形（--draft）は、レイヤーの指定を使わずに先に分ける。
+	// 1. 下書きを作る形（--draft）は、設定の指定を使わずに先に分ける。
 	asJSON := a.Truthy("json")
 	if !a.IsNone("draft") {
 		return templateDraft(stdout, stderr, conf, root, a)
 	}
-	// 2. 対象のレイヤー（既定は自身のレイヤー）を確かめる。ファイルの検査（--check-file）だけは、共通レイヤーも指せる。
+	// 2. 対象の設定（既定はワークスペースの設定）を確かめる。ファイルの検査（--check-file）だけは、共通設定も指せる。
 	layer := ospath.Strip(cmpOr(a.Str("layer"), config.LayerSelf))
 	known := layerNames(conf, root)
 	if !a.IsNone("check_file") {
@@ -193,7 +193,7 @@ func layerNames(conf *config.Settings, root string) []string {
 }
 
 func unknownLayer(layer string, known []string) string {
-	return "レイヤー " + pyfmt.Repr(layer) + " はありません（" + strings.Join(known, " / ") + "）"
+	return "設定 " + pyfmt.Repr(layer) + " はありません（" + strings.Join(known, " / ") + "）"
 }
 
 // label は深刻度の欄（幅をそろえる）。
@@ -322,7 +322,7 @@ func templateDraft(stdout, stderr io.Writer, conf *config.Settings, root string,
 	return config.ExitOK
 }
 
-// showTemplate はテンプレート 1 つの中身を表示する（`--show`）。読むだけ。共通のテンプレートは、いまのレイヤーの
+// showTemplate はテンプレート 1 つの中身を表示する（`--show`）。読むだけ。共通のテンプレートは、いまの設定の
 // 種類で検査し直す。
 func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, scanned *templates.Scan, layer, name string,
 	asJSON bool) int {
@@ -334,7 +334,7 @@ func showTemplate(stdout, stderr io.Writer, conf *config.Settings, root string, 
 	if entry.Layer == config.LayerCommon {
 		entry = templates.Recheck(entry, templates.TypesFor(conf, root, layer), &scanned.Catalog)
 	}
-	// 共通レイヤーのテンプレートは、見ているレイヤーの定義で検査し直したものを見せる（使えない部分は「使わない」と添える）。
+	// 共通設定のテンプレートは、見ている設定の定義で検査し直したものを見せる（使えない部分は「使わない」と添える）。
 	row := templates.EntryJSON(entry)
 	text, _ := fsio.DecodeBytes(yaml.TrimBOM(entry.Raw), fsio.Replace)
 	if asJSON {

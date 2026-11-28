@@ -41,7 +41,7 @@ func with(r rule, kv ...any) rule {
 	return out
 }
 
-// rulesFile は共通レイヤーの既定の場所にルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
+// rulesFile は共通設定の既定の場所にルールファイルを 1 本置く。並べたルールは deny のタイプに入る。
 func rulesFile(t testing.TB, dir string, rules ...rule) string {
 	return rulesFileOpt(t, dir, 1, true, rules...)
 }

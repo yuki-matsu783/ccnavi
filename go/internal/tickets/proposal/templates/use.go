@@ -40,7 +40,7 @@ func Resolve(conf *config.Settings, root, layer, name string) (*Found, string) {
 		if known == "" {
 			known = "無い"
 		}
-		return nil, fmt.Sprintf("レイヤー %s はありません（%s）", pyfmt.Repr(layer), known)
+		return nil, fmt.Sprintf("設定 %s はありません（%s）", pyfmt.Repr(layer), known)
 	}
 	e := s.Find(layer, name)
 	if e == nil {

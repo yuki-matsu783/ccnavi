@@ -103,7 +103,7 @@ func mkdir(t testing.TB, dir string) string {
 	return dir
 }
 
-// putCommonRules は共通レイヤーの既定の場所にルールファイルを置く。`--rules` は診断でだけ有効で、hook の判定には届かない。
+// putCommonRules は共通設定の既定の場所にルールファイルを置く。`--rules` は診断でだけ有効で、hook の判定には届かない。
 // 書き出すのは JSON（YAML は JSON の上位互換で、判定が読むのと同じ読み手が受け取る）。
 func putCommonRules(t testing.TB, root string, sections map[string]any) string {
 	t.Helper()

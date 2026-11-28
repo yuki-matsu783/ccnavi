@@ -94,7 +94,7 @@ type Record struct {
 	// Tree と Project は呼び出しがどのツリーのものと判定されたか（ワークスペースなら Project は空）。
 	Tree    string
 	Project string
-	// Source は判定を下したルールのレイヤー（common・self・プロジェクトの名前）。
+	// Source は判定を下したルールの設定（common・self・プロジェクトの名前）。
 	Source string
 	// Hits は判定が適用したルールそのもの（Rules の末尾と同じ順）。読むのは診断（--test）だけで行には書かない。
 	// 型を決めないのは、記録の層から判定の層（policy）へ依存を張らないため。

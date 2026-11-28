@@ -27,7 +27,7 @@ const (
 	projectWhere  = "(projects/"
 )
 
-// LayerWhere はそのレイヤーの苦情の出どころの表記。
+// LayerWhere はその設定の苦情の出どころの表記。
 func LayerWhere(name string) string {
 	switch name {
 	case config.LayerCommon:
@@ -47,13 +47,13 @@ func prefixed(where string, p rules.Problem) rules.Problem {
 	return problem(p.Severity, ospath.Rstrip(where+" "+p.Rule), p.Detail)
 }
 
-// namedRules は共通レイヤーのルールの置き場が、既定の場所ではなく差し替えで名指しされたものか。
+// namedRules は共通設定のルールの置き場が、既定の場所ではなく差し替えで名指しされたものか。
 func namedRules(conf *config.Settings, root string) bool {
 	def := ospath.Join(root, config.DefaultRules)
 	return pathcase.Fold(ospath.Abspath(conf.Rules)) != pathcase.Fold(ospath.Abspath(def))
 }
 
-// CommonRules は共通レイヤーのルールファイルの苦情。無いのは正常（無い = 空）で、不正なときだけ言う。
+// CommonRules は共通設定のルールファイルの苦情。無いのは正常（無い = 空）で、不正なときだけ言う。
 // 差し替え（診断の --rules、取り込みの下書き）で名指しされたファイルが無いのは、置き場が空なのとは別なので言う。
 func CommonRules(conf *config.Settings, root string) []rules.Problem {
 	if ospath.DiskExists(conf.Rules) || namedRules(conf, root) {
@@ -62,8 +62,8 @@ func CommonRules(conf *config.Settings, root string) []rules.Problem {
 	return nil
 }
 
-// CommonPhases は共通レイヤーの phases.yml が読めるか。無いのは正常で、何も言わない。読めなければ判定は共通
-// レイヤーを空として扱い、各レイヤーの定義だけを使う（各レイヤーは LayerConfigs が見る）。
+// CommonPhases は共通設定の phases.yml が読めるか。無いのは正常で、何も言わない。読めなければ判定は共通
+// 設定を空として扱い、各設定の定義だけを使う（各設定は LayerConfigs が見る）。
 func CommonPhases(conf *config.Settings) []rules.Problem {
 	_, notes := phases.CommonTypes(conf)
 	var out []rules.Problem
@@ -73,7 +73,7 @@ func CommonPhases(conf *config.Settings) []rules.Problem {
 	return out
 }
 
-// CommonRisk は共通レイヤーの配点が読めるか（無いのは不備ではない。組み込みの配点）。script: が指す先が在る
+// CommonRisk は共通設定の配点が読めるか（無いのは不備ではない。組み込みの配点）。script: が指す先が在る
 // ことも見る（走らせるときは重いほうになるが、そこで気づくのは子を閉じる時点になる）。
 func CommonRisk(conf *config.Settings, root string) []rules.Problem {
 	if conf.Risk == "" {
@@ -90,8 +90,8 @@ func CommonRisk(conf *config.Settings, root string) []rules.Problem {
 	return out
 }
 
-// CommonSections は共通レイヤーの ticket-sections.yml が読めるか。無いのは正常で、何も言わない。読めなければ
-// 判定は共通レイヤーの見出しを使わない（各レイヤーは LayerConfigs が見る）。
+// CommonSections は共通設定の ticket-sections.yml が読めるか。無いのは正常で、何も言わない。読めなければ
+// 判定は共通設定の見出しを使わない（各設定は LayerConfigs が見る）。
 func CommonSections(conf *config.Settings) []rules.Problem {
 	_, notes := sections.CommonFile(conf)
 	var out []rules.Problem
@@ -101,8 +101,8 @@ func CommonSections(conf *config.Settings) []rules.Problem {
 	return out
 }
 
-// LayerRules はレイヤーのルールファイルに食い違いが無いか（読めること、レイヤーをまたいだ重複と同名の衝突）。
-// only を渡せばそのレイヤーだけ。共通レイヤーは CommonRules が見るので、2 つ目以降だけを回す。
+// LayerRules は設定のルールファイルに食い違いが無いか（読めること、設定をまたいだ重複と同名の衝突）。
+// only を渡せばその設定だけ。共通設定は CommonRules が見るので、2 つ目以降だけを回す。
 // .ccnavi/config/project/ が無いことは言わない（無いのは正常で、言うと本当に言うべきものが埋もれる）。
 func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []rules.Problem {
 	var out []rules.Problem
@@ -117,8 +117,8 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 		where := LayerWhere(view.Name)
 		if view.Unreadable != "" {
 			out = append(out, problem(rules.Error, where, view.Path+" を読めない ("+view.Unreadable+")。"+
-				"このレイヤーは空として扱っている。"+
-				"共通レイヤーだけで判定しているので、ここに書いた宣言は 1 件も使われていない"))
+				"この設定は空として扱っている。"+
+				"共通設定だけで判定しているので、ここに書いた宣言は 1 件も使われていない"))
 			continue
 		}
 		if view.Missing {
@@ -134,7 +134,7 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 			out = append(out, prefixed(where, p))
 			told[problem(p.Severity, p.Rule, p.Detail)] = true
 		}
-		// Survey の結果にもレイヤーのファイルの苦情が含まれる。FileProblems が同じファイルを読んで言ったものは数えない
+		// Survey の結果にも設定のファイルの苦情が含まれる。FileProblems が同じファイルを読んで言ったものは数えない
 		// （同じ苦情が 2 度並び、件数も水増しされる）。
 		for _, p := range view.Problems {
 			if !told[problem(p.Severity, p.Rule, p.Detail)] {
@@ -145,9 +145,9 @@ func LayerRules(stderr io.Writer, conf *config.Settings, root, only string) []ru
 	return out
 }
 
-// LayerConfigs は各レイヤーの phases・risk・sections が共通レイヤーと合成できるか。only を渡せばそのレイヤーだけ、
-// kind（KindPhases・KindRisk・KindSections）を渡せばその種類だけ。見るのは合成したあとの内容で、共通レイヤー自身の
-// 苦情は CommonPhases・CommonRisk・CommonSections が言うので、レイヤーの側だけを数える。
+// LayerConfigs は各設定の phases・risk・sections が共通設定と合成できるか。only を渡せばその設定だけ、
+// kind（KindPhases・KindRisk・KindSections）を渡せばその種類だけ。見るのは合成したあとの内容で、共通設定自身の
+// 苦情は CommonPhases・CommonRisk・CommonSections が言うので、設定の側だけを数える。
 func LayerConfigs(conf *config.Settings, root, only string, kind config.LayerKind) []rules.Problem {
 	var out []rules.Problem
 	for _, name := range layer.Names(conf) {
@@ -178,7 +178,7 @@ func LayerConfigs(conf *config.Settings, root, only string, kind config.LayerKin
 	return out
 }
 
-// FileProblems は 1 つのレイヤー（common・self・プロジェクトの名前）の 1 つの種類の設定ファイルを、--lint と
+// FileProblems は 1 つの設定（common・self・プロジェクトの名前）の 1 つの種類の設定ファイルを、--lint と
 // 同じ水準で検査した苦情。読むファイルは conf が指す先（取り込みの検査では下書きへ差し替えてある）。
 func FileProblems(conf *config.Settings, root string, kind config.LayerKind, name string) []rules.Problem {
 	if name == config.LayerCommon {
@@ -202,9 +202,9 @@ func FileProblems(conf *config.Settings, root string, kind config.LayerKind, nam
 const spareScope = "wip/"
 
 // UnmatchedScopes はフェーズ定義の scope の glob で、git が挙げるどのファイルにも当たらないものを warn で言う。
-// 共通レイヤーの定義は src/*・tests/* のような配置を前提にするので、違う配置では範囲に合う型が見つからずに
-// 止まる。見るのは自身と各プロジェクトのレイヤーそれぞれで共通と合成した結果。inherit と wip/ の下は見ず、
-// git が使えないレイヤーは何も言わない（一覧が取れないだけで、設定の不備ではない）。
+// 共通設定の定義は src/*・tests/* のような配置を前提にするので、違う配置では範囲に合う型が見つからずに
+// 止まる。見るのは自身と各プロジェクトの設定それぞれで共通と合成した結果。inherit と wip/ の下は見ず、
+// git が使えない設定は何も言わない（一覧が取れないだけで、設定の不備ではない）。
 func UnmatchedScopes(conf *config.Settings, root string) []rules.Problem {
 	var out []rules.Problem
 	for _, name := range layer.Names(conf) {
@@ -228,7 +228,7 @@ func UnmatchedScopes(conf *config.Settings, root string) []rules.Problem {
 				out = append(out, problem(rules.Warn, where+" "+phasesWhere+" "+p.ID,
 					"`scope` の `"+e.Glob+"` がどのファイルにも当たりません。"+
 						"この配置では範囲に合う型が無く、作業が止まります。"+
-						"このレイヤーの `.ccnavi/config/project/phases.yml` に、実際の置き場を"+
+						"この設定の `.ccnavi/config/project/phases.yml` に、実際の置き場を"+
 						"`scope` に書いた定義を足してください（`"+p.ID+"` と同じ id は使えません。"+
 						"別の id と表示名を付けてください。書き方は `/ccnavi-config`、"+
 						"流れは `.ccnavi/docs/grow-phases.md` を見てください）"))

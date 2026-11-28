@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// 設定の受入テスト。phases は共通 + 1 レイヤーの和。
+// 設定の受入テスト。phases は共通 + 1 つの設定の和。
 //
-// 土台の共通レイヤーは phases を持たない（統合結果を見るテストが自分で置く）。自身のレイヤーに `docs`、lib のレイヤーに
+// 土台の共通設定は phases を持たない（統合結果を見るテストが自分で置く）。ワークスペースの設定に `docs`、lib の設定に
 // `design` / `build` / `release` がある。使うフェーズ定義は、親の承認済みチケットの `project:` で決まる。
 // lib 向けの提案は `projects/lib/wip/proposals/` に置き、ワークスペース向けは `wip/proposals/` に置く。
 
-// 別の id で title だけ自身のレイヤーの design（設計）と重なる。
+// 別の id で title だけワークスペースの設定の design（設計）と重なる。
 const libPhasesTitleOverlap = `version: 1
 phases:
   build:
@@ -23,7 +23,7 @@ phases:
     scope: ["src/*"]
 `
 
-// 自身のレイヤーに置く、lib と同じ design の id を別の中身で持つ定義。
+// ワークスペースの設定に置く、lib と同じ design の id を別の中身で持つ定義。
 const ownPhasesDesign = `version: 1
 phases:
   design:
@@ -77,7 +77,7 @@ func idsOf(types []sumType) []string {
 	return out
 }
 
-// phaseProblems は phases の Problem。layer を渡すと、そのレイヤーのものだけ。
+// phaseProblems は phases の Problem。layer を渡すと、その設定のものだけ。
 func (w *ws) phaseProblems(severity, layer string) []configws.Problem {
 	w.T.Helper()
 	where := ""
@@ -127,7 +127,7 @@ func TestAPlanCanNameATypeFromTheProjectLayer(t *testing.T) {
 
 func TestTheLayerFollowsTheProjectOfTheParent(t *testing.T) {
 	t.Parallel()
-	// 空の `project:` は自身のレイヤー。プロジェクトのレイヤーの定義は他から指せない。
+	// 空の `project:` はワークスペースの設定。プロジェクトの設定の定義は他から指せない。
 	w := newWS(t, configws.KindBase)
 	w.Propose("i0002", configws.TicketText("i0002", configws.TicketOpts{Plan: []string{"docs"}, Allow: []string{"docs/*"}}), "")
 	w.mustApprove()
@@ -135,7 +135,7 @@ func TestTheLayerFollowsTheProjectOfTheParent(t *testing.T) {
 	w.Propose("i0003", configws.TicketText("i0003", configws.TicketOpts{Plan: []string{"build"}, Allow: []string{"src/*"}}), "")
 	refused := w.Approve()
 	if refused.Code == 0 || !strings.Contains(refused.Stderr, "build") {
-		t.Errorf("lib の build を自身のレイヤーから指せてしまう: code %d\n%s", refused.Code, refused.Stderr)
+		t.Errorf("lib の build をワークスペースの設定から指せてしまう: code %d\n%s", refused.Code, refused.Stderr)
 	}
 	if configws.Exists(w.ApprovedCopy("i0003")) {
 		t.Error("拒んだのに承認済みチケットが置かれた")
@@ -150,8 +150,8 @@ func TestTheLayerFollowsTheProjectOfTheParent(t *testing.T) {
 
 func TestTheSameIdInTwoLayersIsNotAConflict(t *testing.T) {
 	t.Parallel()
-	// 自身のレイヤーとプロジェクトのレイヤーどうしは足さないので、その間の衝突は無い。足すのは共通レイヤーと親の `project:` が
-	// 指すレイヤーだけ（その和の苦情は Go の phases の TestLayerTypes が見る）。同じ design を別の中身で持っても、title が
+	// ワークスペースの設定とプロジェクトの設定どうしは足さないので、その間の衝突は無い。足すのは共通設定と親の `project:` が
+	// 指す設定だけ（その和の苦情は Go の phases の TestLayerTypes が見る）。同じ design を別の中身で持っても、title が
 	// 重なっても、全欄が同じでも、error にも info にもならず、lib 向けの親は lib の design を使う。
 	w := newWS(t, configws.KindBase)
 	configws.WritePhases(t, w.Root, ownPhasesDesign)
@@ -182,7 +182,7 @@ func TestTheSameIdInTwoLayersIsNotAConflict(t *testing.T) {
 
 func TestACommonPhasesFileIsNotAnErrorAndIsUsed(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの phases.yml は置ける。--lint は error を出さず、`plan:` が共通レイヤーの定義を指せる。
+	// 共通設定の phases.yml は置ける。--lint は error を出さず、`plan:` が共通設定の定義を指せる。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 
@@ -205,7 +205,7 @@ func TestACommonPhasesFileIsNotAnErrorAndIsUsed(t *testing.T) {
 
 func TestOnlyTheCommonLayerHasPhases(t *testing.T) {
 	t.Parallel()
-	// レイヤーに phases.yml が無くても、共通レイヤーの定義だけで `plan:` が読める。
+	// 設定に phases.yml が無くても、共通設定の定義だけで `plan:` が読める。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	if err := configws.RemoveFile(configws.LayerPath(w.Root, "phases")); err != nil {
@@ -217,14 +217,14 @@ func TestOnlyTheCommonLayerHasPhases(t *testing.T) {
 	}
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"design"}, Allow: []string{"wip/design/*"}}), "")
 	w.mustApprove()
-	// app は `.ccnavi/` を持たないが、共通レイヤーの定義は使える。
+	// app は `.ccnavi/` を持たないが、共通設定の定義は使える。
 	w.Propose("i0002", configws.TicketText("i0002", configws.TicketOpts{Project: "app", Plan: []string{"design"}, Allow: []string{"wip/design/*"}}), "app")
 	w.mustApprove()
 }
 
 func TestCommonAndLayerTypesAddUp(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの定義とレイヤーの定義を足す。1 つの計画で両方を使える。
+	// 共通設定の定義と設定の定義を足す。1 つの計画で両方を使える。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"design", "docs"}, Allow: []string{"wip/design/*", "docs/*"}}), "")
@@ -235,7 +235,7 @@ func TestCommonAndLayerTypesAddUp(t *testing.T) {
 	if len(got) != 2 || got["design"] != "common" || got["docs"] != "self" {
 		t.Errorf("self の定義と出どころ: %v", got)
 	}
-	// 自身のレイヤーの定義はプロジェクトには足さない。
+	// ワークスペースの設定の定義はプロジェクトには足さない。
 	if ids := idsOf(sums["app"]); len(ids) != 1 || ids[0] != "design" {
 		t.Errorf("app の定義: %v", ids)
 	}
@@ -243,7 +243,7 @@ func TestCommonAndLayerTypesAddUp(t *testing.T) {
 
 func TestFillPhasesTakesTypesFromBothLayers(t *testing.T) {
 	t.Parallel()
-	// `--plan-order <親> --fill-phases` は共通レイヤーとレイヤーの和からコピーする。
+	// `--plan-order <親> --fill-phases` は共通設定とプロジェクトの設定の和からコピーする。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	text := configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"design", "docs"}, Allow: []string{"wip/design/*", "docs/*"}})
@@ -262,7 +262,7 @@ func TestFillPhasesTakesTypesFromBothLayers(t *testing.T) {
 
 func TestTheSameIdWithADifferentBodyAcrossCommonIsAnError(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーと同じ id で中身が違う定義は error。衝突した定義だけを破棄し、共通の定義を使う。そのレイヤーのほかの定義は生きている。
+	// 共通設定と同じ id で中身が違う定義は error。衝突した定義だけを破棄し、共通の定義を使う。その設定のほかの定義は生きている。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, configws.CommonPhasesText)
 	configws.WritePhases(t, w.Root, ownPhasesDesign+"  docs:\n    kind: work\n    title: 文書\n    review: false\n    scope: [\"docs/*\"]\n")
@@ -280,13 +280,13 @@ func TestTheSameIdWithADifferentBodyAcrossCommonIsAnError(t *testing.T) {
 	if !found {
 		t.Errorf("design の衝突を error で言わない: %+v", errs)
 	}
-	// 破棄するのは衝突した design だけ。同じレイヤーの docs は使える。
+	// 破棄するのは衝突した design だけ。同じ設定の docs は使える。
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Plan: []string{"docs"}, Allow: []string{"docs/*"}}), "")
 	w.mustApprove()
 	if !configws.Exists(w.ApprovedCopy("i0001")) {
 		t.Error("承認済みチケットが置かれていない")
 	}
-	// design は共通レイヤーの定義が使われる。
+	// design は共通設定の定義が使われる。
 	byID := map[string]sumType{}
 	for _, ty := range w.sums()["self"] {
 		byID[ty.ID] = ty
@@ -294,7 +294,7 @@ func TestTheSameIdWithADifferentBodyAcrossCommonIsAnError(t *testing.T) {
 	if byID["design"].Source != "common" || byID["design"].Title != "設計" || byID["docs"].Source != "self" {
 		t.Errorf("self の定義: %+v", byID)
 	}
-	// コピーが自身のレイヤーの design（中身違い）なら、承認で止まる。
+	// コピーがワークスペースの設定の design（中身違い）なら、承認で止まる。
 	ownCopy := configws.TicketText("i0002", configws.TicketOpts{Plan: []string{"design"}, Allow: []string{"wip/*"}})
 	configws.Write(t, p(w.Root, "wip", "proposals", "todo", "i0002.md"), configws.InsertPhases(ownCopy, ownPhasesDesign))
 	w.mustRefuse("i0002")
@@ -302,13 +302,13 @@ func TestTheSameIdWithADifferentBodyAcrossCommonIsAnError(t *testing.T) {
 
 func TestABrokenCommonLayerLeavesTheLayerTypesInUse(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーの phases.yml が読めなくても、レイヤーの定義だけで `plan:` が読める。
+	// 共通設定の phases.yml が読めなくても、設定の定義だけで `plan:` が読める。
 	// 共通の定義は空として扱うので、共通にしか無い定義を使う計画は承認で止まる。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, w.Phases, "version: 1\nphases: [\n")
 
 	if !configws.AnyWhere(w.phaseProblems("error", ""), "(phases)") {
-		t.Error("共通レイヤーの phases.yml の不正を error で言わない")
+		t.Error("共通設定の phases.yml の不正を error で言わない")
 	}
 	if got := w.phaseProblems("error", "lib"); len(got) != 0 {
 		t.Errorf("lib の error が出る: %+v", got)
@@ -353,7 +353,7 @@ func TestScopeStaysRelativeToTheWorktree(t *testing.T) {
 
 func TestABrokenProjectPhasesIsAnErrorAndTheLayerIsEmpty(t *testing.T) {
 	t.Parallel()
-	// 不正なレイヤーの phases は空 + --lint error。`plan:` は読めない。
+	// 不正な設定の phases は空 + --lint error。`plan:` は読めない。
 	w := newWS(t, configws.KindBase)
 	configws.Write(t, configws.LayerPath(w.Lib, "phases"), "version: 1\nphases: [\n")
 
@@ -362,6 +362,6 @@ func TestABrokenProjectPhasesIsAnErrorAndTheLayerIsEmpty(t *testing.T) {
 	}
 	w.Propose("i0001", configws.TicketText("i0001", configws.TicketOpts{Project: "lib", Plan: []string{"design"}, Allow: []string{"wip/*"}}), "lib")
 	if w.Approve().Code == 0 {
-		t.Error("読めないレイヤーの定義を指す計画が通った")
+		t.Error("読めない設定の定義を指す計画が通った")
 	}
 }

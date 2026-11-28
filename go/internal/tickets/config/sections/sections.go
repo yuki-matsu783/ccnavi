@@ -148,7 +148,7 @@ func (f *File) over(base form.Sections) form.Sections {
 	return base
 }
 
-// CommonFile は共通レイヤーの ticket-sections.yml と、その苦情。無いか壊れていれば nil。
+// CommonFile は共通設定の ticket-sections.yml と、その苦情。無いか壊れていれば nil。
 func CommonFile(conf *config.Settings) (*File, []rules.Problem) {
 	if conf.Sections == "" {
 		return nil, nil
@@ -156,15 +156,15 @@ func CommonFile(conf *config.Settings) (*File, []rules.Problem) {
 	return Load(conf.Sections)
 }
 
-// Common は共通レイヤーの見出し。Stop の判定の基準が使う（判定はプロジェクトを選ばない）。
+// Common は共通設定の見出し。Stop の判定の基準が使う（判定はプロジェクトを選ばない）。
 func Common(conf *config.Settings) form.Sections {
 	f, _ := CommonFile(conf)
 	return f.over(form.Sections{})
 }
 
-// Layer は使う見出し（共通レイヤーに、親の project: が指すレイヤーを重ねたもの）と、そのレイヤーの苦情。
-// レイヤーのファイルが壊れていれば共通レイヤーだけを使う。共通レイヤーの苦情は返さない（言う場所は --lint の
-// 共通レイヤーの項で、二重に言わない）。
+// Layer は使う見出し（共通設定に、親の project: が指す設定を合わせたもの）と、その設定の苦情。
+// 設定のファイルが壊れていれば共通設定だけを使う。共通設定の苦情は返さない（言う場所は --lint の
+// 共通設定の項で、二重に言わない）。
 func Layer(conf *config.Settings, root, project string) (form.Sections, []rules.Problem) {
 	out := Common(conf)
 	path := layer.File(conf, root, project, config.KindSections)
@@ -181,7 +181,7 @@ func For(conf *config.Settings, root, project string) form.Sections {
 	return out
 }
 
-// StopCriteria は Stop の AI 判定の基準。R2 に共通レイヤーの見出しを入れる。計画を作る hook と、材料・記録の
+// StopCriteria は Stop の AI 判定の基準。R2 に共通設定の見出しを入れる。計画を作る hook と、材料・記録の
 // 入口が同じ基準（同じ材料の版）になるよう、組み立てはここ 1 か所にする。
 func StopCriteria(conf *config.Settings, root string) string {
 	s := Common(conf)

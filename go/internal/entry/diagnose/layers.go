@@ -19,7 +19,7 @@ const unreadableFallback = "読めない"
 // inheritScope は範囲が親の範囲そのまま（定義の scope が無い・空）であることを言う 1 語。
 const inheritScope = "inherit"
 
-// layerConfig はそのレイヤーの phases か risk のパス。共通レイヤーは設定が持つ既定そのもの。
+// layerConfig はその設定の phases か risk のパス。共通設定は設定が持つ既定そのもの。
 func layerConfig(conf *config.Settings, root, name string, kind config.LayerKind) string {
 	if name == config.LayerCommon {
 		if kind == config.KindPhases {
@@ -62,8 +62,8 @@ func problemsText(notes []rules.Problem) string {
 	return unreadableFallback
 }
 
-// layerPhaseSet はそのレイヤーのファイルに書かれたフェーズ定義と、読めなかった理由。無いレイヤーは nil。
-// 判定が使う和（共通 + 親の project: のレイヤー）は phases.LayerTypes が組む。
+// layerPhaseSet はその設定のファイルに書かれたフェーズ定義と、読めなかった理由。無い設定は nil。
+// 判定が使う和（共通 + 親の project: の設定）は phases.LayerTypes が組む。
 func layerPhaseSet(path string) (*phases.Types, string) {
 	if path == "" || !ospath.IsFile(path) {
 		return nil, ""
@@ -85,8 +85,8 @@ func layerPhaseTypes(path string) ([]*phases.PhaseType, string) {
 	return out, why
 }
 
-// layerRisk はそのレイヤーのリスクの項目と、読めなかった理由。script: に書ける場所がレイヤーごとに違うので、
-// 読み方もレイヤーで分ける。
+// layerRisk はその設定のリスクの項目と、読めなかった理由。script: に書ける場所が設定ごとに違うので、
+// 読み方も設定で分ける。
 func layerRisk(conf *config.Settings, name, path string) ([]*risk.Factor, string) {
 	if path == "" || !ospath.IsFile(path) {
 		return nil, ""

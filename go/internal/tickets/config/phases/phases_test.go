@@ -109,17 +109,17 @@ func TestLayerTypes(t *testing.T) {
 	if len(notes) != 2 || notes[0].Severity != rules.Info || notes[1].Severity != rules.Error {
 		t.Errorf("苦情 %v", notes)
 	}
-	// 予約名のプロジェクトはレイヤーとして数えない。
+	// 予約名のプロジェクトは設定として数えない。
 	if typesPath(conf, root, config.LayerSelf) != "" || typesPath(conf, root, config.LayerCommon) != "" {
 		t.Error("予約名にパスがある")
 	}
-	// 壊れたレイヤーは空として扱い、そのレイヤーの苦情を返す。
+	// 壊れた設定は空として扱い、その設定の苦情を返す。
 	testkit.Put(t, layer, "version: 1\nphases: [\n")
 	types, notes = LayerTypes(conf, root, "")
 	if got := idsOf(types); !reflect.DeepEqual(got, []string{"a@common", "b@common"}) || len(notes) != 1 {
-		t.Errorf("壊れたレイヤー %v %v", got, notes)
+		t.Errorf("壊れた設定 %v %v", got, notes)
 	}
-	// 共通レイヤーが壊れていれば、レイヤーの定義だけを使う（共通レイヤーの苦情は返さない）。
+	// 共通設定が壊れていれば、設定の定義だけを使う（共通設定の苦情は返さない）。
 	testkit.Put(t, conf.Phases, "\xff")
 	testkit.Put(t, layer, defs("  d: {}"))
 	types, notes = LayerTypes(conf, root, "")

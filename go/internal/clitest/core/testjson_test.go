@@ -72,7 +72,7 @@ func decode(t *testing.T, text string) map[string]any {
 	return m
 }
 
-// 試験は判定とヒットしたルールの一覧で共通レイヤーを 2 度読み、期待は 1 件ずつ判定する。どちらでも、同じ苦情を 2 度出さない。
+// 試験は判定とヒットしたルールの一覧で共通設定を 2 度読み、期待は 1 件ずつ判定する。どちらでも、同じ苦情を 2 度出さない。
 func TestTestRuleProblemsAreSaidOnce(t *testing.T) {
 	t.Parallel()
 	e := newTestJSONEnv(t)

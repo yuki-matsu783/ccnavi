@@ -54,7 +54,7 @@ func projectPlaces(conf *config.Settings, root string) []rules.Problem {
 				Kind: kindProjectsUnignored})
 		}
 	}
-	// 2. プロジェクトごとの検査。予約名のプロジェクトはレイヤーとして数えないので error にする。
+	// 2. プロジェクトごとの検査。予約名のプロジェクトは設定として数えないので error にする。
 	quoted := make([]string, len(config.ReservedLayerNames()))
 	for i, name := range config.ReservedLayerNames() {
 		quoted[i] = "`" + name + "`"

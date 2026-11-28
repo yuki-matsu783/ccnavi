@@ -64,8 +64,8 @@ var (
 	matchWriteTools  = rules.MatchOf(config.WriteTools()...)
 )
 
-// Load は共通レイヤーが読めないときの既定を返す。土台の deny、シェルから設定へ書き込む形の deny、Read を通す allow からなる。
-// シェルの書き込みと照合する場所は呼び出しごとに実際の設定から組む。実行ファイル・ccnavi ディレクトリ・共通レイヤーは
+// Load は共通設定が読めないときの既定を返す。土台の deny、シェルから設定へ書き込む形の deny、Read を通す allow からなる。
+// シェルの書き込みと照合する場所は呼び出しごとに実際の設定から組む。実行ファイル・ccnavi ディレクトリ・共通設定は
 // 設定で動くので、固定の形だと動かしたワークスペースでだけ保護が外れてしまう。
 // 苦情はこのビルドの不備なので、呼び手はそのまま報告してよい。
 func Load(root string, conf *config.Settings) (*rules.RuleSet, []rules.Problem) {
@@ -83,7 +83,7 @@ func Load(root string, conf *config.Settings) (*rules.RuleSet, []rules.Problem) 
 	return &rules.RuleSet{Version: rules.Version, Deny: deny, Allow: allow}, append(problems, more...)
 }
 
-// LoadBase は常に効く組み込みの deny（土台）を返す。共通レイヤーと config のルールは、この上に足す。
+// LoadBase は常に効く組み込みの deny（土台）を返す。共通設定と config のルールは、この上に足す。
 // root は文面の git の打ち方を決めるだけで、止める形は変えない。
 func LoadBase(root string) (*rules.RuleSet, []rules.Problem) {
 	deny, problems := rules.Builtin(rules.Deny, denySpecs(config.GitCommand(root), config.HasGitWrapper(root)), root)
@@ -93,7 +93,7 @@ func LoadBase(root string) (*rules.RuleSet, []rules.Problem) {
 	return &rules.RuleSet{Version: rules.Version, Deny: deny}, problems
 }
 
-// ReadAllow は Read を通す allow。共通レイヤーと config が両方無いときだけ足す。
+// ReadAllow は Read を通す allow。共通設定と config が両方無いときだけ足す。
 func ReadAllow() []*rules.Rule {
 	allow, _ := rules.Builtin(rules.Allow, allowSpecs, "")
 	return allow

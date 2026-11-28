@@ -3,51 +3,51 @@ type: design
 title: 11.9 診断と記録
 description: 複数リポジトリでの診断の出力と記録
 tags: [design-doc, projects, records]
-keywords: [診断, --explain, 記録, レイヤー]
+keywords: [診断, --explain, 記録, 設定]
 ---
 
 [設計書の入口](../../20_design.md) > [11. 複数のリポジトリ](../multi-repo.md)
 
 ### 11.9 診断と記録
 
-**`--explain` はレイヤーごとに全件。** ルールは `id / match / glob（か regex）` を共通レイヤー・自身のレイヤー・各プロジェクトの順に、タイプごとに並べる。
-フェーズ定義と配点は `id / 出どころのレイヤー / 主な欄` の表を足す。
+**`--explain` は設定ごとに全件。** ルールは `id / match / glob（か regex）` を共通設定・ワークスペースの設定・各プロジェクトの順に、タイプごとに並べる。
+フェーズ定義と配点は `id / 出どころの設定 / 主な欄` の表を足す。
 
 ```
-■ rules 共通レイヤー（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
+■ rules 共通設定（.ccnavi/config/common/rules.yml、deny 12 / ask 3 / allow 4）
   deny  workspace-root       Write|Edit|NotebookEdit  ^{root}[\\/]
   ...
-■ rules ワークスペースのレイヤー（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
+■ rules ワークスペースの設定（.ccnavi/config/project/rules.yml、deny 0 / ask 0 / allow 1）
   allow self:worktrees       Write|Edit               */.claude/worktrees/*
 ■ rules lib（projects/lib/.ccnavi/config/project/rules.yml、deny 2 / ask 0 / allow 1）
   deny  lib:schema           Write|Edit               */schema/*
-■ phases（共通レイヤー 7 種、ワークスペースのレイヤー 4 種、lib 1 種。共通レイヤーと、親チケットの project: で指定されたレイヤーを組み合わせて適用します）
-  id            レイヤー     kind  title         review  scope
-  design        共通レイヤー work  設計          true    wip/design/*, docs/*
+■ phases（共通設定 7 種、ワークスペースの設定 4 種、lib 1 種。共通設定と、親チケットの project: で指定された設定を組み合わせて適用します）
+  id            設定     kind  title         review  scope
+  design        共通設定 work  設計          true    wip/design/*, docs/*
   build         lib          work  ビルド        false   src/*
 ■ risk（levels: medium 20 / high 40 / critical 70）
-  id            レイヤー     加点条件          points  message
-  big-diff      共通レイヤー lines_over 300    25      行数が多い
+  id            設定     加点条件          points  message
+  big-diff      共通設定 lines_over 300    25      行数が多い
   schema        lib          glob db/schema/*  30      スキーマに触った
 ```
 
-レイヤーごとの表は、判定と同じ順・同じ重ね方で読んだ結果を並べる。
-読めないレイヤーはその位置に「読めない: <理由>。このレイヤーは空として扱う」と出す（phases と risk の表では頭にレイヤーの名前を付ける）。rules で置いていないレイヤーは「このレイヤーの設定ファイルはありません。設定なしとして扱います。」と出す。phases の `review` 列はレビューが要るかの真偽値（`true` / `false`）。
-`levels` の行に出るのは共通レイヤーの側の値で、実際に使われる値はチケットのレイヤーで決まる。phases の表はレイヤーごとに書いてある定義を並べ、判定が使うのは共通と親の `project:` が指すレイヤーの和（11.4.1）。和は `--explain --json` の `sums[].phases` に出す。ファイルが無いことは、どのレイヤーでも不備として出さない（11.2）。
+設定ごとの表は、判定と同じ順・同じ重ね方で読んだ結果を並べる。
+読めない設定はその位置に「読めない: <理由>。この設定は空として扱う」と出す（phases と risk の表では頭に設定の名前を付ける）。rules で置いていない設定は「この設定のファイルはありません。設定なしとして扱います。」と出す。phases の `review` 列はレビューが要るかの真偽値（`true` / `false`）。
+`levels` の行に出るのは共通設定の側の値で、実際に使われる値はチケットの設定で決まる。phases の表は設定ごとに書いてある定義を並べ、判定が使うのは共通と親の `project:` が指す設定の和（11.4.1）。和は `--explain --json` の `sums[].phases` に出す。ファイルが無いことは、どの設定でも不備として出さない（11.2）。
 
-記録の 1 行は `tree` と `project`（この呼び出しがどのツリーのものと判定されたか）に加えて、出どころのレイヤー
-（`common | self | <名前>`）を持つ。入るのは判定を下したルール（ヒットしたものの先頭）のレイヤーで、ヒットしなかった行は空。
-配点の記録（`phases/<親>/<子>.risk.json`）は加点した項目ごとに、判定の記録（`<子>.judge.json`）は項目ごとに、その項目のレイヤーを持つ。
-フェーズのマーカーは、フェーズ定義を根拠に置くものにだけそのフェーズ定義のレイヤーを書く。
+記録の 1 行は `tree` と `project`（この呼び出しがどのツリーのものと判定されたか）に加えて、出どころの設定
+（`common | self | <名前>`）を持つ。入るのは判定を下したルール（ヒットしたものの先頭）の設定で、ヒットしなかった行は空。
+配点の記録（`phases/<親>/<子>.risk.json`）は加点した項目ごとに、判定の記録（`<子>.judge.json`）は項目ごとに、その項目の設定を持つ。
+フェーズのマーカーは、フェーズ定義を根拠に置くものにだけそのフェーズ定義の設定を書く。
 
-`--explain --json`（ボードの JSON）は `layers[]` にレイヤーごとのルール・フェーズ定義・配点と、それぞれのパスと読めなかった理由を持つ。
-拡張はレイヤーを自分で探しに行かない。
+`--explain --json`（ボードの JSON）は `layers[]` に設定ごとのルール・フェーズ定義・配点と、それぞれのパスと読めなかった理由を持つ。
+拡張は設定を自分で探しに行かない。
 
 `--lint` は、`projects/` がワークスペースの `.gitignore` に入っているか、プロジェクトの中にワークツリー（`.claude/worktrees/`）が無いか、
 ワークツリーの元リポジトリが承認済みチケットの `project:` と合うか、走査されないチケットの置き場が残っていないか、に加えて次を言う。
 `.ccnavi/config/project/` が無いことは言わない（無いのが正常）。
 
-レイヤーをまたぐ重複と合成の指摘（裸の `id` の重複、同じ `id` で中身違い、`levels` の逆転、`script:` が指す先、レイヤーのファイルの不正、予約名のプロジェクト、ワークツリーにだけあるファイル）の深刻度は、[要件 2.10.1](../../11_requirements/diagnostics.md#2101-設定の検証の指摘一覧) の表が持つ。
+設定をまたぐ重複と合成の指摘（裸の `id` の重複、同じ `id` で中身違い、`levels` の逆転、`script:` が指す先、設定のファイルの不正、予約名のプロジェクト、ワークツリーにだけあるファイル）の深刻度は、[要件 2.10.1](../../11_requirements/diagnostics.md#2101-設定の検証の指摘一覧) の表が持つ。
 
 `projects/` の置き場は固定なので、その前にワークスペースの git の索引に `projects/` の下が載っていないかを見る
 （`git ls-files -s -- projects/`。プロジェクトが 1 つも無くても見る）。索引の mode で 2 つに分け、どちらも `(projects)` の warn にとどめる。
@@ -62,13 +62,13 @@ VS Code 拡張は同じ warn をプロジェクト画面に出す。
 
 `--lint` の指摘の全件は [要件 2.10.1](../../11_requirements/diagnostics.md#2101-設定の検証の指摘一覧)。
 
-`--lint` の JSON も同じ指摘を同じ深刻度で出す。レイヤーの指摘は `where` にレイヤーの名前が入る（`(self) rule-id`、`(projects/lib) (risk) id`）。
+`--lint` の JSON も同じ指摘を同じ深刻度で出す。設定の指摘は `where` に設定の名前が入る（`(self) rule-id`、`(projects/lib) (risk) id`）。
 
 ターミナルから打つ `user agree` は、承認の対象の一部が外れたら終了コード 4 で終わる（何も置かずに失敗したときは 1）。通ったぶんの承認済みチケットは置き、外れたものは名指しする。`ccnavi-user-agree.sh` は 0 と 4 のどちらでも、この承認で書いたパスをコミットして push し、4 のときは最後に 1 で終わる。
 拡張が子プロセスで打つ `user agree --yes`（10 章）の終了コードは別。
 
-導入スクリプト `ccnavi-setup.sh` は共通レイヤーに `rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml` のひな形を配る。自身のレイヤーの `phases.yml` は配らず、既にあれば触らない。
-「まだ無いもの」の点検には、`rules.yml` と `risks.yml` と、共通にも自身のレイヤーにも無い `phases.yml` を数える。
+導入スクリプト `ccnavi-setup.sh` は共通設定に `rules.yml`・`phases.yml`・`risks.yml`・`ticket-sections.yml` のひな形を配る。ワークスペースの設定の `phases.yml` は配らず、既にあれば触らない。
+「まだ無いもの」の点検には、`rules.yml` と `risks.yml` と、共通にもワークスペースの設定にも無い `phases.yml` を数える。
 配布元に共通のテンプレート（`.ccnavi/config/common/templates/*.yml`）があるときは、配布先に無いものも挙げる。配るスキル（工程スキルと配るだけのスキル）の配布先に `SKILL.md` や `references/common/` の `.md` が無いときも、書き込みのあとの点検で挙げる（`--check` は書かないので、配るものを「配る」に並べる）。
 
-dry-run でまずレイヤーの分布を見て、Bash の和と、大文字小文字を区別しない照合で増えた `ask` と `deny` を数えてから `enable` に切り替える。
+dry-run でまず設定の分布を見て、Bash の和と、大文字小文字を区別しない照合で増えた `ask` と `deny` を数えてから `enable` に切り替える。

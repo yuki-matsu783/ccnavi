@@ -94,7 +94,7 @@ var subTiers = map[string]map[string]int{
 		"selfguard": 3,
 		// 4: 組み込みのルール（selfguard の守る形を読む）
 		"builtin": 4,
-		// 5: 適用するルール集合を決める（組み込みとレイヤーを重ねる）
+		// 5: 適用するルール集合を決める（組み込みに設定を足す）
 		"ruleload": 5,
 	},
 	"tickets": {

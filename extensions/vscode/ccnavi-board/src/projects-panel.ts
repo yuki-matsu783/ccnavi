@@ -9,12 +9,12 @@
  * 一覧は実行ファイルの答え（`--explain --json`のtreesとlayers、`--lint --json`の苦情）を並べる。
  * 拡張が自分で見るのは、origin（ローカルのgitを読み取り専用で起こす）、ワークスペースとプロジェクトの設定のルールファイル・
  * `.gitignore`の本文、プロジェクトになっていない`.git`の探索だけ。
- * そのルールファイルの場所はlayers（レイヤー）の答えを使い、`.ccnavi`から自分で組まない（組み方を実行ファイルとずらさない）。
+ * そのルールファイルの場所はlayers（設定の一覧）の答えを使い、`.ccnavi`から自分で組まない（組み方を実行ファイルとずらさない）。
  *
  * cloneは統合ターミナルへ送る。認証の対話はそこでユーザが行い、完了は`projects/<名前>/.git`
  * の出現を監視して拾う。拡張が書くのは、ユーザがボタンを押したときの`.gitignore`だけ。
  *
- * 共通レイヤーのミラー（各プロジェクトの`.ccnavi/config/common/`）のずれは、開いた時と5分ごと（`MIRROR_INTERVAL_MS`）に
+ * 共通設定のミラー（各プロジェクトの`.ccnavi/config/common/`）のずれは、開いた時と5分ごと（`MIRROR_INTERVAL_MS`）に
  * 実行ファイルに聞く（`user mirror --json`。読むだけ）。一覧の読み直し（`update`）とは別に回し、結果は`ProjectsData`の`mirror`に載せる。
  * 処理の流れ:
  *
@@ -62,7 +62,7 @@ const DEBOUNCE_MS = 300;
 const SCREEN = "projects";
 const TITLE = "ccnaviプロジェクト管理";
 /**
- * ミラーのずれを調べ直す間隔。ずれは共通レイヤーを直したときにしか生じず、急ぐものではない。
+ * ミラーのずれを調べ直す間隔。ずれは共通設定を直したときにしか生じず、急ぐものではない。
  * 1回ごとに実行ファイルを2度（`--version --json`と`user mirror --json`）起こすので、短くしすぎない
  */
 const MIRROR_INTERVAL_MS = 5 * 60 * 1000;

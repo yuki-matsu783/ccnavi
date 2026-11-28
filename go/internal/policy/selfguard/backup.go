@@ -44,11 +44,11 @@ const (
 	// refreshAfter は変わっていないバックアップの更新時刻を新しくする間隔（掃除に古いと読まれないよう keepFor より短く）。
 	refreshAfter = 24 * time.Hour
 
-	// commonRulesKey は共通レイヤーのルールファイルの key（レイヤーの key と同じ。重ねて持たない）。
+	// commonRulesKey は共通設定のルールファイルの key（設定の key と同じ。二重に持たない）。
 	commonRulesKey = string(config.KindRules)
 )
 
-// commonRulesDraft は共通レイヤーのルールファイルの下書きの置き場（ワークスペースルートからの相対、"/" 区切り）。
+// commonRulesDraft は共通設定のルールファイルの下書きの置き場（ワークスペースルートからの相対、"/" 区切り）。
 var commonRulesDraft = strings.Join(append(slices.Clone(handoffParts), ospath.Slashed(config.DefaultRules)), "/")
 
 // choices は戻す働きの設定が取る値。gateChoices は、戻す働きを伴わない切り替え（チケットの承認の経路など）の値。
@@ -384,7 +384,7 @@ type backup struct {
 	target            Target
 }
 
-// path はバックアップの置き場。key はレイヤーの `:` を含むので（Windows では代替データストリームになる）、使える字に置き換える。
+// path はバックアップの置き場。key は設定の `:` を含むので（Windows では代替データストリームになる）、使える字に置き換える。
 // 切り詰めない。ワークツリー側の key の末尾の digest を削ると、別のワークツリーと同じ名前になるため。
 func (b backup) path() string {
 	return ospath.Join(b.stateDir, backupDir, safeSession(b.session), fsio.SafeName(b.target.Key, fsio.NoLimit))

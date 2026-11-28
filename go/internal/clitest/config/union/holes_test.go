@@ -8,13 +8,13 @@ import (
 	"testing"
 )
 
-// `.ccnavi/` の組み込み deny とレイヤーの名前を、表記を変えて回避できないことの受入テスト
+// `.ccnavi/` の組み込み deny と設定の名前を、表記を変えて回避できないことの受入テスト
 // 。
 //
 // どれも、直さないと組み込み deny が「守っている」と言いながら回避できる形。`.claude/` の側も同じ適用の仕方で守られる。
 //   - 大文字小文字: glob と regex で書いたルールと組み込みの保護を、どの機械でも区別せずに適用する。区別が要る regex は `(?-i:...)` で囲む
 //   - 区切りが続かないパス: `rm -rf .ccnavi` / `mv .ccnavi .ccnavi.bak` / `rm -rf .claude`
-//   - 生の id のコロン: レイヤーの名前をつけた形と見分けが付かないものを error にする
+//   - 生の id のコロン: 設定の名前をつけた形と見分けが付かないものを error にする
 //   - `self` の予約: `projects/Self/` も `self` と同じに扱って数えない
 //   - 確認だけ: 既に参照されている `.ccnavi/scripts/` のスクリプトを、表記を変えた形でも区切りの無い形でも、Write / Edit とシェルの両方で書き換えられない
 //
@@ -40,7 +40,7 @@ var caseRules = configws.Ruleset(
 	[]configws.Obj{configws.Rule("anything-read", "Read", "regex", ".", "")},
 )
 
-// 生の id のコロンの的。裸の id にコロンがある。共通レイヤーに置けば lib の定義に見える。
+// 生の id のコロンの的。裸の id にコロンがある。共通設定に置けば lib の定義に見える。
 var colonRules = configws.Ruleset(
 	[]configws.Obj{configws.Rule("lib:custom", "Write|Edit", "glob", "*/custom/*", "custom はユーザが置く。")},
 	[]configws.Obj{configws.Rule("anything-read", "Read", "regex", ".", "")},
@@ -60,37 +60,37 @@ factors:
   - {id: "lib:schema", points: 5, glob: "schema/**", message: スキーマに触った}
 `
 
-// `self` の予約の的。`projects/Self/` のレイヤーに置く deny。数えないので、ヒットしてはいけない。
+// `self` の予約の的。`projects/Self/` の設定に置く deny。数えないので、ヒットしてはいけない。
 var selfProjectRules = configws.Ruleset([]configws.Obj{configws.Rule("kube", "Bash", "glob", "*kubectl*", "kubectl はユーザが打つ。")}, nil)
 
-// 予約名のプロジェクトへの Write の的。ワークスペース自身のレイヤーに置く、広い allow と 1 本の deny。
-// 予約名のプロジェクトのレイヤーを名前で引くとこのレイヤーにヒットするので、そのプロジェクトへの Write がここの allow で通り、
+// 予約名のプロジェクトへの Write の的。ワークスペースの設定に置く、広い allow と 1 本の deny。
+// 予約名のプロジェクトの設定を名前で引くとこの設定にヒットするので、そのプロジェクトへの Write がここの allow で通り、
 // ここの deny で止まる。どちらも起きてはいけない。
 var wideOwnRules = configws.Ruleset(
 	[]configws.Obj{configws.Rule("generated", "Write|Edit", "glob", "*/generated/*", "generated files are rebuilt, not edited.")},
 	[]configws.Obj{configws.Rule("wide", "Write|Edit", "glob", "*", "")},
 )
 
-// 予約名のプロジェクトのレイヤーに置く deny。レイヤーとして数えないのでヒットしない。
-// ヒットしないことは「緩い」のではない。共通レイヤーだけで判定するので、allow も無い。
+// 予約名のプロジェクトの設定に置く deny。設定として数えないのでヒットしない。
+// ヒットしないことは「緩い」のではない。共通設定だけで判定するので、allow も無い。
 var reservedProjectRules = configws.Ruleset([]configws.Obj{configws.Rule("secret", "Write|Edit", "glob", "*/secret/*", "secret はユーザが置く。")}, nil)
 
-// 予約名のプロジェクトのレイヤーの phases / risk。中身は何でもよく、バックアップと復元の対象に入るかだけを見る。
+// 予約名のプロジェクトの設定の phases / risk。中身は何でもよく、バックアップと復元の対象に入るかだけを見る。
 const reservedProjectPhases = `version: 1
 phases:
   reserved:
     kind: work
-    title: 予約名のレイヤー
+    title: 予約名の設定
     review: false
     scope: ["src/*"]
 `
 
 const reservedProjectRisk = `version: 1
 factors:
-  - {id: reserved, points: 5, glob: "src/**", message: 予約名のレイヤーで数えた}
+  - {id: reserved, points: 5, glob: "src/**", message: 予約名の設定で数えた}
 `
 
-// 参照されているスクリプトの的。レイヤーの risk が呼ぶスクリプト。これが書き換わると配点が 0 を返せる。
+// 参照されているスクリプトの的。設定の risk が呼ぶスクリプト。これが書き換わると配点が 0 を返せる。
 const (
 	countScript = "printf '{\"points\": 30, \"message\": \"%s\"}' \"$CCNAVI_TICKET\"\n"
 	countRisk   = "version: 1\nfactors:\n  - {id: counted, points: 5, script: .ccnavi/scripts/count.sh, message: 数えた}\n"
@@ -135,7 +135,7 @@ func TestARegexCanKeepTheDistinctionWithAnInlineFlag(t *testing.T) {
 func TestTheBuiltinProjectHomeDenyMatchesASwappedSpelling(t *testing.T) {
 	t.Parallel()
 	// 組み込みの `*/.ccnavi/*` も、どの機械でも大文字小文字を区別せずにヒットする（穴そのもの）。
-	// 的は app のレイヤー。雛形の app は `.ccnavi/` を持たないので、`.Ccnavi/` はディスクに無く、realpath がパスを補正しない。
+	// 的は app の設定。雛形の app は `.ccnavi/` を持たないので、`.Ccnavi/` はディスクに無く、realpath がパスを補正しない。
 	// 「まだ無いところを表記違いで作る」という、ちょうど回避が成り立つ形になる。
 	w := newWS(t, configws.KindGuard)
 	if configws.Exists(p(w.App, configws.Home)) {
@@ -177,11 +177,11 @@ func TestCopyDestinationOnlyIsGuarded(t *testing.T) {
 	})
 }
 
-// 生の id のコロン。レイヤーの名前をつけた形（`lib:custom`）と見分けが付かない。
+// 生の id のコロン。設定の名前をつけた形（`lib:custom`）と見分けが付かない。
 
 func TestAColonInAnIdIsNamedByLint(t *testing.T) {
 	t.Parallel()
-	// 共通レイヤーでもレイヤーでも、フェーズ定義でも risk の項目でも、コロンを含む id は error で名指しする。
+	// 共通設定でも設定でも、フェーズ定義でも risk の項目でも、コロンを含む id は error で名指しする。
 	for _, c := range []struct {
 		name  string
 		setup func(t testing.TB, w *ws)
@@ -229,21 +229,21 @@ func TestReservedSelfIsNamedByLintAndNotCounted(t *testing.T) {
 
 	// `projects/Self/` も error で名指しする。
 	w.MustHaveDetail(w.Problems("error", configws.ProjectWhere("Self")), "self")
-	// 数えないので、そのレイヤーの deny は Bash の和に入らない。
+	// 数えないので、その設定の deny は Bash の和に入らない。
 	w.AssertNotDenied(w.Hook("Bash", w.Root, configws.Obj{"command": "kubectl get pods"}))
-	// 普通の名前のレイヤーは和に入る。「そもそも和が使われていない」ではないことを見る。
+	// 普通の名前の設定は和に入る。「そもそも和が使われていない」ではないことを見る。
 	w.AssertDenied(w.Hook("Bash", w.Root, configws.Obj{"command": "psql -c 'select 1'"}), "lib:raw-psql")
 }
 
-// 予約名のプロジェクトへの Write が、ワークスペース自身のレイヤーで判定される穴。
+// 予約名のプロジェクトへの Write が、ワークスペースの設定で判定される穴。
 //
-// `layers` は `projects/self/` を数えないのに、`layer_for` は `target.project or LAYER_SELF` をレイヤーの名前で引いていた。
-// `target.project` が `"self"` ならレイヤーの名前と一致するので、ワークスペース自身のレイヤーが返る。そのプロジェクトへの
-// Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースのレイヤーのルールで判定される。
+// `layers` は `projects/self/` を数えないのに、`layer_for` は `target.project or LAYER_SELF` を設定の名前で引いていた。
+// `target.project` が `"self"` なら設定の名前と一致するので、ワークスペースの設定が返る。そのプロジェクトへの
+// Write / Edit が、プロジェクト自身の deny を一度も読まずに、ワークスペースの設定のルールで判定される。
 //
-// 穴が再現する形に組む。ワークスペース自身のレイヤーに広い allow（`self:wide`）と deny（`self:generated`）を置き、
-// プロジェクトのレイヤーに deny（`secret`）を置く。レイヤーの名前で引くと `self:wide` が採られて通り、`self:generated` で止まる。
-// 予約名のプロジェクトはレイヤー無しなので共通レイヤーだけで判定し、どちらも記録に現れない。
+// 穴が再現する形に組む。ワークスペースの設定に広い allow（`self:wide`）と deny（`self:generated`）を置き、
+// プロジェクトの設定に deny（`secret`）を置く。設定の名前で引くと `self:wide` が採られて通り、`self:generated` で止まる。
+// 予約名のプロジェクトは設定無しなので共通設定だけで判定し、どちらも記録に現れない。
 
 func reservedWS(t testing.TB) *ws {
 	w := newWS(t, configws.KindBase)
@@ -268,14 +268,14 @@ func TestAWriteIntoAReservedProjectIsNotJudgedByTheWorkspaceLayer(t *testing.T) 
 
 			result := w.Hook("Write", w.Root, configws.Obj{"file_path": p(project, "secret", "x.txt")})
 			rec = w.LastRecord()
-			// 穴の本体。レイヤーの名前で引くと、ここに `self:wide` が入り、decision が allow になる。
+			// 穴の本体。設定の名前で引くと、ここに `self:wide` が入り、decision が allow になる。
 			if slices.Contains(rec.Ids(), "self:wide") || rec.Str("decision") == "allow" {
-				t.Errorf("ワークスペースのレイヤーで判定された: %v", rec)
+				t.Errorf("ワークスペースの設定で判定された: %v", rec)
 			}
-			// プロジェクトのレイヤーも足さない（レイヤー無し）。共通レイヤーに `*/secret/*` は無いので deny でもない。
+			// プロジェクトの設定も足さない（設定無し）。共通設定に `*/secret/*` は無いので deny でもない。
 			w.AssertNotDenied(result)
 			if slices.Contains(rec.Names(), name+":secret") {
-				t.Errorf("予約名のレイヤーの deny がヒットした: %v", rec)
+				t.Errorf("予約名の設定の deny がヒットした: %v", rec)
 			}
 		})
 	}
@@ -283,12 +283,12 @@ func TestAWriteIntoAReservedProjectIsNotJudgedByTheWorkspaceLayer(t *testing.T) 
 
 func TestTheWorkspaceLayerDenyDoesNotReachAReservedProject(t *testing.T) {
 	t.Parallel()
-	// レイヤーを借りないので、ワークスペースのレイヤーの deny もヒットしない。
+	// 設定を借りないので、ワークスペースの設定の deny もヒットしない。
 	w := reservedWS(t)
 	project := w.Project(layerSelf, reservedProjectRules, "", "")
 	// 前提。同じパスはワークスペースのツリーでは止まる。
 	w.AssertDenied(w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.Root, "generated", "x.py")}), "self:generated")
-	// レイヤーの名前で引くと、ここも `self:generated` で止まる。レイヤー無しなら共通レイヤーだけ。
+	// 設定の名前で引くと、ここも `self:generated` で止まる。設定無しなら共通設定だけ。
 	w.AssertNotDenied(w.Hook("Write", w.Root, configws.Obj{"file_path": p(project, "generated", "x.py")}))
 	if slices.Contains(w.LastRecord().Ids(), "self:generated") {
 		t.Error("self:generated がヒットした")
@@ -297,10 +297,10 @@ func TestTheWorkspaceLayerDenyDoesNotReachAReservedProject(t *testing.T) {
 
 func TestAProjectWhoseNameIsNotReservedStillWorks(t *testing.T) {
 	t.Parallel()
-	// 対照: 予約名でない `lib` は今までどおり自分のレイヤーで判定される。
+	// 対照: 予約名でない `lib` は今までどおり自分の設定で判定される。
 	w := reservedWS(t)
 	w.AssertDenied(w.Hook("Write", w.Root, configws.Obj{"file_path": p(w.Lib, "schema", "x.sql")}), "lib:schema")
-	// 広い allow は行き先の 1 レイヤーにしか足さないので、lib にはヒットしない。
+	// 広い allow は行き先の 1 つの設定にしか足さないので、lib にはヒットしない。
 	if slices.Contains(w.LastRecord().Ids(), "self:wide") {
 		t.Error("lib に self:wide がヒットした")
 	}
@@ -362,17 +362,17 @@ func TestATicketCannotNameAReservedLayerName(t *testing.T) {
 	}
 }
 
-// `projects/common/` のレイヤーの 3 本がバックアップと復元の対象から外れる穴。
+// `projects/common/` の設定の 3 本がバックアップと復元の対象から外れる穴。
 //
-// `_layer_key` が `layer == LAYER_COMMON` の文字列比較で key を決めていた。`projects/common/` があると、そのレイヤーの key が
-// `rules` / `phases` / `risk` になって共通レイヤーの key と完全に一致し、`_places` の重複の排除で先に積んだ共通レイヤーだけが
+// `_layer_key` が `layer == LAYER_COMMON` の文字列比較で key を決めていた。`projects/common/` があると、その設定の key が
+// `rules` / `phases` / `risk` になって共通設定の key と完全に一致し、`_places` の重複の排除で先に積んだ共通設定だけが
 // 残る。プロジェクトが名前を 1 つ選ぶだけで、その 3 本が守られなくなる。
-// key が共通レイヤーと重なると、この 2 つが失敗する（戻らず不正な中身が残る）。
+// key が共通設定と重なると、この 2 つが失敗する（戻らず不正な中身が残る）。
 
 func TestTheLayersOfReservedNamesAreRestoredWithTheCommonLayer(t *testing.T) {
 	t.Parallel()
-	// `projects/common/` の 3 本・`projects/self/` の 2 本・共通レイヤーの phases / risk・ワークスペース自身の risk が、
-	// 同じ 1 回のバックアップと復元で全部戻る（key が衝突しない）。`projects/self/` は、ワークスペース自身のレイヤーとは別に守る。
+	// `projects/common/` の 3 本・`projects/self/` の 2 本・共通設定の phases / risk・ワークスペース自身の risk が、
+	// 同じ 1 回のバックアップと復元で全部戻る（key が衝突しない）。`projects/self/` は、ワークスペースの設定とは別に守る。
 	w := newWS(t, configws.KindGuard)
 	reserved := w.Project(layerCommon, reservedProjectRules, reservedProjectPhases, reservedProjectRisk)
 	project := w.Project(layerSelf, reservedProjectRules, reservedProjectPhases, "")

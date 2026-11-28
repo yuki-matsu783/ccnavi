@@ -27,8 +27,8 @@ type Filled struct {
 	Held []string
 }
 
-// Fill は target（承認待ちの親の提案）の phases: を、計画が使う定義（phases.yml の共通レイヤーと親の project: の
-// レイヤーの和）に差し替えて書く（無ければ plan: の前に足す）。current は改版ならその親の承認済みチケットで、
+// Fill は target（承認待ちの親の提案）の phases: を、計画が使う定義（phases.yml の共通設定と親の project: の
+// 設定の和）に差し替えて書く（無ければ plan: の前に足す）。current は改版ならその親の承認済みチケットで、
 // 子が承認された番号が使う定義はそのコピーから差し込む（改版の承認が同じ規則で確かめる）。
 func Fill(conf *config.Settings, root string, target, current *ticket.Ticket) Filled {
 	name := target.ID
@@ -52,7 +52,7 @@ func Fill(conf *config.Settings, root string, target, current *ticket.Ticket) Fi
 	}
 	cfg := phases.LoadTypes(conf, root, target.Project)
 	if cfg == nil {
-		return Filled{Why: "フェーズ定義（共通レイヤーと " + cmp.Or(target.Project, "自身") + " のレイヤーの phases.yml）が" +
+		return Filled{Why: "フェーズ定義（共通設定と " + cmp.Or(target.Project, "自身") + " の設定の phases.yml）が" +
 			"どちらも無いか読めないので、コピーできない。何も反映しません。"}
 	}
 	held := heldTypes(conf, root, current)

@@ -91,7 +91,7 @@ func Before(stdout, stderr io.Writer, mode config.Mode, conf *config.Settings, r
 			reasons.CommandTooLongRule, reasons.CommandTooLong(root, commandLengthLimit, length), config.General)
 	}
 
-	// 組み込みの既定に戻ったときだけ知らせる。レイヤーが不正で空になったのは退避ではないので、記録と lint が伝える。
+	// 組み込みの既定に戻ったときだけ知らせる。設定が不正で空になったのは退避ではないので、記録と lint が伝える。
 	fallback := ""
 	if record.Fallback == builtin.Fallback {
 		path := record.Detail
@@ -487,7 +487,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 		hitIDs[r.ID] = true
 	}
 	if verdict == rules.Deny && slices.ContainsFunc(group, func(r *rules.Rule) bool { return r.Base }) {
-		// 土台はいつも当たる。レイヤーの deny にも当たったなら、そちらだけを言う（同じ拒否を 2 つの文で返さない）。
+		// 土台はいつも当たる。設定の deny にも当たったなら、そちらだけを言う（同じ拒否を 2 つの文で返さない）。
 		var keptRules []*rules.Rule
 		var keptVia []viaLayer
 		for i, r := range group {
@@ -562,7 +562,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 		if strength[t.decision] > strength[verdict] {
 			verdict, ticketReason, ticketCode = t.decision, t.text, t.code
 			if ticketReason != "" {
-				// 判定を下したのはレイヤーを持たないチケット。狭められたルールの id は後ろに残す。
+				// 判定を下したのは設定を持たないチケット。狭められたルールの id は後ろに残す。
 				decidedBy := builtin.TicketScopeRuleID
 				switch t.code {
 				case reasons.CodeTicketBlocked:
@@ -613,7 +613,7 @@ func (j *judgement) byRules(ruleSet *rules.RuleSet, source rules.Origin, subject
 		}
 		record.Code = reasons.CodeRedirectLimitDeny
 		record.Rules = slices.Concat([]string{reasons.RedirectLimitRule}, record.Rules)
-		// 決めたのはレイヤーを持たない組み込み。並べた ask のレイヤーを残すと、ルールファイルが止めたように読める。
+		// 決めたのは設定を持たない組み込み。並べた ask の設定を残すと、ルールファイルが止めたように読める。
 		record.Source = ""
 	case verdict == rules.Deny && ticketReason == "":
 		// ヒットした理由はまとめて 1 回で返す（1 つずつ返すと、直すたびに往復が増える）。

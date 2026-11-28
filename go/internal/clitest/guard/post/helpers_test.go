@@ -334,7 +334,7 @@ func gitTry(repo string, args ...string) error {
 	return cmd.Run()
 }
 
-// freshWorkspace は tests/fixtures の見本のルールを共通レイヤーに据えた、テストごとの作業場所。
+// freshWorkspace は tests/fixtures の見本のルールを共通設定に据えた、テストごとの作業場所。
 // base.FixtureWorkspace は読むだけの共有の木だが、記録や state を書く検査は、並行するテストと取り合わないよう別に持つ。
 func freshWorkspace(t testing.TB, fixture string) string {
 	t.Helper()

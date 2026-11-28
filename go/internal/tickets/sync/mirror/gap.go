@@ -54,7 +54,7 @@ func names(paths []string) string {
 
 // Label はずれたパスの表示（先頭の 10 件まで）。
 func Label(mirrored []string) string {
-	return "共通レイヤーのコピーとのずれ: " + names(mirrored)
+	return "共通設定のコピーとのずれ: " + names(mirrored)
 }
 
 // OthersNote はずれ以外の変更があるときの一文。無ければ空。

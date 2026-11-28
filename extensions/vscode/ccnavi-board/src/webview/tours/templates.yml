@@ -1,6 +1,6 @@
 # テンプレート管理画面の案内。`sample:`は案内の間だけ画面に出す見本（実際のテンプレートではない）。
-#   path見本のレイヤーの置き場（画面には「（見本）」を付けて出す）
-#   templates見本のレイヤー（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（破棄した理由。あれば「使われない」）・text（本文）
+#   path見本の設定の置き場（画面には「（見本）」を付けて出す）
+#   templates見本の設定（self）のテンプレート。name・description・when・plan・feedback・flows・problems・dropped（破棄した理由。あれば「使われない」）・text（本文）
 #   drafts見本の下書き。name・description・problems・plan・feedback・flows
 #   sums       「統合結果」の見本。実行ファイルが出す索引の形（共通の設定 + 1つの設定の和）
 # `scene:`は手順ごとの画面の様子。手順ごとに全部を書く（前の手順を引き継がない）。

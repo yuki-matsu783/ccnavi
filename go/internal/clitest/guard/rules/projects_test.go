@@ -19,16 +19,16 @@ import (
 // 複数のリポジトリの受入テスト。道具を外から呼んで応答だけを見る。
 //
 // ワークスペース 1 つとプロジェクト 2 つ（app と lib）を一時ディレクトリに作る。ワークスペースは Claude Code を起動した場所で、
-// 自分の git を持つ。プロジェクトは `projects/` の直下に clone した別のリポジトリで、それぞれレイヤーの 3 本の置き場
+// 自分の git を持つ。プロジェクトは `projects/` の直下に clone した別のリポジトリで、それぞれ設定の 3 本の置き場
 // （`.ccnavi/config/project/`）に rules.yml を持つ。見るのは 5 つ。
 //
-//  1. パスを持つツールは共通レイヤー + 行き先のプロジェクトのレイヤーで判定される。ワークスペースへの書き込みは共通レイヤー + 自身のレイヤー
-//  2. Bash は共通レイヤーと全部のレイヤーの和で判定され、cwd がどこでも同じ
-//  3. 読めないレイヤーは空として扱われ、記録がレイヤーの名前を残す。組み込みの既定へは戻らない
+//  1. パスを持つツールは共通設定 + 行き先のプロジェクトの設定で判定される。ワークスペースへの書き込みは共通設定 + ワークスペースの設定
+//  2. Bash は共通設定と全部の設定の和で判定され、cwd がどこでも同じ
+//  3. 読めない設定は空として扱われ、記録が設定の名前を残す。組み込みの既定へは戻らない
 //  4. プロジェクトから切ったワークツリーが認識され、元リポジトリとチケットの `project:` が食い違えば止まる
 //  5. `projects/` を作らなければ、この機能が入る前と同じに動く
 //
-// レイヤーの和そのもの（重複の排除、同 id、`--explain`）は config/union が見る。ここが見るのは、置き場とツリーの結び付きが合っていること。
+// 設定の和そのもの（重複の排除、同 id、`--explain`）は config/union が見る。ここが見るのは、置き場とツリーの結び付きが合っていること。
 
 func rule(id, match, glob, message string) payload {
 	r := payload{"id": id, "match": match, "glob": glob}
@@ -117,7 +117,7 @@ func newProjects(t *testing.T) *projects {
 	write(t, filepath.Join(ws, "src", "keep.py"), "print(1)\n")
 	run.Git(t, ws, "add", "-A")
 	run.Git(t, ws, "commit", "--quiet", "-m", "init")
-	// 共通レイヤーは既定の置き場へ。`--rules` は診断でだけ有効。
+	// 共通設定は既定の置き場へ。`--rules` は診断でだけ有効。
 	write(t, base.CommonPath(ws, "rules"), jsonText(t, wsRules))
 	p := &projects{t: t, ws: ws}
 	p.app = p.project("app", appRules)
@@ -330,8 +330,8 @@ func TestBashIsJudgedByTheUnionRegardlessOfCwd(t *testing.T) {
 
 func TestUnreadableProjectRulesAreEmptyAndDropOutOfTheUnion(t *testing.T) {
 	t.Parallel()
-	// 不正なレイヤーは空として扱い、記録がレイヤーの名前を残す。組み込みの既定には戻らない。
-	// 共通レイヤーが有るのに戻すと、共通レイヤーの deny が消える側になる。
+	// 不正な設定は空として扱い、記録が設定の名前を残す。組み込みの既定には戻らない。
+	// 共通設定が有るのに戻すと、共通設定の deny が消える側になる。
 	p := newProjects(t)
 	write(t, base.ConfigPath(p.app, "rules"), "version: 1\ndeny: [\n")
 	passed := p.write(p.ws, filepath.Join(p.app, "schema", "x.sql"))
@@ -344,7 +344,7 @@ func TestUnreadableProjectRulesAreEmptyAndDropOutOfTheUnion(t *testing.T) {
 	}
 	mustNotHave(t, parse(t, passed).text(), "built-in defaults")
 
-	// 共通レイヤーの deny は不正なレイヤーの上でもヒットしたまま。
+	// 共通設定の deny は不正な設定の上でもヒットしたまま。
 	mustHave(t, mustDeny(t, p.write(p.ws, filepath.Join(p.app, ".ccnavi", "approved", "x"))).text(), "guard-approved")
 
 	mustHave(t, mustDeny(t, p.bash(p.app, "psql")).text(), libPsqlID)
@@ -534,7 +534,7 @@ func TestAProposalInsideAProjectWorktreeIsReadWithoutComplaint(t *testing.T) {
 	// 共有するために、そこに置く。置き場はワークツリーの元リポジトリで決まり、承認済みチケットは記録したパスから引くので閉じられる。
 	p := newProjects(t)
 	tree := p.worktree(p.lib, "i0010")
-	// 計画のある親だけが着手できる。定義はプロジェクトのレイヤー（config）に置く。
+	// 計画のある親だけが着手できる。定義はプロジェクトの設定（config）に置く。
 	samples.WritePlainPhases(t, p.lib)
 	write(t, filepath.Join(tree, "wip", "proposals", "todo", "i0010.md"), ticketText("i0010", "", "", []string{"src/*"}, 1))
 	approved := p.mustAgree()
@@ -686,7 +686,7 @@ func TestLintNamesProjectConfigProblems(t *testing.T) {
 	// scratchpad の無視行は求めない（実行前チェックの話）
 	mustNotHave(t, out, "(scratch")
 
-	// `--explain` はレイヤーごとに並べる。読めないレイヤーはその位置で言う。
+	// `--explain` は設定ごとに並べる。読めない設定はその位置で言う。
 	explained := p.ccnavi("", "--explain")
 	mustHave(t, explained.Stdout, "■ rules app", "■ rules lib", "読めない")
 }

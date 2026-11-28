@@ -1,5 +1,5 @@
 /**
- * テンプレート1件。見出しに名前・レイヤー・状態のバッジ・説明を出し、開くと計画とフローの図・本文の取り出しを出す。
+ * テンプレート1件。見出しに名前・設定の名前・状態のバッジ・説明を出し、開くと計画とフローの図・本文の取り出しを出す。
  * 判定（有効・無効・使われない・破棄した理由・読めない）は実行ファイルの答えのまま出す。
  */
 import { useEffect, type JSX } from "react";
@@ -22,7 +22,7 @@ export interface TemplateProps {
   readonly onShow: () => void;
   /** 案内が指す先にする（一覧の最初の1件だけ） */
   readonly tour: boolean;
-  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用のレイヤー・読めない行・案内の間） */
+  /** 編集を始める。渡さなければ「編集」は出さない（読み取り専用の設定・読めない行・案内の間） */
   readonly onEdit?: () => void;
   /** 図の中身（実行ファイルに読ませた答え）。まだ読んでいなければundefined。読めなかったときは`previewError`に理由 */
   readonly preview?: TemplateCheck | undefined;
@@ -108,8 +108,8 @@ export function Template({ entry, open, onToggle, detail, detailError, onShow, t
 }
 
 /**
- * 届いた本文が、この行のものか。実行ファイルはレイヤーごとでなく統合結果で1件を返すので、破棄された行を開くと
- * 別のレイヤーの本文が来ることがある。レイヤーとsha（読めない行はshaが空なのでレイヤーだけ）で突き合わせる
+ * 届いた本文が、この行のものか。実行ファイルは設定ごとでなく統合結果で1件を返すので、破棄された行を開くと
+ * 別の設定の本文が来ることがある。設定とsha（読めない行はshaが空なので設定だけ）で突き合わせる
  */
 function detailMatches(detail: TemplateDetail, entry: TemplateEntry): boolean {
   return detail.layer === entry.layer && (entry.sha === "" || detail.sha === entry.sha);

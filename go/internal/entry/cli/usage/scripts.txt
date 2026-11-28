@@ -1,4 +1,4 @@
-共通レイヤーの3つのファイルは --rules、--phases、--risk で、レイヤーを探す場所は --projects と
+共通設定の3つのファイルは --rules、--phases、--risk で、設定を探す場所は --projects と
 --project-home で変更します。この5つはいずれも同じ制限が適用され、診断専用で、
 それ以外の実行では無視されます。
 
@@ -100,7 +100,7 @@
     ccnavi sync check <parent> [<repo>]
         （<parent> を取り込んだ後の検査です（ccnavi-sync.sh は sync recheck で同じ判定をします）。ファミリーの承認済みチケットと
          その権限を再判定します。"check 1" の行に続いて、"error <detail>" か "warn <detail>" を
-         1行ずつ出力します（warn には、手元のレイヤーが取得済みの origin/<統合先> のレイヤーと
+         1行ずつ出力します（warn には、手元の設定が取得済みの origin/<統合先> の設定と
          違うことを含みます。git show でローカルの参照を読むだけで、ネットワークには出ません）。
          error がある場合は終了コード1になります）
     ccnavi fetch plan|forward|track|retarget|base|advance|auth <args>...

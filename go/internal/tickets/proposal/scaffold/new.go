@@ -25,7 +25,7 @@ import (
 
 // Request は ticket new の引数。Issue と MR は親の作成と承認の前提で、nil は渡されていない。Template を渡すと
 // Plan（型の列）の代わりにテンプレートから計画と子のフローの下書きを作る（Layer はテンプレートを統合結果で引く
-// レイヤー。空なら cwd のツリーのレイヤー）。フィードバック計画は WithFeedback のときだけ書く。Scope は今回の作業の
+// 設定。空なら cwd のツリーの設定）。フィードバック計画は WithFeedback のときだけ書く。Scope は今回の作業の
 // 範囲（glob）で、型の scope を集めたものに足して allow に書く。
 type Request struct {
 	ID           string
@@ -105,7 +105,7 @@ func New(stdout, stderr io.Writer, conf *config.Settings, root, cwd string, req 
 	}
 	types := phases.LoadTypes(conf, root, where.Project)
 	if types == nil {
-		return refuse("フェーズ定義（" + layerLabel(where.Project) + " のレイヤーの phases.yml）が無いか読めない。" +
+		return refuse("フェーズ定義（" + layerLabel(where.Project) + " の設定の phases.yml）が無いか読めない。" +
 			"plan の型の定義を読めず、承認の検査を通る plan とコピー（phases:）を作れない" +
 			"（設計 9.7）。phases.yml を用意してから実行します。")
 	}
@@ -290,7 +290,7 @@ func fromTemplate(conf *config.Settings, root string, where tree.Tree, types *ph
 	if !withFeedback {
 		skipped, feedback = len(feedback), nil
 	}
-	// 1. ステップの型が、今のレイヤーの phases.yml に全部あるか。
+	// 1. ステップの型が、今の設定の phases.yml に全部あるか。
 	var names []string
 	for _, item := range append(append([]templates.Item{}, plan...), feedback...) {
 		names = append(names, item.Type)
@@ -303,7 +303,7 @@ func fromTemplate(conf *config.Settings, root string, where tree.Tree, types *ph
 	}
 	if len(missing) > 0 {
 		return nil, "テンプレート " + pyfmt.Repr(name) + " のステップの定義 " + strings.Join(missing, ", ") + " が " +
-			"phases.yml にありません（" + layerLabel(where.Project) + " のレイヤー）。テンプレートを直すか、" +
+			"phases.yml にありません（" + layerLabel(where.Project) + " の設定）。テンプレートを直すか、" +
 			"ユーザに phases.yml へ追加してもらう"
 	}
 	// 2. 型の kind が、置く計画に合うか（plan は作業、feedback はフィードバックの定義だけ）。

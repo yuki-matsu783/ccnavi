@@ -25,7 +25,7 @@ function openedOf(check: TemplateCheck, extra: Partial<EditOpened> = {}): EditOp
   return { name: "feature", layer: "self", created: false, sha: "sha-opened", data: check.data, check, lock: { locked: false, reason: "", doing: [], turns: [] }, ...extra };
 }
 
-/** 見本の画面（図の大きさを測れる細工つき）。selfのレイヤーのfeatureの行を開いた状態 */
+/** 見本の画面（図の大きさを測れる細工つき）。selfの設定のfeatureの行を開いた状態 */
 async function openList(): Promise<DomPage> {
   const dom = await loadPage(templatesHtml({ kind: "page", page: page() }), undefined, { measure: true });
   await dom.settle();
@@ -259,7 +259,7 @@ test("CB-D386 未保存のまま閉じようとすると破棄してよいかを
   }
 });
 
-test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用のレイヤーでは編集と作るの入口を出さない", async () => {
+test("CB-D387 編集を始められなかったときは、理由を一覧の上に出す。読み取り専用の設定では編集と作るの入口を出さない", async () => {
   const dom = await openList();
   try {
     await openFeature(dom);

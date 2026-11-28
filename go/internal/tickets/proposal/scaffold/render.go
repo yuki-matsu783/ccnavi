@@ -154,7 +154,7 @@ func linear(plan []string) []templates.Item {
 }
 
 // render は雛形の全文。phases: は書かない（書いたあとに planedit.Fill が差し込む）。after は提案の絶対番号
-// （フィードバック計画は全体計画の続き）。issue は 12 か owner/repo#12。headings は本文に置く見出し（レイヤーの
+// （フィードバック計画は全体計画の続き）。issue は 12 か owner/repo#12。headings は本文に置く見出し（設定の
 // ticket-sections.yml の parent）で、目印のある見出しはその下に目印を 1 行置く。
 func render(ident, title string, plan, feedback []templates.Item, allow []string, issue string, mr int,
 	headings []form.Heading) string {

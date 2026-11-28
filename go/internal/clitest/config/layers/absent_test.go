@@ -14,11 +14,11 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// 共通レイヤーと config が無いとき・不正なときの受入テスト。
+// 共通設定と config が無いとき・不正なときの受入テスト。
 //
 // ファイルが無いのは「設定が無い」正常で、ルール・リスクの配点・フェーズ定義のすべてで空として扱う。記録の `fallback` にも `--lint` にも出さない。
-// 不正なときだけ `fallback` を残す。組み込みの deny は、共通レイヤーと config の有無・状態によらず常にヒットする。
-// 土台は configws の雛形。配点のレイヤーの和の細部、組み込みの文面、照合の速さは Go のテスト
+// 不正なときだけ `fallback` を残す。組み込みの deny は、共通設定と config の有無・状態によらず常にヒットする。
+// 土台は configws の雛形。配点の設定の和の細部、組み込みの文面、照合の速さは Go のテスト
 // （go/internal/tickets/config/risk・go/internal/policy/builtin・go/internal/policy/rules）が確かめる。
 
 const (
@@ -27,7 +27,7 @@ const (
 	rawGitBuiltin = "builtin:guard-raw-git"
 )
 
-// absentWS は雛形のワークスペースに、共通レイヤーなどを取り除く道具を足したもの。
+// absentWS は雛形のワークスペースに、共通設定などを取り除く道具を足したもの。
 type absentWS struct{ *configws.WS }
 
 func newAbsentWS(t testing.TB) absentWS { return absentWS{configws.NewWS(t, configws.KindBase)} }
@@ -66,7 +66,7 @@ func TestAMissingCommonLayerIsEmptyAndIsNotAFallback(t *testing.T) {
 
 	w.AssertDenied(denied, "self:generated")
 	if _, ok := w.LastRecord()["fallback"]; ok {
-		t.Error("共通レイヤーが無いだけで fallback を残した")
+		t.Error("共通設定が無いだけで fallback を残した")
 	}
 	if strings.Contains(w.Reason(denied), "built-in defaults") {
 		t.Error("理由が組み込みの既定の話になった")
@@ -126,14 +126,14 @@ func TestTheBuiltinCredentialsDenyHasALeadingBoundary(t *testing.T) {
 	}
 }
 
-// 共通レイヤーが在っても、組み込みの deny は土台としてヒットする。
+// 共通設定が在っても、組み込みの deny は土台としてヒットする。
 func TestBuiltinDenyStaysOnUnderTheCommonLayer(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
 	w.AssertDenied(w.Hook("Bash", w.Root, configws.Obj{"command": "git reset --hard HEAD~1"}), "builtin:git-reset-hard")
 }
 
-// 共通レイヤーも config も無ければ、組み込みの既定だけで判定する（`fallback` は残さない）。既定は `Read` を通す（allow）。
+// 共通設定も config も無ければ、組み込みの既定だけで判定する（`fallback` は残さない）。既定は `Read` を通す（allow）。
 // その allow は組み込みの既定だけのとき限りで、config が 1 本でも在れば足さない。
 func TestTheBuiltinDefaultsDecideWhenNoLayerIsPlaced(t *testing.T) {
 	t.Parallel()
@@ -167,7 +167,7 @@ func TestTheBuiltinDefaultsDecideWhenNoLayerIsPlaced(t *testing.T) {
 	})
 }
 
-// 共通レイヤーのルールが不正なら、組み込みの既定だけで判定する。`fallback` を残し、`--lint` は error で言う。
+// 共通設定のルールが不正なら、組み込みの既定だけで判定する。`fallback` を残し、`--lint` は error で言う。
 func TestABrokenCommonLayerFallsBackToTheBuiltinDefaultsOnly(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -187,11 +187,11 @@ func TestABrokenCommonLayerFallsBackToTheBuiltinDefaultsOnly(t *testing.T) {
 	}
 	w.AssertDenied(w.Hook("Bash", w.Root, configws.Obj{"command": rmRf}))
 	if len(w.Problems("error", "(rules)")) == 0 {
-		t.Error("不正な共通レイヤーを --lint が error で言わない")
+		t.Error("不正な共通設定を --lint が error で言わない")
 	}
 }
 
-// config のレイヤーが不正なら空。共通レイヤーは効き、`fallback` に名前を残す。
+// config の設定が不正なら空。共通設定は効き、`fallback` に名前を残す。
 func TestABrokenLayerIsEmptyAndIsNamedInTheFallback(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -205,7 +205,7 @@ func TestABrokenLayerIsEmptyAndIsNamedInTheFallback(t *testing.T) {
 	}
 }
 
-// `--lint` は、共通レイヤーと config の 3 本が無いことを不備として言わない。
+// `--lint` は、共通設定と config の 3 本が無いことを不備として言わない。
 func TestLintSaysNothingAboutMissingFiles(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -230,7 +230,7 @@ func TestLintSaysNothingAboutMissingFiles(t *testing.T) {
 	}
 }
 
-// `--explain` は、置いていないレイヤーを「置いていない（無い = 空）」と言う。
+// `--explain` は、置いていない設定を「置いていない（無い = 空）」と言う。
 func TestExplainShowsAMissingLayerAsNotPlaced(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -238,12 +238,12 @@ func TestExplainShowsAMissingLayerAsNotPlaced(t *testing.T) {
 
 	out := w.Ccnavi("--explain").Stdout
 
-	if !strings.Contains(out, "このレイヤーの設定ファイルはありません") {
+	if !strings.Contains(out, "この設定のファイルはありません") {
 		t.Errorf("置いていないと言わない:\n%s", out)
 	}
-	before, _, _ := strings.Cut(out, "■ rules ワークスペースのレイヤー")
+	before, _, _ := strings.Cut(out, "■ rules ワークスペースの設定")
 	if strings.Contains(before, "読めない: ") {
-		t.Errorf("置いていないレイヤーを読めないと言った:\n%s", before)
+		t.Errorf("置いていない設定を読めないと言った:\n%s", before)
 	}
 }
 
@@ -319,7 +319,7 @@ var builtinPassed = []string{
 }
 
 // 組み込みの deny（土台）は、glob の文字列一致で外れていた表記違いも止める。git のグローバルオプションを挟んだ形、
-// rm の再帰と強制の組み合わせ・順序・長い形。片方だけの rm や、`git` を含む別の語は止めない。共通レイヤーが無いときと、
+// rm の再帰と強制の組み合わせ・順序・長い形。片方だけの rm や、`git` を含む別の語は止めない。共通設定が無いときと、
 // 壊れて組み込みの既定に戻ったときの両方で見る（hook の実行前と同じ判定の本体を、表ごとに 1 回の起動で通す）。
 func TestBuiltinFormsAreDeniedWhateverTheStateOfTheCommonLayer(t *testing.T) {
 	t.Parallel()
@@ -383,7 +383,7 @@ func TestTheNextStepNamesTheGitWrapper(t *testing.T) {
 // ---- 生の git
 
 // 生の git は組み込みで常に止める。ラッパーがあればラッパーへ誘導し、無ければユーザに頼む。
-// 共通レイヤーの有無、壊れて組み込みの既定に戻ったとき、チケット制御の可否、ラッパーの有無に依らない。
+// 共通設定の有無、壊れて組み込みの既定に戻ったとき、チケット制御の可否、ラッパーの有無に依らない。
 func rawGitWS(t *testing.T) (absentWS, string) {
 	w := newAbsentWS(t)
 	script := configws.Write(t, filepath.Join(w.Root, ".ccnavi", "scripts", "ccnavi-git.sh"), "exit 0\n")
@@ -533,7 +533,7 @@ var gitDirShellPassed = []string{
 	"ls .gitignore | xargs rm",
 }
 
-// `.git` の中への書き込みは、共通レイヤーと config の有無・状態によらず土台で止める。名指しのツール（Write / Edit / NotebookEdit）は
+// `.git` の中への書き込みは、共通設定と config の有無・状態によらず土台で止める。名指しのツール（Write / Edit / NotebookEdit）は
 // `.git/` の下と `.git` そのもの、シェルは守る場所と同じ書き込みの形で見る。読むだけと、`.gitignore`・`.github/` は止めない。
 // git のラッパーの呼び出しは、`.git` がコマンド文字列に出ないのでヒットしない。表は状態ごとに 1 回の起動でまとめて判定する。
 func TestGitDirWritesAreDeniedWhateverTheStateOfTheCommonLayer(t *testing.T) {
@@ -682,7 +682,7 @@ func (w absentWS) explain() (sums map[string]sumView, raw map[string]any) {
 	return sums, raw
 }
 
-// ワークスペースの中では、プロジェクトのミラー（`.ccnavi/config/common/`）を共通レイヤーとして読まない。
+// ワークスペースの中では、プロジェクトのミラー（`.ccnavi/config/common/`）を共通設定として読まない。
 // ミラーのルール・配点・フェーズ定義は、判定にも和にも入らない（不正なミラーの phases.yml があっても何も言わない）。
 func TestTheMirrorIsNotReadInTheWorkspace(t *testing.T) {
 	t.Parallel()
@@ -716,11 +716,11 @@ func TestTheMirrorIsNotReadInTheWorkspace(t *testing.T) {
 	}
 }
 
-// 単体の clone。そのプロジェクトがルートになる。`.ccnavi/config/common/`（ミラー）が共通レイヤー、`.ccnavi/config/project/` が
-// 自身のレイヤーとして読まれ、ワークスペースの中と同じ「共通 + 1 レイヤー」の和で判定される。
+// 単体の clone。そのプロジェクトがルートになる。`.ccnavi/config/common/`（ミラー）が共通設定、`.ccnavi/config/project/` が
+// ワークスペースの設定として読まれ、ワークスペースの中と同じ「共通 + 1 つの設定」の和で判定される。
 func newStandalone(t *testing.T) (absentWS, string) {
 	w := newAbsentWS(t)
-	// lib を単体の clone に見立てる。ミラーは共通レイヤーのコピー。
+	// lib を単体の clone に見立てる。ミラーは共通設定のコピー。
 	mirror := filepath.Join(w.Lib, ".ccnavi", "config", "common")
 	configws.Write(t, filepath.Join(mirror, "rules.yml"), configws.Body(configws.CommonRules))
 	configws.Write(t, filepath.Join(mirror, "risks.yml"), configws.CommonRiskText)
@@ -741,7 +741,7 @@ func TestStandaloneCloneTheMirrorIsTheCommonLayerAndTheConfigIsTheOwnLayer(t *te
 	if got := w.HitRules(); !slices.Equal(got, []string{"self:schema"}) || w.LastRecord().Str("source") != "self" {
 		t.Errorf("hits = %v, record = %v", got, w.LastRecord())
 	}
-	// Bash も同じ和（共通 + 自身のレイヤー）。プロジェクトのレイヤーは無い。
+	// Bash も同じ和（共通 + ワークスペースの設定）。プロジェクトの設定は無い。
 	w.AssertDenied(w.Hook("Bash", w.Lib, configws.Obj{"command": "terraform apply"}), "terraform")
 	w.AssertDenied(w.Hook("Bash", w.Lib, configws.Obj{"command": "psql -c x"}), "self:raw-psql")
 }
@@ -750,7 +750,7 @@ func TestStandaloneCloneSumsTheCommonLayerAndTheOwnLayer(t *testing.T) {
 	t.Parallel()
 	w, _ := newStandalone(t)
 	sums, _ := w.explain()
-	// 配点も共通 + 自身のレイヤーの和。閾値は小さいほう。
+	// 配点も共通 + ワークスペースの設定の和。閾値は小さいほう。
 	risk := sums["self"].Risk
 	if got := sums["self"].factorIDs(); !slices.Equal(got, []string{"big-diff", "schema"}) || risk.Levels["critical"] != 50 || risk.Fallback != "" {
 		t.Errorf("risk = %+v", risk)
@@ -786,7 +786,7 @@ func TestStandaloneCloneMirrorScriptResolvesFromTheCloneRoot(t *testing.T) {
 	}
 }
 
-// `--lint` もミラーを共通レイヤーとして読む。ミラーが不正なら error で名指しする。
+// `--lint` もミラーを共通設定として読む。ミラーが不正なら error で名指しする。
 func TestStandaloneCloneLintReadsTheMirrorAsTheCommonLayer(t *testing.T) {
 	t.Parallel()
 	w, mirror := newStandalone(t)
@@ -819,8 +819,8 @@ func TestEveryExplainSumIsTheCommonLayerPlusOneLayer(t *testing.T) {
 	}
 }
 
-// `layers[]` は重ねの途中経過なので、先のレイヤーと全欄が同じ定義は後ろから外れる。
-// `sums[]` は「共通 + そのレイヤー」だけで重ねるので、外れない。
+// `layers[]` は合わせる途中経過なので、先の設定と全欄が同じ定義は後ろから外れる。
+// `sums[]` は「共通 + その設定」だけで合わせるので、外れない。
 func TestASumKeepsWhatTheLayersOverviewDrops(t *testing.T) {
 	t.Parallel()
 	w := newAbsentWS(t)
@@ -830,7 +830,7 @@ func TestASumKeepsWhatTheLayersOverviewDrops(t *testing.T) {
 
 	sums, _ := w.explain()
 
-	// どちらの和も共通レイヤーの定義だけ（全欄一致の重複は後ろを破棄する）。
+	// どちらの和も共通設定の定義だけ（全欄一致の重複は後ろを破棄する）。
 	var want []string
 	for _, r := range configws.DenyOf(configws.CommonRules) {
 		want = append(want, r["id"].(string))
@@ -838,7 +838,7 @@ func TestASumKeepsWhatTheLayersOverviewDrops(t *testing.T) {
 	if got := sums["lib"].denyIDs(); !slices.Equal(got, want) {
 		t.Errorf("lib の deny = %v, want %v", got, want)
 	}
-	// lib のレイヤー自身の宣言は、他のレイヤーの定義に引かれない。
+	// lib の設定自身の宣言は、他の設定の定義に引かれない。
 	if sums["lib"].denyIDs()[0] != sums["self"].denyIDs()[0] {
 		t.Errorf("lib = %v, self = %v", sums["lib"].denyIDs(), sums["self"].denyIDs())
 	}

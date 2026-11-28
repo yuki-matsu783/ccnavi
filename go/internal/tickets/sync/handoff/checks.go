@@ -25,7 +25,7 @@ import (
 // shSaidLimit は sh -n の苦情を理由に入れる字数。
 const shSaidLimit = 400
 
-// defenseIDPrefix はレイヤーの rules.yml に利用者が書く防御のルールの id の印（ccnavi 自身の保護は組み込みの
+// defenseIDPrefix は設定の rules.yml に利用者が書く防御のルールの id の印（ccnavi 自身の保護は組み込みの
 // builtin:guard-*）。
 const defenseIDPrefix = "guard-"
 
@@ -94,7 +94,7 @@ func checkContents(conf *config.Settings, root string, plan *Plan) {
 	}
 }
 
-// overlay は取り込んだあとの状態の設定。レイヤーの設定の置き場を下書きへ差し替える。
+// overlay は取り込んだあとの状態の設定。設定の置き場を下書きへ差し替える。
 func overlay(conf *config.Settings, entries []*Entry) *config.Settings {
 	out := *conf
 	out.ProjectRulesFiles = copied(conf.ProjectRulesFiles)
@@ -334,10 +334,10 @@ type rivalKey struct{ layer, name string }
 
 type rivalBody struct{ rel, text string }
 
-// templateCollisions は、取り込むと共通とレイヤーに同名で中身の違うものが並ぶ形になるなら断る（統合結果は
-// その形のレイヤーの側を使わない error にする）。比べる相手は、同じ回に取り込む下書きを優先し、無ければ今の置き場のもの。
+// templateCollisions は、取り込むと共通と設定に同名で中身の違うものが並ぶ形になるなら断る（統合結果は
+// その形の設定の側を使わない error にする）。比べる相手は、同じ回に取り込む下書きを優先し、無ければ今の置き場のもの。
 func templateCollisions(conf *config.Settings, root string, e *Entry, t *templates.Template, together []*Entry) {
-	// 同名のテンプレートが共通とレイヤーに並んで中身が違うと、統合結果がレイヤーの側を使わない error になる。
+	// 同名のテンプレートが共通と設定に並んで中身が違うと、統合結果が設定の側を使わない error になる。
 	// 名前は大文字小文字を畳んで比べる。比べる相手は、同じ回に取り込む下書き → 今の置き場の順に優先する。
 	mine := templates.Dump(t)
 	name := FoldPart(t.Name)

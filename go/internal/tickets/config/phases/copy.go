@@ -29,7 +29,7 @@ func ReadCopy(raw any) (*Types, []rules.Problem) {
 }
 
 // TypesOf はチケットのコピーの定義。コピーが無ければ空。読んだものは t.PhaseTypes に持たせて使い回す。
-// 出どころのレイヤーは親の project: が指すレイヤーで、project は読んだあとに置き場から入るので引くたびに付け直す。
+// 出どころの設定は親の project: が指す設定で、project は読んだあとに置き場から入るので引くたびに付け直す。
 func TypesOf(t *ticket.Ticket) *Types {
 	types, ok := t.PhaseTypes.(*Types)
 	if !ok {
@@ -46,8 +46,8 @@ func TypesOf(t *ticket.Ticket) *Types {
 // HasCopy は phases: を書いているか（空の値は書いていないとみなす）。
 func HasCopy(t *ticket.Ticket) bool { return t.PhasesRaw != nil }
 
-// Origin はコピーの定義の出どころのレイヤー（記録の source）。共通レイヤーに同じ id で読んだ形も同じ定義が
-// あれば共通レイヤーから来たと読む。承認のあとに共通の定義が直されていれば、親のレイヤーのまま。
+// Origin はコピーの定義の出どころの設定（記録の source）。共通設定に同じ id で読んだ形も同じ定義が
+// あれば共通設定から来たと読む。承認のあとに共通の定義が直されていれば、親の設定のまま。
 func Origin(p *PhaseType, common *Types) string {
 	if found := common.Get(p.ID); found != nil && Same(found, p) {
 		return config.LayerCommon

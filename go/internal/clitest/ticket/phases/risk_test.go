@@ -33,7 +33,7 @@ factors:
 // riskPhases は範囲の上限が無く、レビュー不要の定義。宣言では「レビュー不要」な作業を実績で上書きする。
 const riskPhases = "version: 1\nphases:\n  work:\n    kind: work\n    title: 作業\n    review: false\n    scope: inherit\n"
 
-// riskWS は配点と定義を共通レイヤーの既定の置き場へ置いた作業場（`--risk`・`--phases` は診断でだけ有効で、
+// riskWS は配点と定義を共通設定の既定の置き場へ置いた作業場（`--risk`・`--phases` は診断でだけ有効で、
 // `ticket` のサブコマンドには届かない）。
 type riskWS struct {
 	*ws
@@ -214,7 +214,7 @@ func TestARiskFlagOnTicketFinishDoesNotChangeTheScore(t *testing.T) {
 func TestASecondRootOnTicketFinishIsRefused(t *testing.T) {
 	t.Parallel()
 	// `ticket finish <子> --root <偽>` は断る（issue #65 の敵対的レビューで出た形）。sh は自分の `--root` を先に置き、
-	// エージェントの引数を後ろに繋ぐ。後ろに 1 本足すと後勝ちで sh が渡した正しい値を上書きできた。`--root` からは共通レイヤーの
+	// エージェントの引数を後ろに繋ぐ。後ろに 1 本足すと後勝ちで sh が渡した正しい値を上書きできた。`--root` からは共通設定の
 	// 3 本も projects も approved も導かれるので、`--risk` を使わずに同じ差し替えができる。偽のルートの中身を作り込まず、
 	// 2 本目が在ること自体を断る。
 	r := newRiskWS(t)

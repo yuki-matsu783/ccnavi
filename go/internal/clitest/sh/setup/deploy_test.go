@@ -30,9 +30,9 @@ func TestDeployWritesTheSettingsAndCopiesThePartsInOneRun(t *testing.T) {
 			t.Errorf("%s を配っていない", rel)
 		}
 	}
-	// 自身のレイヤーの phases.yml は配らない（レイアウトに依存する定義は配布先のユーザが書く）。
+	// ワークスペースの設定の phases.yml は配らない（レイアウトに依存する定義は配布先のユーザが書く）。
 	if shkit.Exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
-		t.Error("自身のレイヤーの phases.yml を配った")
+		t.Error("ワークスペースの設定の phases.yml を配った")
 	}
 	for _, name := range deployScripts {
 		if !shkit.Exists(w.path(".ccnavi", "scripts", name)) {

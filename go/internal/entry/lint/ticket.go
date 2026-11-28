@@ -171,7 +171,7 @@ func copyProblems(conf *config.Settings, root string, copies []*ticket.Ticket, i
 			pool[t.ID] = t
 		}
 	}
-	// 定義はチケットごとにレイヤーが違いうるので、プロジェクトごとに 1 回だけ読む。
+	// 定義はチケットごとに設定が違いうるので、プロジェクトごとに 1 回だけ読む。
 	types := map[string]*phases.Types{}
 	typesOf := func(project string) *phases.Types {
 		if _, ok := types[project]; !ok {

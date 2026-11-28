@@ -1,5 +1,5 @@
 /*
- * 共通レイヤーのミラーの表示（`Mirror.tsx`）。カードの「ミラー」の欄（状態と「ミラーを同期」の1行、畳んだずれの一覧）と、
+ * 共通設定のミラーの表示（`Mirror.tsx`）。カードの「ミラー」の欄（状態と「ミラーを同期」の1行、畳んだずれの一覧）と、
  * 上部の最終確認の時刻。帯は骨組みの`.banner`のまま。
  */
 .mirror-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-2) var(--gap-4); }

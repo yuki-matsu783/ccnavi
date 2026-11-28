@@ -69,7 +69,7 @@ type Options struct {
 	Bin         string
 	ProjectHome string
 	Root        string
-	// CommonFiles は共通レイヤーの設定ファイル（CommonLayerFiles）。
+	// CommonFiles は共通設定のファイル（CommonLayerFiles）。
 	CommonFiles []string
 	// Log と State は記録と state の置き場（診断のフラグで動かせる）。
 	Log, State string
@@ -81,8 +81,8 @@ type Options struct {
 }
 
 // AddRules はガード自身を守るルールを、ルールファイルの外から判定の先頭に足す（ルールに書かせると消せるため）。
-// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通レイヤーの設定ファイル。
-// 先頭に挿すので、後に足したものほど先に当たる（共通レイヤーの 1 本が ccnavi ディレクトリの 1 本より先）。
+// 足すのは、シェルから書き込む形・実行ファイル・ccnavi ディレクトリ・置き場のリンク 2 本・記録の置き場・共通設定のファイル。
+// 先頭に挿すので、後に足したものほど先に当たる（共通設定の 1 本が ccnavi ディレクトリの 1 本より先）。
 func AddRules(rs *rules.RuleSet, o Options) {
 	next := nextHint(o.Root)
 	if o.Tool == "" || rules.ToolMatches(shellMatch, o.Tool) {
@@ -158,7 +158,7 @@ func AddNamedRules(rs *rules.RuleSet, projectHome, root string) {
 	}
 }
 
-// commonFileNames は共通レイヤーの設定ファイルの名前を並べた式（config.LayerKinds の順）。
+// commonFileNames は共通設定のファイルの名前を並べた式（config.LayerKinds の順）。
 func commonFileNames() string {
 	names := config.LayerFileNames()
 	var quoted []string

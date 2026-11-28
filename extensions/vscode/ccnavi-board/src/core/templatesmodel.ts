@@ -146,12 +146,12 @@ export function revealControls(text: string): string {
   return out;
 }
 
-/** 本文を読むときのレイヤー。`project`の対象はレイヤーの名前（そのレイヤー）、それ以外は共通との統合結果のself */
+/** 本文を読むときの設定。`project`の対象は設定の名前（その設定）、それ以外は共通との統合結果のself */
 export function templatesLayerOf(target: { readonly kind: string; readonly name: string }): string {
   return target.kind === "project" ? target.name : "self";
 }
 
-/** 対象が見せるレイヤーの名前。共通の設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこのレイヤーのテンプレートだけ） */
+/** 対象が見せる設定の名前。共通の設定はcommon、ワークスペースはself、プロジェクトはその名前（編集できるのはこの設定のテンプレートだけ） */
 export function shownLayerOf(target: { readonly kind: string; readonly name: string }): string {
   if (target.kind === "workspace") {
     return "common";
@@ -185,7 +185,7 @@ export function validNewTemplateName(name: string): boolean {
 }
 
 /**
- * 新しいテンプレートの名前が、共通のレイヤーか`layer`のレイヤーの既存の名前と重なるか。大文字小文字は区別しない（別の機械で2本が1本に重なる）。
+ * 新しいテンプレートの名前が、共通設定か`layer`の設定の既存の名前と重なるか。大文字小文字は区別しない（別の機械で2本が1本に重なる）。
  * 重なる既存の1件を返す。無ければundefined
  */
 export function templateNameTaken(layers: readonly TemplateLayer[], layer: string, name: string): { readonly layer: string; readonly name: string } | undefined {

@@ -413,7 +413,7 @@ func TestIntegrateACleanupAfterARevertStillCompletes(t *testing.T) {
 	}
 }
 
-// 自己防衛の対象（共通レイヤーの rules.yml・プロジェクトのレイヤー）を含む取り込みは、ターミナルでユーザが打つ。
+// 自己防衛の対象（共通設定の rules.yml・プロジェクトの設定）を含む取り込みは、ターミナルでユーザが打つ。
 func TestIntegrateAGuardedFileNeedsTheTerminal(t *testing.T) {
 	t.Parallel()
 	t.Run("ワークスペース", func(t *testing.T) {

@@ -23,8 +23,8 @@ keywords: [モジュール, パッケージ, 構成, infra, records, policy, tic
 | `go/cmd/ccnavi-chrome/` | Chrome 拡張が読む WASM の入口。要求の JSON を `entry/chrome` に渡す | `entry` |
 | `go/internal/infra/` | 土台。ファイル・git・パス照合・hook の入出力・設定・シェルの読み・ワークツリー | どれも読まない |
 | `go/internal/records/` | 記録。伏せ字・判定の記録・診断ログ・後始末・拒否や失敗の数え・ターン中の印・学びの蓄積・放置セッションの引き継ぎ促し・コンテキストに乗ったファイル | `infra` |
-| `go/internal/policy/` | ルール。読み込み・照合・組み込み・レイヤーの合成・自己防衛・文脈ファイル | `infra`、`records` |
-| `go/internal/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作、ユーザの発言のときの共通レイヤー・工程スキルのミラー | `infra`、`records`、`policy` |
+| `go/internal/policy/` | ルール。読み込み・照合・組み込み・設定の合成・自己防衛・文脈ファイル | `infra`、`records` |
+| `go/internal/tickets/` | チケット。置き場、合意の手続き、承認・レビュー済みの判定、フェーズ、リスク、操作、ユーザの発言のときの共通設定・工程スキルのミラー | `infra`、`records`、`policy` |
 | `go/internal/catalog/` | 目録。文書の索引と `--docs` の引き方、プロジェクトのスキルの目録 | `infra`、`records`、`policy`、`tickets` |
 | `go/internal/hook/` | hook の判定。実行前チェック・文面・実行後チェック・イベント・サブエージェント | `infra`、`records`、`policy`、`tickets`、`catalog` |
 | `go/internal/entry/` | 入口。CLI・診断・lint・提案・版・Chrome 拡張の入口 | 下の全部。どこからも読まれない |
@@ -114,7 +114,7 @@ keywords: [モジュール, パッケージ, 構成, infra, records, policy, tic
 | まとまり | 役割 |
 |---|---|
 | CLI（`cli`） | 1 回の起動の入口。標準入出力とコマンドラインを判定や各コマンドへ振り分け、ワークスペースルートを見つける。`--help` の本文、引数の読み分け、サブコマンドごとの入口 |
-| lint（`lint`） | 設定とルールの検証。置き場・レイヤー・テンプレート・チケット・ブランチ・直接作業・wiki ごとにファイルを分けてある |
+| lint（`lint`） | 設定とルールの検証。置き場・設定・テンプレート・チケット・ブランチ・直接作業・wiki ごとにファイルを分けてある |
 | 診断（`diagnose`） | 判定を実行せずに試す `--test` と `--explain`。名前を引き受ける入口と、試す・説明する・チケット管理画面の中身・共有する部品に分けてある |
 | Chrome 拡張の入口（`chrome`） | 拡張が WASM で呼ぶ要求を受け、ブランチの中身から仮のツリーを組んで、手元と同じ判定を通す。拡張はここだけを呼ぶ |
 | そのほか | sh がチケットについて聞くこと（`shask`。読むだけ）、チケットの状態の表示（`status`）、`--suggest`（`suggest`）、`--version`（`version`） |

@@ -7,9 +7,9 @@ import (
 	"ccnavi/internal/harness/shkit"
 )
 
-// 導入スクリプト（scripts/ccnavi-setup.sh）が配る設定のひな形の置き場。rules・phases・risk のひな形は、どれも共通レイヤー
-// （.ccnavi/config/common/）へ配る。自身のレイヤー（.ccnavi/config/project/）の phases.yml は配らない（レイアウトに依存する定義は
-// 配布先のユーザが書く。既にあれば触らない）。配らないときは、rules と risk と、phases が共通にも自身のレイヤーにも無いことが
+// 導入スクリプト（scripts/ccnavi-setup.sh）が配る設定のひな形の置き場。rules・phases・risk のひな形は、どれも共通設定
+// （.ccnavi/config/common/）へ配る。ワークスペースの設定（.ccnavi/config/project/）の phases.yml は配らない（レイアウトに依存する定義は
+// 配布先のユーザが書く。既にあれば触らない）。配らないときは、rules と risk と、phases が共通にもワークスペースの設定にも無いことが
 // 「まだ無いもの」に名前が出る。
 
 const (
@@ -19,7 +19,7 @@ const (
 	minePhases  = "version: 1\nphases:\n  mine:\n    kind: work\n    title: 自分の\n"
 )
 
-// layersSource は配布元のふり。実行ファイルと、共通レイヤーの rules / phases / risk と、自身のレイヤーの phases。
+// layersSource は配布元のふり。実行ファイルと、共通設定の rules / phases / risk と、ワークスペースの設定の phases。
 // 代わりに通る sh は起動して最初に共通部を読むので、配布元にもそれを置く（無いと「配布元に無くて配れないもの」として名指しされる）。
 func layersSource(t *testing.T) string {
 	t.Helper()
@@ -38,7 +38,7 @@ func layersSource(t *testing.T) string {
 	return root
 }
 
-// 共通レイヤーに rules.yml・risks.yml・phases.yml・ticket-sections.yml のひな形を中身を変えずに配る。自身のレイヤーの phases.yml は、配布元にあっても配らず、
+// 共通設定に rules.yml・risks.yml・phases.yml・ticket-sections.yml のひな形を中身を変えずに配る。ワークスペースの設定の phases.yml は、配布元にあっても配らず、
 // 配布先に既にあれば --force でも触らない。
 func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 	t.Parallel()
@@ -49,28 +49,28 @@ func TestDeployCopiesTheCommonLayerTemplatesAndNotTheOwnPhases(t *testing.T) {
 		code(t, r, 0)
 		for _, kind := range []string{"rules.yml", "risks.yml", "phases.yml", "ticket-sections.yml"} {
 			if !shkit.Exists(w.path(".ccnavi", "config", "common", kind)) {
-				t.Errorf("共通レイヤーの %s が配られていない", kind)
+				t.Errorf("共通設定の %s が配られていない", kind)
 			}
 		}
 		if shkit.Exists(w.path(".ccnavi", "config", "project", "phases.yml")) {
-			t.Error("自身のレイヤーの phases.yml を配った")
+			t.Error("ワークスペースの設定の phases.yml を配った")
 		}
 		notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml", "まだ無いもの")
 	})
-	t.Run("--force でも配布先の自身のレイヤーに触らない", func(t *testing.T) {
+	t.Run("--force でも配布先のワークスペースの設定に触らない", func(t *testing.T) {
 		t.Parallel()
 		w := newTarget(t)
 		own := shkit.Write(t, w.path(".ccnavi", "config", "project", "phases.yml"), minePhases)
 		r := w.setup("--mode", "enable", "--deploy", layersSource(t), "--force")
 		code(t, r, 0)
 		eq(t, "共通の phases.yml", shkit.Read(t, w.path(".ccnavi", "config", "common", "phases.yml")), layerPhases)
-		eq(t, "自身のレイヤーの phases.yml", shkit.Read(t, own), minePhases)
+		eq(t, "ワークスペースの設定の phases.yml", shkit.Read(t, own), minePhases)
 		in(t, r.Stdout, ".ccnavi/config/common/phases.yml")
 		notIn(t, r.Stdout, ".ccnavi/config/project/phases.yml")
 	})
 }
 
-// 配布先に共通レイヤーの phases.yml があれば、--force の無い配布では入れ替えない。
+// 配布先に共通設定の phases.yml があれば、--force の無い配布では入れ替えない。
 func TestExistingCommonPhasesIsKeptWithoutForce(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)
@@ -80,7 +80,7 @@ func TestExistingCommonPhasesIsKeptWithoutForce(t *testing.T) {
 	eq(t, "共通の phases.yml", shkit.Read(t, common), minePhases)
 }
 
-// フェーズ定義が共通レイヤーにだけあれば、自身のレイヤーの phases.yml が無くても「まだ無いもの」に出さない。
+// フェーズ定義が共通設定にだけあれば、ワークスペースの設定の phases.yml が無くても「まだ無いもの」に出さない。
 func TestPhasesOnlyInCommonIsNotMissing(t *testing.T) {
 	t.Parallel()
 	w := newTarget(t)

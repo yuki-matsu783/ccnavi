@@ -15,7 +15,7 @@ const sample = parseTemplatesSample(def.sample);
 /** 画面が`data-tour`で持つ指す先の印 */
 const TARGETS = ["summary", "target", "refresh", "list", "template", "drafts", "draft", "handoff", "sum", "sum-pick", "sum-count", "sum-table", "tour"];
 
-test("CB-T572 テンプレートの見本は、selfのレイヤーのテンプレート・下書き・統合結果・本文に読める", () => {
+test("CB-T572 テンプレートの見本は、selfの設定のテンプレート・下書き・統合結果・本文に読める", () => {
   const data = sample.page.data;
   assert.equal(data.layers.length, 1);
   assert.equal(data.layers[0].name, "self");

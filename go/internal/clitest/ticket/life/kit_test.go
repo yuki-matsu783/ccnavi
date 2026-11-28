@@ -193,7 +193,7 @@ func (p preview) rejectedHas(word string) bool {
 	return false
 }
 
-// baseCommonRules は共通レイヤーのルールのパス。
+// baseCommonRules は共通設定のルールのパス。
 func baseCommonRules(root string) string { return base.CommonPath(root, "rules") }
 
 func removeAll(path string) error { return os.RemoveAll(path) }

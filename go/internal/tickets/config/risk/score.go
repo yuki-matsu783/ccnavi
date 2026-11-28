@@ -200,7 +200,7 @@ func Measure(worktree, base, head string) (*Diff, string) {
 	return &Diff{changes: changes.list, Base: base, Head: sha}, ""
 }
 
-// hit は加点した項目。source はその項目が書いてあるレイヤー（記録に残す）。
+// hit は加点した項目。source はその項目が書いてある設定（記録に残す）。
 type hit struct {
 	id     string
 	points int
@@ -302,7 +302,7 @@ func Evaluate(d *Definition, diff *Diff, root, worktree string, env map[string]s
 			hit(points, f.Message+"（"+shown+"）")
 		// スクリプトの出力を点にする。測れなければ、軽い側へ倒れないよう配点の全部を加点して unmeasured に残す。
 		case KindScript:
-			// 解く基準はそのレイヤーの git プロジェクトルート。
+			// 解く基準はその設定の git プロジェクトルート。
 			home := f.home
 			if home == "" {
 				home = root

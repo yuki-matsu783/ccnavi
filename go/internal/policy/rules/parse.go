@@ -224,7 +224,7 @@ func build(raw rawRule, section Decision, where, root string) (*Rule, []Problem)
 			"その保護ごと切ってください")
 	}
 	if !raw.builtin && strings.Contains(raw.id, IDSeparator) {
-		return fail("id に `" + IDSeparator + "` は書けない。レイヤーの名前を添えた形" +
+		return fail("id に `" + IDSeparator + "` は書けない。設定の名前を添えた形" +
 			"（`self" + IDSeparator + "id` / `<プロジェクト名>" + IDSeparator + "id`）と" +
 			"見分けが付かず、記録を読んだユーザがどのファイルを直すのか決められない")
 	}

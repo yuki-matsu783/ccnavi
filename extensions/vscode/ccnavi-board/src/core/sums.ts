@@ -17,11 +17,11 @@ export interface RulesSum {
   /** 欄に出す名前 */
   readonly label: string;
   readonly layers: readonly string[];
-  /** そのレイヤーのルールファイル（ワークスペースルートからの相対のこともある。実行ファイルが出したまま） */
+  /** その設定のルールファイル（ワークスペースルートからの相対のこともある。実行ファイルが出したまま） */
   readonly path: string;
   /** 実行ファイルがそのファイルを読めず、空として扱っている理由。空なら読めた */
   readonly unreadable: string;
-  /** そのレイヤーのファイルが無い（「設定が無い」正常な状態） */
+  /** その設定のファイルが無い（「設定が無い」正常な状態） */
   readonly missing: boolean;
   readonly deny: readonly SumRuleJson[];
   readonly ask: readonly SumRuleJson[];
@@ -46,12 +46,12 @@ export function sumLabel(name: string): string {
   return name === "self" ? "共通設定 + ワークスペース" : `共通設定 + プロジェクト（${name}）`;
 }
 
-/** レイヤーの名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
+/** 設定の名前（`common` / `self` / プロジェクト名）を画面の言い方にする */
 export function layerLabel(name: string): string {
   return name === "common" ? "共通設定" : name === "self" ? "ワークスペース" : `プロジェクト（${name}）`;
 }
 
-/** 統合結果のレイヤーを「共通 + ワークスペース」の形に並べる */
+/** 統合結果の設定を「共通 + ワークスペース」の形に並べる */
 export function layersText(layers: readonly string[]): string {
   return layers.map(layerLabel).join(" + ");
 }

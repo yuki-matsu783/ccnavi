@@ -319,7 +319,7 @@ test("CB-D68 往復の間は帯の更新も止め、更新を押した時点で�
     dom.click(dom.one('#changed button[data-action="reload"]'));
     await dom.settle();
     assert.deepEqual(dom.posted.filter((message) => message.type === "reload"), [{ type: "reload", dirty: true }]);
-    // レイヤーの置き場を実行ファイルに聞く間、欄は止まっている
+    // 設定の置き場を実行ファイルに聞く間、欄は止まっている
     assert.ok(dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);
     await dom.send({ type: "cancelled" });
     assert.ok(!dom.one<HTMLInputElement>(`${rowSelector("p1")} input.f-title`).disabled);

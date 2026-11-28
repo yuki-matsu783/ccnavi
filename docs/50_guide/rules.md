@@ -1,9 +1,9 @@
 ---
 title: ルールの書き方
 type: guide
-description: rules.yml の書き方。id・レイヤー・強さ・additionalContext 系の欄・match と glob と regex・except と when・繰り返しの拒否と失敗の連絡
+description: rules.yml の書き方。id・設定・強さ・additionalContext 系の欄・match と glob と regex・except と when・繰り返しの拒否と失敗の連絡
 tags: [user-guide, rules, config]
-keywords: [ルール, rules.yml, deny, ask, allow, id, レイヤー, additionalContext, additionalContextOnce, every, Stop, additionalContextFile, glob, regex, except, when, match, 権限モード, CCNAVI_DENY_REPEAT, CCNAVI_FAIL_STREAK_COUNT, CCNAVI_GUARD_UNWATCHED]
+keywords: [ルール, rules.yml, deny, ask, allow, id, 設定, additionalContext, additionalContextOnce, every, Stop, additionalContextFile, glob, regex, except, when, match, 権限モード, CCNAVI_DENY_REPEAT, CCNAVI_FAIL_STREAK_COUNT, CCNAVI_GUARD_UNWATCHED]
 ---
 
 # ルールの書き方
@@ -49,7 +49,7 @@ allow:
 ### `id` と表記の決まり
 
 - `id`は必須。書かないルールは読み込まず、`--lint`がerrorで名指しする（記録と文面にこの名前が出るため、名前の無いルールは記録も報告も指せない）
-- `id`にコロンは書けない（レイヤーの名前を添えた`self:id` / `<プロジェクト名>:id`と見分けが付かないため）。
+- `id`にコロンは書けない（設定の名前を添えた`self:id` / `<プロジェクト名>:id`と見分けが付かないため）。
   `--lint`がerrorにし、その 1 件は読み込まれない。ルール・フェーズ定義・リスクの配点・提案の見出しの 4 本とも同じ
 - `glob`も`regex`も、どの機械でも大文字小文字を区別せずに適用する。`*/.ccnavi/*`は`.Ccnavi/`にもヒットする。
   `allow`も表記違いにまでヒットするので、既存のルールを持ち込むときは`--test-expectations`で、通したくないものが
@@ -59,51 +59,51 @@ allow:
   `\.(?-i:[^c\\/])`と囲む
 - コマンドの名前も区別しない。`CAT file`は`cat file`と同じ判定になる。区別する機械で`CAT`という別の
   実行ファイルが在れば、`cat`向けの`allow`がそれにもヒットする
-- `common`と`self`はレイヤーの名前として予約してある。`projects/common/`や`projects/self/`は、表記違い（`projects/Self/`）を
-  含めてレイヤーとして数えない。そこに置いた宣言は 1 件も適用されず、そのプロジェクトへの書き込みは共通レイヤーだけで判定される。
+- `common`と`self`は設定の名前として予約してある。`projects/common/`や`projects/self/`は、表記違い（`projects/Self/`）を
+  含めて設定として数えない。そこに置いた宣言は 1 件も適用されず、そのプロジェクトへの書き込みは共通設定だけで判定される。
   `--lint`がerrorで名指しし、`ccnavi-user-agree.sh`はその`project:`を承認しない
 
-### ルールは 3 つのレイヤーの和でヒットする
+### ルールは 3 つの設定の和でヒットする
 
-ルールとリスクの配点は 3 種のレイヤーに置ける。ヒットするのは共通レイヤー + そのツリーのレイヤーの和で、
-足すだけ、上書き無し、厳しいほうが採られる。フェーズ定義も 3 種のレイヤーに置け、使うのは共通レイヤー + 親の`project:`が指すレイヤー
-（空ならワークスペース自身のレイヤー）の和。
+ルールとリスクの配点は 3 種の設定に置ける。ヒットするのは共通設定 + そのツリーの設定の和で、
+足すだけ、上書き無し、厳しいほうが採られる。フェーズ定義も 3 種の設定に置け、使うのは共通設定 + 親の`project:`が指す設定
+（空ならワークスペースの設定）の和。
 
-| レイヤー | 置き場 | 何を置くか |
+| 設定 | 置き場 | 何を置くか |
 |---|---|---|
-| 共通レイヤー | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml`（置き場は固定） | どのツリーにも適用するもの |
-| ワークスペース自身のレイヤー | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
-| プロジェクトのレイヤー | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
+| 共通設定 | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml`（置き場は固定） | どのツリーにも適用するもの |
+| ワークスペースの設定 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
 作業・レビュー計画のテンプレートは、共通のもの（ある場合）を`.ccnavi/config/common/templates/`、そのワークスペース（またはプロジェクト）のものを`.ccnavi/config/project/templates/`に置く。この表の設定ファイルには入らず、`*/.ccnavi/*`の一般の保護で守られる。
 
-3 レイヤーとも置き場は固定で、環境変数では動かない（[設定](settings.md)の「置き場は固定」）。
-自身のレイヤーとプロジェクトのレイヤーは形が同じで、どちらもgitプロジェクトルートの直下に置く。
+3 つの設定とも置き場は固定で、環境変数では動かない（[設定](settings.md)の「置き場は固定」）。
+ワークスペースの設定とプロジェクトの設定は形が同じで、どちらもgitプロジェクトルートの直下に置く。
 
-| ツール | ヒットするレイヤー |
+| ツール | ヒットする設定 |
 |---|---|
-| パスを取るツール: `Read` / `Grep` / `Glob` / `Write` / `Edit` / `MultiEdit` / `NotebookEdit` | 共通レイヤー + 行き先の 1 レイヤー。行き先がプロジェクトの中ならそのレイヤー、ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）なら自身のレイヤー。`Grep`と`Glob`が探す場所を省いたときは`cwd`が行き先 |
-| パスを取らないツール: `Bash` / `PowerShell` / `WebFetch` / `Skill` / `Agent` | 共通レイヤー + 自身のレイヤー + 全プロジェクトのレイヤー。どこに`cwd`があっても、`cd`を挟んでも同じ判定になる。あるレイヤーの`allow`は他のプロジェクトの作業にも適用される |
+| パスを取るツール: `Read` / `Grep` / `Glob` / `Write` / `Edit` / `MultiEdit` / `NotebookEdit` | 共通設定 + 行き先の 1 つの設定。行き先がプロジェクトの中ならその設定、ワークスペースのツリー（ワークスペースルートと、そこから切ったワークツリー）ならワークスペースの設定。`Grep`と`Glob`が探す場所を省いたときは`cwd`が行き先 |
+| パスを取らないツール: `Bash` / `PowerShell` / `WebFetch` / `Skill` / `Agent` | 共通設定 + ワークスペースの設定 + 全プロジェクトの設定。どこに`cwd`があっても、`cd`を挟んでも同じ判定になる。ある設定の`allow`は他のプロジェクトの作業にも適用される |
 
-順は 共通レイヤー → 自身のレイヤー → プロジェクトのレイヤー（名前順）で、`deny` `ask` `allow`の順は変わらない。
+順は 共通設定 → ワークスペースの設定 → プロジェクトの設定（名前順）で、`deny` `ask` `allow`の順は変わらない。
 
 つまずきやすい点は 2 つある。
 
-- 読むのは元リポジトリにcheckoutされている版だけ。ワークツリーでレイヤーを直しても、統合されるまで反映されない。
+- 読むのは元リポジトリにcheckoutされている版だけ。ワークツリーで設定を直しても、統合されるまで反映されない。
   ワークツリーにしかないファイルは`--lint`がwarnで知らせる。承認済みの領域（`.ccnavi/approved/`の承認済みチケット・
   マーカー・子の記録・フロー）は数えない。そこは親のワークツリーの版が読まれる
 - 同じ`id`で中身が違うルールは両方とも適用され、`--lint`がwarnで知らせる。`deny`と`ask`は増えるほうになる。
-  リスクの配点も両方を数え、後ろのレイヤーの項目は`<レイヤー>:<id>`という名前になる。
-  フェーズ定義は、共通レイヤーと同じ`id`で中身が違うか、`title`が重なれば`--lint`がerrorで言い、
-  レイヤーの側のその定義だけを使わない（同じ`id`なら共通の定義を使い、そのレイヤーのほかの定義は使う。全欄が同じならinfoで、レイヤーの側を破棄する）
+  リスクの配点も両方を数え、後ろの設定の項目は`<設定の名前>:<id>`という名前になる。
+  フェーズ定義は、共通設定と同じ`id`で中身が違うか、`title`が重なれば`--lint`がerrorで言い、
+  足す側の設定のその定義だけを使わない（同じ`id`なら共通の定義を使い、その設定のほかの定義は使う。全欄が同じならinfoで、足す側の設定を破棄する）
 
-ファイルが無いのは「設定が無い」正常で、空として扱う。不正なレイヤーも空として扱い、`--lint`がerrorにする。
-文面や記録に出る`id`は、共通レイヤーなら裸の`id`、自身のレイヤーなら`self:id`、プロジェクトのレイヤーなら`<名前>:id`になる。
+ファイルが無いのは「設定が無い」正常で、空として扱う。不正な設定も空として扱い、`--lint`がerrorにする。
+文面や記録に出る`id`は、共通設定なら裸の`id`、ワークスペースの設定なら`self:id`、プロジェクトの設定なら`<名前>:id`になる。
 
-できないこと: プロジェクトのレイヤーで共通レイヤーの`ask`を`allow`に緩める、共通レイヤーの`allow`をプロジェクトごとに外す、
-他のプロジェクトのレイヤーをパスを取るツールの判定に足す（「AのルールをBにも」は共通レイヤーへ上げる）。
+できないこと: プロジェクトの設定で共通設定の`ask`を`allow`に緩める、共通設定の`allow`をプロジェクトごとに外す、
+他のプロジェクトの設定をパスを取るツールの判定に足す（「AのルールをBにも」は共通設定へ上げる）。
 
-ccnaviディレクトリの下（既定なら`.ccnavi/`。共通レイヤーの`.ccnavi/config/common/`も入る）は、ルールに書かなくても書き込みが止まる（[コアファイルを守る](hooks.md)）。
+ccnaviディレクトリの下（既定なら`.ccnavi/`。共通設定の`.ccnavi/config/common/`も入る）は、ルールに書かなくても書き込みが止まる（[コアファイルを守る](hooks.md)）。
 
 ## 利用場面でガイドを届ける
 
@@ -200,12 +200,12 @@ allow:
     additionalContextFile: .ccnavi/docs/skill-review.md
 ```
 
-- 読むのは共通レイヤーと自身のレイヤーだけ。プロジェクトのレイヤーに書いても使われない。レイヤーの前置き（`self:`など）を除いたidが同じなら、先に読んだ共通レイヤーの 1 本だけが使われる
+- 読むのは共通設定とワークスペースの設定だけ。プロジェクトの設定に書いても使われない。設定の前置き（`self:`など）を除いたidが同じなら、先に読んだ共通設定の 1 本だけが使われる
 - `every`が 2 より小さいものは使わない。本文のファイルはワークスペースルートの版だけを読む
 - 同じ`Stop`で`finish`の促し・レビュー依頼までの道の促し・サブエージェント結果の促し・直接作業の`integrate`の促し（[ターンの終わりの報告](hooks.md)）が止めるなら、そちらだけを出し、このルールの回数は進めない
 - `dry-run`でも止める（止めないと文がモデルに届かないため）
 - `--test Stop "(stop)"`と期待の`tool: Stop`で、使われるルールを確かめられる
-- `deny` / `ask`に書いたもの（`Bash|Stop`なら`Stop`の部分）、プロジェクトのレイヤーに書いたもの、`(stop)`にヒットしない表記、`every`の無いものは`--lint`がwarnで知らせる
+- `deny` / `ask`に書いたもの（`Bash|Stop`なら`Stop`の部分）、プロジェクトの設定に書いたもの、`(stop)`にヒットしない表記、`every`の無いものは`--lint`がwarnで知らせる
 
 サブエージェントのターンの終わりと、回数を覚える場所が無いときは、止めない。
 
@@ -282,7 +282,7 @@ ccnaviは判定を返さず、Claude Codeの権限モードに従う。
 確認に答える者が居ないモードでは、askを返すと誰も答えないまま通ってしまうため、通さない。
 知らないモードの名前は確認にする。
 
-`CCNAVI_GUARD_UNWATCHED=disable`と書いたレイヤーでは、`dontAsk`と`bypassPermissions`でも判定を返さず、
+`CCNAVI_GUARD_UNWATCHED=disable`と書いた設定では、`dontAsk`と`bypassPermissions`でも判定を返さず、
 そのモードの取り決めに委ねる。`--lint`が、切れていることをwarnで知らせる。
 
 読み切れなかったコマンド（`PARSE_UNCERTAIN`）は、この設定でも権限モードに委ねない
@@ -419,4 +419,4 @@ Artifactツールが失敗したとき（中断を除く）は、上の回数と
 ## さらに詳しく
 
 - 判定の仕組み: 設計書の[ルール](../21_design/rules.md)と[実行前チェック](../21_design/pre-check.md)
-- レイヤーの合成: 設計書の[複数リポジトリのルール](../21_design/multi-repo/rules.md)と、要件書の[複数のリポジトリ](../11_requirements/multi-repo.md)
+- 設定の合成: 設計書の[複数リポジトリのルール](../21_design/multi-repo/rules.md)と、要件書の[複数のリポジトリ](../11_requirements/multi-repo.md)

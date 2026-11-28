@@ -18,8 +18,8 @@ keywords: [自己防衛, コアファイル, 保護, バックアップ, 復元]
 | 対象 | 何が懸かっているか | バックアップを取る時点 |
 |---|---|---|
 | `.claude/settings.json` / `.claude/settings.local.json` | hook の登録そのもの | ツール実行前と、ユーザの発言時 |
-| 共通レイヤーのファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前と、ユーザの発言時 |
-| 自身のレイヤーと各プロジェクトのレイヤーの `.ccnavi/config/project/{rules,phases,risks}.yml` | 同上 | ツール実行前と、ユーザの発言時 |
+| 共通設定のファイル（`.ccnavi/config/common/{rules,phases,risks}.yml`） | 判定の中身そのもの | ツール実行前と、ユーザの発言時 |
+| ワークスペースの設定と各プロジェクトの設定の `.ccnavi/config/project/{rules,phases,risks}.yml` | 同上 | ツール実行前と、ユーザの発言時 |
 | `CCNAVI_ENTRY_PATH` が指すファイル（振り分けの sh）と、sh がこの機械で起動する実行ファイル | 判定器の実体 | セッション開始 |
 
 作業・レビュー計画のテンプレート（`.ccnavi/config/{common,project}/templates/`）は、この表に足さない。`*/.ccnavi/*` の一般の保護で止める。
@@ -36,10 +36,10 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 
 | id | 足すとき | 止めるもの |
 |---|---|---|
-| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、レイヤーの設定ファイルと ccnavi ディレクトリ、共通レイヤーの設定ファイル（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
+| `builtin:guard-setting-files` | 常に | Bash で、書き込みの形（`>` 系のリダイレクト、`mv` `rm` `tee` `dd` `truncate` `patch` `shred`、`sed -i`、`cp` `ln` `install` の行き先、`cp` `ln` `install` `mv` で守る名前を入っているディレクトリへ置く形）と場所（`.claude/hooks/`、`.claude/settings*.json`、`ccnavi-git.sh`、実行ファイル、設定ファイルと ccnavi ディレクトリ、共通設定のファイル（`.ccnavi/config/common/`）、記録と state の `logs/decisions.jsonl` `logs/state`、閉じたチケットの退避の `logs/archive`）の組 |
 | `builtin:guard-binary` | `CCNAVI_ENTRY_PATH` が設定されているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` |
 | `builtin:guard-project-home` | 常に（ccnavi ディレクトリは固定の `.ccnavi`） | 同上 |
-| `builtin:guard-common-layer` | 共通レイヤーの設定ファイルの置き場が決まっているとき（11.6） | 同上 |
+| `builtin:guard-common-layer` | 共通設定のファイルの置き場が決まっているとき（11.6） | 同上 |
 | `builtin:guard-records` | 常に | `Write` `Edit` `MultiEdit` `NotebookEdit` で、記録と state の置き場（`logs/decisions*.jsonl`、`logs/state/`、閉じたチケットの退避 `logs/archive/`。診断のフラグ `--log` / `--state` で動かしたときは、その置き場とローテートした分にも適用する）。シェルの側の `builtin:guard-setting-files` と同じ場所 |
 | `builtin:guard-handoff-links` | ワークスペースルートが決まっているとき | `Write` `Edit` `MultiEdit` `NotebookEdit` で、ツリーの直下の `wip/handoff/` の下の対象のうち、リンクを通るもの・ハードリンクでほかの名前とつながったもの・`..` を含むもの。つながっていないコピーと置き場の外にはヒットしない |
 | `builtin:guard-handoff-ln` | ワークスペースルートが決まっているとき | Bash で、リンクを作るコマンド（`ln`・`link`・`cp -l` / `-s` / `--link` / `--symbolic-link`）があり、コマンド行に `handoff` の綴りがあるか、作業ディレクトリが置き場の中の形。行き先は読み分けない（止める側に倒す） |
@@ -97,13 +97,13 @@ hook スクリプトと保護済みスクリプトは、この表の対象（バ
 `builtin:guard-setting-files` が止める（`cp .ccnavi/scripts/ccnavi-git.sh wip/handoff/ccnavi-git.sh`）。守る場所を直すときは
 `ccnavi-stage.sh <元のパス>` で置き場へ写す。sh の中でコピーするので hook の判定は写す `cp` を見ず、実行権限・バイナリ・大きいファイル・
 `.claude` の階層の `handoff-.claude` への読み替えも sh が扱う。止めたときの文（`next`）がこの手順を案内する。
-組み込みはルールファイルに何が書いてあっても足す。`builtin:guard-` で始まる id はルールファイルのどのレイヤーにも書けず、
+組み込みはルールファイルに何が書いてあっても足す。`builtin:guard-` で始まる id はルールファイルのどの設定にも書けず、
 書けばそのルールを読み込まずに error にする（`--lint` も言う）。組み込みを外したいなら env（`CCNAVI_GUARD_CORE_FILES`）でこの機能ごと切る。
-組み込みの既定を使っている間（共通レイヤーのルールが不正な間）と `disable` のときは足さない。土台の deny（5.6）は別で、この間も常にヒットする（設計 11.2）。既定を使っている間は、組み込みの既定（REQ-PRE-06）のシェルの 1 本
-（`builtin:guard-config-via-bash`）が、呼び出しごとに同じ設定から組んで、実行ファイル・ccnavi ディレクトリ・共通レイヤーを
+組み込みの既定を使っている間（共通設定のルールが不正な間）と `disable` のときは足さない。土台の deny（5.6）は別で、この間も常にヒットする（設計 11.2）。既定を使っている間は、組み込みの既定（REQ-PRE-06）のシェルの 1 本
+（`builtin:guard-config-via-bash`）が、呼び出しごとに同じ設定から組んで、実行ファイル・ccnavi ディレクトリ・共通設定を
 動かした先への書き込みも止める。
 
-共通レイヤーの設定ファイル（`config.LayerKinds` の各種類）は、置き場がどこでも `builtin:guard-common-layer` が `Write` / `Edit` から止める。適用するのはワークスペースルートと、
+共通設定のファイル（`config.LayerKinds` の各種類）は、置き場がどこでも `builtin:guard-common-layer` が `Write` / `Edit` から止める。適用するのはワークスペースルートと、
 そこから切ったワークツリーの下の同じ相対（ワークスペースルートの外に置いたなら、そのパス）。既定の置き場（`.ccnavi/config/common/`）では
 `builtin:guard-project-home` より先にこちらがヒットする。期待する判定（`rule-expectations.yml`）はこれに入らず、既定の置き場なら
 `builtin:guard-project-home` が止める。
@@ -119,8 +119,8 @@ git のラッパーで守る場所を消す・戻す形（`DENY_WRAPPER_CORE_PAT
 
 | ヒットするもの | 扱い |
 |---|---|
-| 書いたとおりのパスか、居場所（payload の cwd から `cd` を追った先）で解いた絶対パスに、`builtin:guard-setting-files` の場所の式がヒットする | シェルの書き込みと同じ場所を、同じ式で見る。実行ファイル・動かした ccnavi ディレクトリ・共通レイヤーもその式に入っている |
-| 守る場所を中に含むディレクトリ（ワークスペースルート・実行ファイル・共通レイヤー・記録と state・プロジェクトの置き場の上と、`.ccnavi`・`.claude`・`.git` を直に、または 1 つ下に持つディレクトリ） | 中身ごと戻す・消す形（`restore --source <ref> -- .`・`rm -r projects`）が止まる |
+| 書いたとおりのパスか、居場所（payload の cwd から `cd` を追った先）で解いた絶対パスに、`builtin:guard-setting-files` の場所の式がヒットする | シェルの書き込みと同じ場所を、同じ式で見る。実行ファイル・動かした ccnavi ディレクトリ・共通設定もその式に入っている |
+| 守る場所を中に含むディレクトリ（ワークスペースルート・実行ファイル・共通設定・記録と state・プロジェクトの置き場の上と、`.ccnavi`・`.claude`・`.git` を直に、または 1 つ下に持つディレクトリ） | 中身ごと戻す・消す形（`restore --source <ref> -- .`・`rm -r projects`）が止まる |
 | `:` で始まる pathspec、グロブの前に固定のディレクトリが無い指定、`--pathspec-from-file`（省略形も） | ヒットするとみなして止める。git の pathspec のグロブは `/` もまたぐ |
 | 対象を読み切れない形。変数・置換で組み立てたパス、居場所の読めない `cd` / `pushd` の後の相対パス、走査が読み切れないコマンド行 | ヒットするとみなして止める |
 | 承認済みチケットの置き場（`.ccnavi/approved/` とその下） | 文面は「ユーザに依頼する」。置き場を動かすのはユーザと ccnavi のスクリプト。レビュー済みのマーカーを消す `rm` はユーザがターミナルで打つ手順なので、sh は通す |
@@ -182,8 +182,8 @@ hook 自身は settings.json の env で起動するので、ここで見る代�
 
 失敗した呼び出し（`PostToolUseFailure`）も、成功した呼び出しと同じ照合を行う。
 
-組み込みの既定を使っている間（共通レイヤーのルールファイルが読めない間）に、そのファイルを直した書き込みも、例外にせず戻す。全体が dry-run で名前で書くツールが通った場合も同じ。
-共通レイヤーのルールファイルを戻した報告には、直し方（下書きを `wip/handoff/.ccnavi/config/common/rules.yml` に置き、ユーザがターミナルの `ccnavi-user-handoff.sh` で取り込む）を添える。
+組み込みの既定を使っている間（共通設定のルールファイルが読めない間）に、そのファイルを直した書き込みも、例外にせず戻す。全体が dry-run で名前で書くツールが通った場合も同じ。
+共通設定のルールファイルを戻した報告には、直し方（下書きを `wip/handoff/.ccnavi/config/common/rules.yml` に置き、ユーザがターミナルの `ccnavi-user-handoff.sh` で取り込む）を添える。
 
 実行ファイルは `SessionStart` でバックアップする（ツール呼び出しの外で変わったら、次の発言か実行前に取り直す）。バックアップするのは `CCNAVI_ENTRY_PATH` が指す sh（バックアップのキー `bin`）と、
 sh がこの機械で起動する実体（`bin-launched`）の 2 つ。実体は `platformtag.LaunchedExecutable` が sh と同じ順で探し、

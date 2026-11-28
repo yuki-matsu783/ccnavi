@@ -7,7 +7,7 @@
 import type { DraftEntry, FlowSummary, PlanItem, ProblemSeverity, Sum, SumRow, TemplateEntry, TemplateProblem, TemplatesPage } from "./templates-view.js";
 
 export interface TemplatesSample {
-  /** 見本の画面（対象はワークスペース、見せるレイヤーはself） */
+  /** 見本の画面（対象はワークスペース、見せる設定はself） */
   readonly page: TemplatesPage;
   /** テンプレートの名前 → 本文（「本文を見る」の見本） */
   readonly texts: Readonly<Record<string, string>>;

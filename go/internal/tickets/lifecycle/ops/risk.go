@@ -91,7 +91,7 @@ func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, facto
 		"reason", reason,
 		"head", head,
 		"at", fsio.Stamp(),
-		// その項目がどのレイヤーに書いてあるか。
+		// その項目がどの設定に書いてあるか。
 		"source", factor.Source,
 	))
 	if failed := marks.WriteRecord(where, found.Parent, id, marks.Judge, record); failed != "" {
@@ -107,7 +107,7 @@ func RecordRisk(stdout, stderr io.Writer, conf *config.Settings, root, id, facto
 	return 0
 }
 
-// projectOf はこのチケットのレイヤーを決める project:。正とするのは承認済みチケットの側で、子は親の承認済み
+// projectOf はこのチケットの設定を決める project:。正とするのは承認済みチケットの側で、子は親の承認済み
 // チケットから継ぐ。提案に書いてある値はユーザが承認していないので、判定の根拠にしない。
 func projectOf(conf *config.Settings, root string, found *ticket.Ticket) string {
 	if !found.IsChild() {
@@ -188,7 +188,7 @@ func scoreChild(stderr io.Writer, conf *config.Settings, root string, found *tic
 	record.Set("at", fsio.Stamp())
 	record.Set("summary", diff.Summary())
 	if len(definition.Dropped) > 0 {
-		// 空として扱ったレイヤーの名前を残す。共通レイヤーだけで測ったことが、あとから記録を読んだユーザに分かる。
+		// 空として扱った設定の名前を残す。共通設定だけで測ったことが、あとから記録を読んだユーザに分かる。
 		record.Set("fallback", strings.Join(definition.Dropped, ","))
 	}
 	if failed := marks.WriteRecord(where, found.Parent, found.ID, marks.Risk, record); failed != "" {

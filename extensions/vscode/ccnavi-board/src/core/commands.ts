@@ -109,7 +109,7 @@ export function handoffYesArgs(paths: readonly string[], expect: string): readon
 }
 
 /**
- * `user mirror [<プロジェクト名>…] --json`。共通レイヤーのミラーのずれを見る（`--yes`を付けない。何も書かない）。
+ * `user mirror [<プロジェクト名>…] --json`。共通設定のミラーのずれを見る（`--yes`を付けない。何も書かない）。
  * 名前を省くと全プロジェクト。結果の`expect`は差分のある全プロジェクトの、各プロジェクトの`expect`はそのプロジェクトだけのハッシュ。
  * `--root`は`run()`が付ける。
  */
@@ -317,7 +317,7 @@ export function writeAndPushTargetOf(stdout: string): string {
 /**
  * 判定と検証に掛けるルールファイルの差し替え。共通の設定のルールは`--rules`で、
  * プロジェクト1つのルールは`--project-rules-file <名前>=<パス>`で（docs/11_requirements/json-shapes.md「lintのJSON」）。
- * ワークスペースの設定は同じオプションに名前`self`で渡す。実行ファイルはレイヤー（layer）の名前で差し替えを引き、
+ * ワークスペースの設定は同じオプションに名前`self`で渡す。実行ファイルは設定（layer）の名前で差し替えを引き、
  * `self`という名前のプロジェクトはプロジェクトの設定として数えないので取り違えない。
  * どれも診断（`--lint` / `--test` / `--test-expectations` / `--explain`）でだけ有効で、
  * hookからの判定にもチケットとレビューのサブコマンドにも届かない（実行ファイルが診断以外では断る）。

@@ -12,7 +12,7 @@ keywords: [テンプレート, 作業・レビュー計画, plan, feedback, フ�
 
 完了した作業の計画とフローを次の作業で使い回すための設計。ここにあるのは、読む側（読み込み・2 層の統合結果・検査・
 `ccnavi --templates` の答え・`--lint` への出方）と、溜める側（下書きの作成。取り込みは [9.19](handoff.md)）、
-使う側（`ticket new --template`）、案内と配布（親の `finish` の案内、共通レイヤーのミラー、導入 sh）まで。用語は CONTEXT.md の「作業・レビュー計画」に従う。
+使う側（`ticket new --template`）、案内と配布（親の `finish` の案内、共通設定のミラー、導入 sh）まで。用語は CONTEXT.md の「作業・レビュー計画」に従う。
 
 **何か。** 1 つの親の作業・レビュー計画（全体計画 `plan:` とフィードバック計画 `feedback:` のステップと `after`）と、
 各子のフローの本文を 1 ファイル `<名前>.yml` にまとめたもの。欄は `name`・`description`・`when`・`plan`・`feedback`・`flows`。
@@ -22,14 +22,14 @@ keywords: [テンプレート, 作業・レビュー計画, plan, feedback, フ�
 
 **置き場と統合結果。** 共通は `.ccnavi/config/common/templates/`、プロジェクトは `.ccnavi/config/project/templates/`
 （`config.Settings.CommonTemplatesDir` / `config.Settings.LayerTemplatesDir`）。設定ファイルの種類を回す
-`config.LayerKinds` には入れない。使うのは共通と 1 つのレイヤー
-（自身のレイヤーか、プロジェクト）の和。
+`config.LayerKinds` には入れない。使うのは共通と 1 つの設定
+（ワークスペースの設定か、プロジェクト）の和。
 
 | 場合 | 扱い |
 |---|---|
-| 同名で全欄が同じ | レイヤーの側を破棄して info。共通の 1 本を使う |
-| 同名で中身が違う | レイヤーの側を使わず error。違う欄を名指しする。共通を使う |
-| 共通のテンプレートが読めない | 共通のそのテンプレートを無いものとして扱い、レイヤーの側は使う |
+| 同名で全欄が同じ | 足す側の設定を破棄して info。共通の 1 本を使う |
+| 同名で中身が違う | 足す側の設定を使わず error。違う欄を名指しする。共通を使う |
+| 共通のテンプレートが読めない | 共通のそのテンプレートを無いものとして扱い、足す側の設定は使う |
 | 置き場が無い | 正常（無い = 空） |
 
 フェーズ定義の統合結果（`phases.merge`）と同じ形で、どちらが効くかを黙って決めない。1 本の衝突で、ほかのテンプレートは止めない。
@@ -58,18 +58,18 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 | 計画が 99 ステップ（子の識別子のフェーズ番号の上限）を超える。全体計画とフィードバック計画の合計で数える（99 ステップは通り、100 ステップ・98+2・60+40 は error） | error |
 | 制御文字・書式文字（Cc。改行とタブを除く。Cf＝右から左への上書き・幅ゼロ・BOM など。Zl・Zp）が、`description`・`when`・ステップ・フローを含む全ての文字列に在る。読んだ中身に出ないコメントの中の文字は、取り込みの下見が生の本文を見て同じ error にする | error |
 | `flows` の添字が全体計画に在る、フローの形が読める（`flow.Parse`） | error |
-| 型が使うフェーズ定義（共通 + レイヤーの `phases.yml`）に無い | warn |
+| 型が使うフェーズ定義（共通 + 足す側の設定の `phases.yml`）に無い | warn |
 | 定義の `kind` が置き場と合わない、延期の引き受け手の定義にレビューが無い（`candidates.PlanProblems`） | warn |
 | フローの線の構造・名前の表記（`flow.StructureProblems` / `flow.NameProblems`。`--lint --flow` と同じ） | warn |
 
 定義に左右される食い違いは warn にとどめる。承認のあとは親のコピーを読み、`phases.yml` を直しても進行中の
 親を止めない決まりと同じ向き。使うときの承認の検査が改めて error にする。型が `phases.yml` に無いときは仮の定義を置いて順序の検査を
 通し、定義が無いことは別に warn で言う。定義が 1 本も無いときは、型ごとではなく 1 件の warn にまとめる。共通のテンプレートは共通の定義だけで、
-レイヤーのテンプレートは共通 + レイヤーの定義で検査する（`--templates` の一覧は、選んだレイヤーの統合結果の定義で検査し直す）。
+設定のテンプレートは共通 + 足す側の定義で検査する（`--templates` の一覧は、選んだ設定の統合結果の定義で検査し直す）。
 
 **`--templates`。** `entry/cli` が引数を受ける。一覧・`--keyword`（`name`・`description`・`when` の部分一致。語を重ねるとどれか）・
-`--show <名前>`・`--check-file <パス>`（任意のパスのテンプレートを置き場に入れずに検査する。読み返した中身 `data`・計画の図の中身 `plans`・選べる型 `types` を返す。拡張の編集欄が保存の前に呼ぶ）・`--layer`・`--json`。`--layer` は統合結果の相手のレイヤー（既定は自身）で、一覧と `--show` のほか、`--draft`（`--to project` の取り込み先）と
-`ticket new --template`（テンプレートを引くレイヤー）にもある。読むだけなのでエージェントが打ってよい。失敗（`--show` の無い名前、不明な `--layer`）は、
+`--show <名前>`・`--check-file <パス>`（任意のパスのテンプレートを置き場に入れずに検査する。読み返した中身 `data`・計画の図の中身 `plans`・選べる型 `types` を返す。拡張の編集欄が保存の前に呼ぶ）・`--layer`・`--json`。`--layer` は統合結果の相手の設定（既定は自身）で、一覧と `--show` のほか、`--draft`（`--to project` の取り込み先）と
+`ticket new --template`（テンプレートを引く設定）にもある。読むだけなのでエージェントが打ってよい。失敗（`--show` の無い名前、不明な `--layer`）は、
 `--json` なら `--draft` と同じく `{version, ok: false, error}` を標準出力に出す（終了コードは 1）。`--docs` の絞り込みのうち `--keyword` だけを共有し、
 ほかは `--docs` でだけ使えるまま断る。`--docs` や、判定・チケットの経路のフラグとは並べられない。答えの形は下の表と `tests/fixtures/templates-json.json`（見本で固定している）。画面は判定を自分で出さず、この答えをそのまま描く（`--check-file` の答えの形は `tests/fixtures/templates-check-json.json`）。
 
@@ -78,18 +78,18 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 | キー | 何 |
 |---|---|
 | `version` / `root` | 形の版（いま 1）/ ワークスペースルート |
-| `layer` / `keywords` | 一覧の対象のレイヤー（`--layer`、既定 `self`）/ 検索の語 |
+| `layer` / `keywords` | 一覧の対象の設定（`--layer`、既定 `self`）/ 検索の語 |
 | `templates[]` | 共通 + `layer` の統合結果（`keywords` で絞る）。共通の側の検査は、統合結果のフェーズ定義で行う |
-| `layers[]` | 共通・`self`・各プロジェクトの生の中身。`{name, path, exists, unreadable, writable, problems[], templates[]}`。検査はそのレイヤーのフェーズ定義（共通は共通だけ）で行う |
-| `sums[]` | レイヤーごとの統合結果の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
-| `errors` / `warns` / `infos` | 全レイヤーの苦情の件数 |
+| `layers[]` | 共通・`self`・各プロジェクトの生の中身。`{name, path, exists, unreadable, writable, problems[], templates[]}`。検査はその設定のフェーズ定義（共通は共通だけ）で行う |
+| `sums[]` | 設定ごとの統合結果の索引。`{name, layers[], templates[{name, layer, effective, dropped}]}` |
+| `errors` / `warns` / `infos` | 全設定の苦情の件数 |
 | `drafts[]` | 下書き（効力なし。`templates[]` にも統合結果にも入らない。`keywords` で絞る）。下の表 |
 
 `templates[]` と `layers[].templates[]` の 1 件。
 
 | キー | 何 |
 |---|---|
-| `name` / `layer` / `path` | 名前 / `common` かレイヤーの名前 / ワークスペースルートからの相対パス（`/` 区切り） |
+| `name` / `layer` / `path` | 名前 / `common` か設定の名前 / ワークスペースルートからの相対パス（`/` 区切り） |
 | `sha` | ファイルの中身の SHA-256。保存のときの `--expect` に使う（`--plan-order` の `source_sha` と同じ流儀） |
 | `valid` | 読めたか。読めなければ下の中身は空で、理由は `problems` と `dropped.detail` |
 | `description` / `when` | 説明 / 選ぶ手がかり |
@@ -109,7 +109,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 | `tree` | 下書きが在るツリーの名前。ワークスペースルートは空 |
 | `checked_with` | 検査に使ったフェーズ定義の層（`self` かプロジェクト名）。`templates[].layer`（ファイルが在る層）とは別 |
 | `importable` | 読めて、error が無い（取り込みの前提。取り込み先の定義での検査は `user handoff` が行う） |
-| `exists_in` | 同じ名前のテンプレートが在るレイヤー（`common` を含む）。在れば `--draft` は断る（既存を直すときは `ccnavi-stage.sh` でコピーして編集する） |
+| `exists_in` | 同じ名前のテンプレートが在る設定（`common` を含む）。在れば `--draft` は断る（既存を直すときは `ccnavi-stage.sh` でコピーして編集する） |
 | `also_in` | 同じ中身の下書きを持つほかのツリー（`tree` と同じ表記。ワークスペースルートは空。親のブランチに乗った下書きは子のワークツリーにも在る） |
 
 **画面での編集。** ユーザは拡張の編集欄で、計画のステップと線・子のフローを図で直して保存できる。保存は、`--check-file` に error が無く、読み返した中身が書こうとした中身と同じで、開いたときからファイルが外で変わっておらず、作業中のチケットが無いときだけ、拡張が一時ファイルの入れ替えで書く。作業中の錠は取り込み待ち画面と同じ決まりで、拡張の画面だけが持つ。エージェントは通れない。
@@ -117,16 +117,16 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 答えには、各テンプレートの名前・層・置き場の相対パス・中身のハッシュ（`--plan-order` の `source_sha` と同じ流儀）・
 説明・いつ使うか・計画のステップ（計画の中の添字と、提案にコピーしたときの番号つき）・フローの要約・統合結果で使われるか（`effective`）と
 破棄した理由（`dropped`）・書き込めるか（`writable`）・検査の結果（`severity` と `detail`）を入れる。層ごとの生の中身（`layers`）、
-選んだレイヤーの統合結果（`templates`）、全レイヤーの統合結果の索引（`sums`）の 3 つを返し、統合結果だけでなく、
+選んだ設定の統合結果（`templates`）、全設定の統合結果の索引（`sums`）の 3 つを返し、統合結果だけでなく、
 どの層に何が書いてあって、どれが効いているかが分かる。
 
 **書き込めるか。** ワークスペースルートの共通は書ける。発言のときの同期がプロジェクトの `.ccnavi/config/common/` へコピーしたミラー（承認済みの
-親のワークツリーの中）は共通レイヤーのコピーで誰も編集しないので、`writable` は `false`。レイヤーの置き場は常に `true`。
+親のワークツリーの中）は共通設定のコピーで誰も編集しないので、`writable` は `false`。設定の置き場は常に `true`。
 ミラーへの配布は「案内と配布」の節のとおり。
 
 `drafts[]` には下書きの本文そのまま（`text`）を足す（`--show --json` の `template.text` と同じ読み方）。
 
-**`--lint`。** `entry/lint` が `templates.Load` の苦情を `(templates)`（共通）・`(templates/<レイヤー>)` の場所で出す。
+**`--lint`。** `entry/lint` が `templates.Load` の苦情を `(templates)`（共通）・`(templates/<設定の名前>)` の場所で出す。
 置き場の無いワークスペースでは何も言わない。読むのは設定の置き場だけなので、走査にコピー（`copies`）を
 渡す必要は無く、置き場の読み直しの回数も増えない。`--lint --json` の形は欄を足していないので、版は上げない。
 
@@ -147,7 +147,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 
 `drafts.targetOf`（取り込み先）と `handoff.DraftRel`（下書きの置き場）が、この相対パスを返す。下書きに効力は無い。
 `templates.Load` も `--templates` の統合結果も読まない。下書きを読む口は `drafts.Scan` で、ツリーの `wip/handoff/` のうち
-`template` の種類にヒットするものを読み、そのツリーのレイヤー（`self` かプロジェクト名）のフェーズ定義で検査する。
+`template` の種類にヒットするものを読み、そのツリーの設定（`self` かプロジェクト名）のフェーズ定義で検査する。
 
 **`--templates --draft <親> [--name <名前>] [--to common|project] [--layer <名前>]`。** エージェントが打ってよい（効力が無いので `useronly` の `cliForms` には足さない）。
 
@@ -166,7 +166,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 **`--templates` の一覧。** 下書きがあれば最後に `下書き: N 件（wip/handoff/）` を 1 行出す。`--json` は `drafts[]` を足す。
 `wip/handoff/` の `template` の種類の下書きを返す。1 件は `name`・`tree`・`path`・`sha`・`text`・`valid`・`importable`・`checked_with`
 （検査に使ったフェーズ定義の層。`templates[].layer`＝ファイルが在る層とは意味が違うので名前を分けた）・
-`exists_in`（同名のテンプレートが在るレイヤー）・`also_in`（`tree` と同じ表記で、ワークスペースルートは空。人間向けの言い方は text 出力の側で作る）・`description`・`when`・`plan`・`feedback`・`flows`・`problems`。
+`exists_in`（同名のテンプレートが在る設定）・`also_in`（`tree` と同じ表記で、ワークスペースルートは空。人間向けの言い方は text 出力の側で作る）・`description`・`when`・`plan`・`feedback`・`flows`・`problems`。
 
 **`--lint`。** 下書きの苦情は `(template-drafts)` の場所で、error を warn に下げて出す（効力が無い）。深刻度は warn と info だけ。
 検査の置き場は `wip/handoff/` で、`entry/lint` が読む。
@@ -177,7 +177,7 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 [--layer <名前>] [--with-feedback] --issue <N|owner/repo#N> --mr <N>`（`tickets/proposal/scaffold` の `--plan` の足場と同じ入口。`--plan` とは併用できない）。判定・組み込みの保護・
 `rules.yml` に、この入口のための決まりは無い。`ticket new` は `useronly.flags` に無く、書くのは `todo/` の提案と下書きの置き場だけなので、
 エージェントが打ってよい。`ccnavi-ticket.sh` は `new` を通さない（実行ファイルを直接打つ）。
-`--template` と `--with-feedback` は実行ファイルのオプションで、`useronly.exeOptions` にある。`ticket new` では `--layer` をテンプレートを引くレイヤーとして読む。
+`--template` と `--with-feedback` は実行ファイルのオプションで、`useronly.exeOptions` にある。`ticket new` では `--layer` をテンプレートを引く設定として読む。
 
 **フィードバック計画は既定では書かない。** フィードバック計画は、全体計画の最後のレビューを見て、改版で 1 回だけ足す決まり。最初の提案に `feedback:` を入れると、
 `candidates` の改版の検査が「フィードバック計画を立てたあとは全体計画を変えられない」「フィードバック計画は 1 回だけ」で拒み、承認後に全体計画を改版できなくなる。
@@ -187,8 +187,8 @@ literal で表せない文字列（行末の空白、先頭の空白・改行、
 
 | ステップ | 内容 |
 |---|---|
-| 引く（`templates.Resolve`） | 共通 + 1 つのレイヤー（既定はワークツリーのレイヤー）の統合結果から名前で引く。使えるのは取り込まれていて（`effective`）error が無いもの。無い・読めない・error がある・レイヤーに無い、は理由を言って終了コード 1。共通とレイヤーに同名で中身が違うものが並べば、共通が引かれ、使わなかったレイヤーの側の理由を `note:` で言う（統合結果がレイヤーの側を使わない向きと同じ）。共通のテンプレートは、統合結果の定義で検査し直してから判断する |
-| 定義の突き合わせ | ステップの型が `phases.yml`（共通 + そのワークツリーのレイヤー）に無い、`plan` の型が work でない／`feedback` の型が feedback でない、は書く前に断る（`planedit.Fill` が断るのと同じ向きで、提案を書く前に止める）。テンプレートの検査は定義に左右される食い違いを warn にとどめるので、ここが error にする |
+| 引く（`templates.Resolve`） | 共通 + 1 つの設定（既定はワークツリーの設定）の統合結果から名前で引く。使えるのは取り込まれていて（`effective`）error が無いもの。無い・読めない・error がある・設定に無い、は理由を言って終了コード 1。共通と足す側の設定に同名で中身が違うものが並べば、共通が引かれ、使わなかった足す側の設定の理由を `note:` で言う（統合結果が足す側の設定を使わない向きと同じ）。共通のテンプレートは、統合結果の定義で検査し直してから判断する |
+| 定義の突き合わせ | ステップの型が `phases.yml`（共通 + そのワークツリーの設定）に無い、`plan` の型が work でない／`feedback` の型が feedback でない、は書く前に断る（`planedit.Fill` が断るのと同じ向きで、提案を書く前に止める）。テンプレートの検査は定義に左右される食い違いを warn にとどめるので、ここが error にする |
 | 付け直し（`templates.Absolute`） | `after` を計画の中の添字から提案の絶対番号にする。全体計画はそのまま、フィードバック計画は全体計画のステップ数を足す。`--draft` の正規化（フィードバック計画はステップ数を引く）の逆で、行き来しても元の計画に戻る。`review:` と `deferred:` の値（`true`）はそのままコピーする |
 | 書く | 提案は `ticket.Parse` が読める形（`PlanItem.Raw` と同じ書き分け）で `plan:` / `feedback:` を書く。`allow` は計画とフィードバック計画の型の `scope` を集める（`inherit` だけで空なら断る）。書いたあとに `planedit.Fill` で `phases:` を差し込み、書いた提案に承認の検査（`candidates.PlanProblems`）を適用して、error があれば提案を消して断る |
 | 子のフローの下書き | `flows[n]`（全体計画の n 番目のステップ）を `<提案の置き場>/flows/<親>-<NN>-01.yml`（`flow.DraftRel`）に `fsio.NewDurable` で書く。`flow.Load` で読める。書き損じたら、書いた提案と下書きを消して断る |
@@ -221,11 +221,11 @@ warn（`TODO` の残りなど）、次の手（rationale・固有名を直す、
 |---|---|
 | 親が計画を持つ | `drafts.findParent` が完了した親（`done/`）を引ける。計画が無い・取り消した親は引けず、出さない |
 | その親の識別子の下書きが無い | 親のワークツリーの `wip/handoff/` の下の、`--draft` が書く名前が親の識別子の下書き。在れば作り済みなので出さない |
-| 同じ計画の形のテンプレートが取り込まれていない | 共通とレイヤーの全テンプレートの `plan`・`feedback`（`type`・`review`・`after`）を、`--draft` が作る中身と比べる。フローの文は比べない（下書きの一般化で直るため。比べると、取り込んだ直後でも同じに読めない）。読めないテンプレートも計画の形が読めれば数える |
+| 同じ計画の形のテンプレートが取り込まれていない | 共通と足す側の設定の全テンプレートの `plan`・`feedback`（`type`・`review`・`after`）を、`--draft` が作る中身と比べる。フローの文は比べない（下書きの一般化で直るため。比べると、取り込んだ直後でも同じに読めない）。読めないテンプレートも計画の形が読めれば数える |
 
 案内は、`ready` の案内（Draft を外す手順）の後ろに足す。Draft を外し済みの親には出さない（`ready` で `done/` を退避済みのため、材料が拾えない）。
 
-**共通レイヤーのミラー（`mirror`）。** `mirror.commonSources` が、設定ファイル・期待する判定・配点のスクリプトに加えて、共通のテンプレート
+**共通設定のミラー（`mirror`）。** `mirror.commonSources` が、設定ファイル・期待する判定・配点のスクリプトに加えて、共通のテンプレート
 `.ccnavi/config/common/templates/*.yml` を、ミラーの置き場からの相対（`templates/<名前>.yml`）で集める。`plan` は共通に無いファイルをミラーから
 消すので、集めないとミラーに置いたテンプレートが次の同期で消える。コピーする前に、各テンプレートを共通として読めるか確かめる
 （`templates.ReadLayer` で置き場を読み、`check` を共通のフェーズ定義で適用する。error のあるテンプレートはコピーせずに飛ばし、着手は止めない。warn は止めない。

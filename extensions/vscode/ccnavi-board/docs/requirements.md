@@ -42,7 +42,7 @@ VS Code拡張「ccnaviボード」が外から見てどうふるまうかを書�
 
 ## 用語と参照
 
-共通の設定（`.ccnavi/config/common/`）・ワークスペースの設定・プロジェクトの設定を、実行ファイルやccnavi本体のdocsでは「レイヤー（layer）」と呼ぶ（共通レイヤー・自身のレイヤー（`self`）・プロジェクトのレイヤー）。
+共通の設定（`.ccnavi/config/common/`）・ワークスペースの設定・プロジェクトの設定を、実行ファイルやccnavi本体のdocsでは「設定（layer）」と呼ぶ（共通設定・ワークスペースの設定（`self`）・プロジェクトの設定）。
 
 - 出力の形: ccnaviのdocs/11_requirements/json-shapes.md「チケット管理画面のJSON」「試験のJSON」
 - 設計: [設計10](../../../../docs/21_design/diagnostics.md)、要求: [要件REQ-DIA-02 / REQ-DIA-03 / REQ-DIA-06](../../../../docs/11_requirements/diagnostics.md)

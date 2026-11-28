@@ -21,7 +21,7 @@ import (
 //     元の計画と同じ形・同じフローになる
 //  3. 子のフローの下書き: 全体計画の n 番目のステップの最初の子 `<親>-<NN>-01` の `wip/proposals/flows/<子>.yml` に書く
 //  4. 断る: 無い名前、使えない名前、定義が phases.yml に無い、既にある提案・フロー下書き。断ったときは何も書かない
-//  5. 統合結果: 共通とレイヤーで衝突した名前は共通が引かれ、そのことを言う
+//  5. 統合結果: 共通と設定で衝突した名前は共通が引かれ、そのことを言う
 
 const useIdent = "feature-9-from-template"
 
@@ -70,7 +70,7 @@ func newUse(t *testing.T) *use {
 	return &use{drafts: d, tree: tree, todo: filepath.Join(tree, "wip", "proposals", "todo", useIdent+".md")}
 }
 
-// put はテンプレートを共通（common）かプロジェクトのレイヤー（それ以外）に置く。
+// put はテンプレートを共通（common）かプロジェクトの設定（それ以外）に置く。
 func (u *use) put(name, text, layer string) string {
 	where := "common"
 	if layer != "common" {
@@ -254,7 +254,7 @@ func TestANameThatClashesUsesTheCommonOneAndSaysSo(t *testing.T) {
 	u.put("small", strings.Replace(useSmall, "設計して実装する", "別の中身", 1), "self")
 	r := u.mustOK(u.newTicket("small", "", ""), "ticket new")
 	contains(t, "stdout", r.Stdout, "note:", "共通と同じ名前で中身が違う", ".ccnavi/config/common/templates/small.yml")
-	// レイヤーにだけあるテンプレートも使える
+	// 設定にだけあるテンプレートも使える
 	remove(t, u.todo)
 	remove(t, filepath.Join(u.root, ".ccnavi", "config", "common", "templates", "small.yml"))
 	r = u.mustOK(u.newTicket("small", "", ""), "layer only")

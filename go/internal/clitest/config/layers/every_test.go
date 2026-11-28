@@ -32,7 +32,7 @@ func srcRule(extra ...any) configws.Obj {
 	return configws.With(configws.Obj{"id": "src", "match": "Write", "glob": "*/src/*"}, extra...)
 }
 
-// hitter はルールを共通レイヤーの既定の場所に置いた使い捨てのルート。`--rules` では渡さない（診断でだけ有効で、hook の判定には届かない）。
+// hitter はルールを共通設定の既定の場所に置いた使い捨てのルート。`--rules` では渡さない（診断でだけ有効で、hook の判定には届かない）。
 type hitter struct {
 	t    *testing.T
 	root string

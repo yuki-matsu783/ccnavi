@@ -15,15 +15,15 @@ import (
 	"ccnavi/internal/harness/samples"
 )
 
-// ユーザの発言のたびに、共通レイヤーをプロジェクトの `.ccnavi/config/common/` へミラーする。
+// ユーザの発言のたびに、共通設定をプロジェクトの `.ccnavi/config/common/` へミラーする。
 //
-// 共通レイヤー（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあり、プロジェクトだけを clone したユーザからは
-// 見えない。ユーザの発言（UserPromptSubmit）で、共通レイヤーの中身を、着手済みの親のワークツリーにあるプロジェクトの
+// 共通設定（ワークスペースルートの `.ccnavi/config/common/`）はワークスペースの git にあり、プロジェクトだけを clone したユーザからは
+// 見えない。ユーザの発言（UserPromptSubmit）で、共通設定の中身を、着手済みの親のワークツリーにあるプロジェクトの
 // `.ccnavi/config/common/` へコピーする。プロジェクトの `.ccnavi/config/project/` には触れない。`ticket start` ではコピーしない。
-// 土台は configws の雛形（共通レイヤーは rules / risks の 2 本を持ち、lib の config は 3 本とも別の中身を持つ。app は `.ccnavi/` を持たない）。
+// 土台は configws の雛形（共通設定は rules / risks の 2 本を持ち、lib の config は 3 本とも別の中身を持つ。app は `.ccnavi/` を持たない）。
 //
 // 見るのは 5 つ。
-//  1. 発言が、共通レイヤーの中身を着手済みの親のワークツリーのミラーへコピーし、config には触れない。共通レイヤーから無くなったファイルは
+//  1. 発言が、共通設定の中身を着手済みの親のワークツリーのミラーへコピーし、config には触れない。共通設定から無くなったファイルは
 //     ミラーからも消す。`script:` の値は書き換えない
 //  2. 子とワークスペース自身の作業、未着手の親にはコピーしない。`ticket start` 自身はコピーしない
 //  3. コピーできない形（読めない・書き込みの失敗）では何もコピーせず、発言と着手は止めずに理由を言う。上書きの記録・知らせ・閉じるのを止める処理は無い
@@ -72,7 +72,7 @@ func (w *syncWS) startParent(project string) (tree, out string) {
 	if project != "" {
 		owner = filepath.Join(w.Projects, project)
 	}
-	// 計画の無い親は着手できない。レイヤーに定義のあるプロジェクトはその定義を使い、定義の無いプロジェクト（app）には最小の定義を置く。
+	// 計画の無い親は着手できない。設定に定義のあるプロジェクトはその定義を使い、定義の無いプロジェクト（app）には最小の定義を置く。
 	plan := map[string]string{"lib": "build", "": "docs"}[project]
 	if plan == "" {
 		plan = "work"
@@ -147,7 +147,7 @@ func assertHas(t testing.TB, text string, subs ...string) {
 	}
 }
 
-// 1: 共通レイヤーの中身を親のワークツリーの `.ccnavi/config/common/` へコピーする。config は触らない。
+// 1: 共通設定の中身を親のワークツリーの `.ccnavi/config/common/` へコピーする。config は触らない。
 func TestParentStartMirrorsTheCommonLayerAndLeavesConfigAlone(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
@@ -268,7 +268,7 @@ func TestAProjectWithoutALayerGetsTheMirror(t *testing.T) {
 	assertGone(t, configOf(tree, "rules"))
 }
 
-// 2: ワークスペース自身の作業は、共通レイヤーと同じリポジトリにあるのでコピーしない。
+// 2: ワークスペース自身の作業は、共通設定と同じリポジトリにあるのでコピーしない。
 func TestWorkspaceTicketsAreNotMirrored(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
@@ -379,7 +379,7 @@ func TestACommonRuleUsingRootIsMirrored(t *testing.T) {
 	jsonEqual(t, configws.Read(t, mirrorOf(tree, "rules.yml")), rules)
 }
 
-// 3: ミラーとして読めない共通レイヤー・配るのに足りないもの（指すスクリプトが無い）は、何もコピーせず、理由を言う（着手は止めない）。
+// 3: ミラーとして読めない共通設定・配るのに足りないもの（指すスクリプトが無い）は、何もコピーせず、理由を言う（着手は止めない）。
 func TestACommonLayerTheMirrorCannotHoldIsReportedAndTheStartGoesOn(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -408,7 +408,7 @@ func TestACommonLayerTheMirrorCannotHoldIsReportedAndTheStartGoesOn(t *testing.T
 	}
 }
 
-// 1: 共通レイヤーに phases.yml が無く config にだけあるとき、ミラーに phases.yml は置かず、着手は通る。
+// 1: 共通設定に phases.yml が無く config にだけあるとき、ミラーに phases.yml は置かず、着手は通る。
 // 前に配った phases.yml がミラーに残っていれば消す。config の phases.yml には触れない。
 func TestWithoutACommonPhasesFileTheMirrorHasNone(t *testing.T) {
 	t.Parallel()
@@ -428,7 +428,7 @@ func TestWithoutACommonPhasesFileTheMirrorHasNone(t *testing.T) {
 	assertRead(t, configOf(tree, "phases"), configws.LibPhasesText)
 }
 
-// 1: 共通レイヤーの phases.yml もミラーへコピーする。config の phases.yml には触れない。
+// 1: 共通設定の phases.yml もミラーへコピーする。config の phases.yml には触れない。
 func TestACommonPhasesFileIsMirrored(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
@@ -466,7 +466,7 @@ func assertNoText(t testing.TB, text string, subs ...string) {
 	}
 }
 
-// 5: ミラーの後に手を入れて共通レイヤーと違う中身にしたものは報告する。config の書き込みは、ミラーと中身が同じでも外さない。
+// 5: ミラーの後に手を入れて共通設定と違う中身にしたものは報告する。config の書き込みは、ミラーと中身が同じでも外さない。
 func TestPostMonitorReportsEditsAfterTheMirror(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -519,7 +519,7 @@ func TestCoreFileGuardKeepsTheMirror(t *testing.T) {
 	assertRead(t, mirrorOf(tree, "risks.yml"), configws.CommonRiskText)
 }
 
-// 4: 共通レイヤーから無くなって発言で消したミラーも、戻さない。
+// 4: 共通設定から無くなって発言で消したミラーも、戻さない。
 func TestCoreFileGuardKeepsARemovedMirrorFile(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)
@@ -543,7 +543,7 @@ func TestCoreFileGuardKeepsARemovedMirrorFile(t *testing.T) {
 	assertGone(t, mirrorOf(tree, "phases.yml"))
 }
 
-// ミラーが統合先に入っても、共通レイヤーの同じ項目と 2 回数えない。ワークスペースの中ではミラーを読まない（共通レイヤーは 1 本）ので、
+// ミラーが統合先に入っても、共通設定の同じ項目と 2 回数えない。ワークスペースの中ではミラーを読まない（共通設定は 1 本）ので、
 // そもそも数が増えない。
 func TestAMirroredScriptFactorIsNotCountedTwice(t *testing.T) {
 	t.Parallel()
@@ -586,7 +586,7 @@ func TestAMirroredScriptFactorIsNotCountedTwice(t *testing.T) {
 
 // ---- 発言ごとの同期（差分が無ければ読み書きしない）
 
-// 5: ターンの間にユーザが共通レイヤーを直すと、次の発言でコピーされ、戻されない。
+// 5: ターンの間にユーザが共通設定を直すと、次の発言でコピーされ、戻されない。
 func TestAChangeInTheCommonLayerReachesTheMirrorAtTheNextPrompt(t *testing.T) {
 	t.Parallel()
 	w := newSyncWS(t)

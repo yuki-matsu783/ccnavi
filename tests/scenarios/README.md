@@ -47,7 +47,7 @@ UC の番号と中身の正は、要件書の流れの文書（[flows.md](../../
 | UC-15 | セッション開始のとき、実効権限をユーザとエージェントに同じ内容で渡す | 4 | 未作成 | — |
 | UC-16 | `ccnavi --lint`・`--test`・`--explain` で、設定の誤りと判定の理由をユーザが確かめる | 5 | 未作成 | — |
 | UC-17 | ワークスペースの下の複数プロジェクトを、プロジェクトごとのルールで扱う（ネストの検知を含む） | 5 | 未作成 | — |
-| UC-18 | 親チケットの着手で、共通レイヤーがプロジェクトの `.ccnavi/config/common/` にミラーされる（`config/project/` と元のリポジトリは触れない） | 5 | [UC-18](UC-18-common-layer-mirror.yml) | draft |
+| UC-18 | 親チケットの着手で、共通設定がプロジェクトの `.ccnavi/config/common/` にミラーされる（`config/project/` と元のリポジトリは触れない） | 5 | [UC-18](UC-18-common-layer-mirror.yml) | draft |
 | UC-19 | ユーザのチェックアウトに未コミットの変更があるとき、別の作業を頼まれても、その変更に触れずに進める（事前状態は `setup.files` の追記と `setup.reset` で作る） | 2 | [UC-19](UC-19-dirty-checkout.yml) | draft |
 | UC-20 | Docker の GitLab で、ccnavi の sh が MR を作り、スレッドの指摘・解決・承認までチケット作業を通す（`setup.host: docker-gitlab`・`human_api`） | 3 | [UC-20](UC-20-docker-gitlab-ticket-review.yml) | verified |
 

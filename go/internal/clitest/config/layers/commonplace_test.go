@@ -11,12 +11,12 @@ import (
 	"ccnavi/internal/harness/run"
 )
 
-// 共通レイヤーの置き場は `.ccnavi/config/common/` 固定の受入テスト。
+// 共通設定の置き場は `.ccnavi/config/common/` 固定の受入テスト。
 //
-// 3 つのレイヤーのうち共通レイヤーだけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）で動き、自身のレイヤーとプロジェクトの
-// レイヤーは `<ccnavi ディレクトリ>/config/project/` 固定、という非対称を無くす。env を渡しても共通レイヤーは既定の置き場のままになる。
+// 3 つの設定のうち共通設定だけが env（`CCNAVI_RULES` / `CCNAVI_PHASES` / `CCNAVI_RISK`）で動き、ワークスペースの設定とプロジェクトの
+// 設定は `<ccnavi ディレクトリ>/config/project/` 固定、という非対称を無くす。env を渡しても共通設定は既定の置き場のままになる。
 //
-// フラグ（`--rules` / `--phases` / `--risk`）は残す。ここを一緒に消すと、レイヤーの合成を確かめるテストが自分の一時ディレクトリを指せなくなる
+// フラグ（`--rules` / `--phases` / `--risk`）は残す。ここを一緒に消すと、設定の合成を確かめるテストが自分の一時ディレクトリを指せなくなる
 // （configws）。hook は引数を渡さずに起動するので、hook からの判定の入口は固定される。フラグが有効なのは診断の経路
 // （`--lint` / `--test` / `--test-expectations` / `--explain`）だけで、hook からの判定と `ticket` / `review` のサブコマンドでは無視して、標準エラーに言う（issue #65）。
 //
@@ -24,13 +24,13 @@ import (
 // ここは flags で足せる形にしてある。ここが失敗したら、env を読む経路が戻ったということ。
 
 var (
-	// 共通レイヤーに置いてあるものとは別の中身。env かフラグがこちらを指したときだけヒットする。
+	// 共通設定に置いてあるものとは別の中身。env かフラグがこちらを指したときだけヒットする。
 	otherRules  = configws.Obj{"version": 1, "deny": []configws.Obj{{"id": "only-in-the-other-file", "match": "Read", "glob": "*/src/*", "message": "this file is not the common layer."}}}
 	otherPhases = "version: 1\nphases:\n  only-here:\n    kind: work\n    title: よそ\n"
 	otherRisk   = "version: 1\nfactors:\n  - id: only-here\n    lines_over: 1\n    points: 99\n"
 )
 
-// layerKind は共通レイヤーの 3 本。field は `--explain --json` のレイヤーの欄。
+// layerKind は共通設定の 3 本。field は `--explain --json` の設定の欄。
 type layerKind struct{ name, env, flag, field string }
 
 var layerKinds = []layerKind{
@@ -39,7 +39,7 @@ var layerKinds = []layerKind{
 	{"risk", "CCNAVI_RISK", "--risk", "risk"},
 }
 
-// placeWS は共通レイヤーの 3 本をフラグで渡さずに動かす道具。
+// placeWS は共通設定の 3 本をフラグで渡さずに動かす道具。
 type placeWS struct {
 	*configws.WS
 	// other はその種類のよその 1 本、own は既定の置き場。
@@ -59,7 +59,7 @@ func newPlaceWS(t *testing.T) *placeWS {
 	return w
 }
 
-// bare は共通レイヤーの 3 本をフラグで渡さずに 1 回動かす。flags を渡したときだけ、そのフラグを足す。
+// bare は共通設定の 3 本をフラグで渡さずに 1 回動かす。flags を渡したときだけ、そのフラグを足す。
 func (w *placeWS) bare(env map[string]string, guard string, flags []string, stdin string, args ...string) run.Result {
 	w.T.Helper()
 	prefix := []string{"--root", w.Root, "--guard-core-files", guard, "--restore-if-deny", "disable", "--guard-ticket-approval", "disable"}
@@ -76,7 +76,7 @@ func (w *placeWS) decide(tool string, env map[string]string, guard string, flags
 
 func (w *placeWS) target() string { return filepath.Join(w.Root, "src", "a.py") }
 
-// common は `--explain --json` の共通レイヤーの 1 件。
+// common は `--explain --json` の共通設定の 1 件。
 func (w *placeWS) common(env map[string]string, flags []string) map[string]any {
 	w.T.Helper()
 	r := w.bare(env, "disable", flags, "", "--explain", "--json", "Read", w.target())
@@ -93,7 +93,7 @@ func (w *placeWS) common(env map[string]string, flags []string) map[string]any {
 		}
 	}
 	if len(found) != 1 {
-		w.T.Fatalf("共通レイヤーは 1 件のはず: %v", out.Layers)
+		w.T.Fatalf("共通設定は 1 件のはず: %v", out.Layers)
 	}
 	return found[0]
 }
@@ -127,7 +127,7 @@ func (w *placeWS) allThree() map[string]string {
 	return env
 }
 
-// env は共通レイヤーを動かさない。1 本ずつ渡しても、3 本まとめて渡しても、共通レイヤーは `.ccnavi/config/common/` のまま。
+// env は共通設定を動かさない。1 本ずつ渡しても、3 本まとめて渡しても、共通設定は `.ccnavi/config/common/` のまま。
 // env が指したファイルの deny はヒットしない（置き場だけでなく判定でも確かめる）。
 func TestEnvDoesNotMoveTheCommonLayer(t *testing.T) {
 	t.Parallel()
@@ -186,7 +186,7 @@ func TestFlagsStillMoveTheCommonLayerInDiagnostics(t *testing.T) {
 	})
 }
 
-// 診断の外では、フラグも共通レイヤーを動かさない（issue #65）。`--project-rules-file` / `--project-phases-file` と揃える。
+// 診断の外では、フラグも共通設定を動かさない（issue #65）。`--project-rules-file` / `--project-phases-file` と揃える。
 // 上の TestFlagsStillMoveTheCommonLayerInDiagnostics と対で読む。片方だけだと、フラグを消してもそのまま通してもテストは通り続ける。
 func TestFlagsAreDiagnosisOnly(t *testing.T) {
 	t.Parallel()

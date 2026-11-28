@@ -48,7 +48,7 @@ func childText(id, phase string, entries string, extra ...string) string {
 	return text + "---\n\n本文\n"
 }
 
-// selfRules は自身のレイヤーのルール。文脈（additionalContext）・刻み・ask・when・except を当てる。
+// selfRules はワークスペースの設定のルール。文脈（additionalContext）・刻み・ask・when・except を当てる。
 const selfRules = `version: 1
 deny:
   - id: no-curl
@@ -82,7 +82,7 @@ allow:
       - glob: "*/src/secret*"
 `
 
-// workspace は判定の材料を一通り置いたワークスペース。共通レイヤーと sh はリポジトリのものを写し、自身のレイヤーに
+// workspace は判定の材料を一通り置いたワークスペース。共通設定と sh はリポジトリのものを写し、ワークスペースの設定に
 // selfRules を置く。チケットは親 1 本と、着手済みの子（ワークツリーとフローあり）・未着手の子・閉じた子。
 func workspace(t *testing.T) string {
 	t.Helper()

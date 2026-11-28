@@ -212,7 +212,7 @@ func PlaceProblems(root string, conf *config.Settings, t *ticket.Ticket) []rules
 		texts.Say(root, "NEXT_APPROVAL_PLACE", texts.Values{"family": family}, nil))}
 }
 
-// reservedProject は project: がレイヤーの名前に予約してある表記なら error。
+// reservedProject は project: が設定の名前に予約してある表記なら error。
 func reservedProject(t *ticket.Ticket) []rules.Problem {
 	if t.Project == "" || !config.IsReservedLayerName(t.Project) {
 		return nil
@@ -236,7 +236,7 @@ func projectLabel(project string) string {
 
 // ProjectProblems は、project が置き場と合っているかを返す。
 // プロジェクトを決めるのは、提案を置いた場所で、frontmatter の project: は照合に使う。
-// 予約名（common・self）は指せない。レイヤーとして数えない名前なので、指せると「レイヤーが決まらないチケット」を承認することになる。
+// 予約名（common・self）は指せない。設定として数えない名前なので、指せると「設定が決まらないチケット」を承認することになる。
 func ProjectProblems(t *ticket.Ticket, pool map[string]*ticket.Ticket, conf *config.Settings) []rules.Problem {
 	if t.DeclaredProject != "" && t.DeclaredProject != t.Project {
 		return []rules.Problem{problem(t, "`project: "+t.DeclaredProject+"` が置き場"+
@@ -258,7 +258,7 @@ func ProjectProblems(t *ticket.Ticket, pool map[string]*ticket.Ticket, conf *con
 	if t.Project == "" {
 		return nil
 	}
-	// 予約名は known から外す。置き場に projects/self/ が在っても、それはレイヤーではない。
+	// 予約名は known から外す。置き場に projects/self/ が在っても、それは設定ではない。
 	for _, p := range tree.Projects(conf.Projects) {
 		if p.Name == t.Project && !config.IsReservedLayerName(p.Name) {
 			return nil

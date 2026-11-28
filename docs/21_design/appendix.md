@@ -134,11 +134,11 @@ JSON も、同じコードをキー `code` に持つ（通れば `null`。`stopp
 | `degraded` | コマンドを読み切れずに生の文字列で判定した回。`command-taken-as-code`、`unterminated-quote`、`unterminated-substitution`、`ambiguous-substitution`、`backquote`、`expanded-redirect-target`（`ambiguous-substitution` と `backquote` は `DENY_AMBIGUOUS_FORM` / `DENY_BACKQUOTE` で止めた回） |
 | `quoted` | 引用の中から切り出したコマンドにだけヒットしたルールの id |
 | `unwrapped` | 実行役のコマンド（`env`・`sudo`・`sh -c` など）の中のコマンド、または `cd` で移った先から見たパス（6.3.2）でヒットしたときの、そのコマンド。複数なら `\x00` でつなぐ |
-| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。自身のレイヤーやプロジェクトのレイヤーが読めなかった回は、そのレイヤーの名前（`self`、`lib` など）が入り、そのレイヤーを空として判定している |
-| `source` | 判定を下したルールのレイヤー。`common` / `self` / プロジェクトの名前。`rules` の名前にはレイヤーの前置きが付かない（相対パスで出どころが分かる） |
+| `fallback` | ルールファイルを読めず組み込みの既定で判定した回（`detail` にパス）。ワークスペースの設定やプロジェクトの設定が読めなかった回は、その設定の名前（`self`、`lib` など）が入り、その設定を空として判定している |
+| `source` | 判定を下したルールの設定。`common` / `self` / プロジェクトの名前。`rules` の名前には設定の前置きが付かない（相対パスで出どころが分かる） |
 
 チケットの子ごとの記録（`.ccnavi/approved/phases/<親>/<子>.risk.json` と `.judge.json`）にも項目ごとに `source` が入る。
-フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義のレイヤーが入る。
+フェーズ定義を根拠に置くフェーズのマーカーには、そのフェーズ定義の設定が入る。
 
 #### 秘密の伏せ方
 

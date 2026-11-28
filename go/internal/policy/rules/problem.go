@@ -7,7 +7,7 @@ const (
 	Error Severity = "error"
 	Warn  Severity = "warn"
 	// Info は書いたとおりに判定に使われているが、書いたユーザが知りたいはずのこと
-	// （レイヤーをまたいで同じ定義が重なり、後ろを外した）。Warn に混ぜると本当に緩んだ Warn が埋もれる。
+	// （設定をまたいで同じ定義が重なり、後ろを外した）。Warn に混ぜると本当に緩んだ Warn が埋もれる。
 	Info Severity = "info"
 )
 

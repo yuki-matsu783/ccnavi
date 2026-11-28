@@ -15,7 +15,7 @@ import (
 
 const (
 	whereTemplates = "(templates)"
-	// whereTemplateDrafts は下書きの苦情の出どころ。レイヤーの名前（`(templates/<名前>)`）と紛れない表記にする。
+	// whereTemplateDrafts は下書きの苦情の出どころ。設定の名前（`(templates/<名前>)`）と紛れない表記にする。
 	whereTemplateDrafts = "(template-drafts)"
 	whereMessages       = "(messages)"
 )
@@ -47,7 +47,7 @@ func templateProblems(conf *config.Settings, root string) []rules.Problem {
 	return found
 }
 
-// messageProblems は文面ファイル（`.ccnavi/messages/*.yml`。レイヤーごとの messages/ は読まない）の苦情。
+// messageProblems は文面ファイル（`.ccnavi/messages/*.yml`。設定ごとの messages/ は読まない）の苦情。
 func messageProblems(root string) []rules.Problem {
 	var out []rules.Problem
 	for _, p := range texts.Load(root).Problems {
