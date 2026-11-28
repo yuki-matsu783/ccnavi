@@ -11,6 +11,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/tree"
+	"ccnavi/internal/tickets/approval"
 	"ccnavi/internal/tickets/lifecycle/gitlog"
 	"ccnavi/internal/tickets/lifecycle/gitwrap"
 	"ccnavi/internal/tickets/lifecycle/integrate"
@@ -45,7 +46,8 @@ func runGitCheck(in *input, stdout, stderr io.Writer, root string, conf *config.
 	env := &gitwrap.Env{
 		Names: gitwrap.Names{Self: words[0], Sync: words[1], Start: words[2], SelfQ: words[3], WorktreeQ: words[4]},
 		Root:  root, Cwd: cwd,
-		ParentTree: func(top, name string) int { return shask.IsParentTree(root, conf, top, name) },
+		ParentTree:  func(top, name string) int { return shask.IsParentTree(root, conf, top, name) },
+		ChildParent: func(name string) (string, bool) { return approval.ChildParent(conf, root, name) },
 	}
 	a := gitwrap.Judge(env, args)
 	if a.Deny != nil {

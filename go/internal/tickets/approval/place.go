@@ -47,6 +47,78 @@ func ParentPaths(conf *config.Settings, treeRoot, id string) []string {
 	}
 }
 
+// UnknownParent は子とは分かるが親を決められない（読めない・親の欄が空）ときに、親の名前の代わりに出す印。呼び手は止める側に倒す。
+const UnknownParent = "?"
+
+// TicketPaths はツリーで名前 name のチケットが在りうるファイル（承認済みの doing/・done/、提案の review/）。
+// ワークツリーの役（子か親か）は、このファイルで決める。
+func TicketPaths(conf *config.Settings, treeRoot, name string) []string {
+	approvedDir := conf.ApprovedDir(treeRoot)
+	return []string{
+		CopyPath(approvedDir, name),
+		ClosedPath(approvedDir, name),
+		place.File(treeRoot, conf.Tickets, place.Review, name),
+	}
+}
+
+// ParentOfFile はディスク上のチケットのファイル path の `parent` 欄。has は欄があるか、ok はファイルと frontmatter を
+// 読めたか（読めなければ has・parent は意味を持たない。読み手は止める側に倒す）。値が空・null なら parent は空。
+func ParentOfFile(path string) (parent string, has, ok bool) {
+	text, err := fsio.ReadDiskText(path, fsio.Replace)
+	if err != nil {
+		return "", false, false
+	}
+	front, err := ticket.FrontMapping(text)
+	if err != nil || front == nil {
+		return "", false, false
+	}
+	return front.Text("parent"), front.Has("parent"), true
+}
+
+// ChildParent は、名前 name のワークツリーが子チケットのものなら、その親の識別子（child が真）。子でなければ child は偽。
+//
+// 子の承認済みチケットを置くのは、ふつう親のワークツリーなので、ワークスペースルート・プロジェクトの置き場の下・
+// `.claude/worktrees/` の下のディレクトリ全部を探す（git のリポジトリかどうかは問わない）。見るファイルは TicketPaths
+// （閉じた承認済みと、レビュー待ちも含む。子を閉じたあと、親が取り込んで片付けるまでの間もそのツリーは子のもの）。
+// 読めないファイルと、親の欄が空のものは「子かもしれない」として child を真、親を UnknownParent にする。
+func ChildParent(conf *config.Settings, root, name string) (parent string, child bool) {
+	for _, top := range searchedTrees(conf, root) {
+		for _, path := range TicketPaths(conf, top, name) {
+			if !ospath.IsFile(path) {
+				continue
+			}
+			found, has, ok := ParentOfFile(path)
+			switch {
+			case !ok || has && found == "":
+				return UnknownParent, true
+			case has:
+				return found, true
+			}
+		}
+	}
+	return "", false
+}
+
+// searchedTrees はワークスペースルートと、プロジェクトの置き場・`.claude/worktrees/` の下のディレクトリ全部。
+func searchedTrees(conf *config.Settings, root string) []string {
+	tops := []string{root}
+	for _, base := range []string{conf.Projects, tree.WorktreesPath(root)} {
+		if base == "" {
+			continue
+		}
+		names, err := ospath.DiskListdir(base)
+		if err != nil {
+			continue
+		}
+		for _, n := range names {
+			if ospath.IsDir(ospath.Join(base, n)) {
+				tops = append(tops, ospath.Join(base, n))
+			}
+		}
+	}
+	return tops
+}
+
 // FrontOf はチケットのファイルの frontmatter。無い・読めなければ nil（チケットとしての検査は掛けない）。
 func FrontOf(path string) *yaml.Map {
 	text, ok := fsio.ReadText(path, fsio.Strict)

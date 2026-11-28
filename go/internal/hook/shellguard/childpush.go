@@ -4,6 +4,7 @@ import (
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/shell"
 	"ccnavi/internal/policy/texts"
+	"ccnavi/internal/tickets/approval"
 )
 
 const pushSub = "push"
@@ -32,7 +33,7 @@ func CheckChildPush(conf *config.Settings, root, cwd, subject string, degraded b
 		if name == "" {
 			continue
 		}
-		if parent := childParent(conf, root, name); parent != "" {
+		if parent, child := approval.ChildParent(conf, root, name); child {
 			return name, parent
 		}
 	}

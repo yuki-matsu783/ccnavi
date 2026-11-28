@@ -49,6 +49,7 @@ func env(root, cwd string) *gitwrap.Env {
 			SelfQ: "sh " + shell.SingleQuote(sh("ccnavi-git.sh")), WorktreeQ: "sh " + shell.SingleQuote(sh("ccnavi-worktree.sh")),
 		},
 		Root: root, Cwd: cwd,
-		ParentTree: func(string, string) int { return 2 },
+		ParentTree:  func(string, string) int { return 2 },
+		ChildParent: func(string) (string, bool) { return "", false },
 	}
 }

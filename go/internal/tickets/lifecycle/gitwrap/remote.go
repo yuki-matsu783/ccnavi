@@ -1,10 +1,8 @@
 package gitwrap
 
 import (
-	"os"
 	"strings"
 
-	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/tickets/model/ids"
 )
 
@@ -99,7 +97,7 @@ func (e *Env) push(args []string, a *Answer) *Deny {
 	top := e.Top()
 	name, inWorktree := e.worktreeName(top)
 	if inWorktree {
-		if parent, child := e.childParent(name); child {
+		if parent, child := e.ChildParent(name); child {
 			return &Deny{"push-child-worktree", name + " は子チケットのワークツリーです。子のブランチはリモートへ送りません。親（" + parent + "）が子の成果を取り込んでから、親のワークツリー (.claude/worktrees/" + parent + ") で送ります。子は作業を終えたら結果を報告して終わってください。"}
 		}
 	}
@@ -162,40 +160,4 @@ func (e *Env) pushesToOrigin(remote, branch string) bool {
 	}
 	origin, _ := e.config("remote.origin.url")
 	return origin != "" && url == origin
-}
-
-// childParent は、名前 name のワークツリーが子チケットのもの（`parent:` の行がある）か、とその親の識別子。
-//
-// 子の承認済みチケットを置くのは、ふつう親のワークツリー。ワークスペースルートだけを見ると、親のツリーに置かれた子を
-// 見落とすので、ccnavi が承認済みチケットを探すのと同じツリー（ワークスペースルート・projects/ の下・.claude/worktrees/ の下）
-// を全部見る。レビュー待ち（review/）とクローズした承認済みチケット（done/）も見る（子をクローズしたあと、親が取り込んで片付けるまでの
-// 間もそのツリーは子のもの）。
-func (e *Env) childParent(name string) (string, bool) {
-	trees := []string{e.Root}
-	for _, base := range []string{ospath.Join(e.Root, "projects"), ospath.Join(e.Root, ".claude", "worktrees")} {
-		names, _ := os.ReadDir(base)
-		for _, n := range names {
-			if p := ospath.Join(base, n.Name()); ospath.IsDir(p) {
-				trees = append(trees, p)
-			}
-		}
-	}
-	for _, t := range trees {
-		for _, copy := range []string{
-			ospath.Join(t, ".ccnavi", "approved", "doing", name+".md"),
-			ospath.Join(t, ".ccnavi", "approved", "done", name+".md"),
-			ospath.Join(t, "wip", "proposals", "review", name+".md"),
-		} {
-			text, err := ospath.ReadDiskText(copy)
-			if err != nil {
-				continue
-			}
-			for _, line := range strings.Split(text, "\n") {
-				if rest, ok := strings.CutPrefix(line, "parent:"); ok {
-					return strings.TrimSpace(rest), true
-				}
-			}
-		}
-	}
-	return "", false
 }

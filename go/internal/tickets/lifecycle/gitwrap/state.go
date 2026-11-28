@@ -18,6 +18,8 @@ type Env struct {
 	Root, Cwd string
 	// ParentTree は、ツリー top（名前 name）が親チケットのワークツリーか。0 は親、1 は親でない、2 は決められない。
 	ParentTree func(top, name string) int
+	// ChildParent は、名前 name のワークツリーが子チケットのものか、とその親の識別子。
+	ChildParent func(name string) (parent string, child bool)
 
 	top, prefix *string
 }
