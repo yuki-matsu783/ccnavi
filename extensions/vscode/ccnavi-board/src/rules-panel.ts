@@ -44,8 +44,8 @@ import { HANDOFF_ENTRY } from "./handoff-entry.js";
 import type { RulesTarget } from "./core/screens.js";
 import { targetOptions } from "./core/targets.js";
 import { blockedFailure, unreadableFailure, type ErrorFile } from "./core/load-failure.js";
-import { assertRetained, openInEditor, watchGlobs, workspaceFolder } from "./panel-common.js";
-import { binSetting, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
+import { assertRetained, openInEditor, resolveIn, toGlob, watchGlobs, workspaceFolder } from "./panel-common.js";
+import { binSetting, readSettingFile, sameTarget, settingsPanel, targetKey, type SettingsLoaded, type SettingsState } from "./settings-panel.js";
 import { webviewScript, webviewStyle } from "./webview-asset.js";
 
 const DEFAULT_RULES = ".ccnavi/config/common/rules.yml";
@@ -180,22 +180,8 @@ async function readPage(root: string, target: RulesTarget): Promise<Loaded> {
       throw unreadableFailure({ path: rulesPath, rel: rulesRel }, layer.rules.unreadable);
     }
   }
-  let text: string;
-  let mtimeMs: number;
-  let exists: boolean;
-  try {
-    text = fs.readFileSync(rulesPath, "utf8");
-    mtimeMs = fs.statSync(rulesPath).mtimeMs;
-    exists = true;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw new Error(`ルールファイルを読み込めません（${rulesRel}）: ${(error as Error).message}`);
-    }
-    // 無いのは不備ではない（「設定が無い」正常な状態）。空として出し、ルールを足して保存すればファイルが作られる。
-    text = "";
-    mtimeMs = 0;
-    exists = false;
-  }
+  // 無いのは不備ではない（「設定が無い」正常な状態）。空として出し、ルールを足して保存すればファイルが作られる。
+  const { text, mtimeMs, exists } = readSettingFile(rulesPath, rulesRel, "ルールファイル");
   const doc = readRules(exists ? text : "version: 1\n");
   if (doc.blocking.length > 0) {
     throw blockedFailure({ path: rulesPath, rel: rulesRel }, doc.blocking);
@@ -234,10 +220,6 @@ function readText(filePath: string): string | undefined {
   }
 }
 
-function resolveIn(root: string, filePath: string): string {
-  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
-}
-
 /**
  * ルールファイルと設定ファイルが変わったら「ファイルの変更を検知しました」と伝える。自分の保存は除く。
  * 対象のパスは設定ファイルの場所で変わるので、更新のたびに張り直す。
@@ -249,10 +231,6 @@ function watchFiles(current: PanelState): void {
   current.fileWatchers = [];
   const rulesRel = current.loaded?.file.rel ?? DEFAULT_RULES;
   current.fileWatchers.push(...watchGlobs(current.folder, [toGlob(rulesRel), ".claude/settings.json", ".claude/settings.local.json"], () => scheduleChanged(current)));
-}
-
-function toGlob(rel: string): string {
-  return rel.replace(/\\/g, "/");
 }
 
 function alive(current: PanelState): boolean {
