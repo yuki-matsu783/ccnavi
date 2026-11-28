@@ -331,6 +331,31 @@ func TestParentsCarryPhasesAndGates(t *testing.T) {
 	if js(two, "state") != "active" || !slices.Equal(strs(jl(two, "tickets")), []string{"i0001-02-02"}) || js(two, "states", "i0001-02-02") != "doing" || !jb(two, "review_required") {
 		t.Errorf("phase 2 = %v", two)
 	}
+	// 計画の流れ（承認の preview の plans と同じ形）。子が承認された番号は固定した番号。提案ではないので source_sha は空。
+	plans := jl(p, "plans")
+	if len(plans) != 1 || js(plans[0], "ticket") != "i0001" || js(plans[0], "part") != "plan" || js(plans[0], "source_sha") != "" {
+		t.Fatalf("plans = %v", plans)
+	}
+	items := jl(plans[0], "items")
+	if len(items) != 2 || jf(items[0], "number") != 1 || js(items[1], "type") != "design" || !jb(items[0], "locked") || !jb(items[1], "locked") {
+		t.Errorf("plans[0].items = %v", items)
+	}
+	if got := jl(plans[0], "after", "2"); len(got) != 1 || got[0] != 1.0 {
+		t.Errorf("plans[0].after = %v", jv(plans[0], "after"))
+	}
+}
+
+// 計画の流れの形は、承認の preview の plans と同じ（同じ関数で組む）。
+func TestParentPlansHaveTheShapeOfTheApprovalPreview(t *testing.T) {
+	t.Parallel()
+	board := boardSceneBuild(t).board()
+	preview := readFixture(t, "approve-preview.json")
+	if !slices.Equal(sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0)))) {
+		t.Errorf("plans のキーが違う: preview %v, ボード %v", sortedKeys(jm(jv(preview, "plans", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0))))
+	}
+	if !slices.Equal(sortedKeys(jm(jv(preview, "plans", 0, "items", 0))), sortedKeys(jm(jv(board, "parents", 0, "plans", 0, "items", 0)))) {
+		t.Errorf("plans[].items のキーが違う")
+	}
 }
 
 func TestWithTicketControlDisabledTheBoardIsEmptyAndSaysWhy(t *testing.T) {
@@ -538,6 +563,7 @@ func TestBoardShapeMatchesTheExtensionFixture(t *testing.T) {
 	sameKeys("proposal", proposalOf(fixture), proposalOf(board))
 	sameKeys("parents[0]", jv(fixture, "parents", 0), jv(board, "parents", 0))
 	sameKeys("parents[0].phases[0]", jv(fixture, "parents", 0, "phases", 0), jv(board, "parents", 0, "phases", 0))
+	sameKeys("parents[0].plans[0]", jv(fixture, "parents", 0, "plans", 0), jv(board, "parents", 0, "plans", 0))
 	sameKeys("sums[0].phases", jv(fixture, "sums", 0, "phases"), jv(board, "sums", 0, "phases"))
 	sameKeys("inbox", jv(fixture, "inbox"), jv(board, "inbox"))
 	flowOf := func(root map[string]any) any {

@@ -59,6 +59,14 @@ func (s *Source) sha() string {
 	return digest.HexSum(h)
 }
 
+// planSHA は図の中身（plans）に載せる source_sha。提案のバイト列を読んでいない元（承認済みの親。ApprovedPlans）は空。
+func (s *Source) planSHA() string {
+	if s.raw == nil {
+		return ""
+	}
+	return s.sha()
+}
+
 // Load は振り直しの元を読む。親の提案を 1 回だけ読み、その中身で計画とハッシュを決める。
 func Load(conf *config.Settings, root string, proposal *ticket.Ticket, proposals []*ticket.Ticket, current *ticket.Ticket) (*Source, string) {
 	raw, ok := fsio.ReadBytes(proposal.Path)

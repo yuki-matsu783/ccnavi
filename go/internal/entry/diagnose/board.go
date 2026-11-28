@@ -32,6 +32,7 @@ import (
 	"ccnavi/internal/tickets/notice"
 	"ccnavi/internal/tickets/phase"
 	"ccnavi/internal/tickets/proposal/agree"
+	"ccnavi/internal/tickets/proposal/planedit"
 )
 
 // boardVersion は `--explain --json` の形の版。読み手（VS Code 拡張）が形の違いに気づけるように。
@@ -208,7 +209,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 	var families []*parentRow
 	for _, p := range parents {
 		if !p.IsChild() {
-			families = append(families, parentRecord(conf, root, p, idx.closed, raw))
+			families = append(families, parentRecord(conf, root, p, idx.closed, raw, settled))
 		}
 	}
 	markAttention(rows, families, waiting)
@@ -664,10 +665,10 @@ func phaseRecord(ph *phase.Phase, manual string) (*pyjson.Object, phaseRow) {
 		escalates: ph.RiskEscalates()}
 }
 
-// parentRecord は親 1 件。局面、計画、親のマーカー、フェーズの並び。閉じた親は局面を持たない（「クローズ可」と言っても
-// 意味が無い）。
+// parentRecord は親 1 件。局面、計画、計画の流れ（図の中身）、親のマーカー、フェーズの並び。閉じた親は局面を持たない
+// （「クローズ可」と言っても意味が無い）。
 func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, closedIndex map[string]*ticket.Ticket,
-	raw *approval.Raw) *parentRow {
+	raw *approval.Raw, settled []*ticket.Ticket) *parentRow {
 	home := approval.HomeDirRead(conf, root, parent.ID, "", parent.Project)
 	_, closed := closedIndex[parent.ID]
 	stage := ""
@@ -704,6 +705,8 @@ func parentRecord(conf *config.Settings, root string, parent *ticket.Ticket, clo
 		"stage", stage,
 		"plan", plan,
 		"feedback", feedback,
+		// 計画の流れ（図の中身）。承認待ちの提案の図（承認の preview・--plan-order）と同じ関数で組む。
+		"plans", planedit.ApprovedPlans(parent, settled),
 		"close_early", objOrNil(marks.ReadParent(home, parent.ID, marks.CloseEarly)),
 		"ready", objOrNil(marks.ReadParent(home, parent.ID, marks.Ready)),
 		"closed_record", objOrNil(marks.ReadParent(home, parent.ID, marks.Closed)),

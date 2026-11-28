@@ -2,6 +2,9 @@
 //   - 計画の番号の振り直しと書き戻し（`--plan-order <親>`。Reorder・Save）
 //   - 計画が使うフェーズ定義のコピーの差し込み（`--plan-order <親> --fill-phases`。Fill）
 //
+// 図の中身（plans）も組む。承認待ちの提案の図（`--plan-order`・承認の preview。PreviewPlans）と、承認済みの親の
+// 計画の流れ（`--explain --json` の parents[].plans。ApprovedPlans）は、同じ Answer.plans から作る。
+//
 // どちらも frontmatter の決まった欄の値の行だけを差し替える。ほかの行（コメントも）と本文は残す。値の中に書いた
 // コメントは消える。書く前に組んだ全文を読み直し、ほかの欄が読んだ形で元と同じでなければ何も書かない（値にアンカーがあり、
 // ほかの欄が別名で指しているときなど）。
