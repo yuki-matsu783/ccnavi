@@ -280,7 +280,7 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
                 onSelect(undefined);
               }}
             >
-              グループを解く
+              グループを解除
             </button>
           </div>
         </>
@@ -291,20 +291,22 @@ function NodeFields({ doc, node, readOnly, onChange, onSeal, onSelect, candidate
           <pre className="flow-raw">{yamlText(nodeData(node))}</pre>
         </>
       )}
-      <div className="buttons">
-        <button
-          type="button"
-          className="action"
-          data-action="remove-node"
-          disabled={readOnly}
-          onClick={() => {
-            onChange(removeNode(doc, node.id));
-            onSelect(undefined);
-          }}
-        >
-          {group ? "グループを削除（中のノードは残す）" : "ノードを削除"}
-        </button>
-      </div>
+      {!group && (
+        <div className="buttons">
+          <button
+            type="button"
+            className="action"
+            data-action="remove-node"
+            disabled={readOnly}
+            onClick={() => {
+              onChange(removeNode(doc, node.id));
+              onSelect(undefined);
+            }}
+          >
+            ノードを削除
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

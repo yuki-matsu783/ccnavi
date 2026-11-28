@@ -202,7 +202,7 @@ write-and-push の対象の親子のチケットでは、親のワークツリ�
 
 | 欄 | 中身 |
 |---|---|
-| `plans` | 計画ごと（全体計画とフィードバック計画）に 1 件。`items`（`number` 振り直した番号・`from` 元の番号・`type`・`title`・`review`・`deferred`・`review_at`・`locked` 子が承認された番号）、`after`（振り直した番号での直接の先行）、`proposed`（提案に書いてある先行。「案に戻す」に使う）、`current`（改版のとき、承認済みの先行関係から戻した直接の先行。新規なら `null`）、`loose`（最後のステップの先行になっていないステップ）、`ready`（すぐ始まるステップ）、`problems`（その計画の順序の検査の error）、`source_sha` |
+| `plans` | 計画ごと（全体計画とフィードバック計画）に 1 件。`items`（`number` 振り直した番号・`from` 元の番号・`type`・`title`・`review`・`deferred`・`review_at`・`locked` 子が承認された番号）、`after`（振り直した番号での直接の先行）、`proposed`（提案に書いてある先行。「提案の順序に戻す」に使う）、`current`（改版のとき、承認済みの先行関係から戻した直接の先行。新規なら `null`）、`loose`（最後のステップの先行になっていないステップ）、`ready`（すぐ始まるステップ）、`problems`（その計画の順序の検査の error）、`source_sha` |
 | `source_sha` | 親の提案と、その親の `todo/` の子の提案と、その子を `predecessors` で指す `todo/` の子の提案のバイト列をまとめたハッシュ（ツリーとツリーからの相対パスで区切る）。`--order` によらない。`--expect` に返す |
 | `problems` / `loose` | 振り直した計画の順序の検査（`after` の形・終端・最後のステップの延期・延期の引き受け手とそのレビュー）の error と、最後のステップの先行になっていないステップ（両方の計画） |
 | `refused` | 引けない線（`kind` が `cycle` 循環・`locked` 子が承認された番号へ入る線を変えた・`unpackable` 固定した番号を動かさずに番号が振れない、`number`、`text`）。断ったときは振り直さず、提案のままの答えを返す |

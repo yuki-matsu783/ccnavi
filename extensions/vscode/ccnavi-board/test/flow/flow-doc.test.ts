@@ -385,7 +385,7 @@ test("CB-T254 グループ化は選んだノードを外枠＋余白の枠で囲
   assert.deepEqual(absolutePosition(fresh.doc, "x"), { x: 700, y: 500 });
 });
 
-test("CB-T255 グループを解く・削除すると、中のノードは図の上の同じ位置で外へ出て残る。中のノードを削除してもグループは残る", () => {
+test("CB-T255 グループを解除（削除）すると、中のノードは図の上の同じ位置で外へ出て残る。中のノードを削除してもグループは残る", () => {
   const grouped = groupNodes(three(), ["a", "b"]);
   assert.ok(grouped !== undefined);
   for (const next of [ungroup(grouped.doc, "group-1"), removeNode(grouped.doc, "group-1")]) {

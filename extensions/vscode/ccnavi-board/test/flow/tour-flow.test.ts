@@ -130,7 +130,7 @@ test("CB-T486 画面の注意（flowNotices）は、入れ子の見本（deep）
   assert.ok(deep.some((notice) => notice.includes("子チケットの担当の下に3階層あります")), deep.join("\n"));
   // 開始が無い見本（broken）の注意は、実行ファイルの warn（start が無い）に任せ、画面は言わない
   assert.deepEqual(flowNotices(sample.flows.broken.doc, { exe: true }), []);
-  assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("start がありません")));
+  assert.ok(sample.flows.broken.checks.warns.some((warn) => warn.includes("開始（start）が無い")));
 });
 
 test("CB-T487 保存前の差分と下書きの差分は、見本どうしで意味のある違いになる（追加した・削除した・変えた）", () => {

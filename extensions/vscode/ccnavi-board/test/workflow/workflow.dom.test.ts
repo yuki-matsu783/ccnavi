@@ -34,7 +34,7 @@ function removeEdge(dom: DomPage, edge: string): { readonly seq: number; readonl
   return { seq: sent.seq as number, order: sent.order };
 }
 
-test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提案のままなので未保存ではなく、保存と案に戻すは押せない", async () => {
+test("CB-D166 開くと、計画ごとの図を線を引ける形で出す。提案のままなので未保存ではなく、保存と提案の順序に戻すは押せない", async () => {
   const dom = await openWorkflow();
   try {
     assert.deepEqual(
@@ -190,7 +190,7 @@ test("CB-D179 子の提案を付け替えられない理由・改版の錠・計
   }
 });
 
-test("CB-D172 案に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
+test("CB-D172 提案の順序に戻すと、往復せずに開いたときの答えに戻る。未保存が消える", async () => {
   const dom = await openWorkflow();
   try {
     const { seq } = removeEdge(dom, "after-1-3");
@@ -324,7 +324,7 @@ test("CB-D182 拡張ホストが頼んだらタブの案内を出し、最後ま
     await dom.settle();
     // 計画のあるタブでも、案内の間は見本を出す（今の計画には触れない）
     assert.equal(dom.all(".tour-sample").length, 1);
-    assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序に決める", "承認との関係", "案内"]);
+    assert.deepEqual(await walkTour(dom), ["図", "直す手段", "この順序で保存", "承認との関係", "案内"]);
     assert.equal(dom.all(".tour").length, 0);
     assert.deepEqual(dom.posted.filter((message) => message.type === "tourDone"), [{ type: "tourDone" }]);
     // 「?」は案内の一覧を開き、基本の案内を選ぶと最初の手順から始まる

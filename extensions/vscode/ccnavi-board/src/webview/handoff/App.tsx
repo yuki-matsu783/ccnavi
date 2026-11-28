@@ -282,7 +282,7 @@ function TreeSelect({
 }): JSX.Element {
   return (
     <label className="tree-select">
-      ツリー{" "}
+      ワークツリー{" "}
       <select id="tree" data-action="switch-tree" value={tree} disabled={disabled} onChange={(event) => onSwitch(event.target.value)}>
         {trees.map((t) => (
           <option key={t.key} value={t.key}>

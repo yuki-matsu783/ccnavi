@@ -108,7 +108,7 @@
          update-ref・origin/HEAD の向け直し、認証に失敗して取ってこられなかったときの案内を行います。"fetch 1" の行に続いて、表示する "out <行>" と
          次の一手の "next <語>"（fetch・lock）を出力します。ネットワークには出ません）
     ccnavi sync retired
-        （ボード用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
+        （チケット管理画面用。"retired 1" の行に続いて、親を閉じた後の片付けの列挙元
          （state/retire/<parent>.json）を "retired <parent> <self|project> <mr|-> <branch|->" の
          形で1行ずつ出力します。読めない記録や mr の無い記録は "incomplete <parent> <理由>"
          です。ネットワークにも git にも触れません）
@@ -269,7 +269,7 @@ ccnavi自身は、リモートに接続しません。スクリプトがマー�
 レビューを取得し、--result <json> として渡します。
 
 未解決のレビュースレッドは、人が親のワークツリーのターミナルから、次のコマンドで受け入れます
-（VS Code のボードの「決める」も、同じ判定を通ります）。
+（VS Code のチケット管理画面の「レビュー完了」も、同じ判定を通ります）。
 
     sh <workspace root>/.ccnavi/scripts/ccnavi-user-decide.sh N
 

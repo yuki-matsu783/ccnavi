@@ -126,7 +126,7 @@ func Gather(stderr io.Writer, conf *config.Settings, root string, only []string)
 			if shown == "" {
 				shown = "(空の識別子)"
 			}
-			return refuse([]string{"承認待ちに無い: " + shown, "何も承認しない。ボードを更新して承認待ちを確かめてください"})
+			return refuse([]string{"承認待ちに無い: " + shown, "何も承認しない。チケット管理画面を更新して承認待ちを確かめてください"})
 		}
 		skipped := map[string]bool{}
 		for _, t := range revisions {

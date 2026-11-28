@@ -29,7 +29,7 @@
       "ccnavi": [
         {
           "id": "ccnaviBoard.entries",
-          "name": "画面",
+          "name": "画面の一覧",
           "icon": "media/icon.svg"
         }
       ]
