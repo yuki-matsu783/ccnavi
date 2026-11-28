@@ -15,8 +15,7 @@ import { Fragment, useEffect, useRef, type JSX } from "react";
 
 import type { BoardColumn, Card } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
-import { CardItem } from "./Card.js";
-import { post } from "./post.js";
+import { CardItem, phaseClassName, WorkflowButton } from "./Card.js";
 
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない */
 export const MIN_WIDTH = 220;
@@ -121,7 +120,7 @@ function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf,
       {parent !== undefined ? (
         <>
           <CardItem card={parent} hidden={!shown} head moved={movedOf(parent)} selected={selectedOf(parent)} onSelect={() => onSelect(parent)}>
-            {parent.workflow ? <WorkflowHeadButton id={parent.id} /> : null}
+            {parent.workflow ? <WorkflowButton id={parent.id} /> : null}
             {parent.phases.length > 0 ? (
               <button
                 type="button"
@@ -199,7 +198,7 @@ function LanePhases({ parent, childCards, onPlanFlow }: { readonly parent: Card;
         {parent.phases.map((p) => {
           const own = childCards.filter((card) => card.phase === p.number);
           return (
-            <li key={p.number} className={`phase phase-${p.state}${p.status === "レビュー待ち" || p.status === "レビュー準備中" ? " review-hold" : ""}${p.status === "要確認" ? " phase-check" : ""}`} data-phase={p.number} data-status={p.status}>
+            <li key={p.number} className={phaseClassName(p)} data-phase={p.number} data-status={p.status}>
               <span className="phase-dot" aria-hidden="true" />
               <span className="phase-name">
                 <span className="phase-label">{p.label}</span>
@@ -212,22 +211,6 @@ function LanePhases({ parent, childCards, onPlanFlow }: { readonly parent: Card;
         })}
       </ul>
     </div>
-  );
-}
-
-/** 承認待ちの親の「計画編集」。出すかは組み立て（`card.workflow`）が決め、押したら拡張ホストへ返すだけ */
-function WorkflowHeadButton({ id }: { readonly id: string }): JSX.Element {
-  return (
-    <button
-      type="button"
-      className="card-button"
-      data-action="workflow"
-      data-ticket={id}
-      title="計画編集タブを開きます。ステップの順序（どのステップが先行するか）を図で直せます。保存すると提案の内容が変わるので、承認画面を開き直してください。"
-      onClick={() => post({ type: "workflow", ticket: id })}
-    >
-      計画編集
-    </button>
   );
 }
 

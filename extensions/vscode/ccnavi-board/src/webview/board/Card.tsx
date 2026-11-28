@@ -9,7 +9,7 @@
  */
 import { Children, type JSX, type ReactNode } from "react";
 
-import type { Action, Card } from "../../core/board.js";
+import type { Action, Card, PhaseChip } from "../../core/board.js";
 import type { Moved } from "../../core/board-moved.js";
 import type { Status } from "../../core/status.js";
 import { post } from "./post.js";
@@ -48,7 +48,7 @@ export function CardItem({
   if (card.issues.length > 0) {
     classes.push("has-issue");
   }
-  if (card.status.label === "レビュー待ち" || card.status.label === "レビュー準備中") {
+  if (card.hold === "review") {
     classes.push("review-hold");
   }
   if (card.pendingApproval) {
@@ -220,4 +220,30 @@ export function ApproveButton({ id, tour = false }: { readonly id: string; reado
       承認
     </button>
   );
+}
+
+/**
+ * 親の提案の計画の順序を直す計画編集タブを開くボタン。出すかは組み立て（`workflow`）が決め、押したら拡張ホストへ返すだけ。
+ * `tour`は詳細欄のボタンにだけ付ける（案内の指す先を1つにする）
+ */
+export function WorkflowButton({ id, tour = false }: { readonly id: string; readonly tour?: boolean }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="card-button"
+      data-action="workflow"
+      data-tour={tour ? "workflow-button" : undefined}
+      data-ticket={id}
+      title="計画編集タブを開きます。ステップの順序（どのステップが先行するか）を図で直せます。保存すると提案の内容が変わるので、承認画面を開き直してください。"
+      onClick={() => post({ type: "workflow", ticket: id })}
+    >
+      計画編集
+    </button>
+  );
+}
+
+/** フェーズ行のクラス。止まっている印（`hold`）で色を足す。言葉は比べない */
+export function phaseClassName(p: PhaseChip): string {
+  const hold = p.hold === "review" ? " review-hold" : p.hold === "check" ? " phase-check" : "";
+  return `phase phase-${p.state}${hold}`;
 }

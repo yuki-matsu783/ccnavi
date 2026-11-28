@@ -22,6 +22,17 @@ export type PhaseStatus =
   | "これから"
   | "要確認";
 
+/** 「止まっている」印。`review`はレビューで止まっている（レビュー待ち・レビュー準備中）、`check`は要確認、空は止まっていない */
+export type Hold = "review" | "check" | "";
+
+/** フェーズ行の一言とバッジの言葉から「止まっている」印を決める。部品は言葉を比べず、これを読む */
+export function holdOf(label: string): Hold {
+  if (label === "レビュー待ち" || label === "レビュー準備中") {
+    return "review";
+  }
+  return label === "要確認" ? "check" : "";
+}
+
 /** バッジの色の系統。色だけに頼らず、言葉は必ず出す */
 export type Tone = "check" | "turn" | "wait" | "work" | "done" | "cancel";
 

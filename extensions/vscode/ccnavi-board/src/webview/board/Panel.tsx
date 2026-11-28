@@ -11,7 +11,7 @@ import type { JSX } from "react";
 import type { Card, PhaseChip } from "../../core/board.js";
 import { flowButtonLabel } from "../../core/flow-view.js";
 import type { FlowJson } from "../../core/model.js";
-import { ApproveButton, ReviewDoneButton, StatusMark, type ReviewAction } from "./Card.js";
+import { ApproveButton, phaseClassName, ReviewDoneButton, StatusMark, WorkflowButton, type ReviewAction } from "./Card.js";
 import { post } from "./post.js";
 import { detailRows, isHttpUrl, mrText, type DetailRow } from "./text.js";
 
@@ -48,7 +48,7 @@ export function CardPanel({ card, onClose, below }: { readonly card: Card; reado
           </button>
         ) : null}
         {card.flow !== null ? <FlowButton flow={card.flow} id={card.id} closed={card.column === "done" || card.column === "cancelled"} /> : null}
-        {card.workflow ? <WorkflowButton id={card.id} /> : null}
+        {card.workflow ? <WorkflowButton id={card.id} tour /> : null}
         {card.templateDraft ? <TemplateDraftButton id={card.id} /> : null}
       </div>
       {rows.length > 0 ? (
@@ -128,7 +128,7 @@ function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Elem
   return (
     <ul className="phases" data-tour="phases">
       {phases.map((p) => (
-        <li key={p.number} className={`phase phase-${p.state}${p.status === "レビュー待ち" || p.status === "レビュー準備中" ? " review-hold" : ""}${p.status === "要確認" ? " phase-check" : ""}`} data-phase={p.number} data-status={p.status}>
+        <li key={p.number} className={phaseClassName(p)} data-phase={p.number} data-status={p.status}>
           <span className="phase-dot" aria-hidden="true" />
           <span className="phase-name">
             <span className="phase-label">{p.label}</span>
@@ -180,26 +180,6 @@ function FlowButton({ flow, id, closed }: { readonly flow: FlowJson; readonly id
       onClick={() => post({ type: "flow", ticket: id })}
     >
       {flowButtonLabel(flow, closed)}
-    </button>
-  );
-}
-
-/**
- * 親の提案の計画の順序を直す計画編集タブを開くボタン。出すかは組み立て（`card.workflow`）が決め、
- * 押したら拡張ホストへ返すだけ
- */
-function WorkflowButton({ id }: { readonly id: string }): JSX.Element {
-  return (
-    <button
-      type="button"
-      className="card-button"
-      data-action="workflow"
-      data-tour="workflow-button"
-      data-ticket={id}
-      title="計画編集タブを開きます。ステップの順序（どのステップが先行するか）を図で直せます。保存すると提案の内容が変わるので、承認画面を開き直してください。"
-      onClick={() => post({ type: "workflow", ticket: id })}
-    >
-      計画編集
     </button>
   );
 }
