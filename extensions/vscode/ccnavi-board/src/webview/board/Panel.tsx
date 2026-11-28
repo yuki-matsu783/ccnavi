@@ -122,7 +122,7 @@ function Turn({ card }: { readonly card: Card }): JSX.Element | null {
 
 /**
  * 親のフェーズ一覧。1フェーズ1行で、左の丸がフェーズ、右が状態の一言（`core/status.ts`の`phaseStatusOf`）。
- * ユーザが対応する注意（`manual`）は1行で出す。行にボタンは置かない（［MRを開く］［レビュー完了］は子の操作）
+ * ユーザが対応する注意（`manual`）は1行で出す。行にボタンは置かない（「MRを開く」「レビュー完了」は子の操作）
  */
 function Phases({ phases }: { readonly phases: readonly PhaseChip[] }): JSX.Element {
   return (

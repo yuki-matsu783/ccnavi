@@ -4,7 +4,7 @@ import type { BoardJson } from "../../src/core/model.js";
 import { targetFrom, openingTarget } from "../../src/core/targets.js";
 import { fixture } from "../helpers/fixture.js";
 
-/** プロジェクトapiを設定の対象に持つボード */
+/** プロジェクトapiを設定の対象に持つチケット管理画面 */
 function withApi(): BoardJson {
   const base = fixture();
   const self = base.layers.find((l) => l.name === "self");

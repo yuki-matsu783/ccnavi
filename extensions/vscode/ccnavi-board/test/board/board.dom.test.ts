@@ -32,7 +32,7 @@ test("CB-D1288 拡張ホストのselectで、そのカードを隠している�
     assert.deepEqual(state.folded, ["done"]);
     assert.equal(state.selected, JSON.stringify(["", "i0001-02-02"]));
     assert.deepEqual(page.posted.filter((m) => m.type !== "ready"), []);
-    // いまのボードに無いカードなら、絞り込みも畳みも選択も変えない
+    // いまのチケット管理画面に無いカードなら、絞り込みも畳みも選択も変えない
     await page.send({ type: "select", ticket: "i9999" });
     await page.settle();
     assert.deepEqual((page.state() as { folded: string[] }).folded, ["done"]);
@@ -336,7 +336,7 @@ function drag(page: DomPage, handle: Element, to?: number): void {
 
 test("CB-D51 列の幅は取っ手のドラッグで決まって覚え、押しただけでは決まらない。ダブルクリックで戻る", async () => {
   const page = await openBoard();
-  // 列の幅は全部の行で揃えるので、ボードのgridの列の指定（承認待ち・進行中・完了・取り消し）に出る
+  // 列の幅は全部の行で揃えるので、チケット管理画面のgridの列の指定（承認待ち・進行中・完了・取り消し）に出る
   const tracks = (): string => (page.one(".board") as unknown as { style: { gridTemplateColumns: string } }).style.gridTemplateColumns;
   try {
     const column = (): Element => page.one('.column[data-state="doing"]');

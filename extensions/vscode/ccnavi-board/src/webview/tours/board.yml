@@ -18,7 +18,7 @@
 #
 # `target:`は`data-tour="…"`の印。使うものは次のとおり。
 #   ヘッダsummary / filter-project / filter-parent / filter-attention / filter-archived / refresh / merge-check / approve / tour
-#   ボードboard / column-<列> / card-<識別子>（親は行の見出し）/ lane-phase-list（`scene.open`で開いた親の行のフェーズ一覧）/
+#   チケット管理画面（board）/ column-<列> / card-<識別子>（親は行の見出し）/ lane-phase-list（`scene.open`で開いた親の行のフェーズ一覧）/
 #              merge-band / merge-retire / merge-abandon
 #   カード内status（状態のバッジ）/ approve-one / review-done / notes / badge-<種類>（blocked preds worktree
 #              risk seen issue unsent）/ moved

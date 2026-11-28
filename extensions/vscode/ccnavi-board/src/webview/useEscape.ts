@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
  * Escは、いま出ているもののうち最も手前の1つだけが受ける。
  */
 export const ESCAPE_LAYER = {
-  /** ボードの選んだカードの右のパネル（`board/Panel.css`）。画面を覆わないので一番奥 */
+  /** チケット管理画面の選んだカードの右のパネル（`board/Panel.css`）。画面を覆わないので一番奥 */
   panel: 1,
   /** 選択肢の一覧（`rules/Rule.css`） */
   popup: 5,

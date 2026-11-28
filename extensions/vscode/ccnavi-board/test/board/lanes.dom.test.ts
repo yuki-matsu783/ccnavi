@@ -1,8 +1,8 @@
 /**
- * ボードの行を親ごとに分ける（`webview/board/Lanes.tsx`）。親は必ず行の見出しにあり、列の中には子だけが並ぶ。
+ * チケット管理画面の行を親ごとに分ける（`webview/board/Lanes.tsx`）。親は必ず行の見出しにあり、列の中には子だけが並ぶ。
  * 列の件数は子だけ。「フェーズを表示」で親の行を開くと、フェーズごとの状態と子の一覧が出る（矢印は描かない）。順序は
  * 開いた行の「計画の流れを見る」で、図を見るだけで開く。
- * 親のカードがボードに無い子は、親の識別子だけを見出しにした行に入る。
+ * 親のカードがチケット管理画面に無い子は、親の識別子だけを見出しにした行に入る。
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -16,7 +16,7 @@ import { plansOf } from "../helpers/plan-reorder.js";
 
 const laneKey = (project: string, family: string): string => JSON.stringify([project, family]);
 
-/** フェーズの多い作業中の親・子の無い承認待ちの親・親がボードに無い子 */
+/** フェーズの多い作業中の親・子の無い承認待ちの親・親がチケット管理画面に無い子 */
 function scene(): BoardJson {
   return {
     ...boardOf(
@@ -43,7 +43,7 @@ function scene(): BoardJson {
   };
 }
 
-test("CB-D1294 行は親ごと。親は行の見出しにだけ置き（バッジ・局面・承認待ちの親の［承認］［計画編集］）、列の中には子だけ。列の件数は子だけを数える", async () => {
+test("CB-D1294 行は親ごと。親は行の見出しにだけ置き（バッジ・局面・承認待ちの親の「承認」「計画編集」）、列の中には子だけ。列の件数は子だけを数える", async () => {
   const page = await openBoard(scene(), { state: { folded: [] } });
   try {
     // 行の順は親の識別子の順。親の無い子は親の識別子の行に入る
@@ -59,14 +59,14 @@ test("CB-D1294 行は親ごと。親は行の見出しにだけ置き（バッ�
     assert.deepEqual(cells("p1"), [["todo", "p1-03-01"], ["doing", "p1-02-01", "p1-02-02"], ["done", "p1-01-01"], ["cancelled", "p1-02-03"]]);
     // 列の件数は子だけ（承認待ちの親p2は数えない）
     assert.deepEqual(page.all(".column").map((c) => c.querySelector(".count")?.textContent), ["子1", "子3", "子1", "子1"]);
-    // 承認待ちの親の見出しには［承認］（主ボタン）と［計画編集］。子が無いことを言う
+    // 承認待ちの親の見出しには「承認」（主ボタン）と「計画編集」。子が無いことを言う
     const p2 = page.one('.lane[data-lane="p2"] > .card.lane-head');
     assert.deepEqual(Array.from(p2.querySelectorAll("button")).map((b) => b.getAttribute("data-action")), ["approve-one", "workflow"]);
     assert.equal(page.one('.lane[data-lane="p2"] .lane-empty').textContent, "子はまだありません");
-    // 親がボードに無い子の行は、親の識別子と、そのことを言う見出し（選べない）
+    // 親がチケット管理画面に無い子の行は、親の識別子と、そのことを言う見出し（選べない）
     const orphan = page.one('.lane[data-lane="gone"] > .lane-orphan');
     assert.match(orphan.textContent, /親 gone/);
-    assert.match(orphan.textContent, /親のチケットはボードにありません/);
+    assert.match(orphan.textContent, /親のチケットはチケット管理画面にありません/);
     assert.equal(orphan.classList.contains("card"), false);
     assert.equal(page.all('.lane[data-lane="gone"] .cell[data-cell="doing"] .card[data-id="gone-01-01"]').length, 1);
   } finally {
@@ -142,7 +142,7 @@ test("CB-D1296 「フェーズを表示」で親の行を開くと、フェー�
   }
 });
 
-test("CB-D1302 開いた親の行の「計画の流れを見る」は、図の中身（parents[].plans）を持つ親にだけ出し、押すと同じ図の部品を見るだけで開く（承認・編集の操作は無い）。Escと［閉じる］で閉じる", async () => {
+test("CB-D1302 開いた親の行の「計画の流れを見る」は、図の中身（parents[].plans）を持つ親にだけ出し、押すと同じ図の部品を見るだけで開く（承認・編集の操作は無い）。Escと「閉じる」で閉じる", async () => {
   // 図の中身が無い親には出さない
   const bare = await openBoard(scene(), { state: { opened: [laneKey("", "p1")] } });
   try {
@@ -169,7 +169,7 @@ test("CB-D1302 開いた親の行の「計画の流れを見る」は、図の�
     assert.deepEqual(page.all(".plan-flow .plan-graph").map((g) => g.getAttribute("data-part")), ["plan"]);
     assert.equal(page.all('.plan-flow .plan-graph .react-flow__node').length, 5);
     assert.equal(page.one('.plan-flow .react-flow__node[data-id="n1"] .plan-node').getAttribute("data-locked"), "1");
-    // 見るだけ: ボタンは［閉じる］（と図の拡大・縮小）だけで、承認・計画編集は無い。押しても拡張ホストへは送らない
+    // 見るだけ: ボタンは「閉じる」（と図の拡大・縮小）だけで、承認・計画編集は無い。押しても拡張ホストへは送らない
     assert.deepEqual(page.all(".plan-flow .overlay-actions button").map((b) => b.getAttribute("data-action")), ["plan-flow-close"]);
     assert.equal(page.all('.plan-flow [data-action="edit-workflow"], .plan-flow [data-action^="approve"]').length, 0);
     assert.equal(page.posted.filter((m) => m.type !== "ready").length, 0);

@@ -38,7 +38,7 @@ export function CardItem({
   readonly onSelect: () => void;
   /** 親の行の見出しとして描く（`div`。列の中の子は`li`） */
   readonly head?: boolean;
-  /** 主な操作の後ろに並べる補助の操作（親の行の見出しの［計画編集］［フェーズを表示］） */
+  /** 主な操作の後ろに並べる補助の操作（親の行の見出しの「計画編集」「フェーズを表示」） */
   readonly children?: ReactNode;
 }): JSX.Element {
   const classes = ["card", card.isParent ? "parent" : "child"];
@@ -128,8 +128,8 @@ export function StatusMark({ status }: { readonly status: Status }): JSX.Element
 }
 
 /**
- * カードの主な操作。あれば1つだけ出す（主ボタン）。承認待ちなら［承認］、そうでなくバッジが「レビュー待ち」の子なら［レビュー完了］。
- * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。［MRを開く］と案内の文は右のパネルの「ユーザ待ち」に出す
+ * カードの主な操作。あれば1つだけ出す（主ボタン）。承認待ちなら「承認」、そうでなくバッジが「レビュー待ち」の子なら「レビュー完了」。
+ * 承認は`pendingApproval`だけを条件にする（バッジが「要確認」でも出す）。「MRを開く」と案内の文は右のパネルの「ユーザ待ち」に出す
  */
 function Primary({ card, extra }: { readonly card: Card; readonly extra?: ReactNode }): JSX.Element | null {
   const approve = card.actions.some((a) => a.kind === "approve");
@@ -185,7 +185,7 @@ function Badge({ note }: { readonly note: Note }): JSX.Element {
 }
 
 /**
- * ［レビュー完了］（主ボタン）。残った指摘を読む流れに入るだけで、まだ何も置かない。
+ * 「レビュー完了」（主ボタン）。残った指摘を読む流れに入るだけで、まだ何も置かない。
  * `tour`はカードの上のボタンにだけ付ける（案内の指す先を1つにする）
  */
 export function ReviewDoneButton({ action, tour = false }: { readonly action: ReviewAction; readonly tour?: boolean }): JSX.Element {

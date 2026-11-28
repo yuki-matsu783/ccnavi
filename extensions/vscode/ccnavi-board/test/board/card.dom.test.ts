@@ -65,7 +65,7 @@ test("CB-D700 カードは 見出し → 局面（親だけ）→ 注意 → 主
     const kindsOf = (selector: string): string[] => Array.from(page.one(selector).children).map((el) => el.className.split(" ")[0]);
     // 親（承認待ち・計画あり）: 見出しと主な操作（承認）だけ。計画編集・詳細はパネル
     assert.deepEqual(kindsOf(card("fresh")), ["card-head", "card-primary"]);
-    // 親（作業中）: 見出し・局面・注意（未送信）と［フェーズを表示］。フェーズ行とMRはカードに無い（行を開くと見出しの下に出る）
+    // 親（作業中）: 見出し・局面・注意（未送信）と「フェーズを表示」。フェーズ行とMRはカードに無い（行を開くと見出しの下に出る）
     assert.deepEqual(kindsOf(card("busy")), ["card-head", "stage", "badges", "card-primary"]);
     // 子（レビュー待ち）: 見出し・注意（HIGH）・主な操作（レビュー完了）。位置はカードに無い
     assert.deepEqual(kindsOf(card("busy-02-01")), ["card-head", "badges", "card-primary"]);
@@ -117,7 +117,7 @@ test("CB-D701 バッジは見出しの右端に1つ。言葉とツールチッ�
   }
 });
 
-test("CB-D702 承認待ちのカードには［承認］（主ボタン）だけ。パネルの「ユーザ待ち」に「内容を確認して承認してください」と［承認］。要確認のバッジでも承認は出る", async () => {
+test("CB-D702 承認待ちのカードには「承認」（主ボタン）だけ。パネルの「ユーザ待ち」に「内容を確認して承認してください」と「承認」。要確認のバッジでも承認は出る", async () => {
   const page = await openBoard(
     pendingOf(
       boardOf([
@@ -157,7 +157,7 @@ test("CB-D702 承認待ちのカードには［承認］（主ボタン）だけ
   }
 });
 
-test("CB-D703 バッジが「レビュー待ち」の子のカードには［レビュー完了］（主ボタン）だけ。パネルの「ユーザ待ち」に「MRでレビューしてください」と［MRを開く］（リンク）と［レビュー完了］。ほかの子には出さない", async () => {
+test("CB-D703 バッジが「レビュー待ち」の子のカードには「レビュー完了」（主ボタン）だけ。パネルの「ユーザ待ち」に「MRでレビューしてください」と「MRを開く」（リンク）と「レビュー完了」。ほかの子には出さない", async () => {
   const page = await openBoard(scene());
   try {
     const child = card("busy-02-01");
@@ -192,7 +192,7 @@ test("CB-D703 バッジが「レビュー待ち」の子のカードには［レ
   }
 });
 
-test("CB-D704 フェーズ行（パネル）: 一言（9通り）・手で動かした注意の1行。行に［MRを開く］［レビュー完了］は置かない（子の操作だけ）", async () => {
+test("CB-D704 フェーズ行（パネル）: 一言（9通り）・手で動かした注意の1行。行に「MRを開く」「レビュー完了」は置かない（子の操作だけ）", async () => {
   const page = await openBoard(scene());
   try {
     await select(page, "busy");
@@ -470,7 +470,7 @@ test("CB-D710 選んだカードはプロジェクトとIDの組でwebviewの状
   }
 });
 
-test("CB-D711 カードを押す（または焦点を当ててEnter）と選んでパネルを出す。ファイルはパネルの「チケットを開く」で開く。ボタン・リンクの上では選ばない。［閉じる］とEscでパネルを閉じる", async () => {
+test("CB-D711 カードを押す（または焦点を当ててEnter）と選んでパネルを出す。ファイルはパネルの「チケットを開く」で開く。ボタン・リンクの上では選ばない。「閉じる」とEscでパネルを閉じる", async () => {
   const json = boardOf(
     [
       ticketJson("p", { issue: 4 }),
@@ -501,7 +501,7 @@ test("CB-D711 カードを押す（または焦点を当ててEnter）と選ん�
     page.key("Enter", page.one(`${card("w")} button[data-action="review-done"]`));
     await page.settle();
     assert.equal(page.one(PANEL).getAttribute("data-panel"), "p");
-    // ［閉じる］でパネルが消え、選択も外れる
+    // 「閉じる」でパネルが消え、選択も外れる
     page.click(page.one(`${PANEL} button[data-action="panel-close"]`));
     await page.settle();
     assert.equal(page.all(PANEL).length, 0);

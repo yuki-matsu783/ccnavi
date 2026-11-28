@@ -1,11 +1,11 @@
 /**
- * ボードの本体。列（承認待ち・進行中・完了・取り消し、アーカイブを表示すれば5つめ）を横に、親ごとの行を縦に並べる。
+ * チケット管理画面の本体。列（承認待ち・進行中・完了・取り消し、アーカイブを表示すれば5つめ）を横に、親ごとの行を縦に並べる。
  * 親は必ず行の見出し（`CardItem`の`head`）に置き、列の中には子だけを置く。列の見出しの件数は子だけを数える。
  * 「フェーズを表示」で親の行を開くと、フェーズごとの状態と子の一覧を出す（順序は矢印で描かない）。順序は、開いた行の
  * 「計画の流れを見る」で、承認のオーバーレイと同じ図の部品を読むだけで開いて見せる（`PlanFlow.tsx`）。
  *
  * どの親の行に入るかは、カードの`family`（親なら自分、子なら親の識別子）とプロジェクトの組で決める。
- * 親のカードがボードに無い子（親のチケットが読めない・別の場所にある）は、親の識別子だけを見出しにした行に入る。
+ * 親のカードがチケット管理画面に無い子（親のチケットが読めない・別の場所にある）は、親の識別子だけを見出しにした行に入る。
  * 判定はしない。並べるカードと言葉は組み立て（core/board.ts）が決めた値のとおり。
  *
  * 列の幅は全部の行で揃える（CSSのgridの列）。見出しを押すと列を畳み、見出しの右端の取っ手をドラッグすると幅を固定する
@@ -21,7 +21,7 @@ import { post } from "./post.js";
 /** 列の最小の幅（px）。ドラッグでもこれより狭くしない */
 export const MIN_WIDTH = 220;
 
-/** 親ごとの行。`parent`は親のカード（ボードに無ければundefined） */
+/** 親ごとの行。`parent`は親のカード（チケット管理画面に無ければundefined） */
 export interface Lane {
   readonly key: string;
   readonly project: string;
@@ -140,7 +140,7 @@ function LaneRow({ lane, columns, folded, opened, hiddenOf, movedOf, selectedOf,
       ) : (
         <div className="lane-head lane-orphan" data-orphan={lane.family}>
           <span className="lane-orphan-id">親 {lane.family}</span>
-          <span className="lane-orphan-note">親のチケットはボードにありません</span>
+          <span className="lane-orphan-note">親のチケットはチケット管理画面にありません</span>
         </div>
       )}
       {open && parent !== undefined ? <LanePhases parent={parent} childCards={lane.children} onPlanFlow={() => onPlanFlow(parent)} /> : null}
@@ -215,7 +215,7 @@ function LanePhases({ parent, childCards, onPlanFlow }: { readonly parent: Card;
   );
 }
 
-/** 承認待ちの親の［計画編集］。出すかは組み立て（`card.workflow`）が決め、押したら拡張ホストへ返すだけ */
+/** 承認待ちの親の「計画編集」。出すかは組み立て（`card.workflow`）が決め、押したら拡張ホストへ返すだけ */
 function WorkflowHeadButton({ id }: { readonly id: string }): JSX.Element {
   return (
     <button

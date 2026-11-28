@@ -1,5 +1,5 @@
 /*
- * ボードの本体（`Lanes.tsx`）。列の見出しを1行目に、親ごとの行をその下に並べる。列の幅は全部の行で揃える（grid。
+ * チケット管理画面の本体（`Lanes.tsx`）。列の見出しを1行目に、親ごとの行をその下に並べる。列の幅は全部の行で揃える（grid。
  * 列の幅の指定は`Lanes.tsx`の`tracksOf`がインラインのstyleで書く）。親ごとの行（`.lane`）は箱を作らず（display: contents）、
  * 見出し・開いたフェーズ・列ごとのセルが、そのままgridに並ぶ。
  * 4列が220pxずつ収まらない幅（940px以下）では、gridをやめて親ごとの行を縦に積み、行の中で子を列の名前つきで並べる。
@@ -48,7 +48,7 @@ button.fold:focus-visible { outline: 1px solid var(--vscode-focusBorder); outlin
 .lane-head .status { margin-left: 0; }
 .lane-head .stage, .lane-head .moved-mark, .lane-head .badges { margin-top: 0; }
 .lane-head .card-primary { margin: 0 0 0 auto; }
-/* 親のチケットがボードに無い子の行の見出し。選べない（パネルに出す親が無い） */
+/* 親のチケットがチケット管理画面に無い子の行の見出し。選べない（パネルに出す親が無い） */
 .lane-orphan {
   margin-top: 14px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: var(--gap-2) var(--gap-4); align-items: baseline;
   border: 1px dashed var(--vscode-panel-border); border-radius: var(--radius-lg);

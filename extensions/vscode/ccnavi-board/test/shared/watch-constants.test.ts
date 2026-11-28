@@ -51,7 +51,7 @@ test("CB-T577 自分の書き込みを抑える画面は、監視の通知の前
   assert.match(read("handoff-panel.ts"), /current\.writing \|\| Date\.now\(\) - current\.wroteAt/);
 });
 
-test("CB-T1289 拡張全体の答えは、ボードの置き場・全ツリーの取り込み待ちの下書きと取り込み先・設定ファイルを見張る。ボードは自分で見張らない", () => {
+test("CB-T1289 拡張全体の答えは、チケット管理画面の置き場・全ツリーの取り込み待ちの下書きと取り込み先・設定ファイルを見張る。チケット管理画面は自分で見張らない", () => {
   for (const glob of [...WATCH_PATTERNS, ...HANDOFF_PATTERNS]) {
     assert.ok((FEED_PATTERNS as readonly string[]).includes(glob), glob);
   }
@@ -61,7 +61,7 @@ test("CB-T1289 拡張全体の答えは、ボードの置き場・全ツリー�
   }
   assert.match(read("board-feed.ts"), /watchGlobs\(folder, FEED_PATTERNS,/);
   assert.match(read("handoff-panel.ts"), /watchGlobs\(current\.folder, HANDOFF_PATTERNS,/);
-  // ボードとチケット制御は監視を持たず、拡張全体の答えを聞く
+  // チケット管理画面とチケット制御は監視を持たず、拡張全体の答えを聞く
   for (const name of ["board-panel.ts", "ticket-control.ts", "sidebar.ts"]) {
     assert.doesNotMatch(read(name), /watchTickets|watchGlobs|loadBoard/, name);
     assert.match(read(name), /boardFeed\.subscribe/, name);

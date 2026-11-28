@@ -1,7 +1,7 @@
 /**
  * Webviewパネルの生成・更新・破棄と、Webviewからの操作の受け付け。答えの読み直しとファイル監視は拡張全体の
  * `board-feed.ts`が持ち、ここは届いた答えを描く（サイドパネルと同じ答え）。サイドパネルの行から開くときは、
- * 開いたあとに進む場所（`BoardTarget`）を受けて、ボードが読めたら進む。
+ * 開いたあとに進む場所（`BoardTarget`）を受けて、チケット管理画面が読めたら進む。
  * VS CodeのAPIに触れるので単体テストの対象外。docs/design/manual-checks.mdの手動確認の手順で確かめる。
  */
 import * as crypto from "node:crypto";
@@ -68,7 +68,7 @@ interface PanelState {
   /** 次に描いたときに選ぶ絞り込み。1度使ったら消す（以後はWebviewのstateが覚える） */
   filter?: string;
   /**
-   * 開いたあとに進む場所（サイドパネルの行から）。ボードが読めたら1度だけ行う。`project`は`filter`に、`select`は`select`に移す
+   * 開いたあとに進む場所（サイドパネルの行から）。チケット管理画面が読めたら1度だけ行う。`project`は`filter`に、`select`は`select`に移す
    */
   target?: BoardTarget;
   /** 画面に送って選ばせるカード（右のパネルに出す）。届いたら消す（絞り込みと同じく、作り直し中は持ち越す） */
@@ -137,7 +137,7 @@ export async function openBoard(target?: BoardTarget): Promise<void> {
     state.wasVisible = true;
     state.panel.reveal(state.panel.viewColumn);
     aim(state, target);
-    // 読めているボードで、絞り込みとカードの焦点をすぐに渡し、覚えた場所へ進む（読み直しを待たない）
+    // 読めているチケット管理画面で、絞り込みとカードの焦点をすぐに渡し、覚えた場所へ進む（読み直しを待たない）
     redraw(state);
     runTarget(state);
     void update();
@@ -188,7 +188,7 @@ export async function openBoard(target?: BoardTarget): Promise<void> {
   void update();
 }
 
-/** 進む場所を覚える。絞り込みと選ぶカードは画面に送るもの、ほかはボードが読めたら行うもの */
+/** 進む場所を覚える。絞り込みと選ぶカードは画面に送るもの、ほかはチケット管理画面が読めたら行うもの */
 function aim(current: PanelState, target: BoardTarget | undefined): void {
   if (target === undefined) {
     return;
@@ -203,8 +203,8 @@ function aim(current: PanelState, target: BoardTarget | undefined): void {
 }
 
 /**
- * 覚えた場所へ進む。ボードが読めていなければ待つ（次に読めたときに`apply`から呼ばれる）。
- * 行けるかは、カードのボタンを押したときと同じく遷移の側が、いまのボードで確かめる
+ * 覚えた場所へ進む。チケット管理画面が読めていなければ待つ（次に読めたときに`apply`から呼ばれる）。
+ * 行けるかは、カードのボタンを押したときと同じく遷移の側が、いまのチケット管理画面で確かめる
  */
 function runTarget(current: PanelState): void {
   const target = current.target;
@@ -214,7 +214,7 @@ function runTarget(current: PanelState): void {
   current.target = undefined;
   switch (target.kind) {
     case "approve":
-      // カードの［承認］と同じ。その1件だけを絞りとして送る
+      // カードの「承認」と同じ。その1件だけを絞りとして送る
       approveTickets(current, [target.ticket], true);
       return;
     case "decide":
@@ -278,7 +278,7 @@ function registerPanelHandlers(current: PanelState): void {
     }
   });
 
-  // 読み直しは拡張全体の答え（`board-feed.ts`）が持つ。監視もそちらで、ボードを閉じていても続く
+  // 読み直しは拡張全体の答え（`board-feed.ts`）が持つ。監視もそちらで、チケット管理画面を閉じていても続く
   current.stopFeed = boardFeed.subscribe((result) => apply(current, result));
 }
 
@@ -296,7 +296,7 @@ function apply(current: PanelState, result: LoadResult): void {
   if (!result.ok) {
     // 開いている間の失敗は閉じない。前の表示を消して、何が起きたかを見せる。
     // 承認のオーバーレイは引き継いで残す。承認した文は取り返しがつかないので、
-    // ボードが描けないことを理由に消さない。進む場所も捨てる（読めないボードでは確かめられない）
+    // チケット管理画面が描けないことを理由に消さない。進む場所も捨てる（読めないチケット管理画面では確かめられない）
     current.board = undefined;
     current.target = undefined;
     showError(current, result.error);
@@ -305,7 +305,7 @@ function apply(current: PanelState, result: LoadResult): void {
   const board = buildBoard(result.board);
   current.board = board;
   // 承認待ちの親の提案に無い親の、計画編集タブの保存のハッシュを忘れる。ターミナルやChrome拡張で承認した・
-  // 取り下げた親を、あとで出す改版の提案と比べない（ボードから承認したときは承認の結果でも忘れる）
+  // 取り下げた親を、あとで出す改版の提案と比べない（チケット管理画面から承認したときは承認の結果でも忘れる）
   forgetSaved(staleSaved(workflowTabs().saved, todoParentsOf(board)));
   show(current, board);
   runTarget(current);
@@ -358,7 +358,7 @@ function send(current: PanelState, data: BoardData): void {
   if (filter !== undefined && current.host.post({ type: "filter", project: filter } satisfies ToBoard)) {
     current.filter = undefined;
   }
-  // 選ぶカードも同じ。中身のあとに送る（画面は届いた中身のカードを探す）。読めたボードのときだけ
+  // 選ぶカードも同じ。中身のあとに送る（画面は届いた中身のカードを探す）。読めたチケット管理画面のときだけ
   const select = current.select;
   if (select !== undefined && data.kind === "board" && current.host.post({ type: "select", ticket: select } satisfies ToBoard)) {
     current.select = undefined;
@@ -502,12 +502,12 @@ function handleMessage(message: BoardMessage | undefined): void {
   }
 }
 
-/** 承認のオーバーレイを開く。突き合わせる相手（いまのボードの承認待ち）をつけて渡し、決めるのは遷移の側 */
+/** 承認のオーバーレイを開く。突き合わせる相手（いまのチケット管理画面の承認待ち）をつけて渡し、決めるのは遷移の側 */
 function approveTickets(current: PanelState, tickets: readonly string[], filtered: boolean): void {
   dispatch(current, { kind: "approve", tickets, filtered, pending: current.board?.pendingApproval ?? [] });
 }
 
-/** レビュー完了を始める。ボードから引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める */
+/** レビュー完了を始める。チケット管理画面から引くもの（親のワークツリー・フェーズ）をつけて渡し、開いてよいかは遷移の側が決める */
 function startDecide(current: PanelState, parent: string, phase: number): void {
   dispatch(current, {
     kind: "decide",

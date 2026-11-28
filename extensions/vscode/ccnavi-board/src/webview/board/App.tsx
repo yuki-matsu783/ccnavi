@@ -1,5 +1,5 @@
 /**
- * ボード画面の本体。列とカード、選んだカードの右のパネル、絞り込み、承認のオーバーレイ。
+ * チケット管理画面の本体。列とカード、選んだカードの右のパネル、絞り込み、承認のオーバーレイ。
  *
  * 見せる中身は拡張ホストが渡す（`BoardData`）。承認のオーバーレイも、動いた表示も、
  * 決めて覚えるのは拡張ホストで、ここは渡された分を出すだけ。画面が自分で持つのは、ユーザが触って
@@ -213,7 +213,7 @@ export function App({ initial }: { readonly initial: BoardData }): JSX.Element {
     document.body.classList.toggle("filtering", filtering);
   }, [filtering]);
 
-  // 選んだカード。覚えるのは実際のボードのカードだけ（消えたカードなら外す）。
+  // 選んだカード。覚えるのは実際のチケット管理画面のカードだけ（消えたカードなら外す）。
   // 読み直せなかった画面（boardが無い）では、覚えていた分を触らない
   const selected = board === undefined || board.columns.some((column) => column.cards.some((card) => cardKey(card) === view.selected)) ? view.selected : EMPTY.selected;
 

@@ -3,7 +3,7 @@
  * 承認済みチケットとマーカー（同じツリーの`.ccnavi/approved/`。`doing/` `done/` `phases/`）、ワークツリーの登録、
  * クローズしたチケットの退避（ワークスペースの`logs/archive/`。`ccnavi-review.sh ready`が移す）。
  *
- * 拡張全体の答え（`board-feed.ts`。ボードとサイドパネルが読む）と6つの画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理・
+ * 拡張全体の答え（`board-feed.ts`。チケット管理画面とサイドパネルが読む）と6つの画面（ルール管理・リスク管理・フェーズ管理・テンプレート管理・
  * フロー編集・計画編集）が同じ場所を見るので、どれか1つの画面に
  * 置いて他から引かせず、ここに1本だけ置く。globはOSによらず "/" 区切り。
  */
@@ -37,7 +37,7 @@ export const HANDOFF_PATTERNS = [
 ] as const;
 
 /**
- * 拡張全体で`--explain --json`を読み直す場所（`board-feed.ts`）。ボードの置き場に、取り込み待ちの数（`inbox.handoff`）と
+ * 拡張全体で`--explain --json`を読み直す場所（`board-feed.ts`）。チケット管理画面の置き場に、取り込み待ちの数（`inbox.handoff`）と
  * チケット制御（`settings.ticket_control`）が変わる場所を足したもの。フローの下書き（`wip/proposals/flows/`）は提案の置き場に入る
  */
 export const FEED_PATTERNS = [...WATCH_PATTERNS, ...HANDOFF_PATTERNS] as const;

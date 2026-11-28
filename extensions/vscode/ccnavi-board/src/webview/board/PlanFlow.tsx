@@ -1,7 +1,7 @@
 /**
  * 承認済みの親の計画の流れ（開いた親の行の「計画の流れを見る」）。承認のオーバーレイと同じ図の部品（`PlanGraph`）を
  * 読むだけで出す。中身は`--explain --json`の`parents[].plans`で、実行ファイルが承認のpreviewと同じ関数で組んだもの。
- * 承認・編集の操作は置かない。開いているかは画面だけが持ち（拡張ホストへは返さない）、Escか［閉じる］で閉じる。
+ * 承認・編集の操作は置かない。開いているかは画面だけが持ち（拡張ホストへは返さない）、Escか「閉じる」で閉じる。
  */
 import { useEffect, useRef, type JSX } from "react";
 
@@ -12,7 +12,7 @@ import { ESCAPE_LAYER, useEscape } from "../useEscape.js";
 
 export function PlanFlow({ card, onClose }: { readonly card: Card; readonly onClose: () => void }): JSX.Element {
   const box = useRef<HTMLElement>(null);
-  // 開いたら［閉じる］に焦点を置く
+  // 開いたら「閉じる」に焦点を置く
   useEffect(() => {
     box.current?.querySelector<HTMLButtonElement>('button[data-action="plan-flow-close"]')?.focus({ preventScroll: true });
   }, [card.id]);

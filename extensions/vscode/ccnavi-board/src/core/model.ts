@@ -274,7 +274,7 @@ export interface ParentJson {
   readonly feedback: readonly unknown[] | null;
   /**
    * 計画の流れ（図の中身。計画ごとに1件）。承認のpreviewの`plans`と同じ形で、実行ファイルの同じ関数が組む。
-   * 計画を持たない親は空で、ボードは「計画の流れを見る」を出さない
+   * 計画を持たない親は空で、チケット管理画面は「計画の流れを見る」を出さない
    */
   readonly plans: readonly ApprovePlan[];
   readonly close_early: Record<string, unknown> | null;
