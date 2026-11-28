@@ -101,6 +101,40 @@ export interface FlowDraftJson {
   readonly exists: boolean;
   /** ファイルか、ツリーのルートからそこまでの途中がシンボリックリンク（実行ファイルの答え） */
   readonly linked: boolean;
+  /**
+   * 「提案あり」を出すか。下書きが在り、読めないか、いまのフローと位置とグループ化を除いて違う（いまのフローが無ければ在るだけで真）。
+   * 実行ファイルの答え
+   */
+  readonly differs: boolean;
+}
+
+/** レビュー待ちのフェーズ1つ */
+export interface InboxReviewJson {
+  readonly parent: string;
+  readonly phase: number;
+}
+
+/** 取り込み待ちのあるツリー1つ。`tree`は`trees[].root` */
+export interface InboxHandoffJson {
+  readonly tree: string;
+  readonly count: number;
+}
+
+/**
+ * ユーザ待ちの分類（実行ファイルの答え）。1つのチケットは上から最初に当てはまる1種類だけに入る。
+ * 拡張は数を並べるだけで、分け直さない
+ */
+export interface InboxJson {
+  /** 承認待ち（`pending_approval`と同じ） */
+  readonly approval: readonly string[];
+  /** レビュー待ちのフェーズ */
+  readonly review: readonly InboxReviewJson[];
+  /** `attention`のうち上の2つに入らないチケット */
+  readonly notice: readonly string[];
+  /** ツリーごとの取り込み待ちの数（0のツリーは無い） */
+  readonly handoff: readonly InboxHandoffJson[];
+  /** `attention`ではなく、フローの下書きが「提案あり」の子 */
+  readonly flow_draft: readonly string[];
 }
 
 /**
@@ -367,6 +401,8 @@ export interface BoardJson {
   readonly projects: readonly string[];
   readonly problems: readonly string[];
   readonly pending_approval: readonly string[];
+  /** ユーザ待ちの分類 */
+  readonly inbox: InboxJson;
   readonly tickets: readonly TicketJson[];
   readonly parents: readonly ParentJson[];
   /** 手元の退避にあるクローズしたチケット（表示用） */
@@ -423,11 +459,26 @@ export function parseBoardJson(text: string): ParseResult {
       projects: list(raw.projects).map(str),
       problems: list(raw.problems).map(str),
       pending_approval: list(raw.pending_approval).map(str),
+      inbox: inboxOf(isRecord(raw.inbox) ? raw.inbox : {}),
       tickets: list(raw.tickets).filter(isRecord).map(ticket),
       parents: list(raw.parents).filter(isRecord).map(parent),
       archived: list(raw.archived).filter(isRecord).map(archived),
       turns: list(raw.turns).filter(isRecord).map(turnOf),
     },
+  };
+}
+
+function inboxOf(raw: Record<string, unknown>): InboxJson {
+  return {
+    approval: list(raw.approval).map(str),
+    review: list(raw.review)
+      .filter(isRecord)
+      .map((r) => ({ parent: str(r.parent), phase: typeof r.phase === "number" ? r.phase : 0 })),
+    notice: list(raw.notice).map(str),
+    handoff: list(raw.handoff)
+      .filter(isRecord)
+      .map((h) => ({ tree: str(h.tree), count: typeof h.count === "number" ? h.count : 0 })),
+    flow_draft: list(raw.flow_draft).map(str),
   };
 }
 
@@ -594,7 +645,7 @@ function flowDraft(raw: Record<string, unknown>): FlowDraftJson | null {
   if (path === "") {
     return null;
   }
-  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked === true };
+  return { path, rel: str(raw.rel), exists: raw.exists === true, linked: raw.linked === true, differs: raw.differs === true };
 }
 
 function seenIn(value: unknown): readonly SeenInJson[] {

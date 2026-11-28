@@ -163,6 +163,21 @@ func (p *Plan) Selected() []*Entry {
 	return out
 }
 
+// Waiting は取り込める下書きの数。状態が new か changed のもの（error があれば rejected なので入らない）。
+// ターミナルでだけ取り込めるもの（ボードの経路の外）も数える。全体の誤りがあれば 0。
+func (p *Plan) Waiting() int {
+	if p.Error != "" {
+		return 0
+	}
+	n := 0
+	for _, e := range p.Entries {
+		if s := e.State(); s == stateNew || s == stateChanged {
+			n++
+		}
+	}
+	return n
+}
+
 // Expect は選んだ対象の照合の値（--expect）。
 func (p *Plan) Expect() string { return expectOf(p.Selected()) }
 

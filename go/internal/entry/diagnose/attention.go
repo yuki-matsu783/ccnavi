@@ -19,7 +19,8 @@ func markAttention(rows []*ticketRow, parents []*parentRow, pending map[string]b
 	for _, r := range rows {
 		found := issues(r, ids)
 		r.obj.Set("issues", found)
-		r.obj.Set("attention", attention(r, byID, pending, len(found) > 0))
+		r.attention = attention(r, byID, pending, len(found) > 0)
+		r.obj.Set("attention", r.attention)
 	}
 }
 

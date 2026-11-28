@@ -443,6 +443,47 @@ func TestAttentionAndIssuesFollowTheScene(t *testing.T) {
 	}
 }
 
+// inbox は 1 チケット 1 種類で分ける。承認待ちの子は approval だけに入り、notice に重ねない。フローの下書きが在る
+// 子は flow_draft に、ツリーの取り込める下書きは handoff に数える。
+func TestInboxSortsWaitingTicketsAndDrafts(t *testing.T) {
+	t.Parallel()
+	tr := boardSceneBuild(t)
+	board := tr.board()
+	inboxList := func(b map[string]any, key string) []string {
+		var out []string
+		for _, v := range jl(b, "inbox", key) {
+			s, _ := v.(string)
+			out = append(out, s)
+		}
+		return out
+	}
+	if got := inboxList(board, "approval"); !slices.Equal(got, []string{"i0001-02-03"}) {
+		t.Errorf("approval = %v", got)
+	}
+	for _, key := range []string{"review", "notice", "handoff", "flow_draft"} {
+		if len(jl(board, "inbox", key)) != 0 {
+			t.Errorf("%s = %v", key, jv(board, "inbox", key))
+		}
+	}
+	var draft string
+	for _, tk := range jl(board, "tickets") {
+		if js(tk, "ticket") == "i0001-02-02" {
+			draft = js(tk, "flow", "draft", "path")
+		}
+	}
+	ticketkit.Write(t, draft, "id: f\nnodes:\n  - {id: start, type: start}\n")
+	ticketkit.Write(t, filepath.Join(tr.Root, ".ccnavi", "docs", "note.md"), "前\n")
+	ticketkit.Write(t, filepath.Join(tr.Root, "wip", "handoff", ".ccnavi", "docs", "note.md"), "後\n")
+	board = tr.board()
+	if got := inboxList(board, "flow_draft"); !slices.Equal(got, []string{"i0001-02-02"}) {
+		t.Errorf("flow_draft = %v", got)
+	}
+	handoffs := jl(board, "inbox", "handoff")
+	if len(handoffs) != 1 || js(handoffs[0], "tree") != tr.Root || jv(handoffs[0], "count") != float64(1) {
+		t.Errorf("handoff = %v", handoffs)
+	}
+}
+
 // finish が書いた merged_sha（合流した子の先頭）をボードの JSON に載せる（表示だけ）。
 func TestTheMergedHeadOfAChildIsShown(t *testing.T) {
 	t.Parallel()
@@ -498,4 +539,14 @@ func TestBoardShapeMatchesTheExtensionFixture(t *testing.T) {
 	sameKeys("parents[0]", jv(fixture, "parents", 0), jv(board, "parents", 0))
 	sameKeys("parents[0].phases[0]", jv(fixture, "parents", 0, "phases", 0), jv(board, "parents", 0, "phases", 0))
 	sameKeys("sums[0].phases", jv(fixture, "sums", 0, "phases"), jv(board, "sums", 0, "phases"))
+	sameKeys("inbox", jv(fixture, "inbox"), jv(board, "inbox"))
+	flowOf := func(root map[string]any) any {
+		for _, tk := range jl(root, "tickets") {
+			if f := jv(tk, "flow", "draft"); f != nil {
+				return f
+			}
+		}
+		return nil
+	}
+	sameKeys("tickets[].flow.draft", flowOf(fixture), flowOf(board))
 }

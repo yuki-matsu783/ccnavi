@@ -149,6 +149,7 @@ test("CB-T293 下書きの置き場は実行ファイルのflow.draftのコピ�
     rel: "wip/proposals/flows/i0001-02-03.yml",
     exists: false,
     linked: false,
+    differs: false,
   });
 });
 

@@ -98,6 +98,8 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 			projects = append(projects, t.Name)
 		}
 	}
+	// 取り込み待ちはチケットに関わらないので、チケット制御が切れていても数える。
+	handoffs := handoffWaiting(trees)
 	turns := []any{}
 	for _, t := range turn.Active(conf.State, time.Now()) {
 		turns = append(turns, pyjson.NewObject("session", t.Session, "since", t.Since.Unix(), "seen", t.Seen.Unix()))
@@ -114,6 +116,8 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 		"sums", sumRecords(conf, root, stderr),
 		"problems", nil,
 		"pending_approval", []string{},
+		// ユーザ待ちの分類。チケットの分は全チケットと親が揃ってから決める（inboxRecord）。
+		"inbox", inboxRecord(nil, nil, nil, handoffs),
 		"tickets", []any{},
 		"parents", []any{},
 		// 手元の退避にある閉じたチケット。表示のためだけに載せ、判定には混ぜない。
@@ -208,6 +212,7 @@ func board(conf *config.Settings, root string, stderr io.Writer, modeFlag, ticke
 		}
 	}
 	markAttention(rows, families, waiting)
+	payload.Set("inbox", inboxRecord(rows, families, pendingIDs, handoffs))
 	tickets := make([]any, len(rows))
 	skip := map[[2]string]bool{}
 	for i, r := range rows {
@@ -422,6 +427,8 @@ type ticketRow struct {
 	worktree            bool
 	risk                *pyjson.Object
 	scattered           bool
+	// flowDraft はフローの下書きが「提案あり」か（flow.draft.differs）。attention は markAttention が決める。
+	flowDraft, attention bool
 }
 
 // ticketRecord はチケット 1 件。状態は承認済みチケットの置き場で決め、項目は提案があれば提案を、無ければ承認済みの
@@ -490,6 +497,8 @@ func ticketRecord(conf *config.Settings, root, id string, idx indexes, worktrees
 	if flowSource == nil {
 		flowSource = source
 	}
+	flowInfo := flow.FlowInfo(conf, root, flowSource)
+	flowDraft := flow.DraftDiffers(flowInfo)
 	var riskRecord, judgeRecord any
 	var riskObj *pyjson.Object
 	if source.Parent != "" {
@@ -533,13 +542,13 @@ func ticketRecord(conf *config.Settings, root, id string, idx indexes, worktrees
 		"in_progress", isOpen && openCopy.State == place.Doing && openCopy.InProgress(),
 		"seen_in", nonNilAny(seenIn),
 		"scattered", nonNilAny(scattered),
-		"flow", flowObject(flow.FlowInfo(conf, root, flowSource)),
+		"flow", flowObject(flowInfo, flowDraft),
 		"risk", riskRecord,
 		"judge", judgeRecord,
 	)
 	return &ticketRow{obj: obj, id: id, parent: source.Parent, project: source.Project, phase: source.Phase,
 		hasProposal: proposal != nil, status: status, blocked: blocked, worktree: hasTree, risk: riskObj,
-		scattered: len(scattered) > 0}
+		scattered: len(scattered) > 0, flowDraft: flowDraft}
 }
 
 func nonNilAny(s []any) []any {
@@ -568,9 +577,9 @@ func needValue(n ticket.Need) any {
 	return nil
 }
 
-// flowObject はボードのフローの欄。draft はエージェントの下書き（効力は無い）。locked は判定がそのフローへの書き込みを
-// 止めているか、lock_kind はその種類（止めていなければ null）。
-func flowObject(info *flow.Info) any {
+// flowObject はボードのフローの欄。draft はエージェントの下書き（効力は無い）で、differs はそれを「提案あり」として
+// 見せるか（flow.DraftDiffers）。locked は判定がそのフローへの書き込みを止めているか、lock_kind はその種類（止めていなければ null）。
+func flowObject(info *flow.Info, differs bool) any {
 	if info == nil {
 		return nil
 	}
@@ -581,7 +590,7 @@ func flowObject(info *flow.Info) any {
 	return pyjson.NewObject("path", info.Path, "rel", info.Rel, "tree", info.Tree, "exists", info.Exists,
 		"linked", info.Linked, "locked", info.Locked(), "lock_kind", kind,
 		"draft", pyjson.NewObject("path", info.Draft.Path, "rel", info.Draft.Rel, "exists", info.Draft.Exists,
-			"linked", info.Draft.Linked))
+			"linked", info.Draft.Linked, "differs", differs))
 }
 
 // parentRow は親 1 件の JSON と、要対応を決めるのに読むフェーズの欄。
