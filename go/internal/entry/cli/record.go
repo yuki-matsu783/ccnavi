@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fsio"
 	"ccnavi/internal/infra/ospath"
@@ -25,7 +24,7 @@ const recordDir = "write-and-push"
 // （上書きで置き場を動かせば、どこへでも書ける経路になる）。比べるのは行き着く先で、途中にリンクがあれば断る。
 // コマンドが失敗しても、そこまでに書いたパスで一覧を書く（失敗した回も戻すのに一覧を使う）。一覧を書けなければ、
 // コマンドの結果に依らず 1 で終わる。
-func recordedRun(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) int {
+func recordedRun(in *input, stdout, stderr io.Writer, parser *argReader, a opts, unmarked *useronly.Verb) int {
 	// 1. 書き出し先を決めて検査する。書き出し先はワークスペースの既定の state の下だけ（行き着く先で比べる）。
 	wrapper := opts{maps.Clone(a.Namespace), a.parser}
 	if !oneWrapperFlagEach(stderr, wrapper) {

@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/fsio"
@@ -104,7 +103,7 @@ func readList(path string) ([]string, bool) {
 // wapWrite は `--record-commit <文>` つきの 1 回。親のワークツリーで、元の先頭を読み、子の finish なら子の先頭を
 // 合流し（`--record-merge <sha>`）、状態の操作を書き込みの記録つきで走らせ、書いたパスをコミットする。失敗したら
 // この起動の中で合流ごと元に戻す。INT・TERM・HUP は受けて、書き終えてから戻して 130 で終える（途中で死なない）。
-func wapWrite(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) int {
+func wapWrite(in *input, stdout, stderr io.Writer, parser *argReader, a opts, unmarked *useronly.Verb) int {
 	answerPath := resolvedTarget(a.Str("record_writes")) + wapAnswerSuffix
 	listPath := resolvedTarget(a.Str("record_writes"))
 	ans := &wapAnswer{}
@@ -116,7 +115,7 @@ func wapWrite(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a op
 	return code
 }
 
-func wapWriteSteps(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb,
+func wapWriteSteps(in *input, stdout, stderr io.Writer, parser *argReader, a opts, unmarked *useronly.Verb,
 	ans *wapAnswer, listPath string) int {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)

@@ -160,7 +160,7 @@ root=$(ccnavi_workspace) || ccnavi_no_workspace ccnavi-ticket
 # 実行ファイル。識別子の読み・結果ファイル・子のワークツリーも実行ファイルに聞くので、最初に探す。
 ccnavi_wap_use_exe "$root" || ccnavi_no_bin ccnavi-ticket
 
-# 識別子は実行ファイル（`ticket-sh id`）が、本体の ticket の引数の読み（argparse）と同じに読む。`--` と `--reason <値>` を
+# 識別子は実行ファイル（`ticket-sh id`）が、本体の ticket の引数の読みと同じに読む。`--` と `--reason <値>` を
 # 読み飛ばした最初の語。使える識別子なら ticket_id に入れ、使えなければ空にして断りの文を ticket_bad に入れる。
 ticket_ask() {
 	ccnavi_wap_exe ticket-sh "$@" 2>/dev/null </dev/null | tr -d '\r'
@@ -268,7 +268,7 @@ start | finish | cancel | approval-request | consolidate)
 	ccnavi_wap_sh="$(dirname "$0")"
 	trap 'ccnavi_wap_end' EXIT
 	trap 'ccnavi_wap_end; exit 130' INT TERM HUP
-	# 識別子は実行ファイル（argparse）と同じに読む（上の ticket_id。`start -- <親>` で write-and-push を経ずに通らないようにする）。
+	# 識別子は実行ファイルの引数の読みと同じに読む（上の ticket_id。`start -- <親>` で write-and-push を経ずに通らないようにする）。
 	wap_id="$ticket_id"
 	if [ -z "$wap_id" ]; then
 		printf 'ccnavi-ticket: %s\n' "${ticket_bad:-$1 には識別子を指定してください（実行ファイルが答えませんでした）。}" >&2

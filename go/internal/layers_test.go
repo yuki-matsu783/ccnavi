@@ -53,7 +53,6 @@ var subTiers = map[string]map[string]int{
 		"platformtag": 1,
 		"yaml":        1,
 		"pyre":        1, // re の写し（RE2 で書けない式を、ルールの書き手が想定する re と同じ答えで読む）
-		"argparse":    1, // argparse の写し（CLI の引数の読みと usage・エラーの文）
 		// 2: ファイル・設定・入出力・照合
 		"fsio":      2,
 		"config":    2,

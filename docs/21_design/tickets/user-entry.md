@@ -76,7 +76,7 @@ keywords: [ユーザ専用, user, 入口, 表, useronly, ccnavi-user, hook, 読�
 
 `user <操作>` は、どこから呼ばれたかを示す印 `--entry <値>` を `user` の前に付けて呼ぶ。値は `sh`（`ccnavi-user-*.sh`）と
 `board`（拡張のチケット管理画面の子プロセス）の 2 つ。印は `wrapperOptions` に入っていて、読み替え（`Rewrite`）と hook の正規表現は
-読み飛ばす。実行ファイルは `useronly.TakeEntry` で argv から外し、argparse の結果（`args`）には入れない。値が 2 つのどちらでもない、
+読み飛ばす。実行ファイルは `useronly.TakeEntry` で argv から外し、引数の読みの結果（`args`）には入れない。値が 2 つのどちらでもない、
 2 度ある、`user` の入口でない形は `useronly.EntryError` で断る（終了コード 2）。
 
 印が無い `user <操作>` は、設定を読んでガードを解いた直後に、見るだけの形も含めて断る（`useronly.DirectRefusal`。終了コード 2）。
@@ -93,11 +93,11 @@ hook が止める。
 値を取る操作（`reviewed`）で値が無い、または知らない操作のときは `useronly.EntryError` で、使い方を標準エラーに出して終了コード 2 で終わる。
 `user` で始まらない引数はそのまま通る。
 
-「`user` の入口から来た」という事実は argparse の結果（`args`）に入れず、`Rewrite` が返す操作を別の変数（`entry`）で持つ。
+「`user` の入口から来た」という事実は 引数の読みの結果（`args`）に入れず、`Rewrite` が返す操作を別の変数（`entry`）で持つ。
 オプションで偽装できないようにするため、`args` には何も足さない。
 
-argparse が読んだ後、`entry` が空（`user` の外）で、`useronly.Refused` が空でなければ、何も動かさず標準エラーに断りを書いて終了コード 2 で終わる。
-`Refused` は `flags` の `gated` の行を、argparse の結果で見る（argv の文字列を探さない）。`--yes` は、どの操作にも付くので最後に見る。
+引数を読んだ後、`entry` が空（`user` の外）で、`useronly.Refused` が空でなければ、何も動かさず標準エラーに断りを書いて終了コード 2 で終わる。
+`Refused` は `flags` の `gated` の行を、引数の読みの結果で見る（argv の文字列を探さない）。`--yes` は、どの操作にも付くので最後に見る。
 `unlessPreview` の条件にヒットする形（`--agree --preview`、`--prune --preview`、`--reviewed … --preview`）は断らない。`--handoff` と `--mirror` は `--yes` の有無によらず断る。
 断りの文は、対応する sh（`ccnavi-user-agree.sh` など。`Verb.Script`）と、見るだけの形があればそれを案内する。
 

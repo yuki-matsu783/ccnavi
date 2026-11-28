@@ -210,7 +210,7 @@ var pyDigits = &unicode.RangeTable{
 }
 
 // isDigits は Python の s.isdigit()。fd の番号の見分けに使う。空は偽で、上付き・丸数字も数字に数える（pyDigits）。
-// Nd だけを見て空も真にする argparse の allDigits や、ASCII だけを見る pyfmt.IsASCIIDigits とは答えが違うので、寄せない。
+// Nd だけを見る判定や、ASCII だけを見る pyfmt.IsASCIIDigits とは答えが違うので、寄せない。
 func isDigits(s string) bool {
 	if s == "" {
 		return false

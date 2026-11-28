@@ -3,8 +3,6 @@ package cli
 import (
 	"slices"
 	"strings"
-
-	"ccnavi/internal/infra/argparse"
 )
 
 // bareYes は値なしで渡された `--yes` を表す。値なしで読むのは、取り込み（`user handoff --yes`）とミラーの同期
@@ -15,15 +13,13 @@ const bareYes = "\x00bare"
 // newParser は ccnavi の引数の読み手を組む。オプションの前方一致は受け付けない。受け付けると、
 // `--close` や `--review` が `--close-early` や `--reviewed` として走ってしまうが、省略せずに書いた形しか見ない
 // 組み込みの deny では止められない。help の本文は usage/ の文。
-func newParser() *argparse.Parser {
-	p := argparse.New("ccnavi")
-	str := func(flag string) { p.Add(argparse.Arg{Flags: []string{flag}, Default: ""}) }
-	none := func(flag string, metavar ...string) {
-		p.Add(argparse.Arg{Flags: []string{flag}, Metavar: metavar})
-	}
-	flag := func(flags ...string) { p.Add(argparse.Arg{Flags: flags, Kind: argparse.StoreTrue}) }
-	list := func(flag string) { p.Add(argparse.Arg{Flags: []string{flag}, Kind: argparse.Append}) }
-	integer := func(flag string) { p.Add(argparse.Arg{Flags: []string{flag}, Type: argparse.Int}) }
+func newParser() *argReader {
+	p := newArgReader()
+	str := func(flag string) { p.add(argValue, "", flag) }
+	none := func(flag string) { p.add(argValue, nil, flag) }
+	flag := func(flags ...string) { p.add(argSwitch, false, flags...) }
+	list := func(flag string) { p.add(argList, nil, flag) }
+	integer := func(flag string) { p.add(argInt, nil, flag) }
 
 	// sh が計算して渡すパス。2 度来ていないかを見るので並びで受ける（wrapperFlags）。
 	list("--root")
@@ -40,18 +36,18 @@ func newParser() *argparse.Parser {
 	flag("--agree")
 	flag("--preview")
 	flag("--verify")
-	none("--plan-order", "PARENT")
+	none("--plan-order")
 	flag("--fill-phases")
-	none("--order", "JSON")
+	none("--order")
 	flag("--write")
-	none("--expect", "SHA")
-	p.Add(argparse.Arg{Flags: []string{"--yes"}, Nargs: argparse.Optional, Const: bareYes, Default: ""})
+	none("--expect")
+	p.add(argOptional, "", "--yes")
 	str("--digest")
-	p.Add(argparse.Arg{Flags: []string{"--placed-out"}, Default: "", Metavar: []string{"FILE"}})
-	p.Add(argparse.Arg{Flags: []string{"--test"}, Nargs: 2, Metavar: []string{"TOOL", "SUBJECT"}})
+	str("--placed-out")
+	p.add(argPair, nil, "--test")
 	str("--permission-mode")
 	str("--agent-id")
-	p.Add(argparse.Arg{Flags: []string{"--test-expectations"}, Default: "", Metavar: []string{"FILE"}})
+	str("--test-expectations")
 	flag("--explain")
 	flag("--prune")
 	flag("--suggest")
@@ -81,26 +77,25 @@ func newParser() *argparse.Parser {
 	flag("--no-refresh")
 	flag("--learnings")
 	flag("--templates")
-	none("--show", "NAME")
+	none("--show")
 	str("--layer")
-	none("--check-file", "PATH")
-	none("--draft", "PARENT")
+	none("--check-file")
+	none("--draft")
 	str("--name")
 	str("--to")
 	flag("--handoff")
 	flag("--mirror")
-	p.Add(argparse.Arg{Flags: []string{"command"}, Nargs: argparse.ZeroOrMore})
 	list("--cwd")
 	integer("--phase")
 	flag("--check")
-	none("--abandon", "PARENT")
+	none("--abandon")
 	str("--body-file")
 	str("--reason")
 	str("--title")
 	str("--plan")
 	none("--issue")
 	integer("--mr")
-	p.Add(argparse.Arg{Flags: []string{"--scope"}, Kind: argparse.Append, Default: []string{}})
+	p.add(argList, []any{}, "--scope")
 	str("--template")
 	flag("--with-feedback")
 	flag("--feedback")
@@ -127,12 +122,11 @@ func newParser() *argparse.Parser {
 	return p
 }
 
-// opts は読めた引数と、それを読んだ parser である。argparse の Namespace のように、
-// 経路の途中で値を差し替える（sh が渡すパスを 1 本にまとめる、診断の外の差し替えを捨てる）。
-// 欄の名前は argparse の dest と同じにする。
+// opts は読めた引数と、それを読んだ argReader である。経路の途中で値を差し替える
+// （sh が渡すパスを 1 本にまとめる、診断の外の差し替えを捨てる）。欄の名前は `--foo-bar` なら foo_bar。
 type opts struct {
-	argparse.Namespace
-	parser *argparse.Parser
+	Namespace
+	parser *argReader
 }
 
 // given はオプション flag の値が既定と違うか（渡されたか）。
@@ -196,9 +190,9 @@ func beforeDashes(argv []string) []string {
 	return argv
 }
 
-// takeTestWords は `--test` と続く 2 語を、argparse に渡す前に抜き出す。続く 2 語をそのまま取ると、
+// takeTestWords は `--test` と続く 2 語を、読む前に抜き出す。続く 2 語をそのまま取ると、
 // 2 語の中のオプションの名前（`--test Bash --permission-mode auto ls`）まで語として取り込み、
-// testUsage の案内まで届いてしまう。2 語に満たないときと `--` の後ろにあるときは、そのまま argparse に任せる。
+// testUsage の案内まで届いてしまう。2 語に満たないときと `--` の後ろにあるときは、そのまま argReader に任せる。
 func takeTestWords(argv []string) ([]string, []string) {
 	if !slices.Contains(beforeDashes(argv), "--test") {
 		return argv, nil
@@ -212,7 +206,7 @@ func takeTestWords(argv []string) ([]string, []string) {
 }
 
 // helpOfTest は `--test ... --help` を `--help test`（test の節）の形にする。`--test --help` は語が足りず
-// argparse の誤りで落ち、`--help` に届かないため。
+// 引数の誤りで落ち、`--help` に届かないため。
 func helpOfTest(argv []string) []string {
 	head := beforeDashes(argv)
 	if !slices.Contains(head, "--test") || !(slices.Contains(head, "-h") || slices.Contains(head, "--help")) {

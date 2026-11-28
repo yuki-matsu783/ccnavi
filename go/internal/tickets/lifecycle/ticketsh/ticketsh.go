@@ -15,7 +15,7 @@ import (
 	"ccnavi/internal/tickets/model/ids"
 )
 
-// ID は、ccnavi-ticket.sh の引数（先頭はサブコマンド）から識別子を、実行ファイルの ticket の引数の読み（argparse）と同じに
+// ID は、ccnavi-ticket.sh の引数（先頭はサブコマンド）から識別子を、実行ファイルの ticket の引数の読みと同じに
 // 読む。`--` と `--reason <値>` とほかのオプションを読み飛ばした最初の語。`start -- <親>` のように書いて write-and-push を
 // 経ずに通らないよう、sh と実行ファイルで読み方を揃える。
 func ID(args []string) string {

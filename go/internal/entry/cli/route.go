@@ -13,7 +13,6 @@ import (
 	"ccnavi/internal/entry/shask"
 	"ccnavi/internal/entry/suggest"
 	"ccnavi/internal/entry/version"
-	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/env"
 	"ccnavi/internal/infra/ospath"
@@ -106,7 +105,7 @@ func routeOf(a opts) route {
 // hook の経路は、設定を読むところから先のどこで落ちても、内部エラーの応答（hookCrashed）で終える。Run の受けまで
 // 落ちると終了コード 1 になり、Claude Code は PreToolUse の 1 を「止めない」と読むからである。それより前の失敗は
 // Run の受け（runCrashed）が受ける。進み具合（so）は hook の処理（hookSteps）が書き足す。
-func parsed(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, unmarked *useronly.Verb) (code int) {
+func parsed(in *input, stdout, stderr io.Writer, parser *argReader, a opts, unmarked *useronly.Verb) (code int) {
 	r := routeOf(a)
 	// 版だけを出す。受け付けるオプションの一覧は出さない。
 	if r == routeVersion {
@@ -174,7 +173,7 @@ func prepareTicketControl(stderr io.Writer, a opts, conf *config.Settings) {
 	conf.TicketControl = resolveGate(stderr, a.Str("ticket_control"), conf.TicketControl, env.TicketControl)
 }
 
-func routes(in *input, stdout, stderr io.Writer, parser *argparse.Parser, a opts, r route, unmarked *useronly.Verb,
+func routes(in *input, stdout, stderr io.Writer, parser *argReader, a opts, r route, unmarked *useronly.Verb,
 	root string, conf *config.Settings, problems []string, so *hookSoFar) int {
 	isDiagnosis := diagnosing(a)
 	prepare(stderr, a, conf)

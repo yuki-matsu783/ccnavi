@@ -5,7 +5,6 @@ import (
 	"io"
 	"strings"
 
-	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/ospath"
 	"ccnavi/internal/infra/shell"
@@ -21,7 +20,7 @@ var mirrorActionText = map[mirror.Action]string{
 }
 
 // mirrorUsage は `--mirror` の組み合わせの誤り。
-func mirrorUsage(parser *argparse.Parser, a opts) string {
+func mirrorUsage(parser *argReader, a opts) string {
 	if refused := sidewaysProblem(parser, a, "mirror", "user mirror"); refused != "" {
 		return refused
 	}
@@ -44,7 +43,7 @@ func mirrorUsage(parser *argparse.Parser, a opts) string {
 
 // runMirror は `ccnavi user mirror`。プロジェクトのミラーを、ワークスペースの共通設定に揃える。見るだけの形を
 // 含めてユーザ専用。書くのはワークツリーだけで、コミットはしない。
-func runMirror(in *input, stdout, stderr io.Writer, parser *argparse.Parser, conf *config.Settings, root string, a opts) int {
+func runMirror(in *input, stdout, stderr io.Writer, parser *argReader, conf *config.Settings, root string, a opts) int {
 	// 1. 引数の組み合わせを確かめる。
 	asJSON := a.Truthy("json")
 	if refused := mirrorUsage(parser, a); refused != "" {

@@ -106,7 +106,7 @@ error がある間は配点もフェーズ定義も保存できない。
 - 文字コード: 標準入出力は、どの OS でも UTF-8・改行 LF で読み書きする。診断の JSON
   （`--explain` / `--test` / `--test-expectations` / `--lint` / `--suggest` / `--version`）は ASCII に変換し（`pyjson.Options` の既定）、
   承認の JSON と残った指摘の JSON は変換しない（`RawUnicode`）
-- 引数の誤り（`infra/argparse` の `*Error`）は、usage と `ccnavi: error: …` を出して終了コード 1 にする
+- 引数の誤り（`entry/cli` の引数の読み `argReader` の error）は、`ccnavi: error: …` と `ccnavi --help` の案内を出して終了コード 1 にする
 - `ccnavi write-and-push family <親>` の答え（1 行目 `write-and-push 1`、`target yes|no|stop`）は、sh（write-and-push）だけでなく拡張も読む。
   フローを保存した後に承認の push を送るかを、これで決める
 - 診断ログ（`logs/diag/`）の行の形・置き場・レベルは、sh・実行ファイル・拡張の 3 つの logger で揃える。

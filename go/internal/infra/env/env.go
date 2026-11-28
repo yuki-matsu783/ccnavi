@@ -159,5 +159,4 @@ const (
 	HomeDrive   = "HOMEDRIVE"
 	HomePath    = "HOMEPATH"
 	UserName    = "USERNAME"
-	Columns     = "COLUMNS"
 )

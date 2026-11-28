@@ -18,7 +18,7 @@ import (
 
 // 置き場を動かすフラグは 2 組ある。どちらも診断の経路でだけ効く。sh は受け取った引数をそのまま渡すので、
 // 診断の外で受けると、記録を消した形や置き場を差し替えた形でサブコマンドが動いてしまう。
-// 渡されたかは、値が argparse の既定と違うかで見る。
+// 渡されたかは、値が 引数の既定と違うかで見る。
 var (
 	// layerOverrides は設定の置き場を動かすフラグ。前の 3 本は共通設定の中身、後の 2 本は設定を探す先を
 	// 指す。どれを外しても、プロジェクトの設定が丸ごと消える。そうなると実績リスクが下がり、レビュー待ちを
@@ -27,7 +27,7 @@ var (
 	// placeOverrides は記録と状態とチケットの置き場を動かすフラグ。
 	placeOverrides = []string{"--log", "--state", "--approved", "--tickets"}
 	// wrapperFlags は sh が自分で計算して渡すパスと、渡されなかったときにまとめる値。sh は自分の分を先に置き、
-	// エージェントの引数を後ろに付けるので、argparse の後勝ちでは 2 本目で上書きできてしまう。
+	// エージェントの引数を後ろに付けるので、後勝ちでは 2 本目で上書きできてしまう。
 	// 2 度渡す正しい使い方は無いので、2 本目があること自体を断る。
 	wrapperFlags = []struct {
 		flag, dest string
@@ -63,7 +63,7 @@ const (
 )
 
 // oneWrapperFlagEach は、sh が渡すパスが 2 度来ていないかを見て、1 本にまとめる。2 度来ていたら false を返す。
-// 数えるのは argparse に任せる。argv を直接数えると、`--reason=--root` のような別のオプションの値まで数えてしまう。
+// 数えるのは引数の読みに任せる。argv を直接数えると、`--reason=--root` のような別のオプションの値まで数えてしまう。
 func oneWrapperFlagEach(stderr io.Writer, a opts) bool {
 	for _, w := range wrapperFlags {
 		v := a.Namespace[w.dest]

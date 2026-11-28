@@ -38,7 +38,7 @@ func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
-// args は argparse と同じく、位置引数とオプションを入れ替えて書ける。
+// args は、位置引数とオプションを入れ替えて書ける。
 type args struct {
 	pos   []string
 	flags map[string]string

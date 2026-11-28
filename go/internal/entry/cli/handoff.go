@@ -5,7 +5,6 @@ import (
 	"io"
 	"strings"
 
-	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/pyjson"
 	"ccnavi/internal/infra/shell"
@@ -33,7 +32,7 @@ var sidewaysOptions = map[string]bool{
 }
 
 // sidewaysProblem は、`--handoff`（own）・`--mirror` と同時に渡せないオプションのうち最初のもの。
-func sidewaysProblem(parser *argparse.Parser, a opts, own, verb string) string {
+func sidewaysProblem(parser *argReader, a opts, own, verb string) string {
 	for _, action := range parser.Actions() {
 		if action.Dest == own || sidewaysOptions[action.Dest] || len(action.OptionStrings) == 0 {
 			continue
@@ -78,7 +77,7 @@ func failAnswer(stdout, stderr io.Writer, asJSON bool, version int, text string)
 }
 
 // handoffUsage は `--handoff` の組み合わせの誤り。
-func handoffUsage(parser *argparse.Parser, a opts) string {
+func handoffUsage(parser *argReader, a opts) string {
 	if refused := sidewaysProblem(parser, a, "handoff", "user handoff"); refused != "" {
 		return refused
 	}
@@ -99,7 +98,7 @@ func handoffUsage(parser *argparse.Parser, a opts) string {
 
 // runHandoff は `ccnavi user handoff` を処理する。保護対象の下書き（wip/handoff/）を、見るだけか、
 // `--yes` で元の場所へ取り込む。見るだけの形も含めてユーザ専用で、hook が止める。
-func runHandoff(in *input, stdout, stderr io.Writer, parser *argparse.Parser, conf *config.Settings, root string, a opts) int {
+func runHandoff(in *input, stdout, stderr io.Writer, parser *argReader, conf *config.Settings, root string, a opts) int {
 	asJSON := a.Truthy("json")
 	if refused := handoffUsage(parser, a); refused != "" {
 		return failAnswer(stdout, stderr, asJSON, handoff.JSONVersion, refused)

@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"strings"
 
 	"ccnavi/internal/hostreply"
-	"ccnavi/internal/infra/argparse"
 	"ccnavi/internal/infra/config"
 	"ccnavi/internal/infra/fault"
 	"ccnavi/internal/infra/ospath"
@@ -96,15 +94,12 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 		fmt.Fprintf(stderr, "ccnavi: %s\n", texts.SayFault(defaultRoot(), err))
 		return config.ExitBlock
 	}
-	// 引数を読む。`--test` の語と `--help`・`--json` の位置は、argparse に渡す前に整える（どの順に書いても同じに読むため）。
+	// 引数を読む。`--test` の語と `--help`・`--json` の位置は、読む前に整える（どの順に書いても同じに読むため）。
 	parser := newParser()
 	rest, testWords := takeTestWords(jsonOutOfTest(helpOfTest(argv)))
 	ns, err := parser.Parse(rest)
 	if err != nil {
-		var bad *argparse.Error
-		if errors.As(err, &bad) {
-			io.WriteString(stderr, parser.ErrorText(bad.What))
-		}
+		fmt.Fprintf(stderr, "ccnavi: error: %s\n使い方は ccnavi --help で見られます。\n", err)
 		return config.ExitError
 	}
 	// `--test` は後ろの 2 語（TOOL と SUBJECT）を取る。整えるときに取り出した語をここで戻す。
@@ -145,7 +140,7 @@ func run(in *input, stdout, stderr io.Writer, argv []string) int {
 }
 
 // usageRefusal は設定を読む前に分かる組み合わせの誤り。正しければ空。
-func usageRefusal(parser *argparse.Parser, a opts) string {
+func usageRefusal(parser *argReader, a opts) string {
 	if a.Truthy("all") {
 		return "--all は --help と一緒にだけ指定できます（全文を出す）。"
 	}
@@ -189,7 +184,7 @@ func usageRefusal(parser *argparse.Parser, a opts) string {
 
 // testUsage は `--test` と、その payload の欄の組み合わせの誤り。どれも黙って無視せずに断る。無視すると、
 // 試したつもりの呼び出しと違う答えを読む。
-func testUsage(parser *argparse.Parser, a opts) string {
+func testUsage(parser *argReader, a opts) string {
 	if a.IsNone("test") {
 		if a.Str("permission_mode") != "" {
 			return "--permission-mode は --test でだけ指定できる"

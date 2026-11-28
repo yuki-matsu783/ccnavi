@@ -25,7 +25,7 @@ func isWrapperOption(word string) bool {
 
 // asciiLower はコマンドの語を比べる形（ASCII の大文字だけを小文字にする）。casefold を使うと `ſ`（U+017F）が
 // `s` に、`ﬀ` が `ff` になり、hook の式と実行ファイルの読みの片方だけが入口と読む綴りができる。ここで比べるのは
-// パスではなくコマンドの語（argparse と同じく ASCII の綴り）なので、pathcase.Fold の決まりの外にある。
+// パスではなくコマンドの語（引数の読みと同じく ASCII の綴り）なので、pathcase.Fold の決まりの外にある。
 func asciiLower(word string) string {
 	return strings.Map(func(r rune) rune {
 		if 'A' <= r && r <= 'Z' {

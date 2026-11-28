@@ -3,7 +3,7 @@
 // 終了は呼び手（cmd/ccnavi）が行う。
 //
 // 引数の文法、usage、エラーの文、終了コードは、拡張と sh との契約である。
-// 引数の誤りは usage と `ccnavi: error: …` を出し、終了コード 1 にする。`--help` の本文は usage/ の文である。
+// 引数の誤りは `ccnavi: error: …` と `ccnavi --help` の案内を出し、終了コード 1 にする。`--help` の本文は usage/ の文である。
 //
 // hook の経路では、下の部品の error と panic を入口で受け、判定に達しなかった回の内部エラーの応答にする。
 // 終了コード 1 で抜けると、Claude Code は PreToolUse の呼び出しをそのまま通してしまう。
