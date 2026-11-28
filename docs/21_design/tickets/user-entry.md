@@ -53,9 +53,14 @@ keywords: [ユーザ専用, user, 入口, 表, useronly, ccnavi-user, hook, 読�
 
 見るだけの形のうち、`user` に入れずそのまま通すのは次の 3 つ: `--agree --preview [--verify] [--json]`、`--prune --preview`、
 `--reviewed N --accept-unresolved --preview`（`ccnavi-review.sh decide <N> --preview` が内部で呼ぶ）。
-`user handoff` と `user mirror` は見るだけの形（`--yes` なし）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unlessPreview` を持たない）。
+`user handoff` と `user mirror` は見るだけの形（`--preview`）も `user` の入口の中に置き、外では断る（見るだけの形を通す `unlessPreview` を持たない）。
+`user handoff`・`user mirror` を `--yes` も `--preview` も付けずに打つと、ターミナルで計画を見せて y/N を聞き、y のときだけ、見せた計画の値で書く。
+`--yes --expect <値>` は y/N を省く形（ボードの経路。ターミナルでも、見せた値を渡せば使える）。`--preview` と `--yes` は同時に渡せず、`--json` は `--preview` か `--yes` と一緒に渡す。
+`user prune` も、ターミナルで動かすものを見せて y/N を聞く（`--preview` は見るだけ）。
 
-ユーザが打つ入口は sh にそろえる。ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分かれる。
+引数なしの `ccnavi user` は、入口の一覧（名前・1 行の説明・打つ例。`useronly.Listing`）を出して終わる。何も動かさない。
+ユーザが打つ入口は sh にそろえる。ユーザ専用の sh は `ccnavi-user-<操作>.sh` に分かれ、確認（y/N）・`--yes`・`--preview`・usage・終了コード・一部だけ通ったときの出力は
+[ユーザ専用 sh の作法](../../../.agents/docs/script-output.md)でそろえる。
 
 | 操作 | sh | 実行ファイルの操作 |
 |---|---|---|
@@ -123,7 +128,7 @@ hook は擬似ターミナルを作る実行役（`script`・`tmux`・`screen`�
 
 #### ターミナル要求の位置づけ
 
-実行ファイルは、`ccnavi-user-agree.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`・`ccnavi-user-prune.sh` と、書くとき（`--yes`）の `ccnavi-user-handoff.sh` と `ccnavi-user-mirror.sh` で、標準入力がターミナルのときだけ動く。
+実行ファイルは、`ccnavi-user-agree.sh`・`ccnavi-user-decide.sh`・`ccnavi-user-close-early.sh`・`ccnavi-user-prune.sh` と、書くとき（`--preview` の無い形）の `ccnavi-user-handoff.sh` と `ccnavi-user-mirror.sh` で、標準入力がターミナルのときだけ動く。
 ターミナルを求めるときに標準エラーへ出す名前は、ユーザが打つ sh の名前で、`verbs` の `terminal`（`useronly.Terminal`）が持つ。
 
 ターミナルを求めない経路（`--yes` の承認、チケット管理画面の指摘の対応方針、チケット管理画面からの handoff の取り込みとミラーの同期）では、hook の文字列検査が唯一の防御で、ターミナル要求は 2 つ目ではない。

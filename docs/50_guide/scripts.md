@@ -53,9 +53,12 @@ keywords: [スクリプト, sh, ccnavi-git.sh, ccnavi-ticket.sh, ccnavi-review.s
 | `ccnavi-user-decide.sh` | 残った指摘（未解決のスレッド）の対応方針を決めて置く | ユーザ |
 | `ccnavi-user-close-early.sh` | 残りがあるまま親を早めにクローズする判断を置く。残りを issue に書き出す | ユーザ |
 | `ccnavi-user-clean-branch.sh` | 親をクローズしたときに残した、子の手元のブランチを消す。条件は消す前に確かめ直す | ユーザ |
-| `ccnavi-user-handoff.sh` | 保護対象の下書き（`wip/handoff/`）を、本来の場所へ取り込む。引数なしは取り込み待ちを見せるだけ | ユーザ |
-| `ccnavi-user-mirror.sh` | 共通設定のミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしは見せるだけ | ユーザ |
-| `ccnavi-user-prune.sh` | 判定ログと state を整理する。`--preview` は動かすものを並べるだけ | ユーザ |
+| `ccnavi-user-handoff.sh` | 保護対象の下書き（`wip/handoff/`）を、本来の場所へ取り込む。引数なしは取り込み待ちを見せて y/N を聞く。`--preview` は見るだけ | ユーザ |
+| `ccnavi-user-mirror.sh` | 共通設定のミラーと工程スキル（`skills/`）のずれを見て、プロジェクトへ揃える。引数なしはずれを見せて y/N を聞く。`--preview` は見るだけ | ユーザ |
+| `ccnavi-user-prune.sh` | 判定ログと state を整理する。動かすものを見せて y/N を聞く。`--preview` は並べるだけ | ユーザ |
+
+`ccnavi user`（引数なし）は、この入口の名前・1 行の説明・打つ例を一覧で出す。どの sh も `-h` で使い方と例を出す。
+書く操作は実行ファイルが y/N を聞き、`--preview` は何も書かない。一部だけ通ったときは、`通ったもの:`・`残り:`・`次:`（打ち直す 1 行）を出して終了コード 1 で終わる。
 
 ## 直接は打たないファイル
 

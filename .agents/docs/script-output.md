@@ -1,9 +1,9 @@
 ---
 type: guide
 title: スクリプトの出力に次の一手を書く
-description: チケット作業を進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型
+description: チケット作業を進めるshと実行ファイルの出力で、次の一手を「次:」で始まる行に出す決まり。行頭の語の使い分け、書き方、出さない場面、テストの型、ユーザ専用 sh（ccnavi-user-*.sh）の作法
 tags: [sh-scripts, exe-boundary]
-keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チケット作業, ccnavi-start.sh, ticket new, printf, stdout]
+keywords: [出力, ユーザ専用, ccnavi-user, 確認, --yes, --preview, usage, 終了コード, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チケット作業, ccnavi-start.sh, ticket new, printf, stdout]
 ---
 
 # スクリプトの出力に次の一手を書く
@@ -100,3 +100,18 @@ keywords: [出力, 案内, 次:, 次の一手, 必須:, 案内:, 次の手:, チ
 - 行頭が `次: ` の行を数えて、1行であることを見る（`go/internal/clitest/sh/start/`）
 - 値が埋まっていることを見る。識別子・タイトル・`--issue`・`--mr` が、そのまま打てる形で並んでいる。移した出力のテストは、文面ファイルを引いた結果に対して書く
 - 出さない場面で出ていないことを見る（既存の検査で足りることが多い）
+
+## ユーザ専用 sh の作法
+
+人間がターミナルで打つ `.ccnavi/scripts/ccnavi-user-*.sh`（`ccnavi-user-lib-review.sh` は部品で、打たない）は、次の作法でそろえる。入口の表は `go/internal/tickets/model/useronly`（設計は `docs/21_design/tickets/user-entry.md`）。一覧は、引数なしの `ccnavi user` が名前・1 行の説明・打つ例で出す（`useronly.Listing`。sh を足したら `entries` に 1 行足す）。
+
+| 作法 | 決まり |
+|---|---|
+| 確認（y/N） | 書く操作は、ターミナルで打つと実行ファイルが内容を見せて y/N を聞く。sh は y/N を聞かない。対象は `agree`・`decide`・`close-early`・`prune`・`handoff`・`mirror`。`decide --resume` の続きの送信だけは、記録の要約を見せて sh が聞く |
+| `--yes` | y/N を省く形。ボードがターミナルを経ずに送る（`handoff`・`mirror` の `--yes --expect <値>`、`decide` の `--choices <JSON> --digest <値>`）。`--expect` は見せた内容の照合値で、合わなければ書かない。`agree`・`close-early`・`prune` の sh は `--yes` を受けない |
+| `--preview` | 何も書かずに内容だけ出す。持つのは、書く前に内容を言える `agree`・`decide`（`<N>` と一緒）・`handoff`・`mirror`・`prune`。持たないもの: `close-early`（y/N の前の一覧が見せる中身）、`push-approved`（承認の後始末で、y/N を聞かない）、`clean-branch`（y/N を聞かない。取り消した子だけ `--confirmed` で消してよいと言う）。`--preview` と `--yes` は同時に渡せない。`--json` は `--preview` か `--yes` と一緒に渡す（ボードが読む形） |
+| usage | `-h`・`--help`・単独の `help` で標準出力に出し、終了コード 0。1 行目は `使い方: sh .ccnavi/scripts/ccnavi-user-<名前>.sh <引数>`、最後の行は `例: sh .ccnavi/scripts/ccnavi-user-<名前>.sh …`（1 行）。知らない引数と引数の誤りは、usage を標準エラーに出して終了コード 2（実行ファイルを起こすだけの包みは、実行ファイルの断りが返る） |
+| 終了コード | 0 全部通った（見るだけの形も） / 1 通らなかった・一部だけ通った・y/N で n・前提の未充足 / 2 sh 自身が見つけた引数か環境の誤り（実行ファイルを起こすだけの包みでは、実行ファイルの使い方の誤りは 1） |
+| 一部だけ通ったとき | 通ったものを戻さず、終了コード 1 で、標準出力に `通ったもの:`・`残り:`・`次:`（打ち直す 1 行。そのまま打てる形）をこの順に出す。`agree`（承認の一部・push 未了）、`decide`（置いたあとの投稿が未了）、`close-early`・`push-approved`（push 未了）、`mirror`（一部のプロジェクトだけ揃った）が出す |
+
+ユーザが打つ入口の sh と、その実行ファイル側（`ccnavi user <操作>`）は、この表に合わせて直す。作法を変えるときは、`user_scripts_sh_test.go` の検査（usage の形・例の 1 行・一覧の一致）を同じ変更で直す。

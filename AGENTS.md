@@ -45,7 +45,7 @@ ccnavi の使い方（`.ccnavi/docs/`）は `.ccnavi/CCNAVI.md` の表に記載�
 | 操作を止める条件（ゲート）を足す・直す、承認・レビューを頼む操作の拒否条件を決める、名前・オプション・形式を変える（後方互換を残さない） | `.agents/docs/gate-conditions.md` |
 | エージェントに渡す次の一手を、どの契機・担当に置くか選ぶ（`status`・`Guidance`・Stop の促し・ルールの文脈など） | `.agents/docs/next-step-placement.md` |
 | sh・Go・TS でログを書く、logger を直す | `.agents/docs/logging.md` |
-| sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、チケット作業を進める出力を新しく書く | `.agents/docs/script-output.md` |
+| sh や実行ファイルの出力に案内（`次:`・`案内:`・`必須:`）を足す・直す、チケット作業を進める出力を新しく書く、ユーザが打つ `ccnavi-user-*.sh` を足す・直す（確認・`--yes`・`--preview`・usage・終了コード・一部だけ通ったときの出力） | `.agents/docs/script-output.md` |
 | テスト（Go）を回す（特に全件）、回す範囲を決める | `.agents/docs/testing.md` |
 | GitLab の模擬（`go/internal/harness/fakegitlab`）の応答を変える、契約テスト（`tests/contract/`）・録画した応答の形（`recorded*.json`）を足す・直す | `.agents/docs/gitlab-contract.md` |
 | 受入シナリオ（`tests/scenarios/`）を書く、`claude -p` で振る舞いを回す（明確な指示があったときだけ） | `.agents/docs/acceptance-scenarios.md` |
