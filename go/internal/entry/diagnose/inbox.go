@@ -7,7 +7,7 @@ import (
 	"ccnavi/internal/tickets/sync/handoff"
 )
 
-// inboxRecord はユーザ待ちの分類（ボードの inbox）。形は docs/11_requirements/json-shapes.md「ボードの JSON」。
+// inboxRecord はユーザ待ちの分類（チケット管理画面の inbox）。形は docs/11_requirements/json-shapes.md「ボードの JSON」。
 // チケットは上から最初に当てはまる 1 種類だけに入る: approval（承認待ち）→ review（レビュー待ちのフェーズ）→
 // notice（attention のうち上の 2 つに入らないもの）→ flow_draft（attention ではなく、フローの下書きが「提案あり」）。
 // handoff はチケットではなくツリーごとの取り込み待ちの数。拡張は数を並べるだけにする（分類を 2 か所に持たない）。

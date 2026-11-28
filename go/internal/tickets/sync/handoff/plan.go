@@ -164,7 +164,7 @@ func (p *Plan) Selected() []*Entry {
 }
 
 // Waiting は取り込める下書きの数。状態が new か changed のもの（error があれば rejected なので入らない）。
-// ターミナルでだけ取り込めるもの（ボードの経路の外）も数える。全体の誤りがあれば 0。
+// ターミナルでだけ取り込めるもの（チケット管理画面の経路の外）も数える。全体の誤りがあれば 0。
 func (p *Plan) Waiting() int {
 	if p.Error != "" {
 		return 0

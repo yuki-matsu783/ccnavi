@@ -135,7 +135,7 @@ func FixedNumbers(conf *config.Settings, root, parentID string) map[int]bool {
 	return FixedIn(approval.ReadRaw(conf, root).Everything(), parentID)
 }
 
-// FixedIn は FixedNumbers の、読んだ承認済みチケット（settled）から数える形。置き場を読み終えた呼び手（ボード）が使う。
+// FixedIn は FixedNumbers の、読んだ承認済みチケット（settled）から数える形。置き場を読み終えた呼び手（チケット管理画面）が使う。
 func FixedIn(settled []*ticket.Ticket, parentID string) map[int]bool {
 	out := map[int]bool{}
 	for _, t := range settled {

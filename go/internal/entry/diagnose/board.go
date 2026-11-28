@@ -578,7 +578,7 @@ func needValue(n ticket.Need) any {
 	return nil
 }
 
-// flowObject はボードのフローの欄。draft はエージェントの下書き（効力は無い）で、differs はそれを「提案あり」として
+// flowObject はチケット管理画面のフローの欄。draft はエージェントの下書き（効力は無い）で、differs はそれを「提案あり」として
 // 見せるか（flow.DraftDiffers）。locked は判定がそのフローへの書き込みを止めているか、lock_kind はその種類（止めていなければ null）。
 func flowObject(info *flow.Info, differs bool) any {
 	if info == nil {

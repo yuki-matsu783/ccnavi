@@ -453,7 +453,7 @@ func PreviewPlans(conf *config.Settings, root string, parents []Parent, proposal
 	return out
 }
 
-// ApprovedPlans は承認済みの親の計画の流れ（図の中身。ボードの parents[].plans）。承認待ちの提案の図と同じ plans で組む。
+// ApprovedPlans は承認済みの親の計画の流れ（図の中身。チケット管理画面の parents[].plans）。承認待ちの提案の図と同じ plans で組む。
 // 子が承認された番号（settled から数える）は固定した番号として印を付ける。提案ではないので、改版の前の姿（current）は
 // 持たず、source_sha は空。計画を持たなければ空。
 func ApprovedPlans(parent *ticket.Ticket, settled []*ticket.Ticket) []any {
