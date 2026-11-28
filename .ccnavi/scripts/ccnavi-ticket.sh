@@ -113,7 +113,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
   ccnavi-user-decide.sh、Chrome 拡張のレビュー済み）。
 
   提案の plan に書くフェーズ定義は、共通の .ccnavi/config/common/phases.yml と、親の project: が
-  指す config の phases.yml の和から選ぶ（自身のレイヤーは .ccnavi/config/project/phases.yml、
+  指す config の phases.yml を足した統合結果から選ぶ（ワークスペースの設定は .ccnavi/config/project/phases.yml、
   プロジェクトは projects/<名前>/.ccnavi/config/project/phases.yml）。plan のステップには after: [番号] で先に済んでいる
   べきステップを書き（自分より小さい番号だけ）、最後のステップにほかの全部が先行するようにする。
   feedback: のステップも同じで、after はフィードバック計画の番号だけを指す。独立した作業は

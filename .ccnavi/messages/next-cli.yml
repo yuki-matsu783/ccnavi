@@ -397,7 +397,7 @@ messages:
     kind: note
     values: [tmp]
     note: |-
-      取り込み結果は一時ワークツリーで検証できる: cd {tmp:path} && <テストやビルド>。ここは編集しない。プロジェクトのレイヤーのルールが通常どおりヒットする場所ではない
+      取り込み結果は一時ワークツリーで検証できる: cd {tmp:path} && <テストやビルド>。ここは編集しない。プロジェクトの設定のルールが通常どおりヒットする場所ではない
 
   NOTE_GIT_INTEGRATE_IGNORED_OVERLAP:
     kind: note

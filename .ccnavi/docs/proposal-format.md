@@ -95,7 +95,7 @@ ask:                       # 無くてよい。allow か ask のどちらかが 
 
 新しい親と子の提案の本文には、`ticket-sections.yml` が求める `## <見出し>` を書く。欠けると承認と `--lint` が warn で名指しし、Stop の判定も同じ見出しを求める。
 
-- 置き場は共通の `.ccnavi/config/common/ticket-sections.yml` と、親の `project:` が指すレイヤーの `.ccnavi/config/project/ticket-sections.yml`。レイヤーに `parent`（`child`）があれば、その種類はレイヤーの並びに置き換わる
+- 置き場は共通の `.ccnavi/config/common/ticket-sections.yml` と、親の `project:` が指すプロジェクトの設定の `.ccnavi/config/project/ticket-sections.yml`。そこに `parent`（`child`）があれば、その種類はそちらの並びに置き換わる
 - 既定の見出しは配布する共通の `ticket-sections.yml` に書いてある。親が `目的`・`範囲`・`対象外`・`完了の確かめ方`・`計画の理由`、子が `担当範囲`・`親の要求との対応`・`確認の手順`
 - 見出しの名前は大文字小文字を区別せずに探す。コードフェンスの中の見出しは数えない
 - ユーザの設定で、エージェントは書き換えない。見出しを変えたいときはユーザに頼む

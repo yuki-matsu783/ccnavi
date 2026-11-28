@@ -30,7 +30,7 @@ keywords: [CCNAVI.md, 非対話, non_interactive, ccnavi:if, ccnavi:else, ccnavi
 
 | 条件の名前 | 成り立つとき |
 |---|---|
-| `workspace_root` | ワークスペースのルール（共通レイヤーか自身のレイヤー）の`deny`にid `workspace-root`がある |
+| `workspace_root` | ワークスペースのルール（共通設定かワークスペースの設定）の`deny`にid `workspace-root`がある |
 | `git_wrapper` | ワークスペースに git の入口（`.ccnavi/scripts/ccnavi-git.sh`）がある。生の git は組み込みでいつも止まるので、git の行は、これが偽のときは入口を名指しせず「ユーザに頼む」形になる |
 | `projects` | プロジェクトの置き場に`.git`を持つプロジェクトがある |
 | `tickets` | チケット制御を使っている（`CCNAVI_TICKET_CONTROL`が`disable`でない） |
@@ -39,7 +39,7 @@ keywords: [CCNAVI.md, 非対話, non_interactive, ccnavi:if, ccnavi:else, ccnavi
 | `non_interactive` | 環境変数`CLAUDE_CODE_SESSION_ATTENDED`が`0`（付き添いなし。`claude -p`など）。未設定・`1`・その他の値は成り立たない。この変数はClaude Codeの文書に無い |
 
 ワークツリーとgitの行は、それを支えるdenyがあるときだけ出す。ルールが無いワークスペースで出すと、文と判定が食い違う。
-共通レイヤーが読めずに組み込みの既定に戻ったときも出ない（既定にはこの2つのidが無い）。
+共通設定が読めずに組み込みの既定に戻ったときも出ない（既定にはこの2つのidが無い）。
 
 ## 条件を足す（配布先）
 

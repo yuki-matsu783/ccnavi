@@ -2,7 +2,7 @@
 name: ccnavi-config
 distribute: true
 description: >-
-  ccnavi の設定 4 本（rules.yml・phases.yml・risks.yml・ticket-sections.yml。.ccnavi/config/common/ と config/project/ の和）を書く・足す・直す・
+  ccnavi の設定 4 本（rules.yml・phases.yml・risks.yml・ticket-sections.yml。.ccnavi/config/common/ に config/project/ を足した統合結果）を書く・足す・直す・
   確かめる。ルールを足したい、フェーズ定義やリスクの配点や提案の見出しを変えたい、書いた設定が
   意図どおりに効いているか疑わしい、`/ccnavi-config` と打たれた、のどれでも使う。
   足すときは下書きを検証してからユーザに渡し、確かめるときは lint と期待する判定を回して
@@ -13,36 +13,36 @@ description: >-
 
 ccnavi の判定と進め方は 4 本のファイルで決まる。どれもユーザが持つ設定。
 
-| ファイル | 決めるもの | どのレイヤーにも無いとき |
+| ファイル | 決めるもの | どの設定にも無いとき |
 |---|---|---|
 | `rules.yml` | 何を止め、何を聞き、何を通すか（`deny` / `ask` / `allow`） | 組み込みの既定だけで判定する（無いのは正常で、`--lint` も言わない） |
-| `phases.yml` | フェーズ定義（共通レイヤーと config の和）。親の `plan:` に並べる名前と、その範囲・レビュー・成果物。順序は持たない（親の計画のステップの `after` で書く） | 計画の無い親だけが利用できる（番号だけのフェーズ）。計画を持つ親は承認できない |
+| `phases.yml` | フェーズ定義（共通設定に config を足した統合結果）。親の `plan:` に並べる名前と、その範囲・レビュー・成果物。順序は持たない（親の計画のステップの `after` で書く） | 計画の無い親だけが利用できる（番号だけのフェーズ）。計画を持つ親は承認できない |
 | `risks.yml` | 子を閉じるときに差分を数える配点。HIGH 以上はレビューが済むまで止まる | 組み込みの配点（big-diff・many-files・ci・deletes） |
-| `ticket-sections.yml` | 親（`parent`）と子（`child`）の提案の本文に求める `## ` の見出しと、親の雛形が見出しの下に置く空欄の目印（`todo`）。Stop の判定（R2）も共通レイヤーの見出しを求める | その種類の見出しを見ない（雛形にも見出しを置かない） |
+| `ticket-sections.yml` | 親（`parent`）と子（`child`）の提案の本文に求める `## ` の見出しと、親の雛形が見出しの下に置く空欄の目印（`todo`）。Stop の判定（R2）も共通設定の見出しを求める | その種類の見出しを見ない（雛形にも見出しを置かない） |
 
-置けるレイヤーは 3 つ（共通 `.ccnavi/config/common/`、自身と各プロジェクトの `.ccnavi/config/project/`）で、置き場は固定。判定には、共通レイヤーにその操作に関わるレイヤーを足したものを使い、足すだけで上書きも取り消しもしない。
+設定を置けるのは 3 か所（共通 `.ccnavi/config/common/`、ワークスペースと各プロジェクトの `.ccnavi/config/project/`）で、置き場は固定。判定には、共通設定にその操作に関わる設定を足したものを使い、足すだけで上書きも取り消しもしない。
 
-| レイヤー | 置き場 | 何を置くか |
+| 設定 | 置き場 | 何を置くか |
 |---|---|---|
-| 共通 | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml` | どのツリーにも適用するもの |
-| ワークスペース自身 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペース自身のツリーにだけ適用するもの |
-| プロジェクト | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
+| 共通設定 | `.ccnavi/config/common/{rules,phases,risks,ticket-sections}.yml` | どのツリーにも適用するもの |
+| ワークスペースの設定 | `<ワークスペースルート>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | ワークスペースのツリーにだけ適用するもの |
+| プロジェクトの設定 | `projects/<名前>/.ccnavi/config/project/{rules,phases,risks,ticket-sections}.yml` | そのプロジェクトのツリーにだけ適用するもの |
 
-同じ `id` のルールは足すだけで、上書きも取り消しもしない。厳しいほうが採られる。共通レイヤーは、着手済みの親のワークツリーのプロジェクトへミラーされる（`.ccnavi/docs/projects.md`）。
+同じ `id` のルールは足すだけで、上書きも取り消しもしない。厳しいほうが採られる。共通設定は、着手済みの親のワークツリーのプロジェクトへミラーされる（`.ccnavi/docs/projects.md`）。
 どのプロジェクトでも同じ構成（`src/*`・`tests/*` など）を前提にできる `phases.yml` の定義は共通に、`scope` がレイアウトに依存する定義は config に置く。
 `phases.yml` を読むのは提案の承認の検査と `--plan-order <親> --fill-phases`（コピーを差し込む）と `--lint` だけで、承認のあとの判定は
 親チケットにコピーした定義（`phases:`）を読む。直しても進行中の親には届かない。
 
-- `risks.yml`・`phases.yml`・`ticket-sections.yml` が足すレイヤーは、親チケットの `project:` が指すレイヤー（空なら自身のレイヤー）
+- `risks.yml`・`phases.yml`・`ticket-sections.yml` が共通設定に足す設定は、親チケットの `project:` が指すプロジェクトの設定（空ならワークスペースの設定）
 
 ファイルが無いのは「設定が無い」正常で、空として扱い、`fallback` にも診断にも出ない。壊れているときだけ `--lint` が error で言う。
-組み込みの deny は、共通レイヤーと config の有無・状態によらず常に有効。
+組み込みの deny は、共通設定と config の有無・状態によらず常に有効。
 
-- 共通レイヤーの `rules.yml`: 無ければ空として、config のレイヤーを組み込みの deny の上に足す。壊れていれば、組み込みの既定だけで判定し、他のレイヤーは足さない
+- 共通設定の `rules.yml`: 無ければ空として、config のルールを組み込みの deny の上に足す。壊れていれば、組み込みの既定だけで判定し、他の設定は足さない
 - `phases.yml`: 共通と config のどちらか片方が無ければ、在る側の定義だけを使う。壊れたファイルは空として扱う。使う定義が無ければ、計画を持つ親の提案は承認できない（承認済みの親はコピーで判定し続け、`--lint` が warn で言う）
-- 共通レイヤーの `risks.yml`: 無ければ空として、他のレイヤーの項目だけを数える（組み込みの配点は共通も config も無いときだけ）。壊れていれば組み込みの配点だけで、他のレイヤーは足さない
-- 他のレイヤーの `rules.yml` と `risks.yml`: 無ければ空。壊れていれば空として扱い、そのレイヤーの分だけが抜ける
-- `ticket-sections.yml`: 足さずに置き換える。レイヤーに `parent`（`child`）があれば、その種類は共通の並びの代わりにレイヤーの並びを使う。壊れたファイルは使わない（レイヤーの側が壊れていれば共通の並びを使う）
+- 共通設定の `risks.yml`: 無ければ空として、他の設定の項目だけを数える（組み込みの配点は共通も config も無いときだけ）。壊れていれば組み込みの配点だけで、他の設定は足さない
+- 共通設定以外の `rules.yml` と `risks.yml`: 無ければ空。壊れていれば空として扱い、その設定の分だけが抜ける
+- `ticket-sections.yml`: 足さずに置き換える。config 側に `parent`（`child`）があれば、その種類は共通の並びの代わりに config 側の並びを使う。壊れたファイルは使わない（config 側が壊れていれば共通の並びを使う）
 
 | 言われたこと | 読むもの |
 |---|---|
